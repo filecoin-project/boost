@@ -1,0 +1,8 @@
+/boost
+extern/filecoin-ffi/rust/target
+**/*.a
+**/*.pc
+/**/*/.DS_STORE
+.DS_STORE
+build/.*
+.idea
