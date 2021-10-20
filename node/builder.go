@@ -241,8 +241,6 @@ func ConfigCommon(cfg *config.Common) Option {
 			cfg.Libp2p.AnnounceAddresses,
 			cfg.Libp2p.NoAnnounceAddresses)),
 		If(!cfg.Libp2p.DisableNatPortMap, Override(NatPortMapKey, lp2p.NatPortMap)),
-		//Override(new(*pubsub.PubSub), lp2p.GossipSub),
-		//Override(new(*config.Pubsub), &cfg.Pubsub),
 	)
 }
 
