@@ -17,16 +17,12 @@ import (
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/node/modules/helpers"
 	"github.com/filecoin-project/boost/node/modules/lp2p"
-	"github.com/filecoin-project/boost/node/modules/testing"
 	"github.com/filecoin-project/boost/node/repo"
-	"github.com/filecoin-project/lotus/chain/beacon"
 	"github.com/filecoin-project/lotus/chain/types"
 	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
 	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
-	"github.com/filecoin-project/lotus/lib/peermgr"
 	_ "github.com/filecoin-project/lotus/lib/sigs/bls"
 	_ "github.com/filecoin-project/lotus/lib/sigs/secp"
-	"github.com/filecoin-project/lotus/markets/storageadapter"
 	"github.com/filecoin-project/lotus/system"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipfs/go-metrics-interface"
@@ -137,8 +133,6 @@ type Settings struct {
 	Base   bool // Base option applied
 	Config bool // Config option applied
 	Lite   bool // Start node in "lite" mode
-
-	enableLibp2pNode bool
 }
 
 // Basic lotus-app services
@@ -202,25 +196,19 @@ var LibP2P = Options(
 	Override(ConnGaterKey, lp2p.ConnGaterOption),
 )
 
-func IsType(t repo.RepoType) func(s *Settings) bool {
-	return func(s *Settings) bool { return s.nodeType == t }
-}
-
 func Base() Option {
 	return Options(
 		func(s *Settings) error { s.Base = true; return nil }, // mark Base as applied
 		ApplyIf(func(s *Settings) bool { return s.Config },
 			Error(errors.New("the Base() option must be set before Config option")),
 		),
-		ApplyIf(func(s *Settings) bool { return s.enableLibp2pNode },
-			LibP2P,
-		),
+		LibP2P,
 		BoostNode,
 	)
 }
 
 // Config sets up constructors based on the provided Config
-func ConfigCommon(cfg *config.Common, enableLibp2pNode bool) Option {
+func ConfigCommon(cfg *config.Common) Option {
 	return Options(
 		func(s *Settings) error { s.Config = true; return nil },
 		Override(new(dtypes.APIEndpoint), func() (dtypes.APIEndpoint, error) {
@@ -237,33 +225,26 @@ func ConfigCommon(cfg *config.Common, enableLibp2pNode bool) Option {
 			return urls, nil
 		}),
 		ApplyIf(func(s *Settings) bool { return s.Base }), // apply only if Base has already been applied
-		If(!enableLibp2pNode,
-			Override(new(api.Net), new(api.NetStub)),
-			Override(new(api.Common), From(new(common.CommonAPI))),
-		),
-		If(enableLibp2pNode,
-			//Override(new(api.Net), new(api.NetStub)),
-			Override(new(api.Net), From(new(net.NetAPI))),
-			Override(new(api.Common), From(new(common.CommonAPI))),
-			Override(StartListeningKey, lp2p.StartListening(cfg.Libp2p.ListenAddresses)),
-			//Override(ConnectionManagerKey, lp2p.ConnectionManager(
-			//cfg.Libp2p.ConnMgrLow,
-			//cfg.Libp2p.ConnMgrHigh,
-			//time.Duration(cfg.Libp2p.ConnMgrGrace),
-			//cfg.Libp2p.ProtectedPeers)),
-			//Override(new(*pubsub.PubSub), lp2p.GossipSub),
-			//Override(new(*config.Pubsub), &cfg.Pubsub),
+		Override(new(api.Net), From(new(net.NetAPI))),
+		Override(new(api.Common), From(new(common.CommonAPI))),
+		Override(StartListeningKey, lp2p.StartListening(cfg.Libp2p.ListenAddresses)),
+		//Override(ConnectionManagerKey, lp2p.ConnectionManager(
+		//cfg.Libp2p.ConnMgrLow,
+		//cfg.Libp2p.ConnMgrHigh,
+		//time.Duration(cfg.Libp2p.ConnMgrGrace),
+		//cfg.Libp2p.ProtectedPeers)),
+		//Override(new(*pubsub.PubSub), lp2p.GossipSub),
+		//Override(new(*config.Pubsub), &cfg.Pubsub),
 
-			//ApplyIf(func(s *Settings) bool { return len(cfg.Libp2p.BootstrapPeers) > 0 },
-			//Override(new(dtypes.BootstrapPeers), modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)),
-			//),
+		//ApplyIf(func(s *Settings) bool { return len(cfg.Libp2p.BootstrapPeers) > 0 },
+		//Override(new(dtypes.BootstrapPeers), modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)),
+		//),
 
-			//Override(AddrsFactoryKey, lp2p.AddrsFactory(
-			//cfg.Libp2p.AnnounceAddresses,
-			//cfg.Libp2p.NoAnnounceAddresses)),
+		//Override(AddrsFactoryKey, lp2p.AddrsFactory(
+		//cfg.Libp2p.AnnounceAddresses,
+		//cfg.Libp2p.NoAnnounceAddresses)),
 
-			//If(!cfg.Libp2p.DisableNatPortMap, Override(NatPortMapKey, lp2p.NatPortMap)),
-		),
+		//If(!cfg.Libp2p.DisableNatPortMap, Override(NatPortMapKey, lp2p.NatPortMap)),
 		Override(new(dtypes.MetadataDS), modules.Datastore(cfg.Backup.DisableMetadataLog)),
 	)
 }
@@ -339,40 +320,6 @@ func New(ctx context.Context, opts ...Option) (StopFunc, error) {
 	return app.Stop, nil
 }
 
-// In-memory / testing
-
-func Test() Option {
-	return Options(
-		Unset(RunPeerMgrKey),
-		Unset(new(*peermgr.PeerMgr)),
-		Override(new(beacon.Schedule), testing.RandomBeacon),
-		Override(new(*storageadapter.DealPublisher), storageadapter.NewDealPublisher(nil, storageadapter.PublishMsgConfig{})),
-	)
-}
-
-// For 3rd party dep injection.
-
-func WithRepoType(repoType repo.RepoType) func(s *Settings) error {
-	return func(s *Settings) error {
-		s.nodeType = repoType
-		return nil
-	}
-}
-
-func WithEnableLibp2pNode(enable bool) func(s *Settings) error {
-	return func(s *Settings) error {
-		s.enableLibp2pNode = enable
-		return nil
-	}
-}
-
-func WithInvokesKey(i invoke, resApi interface{}) func(s *Settings) error {
-	return func(s *Settings) error {
-		s.invokes[i] = fx.Populate(resApi)
-		return nil
-	}
-}
-
 var BoostNode = Options(
 	Override(new(sectorstorage.StorageAuth), modules.StorageAuth),
 
@@ -403,7 +350,7 @@ func ConfigBoost(c interface{}) Option {
 	}
 
 	return Options(
-		ConfigCommon(&cfg.Common, true),
+		ConfigCommon(&cfg.Common),
 
 		Override(CheckFDLimit, modules.CheckFdLimit(build.BoostFDLimit)), // recommend at least 100k FD limit to miners
 
@@ -421,7 +368,6 @@ func Boost(out *api.Boost) Option {
 
 		func(s *Settings) error {
 			s.nodeType = repo.Boost
-			s.enableLibp2pNode = true
 			return nil
 		},
 

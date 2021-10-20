@@ -49,14 +49,9 @@ func (a *CommonAPI) AuthNew(ctx context.Context, perms []auth.Permission) ([]byt
 }
 
 func (a *CommonAPI) Version(context.Context) (api.APIVersion, error) {
-	v, err := api.VersionForType(api.RunningNodeType)
-	if err != nil {
-		return api.APIVersion{}, err
-	}
-
 	return api.APIVersion{
 		Version:    build.UserVersion(),
-		APIVersion: v,
+		APIVersion: api.BoostAPIVersion0,
 	}, nil
 }
 

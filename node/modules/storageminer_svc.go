@@ -8,19 +8,21 @@ import (
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/api/client"
+	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/node/modules/helpers"
+
+	lapi "github.com/filecoin-project/lotus/api"
+	lclient "github.com/filecoin-project/lotus/api/client"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
-	"github.com/filecoin-project/lotus/node/modules/helpers"
 )
 
-type MinerSealingService api.StorageMiner
-type MinerStorageService api.StorageMiner
+type MinerSealingService lapi.StorageMiner
+type MinerStorageService lapi.StorageMiner
 
 var _ sectorblocks.SectorBuilder = *new(MinerSealingService)
 
-func connectMinerService(apiInfo string) func(mctx helpers.MetricsCtx, lc fx.Lifecycle) (api.StorageMiner, error) {
-	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle) (api.StorageMiner, error) {
+func connectMinerService(apiInfo string) func(mctx helpers.MetricsCtx, lc fx.Lifecycle) (lapi.StorageMiner, error) {
+	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle) (lapi.StorageMiner, error) {
 		ctx := helpers.LifecycleCtx(mctx, lc)
 		info := cliutil.ParseApiInfo(apiInfo)
 		addr, err := info.DialArgs("v0")
@@ -30,7 +32,7 @@ func connectMinerService(apiInfo string) func(mctx helpers.MetricsCtx, lc fx.Lif
 
 		log.Infof("Checking (svc) api version of %s", addr)
 
-		mapi, closer, err := client.NewStorageMinerRPCV0(ctx, addr, info.AuthHeader())
+		mapi, closer, err := lclient.NewStorageMinerRPCV0(ctx, addr, info.AuthHeader())
 		if err != nil {
 			return nil, err
 		}
@@ -41,7 +43,7 @@ func connectMinerService(apiInfo string) func(mctx helpers.MetricsCtx, lc fx.Lif
 					return xerrors.Errorf("checking version: %w", err)
 				}
 
-				if !v.APIVersion.EqMajorMinor(api.MinerAPIVersion0) {
+				if !v.APIVersion.EqMajorMinor(lapi.MinerAPIVersion0) {
 					return xerrors.Errorf("remote service API version didn't match (expected %s, remote %s)", api.MinerAPIVersion0, v.APIVersion)
 				}
 
