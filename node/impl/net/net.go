@@ -28,7 +28,6 @@ type NetAPI struct {
 	Router    lp2p.BaseIpfsRouting
 	ConnGater *conngater.BasicConnectionGater
 	Reporter  metrics.Reporter
-	//Sk        *dtypes.ScoreKeeper
 }
 
 func (a *NetAPI) ID(context.Context) (peer.ID, error) {

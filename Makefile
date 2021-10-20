@@ -64,9 +64,6 @@ CLEAN+=build/.update-modules
 deps: $(BUILD_DEPS)
 .PHONY: deps
 
-build-devnets: build lotus-seed lotus-shed lotus-wallet lotus-gateway
-.PHONY: build-devnets
-
 boost: $(BUILD_DEPS)
 	rm -f boost
 	$(GOCC) build $(GOFLAGS) -o boost ./cmd/boost
