@@ -3,10 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node"
-	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/node/repo"
 
@@ -20,8 +18,9 @@ import (
 )
 
 var runCmd = &cli.Command{
-	Name:  "run",
-	Usage: "Start a boost process",
+	Name:   "run",
+	Usage:  "Start a boost process",
+	Before: before,
 	Action: func(cctx *cli.Context) error {
 		fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx)
 		if err != nil {
@@ -56,35 +55,9 @@ var runCmd = &cli.Command{
 			return err
 		}
 
-		ok, err := r.Exists()
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return xerrors.Errorf("repo at '%s' is not initialized, run 'boost init' to set it up", boostRepoPath)
-		}
-
-		lr, err := r.Lock(repo.Boost)
-		if err != nil {
-			return err
-		}
-		c, err := lr.Config()
-		if err != nil {
-			return err
-		}
-		cfg, ok := c.(*config.Boost)
-		if !ok {
-			return xerrors.Errorf("invalid config for repo, got: %T", c)
-		}
-
-		spew.Dump(cfg)
-
-		err = lr.Close()
-		if err != nil {
-			return err
-		}
-
 		shutdownChan := make(chan struct{})
+
+		log.Debug("Instantiating new boost node")
 
 		var boostApi api.Boost
 		stop, err := node.New(ctx,
@@ -98,30 +71,34 @@ var runCmd = &cli.Command{
 			return xerrors.Errorf("creating node: %w", err)
 		}
 
+		log.Debug("Getting API endpoint of boost node")
+
 		endpoint, err := r.APIEndpoint()
 		if err != nil {
 			return xerrors.Errorf("getting API endpoint: %w", err)
 		}
 
-		log.Warnf("Enabling bootstrapping of libp2p network with full node...")
+		log.Debug("Bootstrapping libp2p network with full node")
 
 		// Bootstrap with full node
-		//remoteAddrs, err := fullnodeApi.NetAddrsListen(ctx)
-		//if err != nil {
-		//return xerrors.Errorf("getting full node libp2p address: %w", err)
-		//}
+		remoteAddrs, err := fullnodeApi.NetAddrsListen(ctx)
+		if err != nil {
+			return xerrors.Errorf("getting full node libp2p address: %w", err)
+		}
 
-		//if err := boostApi.NetConnect(ctx, remoteAddrs); err != nil {
-		//return xerrors.Errorf("connecting to full node (libp2p): %w", err)
-		//}
+		if err := boostApi.NetConnect(ctx, remoteAddrs); err != nil {
+			return xerrors.Errorf("connecting to full node (libp2p): %w", err)
+		}
 
-		log.Infow("Remote full node version", "version", v)
+		log.Debugw("Remote full node version", "version", v)
 
-		// Instantiate the boost service handler.
+		// Instantiate the boost service JSON RPC handler.
 		handler, err := node.BoostHandler(boostApi, true)
 		if err != nil {
 			return xerrors.Errorf("failed to instantiate rpc handler: %w", err)
 		}
+
+		log.Debugw("Boost JSON RPC server is listening", "endpoint", endpoint)
 
 		// Serve the RPC.
 		rpcStopper, err := node.ServeRPC(handler, "boost", endpoint)

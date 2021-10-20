@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/impl"
 	"github.com/filecoin-project/boost/node/impl/common"
+	"github.com/filecoin-project/boost/node/impl/net"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/node/modules/helpers"
@@ -170,7 +171,7 @@ var LibP2P = Options(
 	// Host dependencies
 	Override(new(peerstore.Peerstore), pstoremem.NewPeerstore),
 	Override(PstoreAddSelfKeysKey, lp2p.PstoreAddSelfKeys),
-	//Override(StartListeningKey, lp2p.StartListening(config.DefaultFullNode().Libp2p.ListenAddresses)),
+	Override(StartListeningKey, lp2p.StartListening([]string{"/ip4/127.0.0.1/tcp/1899"})),
 
 	// Host settings
 	Override(DefaultTransportsKey, lp2p.DefaultTransports),
@@ -211,10 +212,9 @@ func Base() Option {
 		ApplyIf(func(s *Settings) bool { return s.Config },
 			Error(errors.New("the Base() option must be set before Config option")),
 		),
-		//TODO: enable libp2p node
-		//ApplyIf(func(s *Settings) bool { return s.enableLibp2pNode },
-		//LibP2P,
-		//),
+		ApplyIf(func(s *Settings) bool { return s.enableLibp2pNode },
+			LibP2P,
+		),
 		BoostNode,
 	)
 }
@@ -242,10 +242,10 @@ func ConfigCommon(cfg *config.Common, enableLibp2pNode bool) Option {
 			Override(new(api.Common), From(new(common.CommonAPI))),
 		),
 		If(enableLibp2pNode,
-			Override(new(api.Net), new(api.NetStub)),
-			//Override(new(api.Net), From(new(net.NetAPI))),
+			//Override(new(api.Net), new(api.NetStub)),
+			Override(new(api.Net), From(new(net.NetAPI))),
 			Override(new(api.Common), From(new(common.CommonAPI))),
-			//Override(StartListeningKey, lp2p.StartListening(cfg.Libp2p.ListenAddresses)),
+			Override(StartListeningKey, lp2p.StartListening(cfg.Libp2p.ListenAddresses)),
 			//Override(ConnectionManagerKey, lp2p.ConnectionManager(
 			//cfg.Libp2p.ConnMgrLow,
 			//cfg.Libp2p.ConnMgrHigh,

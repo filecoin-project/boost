@@ -9,7 +9,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	manet "github.com/multiformats/go-multiaddr/net"
 
-	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/boost/api"
 )
 
 var cLog = logging.Logger("conngater")

@@ -3,29 +3,21 @@ package main
 import (
 	"context"
 
-	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/boost/node/repo"
 
-	cliutil "github.com/filecoin-project/boost/cli/util"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
 	lcli "github.com/filecoin-project/lotus/cli"
 )
 
 var initCmd = &cli.Command{
-	Name:  "init",
-	Usage: "Initialize a lotus miner repo",
-	Flags: []cli.Flag{},
-	Before: func(cctx *cli.Context) error {
-		if cliutil.IsVeryVerbose {
-			_ = logging.SetLogLevel("boost", "DEBUG")
-		}
-
-		return nil
-	},
+	Name:   "init",
+	Usage:  "Initialize a lotus miner repo",
+	Flags:  []cli.Flag{},
+	Before: before,
 	Action: func(cctx *cli.Context) error {
 		log.Info("Initializing boost repo")
 
@@ -49,9 +41,9 @@ var initCmd = &cli.Command{
 			return xerrors.Errorf("sync wait: %w", err)
 		}
 
-		log.Debug("Checking if repo exists")
-
 		repoPath := cctx.String(FlagBoostRepo)
+		log.Debugw("Checking if repo exists", "path", repoPath)
+
 		r, err := repo.NewFS(repoPath)
 		if err != nil {
 			return err

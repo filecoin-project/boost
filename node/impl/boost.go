@@ -10,6 +10,7 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	lapi "github.com/filecoin-project/lotus/api"
 )
 
 type BoostAPI struct {
@@ -18,7 +19,7 @@ type BoostAPI struct {
 	api.Common
 	api.Net
 
-	//Full        api.FullNode
+	Full lapi.FullNode
 	//LocalStore  *stores.Local
 	//RemoteStore *stores.Remote
 

@@ -45,3 +45,11 @@ func main() {
 		log.Fatal(err)
 	}
 }
+
+func before(cctx *cli.Context) error {
+	if cliutil.IsVeryVerbose {
+		_ = logging.SetLogLevel("boost", "DEBUG")
+	}
+
+	return nil
+}

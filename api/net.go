@@ -29,10 +29,10 @@ type Net interface {
 	NetAddrsListen(context.Context) (peer.AddrInfo, error)                    //perm:read
 	NetDisconnect(context.Context, peer.ID) error                             //perm:write
 	NetFindPeer(context.Context, peer.ID) (peer.AddrInfo, error)              //perm:read
-	NetPubsubScores(context.Context) ([]PubsubScore, error)                   //perm:read
-	NetAutoNatStatus(context.Context) (NatInfo, error)                        //perm:read
-	NetAgentVersion(ctx context.Context, p peer.ID) (string, error)           //perm:read
-	NetPeerInfo(context.Context, peer.ID) (*ExtendedPeerInfo, error)          //perm:read
+	//NetPubsubScores(context.Context) ([]PubsubScore, error)                   //perm:read
+	NetAutoNatStatus(context.Context) (NatInfo, error)               //perm:read
+	NetAgentVersion(ctx context.Context, p peer.ID) (string, error)  //perm:read
+	NetPeerInfo(context.Context, peer.ID) (*ExtendedPeerInfo, error) //perm:read
 
 	// NetBandwidthStats returns statistics about the nodes total bandwidth
 	// usage and current rate across all peers and protocols.

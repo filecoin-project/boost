@@ -3,7 +3,6 @@ package net
 import (
 	"context"
 	"sort"
-	"strings"
 
 	"go.uber.org/fx"
 
@@ -17,9 +16,8 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/conngater"
 	ma "github.com/multiformats/go-multiaddr"
 
-	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
-	"github.com/filecoin-project/lotus/node/modules/lp2p"
+	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/node/modules/lp2p"
 )
 
 type NetAPI struct {
@@ -30,7 +28,7 @@ type NetAPI struct {
 	Router    lp2p.BaseIpfsRouting
 	ConnGater *conngater.BasicConnectionGater
 	Reporter  metrics.Reporter
-	Sk        *dtypes.ScoreKeeper
+	//Sk        *dtypes.ScoreKeeper
 }
 
 func (a *NetAPI) ID(context.Context) (peer.ID, error) {
@@ -39,22 +37,6 @@ func (a *NetAPI) ID(context.Context) (peer.ID, error) {
 
 func (a *NetAPI) NetConnectedness(ctx context.Context, pid peer.ID) (network.Connectedness, error) {
 	return a.Host.Network().Connectedness(pid), nil
-}
-
-func (a *NetAPI) NetPubsubScores(context.Context) ([]api.PubsubScore, error) {
-	scores := a.Sk.Get()
-	out := make([]api.PubsubScore, len(scores))
-	i := 0
-	for k, v := range scores {
-		out[i] = api.PubsubScore{ID: k, Score: v}
-		i++
-	}
-
-	sort.Slice(out, func(i, j int) bool {
-		return strings.Compare(string(out[i].ID), string(out[j].ID)) > 0
-	})
-
-	return out, nil
 }
 
 func (a *NetAPI) NetPeers(context.Context) ([]peer.AddrInfo, error) {
