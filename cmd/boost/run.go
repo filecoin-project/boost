@@ -37,6 +37,8 @@ var runCmd = &cli.Command{
 			return err
 		}
 
+		log.Debugw("Remote full node version", "version", v)
+
 		if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
 			return xerrors.Errorf("Remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion1, v.APIVersion)
 		}
@@ -50,9 +52,17 @@ var runCmd = &cli.Command{
 		}
 
 		boostRepoPath := cctx.String(FlagBoostRepo)
+
 		r, err := repo.NewFS(boostRepoPath)
 		if err != nil {
 			return err
+		}
+		ok, err := r.Exists()
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return xerrors.Errorf("repo at '%s' is not initialized", cctx.String(FlagBoostRepo))
 		}
 
 		shutdownChan := make(chan struct{})
@@ -78,7 +88,13 @@ var runCmd = &cli.Command{
 			return xerrors.Errorf("getting API endpoint: %w", err)
 		}
 
-		log.Debug("Bootstrapping libp2p network with full node")
+		// Get maddr for boost node
+		maddr, err := boostApi.NetAddrsListen(ctx)
+		if err != nil {
+			return xerrors.Errorf("getting boost libp2p address: %w", err)
+		}
+
+		log.Debugw("Boost libp2p node listening", "maddr", maddr)
 
 		// Bootstrap with full node
 		remoteAddrs, err := fullnodeApi.NetAddrsListen(ctx)
@@ -86,11 +102,11 @@ var runCmd = &cli.Command{
 			return xerrors.Errorf("getting full node libp2p address: %w", err)
 		}
 
+		log.Debugw("Bootstrapping boost libp2p network with full node", "maadr", remoteAddrs)
+
 		if err := boostApi.NetConnect(ctx, remoteAddrs); err != nil {
 			return xerrors.Errorf("connecting to full node (libp2p): %w", err)
 		}
-
-		log.Debugw("Remote full node version", "version", v)
 
 		// Instantiate the boost service JSON RPC handler.
 		handler, err := node.BoostHandler(boostApi, true)
