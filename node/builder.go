@@ -227,25 +227,22 @@ func ConfigCommon(cfg *config.Common) Option {
 		ApplyIf(func(s *Settings) bool { return s.Base }), // apply only if Base has already been applied
 		Override(new(api.Net), From(new(net.NetAPI))),
 		Override(new(api.Common), From(new(common.CommonAPI))),
+		Override(new(dtypes.MetadataDS), modules.Datastore(cfg.Backup.DisableMetadataLog)),
 		Override(StartListeningKey, lp2p.StartListening(cfg.Libp2p.ListenAddresses)),
-		//Override(ConnectionManagerKey, lp2p.ConnectionManager(
-		//cfg.Libp2p.ConnMgrLow,
-		//cfg.Libp2p.ConnMgrHigh,
-		//time.Duration(cfg.Libp2p.ConnMgrGrace),
-		//cfg.Libp2p.ProtectedPeers)),
+		Override(ConnectionManagerKey, lp2p.ConnectionManager(
+			cfg.Libp2p.ConnMgrLow,
+			cfg.Libp2p.ConnMgrHigh,
+			time.Duration(cfg.Libp2p.ConnMgrGrace),
+			cfg.Libp2p.ProtectedPeers)),
+		ApplyIf(func(s *Settings) bool { return len(cfg.Libp2p.BootstrapPeers) > 0 },
+			Override(new(dtypes.BootstrapPeers), modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)),
+		),
+		Override(AddrsFactoryKey, lp2p.AddrsFactory(
+			cfg.Libp2p.AnnounceAddresses,
+			cfg.Libp2p.NoAnnounceAddresses)),
+		If(!cfg.Libp2p.DisableNatPortMap, Override(NatPortMapKey, lp2p.NatPortMap)),
 		//Override(new(*pubsub.PubSub), lp2p.GossipSub),
 		//Override(new(*config.Pubsub), &cfg.Pubsub),
-
-		//ApplyIf(func(s *Settings) bool { return len(cfg.Libp2p.BootstrapPeers) > 0 },
-		//Override(new(dtypes.BootstrapPeers), modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)),
-		//),
-
-		//Override(AddrsFactoryKey, lp2p.AddrsFactory(
-		//cfg.Libp2p.AnnounceAddresses,
-		//cfg.Libp2p.NoAnnounceAddresses)),
-
-		//If(!cfg.Libp2p.DisableNatPortMap, Override(NatPortMapKey, lp2p.NatPortMap)),
-		Override(new(dtypes.MetadataDS), modules.Datastore(cfg.Backup.DisableMetadataLog)),
 	)
 }
 
