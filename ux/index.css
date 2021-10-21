@@ -1,0 +1,125 @@
+@font-face {
+  font-family: "Virgil";
+  src: url("Virgil.woff2");
+  font-display: swap;
+}
+
+#content {
+  font-family: Virgil;
+  font-size: 1.25em;
+  padding-bottom: 3em;
+}
+#content table {
+  font-size: 1em;
+}
+
+.menu {
+  width: 10em;
+  padding: 1em;
+  vertical-align: top;
+}
+
+.menu .menu-item {
+  color: #a61e4d;
+  margin: 0.5em;
+  cursor: pointer;
+}
+
+.page-title {
+  margin:  1em auto;
+  text-align: center;
+  font-size: 1.5em;
+  color: #a61e4d;
+}
+
+.deals table {
+  font-size: 1em;
+  width: 100%;
+}
+
+.deals td {
+  padding: 0.5em 1em;
+}
+
+#deal-detail {
+  padding-top: 1em;
+  margin: auto;
+}
+
+#deal-detail .title {
+  margin:  1em auto;
+  text-align: center;
+  font-size: 1.25em;
+  color: #a61e4d;
+}
+
+#deal-detail table {
+  font-size: 1em;
+}
+
+#deal-detail table.deal-fields {
+  display: inline-block;
+  width: auto;
+  margin-bottom: 1em;
+}
+
+#deal-detail td {
+  padding: 0.5em 1em;
+}
+
+#deal-detail td.since-last {
+  color:  #999;
+}
+
+#deal-detail .buttons {
+  display: inline-block;
+  float: right;
+}
+
+#deal-detail .buttons .button {
+  color: #fff;
+  background-color: #3399ff;
+  border-radius: 0.5em;
+  padding: 0.5em;
+  margin: 0.5em;
+  cursor: pointer;
+  text-align: center;
+}
+
+.storage > table {
+  margin-top: 2.5em;
+}
+
+.storage .storage-bar {
+  height: 200px;
+  width: 5em;
+}
+
+.storage .storage-bar .size {
+  font-size: 0.8em;
+  position: absolute;
+  margin-top: -1.5em;
+}
+
+.storage .storage-bar .bar {
+  width: 3em;
+  border: 1px solid black;
+  margin: auto;
+}
+
+.storage .storage-bar .bar .used {
+  background-image: repeating-linear-gradient( 
+    135deg,
+    #fff,
+    #fff 5px,
+    #465298 5px,
+    #465298 6px);
+  border-top: 1px solid #465298;
+  border-bottom: 1px solid #000;
+}
+
+.storage .label {
+  font-size: 0.8em;
+  text-align: center;
+  padding-top: 1em;
+}
