@@ -6,3 +6,6 @@ extern/filecoin-ffi/rust/target
 .DS_STORE
 build/.*
 .idea
+ux/index.js
+ux/node_modules
+ux/package-lock.json
