@@ -41,7 +41,7 @@ var _ api.Boost = &BoostAPI{}
 
 func (sm *BoostAPI) ServeRemote(perm bool) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if perm == true {
+		if perm {
 			if !auth.HasPerm(r.Context(), nil, api.PermAdmin) {
 				w.WriteHeader(401)
 				_ = json.NewEncoder(w).Encode(struct{ Error string }{"unauthorized: missing write permission"})

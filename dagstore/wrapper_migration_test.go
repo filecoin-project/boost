@@ -4,18 +4,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/dagstore"
-	"github.com/stretchr/testify/require"
-
-	"github.com/filecoin-project/go-state-types/abi"
-
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket/impl/testnodes"
 	tut "github.com/filecoin-project/go-fil-markets/shared_testutil"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
-
-	"github.com/filecoin-project/lotus/node/config"
-
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
+	"github.com/stretchr/testify/require"
 )
 
 func TestShardRegistration(t *testing.T) {
@@ -90,7 +86,7 @@ func TestShardRegistration(t *testing.T) {
 		},
 	}}
 
-	cfg := config.DefaultStorageMiner().DAGStore
+	cfg := config.DefaultBoost().DAGStore
 	cfg.RootDir = t.TempDir()
 
 	mapi := NewMinerAPI(ps, sa, 10)
