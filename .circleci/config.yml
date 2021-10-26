@@ -1,0 +1,320 @@
+version: 2.1
+orbs:
+  go: gotest/tools@0.0.13
+
+executors:
+  golang:
+    docker:
+      - image: circleci/golang:1.17.2
+    resource_class: 2xlarge
+  ubuntu:
+    docker:
+      - image: ubuntu:20.04
+
+commands:
+  install-deps:
+    steps:
+      - go/install-ssh
+      - go/install: {package: git}
+  prepare:
+    parameters:
+      linux:
+        default: true
+        description: is a linux build environment?
+        type: boolean
+      darwin:
+        default: false
+        description: is a darwin build environment?
+        type: boolean
+    steps:
+      - checkout
+      - git_fetch_all_tags
+      - checkout
+      - when:
+          condition: << parameters.linux >>
+          steps:
+            - run: sudo apt-get update
+            - run: sudo apt-get install ocl-icd-opencl-dev libhwloc-dev
+      - run: git submodule sync
+      - run: git submodule update --init
+  git_fetch_all_tags:
+    steps:
+      - run:
+          name: fetch all tags
+          command: |
+            git fetch --all
+
+jobs:
+  mod-tidy-check:
+    executor: golang
+    steps:
+      - install-deps
+      - prepare
+      - go/mod-tidy-check
+
+  build-all:
+    executor: golang
+    steps:
+      - install-deps
+      - prepare
+      - run: sudo apt-get update
+      - run: sudo apt-get install npm
+      - run:
+          command: make buildall
+      - run:
+          name: check tag and version output match
+          command: ./scripts/version-check.sh ./boost
+      - store_artifacts:
+          path: boost
+      - run: mkdir linux && mv boost linux/
+      - persist_to_workspace:
+          root: "."
+          paths:
+            - linux
+
+  build-debug:
+    executor: golang
+    steps:
+      - install-deps
+      - prepare
+      - run:
+          command: make debug
+
+  test:
+    description: |
+      Run tests with gotestsum.
+    parameters: &test-params
+      executor:
+        type: executor
+        default: golang
+      go-test-flags:
+        type: string
+        default: "-timeout 30m"
+        description: Flags passed to go test.
+      target:
+        type: string
+        default: "./..."
+        description: Import paths of packages to be tested.
+      proofs-log-test:
+        type: string
+        default: "0"
+      suite:
+        type: string
+        default: unit
+        description: Test suite name to report to CircleCI.
+      gotestsum-format:
+        type: string
+        default: standard-verbose
+        description: gotestsum format. https://github.com/gotestyourself/gotestsum#format
+      coverage:
+        type: string
+        default: -coverprofile=coverage.txt -coverpkg=github.com/filecoin-project/boost/...
+        description: Coverage flag. Set to the empty string to disable.
+      codecov-upload:
+        type: boolean
+        default: true
+        description: |
+          Upload coverage report to https://codecov.io/. Requires the codecov API token to be
+          set as an environment variable for private projects.
+    executor: << parameters.executor >>
+    steps:
+      - install-deps
+      - prepare
+      - run:
+          command: make deps boost
+          no_output_timeout: 30m
+      - go/install-gotestsum:
+          gobin: $HOME/.local/bin
+          version: 0.5.2
+      - run:
+          name: go test
+          environment:
+            TEST_RUSTPROOFS_LOGS: << parameters.proofs-log-test >>
+            SKIP_CONFORMANCE: "1"
+          command: |
+            mkdir -p /tmp/test-reports/<< parameters.suite >>
+            mkdir -p /tmp/test-artifacts
+            gotestsum \
+              --format << parameters.gotestsum-format >> \
+              --junitfile /tmp/test-reports/<< parameters.suite >>/junit.xml \
+              --jsonfile /tmp/test-artifacts/<< parameters.suite >>.json \
+              -- \
+              << parameters.coverage >> \
+              << parameters.go-test-flags >> \
+              << parameters.target >>
+          no_output_timeout: 30m
+      - store_test_results:
+          path: /tmp/test-reports
+      - store_artifacts:
+          path: /tmp/test-artifacts/<< parameters.suite >>.json
+      - when:
+          condition: << parameters.codecov-upload >>
+          steps:
+            - go/install: {package: bash}
+            - go/install: {package: curl}
+            - run:
+                shell: /bin/bash -eo pipefail
+                command: |
+                  bash <(curl -s https://codecov.io/bash)
+
+  build-macos:
+    description: build darwin boost binary
+    macos:
+      xcode: "12.5.0"
+    working_directory: ~/go/src/github.com/filecoin-project/boost
+    steps:
+      - prepare:
+          linux: false
+          darwin: true
+      - run:
+          name: Install go
+          command: |
+            curl -O https://dl.google.com/go/go1.17.2.darwin-amd64.pkg && \
+            sudo installer -pkg go1.17.2.darwin-amd64.pkg -target /
+      - run:
+          name: Install pkg-config
+          command: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config
+      - run: go version
+      - run:
+          name: Install Rust
+          command: |
+            curl https://sh.rustup.rs -sSf | sh -s -- -y
+      - run:
+          name: Install hwloc
+          command: |
+            mkdir ~/hwloc
+            curl --location https://download.open-mpi.org/release/hwloc/v2.4/hwloc-2.4.1.tar.gz --output ~/hwloc/hwloc-2.4.1.tar.gz
+            cd ~/hwloc
+            tar -xvzpf hwloc-2.4.1.tar.gz
+            cd hwloc-2.4.1
+            ./configure && make && sudo make install
+      - restore_cache:
+          name: restore cargo cache
+          key: v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/boost/go.sum" }}
+      - install-deps
+      - run:
+          command: make build
+          no_output_timeout: 30m
+      - run:
+          name: check tag and version output match
+          command: ./scripts/version-check.sh ./boost
+      - store_artifacts:
+          path: boost
+      - run: mkdir darwin && mv boost darwin/
+      - persist_to_workspace:
+          root: "."
+          paths:
+            - darwin
+      - save_cache:
+          name: save cargo cache
+          key: v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/boost/go.sum" }}
+          paths:
+            - "~/.rustup"
+            - "~/.cargo"
+
+  gofmt:
+    executor: golang
+    steps:
+      - install-deps
+      - prepare
+      - run:
+          command: "! go fmt ./... 2>&1 | read"
+
+  gen-check:
+    executor: golang
+    steps:
+      - install-deps
+      - prepare
+      - run: make deps
+      - run: go install golang.org/x/tools/cmd/goimports
+      - run: go install github.com/hannahhoward/cbor-gen-for
+      - run: make gen
+      - run: git --no-pager diff
+      - run: git --no-pager diff --quiet
+      - run: make docsgen-cli
+      - run: git --no-pager diff
+      - run: git --no-pager diff --quiet
+
+  docs-check:
+    executor: golang
+    steps:
+      - install-deps
+      - prepare
+      - run: go install golang.org/x/tools/cmd/goimports
+      - run: zcat build/openrpc/full.json.gz | jq > ../pre-openrpc-full
+      - run: zcat build/openrpc/miner.json.gz | jq > ../pre-openrpc-miner
+      - run: zcat build/openrpc/worker.json.gz | jq > ../pre-openrpc-worker
+      - run: make deps
+      - run: make docsgen
+      - run: zcat build/openrpc/full.json.gz | jq > ../post-openrpc-full
+      - run: zcat build/openrpc/miner.json.gz | jq > ../post-openrpc-miner
+      - run: zcat build/openrpc/worker.json.gz | jq > ../post-openrpc-worker
+      - run: git --no-pager diff
+      - run: diff ../pre-openrpc-full ../post-openrpc-full
+      - run: diff ../pre-openrpc-miner ../post-openrpc-miner
+      - run: diff ../pre-openrpc-worker ../post-openrpc-worker
+      - run: git --no-pager diff --quiet
+
+  lint: &lint
+    description: |
+      Run golangci-lint.
+    parameters:
+      executor:
+        type: executor
+        default: golang
+      golangci-lint-version:
+        type: string
+        default: 1.27.0
+      concurrency:
+        type: string
+        default: '2'
+        description: |
+          Concurrency used to run linters. Defaults to 2 because NumCPU is not
+          aware of container CPU limits.
+      args:
+        type: string
+        default: ''
+        description: |
+          Arguments to pass to golangci-lint
+    executor: << parameters.executor >>
+    steps:
+      - install-deps
+      - prepare
+      - run:
+          command: make deps
+          no_output_timeout: 30m
+      - go/install-golangci-lint:
+          gobin: $HOME/.local/bin
+          version: << parameters.golangci-lint-version >>
+      - run:
+          name: Lint
+          command: |
+            $HOME/.local/bin/golangci-lint run -v --timeout 2m \
+              --concurrency << parameters.concurrency >> << parameters.args >>
+  lint-all:
+    <<: *lint
+
+workflows:
+  version: 2.1
+  ci:
+    jobs:
+      - lint-all:
+          concurrency: "16"   # expend all docker 2xlarge CPUs.
+      - mod-tidy-check
+      - gofmt
+      - gen-check
+      - docs-check
+      - build-debug
+      - build-all:
+          filters:
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      - build-macos:
+          filters:
+            branches:
+              ignore:
+                - /.*/
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
