@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -29,7 +28,7 @@ func main() {
 			&cli.StringFlag{
 				Name:    FlagBoostRepo,
 				EnvVars: []string{"BOOST_PATH"},
-				Usage:   fmt.Sprintf("boost repo path"),
+				Usage:   "boost repo path",
 				Value:   "~/.boost",
 			},
 			cliutil.FlagVeryVerbose,
