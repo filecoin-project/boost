@@ -53,6 +53,8 @@ type Provider struct {
 	//dagStore    stores.DAGStoreWrapper
 
 	transport datatransfer.Transport
+
+	adapter *Adapter
 }
 
 //func NewProvider(dbApi datastore.API, lotusNode lotusnode.StorageProviderNode) (*provider, error) {
@@ -64,6 +66,8 @@ func NewProvider(fullnodeApi v1api.FullNode) (*Provider, error) {
 		cancel:      cancel,
 		fullnodeApi: fullnodeApi,
 		//dbApi:     dbApi,
+
+		adapter: &Adapter{}, // TODO: instantiate properly
 	}, nil
 }
 

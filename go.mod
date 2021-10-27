@@ -11,6 +11,7 @@ require (
 	github.com/filecoin-project/dagstore v0.4.3
 	github.com/filecoin-project/go-address v0.0.5
 	github.com/filecoin-project/go-bitfield v0.2.4
+	github.com/filecoin-project/go-cbor-util v0.0.0-20191219014500-08c40a1e63a2
 	github.com/filecoin-project/go-commp-utils v0.1.1-0.20210427191551-70bf140d31c7
 	github.com/filecoin-project/go-data-transfer v1.11.1
 	github.com/filecoin-project/go-fil-commcid v0.1.0
@@ -24,6 +25,8 @@ require (
 	github.com/filecoin-project/lotus v1.13.0
 	github.com/filecoin-project/specs-actors v0.9.14
 	github.com/filecoin-project/specs-actors/v2 v2.3.5
+	github.com/filecoin-project/specs-actors/v5 v5.0.4
+	github.com/filecoin-project/specs-storage v0.1.1-0.20201105051918-5188d9774506
 	github.com/gbrlsnchs/jwt/v3 v3.0.0-beta.1
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
@@ -39,6 +42,7 @@ require (
 	github.com/ipfs/go-graphsync v0.10.1
 	github.com/ipfs/go-ipfs-blockstore v1.0.4
 	github.com/ipfs/go-ipfs-blocksutil v0.0.1
+	github.com/ipfs/go-ipfs-ds-help v1.0.0
 	github.com/ipfs/go-ipfs-exchange-interface v0.0.1
 	github.com/ipfs/go-ipfs-routing v0.1.0
 	github.com/ipfs/go-log/v2 v2.3.0
@@ -118,7 +122,6 @@ require (
 	github.com/filecoin-project/filecoin-ffi v0.30.4-0.20200910194244-f640612a1a1f // indirect
 	github.com/filecoin-project/go-amt-ipld/v2 v2.1.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v3 v3.1.0 // indirect
-	github.com/filecoin-project/go-cbor-util v0.0.0-20191219014500-08c40a1e63a2 // indirect
 	github.com/filecoin-project/go-crypto v0.0.0-20191218222705-effae4ea9f03 // indirect
 	github.com/filecoin-project/go-ds-versioning v0.1.0 // indirect
 	github.com/filecoin-project/go-hamt-ipld v0.1.5 // indirect
@@ -127,9 +130,7 @@ require (
 	github.com/filecoin-project/go-paramfetch v0.0.2 // indirect
 	github.com/filecoin-project/specs-actors/v3 v3.1.1 // indirect
 	github.com/filecoin-project/specs-actors/v4 v4.0.1 // indirect
-	github.com/filecoin-project/specs-actors/v5 v5.0.4 // indirect
 	github.com/filecoin-project/specs-actors/v6 v6.0.0 // indirect
-	github.com/filecoin-project/specs-storage v0.1.1-0.20201105051918-5188d9774506 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
@@ -159,7 +160,6 @@ require (
 	github.com/ipfs/go-filestore v1.0.0 // indirect
 	github.com/ipfs/go-ipfs-chunker v0.0.5 // indirect
 	github.com/ipfs/go-ipfs-cmds v0.3.0 // indirect
-	github.com/ipfs/go-ipfs-ds-help v1.0.0 // indirect
 	github.com/ipfs/go-ipfs-exchange-offline v0.0.1 // indirect
 	github.com/ipfs/go-ipfs-files v0.0.8 // indirect
 	github.com/ipfs/go-ipfs-http-client v0.0.6 // indirect
