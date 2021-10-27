@@ -21,7 +21,7 @@ func TestDB(t *testing.T) {
 	db, err := Open(tmpFile)
 	req.NoError(err)
 
-	deals, err := db.Query(ctx)
+	deals, err := db.List(ctx)
 	req.NoError(err)
 	req.Len(deals, 2)
 

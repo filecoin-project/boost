@@ -1,3 +1,9 @@
+CREATE TABLE DealLogs (
+    DealID varchar(128),
+    CreatedAt DateTime,
+    LogText varchar(1024)
+);
+
 CREATE TABLE Deals (
     ID varchar(128),
     CreatedAt DateTime,
@@ -12,5 +18,6 @@ CREATE TABLE Deals (
     StoragePricePerEpoch int,
     ProviderCollateral int,
     ClientCollateral int,
+    State varchar(32),
     PRIMARY KEY(ID)
 ) WITHOUT ROWID;
