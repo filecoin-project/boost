@@ -16,8 +16,6 @@ import (
 
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 
-	"github.com/filecoin-project/go-state-types/exitcode"
-
 	"github.com/filecoin-project/go-commp-utils/writer"
 	commcid "github.com/filecoin-project/go-fil-commcid"
 	commp "github.com/filecoin-project/go-fil-commp-hashhash"
@@ -69,17 +67,6 @@ func (p *provider) doDeal(ds *types.ProviderDealState, publisher event.Emitter) 
 		}
 	}
 
-	// Reserve funds
-	if ds.Checkpoint < dealcheckpoints.FundsReserved {
-		if err := p.reserveFunds(ds); err != nil {
-			p.failDeal(ds, fmt.Errorf("failed to reserve funds: %w", err))
-			return
-		}
-		if err := publisher.Emit(dealStateToEvent(ds)); err != nil {
-			// log
-		}
-	}
-
 	// Publish
 	if ds.Checkpoint <= dealcheckpoints.Published {
 		if err := p.publishDeal(ds); err != nil {
@@ -90,8 +77,6 @@ func (p *provider) doDeal(ds *types.ProviderDealState, publisher event.Emitter) 
 			// log
 		}
 	}
-
-	// TODO Release Reserved Funds ?
 
 	// AddPiece
 	if ds.Checkpoint < dealcheckpoints.AddedPiece {
@@ -163,53 +148,6 @@ func (p *provider) transferAndVerify(ds *types.ProviderDealState, publisher even
 	}
 
 	// TODO : Emit a notification here
-	return nil
-}
-
-// ReserveProviderFunds adds funds, as needed to the StorageMarketActor, so the miner has adequate collateral for the deal
-func (p *provider) reserveFunds(ds *types.ProviderDealState) error {
-	tok, _, err := p.lotusNode.GetChainHead(p.ctx)
-	if err != nil {
-		return fmt.Errorf("acquiring chain head: %w", err)
-	}
-
-	waddr, err := p.lotusNode.GetMinerWorkerAddress(p.ctx, ds.ClientDealProposal.Proposal.Provider, tok)
-	if err != nil {
-		return fmt.Errorf("looking up miner worker: %w", err)
-	}
-
-	mcid, err := p.lotusNode.ReserveFunds(p.ctx, waddr, ds.ClientDealProposal.Proposal.Provider, ds.ClientDealProposal.Proposal.ProviderCollateral)
-	if err != nil {
-		return fmt.Errorf("reserving funds: %w", err)
-	}
-
-	// if no message was sent, and there was no error, funds were already available
-	if mcid == cid.Undef {
-		ds.Checkpoint = dealcheckpoints.FundsReserved
-		if err := p.dbApi.CreateOrUpdateDeal(ds); err != nil {
-			return fmt.Errorf("failed to update deal state: %w", err)
-		}
-		return nil
-	}
-
-	if err := p.lotusNode.WaitForMessage(p.ctx, mcid, func(code exitcode.ExitCode, bytes []byte, finalCid cid.Cid, err error) error {
-		if err != nil {
-			return fmt.Errorf("AddFunds errored: %w", err)
-		}
-		if code != exitcode.Ok {
-			return fmt.Errorf("AddFunds exit code: %s", code.String())
-		}
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to reserve funds: %w", err)
-	}
-
-	ds.AddFundsCid = mcid
-	ds.Checkpoint = dealcheckpoints.FundsReserved
-	if err := p.dbApi.CreateOrUpdateDeal(ds); err != nil {
-		return fmt.Errorf("failed to update deal state: %w", err)
-	}
-
 	return nil
 }
 
