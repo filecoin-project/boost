@@ -23,9 +23,6 @@ import (
 	"github.com/filecoin-project/go-address"
 	logging "github.com/ipfs/go-log/v2"
 
-	"github.com/filecoin-project/boost/storagemarket/storagemanager"
-
-	"github.com/filecoin-project/boost/storagemarket/fundmanager"
 	"github.com/filecoin-project/boost/storagemarket/types"
 
 	"github.com/filecoin-project/boost/storagemarket/datastore"
@@ -62,20 +59,17 @@ type provider struct {
 	lotusNode lotusnode.StorageProviderNode
 	dagStore  stores.DAGStoreWrapper
 
-	fundManager    fundmanager.Manager
-	storageManager storagemanager.Manager
-	// TODO
-	// dealAcceptanceFilter
-
 	transport datatransfer.Transport
 }
 
-func NewProvider(dbApi datastore.API, lotusNode lotusnode.StorageProviderNode, fundManager fundmanager.Manager) (*provider, error) {
+func NewProvider(dbApi datastore.API, lotusNode lotusnode.StorageProviderNode) (*provider, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &provider{
-		ctx:    ctx,
-		cancel: cancel,
+		ctx:       ctx,
+		cancel:    cancel,
+		lotusNode: lotusNode,
+		dbApi:     dbApi,
 	}, nil
 }
 
