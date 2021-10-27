@@ -59,6 +59,7 @@ require (
 	github.com/libp2p/go-libp2p-tls v0.2.0
 	github.com/libp2p/go-libp2p-yamux v0.5.4
 	github.com/libp2p/go-maddr-filter v0.1.0
+	github.com/mattn/go-sqlite3 v1.14.9
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/multiformats/go-base32 v0.0.3
 	github.com/multiformats/go-multiaddr v0.4.0
