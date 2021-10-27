@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,20 +14,15 @@ import (
 	"go.uber.org/multierr"
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/go-address"
 	dtimpl "github.com/filecoin-project/go-data-transfer/impl"
 	dtnet "github.com/filecoin-project/go-data-transfer/network"
 	dtgstransport "github.com/filecoin-project/go-data-transfer/transport/graphsync"
-	piecefilestore "github.com/filecoin-project/go-fil-markets/filestore"
 	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
 	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
-	"github.com/filecoin-project/go-fil-markets/shared"
-	"github.com/filecoin-project/go-fil-markets/storagemarket"
-	storageimpl "github.com/filecoin-project/go-fil-markets/storagemarket/impl"
-	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
-	smnet "github.com/filecoin-project/go-fil-markets/storagemarket/network"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-statestore"
@@ -49,14 +43,10 @@ import (
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/blockstore"
-	"github.com/filecoin-project/lotus/chain/gen"
-	"github.com/filecoin-project/lotus/chain/gen/slashfilter"
-	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/markets"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	marketevents "github.com/filecoin-project/lotus/markets/loggers"
-	lotusminer "github.com/filecoin-project/lotus/miner"
 )
 
 var (
@@ -97,24 +87,6 @@ func HandleRetrieval(host host.Host, lc fx.Lifecycle, m retrievalmarket.Retrieva
 		},
 		OnStop: func(context.Context) error {
 			return m.Stop()
-		},
-	})
-}
-
-func HandleDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, host host.Host, h storagemarket.StorageProvider, j journal.Journal) {
-	ctx := helpers.LifecycleCtx(mctx, lc)
-	h.OnReady(marketevents.ReadyLogger("storage provider"))
-	lc.Append(fx.Hook{
-		OnStart: func(context.Context) error {
-			h.SubscribeToEvents(marketevents.StorageProviderLogger)
-
-			evtType := j.RegisterEventType("markets/storage/provider", "state_change")
-			h.SubscribeToEvents(markets.StorageProviderJournaler(j, evtType))
-
-			return h.Start(ctx)
-		},
-		OnStop: func(context.Context) error {
-			return h.Stop()
 		},
 	})
 }
@@ -216,231 +188,6 @@ func StagingBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, r repo.LockedRe
 	return blockstore.FromDatastore(stagingds), nil
 }
 
-// StagingGraphsync creates a graphsync instance which reads and writes blocks
-// to the StagingBlockstore
-//func StagingGraphsync(parallelTransfersForStorage uint64, parallelTransfersForRetrieval uint64) func(mctx helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.StagingBlockstore, h host.Host) dtypes.StagingGraphsync {
-//return func(mctx helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.StagingBlockstore, h host.Host) dtypes.StagingGraphsync {
-//graphsyncNetwork := gsnet.NewFromLibp2pHost(h)
-//lsys := storeutil.LinkSystemForBlockstore(ibs)
-//gs := graphsync.New(helpers.LifecycleCtx(mctx, lc),
-//graphsyncNetwork,
-//lsys,
-//graphsync.RejectAllRequestsByDefault(),
-//graphsync.MaxInProgressIncomingRequests(parallelTransfersForRetrieval),
-//graphsync.MaxInProgressOutgoingRequests(parallelTransfersForStorage),
-//graphsyncimpl.MaxLinksPerIncomingRequests(config.MaxTraversalLinks),
-//graphsyncimpl.MaxLinksPerOutgoingRequests(config.MaxTraversalLinks))
-
-//return gs
-//}
-//}
-
-func SetupBlockProducer(lc fx.Lifecycle, ds dtypes.MetadataDS, api v1api.FullNode, epp gen.WinningPoStProver, sf *slashfilter.SlashFilter, j journal.Journal) (*lotusminer.Miner, error) {
-	minerAddr, err := minerAddrFromDS(ds)
-	if err != nil {
-		return nil, err
-	}
-
-	m := lotusminer.NewMiner(api, epp, minerAddr, sf, j)
-
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			if err := m.Start(ctx); err != nil {
-				return err
-			}
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			return m.Stop(ctx)
-		},
-	})
-
-	return m, nil
-}
-
-func NewStorageAsk(ctx helpers.MetricsCtx, fapi v1api.FullNode, ds dtypes.MetadataDS, minerAddress dtypes.MinerAddress, spn storagemarket.StorageProviderNode) (*storedask.StoredAsk, error) {
-
-	mi, err := fapi.StateMinerInfo(ctx, address.Address(minerAddress), types.EmptyTSK)
-	if err != nil {
-		return nil, err
-	}
-
-	providerDs := namespace.Wrap(ds, datastore.NewKey("/deals/provider"))
-	// legacy this was mistake where this key was place -- so we move the legacy key if need be
-	err = shared.MoveKey(providerDs, "/latest-ask", "/storage-ask/latest")
-	if err != nil {
-		return nil, err
-	}
-	return storedask.NewStoredAsk(namespace.Wrap(providerDs, datastore.NewKey("/storage-ask")), datastore.NewKey("latest"), spn, address.Address(minerAddress),
-		storagemarket.MaxPieceSize(abi.PaddedPieceSize(mi.SectorSize)))
-}
-
-func BasicDealFilter(cfg config.DealmakingConfig, user dtypes.StorageDealFilter) func(onlineOk dtypes.ConsiderOnlineStorageDealsConfigFunc,
-	offlineOk dtypes.ConsiderOfflineStorageDealsConfigFunc,
-	verifiedOk dtypes.ConsiderVerifiedStorageDealsConfigFunc,
-	unverifiedOk dtypes.ConsiderUnverifiedStorageDealsConfigFunc,
-	blocklistFunc dtypes.StorageDealPieceCidBlocklistConfigFunc,
-	expectedSealTimeFunc dtypes.GetExpectedSealDurationFunc,
-	startDelay dtypes.GetMaxDealStartDelayFunc,
-	spn storagemarket.StorageProviderNode,
-	r repo.LockedRepo,
-) dtypes.StorageDealFilter {
-	return func(onlineOk dtypes.ConsiderOnlineStorageDealsConfigFunc,
-		offlineOk dtypes.ConsiderOfflineStorageDealsConfigFunc,
-		verifiedOk dtypes.ConsiderVerifiedStorageDealsConfigFunc,
-		unverifiedOk dtypes.ConsiderUnverifiedStorageDealsConfigFunc,
-		blocklistFunc dtypes.StorageDealPieceCidBlocklistConfigFunc,
-		expectedSealTimeFunc dtypes.GetExpectedSealDurationFunc,
-		startDelay dtypes.GetMaxDealStartDelayFunc,
-		spn storagemarket.StorageProviderNode,
-		r repo.LockedRepo,
-	) dtypes.StorageDealFilter {
-
-		return func(ctx context.Context, deal storagemarket.MinerDeal) (bool, string, error) {
-			b, err := onlineOk()
-			if err != nil {
-				return false, "miner error", err
-			}
-
-			if deal.Ref != nil && deal.Ref.TransferType != storagemarket.TTManual && !b {
-				log.Warnf("online storage deal consideration disabled; rejecting storage deal proposal from client: %s", deal.Client.String())
-				return false, "miner is not considering online storage deals", nil
-			}
-
-			b, err = offlineOk()
-			if err != nil {
-				return false, "miner error", err
-			}
-
-			if deal.Ref != nil && deal.Ref.TransferType == storagemarket.TTManual && !b {
-				log.Warnf("offline storage deal consideration disabled; rejecting storage deal proposal from client: %s", deal.Client.String())
-				return false, "miner is not accepting offline storage deals", nil
-			}
-
-			b, err = verifiedOk()
-			if err != nil {
-				return false, "miner error", err
-			}
-
-			if deal.Proposal.VerifiedDeal && !b {
-				log.Warnf("verified storage deal consideration disabled; rejecting storage deal proposal from client: %s", deal.Client.String())
-				return false, "miner is not accepting verified storage deals", nil
-			}
-
-			b, err = unverifiedOk()
-			if err != nil {
-				return false, "miner error", err
-			}
-
-			if !deal.Proposal.VerifiedDeal && !b {
-				log.Warnf("unverified storage deal consideration disabled; rejecting storage deal proposal from client: %s", deal.Client.String())
-				return false, "miner is not accepting unverified storage deals", nil
-			}
-
-			blocklist, err := blocklistFunc()
-			if err != nil {
-				return false, "miner error", err
-			}
-
-			for idx := range blocklist {
-				if deal.Proposal.PieceCID.Equals(blocklist[idx]) {
-					log.Warnf("piece CID in proposal %s is blocklisted; rejecting storage deal proposal from client: %s", deal.Proposal.PieceCID, deal.Client.String())
-					return false, fmt.Sprintf("miner has blocklisted piece CID %s", deal.Proposal.PieceCID), nil
-				}
-			}
-
-			//sealDuration, err := expectedSealTimeFunc()
-			//if err != nil {
-			//return false, "miner error", err
-			//}
-
-			//sealEpochs := sealDuration / (time.Duration(build.BlockDelaySecs) * time.Second)
-			//_, ht, err := spn.GetChainHead(ctx)
-			//if err != nil {
-			//return false, "failed to get chain head", err
-			//}
-			//earliest := abi.ChainEpoch(sealEpochs) + ht
-			//if deal.Proposal.StartEpoch < earliest {
-			//log.Warnw("proposed deal would start before sealing can be completed; rejecting storage deal proposal from client", "piece_cid", deal.Proposal.PieceCID, "client", deal.Client.String(), "seal_duration", sealDuration, "earliest", earliest, "curepoch", ht)
-			//return false, fmt.Sprintf("cannot seal a sector before %s", deal.Proposal.StartEpoch), nil
-			//}
-
-			sd, err := startDelay()
-			if err != nil {
-				return false, "miner error", err
-			}
-
-			dir := filepath.Join(r.Path(), StagingAreaDirName)
-			diskUsageBytes, err := r.DiskUsage(dir)
-			if err != nil {
-				return false, "miner error", err
-			}
-
-			if cfg.MaxStagingDealsBytes != 0 && diskUsageBytes >= cfg.MaxStagingDealsBytes {
-				log.Errorw("proposed deal rejected because there are too many deals in the staging area at the moment", "MaxStagingDealsBytes", cfg.MaxStagingDealsBytes, "DiskUsageBytes", diskUsageBytes)
-				return false, "cannot accept deal as miner is overloaded at the moment - there are too many staging deals being processed", nil
-			}
-
-			_ = sd
-
-			// Reject if it's more than 7 days in the future
-			// TODO: read from cfg
-			//maxStartEpoch := earliest + abi.ChainEpoch(uint64(sd.Seconds())/build.BlockDelaySecs)
-			//if deal.Proposal.StartEpoch > maxStartEpoch {
-			//return false, fmt.Sprintf("deal start epoch is too far in the future: %s > %s", deal.Proposal.StartEpoch, maxStartEpoch), nil
-			//}
-
-			//if user != nil {
-			//return user(ctx, deal)
-			//}
-
-			return true, "", nil
-		}
-	}
-}
-
-func StorageProvider(minerAddress dtypes.MinerAddress,
-	storedAsk *storedask.StoredAsk,
-	h host.Host, ds dtypes.MetadataDS,
-	r repo.LockedRepo,
-	pieceStore dtypes.ProviderPieceStore,
-	dataTransfer dtypes.ProviderDataTransfer,
-	spn storagemarket.StorageProviderNode,
-	df dtypes.StorageDealFilter,
-	dsw *dagstore.Wrapper,
-) (storagemarket.StorageProvider, error) {
-	net := smnet.NewFromLibp2pHost(h)
-
-	dir := filepath.Join(r.Path(), StagingAreaDirName)
-
-	// migrate temporary files that were created directly under the repo, by
-	// moving them to the new directory and symlinking them.
-	oldDir := r.Path()
-	if err := migrateDealStaging(oldDir, dir); err != nil {
-		return nil, xerrors.Errorf("failed to make deal staging directory %w", err)
-	}
-
-	store, err := piecefilestore.NewLocalFileStore(piecefilestore.OsPath(dir))
-	if err != nil {
-		return nil, err
-	}
-
-	opt := storageimpl.CustomDealDecisionLogic(storageimpl.DealDeciderFunc(df))
-
-	return storageimpl.NewProvider(
-		net,
-		namespace.Wrap(ds, datastore.NewKey("/deals/provider")),
-		store,
-		dsw,
-		pieceStore,
-		dataTransfer,
-		spn,
-		address.Address(minerAddress),
-		storedAsk,
-		opt,
-	)
-}
-
 func RetrievalDealFilter(userFilter dtypes.RetrievalDealFilter) func(onlineOk dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
 	offlineOk dtypes.ConsiderOfflineRetrievalDealsConfigFunc) dtypes.RetrievalDealFilter {
 	return func(onlineOk dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
@@ -477,20 +224,6 @@ func RetrievalDealFilter(userFilter dtypes.RetrievalDealFilter) func(onlineOk dt
 func RetrievalNetwork(h host.Host) rmnet.RetrievalMarketNetwork {
 	return rmnet.NewFromLibp2pHost(h)
 }
-
-// RetrievalPricingFunc configures the pricing function to use for retrieval deals.
-//func RetrievalPricingFunc(cfg config.DealmakingConfig) func(_ dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
-//_ dtypes.ConsiderOfflineRetrievalDealsConfigFunc) dtypes.RetrievalPricingFunc {
-
-//return func(_ dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
-//_ dtypes.ConsiderOfflineRetrievalDealsConfigFunc) dtypes.RetrievalPricingFunc {
-//if cfg.RetrievalPricing.Strategy == config.RetrievalPricingExternalMode {
-//return pricing.ExternalRetrievalPricingFunc(cfg.RetrievalPricing.External.Path)
-//}
-
-//return retrievalimpl.DefaultPricingFunc(cfg.RetrievalPricing.Default.VerifiedDealsFreeTransfer)
-//}
-//}
 
 // RetrievalProvider creates a new retrieval provider attached to the provider blockstore
 func RetrievalProvider(
@@ -767,63 +500,14 @@ func mutateCfg(r repo.LockedRepo, mutator func(*config.Boost)) error {
 	return multierr.Combine(typeErr, setConfigErr)
 }
 
-func migrateDealStaging(oldPath, newPath string) error {
-	dirInfo, err := os.Stat(newPath)
-	if err == nil {
-		if !dirInfo.IsDir() {
-			return xerrors.Errorf("%s is not a directory", newPath)
-		}
-		// The newPath exists already, below migration has already occurred.
-		return nil
-	}
-
-	// if the directory doesn't exist, create it
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(newPath, 0755); err != nil {
-			return xerrors.Errorf("failed to mk directory %s for deal staging: %w", newPath, err)
-		}
-	} else { // if we failed for other reasons, abort.
-		return err
-	}
-
-	// if this is the first time we created the directory, symlink all staged deals into it. "Migration"
-	// get a list of files in the miner repo
-	dirEntries, err := os.ReadDir(oldPath)
-	if err != nil {
-		return xerrors.Errorf("failed to list directory %s for deal staging: %w", oldPath, err)
-	}
-
-	for _, entry := range dirEntries {
-		// ignore directories, they are not the deals.
-		if entry.IsDir() {
-			continue
-		}
-		// the FileStore from fil-storage-market creates temporary staged deal files with the pattern "fstmp"
-		// https://github.com/filecoin-project/go-fil-markets/blob/00ff81e477d846ac0cb58a0c7d1c2e9afb5ee1db/filestore/filestore.go#L69
-		name := entry.Name()
-		if strings.Contains(name, "fstmp") {
-			// from the miner repo
-			oldPath := filepath.Join(oldPath, name)
-			// to its subdir "deal-staging"
-			newPath := filepath.Join(newPath, name)
-			// create a symbolic link in the new deal staging directory to preserve existing staged deals.
-			// all future staged deals will be created here.
-			if err := os.Rename(oldPath, newPath); err != nil {
-				return xerrors.Errorf("failed to move %s to %s: %w", oldPath, newPath, err)
-			}
-			if err := os.Symlink(newPath, oldPath); err != nil {
-				return xerrors.Errorf("failed to symlink %s to %s: %w", oldPath, newPath, err)
-			}
-			log.Infow("symlinked staged deal", "from", oldPath, "to", newPath)
-		}
-	}
-	return nil
-}
-
 func StorageNetworkName(ctx helpers.MetricsCtx, a v1api.FullNode) (dtypes.NetworkName, error) {
 	n, err := a.StateNetworkName(ctx)
 	if err != nil {
 		return "", err
 	}
 	return dtypes.NetworkName(n), nil
+}
+
+func NewStorageMarketProvider(ctx helpers.MetricsCtx, a v1api.FullNode) (*storagemarket.Provider, error) {
+	return storagemarket.NewProvider(a)
 }
