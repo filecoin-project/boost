@@ -42,8 +42,8 @@ const (
 type RepoType int
 
 const (
-	//_ = iota // Default is invalid
-	Boost RepoType = iota + 6
+	_              = iota // Default is invalid
+	Boost RepoType = iota
 )
 
 func (t RepoType) String() string {
