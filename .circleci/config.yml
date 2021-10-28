@@ -61,9 +61,6 @@ jobs:
       - run: sudo apt-get install npm
       - run:
           command: make buildall
-      - run:
-          name: check tag and version output match
-          command: ./scripts/version-check.sh ./boost
       - store_artifacts:
           path: boost
       - run: mkdir linux && mv boost linux/
@@ -71,14 +68,6 @@ jobs:
           root: "."
           paths:
             - linux
-
-  build-debug:
-    executor: golang
-    steps:
-      - install-deps
-      - prepare
-      - run:
-          command: make debug
 
   test:
     description: |
@@ -220,41 +209,6 @@ jobs:
       - run:
           command: "! go fmt ./... 2>&1 | read"
 
-  gen-check:
-    executor: golang
-    steps:
-      - install-deps
-      - prepare
-      - run: make deps
-      - run: go install golang.org/x/tools/cmd/goimports
-      - run: go install github.com/hannahhoward/cbor-gen-for
-      - run: make gen
-      - run: git --no-pager diff
-      - run: git --no-pager diff --quiet
-      - run: make docsgen-cli
-      - run: git --no-pager diff
-      - run: git --no-pager diff --quiet
-
-  docs-check:
-    executor: golang
-    steps:
-      - install-deps
-      - prepare
-      - run: go install golang.org/x/tools/cmd/goimports
-      - run: zcat build/openrpc/full.json.gz | jq > ../pre-openrpc-full
-      - run: zcat build/openrpc/miner.json.gz | jq > ../pre-openrpc-miner
-      - run: zcat build/openrpc/worker.json.gz | jq > ../pre-openrpc-worker
-      - run: make deps
-      - run: make docsgen
-      - run: zcat build/openrpc/full.json.gz | jq > ../post-openrpc-full
-      - run: zcat build/openrpc/miner.json.gz | jq > ../post-openrpc-miner
-      - run: zcat build/openrpc/worker.json.gz | jq > ../post-openrpc-worker
-      - run: git --no-pager diff
-      - run: diff ../pre-openrpc-full ../post-openrpc-full
-      - run: diff ../pre-openrpc-miner ../post-openrpc-miner
-      - run: diff ../pre-openrpc-worker ../post-openrpc-worker
-      - run: git --no-pager diff --quiet
-
   lint: &lint
     description: |
       Run golangci-lint.
@@ -302,9 +256,6 @@ workflows:
           concurrency: "16"   # expend all docker 2xlarge CPUs.
       - mod-tidy-check
       - gofmt
-      - gen-check
-      - docs-check
-      - build-debug
       - build-all:
           filters:
             tags:

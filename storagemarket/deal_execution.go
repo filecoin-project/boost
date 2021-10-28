@@ -8,8 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/filecoin-project/boost/stores"
-
 	"github.com/libp2p/go-libp2p-core/event"
 
 	"github.com/filecoin-project/go-padreader"
@@ -25,7 +23,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 )
 
-func (p *provider) failDeal(ds *types.ProviderDealState, err error) {
+func (p *Provider) failDeal(ds *types.ProviderDealState, err error) {
 	p.cleanupDeal(ds)
 
 	select {
@@ -34,7 +32,7 @@ func (p *provider) failDeal(ds *types.ProviderDealState, err error) {
 	}
 }
 
-func (p *provider) cleanupDeal(ds *types.ProviderDealState) {
+func (p *Provider) cleanupDeal(ds *types.ProviderDealState) {
 	_ = os.Remove(ds.InboundCARPath)
 	// ...
 	//cleanup resources here
@@ -50,9 +48,10 @@ func transferEventToProviderEvent(ds *types.ProviderDealState, evt types.DataTra
 	return types.ProviderDealEvent{}
 }
 
-func (p *provider) doDeal(ds *types.ProviderDealState, publisher event.Emitter) {
+func (p *Provider) doDeal(ds *types.ProviderDealState, publisher event.Emitter) {
 	// publish an event with the current state of the deal
 	if err := publisher.Emit(dealStateToEvent(ds)); err != nil {
+		panic(err)
 		// log
 	}
 
@@ -63,6 +62,7 @@ func (p *provider) doDeal(ds *types.ProviderDealState, publisher event.Emitter) 
 			return
 		}
 		if err := publisher.Emit(dealStateToEvent(ds)); err != nil {
+			panic(err)
 			// log
 		}
 	}
@@ -74,6 +74,7 @@ func (p *provider) doDeal(ds *types.ProviderDealState, publisher event.Emitter) 
 			return
 		}
 		if err := publisher.Emit(dealStateToEvent(ds)); err != nil {
+			panic(err)
 			// log
 		}
 	}
@@ -86,6 +87,7 @@ func (p *provider) doDeal(ds *types.ProviderDealState, publisher event.Emitter) 
 		}
 
 		if err := publisher.Emit(dealStateToEvent(ds)); err != nil {
+			panic(err)
 			// log
 		}
 	}
@@ -98,7 +100,7 @@ func (p *provider) doDeal(ds *types.ProviderDealState, publisher event.Emitter) 
 	// Watch deal on chain and change state in DB and emit notifications.
 }
 
-func (p *provider) transferAndVerify(ds *types.ProviderDealState, publisher event.Emitter) error {
+func (p *Provider) transferAndVerify(ds *types.ProviderDealState, publisher event.Emitter) error {
 	// Transfer Data
 	u, err := url.Parse(ds.TransferURL)
 	if err != nil {
@@ -120,6 +122,7 @@ func (p *provider) transferAndVerify(ds *types.ProviderDealState, publisher even
 	case evt := <-transferSub.Out():
 		dtEvent := evt.(types.DataTransferEvent)
 		if err := publisher.Emit(transferEventToProviderEvent(ds, dtEvent)); err != nil {
+			panic(err)
 			// log
 		}
 		// if dtEvent.Type == Completed || Cancelled || Error {
@@ -143,9 +146,9 @@ func (p *provider) transferAndVerify(ds *types.ProviderDealState, publisher even
 
 	// persist transferred checkpoint
 	ds.Checkpoint = dealcheckpoints.Transferred
-	if err := p.dbApi.CreateOrUpdateDeal(ds); err != nil {
-		return fmt.Errorf("failed to persist deal state: %w", err)
-	}
+	//if err := p.dbApi.CreateOrUpdateDeal(ds); err != nil {
+	//return fmt.Errorf("failed to persist deal state: %w", err)
+	//}
 
 	// TODO : Emit a notification here
 	return nil
@@ -153,7 +156,7 @@ func (p *provider) transferAndVerify(ds *types.ProviderDealState, publisher even
 
 // GeneratePieceCommitment generates the pieceCid for the CARv1 deal payload in
 // the CARv2 file that already exists at the given path.
-func (p *provider) generatePieceCommitment(ds *types.ProviderDealState) (c cid.Cid, finalErr error) {
+func (p *Provider) generatePieceCommitment(ds *types.ProviderDealState) (c cid.Cid, finalErr error) {
 	rd, err := carv2.OpenReader(ds.InboundCARPath)
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to get CARv2 reader: %w", err)
@@ -204,38 +207,38 @@ func (p *provider) generatePieceCommitment(ds *types.ProviderDealState) (c cid.C
 	return cidAndSize.PieceCID, err
 }
 
-func (p *provider) publishDeal(ds *types.ProviderDealState) error {
-	if ds.Checkpoint < dealcheckpoints.Published {
-		mcid, err := p.lotusNode.PublishDeals(p.ctx, *ds)
-		if err != nil {
-			return fmt.Errorf("failed to publish deal: %w", err)
-		}
+func (p *Provider) publishDeal(ds *types.ProviderDealState) error {
+	//if ds.Checkpoint < dealcheckpoints.Published {
+	//mcid, err := p.fullnodeApi.PublishDeals(p.ctx, *ds)
+	//if err != nil {
+	//return fmt.Errorf("failed to publish deal: %w", err)
+	//}
 
-		ds.PublishCid = mcid
-		ds.Checkpoint = dealcheckpoints.Published
-		if err := p.dbApi.CreateOrUpdateDeal(ds); err != nil {
-			return fmt.Errorf("failed to update deal: %w", err)
-		}
-	}
+	//ds.PublishCid = mcid
+	//ds.Checkpoint = dealcheckpoints.Published
+	//if err := p.dbApi.CreateOrUpdateDeal(ds); err != nil {
+	//return fmt.Errorf("failed to update deal: %w", err)
+	//}
+	//}
 
-	res, err := p.lotusNode.WaitForPublishDeals(p.ctx, ds.PublishCid, ds.ClientDealProposal.Proposal)
-	if err != nil {
-		return fmt.Errorf("wait for publish failed: %w", err)
-	}
+	//res, err := p.lotusNode.WaitForPublishDeals(p.ctx, ds.PublishCid, ds.ClientDealProposal.Proposal)
+	//if err != nil {
+	//return fmt.Errorf("wait for publish failed: %w", err)
+	//}
 
-	ds.PublishCid = res.FinalCid
-	ds.DealID = res.DealID
-	ds.Checkpoint = dealcheckpoints.PublishConfirmed
-	if err := p.dbApi.CreateOrUpdateDeal(ds); err != nil {
-		return fmt.Errorf("failed to update deal: %w", err)
-	}
+	//ds.PublishCid = res.FinalCid
+	//ds.DealID = res.DealID
+	//ds.Checkpoint = dealcheckpoints.PublishConfirmed
+	//if err := p.dbApi.CreateOrUpdateDeal(ds); err != nil {
+	//return fmt.Errorf("failed to update deal: %w", err)
+	//}
 
 	// TODO Release funds ? How does that work ?
 	return nil
 }
 
 // HandoffDeal hands off a published deal for sealing and commitment in a sector
-func (p *provider) addPiece(ds *types.ProviderDealState) error {
+func (p *Provider) addPiece(ds *types.ProviderDealState) error {
 	v2r, err := carv2.OpenReader(ds.InboundCARPath)
 	if err != nil {
 		return fmt.Errorf("failed to open CARv2 file: %w", err)
@@ -247,36 +250,38 @@ func (p *provider) addPiece(ds *types.ProviderDealState) error {
 		return fmt.Errorf("failed to create inflator: %w", err)
 	}
 
-	packingInfo, packingErr := p.lotusNode.OnDealComplete(
-		p.ctx,
-		*ds,
-		ds.ClientDealProposal.Proposal.PieceSize.Unpadded(),
-		paddedReader,
-	)
+	_ = paddedReader
+
+	//packingInfo, packingErr := p.fullnodeApi.OnDealComplete(
+	//p.ctx,
+	//*ds,
+	//ds.ClientDealProposal.Proposal.PieceSize.Unpadded(),
+	//paddedReader,
+	//)
 
 	// Close the reader as we're done reading from it.
-	if err := v2r.Close(); err != nil {
-		return fmt.Errorf("failed to close CARv2 reader: %w", err)
-	}
+	//if err := v2r.Close(); err != nil {
+	//return fmt.Errorf("failed to close CARv2 reader: %w", err)
+	//}
 
-	if packingErr != nil {
-		return fmt.Errorf("packing piece %s: %w", ds.ClientDealProposal.Proposal.PieceCID, packingErr)
-	}
+	//if packingErr != nil {
+	//return fmt.Errorf("packing piece %s: %w", ds.ClientDealProposal.Proposal.PieceCID, packingErr)
+	//}
 
-	ds.SectorID = packingInfo.SectorNumber
-	ds.Offset = packingInfo.Offset
-	ds.Length = packingInfo.Size
-	ds.Checkpoint = dealcheckpoints.AddedPiece
-	if err := p.dbApi.CreateOrUpdateDeal(ds); err != nil {
-		return fmt.Errorf("failed to update deal: %w", err)
-	}
+	//ds.SectorID = packingInfo.SectorNumber
+	//ds.Offset = packingInfo.Offset
+	//ds.Length = packingInfo.Size
+	//ds.Checkpoint = dealcheckpoints.AddedPiece
+	//if err := p.dbApi.CreateOrUpdateDeal(ds); err != nil {
+	//return fmt.Errorf("failed to update deal: %w", err)
+	//}
 
-	// Register the deal data as a "shard" with the DAG store. Later it can be
-	// fetched from the DAG store during retrieval.
-	if err := stores.RegisterShardSync(p.ctx, p.dagStore, ds.ClientDealProposal.Proposal.PieceCID, ds.InboundCARPath, true); err != nil {
-		err = fmt.Errorf("failed to activate shard: %w", err)
-		log.Error(err)
-	}
+	//// Register the deal data as a "shard" with the DAG store. Later it can be
+	//// fetched from the DAG store during retrieval.
+	//if err := stores.RegisterShardSync(p.ctx, p.dagStore, ds.ClientDealProposal.Proposal.PieceCID, ds.InboundCARPath, true); err != nil {
+	//err = fmt.Errorf("failed to activate shard: %w", err)
+	//log.Error(err)
+	//}
 
 	return nil
 }

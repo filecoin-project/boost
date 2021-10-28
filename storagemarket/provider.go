@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/filestore"
-	"github.com/filecoin-project/boost/stores"
+	"github.com/filecoin-project/lotus/api/v1api"
 
 	"github.com/libp2p/go-eventbus"
 
@@ -18,23 +18,17 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 
 	"github.com/filecoin-project/boost/storagemarket/datatransfer"
-	"github.com/filecoin-project/boost/storagemarket/lotusnode"
 
 	"github.com/filecoin-project/go-address"
-	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
-
-	"github.com/filecoin-project/boost/storagemarket/datastore"
 )
-
-var log = logging.Logger("provider")
 
 type Config struct {
 	MaxTransferDuration time.Duration
 }
 
-type provider struct {
+type Provider struct {
 	config Config
 	// Address of the provider on chain.
 	Address address.Address
@@ -53,31 +47,35 @@ type provider struct {
 	restartDealsChan chan restartReq
 
 	// Database API
-	dbApi datastore.API
+	//dbApi datastore.API
 
-	// interacts with lotus
-	lotusNode lotusnode.StorageProviderNode
-	dagStore  stores.DAGStoreWrapper
+	fullnodeApi v1api.FullNode
+	//dagStore    stores.DAGStoreWrapper
 
 	transport datatransfer.Transport
+
+	adapter *Adapter
 }
 
-func NewProvider(dbApi datastore.API, lotusNode lotusnode.StorageProviderNode) (*provider, error) {
+//func NewProvider(dbApi datastore.API, lotusNode lotusnode.StorageProviderNode) (*provider, error) {
+func NewProvider(fullnodeApi v1api.FullNode) (*Provider, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return &provider{
-		ctx:       ctx,
-		cancel:    cancel,
-		lotusNode: lotusNode,
-		dbApi:     dbApi,
+	return &Provider{
+		ctx:         ctx,
+		cancel:      cancel,
+		fullnodeApi: fullnodeApi,
+		//dbApi:     dbApi,
+
+		adapter: &Adapter{}, // TODO: instantiate properly
 	}, nil
 }
 
-func (p *provider) GetAsk() *types.StorageAsk {
+func (p *Provider) GetAsk() *types.StorageAsk {
 	return nil
 }
 
-func (p *provider) ExecuteDeal(dp *types.ClientDealParams) (dh *DealHandler, pi *types.ProviderDealRejectionInfo, err error) {
+func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (dh *DealHandler, pi *types.ProviderDealRejectionInfo, err error) {
 	if _, err := url.Parse(dp.TransferURL); err != nil {
 		return nil, nil, fmt.Errorf("transfer url is invalid: %w", err)
 	}
@@ -101,7 +99,7 @@ func (p *provider) ExecuteDeal(dp *types.ClientDealParams) (dh *DealHandler, pi 
 	// create a temp file where we will hold the deal data.
 	tmp, err := p.fs.CreateTemp()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create temp file: %w, err")
+		return nil, nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
 		_ = os.Remove(string(tmp.OsPath()))
@@ -166,7 +164,7 @@ func createPubSub(bus event.Bus) (event.Emitter, event.Subscription, error) {
 	return emitter, sub, nil
 }
 
-func (p *provider) Start() []*DealHandler {
+func (p *Provider) Start() []*DealHandler {
 	// restart all existing deals
 	// execute db query to get all non-terminated deals here
 	var deals []*types.ProviderDealState
@@ -205,7 +203,7 @@ func (p *provider) Start() []*DealHandler {
 	return dhs
 }
 
-func (p *provider) Close() error {
+func (p *Provider) Close() error {
 	p.closeSync.Do(func() {
 		p.cancel()
 		p.wg.Wait()
@@ -237,7 +235,7 @@ type restartReq struct {
 
 // TODO: This is transient -> If it dosen't work out, we will use locks.
 // 1:N will move this problem elsewhere.
-func (p *provider) loop() {
+func (p *Provider) loop() {
 	defer p.wg.Done()
 
 	for {

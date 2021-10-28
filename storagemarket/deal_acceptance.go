@@ -5,10 +5,8 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
-
-	"github.com/filecoin-project/go-fil-markets/shared"
-
 	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-fil-markets/shared"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -20,13 +18,12 @@ import (
 const DealMaxLabelSize = 256
 
 // ValidateDealProposal validates a proposed deal against the provider criteria
-func (p *provider) validateDealProposal(deal types.ProviderDealState) error {
-	tok, curEpoch, err := p.lotusNode.GetChainHead(p.ctx)
+func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
+	tok, curEpoch, err := p.adapter.GetChainHead(p.ctx)
 	if err != nil {
 		return fmt.Errorf("node error getting most recent state id: %w", err)
 	}
 
-	// verify client signature
 	if err := p.validateSignature(tok, deal); err != nil {
 		return fmt.Errorf("validateSignature failed: %w", err)
 	}
@@ -74,7 +71,7 @@ func (p *provider) validateDealProposal(deal types.ProviderDealState) error {
 		return fmt.Errorf("invalid deal end epoch %d: cannot be more than %d past current epoch %d", proposal.EndEpoch, miner.MaxSectorExpirationExtension, curEpoch)
 	}
 
-	pcMin, pcMax, err := p.lotusNode.DealProviderCollateralBounds(p.ctx, proposal.PieceSize, proposal.VerifiedDeal)
+	pcMin, pcMax, err := p.adapter.DealProviderCollateralBounds(p.ctx, proposal.PieceSize, proposal.VerifiedDeal)
 	if err != nil {
 		return fmt.Errorf("node error getting collateral bounds: %w", err)
 	}
@@ -92,7 +89,7 @@ func (p *provider) validateDealProposal(deal types.ProviderDealState) error {
 	}
 
 	// check market funds
-	clientMarketBalance, err := p.lotusNode.GetBalance(p.ctx, proposal.Client, tok)
+	clientMarketBalance, err := p.adapter.GetBalance(p.ctx, proposal.Client, tok)
 	if err != nil {
 		return fmt.Errorf("node error getting client market balance failed: %w", err)
 	}
@@ -105,7 +102,7 @@ func (p *provider) validateDealProposal(deal types.ProviderDealState) error {
 
 	// Verified deal checks
 	if proposal.VerifiedDeal {
-		dataCap, err := p.lotusNode.GetDataCap(p.ctx, proposal.Client, tok)
+		dataCap, err := p.adapter.GetDataCap(p.ctx, proposal.Client, tok)
 		if err != nil {
 			return fmt.Errorf("node error fetching verified data cap: %w", err)
 		}
@@ -123,7 +120,7 @@ func (p *provider) validateDealProposal(deal types.ProviderDealState) error {
 	return nil
 }
 
-func (p *provider) validateAsk(deal types.ProviderDealState) error {
+func (p *Provider) validateAsk(deal types.ProviderDealState) error {
 	ask := p.GetAsk()
 	askPrice := ask.Price
 	if deal.ClientDealProposal.Proposal.VerifiedDeal {
@@ -147,13 +144,13 @@ func (p *provider) validateAsk(deal types.ProviderDealState) error {
 	return nil
 }
 
-func (p *provider) validateSignature(tok shared.TipSetToken, deal types.ProviderDealState) error {
+func (p *Provider) validateSignature(tok shared.TipSetToken, deal types.ProviderDealState) error {
 	b, err := cborutil.Dump(&deal.ClientDealProposal.Proposal)
 	if err != nil {
 		return fmt.Errorf("failed to serialize client deal proposal: %w", err)
 	}
 
-	verified, err := p.lotusNode.VerifySignature(p.ctx, deal.ClientDealProposal.ClientSignature, deal.ClientDealProposal.Proposal.Client, b, tok)
+	verified, err := p.adapter.VerifySignature(p.ctx, deal.ClientDealProposal.ClientSignature, deal.ClientDealProposal.Proposal.Client, b, tok)
 	if err != nil {
 		return fmt.Errorf("error verifying signature: %w", err)
 	}
