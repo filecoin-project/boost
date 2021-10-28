@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Virgil";
-  src: url("Virgil.woff2");
+  src: local('Virgil'), url("./fonts/Virgil.woff2");
   font-display: swap;
 }
 
@@ -108,12 +108,12 @@
 }
 
 .storage .storage-bar .bar .used {
-  background-image: repeating-linear-gradient( 
-    135deg,
-    #fff,
-    #fff 5px,
-    #465298 5px,
-    #465298 6px);
+  background-image: repeating-linear-gradient(
+          135deg,
+          #fff,
+          #fff 5px,
+          #465298 5px,
+          #465298 6px);
   border-top: 1px solid #465298;
   border-bottom: 1px solid #000;
 }
