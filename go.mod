@@ -32,6 +32,8 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.7.4
+	github.com/graph-gophers/graphql-go v1.2.0
+	github.com/graph-gophers/graphql-transport-ws v0.0.1
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-blockservice v0.1.5
 	github.com/ipfs/go-cid v0.1.0

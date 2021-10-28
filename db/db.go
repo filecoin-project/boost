@@ -53,7 +53,7 @@ func (d *DealsDB) ByID(id string) (*Deal, error) {
 	return d.scanRow(row)
 }
 
-func (d *DealsDB) List(ctx context.Context) ([]Deal, error) {
+func (d *DealsDB) List(ctx context.Context) ([]*Deal, error) {
 	qry := "SELECT " + dealFields + " FROM Deals"
 	rows, err := d.db.QueryContext(ctx, qry)
 	if err != nil {
@@ -61,13 +61,13 @@ func (d *DealsDB) List(ctx context.Context) ([]Deal, error) {
 	}
 	defer rows.Close()
 
-	deals := make([]Deal, 0, 16)
+	deals := make([]*Deal, 0, 16)
 	for rows.Next() {
 		deal, err := d.scanRow(rows)
 		if err != nil {
 			return nil, err
 		}
-		deals = append(deals, *deal)
+		deals = append(deals, deal)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
