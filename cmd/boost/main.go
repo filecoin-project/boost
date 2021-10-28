@@ -36,6 +36,7 @@ func main() {
 		Commands: []*cli.Command{
 			runCmd,
 			initCmd,
+			dummydealCmd,
 		},
 	}
 	app.Setup()
