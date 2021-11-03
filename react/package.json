@@ -1,0 +1,53 @@
+{
+  "name": "boost",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@apollo/client": "^3.4.16",
+    "@apollo/react-hooks": "^4.0.0",
+    "@testing-library/jest-dom": "^5.11.4",
+    "@testing-library/react": "^11.1.0",
+    "@testing-library/user-event": "^12.1.10",
+    "apollo-boost": "^0.4.9",
+    "apollo-cache-inmemory": "^1.6.6",
+    "apollo-client": "^2.6.10",
+    "apollo-link-ws": "^1.0.20",
+    "graphql-tag": "^2.12.5",
+    "moment": "^2.29.1",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "react-relay": "^12.0.0",
+    "react-scripts": "4.0.3",
+    "relay-runtime": "^12.0.0",
+    "subscriptions-transport-ws": "^0.9.19",
+    "web-vitals": "^1.0.1"
+  },
+  "scripts": {
+    "start": "npm run relay && react-scripts start",
+    "build": "npm run relay && react-scripts build",
+    "relay": "npx relay-compiler --schema ../gql/schema.graphql --src ./src/ --watchman false $@"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "babel-plugin-relay": "^12.0.0",
+    "graphql": "^15.7.1",
+    "relay-compiler": "^12.0.0"
+  }
+}
