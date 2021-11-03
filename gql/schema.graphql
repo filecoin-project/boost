@@ -1,0 +1,41 @@
+schema {
+  query: RootQuery
+  subscription: RootSubscription
+}
+
+"""
+The `Time` scalar type represents a DateTime. The DateTime is serialized as an RFC 3339 quoted string
+"""
+scalar Time
+
+type Deal {
+  ID: ID!
+  Client: String!
+  CreatedAt: Time!
+  Logs: [DealLog]!
+  PieceCid: String!
+  PieceSize: Float!
+  ProviderCollateral: Float!
+  StartEpoch: Float!
+  EndEpoch: Float!
+  State: String!
+}
+
+type DealLog {
+  DealID: ID!
+  CreatedAt: Time!
+  Text: String!
+}
+
+type RootQuery {
+  """Get Deal by ID"""
+  deal(id: ID!): Deal
+
+  """Get all Deals"""
+  deals: [Deal]
+}
+
+type RootSubscription {
+  """Subscribe to Deal updates by ID"""
+  dealSub(id: ID!): Deal
+}
