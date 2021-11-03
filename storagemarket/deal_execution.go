@@ -33,7 +33,7 @@ func (p *Provider) failDeal(ds *types.ProviderDealState, err error) {
 }
 
 func (p *Provider) cleanupDeal(ds *types.ProviderDealState) {
-	_ = os.Remove(ds.InboundCARPath)
+	_ = os.Remove(ds.InboundFilePath)
 	// ...
 	//cleanup resources here
 }
@@ -102,17 +102,16 @@ func (p *Provider) doDeal(ds *types.ProviderDealState, publisher event.Emitter) 
 
 func (p *Provider) transferAndVerify(ds *types.ProviderDealState, publisher event.Emitter) error {
 	// Transfer Data
-	u, err := url.Parse(ds.TransferURL)
-	if err != nil {
-		return fmt.Errorf("failed to parse transfer URL: %w", err)
-	}
+
+	// TODO: use a generic data transfer descriptor instead of a URL
+	u := url.URL{}
 
 	tctx, cancel := context.WithDeadline(p.ctx, time.Now().Add(p.config.MaxTransferDuration))
 	defer cancel()
 	// TODO Execute SHOULD respect the context here !
 	// async call returns the subscription -> dosen't block
 	// need to ensure that  that passing the padded piece size here makes sense to the transport layer which will receieve the raw unpadded bytes.
-	transferSub, err := p.transport.Execute(tctx, u, ds.InboundCARPath, ds.ClientDealProposal.Proposal.PieceSize)
+	transferSub, err := p.transport.Execute(tctx, &u, ds.InboundFilePath, ds.ClientDealProposal.Proposal.PieceSize)
 	if err != nil {
 		return fmt.Errorf("failed data transfer: %w", err)
 	}
@@ -146,9 +145,9 @@ func (p *Provider) transferAndVerify(ds *types.ProviderDealState, publisher even
 
 	// persist transferred checkpoint
 	ds.Checkpoint = dealcheckpoints.Transferred
-	//if err := p.dbApi.CreateOrUpdateDeal(ds); err != nil {
-	//return fmt.Errorf("failed to persist deal state: %w", err)
-	//}
+	if err := p.db.Update(p.ctx, ds); err != nil {
+		return fmt.Errorf("failed to persist deal state: %w", err)
+	}
 
 	// TODO : Emit a notification here
 	return nil
@@ -157,7 +156,7 @@ func (p *Provider) transferAndVerify(ds *types.ProviderDealState, publisher even
 // GeneratePieceCommitment generates the pieceCid for the CARv1 deal payload in
 // the CARv2 file that already exists at the given path.
 func (p *Provider) generatePieceCommitment(ds *types.ProviderDealState) (c cid.Cid, finalErr error) {
-	rd, err := carv2.OpenReader(ds.InboundCARPath)
+	rd, err := carv2.OpenReader(ds.InboundFilePath)
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to get CARv2 reader: %w", err)
 	}
@@ -239,7 +238,7 @@ func (p *Provider) publishDeal(ds *types.ProviderDealState) error {
 
 // HandoffDeal hands off a published deal for sealing and commitment in a sector
 func (p *Provider) addPiece(ds *types.ProviderDealState) error {
-	v2r, err := carv2.OpenReader(ds.InboundCARPath)
+	v2r, err := carv2.OpenReader(ds.InboundFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to open CARv2 file: %w", err)
 	}

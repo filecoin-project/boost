@@ -25,8 +25,8 @@ const DealsListQuery = gql`
         CreatedAt
         PieceCid
         PieceSize
-        Client
-        State
+        ClientAddress
+        Message
         Logs {
           CreatedAt
           Text
@@ -42,8 +42,8 @@ const DealSubscription = gql`
         CreatedAt
         PieceCid
         PieceSize
-        Client
-        State
+        ClientAddress
+        Message
         Logs {
           CreatedAt
           Text
@@ -228,8 +228,8 @@ function DealRow(props) {
             <td>{moment(deal.CreatedAt).fromNow()}</td>
             <td>{deal.ID}</td>
             <td>{humanFileSize(deal.PieceSize, false, 0)}</td>
-            <td>{deal.Client}</td>
-            <td>{deal.State}</td>
+            <td>{deal.ClientAddress}</td>
+            <td>{deal.Message}</td>
         </tr>
     )
 }

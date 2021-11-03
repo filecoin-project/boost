@@ -6,9 +6,12 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/filecoin-project/boost/db"
 
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
@@ -508,6 +511,11 @@ func StorageNetworkName(ctx helpers.MetricsCtx, a v1api.FullNode) (dtypes.Networ
 	return dtypes.NetworkName(n), nil
 }
 
-func NewStorageMarketProvider(ctx helpers.MetricsCtx, a v1api.FullNode) (*storagemarket.Provider, error) {
-	return storagemarket.NewProvider(a)
+func NewStorageMarketProvider(ctx helpers.MetricsCtx, r repo.LockedRepo, a v1api.FullNode) (*storagemarket.Provider, error) {
+	dbPath := path.Join(r.Path(), "deals.db")
+	sqldb, err := db.SqlDB(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	return storagemarket.NewProvider(sqldb, a)
 }

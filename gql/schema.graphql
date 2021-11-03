@@ -10,15 +10,16 @@ scalar Time
 
 type Deal {
   ID: ID!
-  Client: String!
+  ClientAddress: String!
+  ProviderAddress: String!
   CreatedAt: Time!
-  Logs: [DealLog]!
   PieceCid: String!
   PieceSize: Float!
   ProviderCollateral: Float!
   StartEpoch: Float!
   EndEpoch: Float!
-  State: String!
+  Message: String!
+  Logs: [DealLog]!
 }
 
 type DealLog {

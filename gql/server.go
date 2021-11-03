@@ -1,6 +1,7 @@
 package gql
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -42,6 +43,9 @@ func runDemoServer(listenAddr string) error {
 }
 
 func Serve(listenAddr string, dealsDB *db.DealsDB) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Graphiql handler (GUI for making graphql queries)
 	http.HandleFunc("/", graphiql(httpPort))
 
@@ -54,7 +58,7 @@ func Serve(listenAddr string, dealsDB *db.DealsDB) error {
 	// Allow resolving directly to fields (instead of requiring resolvers to
 	// have a method for every graphql field)
 	opts := []graphql.SchemaOpt{graphql.UseFieldResolvers()}
-	schema, err := graphql.ParseSchema(string(schemaText), newResolver(dealsDB), opts...)
+	schema, err := graphql.ParseSchema(string(schemaText), newResolver(ctx, dealsDB), opts...)
 	if err != nil {
 		return err
 	}
