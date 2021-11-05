@@ -39,7 +39,7 @@ type ProviderDealState struct {
 
 	// Chain Vars
 	ChainDealID abi.DealID
-	PublishCID  cid.Cid
+	PublishCID  *cid.Cid
 
 	// sector packing info
 	SectorID abi.SectorNumber
@@ -48,4 +48,6 @@ type ProviderDealState struct {
 
 	// deal checkpoint in DB.
 	Checkpoint dealcheckpoints.Checkpoint
+	// set if there's an error
+	Err string
 }

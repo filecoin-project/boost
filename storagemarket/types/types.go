@@ -1,8 +1,6 @@
 package types
 
 import (
-	"time"
-
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
 
@@ -40,14 +38,10 @@ type ClientDealParams struct {
 	TransferParams []byte
 }
 
-// ProviderDealRejectionInfo is the information sent by the Storage Provider to the Client when it rejects a valid deal.
-type ProviderDealRejectionInfo struct {
-	Reason  string
-	Backoff time.Duration
-}
+type ProviderDealInfo struct {
+	Deal        *ProviderDealState
+	Transferred uint64
 
-type ProviderDealEvent struct {
-	DealUuid uuid.UUID
 	// ...
 	//
 }

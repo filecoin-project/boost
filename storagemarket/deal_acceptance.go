@@ -88,17 +88,18 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 		return fmt.Errorf("validateAsk failed: %w", err)
 	}
 
-	// check market funds
-	clientMarketBalance, err := p.adapter.GetBalance(p.ctx, proposal.Client, tok)
-	if err != nil {
-		return fmt.Errorf("node error getting client market balance failed: %w", err)
-	}
-
-	// This doesn't guarantee that the client won't withdraw / lock those funds
-	// but it's a decent first filter
-	if clientMarketBalance.Available.LessThan(proposal.ClientBalanceRequirement()) {
-		return fmt.Errorf("clientMarketBalance.Available too small: %d < %d", clientMarketBalance.Available, proposal.ClientBalanceRequirement())
-	}
+	// TODO: Uncomment when client has been implemented
+	//// check market funds
+	//clientMarketBalance, err := p.adapter.GetBalance(p.ctx, proposal.Client, tok)
+	//if err != nil {
+	//	return fmt.Errorf("node error getting client market balance failed: %w", err)
+	//}
+	//
+	//// This doesn't guarantee that the client won't withdraw / lock those funds
+	//// but it's a decent first filter
+	//if clientMarketBalance.Available.LessThan(proposal.ClientBalanceRequirement()) {
+	//	return fmt.Errorf("clientMarketBalance.Available too small: %d < %d", clientMarketBalance.Available, proposal.ClientBalanceRequirement())
+	//}
 
 	// Verified deal checks
 	if proposal.VerifiedDeal {
@@ -145,6 +146,9 @@ func (p *Provider) validateAsk(deal types.ProviderDealState) error {
 }
 
 func (p *Provider) validateSignature(tok shared.TipSetToken, deal types.ProviderDealState) error {
+	// TODO: do proper signature validation once the client side of deal making is set up
+	return nil
+
 	b, err := cborutil.Dump(&deal.ClientDealProposal.Proposal)
 	if err != nil {
 		return fmt.Errorf("failed to serialize client deal proposal: %w", err)

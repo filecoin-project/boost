@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
-	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
@@ -35,7 +34,6 @@ import (
 
 var addPieceRetryWait = 5 * time.Minute
 var addPieceRetryTimeout = 6 * time.Hour
-var log = logging.Logger("storageadapter")
 
 type Adapter struct {
 	v1api.FullNode
