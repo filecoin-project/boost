@@ -2,29 +2,30 @@ package storagemarket
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"os"
+	"path"
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/api"
+
+	"golang.org/x/xerrors"
+
 	"github.com/filecoin-project/boost/db"
-
 	"github.com/filecoin-project/boost/filestore"
-	"github.com/filecoin-project/lotus/api/v1api"
-
-	"github.com/libp2p/go-eventbus"
-
-	"github.com/libp2p/go-libp2p-core/event"
-
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-
 	"github.com/filecoin-project/boost/storagemarket/datatransfer"
-
-	"github.com/filecoin-project/go-address"
-
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/google/uuid"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/libp2p/go-libp2p-core/event"
 )
+
+var log = logging.Logger("provider")
 
 type Config struct {
 	MaxTransferDuration time.Duration
@@ -40,6 +41,8 @@ type Provider struct {
 	closeSync sync.Once
 	wg        sync.WaitGroup
 
+	newDealPS *newDealPS
+
 	// filestore for manipulating files on disk.
 	fs filestore.FileStore
 
@@ -54,29 +57,65 @@ type Provider struct {
 	fullnodeApi v1api.FullNode
 	//dagStore    stores.DAGStoreWrapper
 
-	transport datatransfer.Transport
+	Transport *datatransfer.MockTransport
 
 	adapter *Adapter
+
+	dealExecs *dealExecs
 }
 
-func NewProvider(sqldb *sql.DB, fullnodeApi v1api.FullNode) (*Provider, error) {
-	ctx, cancel := context.WithCancel(context.Background())
+func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNode, addr address.Address) (*Provider, error) {
+	fspath := path.Join(repoRoot, "incoming")
+	err := os.MkdirAll(fspath, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	fs, err := filestore.NewLocalFileStore(filestore.OsPath(fspath))
+	if err != nil {
+		return nil, err
+	}
+
+	newDealPS, err := newDealPubsub()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Provider{
-		ctx:         ctx,
-		cancel:      cancel,
+		// TODO: pass max transfer duration as a param
+		config:      Config{MaxTransferDuration: 30 * time.Second},
+		Address:     addr,
+		newDealPS:   newDealPS,
+		fs:          fs,
 		fullnodeApi: fullnodeApi,
-		db:          db.NewDealsDB(sqldb),
+		db:          dealsDB,
 
-		adapter: &Adapter{}, // TODO: instantiate properly
+		acceptDealsChan:  make(chan acceptDealReq, 128),
+		failedDealsChan:  make(chan failedDealReq, 128),
+		restartDealsChan: make(chan restartReq, 128),
+
+		Transport: datatransfer.NewMockTransport(),
+
+		adapter: &Adapter{
+			FullNode: fullnodeApi,
+		},
+
+		dealExecs: newDealExecs(),
 	}, nil
 }
 
 func (p *Provider) GetAsk() *types.StorageAsk {
-	return nil
+	return &types.StorageAsk{
+		Price:         abi.NewTokenAmount(1),
+		VerifiedPrice: abi.NewTokenAmount(1),
+		MinPieceSize:  0,
+		MaxPieceSize:  64 * 1024 * 1024 * 1024,
+		Miner:         p.Address,
+	}
 }
 
-func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (dh *DealHandler, pi *types.ProviderDealRejectionInfo, err error) {
+func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDealRejectionInfo, err error) {
+	log.Infow("execute deal", "id", dp.DealUuid)
+
 	ds := types.ProviderDealState{
 		DealUuid:           dp.DealUuid,
 		ClientDealProposal: dp.ClientDealProposal,
@@ -89,34 +128,30 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (dh *DealHandler, pi 
 
 	// validate the deal proposal
 	if err := p.validateDealProposal(ds); err != nil {
-		return nil, &types.ProviderDealRejectionInfo{
+		return &api.ProviderDealRejectionInfo{
 			Reason: fmt.Sprintf("failed validation: %s", err),
 		}, err
+	}
+
+	de, err := p.newDealExec(&ds)
+	if err != nil {
+		return nil, err
 	}
 
 	// create a temp file where we will hold the deal data.
 	tmp, err := p.fs.CreateTemp()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create temp file: %w", err)
+		return nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
 		_ = os.Remove(string(tmp.OsPath()))
-		return nil, nil, fmt.Errorf("failed to close temp file: %w", err)
+		return nil, fmt.Errorf("failed to close temp file: %w", err)
 	}
 	ds.InboundFilePath = string(tmp.OsPath())
-
-	// create the pub-sub plumbing for this deal
-	bus := eventbus.NewBus()
-	publisher, sub, err := createPubSub(bus)
-	if err != nil {
-		_ = os.Remove(ds.InboundFilePath)
-		return nil, nil, err
-	}
 
 	defer func() {
 		if pi != nil || err != nil {
 			_ = os.Remove(ds.InboundFilePath)
-			_ = sub.Close()
 		}
 	}()
 
@@ -124,73 +159,64 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (dh *DealHandler, pi 
 	// then wait for a response and return the response to the client.
 	respChan := make(chan acceptDealResp, 1)
 	select {
-	case p.acceptDealsChan <- acceptDealReq{&ds, respChan, publisher}:
+	case p.acceptDealsChan <- acceptDealReq{rsp: respChan, de: de}:
 	case <-p.ctx.Done():
-		return nil, nil, p.ctx.Err()
+		return nil, p.ctx.Err()
 	}
 
 	var resp acceptDealResp
 	select {
 	case resp = <-respChan:
 	case <-p.ctx.Done():
-		return nil, nil, p.ctx.Err()
+		return nil, p.ctx.Err()
 	}
 
 	// if there was an error, we return no rejection reason as well.
 	if resp.err != nil {
-		return nil, nil, fmt.Errorf("failed to accept deal: %w", resp.err)
+		return nil, fmt.Errorf("failed to accept deal: %w", resp.err)
 	}
 	// return rejection reason as provider has rejected a valid deal.
 	if !resp.accepted {
-		return nil, resp.ri, nil
+		log.Infow("rejected deal: "+resp.ri.Reason, "id", dp.DealUuid)
+		return resp.ri, nil
 	}
 
-	dh = newDealHandler(dp.DealUuid, sub)
-	return dh, nil, nil
+	return nil, nil
 }
 
-func createPubSub(bus event.Bus) (event.Emitter, event.Subscription, error) {
-	emitter, err := bus.Emitter(&types.ProviderDealEvent{}, eventbus.Stateful)
+func (p *Provider) Start(ctx context.Context) error {
+	log.Infow("storage provider: starting")
+
+	p.ctx, p.cancel = context.WithCancel(ctx)
+
+	// initialize the database
+	err := p.db.Init(p.ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create event emitter: %w", err)
-	}
-	sub, err := bus.Subscribe(new(types.ProviderDealEvent), eventbus.BufSize(256))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create subscriber: %w", err)
+		return err
 	}
 
-	return emitter, sub, nil
-}
-
-func (p *Provider) Start() ([]*DealHandler, error) {
 	// restart all existing deals
 	deals, err := p.db.ListActive(p.ctx)
 	if err != nil {
-		return nil, err
+		return xerrors.Errorf("getting active deals: %w", err)
 	}
 
 	var restartWg sync.WaitGroup
-	dhs := make([]*DealHandler, 0, len(deals))
-
 	for _, deal := range deals {
-		pub, sub, err := createPubSub(eventbus.NewBus())
+		de, err := p.newDealExec(deal)
 		if err != nil {
-			panic(err)
+			return err
 		}
-
-		req := restartReq{&deal, pub}
 
 		restartWg.Add(1)
 		go func() {
 			defer restartWg.Done()
 
 			select {
-			case p.restartDealsChan <- req:
+			case p.restartDealsChan <- restartReq{de: de}:
 			case <-p.ctx.Done():
 			}
 		}()
-
-		dhs = append(dhs, newDealHandler(deal.DealUuid, sub))
 	}
 
 	p.wg.Add(1)
@@ -200,7 +226,8 @@ func (p *Provider) Start() ([]*DealHandler, error) {
 	// after all existing deals have restarted and accounted for their resources.
 	restartWg.Wait()
 
-	return dhs, nil
+	log.Infow("storage provider: started")
+	return nil
 }
 
 func (p *Provider) Close() error {
@@ -211,15 +238,41 @@ func (p *Provider) Close() error {
 	return nil
 }
 
+// SubscribeNewDeals subscribes to "new deal" events
+func (p *Provider) SubscribeNewDeals() (event.Subscription, error) {
+	return p.newDealPS.subscribe()
+}
+
+// SubscribeNewDeals subscribes to updates to a deal
+func (p *Provider) SubscribeDealUpdates(dealUuid uuid.UUID) (event.Subscription, error) {
+	de, err := p.dealExecs.get(dealUuid)
+	if err != nil {
+		return nil, err
+	}
+	return de.subscribeUpdates()
+}
+
+// CancelDeal cancels a deal and any associated data transfer
+func (p *Provider) CancelDeal(ctx context.Context, dealUuid uuid.UUID) error {
+	de, err := p.dealExecs.get(dealUuid)
+	if err != nil {
+		if xerrors.Is(err, ErrDealExecNotFound) {
+			return nil
+		}
+		return err
+	}
+	de.cancel(ctx)
+	return nil
+}
+
 type acceptDealReq struct {
-	st        *types.ProviderDealState
-	rsp       chan acceptDealResp
-	publisher event.Emitter
+	rsp chan acceptDealResp
+	de  *dealExec
 }
 
 type acceptDealResp struct {
 	accepted bool
-	ri       *types.ProviderDealRejectionInfo
+	ri       *api.ProviderDealRejectionInfo
 	err      error
 }
 
@@ -229,8 +282,7 @@ type failedDealReq struct {
 }
 
 type restartReq struct {
-	st        *types.ProviderDealState
-	publisher event.Emitter
+	de *dealExec
 }
 
 // TODO: This is transient -> If it dosen't work out, we will use locks.
@@ -241,17 +293,22 @@ func (p *Provider) loop() {
 	for {
 		select {
 		case restartReq := <-p.restartDealsChan:
+			log.Infow("restart deal", "id", restartReq.de.deal.DealUuid)
+
 			// Put ANY RESTART SYNCHRONIZATION LOGIC HERE.
 			// ....
 			//
 			p.wg.Add(1)
 			go func() {
 				defer p.wg.Done()
-				p.doDeal(restartReq.st, restartReq.publisher)
+				restartReq.de.doDeal()
 			}()
 
 		case dealReq := <-p.acceptDealsChan:
-			writeDealResp := func(accepted bool, ri *types.ProviderDealRejectionInfo, err error) {
+			deal := dealReq.de.deal
+			log.Infow("process accept deal request", "id", deal.DealUuid)
+
+			writeDealResp := func(accepted bool, ri *api.ProviderDealRejectionInfo, err error) {
 				select {
 				case dealReq.rsp <- acceptDealResp{accepted, ri, err}:
 				case <-p.ctx.Done():
@@ -267,31 +324,35 @@ func (p *Provider) loop() {
 
 			// TODO: Deal filter, storage space manager, fund manager etc . basically synchronization
 			// send rejection if deal is not accepted by the above filters
-			var accepted bool
+			accepted := true
 			if !accepted {
-				go writeDealResp(false, &types.ProviderDealRejectionInfo{}, nil)
+				go writeDealResp(false, &api.ProviderDealRejectionInfo{}, nil)
 				continue
 			}
 			go writeDealResp(true, nil, nil)
 
-			// start executing the deal
-			dealReq.st.Checkpoint = dealcheckpoints.New
-
 			// write deal state to the database
-			err = p.db.Insert(p.ctx, dealReq.st)
+			log.Infow("insert deal into DB", "id", deal.DealUuid)
+
+			deal.CreatedAt = time.Now()
+			deal.Checkpoint = dealcheckpoints.New
+
+			err = p.db.Insert(p.ctx, deal)
 			if err != nil {
 				go writeDealResp(false, nil, err)
 				continue
 			}
 
+			// start executing the deal
 			p.wg.Add(1)
 			go func() {
 				defer p.wg.Done()
-				p.doDeal(dealReq.st, dealReq.publisher)
+
+				dealReq.de.doDeal()
 			}()
 
 		case failedDeal := <-p.failedDealsChan:
-			fmt.Println(failedDeal)
+			log.Errorw("deal failed", "id", failedDeal.st.DealUuid, "err", failedDeal.err)
 			// Release storage space , funds, shared resources etc etc.
 
 		case <-p.ctx.Done():

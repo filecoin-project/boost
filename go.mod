@@ -7,7 +7,6 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
 	github.com/BurntSushi/toml v0.3.1
-	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger/v2 v2.2007.2
 	github.com/filecoin-project/dagstore v0.4.3
 	github.com/filecoin-project/go-address v0.0.5
@@ -89,6 +88,14 @@ require (
 )
 
 require (
-	github.com/cskr/pubsub v1.0.2
+	github.com/ipfs/go-cidutil v0.0.2
+	github.com/ipfs/go-ipfs-chunker v0.0.5
+	github.com/ipfs/go-ipfs-exchange-offline v0.0.1
+	github.com/ipfs/go-ipfs-files v0.0.8
+	github.com/ipfs/go-ipld-format v0.2.0
+	github.com/ipfs/go-merkledag v0.3.2
+	github.com/ipfs/go-unixfs v0.2.6
+	github.com/ipld/go-car v0.3.2-0.20211001225732-32d0d9933823
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
+	github.com/multiformats/go-multihash v0.0.15
 )
