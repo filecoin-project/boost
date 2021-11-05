@@ -12,6 +12,7 @@ package api
 //  * Generate openrpc blobs
 
 type Boost interface {
+	Market
 	Common
 	Net
 }

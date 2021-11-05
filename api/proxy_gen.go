@@ -11,12 +11,14 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	xerrors "golang.org/x/xerrors"
+	"golang.org/x/xerrors"
 )
 
 var ErrNotSupported = xerrors.New("method not supported")
 
 type BoostStruct struct {
+	MarketStruct
+
 	CommonStruct
 
 	NetStruct
@@ -26,6 +28,8 @@ type BoostStruct struct {
 }
 
 type BoostStub struct {
+	MarketStub
+
 	CommonStub
 
 	NetStub
@@ -66,6 +70,15 @@ type CommonNetStub struct {
 	CommonStub
 
 	NetStub
+}
+
+type MarketStruct struct {
+	Internal struct {
+		MarketDummyDeal func(p0 context.Context) (*ProviderDealRejectionInfo, error) `perm:"admin"`
+	}
+}
+
+type MarketStub struct {
 }
 
 type NetStruct struct {
@@ -149,6 +162,17 @@ func (s *CommonStruct) AuthVerify(p0 context.Context, p1 string) ([]auth.Permiss
 
 func (s *CommonStub) AuthVerify(p0 context.Context, p1 string) ([]auth.Permission, error) {
 	return *new([]auth.Permission), ErrNotSupported
+}
+
+func (s *MarketStruct) MarketDummyDeal(p0 context.Context) (*ProviderDealRejectionInfo, error) {
+	if s.Internal.MarketDummyDeal == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.MarketDummyDeal(p0)
+}
+
+func (s *MarketStub) MarketDummyDeal(p0 context.Context) (*ProviderDealRejectionInfo, error) {
+	return nil, ErrNotSupported
 }
 
 func (s *NetStruct) ID(p0 context.Context) (peer.ID, error) {
@@ -331,4 +355,5 @@ var _ Boost = new(BoostStruct)
 var _ ChainIO = new(ChainIOStruct)
 var _ Common = new(CommonStruct)
 var _ CommonNet = new(CommonNetStruct)
+var _ Market = new(MarketStruct)
 var _ Net = new(NetStruct)

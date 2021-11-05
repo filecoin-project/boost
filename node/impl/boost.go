@@ -1,16 +1,34 @@
 package impl
 
 import (
+	"context"
 	"encoding/json"
+	"math/rand"
 	"net/http"
 
-	"github.com/filecoin-project/go-jsonrpc/auth"
+	"github.com/filecoin-project/boost/storagemarket/datatransfer"
 
-	"go.uber.org/fx"
+	"github.com/filecoin-project/boost/gql"
+
+	"github.com/filecoin-project/boost/storagemarket"
+
+	"github.com/filecoin-project/boost/util"
+
+	"github.com/filecoin-project/go-address"
+
+	"github.com/filecoin-project/boost/testutil"
+
+	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/crypto"
+	"github.com/filecoin-project/specs-actors/actors/builtin/market"
+	"github.com/google/uuid"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/go-jsonrpc/auth"
 	lapi "github.com/filecoin-project/lotus/api"
+	"go.uber.org/fx"
 )
 
 type BoostAPI struct {
@@ -23,9 +41,9 @@ type BoostAPI struct {
 	//LocalStore  *stores.Local
 	//RemoteStore *stores.Remote
 
-	//// Markets
+	// Markets
+	StorageProvider *storagemarket.Provider `optional:"true"`
 	//PieceStore        dtypes.ProviderPieceStore         `optional:"true"`
-	//StorageProvider   storagemarket.StorageProvider     `optional:"true"`
 	//RetrievalProvider retrievalmarket.RetrievalProvider `optional:"true"`
 	//SectorAccessor    retrievalmarket.SectorAccessor    `optional:"true"`
 	//DataTransfer      dtypes.ProviderDataTransfer       `optional:"true"`
@@ -33,6 +51,10 @@ type BoostAPI struct {
 	//SectorBlocks      *sectorblocks.SectorBlocks        `optional:"true"`
 	//Host              host.Host                         `optional:"true"`
 	//DAGStore          *dagstore.DAGStore                `optional:"true"`
+
+	// TODO: Figure out how to start graphql server without it needing
+	// to be a dependency of another fx object
+	GraphqlServer *gql.Server `optional:"true"`
 
 	DS dtypes.MetadataDS
 }
@@ -51,6 +73,58 @@ func (sm *BoostAPI) ServeRemote(perm bool) func(w http.ResponseWriter, r *http.R
 
 		//sm.StorageMgr.ServeHTTP(w, r)
 	}
+}
+
+func (sm *BoostAPI) MarketDummyDeal(ctx context.Context) (*api.ProviderDealRejectionInfo, error) {
+	carRes, err := testutil.CreateRandomCARv1(5, 1600)
+	if err != nil {
+		return nil, err
+	}
+
+	pieceCid, pieceSize, err := util.CommP(ctx, carRes.Blockstore, carRes.Root)
+	if err != nil {
+		return nil, err
+	}
+
+	clientAddr, _ := address.NewIDAddress(1234)
+	proposal := market.ClientDealProposal{
+		Proposal: market.DealProposal{
+			PieceCID:             pieceCid,
+			PieceSize:            pieceSize.Padded(),
+			VerifiedDeal:         false,
+			Client:               clientAddr,
+			Provider:             sm.StorageProvider.Address,
+			Label:                carRes.Root.String(),
+			StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
+			EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
+			StoragePricePerEpoch: abi.NewTokenAmount(rand.Int63()),
+			ProviderCollateral:   abi.NewTokenAmount(0),
+			ClientCollateral:     abi.NewTokenAmount(0),
+		},
+		ClientSignature: crypto.Signature{
+			Type: crypto.SigTypeBLS,
+			Data: []byte("sig"),
+		},
+	}
+
+	// Save the path to the CAR file as a transfer parameter
+	transferParams := &datatransfer.TransferLocalParams{Path: carRes.CarFile}
+	paramsBytes, err := datatransfer.TransferLocal.MarshallParams(transferParams)
+	if err != nil {
+		return nil, err
+	}
+
+	deal := &types.ClientDealParams{
+		DealUuid:           uuid.New(),
+		MinerPeerID:        "miner peer",
+		ClientPeerID:       "client peer",
+		ClientDealProposal: proposal,
+		DealDataRoot:       testutil.GenerateCid(),
+		TransferType:       datatransfer.TransferLocal.Type(),
+		TransferParams:     paramsBytes,
+	}
+
+	return sm.StorageProvider.ExecuteDeal(deal)
 }
 
 //func (sm *BoostAPI) MarketImportDealData(ctx context.Context, propCid cid.Cid, path string) error {
