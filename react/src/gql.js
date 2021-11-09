@@ -2,6 +2,9 @@ import gql from "graphql-tag";
 import ApolloClient from "apollo-client";
 import {WebSocketLink} from "apollo-link-ws";
 import {InMemoryCache} from "apollo-cache-inmemory";
+import {parseDates} from "./hooks";
+
+const cache = new InMemoryCache();
 
 const gqlClient = new ApolloClient({
     link: new WebSocketLink({
@@ -10,22 +13,40 @@ const gqlClient = new ApolloClient({
             reconnect: true,
         },
     }),
-    cache: new InMemoryCache(),
+    cache
 });
 
+const gqlQuery = function(...args) {
+    var res = gqlClient.query.apply(gqlClient, args)
+    return res.then(ret => {
+        if (ret.data) {
+            parseDates(ret.data)
+        }
+        return ret
+    })
+}
+
+const gqlSubscribe = function(...args) {
+    return gqlClient.subscribe.apply(gqlClient, args)
+}
+
 const DealsListQuery = gql`
-    query AppDealsListQuery {
-        deals {
-            ID
-            CreatedAt
-            PieceCid
-            PieceSize
-            ClientAddress
-            Message
-            Logs {
+    query AppDealsListQuery($first: ID, $limit: Int) {
+        deals(first: $first, limit: $limit) {
+            deals {
+                ID
                 CreatedAt
-                Text
+                PieceCid
+                PieceSize
+                ClientAddress
+                Message
+                Logs {
+                    CreatedAt
+                    Text
+                }
             }
+            totalCount
+            next
         }
     }
 `;
@@ -72,6 +93,8 @@ const NewDealsSubscription = gql`
 
 export {
     gqlClient,
+    gqlQuery,
+    gqlSubscribe,
     DealsListQuery,
     DealSubscription,
     DealCancelMutation,

@@ -2,9 +2,11 @@ import './App.css';
 import moment from 'moment';
 import React, { useState, useEffect } from 'react';
 import { ApolloProvider } from "@apollo/react-hooks";
-import { useSubscription, useQuery, useMutation } from "./hooks";
+import { useSubscription, useMutation, parseDates } from "./hooks";
 import {
     gqlClient,
+    gqlQuery,
+    gqlSubscribe,
     DealsListQuery,
     DealSubscription,
     DealCancelMutation,
@@ -123,8 +125,6 @@ function DealLog(props) {
 }
 
 function DealDetail(props) {
-    var deal = props.deal
-
     // Add a class to the document body when showing the deal detail page
     useEffect(() => {
         document.body.classList.add('modal-open')
@@ -135,8 +135,22 @@ function DealDetail(props) {
     })
 
     const [cancelDeal] = useMutation(DealCancelMutation, {
-        variables: { id: deal.ID }
+        variables: { id: props.deal.ID }
     })
+
+    const { loading, error, data } = useSubscription(DealSubscription, {
+        variables: { id: props.deal.ID },
+    })
+
+    if (error) {
+        return <div>Error: {error.message}</div>
+    }
+
+    var deal = props.deal
+    if (!loading) {
+        deal = data.dealUpdate
+    }
+
 
     var logRowData = []
     for (var i = 0; i < (deal.Logs || []).length; i++) {
@@ -193,7 +207,6 @@ function DealDetail(props) {
 function DealRow(props) {
     const { loading, error, data } = useSubscription(DealSubscription, {
         variables: { id: props.deal.ID },
-        onSubscriptionData: ({ subscriptionData }) => props.updateDeal(subscriptionData.data.dealUpdate)
     })
 
     if (error) {
@@ -222,47 +235,167 @@ function uniqDeals(deals) {
     return new Array(...new Map(deals.map(el => [el.ID, el])).values())
 }
 
+var dealsPerPage = 10
+
+class NewDealsSubscriber {
+    constructor(initialDeals, onNewDeal) {
+        this.pageNum = 1
+        this.deals = initialDeals
+        this.onNewDeal = onNewDeal
+    }
+
+    updateFields(deals, pageNum) {
+        newDealsSubscriber.deals = deals
+        newDealsSubscriber.pageNum = pageNum
+    }
+
+    async subscribe() {
+        var that = this
+
+        try {
+            var res = await gqlSubscribe({
+                query: NewDealsSubscription
+            })
+            res.subscribe({
+                next(r) {
+                    parseDates(r)
+
+                    // Don't add new deals to the list if we're not on the first page
+                    if (this.pageNum > 1) {
+                        return
+                    }
+
+                    var nextCursor
+                    var dealNew = r.data.dealNew
+                    that.deals = uniqDeals([dealNew, ...that.deals])
+                    if (that.deals.length > dealsPerPage) {
+                        nextCursor = that.deals[dealsPerPage].ID
+                        that.deals = that.deals.slice(0, dealsPerPage)
+                        that.onNewDeal(that.deals, nextCursor)
+                    }
+                },
+                error(e) {
+                    console.log('new deals subscription error:', e)
+                }
+            })
+        } catch (e) {
+            console.log('new deals subscription error:', e)
+        }
+    }
+}
+
+class DealsPagination {
+    constructor(setPageNum, dealsListQuery) {
+        this.pageCursors = {}
+        this.setPageNum = setPageNum
+        this.dealsListQuery = dealsListQuery
+    }
+
+    addPageCursor(num, cursor) {
+        var newPageCursors = {}
+        newPageCursors[num] = cursor
+        this.pageCursors = Object.assign(this.pageCursors, newPageCursors)
+    }
+
+    async nextPage(currentPage) {
+        var newPageNum = currentPage+1
+        var nextCursor = this.pageCursors[newPageNum]
+        if (!nextCursor) {
+            return
+        }
+
+        var dealList = await this.dealsListQuery(nextCursor)
+        this.setPageNum(newPageNum)
+        this.addPageCursor(newPageNum+1, dealList.next)
+    }
+
+    async prevPage(currentPage) {
+        if (currentPage <= 1) {
+            return
+        }
+
+        var newPageNum = currentPage-1
+        var prevCursor = this.pageCursors[newPageNum]
+        await this.dealsListQuery(prevCursor)
+        this.setPageNum(newPageNum)
+    }
+}
+
+var newDealsSubscriber
+var dealsPagination
+
 function StorageDealsPage(props) {
     const [dealToShow, setDealToShow] = useState(null)
+    const [deals, setDeals] = useState([])
+    const [totalCount, setTotalCount] = useState(0)
+    const [pageNum, setPageNum] = useState(1)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState()
 
-    const { loading, error, data, subscribeToMore, updateQuery } = useQuery(DealsListQuery)
-
-    // Subscribe to "new deal" events
-    useEffect(() => {
-        return subscribeToMore({
-            document: NewDealsSubscription,
-            updateQuery: (prev, { subscriptionData }) => {
-                if (!subscriptionData.data) return prev
-
-                // Add new deal to list of existing deals
-                const newDeal = subscriptionData.data.dealNew
-                var deals = uniqDeals([newDeal, ...((prev && prev.deals) || [])])
-                return Object.assign({}, prev, {
-                    deals: deals
-                });
-            }
-        })
-    })
-
-    // In DealRow we subscribe to updates for a particular deal.
-    // When the subscription sends an update, re-render.
-    function updateDeal(deal) {
-        updateQuery(prev => {
-            if (!prev || !prev.deals) return prev
-
-            return Object.assign({}, prev, {
-                deals: prev.deals.map(dl => dl.ID == deal.ID ? deal : dl)
+    async function dealsListQuery(cursor) {
+        try {
+            var res = await gqlQuery({
+                query: DealsListQuery,
+                variables: {
+                    limit: dealsPerPage,
+                    first: cursor,
+                },
+                fetchPolicy: 'network-only',
             })
-        })
+
+            var dealList = res.data.deals
+            setDeals(dealList.deals)
+            setTotalCount(dealList.totalCount)
+            setLoading(false)
+
+            return dealList
+        } catch (e) {
+            setError(e)
+        }
     }
+
+    // Runs the first time the page is rendered
+    useEffect(() => {
+        // Create a pagination manager
+        dealsPagination = new DealsPagination(setPageNum, dealsListQuery)
+        async function onStart() {
+            // Make a query to get the current list of deals
+            var res = await dealsListQuery()
+            if (res.deals) {
+                // Subscribe to "new deal" events
+                newDealsSubscriber = new NewDealsSubscriber(res.deals, function (newDeals, nextCursor) {
+                    if (newDealsSubscriber.pageNum === 1) {
+                        // If it's the first page, update the list of deals
+                        // that is currently being displayed
+                        setDeals(newDeals)
+                        dealsPagination.addPageCursor(2, nextCursor)
+                    }
+                    setTotalCount(res.totalCount+1)
+                })
+
+                dealsPagination.addPageCursor(2, res.next)
+            }
+            newDealsSubscriber.subscribe()
+        }
+
+        onStart()
+    }, [])
+
+    // When the deals being displayed or the page number changes, update the
+    // deals subscriber fields
+    useEffect(() => {
+        newDealsSubscriber && newDealsSubscriber.updateFields(deals, pageNum)
+    }, [deals, pageNum])
 
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error.message}</div>;
 
     var dealDetail
     if (dealToShow) {
-        dealDetail = data.deals.find(dl => dl.ID === dealToShow)
+        dealDetail = deals.find(dl => dl.ID === dealToShow)
     }
+
+    var totalPages = Math.ceil(totalCount / dealsPerPage)
 
     return <div className="deals">
         <table>
@@ -275,11 +408,20 @@ function StorageDealsPage(props) {
                     <th>State</th>
                 </tr>
 
-                {data.deals.map(deal => (
-                    <DealRow key={deal.ID} deal={deal} updateDeal={updateDeal} onDealRowClick={setDealToShow} />
+                {deals.map(deal => (
+                    <DealRow key={deal.ID} deal={deal} onDealRowClick={setDealToShow} />
                 ))}
             </tbody>
         </table>
+
+        <div className="pagination">
+            <div className="controls">
+                <div className="left" onClick={() => dealsPagination.prevPage(pageNum)}>&lt;</div>
+                <div className="page">{pageNum} of {totalPages}</div>
+                <div className="right" onClick={() => dealsPagination.nextPage(pageNum)}>&gt;</div>
+                <div className="total">{totalCount} deals</div>
+            </div>
+        </div>
 
         {dealDetail && (
             <div id="deal-detail">

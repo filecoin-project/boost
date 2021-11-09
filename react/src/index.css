@@ -74,6 +74,31 @@ body.modal-open {
   color: #465298;
 }
 
+.deals .pagination {
+  position: relative;
+}
+
+.deals .pagination .controls {
+  position: absolute;
+  margin-top: 1em;
+  left: 50%;
+  transform: translate(-50%, 0);
+}
+
+.deals .pagination .left, .deals .pagination .right, .deals .pagination .page, .deals .pagination .total {
+  display: inline-block;
+  padding: 0 0.5em;
+}
+
+.deals .pagination .left, .deals .pagination .right {
+  color: #465298;
+  cursor: pointer;
+}
+
+.deals .pagination .total {
+  color: #999;
+}
+
 #deal-detail {
   padding-top: 1em;
   margin: auto;

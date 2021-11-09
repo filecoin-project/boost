@@ -7,28 +7,21 @@ import (
 	"os"
 	"time"
 
-	"github.com/libp2p/go-eventbus"
-
-	"github.com/filecoin-project/boost/db"
-	"github.com/google/uuid"
-
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/storagemarket/datatransfer"
-
-	"github.com/libp2p/go-libp2p-core/event"
-
-	"github.com/filecoin-project/go-padreader"
-
+	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-
 	"github.com/filecoin-project/go-commp-utils/writer"
 	commcid "github.com/filecoin-project/go-fil-commcid"
 	commp "github.com/filecoin-project/go-fil-commp-hashhash"
+	"github.com/filecoin-project/go-padreader"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
-
-	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/libp2p/go-eventbus"
+	"github.com/libp2p/go-libp2p-core/event"
 )
 
 var ErrDealExecNotFound = xerrors.Errorf("deal exec not found")

@@ -4,6 +4,7 @@ import {
     useSubscription as apolloUseSubscription,
     useQuery as apolloUseQuery,
     useMutation as apolloUseMutation,
+    useLazyQuery as apolloUseLazyQuery,
 } from "@apollo/react-hooks";
 
 var useSubscription = function(...args) {
@@ -15,6 +16,13 @@ var useSubscription = function(...args) {
 }
 var useQuery = function(...args) {
     var ret = apolloUseQuery.apply(null, args)
+    if (ret.data) {
+        parseDates(ret.data)
+    }
+    return ret
+}
+var useLazyQuery = function(...args) {
+    var ret = apolloUseLazyQuery.apply(null, args)
     if (ret.data) {
         parseDates(ret.data)
     }
@@ -46,6 +54,8 @@ function parseDates(obj, parent, parentKey) {
 
 export {
     useQuery,
+    useLazyQuery,
     useSubscription,
     useMutation,
+    parseDates,
 };
