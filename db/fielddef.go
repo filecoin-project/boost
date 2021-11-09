@@ -123,7 +123,10 @@ func (fd *sigFieldDef) marshall() (interface{}, error) {
 
 func (fd *sigFieldDef) unmarshall() error {
 	var sig crypto.Signature
-	sig.UnmarshalBinary(fd.marshalled)
+	err := sig.UnmarshalBinary(fd.marshalled)
+	if err != nil {
+		return xerrors.Errorf("parsing signature: %w", err)
+	}
 
 	*fd.f = sig
 	return nil
