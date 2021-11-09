@@ -7,8 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/libp2p/go-eventbus"
-
 	"github.com/filecoin-project/boost/db"
 	"github.com/google/uuid"
 
@@ -32,37 +30,6 @@ import (
 )
 
 var ErrDealExecNotFound = xerrors.Errorf("deal exec not found")
-
-func (p *Provider) doDeal(deal *types.ProviderDealState) {
-	// Set up pubsub for deal updates
-	bus := eventbus.NewBus()
-	pub, err := bus.Emitter(&types.ProviderDealInfo{}, eventbus.Stateful)
-	if err != nil {
-		err := fmt.Errorf("failed to create event emitter: %w", err)
-		p.failDeal(pub, deal, err)
-		return
-	}
-
-	// Create a context that can be cancelled for this deal if the user wants
-	// to cancel the deal early
-	ctx, stop := context.WithCancel(p.ctx)
-	defer stop()
-
-	stopped := make(chan struct{})
-	defer close(stopped)
-
-	// Keep track of the fields to subscribe to or cancel the deal
-	p.dealHandlers.track(&dealHandler{
-		dealUuid: deal.DealUuid,
-		ctx:      ctx,
-		stop:     stop,
-		stopped:  stopped,
-		bus:      bus,
-	})
-
-	// Execute the deal synchronously
-	p.execDeal(ctx, pub, deal)
-}
 
 func (p *Provider) execDeal(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) {
 	// publish "new deal" event

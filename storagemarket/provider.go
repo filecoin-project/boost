@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-eventbus"
+
 	"github.com/filecoin-project/boost/api"
 
 	"golang.org/x/xerrors"
@@ -198,12 +200,15 @@ func (p *Provider) Start(ctx context.Context) error {
 
 	var restartWg sync.WaitGroup
 	for _, deal := range deals {
+		deal := deal
+		dealHandler := p.newDealHandler(deal)
+
 		restartWg.Add(1)
 		go func() {
 			defer restartWg.Done()
 
 			select {
-			case p.restartDealsChan <- restartReq{deal: deal}:
+			case p.restartDealsChan <- restartReq{deal: deal, dealHandler: dealHandler}:
 			case <-p.ctx.Done():
 			}
 		}()
@@ -256,8 +261,9 @@ func (p *Provider) CancelDeal(ctx context.Context, dealUuid uuid.UUID) error {
 }
 
 type acceptDealReq struct {
-	rsp  chan acceptDealResp
-	deal *types.ProviderDealState
+	rsp         chan acceptDealResp
+	deal        *types.ProviderDealState
+	dealHandler *dealHandler
 }
 
 type acceptDealResp struct {
@@ -272,7 +278,8 @@ type failedDealReq struct {
 }
 
 type restartReq struct {
-	deal *types.ProviderDealState
+	deal        *types.ProviderDealState
+	dealHandler *dealHandler
 }
 
 // TODO: This is transient -> If it dosen't work out, we will use locks.
@@ -292,7 +299,11 @@ func (p *Provider) loop() {
 			go func() {
 				defer p.wg.Done()
 
-				p.doDeal(restartReq.deal)
+				defer restartReq.dealHandler.stop()
+				defer close(restartReq.dealHandler.stopped)
+
+				// Execute the deal synchronously
+				p.execDeal(restartReq.dealHandler.ctx, restartReq.dealHandler.pub, restartReq.deal)
 			}()
 
 		case dealReq := <-p.acceptDealsChan:
@@ -300,6 +311,11 @@ func (p *Provider) loop() {
 			log.Infow("process accept deal request", "id", deal.DealUuid)
 
 			writeDealResp := func(accepted bool, ri *api.ProviderDealRejectionInfo, err error) {
+				if err != nil {
+					defer dealReq.dealHandler.stop()
+					defer close(dealReq.dealHandler.stopped)
+				}
+
 				select {
 				case dealReq.rsp <- acceptDealResp{accepted, ri, err}:
 				case <-p.ctx.Done():
@@ -338,8 +354,11 @@ func (p *Provider) loop() {
 			p.wg.Add(1)
 			go func() {
 				defer p.wg.Done()
+				defer dealReq.dealHandler.stop()
+				defer close(dealReq.dealHandler.stopped)
 
-				p.doDeal(deal)
+				// Execute the deal synchronously
+				p.execDeal(dealReq.dealHandler.ctx, dealReq.dealHandler.pub, dealReq.deal)
 			}()
 
 		case failedDeal := <-p.failedDealsChan:
@@ -350,4 +369,32 @@ func (p *Provider) loop() {
 			return
 		}
 	}
+}
+
+func (p *Provider) newDealHandler(deal *types.ProviderDealState) *dealHandler {
+	// Set up pubsub for deal updates
+	bus := eventbus.NewBus()
+	pub, err := bus.Emitter(&types.ProviderDealInfo{}, eventbus.Stateful)
+	if err != nil {
+		err := fmt.Errorf("failed to create event emitter: %w", err)
+		p.failDeal(pub, deal, err)
+		return nil
+	}
+
+	// Create a context that can be cancelled for this deal if the user wants
+	// to cancel the deal early
+	ctx, stop := context.WithCancel(p.ctx)
+
+	// Keep track of the fields to subscribe to or cancel the deal
+	dh := &dealHandler{
+		dealUuid: deal.DealUuid,
+		ctx:      ctx,
+		stop:     stop,
+		stopped:  make(chan struct{}),
+		bus:      bus,
+		pub:      pub,
+	}
+	p.dealHandlers.track(dh)
+
+	return dh
 }

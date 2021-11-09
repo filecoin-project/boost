@@ -18,6 +18,7 @@ type dealHandler struct {
 	stop     context.CancelFunc
 	stopped  chan struct{}
 	bus      event.Bus
+	pub      event.Emitter
 }
 
 func (d *dealHandler) cancel(ctx context.Context) {
