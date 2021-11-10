@@ -141,7 +141,7 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 	// }
 
 	if err := tctx.Err(); err != nil {
-		return fmt.Errorf("data transfer timed out: %w", err)
+		return fmt.Errorf("data transfer ctx errored: %w", err)
 	}
 
 	// Verify CommP matches
