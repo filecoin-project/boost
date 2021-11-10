@@ -42,7 +42,7 @@ type BoostAPI struct {
 	//RemoteStore *stores.Remote
 
 	// Markets
-	StorageProvider *storagemarket.Provider `optional:"true"`
+	StorageProvider *storagemarket.Provider
 	//PieceStore        dtypes.ProviderPieceStore         `optional:"true"`
 	//RetrievalProvider retrievalmarket.RetrievalProvider `optional:"true"`
 	//SectorAccessor    retrievalmarket.SectorAccessor    `optional:"true"`
