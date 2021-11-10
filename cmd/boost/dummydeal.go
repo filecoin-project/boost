@@ -1,7 +1,8 @@
 package main
 
 import (
-	"github.com/davecgh/go-spew/spew"
+	"fmt"
+
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 
@@ -21,14 +22,17 @@ var dummydealCmd = &cli.Command{
 
 		ctx := lcli.DaemonContext(cctx)
 
-		log.Debug("Get boost identity")
-
-		res, err := boostApi.ID(ctx)
+		log.Debug("Make API call to start dummy deal")
+		rej, err := boostApi.MarketDummyDeal(ctx)
 		if err != nil {
-			return xerrors.Errorf("couldnt get boost identity: %w", err)
+			return xerrors.Errorf("creating dummy deal: %w", err)
 		}
 
-		spew.Dump(res)
+		if rej != nil && rej.Reason != "" {
+			fmt.Printf("Dummy deal rejected: %s\n", rej.Reason)
+			return nil
+		}
+		fmt.Println("Made dummy deal")
 
 		return nil
 	},
