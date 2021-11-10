@@ -5,8 +5,11 @@ import (
 	"errors"
 	"time"
 
+	"github.com/filecoin-project/boost/db"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
+	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/journal"
 	"github.com/filecoin-project/boost/journal/alerting"
 	"github.com/filecoin-project/boost/node/config"
@@ -18,6 +21,7 @@ import (
 	"github.com/filecoin-project/boost/node/modules/helpers"
 	"github.com/filecoin-project/boost/node/modules/lp2p"
 	"github.com/filecoin-project/boost/node/repo"
+	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/lotus/chain/types"
 	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
 	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
@@ -323,6 +327,9 @@ var BoostNode = Options(
 	Override(new(dtypes.MinerID), modules.MinerID),
 
 	Override(new(dtypes.NetworkName), modules.StorageNetworkName),
+	Override(new(*db.DealsDB), modules.NewStorageMarketDB),
+	Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider),
+	Override(new(*gql.Server), modules.NewGraphqlServer),
 )
 
 func ConfigBoost(c interface{}) Option {

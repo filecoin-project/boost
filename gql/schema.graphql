@@ -1,6 +1,7 @@
 schema {
   query: RootQuery
   subscription: RootSubscription
+  mutation: RootMutation
 }
 
 """
@@ -36,7 +37,14 @@ type RootQuery {
   deals: [Deal]
 }
 
+type RootMutation {
+  """Cancel a Deal"""
+  dealCancel(id: ID!): ID!
+}
+
 type RootSubscription {
   """Subscribe to Deal updates by ID"""
-  dealSub(id: ID!): Deal
+  dealUpdate(id: ID!): Deal
+  """Subscribe to new Deals"""
+  dealNew: Deal
 }

@@ -4,9 +4,17 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"time"
+
+	"github.com/libp2p/go-eventbus"
+
+	"github.com/filecoin-project/boost/db"
+	"github.com/google/uuid"
+
+	"golang.org/x/xerrors"
+
+	"github.com/filecoin-project/boost/storagemarket/datatransfer"
 
 	"github.com/libp2p/go-libp2p-core/event"
 
@@ -23,140 +31,139 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 )
 
-func (p *Provider) failDeal(ds *types.ProviderDealState, err error) {
-	p.cleanupDeal(ds)
+var ErrDealExecNotFound = xerrors.Errorf("deal exec not found")
 
-	select {
-	case p.failedDealsChan <- failedDealReq{ds, err}:
-	case <-p.ctx.Done():
+func (p *Provider) doDeal(deal *types.ProviderDealState) {
+	// Set up pubsub for deal updates
+	bus := eventbus.NewBus()
+	pub, err := bus.Emitter(&types.ProviderDealInfo{}, eventbus.Stateful)
+	if err != nil {
+		err := fmt.Errorf("failed to create event emitter: %w", err)
+		p.failDeal(pub, deal, err)
+		return
 	}
+
+	// Create a context that can be cancelled for this deal if the user wants
+	// to cancel the deal early
+	ctx, stop := context.WithCancel(p.ctx)
+	defer stop()
+
+	stopped := make(chan struct{})
+	defer close(stopped)
+
+	// Keep track of the fields to subscribe to or cancel the deal
+	p.dealHandlers.track(&dealHandler{
+		dealUuid: deal.DealUuid,
+		ctx:      ctx,
+		stop:     stop,
+		stopped:  stopped,
+		bus:      bus,
+	})
+
+	// Execute the deal synchronously
+	p.execDeal(ctx, pub, deal)
 }
 
-func (p *Provider) cleanupDeal(ds *types.ProviderDealState) {
-	_ = os.Remove(ds.InboundFilePath)
-	// ...
-	//cleanup resources here
-}
+func (p *Provider) execDeal(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) {
+	// publish "new deal" event
+	p.fireEventDealNew(deal)
 
-func dealStateToEvent(ds *types.ProviderDealState) types.ProviderDealEvent {
-	// TODO flush out this function based on UX needs !
-	return types.ProviderDealEvent{}
-}
-
-func transferEventToProviderEvent(ds *types.ProviderDealState, evt types.DataTransferEvent) types.ProviderDealEvent {
-	// TODO flush out based on UX needs
-	return types.ProviderDealEvent{}
-}
-
-func (p *Provider) doDeal(ds *types.ProviderDealState, publisher event.Emitter) {
 	// publish an event with the current state of the deal
-	if err := publisher.Emit(dealStateToEvent(ds)); err != nil {
-		panic(err)
-		// log
-	}
+	p.fireEventDealUpdate(pub, deal, 0)
+
+	p.addDealLog(deal.DealUuid, "Deal Accepted")
 
 	// Transfer Data
-	if ds.Checkpoint < dealcheckpoints.Transferred {
-		if err := p.transferAndVerify(ds, publisher); err != nil {
-			p.failDeal(ds, fmt.Errorf("failed data transfer: %w", err))
+	if deal.Checkpoint < dealcheckpoints.Transferred {
+		if err := p.transferAndVerify(ctx, pub, deal); err != nil {
+			p.failDeal(pub, deal, fmt.Errorf("failed data transfer: %w", err))
 			return
 		}
-		if err := publisher.Emit(dealStateToEvent(ds)); err != nil {
-			panic(err)
-			// log
-		}
+
+		p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.Transferred)
 	}
 
 	// Publish
-	if ds.Checkpoint <= dealcheckpoints.Published {
-		if err := p.publishDeal(ds); err != nil {
-			p.failDeal(ds, fmt.Errorf("failed to publish deal: %w", err))
+	if deal.Checkpoint <= dealcheckpoints.Published {
+		if err := p.publishDeal(ctx, deal); err != nil {
+			p.failDeal(pub, deal, fmt.Errorf("failed to publish deal: %w", err))
 			return
 		}
-		if err := publisher.Emit(dealStateToEvent(ds)); err != nil {
-			panic(err)
-			// log
-		}
+
+		p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.Published)
 	}
 
 	// AddPiece
-	if ds.Checkpoint < dealcheckpoints.AddedPiece {
-		if err := p.addPiece(ds); err != nil {
-			p.failDeal(ds, fmt.Errorf("failed to add piece: %w", err))
+	if deal.Checkpoint < dealcheckpoints.AddedPiece {
+		if err := p.addPiece(deal); err != nil {
+			p.failDeal(pub, deal, fmt.Errorf("failed to add piece: %w", err))
 			return
 		}
 
-		if err := publisher.Emit(dealStateToEvent(ds)); err != nil {
-			panic(err)
-			// log
-		}
+		p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.AddedPiece)
 	}
 
-	// Lie back, sip your cocktail and watch the deal as it goes through the cycle of life and eventually expires.
-	// The deal will eventually wonder if it was all worth it, only to then realise that if it was able to make life
-	// easy for even one Web2 user, it really was all worth it, for kindness keeps us warm in an otherwise cold and indifferent cosmos.
-	// ...
-	// ...
 	// Watch deal on chain and change state in DB and emit notifications.
+
+	// TODO: Clean up deal when it completes
+	//d.cleanupDeal()
 }
 
-func (p *Provider) transferAndVerify(ds *types.ProviderDealState, publisher event.Emitter) error {
-	// Transfer Data
+func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
+	log.Infow("transferring deal data", "id", deal.DealUuid)
+	p.addDealLog(deal.DealUuid, "Start data transfer")
 
-	// TODO: use a generic data transfer descriptor instead of a URL
-	u := url.URL{}
-
-	tctx, cancel := context.WithDeadline(p.ctx, time.Now().Add(p.config.MaxTransferDuration))
+	tctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.config.MaxTransferDuration))
 	defer cancel()
-	// TODO Execute SHOULD respect the context here !
-	// async call returns the subscription -> dosen't block
-	// need to ensure that  that passing the padded piece size here makes sense to the transport layer which will receieve the raw unpadded bytes.
-	transferSub, err := p.transport.Execute(tctx, &u, ds.InboundFilePath, ds.ClientDealProposal.Proposal.PieceSize)
+
+	// TODO: need to ensure that passing the padded piece size here makes
+	// sense to the transport layer which will receive the raw unpadded bytes
+	execParams := datatransfer.ExecuteParams{
+		TransferType:   deal.TransferType,
+		TransferParams: deal.TransferParams,
+		DealUuid:       deal.DealUuid,
+		FilePath:       deal.InboundFilePath,
+		Size:           uint64(deal.ClientDealProposal.Proposal.PieceSize),
+	}
+	sub, err := p.Transport.Execute(tctx, execParams)
 	if err != nil {
 		return fmt.Errorf("failed data transfer: %w", err)
 	}
-	defer transferSub.Close()
-	select {
-	// similar to boost notifications, the transport layer too will first push the current state before resuming the transfer
-	case evt := <-transferSub.Out():
-		dtEvent := evt.(types.DataTransferEvent)
-		if err := publisher.Emit(transferEventToProviderEvent(ds, dtEvent)); err != nil {
-			panic(err)
-			// log
-		}
-		// if dtEvent.Type == Completed || Cancelled || Error {
-		// move ahead, fail deal etc.
-		// }
 
-	case <-tctx.Done():
-		return fmt.Errorf("data transfer timed out: %w", tctx.Err())
+	for transferred := range sub {
+		p.fireEventDealUpdate(pub, deal, transferred)
+	}
+
+	p.addDealLog(deal.DealUuid, "Data transfer complete")
+
+	// if dtEvent.Type == Completed || Cancelled || Error {
+	// move ahead, fail deal etc.
+	// }
+
+	if err := tctx.Err(); err != nil {
+		return fmt.Errorf("data transfer timed out: %w", err)
 	}
 
 	// Verify CommP matches
-	pieceCid, err := p.generatePieceCommitment(ds)
+	pieceCid, err := p.generatePieceCommitment(deal)
 	if err != nil {
 		return fmt.Errorf("failed to generate CommP: %w", err)
 	}
 
-	clientPieceCid := ds.ClientDealProposal.Proposal.PieceCID
+	clientPieceCid := deal.ClientDealProposal.Proposal.PieceCID
 	if pieceCid != clientPieceCid {
 		return fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid)
 	}
 
-	// persist transferred checkpoint
-	ds.Checkpoint = dealcheckpoints.Transferred
-	if err := p.db.Update(p.ctx, ds); err != nil {
-		return fmt.Errorf("failed to persist deal state: %w", err)
-	}
+	p.addDealLog(deal.DealUuid, "Data verification successful")
 
-	// TODO : Emit a notification here
 	return nil
 }
 
 // GeneratePieceCommitment generates the pieceCid for the CARv1 deal payload in
 // the CARv2 file that already exists at the given path.
-func (p *Provider) generatePieceCommitment(ds *types.ProviderDealState) (c cid.Cid, finalErr error) {
-	rd, err := carv2.OpenReader(ds.InboundFilePath)
+func (p *Provider) generatePieceCommitment(deal *types.ProviderDealState) (c cid.Cid, finalErr error) {
+	rd, err := carv2.OpenReader(deal.InboundFilePath)
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to get CARv2 reader: %w", err)
 	}
@@ -174,21 +181,23 @@ func (p *Provider) generatePieceCommitment(ds *types.ProviderDealState) (c cid.C
 
 	// dump the CARv1 payload of the CARv2 file to the Commp Writer and get back the CommP.
 	w := &writer.Writer{}
-	written, err := io.Copy(w, rd.DataReader())
+	//written, err := io.Copy(w, rd.DataReader())
+	_, err = io.Copy(w, rd.DataReader())
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to write to CommP writer: %w", err)
 	}
 
-	if written != int64(rd.Header.DataSize) {
-		return cid.Undef, fmt.Errorf("number of bytes written to CommP writer %d not equal to the CARv1 payload size %d", written, rd.Header.DataSize)
-	}
+	// TODO: figure out why the CARv1 payload size is always 0
+	//if written != int64(rd.Header.DataSize) {
+	//	return cid.Undef, fmt.Errorf("number of bytes written to CommP writer %d not equal to the CARv1 payload size %d", written, rd.Header.DataSize)
+	//}
 
 	cidAndSize, err := w.Sum()
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to get CommP: %w", err)
 	}
 
-	dealSize := ds.ClientDealProposal.Proposal.PieceSize
+	dealSize := deal.ClientDealProposal.Proposal.PieceSize
 	if cidAndSize.PieceSize < dealSize {
 		// need to pad up!
 		rawPaddedCommp, err := commp.PadCommP(
@@ -206,7 +215,9 @@ func (p *Provider) generatePieceCommitment(ds *types.ProviderDealState) (c cid.C
 	return cidAndSize.PieceCID, err
 }
 
-func (p *Provider) publishDeal(ds *types.ProviderDealState) error {
+func (p *Provider) publishDeal(ctx context.Context, deal *types.ProviderDealState) error {
+	p.addDealLog(deal.DealUuid, "Publishing deal")
+
 	//if ds.Checkpoint < dealcheckpoints.Published {
 	//mcid, err := p.fullnodeApi.PublishDeals(p.ctx, *ds)
 	//if err != nil {
@@ -233,18 +244,27 @@ func (p *Provider) publishDeal(ds *types.ProviderDealState) error {
 	//}
 
 	// TODO Release funds ? How does that work ?
+
+	select {
+	case <-ctx.Done():
+	case <-time.After(10 * time.Second):
+	}
+
+	p.addDealLog(deal.DealUuid, "Deal published successfully")
 	return nil
 }
 
 // HandoffDeal hands off a published deal for sealing and commitment in a sector
-func (p *Provider) addPiece(ds *types.ProviderDealState) error {
-	v2r, err := carv2.OpenReader(ds.InboundFilePath)
+func (p *Provider) addPiece(deal *types.ProviderDealState) error {
+	p.addDealLog(deal.DealUuid, "Hand off deal to sealer")
+
+	v2r, err := carv2.OpenReader(deal.InboundFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to open CARv2 file: %w", err)
 	}
 
 	// Hand the deal off to the process that adds it to a sector
-	paddedReader, err := padreader.NewInflator(v2r.DataReader(), v2r.Header.DataSize, ds.ClientDealProposal.Proposal.PieceSize.Unpadded())
+	paddedReader, err := padreader.NewInflator(v2r.DataReader(), v2r.Header.DataSize, deal.ClientDealProposal.Proposal.PieceSize.Unpadded())
 	if err != nil {
 		return fmt.Errorf("failed to create inflator: %w", err)
 	}
@@ -282,5 +302,82 @@ func (p *Provider) addPiece(ds *types.ProviderDealState) error {
 	//log.Error(err)
 	//}
 
+	p.addDealLog(deal.DealUuid, "Deal handed off to sealer successfully")
+
 	return nil
+}
+
+func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, err error) {
+	p.cleanupDeal(deal)
+
+	// Update state in DB with error
+	deal.Checkpoint = dealcheckpoints.Complete
+	if xerrors.Is(err, context.Canceled) {
+		deal.Err = "Cancelled"
+		p.addDealLog(deal.DealUuid, "Deal cancelled")
+	} else {
+		deal.Err = err.Error()
+		p.addDealLog(deal.DealUuid, "Deal failed: %s", deal.Err)
+	}
+	dberr := p.db.Update(p.ctx, deal)
+	if dberr != nil {
+		log.Errorw("updating failed deal in db", "id", deal.DealUuid, "err", err)
+	}
+
+	// Fire deal update event
+	if pub != nil {
+		p.fireEventDealUpdate(pub, deal, p.Transport.Transferred(deal.DealUuid))
+	}
+
+	select {
+	case p.failedDealsChan <- failedDealReq{deal, err}:
+	case <-p.ctx.Done():
+	}
+}
+
+func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
+	_ = os.Remove(deal.InboundFilePath)
+	// ...
+	//cleanup resources here
+
+	p.dealHandlers.del(deal.DealUuid)
+}
+
+func (p *Provider) fireEventDealNew(deal *types.ProviderDealState) {
+	evt := types.ProviderDealInfo{Deal: deal}
+	if err := p.newDealPS.NewDeals.Emit(evt); err != nil {
+		log.Warn("publishing new deal event", "id", deal.DealUuid, "err", err)
+	}
+}
+
+func (p *Provider) fireEventDealUpdate(pub event.Emitter, deal *types.ProviderDealState, transferred uint64) {
+	evt := types.ProviderDealInfo{
+		Deal:        deal,
+		Transferred: transferred,
+	}
+
+	if err := pub.Emit(evt); err != nil {
+		log.Warn("publishing deal state update", "id", deal.DealUuid, "err", err)
+	}
+}
+
+func (p *Provider) updateCheckpoint(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState, ckpt dealcheckpoints.Checkpoint) {
+	deal.Checkpoint = ckpt
+	if err := p.db.Update(ctx, deal); err != nil {
+		p.failDeal(pub, deal, fmt.Errorf("failed to persist deal state: %w", err))
+		return
+	}
+
+	p.fireEventDealUpdate(pub, deal, p.Transport.Transferred(deal.DealUuid))
+}
+
+func (p *Provider) addDealLog(dealUuid uuid.UUID, format string, args ...interface{}) {
+	l := &db.DealLog{
+		DealUuid:  dealUuid,
+		Text:      fmt.Sprintf(format, args...),
+		CreatedAt: time.Now(),
+	}
+	if err := p.db.InsertLog(p.ctx, l); err != nil {
+		log.Warnw("failed to persist deal log: %s", err)
+	}
 }
