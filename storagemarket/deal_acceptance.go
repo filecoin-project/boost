@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
-	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-fil-markets/shared"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -149,18 +148,18 @@ func (p *Provider) validateSignature(tok shared.TipSetToken, deal types.Provider
 	// TODO: do proper signature validation once the client side of deal making is set up
 	return nil
 
-	b, err := cborutil.Dump(&deal.ClientDealProposal.Proposal)
-	if err != nil {
-		return fmt.Errorf("failed to serialize client deal proposal: %w", err)
-	}
+	//b, err := cborutil.Dump(&deal.ClientDealProposal.Proposal)
+	//if err != nil {
+	//return fmt.Errorf("failed to serialize client deal proposal: %w", err)
+	//}
 
-	verified, err := p.adapter.VerifySignature(p.ctx, deal.ClientDealProposal.ClientSignature, deal.ClientDealProposal.Proposal.Client, b, tok)
-	if err != nil {
-		return fmt.Errorf("error verifying signature: %w", err)
-	}
-	if !verified {
-		return errors.New("could not verify signature")
-	}
+	//verified, err := p.adapter.VerifySignature(p.ctx, deal.ClientDealProposal.ClientSignature, deal.ClientDealProposal.Proposal.Client, b, tok)
+	//if err != nil {
+	//return fmt.Errorf("error verifying signature: %w", err)
+	//}
+	//if !verified {
+	//return errors.New("could not verify signature")
+	//}
 
-	return nil
+	//return nil
 }

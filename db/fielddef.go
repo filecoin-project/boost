@@ -58,7 +58,7 @@ func (fd *cidFieldDef) unmarshall() error {
 
 	c, err := cid.Parse(fd.cidStr.String)
 	if err != nil {
-		return xerrors.Errorf("parsing CID from string '%s': %w", fd.cidStr, err)
+		return xerrors.Errorf("parsing CID from string '%s': %w", fd.cidStr.String, err)
 	}
 
 	*fd.f = c
