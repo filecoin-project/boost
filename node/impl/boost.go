@@ -54,7 +54,7 @@ type BoostAPI struct {
 
 	// TODO: Figure out how to start graphql server without it needing
 	// to be a dependency of another fx object
-	GraphqlServer *gql.Server `optional:"true"`
+	GraphqlServer *gql.Server
 
 	DS dtypes.MetadataDS
 }
