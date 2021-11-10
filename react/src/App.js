@@ -1,56 +1,15 @@
 import './App.css';
 import moment from 'moment';
-import React, { useState } from 'react';
-import ApolloClient from "apollo-client";
+import React, { useState, useEffect } from 'react';
 import { ApolloProvider } from "@apollo/react-hooks";
-import { WebSocketLink } from "apollo-link-ws";
-import { InMemoryCache } from "apollo-cache-inmemory";
-import { useSubscription, useQuery } from "./hooks";
-import gql from "graphql-tag";
-
-const gqlClient = new ApolloClient({
-    link: new WebSocketLink({
-        uri: "ws://localhost:8080/graphql",
-        options: {
-            reconnect: true,
-        },
-    }),
-    cache: new InMemoryCache(),
-});
-
-const DealsListQuery = gql`
-    query AppDealsListQuery {
-      deals {
-        ID
-        CreatedAt
-        PieceCid
-        PieceSize
-        ClientAddress
-        Message
-        Logs {
-          CreatedAt
-          Text
-        }
-      }
-    }
-`;
-
-const DealSubscription = gql`
-    subscription AppDealSubscription($id: ID!) {
-      dealSub(id: $id) {
-        ID
-        CreatedAt
-        PieceCid
-        PieceSize
-        ClientAddress
-        Message
-        Logs {
-          CreatedAt
-          Text
-        }
-      }
-    }
-`;
+import { useSubscription, useQuery, useMutation } from "./hooks";
+import {
+    gqlClient,
+    DealsListQuery,
+    DealSubscription,
+    DealCancelMutation,
+    NewDealsSubscription,
+} from "./gql";
 
 moment.locale('en', {
     relativeTime: {
@@ -130,18 +89,16 @@ function AppRoot(props) {
     );
 }
 
-class Menu extends React.Component {
-    render() {
-        return (
-            <td className="menu">
-                {this.props.pages.map(page => (
-                    <div key={page.pageType} className="menu-item" onClick={() => this.props.onMenuItemClick(page.pageType)}>
-                        {page.title}
-                    </div>
-                ))}
-            </td>
-        )
-    }
+function Menu(props) {
+    return (
+        <td className="menu">
+            {props.pages.map(page => (
+                <div key={page.pageType} className="menu-item" onClick={() => props.onMenuItemClick(page.pageType)}>
+                    {page.title}
+                </div>
+            ))}
+        </td>
+    )
 }
 
 function DealLog(props) {
@@ -165,24 +122,44 @@ function DealLog(props) {
     </tr>
 }
 
-class DealDetail extends React.Component {
-    render() {
-        var deal = this.props.deal
+function DealDetail(props) {
+    var deal = props.deal
 
-        var logRowData = []
-        for (var i = 0; i < (deal.Logs || []).length; i++) {
-            var log = deal.Logs[i]
-            var prev = i === 0 ? null : deal.Logs[i-1]
-            logRowData.push({ log: log, prev: prev })
+    // Add a class to the document body when showing the deal detail page
+    useEffect(() => {
+        document.body.classList.add('modal-open')
+
+        return function () {
+            document.body.classList.remove('modal-open')
         }
+    })
 
-        return <div className="deal-detail" id={deal.ID} style={ this.props.show ? null : {display: 'none'} } >
+    const [cancelDeal] = useMutation(DealCancelMutation, {
+        variables: { id: deal.ID }
+    })
+
+    var logRowData = []
+    for (var i = 0; i < (deal.Logs || []).length; i++) {
+        var log = deal.Logs[i]
+        var prev = i === 0 ? null : deal.Logs[i-1]
+        logRowData.push({ log: log, prev: prev })
+    }
+
+    return <div className="deal-detail modal" id={deal.ID}>
+        <div className="content">
+            <div className="close" onClick={props.onCloseClick}>
+                <div className="button">X</div>
+            </div>
             <div className="title">Deal {deal.ID}</div>
             <table className="deal-fields">
                 <tbody>
                 <tr>
                     <td>CreatedAt</td>
                     <td>{moment(deal.CreatedAt).format(dateFormat)}</td>
+                </tr>
+                <tr>
+                    <td>Client</td>
+                    <td>{deal.ClientAddress}</td>
                 </tr>
                 <tr>
                     <td>Amount</td>
@@ -192,11 +169,15 @@ class DealDetail extends React.Component {
                     <td>Size</td>
                     <td>{deal.PieceSize}</td>
                 </tr>
+                <tr>
+                    <td>State</td>
+                    <td>{deal.Message}</td>
+                </tr>
                 </tbody>
             </table>
 
             <div className="buttons">
-                <div className="button cancel">Cancel</div>
+                <div className="button cancel" onClick={cancelDeal}>Cancel</div>
                 <div className="button retry">Retry</div>
             </div>
 
@@ -206,27 +187,30 @@ class DealDetail extends React.Component {
                 </tbody>
             </table>
         </div>
-    }
+    </div>
 }
 
 function DealRow(props) {
     const { loading, error, data } = useSubscription(DealSubscription, {
-        variables: { id: props.deal.ID }
+        variables: { id: props.deal.ID },
+        onSubscriptionData: ({ subscriptionData }) => props.updateDeal(subscriptionData.data.dealUpdate)
     })
 
     if (error) {
-        return <tr><td>Error: {error}</td></tr>
+        return <tr><td colSpan={5}>Error: {error.message}</td></tr>
     }
 
     var deal = props.deal
     if (!loading) {
-        deal = data.dealSub
+        deal = data.dealUpdate
     }
 
     return (
-        <tr onClick={() => props.onDealRowClick(deal.ID)}>
+        <tr>
             <td>{moment(deal.CreatedAt).fromNow()}</td>
-            <td>{deal.ID}</td>
+            <td className="deal-id" onClick={() => props.onDealRowClick(deal.ID)}>
+                {deal.ID}
+            </td>
             <td>{humanFileSize(deal.PieceSize, false, 0)}</td>
             <td>{deal.ClientAddress}</td>
             <td>{deal.Message}</td>
@@ -234,12 +218,51 @@ function DealRow(props) {
     )
 }
 
+function uniqDeals(deals) {
+    return new Array(...new Map(deals.map(el => [el.ID, el])).values())
+}
+
 function StorageDealsPage(props) {
     const [dealToShow, setDealToShow] = useState(null)
-    const { loading, error, data } = useQuery(DealsListQuery)
+
+    const { loading, error, data, subscribeToMore, updateQuery } = useQuery(DealsListQuery)
+
+    // Subscribe to "new deal" events
+    useEffect(() => {
+        return subscribeToMore({
+            document: NewDealsSubscription,
+            updateQuery: (prev, { subscriptionData }) => {
+                if (!subscriptionData.data) return prev
+
+                // Add new deal to list of existing deals
+                const newDeal = subscriptionData.data.dealNew
+                var deals = uniqDeals([newDeal, ...((prev && prev.deals) || [])])
+                return Object.assign({}, prev, {
+                    deals: deals
+                });
+            }
+        })
+    })
+
+    // In DealRow we subscribe to updates for a particular deal.
+    // When the subscription sends an update, re-render.
+    function updateDeal(deal) {
+        updateQuery(prev => {
+            if (!prev || !prev.deals) return prev
+
+            return Object.assign({}, prev, {
+                deals: prev.deals.map(dl => dl.ID == deal.ID ? deal : dl)
+            })
+        })
+    }
 
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error.message}</div>;
+
+    var dealDetail
+    if (dealToShow) {
+        dealDetail = data.deals.find(dl => dl.ID === dealToShow)
+    }
 
     return <div className="deals">
         <table>
@@ -252,18 +275,17 @@ function StorageDealsPage(props) {
                     <th>State</th>
                 </tr>
 
-                { data.deals.map(deal => (
-                    <DealRow key={deal.ID} deal={deal} onDealRowClick={() => setDealToShow(deal.ID) }></DealRow>
+                {data.deals.map(deal => (
+                    <DealRow key={deal.ID} deal={deal} updateDeal={updateDeal} onDealRowClick={setDealToShow} />
                 ))}
-
             </tbody>
         </table>
 
-        <div id="deal-detail">
-            { data.deals.map(deal => (
-                <DealDetail key={deal.ID} deal={deal} show={ dealToShow === deal.ID } />
-            ))}
-        </div>
+        {dealDetail && (
+            <div id="deal-detail">
+                <DealDetail key={dealDetail.ID} deal={dealDetail} onCloseClick={() => setDealToShow("")}/>
+            </div>
+        )}
     </div>
 }
 

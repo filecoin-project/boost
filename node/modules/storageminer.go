@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/boost/db"
-
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/go-address"
 	dtimpl "github.com/filecoin-project/go-data-transfer/impl"
@@ -511,11 +511,39 @@ func StorageNetworkName(ctx helpers.MetricsCtx, a v1api.FullNode) (dtypes.Networ
 	return dtypes.NetworkName(n), nil
 }
 
-func NewStorageMarketProvider(ctx helpers.MetricsCtx, r repo.LockedRepo, a v1api.FullNode) (*storagemarket.Provider, error) {
+func NewStorageMarketDB(r repo.LockedRepo) (*db.DealsDB, error) {
 	dbPath := path.Join(r.Path(), "deals.db")
 	sqldb, err := db.SqlDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
-	return storagemarket.NewProvider(sqldb, a)
+	return db.NewDealsDB(sqldb), nil
+}
+
+func NewStorageMarketProvider(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, db *db.DealsDB) (*storagemarket.Provider, error) {
+	// TODO: Should we get the address from the Storage Miner API?
+	// Or should it be stored in the metadata store - see minerAddrFromDS
+	addr, err := address.NewActorAddress([]byte("TODO: miner"))
+	if err != nil {
+		panic(err)
+	}
+
+	prov, err := storagemarket.NewProvider(r.Path(), db, a, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	lc.Append(fx.Hook{OnStart: prov.Start})
+
+	return prov, nil
+}
+
+func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, db *db.DealsDB) *gql.Server {
+	server := gql.NewServer(prov, db)
+
+	lc.Append(fx.Hook{
+		OnStart: server.Serve,
+	})
+
+	return server
 }

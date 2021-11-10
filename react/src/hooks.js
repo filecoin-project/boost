@@ -1,6 +1,10 @@
 // TODO: Figure out if there's a way to hook into apollo to do this
 // in a nicer way
-import { useSubscription as apolloUseSubscription, useQuery as apolloUseQuery } from "@apollo/react-hooks";
+import {
+    useSubscription as apolloUseSubscription,
+    useQuery as apolloUseQuery,
+    useMutation as apolloUseMutation,
+} from "@apollo/react-hooks";
 
 var useSubscription = function(...args) {
     var ret = apolloUseSubscription.apply(null, args)
@@ -11,6 +15,13 @@ var useSubscription = function(...args) {
 }
 var useQuery = function(...args) {
     var ret = apolloUseQuery.apply(null, args)
+    if (ret.data) {
+        parseDates(ret.data)
+    }
+    return ret
+}
+var useMutation = function(...args) {
+    var ret = apolloUseMutation.apply(null, args)
     if (ret.data) {
         parseDates(ret.data)
     }
@@ -36,4 +47,5 @@ function parseDates(obj, parent, parentKey) {
 export {
     useQuery,
     useSubscription,
+    useMutation,
 };
