@@ -23,27 +23,40 @@ func NewMockTransport() *MockTransport {
 	}
 }
 
-func (t *MockTransport) SimulateTransfer(ctx context.Context, dealUuid uuid.UUID, size uint64, onTransferred OnTransferredFn) error {
-	fivePct := size / 20
-	for i := 0; i < 20; i++ {
-		transferred := uint64(i)*fivePct + uint64(rand.Int63n(int64(fivePct)))
-		t.setTransferred(dealUuid, transferred)
-		if onTransferred != nil {
-			onTransferred(transferred)
+func (t *MockTransport) SimulateTransfer(ctx context.Context, dealUuid uuid.UUID, size uint64) (chan uint64, error) {
+	tch := make(chan uint64)
+
+	go func() {
+		fivePct := size / 20
+		for i := 0; i < 20; i++ {
+			transferred := uint64(i)*fivePct + uint64(rand.Int63n(int64(fivePct)))
+			t.setTransferred(dealUuid, transferred)
+
+			select {
+			case <-ctx.Done():
+				close(tch)
+				return
+			case tch <- transferred:
+			}
+
+			select {
+			case <-ctx.Done():
+				close(tch)
+				return
+			case <-time.After(500*time.Millisecond + time.Duration(rand.Intn(1000))*time.Millisecond):
+			}
 		}
+
+		t.setTransferred(dealUuid, size)
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(500*time.Millisecond + time.Duration(rand.Intn(1000))*time.Millisecond):
+			close(tch)
+			return
+		case tch <- size:
 		}
-	}
+	}()
 
-	t.setTransferred(dealUuid, size)
-	if onTransferred != nil {
-		onTransferred(size)
-	}
-
-	return nil
+	return tch, nil
 }
 
 func (t *MockTransport) setTransferred(dealUuid uuid.UUID, size uint64) {
@@ -71,24 +84,23 @@ type ExecuteParams struct {
 	DealUuid       uuid.UUID
 	FilePath       string
 	Size           uint64
-	OnTransferred  OnTransferredFn
 }
 
-func (t *MockTransport) Execute(ctx context.Context, params ExecuteParams) error {
+func (t *MockTransport) Execute(ctx context.Context, params ExecuteParams) (chan uint64, error) {
 	transferParams, err := TransferLocal.UnmarshallParams(params.TransferParams)
 	if err != nil {
-		return xerrors.Errorf("unmarshalling data transfer params: %w", err)
+		return nil, xerrors.Errorf("unmarshalling data transfer params: %w", err)
 	}
 
 	bz, err := ioutil.ReadFile(transferParams.Path)
 	if err != nil {
-		return xerrors.Errorf("reading file %s: %w", transferParams.Path, err)
+		return nil, xerrors.Errorf("reading file %s: %w", transferParams.Path, err)
 	}
 
 	err = ioutil.WriteFile(params.FilePath, bz, 0644)
 	if err != nil {
-		return xerrors.Errorf("writing file %s: %w", params.FilePath, err)
+		return nil, xerrors.Errorf("writing file %s: %w", params.FilePath, err)
 	}
 
-	return t.SimulateTransfer(ctx, params.DealUuid, params.Size, params.OnTransferred)
+	return t.SimulateTransfer(ctx, params.DealUuid, params.Size)
 }

@@ -61,7 +61,7 @@ type Provider struct {
 
 	adapter *Adapter
 
-	dealExecs *dealExecs
+	dealHandlers *dealHandlers
 }
 
 func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNode, addr address.Address) (*Provider, error) {
@@ -99,7 +99,7 @@ func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNod
 			FullNode: fullnodeApi,
 		},
 
-		dealExecs: newDealExecs(),
+		dealHandlers: newDealHandlers(),
 	}, nil
 }
 
@@ -133,11 +133,6 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDeal
 		}, err
 	}
 
-	de, err := p.newDealExec(&ds)
-	if err != nil {
-		return nil, err
-	}
-
 	// create a temp file where we will hold the deal data.
 	tmp, err := p.fs.CreateTemp()
 	if err != nil {
@@ -159,7 +154,7 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDeal
 	// then wait for a response and return the response to the client.
 	respChan := make(chan acceptDealResp, 1)
 	select {
-	case p.acceptDealsChan <- acceptDealReq{rsp: respChan, de: de}:
+	case p.acceptDealsChan <- acceptDealReq{rsp: respChan, deal: &ds}:
 	case <-p.ctx.Done():
 		return nil, p.ctx.Err()
 	}
@@ -203,17 +198,12 @@ func (p *Provider) Start(ctx context.Context) error {
 
 	var restartWg sync.WaitGroup
 	for _, deal := range deals {
-		de, err := p.newDealExec(deal)
-		if err != nil {
-			return err
-		}
-
 		restartWg.Add(1)
 		go func() {
 			defer restartWg.Done()
 
 			select {
-			case p.restartDealsChan <- restartReq{de: de}:
+			case p.restartDealsChan <- restartReq{deal: deal}:
 			case <-p.ctx.Done():
 			}
 		}()
@@ -245,29 +235,29 @@ func (p *Provider) SubscribeNewDeals() (event.Subscription, error) {
 
 // SubscribeNewDeals subscribes to updates to a deal
 func (p *Provider) SubscribeDealUpdates(dealUuid uuid.UUID) (event.Subscription, error) {
-	de, err := p.dealExecs.get(dealUuid)
+	dh, err := p.dealHandlers.get(dealUuid)
 	if err != nil {
 		return nil, err
 	}
-	return de.subscribeUpdates()
+	return dh.subscribeUpdates()
 }
 
 // CancelDeal cancels a deal and any associated data transfer
 func (p *Provider) CancelDeal(ctx context.Context, dealUuid uuid.UUID) error {
-	de, err := p.dealExecs.get(dealUuid)
+	dh, err := p.dealHandlers.get(dealUuid)
 	if err != nil {
 		if xerrors.Is(err, ErrDealExecNotFound) {
 			return nil
 		}
 		return err
 	}
-	de.cancel(ctx)
+	dh.cancel(ctx)
 	return nil
 }
 
 type acceptDealReq struct {
-	rsp chan acceptDealResp
-	de  *dealExec
+	rsp  chan acceptDealResp
+	deal *types.ProviderDealState
 }
 
 type acceptDealResp struct {
@@ -282,7 +272,7 @@ type failedDealReq struct {
 }
 
 type restartReq struct {
-	de *dealExec
+	deal *types.ProviderDealState
 }
 
 // TODO: This is transient -> If it dosen't work out, we will use locks.
@@ -293,7 +283,7 @@ func (p *Provider) loop() {
 	for {
 		select {
 		case restartReq := <-p.restartDealsChan:
-			log.Infow("restart deal", "id", restartReq.de.deal.DealUuid)
+			log.Infow("restart deal", "id", restartReq.deal.DealUuid)
 
 			// Put ANY RESTART SYNCHRONIZATION LOGIC HERE.
 			// ....
@@ -301,11 +291,12 @@ func (p *Provider) loop() {
 			p.wg.Add(1)
 			go func() {
 				defer p.wg.Done()
-				restartReq.de.doDeal()
+
+				p.doDeal(restartReq.deal)
 			}()
 
 		case dealReq := <-p.acceptDealsChan:
-			deal := dealReq.de.deal
+			deal := dealReq.deal
 			log.Infow("process accept deal request", "id", deal.DealUuid)
 
 			writeDealResp := func(accepted bool, ri *api.ProviderDealRejectionInfo, err error) {
@@ -348,7 +339,7 @@ func (p *Provider) loop() {
 			go func() {
 				defer p.wg.Done()
 
-				dealReq.de.doDeal()
+				p.doDeal(deal)
 			}()
 
 		case failedDeal := <-p.failedDealsChan:
