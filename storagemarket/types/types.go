@@ -35,7 +35,9 @@ type ClientDealParams struct {
 	ClientDealProposal market.ClientDealProposal
 
 	DealDataRoot cid.Cid
-	TransferURL  string
+
+	TransferType   string
+	TransferParams []byte
 }
 
 // ProviderDealRejectionInfo is the information sent by the Storage Provider to the Client when it rejects a valid deal.

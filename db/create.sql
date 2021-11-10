@@ -1,23 +1,36 @@
-CREATE TABLE DealLogs (
-    DealID varchar(128),
+CREATE TABLE IF NOT EXISTS DealLogs (
+    DealID TEXT,
     CreatedAt DateTime,
-    LogText varchar(1024)
+    LogTEXT TEXT
 );
 
-CREATE TABLE Deals (
-    ID varchar(128),
+CREATE TABLE IF NOT EXISTS Deals (
+    ID TEXT,
     CreatedAt DateTime,
-    PieceCID varchar(255),
-    PieceSize int,
-    Address varchar(255),
-    Client varchar(255),
-    Provider varchar(255),
-    Label varchar(255),
-    StartEpoch int,
-    EndEpoch int,
-    StoragePricePerEpoch int,
-    ProviderCollateral int,
-    ClientCollateral int,
-    State varchar(32),
+    DealProposalSignature BLOB,
+    PieceCID TEXT,
+    PieceSize INT,
+    VerifiedDeal BOOL,
+    ClientAddress TEXT,
+    ProviderAddress TEXT,
+    Label TEXT,
+    StartEpoch INT,
+    EndEpoch INT,
+    StoragePricePerEpoch BLOB,
+    ProviderCollateral BLOB,
+    ClientCollateral BLOB,
+    SelfPeerID TEXT,
+    ClientPeerID TEXT,
+    DealDataRoot TEXT,
+    InboundFilePath TEXT,
+    TransferType TEXT,
+    TransferParams BLOB,
+    ChainDealID INT,
+    PublishCID TEXT,
+    SectorID INT,
+    Offset INT,
+    Length INT,
+    Checkpoint TEXT,
+    Error TEXT,
     PRIMARY KEY(ID)
 ) WITHOUT ROWID;

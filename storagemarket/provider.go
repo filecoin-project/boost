@@ -2,11 +2,13 @@ package storagemarket
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
-	"net/url"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/filecoin-project/boost/db"
 
 	"github.com/filecoin-project/boost/filestore"
 	"github.com/filecoin-project/lotus/api/v1api"
@@ -47,7 +49,7 @@ type Provider struct {
 	restartDealsChan chan restartReq
 
 	// Database API
-	//dbApi datastore.API
+	db *db.DealsDB
 
 	fullnodeApi v1api.FullNode
 	//dagStore    stores.DAGStoreWrapper
@@ -57,15 +59,14 @@ type Provider struct {
 	adapter *Adapter
 }
 
-//func NewProvider(dbApi datastore.API, lotusNode lotusnode.StorageProviderNode) (*provider, error) {
-func NewProvider(fullnodeApi v1api.FullNode) (*Provider, error) {
+func NewProvider(sqldb *sql.DB, fullnodeApi v1api.FullNode) (*Provider, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Provider{
 		ctx:         ctx,
 		cancel:      cancel,
 		fullnodeApi: fullnodeApi,
-		//dbApi:     dbApi,
+		db:          db.NewDealsDB(sqldb),
 
 		adapter: &Adapter{}, // TODO: instantiate properly
 	}, nil
@@ -76,17 +77,14 @@ func (p *Provider) GetAsk() *types.StorageAsk {
 }
 
 func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (dh *DealHandler, pi *types.ProviderDealRejectionInfo, err error) {
-	if _, err := url.Parse(dp.TransferURL); err != nil {
-		return nil, nil, fmt.Errorf("transfer url is invalid: %w", err)
-	}
-
 	ds := types.ProviderDealState{
 		DealUuid:           dp.DealUuid,
 		ClientDealProposal: dp.ClientDealProposal,
 		SelfPeerID:         dp.MinerPeerID,
 		ClientPeerID:       dp.ClientPeerID,
 		DealDataRoot:       dp.DealDataRoot,
-		TransferURL:        dp.TransferURL,
+		TransferType:       dp.TransferType,
+		TransferParams:     dp.TransferParams,
 	}
 
 	// validate the deal proposal
@@ -105,19 +103,19 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (dh *DealHandler, pi 
 		_ = os.Remove(string(tmp.OsPath()))
 		return nil, nil, fmt.Errorf("failed to close temp file: %w", err)
 	}
-	ds.InboundCARPath = string(tmp.OsPath())
+	ds.InboundFilePath = string(tmp.OsPath())
 
 	// create the pub-sub plumbing for this deal
 	bus := eventbus.NewBus()
 	publisher, sub, err := createPubSub(bus)
 	if err != nil {
-		_ = os.Remove(ds.InboundCARPath)
+		_ = os.Remove(ds.InboundFilePath)
 		return nil, nil, err
 	}
 
 	defer func() {
 		if pi != nil || err != nil {
-			_ = os.Remove(ds.InboundCARPath)
+			_ = os.Remove(ds.InboundFilePath)
 			_ = sub.Close()
 		}
 	}()
@@ -164,21 +162,23 @@ func createPubSub(bus event.Bus) (event.Emitter, event.Subscription, error) {
 	return emitter, sub, nil
 }
 
-func (p *Provider) Start() []*DealHandler {
+func (p *Provider) Start() ([]*DealHandler, error) {
 	// restart all existing deals
-	// execute db query to get all non-terminated deals here
-	var deals []*types.ProviderDealState
+	deals, err := p.db.ListActive(p.ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var restartWg sync.WaitGroup
 	dhs := make([]*DealHandler, 0, len(deals))
 
-	for i := range deals {
+	for _, deal := range deals {
 		pub, sub, err := createPubSub(eventbus.NewBus())
 		if err != nil {
 			panic(err)
 		}
 
-		deal := deals[i]
-		req := restartReq{deal, pub}
+		req := restartReq{&deal, pub}
 
 		restartWg.Add(1)
 		go func() {
@@ -200,7 +200,7 @@ func (p *Provider) Start() []*DealHandler {
 	// after all existing deals have restarted and accounted for their resources.
 	restartWg.Wait()
 
-	return dhs
+	return dhs, nil
 }
 
 func (p *Provider) Close() error {
@@ -276,6 +276,13 @@ func (p *Provider) loop() {
 
 			// start executing the deal
 			dealReq.st.Checkpoint = dealcheckpoints.New
+
+			// write deal state to the database
+			err = p.db.Insert(p.ctx, dealReq.st)
+			if err != nil {
+				go writeDealResp(false, nil, err)
+				continue
+			}
 
 			p.wg.Add(1)
 			go func() {

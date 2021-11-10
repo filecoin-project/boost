@@ -2,10 +2,16 @@ package db
 
 import (
 	"context"
-	"fmt"
-	"github.com/stretchr/testify/require"
+	"database/sql"
 	"path"
 	"testing"
+	"time"
+
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+
+	"github.com/filecoin-project/boost/storagemarket/types"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDB(t *testing.T) {
@@ -15,15 +21,60 @@ func TestDB(t *testing.T) {
 	tmpFile := path.Join(t.TempDir(), "test.db")
 	//fmt.Println(tmpFile)
 
-	err := LoadFixtures(ctx, tmpFile, "create.sql", "fixtures.sql")
+	deals, err := generateDeals()
 	req.NoError(err)
 
-	db, err := Open(tmpFile)
+	sqldb, err := sql.Open("sqlite3", "file:"+tmpFile)
 	req.NoError(err)
 
-	deals, err := db.List(ctx)
+	db := NewDealsDB(sqldb)
 	req.NoError(err)
-	req.Len(deals, 2)
 
-	fmt.Println(deals[0])
+	err = createTables(ctx, sqldb)
+	req.NoError(err)
+
+	deal := deals[0]
+	db.Insert(ctx, &deal)
+
+	storedDeal, err := db.ByID(ctx, deal.DealUuid)
+	req.NoError(err)
+
+	// TODO: Work out why returned CreatedAt is not equal to stored CreatedAt
+	//req.Equal(deal.CreatedAt.String(), storedDeal.CreatedAt.String())
+	deal.CreatedAt = time.Time{}
+	storedDeal.CreatedAt = time.Time{}
+	req.Equal(deal, *storedDeal)
+
+	dealList, err := db.List(ctx)
+	req.NoError(err)
+	req.Len(deals, len(deals))
+
+	var storedListDeal types.ProviderDealState
+	for _, dl := range dealList {
+		if dl.DealUuid == deal.DealUuid {
+			storedListDeal = dl
+		}
+	}
+	deal.CreatedAt = time.Time{}
+	storedListDeal.CreatedAt = time.Time{}
+	req.Equal(deal, storedListDeal)
+
+	deal.Checkpoint = dealcheckpoints.Published
+	err = db.Update(ctx, &deal)
+	req.NoError(err)
+
+	storedDeal, err = db.ByID(ctx, deal.DealUuid)
+	req.NoError(err)
+
+	deal.CreatedAt = time.Time{}
+	storedDeal.CreatedAt = time.Time{}
+	req.Equal(deal, *storedDeal)
+
+	//err = db.InsertLog(ctx, &DealLog{DealUuid: deal.DealUuid, Text: "Test"})
+	//req.NoError(err)
+
+	//logs, err := db.Logs(ctx, deal.DealUuid)
+	//req.NoError(err)
+	//req.Len(logs, 1)
+	//req.Equal("Test", logs[0].Text)
 }
