@@ -89,9 +89,9 @@ func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNod
 		fullnodeApi: fullnodeApi,
 		db:          dealsDB,
 
-		acceptDealsChan:  make(chan acceptDealReq, 128),
-		failedDealsChan:  make(chan failedDealReq, 128),
-		restartDealsChan: make(chan restartReq, 128),
+		acceptDealsChan:  make(chan acceptDealReq),
+		failedDealsChan:  make(chan failedDealReq),
+		restartDealsChan: make(chan restartReq),
 
 		Transport: datatransfer.NewMockTransport(),
 
