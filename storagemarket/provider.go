@@ -198,6 +198,7 @@ func (p *Provider) Start(ctx context.Context) error {
 
 	var restartWg sync.WaitGroup
 	for _, deal := range deals {
+		deal := deal
 		restartWg.Add(1)
 		go func() {
 			defer restartWg.Done()

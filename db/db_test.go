@@ -34,7 +34,8 @@ func TestDB(t *testing.T) {
 	req.NoError(err)
 
 	deal := deals[0]
-	db.Insert(ctx, &deal)
+	err = db.Insert(ctx, &deal)
+	req.NoError(err)
 
 	storedDeal, err := db.ByID(ctx, deal.DealUuid)
 	req.NoError(err)
@@ -52,7 +53,7 @@ func TestDB(t *testing.T) {
 	var storedListDeal types.ProviderDealState
 	for _, dl := range dealList {
 		if dl.DealUuid == deal.DealUuid {
-			storedListDeal = dl
+			storedListDeal = *dl
 		}
 	}
 	deal.CreatedAt = time.Time{}
