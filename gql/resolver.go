@@ -99,7 +99,7 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 
 	sub, err := r.provider.SubscribeDealUpdates(dealUuid)
 	if err != nil {
-		if xerrors.Is(err, storagemarket.ErrDealExecNotFound) {
+		if xerrors.Is(err, storagemarket.ErrDealHandlerFound) {
 			close(c)
 			return c, nil
 		}

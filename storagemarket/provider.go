@@ -54,17 +54,15 @@ type Provider struct {
 	// Database API
 	db *db.DealsDB
 
-	fullnodeApi v1api.FullNode
-	//dagStore    stores.DAGStoreWrapper
-
 	Transport *datatransfer.MockTransport
 
-	adapter *Adapter
+	dealPublisher *DealPublisher
+	adapter       *Adapter
 
 	dealHandlers *dealHandlers
 }
 
-func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNode, addr address.Address) (*Provider, error) {
+func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -82,12 +80,11 @@ func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNod
 
 	return &Provider{
 		// TODO: pass max transfer duration as a param
-		config:      Config{MaxTransferDuration: 30 * time.Second},
-		Address:     addr,
-		newDealPS:   newDealPS,
-		fs:          fs,
-		fullnodeApi: fullnodeApi,
-		db:          dealsDB,
+		config:    Config{MaxTransferDuration: 30 * time.Second},
+		Address:   addr,
+		newDealPS: newDealPS,
+		fs:        fs,
+		db:        dealsDB,
 
 		acceptDealsChan:  make(chan acceptDealReq),
 		failedDealsChan:  make(chan failedDealReq),
@@ -95,6 +92,7 @@ func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNod
 
 		Transport: datatransfer.NewMockTransport(),
 
+		dealPublisher: dealPublisher,
 		adapter: &Adapter{
 			FullNode: fullnodeApi,
 		},
@@ -247,7 +245,7 @@ func (p *Provider) SubscribeDealUpdates(dealUuid uuid.UUID) (event.Subscription,
 func (p *Provider) CancelDeal(ctx context.Context, dealUuid uuid.UUID) error {
 	dh, err := p.dealHandlers.get(dealUuid)
 	if err != nil {
-		if xerrors.Is(err, ErrDealExecNotFound) {
+		if xerrors.Is(err, ErrDealHandlerFound) {
 			return nil
 		}
 		return err

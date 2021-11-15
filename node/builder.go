@@ -328,7 +328,6 @@ var BoostNode = Options(
 
 	Override(new(dtypes.NetworkName), modules.StorageNetworkName),
 	Override(new(*db.DealsDB), modules.NewStorageMarketDB),
-	Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider),
 	Override(new(*gql.Server), modules.NewGraphqlServer),
 )
 
@@ -359,6 +358,16 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(stores.LocalStorage), From(new(repo.LockedRepo))),
 		Override(new(*stores.Local), modules.LocalStorage),
 		Override(new(*stores.Remote), modules.RemoteStorage),
+
+		Override(new(*storagemarket.DealPublisher), storagemarket.NewDealPublisher(storagemarket.PublishMsgConfig{
+			Wallet:                  cfg.Wallets.PublishStorageDeals,
+			Period:                  time.Duration(cfg.Dealmaking.PublishMsgPeriod),
+			MaxDealsPerMsg:          cfg.Dealmaking.PublishMsgMaxDealsPerMsg,
+			StartEpochSealingBuffer: cfg.Dealmaking.StartEpochSealingBuffer,
+			MaxPublishDealsFee:      cfg.Dealmaking.PublishMsgMaxFee,
+		})),
+
+		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(cfg.Wallets.Miner)),
 	)
 }
 

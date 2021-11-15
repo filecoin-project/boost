@@ -520,22 +520,17 @@ func NewStorageMarketDB(r repo.LockedRepo) (*db.DealsDB, error) {
 	return db.NewDealsDB(sqldb), nil
 }
 
-func NewStorageMarketProvider(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, db *db.DealsDB) (*storagemarket.Provider, error) {
-	// TODO: Should we get the address from the Storage Miner API?
-	// Or should it be stored in the metadata store - see minerAddrFromDS
-	addr, err := address.NewActorAddress([]byte("TODO: miner"))
-	if err != nil {
-		panic(err)
+func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, db *db.DealsDB, dp *storagemarket.DealPublisher) (*storagemarket.Provider, error) {
+	return func(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, db *db.DealsDB, dp *storagemarket.DealPublisher) (*storagemarket.Provider, error) {
+		prov, err := storagemarket.NewProvider(r.Path(), db, a, dp, provAddr)
+		if err != nil {
+			return nil, err
+		}
+
+		lc.Append(fx.Hook{OnStart: prov.Start})
+
+		return prov, nil
 	}
-
-	prov, err := storagemarket.NewProvider(r.Path(), db, a, addr)
-	if err != nil {
-		return nil, err
-	}
-
-	lc.Append(fx.Hook{OnStart: prov.Start})
-
-	return prov, nil
 }
 
 func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, db *db.DealsDB) *gql.Server {
