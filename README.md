@@ -42,6 +42,22 @@ FULLNODE_API_INFO=/ip4/127.0.0.1/tcp/1234/http boost run
 boost dummydeal
 ```
 
+## Web UI
+
+1. Install and build
+
+```
+cd react
+npm install
+npm run build
+```
+
+2. Open UI
+
+```
+http://localhost:8080
+```
+
 ## License
 
 Dual-licensed under [MIT](https://github.com/filecoin-project/boost/blob/main/LICENSE-MIT) + [Apache 2.0](https://github.com/filecoin-project/boost/blob/main/LICENSE-APACHE)

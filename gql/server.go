@@ -32,8 +32,17 @@ func NewServer(prov *storagemarket.Provider, db *db.DealsDB) *Server {
 func (s *Server) Serve(ctx context.Context) error {
 	log.Info("graphql server: starting")
 
+	// Serve react app
+	path := "/"
+	directory := "react/build"
+	http.Handle(path, http.StripPrefix(path, http.FileServer(http.Dir(directory))))
+
+	spath := "/static/"
+	sdirectory := "react/build/static"
+	http.Handle(spath, http.StripPrefix(spath, http.FileServer(http.Dir(sdirectory))))
+
 	// Graphiql handler (GUI for making graphql queries)
-	http.HandleFunc("/", graphiql(httpPort))
+	http.HandleFunc("/graphiql", graphiql(httpPort))
 
 	// Init graphQL schema
 	schemaText, err := ioutil.ReadFile("gql/schema.graphql")
