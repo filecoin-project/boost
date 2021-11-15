@@ -50,10 +50,9 @@ func (t *MockTransport) SimulateTransfer(ctx context.Context, dealUuid uuid.UUID
 		t.setTransferred(dealUuid, size)
 		select {
 		case <-ctx.Done():
-			close(tch)
-			return
 		case tch <- size:
 		}
+		close(tch)
 	}()
 
 	return tch, nil

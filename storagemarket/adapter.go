@@ -41,16 +41,10 @@ type Adapter struct {
 	secb *sectorblocks.SectorBlocks
 	//ev   *events.Events
 
-	dealPublisher *DealPublisher
-
 	addBalanceSpec              *api.MessageSendSpec
 	maxDealCollateralMultiplier uint64
 	//dsMatcher                   *dealStateMatcher
 	scMgr *SectorCommittedManager
-}
-
-func (n *Adapter) PublishDeals(ctx context.Context, deal storagemarket.MinerDeal) (cid.Cid, error) {
-	return n.dealPublisher.Publish(ctx, deal.ClientDealProposal)
 }
 
 func (n *Adapter) OnDealComplete(ctx context.Context, deal storagemarket.MinerDeal, pieceSize abi.UnpaddedPieceSize, pieceData io.Reader) (*storagemarket.PackingResult, error) {

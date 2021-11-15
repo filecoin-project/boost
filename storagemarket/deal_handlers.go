@@ -7,6 +7,8 @@ import (
 	"golang.org/x/xerrors"
 )
 
+var ErrDealHandlerFound = xerrors.Errorf("deal handler not found")
+
 // dealHandlers keeps track of executing deals by deal uuid
 type dealHandlers struct {
 	lk       sync.RWMutex
@@ -32,7 +34,7 @@ func (p *dealHandlers) get(dealUuid uuid.UUID) (*dealHandler, error) {
 
 	dh, ok := p.handlers[dealUuid]
 	if !ok {
-		return nil, xerrors.Errorf("deal %s: %w", dealUuid, ErrDealExecNotFound)
+		return nil, xerrors.Errorf("deal %s: %w", dealUuid, ErrDealHandlerFound)
 	}
 	return dh, nil
 }
