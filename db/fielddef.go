@@ -65,6 +65,36 @@ func (fd *cidFieldDef) unmarshall() error {
 	return nil
 }
 
+type cidPtrFieldDef struct {
+	cidStr sql.NullString
+	f      **cid.Cid
+}
+
+func (fd *cidPtrFieldDef) fieldPtr() interface{} {
+	return &fd.cidStr
+}
+
+func (fd *cidPtrFieldDef) marshall() (interface{}, error) {
+	if (*fd.f) == nil {
+		return nil, nil
+	}
+	return (*fd.f).String(), nil
+}
+
+func (fd *cidPtrFieldDef) unmarshall() error {
+	if !fd.cidStr.Valid {
+		return nil
+	}
+
+	c, err := cid.Parse(fd.cidStr.String)
+	if err != nil {
+		return xerrors.Errorf("parsing CID from string '%s': %w", fd.cidStr.String, err)
+	}
+
+	*fd.f = &c
+	return nil
+}
+
 type bigIntFieldDef struct {
 	marshalled []byte
 	f          *big.Int

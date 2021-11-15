@@ -23,6 +23,12 @@ type Deal {
   Logs: [DealLog]!
 }
 
+type DealList {
+  totalCount: Int!
+  next: ID
+  deals: [Deal]!
+}
+
 type DealLog {
   DealID: ID!
   CreatedAt: Time!
@@ -34,7 +40,7 @@ type RootQuery {
   deal(id: ID!): Deal
 
   """Get all Deals"""
-  deals: [Deal]
+  deals(first: ID, limit: Int): DealList!
 }
 
 type RootMutation {

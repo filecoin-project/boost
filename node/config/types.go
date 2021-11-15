@@ -1,6 +1,8 @@
 package config
 
 import (
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 )
 
@@ -32,6 +34,14 @@ type Boost struct {
 	SectorIndexApiInfo string
 	Dealmaking         DealmakingConfig
 	DAGStore           DAGStoreConfig
+	Wallets            WalletsConfig
+}
+
+type WalletsConfig struct {
+	// The "owner" address of the miner
+	Miner address.Address
+	// The wallet used to send PublishStorageDeals messages
+	PublishStorageDeals address.Address
 }
 
 type DAGStoreConfig struct {
@@ -94,7 +104,9 @@ type DealmakingConfig struct {
 	PublishMsgPeriod Duration
 	// The maximum number of deals to include in a single PublishStorageDeals
 	// message
-	MaxDealsPerPublishMsg uint64
+	PublishMsgMaxDealsPerMsg uint64
+	// The maximum network fees to pay when sending the PublishStorageDeals message
+	PublishMsgMaxFee types.FIL
 	// The maximum collateral that the provider will put up against a deal,
 	// as a multiplier of the minimum collateral bound
 	MaxProviderCollateralMultiplier uint64

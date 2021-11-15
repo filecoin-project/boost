@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/graph-gophers/graphql-go"
+
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -83,7 +85,7 @@ func newDealAccessor(db *sql.DB, deal *types.ProviderDealState) *dealAccessor {
 			"TransferType":          &fieldDef{f: &deal.TransferType},
 			"TransferParams":        &fieldDef{f: &deal.TransferParams},
 			"ChainDealID":           &fieldDef{f: &deal.ChainDealID},
-			"PublishCID":            &cidFieldDef{f: deal.PublishCID},
+			"PublishCID":            &cidPtrFieldDef{f: &deal.PublishCID},
 			"SectorID":              &fieldDef{f: &deal.SectorID},
 			"Offset":                &fieldDef{f: &deal.Offset},
 			"Length":                &fieldDef{f: &deal.Length},
@@ -109,11 +111,11 @@ func (d *dealAccessor) scan(row Scannable) error {
 	}
 
 	// For each field
-	for _, fieldDef := range d.def {
+	for name, fieldDef := range d.def {
 		// Unmarshall the scanned value into deal object
 		err := fieldDef.unmarshall()
 		if err != nil {
-			return xerrors.Errorf("unmarshalling db field: %s", err)
+			return xerrors.Errorf("unmarshalling db field %s: %s", name, err)
 		}
 	}
 	return nil
@@ -222,22 +224,40 @@ func (d *DealsDB) ByID(ctx context.Context, id uuid.UUID) (*types.ProviderDealSt
 	return d.scanRow(row)
 }
 
+func (d *DealsDB) Count(ctx context.Context) (int, error) {
+	var count int
+	row := d.db.QueryRowContext(ctx, "SELECT count(*) FROM Deals")
+	err := row.Scan(&count)
+	return count, err
+}
+
 func (d *DealsDB) ListActive(ctx context.Context) ([]*types.ProviderDealState, error) {
-	return d.list(ctx, "Checkpoint != ?", dealcheckpoints.Complete.String())
+	return d.list(ctx, 0, "Checkpoint != ?", dealcheckpoints.Complete.String())
 }
 
-func (d *DealsDB) List(ctx context.Context) ([]*types.ProviderDealState, error) {
-	return d.list(ctx, "")
+func (d *DealsDB) List(ctx context.Context, first *graphql.ID, limit int) ([]*types.ProviderDealState, error) {
+	where := ""
+	whereArgs := []interface{}{}
+	if first != nil {
+		where += "CreatedAt <= (SELECT CreatedAt FROM Deals WHERE ID = ?)"
+		whereArgs = append(whereArgs, *first)
+	}
+	return d.list(ctx, limit, where, whereArgs...)
 }
 
-func (d *DealsDB) list(ctx context.Context, whereClause string, whereArgs ...interface{}) ([]*types.ProviderDealState, error) {
+func (d *DealsDB) list(ctx context.Context, limit int, whereClause string, whereArgs ...interface{}) ([]*types.ProviderDealState, error) {
+	args := whereArgs
 	qry := "SELECT " + dealFieldsStr + " FROM Deals"
 	if whereClause != "" {
 		qry += " WHERE " + whereClause
 	}
 	qry += " ORDER BY CreatedAt DESC"
+	if limit > 0 {
+		qry += " LIMIT ?"
+		args = append(args, limit)
+	}
 
-	rows, err := d.db.QueryContext(ctx, qry, whereArgs...)
+	rows, err := d.db.QueryContext(ctx, qry, args...)
 	if err != nil {
 		return nil, err
 	}

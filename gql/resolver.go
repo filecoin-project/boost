@@ -15,6 +15,12 @@ import (
 	"golang.org/x/xerrors"
 )
 
+type dealListResolver struct {
+	TotalCount int32
+	Next       *graphql.ID
+	Deals      []*dealResolver
+}
+
 // resolver translates from a request for a graphql field to the data for
 // that field
 type resolver struct {
@@ -48,9 +54,19 @@ func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dea
 	return newDealResolver(deal, r.dealsDB), nil
 }
 
-// query: deals() []Deal
-func (r *resolver) Deals(ctx context.Context) (*[]*dealResolver, error) {
-	deals, err := r.dealList(ctx)
+type dealsArgs struct {
+	First *graphql.ID
+	Limit graphql.NullInt
+}
+
+// query: deals(first, limit) DealList
+func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver, error) {
+	limit := 10
+	if args.Limit.Set && args.Limit.Value != nil && *args.Limit.Value > 0 {
+		limit = int(*args.Limit.Value)
+	}
+
+	deals, count, next, err := r.dealList(ctx, args.First, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +75,17 @@ func (r *resolver) Deals(ctx context.Context) (*[]*dealResolver, error) {
 	for _, deal := range deals {
 		resolvers = append(resolvers, newDealResolver(&deal, r.dealsDB))
 	}
-	return &resolvers, nil
+
+	var nextID *graphql.ID
+	if next != nil {
+		gqlid := graphql.ID(next.String())
+		nextID = &gqlid
+	}
+	return &dealListResolver{
+		TotalCount: int32(count),
+		Next:       nextID,
+		Deals:      resolvers,
+	}, nil
 }
 
 // subscription: dealUpdate(id) <-chan Deal
@@ -73,7 +99,7 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 
 	sub, err := r.provider.SubscribeDealUpdates(dealUuid)
 	if err != nil {
-		if xerrors.Is(err, storagemarket.ErrDealExecNotFound) {
+		if xerrors.Is(err, storagemarket.ErrDealHandlerFound) {
 			close(c)
 			return c, nil
 		}
@@ -132,8 +158,8 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealResolver, error) {
 		return nil, xerrors.Errorf("subscribing to new deal events: %w", err)
 	}
 
-	// Updates to deal state are broadcast on pubsub. Pipe these updates to the
-	// deal subscription channel returned by this method.
+	// New deals are broadcast on pubsub. Pipe these deals to the
+	// new deal subscription channel returned by this method.
 	go func() {
 		// When the connection ends, unsubscribe
 		defer sub.Close()
@@ -146,7 +172,7 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealResolver, error) {
 
 			// New deal
 			case evti := <-sub.Out():
-				// Pipe the update to the deal subscription channel
+				// Pipe the deal to the new deal channel
 				di := evti.(types.ProviderDealInfo)
 				rsv := newDealResolver(&di, r.dealsDB)
 
@@ -186,12 +212,30 @@ func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.Pro
 	}, nil
 }
 
-func (r *resolver) dealList(ctx context.Context) ([]types.ProviderDealInfo, error) {
-	deals, err := r.dealsDB.List(ctx)
+func (r *resolver) dealList(ctx context.Context, first *graphql.ID, limit int) ([]types.ProviderDealInfo, int, *uuid.UUID, error) {
+	// Get one extra deal so we can get the first deal UUID of the next page
+	allDeals, err := r.dealsDB.List(ctx, first, limit+1)
 	if err != nil {
-		return nil, err
+		return nil, 0, nil, err
 	}
 
+	deals := allDeals
+	var nextDealUuid *uuid.UUID
+	// If there was more than one page of deals available
+	if len(allDeals) > limit {
+		// Get the first deal UUID of the next page
+		nextDealUuid = &allDeals[len(allDeals)-1].DealUuid
+		// Filter for deals on this page
+		deals = allDeals[:limit]
+	}
+
+	// Get the total deal count
+	count, err := r.dealsDB.Count(ctx)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+
+	// Include data transfer information with the deal
 	dis := make([]types.ProviderDealInfo, 0, len(deals))
 	for _, deal := range deals {
 		dis = append(dis, types.ProviderDealInfo{
@@ -200,7 +244,7 @@ func (r *resolver) dealList(ctx context.Context) ([]types.ProviderDealInfo, erro
 		})
 	}
 
-	return dis, nil
+	return dis, count, nextDealUuid, nil
 }
 
 type dealResolver struct {
@@ -210,9 +254,6 @@ type dealResolver struct {
 }
 
 func newDealResolver(deal *types.ProviderDealInfo, dealsDB *db.DealsDB) *dealResolver {
-	if dealsDB == nil {
-		panic("deals DB must not be nil")
-	}
 	return &dealResolver{
 		ProviderDealState: *deal.Deal,
 		transferred:       deal.Transferred,

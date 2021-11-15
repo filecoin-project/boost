@@ -70,7 +70,8 @@ func DefaultBoost() *Boost {
 			MaxDealStartDelay:               Duration(time.Hour * 24 * 14),
 			ExpectedSealDuration:            Duration(time.Hour * 24),
 			PublishMsgPeriod:                Duration(time.Hour),
-			MaxDealsPerPublishMsg:           8,
+			PublishMsgMaxDealsPerMsg:        8,
+			PublishMsgMaxFee:                types.MustParseFIL("0.05"),
 			MaxProviderCollateralMultiplier: 2,
 
 			SimultaneousTransfersForStorage:   DefaultSimultaneousTransfers,

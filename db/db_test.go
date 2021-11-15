@@ -33,10 +33,12 @@ func TestDB(t *testing.T) {
 	err = createTables(ctx, sqldb)
 	req.NoError(err)
 
-	deal := deals[0]
-	err = db.Insert(ctx, &deal)
-	req.NoError(err)
+	for _, deal := range deals {
+		err = db.Insert(ctx, &deal)
+		req.NoError(err)
+	}
 
+	deal := deals[0]
 	storedDeal, err := db.ByID(ctx, deal.DealUuid)
 	req.NoError(err)
 
@@ -46,9 +48,13 @@ func TestDB(t *testing.T) {
 	storedDeal.CreatedAt = time.Time{}
 	req.Equal(deal, *storedDeal)
 
-	dealList, err := db.List(ctx)
+	dealList, err := db.List(ctx, nil, 100)
 	req.NoError(err)
-	req.Len(deals, len(deals))
+	req.Len(dealList, len(deals))
+
+	count, err := db.Count(ctx)
+	req.NoError(err)
+	req.Equal(len(deals), count)
 
 	var storedListDeal types.ProviderDealState
 	for _, dl := range dealList {
@@ -71,11 +77,11 @@ func TestDB(t *testing.T) {
 	storedDeal.CreatedAt = time.Time{}
 	req.Equal(deal, *storedDeal)
 
-	//err = db.InsertLog(ctx, &DealLog{DealUuid: deal.DealUuid, Text: "Test"})
-	//req.NoError(err)
+	err = db.InsertLog(ctx, &DealLog{DealUuid: deal.DealUuid, Text: "Test"})
+	req.NoError(err)
 
-	//logs, err := db.Logs(ctx, deal.DealUuid)
-	//req.NoError(err)
-	//req.Len(logs, 1)
-	//req.Equal("Test", logs[0].Text)
+	logs, err := db.Logs(ctx, deal.DealUuid)
+	req.NoError(err)
+	req.Len(logs, 1)
+	req.Equal("Test", logs[0].Text)
 }
