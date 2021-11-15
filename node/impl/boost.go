@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 
+	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemarket/datatransfer"
 
 	"github.com/filecoin-project/boost/gql"
@@ -48,7 +49,7 @@ type BoostAPI struct {
 	//SectorAccessor    retrievalmarket.SectorAccessor    `optional:"true"`
 	//DataTransfer      dtypes.ProviderDataTransfer       `optional:"true"`
 	//DealPublisher     *storageadapter.DealPublisher     `optional:"true"`
-	//SectorBlocks      *sectorblocks.SectorBlocks        `optional:"true"`
+	SectorBlocks *sectorblocks.SectorBlocks
 	//Host              host.Host                         `optional:"true"`
 	//DAGStore          *dagstore.DAGStore                `optional:"true"`
 

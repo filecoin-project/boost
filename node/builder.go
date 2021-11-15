@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/storage/sectorblocks"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
@@ -326,6 +327,10 @@ var BoostNode = Options(
 	Override(new(dtypes.MinerAddress), modules.MinerAddress),
 	Override(new(dtypes.MinerID), modules.MinerID),
 
+	// Sector API
+	Override(new(sectorblocks.SectorBuilder), From(new(modules.MinerStorageService))),
+	Override(new(*sectorblocks.SectorBlocks), sectorblocks.NewSectorBlocks),
+
 	Override(new(dtypes.NetworkName), modules.StorageNetworkName),
 	Override(new(*db.DealsDB), modules.NewStorageMarketDB),
 	Override(new(*gql.Server), modules.NewGraphqlServer),
@@ -358,6 +363,8 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(stores.LocalStorage), From(new(repo.LockedRepo))),
 		Override(new(*stores.Local), modules.LocalStorage),
 		Override(new(*stores.Remote), modules.RemoteStorage),
+
+		Override(new(modules.MinerStorageService), modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
 
 		Override(new(*storagemarket.DealPublisher), storagemarket.NewDealPublisher(storagemarket.PublishMsgConfig{
 			Wallet:                  cfg.Wallets.PublishStorageDeals,

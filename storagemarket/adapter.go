@@ -22,6 +22,7 @@ import (
 
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/storage/sectorblocks"
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
@@ -47,28 +48,35 @@ type Adapter struct {
 	scMgr *SectorCommittedManager
 }
 
-func (n *Adapter) OnDealComplete(ctx context.Context, deal storagemarket.MinerDeal, pieceSize abi.UnpaddedPieceSize, pieceData io.Reader) (*storagemarket.PackingResult, error) {
-	if deal.PublishCid == nil {
+func (n *Adapter) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDealState, pieceData io.Reader) (*storagemarket.PackingResult, error) {
+	// Sanity check - we must have published the deal before handing it off
+	// to the sealing subsystem
+	if deal.PublishCID == nil {
 		return nil, xerrors.Errorf("deal.PublishCid can't be nil")
 	}
 
 	sdInfo := api.PieceDealInfo{
-		DealID:       deal.DealID,
-		DealProposal: &deal.Proposal,
-		PublishCid:   deal.PublishCid,
+		DealID:       deal.ChainDealID,
+		DealProposal: &deal.ClientDealProposal.Proposal,
+		PublishCid:   deal.PublishCID,
 		DealSchedule: api.DealSchedule{
 			StartEpoch: deal.ClientDealProposal.Proposal.StartEpoch,
 			EndEpoch:   deal.ClientDealProposal.Proposal.EndEpoch,
 		},
-		KeepUnsealed: deal.FastRetrieval,
+		// Assume that it doesn't make sense for a miner not to keep an
+		// unsealed copy. TODO: Check that's a valid assumption.
+		//KeepUnsealed: deal.FastRetrieval,
+		KeepUnsealed: true,
 	}
 
+	// Attempt to add the piece to a sector (repeatedly if necessary)
+	pieceSize := deal.ClientDealProposal.Proposal.PieceSize.Unpadded()
 	p, offset, err := n.secb.AddPiece(ctx, pieceSize, pieceData, sdInfo)
 	curTime := build.Clock.Now()
 	for build.Clock.Since(curTime) < addPieceRetryTimeout {
 		if !xerrors.Is(err, sealing.ErrTooManySectorsSealing) {
 			if err != nil {
-				log.Errorf("failed to addPiece for deal %d, err: %v", deal.DealID, err)
+				log.Errorw("failed to addPiece for deal", "id", deal.DealUuid, "err", err)
 			}
 			break
 		}
@@ -83,7 +91,7 @@ func (n *Adapter) OnDealComplete(ctx context.Context, deal storagemarket.MinerDe
 	if err != nil {
 		return nil, xerrors.Errorf("AddPiece failed: %s", err)
 	}
-	log.Warnf("New Deal: deal %d", deal.DealID)
+	log.Infow("Added new deal to sector", "id", deal.DealUuid, "sector", p)
 
 	return &storagemarket.PackingResult{
 		SectorNumber: p,
