@@ -91,6 +91,16 @@ const NewDealsSubscription = gql`
     }
 `;
 
+const StorageQuery = gql`
+    query AppStorageQuery {
+        storage {
+            Name
+            Capacity
+            Used
+        }
+    }
+`;
+
 export {
     gqlClient,
     gqlQuery,
@@ -99,4 +109,5 @@ export {
     DealSubscription,
     DealCancelMutation,
     NewDealsSubscription,
+    StorageQuery,
 }

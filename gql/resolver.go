@@ -39,6 +39,30 @@ func newResolver(ctx context.Context, dealsDB *db.DealsDB, provider *storagemark
 	return r
 }
 
+type storageResolver struct {
+	Name     string
+	Capacity float64
+	Used     float64
+}
+
+// query: storage: [Storage]
+func (r *resolver) Storage(ctx context.Context) ([]*storageResolver, error) {
+	// TODO: Get these values from storage space manager
+	return []*storageResolver{{
+		Name:     "Free",
+		Capacity: 8.5 * 1024 * 1024 * 1024,
+		Used:     0,
+	}, {
+		Name:     "Transferring",
+		Capacity: 5.2 * 1024 * 1024 * 1024,
+		Used:     3.5 * 1024 * 1024 * 1024,
+	}, {
+		Name:     "Queued",
+		Capacity: 11.2 * 1024 * 1024 * 1024,
+		Used:     0,
+	}}, nil
+}
+
 // query: deal(id) Deal
 func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dealResolver, error) {
 	id, err := toUuid(args.ID)

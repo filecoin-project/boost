@@ -2,7 +2,7 @@ import './App.css';
 import moment from 'moment';
 import React, { useState, useEffect } from 'react';
 import { ApolloProvider } from "@apollo/react-hooks";
-import { useSubscription, useMutation, parseDates } from "./hooks";
+import {useSubscription, useMutation, parseDates, useQuery} from "./hooks";
 import {
     gqlClient,
     gqlQuery,
@@ -11,6 +11,7 @@ import {
     DealSubscription,
     DealCancelMutation,
     NewDealsSubscription,
+    StorageQuery,
 } from "./gql";
 
 moment.locale('en', {
@@ -35,36 +36,6 @@ moment.locale('en', {
 })
 
 var dateFormat = 'YYYY-MM-DD HH:mm:ss.SSS'
-
-var storageDealsPageData = {
-    title: 'Storage Deals',
-    pageType: 'storage-deals',
-}
-
-var storageSpacePageData = {
-    title: 'Storage Space',
-    pageType: 'storage-space',
-    usage: {
-        free: {
-            name: 'Free',
-            size: 8.5
-        },
-        transferring: {
-            name: 'Transferring',
-            size: 5.2,
-            fill: 3.5
-        },
-        queued: {
-            name: 'Queued for sealing',
-            size: 11.2
-        }
-    }
-}
-
-var pages = [
-    storageDealsPageData,
-    storageSpacePageData
-]
 
 function App(props) {
     const [pageToShow, setPageToShow] = useState('storage-deals');
@@ -431,57 +402,72 @@ function StorageDealsPage(props) {
     </div>
 }
 
-class StorageBar extends React.Component {
-    render() {
-        var tp = this.props.barType
-        var barHeightRatio = this.props.usage[tp].size / this.props.max
-        var barHeight = Math.round(barHeightRatio * 100)
-        var fillerHeight = 100 - barHeight
+function StorageBar(props) {
+    var barHeightRatio = props.usage.Capacity / props.max
+    var barHeight = Math.round(barHeightRatio * 100)
+    var fillerHeight = 100 - barHeight
+    var usedPct = Math.floor(100 * props.usage.Used / (props.usage.Capacity || 1))
 
-        return <td className={'storage-bar ' + this.props.barType}>
-            <div className="filler" style={{ height: fillerHeight+'%' }}></div>
-            <div className="bar" style={{ height: barHeight+'%' }}>
-                <div className="size">{this.props.usage[tp].size} GB</div>
-                { this.props.used ? (
-                    <div style={{ height: '100%' }}>
-                        <div className="unused" style={{ height: (100 - this.props.used)+'%' }} />
-                        <div className="used" style={{ height: this.props.used+'%' }} />
-                    </div>
-                ) : null}
-            </div>
-        </td>
-    }
-}
-
-class StorageSpacePage extends React.Component {
-    render() {
-        var max = 0
-        var types = ['free', 'transferring', 'queued']
-        for (let tp of types) {
-            if (this.props.usage[tp].size > max) {
-                max = this.props.usage[tp].size
-            }
-        }
-        var tfrUsed = Math.round(100 * this.props.usage.transferring.fill / this.props.usage.transferring.size)
-
-        return <div className="storage">
-            <table>
-                <tbody>
-                <tr>
-                    <StorageBar usage={this.props.usage} max={max} barType="free" />
-                    <StorageBar usage={this.props.usage} max={max} barType="transferring" used={tfrUsed} />
-                    <StorageBar usage={this.props.usage} max={max} barType="queued" />
-                </tr>
-                <tr>
-                    <td className="label">Free</td>
-                    <td className="label">Transferring</td>
-                    <td className="label">Queued</td>
-                </tr>
-                </tbody>
-            </table>
+    return <td className={'storage-bar ' + props.usage.Name}>
+        <div className="filler" style={{ height: fillerHeight+'%' }}></div>
+        <div className="bar" style={{ height: barHeight+'%' }}>
+            <div className="size">{humanFileSize(props.usage.Capacity)}</div>
+            { props.usage.Used ? (
+                <div style={{ height: '100%' }}>
+                    <div className="unused" style={{ height: (100 - usedPct)+'%' }} />
+                    <div className="used" style={{ height: usedPct+'%' }} />
+                </div>
+            ) : null}
         </div>
-    }
+    </td>
 }
+
+function StorageSpacePage(props) {
+    const { loading, error, data } = useQuery(StorageQuery)
+
+    if (loading) {
+        return <div>Loading...</div>
+    }
+    if (error) {
+        return <div>Error: {error.message}</div>
+    }
+
+    var storage = data.storage
+    var max = 0
+    for (let tp of storage) {
+        if (tp.Capacity > max) {
+            max = tp.Capacity
+        }
+    }
+
+    return <div className="storage">
+        <table>
+            <tbody>
+            <tr>
+                { storage.map(usage => <StorageBar key={usage.Name} usage={usage} max={max} />) }
+            </tr>
+            <tr>
+                { storage.map(usage => <td key={usage.Name} className="label">{usage.Name}</td>) }
+            </tr>
+            </tbody>
+        </table>
+    </div>
+}
+
+var storageDealsPageData = {
+    title: 'Storage Deals',
+    pageType: 'storage-deals',
+}
+
+var storageSpacePageData = {
+    title: 'Storage Space',
+    pageType: 'storage-space',
+}
+
+var pages = [
+    storageDealsPageData,
+    storageSpacePageData
+]
 
 class Pages extends React.Component {
     render() {
