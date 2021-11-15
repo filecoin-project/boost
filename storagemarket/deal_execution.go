@@ -244,47 +244,40 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	return nil
 }
 
-// HandoffDeal hands off a published deal for sealing and commitment in a sector
+// addPiece hands off a published deal for sealing and commitment in a sector
 func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
 	p.addDealLog(deal.DealUuid, "Hand off deal to sealer")
 
+	// Open a reader against the CAR file with the deal data
 	v2r, err := carv2.OpenReader(deal.InboundFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to open CARv2 file: %w", err)
 	}
 
-	// Hand the deal off to the process that adds it to a sector
-	paddedReader, err := padreader.NewInflator(v2r.DataReader(), v2r.Header.DataSize, deal.ClientDealProposal.Proposal.PieceSize.Unpadded())
+	// Inflate the deal size so that it exactly fills a piece
+	proposal := deal.ClientDealProposal.Proposal
+	paddedReader, err := padreader.NewInflator(v2r.DataReader(), v2r.Header.DataSize, proposal.PieceSize.Unpadded())
 	if err != nil {
 		return fmt.Errorf("failed to create inflator: %w", err)
 	}
 
-	_ = paddedReader
-
-	//packingInfo, packingErr := p.fullnodeApi.OnDealComplete(
-	//p.ctx,
-	//*ds,
-	//ds.ClientDealProposal.Proposal.PieceSize.Unpadded(),
-	//paddedReader,
-	//)
+	// Add the piece to a sector
+	packingInfo, packingErr := p.adapter.AddPieceToSector(p.ctx, *deal, paddedReader)
 
 	// Close the reader as we're done reading from it.
-	//if err := v2r.Close(); err != nil {
-	//return fmt.Errorf("failed to close CARv2 reader: %w", err)
-	//}
+	if err := v2r.Close(); err != nil {
+		return fmt.Errorf("failed to close CARv2 reader: %w", err)
+	}
 
-	//if packingErr != nil {
-	//return fmt.Errorf("packing piece %s: %w", ds.ClientDealProposal.Proposal.PieceCID, packingErr)
-	//}
+	if packingErr != nil {
+		return fmt.Errorf("packing piece %s: %w", proposal.PieceCID, packingErr)
+	}
 
-	//ds.SectorID = packingInfo.SectorNumber
-	//ds.Offset = packingInfo.Offset
-	//ds.Length = packingInfo.Size
-	//ds.Checkpoint = dealcheckpoints.AddedPiece
-	//if err := p.dbApi.CreateOrUpdateDeal(ds); err != nil {
-	//return fmt.Errorf("failed to update deal: %w", err)
-	//}
+	deal.SectorID = packingInfo.SectorNumber
+	deal.Offset = packingInfo.Offset
+	deal.Length = packingInfo.Size
 
+	// TODO:
 	//// Register the deal data as a "shard" with the DAG store. Later it can be
 	//// fetched from the DAG store during retrieval.
 	//if err := stores.RegisterShardSync(p.ctx, p.dagStore, ds.ClientDealProposal.Proposal.PieceCID, ds.InboundCARPath, true); err != nil {
