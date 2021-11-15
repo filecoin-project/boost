@@ -84,7 +84,7 @@ func publishDealsPeriodicallyCmd(ctx context.Context) {
 
 		cmd := exec.CommandContext(ctx, "lotus-miner",
 			"storage-deals", "pending-publish", "--publish-now")
-		cmd.Run() // we ignore errors
+		_ = cmd.Run() // we ignore errors
 	}
 }
 
