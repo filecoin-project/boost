@@ -34,10 +34,10 @@ type Boost struct {
 	SectorIndexApiInfo string
 	Dealmaking         DealmakingConfig
 	DAGStore           DAGStoreConfig
-	Wallets            WalletConfig
+	Wallets            WalletsConfig
 }
 
-type WalletConfig struct {
+type WalletsConfig struct {
 	// The "owner" address of the miner
 	Miner address.Address
 	// The wallet used to send PublishStorageDeals messages
