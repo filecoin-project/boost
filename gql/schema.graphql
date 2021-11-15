@@ -35,12 +35,21 @@ type DealLog {
   Text: String!
 }
 
+type Storage {
+  Name: String!
+  Capacity: Float!
+  Used: Float!
+}
+
 type RootQuery {
   """Get Deal by ID"""
   deal(id: ID!): Deal
 
   """Get all Deals"""
   deals(first: ID, limit: Int): DealList!
+
+  """Get storage space usage"""
+  storage: [Storage]!
 }
 
 type RootMutation {
