@@ -69,6 +69,5 @@ func (s *Server) Serve(ctx context.Context) error {
 		_ = http.ListenAndServe(listenAddr, nil)
 	}()
 
-	log.Info("graphql server: started")
 	return nil
 }
