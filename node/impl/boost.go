@@ -44,12 +44,12 @@ type BoostAPI struct {
 
 	// Markets
 	StorageProvider *storagemarket.Provider
+	SectorBlocks    *sectorblocks.SectorBlocks
 	//PieceStore        dtypes.ProviderPieceStore         `optional:"true"`
 	//RetrievalProvider retrievalmarket.RetrievalProvider `optional:"true"`
 	//SectorAccessor    retrievalmarket.SectorAccessor    `optional:"true"`
 	//DataTransfer      dtypes.ProviderDataTransfer       `optional:"true"`
 	//DealPublisher     *storageadapter.DealPublisher     `optional:"true"`
-	SectorBlocks *sectorblocks.SectorBlocks `optional:"true"`
 	//Host              host.Host                         `optional:"true"`
 	//DAGStore          *dagstore.DAGStore                `optional:"true"`
 

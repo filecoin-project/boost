@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/filecoin-project/boost/devnet"
+	"github.com/filecoin-project/boost/pkg/devnet"
 )
 
 func main() {
