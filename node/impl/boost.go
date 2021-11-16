@@ -49,7 +49,7 @@ type BoostAPI struct {
 	//SectorAccessor    retrievalmarket.SectorAccessor    `optional:"true"`
 	//DataTransfer      dtypes.ProviderDataTransfer       `optional:"true"`
 	//DealPublisher     *storageadapter.DealPublisher     `optional:"true"`
-	SectorBlocks *sectorblocks.SectorBlocks
+	SectorBlocks *sectorblocks.SectorBlocks `optional:"true"`
 	//Host              host.Host                         `optional:"true"`
 	//DAGStore          *dagstore.DAGStore                `optional:"true"`
 
