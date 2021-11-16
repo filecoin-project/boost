@@ -41,9 +41,22 @@ type Storage {
   Used: Float!
 }
 
-type Fund {
+type FundAmount {
   Name: String!
   Capacity: Float!
+}
+
+type FundsLogList {
+  totalCount: Int!
+  logs: [FundsLog]!
+  next: Time
+}
+
+type FundsLog {
+  DealID: ID!
+  CreatedAt: Time!
+  Amount: Float!
+  Text: String!
 }
 
 type RootQuery {
@@ -57,7 +70,10 @@ type RootQuery {
   storage: [Storage]!
 
   """Get funds available"""
-  funds: [Fund]!
+  funds: [FundAmount]!
+
+  """Get log of fund transactions"""
+  fundsLogs: FundsLogList!
 }
 
 type RootMutation {

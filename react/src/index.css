@@ -182,3 +182,15 @@ body.modal-open {
   padding-top: 1em;
   vertical-align: top;
 }
+
+.funds-logs {
+  margin-top: 2em;
+}
+
+.funds-logs td, .funds-logs th {
+  padding: 0.5em 1em;
+}
+
+.funds-logs th {
+  color: #a61e4d
+}

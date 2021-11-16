@@ -4,7 +4,7 @@ import {humanFileSize} from "./util";
 export function BarChart(props) {
     var max = 0
     for (let field of props.fields) {
-        field.Type = field.Name.replace(/[ )]/, '-')
+        field.Type = field.Name.replace(/[ ()]/g, '-')
         if (field.Capacity > max) {
             max = field.Capacity
         }
