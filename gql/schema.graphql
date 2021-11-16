@@ -41,6 +41,11 @@ type Storage {
   Used: Float!
 }
 
+type Fund {
+  Name: String!
+  Capacity: Float!
+}
+
 type RootQuery {
   """Get Deal by ID"""
   deal(id: ID!): Deal
@@ -50,6 +55,9 @@ type RootQuery {
 
   """Get storage space usage"""
   storage: [Storage]!
+
+  """Get funds available"""
+  funds: [Fund]!
 }
 
 type RootMutation {

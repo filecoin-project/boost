@@ -101,6 +101,15 @@ const StorageQuery = gql`
     }
 `;
 
+const FundsQuery = gql`
+    query AppFundsQuery {
+        funds {
+            Name
+            Capacity
+        }
+    }
+`;
+
 export {
     gqlClient,
     gqlQuery,
@@ -110,4 +119,5 @@ export {
     DealCancelMutation,
     NewDealsSubscription,
     StorageQuery,
+    FundsQuery,
 }

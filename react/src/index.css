@@ -144,28 +144,28 @@ body.modal-open {
   text-align: center;
 }
 
-.storage > table {
+.bar-chart > table {
   margin-top: 2.5em;
 }
 
-.storage .storage-bar {
+.bar-chart .field {
   height: 200px;
   width: 5em;
 }
 
-.storage .storage-bar .size {
+.bar-chart .field .size {
   font-size: 0.8em;
   position: absolute;
   margin-top: -1.5em;
 }
 
-.storage .storage-bar .bar {
+.bar-chart .field .bar {
   width: 3em;
   border: 1px solid black;
   margin: auto;
 }
 
-.storage .storage-bar .bar .used {
+.bar-chart .field .bar .used {
   background-image: repeating-linear-gradient(
           135deg,
           #fff,
@@ -176,8 +176,9 @@ body.modal-open {
   border-bottom: 1px solid #000;
 }
 
-.storage .label {
+.bar-chart .label {
   font-size: 0.8em;
   text-align: center;
   padding-top: 1em;
+  vertical-align: top;
 }
