@@ -19,11 +19,11 @@ import (
 
 var initCmd = &cli.Command{
 	Name:  "init",
-	Usage: "Initialize a lotus miner repo",
+	Usage: "Initialize a boost repository",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "api-sector-index",
-			Usage: "sector Index API info (lotus-miner auth api-info --perm=admin)",
+			Usage: "miner sector index API info",
 		},
 	},
 	Before: before,
@@ -156,7 +156,7 @@ func checkApiInfo(ctx context.Context, ai string) (string, error) {
 		return "", xerrors.Errorf("could not get DialArgs: %w", err)
 	}
 
-	log.Infof("Checking api version of %s", addr)
+	log.Infof("Checking miner api version of %s", addr)
 
 	api, closer, err := client.NewStorageMinerRPCV0(ctx, addr, info.AuthHeader())
 	if err != nil {
