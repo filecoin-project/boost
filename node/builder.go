@@ -327,10 +327,6 @@ var BoostNode = Options(
 	Override(new(dtypes.MinerAddress), modules.MinerAddress),
 	Override(new(dtypes.MinerID), modules.MinerID),
 
-	// Sector API
-	Override(new(sectorblocks.SectorBuilder), From(new(modules.MinerStorageService))),
-	Override(new(*sectorblocks.SectorBlocks), sectorblocks.NewSectorBlocks),
-
 	Override(new(dtypes.NetworkName), modules.StorageNetworkName),
 	Override(new(*db.DealsDB), modules.NewStorageMarketDB),
 	Override(new(*gql.Server), modules.NewGraphqlServer),
@@ -373,6 +369,11 @@ func ConfigBoost(c interface{}) Option {
 			StartEpochSealingBuffer: cfg.Dealmaking.StartEpochSealingBuffer,
 			MaxPublishDealsFee:      cfg.Dealmaking.PublishMsgMaxFee,
 		})),
+
+		// Sector API
+		Override(new(modules.MinerStorageService), modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
+		Override(new(sectorblocks.SectorBuilder), From(new(modules.MinerStorageService))),
+		Override(new(*sectorblocks.SectorBlocks), sectorblocks.NewSectorBlocks),
 
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(cfg.Wallets.Miner)),
 	)
