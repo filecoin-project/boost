@@ -22,17 +22,14 @@ var initCmd = &cli.Command{
 	Usage: "Initialize a boost repository",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "api-sector-index",
-			Usage: "miner sector index API info",
+			Name:     "api-sector-index",
+			Usage:    "miner sector index API info",
+			Required: true,
 		},
 	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
 		log.Info("Initializing boost repo")
-
-		if !cctx.IsSet("api-sector-index") {
-			return xerrors.Errorf("--api-sector-index is required")
-		}
 
 		ctx := lcli.ReqContext(cctx)
 
