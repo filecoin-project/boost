@@ -63,6 +63,29 @@ func (r *resolver) Storage(ctx context.Context) ([]*storageResolver, error) {
 	}}, nil
 }
 
+type fundsResolver struct {
+	Name     string
+	Capacity float64
+}
+
+// query: funds: [Fund]
+func (r *resolver) Funds(ctx context.Context) ([]*fundsResolver, error) {
+	// TODO: Get these values from funds manager
+	return []*fundsResolver{{
+		Name:     "Available (Deal escrow)",
+		Capacity: 5 * 1024 * 1024,
+	}, {
+		Name:     "Available (Publish message)",
+		Capacity: 6 * 1024 * 1024,
+	}, {
+		Name:     "Reserved for ongoing deals",
+		Capacity: 2 * 1024 * 1024,
+	}, {
+		Name:     "Locked for ongoing deals",
+		Capacity: 3 * 1024 * 1024,
+	}}, nil
+}
+
 // query: deal(id) Deal
 func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dealResolver, error) {
 	id, err := toUuid(args.ID)

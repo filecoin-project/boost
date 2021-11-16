@@ -12,6 +12,7 @@ import {
     DealCancelMutation,
     NewDealsSubscription,
     StorageQuery,
+    FundsQuery,
 } from "./gql";
 
 moment.locale('en', {
@@ -402,13 +403,36 @@ function StorageDealsPage(props) {
     </div>
 }
 
-function StorageBar(props) {
+function BarChart(props) {
+    var max = 0
+    for (let field of props.fields) {
+        field.Type = field.Name.replace(/[ )]/, '-')
+        if (field.Capacity > max) {
+            max = field.Capacity
+        }
+    }
+
+    return <div className="bar-chart">
+        <table>
+            <tbody>
+            <tr>
+                { props.fields.map(field => <ChartBar key={field.Type} usage={field} max={max} />) }
+            </tr>
+            <tr>
+                { props.fields.map(field => <td key={field.Name} className="label">{field.Name}</td>) }
+            </tr>
+            </tbody>
+        </table>
+    </div>
+}
+
+function ChartBar(props) {
     var barHeightRatio = props.usage.Capacity / props.max
     var barHeight = Math.round(barHeightRatio * 100)
     var fillerHeight = 100 - barHeight
     var usedPct = Math.floor(100 * props.usage.Used / (props.usage.Capacity || 1))
 
-    return <td className={'storage-bar ' + props.usage.Name}>
+    return <td className={'field ' + props.usage.Type}>
         <div className="filler" style={{ height: fillerHeight+'%' }}></div>
         <div className="bar" style={{ height: barHeight+'%' }}>
             <div className="size">{humanFileSize(props.usage.Capacity)}</div>
@@ -423,7 +447,7 @@ function StorageBar(props) {
 }
 
 function StorageSpacePage(props) {
-    const { loading, error, data } = useQuery(StorageQuery)
+    const {loading, error, data} = useQuery(StorageQuery)
 
     if (loading) {
         return <div>Loading...</div>
@@ -432,41 +456,32 @@ function StorageSpacePage(props) {
         return <div>Error: {error.message}</div>
     }
 
-    var storage = data.storage
-    var max = 0
-    for (let tp of storage) {
-        if (tp.Capacity > max) {
-            max = tp.Capacity
-        }
+    return <BarChart fields={data.storage} />
+}
+
+function FundsPage(props) {
+    const { loading, error, data } = useQuery(FundsQuery)
+
+    if (loading) {
+        return <div>Loading...</div>
+    }
+    if (error) {
+        return <div>Error: {error.message}</div>
     }
 
-    return <div className="storage">
-        <table>
-            <tbody>
-            <tr>
-                { storage.map(usage => <StorageBar key={usage.Name} usage={usage} max={max} />) }
-            </tr>
-            <tr>
-                { storage.map(usage => <td key={usage.Name} className="label">{usage.Name}</td>) }
-            </tr>
-            </tbody>
-        </table>
-    </div>
+    return <BarChart fields={data.funds} />
 }
 
-var storageDealsPageData = {
-    title: 'Storage Deals',
-    pageType: 'storage-deals',
-}
-
-var storageSpacePageData = {
-    title: 'Storage Space',
-    pageType: 'storage-space',
-}
-
-var pages = [
-    storageDealsPageData,
-    storageSpacePageData
+var pages = [{
+        title: 'Storage Deals',
+        pageType: 'storage-deals',
+    }, {
+        title: 'Storage Space',
+        pageType: 'storage-space',
+    }, {
+        title: 'Funds',
+        pageType: 'funds',
+    }
 ]
 
 class Pages extends React.Component {
@@ -485,9 +500,11 @@ class Pages extends React.Component {
     renderPage(page) {
         switch (page.pageType) {
             case 'storage-deals':
-                return <StorageDealsPage key={page.pageType} deals={page.deals} />
+                return <StorageDealsPage key={page.pageType} />
             case 'storage-space':
-                return <StorageSpacePage key={page.pageType} usage={page.usage} />
+                return <StorageSpacePage key={page.pageType} />
+            case 'funds':
+                return <FundsPage key={page.pageType} />
             default:
                 throw new Error("unrecognized page type " + page.pageType)
         }
