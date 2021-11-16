@@ -7,36 +7,47 @@ Boost is an initial experiment/prototype of markets v2 module for Filecoin. It a
 ```
 git clone https://github.com/filecoin-project/boost
 cd boost
-make boost
+make build
 ```
 
 ## Initialisation and Running
 
-0. Make sure you have a local Lotus fullnode running and listening to `localhost:1234`, for example with a devnet:
+0. Compile and install (move binaries to $PATH)
 
 ```
-# 1. init & start lotus node
-
-rm -rf ~/.devlotus && export LOTUS_BACKUP_BASE_PATH=~/.lotusbackup && export LOTUS_PATH=~/.devlotus && rm -rf localnet.json &&  ./lotus-seed genesis new localnet.json  && ./lotus-seed pre-seal --sector-size 2048 --num-sectors 10 && ./lotus-seed genesis add-miner localnet.json ~/.genesis-sectors/pre-seal-t01000.json && clear && ./lotus daemon --lotus-make-genesis=dev.gen --genesis-template=localnet.json --bootstrap=false
-
-# 2. init & start lotus-miner
-
-rm -rf ~/.lotusminer && export LOTUS_BACKUP_BASE_PATH=~/.lotusbackup && export LOTUS_PATH=~/.devlotus && ./lotus wallet import ~/.genesis-sectors/pre-seal-t01000.key && ./lotus-miner init --genesis-miner --actor=t01000 --sector-size=2048 --pre-sealed-sectors=~/.genesis-sectors --pre-sealed-metadata=~/.genesis-sectors/pre-seal-t01000.json --nosync && ./lotus-miner run --nosync
+make build
+make install
 ```
 
-1. Create Boost repository
+1. Make sure you have a local Lotus fullnode and miner running and listening to `localhost:1234` and `localhost:2345` respectively, for example with a devnet:
 
 ```
-FULLNODE_API_INFO=/ip4/127.0.0.1/tcp/1234/http boost init
+devnet
 ```
 
-2. Run Boost service
+Note that currently `devnet` is using the default paths that `lotus` and `lotus-miner` use for their repositories, and you should make sure these directories are empty:
+
+```
+LOTUS_PATH=~/.lotus
+LOTUS_MINER_PATH=~/.lotusminer
+
+rm -rf ~/.lotus ~/.lotusminer
+```
+
+
+2. Create Boost repository
+
+```
+FULLNODE_API_INFO=/ip4/127.0.0.1/tcp/1234/http boost --vv init --api-sector-index=`lotus-miner auth api-info --perm=admin`
+```
+
+3. Run Boost service
 
 ```
 FULLNODE_API_INFO=/ip4/127.0.0.1/tcp/1234/http boost run
 ```
 
-3. Interact with Boost
+4. Interact with Boost
 
 ```
 boost dummydeal

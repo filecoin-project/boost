@@ -70,13 +70,22 @@ boost: $(BUILD_DEPS)
 .PHONY: boost
 BINS+=boost
 
-build: boost
+devnet: $(BUILD_DEPS)
+	rm -f devnet
+	$(GOCC) build $(GOFLAGS) -o devnet ./cmd/devnet
+.PHONY: devnet
+BINS+=devnet
+
+build: boost devnet
 .PHONY: build
 
-install: install-boost
+install: install-boost install-devnet
 
 install-boost:
 	install -C ./boost /usr/local/bin/boost
+
+install-devnet:
+	install -C ./devnet /usr/local/bin/devnet
 
 buildall: $(BINS)
 
