@@ -1,4 +1,4 @@
-package transport
+package httptransport
 
 import (
 	"context"
@@ -10,23 +10,14 @@ import (
 )
 
 type TransportHandler struct {
-	wg        sync.WaitGroup
 	ctx       context.Context
 	cancel    context.CancelFunc
 	closeOnce sync.Once
 
-	dealInfo *types.TransportDealInfo
-	Sub      event.Subscription
-}
+	sub event.Subscription
 
-func NewHandler(ctx context.Context, cancel context.CancelFunc, dInfo *types.TransportDealInfo, sub event.Subscription, wg sync.WaitGroup) *TransportHandler {
-	return &TransportHandler{
-		ctx:      ctx,
-		cancel:   cancel,
-		dealInfo: dInfo,
-		Sub:      sub,
-		wg:       wg,
-	}
+	dealInfo *types.TransportDealInfo
+	transfer *transfer
 }
 
 // Close shuts down the transfer for the given deal. It is the caller's responsibility to call Close after it no longer needs the transfer.
@@ -36,15 +27,19 @@ func (t *TransportHandler) Close() error {
 		if t.cancel != nil {
 			t.cancel()
 		}
-
 		// wait for all go-routines associated with the transfer to return
-		t.wg.Wait()
-
+		if t.transfer != nil {
+			t.transfer.wg.Wait()
+		}
 		// close the subscription
-		if t.Sub != nil {
-			_ = t.Sub.Close()
+		if t.sub != nil {
+			_ = t.sub.Close()
 		}
 	})
 
 	return nil
+}
+
+func (t *TransportHandler) Sub() event.Subscription {
+	return t.sub
 }

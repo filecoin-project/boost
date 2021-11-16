@@ -34,8 +34,7 @@ type httpTransport struct {
 	// TODO Construct and inject an http client here ?
 }
 
-func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealInfo *types.TransportDealInfo) (th *transport.TransportHandler, isComplete bool, err error) {
-	tctx, cancel := context.WithCancel(ctx)
+func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealInfo *types.TransportDealInfo) (th transport.Handler, isComplete bool, err error) {
 
 	// de-serialize transport opaque token
 	tInfo := &pb.HttpReq{}
@@ -75,19 +74,24 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 		log.Errorw("failed to publish transport event", "dealUuid", dealInfo.DealUuid, "err", err)
 	}
 
-	var wg sync.WaitGroup
 	// start executing the transfer
 	t := &transfer{
 		tInfo:          tInfo,
 		dealInfo:       dealInfo,
 		pub:            pub,
 		nBytesReceived: fileSize,
-		wg:             wg,
 	}
-
 	t.wg.Add(1)
+	tctx, cancel := context.WithCancel(ctx)
 	go t.execute(tctx)
-	return transport.NewHandler(tctx, cancel, dealInfo, sub, wg), false, nil
+
+	return &TransportHandler{
+		ctx:      tctx,
+		cancel:   cancel,
+		sub:      sub,
+		dealInfo: dealInfo,
+		transfer: t,
+	}, false, nil
 }
 
 type transfer struct {
