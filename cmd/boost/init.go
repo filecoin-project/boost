@@ -2,24 +2,37 @@ package main
 
 import (
 	"context"
+	"strings"
 
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/boost/node/repo"
 
+	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boost/node/config"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v0api"
 	lcli "github.com/filecoin-project/lotus/cli"
 )
 
 var initCmd = &cli.Command{
-	Name:   "init",
-	Usage:  "Initialize a lotus miner repo",
-	Flags:  []cli.Flag{},
+	Name:  "init",
+	Usage: "Initialize a lotus miner repo",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "api-sector-index",
+			Usage: "sector Index API info (lotus-miner auth api-info --perm=admin)",
+		},
+	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
 		log.Info("Initializing boost repo")
+
+		if !cctx.IsSet("api-sector-index") {
+			return xerrors.Errorf("--api-sector-index is required")
+		}
 
 		ctx := lcli.ReqContext(cctx)
 
@@ -78,6 +91,29 @@ var initCmd = &cli.Command{
 				return err
 			}
 
+			var cerr error
+			err = lr.SetConfig(func(raw interface{}) {
+				rcfg, ok := raw.(*config.Boost)
+				if !ok {
+					cerr = xerrors.New("expected boost config")
+					return
+				}
+
+				ai, err := checkApiInfo(ctx, cctx.String("api-sector-index"))
+				if err != nil {
+					cerr = xerrors.Errorf("checking sector index API: %w", err)
+					return
+				}
+				rcfg.SectorIndexApiInfo = ai
+
+			})
+			if cerr != nil {
+				return cerr
+			}
+			if err != nil {
+				return xerrors.Errorf("setting config: %w", err)
+			}
+
 			if err := lr.Close(); err != nil {
 				return err
 			}
@@ -110,4 +146,32 @@ func checkV1ApiSupport(ctx context.Context, cctx *cli.Context) error {
 	}
 
 	return nil
+}
+
+func checkApiInfo(ctx context.Context, ai string) (string, error) {
+	ai = strings.TrimPrefix(strings.TrimSpace(ai), "MINER_API_INFO=")
+	info := cliutil.ParseApiInfo(ai)
+	addr, err := info.DialArgs("v0")
+	if err != nil {
+		return "", xerrors.Errorf("could not get DialArgs: %w", err)
+	}
+
+	log.Infof("Checking api version of %s", addr)
+
+	api, closer, err := client.NewStorageMinerRPCV0(ctx, addr, info.AuthHeader())
+	if err != nil {
+		return "", err
+	}
+	defer closer()
+
+	v, err := api.Version(ctx)
+	if err != nil {
+		return "", xerrors.Errorf("checking version: %w", err)
+	}
+
+	if !v.APIVersion.EqMajorMinor(lapi.MinerAPIVersion0) {
+		return "", xerrors.Errorf("remote service API version didn't match (expected %s, remote %s)", lapi.MinerAPIVersion0, v.APIVersion)
+	}
+
+	return ai, nil
 }
