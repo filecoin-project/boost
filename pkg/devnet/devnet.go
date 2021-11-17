@@ -5,13 +5,69 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
+
+func Run(ctx context.Context, done chan struct{}) {
+	var wg sync.WaitGroup
+
+	// The parameter files can be as large as 1GiB.
+	// If this is the first time lotus runs,
+	// and the machine doesn't have particularly fast internet,
+	// we don't want devnet to seemingly stall for many minutes.
+	// Instead, show the download progress explicitly.
+	// fetch-params will exit in about a second if all files are up to date.
+	// The command is also pretty verbose, so reduce its verbosity.
+	{
+		// Ten minutes should be enough for practically any machine.
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+
+		log.Println("Running 'lotus fetch-params 2048'...")
+		cmd := exec.CommandContext(ctx, "lotus", "fetch-params", "2048")
+		cmd.Env = append(os.Environ(), "GOLOG_LOG_LEVEL=error")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			log.Fatal(err)
+		}
+		cancel()
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	wg.Add(4)
+	go func() {
+		runLotusDaemon(ctx, home)
+		log.Println("shut down lotus daemon")
+		wg.Done()
+	}()
+
+	go func() {
+		runLotusMiner(ctx, home)
+		log.Println("shut down lotus miner")
+		wg.Done()
+	}()
+
+	go func() {
+		publishDealsPeriodicallyCmd(ctx)
+		wg.Done()
+	}()
+
+	go func() {
+		setDefaultWalletCmd(ctx)
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	done <- struct{}{}
+}
 
 func runCmdsWithLog(ctx context.Context, name string, commands [][]string) {
 	logFile, err := os.Create(name + ".log")
@@ -106,70 +162,4 @@ func setDefaultWalletCmd(ctx context.Context) {
 		}
 		// TODO: stop once we've set the default wallet once.
 	}
-}
-
-func Main() {
-	var wg sync.WaitGroup
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// The parameter files can be as large as 1GiB.
-	// If this is the first time lotus runs,
-	// and the machine doesn't have particularly fast internet,
-	// we don't want devnet to seemingly stall for many minutes.
-	// Instead, show the download progress explicitly.
-	// fetch-params will exit in about a second if all files are up to date.
-	// The command is also pretty verbose, so reduce its verbosity.
-	{
-		// Ten minutes should be enough for practically any machine.
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-
-		log.Println("Running 'lotus fetch-params 2048'...")
-		cmd := exec.CommandContext(ctx, "lotus", "fetch-params", "2048")
-		cmd.Env = append(os.Environ(), "GOLOG_LOG_LEVEL=error")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			log.Fatal(err)
-		}
-		cancel()
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	wg.Add(4)
-	go func() {
-		runLotusDaemon(ctx, home)
-		wg.Done()
-	}()
-
-	go func() {
-		runLotusMiner(ctx, home)
-		wg.Done()
-	}()
-
-	go func() {
-		publishDealsPeriodicallyCmd(ctx)
-		wg.Done()
-	}()
-
-	go func() {
-		setDefaultWalletCmd(ctx)
-		wg.Done()
-	}()
-
-	// setup a signal handler to cancel the context
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, syscall.SIGTERM, syscall.SIGINT)
-	select {
-	case <-interrupt:
-		log.Println("closing as we got interrupt")
-		cancel()
-	case <-ctx.Done():
-	}
-
-	wg.Wait()
 }
