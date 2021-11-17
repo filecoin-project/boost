@@ -61,13 +61,13 @@
 #
 - name: dif/trivial
   color: b2b7ff
-  description: "Can be confidently tackled by newcomers, who are widely unfamiliar with lotus"
+  description: "Can be confidently tackled by newcomers, who are widely unfamiliar with Boost"
 - name: dif/easy
   color: 7886d7
-  description: "An existing lotus user should be able to pick this up"
+  description: "An existing Boost user should be able to pick this up"
 - name: dif/medium
   color: 6574cd
-  description: "Prior development experience with lotus is likely helpful"
+  description: "Prior development experience with Boost is likely helpful"
 - name: dif/hard
   color: 5661b3
   description: "Suggests that having worked on the specific component affected by this issue is important"
