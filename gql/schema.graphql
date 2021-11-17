@@ -59,6 +59,13 @@ type FundsLog {
   Text: String!
 }
 
+type DealPublish {
+  Period: Int!
+  Start: Time!
+  MaxDealsPerMsg: Int!
+  Deals: [Deal]!
+}
+
 type RootQuery {
   """Get Deal by ID"""
   deal(id: ID!): Deal
@@ -74,11 +81,17 @@ type RootQuery {
 
   """Get log of fund transactions"""
   fundsLogs: FundsLogList!
+
+  """Get information about deals that are pending being published"""
+  dealPublish: DealPublish!
 }
 
 type RootMutation {
   """Cancel a Deal"""
   dealCancel(id: ID!): ID!
+
+  """Publish all pending deals now"""
+  dealPublishNow: Boolean!
 }
 
 type RootSubscription {

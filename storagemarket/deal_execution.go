@@ -208,7 +208,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	if deal.Checkpoint < dealcheckpoints.Published {
 		p.addDealLog(deal.DealUuid, "Publishing deal")
 
-		mcid, err := p.dealPublisher.Publish(p.ctx, deal.ClientDealProposal)
+		mcid, err := p.dealPublisher.Publish(p.ctx, deal.DealUuid, deal.ClientDealProposal)
 		if err != nil {
 			return fmt.Errorf("failed to publish deal %s: %w", deal.DealUuid, err)
 		}

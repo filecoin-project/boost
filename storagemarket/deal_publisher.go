@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
@@ -65,9 +66,10 @@ type DealPublisher struct {
 
 // A deal that is queued to be published
 type pendingDeal struct {
-	ctx    context.Context
-	deal   market2.ClientDealProposal
-	Result chan publishResult
+	ctx      context.Context
+	dealUuid uuid.UUID
+	deal     market2.ClientDealProposal
+	Result   chan publishResult
 }
 
 // The result of publishing a deal
@@ -76,11 +78,12 @@ type publishResult struct {
 	err    error
 }
 
-func newPendingDeal(ctx context.Context, deal market2.ClientDealProposal) *pendingDeal {
+func newPendingDeal(ctx context.Context, dealUuid uuid.UUID, deal market2.ClientDealProposal) *pendingDeal {
 	return &pendingDeal{
-		ctx:    ctx,
-		deal:   deal,
-		Result: make(chan publishResult),
+		ctx:      ctx,
+		dealUuid: dealUuid,
+		deal:     deal,
+		Result:   make(chan publishResult),
 	}
 }
 
@@ -132,8 +135,15 @@ func newDealPublisher(
 	}
 }
 
+type PendingDealInfo struct {
+	DealIDs            []uuid.UUID
+	PublishPeriodStart time.Time
+	PublishPeriod      time.Duration
+	MaxDealsPerMsg     uint64
+}
+
 // PendingDeals returns the list of deals that are queued up to be published
-func (p *DealPublisher) PendingDeals() api.PendingDealInfo {
+func (p *DealPublisher) PendingDeals() PendingDealInfo {
 	p.lk.Lock()
 	defer p.lk.Unlock()
 
@@ -145,15 +155,16 @@ func (p *DealPublisher) PendingDeals() api.PendingDealInfo {
 		}
 	}
 
-	pending := make([]market2.ClientDealProposal, len(deals))
+	pending := make([]uuid.UUID, len(deals))
 	for i, deal := range deals {
-		pending[i] = deal.deal
+		pending[i] = deal.dealUuid
 	}
 
-	return api.PendingDealInfo{
-		Deals:              pending,
+	return PendingDealInfo{
+		DealIDs:            pending,
 		PublishPeriodStart: p.publishPeriodStart,
 		PublishPeriod:      p.publishPeriod,
+		MaxDealsPerMsg:     p.maxDealsPerPublishMsg,
 	}
 }
 
@@ -167,8 +178,8 @@ func (p *DealPublisher) ForcePublishPendingDeals() {
 	p.publishAllDeals()
 }
 
-func (p *DealPublisher) Publish(ctx context.Context, deal market2.ClientDealProposal) (cid.Cid, error) {
-	pdeal := newPendingDeal(ctx, deal)
+func (p *DealPublisher) Publish(ctx context.Context, dealUuid uuid.UUID, deal market2.ClientDealProposal) (cid.Cid, error) {
+	pdeal := newPendingDeal(ctx, dealUuid, deal)
 
 	// Add the deal to the queue
 	p.processNewDeal(pdeal)

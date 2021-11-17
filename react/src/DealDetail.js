@@ -42,7 +42,7 @@ export function DealDetail(props) {
     return <div className="deal-detail modal" id={deal.ID}>
         <div className="content">
             <div className="close" onClick={props.onCloseClick}>
-                <div className="button">X</div>
+                <div>X</div>
             </div>
             <div className="title">Deal {deal.ID}</div>
             <table className="deal-fields">

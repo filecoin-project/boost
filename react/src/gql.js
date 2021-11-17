@@ -125,6 +125,26 @@ const FundsLogsQuery = gql`
     }
 `;
 
+const DealPublishQuery = gql`
+    query AppDealPublishQuery {
+        dealPublish {
+            Start
+            Period
+            MaxDealsPerMsg
+            Deals {
+                ID
+                CreatedAt
+            }
+        }
+    }
+`;
+
+const DealPublishNowMutation = gql`
+    mutation AppDealPublishNowMutation {
+        dealPublishNow
+    }
+`;
+
 export {
     gqlClient,
     gqlQuery,
@@ -136,4 +156,6 @@ export {
     StorageQuery,
     FundsQuery,
     FundsLogsQuery,
+    DealPublishQuery,
+    DealPublishNowMutation,
 }
