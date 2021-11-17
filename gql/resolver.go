@@ -24,19 +24,17 @@ type dealListResolver struct {
 // resolver translates from a request for a graphql field to the data for
 // that field
 type resolver struct {
-	ctx      context.Context
-	dealsDB  *db.DealsDB
-	provider *storagemarket.Provider
+	dealsDB   *db.DealsDB
+	provider  *storagemarket.Provider
+	publisher *storagemarket.DealPublisher
 }
 
-func newResolver(ctx context.Context, dealsDB *db.DealsDB, provider *storagemarket.Provider) *resolver {
-	r := &resolver{
-		ctx:      ctx,
-		dealsDB:  dealsDB,
-		provider: provider,
+func NewResolver(dealsDB *db.DealsDB, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher) *resolver {
+	return &resolver{
+		dealsDB:   dealsDB,
+		provider:  provider,
+		publisher: publisher,
 	}
-
-	return r
 }
 
 type storageResolver struct {
@@ -60,29 +58,6 @@ func (r *resolver) Storage(ctx context.Context) ([]*storageResolver, error) {
 		Name:     "Queued",
 		Capacity: 11.2 * 1024 * 1024 * 1024,
 		Used:     0,
-	}}, nil
-}
-
-type fundsResolver struct {
-	Name     string
-	Capacity float64
-}
-
-// query: funds: [Fund]
-func (r *resolver) Funds(ctx context.Context) ([]*fundsResolver, error) {
-	// TODO: Get these values from funds manager
-	return []*fundsResolver{{
-		Name:     "Available (Deal escrow)",
-		Capacity: 5 * 1024 * 1024,
-	}, {
-		Name:     "Available (Publish message)",
-		Capacity: 6 * 1024 * 1024,
-	}, {
-		Name:     "Reserved for ongoing deals",
-		Capacity: 2 * 1024 * 1024,
-	}, {
-		Name:     "Locked for ongoing deals",
-		Capacity: 3 * 1024 * 1024,
 	}}, nil
 }
 

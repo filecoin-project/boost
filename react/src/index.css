@@ -65,8 +65,9 @@ body.modal-open {
   width: 100%;
 }
 
-.deals td {
+.deals td, .deals th {
   padding: 0.5em 1em;
+  font-weight: normal;
 }
 
 .deals td.deal-id {
@@ -134,7 +135,7 @@ body.modal-open {
   float: right;
 }
 
-#deal-detail .buttons .button {
+.button {
   color: #fff;
   background-color: #3399ff;
   border-radius: 0.5em;
@@ -181,4 +182,40 @@ body.modal-open {
   text-align: center;
   padding-top: 1em;
   vertical-align: top;
+}
+
+.funds-logs {
+  margin-top: 2em;
+}
+
+.funds-logs td, .funds-logs th {
+  padding: 0.5em 1em;
+}
+
+.funds-logs th {
+  color: #a61e4d
+}
+
+#deal-publish h3 {
+  margin-top: 2em;
+  text-align: center;
+  color: #a61e4d;
+}
+
+#deal-publish p {
+  padding-left: 1em
+}
+
+#deal-publish .buttons {
+  position: relative;
+}
+
+#deal-publish .buttons .button {
+  position: absolute;
+  right: -7em;
+  top: -1em;
+}
+
+.deal-publish td {
+  padding: 0.5em 1em;
 }

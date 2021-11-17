@@ -5,6 +5,7 @@ import {gqlClient,} from "./gql";
 import {StorageSpacePage} from "./StorageSpace";
 import {FundsPage} from "./Funds";
 import {StorageDealsPage} from "./Deals";
+import {DealPublishPage} from "./DealPublish";
 
 function App(props) {
     const [pageToShow, setPageToShow] = useState('storage-deals');
@@ -52,6 +53,9 @@ var pages = [{
     }, {
         title: 'Funds',
         pageType: 'funds',
+    }, {
+        title: 'Deal Publish',
+        pageType: 'deal-publish',
     }
 ]
 
@@ -76,6 +80,8 @@ class Pages extends React.Component {
                 return <StorageSpacePage key={page.pageType} />
             case 'funds':
                 return <FundsPage key={page.pageType} />
+            case 'deal-publish':
+                return <DealPublishPage key={page.pageType} />
             default:
                 throw new Error("unrecognized page type " + page.pageType)
         }
