@@ -89,6 +89,9 @@ type RootQuery {
 type RootMutation {
   """Cancel a Deal"""
   dealCancel(id: ID!): ID!
+
+  """Publish all pending deals now"""
+  dealPublishNow: Boolean!
 }
 
 type RootSubscription {

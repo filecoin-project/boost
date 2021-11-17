@@ -139,6 +139,12 @@ const DealPublishQuery = gql`
     }
 `;
 
+const DealPublishNowMutation = gql`
+    mutation AppDealPublishNowMutation {
+        dealPublishNow
+    }
+`;
+
 export {
     gqlClient,
     gqlQuery,
@@ -151,4 +157,5 @@ export {
     FundsQuery,
     FundsLogsQuery,
     DealPublishQuery,
+    DealPublishNowMutation,
 }

@@ -1,10 +1,13 @@
-import {useQuery} from "./hooks";
-import {DealPublishQuery} from "./gql";
+import {useMutation, useQuery} from "./hooks";
+import {DealPublishNowMutation, DealPublishQuery} from "./gql";
 import React from "react";
 import moment from "moment";
 
 export function DealPublishPage(props) {
     const {loading, error, data} = useQuery(DealPublishQuery)
+    const [publishNow] = useMutation(DealPublishNowMutation, {
+        refetchQueries: [{ query: DealPublishQuery }]
+    })
 
     if (loading) {
         return <div>Loading...</div>
@@ -18,10 +21,18 @@ export function DealPublishPage(props) {
 
     var deals = data.dealPublish.Deals
     return <div>
-        <p>
-            {deals.length} deal{deals.length === 1 ? '' : 's'} will be published
-            at {publishTime.format('HH:mm:ss')} (in {publishTime.toNow()})
-        </p>
+        {deals.length ? (
+            <>
+            <div className="buttons">
+                <div className="button cancel" onClick={publishNow}>Publish Now</div>
+            </div>
+
+            <p>
+                {deals.length} deal{deals.length === 1 ? '' : 's'} will be published
+                at {publishTime.format('HH:mm:ss')} (in {publishTime.toNow()})
+            </p>
+            </>
+        ) : null}
 
         <table className="deal-publish">
             <tbody>
@@ -36,7 +47,9 @@ export function DealPublishPage(props) {
             </tbody>
         </table>
 
-        { deals.length && <DealsTable deals={deals} /> }
+        { deals.length ? <DealsTable deals={deals} /> : (
+            <p>There are no deals in the batch publish queue</p>
+        ) }
     </div>
 }
 

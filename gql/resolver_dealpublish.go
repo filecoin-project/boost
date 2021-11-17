@@ -55,3 +55,9 @@ func (r *dealPublishResolver) Deals(ctx context.Context) ([]*dealResolver, error
 
 	return deals, nil
 }
+
+// mutation: dealPublishNow(): bool
+func (r *resolver) DealPublishNow(ctx context.Context) (bool, error) {
+	r.publisher.ForcePublishPendingDeals()
+	return true, nil
+}
