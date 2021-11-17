@@ -40,9 +40,6 @@
 - name: kind/feature
   color: FFF3B8
   description: "Kind: Feature"
-- name: kind/improvement
-  color: FFF5BA
-  description: "Kind: Improvement"
 - name: kind/test
   color: FFF8BD
   description: "Kind: Test"
