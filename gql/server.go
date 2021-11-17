@@ -8,9 +8,6 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 
-	"github.com/filecoin-project/boost/storagemarket"
-
-	"github.com/filecoin-project/boost/db"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
 	"github.com/graph-gophers/graphql-transport-ws/graphqlws"
@@ -21,12 +18,11 @@ var log = logging.Logger("gql")
 const httpPort = 8080
 
 type Server struct {
-	provider *storagemarket.Provider
-	db       *db.DealsDB
+	resolver *resolver
 }
 
-func NewServer(prov *storagemarket.Provider, db *db.DealsDB) *Server {
-	return &Server{provider: prov, db: db}
+func NewServer(resolver *resolver) *Server {
+	return &Server{resolver: resolver}
 }
 
 func (s *Server) Serve(ctx context.Context) error {
@@ -53,7 +49,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	// Allow resolving directly to fields (instead of requiring resolvers to
 	// have a method for every graphql field)
 	opts := []graphql.SchemaOpt{graphql.UseFieldResolvers()}
-	schema, err := graphql.ParseSchema(string(schemaText), newResolver(ctx, s.db, s.provider), opts...)
+	schema, err := graphql.ParseSchema(string(schemaText), s.resolver, opts...)
 	if err != nil {
 		return err
 	}

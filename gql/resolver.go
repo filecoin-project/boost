@@ -24,19 +24,17 @@ type dealListResolver struct {
 // resolver translates from a request for a graphql field to the data for
 // that field
 type resolver struct {
-	ctx      context.Context
-	dealsDB  *db.DealsDB
-	provider *storagemarket.Provider
+	dealsDB   *db.DealsDB
+	provider  *storagemarket.Provider
+	publisher *storagemarket.DealPublisher
 }
 
-func newResolver(ctx context.Context, dealsDB *db.DealsDB, provider *storagemarket.Provider) *resolver {
-	r := &resolver{
-		ctx:      ctx,
-		dealsDB:  dealsDB,
-		provider: provider,
+func NewResolver(dealsDB *db.DealsDB, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher) *resolver {
+	return &resolver{
+		dealsDB:   dealsDB,
+		provider:  provider,
+		publisher: publisher,
 	}
-
-	return r
 }
 
 type storageResolver struct {

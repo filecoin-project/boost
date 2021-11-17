@@ -533,8 +533,9 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 	}
 }
 
-func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, db *db.DealsDB) *gql.Server {
-	server := gql.NewServer(prov, db)
+func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, db *db.DealsDB, publisher *storagemarket.DealPublisher) *gql.Server {
+	resolver := gql.NewResolver(db, prov, publisher)
+	server := gql.NewServer(resolver)
 
 	lc.Append(fx.Hook{
 		OnStart: server.Serve,
