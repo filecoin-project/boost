@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
+	"runtime"
 
 	logging "github.com/ipfs/go-log/v2"
 
@@ -41,7 +43,13 @@ func (s *Server) Serve(ctx context.Context) error {
 	http.HandleFunc("/graphiql", graphiql(httpPort))
 
 	// Init graphQL schema
-	schemaText, err := ioutil.ReadFile("/Users/nonsense/code/src/github.com/filecoin-project/boost/gql/schema.graphql")
+	_, currentDir, _, ok := runtime.Caller(0)
+	if !ok {
+		return fmt.Errorf("couldnt call runtime.Caller")
+	}
+	fpath := filepath.Join(filepath.Dir(currentDir), "schema.graphql")
+
+	schemaText, err := ioutil.ReadFile(fpath)
 	if err != nil {
 		return err
 	}
