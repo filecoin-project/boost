@@ -110,6 +110,15 @@ const FundsQuery = gql`
     }
 `;
 
+const TransfersQuery = gql`
+    query AppTransfersQuery {
+        transfers {
+            At
+            Bytes
+        }
+    }
+`;
+
 const FundsLogsQuery = gql`
     query AppFundsLogsQuery {
         fundsLogs {
@@ -165,4 +174,5 @@ export {
     DealPublishQuery,
     DealPublishNowMutation,
     FundsMoveToEscrow,
+    TransfersQuery,
 }

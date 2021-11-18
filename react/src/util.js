@@ -41,3 +41,7 @@ export function humanFIL(atto) {
     }
     return atto + ' atto'
 }
+
+export function shortDealID(dealID) {
+    return dealID.substring(dealID.length-6)
+}
