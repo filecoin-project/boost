@@ -70,6 +70,10 @@ body.modal-open {
   font-weight: normal;
 }
 
+.deals td {
+  word-break: break-all;
+}
+
 .deals td.deal-id {
   cursor: pointer;
   color: #465298;

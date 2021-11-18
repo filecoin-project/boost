@@ -6,29 +6,23 @@ import (
 	"math/rand"
 	"net/http"
 
-	"github.com/filecoin-project/boost/storage/sectorblocks"
-	"github.com/filecoin-project/boost/storagemarket/datatransfer"
-
+	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
-
+	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemarket"
-
-	"github.com/filecoin-project/boost/util"
-
-	"github.com/filecoin-project/go-address"
-
-	"github.com/filecoin-project/boost/testutil"
-
+	"github.com/filecoin-project/boost/storagemarket/datatransfer"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/boost/util"
+	"github.com/filecoin-project/go-address"
+	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/crypto"
+	lapi "github.com/filecoin-project/lotus/api"
+	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
-
-	"github.com/filecoin-project/boost/api"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/go-jsonrpc/auth"
-	lapi "github.com/filecoin-project/lotus/api"
 	"go.uber.org/fx"
 )
 
@@ -37,6 +31,7 @@ type BoostAPI struct {
 
 	api.Common
 	api.Net
+	api.Wallet
 
 	Full lapi.FullNode
 	//LocalStore  *stores.Local
@@ -87,25 +82,36 @@ func (sm *BoostAPI) MarketDummyDeal(ctx context.Context) (*api.ProviderDealRejec
 		return nil, err
 	}
 
-	clientAddr, _ := address.NewIDAddress(1234)
-	proposal := market.ClientDealProposal{
-		Proposal: market.DealProposal{
-			PieceCID:             pieceCid,
-			PieceSize:            pieceSize.Padded(),
-			VerifiedDeal:         false,
-			Client:               clientAddr,
-			Provider:             sm.StorageProvider.Address,
-			Label:                carRes.Root.String(),
-			StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
-			EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
-			StoragePricePerEpoch: abi.NewTokenAmount(rand.Int63()),
-			ProviderCollateral:   abi.NewTokenAmount(0),
-			ClientCollateral:     abi.NewTokenAmount(0),
-		},
-		ClientSignature: crypto.Signature{
-			Type: crypto.SigTypeBLS,
-			Data: []byte("sig"),
-		},
+	clientAddr, err := sm.Wallet.WalletNew(ctx, chaintypes.KTBLS)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: remove once https://github.com/filecoin-project/boost/pull/45 is merged
+	if sm.StorageProvider.Address == address.Undef {
+		providerAddr, err := sm.Wallet.WalletNew(ctx, chaintypes.KTBLS)
+		if err != nil {
+			return nil, err
+		}
+		sm.StorageProvider.Address = providerAddr
+	}
+
+	proposal := market.DealProposal{
+		PieceCID:             pieceCid,
+		PieceSize:            pieceSize.Padded(),
+		VerifiedDeal:         false,
+		Client:               clientAddr,
+		Provider:             sm.StorageProvider.Address,
+		Label:                carRes.Root.String(),
+		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
+		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
+		StoragePricePerEpoch: abi.NewTokenAmount(rand.Int63()),
+		ProviderCollateral:   abi.NewTokenAmount(0),
+		ClientCollateral:     abi.NewTokenAmount(0),
+	}
+	signedProposal, err := sm.signProposal(ctx, clientAddr, &proposal)
+	if err != nil {
+		return nil, err
 	}
 
 	// Save the path to the CAR file as a transfer parameter
@@ -119,13 +125,32 @@ func (sm *BoostAPI) MarketDummyDeal(ctx context.Context) (*api.ProviderDealRejec
 		DealUuid:           uuid.New(),
 		MinerPeerID:        "miner peer",
 		ClientPeerID:       "client peer",
-		ClientDealProposal: proposal,
+		ClientDealProposal: *signedProposal,
 		DealDataRoot:       testutil.GenerateCid(),
 		TransferType:       datatransfer.TransferLocal.Type(),
 		TransferParams:     paramsBytes,
 	}
 
 	return sm.StorageProvider.ExecuteDeal(deal)
+}
+
+func (sm *BoostAPI) signProposal(ctx context.Context, addr address.Address, proposal *market.DealProposal) (*market.ClientDealProposal, error) {
+	buf, err := cborutil.Dump(proposal)
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := sm.Wallet.WalletSign(ctx, addr, buf, api.MsgMeta{
+		Type: api.MTDealProposal,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &market.ClientDealProposal{
+		Proposal:        *proposal,
+		ClientSignature: *sig,
+	}, nil
 }
 
 //func (sm *BoostAPI) MarketImportDealData(ctx context.Context, propCid cid.Cid, path string) error {

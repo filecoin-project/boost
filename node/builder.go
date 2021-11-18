@@ -5,11 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/storage/sectorblocks"
-
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
+	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/journal"
 	"github.com/filecoin-project/boost/journal/alerting"
@@ -17,11 +15,13 @@ import (
 	"github.com/filecoin-project/boost/node/impl"
 	"github.com/filecoin-project/boost/node/impl/common"
 	"github.com/filecoin-project/boost/node/impl/net"
+	"github.com/filecoin-project/boost/node/impl/wallet"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/node/modules/helpers"
 	"github.com/filecoin-project/boost/node/modules/lp2p"
 	"github.com/filecoin-project/boost/node/repo"
+	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/lotus/chain/types"
 	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
@@ -232,6 +232,7 @@ func ConfigCommon(cfg *config.Common) Option {
 		ApplyIf(func(s *Settings) bool { return s.Base }), // apply only if Base has already been applied
 		Override(new(api.Net), From(new(net.NetAPI))),
 		Override(new(api.Common), From(new(common.CommonAPI))),
+		Override(new(api.Wallet), wallet.NewWallet),
 		Override(new(dtypes.MetadataDS), modules.Datastore(cfg.Backup.DisableMetadataLog)),
 		Override(StartListeningKey, lp2p.StartListening(cfg.Libp2p.ListenAddresses)),
 		Override(ConnectionManagerKey, lp2p.ConnectionManager(
