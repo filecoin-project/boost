@@ -41,7 +41,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	http.HandleFunc("/graphiql", graphiql(httpPort))
 
 	// Init graphQL schema
-	schemaText, err := ioutil.ReadFile("gql/schema.graphql")
+	schemaText, err := ioutil.ReadFile("/Users/nonsense/code/src/github.com/filecoin-project/boost/gql/schema.graphql")
 	if err != nil {
 		return err
 	}

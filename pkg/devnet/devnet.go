@@ -1,15 +1,19 @@
 package devnet
 
 import (
+	"bytes"
 	"context"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	logging "github.com/ipfs/go-log/v2"
 )
+
+var log = logging.Logger("devnet")
 
 func Run(ctx context.Context, done chan struct{}) {
 	var wg sync.WaitGroup
@@ -25,7 +29,7 @@ func Run(ctx context.Context, done chan struct{}) {
 		// Ten minutes should be enough for practically any machine.
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 
-		log.Println("Running 'lotus fetch-params 2048'...")
+		log.Debugw("lotus fetch-params 2048")
 		cmd := exec.CommandContext(ctx, "lotus", "fetch-params", "2048")
 		cmd.Env = append(os.Environ(), "GOLOG_LOG_LEVEL=error")
 		cmd.Stdout = os.Stdout
@@ -44,13 +48,13 @@ func Run(ctx context.Context, done chan struct{}) {
 	wg.Add(4)
 	go func() {
 		runLotusDaemon(ctx, home)
-		log.Println("shut down lotus daemon")
+		log.Debugw("shut down lotus daemon")
 		wg.Done()
 	}()
 
 	go func() {
 		runLotusMiner(ctx, home)
-		log.Println("shut down lotus miner")
+		log.Debugw("shut down lotus miner")
 		wg.Done()
 	}()
 
@@ -77,13 +81,13 @@ func runCmdsWithLog(ctx context.Context, name string, commands [][]string) {
 	defer logFile.Close()
 
 	for _, cmdArgs := range commands {
-		log.Printf("command for %s: %s", name, strings.Join(cmdArgs, " "))
+		log.Debugw("running command", "name", name, "cmd", strings.Join(cmdArgs, " "))
 		cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 		cmd.Stdout = logFile
 		cmd.Stderr = logFile
 		// If ctx.Err()!=nil, we cancelled the command via SIGINT.
 		if err := cmd.Run(); err != nil && ctx.Err() == nil {
-			log.Printf("%s; check %s for details", err, logFile.Name())
+			log.Errorw("check logfile for details", "err", err, "logfile", logFile.Name())
 			break
 		}
 	}
@@ -162,4 +166,23 @@ func setDefaultWalletCmd(ctx context.Context) {
 		}
 		// TODO: stop once we've set the default wallet once.
 	}
+}
+
+func GetMinerEndpoint(ctx context.Context) (string, error) {
+	cmdArgs := []string{"lotus-miner", "auth", "api-info", "--perm=admin"}
+
+	var out bytes.Buffer
+
+	log.Debugw("getting auth token", "command", strings.Join(cmdArgs, " "))
+	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+
+	ai := strings.TrimPrefix(strings.TrimSpace(out.String()), "MINER_API_INFO=")
+	ai = strings.TrimSuffix(ai, "\n")
+
+	return ai, nil
 }

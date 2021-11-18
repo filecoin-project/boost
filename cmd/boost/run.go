@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/node/repo"
+	lrepo "github.com/filecoin-project/lotus/node/repo"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -27,6 +29,15 @@ var runCmd = &cli.Command{
 			return xerrors.Errorf("getting full node api: %w", err)
 		}
 		defer ncloser()
+
+		//ctx := context.Background()
+		addr, headers, err := lcli.GetRawAPI(cctx, lrepo.FullNode, "v1")
+		if err != nil {
+			panic(err)
+		}
+
+		spew.Dump(addr)
+		spew.Dump(headers)
 
 		ctx := lcli.DaemonContext(cctx)
 
