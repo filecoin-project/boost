@@ -127,7 +127,7 @@ func runBoost(t *testing.T) (api.Boost, func()) {
 
 	return api, func() {
 		shutdownChan <- struct{}{}
-		stop(ctx)
+		_ = stop(ctx)
 		<-finishCh
 		closer()
 	}

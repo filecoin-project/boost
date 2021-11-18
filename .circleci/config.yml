@@ -71,80 +71,33 @@ jobs:
 
   test:
     description: |
-      Run tests with gotestsum.
+      Run go tests
     parameters: &test-params
       executor:
         type: executor
         default: golang
       go-test-flags:
         type: string
-        default: "-timeout 30m"
+        default: "-v -timeout 5m"
         description: Flags passed to go test.
       target:
         type: string
         default: "./..."
         description: Import paths of packages to be tested.
-      proofs-log-test:
-        type: string
-        default: "0"
-      suite:
-        type: string
-        default: unit
-        description: Test suite name to report to CircleCI.
-      gotestsum-format:
-        type: string
-        default: standard-verbose
-        description: gotestsum format. https://github.com/gotestyourself/gotestsum#format
-      coverage:
-        type: string
-        default: -coverprofile=coverage.txt -coverpkg=github.com/filecoin-project/boost/...
-        description: Coverage flag. Set to the empty string to disable.
-      codecov-upload:
-        type: boolean
-        default: true
-        description: |
-          Upload coverage report to https://codecov.io/. Requires the codecov API token to be
-          set as an environment variable for private projects.
     executor: << parameters.executor >>
     steps:
       - install-deps
       - prepare
       - run:
-          command: make deps boost
+          command: make build
           no_output_timeout: 30m
-      - go/install-gotestsum:
-          gobin: $HOME/.local/bin
-          version: 0.5.2
       - run:
           name: go test
-          environment:
-            TEST_RUSTPROOFS_LOGS: << parameters.proofs-log-test >>
-            SKIP_CONFORMANCE: "1"
           command: |
-            mkdir -p /tmp/test-reports/<< parameters.suite >>
-            mkdir -p /tmp/test-artifacts
-            gotestsum \
-              --format << parameters.gotestsum-format >> \
-              --junitfile /tmp/test-reports/<< parameters.suite >>/junit.xml \
-              --jsonfile /tmp/test-artifacts/<< parameters.suite >>.json \
-              -- \
-              << parameters.coverage >> \
+            go test -v \
               << parameters.go-test-flags >> \
               << parameters.target >>
           no_output_timeout: 30m
-      - store_test_results:
-          path: /tmp/test-reports
-      - store_artifacts:
-          path: /tmp/test-artifacts/<< parameters.suite >>.json
-      - when:
-          condition: << parameters.codecov-upload >>
-          steps:
-            - go/install: {package: bash}
-            - go/install: {package: curl}
-            - run:
-                shell: /bin/bash -eo pipefail
-                command: |
-                  bash <(curl -s https://codecov.io/bash)
 
   build-macos:
     description: build darwin boost binary
@@ -269,3 +222,4 @@ workflows:
             tags:
               only:
                 - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      - test
