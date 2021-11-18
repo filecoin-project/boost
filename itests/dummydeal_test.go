@@ -2,7 +2,6 @@ package itests
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -17,38 +16,44 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/xerrors"
 )
 
 var log = logging.Logger("boosttest")
 
-func TestDummydeal(t *testing.T) {
+func init() {
 	_ = logging.SetLogLevel("boosttest", "DEBUG")
 	_ = logging.SetLogLevel("devnet", "DEBUG")
+}
 
+func TestDummydeal(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	done := make(chan struct{})
 	go devnet.Run(ctx, done)
 
+	//TODO: detect properly when devnet (daemon+miner) are ready to serve requests
 	time.Sleep(45 * time.Second)
 
-	err := runBoost(t)
+	boostApi, stop := runBoost(t)
+
+	res, err := boostApi.MarketDummyDeal(ctx)
 	require.NoError(t, err)
 
+	log.Debugw("Got response from MarketDummyDeal", "res", spew.Sdump(res))
+
 	cancel()
+
+	go func() { stop() }()
 
 	<-done
 }
 
-func runBoost(t *testing.T) error {
+func runBoost(t *testing.T) (api.Boost, func()) {
 	ctx := context.Background()
 	addr := "ws://127.0.0.1:1234/rpc/v1"
 
 	fullnodeApi, closer, err := client.NewFullNodeRPCV1(ctx, addr, nil)
 	require.NoError(t, err)
-	defer closer()
 
 	r := repo.NewMemory(nil)
 
@@ -78,52 +83,41 @@ func runBoost(t *testing.T) error {
 
 	shutdownChan := make(chan struct{})
 
-	var boostApi api.Boost
+	var api api.Boost
 	stop, err := node.New(ctx,
-		node.Boost(&boostApi),
+		node.Boost(&api),
 		node.Override(new(dtypes.ShutdownChan), shutdownChan),
 		node.Base(),
 		node.Repo(r),
 		node.Override(new(v1api.FullNode), fullnodeApi),
 	)
-	if err != nil {
-		return xerrors.Errorf("creating node: %w", err)
-	}
+	require.NoError(t, err)
 
 	// Bootstrap with full node
 	remoteAddrs, err := fullnodeApi.NetAddrsListen(ctx)
-	if err != nil {
-		return xerrors.Errorf("getting full node libp2p address: %w", err)
-	}
+	require.NoError(t, err)
 
-	log.Debugw("Bootstrapping boost libp2p network with full node", "maadr", remoteAddrs)
+	log.Debugw("bootstrapping libp2p network with full node", "maadr", remoteAddrs)
 
-	if err := boostApi.NetConnect(ctx, remoteAddrs); err != nil {
-		return xerrors.Errorf("connecting to full node (libp2p): %w", err)
-	}
+	err = api.NetConnect(ctx, remoteAddrs)
+	require.NoError(t, err)
 
 	// Instantiate the boost service JSON RPC handler.
-	handler, err := node.BoostHandler(boostApi, true)
-	if err != nil {
-		return xerrors.Errorf("failed to instantiate rpc handler: %w", err)
-	}
+	handler, err := node.BoostHandler(api, true)
+	require.NoError(t, err)
 
-	log.Debug("Getting API endpoint of boost node")
+	log.Debug("getting API endpoint of boost node")
 
 	endpoint, err := r.APIEndpoint()
-	if err != nil {
-		return xerrors.Errorf("getting API endpoint: %w", err)
-	}
+	require.NoError(t, err)
 
-	log.Debugw("Boost JSON RPC server is listening", "endpoint", endpoint)
+	log.Debugw("json rpc server listening", "endpoint", endpoint)
 
 	// Serve the RPC.
 	rpcStopper, err := node.ServeRPC(handler, "boost", endpoint)
-	if err != nil {
-		return fmt.Errorf("failed to start json-rpc endpoint: %s", err)
-	}
+	require.NoError(t, err)
 
-	log.Debugw("Monitoring for shutdown")
+	log.Debugw("monitoring for shutdown")
 
 	// Monitor for shutdown.
 	finishCh := node.MonitorShutdown(shutdownChan,
@@ -131,14 +125,10 @@ func runBoost(t *testing.T) error {
 		node.ShutdownHandler{Component: "boost", StopFunc: stop},
 	)
 
-	res, err := boostApi.MarketDummyDeal(ctx)
-	require.NoError(t, err)
-
-	log.Debugw("Got response from MarketDummyDeal", "res", spew.Sdump(res))
-
-	go func() { shutdownChan <- struct{}{} }()
-
-	go func() { stop(ctx); <-finishCh }()
-
-	return nil
+	return api, func() {
+		shutdownChan <- struct{}{}
+		stop(ctx)
+		<-finishCh
+		closer()
+	}
 }
