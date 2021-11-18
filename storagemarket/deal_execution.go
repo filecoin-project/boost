@@ -10,8 +10,9 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/storagemarket/datatransfer"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	transporttypes "github.com/filecoin-project/boost/transport/types"
+
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	commcid "github.com/filecoin-project/go-fil-commcid"
@@ -51,6 +52,15 @@ func (p *Provider) doDeal(deal *types.ProviderDealState) {
 		bus:      bus,
 	})
 
+	// build in-memory state
+	fi, err := os.Stat(deal.InboundFilePath)
+	if err != nil {
+		err := fmt.Errorf("failed to stat output file: %w", err)
+		p.failDeal(pub, deal, err)
+		return
+	}
+	deal.NBytesReceived = fi.Size()
+
 	// Execute the deal synchronously
 	if err := p.execDeal(ctx, pub, deal); err != nil {
 		p.failDeal(pub, deal, err)
@@ -62,7 +72,7 @@ func (p *Provider) execDeal(ctx context.Context, pub event.Emitter, deal *types.
 	p.fireEventDealNew(deal)
 
 	// publish an event with the current state of the deal
-	p.fireEventDealUpdate(pub, deal, 0)
+	p.fireEventDealUpdate(pub, deal)
 
 	p.addDealLog(deal.DealUuid, "Deal Accepted")
 
@@ -103,32 +113,38 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 
 	// TODO: need to ensure that passing the padded piece size here makes
 	// sense to the transport layer which will receive the raw unpadded bytes
-	execParams := datatransfer.ExecuteParams{
-		TransferType:   deal.TransferType,
-		TransferParams: deal.TransferParams,
-		DealUuid:       deal.DealUuid,
-		FilePath:       deal.InboundFilePath,
-		Size:           uint64(deal.ClientDealProposal.Proposal.PieceSize),
-	}
-	sub, err := p.Transport.Execute(tctx, execParams)
+	handler, err := p.Transport.Execute(tctx, deal.TransferParams, &transporttypes.TransportDealInfo{
+		OutputFile: deal.InboundFilePath,
+		DealUuid:   deal.DealUuid,
+		// TODO Is this the correct size of the actual data without padding ?
+		// I think it's best to explicitly add a "deal size" param to the deal negotiation.
+		DealSize: int64(deal.ClientDealProposal.Proposal.PieceSize),
+	})
 	if err != nil {
 		return fmt.Errorf("failed data transfer: %w", err)
 	}
+	defer handler.Close()
+	// start consuming transport events
+loop:
+	for {
+		select {
+		case evt, ok := <-handler.Sub():
+			if !ok {
+				_ = handler.Close()
+				break loop
+			}
+			if evt.Error != nil {
+				return fmt.Errorf("data-transfer failed: %w", err)
+			}
+			deal.NBytesReceived = evt.NBytesReceived
+			p.fireEventDealUpdate(pub, deal)
 
-	// Fire deal update events as the deal progresses
-	for transferred := range sub {
-		p.fireEventDealUpdate(pub, deal, transferred)
+		case <-tctx.Done():
+			_ = handler.Close()
+			return fmt.Errorf("data-transfer failed, context err: %w", err)
+		}
 	}
-
 	p.addDealLog(deal.DealUuid, "Data transfer complete")
-
-	// if dtEvent.Type == Completed || Cancelled || Error {
-	// move ahead, fail deal etc.
-	// }
-
-	if err := tctx.Err(); err != nil {
-		return fmt.Errorf("data transfer ctx errored: %w", err)
-	}
 
 	// Verify CommP matches
 	pieceCid, err := p.generatePieceCommitment(deal)
@@ -309,7 +325,7 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 
 	// Fire deal update event
 	if pub != nil {
-		p.fireEventDealUpdate(pub, deal, p.Transport.Transferred(deal.DealUuid))
+		p.fireEventDealUpdate(pub, deal)
 	}
 
 	select {
@@ -333,10 +349,10 @@ func (p *Provider) fireEventDealNew(deal *types.ProviderDealState) {
 	}
 }
 
-func (p *Provider) fireEventDealUpdate(pub event.Emitter, deal *types.ProviderDealState, transferred uint64) {
+func (p *Provider) fireEventDealUpdate(pub event.Emitter, deal *types.ProviderDealState) {
 	evt := types.ProviderDealInfo{
 		Deal:        deal,
-		Transferred: transferred,
+		Transferred: uint64(deal.NBytesReceived),
 	}
 
 	if err := pub.Emit(evt); err != nil {
@@ -350,7 +366,7 @@ func (p *Provider) updateCheckpoint(ctx context.Context, pub event.Emitter, deal
 		return fmt.Errorf("failed to persist deal state: %w", err)
 	}
 
-	p.fireEventDealUpdate(pub, deal, p.Transport.Transferred(deal.DealUuid))
+	p.fireEventDealUpdate(pub, deal)
 	return nil
 }
 

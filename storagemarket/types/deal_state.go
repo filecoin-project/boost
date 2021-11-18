@@ -50,4 +50,7 @@ type ProviderDealState struct {
 	Checkpoint dealcheckpoints.Checkpoint
 	// set if there's an error
 	Err string
+
+	// NBytesReceived is the number of bytes Received for this deal
+	NBytesReceived int64
 }

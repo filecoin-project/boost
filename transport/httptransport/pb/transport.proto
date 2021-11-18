@@ -1,8 +1,0 @@
-syntax = "proto3";
-package transport.pb;
-
-option go_package = "pb/transport";
-
-message HttpReq {
-  string URL = 1;
-}

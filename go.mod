@@ -88,7 +88,6 @@ require (
 )
 
 require (
-	github.com/gogo/protobuf v1.3.2
 	github.com/ipfs/go-cidutil v0.0.2
 	github.com/ipfs/go-ipfs-chunker v0.0.5
 	github.com/ipfs/go-ipfs-exchange-offline v0.0.1
@@ -99,5 +98,4 @@ require (
 	github.com/ipld/go-car v0.3.2-0.20211001225732-32d0d9933823
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/multiformats/go-multihash v0.0.15
-	google.golang.org/protobuf v1.27.1
 )

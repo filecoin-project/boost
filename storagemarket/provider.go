@@ -8,13 +8,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/transport"
+	"github.com/filecoin-project/boost/transport/httptransport"
+
 	"github.com/filecoin-project/boost/api"
 
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/filestore"
-	"github.com/filecoin-project/boost/storagemarket/datatransfer"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
@@ -54,7 +56,7 @@ type Provider struct {
 	// Database API
 	db *db.DealsDB
 
-	Transport *datatransfer.MockTransport
+	Transport transport.Transport
 
 	dealPublisher *DealPublisher
 	adapter       *Adapter
@@ -90,7 +92,7 @@ func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNod
 		failedDealsChan:  make(chan failedDealReq),
 		restartDealsChan: make(chan restartReq),
 
-		Transport: datatransfer.NewMockTransport(),
+		Transport: httptransport.New(),
 
 		dealPublisher: dealPublisher,
 		adapter: &Adapter{
@@ -99,6 +101,14 @@ func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNod
 
 		dealHandlers: newDealHandlers(),
 	}, nil
+}
+
+func (p *Provider) NBytesReceived(deal *types.ProviderDealState) (int64, error) {
+	fi, err := os.Stat(deal.InboundFilePath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to stat file: %w", err)
+	}
+	return fi.Size(), nil
 }
 
 func (p *Provider) GetAsk() *types.StorageAsk {

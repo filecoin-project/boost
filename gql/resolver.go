@@ -230,9 +230,14 @@ func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.Pro
 		return nil, err
 	}
 
+	size, err := r.provider.NBytesReceived(deal)
+	if err != nil {
+		return nil, err
+	}
+
 	return &types.ProviderDealInfo{
 		Deal:        deal,
-		Transferred: r.provider.Transport.Transferred(deal.DealUuid),
+		Transferred: uint64(size),
 	}, nil
 }
 
@@ -262,9 +267,14 @@ func (r *resolver) dealList(ctx context.Context, first *graphql.ID, limit int) (
 	// Include data transfer information with the deal
 	dis := make([]types.ProviderDealInfo, 0, len(deals))
 	for _, deal := range deals {
+		size, err := r.provider.NBytesReceived(deal)
+		if err != nil {
+			return nil, 0, nil, err
+		}
+
 		dis = append(dis, types.ProviderDealInfo{
 			Deal:        deal,
-			Transferred: r.provider.Transport.Transferred(deal.DealUuid),
+			Transferred: uint64(size),
 		})
 	}
 

@@ -1,9 +1,12 @@
 package types
 
 import (
-	"github.com/filecoin-project/boost/transport/types/transferstatus"
 	"github.com/google/uuid"
 )
+
+type HttpRequest struct {
+	URL string
+}
 
 type TransportDealInfo struct {
 	OutputFile string
@@ -12,8 +15,6 @@ type TransportDealInfo struct {
 }
 
 type TransportEvent struct {
-	NBytesReceived  int64
-	Status          transferstatus.TransferStatus
-	IsTerminalState bool
-	Error           error
+	NBytesReceived int64
+	Error          error
 }
