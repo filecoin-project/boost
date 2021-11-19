@@ -2,6 +2,7 @@ package itests
 
 import (
 	"context"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -27,19 +28,37 @@ func init() {
 
 func TestDummydeal(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	done := make(chan struct{})
 	go devnet.Run(ctx, done)
 
-	//TODO: detect properly when devnet (daemon+miner) are ready to serve requests
-	time.Sleep(45 * time.Second)
+	minerReadyCmd := "lotus-miner sectors list"
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Second):
+		}
+
+		cmd := exec.CommandContext(ctx, "sh", "-c", minerReadyCmd)
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Debugw("miner not ready")
+			continue
+		}
+		log.Debugw("miner ready")
+		time.Sleep(2 * time.Second)
+		break
+	}
 
 	boostApi, stop := runBoost(t)
 
 	res, err := boostApi.MarketDummyDeal(ctx)
 	require.NoError(t, err)
 
-	log.Debugw("Got response from MarketDummyDeal", "res", spew.Sdump(res))
+	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
 	cancel()
 
