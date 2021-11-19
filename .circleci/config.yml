@@ -45,7 +45,7 @@ commands:
             - 'v25-2k-lotus-params'
           paths:
             - /var/tmp/filecoin-proof-parameters/
-      - run:  ./lotus fetch-params 2048
+      - run:  lotus fetch-params 2048
       - save_cache:
           name: Save parameters cache
           key: 'v25-2k-lotus-params'
@@ -102,7 +102,6 @@ jobs:
     steps:
       - install-deps
       - prepare
-      - download-params
       - run:
           command: make build
           no_output_timeout: 30m
@@ -121,9 +120,13 @@ jobs:
             sudo cp /tmp/libhwloc.so.5 /lib/x86_64-linux-gnu/
             docker rm -v $id
       - run:
-          name: go test
+          name: add lotus to PATH
           command: |
             export PATH=$PATH:$GOPATH/bin
+      - download-params
+      - run:
+          name: go test
+          command: |
             go test \
               << parameters.go-test-flags >> \
               << parameters.target >>
