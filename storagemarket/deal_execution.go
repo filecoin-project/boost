@@ -150,25 +150,22 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.Handler, pub event.Emitter, deal *types.ProviderDealState) error {
 	defer handler.Close()
 
-loop:
 	for {
 		select {
 		case evt, ok := <-handler.Sub():
 			if !ok {
-				break loop
+				return nil
 			}
 			if evt.Error != nil {
-				return fmt.Errorf("data-transfer failed: %w", evt.Error)
+				return evt.Error
 			}
 			deal.NBytesReceived = evt.NBytesReceived
 			p.fireEventDealUpdate(pub, deal)
 
 		case <-ctx.Done():
-			return fmt.Errorf("data-transfer failed, context err: %w", ctx.Err())
+			return ctx.Err()
 		}
 	}
-
-	return nil
 }
 
 // GeneratePieceCommitment generates the pieceCid for the CARv1 deal payload in
