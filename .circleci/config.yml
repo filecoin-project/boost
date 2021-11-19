@@ -56,9 +56,9 @@ commands:
       - restore_cache:
           name: Restore lotus artefacts cache
           keys:
-            - 'lotus-v1.13.1-rc.2'
+            - 'lotus-v1.13.1-rc.22'
           paths:
-            - /go/bin/
+            - /tmp/lotus-artefacts
       - setup_remote_docker:
           version: 19.03.13
       - run:
@@ -66,16 +66,17 @@ commands:
           command: |
             docker pull nonsens3/lotus:v1.13.1-rc2
             id=$(docker create nonsens3/lotus:v1.13.1-rc2)
-            docker cp $id:/usr/local/bin/lotus-seed $GOPATH/bin/lotus-seed
-            docker cp $id:/usr/local/bin/lotus-miner $GOPATH/bin/lotus-miner
-            docker cp $id:/usr/local/bin/lotus $GOPATH/bin/lotus
-            docker cp $id:/lib/libhwloc.so.5 $GOPATH/bin/libhwloc.so.5
+            mkdir -p /tmp/lotus-artefacts
+            docker cp $id:/usr/local/bin/lotus-seed /tmp/lotus-artefacts/lotus-seed
+            docker cp $id:/usr/local/bin/lotus-miner /tmp/lotus-artefacts/lotus-miner
+            docker cp $id:/usr/local/bin/lotus /tmp/lotus-artefacts/lotus
+            docker cp $id:/lib/libhwloc.so.5 /tmp/lotus-artefacts/libhwloc.so.5
             docker rm -v $id
       - save_cache:
           name: Save lotus artefacts cache
-          key: 'lotus-v1.13.1-rc.2'
+          key: 'lotus-v1.13.1-rc.22'
           paths:
-            - /go/bin/
+            - /tmp/lotus-artefacts
   git_fetch_all_tags:
     steps:
       - run:
@@ -132,10 +133,10 @@ jobs:
           no_output_timeout: 30m
       - lotus-artefacts
       - run:
-          name: copy library and add lotus to PATH
+          name: copy library and add lotus binaries to PATH
           command: |
-            sudo cp $GOPATH/bin/libhwloc.so.5 /lib/x86_64-linux-gnu/
-            export PATH=$PATH:$GOPATH/bin
+            sudo cp /tmp/lotus-artefacts/libhwloc.so.5 /lib/x86_64-linux-gnu/
+            export PATH=$PATH:/tmp/lotus-artefacts
       - download-params
       - run:
           name: go test

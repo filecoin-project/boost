@@ -2,7 +2,6 @@ package itests
 
 import (
 	"context"
-	"fmt"
 	"os/exec"
 	"testing"
 	"time"
@@ -45,23 +44,20 @@ func TestDummydeal(t *testing.T) {
 		cmd := exec.CommandContext(ctx, "sh", "-c", minerReadyCmd)
 		_, err := cmd.CombinedOutput()
 		if err != nil {
-			fmt.Println("miner not ready")
+			log.Debugw("miner not ready")
 			continue
 		}
-		fmt.Println("miner ready")
-		time.Sleep(5 * time.Second)
+		log.Debugw("miner ready")
+		time.Sleep(2 * time.Second)
 		break
 	}
-
-	//TODO: detect properly when devnet (daemon+miner) are ready to serve requests
-	//time.Sleep(45 * time.Second)
 
 	boostApi, stop := runBoost(t)
 
 	res, err := boostApi.MarketDummyDeal(ctx)
 	require.NoError(t, err)
 
-	log.Debugw("Got response from MarketDummyDeal", "res", spew.Sdump(res))
+	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
 	cancel()
 
