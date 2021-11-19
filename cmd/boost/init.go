@@ -136,8 +136,8 @@ var initCmd = &cli.Command{
 				}
 				rcfg.SectorIndexApiInfo = ai
 
-				rcfg.Wallets.Miner = walletCP
-				rcfg.Wallets.PublishStorageDeals = walletPSD
+				rcfg.Wallets.Miner = walletCP.String()
+				rcfg.Wallets.PublishStorageDeals = walletPSD.String()
 			})
 			if cerr != nil {
 				return cerr

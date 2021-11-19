@@ -1,7 +1,6 @@
 package config
 
 import (
-	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 )
@@ -39,9 +38,9 @@ type Boost struct {
 
 type WalletsConfig struct {
 	// The "owner" address of the miner
-	Miner address.Address
+	Miner string
 	// The wallet used to send PublishStorageDeals messages
-	PublishStorageDeals address.Address
+	PublishStorageDeals string
 }
 
 type DAGStoreConfig struct {

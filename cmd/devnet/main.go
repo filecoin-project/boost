@@ -8,7 +8,13 @@ import (
 	"syscall"
 
 	"github.com/filecoin-project/boost/pkg/devnet"
+
+	logging "github.com/ipfs/go-log/v2"
 )
+
+func init() {
+	_ = logging.SetLogLevel("devnet", "DEBUG")
+}
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
