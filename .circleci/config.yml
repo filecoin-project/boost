@@ -103,7 +103,7 @@ jobs:
       - install-deps
       - prepare
       - run:
-          command: make build
+          command: make debug
           no_output_timeout: 30m
       - setup_remote_docker:
           version: 19.03.13
