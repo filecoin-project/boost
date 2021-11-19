@@ -108,7 +108,7 @@ jobs:
       - run:
           name: go test
           command: |
-            go test -v \
+            go test \
               << parameters.go-test-flags >> \
               << parameters.target >>
           no_output_timeout: 30m
