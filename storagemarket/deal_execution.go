@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/filecoin-project/boost/transport"
+
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/boost/db"
@@ -28,7 +30,7 @@ import (
 func (p *Provider) doDeal(deal *types.ProviderDealState) {
 	// Set up pubsub for deal updates
 	bus := eventbus.NewBus()
-	pub, err := bus.Emitter(&types.ProviderDealInfo{}, eventbus.Stateful)
+	pub, err := bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
 	if err != nil {
 		err := fmt.Errorf("failed to create event emitter: %w", err)
 		p.failDeal(pub, deal, err)
@@ -111,8 +113,6 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 	tctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.config.MaxTransferDuration))
 	defer cancel()
 
-	// TODO: need to ensure that passing the padded piece size here makes
-	// sense to the transport layer which will receive the raw unpadded bytes
 	handler, err := p.Transport.Execute(tctx, deal.TransferParams, &transporttypes.TransportDealInfo{
 		OutputFile: deal.InboundFilePath,
 		DealUuid:   deal.DealUuid,
@@ -123,27 +123,12 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 	if err != nil {
 		return fmt.Errorf("failed data transfer: %w", err)
 	}
-	defer handler.Close()
-	// start consuming transport events
-loop:
-	for {
-		select {
-		case evt, ok := <-handler.Sub():
-			if !ok {
-				_ = handler.Close()
-				break loop
-			}
-			if evt.Error != nil {
-				return fmt.Errorf("data-transfer failed: %w", err)
-			}
-			deal.NBytesReceived = evt.NBytesReceived
-			p.fireEventDealUpdate(pub, deal)
 
-		case <-tctx.Done():
-			_ = handler.Close()
-			return fmt.Errorf("data-transfer failed, context err: %w", err)
-		}
+	// wait for data-transfer to finish
+	if err := p.waitForTransferFinish(tctx, handler, pub, deal); err != nil {
+		return fmt.Errorf("data-transfer failed: %w", err)
 	}
+
 	p.addDealLog(deal.DealUuid, "Data transfer complete")
 
 	// Verify CommP matches
@@ -160,6 +145,30 @@ loop:
 	p.addDealLog(deal.DealUuid, "Data verification successful")
 
 	return p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.Transferred)
+}
+
+func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.Handler, pub event.Emitter, deal *types.ProviderDealState) error {
+	defer handler.Close()
+
+loop:
+	for {
+		select {
+		case evt, ok := <-handler.Sub():
+			if !ok {
+				break loop
+			}
+			if evt.Error != nil {
+				return fmt.Errorf("data-transfer failed: %w", evt.Error)
+			}
+			deal.NBytesReceived = evt.NBytesReceived
+			p.fireEventDealUpdate(pub, deal)
+
+		case <-ctx.Done():
+			return fmt.Errorf("data-transfer failed, context err: %w", ctx.Err())
+		}
+	}
+
+	return nil
 }
 
 // GeneratePieceCommitment generates the pieceCid for the CARv1 deal payload in
@@ -343,19 +352,13 @@ func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 }
 
 func (p *Provider) fireEventDealNew(deal *types.ProviderDealState) {
-	evt := types.ProviderDealInfo{Deal: deal}
-	if err := p.newDealPS.NewDeals.Emit(evt); err != nil {
+	if err := p.newDealPS.NewDeals.Emit(*deal); err != nil {
 		log.Warn("publishing new deal event", "id", deal.DealUuid, "err", err)
 	}
 }
 
 func (p *Provider) fireEventDealUpdate(pub event.Emitter, deal *types.ProviderDealState) {
-	evt := types.ProviderDealInfo{
-		Deal:        deal,
-		Transferred: uint64(deal.NBytesReceived),
-	}
-
-	if err := pub.Emit(evt); err != nil {
+	if err := pub.Emit(*deal); err != nil {
 		log.Warn("publishing deal state update", "id", deal.DealUuid, "err", err)
 	}
 }

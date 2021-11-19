@@ -31,7 +31,7 @@ func (d *dealHandler) cancel(ctx context.Context) {
 }
 
 func (d *dealHandler) subscribeUpdates() (event.Subscription, error) {
-	sub, err := d.bus.Subscribe(new(types.ProviderDealInfo), eventbus.BufSize(256))
+	sub, err := d.bus.Subscribe(new(types.ProviderDealState), eventbus.BufSize(256))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create deal update subscriber to %s: %w", d.dealUuid, err)
 	}

@@ -40,7 +40,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	// de-serialize transport opaque token
 	tInfo := &types.HttpRequest{}
 	if err := json.Unmarshal(transportInfo, tInfo); err != nil {
-		return nil, fmt.Errorf("failed to de-serialize transport info bytes: %w", err)
+		return nil, fmt.Errorf("failed to de-serialize transport info bytes, bytes:%s, err:%w", string(transportInfo), err)
 	}
 	// check that the outputFile exists
 	fi, err := os.Stat(dealInfo.OutputFile)
@@ -57,7 +57,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 		return nil, fmt.Errorf("deal size=%d but file size=%d", dealInfo.DealSize, fileSize)
 	}
 
-	// construct the transfer instance that will act has the transfer handler
+	// construct the transfer instance that will act as the transfer handler
 	tctx, cancel := context.WithCancel(ctx)
 	t := &transfer{
 		cancel:         cancel,
@@ -113,8 +113,6 @@ func (t *transfer) emitEvent(ctx context.Context, evt types.TransportEvent, id u
 	select {
 	case t.eventCh <- evt:
 		return nil
-	case <-ctx.Done():
-		return ctx.Err()
 	default:
 		return fmt.Errorf("dropping event %+v as channel is full for deal id %s", evt, id)
 	}
@@ -157,13 +155,6 @@ func (t *transfer) execute(ctx context.Context) error {
 		return fmt.Errorf("mismatch in dealSize vs received bytes, dealSize=%d, received=%d", t.dealInfo.DealSize, t.nBytesReceived)
 	}
 
-	// otherwise we're good ! notify the subscriber.
-	if err := t.emitEvent(ctx, types.TransportEvent{
-		NBytesReceived: t.nBytesReceived,
-	}, t.dealInfo.DealUuid); err != nil {
-		log.Errorw("failed to publish transport event", "id", t.dealInfo.DealUuid, "err", err)
-	}
-
 	return nil
 }
 
@@ -198,6 +189,12 @@ func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer,
 			}
 
 			t.nBytesReceived = t.nBytesReceived + int64(nw)
+			// emit event updating the number of bytes received
+			if err := t.emitEvent(ctx, types.TransportEvent{
+				NBytesReceived: t.nBytesReceived,
+			}, t.dealInfo.DealUuid); err != nil {
+				log.Errorw("failed to publish transport event", "id", t.dealInfo.DealUuid, "err", err)
+			}
 		}
 		// the http stream we're reading from has sent us an EOF, nothing to do here.
 		if readErr == io.EOF {
@@ -205,13 +202,6 @@ func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer,
 		}
 		if readErr != nil {
 			return fmt.Errorf("error reading from http response stream: %w", err)
-		}
-
-		// emit event updating the number of bytes received
-		if err := t.emitEvent(ctx, types.TransportEvent{
-			NBytesReceived: t.nBytesReceived,
-		}, t.dealInfo.DealUuid); err != nil {
-			log.Errorw("failed to publish transport event", "id", t.dealInfo.DealUuid, "err", err)
 		}
 	}
 }
