@@ -2,6 +2,8 @@ package itests
 
 import (
 	"context"
+	"fmt"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -31,8 +33,28 @@ func TestDummydeal(t *testing.T) {
 	done := make(chan struct{})
 	go devnet.Run(ctx, done)
 
+	minerReadyCmd := "lotus-miner sectors list"
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Second):
+		}
+
+		cmd := exec.CommandContext(ctx, "sh", "-c", minerReadyCmd)
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Println("miner not ready")
+			continue
+		}
+		fmt.Println("miner ready")
+		time.Sleep(5 * time.Second)
+		break
+	}
+
 	//TODO: detect properly when devnet (daemon+miner) are ready to serve requests
-	time.Sleep(45 * time.Second)
+	//time.Sleep(45 * time.Second)
 
 	boostApi, stop := runBoost(t)
 
