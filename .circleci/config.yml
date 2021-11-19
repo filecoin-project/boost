@@ -37,6 +37,20 @@ commands:
             - run: sudo apt-get install ocl-icd-opencl-dev libhwloc-dev
       - run: git submodule sync
       - run: git submodule update --init
+  download-params:
+    steps:
+      - restore_cache:
+          name: Restore parameters cache
+          keys:
+            - 'v25-2k-lotus-params'
+          paths:
+            - /var/tmp/filecoin-proof-parameters/
+      - run:  ./lotus fetch-params 2048
+      - save_cache:
+          name: Save parameters cache
+          key: 'v25-2k-lotus-params'
+          paths:
+            - /var/tmp/filecoin-proof-parameters/
   git_fetch_all_tags:
     steps:
       - run:
@@ -88,6 +102,7 @@ jobs:
     steps:
       - install-deps
       - prepare
+      - download-params
       - run:
           command: make build
           no_output_timeout: 30m
@@ -108,6 +123,7 @@ jobs:
       - run:
           name: go test
           command: |
+            export PATH=$PATH:$GOPATH/bin
             go test \
               << parameters.go-test-flags >> \
               << parameters.target >>
