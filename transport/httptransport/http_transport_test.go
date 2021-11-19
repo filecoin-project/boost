@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -49,9 +48,7 @@ func TestTransportRespectsContext(t *testing.T) {
 	defer cancel()
 
 	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		for {
-
-		}
+		time.Sleep(1 * time.Hour)
 	}))
 
 	of := getTempFilePath(t)
@@ -138,7 +135,6 @@ func TestCompletionOnMultipleAttemptsWithSameFile(t *testing.T) {
 			require.EqualValues(t, size, evts[0].NBytesReceived)
 			break
 		}
-		fmt.Println(evts)
 		require.Contains(t, evts[len(evts)-1].Error.Error(), "mismatch")
 
 		assertFileContents(t, of, str[:end])
@@ -170,7 +166,6 @@ func TestTransferCancellation(t *testing.T) {
 
 	evts := waitForTransferComplete(t, th)
 	require.Len(t, evts, 1)
-	fmt.Println(evts)
 	require.Contains(t, evts[0].Error.Error(), "context")
 }
 
@@ -210,15 +205,8 @@ func getTempFilePath(t *testing.T) string {
 func waitForTransferComplete(t *testing.T, th transport.Handler) []types.TransportEvent {
 	var evts []types.TransportEvent
 
-loop:
-	for {
-		select {
-		case evt, ok := <-th.Sub():
-			if !ok {
-				break loop
-			}
-			evts = append(evts, evt)
-		}
+	for evt := range th.Sub() {
+		evts = append(evts, evt)
 	}
 
 	return evts
