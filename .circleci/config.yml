@@ -91,6 +91,20 @@ jobs:
       - run:
           command: make build
           no_output_timeout: 30m
+      - setup_remote_docker:
+          version: 19.03.13
+      - run:
+          name: copy latest stable lotus binaries
+          command: |
+            docker pull nonsens3/lotus:v1.13.1-rc2
+            id=$(docker create nonsens3/lotus:v1.13.1-rc2)
+            docker cp $id:/usr/local/bin/lotus-seed $GOPATH/bin/lotus-seed
+            docker cp $id:/usr/local/bin/lotus-miner $GOPATH/bin/lotus-miner
+            docker cp $id:/usr/local/bin/lotus $GOPATH/bin/lotus
+            docker cp $id:/lib/libhwloc.so.5 /tmp/
+            sudo cp /tmp/libhwloc.so.5 /lib/
+            sudo cp /tmp/libhwloc.so.5 /lib/x86_64-linux-gnu/
+            docker rm -v $id
       - run:
           name: go test
           command: |
@@ -222,3 +236,4 @@ workflows:
             tags:
               only:
                 - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      - test
