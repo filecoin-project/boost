@@ -3,10 +3,12 @@ package node
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/storage/sectorblocks"
+	"github.com/filecoin-project/go-address"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
@@ -351,6 +353,15 @@ func ConfigBoost(c interface{}) Option {
 		return Error(xerrors.New("retrieval pricing policy must be either default or external"))
 	}
 
+	walletPSD, err := address.NewFromString(cfg.Wallets.PublishStorageDeals)
+	if err != nil {
+		return Error(fmt.Errorf("failed to parse cfg.Wallets.PublishStorageDeals: %s; err: %w", cfg.Wallets.PublishStorageDeals, err))
+	}
+	walletMiner, err := address.NewFromString(cfg.Wallets.Miner)
+	if err != nil {
+		return Error(fmt.Errorf("failed to parse cfg.Wallets.Miner: %s; err: %w", cfg.Wallets.Miner, err))
+	}
+
 	return Options(
 		ConfigCommon(&cfg.Common),
 
@@ -363,7 +374,7 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(modules.MinerStorageService), modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
 
 		Override(new(*storagemarket.DealPublisher), storagemarket.NewDealPublisher(storagemarket.PublishMsgConfig{
-			Wallet:                  cfg.Wallets.PublishStorageDeals,
+			Wallet:                  walletPSD,
 			Period:                  time.Duration(cfg.Dealmaking.PublishMsgPeriod),
 			MaxDealsPerMsg:          cfg.Dealmaking.PublishMsgMaxDealsPerMsg,
 			StartEpochSealingBuffer: cfg.Dealmaking.StartEpochSealingBuffer,
@@ -375,7 +386,7 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(sectorblocks.SectorBuilder), From(new(modules.MinerStorageService))),
 		Override(new(*sectorblocks.SectorBlocks), sectorblocks.NewSectorBlocks),
 
-		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(cfg.Wallets.Miner)),
+		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner)),
 	)
 }
 

@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/boost/node/repo"
+	"github.com/filecoin-project/go-address"
 
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/node/config"
@@ -26,6 +28,16 @@ var initCmd = &cli.Command{
 			Usage:    "miner sector index API info",
 			Required: true,
 		},
+		&cli.StringFlag{
+			Name:     "wallet-publish-storage-deals",
+			Usage:    "wallet to be used for PublishStorageDeals messages",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "wallet-collateral-pledge",
+			Usage:    "wallet to be used for pledging collateral",
+			Required: true,
+		},
 	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
@@ -34,6 +46,20 @@ var initCmd = &cli.Command{
 		ctx := lcli.ReqContext(cctx)
 
 		log.Debug("Trying to connect to full node RPC")
+
+		walletPSD, err := address.NewFromString(cctx.String("wallet-publish-storage-deals"))
+		if err != nil {
+			return fmt.Errorf("failed to parse wallet-publish-storage-deals: %s; err: %w", cctx.String("wallet-publish-storage-deals"), err)
+		}
+
+		walletCP, err := address.NewFromString(cctx.String("wallet-collateral-pledge"))
+		if err != nil {
+			return fmt.Errorf("failed to parse wallet-collateral-pledge: %s; err: %w", cctx.String("wallet-collateral-pledge"), err)
+		}
+
+		if walletPSD.String() == walletCP.String() {
+			return xerrors.Errorf("wallets for PublishStorageDeals and pledging collateral must be different")
+		}
 
 		if err := checkV1ApiSupport(ctx, cctx); err != nil {
 			return err
@@ -103,6 +129,8 @@ var initCmd = &cli.Command{
 				}
 				rcfg.SectorIndexApiInfo = ai
 
+				rcfg.Wallets.Miner = walletCP.String()
+				rcfg.Wallets.PublishStorageDeals = walletPSD.String()
 			})
 			if cerr != nil {
 				return cerr
