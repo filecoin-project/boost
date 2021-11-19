@@ -155,7 +155,7 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 			// Deal updated
 			case evti := <-sub.Out():
 				// Pipe the update to the deal subscription channel
-				di := evti.(types.ProviderDealInfo)
+				di := evti.(types.ProviderDealState)
 				rsv := newDealResolver(&di, r.dealsDB)
 
 				select {
@@ -195,7 +195,7 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealResolver, error) {
 			// New deal
 			case evti := <-sub.Out():
 				// Pipe the deal to the new deal channel
-				di := evti.(types.ProviderDealInfo)
+				di := evti.(types.ProviderDealState)
 				rsv := newDealResolver(&di, r.dealsDB)
 
 				select {
@@ -222,19 +222,22 @@ func (r *resolver) DealCancel(ctx context.Context, args struct{ ID graphql.ID })
 	return args.ID, err
 }
 
-func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealInfo, error) {
+func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
 	deal, err := r.dealsDB.ByID(ctx, dealUuid)
 	if err != nil {
 		return nil, err
 	}
 
-	return &types.ProviderDealInfo{
-		Deal:        deal,
-		Transferred: r.provider.Transport.Transferred(deal.DealUuid),
-	}, nil
+	size, err := r.provider.NBytesReceived(deal)
+	if err != nil {
+		return nil, err
+	}
+	deal.NBytesReceived = size
+
+	return deal, nil
 }
 
-func (r *resolver) dealList(ctx context.Context, first *graphql.ID, limit int) ([]types.ProviderDealInfo, int, *uuid.UUID, error) {
+func (r *resolver) dealList(ctx context.Context, first *graphql.ID, limit int) ([]types.ProviderDealState, int, *uuid.UUID, error) {
 	// Get one extra deal so we can get the first deal UUID of the next page
 	allDeals, err := r.dealsDB.List(ctx, first, limit+1)
 	if err != nil {
@@ -258,12 +261,15 @@ func (r *resolver) dealList(ctx context.Context, first *graphql.ID, limit int) (
 	}
 
 	// Include data transfer information with the deal
-	dis := make([]types.ProviderDealInfo, 0, len(deals))
+	dis := make([]types.ProviderDealState, 0, len(deals))
 	for _, deal := range deals {
-		dis = append(dis, types.ProviderDealInfo{
-			Deal:        deal,
-			Transferred: r.provider.Transport.Transferred(deal.DealUuid),
-		})
+		size, err := r.provider.NBytesReceived(deal)
+		if err != nil {
+			return nil, 0, nil, err
+		}
+		deal.NBytesReceived = size
+
+		dis = append(dis, *deal)
 	}
 
 	return dis, count, nextDealUuid, nil
@@ -275,10 +281,10 @@ type dealResolver struct {
 	dealsDB     *db.DealsDB
 }
 
-func newDealResolver(deal *types.ProviderDealInfo, dealsDB *db.DealsDB) *dealResolver {
+func newDealResolver(deal *types.ProviderDealState, dealsDB *db.DealsDB) *dealResolver {
 	return &dealResolver{
-		ProviderDealState: *deal.Deal,
-		transferred:       deal.Transferred,
+		ProviderDealState: *deal,
+		transferred:       uint64(deal.NBytesReceived),
 		dealsDB:           dealsDB,
 	}
 }

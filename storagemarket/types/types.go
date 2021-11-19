@@ -38,14 +38,6 @@ type ClientDealParams struct {
 	TransferParams []byte
 }
 
-type ProviderDealInfo struct {
-	Deal        *ProviderDealState
-	Transferred uint64
-
-	// ...
-	//
-}
-
 type DataTransferEvent struct {
 	DealUuid uuid.UUID
 	// ...

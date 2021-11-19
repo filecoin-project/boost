@@ -16,7 +16,7 @@ type newDealPS struct {
 
 func newDealPubsub() (*newDealPS, error) {
 	bus := eventbus.NewBus()
-	emitter, err := bus.Emitter(&types.ProviderDealInfo{}, eventbus.Stateful)
+	emitter, err := bus.Emitter(types.ProviderDealState{}, eventbus.Stateful)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create event emitter: %w", err)
 	}
@@ -28,7 +28,7 @@ func newDealPubsub() (*newDealPS, error) {
 }
 
 func (m *newDealPS) subscribe() (event.Subscription, error) {
-	sub, err := m.newDealsBus.Subscribe(new(types.ProviderDealInfo), eventbus.BufSize(256))
+	sub, err := m.newDealsBus.Subscribe(new(types.ProviderDealState), eventbus.BufSize(256))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create subscriber to new deals: %w", err)
 	}
