@@ -28,6 +28,7 @@ func init() {
 
 func TestDummydeal(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	done := make(chan struct{})
 	go devnet.Run(ctx, done)
