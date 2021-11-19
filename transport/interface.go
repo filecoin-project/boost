@@ -12,5 +12,5 @@ type Transport interface {
 
 type Handler interface {
 	Sub() chan types.TransportEvent
-	Close() error
+	Close()
 }

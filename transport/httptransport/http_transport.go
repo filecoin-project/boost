@@ -71,6 +71,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	// in the output file with the deal size.
 	if fileSize == dealInfo.DealSize {
 		defer close(t.eventCh)
+		defer cancel()
 
 		if err := t.emitEvent(tctx, types.TransportEvent{
 			NBytesReceived: fileSize,
@@ -84,6 +85,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	go func() {
 		defer t.wg.Done()
 		defer close(t.eventCh)
+		defer t.cancel()
 
 		if err := t.execute(tctx); err != nil {
 			if err := t.emitEvent(tctx, types.TransportEvent{
@@ -207,7 +209,7 @@ func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer,
 }
 
 // Close shuts down the transfer for the given deal. It is the caller's responsibility to call Close after it no longer needs the transfer.
-func (t *transfer) Close() error {
+func (t *transfer) Close() {
 	t.closeOnce.Do(func() {
 		// cancel the context associated with the transfer
 		if t.cancel != nil {
@@ -217,7 +219,6 @@ func (t *transfer) Close() error {
 		t.wg.Wait()
 	})
 
-	return nil
 }
 
 func (t *transfer) Sub() chan types.TransportEvent {
