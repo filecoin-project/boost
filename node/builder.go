@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/filecoin-project/boost/db"
@@ -354,11 +355,11 @@ func ConfigBoost(c interface{}) Option {
 
 	walletPSD, err := address.NewFromString(cfg.Wallets.PublishStorageDeals)
 	if err != nil {
-		return Error(err)
+		return Error(fmt.Errorf("failed to parse cfg.Wallets.PublishStorageDeals: %s; err: %w", cfg.Wallets.PublishStorageDeals, err))
 	}
 	walletMiner, err := address.NewFromString(cfg.Wallets.Miner)
 	if err != nil {
-		return Error(err)
+		return Error(fmt.Errorf("failed to parse cfg.Wallets.Miner: %s; err: %w", cfg.Wallets.Miner, err))
 	}
 
 	return Options(
