@@ -51,6 +51,31 @@ commands:
           key: 'v25-2k-lotus-params'
           paths:
             - /var/tmp/filecoin-proof-parameters/
+  lotus-artefacts:
+    steps:
+      - restore_cache:
+          name: Restore lotus artefacts cache
+          keys:
+            - 'lotus-v1.13.1-rc.2'
+          paths:
+            - /go/bin/
+      - setup_remote_docker:
+          version: 19.03.13
+      - run:
+          name: copy latest stable lotus binaries
+          command: |
+            docker pull nonsens3/lotus:v1.13.1-rc2
+            id=$(docker create nonsens3/lotus:v1.13.1-rc2)
+            docker cp $id:/usr/local/bin/lotus-seed $GOPATH/bin/lotus-seed
+            docker cp $id:/usr/local/bin/lotus-miner $GOPATH/bin/lotus-miner
+            docker cp $id:/usr/local/bin/lotus $GOPATH/bin/lotus
+            docker cp $id:/lib/libhwloc.so.5 $GOPATH/bin/libhwloc.so.5
+            docker rm -v $id
+      - save_cache:
+          name: Save lotus artefacts cache
+          key: 'lotus-v1.13.1-rc.2'
+          paths:
+            - /go/bin/
   git_fetch_all_tags:
     steps:
       - run:
@@ -103,25 +128,13 @@ jobs:
       - install-deps
       - prepare
       - run:
-          command: make debug
+          command: make build
           no_output_timeout: 30m
-      - setup_remote_docker:
-          version: 19.03.13
+      - lotus-artefacts
       - run:
-          name: copy latest stable lotus binaries
+          name: copy library and add lotus to PATH
           command: |
-            docker pull nonsens3/lotus:v1.13.1-rc2
-            id=$(docker create nonsens3/lotus:v1.13.1-rc2)
-            docker cp $id:/usr/local/bin/lotus-seed $GOPATH/bin/lotus-seed
-            docker cp $id:/usr/local/bin/lotus-miner $GOPATH/bin/lotus-miner
-            docker cp $id:/usr/local/bin/lotus $GOPATH/bin/lotus
-            docker cp $id:/lib/libhwloc.so.5 /tmp/
-            sudo cp /tmp/libhwloc.so.5 /lib/
-            sudo cp /tmp/libhwloc.so.5 /lib/x86_64-linux-gnu/
-            docker rm -v $id
-      - run:
-          name: add lotus to PATH
-          command: |
+            sudo cp $GOPATH/bin/libhwloc.so.5 /lib/x86_64-linux-gnu/
             export PATH=$PATH:$GOPATH/bin
       - download-params
       - run:
