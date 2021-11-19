@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/urfave/cli/v2"
@@ -46,22 +47,14 @@ var initCmd = &cli.Command{
 
 		log.Debug("Trying to connect to full node RPC")
 
-		var walletPSD address.Address
-		if wPSD := cctx.String("wallet-publish-storage-deals"); wPSD != "" {
-			var err error
-			walletPSD, err = address.NewFromString(wPSD)
-			if err != nil {
-				return err
-			}
+		walletPSD, err := address.NewFromString(cctx.String("wallet-publish-storage-deals"))
+		if err != nil {
+			return fmt.Errorf("failed to parse wallet-publish-storage-deals: %s; err: %w", cctx.String("wallet-publish-storage-deals"), err)
 		}
 
-		var walletCP address.Address
-		if wCP := cctx.String("wallet-collateral-pledge"); wCP != "" {
-			var err error
-			walletCP, err = address.NewFromString(wCP)
-			if err != nil {
-				return err
-			}
+		walletCP, err := address.NewFromString(cctx.String("wallet-collateral-pledge"))
+		if err != nil {
+			return fmt.Errorf("failed to parse wallet-collateral-pledge: %s; err: %w", cctx.String("wallet-collateral-pledge"), err)
 		}
 
 		if walletPSD.String() == walletCP.String() {
