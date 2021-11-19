@@ -21,7 +21,7 @@ func TestDB(t *testing.T) {
 	tmpFile := path.Join(t.TempDir(), "test.db")
 	//fmt.Println(tmpFile)
 
-	deals, err := generateDeals()
+	deals, err := GenerateDeals()
 	req.NoError(err)
 
 	sqldb, err := sql.Open("sqlite3", "file:"+tmpFile)

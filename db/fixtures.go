@@ -25,7 +25,7 @@ func LoadFixtures(ctx context.Context, db *sql.DB) ([]types.ProviderDealState, e
 
 	dealsDB := NewDealsDB(db)
 
-	deals, err := generateDeals()
+	deals, err := GenerateDeals()
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func LoadFixtures(ctx context.Context, db *sql.DB) ([]types.ProviderDealState, e
 	return deals, err
 }
 
-func generateDeals() ([]types.ProviderDealState, error) {
+func GenerateDeals() ([]types.ProviderDealState, error) {
 	clientAddrs := []uint64{01312, 42134, 01322, 43242, 01312}
 	provAddr, err := address.NewActorAddress([]byte("f1523"))
 	if err != nil {

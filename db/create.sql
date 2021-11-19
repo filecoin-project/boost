@@ -35,3 +35,16 @@ CREATE TABLE IF NOT EXISTS Deals (
     Error TEXT,
     PRIMARY KEY(ID)
 ) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS FundsLogs (
+    DealID TEXT,
+    CreatedAt DateTime,
+    LogText TEXT
+);
+
+CREATE TABLE IF NOT EXISTS FundsTagged (
+    DealID TEXT,
+    CreatedAt DateTime,
+    Collateral INT,
+    PubMsg INT
+);

@@ -60,17 +60,15 @@ func (p *Provider) loop() {
 				}
 			}
 
-			// TODO: Deal filter, storage space manager, fund manager etc . basically synchronization
-			// send rejection if deal is not accepted by the above filters
-			var err error
+			// Tag the funds required for escrow and sending the publish deal message
+			// so that they are not used for other deals
+			err := p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
 			if err != nil {
-				go writeDealResp(false, nil, err)
-				continue
-			}
-
-			accepted := true
-			if !accepted {
-				go writeDealResp(false, &api.ProviderDealRejectionInfo{}, nil)
+				go writeDealResp(false, &api.ProviderDealRejectionInfo{
+					// TODO: provide a custom reason message (instead of sending provider
+					// error messages back to client) eg "Not enough provider funds for deal"
+					Reason: err.Error(),
+				}, nil)
 				continue
 			}
 

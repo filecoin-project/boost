@@ -9,23 +9,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/storage/sectorblocks"
-	"github.com/filecoin-project/boost/transport"
-	"github.com/filecoin-project/boost/transport/httptransport"
-
 	"github.com/filecoin-project/boost/api"
-
-	"golang.org/x/xerrors"
-
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/filestore"
+	"github.com/filecoin-project/boost/fundmanager"
+	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/transport"
+	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/event"
+	"golang.org/x/xerrors"
 )
 
 var log = logging.Logger("boost-provider")
@@ -59,8 +57,8 @@ type Provider struct {
 	// Database API
 	db *db.DealsDB
 
-	Transport transport.Transport
-
+	Transport     transport.Transport
+	fundManager   *fundmanager.FundManager
 	dealPublisher *DealPublisher
 	adapter       *Adapter
 
