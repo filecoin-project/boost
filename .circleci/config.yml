@@ -136,7 +136,9 @@ jobs:
           name: copy library and add lotus binaries to PATH
           command: |
             sudo cp /tmp/lotus-artefacts/libhwloc.so.5 /lib/x86_64-linux-gnu/
-            export PATH=$PATH:/tmp/lotus-artefacts
+            sudo cp /tmp/lotus-artefacts/lotus /usr/local/bin/
+            sudo cp /tmp/lotus-artefacts/lotus-miner /usr/local/bin/
+            sudo cp /tmp/lotus-artefacts/lotus-seed /usr/local/bin/
       - download-params
       - run:
           name: go test
