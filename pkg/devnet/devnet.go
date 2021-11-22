@@ -186,3 +186,22 @@ func GetMinerEndpoint(ctx context.Context) (string, error) {
 
 	return ai, nil
 }
+
+func GetFullnodeEndpoint(ctx context.Context) (string, error) {
+	cmdArgs := []string{"lotus", "auth", "api-info", "--perm=admin"}
+
+	var out bytes.Buffer
+
+	log.Debugw("getting auth token", "command", strings.Join(cmdArgs, " "))
+	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+
+	ai := strings.TrimPrefix(strings.TrimSpace(out.String()), "FULLNODE_API_INFO=")
+	ai = strings.TrimSuffix(ai, "\n")
+
+	return ai, nil
+}
