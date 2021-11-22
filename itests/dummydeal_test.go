@@ -14,7 +14,10 @@ import (
 
 	lapi "github.com/filecoin-project/lotus/api"
 
+	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
+	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 
 	"github.com/filecoin-project/boost/storagemarket"
 	"golang.org/x/xerrors"
@@ -27,6 +30,7 @@ import (
 	"github.com/filecoin-project/boost/util"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
@@ -247,7 +251,8 @@ func runBoost(t *testing.T) (api.Boost, address.Address, func()) {
 	log.Infof("default wallet has %d attoFIL", bal)
 
 	// Create a wallet for publish storage deals with some funds
-	psdWalletAddr, err := fullnodeApi.WalletNew(ctx, chaintypes.KTSecp256k1)
+	//psdWalletAddr, err := fullnodeApi.WalletNew(ctx, chaintypes.KTSecp256k1)
+	psdWalletAddr, err := fullnodeApi.WalletNew(ctx, chaintypes.KTBLS)
 	require.NoError(t, err)
 
 	sendFunds(ctx, fullnodeApi, psdWalletAddr, abi.NewTokenAmount(1e18))
@@ -279,13 +284,15 @@ func runBoost(t *testing.T) (api.Boost, address.Address, func()) {
 
 	log.Debugw("got miner actor addr", "addr", minerAddr)
 
-	//actorAddr, err := address.NewFromString("t01000")
-	//require.NoError(t, err)
-	//
+	setControlAddress(t, ctx, fullnodeApi, minerAddr, psdWalletAddr)
+
+	minerAddr, err = address.NewFromString("t01000")
+	require.NoError(t, err)
+
 	//return fullnodeApi.StateMinerInfo(ctx, actorAddr, chaintypes.EmptyTSK)
 
-	mi, err := fullnodeApi.StateMinerInfo(ctx, minerAddr, chaintypes.EmptyTSK)
-	require.NoError(t, err)
+	//mi, err := fullnodeApi.StateMinerInfo(ctx, minerAddr, chaintypes.EmptyTSK)
+	//require.NoError(t, err)
 
 	lr, err := r.Lock(repo.Boost)
 	require.NoError(t, err)
@@ -298,7 +305,7 @@ func runBoost(t *testing.T) (api.Boost, address.Address, func()) {
 		t.Fatalf("invalid config from repo, got: %T", c)
 	}
 	cfg.SectorIndexApiInfo = minerEndpoint
-	cfg.Wallets.Miner = mi.Owner.String()
+	cfg.Wallets.Miner = "t01000" // mi.Owner.String()
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
 
@@ -382,4 +389,29 @@ func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Addr
 
 	_, err = sender.StateWaitMsg(ctx, sm.Cid(), 1, 1e10, true)
 	return err
+}
+
+func setControlAddress(t *testing.T, ctx context.Context, sender lapi.FullNode, minerAddr address.Address, psdAddr address.Address) {
+	mi, err := sender.StateMinerInfo(ctx, minerAddr, chaintypes.EmptyTSK)
+	require.NoError(t, err)
+
+	cwp := &miner2.ChangeWorkerAddressParams{
+		NewWorker:       mi.Worker,
+		NewControlAddrs: []address.Address{psdAddr},
+	}
+	sp, err := actors.SerializeParams(cwp)
+	require.NoError(t, err)
+
+	smsg, err := sender.MpoolPushMessage(ctx, &chaintypes.Message{
+		From:   mi.Owner,
+		To:     minerAddr,
+		Method: miner.Methods.ChangeWorkerAddress,
+
+		Value:  big.Zero(),
+		Params: sp,
+	}, nil)
+	require.NoError(t, err)
+
+	_, err = sender.StateWaitMsg(ctx, smsg.Cid(), 1, 1e10, true)
+	require.NoError(t, err)
 }
