@@ -14,6 +14,8 @@ import (
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/pkg/devnet"
 	"github.com/filecoin-project/lotus/api/client"
+
+	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/lotus/api/v1api"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
@@ -71,7 +73,12 @@ func runBoost(t *testing.T) (api.Boost, func()) {
 	ctx := context.Background()
 	addr := "ws://127.0.0.1:1234/rpc/v1"
 
-	fullnodeApi, closer, err := client.NewFullNodeRPCV1(ctx, addr, nil)
+	fullnodeAiString, err := devnet.GetFullnodeEndpoint(ctx)
+	require.NoError(t, err)
+
+	apiinfo := cliutil.ParseApiInfo(fullnodeAiString)
+
+	fullnodeApi, closer, err := client.NewFullNodeRPCV1(ctx, addr, apiinfo.AuthHeader())
 	require.NoError(t, err)
 
 	r := repo.NewMemory(nil)
