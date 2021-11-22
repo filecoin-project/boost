@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS Deals (
     InboundFilePath TEXT,
     TransferType TEXT,
     TransferParams BLOB,
+    TransferSize INT,
     ChainDealID INT,
     PublishCID TEXT,
     SectorID INT,

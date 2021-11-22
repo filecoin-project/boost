@@ -2,6 +2,7 @@ package storagemarket
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"path"
@@ -130,8 +131,7 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDeal
 		SelfPeerID:         dp.MinerPeerID,
 		ClientPeerID:       dp.ClientPeerID,
 		DealDataRoot:       dp.DealDataRoot,
-		TransferType:       dp.TransferType,
-		TransferParams:     dp.TransferParams,
+		Transfer:           dp.Transfer,
 	}
 
 	// validate the deal proposal
@@ -262,6 +262,16 @@ func (p *Provider) CancelDeal(ctx context.Context, dealUuid uuid.UUID) error {
 	}
 	dh.cancel(ctx)
 	return nil
+}
+
+var ErrDealNotFound = fmt.Errorf("deal not found")
+
+func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
+	deal, err := p.db.ByID(ctx, dealUuid)
+	if xerrors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("getting deal %s: %w", dealUuid, ErrDealNotFound)
+	}
+	return deal, nil
 }
 
 type acceptDealReq struct {

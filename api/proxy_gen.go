@@ -5,7 +5,9 @@ package api
 import (
 	"context"
 
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-jsonrpc/auth"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	metrics "github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -74,7 +76,9 @@ type CommonNetStub struct {
 
 type MarketStruct struct {
 	Internal struct {
-		MarketDummyDeal func(p0 context.Context) (*ProviderDealRejectionInfo, error) `perm:"admin"`
+		Deal func(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) `perm:"admin"`
+
+		MarketDummyDeal func(p0 context.Context, p1 *smtypes.ClientDealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 	}
 }
 
@@ -164,14 +168,25 @@ func (s *CommonStub) AuthVerify(p0 context.Context, p1 string) ([]auth.Permissio
 	return *new([]auth.Permission), ErrNotSupported
 }
 
-func (s *MarketStruct) MarketDummyDeal(p0 context.Context) (*ProviderDealRejectionInfo, error) {
+func (s *MarketStruct) Deal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {
+	if s.Internal.Deal == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.Deal(p0, p1)
+}
+
+func (s *MarketStub) Deal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *MarketStruct) MarketDummyDeal(p0 context.Context, p1 *smtypes.ClientDealParams) (*ProviderDealRejectionInfo, error) {
 	if s.Internal.MarketDummyDeal == nil {
 		return nil, ErrNotSupported
 	}
-	return s.Internal.MarketDummyDeal(p0)
+	return s.Internal.MarketDummyDeal(p0, p1)
 }
 
-func (s *MarketStub) MarketDummyDeal(p0 context.Context) (*ProviderDealRejectionInfo, error) {
+func (s *MarketStub) MarketDummyDeal(p0 context.Context, p1 *smtypes.ClientDealParams) (*ProviderDealRejectionInfo, error) {
 	return nil, ErrNotSupported
 }
 

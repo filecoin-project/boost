@@ -63,6 +63,12 @@ your node if metadata log is disabled`,
 
 			Comment: ``,
 		},
+		{
+			Name: "Wallets",
+			Type: "WalletsConfig",
+
+			Comment: ``,
+		},
 	},
 	"Common": []DocField{
 		{
@@ -198,11 +204,17 @@ before being assigned to a sector`,
 deals to be ready to publish before publishing them all as a batch`,
 		},
 		{
-			Name: "MaxDealsPerPublishMsg",
+			Name: "PublishMsgMaxDealsPerMsg",
 			Type: "uint64",
 
 			Comment: `The maximum number of deals to include in a single PublishStorageDeals
 message`,
+		},
+		{
+			Name: "PublishMsgMaxFee",
+			Type: "types.FIL",
+
+			Comment: `The maximum network fees to pay when sending the PublishStorageDeals message`,
 		},
 		{
 			Name: "MaxProviderCollateralMultiplier",
@@ -362,6 +374,20 @@ default value is true`,
 
 			Comment: `Path of the external script that will be run to price a retrieval deal.
 This parameter is ONLY applicable if the retrieval pricing policy strategy has been configured to "external".`,
+		},
+	},
+	"WalletsConfig": []DocField{
+		{
+			Name: "Miner",
+			Type: "string",
+
+			Comment: `The "owner" address of the miner`,
+		},
+		{
+			Name: "PublishStorageDeals",
+			Type: "string",
+
+			Comment: `The wallet used to send PublishStorageDeals messages`,
 		},
 	},
 }
