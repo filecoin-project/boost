@@ -23,7 +23,7 @@ var dummydealCmd = &cli.Command{
 		ctx := lcli.DaemonContext(cctx)
 
 		log.Debug("Make API call to start dummy deal")
-		rej, err := boostApi.MarketDummyDeal(ctx)
+		rej, err := boostApi.MarketDummyDeal(ctx, nil)
 		if err != nil {
 			return xerrors.Errorf("creating dummy deal: %w", err)
 		}

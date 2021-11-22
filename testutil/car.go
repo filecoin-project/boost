@@ -33,6 +33,7 @@ type CarRes struct {
 	OrigFile   string
 	Root       cid.Cid
 	Blockstore bstore.Blockstore
+	CarSize    uint64
 }
 
 // CreateRandomFile creates a  normal file with the provided seed and the
@@ -82,7 +83,7 @@ func CreateRandomCARv1(rseed, size int) (*CarRes, error) {
 		return nil, err
 	}
 
-	hd, _, err := car.ReadHeader(bufio.NewReader(tmp))
+	hd, sz, err := car.ReadHeader(bufio.NewReader(tmp))
 	if err != nil {
 		return nil, err
 	}
@@ -94,6 +95,7 @@ func CreateRandomCARv1(rseed, size int) (*CarRes, error) {
 
 	return &CarRes{
 		CarFile:    tmp.Name(),
+		CarSize:    sz,
 		OrigFile:   file.Name(),
 		Root:       hd.Roots[0],
 		Blockstore: bs,

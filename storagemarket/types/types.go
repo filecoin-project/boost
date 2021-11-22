@@ -34,8 +34,7 @@ type ClientDealParams struct {
 
 	DealDataRoot cid.Cid
 
-	TransferType   string
-	TransferParams []byte
+	Transfer Transfer
 }
 
 type DataTransferEvent struct {

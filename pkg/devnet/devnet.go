@@ -96,7 +96,7 @@ func runCmdsWithLog(ctx context.Context, name string, commands [][]string) {
 func runLotusDaemon(ctx context.Context, home string) {
 	cmds := [][]string{
 		{"lotus-seed", "genesis", "new", "localnet.json"},
-		{"lotus-seed", "pre-seal", "--sector-size=2048", "--num-sectors=10"},
+		{"lotus-seed", "pre-seal", "--sector-size=2048", "--num-sectors=4"},
 		{"lotus-seed", "genesis", "add-miner", "localnet.json",
 			filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.json")},
 		{"lotus", "daemon", "--lotus-make-genesis=dev.gen",
