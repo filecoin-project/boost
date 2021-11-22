@@ -16,7 +16,7 @@ type newDealPS struct {
 
 func newDealPubsub() (*newDealPS, error) {
 	bus := eventbus.NewBus()
-	emitter, err := bus.Emitter(types.ProviderDealState{}, eventbus.Stateful)
+	emitter, err := bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create event emitter: %w", err)
 	}

@@ -90,6 +90,8 @@ func runBoost(t *testing.T) (api.Boost, func()) {
 		t.Fatalf("invalid config from repo, got: %T", c)
 	}
 	cfg.SectorIndexApiInfo = creds
+	cfg.Wallets.Miner = "t3stekt3i2xsubvww6dxo7fa6ebyuax6qdxrgzsgu3b7ujbhvpjyeqaieclhuakofevmosovcpnepc5oxooheq"
+	cfg.Wallets.PublishStorageDeals = "t3q2mm5omczfre2mneaobktuxrazxqmmb3l3lfhpi4ocn5fwvvpqei462kupmgu2d5eebw3v6qdfauhvv5zdya"
 
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
