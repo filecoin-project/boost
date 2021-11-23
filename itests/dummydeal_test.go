@@ -350,7 +350,6 @@ func runWebServer(path string) (*httptest.Server, error) {
 		file, err := os.Open(path)
 		if err != nil {
 			panic(err)
-			return
 		}
 
 		http.ServeContent(w, r, "", time.Now(), file)
