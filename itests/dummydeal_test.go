@@ -185,7 +185,7 @@ func (f *testFramework) start() {
 		require.NoError(f.t, err)
 
 		amt := abi.NewTokenAmount(1e18)
-		sendFunds(f.ctx, fullnodeApi, clientAddr, amt)
+		_ = sendFunds(f.ctx, fullnodeApi, clientAddr, amt)
 		log.Infof("Created client wallet %s with %d attoFil", clientAddr, amt)
 		wg.Done()
 	}()
@@ -199,7 +199,7 @@ func (f *testFramework) start() {
 		require.NoError(f.t, err)
 
 		amt := abi.NewTokenAmount(1e18)
-		sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
+		_ = sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
 		log.Info("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
 		wg.Done()
 	}()
