@@ -83,7 +83,7 @@ func CreateRandomCARv1(rseed, size int) (*CarRes, error) {
 		return nil, err
 	}
 
-	hd, sz, err := car.ReadHeader(bufio.NewReader(tmp))
+	hd, _, err := car.ReadHeader(bufio.NewReader(tmp))
 	if err != nil {
 		return nil, err
 	}
@@ -93,9 +93,14 @@ func CreateRandomCARv1(rseed, size int) (*CarRes, error) {
 		return nil, err
 	}
 
+	stat, err := os.Stat(tmp.Name())
+	if err != nil {
+		return nil, err
+	}
+
 	return &CarRes{
 		CarFile:    tmp.Name(),
-		CarSize:    sz,
+		CarSize:    uint64(stat.Size()),
 		OrigFile:   file.Name(),
 		Root:       hd.Roots[0],
 		Blockstore: bs,

@@ -130,17 +130,15 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 	p.addDealLog(deal.DealUuid, "Data transfer complete")
 
 	// Verify CommP matches
-	//pieceCid, err := p.generatePieceCommitment(deal)
-	_, err = p.generatePieceCommitment(deal)
+	pieceCid, err := p.generatePieceCommitment(deal)
 	if err != nil {
 		return fmt.Errorf("failed to generate CommP: %w", err)
 	}
 
-	// TODO: why is commp not matching?
-	//clientPieceCid := deal.ClientDealProposal.Proposal.PieceCID
-	//if pieceCid != clientPieceCid {
-	//	return fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid)
-	//}
+	clientPieceCid := deal.ClientDealProposal.Proposal.PieceCID
+	if pieceCid != clientPieceCid {
+		return fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid)
+	}
 
 	p.addDealLog(deal.DealUuid, "Data verification successful")
 
