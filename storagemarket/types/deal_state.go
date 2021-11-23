@@ -29,13 +29,11 @@ type ProviderDealState struct {
 	// DealDataRoot is the root of the IPLD DAG that the client wants to store.
 	DealDataRoot cid.Cid
 
-	// data-transfer
 	// InboundCARPath is the file-path where the storage provider will persist the CAR file sent by the client.
 	InboundFilePath string
-	// TransferURL is the URL sent by the client where the Storage Provider can fetch the CAR file from.
-	//TransferURL    string
-	TransferType   string
-	TransferParams []byte
+
+	// Transfer has the parameters for the data transfer
+	Transfer Transfer
 
 	// Chain Vars
 	ChainDealID abi.DealID
@@ -53,4 +51,15 @@ type ProviderDealState struct {
 
 	// NBytesReceived is the number of bytes Received for this deal
 	NBytesReceived int64
+}
+
+// Transfer has the parameters for a data transfer
+type Transfer struct {
+	// The type of transfer eg "http"
+	Type string
+	// A byte array containing marshalled data specific to the transfer type
+	// eg a JSON encoded struct { URL: "<url>", Headers: {...} }
+	Params []byte
+	// The size of the data transferred in bytes
+	Size uint64
 }

@@ -113,12 +113,10 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 	tctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.config.MaxTransferDuration))
 	defer cancel()
 
-	handler, err := p.Transport.Execute(tctx, deal.TransferParams, &transporttypes.TransportDealInfo{
+	handler, err := p.Transport.Execute(tctx, deal.Transfer.Params, &transporttypes.TransportDealInfo{
 		OutputFile: deal.InboundFilePath,
 		DealUuid:   deal.DealUuid,
-		// TODO Is this the correct size of the actual data without padding ?
-		// I think it's best to explicitly add a "deal size" param to the deal negotiation.
-		DealSize: int64(deal.ClientDealProposal.Proposal.PieceSize),
+		DealSize:   int64(deal.Transfer.Size),
 	})
 	if err != nil {
 		return fmt.Errorf("failed data transfer: %w", err)
@@ -326,7 +324,7 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 	}
 	dberr := p.db.Update(p.ctx, deal)
 	if dberr != nil {
-		log.Errorw("updating failed deal in db", "id", deal.DealUuid, "err", err)
+		log.Errorw("updating failed deal in db", "id", deal.DealUuid, "err", dberr)
 	}
 
 	// Fire deal update event
@@ -377,6 +375,6 @@ func (p *Provider) addDealLog(dealUuid uuid.UUID, format string, args ...interfa
 		CreatedAt: time.Now(),
 	}
 	if err := p.db.InsertLog(p.ctx, l); err != nil {
-		log.Warnw("failed to persist deal log: %s", err)
+		log.Warnw("failed to persist deal log", "id", dealUuid, "err", err)
 	}
 }

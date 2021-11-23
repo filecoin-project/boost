@@ -33,6 +33,7 @@ type CarRes struct {
 	OrigFile   string
 	Root       cid.Cid
 	Blockstore bstore.Blockstore
+	CarSize    uint64
 }
 
 // CreateRandomFile creates a  normal file with the provided seed and the
@@ -92,8 +93,14 @@ func CreateRandomCARv1(rseed, size int) (*CarRes, error) {
 		return nil, err
 	}
 
+	stat, err := os.Stat(tmp.Name())
+	if err != nil {
+		return nil, err
+	}
+
 	return &CarRes{
 		CarFile:    tmp.Name(),
+		CarSize:    uint64(stat.Size()),
 		OrigFile:   file.Name(),
 		Root:       hd.Roots[0],
 		Blockstore: bs,

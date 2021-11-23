@@ -2,6 +2,7 @@ package storagemarket
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"path"
@@ -27,6 +28,8 @@ import (
 )
 
 var log = logging.Logger("boost-provider")
+
+var ErrDealNotFound = fmt.Errorf("deal not found")
 
 type Config struct {
 	MaxTransferDuration time.Duration
@@ -101,6 +104,14 @@ func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNod
 	}, nil
 }
 
+func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
+	deal, err := p.db.ByID(ctx, dealUuid)
+	if xerrors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("getting deal %s: %w", dealUuid, ErrDealNotFound)
+	}
+	return deal, nil
+}
+
 func (p *Provider) NBytesReceived(deal *types.ProviderDealState) (int64, error) {
 	fi, err := os.Stat(deal.InboundFilePath)
 	if err != nil {
@@ -128,8 +139,7 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDeal
 		SelfPeerID:         dp.MinerPeerID,
 		ClientPeerID:       dp.ClientPeerID,
 		DealDataRoot:       dp.DealDataRoot,
-		TransferType:       dp.TransferType,
-		TransferParams:     dp.TransferParams,
+		Transfer:           dp.Transfer,
 	}
 
 	// validate the deal proposal

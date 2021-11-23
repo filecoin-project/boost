@@ -3,6 +3,10 @@ package api
 import (
 	"context"
 	"time"
+
+	"github.com/google/uuid"
+
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 )
 
 //                       MODIFYING THE API INTERFACE
@@ -19,7 +23,8 @@ import (
 type Market interface {
 	// MethodGroup: Market
 
-	MarketDummyDeal(context.Context) (*ProviderDealRejectionInfo, error) //perm:admin
+	MarketDummyDeal(context.Context, *smtypes.ClientDealParams) (*ProviderDealRejectionInfo, error) //perm:admin
+	Deal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)               //perm:admin
 }
 
 // ProviderDealRejectionInfo is the information sent by the Storage Provider to the Client when it rejects a valid deal.
