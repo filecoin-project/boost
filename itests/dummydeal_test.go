@@ -465,8 +465,6 @@ func (f *testFramework) signProposal(addr address.Address, proposal *market.Deal
 		return nil, err
 	}
 
-	// TODO: Do we need to also pass MsgMeta to the signature
-	// api.MsgMeta{Type: lapi.MTDealProposal}
 	sig, err := f.fullNode.WalletSign(f.ctx, addr, buf)
 	if err != nil {
 		return nil, err
