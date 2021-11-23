@@ -156,7 +156,7 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDeal
 		}
 	}()
 
-	resp, err := p.sendDealForAcceptance(&ds)
+	resp, err := p.checkForDealAcceptance(&ds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
 	}
@@ -175,7 +175,7 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDeal
 	return nil, nil
 }
 
-func (p *Provider) sendDealForAcceptance(ds *types.ProviderDealState) (acceptDealResp, error) {
+func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState) (acceptDealResp, error) {
 	// send message to event loop to run the deal through the acceptance filter and reserve the required resources
 	// then wait for a response and return the response to the client.
 	respChan := make(chan acceptDealResp, 1)
@@ -223,7 +223,7 @@ func (p *Provider) Start(ctx context.Context) error {
 			select {
 			case p.restartDealsChan <- restartReq{deal: ds}:
 			case <-p.ctx.Done():
-				log.Errorw("failed to restart deal", "err", p.ctx.Err(), "id", ds.DealUuid)
+				log.Errorw("timeout when restarting deal", "err", p.ctx.Err(), "id", ds.DealUuid)
 			}
 		}()
 	}
