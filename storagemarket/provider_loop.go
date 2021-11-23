@@ -1,27 +1,12 @@
 package storagemarket
 
 import (
-	"context"
-	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/google/uuid"
-	"golang.org/x/xerrors"
 )
-
-var ErrDealNotFound = fmt.Errorf("deal not found")
-
-func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
-	deal, err := p.db.ByID(ctx, dealUuid)
-	if xerrors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("getting deal %s: %w", dealUuid, ErrDealNotFound)
-	}
-	return deal, nil
-}
 
 type acceptDealReq struct {
 	rsp  chan acceptDealResp
@@ -51,7 +36,7 @@ func (p *Provider) loop() {
 	for {
 		select {
 		case restartReq := <-p.restartDealsChan:
-			log.Infow("restart deal", "id", restartReq.deal.DealUuid)
+			log.Infow("restarting deal", "id", restartReq.deal.DealUuid)
 
 			// Put ANY RESTART SYNCHRONIZATION LOGIC HERE.
 			// ....
@@ -62,6 +47,7 @@ func (p *Provider) loop() {
 
 				p.doDeal(restartReq.deal)
 			}()
+			log.Infow("restarted deal", "id", restartReq.deal.DealUuid)
 
 		case dealReq := <-p.acceptDealsChan:
 			deal := dealReq.deal
@@ -75,14 +61,14 @@ func (p *Provider) loop() {
 				}
 			}
 
+			// TODO: Deal filter, storage space manager, fund manager etc . basically synchronization
+			// send rejection if deal is not accepted by the above filters
 			var err error
 			if err != nil {
 				go writeDealResp(false, nil, err)
 				continue
 			}
 
-			// TODO: Deal filter, storage space manager, fund manager etc . basically synchronization
-			// send rejection if deal is not accepted by the above filters
 			accepted := true
 			if !accepted {
 				go writeDealResp(false, &api.ProviderDealRejectionInfo{}, nil)
@@ -91,7 +77,7 @@ func (p *Provider) loop() {
 			go writeDealResp(true, nil, nil)
 
 			// write deal state to the database
-			log.Infow("insert deal into DB", "id", deal.DealUuid)
+			log.Infow("inserting deal into DB", "id", deal.DealUuid)
 
 			deal.CreatedAt = time.Now()
 			deal.Checkpoint = dealcheckpoints.New
@@ -101,6 +87,7 @@ func (p *Provider) loop() {
 				go writeDealResp(false, nil, err)
 				continue
 			}
+			log.Infow("inserted deal into DB", "id", deal.DealUuid)
 
 			// start executing the deal
 			p.wg.Add(1)
@@ -109,6 +96,9 @@ func (p *Provider) loop() {
 
 				p.doDeal(deal)
 			}()
+
+			go writeDealResp(true, nil, nil)
+			log.Infow("deal execution started", "id", deal.DealUuid)
 
 		case failedDeal := <-p.failedDealsChan:
 			log.Errorw("deal failed", "id", failedDeal.st.DealUuid, "err", failedDeal.err)
