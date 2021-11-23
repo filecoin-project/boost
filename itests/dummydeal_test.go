@@ -4,13 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/ipfs/go-cid"
+	"golang.org/x/sync/errgroup"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"sync"
 	"testing"
 	"time"
+
+	cborutil "github.com/filecoin-project/go-cbor-util"
 
 	lapi "github.com/filecoin-project/lotus/api"
 
@@ -31,7 +36,6 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
 
@@ -52,15 +56,18 @@ import (
 
 var log = logging.Logger("boosttest")
 
-func init() {
+func setLogLevel() {
 	_ = logging.SetLogLevel("boosttest", "DEBUG")
 	_ = logging.SetLogLevel("devnet", "DEBUG")
 	_ = logging.SetLogLevel("boost", "DEBUG")
+	_ = logging.SetLogLevel("actors", "DEBUG")
 	_ = logging.SetLogLevel("provider", "DEBUG")
 	_ = logging.SetLogLevel("http-transfer", "DEBUG")
 }
 
 func TestDummydeal(t *testing.T) {
+	setLogLevel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -93,8 +100,8 @@ func TestDummydeal(t *testing.T) {
 		break
 	}
 
-	// Start up boost
-	boostApi, providerAddr, stop := runBoost(t)
+	f := newTestFramework(ctx, t)
+	f.start()
 
 	// Create a CAR file
 	carRes, err := testutil.CreateRandomCARv1(5, 1600)
@@ -108,28 +115,208 @@ func TestDummydeal(t *testing.T) {
 	// Create a new dummy deal
 	dealUuid := uuid.New()
 
-	res, err := makeDummyDeal(ctx, boostApi, providerAddr, dealUuid, carRes, server.URL)
+	res, err := f.makeDummyDeal(dealUuid, carRes, server.URL)
 	require.NoError(t, err)
 
 	// Wait for the deal to reach the Published state
-	err = waitForPublished(ctx, boostApi, dealUuid)
+	err = f.waitForPublished(dealUuid)
 	require.NoError(t, err)
 
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
 	cancel()
-
-	go func() { stop() }()
-
+	go f.stop()
 	<-done
 }
 
-func waitForPublished(ctx context.Context, boostApi api.Boost, dealUuid uuid.UUID) error {
-	publishCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+type testFramework struct {
+	ctx        context.Context
+	t          *testing.T
+	stop       func()
+
+	boost      api.Boost
+	fullNode   lapi.FullNode
+	clientAddr address.Address
+	minerAddr  address.Address
+}
+
+func newTestFramework(ctx context.Context, t *testing.T) *testFramework {
+	return &testFramework{
+		ctx: ctx,
+		t:   t,
+	}
+}
+
+func (f *testFramework) start() {
+	addr := "ws://127.0.0.1:1234/rpc/v1"
+
+	// Get a FullNode API
+	fullnodeApiString, err := devnet.GetFullnodeEndpoint(f.ctx)
+	require.NoError(f.t, err)
+
+	apiinfo := cliutil.ParseApiInfo(fullnodeApiString)
+
+	fullnodeApi, closer, err := client.NewFullNodeRPCV1(f.ctx, addr, apiinfo.AuthHeader())
+	require.NoError(f.t, err)
+
+	f.fullNode = fullnodeApi
+
+	err = fullnodeApi.LogSetLevel(f.ctx, "actors", "DEBUG")
+	require.NoError(f.t, err)
+
+	// Get the default wallet from the devnet daemon
+	defaultWallet, err := fullnodeApi.WalletDefaultAddress(f.ctx)
+	require.NoError(f.t, err)
+
+	bal, err := fullnodeApi.WalletBalance(f.ctx, defaultWallet)
+	require.NoError(f.t, err)
+
+	log.Infof("default wallet has %d attoFIL", bal)
+
+	// Create a wallet for the client with some funds
+	var wg sync.WaitGroup
+	wg.Add(1)
+	var clientAddr address.Address
+	go func() {
+		log.Info("Creating client wallet")
+
+		clientAddr, err = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
+		require.NoError(f.t, err)
+
+		amt := abi.NewTokenAmount(1e18)
+		sendFunds(f.ctx, fullnodeApi, clientAddr, amt)
+		log.Infof("Created client wallet %s with %d attoFil", clientAddr, amt)
+		wg.Done()
+	}()
+
+	// Create a wallet for publish storage deals with some funds
+	wg.Add(1)
+	var psdWalletAddr address.Address
+	go func() {
+		log.Info("Creating publish storage deals wallet")
+		psdWalletAddr, err = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
+		require.NoError(f.t, err)
+
+		amt := abi.NewTokenAmount(1e18)
+		sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
+		log.Info("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
+		wg.Done()
+	}()
+	wg.Wait()
+
+	f.clientAddr = clientAddr
+
+	minerEndpoint, err := devnet.GetMinerEndpoint(f.ctx)
+	require.NoError(f.t, err)
+
+	minerApiInfo := cliutil.ParseApiInfo(minerEndpoint)
+	//minerConnAddr := "ws://127.0.0.1:2345/rpc/v0" // TODO: parse this from minerEndpoint
+	//minerApi, closer, err := client.NewStorageMinerRPCV0(f.ctx, minerConnAddr, minerApiInfo.AuthHeader())
+	//require.NoError(f.t, err)
+
+	log.Debugw("minerApiInfo.Address", "addr", minerApiInfo.Addr)
+
+	// TODO: ActorAddress always returns "f01000" but it should be "t01000"
+	//minerAddr, err := minerApi.ActorAddress(f.ctx)
+	//require.NoError(f.t, err)
+	//
+	//log.Debugw("got miner actor addr", "addr", minerAddr)
+
+	minerAddr, err := address.NewFromString("t01000")
+	require.NoError(f.t, err)
+
+	f.minerAddr = minerAddr
+
+	// Set the control address for the storage provider to be the publish
+	// storage deals wallet
+	f.setControlAddress(psdWalletAddr)
+
+	// Create an in-memory repo
+	r := repo.NewMemory(nil)
+
+	lr, err := r.Lock(repo.Boost)
+	require.NoError(f.t, err)
+
+	// Set some config values on the repo
+	c, err := lr.Config()
+	require.NoError(f.t, err)
+
+	cfg, ok := c.(*config.Boost)
+	if !ok {
+		f.t.Fatalf("invalid config from repo, got: %T", c)
+	}
+	cfg.SectorIndexApiInfo = minerEndpoint
+	cfg.Wallets.Miner = "t01000" // mi.Owner.String()
+	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
+	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
+
+	err = lr.SetConfig(func(raw interface{}) {
+		rcfg := raw.(*config.Boost)
+		*rcfg = *cfg
+	})
+	require.NoError(f.t, err)
+
+	err = lr.Close()
+	require.NoError(f.t, err)
+
+	shutdownChan := make(chan struct{})
+
+	// Create Boost API
+	stop, err := node.New(f.ctx,
+		node.Boost(&f.boost),
+		node.Override(new(dtypes.ShutdownChan), shutdownChan),
+		node.Base(),
+		node.Repo(r),
+		node.Override(new(v1api.FullNode), fullnodeApi),
+	)
+	require.NoError(f.t, err)
+
+	// Bootstrap libp2p with full node
+	remoteAddrs, err := fullnodeApi.NetAddrsListen(f.ctx)
+	require.NoError(f.t, err)
+
+	log.Debugw("bootstrapping libp2p network with full node", "maadr", remoteAddrs)
+
+	err = f.boost.NetConnect(f.ctx, remoteAddrs)
+	require.NoError(f.t, err)
+
+	// Instantiate the boost service JSON RPC handler.
+	handler, err := node.BoostHandler(f.boost, true)
+	require.NoError(f.t, err)
+
+	log.Debug("getting API endpoint of boost node")
+
+	endpoint, err := r.APIEndpoint()
+	require.NoError(f.t, err)
+
+	log.Debugw("json rpc server listening", "endpoint", endpoint)
+
+	// Serve the RPC.
+	rpcStopper, err := node.ServeRPC(handler, "boost", endpoint)
+	require.NoError(f.t, err)
+
+	log.Debugw("monitoring for shutdown")
+
+	// Monitor for shutdown.
+	finishCh := node.MonitorShutdown(shutdownChan,
+		node.ShutdownHandler{Component: "rpc server", StopFunc: rpcStopper},
+		node.ShutdownHandler{Component: "boost", StopFunc: stop},
+	)
+
+	f.stop = func() {
+		shutdownChan <- struct{}{}
+		_ = stop(f.ctx)
+		<-finishCh
+		closer()
+	}
+}
+
+func (f *testFramework) waitForPublished(dealUuid uuid.UUID) error {
+	publishCtx, cancel := context.WithTimeout(f.ctx, 10*time.Second)
 	defer cancel()
 
 	for {
-		deal, err := boostApi.Deal(ctx, dealUuid)
+		deal, err := f.boost.Deal(f.ctx, dealUuid)
 		if err != nil && !xerrors.Is(err, storagemarket.ErrDealNotFound) {
 			return fmt.Errorf("error getting deal: %s", err.Error())
 		}
@@ -171,35 +358,69 @@ func runWebServer(path string) (*httptest.Server, error) {
 	return svr, nil
 }
 
-func makeDummyDeal(ctx context.Context, boostApi api.Boost, provAddr address.Address, dealUuid uuid.UUID, carRes *testutil.CarRes, url string) (*api.ProviderDealRejectionInfo, error) {
-	pieceCid, pieceSize, err := util.CommP(ctx, carRes.Blockstore, carRes.Root)
+func (f *testFramework) makeDummyDeal( dealUuid uuid.UUID, carRes *testutil.CarRes, url string) (*api.ProviderDealRejectionInfo, error) {
+	pieceCid, pieceSize, err := util.CommP(f.ctx, carRes.Blockstore, carRes.Root)
 	if err != nil {
 		return nil, err
 	}
 
-	clientAddr, err := address.NewIDAddress(1234)
+	proposal := market.DealProposal{
+		PieceCID:             pieceCid,
+		PieceSize:            pieceSize.Padded(),
+		VerifiedDeal:         false,
+		Client:               f.clientAddr,
+		Provider:             f.minerAddr,
+		Label:                carRes.Root.String(),
+		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
+		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
+		StoragePricePerEpoch: abi.NewTokenAmount(1),
+		ProviderCollateral:   abi.NewTokenAmount(0),
+		ClientCollateral:     abi.NewTokenAmount(0),
+	}
+
+	signedProposal, err := f.signProposal(f.clientAddr, &proposal)
 	if err != nil {
 		return nil, err
 	}
 
-	proposal := market.ClientDealProposal{
-		Proposal: market.DealProposal{
-			PieceCID:             pieceCid,
-			PieceSize:            pieceSize.Padded(),
-			VerifiedDeal:         false,
-			Client:               clientAddr,
-			Provider:             provAddr,
-			Label:                carRes.Root.String(),
-			StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
-			EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
-			StoragePricePerEpoch: abi.NewTokenAmount(rand.Int63()),
-			ProviderCollateral:   abi.NewTokenAmount(0),
-			ClientCollateral:     abi.NewTokenAmount(0),
-		},
-		ClientSignature: crypto.Signature{
-			Type: crypto.SigTypeBLS,
-			Data: []byte("sig"),
-		},
+	log.Debugf("Client balance requirement for deal: %d attoFil", proposal.ClientBalanceRequirement())
+	log.Debugf("Provider balance requirement for deal: %d attoFil", proposal.ProviderBalanceRequirement())
+
+	clientBal, err := f.fullNode.WalletBalance(f.ctx, f.clientAddr)
+	if err != nil {
+		return nil, err
+	}
+	log.Debugf("Client balance: %d attoFil", clientBal)
+
+	provBal, err := f.fullNode.WalletBalance(f.ctx, f.minerAddr)
+	if err != nil {
+		return nil, err
+	}
+	log.Debugf("Provider balance: %d attoFil", provBal)
+
+	// Add client and provider funds for deal to StorageMarketActor
+	var errgp errgroup.Group
+	errgp.Go(func() error {
+		bal := proposal.ClientBalanceRequirement()
+		log.Infof("adding client balance requirement %d to Storage Market Actor", bal)
+		mcid, err := f.fullNode.MarketAddBalance(f.ctx, f.clientAddr, f.clientAddr, bal)
+		if err != nil {
+			return err
+		}
+		return f.WaitMsg(mcid)
+	})
+	errgp.Go(func() error {
+		bal := proposal.ProviderBalanceRequirement()
+		log.Infof("adding provider balance requirement %d to Storage Market Actor", bal)
+		mcid, err := f.fullNode.MarketAddBalance(f.ctx, f.minerAddr, f.minerAddr, bal)
+		if err != nil {
+			return err
+		}
+		return f.WaitMsg(mcid)
+	})
+	err = errgp.Wait()
+	if err != nil {
+		return nil, err
 	}
 
 	// Save the path to the CAR file as a transfer parameter
@@ -209,7 +430,7 @@ func makeDummyDeal(ctx context.Context, boostApi api.Boost, provAddr address.Add
 		return nil, err
 	}
 
-	peerID, err := boostApi.ID(ctx)
+	peerID, err := f.boost.ID(f.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +439,7 @@ func makeDummyDeal(ctx context.Context, boostApi api.Boost, provAddr address.Add
 		DealUuid:           dealUuid,
 		MinerPeerID:        peerID,
 		ClientPeerID:       peerID,
-		ClientDealProposal: proposal,
+		ClientDealProposal: *signedProposal,
 		DealDataRoot:       carRes.Root,
 		Transfer: types.Transfer{
 			Type:   "http",
@@ -227,147 +448,26 @@ func makeDummyDeal(ctx context.Context, boostApi api.Boost, provAddr address.Add
 		},
 	}
 
-	return boostApi.MarketDummyDeal(ctx, dealParams)
+	return f.boost.MarketDummyDeal(f.ctx, dealParams)
 }
 
-func runBoost(t *testing.T) (api.Boost, address.Address, func()) {
-	ctx := context.Background()
-	addr := "ws://127.0.0.1:1234/rpc/v1"
-
-	fullnodeApiString, err := devnet.GetFullnodeEndpoint(ctx)
-	require.NoError(t, err)
-
-	apiinfo := cliutil.ParseApiInfo(fullnodeApiString)
-
-	fullnodeApi, closer, err := client.NewFullNodeRPCV1(ctx, addr, apiinfo.AuthHeader())
-	require.NoError(t, err)
-
-	defaultWallet, err := fullnodeApi.WalletDefaultAddress(ctx)
-	require.NoError(t, err)
-
-	bal, err := fullnodeApi.WalletBalance(ctx, defaultWallet)
-	require.NoError(t, err)
-
-	log.Infof("default wallet has %d attoFIL", bal)
-
-	// Create a wallet for publish storage deals with some funds
-	//psdWalletAddr, err := fullnodeApi.WalletNew(ctx, chaintypes.KTSecp256k1)
-	psdWalletAddr, err := fullnodeApi.WalletNew(ctx, chaintypes.KTBLS)
-	require.NoError(t, err)
-
-	sendFunds(ctx, fullnodeApi, psdWalletAddr, abi.NewTokenAmount(1e18))
-	log.Info("Created publish storage deals wallet")
-
-	//// Create a wallet for deal collateral with some funds
-	//collatWalletAddr, err := fullnodeApi.WalletNew(ctx, chaintypes.KTSecp256k1)
-	//require.NoError(t, err)
-	//
-	//sendFunds(ctx, fullnodeApi, collatWalletAddr, abi.NewTokenAmount(1e18))
-	//log.Info("Created collateral wallet")
-
-	r := repo.NewMemory(nil)
-
-	minerEndpoint, err := devnet.GetMinerEndpoint(ctx)
-	require.NoError(t, err)
-
-	minerApiInfo := cliutil.ParseApiInfo(minerEndpoint)
-	minerConnAddr := "ws://127.0.0.1:2345/rpc/v0" // TODO: parse this from minerEndpoint
-	minerApi, closer, err := client.NewStorageMinerRPCV0(ctx, minerConnAddr, minerApiInfo.AuthHeader())
-	require.NoError(t, err)
-
-	log.Debugw("minerApiInfo.Address", "addr", minerApiInfo.Addr)
-
-	// TODO: minerAddr is always ""
-	// Need to figure out how to set it on the miner
-	minerAddr, err := minerApi.ActorAddress(ctx)
-	require.NoError(t, err)
-
-	log.Debugw("got miner actor addr", "addr", minerAddr)
-
-	setControlAddress(t, ctx, fullnodeApi, minerAddr, psdWalletAddr)
-
-	minerAddr, err = address.NewFromString("t01000")
-	require.NoError(t, err)
-
-	//return fullnodeApi.StateMinerInfo(ctx, actorAddr, chaintypes.EmptyTSK)
-
-	//mi, err := fullnodeApi.StateMinerInfo(ctx, minerAddr, chaintypes.EmptyTSK)
-	//require.NoError(t, err)
-
-	lr, err := r.Lock(repo.Boost)
-	require.NoError(t, err)
-
-	c, err := lr.Config()
-	require.NoError(t, err)
-
-	cfg, ok := c.(*config.Boost)
-	if !ok {
-		t.Fatalf("invalid config from repo, got: %T", c)
+func (f *testFramework) signProposal(addr address.Address, proposal *market.DealProposal) (*market.ClientDealProposal, error) {
+	buf, err := cborutil.Dump(proposal)
+	if err != nil {
+		return nil, err
 	}
-	cfg.SectorIndexApiInfo = minerEndpoint
-	cfg.Wallets.Miner = "t01000" // mi.Owner.String()
-	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
-	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
 
-	err = lr.SetConfig(func(raw interface{}) {
-		rcfg := raw.(*config.Boost)
-		*rcfg = *cfg
-	})
-	require.NoError(t, err)
-
-	err = lr.Close()
-	require.NoError(t, err)
-
-	shutdownChan := make(chan struct{})
-
-	var api api.Boost
-	stop, err := node.New(ctx,
-		node.Boost(&api),
-		node.Override(new(dtypes.ShutdownChan), shutdownChan),
-		node.Base(),
-		node.Repo(r),
-		node.Override(new(v1api.FullNode), fullnodeApi),
-	)
-	require.NoError(t, err)
-
-	// Bootstrap with full node
-	remoteAddrs, err := fullnodeApi.NetAddrsListen(ctx)
-	require.NoError(t, err)
-
-	log.Debugw("bootstrapping libp2p network with full node", "maadr", remoteAddrs)
-
-	err = api.NetConnect(ctx, remoteAddrs)
-	require.NoError(t, err)
-
-	// Instantiate the boost service JSON RPC handler.
-	handler, err := node.BoostHandler(api, true)
-	require.NoError(t, err)
-
-	log.Debug("getting API endpoint of boost node")
-
-	endpoint, err := r.APIEndpoint()
-	require.NoError(t, err)
-
-	log.Debugw("json rpc server listening", "endpoint", endpoint)
-
-	// Serve the RPC.
-	rpcStopper, err := node.ServeRPC(handler, "boost", endpoint)
-	require.NoError(t, err)
-
-	log.Debugw("monitoring for shutdown")
-
-	// Monitor for shutdown.
-	finishCh := node.MonitorShutdown(shutdownChan,
-		node.ShutdownHandler{Component: "rpc server", StopFunc: rpcStopper},
-		node.ShutdownHandler{Component: "boost", StopFunc: stop},
-	)
-
-	return api, minerAddr, func() {
-		shutdownChan <- struct{}{}
-		_ = stop(ctx)
-		<-finishCh
-		closer()
+	// TODO: Do we need to also pass MsgMeta to the signature
+	// api.MsgMeta{Type: lapi.MTDealProposal}
+	sig, err := f.fullNode.WalletSign(f.ctx, addr, buf)
+	if err != nil {
+		return nil, err
 	}
+
+	return &market.ClientDealProposal{
+		Proposal:        *proposal,
+		ClientSignature: *sig,
+	}, nil
 }
 
 func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Address, amount abi.TokenAmount) error {
@@ -391,27 +491,32 @@ func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Addr
 	return err
 }
 
-func setControlAddress(t *testing.T, ctx context.Context, sender lapi.FullNode, minerAddr address.Address, psdAddr address.Address) {
-	mi, err := sender.StateMinerInfo(ctx, minerAddr, chaintypes.EmptyTSK)
-	require.NoError(t, err)
+func (f *testFramework) setControlAddress(psdAddr address.Address) {
+	mi, err := f.fullNode.StateMinerInfo(f.ctx, f.minerAddr, chaintypes.EmptyTSK)
+	require.NoError(f.t, err)
 
 	cwp := &miner2.ChangeWorkerAddressParams{
 		NewWorker:       mi.Worker,
 		NewControlAddrs: []address.Address{psdAddr},
 	}
 	sp, err := actors.SerializeParams(cwp)
-	require.NoError(t, err)
+	require.NoError(f.t, err)
 
-	smsg, err := sender.MpoolPushMessage(ctx, &chaintypes.Message{
+	smsg, err := f.fullNode.MpoolPushMessage(f.ctx, &chaintypes.Message{
 		From:   mi.Owner,
-		To:     minerAddr,
+		To:     f.minerAddr,
 		Method: miner.Methods.ChangeWorkerAddress,
 
 		Value:  big.Zero(),
 		Params: sp,
 	}, nil)
-	require.NoError(t, err)
+	require.NoError(f.t, err)
 
-	_, err = sender.StateWaitMsg(ctx, smsg.Cid(), 1, 1e10, true)
-	require.NoError(t, err)
+	err = f.WaitMsg(smsg.Cid())
+	require.NoError(f.t, err)
+}
+
+func (f *testFramework) WaitMsg(mcid cid.Cid) error {
+	_, err := f.fullNode.StateWaitMsg(f.ctx, mcid, 1, 1e10, true)
+	return err
 }
