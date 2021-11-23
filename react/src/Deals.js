@@ -83,6 +83,7 @@ export function StorageDealsPage(props) {
 
             return dealList
         } catch (e) {
+            console.error(e)
             setError(e)
         }
     }
@@ -188,7 +189,7 @@ function DealRow(props) {
                 {deal.ID}
             </td>
             <td>{humanFileSize(deal.PieceSize, false, 0)}</td>
-            <td>{deal.ClientAddress}</td>
+            <td className="client">{deal.ClientAddress}</td>
             <td>{deal.Message}</td>
         </tr>
     )

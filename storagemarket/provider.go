@@ -115,7 +115,7 @@ func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.Provide
 func (p *Provider) NBytesReceived(deal *types.ProviderDealState) (int64, error) {
 	fi, err := os.Stat(deal.InboundFilePath)
 	if err != nil {
-		return 0, fmt.Errorf("failed to stat file: %w", err)
+		return 0, nil
 	}
 	return fi.Size(), nil
 }
