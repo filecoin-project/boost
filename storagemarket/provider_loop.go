@@ -1,6 +1,7 @@
 package storagemarket
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/filecoin-project/boost/api"
@@ -28,8 +29,6 @@ type restartReq struct {
 	deal *types.ProviderDealState
 }
 
-// TODO: This is transient -> If it dosen't work out, we will use locks.
-// 1:N will move this problem elsewhere.
 func (p *Provider) loop() {
 	defer p.wg.Done()
 
@@ -84,7 +83,7 @@ func (p *Provider) loop() {
 
 			err = p.db.Insert(p.ctx, deal)
 			if err != nil {
-				go writeDealResp(false, nil, err)
+				go writeDealResp(false, nil, fmt.Errorf("failed to insert deal in db: %w", err))
 				continue
 			}
 			log.Infow("inserted deal into DB", "id", deal.DealUuid)
