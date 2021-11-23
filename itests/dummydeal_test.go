@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ipfs/go-cid"
-	"golang.org/x/sync/errgroup"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +12,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/ipfs/go-cid"
+	"golang.org/x/sync/errgroup"
 
 	cborutil "github.com/filecoin-project/go-cbor-util"
 
@@ -130,9 +131,9 @@ func TestDummydeal(t *testing.T) {
 }
 
 type testFramework struct {
-	ctx        context.Context
-	t          *testing.T
-	stop       func()
+	ctx  context.Context
+	t    *testing.T
+	stop func()
 
 	boost      api.Boost
 	fullNode   lapi.FullNode
@@ -358,7 +359,7 @@ func runWebServer(path string) (*httptest.Server, error) {
 	return svr, nil
 }
 
-func (f *testFramework) makeDummyDeal( dealUuid uuid.UUID, carRes *testutil.CarRes, url string) (*api.ProviderDealRejectionInfo, error) {
+func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carRes *testutil.CarRes, url string) (*api.ProviderDealRejectionInfo, error) {
 	pieceCid, pieceSize, err := util.CommP(f.ctx, carRes.Blockstore, carRes.Root)
 	if err != nil {
 		return nil, err
@@ -403,25 +404,33 @@ func (f *testFramework) makeDummyDeal( dealUuid uuid.UUID, carRes *testutil.CarR
 	errgp.Go(func() error {
 		bal := proposal.ClientBalanceRequirement()
 		log.Infof("adding client balance requirement %d to Storage Market Actor", bal)
-		mcid, err := f.fullNode.MarketAddBalance(f.ctx, f.clientAddr, f.clientAddr, bal)
-		if err != nil {
-			return err
+		if big.Cmp(bal, big.Zero()) > 0 {
+			mcid, err := f.fullNode.MarketAddBalance(f.ctx, f.clientAddr, f.clientAddr, bal)
+			if err != nil {
+				return err
+			}
+			return f.WaitMsg(mcid)
 		}
-		return f.WaitMsg(mcid)
+		return nil
 	})
 	errgp.Go(func() error {
 		bal := proposal.ProviderBalanceRequirement()
 		log.Infof("adding provider balance requirement %d to Storage Market Actor", bal)
-		mcid, err := f.fullNode.MarketAddBalance(f.ctx, f.minerAddr, f.minerAddr, bal)
-		if err != nil {
-			return err
+		if big.Cmp(bal, big.Zero()) > 0 {
+			mcid, err := f.fullNode.MarketAddBalance(f.ctx, f.minerAddr, f.minerAddr, bal)
+			if err != nil {
+				return err
+			}
+			return f.WaitMsg(mcid)
 		}
-		return f.WaitMsg(mcid)
+		return nil
 	})
 	err = errgp.Wait()
 	if err != nil {
 		return nil, err
 	}
+
+	log.Info("done adding balance requirements")
 
 	// Save the path to the CAR file as a transfer parameter
 	transferParams := &types2.HttpRequest{URL: url}
