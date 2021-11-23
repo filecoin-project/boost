@@ -73,7 +73,6 @@ func (p *Provider) loop() {
 				go writeDealResp(false, &api.ProviderDealRejectionInfo{}, nil)
 				continue
 			}
-			go writeDealResp(true, nil, nil)
 
 			// write deal state to the database
 			log.Infow("inserting deal into DB", "id", deal.DealUuid)
