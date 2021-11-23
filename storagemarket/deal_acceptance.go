@@ -18,6 +18,7 @@ const DealMaxLabelSize = 256
 
 // ValidateDealProposal validates a proposed deal against the provider criteria
 func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
+	// TODO Audit based on current Markets code
 	tok, curEpoch, err := p.adapter.GetChainHead(p.ctx)
 	if err != nil {
 		return fmt.Errorf("node error getting most recent state id: %w", err)
