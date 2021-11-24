@@ -78,7 +78,7 @@ func (p *Provider) loop() {
 			deal.CreatedAt = time.Now()
 			deal.Checkpoint = dealcheckpoints.New
 
-			err = p.db.Insert(p.ctx, deal)
+			err = p.dealsDB.Insert(p.ctx, deal)
 			if err != nil {
 				go writeDealResp(false, nil, fmt.Errorf("failed to insert deal in db: %w", err))
 				continue

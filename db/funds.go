@@ -72,7 +72,7 @@ func (f *FundsDB) TotalTagged(ctx context.Context) (*TotalTagged, error) {
 	} else {
 		collat, err = big.FromString(collatStr.String)
 		if err != nil {
-			return nil, fmt.Errorf("parsing Collateral '%s' to big.Int: %w", collatStr, err)
+			return nil, fmt.Errorf("parsing Collateral '%s' to big.Int: %w", collatStr.String, err)
 		}
 	}
 
@@ -82,7 +82,7 @@ func (f *FundsDB) TotalTagged(ctx context.Context) (*TotalTagged, error) {
 	} else {
 		pubMsg, err = big.FromString(pubMsgStr.String)
 		if err != nil {
-			return nil, fmt.Errorf("parsing PubMsg '%s' to big.Int: %w", pubMsgStr, err)
+			return nil, fmt.Errorf("parsing PubMsg '%s' to big.Int: %w", pubMsgStr.String, err)
 		}
 	}
 

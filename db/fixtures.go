@@ -18,7 +18,7 @@ import (
 )
 
 func LoadFixtures(ctx context.Context, db *sql.DB) ([]types.ProviderDealState, error) {
-	err := createTables(ctx, db)
+	err := CreateTables(ctx, db)
 	if err != nil {
 		return nil, err
 	}

@@ -3,10 +3,6 @@ package db
 import (
 	"context"
 	"database/sql"
-	"io/ioutil"
-	"os"
-	"path"
-	"runtime"
 	"strings"
 	"time"
 
@@ -21,10 +17,6 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 )
-
-type Scannable interface {
-	Scan(dest ...interface{}) error
-}
 
 type DealLog struct {
 	DealUuid  uuid.UUID
@@ -179,24 +171,8 @@ func (d *dealAccessor) update(ctx context.Context) error {
 	return err
 }
 
-// OnUpdateFn is called when the deal is updated in the database
-type OnUpdateFn func(deal *types.ProviderDealState)
-
 type DealsDB struct {
-	db         *sql.DB
-	onUpdateFn OnUpdateFn
-}
-
-func SqlDB(dbPath string) (*sql.DB, error) {
-	return sql.Open("sqlite3", "file:"+dbPath)
-}
-
-func Open(dbPath string) (*DealsDB, error) {
-	db, err := SqlDB(dbPath)
-	if err != nil {
-		return nil, err
-	}
-	return NewDealsDB(db), nil
+	db *sql.DB
 }
 
 func NewDealsDB(db *sql.DB) *DealsDB {
@@ -208,15 +184,7 @@ func (d *DealsDB) Insert(ctx context.Context, deal *types.ProviderDealState) err
 }
 
 func (d *DealsDB) Update(ctx context.Context, deal *types.ProviderDealState) error {
-	err := d.newDealDef(deal).update(ctx)
-	if err == nil && d.onUpdateFn != nil {
-		d.onUpdateFn(deal)
-	}
-	return err
-}
-
-func (d *DealsDB) OnUpdate(f OnUpdateFn) {
-	d.onUpdateFn = f
+	return d.newDealDef(deal).update(ctx)
 }
 
 func (d *DealsDB) ByID(ctx context.Context, id uuid.UUID) (*types.ProviderDealState, error) {
@@ -322,39 +290,4 @@ func (d *DealsDB) Logs(ctx context.Context, dealID uuid.UUID) ([]DealLog, error)
 	}
 
 	return dealLogs, nil
-}
-
-func (d *DealsDB) Init(ctx context.Context) error {
-	return createTables(ctx, d.db)
-}
-
-func createTables(ctx context.Context, db *sql.DB) error {
-	_, filename, _, _ := runtime.Caller(1)
-	createPath := path.Join(path.Dir(filename), "/create.sql")
-	createScript, err := ioutil.ReadFile(createPath)
-	if err != nil {
-		return err
-	}
-	_, err = db.ExecContext(ctx, string(createScript))
-	return err
-}
-
-func CreateTmpDB() (string, error) {
-	tmpFile, err := os.CreateTemp("", "test.db")
-	if err != nil {
-		return "", err
-	}
-	tmpFilePath := tmpFile.Name()
-
-	db, err := sql.Open("sqlite3", "file:"+tmpFilePath)
-	if err != nil {
-		return "", err
-	}
-
-	defer db.Close()
-
-	ctx := context.Background()
-	_, err = LoadFixtures(ctx, db)
-
-	return tmpFilePath, err
 }

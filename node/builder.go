@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -26,7 +27,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/chain/market"
 	"github.com/filecoin-project/lotus/chain/types"
 	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
 	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
@@ -332,7 +332,8 @@ var BoostNode = Options(
 	Override(new(dtypes.MinerID), modules.MinerID),
 
 	Override(new(dtypes.NetworkName), modules.StorageNetworkName),
-	Override(new(*db.DealsDB), modules.NewStorageMarketDB),
+	Override(new(*sql.DB), modules.NewBoostDB),
+	Override(new(*db.DealsDB), modules.NewDealsDB),
 	Override(new(*gql.Server), modules.NewGraphqlServer),
 )
 
@@ -383,7 +384,7 @@ func ConfigBoost(c interface{}) Option {
 			MaxPublishDealsFee:      cfg.Dealmaking.PublishMsgMaxFee,
 		})),
 
-		Override(new(*market.FundManager), fundmanager.New(fundmanager.Config{
+		Override(new(*fundmanager.FundManager), fundmanager.New(fundmanager.Config{
 			EscrowWallet: walletMiner,
 			PubMsgWallet: walletPSD,
 			PubMsgBalMin: abi.NewTokenAmount(1000), // TODO: add to node config

@@ -2,6 +2,7 @@ package fundmanager
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sync"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
@@ -38,11 +40,11 @@ type FundManager struct {
 	lk sync.RWMutex
 }
 
-func New(cfg Config) func(api api.FullNode, db *db.FundsDB) *FundManager {
-	return func(api api.FullNode, db *db.FundsDB) *FundManager {
+func New(cfg Config) func(api v1api.FullNode, sqldb *sql.DB) *FundManager {
+	return func(api api.FullNode, sqldb *sql.DB) *FundManager {
 		return &FundManager{
 			api: api,
-			db:  db,
+			db:  db.NewFundsDB(sqldb),
 			cfg: cfg,
 		}
 	}
@@ -118,7 +120,7 @@ func (m *FundManager) totalTagged(ctx context.Context) (*db.TotalTagged, error) 
 
 // UntagFunds untags funds that were associated (tagged) with a deal.
 // It's called when it's no longer necessary to prevent the funds from being
-// use for a different deal (eg because the deal failed / was published)
+// used for a different deal (eg because the deal failed / was published)
 func (m *FundManager) UntagFunds(ctx context.Context, dealUuid uuid.UUID) error {
 	m.lk.Lock()
 	defer m.lk.Unlock()

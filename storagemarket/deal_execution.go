@@ -332,7 +332,7 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 		deal.Err = err.Error()
 		p.addDealLog(deal.DealUuid, "Deal failed: %s", deal.Err)
 	}
-	dberr := p.db.Update(p.ctx, deal)
+	dberr := p.dealsDB.Update(p.ctx, deal)
 	if dberr != nil {
 		log.Errorw("updating failed deal in db", "id", deal.DealUuid, "err", dberr)
 	}
@@ -374,7 +374,7 @@ func (p *Provider) fireEventDealUpdate(pub event.Emitter, deal *types.ProviderDe
 
 func (p *Provider) updateCheckpoint(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState, ckpt dealcheckpoints.Checkpoint) error {
 	deal.Checkpoint = ckpt
-	if err := p.db.Update(ctx, deal); err != nil {
+	if err := p.dealsDB.Update(ctx, deal); err != nil {
 		return fmt.Errorf("failed to persist deal state: %w", err)
 	}
 
@@ -388,7 +388,7 @@ func (p *Provider) addDealLog(dealUuid uuid.UUID, format string, args ...interfa
 		Text:      fmt.Sprintf(format, args...),
 		CreatedAt: time.Now(),
 	}
-	if err := p.db.InsertLog(p.ctx, l); err != nil {
+	if err := p.dealsDB.InsertLog(p.ctx, l); err != nil {
 		log.Warnw("failed to persist deal log", "id", dealUuid, "err", err)
 	}
 }

@@ -3,6 +3,7 @@ package modules
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"os"
@@ -10,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/filecoin-project/boost/fundmanager"
 
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
@@ -512,18 +515,19 @@ func StorageNetworkName(ctx helpers.MetricsCtx, a v1api.FullNode) (dtypes.Networ
 	return dtypes.NetworkName(n), nil
 }
 
-func NewStorageMarketDB(r repo.LockedRepo) (*db.DealsDB, error) {
-	dbPath := path.Join(r.Path(), "deals.db")
-	sqldb, err := db.SqlDB(dbPath)
-	if err != nil {
-		return nil, err
-	}
-	return db.NewDealsDB(sqldb), nil
+func NewBoostDB(r repo.LockedRepo) (*sql.DB, error) {
+	dbPath := path.Join(r.Path(), "boost.db")
+	return db.SqlDB(dbPath)
 }
 
-func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, db *db.DealsDB, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks) (*storagemarket.Provider, error) {
-	return func(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, db *db.DealsDB, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks) (*storagemarket.Provider, error) {
-		prov, err := storagemarket.NewProvider(r.Path(), db, a, dp, provAddr, secb)
+func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
+	return db.NewDealsDB(sqldb)
+}
+
+func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks) (*storagemarket.Provider, error) {
+	return func(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks) (*storagemarket.Provider, error) {
+		prov, err := storagemarket.NewProvider(r.Path(), sqldb, dealsDB, fundMgr, a, dp, provAddr, secb)
+
 		if err != nil {
 			return nil, err
 		}
@@ -534,8 +538,8 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 	}
 }
 
-func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, db *db.DealsDB, publisher *storagemarket.DealPublisher) *gql.Server {
-	resolver := gql.NewResolver(db, prov, publisher)
+func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, publisher *storagemarket.DealPublisher) *gql.Server {
+	resolver := gql.NewResolver(dealsDB, fundMgr, prov, publisher)
 	server := gql.NewServer(resolver)
 
 	lc.Append(fx.Hook{

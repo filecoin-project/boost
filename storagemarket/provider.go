@@ -55,7 +55,8 @@ type Provider struct {
 	restartDealsChan chan restartReq
 
 	// Database API
-	db *db.DealsDB
+	db      *sql.DB
+	dealsDB *db.DealsDB
 
 	Transport     transport.Transport
 	fundManager   *fundmanager.FundManager
@@ -65,7 +66,7 @@ type Provider struct {
 	dealHandlers *dealHandlers
 }
 
-func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address, secb *sectorblocks.SectorBlocks) (*Provider, error) {
+func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address, secb *sectorblocks.SectorBlocks) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -86,13 +87,15 @@ func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNod
 		Address:   addr,
 		newDealPS: newDealPS,
 		fs:        fs,
-		db:        dealsDB,
+		db:        sqldb,
+		dealsDB:   dealsDB,
 
 		acceptDealsChan:  make(chan acceptDealReq),
 		failedDealsChan:  make(chan failedDealReq),
 		restartDealsChan: make(chan restartReq),
 
-		Transport: httptransport.New(),
+		Transport:   httptransport.New(),
+		fundManager: fundMgr,
 
 		dealPublisher: dealPublisher,
 		adapter: &Adapter{
@@ -105,7 +108,7 @@ func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNod
 }
 
 func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
-	deal, err := p.db.ByID(ctx, dealUuid)
+	deal, err := p.dealsDB.ByID(ctx, dealUuid)
 	if xerrors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("getting deal %s: %w", dealUuid, ErrDealNotFound)
 	}
@@ -211,14 +214,14 @@ func (p *Provider) Start(ctx context.Context) error {
 	p.ctx, p.cancel = context.WithCancel(ctx)
 
 	// initialize the database
-	err := p.db.Init(p.ctx)
+	err := db.CreateTables(p.ctx, p.db)
 	if err != nil {
 		return fmt.Errorf("failed to init db: %w", err)
 	}
 	log.Infow("db initialized")
 
 	// restart all existing deals
-	deals, err := p.db.ListActive(p.ctx)
+	deals, err := p.dealsDB.ListActive(p.ctx)
 	if err != nil {
 		return fmt.Errorf("getting active deals: %w", err)
 	}

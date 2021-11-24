@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/filecoin-project/boost/fundmanager"
+
 	"github.com/filecoin-project/boost/storagemarket"
 
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -25,13 +27,15 @@ type dealListResolver struct {
 // that field
 type resolver struct {
 	dealsDB   *db.DealsDB
+	fundMgr   *fundmanager.FundManager
 	provider  *storagemarket.Provider
 	publisher *storagemarket.DealPublisher
 }
 
-func NewResolver(dealsDB *db.DealsDB, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher) *resolver {
+func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher) *resolver {
 	return &resolver{
 		dealsDB:   dealsDB,
+		fundMgr:   fundMgr,
 		provider:  provider,
 		publisher: publisher,
 	}

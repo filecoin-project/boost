@@ -2,8 +2,6 @@ package fundmanager
 
 import (
 	"context"
-	"database/sql"
-	"path"
 	"testing"
 
 	"github.com/filecoin-project/boost/db"
@@ -17,22 +15,12 @@ import (
 )
 
 func TestFundManager(t *testing.T) {
-	logging.SetLogLevel("funds", "debug")
+	_ = logging.SetLogLevel("funds", "debug")
 
 	req := require.New(t)
 	ctx := context.Background()
 
-	tmpFile := path.Join(t.TempDir(), "test.db")
-	//fmt.Println(tmpFile)
-
-	sqldb, err := sql.Open("sqlite3", "file:"+tmpFile)
-	req.NoError(err)
-
-	dealsDb := db.NewDealsDB(sqldb)
-	req.NoError(err)
-
-	// TODO: move somewhere generic (not on deals DB)
-	dealsDb.Init(ctx)
+	sqldb, err := db.CreateTmpDB(ctx)
 	req.NoError(err)
 
 	fundsDB := db.NewFundsDB(sqldb)
@@ -48,6 +36,7 @@ func TestFundManager(t *testing.T) {
 		},
 	}
 
+	// There should be nothing tagged to start with
 	total, err := fm.TotalTagged(ctx)
 	req.NoError(err)
 	req.EqualValues(0, total.Collateral.Int64())
@@ -56,6 +45,7 @@ func TestFundManager(t *testing.T) {
 	deals, err := db.GenerateDeals()
 	req.NoError(err)
 
+	// Tag funds for a deal with collateral 3
 	deal := deals[0]
 	prop := deal.ClientDealProposal.Proposal
 	prop.ProviderCollateral = abi.NewTokenAmount(3)
@@ -64,9 +54,12 @@ func TestFundManager(t *testing.T) {
 
 	total, err = fm.TotalTagged(ctx)
 	req.NoError(err)
+	// Total tagged for collateral should be 3
 	req.EqualValues(3, total.Collateral.Int64())
+	// Total tagged for publish message should be PubMsgBalMin (ie 10)
 	req.EqualValues(10, total.PubMsg.Int64())
 
+	// Tag funds for a deal with collateral 4
 	deal2 := deals[1]
 	prop2 := deal2.ClientDealProposal.Proposal
 	prop2.ProviderCollateral = abi.NewTokenAmount(4)
@@ -75,12 +68,16 @@ func TestFundManager(t *testing.T) {
 
 	total, err = fm.TotalTagged(ctx)
 	req.NoError(err)
+	// Total tagged for collateral should be 3 + 4 = 7
 	req.EqualValues(7, total.Collateral.Int64())
+	// Total tagged for publish message should be 2 x PubMsgBalMin (ie 20)
 	req.EqualValues(20, total.PubMsg.Int64())
 
+	// Untag second deal
 	err = fm.UntagFunds(ctx, deal2.DealUuid)
 	req.NoError(err)
 
+	// Totals should go back to what they were before tagging the second deal
 	total, err = fm.TotalTagged(ctx)
 	req.NoError(err)
 	req.EqualValues(3, total.Collateral.Int64())
