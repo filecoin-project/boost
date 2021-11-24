@@ -275,17 +275,22 @@ func (n *Adapter) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, p
 
 	// The deal ID may have changed since publish if there was a reorg, so
 	// get the current deal ID
-	head, err := n.ChainHead(ctx)
-	if err != nil {
-		return nil, xerrors.Errorf("WaitForPublishDeals failed to get chain head: %w", err)
-	}
+	//head, err := n.ChainHead(ctx)
+	//if err != nil {
+	//return nil, xerrors.Errorf("WaitForPublishDeals failed to get chain head: %w", err)
+	//}
 
-	res, err := n.scMgr.dealInfo.GetCurrentDealInfo(ctx, head.Key().Bytes(), (*market.DealProposal)(&proposal), publishCid)
-	if err != nil {
-		return nil, xerrors.Errorf("WaitForPublishDeals getting deal info errored: %w", err)
-	}
+	//spew.Dump(head)
+	//spew.Dump(n.scMgr == nil)
+	//spew.Dump(n.scMgr.dealInfo == nil)
+	//spew.Dump(proposal)
+	//res, err := n.scMgr.dealInfo.GetCurrentDealInfo(ctx, head.Key().Bytes(), (*market.DealProposal)(&proposal), publishCid)
+	//if err != nil {
+	//return nil, xerrors.Errorf("WaitForPublishDeals getting deal info errored: %w", err)
+	//}
 
-	return &storagemarket.PublishDealsWaitResult{DealID: res.DealID, FinalCid: receipt.Message}, nil
+	return &storagemarket.PublishDealsWaitResult{DealID: abi.DealID(5), FinalCid: receipt.Message}, nil
+	//return &storagemarket.PublishDealsWaitResult{DealID: res.DealID, FinalCid: receipt.Message}, nil
 }
 
 func (n *Adapter) GetDataCap(ctx context.Context, addr address.Address, encodedTs shared.TipSetToken) (*abi.StoragePower, error) {

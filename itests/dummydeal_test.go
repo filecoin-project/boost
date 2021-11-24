@@ -125,6 +125,8 @@ func TestDummydeal(t *testing.T) {
 
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
+	time.Sleep(320 * time.Second)
+
 	cancel()
 	go f.stop()
 	<-done
@@ -200,7 +202,7 @@ func (f *testFramework) start() {
 
 		amt := abi.NewTokenAmount(1e18)
 		_ = sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
-		log.Info("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
+		log.Infof("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
 		wg.Done()
 	}()
 	wg.Wait()
@@ -250,6 +252,7 @@ func (f *testFramework) start() {
 	cfg.Wallets.Miner = "t01000" // mi.Owner.String()
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
+	cfg.Dealmaking.PublishMsgPeriod = config.Duration(time.Second * 1)
 
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
