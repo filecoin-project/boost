@@ -39,6 +39,12 @@ func (s *Server) Serve(ctx context.Context) error {
 	sdirectory := "react/build/static"
 	http.Handle(spath, http.StripPrefix(spath, http.FileServer(http.Dir(sdirectory))))
 
+	// Serve dummy deals
+	err := serveDummyDeals()
+	if err != nil {
+		return err
+	}
+
 	// Graphiql handler (GUI for making graphql queries)
 	http.HandleFunc("/graphiql", graphiql(httpPort))
 
