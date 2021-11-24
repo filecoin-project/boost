@@ -12,6 +12,7 @@ import (
 type acceptDealReq struct {
 	rsp  chan acceptDealResp
 	deal *types.ProviderDealState
+	dh   *dealHandler
 }
 
 type acceptDealResp struct {
@@ -27,6 +28,7 @@ type failedDealReq struct {
 
 type restartReq struct {
 	deal *types.ProviderDealState
+	dh   *dealHandler
 }
 
 func (p *Provider) loop() {
@@ -44,7 +46,7 @@ func (p *Provider) loop() {
 			go func() {
 				defer p.wg.Done()
 
-				p.doDeal(restartReq.deal)
+				p.doDeal(restartReq.deal, restartReq.dh)
 			}()
 			log.Infow("restarted deal", "id", restartReq.deal.DealUuid)
 
@@ -92,7 +94,7 @@ func (p *Provider) loop() {
 			go func() {
 				defer p.wg.Done()
 
-				p.doDeal(deal)
+				p.doDeal(deal, dealReq.dh)
 			}()
 
 			go writeDealResp(true, nil, nil)

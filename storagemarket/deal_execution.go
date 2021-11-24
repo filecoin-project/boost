@@ -2,6 +2,7 @@ package storagemarket
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -27,32 +28,14 @@ import (
 	"github.com/libp2p/go-libp2p-core/event"
 )
 
-func (p *Provider) doDeal(deal *types.ProviderDealState) {
+func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	// Set up pubsub for deal updates
-	bus := eventbus.NewBus()
-	pub, err := bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
+	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
 	if err != nil {
 		err := fmt.Errorf("failed to create event emitter: %w", err)
 		p.failDeal(pub, deal, err)
 		return
 	}
-
-	// Create a context that can be cancelled for this deal if the user wants
-	// to cancel the deal early
-	ctx, stop := context.WithCancel(p.ctx)
-	defer stop()
-
-	stopped := make(chan struct{})
-	defer close(stopped)
-
-	// Keep track of the fields to subscribe to or cancel the deal
-	p.dealHandlers.track(&dealHandler{
-		dealUuid: deal.DealUuid,
-		ctx:      ctx,
-		stop:     stop,
-		stopped:  stopped,
-		bus:      bus,
-	})
 
 	// build in-memory state
 	fi, err := os.Stat(deal.InboundFilePath)
@@ -64,12 +47,12 @@ func (p *Provider) doDeal(deal *types.ProviderDealState) {
 	deal.NBytesReceived = fi.Size()
 
 	// Execute the deal synchronously
-	if err := p.execDeal(ctx, pub, deal); err != nil {
+	if err := p.execDeal(pub, deal, dh); err != nil {
 		p.failDeal(pub, deal, err)
 	}
 }
 
-func (p *Provider) execDeal(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
+func (p *Provider) execDeal(pub event.Emitter, deal *types.ProviderDealState, dh *dealHandler) error {
 	// publish "new deal" event
 	p.fireEventDealNew(deal)
 
@@ -80,21 +63,32 @@ func (p *Provider) execDeal(ctx context.Context, pub event.Emitter, deal *types.
 
 	// Transfer Data
 	if deal.Checkpoint < dealcheckpoints.Transferred {
-		if err := p.transferAndVerify(ctx, pub, deal); err != nil {
+		if err := p.transferAndVerify(dh.transferCtx, pub, deal); err != nil {
+			dh.transferWriteOnce.Do(func() {
+				dh.transferredCancelled <- transferCancelResp{}
+				close(dh.transferredCancelled)
+			})
+
 			return fmt.Errorf("failed data transfer: %w", err)
 		}
 	}
 
+	// announce that transfer can't be cancelled anymore as transfer has already completed.
+	dh.transferWriteOnce.Do(func() {
+		dh.transferredCancelled <- transferCancelResp{err: errors.New("transfer already complete")}
+		close(dh.transferredCancelled)
+	})
+
 	// Publish
 	if deal.Checkpoint <= dealcheckpoints.Published {
-		if err := p.publishDeal(ctx, pub, deal); err != nil {
+		if err := p.publishDeal(dh.ctx, pub, deal); err != nil {
 			return fmt.Errorf("failed to publish deal: %w", err)
 		}
 	}
 
 	// AddPiece
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
-		if err := p.addPiece(ctx, pub, deal); err != nil {
+		if err := p.addPiece(dh.ctx, pub, deal); err != nil {
 			return fmt.Errorf("failed to add piece: %w", err)
 		}
 	}
@@ -340,10 +334,9 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 
 func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 	_ = os.Remove(deal.InboundFilePath)
+	p.cleanupDealHandler(deal.DealUuid)
 	// ...
 	//cleanup resources here
-
-	p.dealHandlers.del(deal.DealUuid)
 }
 
 func (p *Provider) fireEventDealNew(deal *types.ProviderDealState) {

@@ -211,6 +211,7 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealResolver, error) {
 	return c, nil
 }
 
+// TODO Rename this to CancelDealTransfer -> UI should only show the button if transfer hasn't completed.
 // mutation: dealCancel(id): ID
 func (r *resolver) DealCancel(ctx context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
 	dealUuid, err := toUuid(args.ID)
@@ -218,7 +219,7 @@ func (r *resolver) DealCancel(ctx context.Context, args struct{ ID graphql.ID })
 		return args.ID, err
 	}
 
-	err = r.provider.CancelDeal(ctx, dealUuid)
+	err = r.provider.CancelDealTransfer(ctx, dealUuid)
 	return args.ID, err
 }
 
