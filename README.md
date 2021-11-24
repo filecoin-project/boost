@@ -38,9 +38,7 @@ rm -rf ~/.lotus ~/.lotusminer
 2. Create Boost repository
 
 ```
-export `lotus auth api-info --perm=admin`
-# export FULLNODE_API_INFO=token:/ip4/127.0.0.1/tcp/1234/http
-
+`lotus auth api-info --perm=admin` \
 boost --vv init \
       --api-sector-index=`lotus-miner auth api-info --perm=admin` \
       --wallet-publish-storage-deals=`lotus wallet new bls` \
@@ -50,6 +48,7 @@ boost --vv init \
 3. Run Boost service
 
 ```
+`lotus auth api-info --perm=admin` \
 boost run
 ```
 
