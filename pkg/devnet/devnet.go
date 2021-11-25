@@ -43,7 +43,7 @@ func Run(ctx context.Context, tempHome string, done chan struct{}) {
 		cancel()
 	}
 
-	wg.Add(4)
+	wg.Add(3)
 	go func() {
 		runLotusDaemon(ctx, tempHome)
 		log.Debugw("shut down lotus daemon")
