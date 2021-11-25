@@ -90,7 +90,7 @@ func TestDummydeal(t *testing.T) {
 
 		// Miner is ready
 		log.Debugw("miner ready")
-		time.Sleep(2 * time.Second)
+		time.Sleep(5 * time.Second) // wait for AddPiece
 		break
 	}
 
@@ -119,6 +119,8 @@ func TestDummydeal(t *testing.T) {
 	require.NoError(t, err)
 
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
+
+	time.Sleep(3 * time.Second)
 
 	cancel()
 	go f.stop()
@@ -206,20 +208,16 @@ func (f *testFramework) start() {
 	require.NoError(f.t, err)
 
 	minerApiInfo := cliutil.ParseApiInfo(minerEndpoint)
-	//minerConnAddr := "ws://127.0.0.1:2345/rpc/v0" // TODO: parse this from minerEndpoint
-	//minerApi, closer, err := client.NewStorageMinerRPCV0(f.ctx, minerConnAddr, minerApiInfo.AuthHeader())
-	//require.NoError(f.t, err)
+	minerConnAddr := "ws://127.0.0.1:2345/rpc/v0"
+	minerApi, closer, err := client.NewStorageMinerRPCV0(f.ctx, minerConnAddr, minerApiInfo.AuthHeader())
+	require.NoError(f.t, err)
 
 	log.Debugw("minerApiInfo.Address", "addr", minerApiInfo.Addr)
 
-	// TODO: ActorAddress always returns "f01000" but it should be "t01000"
-	//minerAddr, err := minerApi.ActorAddress(f.ctx)
-	//require.NoError(f.t, err)
-	//
-	//log.Debugw("got miner actor addr", "addr", minerAddr)
-
-	minerAddr, err := address.NewFromString("t01000")
+	minerAddr, err := minerApi.ActorAddress(f.ctx)
 	require.NoError(f.t, err)
+
+	log.Debugw("got miner actor addr", "addr", minerAddr)
 
 	f.minerAddr = minerAddr
 
@@ -242,7 +240,7 @@ func (f *testFramework) start() {
 		f.t.Fatalf("invalid config from repo, got: %T", c)
 	}
 	cfg.SectorIndexApiInfo = minerEndpoint
-	cfg.Wallets.Miner = "t01000" // mi.Owner.String()
+	cfg.Wallets.Miner = minerAddr.String()
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
 	cfg.Dealmaking.PublishMsgPeriod = config.Duration(time.Second * 1)
