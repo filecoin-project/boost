@@ -2,33 +2,68 @@ package gql
 
 import (
 	"context"
+	"fmt"
+	"math/big"
 	"math/rand"
 	"time"
 
+	stbig "github.com/filecoin-project/go-state-types/big"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
 )
 
 type fundAmount struct {
-	Name     string
-	Capacity float64
+	Name   string
+	Amount float64
 }
 
 // query: funds: [FundAmount]
 func (r *resolver) Funds(ctx context.Context) ([]*fundAmount, error) {
-	// TODO: Get these values from funds manager
+	tagged, err := r.fundMgr.TotalTagged(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting total tagged: %w", err)
+	}
+
+	balMkt, err := r.fundMgr.BalanceMarket(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting market balance: %w", err)
+	}
+
+	balPubMsg, err := r.fundMgr.BalancePublishMsg(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting publish message balance: %w", err)
+	}
+
+	balCollateral, err := r.fundMgr.BalancePledgeCollateral(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting pledge collateral balance: %w", err)
+	}
+
+	escrowTagged, _ := new(big.Float).SetInt(tagged.Collateral.Int).Float64()
+	pubMsgTagged, _ := new(big.Float).SetInt(tagged.PubMsg.Int).Float64()
+	escrowAvail, _ := new(big.Float).SetInt(balMkt.Available.Int).Float64()
+	escrowLocked, _ := new(big.Float).SetInt(balMkt.Locked.Int).Float64()
+	pubMsgBalance, _ := new(big.Float).SetInt(balPubMsg.Int).Float64()
+	collateralBalance, _ := new(big.Float).SetInt(balCollateral.Int).Float64()
+
 	return []*fundAmount{{
-		Name:     "Available (Deal escrow)",
-		Capacity: 5 * 1024 * 1024,
+		Name:   "escrow-available",
+		Amount: escrowAvail,
 	}, {
-		Name:     "Available (Publish message)",
-		Capacity: 6 * 1024 * 1024,
+		Name:   "escrow-locked",
+		Amount: escrowLocked,
 	}, {
-		Name:     "Reserved for ongoing deals",
-		Capacity: 2 * 1024 * 1024,
+		Name:   "escrow-tagged",
+		Amount: escrowTagged,
 	}, {
-		Name:     "Locked for ongoing deals",
-		Capacity: 3 * 1024 * 1024,
+		Name:   "collateral-balance",
+		Amount: collateralBalance,
+	}, {
+		Name:   "publish-message-balance",
+		Amount: pubMsgBalance,
+	}, {
+		Name:   "publish-message-tagged",
+		Amount: pubMsgTagged,
 	}}, nil
 }
 
@@ -76,4 +111,12 @@ func (r *resolver) FundsLogs(ctx context.Context) (*fundsLogList, error) {
 
 func (r *fundsLogList) Logs(ctx context.Context) ([]*fundsLogResolver, error) {
 	return fundLogs, nil
+}
+
+// mutation: moveFundsToEscrow(amount): Boolean
+func (r *resolver) FundsMoveToEscrow(ctx context.Context, args struct{ Amount float64 }) (bool, error) {
+	amt := new(big.Int)
+	new(big.Float).SetFloat64(args.Amount).Int(amt)
+	_, err := r.fundMgr.MoveFundsToEscrow(ctx, stbig.Int{Int: amt})
+	return true, err
 }

@@ -43,7 +43,7 @@ type Storage {
 
 type FundAmount {
   Name: String!
-  Capacity: Float!
+  Amount: Float!
 }
 
 type FundsLogList {
@@ -92,6 +92,9 @@ type RootMutation {
 
   """Publish all pending deals now"""
   dealPublishNow: Boolean!
+
+  """Top-up the available pledge collateral in escrow for deal publishing"""
+  fundsMoveToEscrow(amount: Float!): Boolean!
 }
 
 type RootSubscription {

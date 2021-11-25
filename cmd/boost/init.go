@@ -71,6 +71,17 @@ var initCmd = &cli.Command{
 		}
 		defer closer()
 
+		smApi, smCloser, err := lcli.GetStorageMinerAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer smCloser()
+
+		minerActor, err := smApi.ActorAddress(ctx)
+		if err != nil {
+			return xerrors.Errorf("getting miner actor address: %w", err)
+		}
+
 		log.Debug("Checking full node sync status")
 
 		if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false); err != nil {
@@ -129,7 +140,8 @@ var initCmd = &cli.Command{
 				}
 				rcfg.SectorIndexApiInfo = ai
 
-				rcfg.Wallets.Miner = walletCP.String()
+				rcfg.Wallets.Miner = minerActor.String()
+				rcfg.Wallets.PledgeCollateral = walletCP.String()
 				rcfg.Wallets.PublishStorageDeals = walletPSD.String()
 			})
 			if cerr != nil {

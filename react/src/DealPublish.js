@@ -24,7 +24,7 @@ export function DealPublishPage(props) {
         {deals.length ? (
             <>
             <div className="buttons">
-                <div className="button cancel" onClick={publishNow}>Publish Now</div>
+                <div className="button" onClick={publishNow}>Publish Now</div>
             </div>
 
             <p>

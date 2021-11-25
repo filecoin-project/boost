@@ -356,6 +356,10 @@ func ConfigBoost(c interface{}) Option {
 		return Error(xerrors.New("retrieval pricing policy must be either default or external"))
 	}
 
+	walletPledgeCollat, err := address.NewFromString(cfg.Wallets.PledgeCollateral)
+	if err != nil {
+		return Error(fmt.Errorf("failed to parse cfg.Wallets.PledgeCollateral: %s; err: %w", cfg.Wallets.PledgeCollateral, err))
+	}
 	walletPSD, err := address.NewFromString(cfg.Wallets.PublishStorageDeals)
 	if err != nil {
 		return Error(fmt.Errorf("failed to parse cfg.Wallets.PublishStorageDeals: %s; err: %w", cfg.Wallets.PublishStorageDeals, err))
@@ -385,7 +389,8 @@ func ConfigBoost(c interface{}) Option {
 		})),
 
 		Override(new(*fundmanager.FundManager), fundmanager.New(fundmanager.Config{
-			EscrowWallet: walletMiner,
+			StorageMiner: walletMiner,
+			CollatWallet: walletPledgeCollat,
 			PubMsgWallet: walletPSD,
 			PubMsgBalMin: abi.NewTokenAmount(1000), // TODO: add to node config
 		})),

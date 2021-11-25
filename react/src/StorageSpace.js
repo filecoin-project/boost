@@ -13,5 +13,5 @@ export function StorageSpacePage(props) {
         return <div>Error: {error.message}</div>
     }
 
-    return <BarChart fields={data.storage}/>
+    return <BarChart fields={data.storage} unit="bytes" />
 }
