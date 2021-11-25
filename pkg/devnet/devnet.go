@@ -3,6 +3,7 @@ package devnet
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,8 +16,10 @@ import (
 
 var log = logging.Logger("devnet")
 
-func Run(ctx context.Context, done chan struct{}) {
+func Run(ctx context.Context, tempHome string, done chan struct{}) {
 	var wg sync.WaitGroup
+
+	log.Debugw("using temp home dir", "dir", tempHome)
 
 	// The parameter files can be as large as 1GiB.
 	// If this is the first time lotus runs,
@@ -31,7 +34,7 @@ func Run(ctx context.Context, done chan struct{}) {
 
 		log.Debugw("lotus fetch-params 8388608")
 		cmd := exec.CommandContext(ctx, "lotus", "fetch-params", "8338608")
-		cmd.Env = append(os.Environ(), "GOLOG_LOG_LEVEL=error")
+		cmd.Env = []string{fmt.Sprintf("HOME=%s", tempHome), "GOLOG_LOG_LEVEL=error"}
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
@@ -40,40 +43,36 @@ func Run(ctx context.Context, done chan struct{}) {
 		cancel()
 	}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	wg.Add(4)
+	wg.Add(3)
 	go func() {
-		runLotusDaemon(ctx, home)
+		runLotusDaemon(ctx, tempHome)
 		log.Debugw("shut down lotus daemon")
 		wg.Done()
 	}()
 
 	go func() {
-		runLotusMiner(ctx, home)
+		runLotusMiner(ctx, tempHome)
 		log.Debugw("shut down lotus miner")
 		wg.Done()
 	}()
 
 	go func() {
-		publishDealsPeriodicallyCmd(ctx)
+		publishDealsPeriodicallyCmd(ctx, tempHome)
 		wg.Done()
 	}()
 
-	go func() {
-		setDefaultWalletCmd(ctx)
-		wg.Done()
-	}()
+	//TODO: Fix setDefaultWalletCmd to work with a temporary $HOME
+	//go func() {
+	//setDefaultWalletCmd(ctx, tempHome)
+	//wg.Done()
+	//}()
 
 	wg.Wait()
 
 	done <- struct{}{}
 }
 
-func runCmdsWithLog(ctx context.Context, name string, commands [][]string) {
+func runCmdsWithLog(ctx context.Context, name string, commands [][]string, homeDir string) {
 	logFile, err := os.Create(name + ".log")
 	if err != nil {
 		log.Fatal(err)
@@ -85,6 +84,7 @@ func runCmdsWithLog(ctx context.Context, name string, commands [][]string) {
 		cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 		cmd.Stdout = logFile
 		cmd.Stderr = logFile
+		cmd.Env = []string{fmt.Sprintf("HOME=%s", homeDir)}
 		// If ctx.Err()!=nil, we cancelled the command via SIGINT.
 		if err := cmd.Run(); err != nil && ctx.Err() == nil {
 			log.Errorw("check logfile for details", "err", err, "logfile", logFile.Name())
@@ -103,7 +103,7 @@ func runLotusDaemon(ctx context.Context, home string) {
 			"--genesis-template=localnet.json", "--bootstrap=false"},
 	}
 
-	runCmdsWithLog(ctx, "lotus-daemon", cmds)
+	runCmdsWithLog(ctx, "lotus-daemon", cmds, home)
 }
 
 func runLotusMiner(ctx context.Context, home string) {
@@ -131,10 +131,10 @@ func runLotusMiner(ctx context.Context, home string) {
 		{"lotus-miner", "run", "--nosync"},
 	}
 
-	runCmdsWithLog(ctx, "lotus-miner", cmds)
+	runCmdsWithLog(ctx, "lotus-miner", cmds, home)
 }
 
-func publishDealsPeriodicallyCmd(ctx context.Context) {
+func publishDealsPeriodicallyCmd(ctx context.Context, homeDir string) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -144,37 +144,39 @@ func publishDealsPeriodicallyCmd(ctx context.Context) {
 
 		cmd := exec.CommandContext(ctx, "lotus-miner",
 			"storage-deals", "pending-publish", "--publish-now")
+		cmd.Env = []string{fmt.Sprintf("HOME=%s", homeDir)}
 		_ = cmd.Run() // we ignore errors
 	}
 }
 
-func setDefaultWalletCmd(ctx context.Context) {
-	// TODO: do this without a shell
-	setDefaultWalletCmd := "lotus wallet list | grep t3 | awk '{print $1}' | xargs lotus wallet set-default"
+//func setDefaultWalletCmd(ctx context.Context, _ string) {
+//// TODO: do this without a shell
+//setDefaultWalletCmd := "lotus wallet list | grep t3 | awk '{print $1}' | xargs lotus wallet set-default"
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(5 * time.Second):
-		}
+//for {
+//select {
+//case <-ctx.Done():
+//return
+//case <-time.After(5 * time.Second):
+//}
 
-		cmd := exec.CommandContext(ctx, "sh", "-c", setDefaultWalletCmd)
-		_, err := cmd.CombinedOutput()
-		if err != nil {
-			continue
-		}
-		// TODO: stop once we've set the default wallet once.
-	}
-}
+//cmd := exec.CommandContext(ctx, "sh", "-c", setDefaultWalletCmd)
+//_, err := cmd.CombinedOutput()
+//if err != nil {
+//continue
+//}
+//// TODO: stop once we've set the default wallet once.
+//}
+//}
 
-func GetMinerEndpoint(ctx context.Context) (string, error) {
+func GetMinerEndpoint(ctx context.Context, homedir string) (string, error) {
 	cmdArgs := []string{"lotus-miner", "auth", "api-info", "--perm=admin"}
 
 	var out bytes.Buffer
 
 	log.Debugw("getting auth token", "command", strings.Join(cmdArgs, " "))
 	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
+	cmd.Env = []string{fmt.Sprintf("HOME=%s", homedir)}
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 	if err := cmd.Run(); err != nil {
@@ -187,13 +189,14 @@ func GetMinerEndpoint(ctx context.Context) (string, error) {
 	return ai, nil
 }
 
-func GetFullnodeEndpoint(ctx context.Context) (string, error) {
+func GetFullnodeEndpoint(ctx context.Context, homedir string) (string, error) {
 	cmdArgs := []string{"lotus", "auth", "api-info", "--perm=admin"}
 
 	var out bytes.Buffer
 
 	log.Debugw("getting auth token", "command", strings.Join(cmdArgs, " "))
 	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
+	cmd.Env = []string{fmt.Sprintf("HOME=%s", homedir)}
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 	if err := cmd.Run(); err != nil {

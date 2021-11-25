@@ -20,8 +20,13 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+
 	done := make(chan struct{})
-	go devnet.Run(ctx, done)
+	go devnet.Run(ctx, home, done)
 
 	// setup a signal handler to cancel the context
 	interrupt := make(chan os.Signal, 1)
