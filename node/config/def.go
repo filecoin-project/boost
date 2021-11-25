@@ -69,7 +69,7 @@ func DefaultBoost() *Boost {
 			// TODO: It'd be nice to set this based on sector size
 			MaxDealStartDelay:               Duration(time.Hour * 24 * 14),
 			ExpectedSealDuration:            Duration(time.Hour * 24),
-			PublishMsgPeriod:                Duration(time.Second * 20),
+			PublishMsgPeriod:                Duration(time.Second * 10),
 			PublishMsgMaxDealsPerMsg:        8,
 			PublishMsgMaxFee:                types.MustParseFIL("0.05"),
 			MaxProviderCollateralMultiplier: 2,

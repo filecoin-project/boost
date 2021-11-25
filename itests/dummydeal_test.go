@@ -98,20 +98,20 @@ func TestDummydeal(t *testing.T) {
 	f.start()
 
 	// Create a CAR file
-	file, err := testutil.CreateRandomFile(5, 2000000)
+	randomFilepath, err := testutil.CreateRandomFile(5, 2000000)
 	require.NoError(t, err)
 
-	root, carV2Path := shared_testutil.CreateDenseCARv2(t, file)
+	rootCid, carFilepath := shared_testutil.CreateDenseCARv2(t, randomFilepath)
 
 	// Start a web server to serve the file
-	server, err := runWebServer(carV2Path)
+	server, err := runWebServer(carFilepath)
 	require.NoError(t, err)
 	defer server.Close()
 
 	// Create a new dummy deal
 	dealUuid := uuid.New()
 
-	res, err := f.makeDummyDeal(dealUuid, carV2Path, root, server.URL)
+	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL)
 	require.NoError(t, err)
 
 	// Wait for the deal to reach the Published state
@@ -119,8 +119,6 @@ func TestDummydeal(t *testing.T) {
 	require.NoError(t, err)
 
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
-
-	time.Sleep(3200 * time.Second)
 
 	cancel()
 	go f.stop()
@@ -311,7 +309,7 @@ func (f *testFramework) start() {
 }
 
 func (f *testFramework) waitForPublished(dealUuid uuid.UUID) error {
-	publishCtx, cancel := context.WithTimeout(f.ctx, 10*time.Second)
+	publishCtx, cancel := context.WithTimeout(f.ctx, 300*time.Second)
 	defer cancel()
 
 	for {
@@ -329,7 +327,7 @@ func (f *testFramework) waitForPublished(dealUuid uuid.UUID) error {
 			switch {
 			case deal.Checkpoint == dealcheckpoints.Complete:
 				return nil
-			case deal.Checkpoint == dealcheckpoints.Published:
+			case deal.Checkpoint == dealcheckpoints.PublishConfirmed:
 				return nil
 			}
 		}
@@ -356,8 +354,8 @@ func runWebServer(path string) (*httptest.Server, error) {
 	return svr, nil
 }
 
-func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFile string, carFileRoot cid.Cid, url string) (*api.ProviderDealRejectionInfo, error) {
-	cidAndSize, err := storagemarket.GenerateCommP(carFile)
+func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string) (*api.ProviderDealRejectionInfo, error) {
+	cidAndSize, err := storagemarket.GenerateCommP(carFilepath)
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +366,7 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFile string, carFil
 		VerifiedDeal:         false,
 		Client:               f.clientAddr,
 		Provider:             f.minerAddr,
-		Label:                carFileRoot.String(),
+		Label:                rootCid.String(),
 		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
 		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
@@ -431,7 +429,7 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFile string, carFil
 
 	// Save the path to the CAR file as a transfer parameter
 	transferParams := &types2.HttpRequest{URL: url}
-	paramsBytes, err := json.Marshal(transferParams)
+	transferParamsJSON, err := json.Marshal(transferParams)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +439,7 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFile string, carFil
 		return nil, err
 	}
 
-	info, err := os.Stat(carFile)
+	carFileinfo, err := os.Stat(carFilepath)
 	if err != nil {
 		return nil, err
 	}
@@ -451,11 +449,11 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFile string, carFil
 		MinerPeerID:        peerID,
 		ClientPeerID:       peerID,
 		ClientDealProposal: *signedProposal,
-		DealDataRoot:       carFileRoot,
+		DealDataRoot:       rootCid,
 		Transfer: types.Transfer{
 			Type:   "http",
-			Params: paramsBytes,
-			Size:   uint64(info.Size()),
+			Params: transferParamsJSON,
+			Size:   uint64(carFileinfo.Size()),
 		},
 	}
 

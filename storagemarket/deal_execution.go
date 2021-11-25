@@ -167,6 +167,7 @@ func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.
 	}
 }
 
+// GenerateCommP
 func GenerateCommP(filepath string) (cidAndSize *writer.DataCIDSize, finalErr error) {
 	rd, err := carv2.OpenReader(filepath)
 	if err != nil {
