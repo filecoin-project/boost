@@ -13,46 +13,39 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ipfs/go-cid"
-	"golang.org/x/sync/errgroup"
-
-	cborutil "github.com/filecoin-project/go-cbor-util"
-
-	lapi "github.com/filecoin-project/lotus/api"
-
-	"github.com/filecoin-project/lotus/chain/actors"
-	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
-	chaintypes "github.com/filecoin-project/lotus/chain/types"
-	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
-
-	"github.com/filecoin-project/boost/storagemarket"
-	"golang.org/x/xerrors"
-
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-
-	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/boost/testutil"
-	types2 "github.com/filecoin-project/boost/transport/types"
-	"github.com/filecoin-project/boost/util"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
-	"github.com/google/uuid"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api"
+	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/pkg/devnet"
+	"github.com/filecoin-project/boost/storagemarket"
+	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boost/testutil"
+	types2 "github.com/filecoin-project/boost/transport/types"
+	"github.com/filecoin-project/go-address"
+	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-fil-markets/shared_testutil"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
+	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
-
-	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	chaintypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/specs-actors/actors/builtin/market"
+	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
+
+	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/xerrors"
 )
 
 var log = logging.Logger("boosttest")
@@ -97,7 +90,7 @@ func TestDummydeal(t *testing.T) {
 
 		// Miner is ready
 		log.Debugw("miner ready")
-		time.Sleep(2 * time.Second)
+		time.Sleep(5 * time.Second) // wait for AddPiece
 		break
 	}
 
@@ -105,18 +98,20 @@ func TestDummydeal(t *testing.T) {
 	f.start()
 
 	// Create a CAR file
-	carRes, err := testutil.CreateRandomCARv1(5, 1600)
+	randomFilepath, err := testutil.CreateRandomFile(5, 2000000)
 	require.NoError(t, err)
 
+	rootCid, carFilepath := shared_testutil.CreateDenseCARv2(t, randomFilepath)
+
 	// Start a web server to serve the file
-	server, err := runWebServer(carRes.CarFile)
+	server, err := runWebServer(carFilepath)
 	require.NoError(t, err)
 	defer server.Close()
 
 	// Create a new dummy deal
 	dealUuid := uuid.New()
 
-	res, err := f.makeDummyDeal(dealUuid, carRes, server.URL)
+	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL)
 	require.NoError(t, err)
 
 	// Wait for the deal to reach the Published state
@@ -124,6 +119,8 @@ func TestDummydeal(t *testing.T) {
 	require.NoError(t, err)
 
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
+
+	time.Sleep(3 * time.Second)
 
 	cancel()
 	go f.stop()
@@ -172,7 +169,7 @@ func (f *testFramework) start() {
 	bal, err := fullnodeApi.WalletBalance(f.ctx, defaultWallet)
 	require.NoError(f.t, err)
 
-	log.Infof("default wallet has %d attoFIL", bal)
+	log.Infof("default wallet %s has %d attoFIL", defaultWallet, bal)
 
 	// Create a wallet for the client with some funds
 	var wg sync.WaitGroup
@@ -200,7 +197,7 @@ func (f *testFramework) start() {
 
 		amt := abi.NewTokenAmount(1e18)
 		_ = sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
-		log.Info("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
+		log.Infof("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
 		wg.Done()
 	}()
 	wg.Wait()
@@ -211,20 +208,16 @@ func (f *testFramework) start() {
 	require.NoError(f.t, err)
 
 	minerApiInfo := cliutil.ParseApiInfo(minerEndpoint)
-	//minerConnAddr := "ws://127.0.0.1:2345/rpc/v0" // TODO: parse this from minerEndpoint
-	//minerApi, closer, err := client.NewStorageMinerRPCV0(f.ctx, minerConnAddr, minerApiInfo.AuthHeader())
-	//require.NoError(f.t, err)
+	minerConnAddr := "ws://127.0.0.1:2345/rpc/v0"
+	minerApi, closer, err := client.NewStorageMinerRPCV0(f.ctx, minerConnAddr, minerApiInfo.AuthHeader())
+	require.NoError(f.t, err)
 
 	log.Debugw("minerApiInfo.Address", "addr", minerApiInfo.Addr)
 
-	// TODO: ActorAddress always returns "f01000" but it should be "t01000"
-	//minerAddr, err := minerApi.ActorAddress(f.ctx)
-	//require.NoError(f.t, err)
-	//
-	//log.Debugw("got miner actor addr", "addr", minerAddr)
-
-	minerAddr, err := address.NewFromString("t01000")
+	minerAddr, err := minerApi.ActorAddress(f.ctx)
 	require.NoError(f.t, err)
+
+	log.Debugw("got miner actor addr", "addr", minerAddr)
 
 	f.minerAddr = minerAddr
 
@@ -247,9 +240,10 @@ func (f *testFramework) start() {
 		f.t.Fatalf("invalid config from repo, got: %T", c)
 	}
 	cfg.SectorIndexApiInfo = minerEndpoint
-	cfg.Wallets.Miner = "t01000" // mi.Owner.String()
+	cfg.Wallets.Miner = minerAddr.String()
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
+	cfg.Dealmaking.PublishMsgPeriod = config.Duration(time.Second * 1)
 
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
@@ -313,7 +307,7 @@ func (f *testFramework) start() {
 }
 
 func (f *testFramework) waitForPublished(dealUuid uuid.UUID) error {
-	publishCtx, cancel := context.WithTimeout(f.ctx, 10*time.Second)
+	publishCtx, cancel := context.WithTimeout(f.ctx, 300*time.Second)
 	defer cancel()
 
 	for {
@@ -331,7 +325,7 @@ func (f *testFramework) waitForPublished(dealUuid uuid.UUID) error {
 			switch {
 			case deal.Checkpoint == dealcheckpoints.Complete:
 				return nil
-			case deal.Checkpoint == dealcheckpoints.Published:
+			case deal.Checkpoint == dealcheckpoints.PublishConfirmed:
 				return nil
 			}
 		}
@@ -358,19 +352,19 @@ func runWebServer(path string) (*httptest.Server, error) {
 	return svr, nil
 }
 
-func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carRes *testutil.CarRes, url string) (*api.ProviderDealRejectionInfo, error) {
-	pieceCid, pieceSize, err := util.CommP(f.ctx, carRes.Blockstore, carRes.Root)
+func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string) (*api.ProviderDealRejectionInfo, error) {
+	cidAndSize, err := storagemarket.GenerateCommP(carFilepath)
 	if err != nil {
 		return nil, err
 	}
 
 	proposal := market.DealProposal{
-		PieceCID:             pieceCid,
-		PieceSize:            pieceSize.Padded(),
+		PieceCID:             cidAndSize.PieceCID,
+		PieceSize:            cidAndSize.PieceSize,
 		VerifiedDeal:         false,
 		Client:               f.clientAddr,
 		Provider:             f.minerAddr,
-		Label:                carRes.Root.String(),
+		Label:                rootCid.String(),
 		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
 		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
@@ -433,7 +427,7 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carRes *testutil.CarRe
 
 	// Save the path to the CAR file as a transfer parameter
 	transferParams := &types2.HttpRequest{URL: url}
-	paramsBytes, err := json.Marshal(transferParams)
+	transferParamsJSON, err := json.Marshal(transferParams)
 	if err != nil {
 		return nil, err
 	}
@@ -443,16 +437,21 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carRes *testutil.CarRe
 		return nil, err
 	}
 
+	carFileinfo, err := os.Stat(carFilepath)
+	if err != nil {
+		return nil, err
+	}
+
 	dealParams := &types.ClientDealParams{
 		DealUuid:           dealUuid,
 		MinerPeerID:        peerID,
 		ClientPeerID:       peerID,
 		ClientDealProposal: *signedProposal,
-		DealDataRoot:       carRes.Root,
+		DealDataRoot:       rootCid,
 		Transfer: types.Transfer{
 			Type:   "http",
-			Params: paramsBytes,
-			Size:   carRes.CarSize,
+			Params: transferParamsJSON,
+			Size:   uint64(carFileinfo.Size()),
 		},
 	}
 

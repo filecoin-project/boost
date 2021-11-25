@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/boost/transport/httptransport"
 
@@ -66,7 +67,7 @@ type Provider struct {
 	dealHandlers *dealHandlers
 }
 
-func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address) (*Provider, error) {
+func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address, secb *sectorblocks.SectorBlocks) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -98,6 +99,7 @@ func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNod
 		dealPublisher: dealPublisher,
 		adapter: &Adapter{
 			FullNode: fullnodeApi,
+			secb:     secb,
 		},
 
 		dealHandlers: newDealHandlers(),

@@ -36,7 +36,30 @@ type CarRes struct {
 	CarSize    uint64
 }
 
-// CreateRandomFile creates a  normal file with the provided seed and the
+// CreateRandomFile
+func CreateRandomFile(rseed, size int) (string, error) {
+	source := io.LimitReader(rand.New(rand.NewSource(int64(rseed))), int64(size))
+
+	file, err := os.CreateTemp("", "sourcefile.dat")
+	if err != nil {
+		return "", err
+	}
+
+	_, err = io.Copy(file, source)
+	if err != nil {
+		return "", err
+	}
+
+	//
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		return "", err
+	}
+
+	return file.Name(), nil
+}
+
+// CreateRandomCARv1 creates a  normal file with the provided seed and the
 // provided size and then transforms it to a CARv1 file and returns it.
 func CreateRandomCARv1(rseed, size int) (*CarRes, error) {
 	ctx := context.Background()

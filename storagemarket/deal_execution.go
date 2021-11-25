@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/transport"
+	"github.com/filecoin-project/go-state-types/abi"
 
 	"golang.org/x/xerrors"
 
@@ -130,7 +131,7 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 	p.addDealLog(deal.DealUuid, "Data transfer complete")
 
 	// Verify CommP matches
-	pieceCid, err := p.generatePieceCommitment(deal)
+	pieceCid, err := GeneratePieceCommitment(deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize)
 	if err != nil {
 		return fmt.Errorf("failed to generate CommP: %w", err)
 	}
@@ -166,19 +167,17 @@ func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.
 	}
 }
 
-// GeneratePieceCommitment generates the pieceCid for the CARv1 deal payload in
-// the CARv2 file that already exists at the given path.
-func (p *Provider) generatePieceCommitment(deal *types.ProviderDealState) (c cid.Cid, finalErr error) {
-	rd, err := carv2.OpenReader(deal.InboundFilePath)
+// GenerateCommP
+func GenerateCommP(filepath string) (cidAndSize *writer.DataCIDSize, finalErr error) {
+	rd, err := carv2.OpenReader(filepath)
 	if err != nil {
-		return cid.Undef, fmt.Errorf("failed to get CARv2 reader: %w", err)
+		return nil, fmt.Errorf("failed to get CARv2 reader: %w", err)
 	}
 
 	defer func() {
 		if err := rd.Close(); err != nil {
-
 			if finalErr == nil {
-				c = cid.Undef
+				cidAndSize = nil
 				finalErr = fmt.Errorf("failed to close CARv2 reader: %w", err)
 				return
 			}
@@ -190,7 +189,7 @@ func (p *Provider) generatePieceCommitment(deal *types.ProviderDealState) (c cid
 	//written, err := io.Copy(w, rd.DataReader())
 	_, err = io.Copy(w, rd.DataReader())
 	if err != nil {
-		return cid.Undef, fmt.Errorf("failed to write to CommP writer: %w", err)
+		return nil, fmt.Errorf("failed to write to CommP writer: %w", err)
 	}
 
 	// TODO: figure out why the CARv1 payload size is always 0
@@ -198,12 +197,23 @@ func (p *Provider) generatePieceCommitment(deal *types.ProviderDealState) (c cid
 	//	return cid.Undef, fmt.Errorf("number of bytes written to CommP writer %d not equal to the CARv1 payload size %d", written, rd.Header.DataSize)
 	//}
 
-	cidAndSize, err := w.Sum()
+	cidAndSize = &writer.DataCIDSize{}
+	*cidAndSize, err = w.Sum()
 	if err != nil {
-		return cid.Undef, fmt.Errorf("failed to get CommP: %w", err)
+		return nil, fmt.Errorf("failed to get CommP: %w", err)
 	}
 
-	dealSize := deal.ClientDealProposal.Proposal.PieceSize
+	return cidAndSize, nil
+}
+
+// GeneratePieceCommitment generates the pieceCid for the CARv1 deal payload in
+// the CARv2 file that already exists at the given path.
+func GeneratePieceCommitment(filepath string, dealSize abi.PaddedPieceSize) (c cid.Cid, finalErr error) {
+	cidAndSize, err := GenerateCommP(filepath)
+	if err != nil {
+		return cid.Undef, err
+	}
+
 	if cidAndSize.PieceSize < dealSize {
 		// need to pad up!
 		rawPaddedCommp, err := commp.PadCommP(

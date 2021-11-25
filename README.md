@@ -38,7 +38,7 @@ rm -rf ~/.lotus ~/.lotusminer
 2. Create Boost repository
 
 ```
-export FULLNODE_API_INFO=/ip4/127.0.0.1/tcp/1234/http
+`lotus auth api-info --perm=admin` \
 boost --vv init \
       --api-sector-index=`lotus-miner auth api-info --perm=admin` \
       --wallet-publish-storage-deals=`lotus wallet new bls` \
@@ -48,6 +48,7 @@ boost --vv init \
 3. Run Boost service
 
 ```
+`lotus auth api-info --perm=admin` \
 boost run
 ```
 
@@ -59,7 +60,6 @@ Note that
 - you can find the provider address in `~/.boost/config.toml` under the config key `Wallets.Miner`
 
 ```
-export FULLNODE_API_INFO=`lotus auth api-info --perm=admin`
 boost dummydeal <client address> <provider address>
 ```
 

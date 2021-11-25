@@ -17,6 +17,7 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/gql"
+	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/go-address"
 	dtimpl "github.com/filecoin-project/go-data-transfer/impl"
@@ -520,9 +521,9 @@ func NewStorageMarketDB(r repo.LockedRepo) (*db.DealsDB, error) {
 	return db.NewDealsDB(sqldb), nil
 }
 
-func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, db *db.DealsDB, dp *storagemarket.DealPublisher) (*storagemarket.Provider, error) {
-	return func(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, db *db.DealsDB, dp *storagemarket.DealPublisher) (*storagemarket.Provider, error) {
-		prov, err := storagemarket.NewProvider(r.Path(), db, a, dp, provAddr)
+func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, db *db.DealsDB, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks) (*storagemarket.Provider, error) {
+	return func(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, db *db.DealsDB, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks) (*storagemarket.Provider, error) {
+		prov, err := storagemarket.NewProvider(r.Path(), db, a, dp, provAddr, secb)
 		if err != nil {
 			return nil, err
 		}
