@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ipfs/go-cid"
+
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -30,7 +32,7 @@ func TestFundManager(t *testing.T) {
 		api: api,
 		db:  fundsDB,
 		cfg: Config{
-			EscrowWallet: address.TestAddress,
+			StorageMiner: address.TestAddress,
 			PubMsgWallet: address.TestAddress2,
 			PubMsgBalMin: abi.NewTokenAmount(10),
 		},
@@ -85,6 +87,10 @@ func TestFundManager(t *testing.T) {
 }
 
 type mockApi struct {
+}
+
+func (m mockApi) MarketAddBalance(ctx context.Context, wallet, addr address.Address, amt types.BigInt) (cid.Cid, error) {
+	return cid.Undef, nil
 }
 
 func (m mockApi) StateMarketBalance(ctx context.Context, addr address.Address, tsk types.TipSetKey) (lapi.MarketBalance, error) {

@@ -26,7 +26,10 @@ var oneFil = 1e18
 export function humanFIL(atto) {
     // 10^18
     if (atto > oneFil / 1000) {
-        return (atto / oneFil).toFixed(3) + ' FIL'
+        var res = (atto / oneFil).toFixed(3)
+        res = res.replace(/0+$/, '')
+        res = res.replace(/\.$/, '')
+        return res + ' FIL'
     }
     return atto + ' atto'
 }
