@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -65,8 +66,13 @@ func TestDummydeal(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	tempHome, err := ioutil.TempDir(os.TempDir(), "boost-devnet-")
+	if err != nil {
+		panic(err)
+	}
+
 	done := make(chan struct{})
-	go devnet.Run(ctx, done)
+	go devnet.Run(ctx, tempHome, done)
 
 	// Wait for the miner to start up by polling it
 	minerReadyCmd := "lotus-miner sectors list"
@@ -79,6 +85,7 @@ func TestDummydeal(t *testing.T) {
 		}
 
 		cmd := exec.CommandContext(ctx, "sh", "-c", minerReadyCmd)
+		cmd.Env = []string{fmt.Sprintf("HOME=%s", tempHome)}
 		_, err := cmd.CombinedOutput()
 		if err != nil {
 			// Still not ready
@@ -94,7 +101,7 @@ func TestDummydeal(t *testing.T) {
 		break
 	}
 
-	f := newTestFramework(ctx, t)
+	f := newTestFramework(ctx, t, tempHome)
 	f.start()
 
 	// Create a CAR file
@@ -128,9 +135,10 @@ func TestDummydeal(t *testing.T) {
 }
 
 type testFramework struct {
-	ctx  context.Context
-	t    *testing.T
-	stop func()
+	ctx     context.Context
+	t       *testing.T
+	homedir string
+	stop    func()
 
 	boost      api.Boost
 	fullNode   lapi.FullNode
@@ -138,10 +146,11 @@ type testFramework struct {
 	minerAddr  address.Address
 }
 
-func newTestFramework(ctx context.Context, t *testing.T) *testFramework {
+func newTestFramework(ctx context.Context, t *testing.T, homedir string) *testFramework {
 	return &testFramework{
-		ctx: ctx,
-		t:   t,
+		ctx:     ctx,
+		t:       t,
+		homedir: homedir,
 	}
 }
 
@@ -149,7 +158,7 @@ func (f *testFramework) start() {
 	addr := "ws://127.0.0.1:1234/rpc/v1"
 
 	// Get a FullNode API
-	fullnodeApiString, err := devnet.GetFullnodeEndpoint(f.ctx)
+	fullnodeApiString, err := devnet.GetFullnodeEndpoint(f.ctx, f.homedir)
 	require.NoError(f.t, err)
 
 	apiinfo := cliutil.ParseApiInfo(fullnodeApiString)
@@ -162,7 +171,14 @@ func (f *testFramework) start() {
 	err = fullnodeApi.LogSetLevel(f.ctx, "actors", "DEBUG")
 	require.NoError(f.t, err)
 
-	// Get the default wallet from the devnet daemon
+	wallets, err := fullnodeApi.WalletList(f.ctx)
+	require.NoError(f.t, err)
+
+	// Set the default wallet for the devnet daemon
+	err = fullnodeApi.WalletSetDefault(f.ctx, wallets[0])
+	require.NoError(f.t, err)
+
+	// Make sure that default wallet has been setup successfully
 	defaultWallet, err := fullnodeApi.WalletDefaultAddress(f.ctx)
 	require.NoError(f.t, err)
 
@@ -204,7 +220,7 @@ func (f *testFramework) start() {
 
 	f.clientAddr = clientAddr
 
-	minerEndpoint, err := devnet.GetMinerEndpoint(f.ctx)
+	minerEndpoint, err := devnet.GetMinerEndpoint(f.ctx, f.homedir)
 	require.NoError(f.t, err)
 
 	minerApiInfo := cliutil.ParseApiInfo(minerEndpoint)
