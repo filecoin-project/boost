@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -66,10 +65,7 @@ func TestDummydeal(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tempHome, err := ioutil.TempDir(os.TempDir(), "boost-devnet-")
-	if err != nil {
-		panic(err)
-	}
+	tempHome := t.TempDir()
 
 	done := make(chan struct{})
 	go devnet.Run(ctx, tempHome, done)
