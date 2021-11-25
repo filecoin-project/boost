@@ -29,8 +29,8 @@ func Run(ctx context.Context, done chan struct{}) {
 		// Ten minutes should be enough for practically any machine.
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 
-		log.Debugw("lotus fetch-params 2048")
-		cmd := exec.CommandContext(ctx, "lotus", "fetch-params", "2048")
+		log.Debugw("lotus fetch-params 8388608")
+		cmd := exec.CommandContext(ctx, "lotus", "fetch-params", "8338608")
 		cmd.Env = append(os.Environ(), "GOLOG_LOG_LEVEL=error")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -96,7 +96,7 @@ func runCmdsWithLog(ctx context.Context, name string, commands [][]string) {
 func runLotusDaemon(ctx context.Context, home string) {
 	cmds := [][]string{
 		{"lotus-seed", "genesis", "new", "localnet.json"},
-		{"lotus-seed", "pre-seal", "--sector-size=2048", "--num-sectors=4"},
+		{"lotus-seed", "pre-seal", "--sector-size=8388608", "--num-sectors=4"},
 		{"lotus-seed", "genesis", "add-miner", "localnet.json",
 			filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.json")},
 		{"lotus", "daemon", "--lotus-make-genesis=dev.gen",
@@ -112,7 +112,7 @@ func runLotusMiner(ctx context.Context, home string) {
 
 		{"lotus", "wallet", "import",
 			filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.key")},
-		{"lotus-miner", "init", "--genesis-miner", "--actor=t01000", "--sector-size=2048",
+		{"lotus-miner", "init", "--genesis-miner", "--actor=t01000", "--sector-size=8388608",
 			"--pre-sealed-sectors=" + filepath.Join(home, ".genesis-sectors"),
 			"--pre-sealed-metadata=" + filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.json"),
 			"--nosync"},

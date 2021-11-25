@@ -17,6 +17,7 @@ const DefaultMaxTraversalLinks = 2 << 29
 func CommP(ctx context.Context, bs bstore.Blockstore, root cid.Cid) (cid.Cid, abi.UnpaddedPieceSize, error) {
 	// do a CARv1 traversal with the DFS selector.
 	sc := car.NewSelectiveCar(ctx, bs, []car.Dag{{Root: root, Selector: shared.AllSelector()}}, car.MaxTraversalLinks(DefaultMaxTraversalLinks))
+	//sc := car.NewSelectiveCar(ctx, bs, []car.Dag{{Root: root, Selector: selectorparse.CommonSelector_ExploreAllRecursively}}, car.MaxTraversalLinks(DefaultMaxTraversalLinks))
 	prepared, err := sc.Prepare()
 	if err != nil {
 		return cid.Undef, 0, xerrors.Errorf("failed to prepare CAR: %w", err)

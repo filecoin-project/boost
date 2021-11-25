@@ -42,13 +42,13 @@ commands:
       - restore_cache:
           name: Restore parameters cache
           keys:
-            - 'v25-2k-lotus-params'
+            - 'v25-8mb-lotus-params'
           paths:
             - /var/tmp/filecoin-proof-parameters/
-      - run:  lotus fetch-params 2048
+      - run:  lotus fetch-params 8388608
       - save_cache:
           name: Save parameters cache
-          key: 'v25-2k-lotus-params'
+          key: 'v25-8mb-lotus-params'
           paths:
             - /var/tmp/filecoin-proof-parameters/
   lotus-artefacts:
@@ -118,7 +118,7 @@ jobs:
         default: golang
       go-test-flags:
         type: string
-        default: "-v -timeout 5m"
+        default: "-v --tags=debug -timeout 5m"
         description: Flags passed to go test.
       target:
         type: string

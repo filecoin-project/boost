@@ -13,46 +13,39 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ipfs/go-cid"
-	"golang.org/x/sync/errgroup"
-
-	cborutil "github.com/filecoin-project/go-cbor-util"
-
-	lapi "github.com/filecoin-project/lotus/api"
-
-	"github.com/filecoin-project/lotus/chain/actors"
-	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
-	chaintypes "github.com/filecoin-project/lotus/chain/types"
-	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
-
-	"github.com/filecoin-project/boost/storagemarket"
-	"golang.org/x/xerrors"
-
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-
-	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/boost/testutil"
-	types2 "github.com/filecoin-project/boost/transport/types"
-	"github.com/filecoin-project/boost/util"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
-	"github.com/google/uuid"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api"
+	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/pkg/devnet"
+	"github.com/filecoin-project/boost/storagemarket"
+	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boost/testutil"
+	types2 "github.com/filecoin-project/boost/transport/types"
+	"github.com/filecoin-project/go-address"
+	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-fil-markets/shared_testutil"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
+	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
-
-	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	chaintypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/specs-actors/actors/builtin/market"
+	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
+
+	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/xerrors"
 )
 
 var log = logging.Logger("boosttest")
@@ -105,18 +98,20 @@ func TestDummydeal(t *testing.T) {
 	f.start()
 
 	// Create a CAR file
-	carRes, err := testutil.CreateRandomCARv1(5, 1600)
+	file, err := testutil.CreateRandomFile(5, 2000000)
 	require.NoError(t, err)
 
+	root, carV2Path := shared_testutil.CreateDenseCARv2(t, file)
+
 	// Start a web server to serve the file
-	server, err := runWebServer(carRes.CarFile)
+	server, err := runWebServer(carV2Path)
 	require.NoError(t, err)
 	defer server.Close()
 
 	// Create a new dummy deal
 	dealUuid := uuid.New()
 
-	res, err := f.makeDummyDeal(dealUuid, carRes, server.URL)
+	res, err := f.makeDummyDeal(dealUuid, carV2Path, root, server.URL)
 	require.NoError(t, err)
 
 	// Wait for the deal to reach the Published state
@@ -125,7 +120,7 @@ func TestDummydeal(t *testing.T) {
 
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
-	time.Sleep(320 * time.Second)
+	time.Sleep(3200 * time.Second)
 
 	cancel()
 	go f.stop()
@@ -174,7 +169,7 @@ func (f *testFramework) start() {
 	bal, err := fullnodeApi.WalletBalance(f.ctx, defaultWallet)
 	require.NoError(f.t, err)
 
-	log.Infof("default wallet has %d attoFIL", bal)
+	log.Infof("default wallet %s has %d attoFIL", defaultWallet, bal)
 
 	// Create a wallet for the client with some funds
 	var wg sync.WaitGroup
@@ -361,19 +356,19 @@ func runWebServer(path string) (*httptest.Server, error) {
 	return svr, nil
 }
 
-func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carRes *testutil.CarRes, url string) (*api.ProviderDealRejectionInfo, error) {
-	pieceCid, pieceSize, err := util.CommP(f.ctx, carRes.Blockstore, carRes.Root)
+func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFile string, carFileRoot cid.Cid, url string) (*api.ProviderDealRejectionInfo, error) {
+	cidAndSize, err := storagemarket.GenerateCommP(carFile)
 	if err != nil {
 		return nil, err
 	}
 
 	proposal := market.DealProposal{
-		PieceCID:             pieceCid,
-		PieceSize:            pieceSize.Padded(),
+		PieceCID:             cidAndSize.PieceCID,
+		PieceSize:            cidAndSize.PieceSize,
 		VerifiedDeal:         false,
 		Client:               f.clientAddr,
 		Provider:             f.minerAddr,
-		Label:                carRes.Root.String(),
+		Label:                carFileRoot.String(),
 		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
 		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
@@ -446,16 +441,21 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carRes *testutil.CarRe
 		return nil, err
 	}
 
+	info, err := os.Stat(carFile)
+	if err != nil {
+		return nil, err
+	}
+
 	dealParams := &types.ClientDealParams{
 		DealUuid:           dealUuid,
 		MinerPeerID:        peerID,
 		ClientPeerID:       peerID,
 		ClientDealProposal: *signedProposal,
-		DealDataRoot:       carRes.Root,
+		DealDataRoot:       carFileRoot,
 		Transfer: types.Transfer{
 			Type:   "http",
 			Params: paramsBytes,
-			Size:   carRes.CarSize,
+			Size:   uint64(info.Size()),
 		},
 	}
 
