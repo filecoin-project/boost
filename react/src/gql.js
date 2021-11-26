@@ -105,7 +105,7 @@ const FundsQuery = gql`
     query AppFundsQuery {
         funds {
             Name
-            Capacity
+            Amount
         }
     }
 `;
@@ -145,6 +145,12 @@ const DealPublishNowMutation = gql`
     }
 `;
 
+const FundsMoveToEscrow = gql`
+    mutation AppDealPublishNowMutation($amount: Float!) {
+        fundsMoveToEscrow(amount: $amount)
+    }
+`;
+
 export {
     gqlClient,
     gqlQuery,
@@ -158,4 +164,5 @@ export {
     FundsLogsQuery,
     DealPublishQuery,
     DealPublishNowMutation,
+    FundsMoveToEscrow,
 }

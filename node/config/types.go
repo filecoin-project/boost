@@ -39,8 +39,11 @@ type Boost struct {
 type WalletsConfig struct {
 	// The "owner" address of the miner
 	Miner string
-	// The wallet used to send PublishStorageDeals messages
+	// The wallet used to send PublishStorageDeals messages.
+	// Must be a control or worker address of the miner.
 	PublishStorageDeals string
+	// The wallet used as the source for pledge collateral
+	PledgeCollateral string
 }
 
 type DAGStoreConfig struct {

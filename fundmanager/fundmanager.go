@@ -16,19 +16,28 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 )
 
 var log = logging.Logger("funds")
 
 type fundManagerAPI interface {
+	MarketAddBalance(ctx context.Context, wallet, addr address.Address, amt types.BigInt) (cid.Cid, error)
 	StateMarketBalance(ctx context.Context, addr address.Address, tsk types.TipSetKey) (api.MarketBalance, error)
 	WalletBalance(context.Context, address.Address) (types.BigInt, error)
 }
 
 type Config struct {
-	EscrowWallet address.Address
+	// The address of the storage miner, used as the target address when
+	// moving funds to escrow
+	StorageMiner address.Address
+	// Wallet used as source of pledge collateral when moving funds to
+	// escrow
+	CollatWallet address.Address
+	// Wallet used to send the publish message (and pay gas fees)
 	PubMsgWallet address.Address
+	// How much to reserve for each publish message
 	PubMsgBalMin abi.TokenAmount
 }
 
@@ -163,15 +172,32 @@ func (m *FundManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, dea
 	return nil
 }
 
+// MoveFundsToEscrow moves funds from the pledge collateral wallet into escrow with
+// the storage market actor
+func (m *FundManager) MoveFundsToEscrow(ctx context.Context, amt abi.TokenAmount) (cid.Cid, error) {
+	msgCid, err := m.api.MarketAddBalance(ctx, m.cfg.CollatWallet, m.cfg.StorageMiner, amt)
+	if err != nil {
+		return cid.Undef, fmt.Errorf("moving %d to escrow wallet %s: %w", amt, m.cfg.StorageMiner, err)
+	}
+
+	return msgCid, err
+}
+
 // BalanceMarket returns available and locked amounts in escrow
 // (on chain with the Storage Market Actor)
 func (m *FundManager) BalanceMarket(ctx context.Context) (storagemarket.Balance, error) {
-	bal, err := m.api.StateMarketBalance(ctx, m.cfg.EscrowWallet, types.EmptyTSK)
+	bal, err := m.api.StateMarketBalance(ctx, m.cfg.StorageMiner, types.EmptyTSK)
 	if err != nil {
 		return storagemarket.Balance{}, err
 	}
 
 	return toSharedBalance(bal), nil
+}
+
+// BalancePledgeCollateral returns the amount of funds in the wallet used for
+// pledging collateral for deal making
+func (m *FundManager) BalancePledgeCollateral(ctx context.Context) (abi.TokenAmount, error) {
+	return m.api.WalletBalance(ctx, m.cfg.CollatWallet)
 }
 
 // BalancePublishMsg returns the amount of funds in the wallet used to send
