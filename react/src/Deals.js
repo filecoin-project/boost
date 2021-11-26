@@ -41,8 +41,8 @@ class NewDealsSubscriber {
                     if (that.deals.length > dealsPerPage) {
                         nextCursor = that.deals[dealsPerPage].ID
                         that.deals = that.deals.slice(0, dealsPerPage)
-                        that.onNewDeal(that.deals, nextCursor)
                     }
+                    that.onNewDeal(that.deals, nextCursor)
                 },
                 error(e) {
                     console.error('new deals subscription error:', e)
