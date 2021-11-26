@@ -173,9 +173,10 @@ func dealProposal(ctx context.Context, fullNode v0api.FullNode, carFilePath stri
 		return nil, err
 	}
 
+	log.Debugf("about to sign with clientAddr: %s", clientAddr)
 	sig, err := fullNode.WalletSign(ctx, clientAddr, buf)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("wallet sign failed: %w", err)
 	}
 
 	return &market.ClientDealProposal{

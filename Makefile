@@ -25,6 +25,7 @@ ifneq ($(strip $(LDFLAGS)),)
 endif
 
 GOFLAGS+=-ldflags="$(ldflags)"
+GOFLAGS+=--tags=debug
 
 
 ## FFI

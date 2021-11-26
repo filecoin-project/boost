@@ -31,7 +31,7 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 	// validate deal proposal
 	proposal := deal.ClientDealProposal.Proposal
 	if proposal.Provider != p.Address {
-		return fmt.Errorf("incorrect provider for deal")
+		return fmt.Errorf("incorrect provider for deal; proposal.Provider: %s; provider.Address: %s", proposal.Provider, p.Address)
 	}
 
 	if len(proposal.Label) > DealMaxLabelSize {
