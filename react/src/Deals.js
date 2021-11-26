@@ -31,7 +31,7 @@ class NewDealsSubscriber {
                     parseDates(r)
 
                     // Don't add new deals to the list if we're not on the first page
-                    if (this.pageNum > 1) {
+                    if (that.pageNum > 1) {
                         return
                     }
 
@@ -45,11 +45,11 @@ class NewDealsSubscriber {
                     }
                 },
                 error(e) {
-                    console.log('new deals subscription error:', e)
+                    console.error('new deals subscription error:', e)
                 }
             })
         } catch (e) {
-            console.log('new deals subscription error:', e)
+            console.error('new deals subscription error:', e)
         }
     }
 }
@@ -96,21 +96,23 @@ export function StorageDealsPage(props) {
         async function onStart() {
             // Make a query to get the current list of deals
             var res = await dealsListQuery()
-            if (res.deals) {
-                // Subscribe to "new deal" events
-                newDealsSubscriber = new NewDealsSubscriber(res.deals, function (newDeals, nextCursor) {
-                    if (newDealsSubscriber.pageNum === 1) {
-                        // If it's the first page, update the list of deals
-                        // that is currently being displayed
-                        setDeals(newDeals)
-                        dealsPagination.addPageCursor(2, nextCursor)
-                    }
-                    setTotalCount(res.totalCount + 1)
-                })
-
-                dealsPagination.addPageCursor(2, res.next)
+            if (!res.deals) {
+                return
             }
+
+            // Subscribe to "new deal" events
+            newDealsSubscriber = new NewDealsSubscriber(res.deals, function (newDeals, nextCursor) {
+                if (newDealsSubscriber.pageNum === 1) {
+                    // If it's the first page, update the list of deals
+                    // that is currently being displayed
+                    setDeals(newDeals)
+                    dealsPagination.addPageCursor(2, nextCursor)
+                }
+                setTotalCount(res.totalCount + 1)
+            })
             newDealsSubscriber.subscribe()
+
+            dealsPagination.addPageCursor(2, res.next)
         }
 
         onStart()
