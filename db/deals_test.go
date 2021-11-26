@@ -2,8 +2,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"path"
 	"testing"
 	"time"
 
@@ -18,19 +16,13 @@ func TestDB(t *testing.T) {
 	req := require.New(t)
 	ctx := context.Background()
 
-	tmpFile := path.Join(t.TempDir(), "test.db")
-	//fmt.Println(tmpFile)
-
-	deals, err := generateDeals()
-	req.NoError(err)
-
-	sqldb, err := sql.Open("sqlite3", "file:"+tmpFile)
+	sqldb, err := CreateTmpDB(ctx)
 	req.NoError(err)
 
 	db := NewDealsDB(sqldb)
 	req.NoError(err)
 
-	err = createTables(ctx, sqldb)
+	deals, err := GenerateDeals()
 	req.NoError(err)
 
 	for _, deal := range deals {

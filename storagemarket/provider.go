@@ -9,23 +9,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/storage/sectorblocks"
-	"github.com/filecoin-project/boost/transport"
-	"github.com/filecoin-project/boost/transport/httptransport"
-
 	"github.com/filecoin-project/boost/api"
-
-	"golang.org/x/xerrors"
-
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/filestore"
+	"github.com/filecoin-project/boost/fundmanager"
+	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/transport"
+	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/event"
+	"golang.org/x/xerrors"
 )
 
 var log = logging.Logger("boost-provider")
@@ -57,17 +55,18 @@ type Provider struct {
 	restartDealsChan chan restartReq
 
 	// Database API
-	db *db.DealsDB
+	db      *sql.DB
+	dealsDB *db.DealsDB
 
-	Transport transport.Transport
-
+	Transport     transport.Transport
+	fundManager   *fundmanager.FundManager
 	dealPublisher *DealPublisher
 	adapter       *Adapter
 
 	dealHandlers *dealHandlers
 }
 
-func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address, secb *sectorblocks.SectorBlocks) (*Provider, error) {
+func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address, secb *sectorblocks.SectorBlocks) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -88,13 +87,15 @@ func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNod
 		Address:   addr,
 		newDealPS: newDealPS,
 		fs:        fs,
-		db:        dealsDB,
+		db:        sqldb,
+		dealsDB:   dealsDB,
 
 		acceptDealsChan:  make(chan acceptDealReq),
 		failedDealsChan:  make(chan failedDealReq),
 		restartDealsChan: make(chan restartReq),
 
-		Transport: httptransport.New(),
+		Transport:   httptransport.New(),
+		fundManager: fundMgr,
 
 		dealPublisher: dealPublisher,
 		adapter: &Adapter{
@@ -107,7 +108,7 @@ func NewProvider(repoRoot string, dealsDB *db.DealsDB, fullnodeApi v1api.FullNod
 }
 
 func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
-	deal, err := p.db.ByID(ctx, dealUuid)
+	deal, err := p.dealsDB.ByID(ctx, dealUuid)
 	if xerrors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("getting deal %s: %w", dealUuid, ErrDealNotFound)
 	}
@@ -213,14 +214,14 @@ func (p *Provider) Start(ctx context.Context) error {
 	p.ctx, p.cancel = context.WithCancel(ctx)
 
 	// initialize the database
-	err := p.db.Init(p.ctx)
+	err := db.CreateTables(p.ctx, p.db)
 	if err != nil {
 		return fmt.Errorf("failed to init db: %w", err)
 	}
 	log.Infow("db initialized")
 
 	// restart all existing deals
-	deals, err := p.db.ListActive(p.ctx)
+	deals, err := p.dealsDB.ListActive(p.ctx)
 	if err != nil {
 		return fmt.Errorf("getting active deals: %w", err)
 	}

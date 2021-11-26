@@ -266,12 +266,12 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 		return err
 	}
 
-	// TODO:
-	// Now that the deal has been published, mark the funds that were tagged
-	// for the deal as being locked
-
 	p.addDealLog(deal.DealUuid, "Deal published successfully")
-	return nil
+
+	// Now that the deal has been published, we no longer need to have funds
+	// tagged as being for this deal (the publish message moves collateral
+	// from the storage market actor escrow balance to the locked balance)
+	return p.fundManager.UntagFunds(ctx, deal.DealUuid)
 }
 
 // addPiece hands off a published deal for sealing and commitment in a sector
@@ -321,7 +321,7 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 }
 
 func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, err error) {
-	p.cleanupDeal(deal)
+	p.cleanupDeal(p.ctx, deal)
 
 	// Update state in DB with error
 	deal.Checkpoint = dealcheckpoints.Complete
@@ -332,7 +332,7 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 		deal.Err = err.Error()
 		p.addDealLog(deal.DealUuid, "Deal failed: %s", deal.Err)
 	}
-	dberr := p.db.Update(p.ctx, deal)
+	dberr := p.dealsDB.Update(p.ctx, deal)
 	if dberr != nil {
 		log.Errorw("updating failed deal in db", "id", deal.DealUuid, "err", dberr)
 	}
@@ -348,10 +348,14 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 	}
 }
 
-func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
+func (p *Provider) cleanupDeal(ctx context.Context, deal *types.ProviderDealState) {
 	_ = os.Remove(deal.InboundFilePath)
 	// ...
 	//cleanup resources here
+	err := p.fundManager.UntagFunds(ctx, deal.DealUuid)
+	if err != nil {
+		log.Errorw("untagging funds", "id", deal.DealUuid, "err", err)
+	}
 
 	p.dealHandlers.del(deal.DealUuid)
 }
@@ -370,7 +374,7 @@ func (p *Provider) fireEventDealUpdate(pub event.Emitter, deal *types.ProviderDe
 
 func (p *Provider) updateCheckpoint(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState, ckpt dealcheckpoints.Checkpoint) error {
 	deal.Checkpoint = ckpt
-	if err := p.db.Update(ctx, deal); err != nil {
+	if err := p.dealsDB.Update(ctx, deal); err != nil {
 		return fmt.Errorf("failed to persist deal state: %w", err)
 	}
 
@@ -384,7 +388,7 @@ func (p *Provider) addDealLog(dealUuid uuid.UUID, format string, args ...interfa
 		Text:      fmt.Sprintf(format, args...),
 		CreatedAt: time.Now(),
 	}
-	if err := p.db.InsertLog(p.ctx, l); err != nil {
+	if err := p.dealsDB.InsertLog(p.ctx, l); err != nil {
 		log.Warnw("failed to persist deal log", "id", dealUuid, "err", err)
 	}
 }
