@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/filecoin-project/boost/build"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -49,6 +50,10 @@ import (
 )
 
 var log = logging.Logger("boosttest")
+
+func init() {
+	build.MessageConfidence = 1
+}
 
 func setLogLevel() {
 	_ = logging.SetLogLevel("boosttest", "DEBUG")
