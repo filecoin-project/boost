@@ -29,7 +29,6 @@ import (
 	types2 "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
-	"github.com/filecoin-project/go-fil-markets/shared_testutil"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	lapi "github.com/filecoin-project/lotus/api"
@@ -109,7 +108,9 @@ func TestDummydeal(t *testing.T) {
 	randomFilepath, err := testutil.CreateRandomFile(5, 2000000)
 	require.NoError(t, err)
 
-	rootCid, carFilepath := shared_testutil.CreateDenseCARv2(t, randomFilepath)
+	rootCid, carFilepath, err := testutil.CreateDenseCARv2(randomFilepath)
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Remove(carFilepath) })
 
 	// Start a web server to serve the file
 	server, err := runWebServer(carFilepath)

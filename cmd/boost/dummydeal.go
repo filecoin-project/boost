@@ -6,20 +6,22 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"os"
 	"path"
 
 	lcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/gql"
+	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/testutil"
 	types2 "github.com/filecoin-project/boost/transport/types"
-	"github.com/filecoin-project/boost/util"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 )
@@ -58,21 +60,20 @@ var dummydealCmd = &cli.Command{
 		}
 
 		// Create a CAR file
-		carRes, err := testutil.CreateRandomCARv1(5, 1600)
+		randomFilepath, err := testutil.CreateRandomFile(rand.Int(), 2000000)
+		if err != nil {
+			return fmt.Errorf("creating random file: %w", err)
+		}
+		rootCid, carFilepath, err := testutil.CreateDenseCARv2(randomFilepath)
 		if err != nil {
 			return fmt.Errorf("creating CAR: %w", err)
 		}
 
 		// Register the file to be served from the web server
 		dealUuid := uuid.New()
-		url, err := serveCarFile(dealUuid, carRes.CarFile)
+		url, err := serveCarFile(dealUuid, carFilepath)
 		if err != nil {
 			return err
-		}
-
-		dealProposal, err := dealProposal(ctx, fullNodeApi, carRes, url, clientAddr, minerAddr)
-		if err != nil {
-			return fmt.Errorf("creating deal proposal: %w", err)
 		}
 
 		// Store the path to the CAR file as a transfer parameter
@@ -87,16 +88,27 @@ var dummydealCmd = &cli.Command{
 			return fmt.Errorf("getting boost peer ID: %w", err)
 		}
 
+		// Create a deal proposal
+		dealProposal, err := dealProposal(ctx, fullNodeApi, carFilepath, rootCid, clientAddr, minerAddr)
+		if err != nil {
+			return fmt.Errorf("creating deal proposal: %w", err)
+		}
+
+		carFileInfo, err := os.Stat(carFilepath)
+		if err != nil {
+			return fmt.Errorf("getting stat of %s: %w", carFilepath, err)
+		}
+
 		dealParams := &types.ClientDealParams{
 			DealUuid:           dealUuid,
 			MinerPeerID:        peerID,
 			ClientPeerID:       peerID,
 			ClientDealProposal: *dealProposal,
-			DealDataRoot:       carRes.Root,
+			DealDataRoot:       rootCid,
 			Transfer: types.Transfer{
 				Type:   "http",
 				Params: paramsBytes,
-				Size:   carRes.CarSize,
+				Size:   uint64(carFileInfo.Size()),
 			},
 		}
 
@@ -136,19 +148,19 @@ func serveCarFile(dealUuid uuid.UUID, fpath string) (string, error) {
 	return url, nil
 }
 
-func dealProposal(ctx context.Context, fullNode v0api.FullNode, carRes *testutil.CarRes, url string, clientAddr address.Address, minerAddr address.Address) (*market.ClientDealProposal, error) {
-	pieceCid, pieceSize, err := util.CommP(ctx, carRes.Blockstore, carRes.Root)
+func dealProposal(ctx context.Context, fullNode v0api.FullNode, carFilePath string, rootCid cid.Cid, clientAddr address.Address, minerAddr address.Address) (*market.ClientDealProposal, error) {
+	cidAndSize, err := storagemarket.GenerateCommP(carFilePath)
 	if err != nil {
 		return nil, err
 	}
 
 	proposal := market.DealProposal{
-		PieceCID:             pieceCid,
-		PieceSize:            pieceSize.Padded(),
+		PieceCID:             cidAndSize.PieceCID,
+		PieceSize:            cidAndSize.PieceSize,
 		VerifiedDeal:         false,
 		Client:               clientAddr,
 		Provider:             minerAddr,
-		Label:                carRes.Root.String(),
+		Label:                rootCid.String(),
 		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
 		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
 		StoragePricePerEpoch: abi.NewTokenAmount(1),

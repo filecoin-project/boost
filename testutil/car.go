@@ -1,8 +1,8 @@
 package testutil
 
 import (
-	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"math/rand"
 	"os"
@@ -16,17 +16,19 @@ import (
 	chunk "github.com/ipfs/go-ipfs-chunker"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
 	files "github.com/ipfs/go-ipfs-files"
-	format "github.com/ipfs/go-ipld-format"
+	ipldformat "github.com/ipfs/go-ipld-format"
 	"github.com/ipfs/go-merkledag"
 	"github.com/ipfs/go-unixfs/importer/balanced"
-	"github.com/ipfs/go-unixfs/importer/helpers"
-	"github.com/ipld/go-car"
+	ihelper "github.com/ipfs/go-unixfs/importer/helpers"
+	"github.com/ipld/go-car/v2/blockstore"
 	"github.com/multiformats/go-multihash"
 )
 
-const unixfsChunkSize uint64 = 1 << 10
-
-var defaultHashFunction = uint64(multihash.BLAKE2B_MIN + 31)
+const (
+	defaultHashFunction = uint64(multihash.BLAKE2B_MIN + 31)
+	unixfsChunkSize     = uint64(1 << 10)
+	unixfsLinksPerLevel = 1024
+)
 
 type CarRes struct {
 	CarFile    string
@@ -59,79 +61,70 @@ func CreateRandomFile(rseed, size int) (string, error) {
 	return file.Name(), nil
 }
 
-// CreateRandomCARv1 creates a  normal file with the provided seed and the
-// provided size and then transforms it to a CARv1 file and returns it.
-func CreateRandomCARv1(rseed, size int) (*CarRes, error) {
-	ctx := context.Background()
-
-	source := io.LimitReader(rand.New(rand.NewSource(int64(rseed))), int64(size))
-
-	file, err := os.CreateTemp("", "sourcefile.dat")
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = io.Copy(file, source)
-	if err != nil {
-		return nil, err
-	}
-
-	//
-	_, err = file.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
-
+// CreateDenseCARv2 generates a "dense" UnixFS CARv2 from the supplied ordinary file.
+// A dense UnixFS CARv2 is one storing leaf data. Contrast to CreateRefCARv2.
+func CreateDenseCARv2(src string) (cid.Cid, string, error) {
 	bs := bstore.NewBlockstore(dssync.MutexWrap(ds.NewMapDatastore()))
 	dagSvc := merkledag.NewDAGService(blockservice.New(bs, offline.Exchange(bs)))
 
-	root, err := writeUnixfsDAG(ctx, file, dagSvc)
+	root, err := WriteUnixfsDAGTo(src, dagSvc)
 	if err != nil {
-		return nil, err
+		return cid.Undef, "", err
 	}
 
-	// create a CARv1 file from the DAG
-	tmp, err := os.CreateTemp("", "randcarv1")
+	// Create a UnixFS DAG again AND generate a CARv2 file using a CARv2
+	// read-write blockstore now that we have the root.
+	out, err := os.CreateTemp("", "rand")
 	if err != nil {
-		return nil, err
+		return cid.Undef, "", err
+	}
+	err = out.Close()
+	if err != nil {
+		return cid.Undef, "", err
 	}
 
-	err = car.WriteCar(ctx, dagSvc, []cid.Cid{root}, tmp)
+	rw, err := blockstore.OpenReadWrite(out.Name(), []cid.Cid{root}, blockstore.UseWholeCIDs(true))
 	if err != nil {
-		return nil, err
+		return cid.Undef, "", err
 	}
 
-	_, err = tmp.Seek(0, io.SeekStart)
+	dagSvc = merkledag.NewDAGService(blockservice.New(rw, offline.Exchange(rw)))
+
+	root2, err := WriteUnixfsDAGTo(src, dagSvc)
 	if err != nil {
-		return nil, err
+		return cid.Undef, "", err
 	}
 
-	hd, _, err := car.ReadHeader(bufio.NewReader(tmp))
+	err = rw.Finalize()
 	if err != nil {
-		return nil, err
+		return cid.Undef, "", err
 	}
 
-	err = tmp.Close()
-	if err != nil {
-		return nil, err
+	if root != root2 {
+		return cid.Undef, "", fmt.Errorf("DAG root cid mismatch")
 	}
 
-	stat, err := os.Stat(tmp.Name())
-	if err != nil {
-		return nil, err
-	}
-
-	return &CarRes{
-		CarFile:    tmp.Name(),
-		CarSize:    uint64(stat.Size()),
-		OrigFile:   file.Name(),
-		Root:       hd.Roots[0],
-		Blockstore: bs,
-	}, nil
+	return root, out.Name(), nil
 }
 
-func writeUnixfsDAG(ctx context.Context, rd io.Reader, dag format.DAGService) (cid.Cid, error) {
-	rpf := files.NewReaderFile(rd)
+func WriteUnixfsDAGTo(path string, into ipldformat.DAGService) (cid.Cid, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return cid.Undef, err
+	}
+	defer file.Close()
+
+	stat, err := file.Stat()
+	if err != nil {
+		return cid.Undef, err
+	}
+
+	// get a IPLD reader path file
+	// required to write the Unixfs DAG blocks to a filestore
+	rpf, err := files.NewReaderPathFile(file.Name(), file, stat)
+	if err != nil {
+		return cid.Undef, err
+	}
 
 	// generate the dag and get the root
 	// import to UnixFS
@@ -142,15 +135,16 @@ func writeUnixfsDAG(ctx context.Context, rd io.Reader, dag format.DAGService) (c
 
 	prefix.MhType = defaultHashFunction
 
-	bufferedDS := format.NewBufferedDAG(ctx, dag)
-	params := helpers.DagBuilderParams{
-		Maxlinks:  1024,
+	bufferedDS := ipldformat.NewBufferedDAG(context.Background(), into)
+	params := ihelper.DagBuilderParams{
+		Maxlinks:  unixfsLinksPerLevel,
 		RawLeaves: true,
 		CidBuilder: cidutil.InlineBuilder{
 			Builder: prefix,
 			Limit:   126,
 		},
 		Dagserv: bufferedDS,
+		NoCopy:  true,
 	}
 
 	db, err := params.New(chunk.NewSizeSplitter(rpf, int64(unixfsChunkSize)))
