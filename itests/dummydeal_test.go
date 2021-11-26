@@ -117,8 +117,8 @@ func TestDummydeal(t *testing.T) {
 	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL)
 	require.NoError(t, err)
 
-	// Wait for the deal to reach the Published state
-	err = f.waitForPublished(dealUuid)
+	// Wait for the deal to be added to a sector
+	err = f.waitForDealAddedToSector(dealUuid)
 	require.NoError(t, err)
 
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
@@ -318,7 +318,7 @@ func (f *testFramework) start() {
 	}
 }
 
-func (f *testFramework) waitForPublished(dealUuid uuid.UUID) error {
+func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 	publishCtx, cancel := context.WithTimeout(f.ctx, 300*time.Second)
 	defer cancel()
 
@@ -337,14 +337,14 @@ func (f *testFramework) waitForPublished(dealUuid uuid.UUID) error {
 			switch {
 			case deal.Checkpoint == dealcheckpoints.Complete:
 				return nil
-			case deal.Checkpoint == dealcheckpoints.PublishConfirmed:
+			case deal.Checkpoint == dealcheckpoints.AddedPiece:
 				return nil
 			}
 		}
 
 		select {
 		case <-publishCtx.Done():
-			return fmt.Errorf("timed out waiting for deal publish")
+			return fmt.Errorf("timed out waiting for deal to be added to a sector")
 		case <-time.After(time.Second):
 		}
 	}
