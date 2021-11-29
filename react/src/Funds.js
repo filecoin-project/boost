@@ -70,11 +70,16 @@ function TopupCollateral(props) {
     const handleTopupChange = event => setTopupAmount(event.target.value)
 
     const [fundsMoveToEscrow] = useMutation(FundsMoveToEscrow, {
-        variables: {amount: parseFloat(topupAmount)}
+        variables: {amount: parseFloat(topupAmount*1e18)}
     })
 
     function topUpAvailable() {
         fundsMoveToEscrow()
+        setTopupAmount('')
+        setShowForm(false)
+    }
+
+    function handleCancel() {
         setTopupAmount('')
         setShowForm(false)
     }
@@ -85,14 +90,14 @@ function TopupCollateral(props) {
                 <div className={"top-up-form"}>
                     <input
                         type="number"
-                        max={props.maxTopup}
+                        max={props.maxTopup*1e-18}
                         value={topupAmount}
                         onChange={handleTopupChange}
                     />
-                    attoFIL
+                    FIL
                     <div className="buttons">
                         <div className="button" onClick={() => topUpAvailable()}>Top up</div>
-                        <div className="button cancel" onClick={() => setShowForm(false)}>Cancel</div>
+                        <div className="button cancel" onClick={handleCancel}>Cancel</div>
                     </div>
                 </div>
             ) : (
@@ -113,6 +118,9 @@ function FundsLogs(props) {
     }
 
     var logs = data.fundsLogs.logs
+    if (logs.length === 0) {
+        return null
+    }
 
     return <table className="funds-logs">
         <tbody>

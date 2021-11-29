@@ -16,6 +16,7 @@ import (
 type FundsLog struct {
 	DealUuid  uuid.UUID
 	CreatedAt time.Time
+	Amount    big.Int
 	Text      string
 }
 
@@ -35,21 +36,82 @@ func (f *FundsDB) Tag(ctx context.Context, dealUuid uuid.UUID, collateral abi.To
 	return err
 }
 
-func (f *FundsDB) Untag(ctx context.Context, dealUuid uuid.UUID) error {
-	_, err := f.db.ExecContext(ctx, "DELETE FROM FundsTagged WHERE DealID = ?", dealUuid)
-	return err
-}
+func (f *FundsDB) Untag(ctx context.Context, dealUuid uuid.UUID) (abi.TokenAmount, error) {
+	qry := "SELECT SUM(Collateral) + SUM(PubMsg) FROM FundsTagged WHERE DealID = ?"
+	row := f.db.QueryRowContext(ctx, qry, dealUuid)
 
-func (f *FundsDB) InsertLog(ctx context.Context, l *FundsLog) error {
-	if l.CreatedAt.IsZero() {
-		l.CreatedAt = time.Now()
+	amt := abi.NewTokenAmount(0)
+	amtFD := &bigIntFieldDef{f: &amt}
+
+	err := row.Scan(&amtFD.marshalled)
+	if err != nil {
+		return abi.NewTokenAmount(0), fmt.Errorf("unmarshalling untagged amount: %w", err)
 	}
 
-	qry := "INSERT INTO FundsLogs (DealID, CreatedAt, LogText) "
-	qry += "VALUES (?, ?, ?)"
-	values := []interface{}{l.DealUuid, l.CreatedAt, l.Text}
-	_, err := f.db.ExecContext(ctx, qry, values...)
-	return err
+	_, err = f.db.ExecContext(ctx, "DELETE FROM FundsTagged WHERE DealID = ?", dealUuid)
+	return amt, err
+}
+
+func (f *FundsDB) InsertLog(ctx context.Context, logs ...*FundsLog) error {
+	now := time.Now()
+	for _, l := range logs {
+		if l.CreatedAt.IsZero() {
+			l.CreatedAt = now
+		}
+
+		amtFD := &bigIntFieldDef{f: &l.Amount}
+		amt, err := amtFD.marshall()
+		if err != nil {
+			return fmt.Errorf("marshalling fund log Amount %d: %w", l.Amount, err)
+		}
+
+		qry := "INSERT INTO FundsLogs (DealID, CreatedAt, Amount, LogText) "
+		qry += "VALUES (?, ?, ?, ?)"
+		values := []interface{}{l.DealUuid, l.CreatedAt, amt, l.Text}
+		_, err = f.db.ExecContext(ctx, qry, values...)
+		if err != nil {
+			return fmt.Errorf("inserting funds log: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (f *FundsDB) Logs(ctx context.Context) ([]FundsLog, error) {
+	qry := "SELECT DealID, CreatedAt, Amount, LogText FROM FundsLogs"
+	rows, err := f.db.QueryContext(ctx, qry)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	fundsLogs := make([]FundsLog, 0, 16)
+	for rows.Next() {
+		var fundsLog FundsLog
+		fundsLog.Amount = abi.NewTokenAmount(0)
+		amtFD := &bigIntFieldDef{f: &fundsLog.Amount}
+		err := rows.Scan(
+			&fundsLog.DealUuid,
+			&fundsLog.CreatedAt,
+			&amtFD.marshalled,
+			&fundsLog.Text)
+
+		if err != nil {
+			return nil, err
+		}
+
+		err = amtFD.unmarshall()
+		if err != nil {
+			return nil, fmt.Errorf("unmarshalling fund log Amount: %w", err)
+		}
+
+		fundsLogs = append(fundsLogs, fundsLog)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return fundsLogs, nil
 }
 
 type TotalTagged struct {

@@ -40,7 +40,11 @@ function ChartBar(props) {
     return <td className={'field ' + props.usage.Type}>
         <div className="filler" style={{height: fillerHeight + '%'}}></div>
         <div className="bar" style={{height: barHeight + '%'}}>
-            <div className="size">{humanize(props.usage.Capacity)}</div>
+            <div className="size">
+                <div className="size-text">
+                    {humanize(props.usage.Capacity)}
+                </div>
+            </div>
             {props.usage.Used ? (
                 <div style={{height: '100%'}}>
                     <div className="unused" style={{height: (100 - usedPct) + '%'}}/>

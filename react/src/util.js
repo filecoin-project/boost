@@ -23,13 +23,21 @@ export function humanFileSize(bytes, si = false, dp = 1) {
 }
 
 var oneFil = 1e18
+var oneNanoFil = 1e9
 export function humanFIL(atto) {
     // 10^18
     if (atto > oneFil / 1000) {
-        var res = (atto / oneFil).toFixed(3)
+        let res = (atto / oneFil).toFixed(3)
         res = res.replace(/0+$/, '')
         res = res.replace(/\.$/, '')
         return res + ' FIL'
+    }
+    // 10^9
+    if (atto > oneNanoFil / 1000) {
+        let res = (atto / oneNanoFil).toFixed(3)
+        res = res.replace(/0+$/, '')
+        res = res.replace(/\.$/, '')
+        return res + ' nano'
     }
     return atto + ' atto'
 }

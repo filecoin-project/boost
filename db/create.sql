@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS Deals (
 CREATE TABLE IF NOT EXISTS FundsLogs (
     DealID TEXT,
     CreatedAt DateTime,
+    Amount BLOB,
     LogText TEXT
 );
 

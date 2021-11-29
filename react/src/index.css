@@ -172,6 +172,12 @@ body.modal-open {
   margin-top: -1.5em;
 }
 
+.bar-chart .field .size-text {
+  position: absolute;
+  bottom: -1em;
+  width: 5em;
+}
+
 .bar-chart .field .bar {
   width: 3em;
   border: 1px solid black;
