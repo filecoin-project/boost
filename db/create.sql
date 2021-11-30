@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS DealLogs (
     DealUUID TEXT,
     CreatedAt DateTime,
-    LogTEXT TEXT
+    LogText TEXT
 );
 
 CREATE TABLE IF NOT EXISTS Deals (
@@ -16,9 +16,9 @@ CREATE TABLE IF NOT EXISTS Deals (
     Label TEXT,
     StartEpoch INT,
     EndEpoch INT,
-    StoragePricePerEpoch BLOB,
-    ProviderCollateral BLOB,
-    ClientCollateral BLOB,
+    StoragePricePerEpoch TEXT,
+    ProviderCollateral TEXT,
+    ClientCollateral TEXT,
     SelfPeerID TEXT,
     ClientPeerID TEXT,
     DealDataRoot TEXT,
@@ -39,13 +39,13 @@ CREATE TABLE IF NOT EXISTS Deals (
 CREATE TABLE IF NOT EXISTS FundsLogs (
     DealUUID TEXT,
     CreatedAt DateTime,
-    Amount BLOB,
+    Amount TEXT,
     LogText TEXT
 );
 
 CREATE TABLE IF NOT EXISTS FundsTagged (
     DealUUID TEXT,
     CreatedAt DateTime,
-    Collateral INT,
-    PubMsg INT
+    Collateral TEXT,
+    PubMsg TEXT
 );
