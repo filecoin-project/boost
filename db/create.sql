@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS DealLogs (
-    DealID TEXT,
+    DealUUID TEXT,
     CreatedAt DateTime,
     LogTEXT TEXT
 );
@@ -37,14 +37,14 @@ CREATE TABLE IF NOT EXISTS Deals (
 ) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS FundsLogs (
-    DealID TEXT,
+    DealUUID TEXT,
     CreatedAt DateTime,
     Amount BLOB,
     LogText TEXT
 );
 
 CREATE TABLE IF NOT EXISTS FundsTagged (
-    DealID TEXT,
+    DealUUID TEXT,
     CreatedAt DateTime,
     Collateral INT,
     PubMsg INT

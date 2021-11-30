@@ -100,7 +100,7 @@ var dummydealCmd = &cli.Command{
 		}
 
 		dealParams := &types.ClientDealParams{
-			DealUuid:           dealUuid,
+			DealUUID:           dealUuid,
 			MinerPeerID:        peerID,
 			ClientPeerID:       peerID,
 			ClientDealProposal: *dealProposal,

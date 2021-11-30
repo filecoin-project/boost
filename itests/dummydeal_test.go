@@ -461,7 +461,7 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 	}
 
 	dealParams := &types.ClientDealParams{
-		DealUuid:           dealUuid,
+		DealUUID:           dealUuid,
 		MinerPeerID:        peerID,
 		ClientPeerID:       peerID,
 		ClientDealProposal: *signedProposal,

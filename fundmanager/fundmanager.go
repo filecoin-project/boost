@@ -140,7 +140,7 @@ func (m *FundManager) UntagFunds(ctx context.Context, dealUuid uuid.UUID) error 
 	}
 
 	fundsLog := &db.FundsLog{
-		DealUuid: dealUuid,
+		DealUUID: dealUuid,
 		Text:     "Untag funds for deal",
 		Amount:   untaggedAmt,
 	}
@@ -160,12 +160,12 @@ func (m *FundManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, dea
 	}
 
 	collatFundsLog := &db.FundsLog{
-		DealUuid: dealUuid,
+		DealUUID: dealUuid,
 		Amount:   dealCollateral,
 		Text:     "Tag funds for collateral",
 	}
 	pubMsgFundsLog := &db.FundsLog{
-		DealUuid: dealUuid,
+		DealUUID: dealUuid,
 		Amount:   pubMsgBal,
 		Text:     "Tag funds for deal publish message",
 	}

@@ -79,7 +79,7 @@ type fundsLogList struct {
 
 type fundsLogResolver struct {
 	CreatedAt graphql.Time
-	DealID    graphql.ID
+	DealUUID  graphql.ID
 	Amount    float64
 	Text      string
 }
@@ -95,7 +95,7 @@ func (r *resolver) FundsLogs(ctx context.Context) (*fundsLogList, error) {
 	for _, l := range logs {
 		fundsLogs = append(fundsLogs, &fundsLogResolver{
 			CreatedAt: graphql.Time{Time: l.CreatedAt},
-			DealID:    graphql.ID(l.DealUuid.String()),
+			DealUUID:  graphql.ID(l.DealUUID.String()),
 			Amount:    toFloat64(l.Amount),
 			Text:      l.Text,
 		})

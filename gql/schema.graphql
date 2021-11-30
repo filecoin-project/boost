@@ -30,7 +30,7 @@ type DealList {
 }
 
 type DealLog {
-  DealID: ID!
+  DealUUID: ID!
   CreatedAt: Time!
   Text: String!
 }
@@ -53,7 +53,7 @@ type FundsLogList {
 }
 
 type FundsLog {
-  DealID: ID!
+  DealUUID: ID!
   CreatedAt: Time!
   Amount: Float!
   Text: String!

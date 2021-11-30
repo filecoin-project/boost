@@ -32,7 +32,7 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 		dealsDB:   r.dealsDB,
 		publisher: r.publisher,
 
-		dealIDs: pending.DealIDs,
+		dealIDs: pending.DealUUIDs,
 
 		Period:         int32(pending.PublishPeriod.Seconds()),
 		Start:          graphql.Time{Time: pending.PublishPeriodStart},
