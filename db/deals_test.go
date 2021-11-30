@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDB(t *testing.T) {
+func TestDealsDB(t *testing.T) {
 	req := require.New(t)
 	ctx := context.Background()
 

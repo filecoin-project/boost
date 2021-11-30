@@ -28,7 +28,7 @@ func NewFundsDB(db *sql.DB) *FundsDB {
 	return &FundsDB{db: db}
 }
 
-func (f *FundsDB) Tag(ctx context.Context, dealUuid uuid.UUID, collateral abi.TokenAmount, pubMsg abi.TokenAmount) interface{} {
+func (f *FundsDB) Tag(ctx context.Context, dealUuid uuid.UUID, collateral abi.TokenAmount, pubMsg abi.TokenAmount) error {
 	qry := "INSERT INTO FundsTagged (DealUUID, CreatedAt, Collateral, PubMsg) "
 	qry += "VALUES (?, ?, ?, ?)"
 	values := []interface{}{dealUuid, time.Now(), collateral.String(), pubMsg.String()}
@@ -37,19 +37,29 @@ func (f *FundsDB) Tag(ctx context.Context, dealUuid uuid.UUID, collateral abi.To
 }
 
 func (f *FundsDB) Untag(ctx context.Context, dealUuid uuid.UUID) (abi.TokenAmount, error) {
-	qry := "SELECT SUM(Collateral) + SUM(PubMsg) FROM FundsTagged WHERE DealUUID = ?"
+	qry := "SELECT Collateral, PubMsg FROM FundsTagged WHERE DealUUID = ?"
 	row := f.db.QueryRowContext(ctx, qry, dealUuid)
 
-	amt := abi.NewTokenAmount(0)
-	amtFD := &bigIntFieldDef{f: &amt}
-
-	err := row.Scan(&amtFD.marshalled)
+	collat := &bigIntFieldDef{f: new(abi.TokenAmount)}
+	pubMsg := &bigIntFieldDef{f: new(abi.TokenAmount)}
+	err := row.Scan(&collat.marshalled, &pubMsg.marshalled)
 	if err != nil {
-		return abi.NewTokenAmount(0), fmt.Errorf("unmarshalling untagged amount: %w", err)
+		if err == sql.ErrNoRows {
+			return abi.NewTokenAmount(0), nil
+		}
+		return abi.NewTokenAmount(0), fmt.Errorf("getting untagged amount: %w", err)
+	}
+	err = collat.unmarshall()
+	if err != nil {
+		return abi.NewTokenAmount(0), fmt.Errorf("unmarshalling untagged Collateral")
+	}
+	err = pubMsg.unmarshall()
+	if err != nil {
+		return abi.NewTokenAmount(0), fmt.Errorf("unmarshalling untagged PubMsg")
 	}
 
 	_, err = f.db.ExecContext(ctx, "DELETE FROM FundsTagged WHERE DealUUID = ?", dealUuid)
-	return amt, err
+	return big.Add(*collat.f, *pubMsg.f), err
 }
 
 func (f *FundsDB) InsertLog(ctx context.Context, logs ...*FundsLog) error {
@@ -59,16 +69,10 @@ func (f *FundsDB) InsertLog(ctx context.Context, logs ...*FundsLog) error {
 			l.CreatedAt = now
 		}
 
-		amtFD := &bigIntFieldDef{f: &l.Amount}
-		amt, err := amtFD.marshall()
-		if err != nil {
-			return fmt.Errorf("marshalling fund log Amount %d: %w", l.Amount, err)
-		}
-
 		qry := "INSERT INTO FundsLogs (DealUUID, CreatedAt, Amount, LogText) "
 		qry += "VALUES (?, ?, ?, ?)"
-		values := []interface{}{l.DealUUID, l.CreatedAt, amt, l.Text}
-		_, err = f.db.ExecContext(ctx, qry, values...)
+		values := []interface{}{l.DealUUID, l.CreatedAt, l.Amount.String(), l.Text}
+		_, err := f.db.ExecContext(ctx, qry, values...)
 		if err != nil {
 			return fmt.Errorf("inserting funds log: %w", err)
 		}
@@ -88,19 +92,17 @@ func (f *FundsDB) Logs(ctx context.Context) ([]FundsLog, error) {
 	fundsLogs := make([]FundsLog, 0, 16)
 	for rows.Next() {
 		var fundsLog FundsLog
-		fundsLog.Amount = abi.NewTokenAmount(0)
-		amtFD := &bigIntFieldDef{f: &fundsLog.Amount}
+		amt := &bigIntFieldDef{f: &fundsLog.Amount}
 		err := rows.Scan(
 			&fundsLog.DealUUID,
 			&fundsLog.CreatedAt,
-			&amtFD.marshalled,
+			&amt.marshalled,
 			&fundsLog.Text)
-
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("getting fund log: %w", err)
 		}
 
-		err = amtFD.unmarshall()
+		err = amt.unmarshall()
 		if err != nil {
 			return nil, fmt.Errorf("unmarshalling fund log Amount: %w", err)
 		}
@@ -120,36 +122,44 @@ type TotalTagged struct {
 }
 
 func (f *FundsDB) TotalTagged(ctx context.Context) (*TotalTagged, error) {
-	var collatStr sql.NullString
-	var pubMsgStr sql.NullString
-	row := f.db.QueryRowContext(ctx, "SELECT sum(Collateral), sum(PubMsg) FROM FundsTagged")
-	err := row.Scan(&collatStr, &pubMsgStr)
+	rows, err := f.db.QueryContext(ctx, "SELECT Collateral, PubMsg FROM FundsTagged")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting total tagged: %w", err)
+	}
+	defer rows.Close()
+
+	tt := &TotalTagged{
+		Collateral: abi.NewTokenAmount(0),
+		PubMsg:     abi.NewTokenAmount(0),
 	}
 
-	var collat big.Int
-	if !collatStr.Valid {
-		collat = big.NewInt(0)
-	} else {
-		collat, err = big.FromString(collatStr.String)
+	for rows.Next() {
+		collat := &bigIntFieldDef{f: new(abi.TokenAmount)}
+		pubMsg := &bigIntFieldDef{f: new(abi.TokenAmount)}
+		err := rows.Scan(&collat.marshalled, &pubMsg.marshalled)
 		if err != nil {
-			return nil, fmt.Errorf("parsing Collateral '%s' to big.Int: %w", collatStr.String, err)
+			return nil, fmt.Errorf("getting total tagged: %w", err)
+		}
+
+		err = collat.unmarshall()
+		if err != nil {
+			return nil, fmt.Errorf("unmarshalling untagged Collateral: %w", err)
+		}
+		if collat.f.Int != nil {
+			tt.Collateral = big.Add(tt.Collateral, *collat.f)
+		}
+
+		err = pubMsg.unmarshall()
+		if err != nil {
+			return nil, fmt.Errorf("unmarshalling untagged PubMsg: %w", err)
+		}
+		if pubMsg.f.Int != nil {
+			tt.PubMsg = big.Add(tt.PubMsg, *pubMsg.f)
 		}
 	}
-
-	var pubMsg big.Int
-	if !pubMsgStr.Valid {
-		pubMsg = big.NewInt(0)
-	} else {
-		pubMsg, err = big.FromString(pubMsgStr.String)
-		if err != nil {
-			return nil, fmt.Errorf("parsing PubMsg '%s' to big.Int: %w", pubMsgStr.String, err)
-		}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("getting total tagged: %w", err)
 	}
 
-	return &TotalTagged{
-		Collateral: collat,
-		PubMsg:     pubMsg,
-	}, nil
+	return tt, nil
 }

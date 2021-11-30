@@ -96,7 +96,7 @@ func (fd *cidPtrFieldDef) unmarshall() error {
 }
 
 type bigIntFieldDef struct {
-	marshalled []byte
+	marshalled sql.NullString
 	f          *big.Int
 }
 
@@ -108,15 +108,17 @@ func (fd *bigIntFieldDef) marshall() (interface{}, error) {
 	if fd.f == nil {
 		return nil, nil
 	}
-	return fd.f.Bytes()
+	return fd.f.String(), nil
 }
 
 func (fd *bigIntFieldDef) unmarshall() error {
-	if fd.marshalled == nil {
+	if !fd.marshalled.Valid {
+		*fd.f = big.NewInt(0)
 		return nil
 	}
+
 	i := big.NewInt(0)
-	i.SetBytes(fd.marshalled)
+	i.SetString(fd.marshalled.String, 0)
 	*fd.f = i
 	return nil
 }
