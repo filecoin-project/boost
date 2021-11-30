@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/filecoin-project/boost/build"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/filecoin-project/boost/build"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api"
@@ -165,7 +166,7 @@ func (f *testFramework) start() {
 
 	apiinfo := cliutil.ParseApiInfo(fullnodeApiString)
 
-	fullnodeApi, closer, err := client.NewFullNodeRPCV1(f.ctx, addr, apiinfo.AuthHeader())
+	fullnodeApi, closerFullnode, err := client.NewFullNodeRPCV1(f.ctx, addr, apiinfo.AuthHeader())
 	require.NoError(f.t, err)
 
 	f.fullNode = fullnodeApi
@@ -227,7 +228,7 @@ func (f *testFramework) start() {
 
 	minerApiInfo := cliutil.ParseApiInfo(minerEndpoint)
 	minerConnAddr := "ws://127.0.0.1:2345/rpc/v0"
-	minerApi, closer, err := client.NewStorageMinerRPCV0(f.ctx, minerConnAddr, minerApiInfo.AuthHeader())
+	minerApi, closerMiner, err := client.NewStorageMinerRPCV0(f.ctx, minerConnAddr, minerApiInfo.AuthHeader())
 	require.NoError(f.t, err)
 
 	log.Debugw("minerApiInfo.Address", "addr", minerApiInfo.Addr)
@@ -320,7 +321,8 @@ func (f *testFramework) start() {
 		shutdownChan <- struct{}{}
 		_ = stop(f.ctx)
 		<-finishCh
-		closer()
+		closerFullnode()
+		closerMiner()
 	}
 }
 
