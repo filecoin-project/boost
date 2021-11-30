@@ -72,6 +72,17 @@ func (p *Provider) loop() {
 				continue
 			}
 
+			// Tag the storage required for the deal in the staging area
+			err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal.PieceSize)
+			if err != nil {
+				go writeDealResp(false, &api.ProviderDealRejectionInfo{
+					// TODO: provide a custom reason message (instead of sending provider
+					// error messages back to client) eg "Not enough staging storage for deal"
+					Reason: err.Error(),
+				}, nil)
+				continue
+			}
+
 			// write deal state to the database
 			log.Infow("inserting deal into DB", "id", deal.DealUuid)
 
