@@ -134,10 +134,10 @@ func (p *Provider) GetAsk() *types.StorageAsk {
 }
 
 func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDealRejectionInfo, err error) {
-	log.Infow("execute deal", "id", dp.DealUuid)
+	log.Infow("execute deal", "uuid", dp.DealUUID)
 
 	ds := types.ProviderDealState{
-		DealUuid:           dp.DealUuid,
+		DealUuid:           dp.DealUUID,
 		ClientDealProposal: dp.ClientDealProposal,
 		SelfPeerID:         dp.MinerPeerID,
 		ClientPeerID:       dp.ClientPeerID,
@@ -180,11 +180,11 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDeal
 	}
 	// return rejection reason as provider has rejected a valid deal.
 	if !resp.accepted {
-		log.Infow("rejected deal: "+resp.ri.Reason, "id", dp.DealUuid)
+		log.Infow("rejected deal: "+resp.ri.Reason, "id", dp.DealUUID)
 		return resp.ri, nil
 	}
 
-	log.Infow("scheduled deal for execution", "id", dp.DealUuid)
+	log.Infow("scheduled deal for execution", "id", dp.DealUUID)
 	return nil, nil
 }
 

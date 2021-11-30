@@ -27,7 +27,7 @@ type StorageAsk struct {
 
 // ClientDealParams are the deal params sent by the client
 type ClientDealParams struct {
-	DealUuid           uuid.UUID
+	DealUUID           uuid.UUID
 	MinerPeerID        peer.ID
 	ClientPeerID       peer.ID
 	ClientDealProposal market.ClientDealProposal

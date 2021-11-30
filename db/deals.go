@@ -19,7 +19,7 @@ import (
 )
 
 type DealLog struct {
-	DealUuid  uuid.UUID
+	DealUUID  uuid.UUID
 	CreatedAt time.Time
 	Text      string
 }
@@ -257,15 +257,15 @@ func (d *DealsDB) scanRow(row Scannable) (*types.ProviderDealState, error) {
 }
 
 func (d *DealsDB) InsertLog(ctx context.Context, l *DealLog) error {
-	qry := "INSERT INTO DealLogs (DealID, CreatedAt, LogText) "
+	qry := "INSERT INTO DealLogs (DealUUID, CreatedAt, LogText) "
 	qry += "VALUES (?, ?, ?)"
-	values := []interface{}{l.DealUuid, l.CreatedAt, l.Text}
+	values := []interface{}{l.DealUUID, l.CreatedAt, l.Text}
 	_, err := d.db.ExecContext(ctx, qry, values...)
 	return err
 }
 
 func (d *DealsDB) Logs(ctx context.Context, dealID uuid.UUID) ([]DealLog, error) {
-	qry := "SELECT DealID, CreatedAt, LogText FROM DealLogs WHERE DealID=?"
+	qry := "SELECT DealUUID, CreatedAt, LogText FROM DealLogs WHERE DealUUID=?"
 	rows, err := d.db.QueryContext(ctx, qry, dealID)
 	if err != nil {
 		return nil, err
@@ -276,7 +276,7 @@ func (d *DealsDB) Logs(ctx context.Context, dealID uuid.UUID) ([]DealLog, error)
 	for rows.Next() {
 		var dealLog DealLog
 		err := rows.Scan(
-			&dealLog.DealUuid,
+			&dealLog.DealUUID,
 			&dealLog.CreatedAt,
 			&dealLog.Text)
 

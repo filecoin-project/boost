@@ -138,7 +138,7 @@ function FundsLogs(props) {
 function FundsLog(props) {
     return <tr>
         <td>{moment(props.log.CreatedAt).fromNow()}</td>
-        <td>{props.log.DealID}</td>
+        <td>{props.log.DealUUID}</td>
         <td>{humanFIL(props.log.Amount)}</td>
         <td>{props.log.Text}</td>
     </tr>

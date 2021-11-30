@@ -14,7 +14,7 @@ import (
 )
 
 type FundsLog struct {
-	DealUuid  uuid.UUID
+	DealUUID  uuid.UUID
 	CreatedAt time.Time
 	Amount    big.Int
 	Text      string
@@ -29,7 +29,7 @@ func NewFundsDB(db *sql.DB) *FundsDB {
 }
 
 func (f *FundsDB) Tag(ctx context.Context, dealUuid uuid.UUID, collateral abi.TokenAmount, pubMsg abi.TokenAmount) interface{} {
-	qry := "INSERT INTO FundsTagged (DealID, CreatedAt, Collateral, PubMsg) "
+	qry := "INSERT INTO FundsTagged (DealUUID, CreatedAt, Collateral, PubMsg) "
 	qry += "VALUES (?, ?, ?, ?)"
 	values := []interface{}{dealUuid, time.Now(), collateral.String(), pubMsg.String()}
 	_, err := f.db.ExecContext(ctx, qry, values...)
@@ -37,7 +37,7 @@ func (f *FundsDB) Tag(ctx context.Context, dealUuid uuid.UUID, collateral abi.To
 }
 
 func (f *FundsDB) Untag(ctx context.Context, dealUuid uuid.UUID) (abi.TokenAmount, error) {
-	qry := "SELECT SUM(Collateral) + SUM(PubMsg) FROM FundsTagged WHERE DealID = ?"
+	qry := "SELECT SUM(Collateral) + SUM(PubMsg) FROM FundsTagged WHERE DealUUID = ?"
 	row := f.db.QueryRowContext(ctx, qry, dealUuid)
 
 	amt := abi.NewTokenAmount(0)
@@ -48,7 +48,7 @@ func (f *FundsDB) Untag(ctx context.Context, dealUuid uuid.UUID) (abi.TokenAmoun
 		return abi.NewTokenAmount(0), fmt.Errorf("unmarshalling untagged amount: %w", err)
 	}
 
-	_, err = f.db.ExecContext(ctx, "DELETE FROM FundsTagged WHERE DealID = ?", dealUuid)
+	_, err = f.db.ExecContext(ctx, "DELETE FROM FundsTagged WHERE DealUUID = ?", dealUuid)
 	return amt, err
 }
 
@@ -65,9 +65,9 @@ func (f *FundsDB) InsertLog(ctx context.Context, logs ...*FundsLog) error {
 			return fmt.Errorf("marshalling fund log Amount %d: %w", l.Amount, err)
 		}
 
-		qry := "INSERT INTO FundsLogs (DealID, CreatedAt, Amount, LogText) "
+		qry := "INSERT INTO FundsLogs (DealUUID, CreatedAt, Amount, LogText) "
 		qry += "VALUES (?, ?, ?, ?)"
-		values := []interface{}{l.DealUuid, l.CreatedAt, amt, l.Text}
+		values := []interface{}{l.DealUUID, l.CreatedAt, amt, l.Text}
 		_, err = f.db.ExecContext(ctx, qry, values...)
 		if err != nil {
 			return fmt.Errorf("inserting funds log: %w", err)
@@ -78,7 +78,7 @@ func (f *FundsDB) InsertLog(ctx context.Context, logs ...*FundsLog) error {
 }
 
 func (f *FundsDB) Logs(ctx context.Context) ([]FundsLog, error) {
-	qry := "SELECT DealID, CreatedAt, Amount, LogText FROM FundsLogs"
+	qry := "SELECT DealUUID, CreatedAt, Amount, LogText FROM FundsLogs"
 	rows, err := f.db.QueryContext(ctx, qry)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func (f *FundsDB) Logs(ctx context.Context) ([]FundsLog, error) {
 		fundsLog.Amount = abi.NewTokenAmount(0)
 		amtFD := &bigIntFieldDef{f: &fundsLog.Amount}
 		err := rows.Scan(
-			&fundsLog.DealUuid,
+			&fundsLog.DealUUID,
 			&fundsLog.CreatedAt,
 			&amtFD.marshalled,
 			&fundsLog.Text)

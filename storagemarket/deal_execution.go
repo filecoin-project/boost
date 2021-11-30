@@ -384,7 +384,7 @@ func (p *Provider) updateCheckpoint(ctx context.Context, pub event.Emitter, deal
 
 func (p *Provider) addDealLog(dealUuid uuid.UUID, format string, args ...interface{}) {
 	l := &db.DealLog{
-		DealUuid:  dealUuid,
+		DealUUID:  dealUuid,
 		Text:      fmt.Sprintf(format, args...),
 		CreatedAt: time.Now(),
 	}

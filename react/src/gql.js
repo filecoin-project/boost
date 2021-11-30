@@ -117,7 +117,7 @@ const FundsLogsQuery = gql`
             next
             logs {
                 CreatedAt
-                DealID
+                DealUUID
                 Amount
                 Text
             }

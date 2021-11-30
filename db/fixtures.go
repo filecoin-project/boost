@@ -116,130 +116,130 @@ func generateDealLogs(deals []types.ProviderDealState) []DealLog {
 		switch i {
 		case 0:
 			logs = append(logs, []DealLog{{
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Minute * 2),
 				Text:      "Propose Deal",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Minute * 2).Add(234 * time.Millisecond),
 				Text:      "Accepted",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Minute * 2).Add(853 * time.Millisecond),
 				Text:      "Start Data Transfer",
 			}}...)
 
 		case 1:
 			logs = append(logs, []DealLog{{
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Minute * 4),
 				Text:      "Propose Deal",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Minute * 4).Add(743 * time.Millisecond),
 				Text:      "Accepted",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Minute * 4).Add(853 * time.Millisecond),
 				Text:      "Start Data Transfer",
 			}}...)
 
 		case 2:
 			logs = append(logs, []DealLog{{
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Minute * 20),
 				Text:      "Propose Deal",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Minute * 20).Add(432 * time.Millisecond),
 				Text:      "Accepted",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Minute * 20).Add(634 * time.Millisecond),
 				Text:      "Start Data Transfer",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Minute * 20).Add(81 * time.Second),
 				Text:      "Data Transfer Complete",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Minute * 20).Add(81 * time.Second).Add(325 * time.Millisecond),
 				Text:      "Publishing",
 			}}...)
 
 		case 3:
 			logs = append(logs, []DealLog{{
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 2).Add(262 * time.Millisecond),
 				Text:      "Propose Deal",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 2).Add(523 * time.Millisecond),
 				Text:      "Accepted",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 2).Add(745 * time.Millisecond),
 				Text:      "Start Data Transfer",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 2).Add(242 * time.Second).Add(523 * time.Millisecond),
 				Text:      "Data Transfer Complete",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 2).Add(242 * time.Second).Add(754 * time.Millisecond),
 				Text:      "Publishing",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 2).Add(544 * time.Second).Add(423 * time.Millisecond),
 				Text:      "Deal Published",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 1).Add(734 * time.Second).Add(345 * time.Millisecond),
 				Text:      "Deal Pre-committed",
 			}}...)
 
 		case 4:
 			logs = append(logs, []DealLog{{
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 4).Add(432 * time.Millisecond),
 				Text:      "Propose Deal",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 4).Add(543 * time.Millisecond),
 				Text:      "Accepted",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 4).Add(643 * time.Millisecond),
 				Text:      "Start Data Transfer",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 4).Add(22 * time.Second).Add(523 * time.Millisecond),
 				Text:      "Error - Connection Lost",
 			}}...)
 
 		case 5:
 			logs = append(logs, []DealLog{{
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 5).Add(843 * time.Millisecond),
 				Text:      "Propose Deal",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 5).Add(942 * time.Millisecond),
 				Text:      "Accepted",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 5).Add(993 * time.Millisecond),
 				Text:      "Start Data Transfer",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 5).Add(432 * time.Second).Add(823 * time.Millisecond),
 				Text:      "Data Transfer Complete",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 5).Add(432 * time.Second).Add(953 * time.Millisecond),
 				Text:      "Publishing",
 			}, {
-				DealUuid:  deal.DealUuid,
+				DealUUID:  deal.DealUuid,
 				CreatedAt: deal.CreatedAt.Add(-time.Hour * 5).Add(433 * time.Second).Add(192 * time.Millisecond),
 				Text:      "Error - Not enough funds",
 			}}...)

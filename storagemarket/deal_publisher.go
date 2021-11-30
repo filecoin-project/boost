@@ -136,7 +136,7 @@ func newDealPublisher(
 }
 
 type PendingDealInfo struct {
-	DealIDs            []uuid.UUID
+	DealUUIDs            []uuid.UUID
 	PublishPeriodStart time.Time
 	PublishPeriod      time.Duration
 	MaxDealsPerMsg     uint64
@@ -161,7 +161,7 @@ func (p *DealPublisher) PendingDeals() PendingDealInfo {
 	}
 
 	return PendingDealInfo{
-		DealIDs:            pending,
+		DealUUIDs:            pending,
 		PublishPeriodStart: p.publishPeriodStart,
 		PublishPeriod:      p.publishPeriod,
 		MaxDealsPerMsg:     p.maxDealsPerPublishMsg,

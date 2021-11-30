@@ -374,8 +374,8 @@ type logsResolver struct {
 	db.DealLog
 }
 
-func (lr *logsResolver) DealID() graphql.ID {
-	return graphql.ID(lr.DealLog.DealUuid.String())
+func (lr *logsResolver) DealUUID() graphql.ID {
+	return graphql.ID(lr.DealLog.DealUUID.String())
 }
 
 func (lr *logsResolver) CreatedAt() graphql.Time {
