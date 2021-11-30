@@ -134,7 +134,7 @@ func (m *FundManager) UntagFunds(ctx context.Context, dealUuid uuid.UUID) error 
 	m.lk.Lock()
 	defer m.lk.Unlock()
 
-	err := m.db.Untag(ctx, dealUuid)
+	untaggedAmt, err := m.db.Untag(ctx, dealUuid)
 	if err != nil {
 		return fmt.Errorf("persisting untag funds for deal to DB: %w", err)
 	}
@@ -142,13 +142,14 @@ func (m *FundManager) UntagFunds(ctx context.Context, dealUuid uuid.UUID) error 
 	fundsLog := &db.FundsLog{
 		DealUuid: dealUuid,
 		Text:     "Untag funds for deal",
+		Amount:   untaggedAmt,
 	}
 	err = m.db.InsertLog(ctx, fundsLog)
 	if err != nil {
-		return fmt.Errorf("persisting tag funds log to DB: %w", err)
+		return fmt.Errorf("persisting untag funds log to DB: %w", err)
 	}
 
-	log.Infow("untag", "id", dealUuid)
+	log.Infow("untag", "id", dealUuid, "amount", untaggedAmt)
 	return nil
 }
 
@@ -158,12 +159,17 @@ func (m *FundManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, dea
 		return fmt.Errorf("persisting tag funds for deal to DB: %w", err)
 	}
 
-	msg := fmt.Sprintf("Tag funds for deal: Collateral %d / Publish Message %d", dealCollateral, pubMsgBal)
-	fundsLog := &db.FundsLog{
+	collatFundsLog := &db.FundsLog{
 		DealUuid: dealUuid,
-		Text:     msg,
+		Amount:   dealCollateral,
+		Text:     "Tag funds for collateral",
 	}
-	err = m.db.InsertLog(ctx, fundsLog)
+	pubMsgFundsLog := &db.FundsLog{
+		DealUuid: dealUuid,
+		Amount:   pubMsgBal,
+		Text:     "Tag funds for deal publish message",
+	}
+	err = m.db.InsertLog(ctx, collatFundsLog, pubMsgFundsLog)
 	if err != nil {
 		return fmt.Errorf("persisting tag funds log to DB: %w", err)
 	}
@@ -204,6 +210,10 @@ func (m *FundManager) BalancePledgeCollateral(ctx context.Context) (abi.TokenAmo
 // publish storage deals messages
 func (m *FundManager) BalancePublishMsg(ctx context.Context) (abi.TokenAmount, error) {
 	return m.api.WalletBalance(ctx, m.cfg.PubMsgWallet)
+}
+
+func (m *FundManager) Logs(ctx context.Context) ([]db.FundsLog, error) {
+	return m.db.Logs(ctx)
 }
 
 func toSharedBalance(bal api.MarketBalance) storagemarket.Balance {

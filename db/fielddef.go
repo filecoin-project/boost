@@ -105,10 +105,16 @@ func (fd *bigIntFieldDef) fieldPtr() interface{} {
 }
 
 func (fd *bigIntFieldDef) marshall() (interface{}, error) {
+	if fd.f == nil {
+		return nil, nil
+	}
 	return fd.f.Bytes()
 }
 
 func (fd *bigIntFieldDef) unmarshall() error {
+	if fd.marshalled == nil {
+		return nil
+	}
 	i := big.NewInt(0)
 	i.SetBytes(fd.marshalled)
 	*fd.f = i

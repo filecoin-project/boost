@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"math/rand"
-	"time"
+
+	"github.com/filecoin-project/go-state-types/abi"
 
 	stbig "github.com/filecoin-project/go-state-types/big"
-	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
 )
 
@@ -39,12 +38,12 @@ func (r *resolver) Funds(ctx context.Context) ([]*fundAmount, error) {
 		return nil, fmt.Errorf("getting pledge collateral balance: %w", err)
 	}
 
-	escrowTagged, _ := new(big.Float).SetInt(tagged.Collateral.Int).Float64()
-	pubMsgTagged, _ := new(big.Float).SetInt(tagged.PubMsg.Int).Float64()
-	escrowAvail, _ := new(big.Float).SetInt(balMkt.Available.Int).Float64()
-	escrowLocked, _ := new(big.Float).SetInt(balMkt.Locked.Int).Float64()
-	pubMsgBalance, _ := new(big.Float).SetInt(balPubMsg.Int).Float64()
-	collateralBalance, _ := new(big.Float).SetInt(balCollateral.Int).Float64()
+	escrowTagged := toFloat64(tagged.Collateral)
+	pubMsgTagged := toFloat64(tagged.PubMsg)
+	escrowAvail := toFloat64(balMkt.Available)
+	escrowLocked := toFloat64(balMkt.Locked)
+	pubMsgBalance := toFloat64(balPubMsg)
+	collateralBalance := toFloat64(balCollateral)
 
 	return []*fundAmount{{
 		Name:   "escrow-available",
@@ -67,9 +66,15 @@ func (r *resolver) Funds(ctx context.Context) ([]*fundAmount, error) {
 	}}, nil
 }
 
+func toFloat64(i abi.TokenAmount) float64 {
+	f64, _ := new(big.Float).SetInt(i.Int).Float64()
+	return f64
+}
+
 type fundsLogList struct {
 	TotalCount int32
 	Next       *graphql.Time
+	Logs       []*fundsLogResolver
 }
 
 type fundsLogResolver struct {
@@ -79,38 +84,28 @@ type fundsLogResolver struct {
 	Text      string
 }
 
-var fundLogs = []*fundsLogResolver{{
-	CreatedAt: graphql.Time{Time: time.Now().Add(-time.Minute)},
-	DealID:    graphql.ID(uuid.New().String()),
-	Amount:    1e18 * rand.Float64(),
-	Text:      "Reserved",
-}, {
-	CreatedAt: graphql.Time{Time: time.Now().Add(-time.Minute * 2)},
-	DealID:    graphql.ID(uuid.New().String()),
-	Amount:    1e18 * rand.Float64(),
-	Text:      "Locked",
-}, {
-	CreatedAt: graphql.Time{Time: time.Now().Add(-time.Minute * 5)},
-	DealID:    graphql.ID(uuid.New().String()),
-	Amount:    1e18 * rand.Float64(),
-	Text:      "Publish Storage Deals (10 deals)",
-}, {
-	CreatedAt: graphql.Time{Time: time.Now().Add(-time.Minute * 23)},
-	DealID:    graphql.ID(uuid.New().String()),
-	Amount:    1e18 * rand.Float64(),
-	Text:      "Refunded (deal error)",
-}}
-
 // query: fundsLogs: FundsLogList
 func (r *resolver) FundsLogs(ctx context.Context) (*fundsLogList, error) {
+	logs, err := r.fundMgr.Logs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting funds logs: %w", err)
+	}
+
+	fundsLogs := make([]*fundsLogResolver, 0, len(logs))
+	for _, l := range logs {
+		fundsLogs = append(fundsLogs, &fundsLogResolver{
+			CreatedAt: graphql.Time{Time: l.CreatedAt},
+			DealID:    graphql.ID(l.DealUuid.String()),
+			Amount:    toFloat64(l.Amount),
+			Text:      l.Text,
+		})
+	}
+
 	return &fundsLogList{
-		TotalCount: int32(len(fundLogs)),
+		Logs:       fundsLogs,
+		TotalCount: int32(len(logs)),
 		Next:       nil,
 	}, nil
-}
-
-func (r *fundsLogList) Logs(ctx context.Context) ([]*fundsLogResolver, error) {
-	return fundLogs, nil
 }
 
 // mutation: moveFundsToEscrow(amount): Boolean
