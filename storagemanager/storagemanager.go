@@ -60,6 +60,30 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize 
 	return nil
 }
 
+// Untag
+func (m *StorageManager) Untag(ctx context.Context, dealUuid uuid.UUID) error {
+	m.lk.Lock()
+	defer m.lk.Unlock()
+
+	pieceSize, err := m.db.Untag(ctx, dealUuid)
+	if err != nil {
+		return fmt.Errorf("persisting untag storage for deal to DB: %w", err)
+	}
+
+	storageLog := &db.StorageLog{
+		DealUUID:  dealUuid,
+		Text:      "Untag staging storage for deal",
+		PieceSize: pieceSize,
+	}
+	err = m.db.InsertLog(ctx, storageLog)
+	if err != nil {
+		return fmt.Errorf("persisting untag storage log to DB: %w", err)
+	}
+
+	log.Infow("untag storage", "id", dealUuid, "pieceSize", pieceSize)
+	return nil
+}
+
 // unlocked
 func (m *StorageManager) totalTagged(ctx context.Context) (abi.PaddedPieceSize, error) {
 	total, err := m.db.TotalTagged(ctx)
@@ -85,6 +109,6 @@ func (m *StorageManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, 
 		return fmt.Errorf("persisting tag storage log to DB: %w", err)
 	}
 
-	log.Infow("tag", "id", dealUuid, "piecesize", pieceSize)
+	log.Infow("tag storage", "id", dealUuid, "pieceSize", pieceSize)
 	return nil
 }
