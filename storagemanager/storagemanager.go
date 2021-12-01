@@ -15,10 +15,12 @@ import (
 var log = logging.Logger("storagemanager")
 
 type Config struct {
+	MaxStagingDealsBytes uint64
 }
 
 type StorageManager struct {
-	db *db.StorageDB
+	db  *db.StorageDB
+	cfg Config
 
 	lk sync.RWMutex
 }
@@ -26,8 +28,8 @@ type StorageManager struct {
 func New(cfg Config) func(sqldb *sql.DB) *StorageManager {
 	return func(sqldb *sql.DB) *StorageManager {
 		return &StorageManager{
-			db: db.NewStorageDB(sqldb),
-			//cfg: cfg,
+			db:  db.NewStorageDB(sqldb),
+			cfg: cfg,
 		}
 	}
 }
@@ -37,12 +39,32 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize 
 	m.lk.Lock()
 	defer m.lk.Unlock()
 
-	err := m.persistTagged(ctx, dealUuid, pieceSize)
+	// Check that the provider has enough funds in escrow to cover the
+	// collateral requirement for the deal
+	tagged, err := m.totalTagged(ctx)
+	if err != nil {
+		return fmt.Errorf("getting total tagged: %w", err)
+	}
+
+	if uint64(tagged)+uint64(pieceSize) >= m.cfg.MaxStagingDealsBytes {
+		return fmt.Errorf("miner overloaded, staging area is full")
+	}
+
+	err = m.persistTagged(ctx, dealUuid, pieceSize)
 	if err != nil {
 		return fmt.Errorf("saving total tagged storage: %w", err)
 	}
 
 	return nil
+}
+
+// unlocked
+func (m *StorageManager) totalTagged(ctx context.Context) (abi.PaddedPieceSize, error) {
+	total, err := m.db.TotalTagged(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("getting total tagged from DB: %w", err)
+	}
+	return total, nil
 }
 
 func (m *StorageManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, pieceSize abi.PaddedPieceSize) error {
