@@ -319,6 +319,15 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 
 	p.addDealLog(deal.DealUuid, "Deal handed off to sealer successfully")
 
+	// Now that the deal has been published, we no longer need to have funds
+	// tagged as being for this deal (the publish message moves collateral
+	// from the storage market actor escrow balance to the locked balance)
+	err = p.storageManager.Untag(ctx, deal.DealUuid)
+	if err != nil {
+		log.Errorw("untagging storage", "uuid", deal.DealUuid, "err", err)
+		return err
+	}
+
 	return p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.AddedPiece)
 }
 
