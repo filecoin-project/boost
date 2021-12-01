@@ -397,7 +397,7 @@ func ConfigBoost(c interface{}) Option {
 		})),
 
 		Override(new(*storagemanager.StorageManager), storagemanager.New(storagemanager.Config{
-			MaxStagingDealsBytes: 8192, // TODO: add to node config
+			MaxStagingDealsBytes: 0, // TODO: add to node config
 		})),
 
 		// Sector API
