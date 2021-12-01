@@ -46,8 +46,10 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize 
 		return fmt.Errorf("getting total tagged: %w", err)
 	}
 
-	if uint64(tagged)+uint64(pieceSize) >= m.cfg.MaxStagingDealsBytes {
-		return fmt.Errorf("miner overloaded, staging area is full")
+	if m.cfg.MaxStagingDealsBytes != 0 {
+		if uint64(tagged)+uint64(pieceSize) >= m.cfg.MaxStagingDealsBytes {
+			return fmt.Errorf("miner overloaded, staging area is full")
+		}
 	}
 
 	err = m.persistTagged(ctx, dealUuid, pieceSize)
