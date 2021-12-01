@@ -36,9 +36,11 @@ type DealLog {
 }
 
 type Storage {
-  Name: String!
-  Capacity: Float!
-  Used: Float!
+  Completed: Float!
+  Transferring: Float!
+  Pending: Float!
+  Free: Float!
+  MountPoint: String!
 }
 
 type FundAmount {
@@ -74,7 +76,7 @@ type RootQuery {
   deals(first: ID, limit: Int): DealList!
 
   """Get storage space usage"""
-  storage: [Storage]!
+  storage: Storage!
 
   """Get funds available"""
   funds: [FundAmount]!

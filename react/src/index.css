@@ -63,12 +63,17 @@ body.modal-open {
   width: 10em;
   padding: 1em;
   vertical-align: top;
+  white-space: nowrap;
 }
 
 .menu .menu-item {
   color: #a61e4d;
   margin: 0.5em;
   cursor: pointer;
+}
+
+.page-content {
+  width: 90%;
 }
 
 .page-title {
@@ -259,4 +264,68 @@ body.modal-open {
 
 .deal-publish td {
   padding: 0.5em 1em;
+}
+
+.storage-chart {
+  position: relative;
+  padding: 1em;
+}
+
+.storage-chart .total-size {
+  position: absolute;
+  right: -1em;
+  top: -0.6em;
+  font-size: 0.8em;
+}
+
+.storage-chart .bars {
+  border: 1px solid black;
+  margin-bottom: 5em;
+  height: 4em;
+}
+
+.storage-chart .bars > div {
+  position: relative;
+  display: inline-block;
+  height: 4em;
+  border-right: 1px solid black;
+}
+
+.storage-chart .bars > div:last-child {
+  border-right: none;
+}
+
+.storage-chart .bars .completed {
+  background-image: repeating-linear-gradient(
+          135deg,
+          #fff,
+          #fff 5px,
+          #e64980 5px,
+          #e64980 6px);
+}
+
+.storage-chart .bars .transferring {
+  background-image: repeating-linear-gradient(
+          135deg,
+          #fff,
+          #fff 5px,
+          #465298 5px,
+          #465298 6px);
+}
+
+.storage-chart .bars .label {
+  padding: 1em;
+  position: absolute;
+  top: 4em;
+  width: 5em;
+  font-size: 0.9em;
+}
+
+.storage-fields {
+  margin-top: 1em
+}
+
+.storage-fields td {
+  padding: 0.5em 1em;
+  font-weight: normal;
 }
