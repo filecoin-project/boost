@@ -94,9 +94,11 @@ const NewDealsSubscription = gql`
 const StorageQuery = gql`
     query AppStorageQuery {
         storage {
-            Name
-            Capacity
-            Used
+            Completed
+            Transferring
+            Pending
+            Free
+            MountPoint
         }
     }
 `;

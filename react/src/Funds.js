@@ -130,7 +130,7 @@ function FundsLogs(props) {
                 <th>Amount</th>
                 <th>Description</th>
             </tr>
-            {logs.map(l => <FundsLog key={l.CreatedAt} log={l} />)}
+            {logs.map((l, i) => <FundsLog key={i} log={l} />)}
         </tbody>
     </table>
 }

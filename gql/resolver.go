@@ -42,27 +42,23 @@ func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, provider
 }
 
 type storageResolver struct {
-	Name     string
-	Capacity float64
-	Used     float64
+	Completed    float64
+	Transferring float64
+	Pending      float64
+	Free         float64
+	MountPoint   string
 }
 
 // query: storage: [Storage]
-func (r *resolver) Storage(ctx context.Context) ([]*storageResolver, error) {
+func (r *resolver) Storage(ctx context.Context) (*storageResolver, error) {
 	// TODO: Get these values from storage space manager
-	return []*storageResolver{{
-		Name:     "Free",
-		Capacity: 8.5 * 1024 * 1024 * 1024,
-		Used:     0,
-	}, {
-		Name:     "Transferring",
-		Capacity: 5.2 * 1024 * 1024 * 1024,
-		Used:     3.5 * 1024 * 1024 * 1024,
-	}, {
-		Name:     "Queued",
-		Capacity: 11.2 * 1024 * 1024 * 1024,
-		Used:     0,
-	}}, nil
+	return &storageResolver{
+		Completed:    8.5 * 1024 * 1024 * 1024,
+		Transferring: 5.2 * 1024 * 1024 * 1024,
+		Pending:      3.5 * 1024 * 1024 * 1024,
+		Free:         11.2 * 1024 * 1024 * 1024,
+		MountPoint:   "/data/deals-staging",
+	}, nil
 }
 
 // query: deal(id) Deal
