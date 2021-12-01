@@ -329,3 +329,16 @@ body.modal-open {
   padding: 0.5em 1em;
   font-weight: normal;
 }
+
+.mpool td, .mpool th {
+  padding: 0.5em 1em;
+  font-weight: normal;
+}
+
+.mpool td.address {
+  word-break: break-all;
+}
+
+.mpool .spacer hr {
+  border-top: none;
+}

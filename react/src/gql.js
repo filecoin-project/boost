@@ -162,6 +162,22 @@ const FundsMoveToEscrow = gql`
     }
 `;
 
+const MpoolQuery = gql`
+    query AppMpoolQuery {
+        mpool {
+            From
+            To
+            Nonce
+            Value
+            GasFeeCap
+            GasLimit
+            GasPremium
+            Method
+            Params
+        }
+    }
+`;
+
 export {
     gqlClient,
     gqlQuery,
@@ -177,4 +193,5 @@ export {
     DealPublishNowMutation,
     FundsMoveToEscrow,
     TransfersQuery,
+    MpoolQuery,
 }

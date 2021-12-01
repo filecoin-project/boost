@@ -4,18 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/libp2p/go-libp2p-core/event"
-
-	"github.com/filecoin-project/boost/fundmanager"
-
-	"github.com/filecoin-project/boost/storagemarket"
-
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/fundmanager"
+	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
+	"github.com/libp2p/go-libp2p-core/event"
 	"golang.org/x/xerrors"
 )
 
@@ -32,14 +29,16 @@ type resolver struct {
 	fundMgr   *fundmanager.FundManager
 	provider  *storagemarket.Provider
 	publisher *storagemarket.DealPublisher
+	fullNode  v1api.FullNode
 }
 
-func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher) *resolver {
+func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		dealsDB:   dealsDB,
 		fundMgr:   fundMgr,
 		provider:  provider,
 		publisher: publisher,
+		fullNode:  fullNode,
 	}
 }
 

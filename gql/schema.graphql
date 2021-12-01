@@ -73,6 +73,18 @@ type TransferPoint {
   Bytes: Float!
 }
 
+type MpoolMessage {
+  From: String!
+  To: String!
+  Nonce: Float!
+  Value: Float!
+  GasFeeCap: Float!
+  GasLimit: Float!
+  GasPremium: Float!
+  Method: String!
+  Params: String!
+}
+
 type RootQuery {
   """Get Deal by ID"""
   deal(id: ID!): Deal
@@ -94,6 +106,9 @@ type RootQuery {
 
   """Get ongoing transfers"""
   transfers: [TransferPoint]!
+
+  """Get local messages in the mpool"""
+  mpool: [MpoolMessage]!
 }
 
 type RootMutation {
