@@ -148,6 +148,7 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 
 func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.Handler, pub event.Emitter, deal *types.ProviderDealState) error {
 	defer handler.Close()
+	defer p.transfers.complete(deal.DealUuid)
 
 	for {
 		select {
@@ -159,6 +160,7 @@ func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.
 				return evt.Error
 			}
 			deal.NBytesReceived = evt.NBytesReceived
+			p.transfers.setBytes(deal.DealUuid, uint64(evt.NBytesReceived))
 			p.fireEventDealUpdate(pub, deal)
 
 		case <-ctx.Done():

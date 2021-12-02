@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/libp2p/go-libp2p-core/event"
+
 	"github.com/filecoin-project/boost/fundmanager"
 
 	"github.com/filecoin-project/boost/storagemarket"
@@ -117,13 +119,13 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 		return nil, err
 	}
 
-	c := make(chan *dealResolver, 1)
+	net := make(chan *dealResolver, 1)
 
-	sub, err := r.provider.SubscribeDealUpdates(dealUuid)
+	dealUpdatesSub, err := r.provider.SubscribeDealUpdates(dealUuid)
 	if err != nil {
 		if xerrors.Is(err, storagemarket.ErrDealHandlerFound) {
-			close(c)
-			return c, nil
+			close(net)
+			return net, nil
 		}
 		return nil, xerrors.Errorf("%s: subscribing to deal updates: %w", args.ID, err)
 	}
@@ -137,38 +139,15 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case c <- newDealResolver(deal, r.dealsDB):
+	case net <- newDealResolver(deal, r.dealsDB):
 	}
 
 	// Updates to deal state are broadcast on pubsub. Pipe these updates to the
-	// deal subscription channel returned by this method.
-	go func() {
-		// When the connection ends, unsubscribe
-		defer sub.Close()
+	// client
+	sub := &subLastUpdate{sub: dealUpdatesSub, dealsDB: r.dealsDB}
+	go sub.Pipe(ctx, net)
 
-		for {
-			select {
-			case <-ctx.Done():
-				// Connection closed
-				return
-
-			// Deal updated
-			case evti := <-sub.Out():
-				// Pipe the update to the deal subscription channel
-				di := evti.(types.ProviderDealState)
-				rsv := newDealResolver(&di, r.dealsDB)
-
-				select {
-				case <-ctx.Done():
-					return
-
-				case c <- rsv:
-				}
-			}
-		}
-	}()
-
-	return c, nil
+	return net, nil
 }
 
 // subscription: dealNew() <-chan Deal
@@ -385,4 +364,52 @@ func toUuid(id graphql.ID) (uuid.UUID, error) {
 		return uuid.UUID{}, xerrors.Errorf("parsing graphql ID '%s' as UUID: %w", id, err)
 	}
 	return dealUuid, nil
+}
+
+type subLastUpdate struct {
+	sub     event.Subscription
+	dealsDB *db.DealsDB
+}
+
+func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
+	// When the connection ends, unsubscribe
+	defer s.sub.Close()
+
+	var lastUpdate interface{}
+	for {
+		// Wait for an update
+		select {
+		case <-ctx.Done():
+			return
+		case update := <-s.sub.Out():
+			lastUpdate = update
+		}
+
+		// Each update supersedes the one before it, so read all pending
+		// updates that are queued up behind the first one, and only save
+		// the very last
+		select {
+		case update := <-s.sub.Out():
+			lastUpdate = update
+		default:
+		}
+
+		// Attempt to send the update to the network. If the network is
+		// blocked, and another update arrives on the subscription,
+		// override the latest update.
+	loop:
+		for {
+			di := lastUpdate.(types.ProviderDealState)
+			rsv := newDealResolver(&di, s.dealsDB)
+
+			select {
+			case <-ctx.Done():
+				return
+			case net <- rsv:
+				break loop
+			case update := <-s.sub.Out():
+				lastUpdate = update
+			}
+		}
+	}
 }

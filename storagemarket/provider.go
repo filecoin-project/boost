@@ -62,6 +62,7 @@ type Provider struct {
 	fundManager   *fundmanager.FundManager
 	dealPublisher *DealPublisher
 	adapter       *Adapter
+	transfers     *dealTransfers
 
 	dealHandlers *dealHandlers
 }
@@ -102,6 +103,7 @@ func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *f
 			FullNode: fullnodeApi,
 			secb:     secb,
 		},
+		transfers: newDealTransfers(),
 
 		dealHandlers: newDealHandlers(),
 	}, nil
@@ -247,6 +249,8 @@ func (p *Provider) Start(ctx context.Context) error {
 	// wait for all deals to be restarted before returning so we know new deals will be processed
 	// after all existing deals have restarted and accounted for their resources.
 	restartWg.Wait()
+
+	go p.transfers.start(p.ctx)
 
 	log.Infow("storage provider: started")
 	return nil

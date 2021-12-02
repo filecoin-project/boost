@@ -28,8 +28,8 @@ func serveDummyDeals() error {
 	return nil
 }
 
-const slowChunkSize = 8
-const slowChunkDelay = time.Microsecond
+const slowChunkSize = 256
+const slowChunkDelay = time.Millisecond
 
 type slowReader struct {
 	*os.File

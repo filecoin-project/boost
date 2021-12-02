@@ -68,6 +68,11 @@ type DealPublish {
   Deals: [Deal]!
 }
 
+type TransferPoint {
+  At: Time!
+  Bytes: Float!
+}
+
 type RootQuery {
   """Get Deal by ID"""
   deal(id: ID!): Deal
@@ -86,6 +91,9 @@ type RootQuery {
 
   """Get information about deals that are pending being published"""
   dealPublish: DealPublish!
+
+  """Get ongoing transfers"""
+  transfers: [TransferPoint]!
 }
 
 type RootMutation {

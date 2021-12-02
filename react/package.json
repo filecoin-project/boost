@@ -16,6 +16,7 @@
     "moment": "^2.29.1",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
+    "react-google-charts": "^3.0.15",
     "react-relay": "^12.0.0",
     "react-scripts": "4.0.3",
     "relay-runtime": "^12.0.0",
