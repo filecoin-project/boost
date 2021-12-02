@@ -214,7 +214,7 @@ var dummydealCmd = &cli.Command{
 // Get the size of the CAR file by making an HTTP request and reading the
 // Content-Length header
 func getHTTPFileSize(ctx context.Context, url string) (uint64, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("HEAD", url, nil)
 	if err != nil {
 		return 0, err
 	}
