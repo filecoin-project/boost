@@ -19,6 +19,7 @@ type msg struct {
 	GasPremium float64
 	Method     string
 	Params     string
+	BaseFee    float64
 }
 
 // query: mpool: [Message]
@@ -33,7 +34,7 @@ func (r *resolver) Mpool(ctx context.Context) ([]*msg, error) {
 	//	return nil, xerrors.Errorf("getting local addresses: %w", err)
 	//}
 
-	filter := map[address.Address]struct{}{}
+	//filter := map[address.Address]struct{}{}
 	//for _, a := range addrss {
 	//	filter[a] = struct{}{}
 	//}
@@ -68,12 +69,13 @@ func (r *resolver) Mpool(ctx context.Context) ([]*msg, error) {
 		},
 	}}
 
+	baseFee := float64(25 * 1e9)
 	gqlmsgs := make([]*msg, 0, len(msgs))
 	for _, m := range msgs {
 		// Filter for local messages
-		if _, has := filter[m.Message.From]; !has {
-			continue
-		}
+		//if _, has := filter[m.Message.From]; !has {
+		//	continue
+		//}
 
 		params := "TODO" // m.Message.Params
 		gqlmsgs = append(gqlmsgs, &msg{
@@ -86,6 +88,7 @@ func (r *resolver) Mpool(ctx context.Context) ([]*msg, error) {
 			GasPremium: toFloat64(m.Message.GasPremium),
 			Method:     m.Message.Method.String(),
 			Params:     params,
+			BaseFee:    baseFee,
 		})
 	}
 

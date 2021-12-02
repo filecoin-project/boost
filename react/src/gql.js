@@ -174,6 +174,7 @@ const MpoolQuery = gql`
             GasPremium
             Method
             Params
+            BaseFee
         }
     }
 `;

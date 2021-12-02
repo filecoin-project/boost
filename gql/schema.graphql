@@ -83,6 +83,7 @@ type MpoolMessage {
   GasPremium: Float!
   Method: String!
   Params: String!
+  BaseFee: Float!
 }
 
 type RootQuery {

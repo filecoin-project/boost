@@ -20,8 +20,6 @@ export function StorageSpacePage(props) {
     totalSize += storage.Pending
     totalSize += storage.Free
 
-    console.log(data)
-
     return <>
         <div className="storage-chart">
             <div className="total-size">

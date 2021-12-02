@@ -70,7 +70,7 @@ var pages = [{
 class Pages extends React.Component {
     render() {
         return (
-            <td class="page-content">
+            <td className="page-content">
                 {this.props.pages.map(page => (
                     <div key={page.pageType} id={page.pageType} style={this.props.pageToShow === page.pageType ? {} : {display: 'none'}}>
                         <div className="page-title">{page.title}</div>

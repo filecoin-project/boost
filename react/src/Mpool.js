@@ -2,6 +2,7 @@ import {useQuery} from "./hooks";
 import {MpoolQuery} from "./gql";
 import React from "react";
 import {humanFIL} from "./util";
+import './Mpool.css'
 
 export function MpoolPage(props) {
     const {loading, error, data} = useQuery(MpoolQuery)
@@ -18,50 +19,98 @@ export function MpoolPage(props) {
     return <div className="mpool">
         <table>
             <tbody>
-                {msgs.map(msg => (
-                    <>
-                        <tr>
-                            <td>To</td>
-                            <td className="address">{msg.To}</td>
-                        </tr>
-                        <tr>
-                            <td>From</td>
-                            <td className="address">{msg.From}</td>
-                        </tr>
-                        <tr>
-                            <td>Nonce</td>
-                            <td>{msg.Nonce}</td>
-                        </tr>
-                        <tr>
-                            <td>Value</td>
-                            <td>{humanFIL(msg.Value)}</td>
-                        </tr>
-                        <tr>
-                            <td>GasFeeCap</td>
-                            <td>{humanFIL(msg.GasFeeCap)}</td>
-                        </tr>
-                        <tr>
-                            <td>GasLimit</td>
-                            <td>{humanFIL(msg.GasLimit)}</td>
-                        </tr>
-                        <tr>
-                            <td>GasPremium</td>
-                            <td>{humanFIL(msg.GasPremium)}</td>
-                        </tr>
-                        <tr>
-                            <td>Method</td>
-                            <td>{msg.Method}</td>
-                        </tr>
-                        <tr>
-                            <td>Params</td>
-                            <td>{msg.Params}</td>
-                        </tr>
-                        <tr className="spacer">
-                            <td colSpan="2"><hr/></td>
-                        </tr>
-                    </>
-                ))}
+                {msgs.map((msg, i) => <MpoolMessage msg={msg} key={i} />)}
             </tbody>
         </table>
+    </div>
+}
+
+function MpoolMessage(props) {
+    const i = props.i
+    const msg = props.msg
+
+    return <>
+        <tr key={"to"}>
+            <td>To</td>
+            <td className="address">{msg.To}</td>
+        </tr>
+        <tr key={"from"}>
+            <td>From</td>
+            <td className="address">{msg.From}</td>
+        </tr>
+        <tr key={i+"nonce"}>
+            <td>Nonce</td>
+            <td>{msg.Nonce}</td>
+        </tr>
+        <tr key={i+"value"}>
+            <td>Value</td>
+            <td>{humanFIL(msg.Value)}</td>
+        </tr>
+        <tr key={i+"method"}>
+            <td>Method</td>
+            <td>{msg.Method}</td>
+        </tr>
+        <tr key={i+"params"}>
+            <td>Params</td>
+            <td>{msg.Params}</td>
+        </tr>
+        <tr key={i+"gas-fee-cap"}>
+            <td>Gas Fee Cap</td>
+            <td>{humanFIL(msg.GasFeeCap)}</td>
+        </tr>
+        <tr key={i+"gas-limit"}>
+            <td>Gas Limit</td>
+            <td>{humanFIL(msg.GasLimit)}</td>
+        </tr>
+        <tr key={i+"gas-premium"}>
+            <td>Gas Premium</td>
+            <td>{humanFIL(msg.GasPremium)}</td>
+        </tr>
+        <tr key={i+"base-fee"}>
+            <td>
+                Base Fee
+                <FeeGraph msg={msg} />
+            </td>
+            <td>{humanFIL(msg.BaseFee)}</td>
+        </tr>
+        <tr key={i+"max-fees"} className="max-fees">
+            <td>Max Fees</td>
+            <td>
+                Gas Limit x Gas Fee Cap<br/>
+                {humanFIL(msg.GasLimit * msg.GasFeeCap)}
+            </td>
+        </tr>
+        <tr key={i+"miner-reward"} className="miner-reward">
+            <td>Miner Reward</td>
+            <td>
+                Gas Limit x Gas Premium<br/>
+                {humanFIL(msg.GasLimit * msg.GasPremium)}
+            </td>
+        </tr>
+        <tr key={i+"spacer"} className="spacer">
+            <td colSpan="2"><hr/></td>
+        </tr>
+    </>
+}
+
+function FeeGraph(props) {
+    return <div className="fee-graph">
+        <div className="max-fees">
+            <div className="axes" />
+            <div className="gas-premium"></div>
+            <div className="max-fees-label">Max Fees</div>
+        </div>
+        <div className="label-gas-limit">
+            Gas Limit
+            <div className="tick-right" />
+        </div>
+        <div className="label-gas-premium">
+            Gas Premium
+            <div className="tick-top" />
+        </div>
+        <div className="label-gas-fee-cap">
+            Gas Fee Cap
+            <div className="tick-top" />
+        </div>
     </div>
 }
