@@ -258,7 +258,7 @@ body.modal-open {
 
 #deal-publish .buttons .button {
   position: absolute;
-  right: -7em;
+  left: 30em;
   top: -1em;
 }
 
