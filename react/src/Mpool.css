@@ -1,0 +1,110 @@
+.mpool td, .mpool th {
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
+
+.mpool td.address {
+    word-break: break-all;
+}
+
+.mpool .max-fees {
+    color: #465298;
+}
+
+.mpool .miner-reward {
+    color: forestgreen;
+}
+
+.mpool .spacer hr {
+    border-top: none;
+}
+
+.mpool .fee-graph {
+    position: absolute;
+    margin-left: 30em;
+    height: 5em;
+}
+
+.mpool .fee-graph .axes {
+    position: absolute;
+    border: 1px dashed #000;
+    border-top: none;
+    border-right: none;
+    height: 6em;
+    width: 10em;
+    top: -1em;
+    z-index: 1;
+}
+
+.mpool .fee-graph .max-fees {
+    position: absolute;
+    height: 5em;
+    width: 9em;
+    border: 1px solid #465298;
+    border-left: none;
+    border-bottom: none;
+}
+
+.mpool .fee-graph .max-fees-label {
+    text-align: center;
+    font-size: 0.8em;
+    padding-top: 2.5em;
+}
+
+.mpool .fee-graph .gas-premium {
+    position: absolute;
+    width: 2em;
+    height: 5em;
+    border: 1px solid forestgreen;
+    border-top: none;
+    border-left: none;
+    border-bottom: transparent;
+    background-image: repeating-linear-gradient(
+            135deg,
+            #fff,
+            #fff 5px,
+            forestgreen 5px,
+            forestgreen 6px);
+}
+
+.mpool .fee-graph .label-gas-limit {
+    position: absolute;
+    font-size: 0.6em;
+    top: -1em;
+    left: -3.5em;
+    width: 3.5em;
+}
+
+.mpool .fee-graph .label-gas-premium {
+    position: absolute;
+    font-size: 0.6em;
+    top: 8.5em;
+    padding-top: 1em;
+    left: 1.85em;
+    width: 3em;
+}
+
+.mpool .fee-graph .label-gas-fee-cap {
+    position: absolute;
+    font-size: 0.6em;
+    top: 8.5em;
+    padding-top: 1em;
+    left: 13.5em;
+    width: 4em;
+}
+
+.mpool .fee-graph .tick-right {
+    position: absolute;
+    right: 0;
+    top: 1em;
+    border-top: 1px solid #000;
+    width: 0.5em;
+}
+
+.mpool .fee-graph .tick-top {
+    position: absolute;
+    top: 0;
+    left: 1.5em;
+    border-left: 1px solid #000;
+    height: 0.5em;
+}
