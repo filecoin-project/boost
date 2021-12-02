@@ -117,12 +117,8 @@ func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.Provide
 	return deal, nil
 }
 
-func (p *Provider) NBytesReceived(deal *types.ProviderDealState) (int64, error) {
-	fi, err := os.Stat(deal.InboundFilePath)
-	if err != nil {
-		return 0, nil
-	}
-	return fi.Size(), nil
+func (p *Provider) NBytesReceived(deal *types.ProviderDealState) uint64 {
+	return p.transfers.getBytes(deal.DealUuid)
 }
 
 func (p *Provider) GetAsk() *types.StorageAsk {

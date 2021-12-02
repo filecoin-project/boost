@@ -150,6 +150,13 @@ func (dt *dealTransfers) setBytes(dealUUID uuid.UUID, bytes uint64) {
 	dt.active[dealUUID] = bytes
 }
 
+func (dt *dealTransfers) getBytes(dealUUID uuid.UUID) uint64 {
+	dt.activeLk.RLock()
+	defer dt.activeLk.RUnlock()
+
+	return dt.active[dealUUID]
+}
+
 func (dt *dealTransfers) complete(dealUUID uuid.UUID) {
 	dt.activeLk.Lock()
 	defer dt.activeLk.Unlock()
