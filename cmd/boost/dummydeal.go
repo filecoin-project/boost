@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"os"
 	"path"
 
@@ -30,7 +31,25 @@ var dummydealCmd = &cli.Command{
 	Name:      "dummydeal",
 	Usage:     "Trigger a sample deal",
 	ArgsUsage: "<client addr> <miner addr>",
-	Before:    before,
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "url",
+			Usage: "url to CAR file",
+		},
+		&cli.StringFlag{
+			Name:  "piece-cid",
+			Usage: "commp of the CAR file",
+		},
+		&cli.Uint64Flag{
+			Name:  "piece-size",
+			Usage: "size of the CAR file as a padded piece",
+		},
+		&cli.StringFlag{
+			Name:  "payload-cid",
+			Usage: "root CID of the CAR file",
+		},
+	},
+	Before: before,
 	Action: func(cctx *cli.Context) error {
 		boostApi, ncloser, err := lcli.GetBoostAPI(cctx)
 		if err != nil {
@@ -59,21 +78,90 @@ var dummydealCmd = &cli.Command{
 			return fmt.Errorf("invalid miner address '%s': %w", cctx.Args().Get(1), err)
 		}
 
-		// Create a CAR file
-		randomFilepath, err := testutil.CreateRandomFile(rand.Int(), 2000000)
-		if err != nil {
-			return fmt.Errorf("creating random file: %w", err)
-		}
-		rootCid, carFilepath, err := testutil.CreateDenseCARv2(randomFilepath)
-		if err != nil {
-			return fmt.Errorf("creating CAR: %w", err)
-		}
-
-		// Register the file to be served from the web server
 		dealUuid := uuid.New()
-		url, err := serveCarFile(dealUuid, carFilepath)
-		if err != nil {
-			return err
+		var pieceCid cid.Cid
+		var pieceSize abi.PaddedPieceSize
+		var rootCid cid.Cid
+		var carFileSize uint64
+
+		// If the URL is not specified, create a randomly generated file
+		// locally, convert it to a CAR and serve the CAR with a web server
+		url := cctx.String("url")
+		if url == "" {
+			// Create a CAR file
+			randomFilepath, err := testutil.CreateRandomFile(rand.Int(), 2000000)
+			if err != nil {
+				return fmt.Errorf("creating random file: %w", err)
+			}
+			payloadCid, carFilepath, err := testutil.CreateDenseCARv2(randomFilepath)
+			if err != nil {
+				return fmt.Errorf("creating CAR: %w", err)
+			}
+			rootCid = payloadCid
+
+			// Register the file to be served from the web server
+			url, err = serveCarFile(dealUuid, carFilepath)
+			if err != nil {
+				return err
+			}
+
+			// Generate CommP
+			cidAndSize, err := storagemarket.GenerateCommP(carFilepath)
+			if err != nil {
+				return fmt.Errorf("generating commp for %s: %w", carFilepath, err)
+			}
+			pieceCid = cidAndSize.PieceCID
+			pieceSize = cidAndSize.PieceSize
+
+			if pieceCid.Prefix() != market.PieceCIDPrefix {
+				return fmt.Errorf("piece cid has wrong prefix: %s", pieceCid)
+			}
+
+			// Get the CAR file size
+			carFileInfo, err := os.Stat(carFilepath)
+			if err != nil {
+				return fmt.Errorf("getting stat of %s: %w", carFilepath, err)
+			}
+			carFileSize = uint64(carFileInfo.Size())
+
+			fmt.Printf("CAR file\n")
+			fmt.Printf("  Path: %s\n", carFilepath)
+			fmt.Printf("  Piece CID: %s\n", pieceCid)
+			fmt.Printf("  Piece size: %d\n", pieceSize)
+			fmt.Printf("  Payload CID: %s\n", rootCid)
+			fmt.Printf("  File size: %d\n", carFileSize)
+		} else {
+			pieceCidStr := cctx.String("piece-cid")
+			if pieceCidStr == "" {
+				return fmt.Errorf("must provide piece-cid parameter for CAR url")
+			}
+			pieceCid, err = cid.Parse(pieceCidStr)
+			if err != nil {
+				return fmt.Errorf("parsing piece cid %s: %w", pieceCidStr, err)
+			}
+
+			pieceSizeParam := cctx.Uint64("piece-size")
+			if pieceSizeParam == 0 {
+				return fmt.Errorf("must provide piece-size parameter for CAR url")
+			}
+			pieceSize = abi.PaddedPieceSize(pieceSizeParam)
+
+			payloadCidStr := cctx.String("payload-cid")
+			if payloadCidStr == "" {
+				return fmt.Errorf("must provide payload-cid parameter for CAR url")
+			}
+			rootCid, err = cid.Parse(payloadCidStr)
+			if err != nil {
+				return fmt.Errorf("parsing payload cid %s: %w", payloadCidStr, err)
+			}
+
+			carFileSize, err = getHTTPFileSize(ctx, url)
+			if err != nil {
+				return fmt.Errorf("getting size of file at %s", url)
+			}
+			if carFileSize == 0 {
+				return fmt.Errorf("unable to get size of file at %s", url)
+			}
 		}
 
 		// Store the path to the CAR file as a transfer parameter
@@ -89,14 +177,9 @@ var dummydealCmd = &cli.Command{
 		}
 
 		// Create a deal proposal
-		dealProposal, err := dealProposal(ctx, fullNodeApi, carFilepath, rootCid, clientAddr, minerAddr)
+		dealProposal, err := dealProposal(ctx, fullNodeApi, rootCid, pieceSize, pieceCid, clientAddr, minerAddr)
 		if err != nil {
 			return fmt.Errorf("creating deal proposal: %w", err)
-		}
-
-		carFileInfo, err := os.Stat(carFilepath)
-		if err != nil {
-			return fmt.Errorf("getting stat of %s: %w", carFilepath, err)
 		}
 
 		dealParams := &types.ClientDealParams{
@@ -108,7 +191,7 @@ var dummydealCmd = &cli.Command{
 			Transfer: types.Transfer{
 				Type:   "http",
 				Params: paramsBytes,
-				Size:   uint64(carFileInfo.Size()),
+				Size:   carFileSize,
 			},
 		}
 
@@ -126,6 +209,28 @@ var dummydealCmd = &cli.Command{
 
 		return nil
 	},
+}
+
+// Get the size of the CAR file by making an HTTP request and reading the
+// Content-Length header
+func getHTTPFileSize(ctx context.Context, url string) (uint64, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	req = req.WithContext(ctx)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+
+	defer resp.Body.Close() // nolint
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
+		return 0, fmt.Errorf("http req failed: code: %d, status: '%s'", resp.StatusCode, resp.Status)
+	}
+
+	return uint64(resp.ContentLength), nil
 }
 
 func serveCarFile(dealUuid uuid.UUID, fpath string) (string, error) {
@@ -148,15 +253,10 @@ func serveCarFile(dealUuid uuid.UUID, fpath string) (string, error) {
 	return url, nil
 }
 
-func dealProposal(ctx context.Context, fullNode v0api.FullNode, carFilePath string, rootCid cid.Cid, clientAddr address.Address, minerAddr address.Address) (*market.ClientDealProposal, error) {
-	cidAndSize, err := storagemarket.GenerateCommP(carFilePath)
-	if err != nil {
-		return nil, err
-	}
-
+func dealProposal(ctx context.Context, fullNode v0api.FullNode, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, clientAddr address.Address, minerAddr address.Address) (*market.ClientDealProposal, error) {
 	proposal := market.DealProposal{
-		PieceCID:             cidAndSize.PieceCID,
-		PieceSize:            cidAndSize.PieceSize,
+		PieceCID:             pieceCid,
+		PieceSize:            pieceSize,
 		VerifiedDeal:         false,
 		Client:               clientAddr,
 		Provider:             minerAddr,
