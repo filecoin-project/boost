@@ -163,8 +163,8 @@ const FundsMoveToEscrow = gql`
 `;
 
 const MpoolQuery = gql`
-    query AppMpoolQuery {
-        mpool {
+    query AppMpoolQuery($local: Boolean!) {
+        mpool(local: $local) {
             From
             To
             Nonce

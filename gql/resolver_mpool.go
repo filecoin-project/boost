@@ -1,12 +1,19 @@
 package gql
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-
+	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/specs-actors/actors/builtin/multisig"
 )
 
 type msg struct {
@@ -22,28 +29,160 @@ type msg struct {
 	BaseFee    float64
 }
 
-// query: mpool: [Message]
-func (r *resolver) Mpool(ctx context.Context) ([]*msg, error) {
-	//msgs, err := r.fullNode.MpoolPending(ctx, types.EmptyTSK)
-	//if err != nil {
-	//	return nil, fmt.Errorf("getting mpool messages: %w", err)
-	//}
+// query: mpool(local): [Message]
+func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg, error) {
+	msgs, err := r.fullNode.MpoolPending(ctx, types.EmptyTSK)
+	if err != nil {
+		return nil, fmt.Errorf("getting mpool messages: %w", err)
+	}
 
-	//addrss, err := r.fullNode.WalletList(ctx)
-	//if err != nil {
-	//	return nil, xerrors.Errorf("getting local addresses: %w", err)
-	//}
+	var filter map[address.Address]struct{}
+	if args.Local {
+		addrs, err := r.fullNode.WalletList(ctx)
+		if err != nil {
+			return nil, xerrors.Errorf("getting local addresses: %w", err)
+		}
 
-	//filter := map[address.Address]struct{}{}
-	//for _, a := range addrss {
-	//	filter[a] = struct{}{}
-	//}
+		filter := map[address.Address]struct{}{}
+		for _, a := range addrs {
+			filter[a] = struct{}{}
+		}
+	}
 
+	ts, err := r.fullNode.ChainHead(ctx)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to get chain head: %w", err)
+	}
+	baseFee := ts.Blocks()[0].ParentBaseFee
+
+	gqlmsgs := make([]*msg, 0, len(msgs))
+	for _, m := range msgs {
+		if filter != nil {
+			// Filter for local messages
+			if _, has := filter[m.Message.From]; !has {
+				continue
+			}
+		}
+
+		method := m.Message.Method.String()
+		toact, err := r.fullNode.StateGetActor(ctx, m.Message.To, types.EmptyTSK)
+		if err == nil {
+			method = filcns.NewActorRegistry().Methods[toact.Code][m.Message.Method].Name
+		}
+
+		var params string
+		paramsMsg, err := messageFromBytes(m.Message.Params)
+		if err != nil {
+			params = err.Error()
+		} else {
+			paramsBytes, err := json.MarshalIndent(paramsMsg, "", "  ")
+			if err != nil {
+				params = err.Error()
+			} else {
+				params = string(paramsBytes)
+			}
+		}
+
+		gqlmsgs = append(gqlmsgs, &msg{
+			To:         m.Message.To.String(),
+			From:       m.Message.From.String(),
+			Nonce:      float64(m.Message.Nonce),
+			Value:      toFloat64(m.Message.Value),
+			GasFeeCap:  toFloat64(m.Message.GasFeeCap),
+			GasLimit:   float64(m.Message.GasLimit),
+			GasPremium: toFloat64(m.Message.GasPremium),
+			Method:     method,
+			Params:     params,
+			BaseFee:    toFloat64(baseFee),
+		})
+	}
+
+	return gqlmsgs, nil
+}
+
+func messageFromBytes(msgb []byte) (types.ChainMsg, error) {
+	// Signed
+	{
+		var msg types.SignedMessage
+		if err := msg.UnmarshalCBOR(bytes.NewReader(msgb)); err == nil {
+			return &msg, nil
+		}
+	}
+
+	// Unsigned
+	{
+		var msg types.Message
+		if err := msg.UnmarshalCBOR(bytes.NewReader(msgb)); err == nil {
+			return &msg, nil
+		}
+	}
+
+	// Multisig propose?
+	{
+		var pp multisig.ProposeParams
+		if err := pp.UnmarshalCBOR(bytes.NewReader(msgb)); err == nil {
+			i, err := address.NewIDAddress(0)
+			if err != nil {
+				return nil, err
+			}
+
+			return &types.Message{
+				// Hack(-ish)
+				Version: 0x6d736967,
+				From:    i,
+
+				To:    pp.To,
+				Value: pp.Value,
+
+				Method: pp.Method,
+				Params: pp.Params,
+
+				GasFeeCap:  big.Zero(),
+				GasPremium: big.Zero(),
+			}, nil
+		}
+	}
+
+	// Encoded json???
+	{
+		if msg, err := messageFromJson(msgb); err == nil {
+			return msg, nil
+		}
+	}
+
+	return nil, xerrors.New("probably not a cbor-serialized message")
+}
+
+func messageFromJson(msgb []byte) (types.ChainMsg, error) {
+	// Unsigned
+	{
+		var msg types.Message
+		if err := json.Unmarshal(msgb, &msg); err == nil {
+			if msg.To != address.Undef {
+				return &msg, nil
+			}
+		}
+	}
+
+	// Signed
+	{
+		var msg types.SignedMessage
+		if err := json.Unmarshal(msgb, &msg); err == nil {
+			if msg.Message.To != address.Undef {
+				return &msg, nil
+			}
+		}
+	}
+
+	return nil, xerrors.New("probably not a json-serialized message")
+}
+
+func mockMessages() []*types.SignedMessage {
 	to0, _ := address.NewFromString("f01469945")
 	from0, _ := address.NewFromString("f3uakndzne4lorwykinlitx2d2puuhgburvxw4dpkfskeofmzg33pm7okyzikqe2gzvaqj2k3hpunwayij6haa")
 	to1, _ := address.NewFromString("f13vk7dxblv6eslc3utzdlt3vlyc6yhdfopfxv5ay")
 	from1, _ := address.NewFromString("f1oz4avehbenl4zlm4k56wlnpyeowptvi45im6w4y")
-	msgs := []*types.SignedMessage{{
+	return []*types.SignedMessage{{
 		Message: types.Message{
 			To:         to0,
 			From:       from0,
@@ -68,29 +207,6 @@ func (r *resolver) Mpool(ctx context.Context) ([]*msg, error) {
 			Params:     nil,
 		},
 	}}
-
-	baseFee := float64(25 * 1e9)
-	gqlmsgs := make([]*msg, 0, len(msgs))
-	for _, m := range msgs {
-		// Filter for local messages
-		//if _, has := filter[m.Message.From]; !has {
-		//	continue
-		//}
-
-		params := "TODO" // m.Message.Params
-		gqlmsgs = append(gqlmsgs, &msg{
-			To:         m.Message.To.String(),
-			From:       m.Message.From.String(),
-			Nonce:      float64(m.Message.Nonce),
-			Value:      toFloat64(m.Message.Value),
-			GasFeeCap:  toFloat64(m.Message.GasFeeCap),
-			GasLimit:   float64(m.Message.GasLimit),
-			GasPremium: toFloat64(m.Message.GasPremium),
-			Method:     m.Message.Method.String(),
-			Params:     params,
-			BaseFee:    baseFee,
-		})
-	}
-
-	return gqlmsgs, nil
 }
+
+var _ = mockMessages()

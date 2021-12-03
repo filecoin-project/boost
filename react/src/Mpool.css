@@ -1,3 +1,8 @@
+.mpool .button {
+    display: inline-block;
+    margin-left: 2em;
+}
+
 .mpool td, .mpool th {
     padding: 0.5em 1em;
     font-weight: normal;

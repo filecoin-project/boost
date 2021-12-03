@@ -1,11 +1,12 @@
 import {useQuery} from "./hooks";
-import {MpoolQuery} from "./gql";
-import React from "react";
+import {DealsListQuery, gqlQuery, MpoolQuery} from "./gql";
+import {React, useState} from "react";
 import {humanFIL} from "./util";
 import './Mpool.css'
 
 export function MpoolPage(props) {
-    const {loading, error, data} = useQuery(MpoolQuery)
+    const [local, setLocal] = useState(true)
+    const {loading, error, data} = useQuery(MpoolQuery, { variables: { local } })
 
     if (loading) {
         return <div>Loading...</div>
@@ -17,6 +18,13 @@ export function MpoolPage(props) {
     const msgs = data.mpool
 
     return <div className="mpool">
+        <p>
+            Showing {msgs.length} messages in {local ? 'local' : ''} message pool.
+            <div className="button" onClick={() => setLocal(!local)}>
+                Show {local ? 'All' : 'Local'} messages
+            </div>
+        </p>
+
         <table>
             <tbody>
                 {msgs.map((msg, i) => <MpoolMessage msg={msg} key={i} />)}
