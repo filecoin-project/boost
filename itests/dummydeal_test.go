@@ -4,15 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/filecoin-project/boost/build"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/filecoin-project/boost/build"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api"
@@ -105,29 +107,55 @@ func TestDummydeal(t *testing.T) {
 	f.start()
 
 	// Create a CAR file
-	randomFilepath, err := testutil.CreateRandomFile(5, 2000000)
+	tempdir := os.TempDir()
+	log.Debugw("using tempdir", "dir", tempdir)
+
+	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
 	require.NoError(t, err)
 
-	rootCid, carFilepath, err := testutil.CreateDenseCARv2(randomFilepath)
+	failingFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
 	require.NoError(t, err)
-	t.Cleanup(func() { os.Remove(carFilepath) })
 
-	// Start a web server to serve the file
-	server, err := runWebServer(carFilepath)
+	rootCid, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
+	require.NoError(t, err)
+
+	failingRootCid, failingCarFilepath, err := testutil.CreateDenseCARv2(tempdir, failingFilepath)
+	require.NoError(t, err)
+
+	// Start a web server to serve the car files
+	server, err := runWebServer(tempdir)
 	require.NoError(t, err)
 	defer server.Close()
 
 	// Create a new dummy deal
 	dealUuid := uuid.New()
 
-	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL)
+	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath))
 	require.NoError(t, err)
+	require.Nil(t, res, "expected res to be nil")
+	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
+
+	time.Sleep(2 * time.Second)
+
+	failingDealUuid := uuid.New()
+	res2, err2 := f.makeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
+	require.NoError(t, err2)
+	require.Equal(t, res2.Reason, "cannot accept piece of size 4194304, on top of already allocated 4194304 bytes, because it would exceed max staging area size 5000000")
+	log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
 
 	// Wait for the deal to be added to a sector
 	err = f.waitForDealAddedToSector(dealUuid)
 	require.NoError(t, err)
 
-	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
+	passingDealUuid := uuid.New()
+	res2, err2 = f.makeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
+	require.NoError(t, err2)
+	require.Nil(t, res2, "expected res2 to be nil")
+	log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
+
+	// Wait for the deal to be added to a sector
+	err = f.waitForDealAddedToSector(passingDealUuid)
+	require.NoError(t, err)
 
 	time.Sleep(3 * time.Second)
 
@@ -165,7 +193,7 @@ func (f *testFramework) start() {
 
 	apiinfo := cliutil.ParseApiInfo(fullnodeApiString)
 
-	fullnodeApi, closer, err := client.NewFullNodeRPCV1(f.ctx, addr, apiinfo.AuthHeader())
+	fullnodeApi, closerFullnode, err := client.NewFullNodeRPCV1(f.ctx, addr, apiinfo.AuthHeader())
 	require.NoError(f.t, err)
 
 	f.fullNode = fullnodeApi
@@ -227,7 +255,7 @@ func (f *testFramework) start() {
 
 	minerApiInfo := cliutil.ParseApiInfo(minerEndpoint)
 	minerConnAddr := "ws://127.0.0.1:2345/rpc/v0"
-	minerApi, closer, err := client.NewStorageMinerRPCV0(f.ctx, minerConnAddr, minerApiInfo.AuthHeader())
+	minerApi, closerMiner, err := client.NewStorageMinerRPCV0(f.ctx, minerConnAddr, minerApiInfo.AuthHeader())
 	require.NoError(f.t, err)
 
 	log.Debugw("minerApiInfo.Address", "addr", minerApiInfo.Addr)
@@ -262,6 +290,7 @@ func (f *testFramework) start() {
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
 	cfg.Dealmaking.PublishMsgPeriod = config.Duration(time.Second * 1)
+	cfg.Dealmaking.MaxStagingDealsBytes = 5000000
 
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
@@ -320,7 +349,8 @@ func (f *testFramework) start() {
 		shutdownChan <- struct{}{}
 		_ = stop(f.ctx)
 		<-finishCh
-		closer()
+		closerFullnode()
+		closerMiner()
 	}
 }
 
@@ -356,17 +386,13 @@ func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 	}
 }
 
-func runWebServer(path string) (*httptest.Server, error) {
+func runWebServer(dir string) (*httptest.Server, error) {
 	// start server with data to send
-	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		file, err := os.Open(path)
-		if err != nil {
-			panic(err)
-		}
 
-		http.ServeContent(w, r, "", time.Now(), file)
-	}))
+	fileSystem := &testutil.SlowFileOpener{Dir: dir}
 
+	handler := http.FileServer(fileSystem)
+	svr := httptest.NewServer(handler)
 	return svr, nil
 }
 

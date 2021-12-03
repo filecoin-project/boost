@@ -49,3 +49,16 @@ CREATE TABLE IF NOT EXISTS FundsTagged (
     Collateral TEXT,
     PubMsg TEXT
 );
+
+CREATE TABLE IF NOT EXISTS StorageLogs (
+    DealUUID TEXT,
+    CreatedAt DateTime,
+    PieceSize TEXT,
+    LogText TEXT
+);
+
+CREATE TABLE IF NOT EXISTS StorageTagged (
+    DealUUID TEXT,
+    CreatedAt DateTime,
+    PieceSize TEXT
+);

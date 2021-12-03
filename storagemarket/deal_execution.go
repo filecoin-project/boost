@@ -319,6 +319,13 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 
 	p.addDealLog(deal.DealUuid, "Deal handed off to sealer successfully")
 
+	// Now that the deal has been handed off to sealer, we should untag storage from the staging area.
+	err = p.storageManager.Untag(ctx, deal.DealUuid)
+	if err != nil {
+		log.Errorw("untagging storage", "uuid", deal.DealUuid, "err", err)
+		return err
+	}
+
 	return p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.AddedPiece)
 }
 
@@ -352,11 +359,17 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 
 func (p *Provider) cleanupDeal(ctx context.Context, deal *types.ProviderDealState) {
 	_ = os.Remove(deal.InboundFilePath)
-	// ...
-	//cleanup resources here
+
+	// clean up tagged funds
 	err := p.fundManager.UntagFunds(ctx, deal.DealUuid)
 	if err != nil {
 		log.Errorw("untagging funds", "id", deal.DealUuid, "err", err)
+	}
+
+	// clean up storage tag
+	err = p.storageManager.Untag(ctx, deal.DealUuid)
+	if err != nil {
+		log.Errorw("untagging storage", "id", deal.DealUuid, "err", err)
 	}
 
 	p.dealHandlers.del(deal.DealUuid)

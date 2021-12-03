@@ -101,7 +101,7 @@ func GenerateDeals() ([]types.ProviderDealState, error) {
 			SectorID:    abi.SectorNumber(rand.Intn(10000)),
 			Offset:      abi.PaddedPieceSize(rand.Intn(1000000)),
 			Length:      abi.PaddedPieceSize(rand.Intn(1000000)),
-			Checkpoint:  dealcheckpoints.New,
+			Checkpoint:  dealcheckpoints.Accepted,
 		}
 
 		deals = append(deals, deal)

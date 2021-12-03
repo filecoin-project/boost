@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/boost/filestore"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/storage/sectorblocks"
+	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/boost/transport/httptransport"
@@ -58,16 +59,17 @@ type Provider struct {
 	db      *sql.DB
 	dealsDB *db.DealsDB
 
-	Transport     transport.Transport
-	fundManager   *fundmanager.FundManager
-	dealPublisher *DealPublisher
-	adapter       *Adapter
-	transfers     *dealTransfers
+	Transport      transport.Transport
+	fundManager    *fundmanager.FundManager
+	storageManager *storagemanager.StorageManager
+	dealPublisher  *DealPublisher
+	adapter        *Adapter
+	transfers      *dealTransfers
 
 	dealHandlers *dealHandlers
 }
 
-func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address, secb *sectorblocks.SectorBlocks) (*Provider, error) {
+func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address, secb *sectorblocks.SectorBlocks) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -84,7 +86,7 @@ func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *f
 	}
 
 	return &Provider{
-		config:    Config{MaxTransferDuration: 30 * time.Second},
+		config:    Config{MaxTransferDuration: 24 * 3600 * time.Second},
 		Address:   addr,
 		newDealPS: newDealPS,
 		fs:        fs,
@@ -95,13 +97,15 @@ func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *f
 		failedDealsChan:  make(chan failedDealReq),
 		restartDealsChan: make(chan restartReq),
 
-		Transport:   httptransport.New(),
-		fundManager: fundMgr,
+		Transport:      httptransport.New(),
+		fundManager:    fundMgr,
+		storageManager: storageMgr,
 
 		dealPublisher: dealPublisher,
 		adapter: &Adapter{
-			FullNode: fullnodeApi,
-			secb:     secb,
+			FullNode:                    fullnodeApi,
+			secb:                        secb,
+			maxDealCollateralMultiplier: 2,
 		},
 		transfers: newDealTransfers(),
 

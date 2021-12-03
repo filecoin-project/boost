@@ -24,6 +24,7 @@ import (
 	"github.com/filecoin-project/boost/node/modules/lp2p"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/storage/sectorblocks"
+	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -393,6 +394,10 @@ func ConfigBoost(c interface{}) Option {
 			CollatWallet: walletPledgeCollat,
 			PubMsgWallet: walletPSD,
 			PubMsgBalMin: abi.NewTokenAmount(1000), // TODO: add to node config
+		})),
+
+		Override(new(*storagemanager.StorageManager), storagemanager.New(storagemanager.Config{
+			MaxStagingDealsBytes: uint64(cfg.Dealmaking.MaxStagingDealsBytes),
 		})),
 
 		// Sector API

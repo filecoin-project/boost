@@ -72,15 +72,41 @@ func (p *Provider) loop() {
 				continue
 			}
 
+			// Tag the storage required for the deal in the staging area
+			err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal.PieceSize)
+			if err != nil {
+				go writeDealResp(false, &api.ProviderDealRejectionInfo{
+					// TODO: provide a custom reason message (instead of sending provider
+					// error messages back to client) eg "Not enough staging storage for deal"
+					Reason: err.Error(),
+				}, nil)
+
+				errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+				if errf != nil {
+					log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
+				}
+				continue
+			}
+
 			// write deal state to the database
 			log.Infow("inserting deal into DB", "id", deal.DealUuid)
 
 			deal.CreatedAt = time.Now()
-			deal.Checkpoint = dealcheckpoints.New
+			deal.Checkpoint = dealcheckpoints.Accepted
 
 			err = p.dealsDB.Insert(p.ctx, deal)
 			if err != nil {
 				go writeDealResp(false, nil, fmt.Errorf("failed to insert deal in db: %w", err))
+
+				errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+				if errf != nil {
+					log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
+				}
+
+				errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
+				if errs != nil {
+					log.Errorw("untagging storage", "id", deal.DealUuid, "err", errs)
+				}
 				continue
 			}
 			log.Infow("inserted deal into DB", "id", deal.DealUuid)

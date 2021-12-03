@@ -296,7 +296,7 @@ func (dr *dealResolver) PieceCid() string {
 
 func (dr *dealResolver) Message() string {
 	switch dr.Checkpoint {
-	case dealcheckpoints.New:
+	case dealcheckpoints.Accepted:
 		switch dr.transferred {
 		case 0:
 			return "Transfer queued"
