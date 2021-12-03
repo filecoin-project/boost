@@ -80,6 +80,11 @@ func (p *Provider) loop() {
 					// error messages back to client) eg "Not enough staging storage for deal"
 					Reason: err.Error(),
 				}, nil)
+
+				errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+				if errf != nil {
+					log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
+				}
 				continue
 			}
 
@@ -92,6 +97,16 @@ func (p *Provider) loop() {
 			err = p.dealsDB.Insert(p.ctx, deal)
 			if err != nil {
 				go writeDealResp(false, nil, fmt.Errorf("failed to insert deal in db: %w", err))
+
+				errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+				if errf != nil {
+					log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
+				}
+
+				errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
+				if errs != nil {
+					log.Errorw("untagging storage", "id", deal.DealUuid, "err", errs)
+				}
 				continue
 			}
 			log.Infow("inserted deal into DB", "id", deal.DealUuid)
