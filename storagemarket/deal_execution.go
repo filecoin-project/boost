@@ -363,13 +363,13 @@ func (p *Provider) cleanupDeal(ctx context.Context, deal *types.ProviderDealStat
 	// clean up tagged funds
 	err := p.fundManager.UntagFunds(ctx, deal.DealUuid)
 	if err != nil {
-		log.Errorw("untagging funds", "uuid", deal.DealUuid, "err", err)
+		log.Errorw("untagging funds", "id", deal.DealUuid, "err", err)
 	}
 
 	// clean up storage tag
 	err = p.storageManager.Untag(ctx, deal.DealUuid)
 	if err != nil {
-		log.Errorw("untagging storage", "uuid", deal.DealUuid, "err", err)
+		log.Errorw("untagging storage", "id", deal.DealUuid, "err", err)
 	}
 
 	p.dealHandlers.del(deal.DealUuid)
