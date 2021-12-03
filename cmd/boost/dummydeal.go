@@ -273,7 +273,7 @@ func dealProposal(ctx context.Context, fullNode v0api.FullNode, rootCid cid.Cid,
 		StartEpoch:           startEpoch,
 		EndEpoch:             endEpoch,
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
-		ProviderCollateral:   abi.NewTokenAmount(152546066071935), // TODO: where is this minimum value coming from?
+		ProviderCollateral:   abi.NewTokenAmount(162546066071935), // TODO: where is this minimum value coming from?
 		ClientCollateral:     abi.NewTokenAmount(0),
 	}
 
