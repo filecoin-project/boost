@@ -121,12 +121,6 @@ func TestDummydeal(t *testing.T) {
 
 	failingRootCid, failingCarFilepath, err := testutil.CreateDenseCARv2(tempdir, failingFilepath)
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		os.Remove(randomFilepath)
-		os.Remove(carFilepath)
-		os.Remove(failingFilepath)
-		os.Remove(failingCarFilepath)
-	})
 
 	// Start a web server to serve the car files
 	server, err := runWebServer(tempdir)
