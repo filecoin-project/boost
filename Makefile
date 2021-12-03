@@ -25,7 +25,6 @@ ifneq ($(strip $(LDFLAGS)),)
 endif
 
 GOFLAGS+=-ldflags="$(ldflags)"
-GOFLAGS+=--tags=debug
 
 
 ## FFI
@@ -61,6 +60,8 @@ build/.update-modules:
 ## MAIN BINARIES
 
 CLEAN+=build/.update-modules
+
+debug: GOFLAGS+=-tags=debug
 
 deps: $(BUILD_DEPS)
 .PHONY: deps
