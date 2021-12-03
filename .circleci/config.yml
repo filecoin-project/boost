@@ -129,7 +129,7 @@ jobs:
       - install-deps
       - prepare
       - run:
-          command: make build
+          command: make debug
           no_output_timeout: 30m
       - lotus-artefacts
       - run:
@@ -184,7 +184,7 @@ jobs:
           key: v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/boost/go.sum" }}
       - install-deps
       - run:
-          command: make build
+          command: make debug
           no_output_timeout: 30m
       - run:
           name: check tag and version output match
@@ -237,7 +237,7 @@ jobs:
       - install-deps
       - prepare
       - run:
-          command: make deps
+          command: make debug deps
           no_output_timeout: 30m
       - go/install-golangci-lint:
           gobin: $HOME/.local/bin

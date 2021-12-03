@@ -176,8 +176,15 @@ var dummydealCmd = &cli.Command{
 			return fmt.Errorf("getting boost peer ID: %w", err)
 		}
 
+		tipset, err := fullNodeApi.ChainHead(ctx)
+		if err != nil {
+			return fmt.Errorf("getting chain head: %w", err)
+		}
+
+		head := tipset.Height()
+
 		// Create a deal proposal
-		dealProposal, err := dealProposal(ctx, fullNodeApi, rootCid, pieceSize, pieceCid, clientAddr, minerAddr)
+		dealProposal, err := dealProposal(ctx, fullNodeApi, rootCid, pieceSize, pieceCid, clientAddr, minerAddr, head)
 		if err != nil {
 			return fmt.Errorf("creating deal proposal: %w", err)
 		}
@@ -253,7 +260,9 @@ func serveCarFile(dealUuid uuid.UUID, fpath string) (string, error) {
 	return url, nil
 }
 
-func dealProposal(ctx context.Context, fullNode v0api.FullNode, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, clientAddr address.Address, minerAddr address.Address) (*market.ClientDealProposal, error) {
+func dealProposal(ctx context.Context, fullNode v0api.FullNode, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, clientAddr address.Address, minerAddr address.Address, head abi.ChainEpoch) (*market.ClientDealProposal, error) {
+	startEpoch := head + abi.ChainEpoch(5760)
+	endEpoch := startEpoch + 521280 // startEpoch + 181 days
 	proposal := market.DealProposal{
 		PieceCID:             pieceCid,
 		PieceSize:            pieceSize,
@@ -261,8 +270,8 @@ func dealProposal(ctx context.Context, fullNode v0api.FullNode, rootCid cid.Cid,
 		Client:               clientAddr,
 		Provider:             minerAddr,
 		Label:                rootCid.String(),
-		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
-		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
+		StartEpoch:           startEpoch,
+		EndEpoch:             endEpoch,
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
 		ProviderCollateral:   abi.NewTokenAmount(0),
 		ClientCollateral:     abi.NewTokenAmount(0),
