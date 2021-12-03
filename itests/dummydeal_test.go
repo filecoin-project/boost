@@ -107,16 +107,19 @@ func TestDummydeal(t *testing.T) {
 	f.start()
 
 	// Create a CAR file
-	randomFilepath, err := testutil.CreateRandomFile(5, 2000000)
+	tempdir := os.TempDir()
+	log.Debugw("using tempdir", "dir", tempdir)
+
+	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
 	require.NoError(t, err)
 
-	failingFilepath, err := testutil.CreateRandomFile(5, 2000000)
+	failingFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
 	require.NoError(t, err)
 
-	rootCid, carFilepath, err := testutil.CreateDenseCARv2(randomFilepath)
+	rootCid, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
 	require.NoError(t, err)
 
-	failingRootCid, failingCarFilepath, err := testutil.CreateDenseCARv2(failingFilepath)
+	failingRootCid, failingCarFilepath, err := testutil.CreateDenseCARv2(tempdir, failingFilepath)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		os.Remove(randomFilepath)
@@ -125,8 +128,8 @@ func TestDummydeal(t *testing.T) {
 		os.Remove(failingCarFilepath)
 	})
 
-	// Start a web server to serve the file
-	server, err := runWebServer(carFilepath)
+	// Start a web server to serve the car files
+	server, err := runWebServer(tempdir)
 	require.NoError(t, err)
 	defer server.Close()
 
@@ -135,20 +138,29 @@ func TestDummydeal(t *testing.T) {
 
 	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath))
 	require.NoError(t, err)
-
+	require.Nil(t, res, "expected res to be nil")
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	failingDealUuid := uuid.New()
 	res2, err2 := f.makeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
 	require.NoError(t, err2)
 	require.Equal(t, res2.Reason, "miner overloaded, staging area is full")
-
 	log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
 
 	// Wait for the deal to be added to a sector
 	err = f.waitForDealAddedToSector(dealUuid)
+	require.NoError(t, err)
+
+	passingDealUuid := uuid.New()
+	res2, err2 = f.makeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
+	require.NoError(t, err2)
+	require.Nil(t, res2, "expected res2 to be nil")
+	log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
+
+	// Wait for the deal to be added to a sector
+	err = f.waitForDealAddedToSector(passingDealUuid)
 	require.NoError(t, err)
 
 	time.Sleep(3 * time.Second)
@@ -380,10 +392,9 @@ func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 	}
 }
 
-func runWebServer(file string) (*httptest.Server, error) {
+func runWebServer(dir string) (*httptest.Server, error) {
 	// start server with data to send
 
-	dir := filepath.Dir(file)
 	fileSystem := &testutil.SlowFileOpener{Dir: dir}
 
 	handler := http.FileServer(fileSystem)

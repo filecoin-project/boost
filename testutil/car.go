@@ -39,10 +39,10 @@ type CarRes struct {
 }
 
 // CreateRandomFile
-func CreateRandomFile(rseed, size int) (string, error) {
+func CreateRandomFile(dir string, rseed, size int) (string, error) {
 	source := io.LimitReader(rand.New(rand.NewSource(int64(rseed))), int64(size))
 
-	file, err := os.CreateTemp("", "sourcefile.dat")
+	file, err := os.CreateTemp(dir, "sourcefile.dat")
 	if err != nil {
 		return "", err
 	}
@@ -63,7 +63,7 @@ func CreateRandomFile(rseed, size int) (string, error) {
 
 // CreateDenseCARv2 generates a "dense" UnixFS CARv2 from the supplied ordinary file.
 // A dense UnixFS CARv2 is one storing leaf data. Contrast to CreateRefCARv2.
-func CreateDenseCARv2(src string) (cid.Cid, string, error) {
+func CreateDenseCARv2(dir, src string) (cid.Cid, string, error) {
 	bs := bstore.NewBlockstore(dssync.MutexWrap(ds.NewMapDatastore()))
 	dagSvc := merkledag.NewDAGService(blockservice.New(bs, offline.Exchange(bs)))
 
@@ -74,7 +74,7 @@ func CreateDenseCARv2(src string) (cid.Cid, string, error) {
 
 	// Create a UnixFS DAG again AND generate a CARv2 file using a CARv2
 	// read-write blockstore now that we have the root.
-	out, err := os.CreateTemp("", "rand")
+	out, err := os.CreateTemp(dir, "rand")
 	if err != nil {
 		return cid.Undef, "", err
 	}

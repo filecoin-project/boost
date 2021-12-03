@@ -89,11 +89,11 @@ var dummydealCmd = &cli.Command{
 		url := cctx.String("url")
 		if url == "" {
 			// Create a CAR file
-			randomFilepath, err := testutil.CreateRandomFile(rand.Int(), 2000000)
+			randomFilepath, err := testutil.CreateRandomFile(os.TempDir(), rand.Int(), 2000000)
 			if err != nil {
 				return fmt.Errorf("creating random file: %w", err)
 			}
-			payloadCid, carFilepath, err := testutil.CreateDenseCARv2(randomFilepath)
+			payloadCid, carFilepath, err := testutil.CreateDenseCARv2(os.TempDir(), randomFilepath)
 			if err != nil {
 				return fmt.Errorf("creating CAR: %w", err)
 			}
