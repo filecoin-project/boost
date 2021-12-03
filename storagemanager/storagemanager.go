@@ -47,7 +47,7 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize 
 
 	if m.cfg.MaxStagingDealsBytes != 0 {
 		if uint64(tagged)+uint64(pieceSize) >= m.cfg.MaxStagingDealsBytes {
-			return fmt.Errorf("miner overloaded, staging area is full")
+			return fmt.Errorf("cannot accept piece of size %d, on top of already allocated %d bytes, because it would exceed max staging area size %d", uint64(pieceSize), uint64(tagged), m.cfg.MaxStagingDealsBytes)
 		}
 	}
 
