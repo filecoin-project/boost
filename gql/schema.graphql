@@ -109,7 +109,7 @@ type RootQuery {
   transfers: [TransferPoint]!
 
   """Get local messages in the mpool"""
-  mpool: [MpoolMessage]!
+  mpool(local: Boolean!): [MpoolMessage]!
 }
 
 type RootMutation {
