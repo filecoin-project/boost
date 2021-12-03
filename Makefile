@@ -62,6 +62,7 @@ build/.update-modules:
 CLEAN+=build/.update-modules
 
 debug: GOFLAGS+=-tags=debug
+debug: build
 
 deps: $(BUILD_DEPS)
 .PHONY: deps

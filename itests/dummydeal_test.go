@@ -143,9 +143,9 @@ func TestDummydeal(t *testing.T) {
 	failingDealUuid := uuid.New()
 	res2, err2 := f.makeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
 	require.NoError(t, err2)
-	require.Equal(res2.Reason, "miner overloaded, staging area is full")
+	require.Equal(t, res2.Reason, "miner overloaded, staging area is full")
 
-	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res2))
+	log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
 
 	// Wait for the deal to be added to a sector
 	err = f.waitForDealAddedToSector(dealUuid)
@@ -284,7 +284,7 @@ func (f *testFramework) start() {
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
 	cfg.Dealmaking.PublishMsgPeriod = config.Duration(time.Second * 1)
-	cfg.Dealmaking.MaxStagingDealsBytes = 3000000
+	cfg.Dealmaking.MaxStagingDealsBytes = 5000000
 
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)

@@ -86,7 +86,7 @@ func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *f
 	}
 
 	return &Provider{
-		config:    Config{MaxTransferDuration: 30 * time.Second},
+		config:    Config{MaxTransferDuration: 24 * 3600 * time.Second},
 		Address:   addr,
 		newDealPS: newDealPS,
 		fs:        fs,
