@@ -107,7 +107,7 @@ func TestDummydeal(t *testing.T) {
 	f.start()
 
 	// Create a CAR file
-	tempdir := os.TempDir()
+	tempdir := t.TempDir()
 	log.Debugw("using tempdir", "dir", tempdir)
 
 	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
