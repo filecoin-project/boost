@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 
 	"github.com/stretchr/testify/require"
@@ -22,27 +21,27 @@ func TestStorageDB(t *testing.T) {
 
 	tt, err := db.TotalTagged(ctx)
 	req.NoError(err)
-	req.Equal(abi.PaddedPieceSize(0), tt)
+	req.Equal(uint64(0), tt)
 
 	dealUUID := uuid.New()
 	amt, err := db.Untag(ctx, dealUUID)
 	req.NoError(err)
-	req.Equal(abi.PaddedPieceSize(0), amt)
+	req.Equal(uint64(0), amt)
 
-	err = db.Tag(ctx, dealUUID, abi.PaddedPieceSize(1111))
+	err = db.Tag(ctx, dealUUID, 1111)
 	req.NoError(err)
 
 	total, err := db.TotalTagged(ctx)
 	req.NoError(err)
-	req.Equal(abi.PaddedPieceSize(1111), total)
+	req.Equal(uint64(1111), total)
 
 	amt, err = db.Untag(ctx, dealUUID)
 	req.NoError(err)
-	req.Equal(abi.PaddedPieceSize(1111), amt)
+	req.Equal(uint64(1111), amt)
 
 	fl := &StorageLog{
 		DealUUID:  dealUUID,
-		PieceSize: abi.PaddedPieceSize(1234),
+		PieceSize: uint64(1234),
 		Text:      "Hello",
 	}
 	err = db.InsertLog(ctx, fl)

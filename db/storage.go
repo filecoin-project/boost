@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/google/uuid"
 )
@@ -14,7 +13,7 @@ import (
 type StorageLog struct {
 	DealUUID  uuid.UUID
 	CreatedAt time.Time
-	PieceSize abi.PaddedPieceSize
+	PieceSize uint64
 	Text      string
 }
 
@@ -26,7 +25,7 @@ func NewStorageDB(db *sql.DB) *StorageDB {
 	return &StorageDB{db: db}
 }
 
-func (s *StorageDB) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize abi.PaddedPieceSize) error {
+func (s *StorageDB) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize uint64) error {
 	qry := "INSERT INTO StorageTagged (DealUUID, CreatedAt, PieceSize) "
 	qry += "VALUES (?, ?, ?)"
 	values := []interface{}{dealUuid, time.Now(), fmt.Sprintf("%d", pieceSize)}
@@ -34,7 +33,7 @@ func (s *StorageDB) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize abi.P
 	return err
 }
 
-func (s *StorageDB) Untag(ctx context.Context, dealUuid uuid.UUID) (abi.PaddedPieceSize, error) {
+func (s *StorageDB) Untag(ctx context.Context, dealUuid uuid.UUID) (uint64, error) {
 	qry := "SELECT PieceSize FROM StorageTagged WHERE DealUUID = ?"
 	row := s.db.QueryRowContext(ctx, qry, dealUuid)
 
@@ -42,17 +41,17 @@ func (s *StorageDB) Untag(ctx context.Context, dealUuid uuid.UUID) (abi.PaddedPi
 	err := row.Scan(&ps.marshalled)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return abi.PaddedPieceSize(0), nil
+			return 0, nil
 		}
-		return abi.PaddedPieceSize(0), fmt.Errorf("getting untagged amount: %w", err)
+		return 0, fmt.Errorf("getting untagged amount: %w", err)
 	}
 	err = ps.unmarshall()
 	if err != nil {
-		return abi.PaddedPieceSize(0), fmt.Errorf("unmarshalling untagged PieceSize")
+		return 0, fmt.Errorf("unmarshalling untagged PieceSize")
 	}
 
 	_, err = s.db.ExecContext(ctx, "DELETE FROM StorageTagged WHERE DealUUID = ?", dealUuid)
-	return abi.PaddedPieceSize((*ps.f).Uint64()), err
+	return (*ps.f).Uint64(), err
 }
 
 func (s *StorageDB) InsertLog(ctx context.Context, logs ...*StorageLog) error {
@@ -102,7 +101,7 @@ func (s *StorageDB) Logs(ctx context.Context) ([]StorageLog, error) {
 			return nil, fmt.Errorf("unmarshalling PieceSize: %w", err)
 		}
 
-		storageLog.PieceSize = abi.PaddedPieceSize((*ps.f).Uint64())
+		storageLog.PieceSize = (*ps.f).Uint64()
 		storageLogs = append(storageLogs, storageLog)
 	}
 	if err := rows.Err(); err != nil {
@@ -112,7 +111,7 @@ func (s *StorageDB) Logs(ctx context.Context) ([]StorageLog, error) {
 	return storageLogs, nil
 }
 
-func (s *StorageDB) TotalTagged(ctx context.Context) (abi.PaddedPieceSize, error) {
+func (s *StorageDB) TotalTagged(ctx context.Context) (uint64, error) {
 	rows, err := s.db.QueryContext(ctx, "SELECT PieceSize FROM StorageTagged")
 	if err != nil {
 		return 0, fmt.Errorf("getting total tagged: %w", err)
@@ -140,5 +139,5 @@ func (s *StorageDB) TotalTagged(ctx context.Context) (abi.PaddedPieceSize, error
 		return 0, fmt.Errorf("getting total tagged: %w", err)
 	}
 
-	return abi.PaddedPieceSize(total.Uint64()), nil
+	return total.Uint64(), nil
 }

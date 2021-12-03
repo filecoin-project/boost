@@ -46,12 +46,12 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize 
 	}
 
 	if m.cfg.MaxStagingDealsBytes != 0 {
-		if uint64(tagged)+uint64(pieceSize) >= m.cfg.MaxStagingDealsBytes {
+		if tagged+uint64(pieceSize) >= m.cfg.MaxStagingDealsBytes {
 			return fmt.Errorf("cannot accept piece of size %d, on top of already allocated %d bytes, because it would exceed max staging area size %d", uint64(pieceSize), uint64(tagged), m.cfg.MaxStagingDealsBytes)
 		}
 	}
 
-	err = m.persistTagged(ctx, dealUuid, pieceSize)
+	err = m.persistTagged(ctx, dealUuid, uint64(pieceSize))
 	if err != nil {
 		return fmt.Errorf("saving total tagged storage: %w", err)
 	}
@@ -84,7 +84,7 @@ func (m *StorageManager) Untag(ctx context.Context, dealUuid uuid.UUID) error {
 }
 
 // unlocked
-func (m *StorageManager) totalTagged(ctx context.Context) (abi.PaddedPieceSize, error) {
+func (m *StorageManager) totalTagged(ctx context.Context) (uint64, error) {
 	total, err := m.db.TotalTagged(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("getting total tagged from DB: %w", err)
@@ -92,7 +92,7 @@ func (m *StorageManager) totalTagged(ctx context.Context) (abi.PaddedPieceSize, 
 	return total, nil
 }
 
-func (m *StorageManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, pieceSize abi.PaddedPieceSize) error {
+func (m *StorageManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, pieceSize uint64) error {
 	err := m.db.Tag(ctx, dealUuid, pieceSize)
 	if err != nil {
 		return fmt.Errorf("persisting tagged storage for deal to DB: %w", err)
