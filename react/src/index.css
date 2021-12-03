@@ -93,8 +93,12 @@ body.modal-open {
   font-weight: normal;
 }
 
-.deals td.client, .deals td.deal-id {
-  word-break: break-all;
+.deals th {
+  white-space: nowrap;
+}
+
+.deals td.piece-size {
+  white-space: nowrap;
 }
 
 .deals td.deal-id {
