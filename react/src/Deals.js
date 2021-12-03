@@ -188,13 +188,25 @@ function DealRow(props) {
         <tr>
             <td>{moment(deal.CreatedAt).fromNow()}</td>
             <td className="deal-id" onClick={() => props.onDealRowClick(deal.ID)}>
-                {deal.ID}
+                <ShortDealID id={deal.ID} />
             </td>
-            <td>{humanFileSize(deal.PieceSize, false, 0)}</td>
-            <td className="client">{deal.ClientAddress}</td>
+            <td className="piece-size">{humanFileSize(deal.PieceSize, false, 0)}</td>
+            <td className="client">
+                <ShortClientAddress address={deal.ClientAddress} />
+            </td>
             <td>{deal.Message}</td>
         </tr>
     )
+}
+
+function ShortDealID(props) {
+    const shortId = props.id.substring(0, 8)+'…'
+    return <div>{shortId}</div>
+}
+
+function ShortClientAddress(props) {
+    const shortAddr = props.address.substring(0, 8)+'…'
+    return <div>{shortAddr}</div>
 }
 
 class DealsPagination {
