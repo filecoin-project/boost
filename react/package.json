@@ -20,7 +20,7 @@
     "react-relay": "^12.0.0",
     "react-scripts": "4.0.3",
     "relay-runtime": "^12.0.0",
-    "subscriptions-transport-ws": "^0.9.19",
+    "subscriptions-transport-ws": "^0.11.0",
     "web-vitals": "^1.0.1"
   },
   "scripts": {

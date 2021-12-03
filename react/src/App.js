@@ -69,14 +69,15 @@ var pages = [{
 
 class Pages extends React.Component {
     render() {
+        const pageType = this.props.pageToShow
+        const page = this.props.pages.find(p => p.pageType === pageType)
+
         return (
             <td className="page-content">
-                {this.props.pages.map(page => (
-                    <div key={page.pageType} id={page.pageType} style={this.props.pageToShow === page.pageType ? {} : {display: 'none'}}>
-                        <div className="page-title">{page.title}</div>
-                        <div className="page-content">{this.renderPage(page)}</div>
-                    </div>
-                ))}
+                <div id={pageType}>
+                    <div className="page-title">{page.title}</div>
+                    <div className="page-content">{this.renderPage(page)}</div>
+                </div>
             </td>)
     }
 
