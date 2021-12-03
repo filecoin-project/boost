@@ -1,25 +1,50 @@
 import gql from "graphql-tag";
-import ApolloClient from "apollo-client";
+import { ApolloClient, HttpLink, split } from "@apollo/client";
+import { getMainDefinition } from '@apollo/client/utilities';
 import {WebSocketLink} from "apollo-link-ws";
 import {InMemoryCache} from "apollo-cache-inmemory";
-import {parseDates} from "./hooks";
+import { parseDates } from "./hooks";
+
+const graphqlEndpoint = "localhost:8080"
+
+// HTTP Link
+const httpLink = new HttpLink({
+    uri: `http://${graphqlEndpoint}/graphql/query`,
+});
+
+// WebSocket Link
+const wsLink = new WebSocketLink({
+    uri: `ws://${graphqlEndpoint}/graphql/subscription`,
+    options: {
+        reconnect: true,
+        lazy: true,
+    },
+});
+
+// Send query request based on the type definition
+const link = split(
+    ({ query }) => {
+        const definition = getMainDefinition(query);
+        return (
+            definition.kind === 'OperationDefinition' &&
+            definition.operation === 'subscription'
+        );
+    },
+    wsLink,
+    httpLink
+);
 
 const cache = new InMemoryCache();
 
 const gqlClient = new ApolloClient({
-    link: new WebSocketLink({
-        uri: "ws://localhost:8080/graphql",
-        options: {
-            reconnect: true,
-        },
-    }),
+    link,
     cache
 });
 
 const gqlQuery = function(...args) {
     var res = gqlClient.query.apply(gqlClient, args)
     return res.then(ret => {
-        if (ret.data) {
+        if (ret && ret.data) {
             parseDates(ret.data)
         }
         return ret

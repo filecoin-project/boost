@@ -1,4 +1,9 @@
-.mpool .button {
+.mpool .header {
+    padding: 1em;
+    margin-bottom: 1em;
+}
+
+.mpool .header .button {
     display: inline-block;
     margin-left: 2em;
 }

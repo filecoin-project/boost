@@ -69,12 +69,14 @@ func (s *Server) Serve(ctx context.Context) error {
 	}
 
 	// graphQL handler
-	graphQLHandler := graphqlws.NewHandlerFunc(schema, &relay.Handler{Schema: schema})
+	queryHandler := &relay.Handler{Schema: schema}
+	wsHandler := graphqlws.NewHandlerFunc(schema, queryHandler)
 
 	go func() {
 		listenAddr := fmt.Sprintf(":%d", httpPort)
 		fmt.Printf("Graphql server listening on %s\n", listenAddr)
-		http.Handle("/graphql", &corsHandler{graphQLHandler})
+		http.Handle("/graphql/subscription", &corsHandler{wsHandler})
+		http.Handle("/graphql/query", &corsHandler{queryHandler})
 
 		_ = http.ListenAndServe(listenAddr, nil)
 	}()
