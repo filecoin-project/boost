@@ -27,11 +27,9 @@ func NewStorageDB(db *sql.DB) *StorageDB {
 }
 
 func (s *StorageDB) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize abi.PaddedPieceSize) error {
-	ps := big.NewIntUnsigned(uint64(pieceSize))
-
 	qry := "INSERT INTO StorageTagged (DealUUID, CreatedAt, PieceSize) "
 	qry += "VALUES (?, ?, ?)"
-	values := []interface{}{dealUuid, time.Now(), ps.String()}
+	values := []interface{}{dealUuid, time.Now(), fmt.Sprintf("%d", pieceSize)}
 	_, err := s.db.ExecContext(ctx, qry, values...)
 	return err
 }
@@ -64,11 +62,9 @@ func (s *StorageDB) InsertLog(ctx context.Context, logs ...*StorageLog) error {
 			l.CreatedAt = now
 		}
 
-		ps := big.NewIntUnsigned(uint64(l.PieceSize))
-
 		qry := "INSERT INTO StorageLogs (DealUUID, CreatedAt, PieceSize, LogText) "
 		qry += "VALUES (?, ?, ?, ?)"
-		values := []interface{}{l.DealUUID, l.CreatedAt, ps.String(), l.Text}
+		values := []interface{}{l.DealUUID, l.CreatedAt, fmt.Sprintf("%d", l.PieceSize), l.Text}
 		_, err := s.db.ExecContext(ctx, qry, values...)
 		if err != nil {
 			return fmt.Errorf("inserting storage log: %w", err)
