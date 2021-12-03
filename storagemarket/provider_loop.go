@@ -87,7 +87,7 @@ func (p *Provider) loop() {
 			log.Infow("inserting deal into DB", "id", deal.DealUuid)
 
 			deal.CreatedAt = time.Now()
-			deal.Checkpoint = dealcheckpoints.New
+			deal.Checkpoint = dealcheckpoints.Accepted
 
 			err = p.dealsDB.Insert(p.ctx, deal)
 			if err != nil {

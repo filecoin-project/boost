@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -109,9 +110,20 @@ func TestDummydeal(t *testing.T) {
 	randomFilepath, err := testutil.CreateRandomFile(5, 2000000)
 	require.NoError(t, err)
 
+	failingFilepath, err := testutil.CreateRandomFile(5, 2000000)
+	require.NoError(t, err)
+
 	rootCid, carFilepath, err := testutil.CreateDenseCARv2(randomFilepath)
 	require.NoError(t, err)
-	t.Cleanup(func() { os.Remove(carFilepath) })
+
+	failingRootCid, failingCarFilepath, err := testutil.CreateDenseCARv2(failingFilepath)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		os.Remove(randomFilepath)
+		os.Remove(carFilepath)
+		os.Remove(failingFilepath)
+		os.Remove(failingCarFilepath)
+	})
 
 	// Start a web server to serve the file
 	server, err := runWebServer(carFilepath)
@@ -121,14 +133,23 @@ func TestDummydeal(t *testing.T) {
 	// Create a new dummy deal
 	dealUuid := uuid.New()
 
-	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL)
+	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath))
 	require.NoError(t, err)
+
+	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
+
+	time.Sleep(5 * time.Second)
+
+	failingDealUuid := uuid.New()
+	res2, err2 := f.makeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
+	require.NoError(t, err2)
+	require.Equal(res2.Reason, "miner overloaded, staging area is full")
+
+	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res2))
 
 	// Wait for the deal to be added to a sector
 	err = f.waitForDealAddedToSector(dealUuid)
 	require.NoError(t, err)
-
-	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
 	time.Sleep(3 * time.Second)
 
@@ -263,6 +284,7 @@ func (f *testFramework) start() {
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
 	cfg.Dealmaking.PublishMsgPeriod = config.Duration(time.Second * 1)
+	cfg.Dealmaking.MaxStagingDealsBytes = 3000000
 
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
@@ -358,17 +380,14 @@ func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 	}
 }
 
-func runWebServer(path string) (*httptest.Server, error) {
+func runWebServer(file string) (*httptest.Server, error) {
 	// start server with data to send
-	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		file, err := os.Open(path)
-		if err != nil {
-			panic(err)
-		}
 
-		http.ServeContent(w, r, "", time.Now(), file)
-	}))
+	dir := filepath.Dir(file)
+	fileSystem := &testutil.SlowFileOpener{Dir: dir}
 
+	handler := http.FileServer(fileSystem)
+	svr := httptest.NewServer(handler)
 	return svr, nil
 }
 
