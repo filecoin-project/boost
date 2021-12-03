@@ -103,8 +103,9 @@ func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *f
 
 		dealPublisher: dealPublisher,
 		adapter: &Adapter{
-			FullNode: fullnodeApi,
-			secb:     secb,
+			FullNode:                    fullnodeApi,
+			secb:                        secb,
+			maxDealCollateralMultiplier: 2,
 		},
 		transfers: newDealTransfers(),
 
