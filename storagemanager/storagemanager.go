@@ -39,8 +39,7 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize 
 	m.lk.Lock()
 	defer m.lk.Unlock()
 
-	// Check that the provider has enough funds in escrow to cover the
-	// collateral requirement for the deal
+	// Get the total tagged storage, so that we know how much is available.
 	tagged, err := m.totalTagged(ctx)
 	if err != nil {
 		return fmt.Errorf("getting total tagged: %w", err)
