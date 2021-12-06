@@ -1,9 +1,9 @@
 import {useMutation, useQuery} from "./hooks";
 import {FundsQuery, FundsLogsQuery, FundsMoveToEscrow} from "./gql";
-import {BarChart} from "./Chart";
-import {useState, React}  from "react";
+import {useState, useEffect, React}  from "react";
 import moment from "moment";
 import {humanFIL} from "./util"
+import $ from 'jquery';
 
 export function FundsPage(props) {
     return (
@@ -24,44 +24,125 @@ function FundsChart(props) {
         return <div>Error: {error.message}</div>
     }
 
-    function fundsAmount(tp) {
-        return (data.funds.find(f => f.Name === tp) || {}).Amount || 0
+    const funds = data.funds
+    const collatBalance = funds.Collateral.Balance
+    const escrow = {
+        tagged: funds.Escrow.Tagged,
+        available: funds.Escrow.Available,
+        locked: funds.Escrow.Locked,
+    }
+    escrow.total = escrow.tagged + escrow.available + escrow.locked
+
+    const pubMsg = {
+        tagged: funds.PubMsg.Tagged,
+        total: funds.PubMsg.Balance,
+    }
+    pubMsg.available = pubMsg.total - pubMsg.tagged
+
+    const amtMax = Math.max(collatBalance, escrow.total, pubMsg.total)
+    const collatBarPct = 100 * collatBalance / amtMax
+
+    const escrowBar = {
+        tagged: Math.floor(100 * escrow.tagged / amtMax)-1,
+        available: Math.floor(100 * escrow.available / amtMax)-1,
+        locked: Math.floor(100 * escrow.locked / amtMax),
+        unit: Math.floor(100*escrow.total / amtMax)
     }
 
-    var barChart = [{
-        Name: 'Available collateral',
-        Capacity: fundsAmount('escrow-available'),
-    }, {
-        Name: 'Tagged collateral',
-        Capacity: fundsAmount('escrow-tagged'),
-    }, {
-        Name: 'Available for Publish message',
-        Capacity: fundsAmount('publish-message-balance'),
-    }, {
-        Name: 'Tagged for Publish message',
-        Capacity: fundsAmount('publish-message-tagged'),
-    }]
+    const pubMsgBar = {
+        tagged: Math.floor(100 * pubMsg.tagged / pubMsg.total)-1,
+        available: Math.floor(100 * pubMsg.available / pubMsg.total)-2,
+        unit: Math.floor(100 * pubMsg.total / amtMax),
+    }
 
-    return <>
-        <BarChart fields={barChart} unit="attofil" />
+    const barSpaceRatio = 0.6
 
-        <div className="collateral">
-            <table>
-                <tbody>
-                <tr>
-                    <td>Locked Collateral</td>
-                    <td>{humanFIL(fundsAmount('escrow-locked'))}</td>
-                </tr>
-                <tr>
-                    <td>Pledge Collateral</td>
-                    <td>{humanFIL(fundsAmount('collateral-balance'))}</td>
-                </tr>
-                </tbody>
-            </table>
+    return <div className="chart">
+        <div className="amounts">
+            <div className="collateral-source">
+                <div className="title">Collateral Source Wallet</div>
+                <WalletAddress address={funds.Collateral.Address} />
+                <div className="bar-content">
+                    <div className="bar" style={{ width: barSpaceRatio*collatBarPct+'%'}}>
+                        <div className="collat"></div>
+                    </div>
+                    <div className="bar-total">{humanFIL(collatBalance)}</div>
+                </div>
+            </div>
 
-            <TopupCollateral maxTopup={fundsAmount('collateral-balance')} />
+            <div className="escrow">
+                <div className="title">Collateral</div>
+                <div className="bar-content">
+                    <div className="bar" style={{ width: barSpaceRatio*escrowBar.unit+'%'}}>
+                        <div className="tagged" style={{width: escrowBar.tagged + '%'}} />
+                        { escrow.available ? (
+                            <div className="available" style={{width: escrowBar.available + '%'}} />
+                        ) : null }
+                        { escrow.locked ? (
+                            <div className="locked" style={{width: escrowBar.locked + '%'}} />
+                        ) : null }
+                    </div>
+
+                    <div className="bar-total">{humanFIL(escrow.total)}</div>
+
+                    <div className="labels">
+                        <div className="label tagged">
+                            <div className="bar-color"></div>
+                            <div className="text">Tagged</div>
+                            <div className="amount">{humanFIL(escrow.tagged)}</div>
+                        </div>
+                        <div className="label available">
+                            <div className="bar-color"></div>
+                            <div className="text">Available</div>
+                            <div className="amount">{humanFIL(escrow.available)}</div>
+                        </div>
+                        { escrow.locked ? (
+                            <div className="label locked">
+                                <div className="bar-color"></div>
+                                <div className="text">Locked</div>
+                                <div className="amount">{humanFIL(escrow.locked)}</div>
+                            </div>
+                        ) : null }
+                    </div>
+                </div>
+            </div>
+
+            <div className="pubmsg-wallet">
+                <div className="title">Publish Storage Deals Wallet</div>
+                <WalletAddress address={funds.PubMsg.Address} />
+                <div className="bar-content">
+                    <div className="bar" style={{ width: barSpaceRatio*pubMsgBar.unit+'%'}} />
+                    <div className="bar-total">{humanFIL(pubMsg.total)}</div>
+
+                    <div className="labels">
+                        <div className="label tagged">
+                            <div className="bar-color"></div>
+                            <div className="text">Tagged</div>
+                            <div className="amount">{humanFIL(pubMsg.tagged)}</div>
+                        </div>
+                        { pubMsg.available ? (
+                            <div className="label available">
+                                <div className="bar-color"></div>
+                                <div className="text">Available</div>
+                                <div className="amount">{humanFIL(pubMsg.available)}</div>
+                            </div>
+                        ) : null }
+                    </div>
+                </div>
+            </div>
         </div>
-    </>
+
+        <TopupCollateral maxTopup={collatBalance} />
+    </div>
+}
+
+function WalletAddress(props) {
+    const shortAddr = props.address.substring(0, 8)+'…'+props.address.substring(props.address.length-8)
+    return <div className="wallet-address">
+        <a href={"https://filfox.info/en/address/"+props.address}>
+            {shortAddr}
+        </a>
+    </div>
 }
 
 function TopupCollateral(props) {

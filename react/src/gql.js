@@ -131,8 +131,20 @@ const StorageQuery = gql`
 const FundsQuery = gql`
     query AppFundsQuery {
         funds {
-            Name
-            Amount
+            Escrow {
+                Tagged
+                Available
+                Locked
+            }
+            Collateral {
+                Address
+                Balance
+            }
+            PubMsg {
+                Address
+                Balance
+                Tagged
+            }
         }
     }
 `;

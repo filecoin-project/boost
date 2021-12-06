@@ -4,6 +4,11 @@
   font-display: swap;
 }
 
+a {
+  color: #465298;
+  text-decoration: none;
+}
+
 .button {
   color: #fff;
   background-color: #3399ff;
@@ -211,10 +216,105 @@ body.modal-open {
   vertical-align: top;
 }
 
-#funds .bar-chart {
+#funds .chart {
+  padding: 1em;
+}
+
+#funds .chart .amounts {
+  width: 50%;
+  display: inline-block;
+}
+
+#funds .chart .wallet-address {
+  padding: 0.5em 0;
+  font-size: 0.8em;
+}
+
+#funds .chart .escrow {
+  margin-top: 1em;
+}
+
+#funds .chart .escrow .title {
+  padding: 0.5em 0;
+}
+
+#funds .chart .bar {
+  border: 1px solid #000;
+  display: inline-block;
+  height: 2.5em;
+  width: 100%;
+}
+
+#funds .chart .bar > div, #funds .chart .bar-total {
   display: inline-block;
   vertical-align: top;
+  height: 2.5em;
 }
+
+#funds .chart .bar-total {
+  line-height: 2.5em;
+}
+
+#funds .chart .bar > div {
+  border-right: 1px solid #000;
+  position: relative;
+}
+
+#funds .chart .bar > div:last-child {
+  border-right: none;
+}
+
+#funds .chart .bar .label {
+  position: absolute;
+  top: 3.2em;
+  font-size: 0.8em;
+  display: inline-block;
+  text-align: center;
+  left: 50%;
+  transform: translate(-50%, 0);
+}
+
+#funds .chart .bar .label .text {
+  padding: 0.5em;
+  white-space: nowrap;
+}
+
+#funds .chart .bar .label .tick {
+  border-left: 1px solid #000;
+  height: 0.5em;
+  margin-left: 50%
+}
+
+#funds .chart .bar-total {
+  padding-left: 1em;
+}
+
+#funds .chart .bar div.tagged {
+  background-image: repeating-linear-gradient(
+          135deg,
+          #fff,
+          #fff 5px,
+          #a61e4d 5px,
+          #a61e4d 6px);
+}
+
+#funds .chart .bar div.locked {
+  background-image: repeating-linear-gradient(
+          135deg,
+          #fff,
+          #fff 5px,
+          #465298 5px,
+          #465298 6px);
+}
+
+#funds .chart .pubmsg-wallet {
+  margin-top: 2em;
+}
+
+#funds .chart .pubmsg-wallet .bar-content {
+  height: 4em;
+}
+
 
 #funds .collateral {
   display: inline-block;
@@ -226,7 +326,62 @@ body.modal-open {
   font-weight: normal;
 }
 
-.top-up-form .button {
+#funds .chart .bar-keys {
+  font-size: 0.8em;
+}
+
+#funds .chart .labels .label {
+  display: inline-block;
+  padding: 0.5em 1em;
+  font-size: 0.8em;
+}
+
+#funds .chart .labels .bar-color {
+  border: 1px solid #000;
+  width: 0.8em;
+  height: 0.8em;
+  display: inline-block;
+}
+
+#funds .chart .labels .text {
+  display: inline-block;
+  padding-left: 0.5em;
+}
+
+#funds .chart .labels .amount {
+  padding: 0.5em 0 0 1.5em;
+}
+
+#funds .chart .labels .tagged .bar-color {
+  background-image: repeating-linear-gradient(
+          135deg,
+          #fff,
+          #fff 3px,
+          #a61e4d 3px,
+          #a61e4d 4px);
+}
+
+#funds .chart .labels .locked .bar-color {
+  background-image: repeating-linear-gradient(
+          135deg,
+          #fff,
+          #fff 3px,
+          #465298 3px,
+          #465298 4px);
+}
+
+#funds .chart .bar-keys .bar-key .bar-text {
+  display: inline-block;
+  padding: 0 0.5em;
+}
+
+.top-up {
+  display: inline-block;
+  width: 50%;
+  vertical-align: top;
+}
+
+.top-up .button {
   display: inline-block;
 }
 
