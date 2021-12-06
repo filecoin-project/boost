@@ -206,10 +206,18 @@ func (m *FundManager) BalancePledgeCollateral(ctx context.Context) (abi.TokenAmo
 	return m.api.WalletBalance(ctx, m.cfg.CollatWallet)
 }
 
+func (m *FundManager) AddressPledgeCollateral() address.Address {
+	return m.cfg.CollatWallet
+}
+
 // BalancePublishMsg returns the amount of funds in the wallet used to send
 // publish storage deals messages
 func (m *FundManager) BalancePublishMsg(ctx context.Context) (abi.TokenAmount, error) {
 	return m.api.WalletBalance(ctx, m.cfg.PubMsgWallet)
+}
+
+func (m *FundManager) AddressPublishMsg() address.Address {
+	return m.cfg.PubMsgWallet
 }
 
 func (m *FundManager) Logs(ctx context.Context) ([]db.FundsLog, error) {

@@ -11,13 +11,26 @@ import (
 	"github.com/graph-gophers/graphql-go"
 )
 
-type fundAmount struct {
-	Name   string
-	Amount float64
+type fundsEscrow struct {
+	Available float64
+	Locked    float64
+	Tagged    float64
 }
 
-// query: funds: [FundAmount]
-func (r *resolver) Funds(ctx context.Context) ([]*fundAmount, error) {
+type fundsWallet struct {
+	Address string
+	Balance float64
+	Tagged  float64
+}
+
+type funds struct {
+	Escrow     fundsEscrow
+	Collateral fundsWallet
+	PubMsg     fundsWallet
+}
+
+// query: funds: Funds
+func (r *resolver) Funds(ctx context.Context) (*funds, error) {
 	tagged, err := r.fundMgr.TotalTagged(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting total tagged: %w", err)
@@ -38,32 +51,22 @@ func (r *resolver) Funds(ctx context.Context) ([]*fundAmount, error) {
 		return nil, fmt.Errorf("getting pledge collateral balance: %w", err)
 	}
 
-	escrowTagged := toFloat64(tagged.Collateral)
-	pubMsgTagged := toFloat64(tagged.PubMsg)
-	escrowAvail := toFloat64(balMkt.Available)
-	escrowLocked := toFloat64(balMkt.Locked)
-	pubMsgBalance := toFloat64(balPubMsg)
-	collateralBalance := toFloat64(balCollateral)
-
-	return []*fundAmount{{
-		Name:   "escrow-available",
-		Amount: escrowAvail,
-	}, {
-		Name:   "escrow-locked",
-		Amount: escrowLocked,
-	}, {
-		Name:   "escrow-tagged",
-		Amount: escrowTagged,
-	}, {
-		Name:   "collateral-balance",
-		Amount: collateralBalance,
-	}, {
-		Name:   "publish-message-balance",
-		Amount: pubMsgBalance,
-	}, {
-		Name:   "publish-message-tagged",
-		Amount: pubMsgTagged,
-	}}, nil
+	return &funds{
+		Escrow: fundsEscrow{
+			Tagged:    toFloat64(tagged.Collateral),
+			Available: toFloat64(balMkt.Available),
+			Locked:    toFloat64(balMkt.Locked),
+		},
+		Collateral: fundsWallet{
+			Address: r.fundMgr.AddressPledgeCollateral().String(),
+			Balance: toFloat64(balCollateral),
+		},
+		PubMsg: fundsWallet{
+			Address: r.fundMgr.AddressPublishMsg().String(),
+			Balance: toFloat64(balPubMsg),
+			Tagged:  toFloat64(tagged.PubMsg),
+		},
+	}, nil
 }
 
 func toFloat64(i abi.TokenAmount) float64 {

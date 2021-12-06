@@ -43,9 +43,22 @@ type Storage {
   MountPoint: String!
 }
 
-type FundAmount {
-  Name: String!
-  Amount: Float!
+type FundsEscrow {
+  Available: Float!
+  Locked: Float!
+  Tagged: Float!
+}
+
+type FundsWallet {
+  Address: String!
+  Balance: Float!
+  Tagged: Float!
+}
+
+type Funds {
+  Escrow: FundsEscrow!
+  Collateral: FundsWallet!
+  PubMsg: FundsWallet!
 }
 
 type FundsLogList {
@@ -97,7 +110,7 @@ type RootQuery {
   storage: Storage!
 
   """Get funds available"""
-  funds: [FundAmount]!
+  funds: Funds!
 
   """Get log of fund transactions"""
   fundsLogs: FundsLogList!
