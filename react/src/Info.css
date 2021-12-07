@@ -1,0 +1,30 @@
+.info {
+    display: inline-block;
+    position: relative;
+}
+
+.info .target {
+    display: inline-block;
+    border: 1px solid #465298;
+    color: #465298;
+    cursor: pointer;
+    border-radius: 2em;
+    padding: 0 0.5em;
+    font-size: 0.6em;
+    vertical-align: top;
+    margin-left: 0.5em;
+}
+
+.info .content {
+    z-index: 1;
+    font-size: 0.8em;
+    position: absolute;
+    top: 0;
+    left: 2em;
+    width: 20em;
+    background: #fff;
+    border: 1px solid #465298;
+    color: #465298;
+    border-radius: 0.2em;
+    padding: 0.5em;
+}
