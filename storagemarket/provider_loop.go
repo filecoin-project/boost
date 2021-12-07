@@ -25,29 +25,11 @@ type failedDealReq struct {
 	err error
 }
 
-type restartReq struct {
-	deal *types.ProviderDealState
-}
-
 func (p *Provider) loop() {
 	defer p.wg.Done()
 
 	for {
 		select {
-		case restartReq := <-p.restartDealsChan:
-			log.Infow("restarting deal", "id", restartReq.deal.DealUuid)
-
-			// Put ANY RESTART SYNCHRONIZATION LOGIC HERE.
-			// ....
-			//
-			p.wg.Add(1)
-			go func() {
-				defer p.wg.Done()
-
-				p.doDeal(restartReq.deal)
-			}()
-			log.Infow("restarted deal", "id", restartReq.deal.DealUuid)
-
 		case dealReq := <-p.acceptDealsChan:
 			deal := dealReq.deal
 			log.Infow("process accept deal request", "id", deal.DealUuid)

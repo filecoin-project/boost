@@ -51,9 +51,8 @@ type Provider struct {
 	fs filestore.FileStore
 
 	// event loop
-	acceptDealsChan  chan acceptDealReq
-	failedDealsChan  chan failedDealReq
-	restartDealsChan chan restartReq
+	acceptDealsChan chan acceptDealReq
+	failedDealsChan chan failedDealReq
 
 	// Database API
 	db      *sql.DB
@@ -93,9 +92,8 @@ func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *f
 		db:        sqldb,
 		dealsDB:   dealsDB,
 
-		acceptDealsChan:  make(chan acceptDealReq),
-		failedDealsChan:  make(chan failedDealReq),
-		restartDealsChan: make(chan restartReq),
+		acceptDealsChan: make(chan acceptDealReq),
+		failedDealsChan: make(chan failedDealReq),
 
 		Transport:      httptransport.New(),
 		fundManager:    fundMgr,
@@ -222,33 +220,8 @@ func (p *Provider) Start(ctx context.Context) error {
 	}
 	log.Infow("db initialized")
 
-	// restart all existing deals
-	deals, err := p.dealsDB.ListActive(p.ctx)
-	if err != nil {
-		return fmt.Errorf("getting active deals: %w", err)
-	}
-
-	var restartWg sync.WaitGroup
-	for _, deal := range deals {
-		ds := deal
-		restartWg.Add(1)
-		go func() {
-			defer restartWg.Done()
-
-			select {
-			case p.restartDealsChan <- restartReq{deal: ds}:
-			case <-p.ctx.Done():
-				log.Errorw("timeout when restarting deal", "err", p.ctx.Err(), "id", ds.DealUuid)
-			}
-		}()
-	}
-
 	p.wg.Add(1)
 	go p.loop()
-
-	// wait for all deals to be restarted before returning so we know new deals will be processed
-	// after all existing deals have restarted and accounted for their resources.
-	restartWg.Wait()
 
 	go p.transfers.start(p.ctx)
 
