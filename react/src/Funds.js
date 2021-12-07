@@ -1,6 +1,6 @@
 import {useMutation, useQuery} from "./hooks";
 import {FundsQuery, FundsLogsQuery, FundsMoveToEscrow} from "./gql";
-import {useState, useEffect, React}  from "react";
+import {useState, React}  from "react";
 import moment from "moment";
 import {humanFIL} from "./util"
 import {Info} from "./Info"

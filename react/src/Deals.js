@@ -184,9 +184,14 @@ function DealRow(props) {
         deal = data.dealUpdate
     }
 
+    var start = '1m'
+    if (new Date().getTime() - deal.CreatedAt.getTime() > 60 * 1000) {
+        start = moment(deal.CreatedAt).fromNow()
+    }
+
     return (
         <tr>
-            <td>{moment(deal.CreatedAt).fromNow()}</td>
+            <td className="start">{start}</td>
             <td className="deal-id" onClick={() => props.onDealRowClick(deal.ID)}>
                 <ShortDealID id={deal.ID} />
             </td>
@@ -194,7 +199,7 @@ function DealRow(props) {
             <td className="client">
                 <ShortClientAddress address={deal.ClientAddress} />
             </td>
-            <td>{deal.Message}</td>
+            <td className="message">{deal.Message}</td>
         </tr>
     )
 }
