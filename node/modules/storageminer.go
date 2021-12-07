@@ -539,8 +539,8 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 	}
 }
 
-func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *gql.Server {
-	resolver := gql.NewResolver(dealsDB, fundMgr, prov, publisher, fullNode)
+func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *gql.Server {
+	resolver := gql.NewResolver(dealsDB, fundMgr, storageMgr, prov, publisher, fullNode)
 	server := gql.NewServer(resolver)
 
 	lc.Append(fx.Hook{

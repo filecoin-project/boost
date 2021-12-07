@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"path/filepath"
 
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
@@ -13,21 +15,47 @@ import (
 
 var log = logging.Logger("storagemanager")
 
+var (
+	StagingAreaDirName = "deal-staging"
+)
+
 type Config struct {
 	MaxStagingDealsBytes uint64
 }
 
 type StorageManager struct {
-	db  *db.StorageDB
-	cfg Config
+	db                 *db.StorageDB
+	cfg                Config
+	StagingAreaDirPath string
 }
 
-func New(cfg Config) func(sqldb *sql.DB) *StorageManager {
-	return func(sqldb *sql.DB) *StorageManager {
+func New(cfg Config) func(lr repo.LockedRepo, sqldb *sql.DB) *StorageManager {
+	return func(lr repo.LockedRepo, sqldb *sql.DB) *StorageManager {
 		return &StorageManager{
-			db:  db.NewStorageDB(sqldb),
-			cfg: cfg,
+			db:                 db.NewStorageDB(sqldb),
+			cfg:                cfg,
+			StagingAreaDirPath: filepath.Join(lr.Path(), StagingAreaDirName),
 		}
+	}
+}
+
+// Free
+func (m *StorageManager) Free(ctx context.Context) (uint64, error) {
+	m.Lock()
+	defer m.Unlock()
+
+	// Get the total tagged storage, so that we know how much is available.
+	tagged, err := m.totalTagged(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("getting total tagged: %w", err)
+	}
+
+	if m.cfg.MaxStagingDealsBytes != 0 {
+		return m.cfg.MaxStagingDealsBytes - tagged, nil
+	} else {
+		// we don't have a max staging area configured, so
+		// maybe return the actual free disk space
+		return 0, nil
 	}
 }
 
@@ -72,6 +100,13 @@ func (m *StorageManager) Untag(ctx context.Context, dealUuid uuid.UUID) error {
 
 	log.Infow("untag storage", "id", dealUuid, "pieceSize", pieceSize)
 	return nil
+}
+
+func (m *StorageManager) TotalTagged(ctx context.Context) (uint64, error) {
+	m.RLock()
+	defer m.RUnlock()
+
+	return m.totalTagged(ctx)
 }
 
 // unlocked
