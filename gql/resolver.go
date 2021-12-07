@@ -274,8 +274,37 @@ func (dr *dealResolver) ProviderAddress() string {
 	return dr.ProviderDealState.ClientDealProposal.Proposal.Provider.String()
 }
 
+func (dr *dealResolver) ClientPeerID() string {
+	return dr.ProviderDealState.ClientPeerID.String()
+}
+
+func (dr *dealResolver) DealDataRoot() string {
+	return dr.ProviderDealState.DealDataRoot.String()
+}
+
+func (dr *dealResolver) PublishCid() string {
+	if dr.ProviderDealState.PublishCID == nil {
+		return ""
+	}
+	return dr.ProviderDealState.PublishCID.String()
+}
+
 func (dr *dealResolver) PieceSize() float64 {
 	return float64(dr.ProviderDealState.ClientDealProposal.Proposal.PieceSize)
+}
+
+type dealTransfer struct {
+	Type   string
+	Size   float64
+	Params string
+}
+
+func (dr *dealResolver) Transfer() dealTransfer {
+	return dealTransfer{
+		Type:   dr.ProviderDealState.Transfer.Type,
+		Size:   float64(dr.ProviderDealState.Transfer.Size),
+		Params: "TODO",
+	}
 }
 
 func (dr *dealResolver) ProviderCollateral() float64 {
@@ -303,11 +332,13 @@ func (dr *dealResolver) Message() string {
 		case 100:
 			return "Transfer Complete"
 		default:
-			pct := (100 * dr.transferred) / uint64(dr.ClientDealProposal.Proposal.PieceSize)
+			pct := (100 * dr.transferred) / dr.ProviderDealState.Transfer.Size
 			return fmt.Sprintf("Transferring %d%%", pct)
 		}
 	case dealcheckpoints.Transferred:
 		return "Publishing"
+	case dealcheckpoints.PublishConfirmed:
+		return "Adding to Sector"
 	case dealcheckpoints.AddedPiece:
 		return "Sealing"
 	case dealcheckpoints.Complete:

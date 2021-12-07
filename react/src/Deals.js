@@ -195,7 +195,7 @@ function DealRow(props) {
             <td className="deal-id" onClick={() => props.onDealRowClick(deal.ID)}>
                 <ShortDealID id={deal.ID} />
             </td>
-            <td className="piece-size">{humanFileSize(deal.PieceSize, false, 0)}</td>
+            <td className="size">{humanFileSize(deal.Transfer.Size, false, 0)}</td>
             <td className="client">
                 <ShortClientAddress address={deal.ClientAddress} />
             </td>

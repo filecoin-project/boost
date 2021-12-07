@@ -3,6 +3,7 @@ import {useMutation, useSubscription} from "./hooks";
 import {DealCancelMutation, DealSubscription} from "./gql";
 import {dateFormat} from "./util-date";
 import moment from "moment";
+import {humanFIL} from "./util";
 
 export function DealDetail(props) {
     // Add a class to the document body when showing the deal detail page
@@ -52,16 +53,48 @@ export function DealDetail(props) {
                     <td>{moment(deal.CreatedAt).format(dateFormat)}</td>
                 </tr>
                 <tr>
-                    <td>Client</td>
+                    <td>Client Address</td>
                     <td>{deal.ClientAddress}</td>
                 </tr>
                 <tr>
-                    <td>Amount</td>
-                    <td>{'0.2 FIL'}</td>
+                    <td>Client Peer ID</td>
+                    <td>{deal.ClientPeerID}</td>
                 </tr>
                 <tr>
-                    <td>Size</td>
-                    <td>{deal.PieceSize}</td>
+                    <td>Deal Data Root CID</td>
+                    <td>{deal.DealDataRoot}</td>
+                </tr>
+                <tr>
+                    <td>Piece CID</td>
+                    <td>{deal.PieceCid}</td>
+                </tr>
+                <tr>
+                    <td>Piece Size</td>
+                    <td>{deal.PieceSize.toLocaleString()}</td>
+                </tr>
+                <tr>
+                    <td>Provider Collateral</td>
+                    <td>{humanFIL(deal.ProviderCollateral)}</td>
+                </tr>
+                <tr>
+                    <td>Start Epoch</td>
+                    <td>{deal.StartEpoch}</td>
+                </tr>
+                <tr>
+                    <td>End Epoch</td>
+                    <td>{deal.EndEpoch}</td>
+                </tr>
+                <tr>
+                    <td>Transfer Type</td>
+                    <td>{deal.Transfer.Type}</td>
+                </tr>
+                <tr>
+                    <td>Transfer Size</td>
+                    <td>{deal.Transfer.Size.toLocaleString()}</td>
+                </tr>
+                <tr>
+                    <td>Publish Message CID</td>
+                    <td>{deal.PublishCid}</td>
                 </tr>
                 <tr>
                     <td>State</td>

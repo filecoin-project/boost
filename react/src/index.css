@@ -107,8 +107,8 @@ body.modal-open {
   width: 3em;
 }
 
-.deals td.piece-size {
-  width: 6em;
+.deals td.size {
+  width: 5em;
   white-space: nowrap;
 }
 
@@ -164,9 +164,14 @@ body.modal-open {
 }
 
 #deal-detail table.deal-fields {
-  display: inline-block;
-  width: auto;
   margin-bottom: 1em;
+}
+
+#deal-detail table.deal-fields tr td:first-child {
+  width: 8em;
+}
+#deal-detail table.deal-fields tr td:last-child {
+  line-break: anywhere;
 }
 
 #deal-detail td {

@@ -64,7 +64,18 @@ const DealsListQuery = gql`
                 PieceCid
                 PieceSize
                 ClientAddress
+                StartEpoch
+                EndEpoch
+                ProviderCollateral
+                ClientPeerID
+                DealDataRoot
+                PublishCid
                 Message
+                Transfer {
+                    Type
+                    Size
+                    Params
+                }
                 Logs {
                     CreatedAt
                     Text
@@ -84,7 +95,18 @@ const DealSubscription = gql`
             PieceCid
             PieceSize
             ClientAddress
+            StartEpoch
+            EndEpoch
+            ProviderCollateral
+            ClientPeerID
+            DealDataRoot
+            PublishCid
             Message
+            Transfer {
+                Type
+                Size
+                Params
+            }
             Logs {
                 CreatedAt
                 Text
@@ -107,7 +129,18 @@ const NewDealsSubscription = gql`
             PieceCid
             PieceSize
             ClientAddress
+            StartEpoch
+            EndEpoch
+            ProviderCollateral
+            ClientPeerID
+            DealDataRoot
+            PublishCid
             Message
+            Transfer {
+                Type
+                Size
+                Params
+            }
             Logs {
                 CreatedAt
                 Text
