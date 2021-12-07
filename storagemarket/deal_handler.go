@@ -1,7 +1,6 @@
 package storagemarket
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -14,20 +13,7 @@ import (
 // dealHandler keeps track of the deal while it's executing
 type dealHandler struct {
 	dealUuid uuid.UUID
-	ctx      context.Context
-	stop     context.CancelFunc
-	stopped  chan struct{}
 	bus      event.Bus
-}
-
-func (d *dealHandler) cancel(ctx context.Context) {
-	d.stop()
-	select {
-	case <-ctx.Done():
-		return
-	case <-d.stopped:
-		return
-	}
 }
 
 func (d *dealHandler) subscribeUpdates() (event.Subscription, error) {

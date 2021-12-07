@@ -3,11 +3,14 @@ package storagemarket
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path"
 	"sync"
 	"time"
+
+	"github.com/libp2p/go-eventbus"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
@@ -30,6 +33,7 @@ import (
 var log = logging.Logger("boost-provider")
 
 var ErrDealNotFound = fmt.Errorf("deal not found")
+var ErrDealHandlerNotFound = errors.New("deal handler not found")
 
 type Config struct {
 	MaxTransferDuration time.Duration
@@ -65,7 +69,8 @@ type Provider struct {
 	adapter        *Adapter
 	transfers      *dealTransfers
 
-	dealHandlers *dealHandlers
+	dhsMu sync.RWMutex
+	dhs   map[uuid.UUID]*dealHandler
 }
 
 func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address, secb *sectorblocks.SectorBlocks) (*Provider, error) {
@@ -107,7 +112,7 @@ func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *f
 		},
 		transfers: newDealTransfers(),
 
-		dealHandlers: newDealHandlers(),
+		dhs: make(map[uuid.UUID]*dealHandler),
 	}, nil
 }
 
@@ -169,7 +174,9 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDeal
 		}
 	}()
 
-	resp, err := p.checkForDealAcceptance(&ds)
+	dh := p.mkAndInsertDealHandler(dp.DealUUID)
+
+	resp, err := p.checkForDealAcceptance(&ds, dh)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
 	}
@@ -188,12 +195,12 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDeal
 	return nil, nil
 }
 
-func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState) (acceptDealResp, error) {
+func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealHandler) (acceptDealResp, error) {
 	// send message to event loop to run the deal through the acceptance filter and reserve the required resources
 	// then wait for a response and return the response to the client.
 	respChan := make(chan acceptDealResp, 1)
 	select {
-	case p.acceptDealsChan <- acceptDealReq{rsp: respChan, deal: ds}:
+	case p.acceptDealsChan <- acceptDealReq{rsp: respChan, deal: ds, dh: dh}:
 	case <-p.ctx.Done():
 		return acceptDealResp{}, p.ctx.Err()
 	}
@@ -206,6 +213,19 @@ func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState) (acceptDe
 	}
 
 	return resp, nil
+}
+
+func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) *dealHandler {
+	bus := eventbus.NewBus()
+	dh := &dealHandler{
+		dealUuid: dealUuid,
+		bus:      bus,
+	}
+
+	p.dhsMu.Lock()
+	defer p.dhsMu.Unlock()
+	p.dhs[dealUuid] = dh
+	return dh
 }
 
 func (p *Provider) Start(ctx context.Context) error {
@@ -244,22 +264,28 @@ func (p *Provider) SubscribeNewDeals() (event.Subscription, error) {
 
 // SubscribeNewDeals subscribes to updates to a deal
 func (p *Provider) SubscribeDealUpdates(dealUuid uuid.UUID) (event.Subscription, error) {
-	dh, err := p.dealHandlers.get(dealUuid)
-	if err != nil {
-		return nil, err
+	dh := p.getDealHandler(dealUuid)
+	if dh == nil {
+		return nil, ErrDealHandlerNotFound
 	}
+
 	return dh.subscribeUpdates()
 }
 
-// CancelDeal cancels a deal and any associated data transfer
+// TODO Implement
 func (p *Provider) CancelDeal(ctx context.Context, dealUuid uuid.UUID) error {
-	dh, err := p.dealHandlers.get(dealUuid)
-	if err != nil {
-		if xerrors.Is(err, ErrDealHandlerFound) {
-			return nil
-		}
-		return err
-	}
-	dh.cancel(ctx)
 	return nil
+}
+
+func (p *Provider) getDealHandler(id uuid.UUID) *dealHandler {
+	p.dhsMu.RLock()
+	defer p.dhsMu.RUnlock()
+
+	return p.dhs[id]
+}
+
+func (p *Provider) cleanupDealHandler(dealUuid uuid.UUID) {
+	p.dhsMu.Lock()
+	delete(p.dhs, dealUuid)
+	p.dhsMu.Unlock()
 }

@@ -12,6 +12,7 @@ import (
 type acceptDealReq struct {
 	rsp  chan acceptDealResp
 	deal *types.ProviderDealState
+	dh   *dealHandler
 }
 
 type acceptDealResp struct {
@@ -98,7 +99,7 @@ func (p *Provider) loop() {
 			go func() {
 				defer p.wg.Done()
 
-				p.doDeal(deal)
+				p.doDeal(deal, dealReq.dh)
 			}()
 
 			go writeDealResp(true, nil, nil)
