@@ -100,15 +100,26 @@ body.modal-open {
 
 .deals th {
   white-space: nowrap;
+  text-align: left;
+}
+
+.deals td.start {
+  width: 3em;
 }
 
 .deals td.piece-size {
+  width: 6em;
   white-space: nowrap;
 }
 
 .deals td.deal-id {
   cursor: pointer;
   color: #465298;
+  width: 7em;
+}
+
+.deals td.client {
+  width: 6em;
 }
 
 .deals .pagination {
