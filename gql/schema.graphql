@@ -9,6 +9,12 @@ The `Time` scalar type represents a DateTime. The DateTime is serialized as an R
 """
 scalar Time
 
+type TransferParams {
+  Type: String!
+  Size: Float!
+  Params: String!
+}
+
 type Deal {
   ID: ID!
   ClientAddress: String!
@@ -19,6 +25,10 @@ type Deal {
   ProviderCollateral: Float!
   StartEpoch: Float!
   EndEpoch: Float!
+  ClientPeerID: String!
+  DealDataRoot: String!
+  PublishCid: String!
+  Transfer: TransferParams!
   Message: String!
   Logs: [DealLog]!
 }
