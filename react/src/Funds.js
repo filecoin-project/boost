@@ -3,7 +3,7 @@ import {FundsQuery, FundsLogsQuery, FundsMoveToEscrow} from "./gql";
 import {useState, useEffect, React}  from "react";
 import moment from "moment";
 import {humanFIL} from "./util"
-import $ from 'jquery';
+import {Info} from "./Info"
 
 export function FundsPage(props) {
     return (
@@ -60,7 +60,13 @@ function FundsChart(props) {
     return <div className="chart">
         <div className="amounts">
             <div className="collateral-source">
-                <div className="title">Collateral Source Wallet</div>
+                <div className="title">
+                    Collateral Source Wallet
+                    <Info>
+                        The Collateral Source Wallet is the wallet from which funds
+                        are moved to escrow.
+                    </Info>
+                </div>
                 <WalletAddress address={funds.Collateral.Address} />
                 <div className="bar-content">
                     <div className="bar" style={{ width: barSpaceRatio*collatBarPct+'%'}}>
@@ -71,7 +77,19 @@ function FundsChart(props) {
             </div>
 
             <div className="escrow">
-                <div className="title">Collateral</div>
+                <div className="title">
+                    Collateral in Escrow
+                    <Info>
+                        Collateral in Escrow is the funds that are kept in escrow on chain.<br/>
+                        <br/>
+                        When a deal is accepted, the collateral for the deal is "tagged". Those
+                        funds cannot be used as collateral for another deal.<br/>
+                        <br/>
+                        When a deal is published, there must be enough funds in escrow to cover
+                        the collateral for the deal. On publish, the tagged funds are moved on
+                        chain from "Available" to "Locked" until the deal is complete.<br/>
+                    </Info>
+                </div>
                 <div className="bar-content">
                     <div className="bar" style={{ width: barSpaceRatio*escrowBar.unit+'%'}}>
                         <div className="tagged" style={{width: escrowBar.tagged + '%'}} />
@@ -108,7 +126,13 @@ function FundsChart(props) {
             </div>
 
             <div className="pubmsg-wallet">
-                <div className="title">Publish Storage Deals Wallet</div>
+                <div className="title">
+                    Publish Storage Deals Wallet
+                    <Info>
+                        The Publish Storage Deals Wallet is used to pay the gas cost
+                        for sending the Publish Storage Deals message on chain.
+                    </Info>
+                </div>
                 <WalletAddress address={funds.PubMsg.Address} />
                 <div className="bar-content">
                     <div className="bar" style={{ width: barSpaceRatio*pubMsgBar.unit+'%'}} />
@@ -177,12 +201,12 @@ function TopupCollateral(props) {
                     />
                     FIL
                     <div className="buttons">
-                        <div className="button" onClick={() => topUpAvailable()}>Top up</div>
+                        <div className="button" onClick={() => topUpAvailable()}>Move</div>
                         <div className="button cancel" onClick={handleCancel}>Cancel</div>
                     </div>
                 </div>
             ) : (
-                <div className="button" onClick={() => setShowForm(true)}>Top up available collateral</div>
+                <div className="button" onClick={() => setShowForm(true)}>Move collateral to escrow</div>
             )}
         </div>
     )
