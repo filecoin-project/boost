@@ -278,6 +278,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 
 // addPiece hands off a published deal for sealing and commitment in a sector
 func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
+	log.Info("Create CARv2 reader")
 	p.addDealLog(deal.DealUuid, "Hand off deal to sealer")
 
 	// Open a reader against the CAR file with the deal data
@@ -286,6 +287,7 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 		return fmt.Errorf("failed to open CARv2 file: %w", err)
 	}
 
+	log.Info("pad CAR")
 	// Inflate the deal size so that it exactly fills a piece
 	proposal := deal.ClientDealProposal.Proposal
 	paddedReader, err := padreader.NewInflator(v2r.DataReader(), v2r.Header.DataSize, proposal.PieceSize.Unpadded())
@@ -293,8 +295,10 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 		return fmt.Errorf("failed to create inflator: %w", err)
 	}
 
+	log.Info("Add piece to sector")
 	// Add the piece to a sector
 	packingInfo, packingErr := p.adapter.AddPieceToSector(p.ctx, *deal, paddedReader)
+	log.Info("Added piece to sector")
 
 	// Close the reader as we're done reading from it.
 	if err := v2r.Close(); err != nil {

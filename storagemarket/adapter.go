@@ -71,6 +71,7 @@ func (n *Adapter) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDea
 
 	// Attempt to add the piece to a sector (repeatedly if necessary)
 	pieceSize := deal.ClientDealProposal.Proposal.PieceSize.Unpadded()
+	log.Infow("add piece to sector", "piece-size", pieceSize)
 	p, offset, err := n.secb.AddPiece(ctx, pieceSize, pieceData, sdInfo)
 	curTime := build.Clock.Now()
 	for build.Clock.Since(curTime) < addPieceRetryTimeout {
@@ -82,6 +83,7 @@ func (n *Adapter) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDea
 		}
 		select {
 		case <-build.Clock.After(addPieceRetryWait):
+			log.Infow("retry add piece to sector", "piece-size", pieceSize)
 			p, offset, err = n.secb.AddPiece(ctx, pieceSize, pieceData, sdInfo)
 		case <-ctx.Done():
 			return nil, xerrors.New("context expired while waiting to retry AddPiece")

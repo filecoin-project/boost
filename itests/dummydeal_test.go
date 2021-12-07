@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -62,6 +64,7 @@ func setLogLevel() {
 	_ = logging.SetLogLevel("boost", "DEBUG")
 	_ = logging.SetLogLevel("actors", "DEBUG")
 	_ = logging.SetLogLevel("provider", "DEBUG")
+	_ = logging.SetLogLevel("boost-provider", "DEBUG")
 	_ = logging.SetLogLevel("http-transfer", "DEBUG")
 }
 
@@ -110,17 +113,29 @@ func TestDummydeal(t *testing.T) {
 	tempdir := t.TempDir()
 	log.Debugw("using tempdir", "dir", tempdir)
 
-	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
-	require.NoError(t, err)
+	//randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
+	//require.NoError(t, err)
 
-	failingFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
-	require.NoError(t, err)
+	//failingFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
+	//require.NoError(t, err)
 
-	rootCid, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
-	require.NoError(t, err)
+	//rootCid, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
+	//require.NoError(t, err)
 
-	failingRootCid, failingCarFilepath, err := testutil.CreateDenseCARv2(tempdir, failingFilepath)
+	carRes, err := testutil.CreateRandomCARv1( 5, 2000000)
 	require.NoError(t, err)
+	carFilepath := carRes.CarFile
+	rootCid := carRes.Root
+	
+	copyFile(carFilepath, path.Join(tempdir, filepath.Base(carFilepath)))
+
+	//pieceCid, pieceSize, err := util.CommP(ctx, carRes.Blockstore, carRes.Root)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	//failingRootCid, failingCarFilepath, err := testutil.CreateDenseCARv2(tempdir, failingFilepath)
+	//require.NoError(t, err)
 
 	// Start a web server to serve the car files
 	server, err := runWebServer(tempdir)
@@ -137,31 +152,40 @@ func TestDummydeal(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	failingDealUuid := uuid.New()
-	res2, err2 := f.makeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
-	require.NoError(t, err2)
-	require.Equal(t, res2.Reason, "cannot accept piece of size 4194304, on top of already allocated 4194304 bytes, because it would exceed max staging area size 5000000")
-	log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
+	//failingDealUuid := uuid.New()
+	//res2, err2 := f.makeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
+	//require.NoError(t, err2)
+	//require.Equal(t, res2.Reason, "cannot accept piece of size 4194304, on top of already allocated 4194304 bytes, because it would exceed max staging area size 5000000")
+	//log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
 
 	// Wait for the deal to be added to a sector
 	err = f.waitForDealAddedToSector(dealUuid)
 	require.NoError(t, err)
 
-	passingDealUuid := uuid.New()
-	res2, err2 = f.makeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
-	require.NoError(t, err2)
-	require.Nil(t, res2, "expected res2 to be nil")
-	log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
+	//passingDealUuid := uuid.New()
+	//res2, err2 := f.makeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
+	//require.NoError(t, err2)
+	//require.Nil(t, res2, "expected res2 to be nil")
+	//log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
 
-	// Wait for the deal to be added to a sector
-	err = f.waitForDealAddedToSector(passingDealUuid)
-	require.NoError(t, err)
+	//// Wait for the deal to be added to a sector
+	//err = f.waitForDealAddedToSector(passingDealUuid)
+	//require.NoError(t, err)
 
 	time.Sleep(3 * time.Second)
 
 	cancel()
 	go f.stop()
 	<-done
+}
+
+func copyFile(sourceFile string, destinationFile string) error {
+	bz, err := ioutil.ReadFile(sourceFile)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(destinationFile, bz, 0644)
 }
 
 type testFramework struct {

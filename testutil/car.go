@@ -1,11 +1,14 @@
 package testutil
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"math/rand"
 	"os"
+
+	"github.com/ipld/go-car"
 
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
@@ -114,6 +117,10 @@ func WriteUnixfsDAGTo(path string, into ipldformat.DAGService) (cid.Cid, error) 
 	}
 	defer file.Close()
 
+	return writeUnixfsDAGTo(file, into)
+}
+
+func writeUnixfsDAGTo(file *os.File, into ipldformat.DAGService) (cid.Cid, error) {
 	stat, err := file.Stat()
 	if err != nil {
 		return cid.Undef, err
@@ -168,4 +175,64 @@ func WriteUnixfsDAGTo(path string, into ipldformat.DAGService) (cid.Cid, error) 
 	}
 
 	return nd.Cid(), nil
+}
+
+// CreateRandomFile creates a  normal file with the provided seed and the
+// provided size and then transforms it to a CARv1 file and returns it.
+func CreateRandomCARv1(rseed, size int) (*CarRes, error) {
+	ctx := context.Background()
+	source := io.LimitReader(rand.New(rand.NewSource(int64(rseed))), int64(size))
+	file, err := os.CreateTemp("", "sourcefile.dat")
+	if err != nil {
+		return nil, err
+	}
+	_, err = io.Copy(file, source)
+	if err != nil {
+		return nil, err
+	}
+	//
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+	bs := bstore.NewBlockstore(dssync.MutexWrap(ds.NewMapDatastore()))
+	dagSvc := merkledag.NewDAGService(blockservice.New(bs, offline.Exchange(bs)))
+	root, err := writeUnixfsDAGTo(file, dagSvc)
+	if err != nil {
+		return nil, err
+	}
+	// create a CARv1 file from the DAG
+	tmp, err := os.CreateTemp("", "randcarv1")
+	if err != nil {
+		return nil, err
+	}
+	err = car.WriteCar(ctx, dagSvc, []cid.Cid{root}, tmp)
+	if err != nil {
+		return nil, err
+	}
+	_, err = tmp.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+	hd, _, err := car.ReadHeader(bufio.NewReader(tmp))
+	if err != nil {
+		return nil, err
+	}
+	err = tmp.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	stat, err := os.Stat(tmp.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	return &CarRes{
+		CarFile:    tmp.Name(),
+		CarSize:    uint64(stat.Size()),
+		OrigFile:   file.Name(),
+		Root:       hd.Roots[0],
+		Blockstore: bs,
+	}, nil
 }
