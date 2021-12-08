@@ -12,6 +12,7 @@ import (
 
 	lcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/gql"
+	"github.com/filecoin-project/boost/policy"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/testutil"
@@ -273,7 +274,7 @@ func dealProposal(ctx context.Context, fullNode v0api.FullNode, rootCid cid.Cid,
 		StartEpoch:           startEpoch,
 		EndEpoch:             endEpoch,
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
-		ProviderCollateral:   abi.NewTokenAmount(162546066071935), // TODO: where is this minimum value coming from?
+		ProviderCollateral:   policy.MaxProviderCollateral, // this value is chain dependent and is 0 on devnet, and currently a multiple of 147276332 on mainnet
 		ClientCollateral:     abi.NewTokenAmount(0),
 	}
 
