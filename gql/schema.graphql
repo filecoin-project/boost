@@ -46,8 +46,8 @@ type DealLog {
 }
 
 type Storage {
-  Completed: Float!
-  Transferring: Float!
+  Staged: Float!
+  Transferred: Float!
   Pending: Float!
   Free: Float!
   MountPoint: String!

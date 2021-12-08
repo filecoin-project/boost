@@ -1,6 +1,10 @@
 package gql
 
-import "context"
+import (
+	"context"
+
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+)
 
 // query: storage: [Storage]
 func (r *resolver) Storage(ctx context.Context) (*storageResolver, error) {
@@ -21,15 +25,19 @@ func (r *resolver) Storage(ctx context.Context) (*storageResolver, error) {
 
 	transferred := uint64(0)
 	for _, deal := range activeDeals {
-		transferred += r.provider.NBytesReceived(deal.DealUuid)
+		if deal.Checkpoint < dealcheckpoints.Transferred {
+			transferred += r.provider.NBytesReceived(deal.DealUuid)
+		} else {
+			transferred += deal.Transfer.Size
+		}
 	}
 
 	staged := uint64(0)
 	return &storageResolver{
-		Staged:      staged,
-		Transferred: transferred,
-		Pending:     tagged - transferred,
-		Free:        free,
+		Staged:      float64(staged),
+		Transferred: float64(transferred),
+		Pending:     float64(tagged - transferred),
+		Free:        float64(free),
 		MountPoint:  r.storageMgr.StagingAreaDirPath,
 	}, nil
 }

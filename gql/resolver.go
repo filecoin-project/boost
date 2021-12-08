@@ -46,10 +46,10 @@ func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageM
 }
 
 type storageResolver struct {
-	Staged      uint64
-	Transferred uint64
-	Pending     uint64
-	Free        uint64
+	Staged      float64
+	Transferred float64
+	Pending     float64
+	Free        float64
 	MountPoint  string
 }
 

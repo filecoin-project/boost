@@ -61,7 +61,7 @@ func (p *Provider) loop() {
 			}
 
 			// Tag the storage required for the deal in the staging area
-			err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal.PieceSize)
+			err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.Transfer.Size)
 			if err != nil {
 				cleanup()
 				dealReq.rsp <- acceptDealResp{accepted: false, ri: &api.ProviderDealRejectionInfo{Reason: err.Error()}, err: nil}

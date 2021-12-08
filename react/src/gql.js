@@ -152,8 +152,8 @@ const NewDealsSubscription = gql`
 const StorageQuery = gql`
     query AppStorageQuery {
         storage {
-            Completed
-            Transferring
+            Staged
+            Transferred
             Pending
             Free
             MountPoint

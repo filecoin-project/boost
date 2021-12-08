@@ -8,7 +8,6 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/repo"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
 )
@@ -43,11 +42,8 @@ func New(cfg Config) func(lr repo.LockedRepo, sqldb *sql.DB) *StorageManager {
 
 // Free
 func (m *StorageManager) Free(ctx context.Context) (uint64, error) {
-	m.Lock()
-	defer m.Unlock()
-
 	// Get the total tagged storage, so that we know how much is available.
-	tagged, err := m.totalTagged(ctx)
+	tagged, err := m.TotalTagged(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("getting total tagged: %w", err)
 	}
@@ -68,20 +64,20 @@ func (m *StorageManager) Free(ctx context.Context) (uint64, error) {
 }
 
 // Tag
-func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize abi.PaddedPieceSize) error {
+func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, size uint64) error {
 	// Get the total tagged storage, so that we know how much is available.
-	tagged, err := m.totalTagged(ctx)
+	tagged, err := m.TotalTagged(ctx)
 	if err != nil {
 		return fmt.Errorf("getting total tagged: %w", err)
 	}
 
 	if m.cfg.MaxStagingDealsBytes != 0 {
-		if tagged+uint64(pieceSize) >= m.cfg.MaxStagingDealsBytes {
-			return fmt.Errorf("cannot accept piece of size %d, on top of already allocated %d bytes, because it would exceed max staging area size %d", uint64(pieceSize), uint64(tagged), m.cfg.MaxStagingDealsBytes)
+		if tagged+uint64(size) >= m.cfg.MaxStagingDealsBytes {
+			return fmt.Errorf("cannot accept piece of size %d, on top of already allocated %d bytes, because it would exceed max staging area size %d", uint64(size), uint64(tagged), m.cfg.MaxStagingDealsBytes)
 		}
 	}
 
-	err = m.persistTagged(ctx, dealUuid, uint64(pieceSize))
+	err = m.persistTagged(ctx, dealUuid, uint64(size))
 	if err != nil {
 		return fmt.Errorf("saving total tagged storage: %w", err)
 	}
@@ -111,14 +107,6 @@ func (m *StorageManager) Untag(ctx context.Context, dealUuid uuid.UUID) error {
 }
 
 func (m *StorageManager) TotalTagged(ctx context.Context) (uint64, error) {
-	m.RLock()
-	defer m.RUnlock()
-
-	return m.totalTagged(ctx)
-}
-
-// unlocked
-func (m *StorageManager) totalTagged(ctx context.Context) (uint64, error) {
 	total, err := m.db.TotalTagged(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("getting total tagged from DB: %w", err)

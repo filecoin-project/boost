@@ -51,6 +51,8 @@ func main() {
 func before(cctx *cli.Context) error {
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boost", "DEBUG")
+		_ = logging.SetLogLevel("provider", "DEBUG")
+		_ = logging.SetLogLevel("gql", "DEBUG")
 	}
 
 	return nil
