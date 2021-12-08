@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost/db"
+	"golang.org/x/xerrors"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -21,9 +24,9 @@ type acceptDealResp struct {
 	err      error
 }
 
-type failedDealReq struct {
-	st  *types.ProviderDealState
-	err error
+type finishedDealsReq struct {
+	deal *types.ProviderDealState
+	done chan struct{}
 }
 
 func (p *Provider) loop() {
@@ -35,11 +38,16 @@ func (p *Provider) loop() {
 			deal := dealReq.deal
 			log.Infow("process accept deal request", "id", deal.DealUuid)
 
-			writeDealResp := func(accepted bool, ri *api.ProviderDealRejectionInfo, err error) {
-				select {
-				case dealReq.rsp <- acceptDealResp{accepted, ri, err}:
-				case <-p.ctx.Done():
-					return
+			// setup cleanup function
+			cleanup := func() {
+				errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+				if errf != nil && !xerrors.Is(errf, db.ErrDealNotFound) {
+					log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
+				}
+
+				errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
+				if errs != nil && !xerrors.Is(errf, db.ErrDealNotFound) {
+					log.Errorw("untagging storage", "id", deal.DealUuid, "err", errs)
 				}
 			}
 
@@ -47,49 +55,27 @@ func (p *Provider) loop() {
 			// so that they are not used for other deals
 			err := p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
 			if err != nil {
-				go writeDealResp(false, &api.ProviderDealRejectionInfo{
-					// TODO: provide a custom reason message (instead of sending provider
-					// error messages back to client) eg "Not enough provider funds for deal"
-					Reason: err.Error(),
-				}, nil)
+				cleanup()
+				dealReq.rsp <- acceptDealResp{false, &api.ProviderDealRejectionInfo{err.Error()}, nil}
 				continue
 			}
 
 			// Tag the storage required for the deal in the staging area
 			err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal.PieceSize)
 			if err != nil {
-				go writeDealResp(false, &api.ProviderDealRejectionInfo{
-					// TODO: provide a custom reason message (instead of sending provider
-					// error messages back to client) eg "Not enough staging storage for deal"
-					Reason: err.Error(),
-				}, nil)
-
-				errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
-				if errf != nil {
-					log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
-				}
+				cleanup()
+				dealReq.rsp <- acceptDealResp{false, &api.ProviderDealRejectionInfo{err.Error()}, nil}
 				continue
 			}
 
 			// write deal state to the database
 			log.Infow("inserting deal into DB", "id", deal.DealUuid)
-
 			deal.CreatedAt = time.Now()
 			deal.Checkpoint = dealcheckpoints.Accepted
-
 			err = p.dealsDB.Insert(p.ctx, deal)
 			if err != nil {
-				go writeDealResp(false, nil, fmt.Errorf("failed to insert deal in db: %w", err))
-
-				errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
-				if errf != nil {
-					log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
-				}
-
-				errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
-				if errs != nil {
-					log.Errorw("untagging storage", "id", deal.DealUuid, "err", errs)
-				}
+				cleanup()
+				dealReq.rsp <- acceptDealResp{false, nil, fmt.Errorf("failed to insert deal in db: %w", err)}
 				continue
 			}
 			log.Infow("inserted deal into DB", "id", deal.DealUuid)
@@ -98,16 +84,25 @@ func (p *Provider) loop() {
 			p.wg.Add(1)
 			go func() {
 				defer p.wg.Done()
-
 				p.doDeal(deal, dealReq.dh)
 			}()
 
-			go writeDealResp(true, nil, nil)
+			dealReq.rsp <- acceptDealResp{true, nil, nil}
 			log.Infow("deal execution started", "id", deal.DealUuid)
 
-		case failedDeal := <-p.failedDealsChan:
-			log.Errorw("deal failed", "id", failedDeal.st.DealUuid, "err", failedDeal.err)
-			// Release storage space , funds, shared resources etc etc.
+		case finishedDeal := <-p.finishedDealsChan:
+			deal := finishedDeal.deal
+			log.Errorw("deal finished", "id", deal.DealUuid)
+			errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+			if errf != nil {
+				log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
+			}
+
+			errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
+			if errs != nil {
+				log.Errorw("untagging storage", "id", deal.DealUuid, "err", errs)
+			}
+			finishedDeal.done <- struct{}{}
 
 		case <-p.ctx.Done():
 			return

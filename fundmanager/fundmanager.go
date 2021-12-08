@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sync"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/go-address"
@@ -45,8 +44,6 @@ type FundManager struct {
 	api fundManagerAPI
 	db  *db.FundsDB
 	cfg Config
-
-	lk sync.RWMutex
 }
 
 func New(cfg Config) func(api v1api.FullNode, sqldb *sql.DB) *FundManager {
@@ -73,9 +70,6 @@ func (m *FundManager) TagFunds(ctx context.Context, dealUuid uuid.UUID, proposal
 	if err != nil {
 		return fmt.Errorf("getting publish deals message wallet balance: %w", err)
 	}
-
-	m.lk.Lock()
-	defer m.lk.Unlock()
 
 	// Check that the provider has enough funds in escrow to cover the
 	// collateral requirement for the deal
@@ -112,9 +106,6 @@ func (m *FundManager) TagFunds(ctx context.Context, dealUuid uuid.UUID, proposal
 // TotalTagged returns the total funds tagged for specific deals for
 // collateral and publish storage deals message
 func (m *FundManager) TotalTagged(ctx context.Context) (*db.TotalTagged, error) {
-	m.lk.RLock()
-	defer m.lk.RUnlock()
-
 	return m.totalTagged(ctx)
 }
 
@@ -131,9 +122,6 @@ func (m *FundManager) totalTagged(ctx context.Context) (*db.TotalTagged, error) 
 // It's called when it's no longer necessary to prevent the funds from being
 // used for a different deal (eg because the deal failed / was published)
 func (m *FundManager) UntagFunds(ctx context.Context, dealUuid uuid.UUID) error {
-	m.lk.Lock()
-	defer m.lk.Unlock()
-
 	untaggedAmt, err := m.db.Untag(ctx, dealUuid)
 	if err != nil {
 		return fmt.Errorf("persisting untag funds for deal to DB: %w", err)

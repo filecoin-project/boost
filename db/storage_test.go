@@ -25,7 +25,7 @@ func TestStorageDB(t *testing.T) {
 
 	dealUUID := uuid.New()
 	amt, err := db.Untag(ctx, dealUUID)
-	req.NoError(err)
+	req.Contains(err.Error(), "not found")
 	req.Equal(uint64(0), amt)
 
 	err = db.Tag(ctx, dealUUID, 1111)

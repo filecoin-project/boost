@@ -190,13 +190,13 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealResolver, error) {
 }
 
 // mutation: dealCancel(id): ID
-func (r *resolver) DealCancel(ctx context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
+func (r *resolver) DealCancel(_ context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
 	dealUuid, err := toUuid(args.ID)
 	if err != nil {
 		return args.ID, err
 	}
 
-	err = r.provider.CancelDeal(ctx, dealUuid)
+	err = r.provider.CancelDeal(dealUuid)
 	return args.ID, err
 }
 

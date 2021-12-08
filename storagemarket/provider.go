@@ -55,8 +55,8 @@ type Provider struct {
 	fs filestore.FileStore
 
 	// event loop
-	acceptDealsChan chan acceptDealReq
-	failedDealsChan chan failedDealReq
+	acceptDealsChan   chan acceptDealReq
+	finishedDealsChan chan finishedDealsReq
 
 	// Database API
 	db      *sql.DB
@@ -97,8 +97,8 @@ func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *f
 		db:        sqldb,
 		dealsDB:   dealsDB,
 
-		acceptDealsChan: make(chan acceptDealReq),
-		failedDealsChan: make(chan failedDealReq),
+		acceptDealsChan:   make(chan acceptDealReq),
+		finishedDealsChan: make(chan finishedDealsReq),
 
 		Transport:      httptransport.New(),
 		fundManager:    fundMgr,
@@ -149,7 +149,6 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDeal
 		DealDataRoot:       dp.DealDataRoot,
 		Transfer:           dp.Transfer,
 	}
-
 	// validate the deal proposal
 	if err := p.validateDealProposal(ds); err != nil {
 		return &api.ProviderDealRejectionInfo{
@@ -157,36 +156,46 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDeal
 		}, nil
 	}
 
+	// setup clean-up code
+	var tmpFile filestore.File
+	var dh *dealHandler
+	cleanup := func() {
+		if tmpFile != nil {
+			_ = os.Remove(string(tmpFile.OsPath()))
+		}
+		if dh != nil {
+			dh.close()
+			p.delDealHandler(dp.DealUUID)
+		}
+	}
+
 	// create a temp file where we will hold the deal data.
-	tmp, err := p.fs.CreateTemp()
+	tmpFile, err = p.fs.CreateTemp()
 	if err != nil {
+		cleanup()
 		return nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(string(tmp.OsPath()))
+	if err := tmpFile.Close(); err != nil {
+		cleanup()
 		return nil, fmt.Errorf("failed to close temp file: %w", err)
 	}
-	ds.InboundFilePath = string(tmp.OsPath())
-	// make sure to remove the temp file if something goes wrong from here on.
-	defer func() {
-		if pi != nil || err != nil {
-			_ = os.Remove(ds.InboundFilePath)
-		}
-	}()
 
-	dh := p.mkAndInsertDealHandler(dp.DealUUID)
-
+	ds.InboundFilePath = string(tmpFile.OsPath())
+	dh = p.mkAndInsertDealHandler(dp.DealUUID)
 	resp, err := p.checkForDealAcceptance(&ds, dh)
 	if err != nil {
+		cleanup()
 		return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
 	}
 
 	// if there was an error, we return no rejection reason as well.
 	if resp.err != nil {
+		cleanup()
 		return nil, fmt.Errorf("failed to accept deal: %w", resp.err)
 	}
 	// return rejection reason as provider has rejected a valid deal.
 	if !resp.accepted {
+		cleanup()
 		log.Infow("rejected deal: "+resp.ri.Reason, "id", dp.DealUUID)
 		return resp.ri, nil
 	}
@@ -217,9 +226,16 @@ func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealH
 
 func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) *dealHandler {
 	bus := eventbus.NewBus()
+
+	transferCtx, cancel := context.WithCancel(p.ctx)
 	dh := &dealHandler{
-		dealUuid: dealUuid,
-		bus:      bus,
+		providerCtx: p.ctx,
+		dealUuid:    dealUuid,
+		bus:         bus,
+
+		transferCtx:    transferCtx,
+		transferCancel: cancel,
+		transferDone:   make(chan error, 1),
 	}
 
 	p.dhsMu.Lock()
@@ -272,9 +288,13 @@ func (p *Provider) SubscribeDealUpdates(dealUuid uuid.UUID) (event.Subscription,
 	return dh.subscribeUpdates()
 }
 
-// TODO Implement
-func (p *Provider) CancelDeal(ctx context.Context, dealUuid uuid.UUID) error {
-	return nil
+func (p *Provider) CancelDeal(dealUuid uuid.UUID) error {
+	dh := p.getDealHandler(dealUuid)
+	if dh == nil {
+		return ErrDealHandlerNotFound
+	}
+
+	return dh.cancel()
 }
 
 func (p *Provider) getDealHandler(id uuid.UUID) *dealHandler {
@@ -284,7 +304,7 @@ func (p *Provider) getDealHandler(id uuid.UUID) *dealHandler {
 	return p.dhs[id]
 }
 
-func (p *Provider) cleanupDealHandler(dealUuid uuid.UUID) {
+func (p *Provider) delDealHandler(dealUuid uuid.UUID) {
 	p.dhsMu.Lock()
 	delete(p.dhs, dealUuid)
 	p.dhsMu.Unlock()

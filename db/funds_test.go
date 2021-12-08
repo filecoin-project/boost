@@ -27,7 +27,7 @@ func TestFundsDB(t *testing.T) {
 
 	dealUUID := uuid.New()
 	amt, err := db.Untag(ctx, dealUUID)
-	req.NoError(err)
+	req.Contains(err.Error(), "not found")
 	req.Equal(int64(0), amt.Int64())
 
 	err = db.Tag(ctx, dealUUID, abi.NewTokenAmount(1111), abi.NewTokenAmount(2222))

@@ -3,10 +3,13 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"io/ioutil"
 	"path"
 	"runtime"
 )
+
+var ErrDealNotFound = errors.New("deal not found")
 
 type Scannable interface {
 	Scan(dest ...interface{}) error
