@@ -197,7 +197,7 @@ func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.Pro
 		return nil, err
 	}
 
-	deal.NBytesReceived = int64(r.provider.NBytesReceived(deal))
+	deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
 
 	return deal, nil
 }
@@ -228,7 +228,7 @@ func (r *resolver) dealList(ctx context.Context, first *graphql.ID, limit int) (
 	// Include data transfer information with the deal
 	dis := make([]types.ProviderDealState, 0, len(deals))
 	for _, deal := range deals {
-		deal.NBytesReceived = int64(r.provider.NBytesReceived(deal))
+		deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
 		dis = append(dis, *deal)
 	}
 
