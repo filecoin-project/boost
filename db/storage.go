@@ -41,7 +41,7 @@ func (s *StorageDB) Untag(ctx context.Context, dealUuid uuid.UUID) (uint64, erro
 	err := row.Scan(&ps.marshalled)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return 0, ErrDealNotFound
+			return 0, ErrNotFound
 		}
 		return 0, fmt.Errorf("getting untagged amount: %w", err)
 	}

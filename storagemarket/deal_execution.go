@@ -33,7 +33,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	// Set up pubsub for deal updates
 	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
 	if err != nil {
-		err := fmt.Errorf("failed to create event emitter: %w", err)
+		err = fmt.Errorf("failed to create event emitter: %w", err)
 		p.cleanupDeal(deal)
 		p.failDeal(pub, deal, err)
 		return
@@ -78,16 +78,12 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	// Transfer Data
 	if deal.Checkpoint < dealcheckpoints.Transferred {
 		if err := p.transferAndVerify(dh.transferCtx, pub, deal); err != nil {
-			dh.tdOnce.Do(func() {
-				close(dh.transferDone)
-			})
+			dh.transferCancelled(nil)
 			return fmt.Errorf("failed data transfer: %w", err)
 		}
 	}
-	dh.tdOnce.Do(func() {
-		dh.transferDone <- errors.New("transfer already complete")
-		close(dh.transferDone)
-	})
+	// transfer can no longer be cancelled
+	dh.transferCancelled(errors.New("transfer already complete"))
 
 	// Publish
 	if deal.Checkpoint <= dealcheckpoints.Published {
@@ -350,10 +346,7 @@ func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 	// close and clean up the deal handler
 	dh := p.getDealHandler(deal.DealUuid)
 	if dh != nil {
-		dh.tdOnce.Do(func() {
-			dh.transferDone <- errors.New("deal cleaned up")
-			close(dh.transferDone)
-		})
+		dh.transferCancelled(errors.New("deal cleaned up"))
 		dh.close()
 		p.delDealHandler(deal.DealUuid)
 	}

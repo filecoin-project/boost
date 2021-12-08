@@ -2,6 +2,7 @@ package storagemarket
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -53,10 +54,18 @@ func (dh *dealHandler) cancel() error {
 		dh.transferErr = err
 		return err
 	case <-dh.providerCtx.Done():
-		return dh.providerCtx.Err()
+		return nil
 	}
+}
+
+func (dh *dealHandler) transferCancelled(err error) {
+	dh.tdOnce.Do(func() {
+		dh.transferDone <- err
+		close(dh.transferDone)
+	})
 }
 
 func (dh *dealHandler) close() {
 	dh.transferCancel()
+	dh.transferCancelled(errors.New("deal handler closed"))
 }

@@ -9,7 +9,7 @@ import (
 	"runtime"
 )
 
-var ErrDealNotFound = errors.New("deal not found")
+var ErrNotFound = errors.New("deal not found")
 
 type Scannable interface {
 	Scan(dest ...interface{}) error

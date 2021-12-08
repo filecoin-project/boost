@@ -41,12 +41,12 @@ func (p *Provider) loop() {
 			// setup cleanup function
 			cleanup := func() {
 				errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
-				if errf != nil && !xerrors.Is(errf, db.ErrDealNotFound) {
+				if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
 					log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
 				}
 
 				errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
-				if errs != nil && !xerrors.Is(errf, db.ErrDealNotFound) {
+				if errs != nil && !xerrors.Is(errf, db.ErrNotFound) {
 					log.Errorw("untagging storage", "id", deal.DealUuid, "err", errs)
 				}
 			}
@@ -92,7 +92,7 @@ func (p *Provider) loop() {
 
 		case finishedDeal := <-p.finishedDealsChan:
 			deal := finishedDeal.deal
-			log.Errorw("deal finished", "id", deal.DealUuid)
+			log.Infow("deal finished", "id", deal.DealUuid)
 			errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 			if errf != nil {
 				log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
