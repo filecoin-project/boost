@@ -2,6 +2,7 @@ import {useQuery} from "./hooks";
 import {StorageQuery} from "./gql";
 import React from "react";
 import {humanFileSize} from "./util";
+import './StorageSpace.css'
 
 export function StorageSpacePage(props) {
     const {loading, error, data} = useQuery(StorageQuery)
@@ -26,29 +27,31 @@ export function StorageSpacePage(props) {
                 {humanFileSize(totalSize)}
             </div>
             <div className="bars">
-                <div className="completed" style={{width: Math.floor(100*storage.Completed/totalSize)+'%'}}>
-                    <div className="label">
-                        Completed - Adding to sector<br/>
-                        {humanFileSize(storage.Completed)}
-                    </div>
+                <div className="completed" style={{width: Math.floor(100*storage.Completed/totalSize)+'%'}} />
+                <div className="transferring" style={{width: Math.floor(100*storage.Transferring/totalSize)+'%'}} />
+                <div className="pending" style={{width: Math.floor(100*storage.Pending/totalSize)+'%'}} />
+                <div className="free" style={{width: Math.floor(100*storage.Free/totalSize)+'%'}} />
+            </div>
+            <div className="labels">
+                <div className="label completed">
+                    <div className="bar-color"></div>
+                    <div className="text">Completed</div>
+                    <div className="amount">{humanFileSize(storage.Completed)}</div>
                 </div>
-                <div className="transferring" style={{width: Math.floor(100*storage.Transferring/totalSize)+'%'}}>
-                    <div className="label">
-                        Transferring<br/>
-                        {humanFileSize(storage.Transferring)}
-                    </div>
+                <div className="label transferring">
+                    <div className="bar-color"></div>
+                    <div className="text">Transferring</div>
+                    <div className="amount">{humanFileSize(storage.Transferring)}</div>
                 </div>
-                <div className="pending" style={{width: Math.floor(100*storage.Pending/totalSize)+'%'}}>
-                    <div className="label">
-                        Pending<br/>
-                        {humanFileSize(storage.Pending)}
-                    </div>
+                <div className="label pending">
+                    <div className="bar-color"></div>
+                    <div className="text">Pending</div>
+                    <div className="amount">{humanFileSize(storage.Pending)}</div>
                 </div>
-                <div className="free" style={{width: Math.floor(100*storage.Free/totalSize)+'%'}}>
-                    <div className="label">
-                        Free<br/>
-                        {humanFileSize(storage.Free)}
-                    </div>
+                <div className="label free">
+                    <div className="bar-color"></div>
+                    <div className="text">Free</div>
+                    <div className="amount">{humanFileSize(storage.Free)}</div>
                 </div>
             </div>
         </div>
