@@ -2,7 +2,9 @@ package storagemarket
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/libp2p/go-eventbus"
@@ -13,21 +15,19 @@ import (
 
 // dealHandler keeps track of the deal while it's executing
 type dealHandler struct {
-	dealUuid uuid.UUID
-	ctx      context.Context
-	stop     context.CancelFunc
-	stopped  chan struct{}
-	bus      event.Bus
-}
+	providerCtx context.Context
+	dealUuid    uuid.UUID
+	bus         event.Bus
 
-func (d *dealHandler) cancel(ctx context.Context) {
-	d.stop()
-	select {
-	case <-ctx.Done():
-		return
-	case <-d.stopped:
-		return
-	}
+	// Transfer cancellation state
+	transferCtx    context.Context
+	transferCancel context.CancelFunc
+	tdOnce         sync.Once // ensures the transferDone channel is closed only once
+	transferDone   chan error
+
+	transferMu       sync.Mutex
+	transferFinished bool
+	transferErr      error
 }
 
 func (d *dealHandler) subscribeUpdates() (event.Subscription, error) {
@@ -36,4 +36,36 @@ func (d *dealHandler) subscribeUpdates() (event.Subscription, error) {
 		return nil, fmt.Errorf("failed to create deal update subscriber to %s: %w", d.dealUuid, err)
 	}
 	return sub, nil
+}
+
+func (dh *dealHandler) cancel() error {
+	dh.transferMu.Lock()
+	defer dh.transferMu.Unlock()
+
+	if dh.transferFinished {
+		return dh.transferErr
+	}
+
+	dh.transferCancel()
+
+	select {
+	case err := <-dh.transferDone:
+		dh.transferFinished = true
+		dh.transferErr = err
+		return err
+	case <-dh.providerCtx.Done():
+		return nil
+	}
+}
+
+func (dh *dealHandler) transferCancelled(err error) {
+	dh.tdOnce.Do(func() {
+		dh.transferDone <- err
+		close(dh.transferDone)
+	})
+}
+
+func (dh *dealHandler) close() {
+	dh.transferCancel()
+	dh.transferCancelled(errors.New("deal handler closed"))
 }

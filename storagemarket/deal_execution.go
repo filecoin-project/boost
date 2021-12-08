@@ -2,6 +2,7 @@ package storagemarket
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,49 +29,44 @@ import (
 	"github.com/libp2p/go-libp2p-core/event"
 )
 
-func (p *Provider) doDeal(deal *types.ProviderDealState) {
+func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	// Set up pubsub for deal updates
-	bus := eventbus.NewBus()
-	pub, err := bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
+	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
 	if err != nil {
-		err := fmt.Errorf("failed to create event emitter: %w", err)
+		err = fmt.Errorf("failed to create event emitter: %w", err)
+		p.cleanupDeal(deal)
 		p.failDeal(pub, deal, err)
 		return
 	}
-
-	// Create a context that can be cancelled for this deal if the user wants
-	// to cancel the deal early
-	ctx, stop := context.WithCancel(p.ctx)
-	defer stop()
-
-	stopped := make(chan struct{})
-	defer close(stopped)
-
-	// Keep track of the fields to subscribe to or cancel the deal
-	p.dealHandlers.track(&dealHandler{
-		dealUuid: deal.DealUuid,
-		ctx:      ctx,
-		stop:     stop,
-		stopped:  stopped,
-		bus:      bus,
-	})
 
 	// build in-memory state
 	fi, err := os.Stat(deal.InboundFilePath)
 	if err != nil {
 		err := fmt.Errorf("failed to stat output file: %w", err)
+		p.cleanupDeal(deal)
 		p.failDeal(pub, deal, err)
 		return
 	}
 	deal.NBytesReceived = fi.Size()
 
 	// Execute the deal synchronously
-	if err := p.execDeal(ctx, pub, deal); err != nil {
+	if err := p.execDealUptoAddPiece(dh.providerCtx, pub, deal, dh); err != nil {
+		p.cleanupDeal(deal)
 		p.failDeal(pub, deal, err)
+		return
 	}
+
+	// deal has been sent for sealing -> we can cleanup the deal state now and simply watch the deal on chain
+	// to wait for deal completion/slashing and update the state in DB accordingly.
+	p.cleanupDeal(deal)
+
+	// TODO
+	// Watch deal on chain and change state in DB and emit notifications.
+	// Given that cleanup deal above also gets rid of the deal handler, subscriptions to deal updates from here on
+	// will fail, we can look into it when we implement deal completion.
 }
 
-func (p *Provider) execDeal(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
+func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState, dh *dealHandler) error {
 	// publish "new deal" event
 	p.fireEventDealNew(deal)
 
@@ -81,10 +77,13 @@ func (p *Provider) execDeal(ctx context.Context, pub event.Emitter, deal *types.
 
 	// Transfer Data
 	if deal.Checkpoint < dealcheckpoints.Transferred {
-		if err := p.transferAndVerify(ctx, pub, deal); err != nil {
+		if err := p.transferAndVerify(dh.transferCtx, pub, deal); err != nil {
+			dh.transferCancelled(nil)
 			return fmt.Errorf("failed data transfer: %w", err)
 		}
 	}
+	// transfer can no longer be cancelled
+	dh.transferCancelled(errors.New("transfer already complete"))
 
 	// Publish
 	if deal.Checkpoint <= dealcheckpoints.Published {
@@ -100,10 +99,6 @@ func (p *Provider) execDeal(ctx context.Context, pub event.Emitter, deal *types.
 		}
 	}
 
-	// Watch deal on chain and change state in DB and emit notifications.
-
-	// TODO: Clean up deal when it completes
-	//d.cleanupDeal()
 	return nil
 }
 
@@ -319,19 +314,11 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 
 	p.addDealLog(deal.DealUuid, "Deal handed off to sealer successfully")
 
-	// Now that the deal has been handed off to sealer, we should untag storage from the staging area.
-	err = p.storageManager.Untag(ctx, deal.DealUuid)
-	if err != nil {
-		log.Errorw("untagging storage", "uuid", deal.DealUuid, "err", err)
-		return err
-	}
-
 	return p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.AddedPiece)
 }
 
 func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, err error) {
-	p.cleanupDeal(p.ctx, deal)
-
+	log.Errorw("deal failed", "id", deal.DealUuid, "err", err)
 	// Update state in DB with error
 	deal.Checkpoint = dealcheckpoints.Complete
 	if xerrors.Is(err, context.Canceled) {
@@ -350,29 +337,34 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 	if pub != nil {
 		p.fireEventDealUpdate(pub, deal)
 	}
-
-	select {
-	case p.failedDealsChan <- failedDealReq{deal, err}:
-	case <-p.ctx.Done():
-	}
 }
 
-func (p *Provider) cleanupDeal(ctx context.Context, deal *types.ProviderDealState) {
+func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
+	// remove the temp file created for inbound deal data
 	_ = os.Remove(deal.InboundFilePath)
 
-	// clean up tagged funds
-	err := p.fundManager.UntagFunds(ctx, deal.DealUuid)
-	if err != nil {
-		log.Errorw("untagging funds", "id", deal.DealUuid, "err", err)
+	// close and clean up the deal handler
+	dh := p.getDealHandler(deal.DealUuid)
+	if dh != nil {
+		dh.transferCancelled(errors.New("deal cleaned up"))
+		dh.close()
+		p.delDealHandler(deal.DealUuid)
 	}
 
-	// clean up storage tag
-	err = p.storageManager.Untag(ctx, deal.DealUuid)
-	if err != nil {
-		log.Errorw("untagging storage", "id", deal.DealUuid, "err", err)
+	done := make(chan struct{}, 1)
+	// submit req to event loop to untag tagged funds and storage space
+	select {
+	case p.finishedDealsChan <- finishedDealsReq{deal: deal, done: done}:
+	case <-p.ctx.Done():
 	}
 
-	p.dealHandlers.del(deal.DealUuid)
+	// wait for event loop to finish cleanup and return before we return from here
+	// so caller is guaranteed that all resources associated with the deal have been cleanedup before
+	// taking further action.
+	select {
+	case <-done:
+	case <-p.ctx.Done():
+	}
 }
 
 func (p *Provider) fireEventDealNew(deal *types.ProviderDealState) {

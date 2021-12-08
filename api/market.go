@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -29,6 +28,5 @@ type Market interface {
 
 // ProviderDealRejectionInfo is the information sent by the Storage Provider to the Client when it rejects a valid deal.
 type ProviderDealRejectionInfo struct {
-	Reason  string
-	Backoff time.Duration
+	Reason string
 }

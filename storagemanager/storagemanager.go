@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sync"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -21,8 +20,6 @@ type Config struct {
 type StorageManager struct {
 	db  *db.StorageDB
 	cfg Config
-
-	lk sync.RWMutex
 }
 
 func New(cfg Config) func(sqldb *sql.DB) *StorageManager {
@@ -36,9 +33,6 @@ func New(cfg Config) func(sqldb *sql.DB) *StorageManager {
 
 // Tag
 func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize abi.PaddedPieceSize) error {
-	m.lk.Lock()
-	defer m.lk.Unlock()
-
 	// Get the total tagged storage, so that we know how much is available.
 	tagged, err := m.totalTagged(ctx)
 	if err != nil {
@@ -61,9 +55,6 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize 
 
 // Untag
 func (m *StorageManager) Untag(ctx context.Context, dealUuid uuid.UUID) error {
-	m.lk.Lock()
-	defer m.lk.Unlock()
-
 	pieceSize, err := m.db.Untag(ctx, dealUuid)
 	if err != nil {
 		return fmt.Errorf("persisting untag storage for deal to DB: %w", err)

@@ -45,7 +45,7 @@ func (f *FundsDB) Untag(ctx context.Context, dealUuid uuid.UUID) (abi.TokenAmoun
 	err := row.Scan(&collat.marshalled, &pubMsg.marshalled)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return abi.NewTokenAmount(0), nil
+			return abi.NewTokenAmount(0), ErrNotFound
 		}
 		return abi.NewTokenAmount(0), fmt.Errorf("getting untagged amount: %w", err)
 	}
