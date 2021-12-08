@@ -56,7 +56,7 @@ func (p *Provider) loop() {
 			err := p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
 			if err != nil {
 				cleanup()
-				dealReq.rsp <- acceptDealResp{false, &api.ProviderDealRejectionInfo{err.Error()}, nil}
+				dealReq.rsp <- acceptDealResp{accepted: false, ri: &api.ProviderDealRejectionInfo{Reason: err.Error()}, err: nil}
 				continue
 			}
 
@@ -64,7 +64,7 @@ func (p *Provider) loop() {
 			err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal.PieceSize)
 			if err != nil {
 				cleanup()
-				dealReq.rsp <- acceptDealResp{false, &api.ProviderDealRejectionInfo{err.Error()}, nil}
+				dealReq.rsp <- acceptDealResp{accepted: false, ri: &api.ProviderDealRejectionInfo{Reason: err.Error()}, err: nil}
 				continue
 			}
 
