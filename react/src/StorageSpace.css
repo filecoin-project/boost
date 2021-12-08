@@ -1,0 +1,98 @@
+.storage-chart {
+    position: relative;
+    padding: 1em;
+}
+
+.storage-chart .total-size {
+    position: absolute;
+    right: -1em;
+    top: -0.6em;
+    font-size: 0.8em;
+}
+
+.storage-chart .bars {
+    border: 1px solid black;
+    height: 4em;
+}
+
+.storage-chart .bars > div {
+    position: relative;
+    display: inline-block;
+    height: 4em;
+    border-right: 1px solid black;
+}
+
+.storage-chart .bars > div:last-child {
+    border-right: none;
+}
+
+.storage-chart .bars .completed {
+    background-image: repeating-linear-gradient(
+            135deg,
+            #fff,
+            #fff 5px,
+            #e64980 5px,
+            #e64980 6px);
+}
+
+.storage-chart .completed .bar-color {
+    background-image: repeating-linear-gradient(
+          135deg,
+          #fff,
+          #fff 3px,
+          #e64980 3px,
+          #e64980 4px);
+}
+
+.storage-chart .bars .transferring {
+    background-image: repeating-linear-gradient(
+            135deg,
+            #fff,
+            #fff 5px,
+            #465298 5px,
+            #465298 6px);
+}
+
+.storage-chart .transferring .bar-color {
+    background-image: repeating-linear-gradient(
+            135deg,
+            #fff,
+            #fff 3px,
+            #465298 3px,
+            #465298 4px);
+}
+
+.storage-chart .labels {
+    padding: 0.5em 0;
+}
+
+.storage-chart .labels .label {
+    display: inline-block;
+    padding: 0.5em 1em;
+    font-size: 0.8em;
+}
+
+.storage-chart .labels .bar-color {
+    border: 1px solid #000;
+    width: 0.8em;
+    height: 0.8em;
+    display: inline-block;
+}
+
+.storage-chart .labels .text {
+    display: inline-block;
+    padding-left: 0.5em;
+}
+
+.storage-chart .labels .amount {
+    padding: 0.5em 0 0 1.5em;
+}
+
+.storage-fields {
+    margin-top: 1em
+}
+
+.storage-fields td {
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
