@@ -24,6 +24,7 @@ type Config struct {
 }
 
 type StorageManager struct {
+	lr                 repo.LockedRepo
 	db                 *db.StorageDB
 	cfg                Config
 	StagingAreaDirPath string
@@ -34,6 +35,7 @@ func New(cfg Config) func(lr repo.LockedRepo, sqldb *sql.DB) *StorageManager {
 		return &StorageManager{
 			db:                 db.NewStorageDB(sqldb),
 			cfg:                cfg,
+			lr:                 lr,
 			StagingAreaDirPath: filepath.Join(lr.Path(), StagingAreaDirName),
 		}
 	}
@@ -54,8 +56,14 @@ func (m *StorageManager) Free(ctx context.Context) (uint64, error) {
 		return m.cfg.MaxStagingDealsBytes - tagged, nil
 	} else {
 		// we don't have a max staging area configured, so
-		// maybe return the actual free disk space
-		return 0, nil
+		// return the actual free disk space
+
+		s, err := m.lr.Stat(m.StagingAreaDirPath)
+		if err != nil {
+			return 0, err
+		}
+
+		return uint64(s.Available), nil
 	}
 }
 
