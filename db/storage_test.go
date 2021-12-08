@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"golang.org/x/xerrors"
+
 	"github.com/google/uuid"
 
 	"github.com/stretchr/testify/require"
@@ -25,7 +27,7 @@ func TestStorageDB(t *testing.T) {
 
 	dealUUID := uuid.New()
 	amt, err := db.Untag(ctx, dealUUID)
-	req.Contains(err.Error(), "not found")
+	req.True(xerrors.Is(err, ErrNotFound))
 	req.Equal(uint64(0), amt)
 
 	err = db.Tag(ctx, dealUUID, 1111)

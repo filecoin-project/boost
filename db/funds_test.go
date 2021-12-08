@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"golang.org/x/xerrors"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 
@@ -27,7 +29,7 @@ func TestFundsDB(t *testing.T) {
 
 	dealUUID := uuid.New()
 	amt, err := db.Untag(ctx, dealUUID)
-	req.Contains(err.Error(), "not found")
+	req.True(xerrors.Is(err, ErrNotFound))
 	req.Equal(int64(0), amt.Int64())
 
 	err = db.Tag(ctx, dealUUID, abi.NewTokenAmount(1111), abi.NewTokenAmount(2222))
