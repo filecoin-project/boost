@@ -39,6 +39,7 @@ type Deal {
   DealDataRoot: String!
   PublishCid: String!
   Transfer: TransferParams!
+  Stage: String!
   Message: String!
   Logs: [DealLog]!
 }

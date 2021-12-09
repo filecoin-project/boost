@@ -315,6 +315,10 @@ func (dr *dealResolver) PieceCid() string {
 	return dr.ProviderDealState.ClientDealProposal.Proposal.PieceCID.String()
 }
 
+func (dr *dealResolver) Stage() string {
+	return dr.ProviderDealState.Checkpoint.String()
+}
+
 func (dr *dealResolver) Message() string {
 	switch dr.Checkpoint {
 	case dealcheckpoints.Accepted:
