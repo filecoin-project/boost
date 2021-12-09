@@ -3,24 +3,21 @@ package gql
 import (
 	"context"
 	"fmt"
-	"math/big"
 
-	"github.com/filecoin-project/go-state-types/abi"
-
-	stbig "github.com/filecoin-project/go-state-types/big"
+	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/graph-gophers/graphql-go"
 )
 
 type fundsEscrow struct {
-	Available float64
-	Locked    float64
-	Tagged    float64
+	Available gqltypes.BigInt
+	Locked    gqltypes.BigInt
+	Tagged    gqltypes.BigInt
 }
 
 type fundsWallet struct {
 	Address string
-	Balance float64
-	Tagged  float64
+	Balance gqltypes.BigInt
+	Tagged  gqltypes.BigInt
 }
 
 type funds struct {
@@ -53,25 +50,20 @@ func (r *resolver) Funds(ctx context.Context) (*funds, error) {
 
 	return &funds{
 		Escrow: fundsEscrow{
-			Tagged:    toFloat64(tagged.Collateral),
-			Available: toFloat64(balMkt.Available),
-			Locked:    toFloat64(balMkt.Locked),
+			Tagged:    gqltypes.BigInt{Int: tagged.Collateral},
+			Available: gqltypes.BigInt{Int: balMkt.Available},
+			Locked:    gqltypes.BigInt{Int: balMkt.Locked},
 		},
 		Collateral: fundsWallet{
 			Address: r.fundMgr.AddressPledgeCollateral().String(),
-			Balance: toFloat64(balCollateral),
+			Balance: gqltypes.BigInt{Int: balCollateral},
 		},
 		PubMsg: fundsWallet{
 			Address: r.fundMgr.AddressPublishMsg().String(),
-			Balance: toFloat64(balPubMsg),
-			Tagged:  toFloat64(tagged.PubMsg),
+			Balance: gqltypes.BigInt{Int: balPubMsg},
+			Tagged:  gqltypes.BigInt{Int: tagged.PubMsg},
 		},
 	}, nil
-}
-
-func toFloat64(i abi.TokenAmount) float64 {
-	f64, _ := new(big.Float).SetInt(i.Int).Float64()
-	return f64
 }
 
 type fundsLogList struct {
@@ -83,7 +75,7 @@ type fundsLogList struct {
 type fundsLogResolver struct {
 	CreatedAt graphql.Time
 	DealUUID  graphql.ID
-	Amount    float64
+	Amount    gqltypes.BigInt
 	Text      string
 }
 
@@ -99,7 +91,7 @@ func (r *resolver) FundsLogs(ctx context.Context) (*fundsLogList, error) {
 		fundsLogs = append(fundsLogs, &fundsLogResolver{
 			CreatedAt: graphql.Time{Time: l.CreatedAt},
 			DealUUID:  graphql.ID(l.DealUUID.String()),
-			Amount:    toFloat64(l.Amount),
+			Amount:    gqltypes.BigInt{Int: l.Amount},
 			Text:      l.Text,
 		})
 	}
@@ -112,9 +104,7 @@ func (r *resolver) FundsLogs(ctx context.Context) (*fundsLogList, error) {
 }
 
 // mutation: moveFundsToEscrow(amount): Boolean
-func (r *resolver) FundsMoveToEscrow(ctx context.Context, args struct{ Amount float64 }) (bool, error) {
-	amt := new(big.Int)
-	new(big.Float).SetFloat64(args.Amount).Int(amt)
-	_, err := r.fundMgr.MoveFundsToEscrow(ctx, stbig.Int{Int: amt})
+func (r *resolver) FundsMoveToEscrow(ctx context.Context, args struct{ Amount gqltypes.BigInt }) (bool, error) {
+	_, err := r.fundMgr.MoveFundsToEscrow(ctx, args.Amount.Int)
 	return true, err
 }

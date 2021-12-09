@@ -8,9 +8,10 @@ import (
 
 	"golang.org/x/xerrors"
 
+	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
+	stbig "github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/specs-actors/actors/builtin/multisig"
@@ -19,14 +20,14 @@ import (
 type msg struct {
 	To         string
 	From       string
-	Nonce      float64
-	Value      float64
-	GasFeeCap  float64
-	GasLimit   float64
-	GasPremium float64
+	Nonce      gqltypes.Uint64
+	Value      gqltypes.BigInt
+	GasFeeCap  gqltypes.BigInt
+	GasLimit   gqltypes.Uint64
+	GasPremium gqltypes.BigInt
 	Method     string
 	Params     string
-	BaseFee    float64
+	BaseFee    gqltypes.BigInt
 }
 
 // query: mpool(local): [Message]
@@ -86,14 +87,14 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 		gqlmsgs = append(gqlmsgs, &msg{
 			To:         m.Message.To.String(),
 			From:       m.Message.From.String(),
-			Nonce:      float64(m.Message.Nonce),
-			Value:      toFloat64(m.Message.Value),
-			GasFeeCap:  toFloat64(m.Message.GasFeeCap),
-			GasLimit:   float64(m.Message.GasLimit),
-			GasPremium: toFloat64(m.Message.GasPremium),
+			Nonce:      gqltypes.Uint64(m.Message.Nonce),
+			Value:      gqltypes.BigInt{Int: m.Message.Value},
+			GasFeeCap:  gqltypes.BigInt{Int: m.Message.GasFeeCap},
+			GasLimit:   gqltypes.Uint64(uint64(m.Message.GasLimit)),
+			GasPremium: gqltypes.BigInt{Int: m.Message.GasPremium},
 			Method:     method,
 			Params:     params,
-			BaseFee:    toFloat64(baseFee),
+			BaseFee:    gqltypes.BigInt{Int: baseFee},
 		})
 	}
 
@@ -137,8 +138,8 @@ func messageFromBytes(msgb []byte) (types.ChainMsg, error) {
 				Method: pp.Method,
 				Params: pp.Params,
 
-				GasFeeCap:  big.Zero(),
-				GasPremium: big.Zero(),
+				GasFeeCap:  stbig.Zero(),
+				GasPremium: stbig.Zero(),
 			}, nil
 		}
 	}
