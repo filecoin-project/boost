@@ -77,22 +77,22 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, size uint6
 
 // Untag
 func (m *StorageManager) Untag(ctx context.Context, dealUuid uuid.UUID) error {
-	pieceSize, err := m.db.Untag(ctx, dealUuid)
+	size, err := m.db.Untag(ctx, dealUuid)
 	if err != nil {
 		return fmt.Errorf("persisting untag storage for deal to DB: %w", err)
 	}
 
 	storageLog := &db.StorageLog{
-		DealUUID:  dealUuid,
-		Text:      "Untag staging storage for deal",
-		PieceSize: pieceSize,
+		DealUUID:     dealUuid,
+		Text:         "Untag staging storage for deal",
+		TransferSize: size,
 	}
 	err = m.db.InsertLog(ctx, storageLog)
 	if err != nil {
 		return fmt.Errorf("persisting untag storage log to DB: %w", err)
 	}
 
-	log.Infow("untag storage", "id", dealUuid, "pieceSize", pieceSize)
+	log.Infow("untag storage", "id", dealUuid, "size", size)
 	return nil
 }
 
@@ -111,9 +111,9 @@ func (m *StorageManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, 
 	}
 
 	storageLog := &db.StorageLog{
-		DealUUID:  dealUuid,
-		PieceSize: pieceSize,
-		Text:      "Tag staging storage",
+		DealUUID:     dealUuid,
+		TransferSize: pieceSize,
+		Text:         "Tag staging storage",
 	}
 	err = m.db.InsertLog(ctx, storageLog)
 	if err != nil {
