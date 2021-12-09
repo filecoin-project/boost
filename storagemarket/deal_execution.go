@@ -288,9 +288,19 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	}
 
 	log.Info("pad CAR")
+
+	var size uint64
+	switch v2r.Version {
+	case 2:
+		size = v2r.Header.DataSize
+	case 1:
+		stat, _ := os.Stat(deal.InboundFilePath)
+		size = uint64(stat.Size())
+	}
+
 	// Inflate the deal size so that it exactly fills a piece
 	proposal := deal.ClientDealProposal.Proposal
-	paddedReader, err := padreader.NewInflator(v2r.DataReader(), v2r.Header.DataSize, proposal.PieceSize.Unpadded())
+	paddedReader, err := padreader.NewInflator(v2r.DataReader(), size, proposal.PieceSize.Unpadded())
 	if err != nil {
 		return fmt.Errorf("failed to create inflator: %w", err)
 	}
