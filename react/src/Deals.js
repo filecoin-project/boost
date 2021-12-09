@@ -36,12 +36,17 @@ class NewDealsSubscriber {
 
                     var nextCursor
                     var dealNew = r.data.dealNew
+                    var prevLength = that.deals.length
                     that.deals = uniqDeals([dealNew, ...that.deals])
                     if (that.deals.length > dealsPerPage) {
                         nextCursor = that.deals[dealsPerPage].ID
                         that.deals = that.deals.slice(0, dealsPerPage)
                     }
-                    that.onNewDeal(that.deals, nextCursor)
+
+                    // If a new deal was added, call the onNewDeal callback
+                    if (that.deals.length > prevLength) {
+                        that.onNewDeal(that.deals, nextCursor)
+                    }
                 },
                 error(e) {
                     console.error('new deals subscription error:', e)
