@@ -183,16 +183,26 @@ func GenerateCommP(filepath string) (cidAndSize *writer.DataCIDSize, finalErr er
 
 	// dump the CARv1 payload of the CARv2 file to the Commp Writer and get back the CommP.
 	w := &writer.Writer{}
-	//written, err := io.Copy(w, rd.DataReader())
-	_, err = io.Copy(w, rd.DataReader())
+	written, err := io.Copy(w, rd.DataReader())
 	if err != nil {
 		return nil, fmt.Errorf("failed to write to CommP writer: %w", err)
 	}
 
-	// TODO: figure out why the CARv1 payload size is always 0
-	//if written != int64(rd.Header.DataSize) {
-	//	return cid.Undef, fmt.Errorf("number of bytes written to CommP writer %d not equal to the CARv1 payload size %d", written, rd.Header.DataSize)
-	//}
+	var size int64
+	switch rd.Version {
+	case 2:
+		size = int64(rd.Header.DataSize)
+	case 1:
+		st, err := os.Stat(filepath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to stat CARv1 file: %w", err)
+		}
+		size = st.Size()
+	}
+
+	if written != size {
+		return nil, fmt.Errorf("number of bytes written to CommP writer %d not equal to the CARv1 payload size %d", written, rd.Header.DataSize)
+	}
 
 	cidAndSize = &writer.DataCIDSize{}
 	*cidAndSize, err = w.Sum()
@@ -281,9 +291,21 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 		return fmt.Errorf("failed to open CARv2 file: %w", err)
 	}
 
+	var size uint64
+	switch v2r.Version {
+	case 1:
+		st, err := os.Stat(deal.InboundFilePath)
+		if err != nil {
+			return fmt.Errorf("failed to stat CARv1 file: %w", err)
+		}
+		size = uint64(st.Size())
+	case 2:
+		size = v2r.Header.DataSize
+	}
+
 	// Inflate the deal size so that it exactly fills a piece
 	proposal := deal.ClientDealProposal.Proposal
-	paddedReader, err := padreader.NewInflator(v2r.DataReader(), v2r.Header.DataSize, proposal.PieceSize.Unpadded())
+	paddedReader, err := padreader.NewInflator(v2r.DataReader(), size, proposal.PieceSize.Unpadded())
 	if err != nil {
 		return fmt.Errorf("failed to create inflator: %w", err)
 	}
