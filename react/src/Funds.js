@@ -1,4 +1,4 @@
-import {useMutation, useQuery} from "./hooks";
+import {useMutation, useQuery} from "@apollo/react-hooks";
 import {FundsQuery, FundsLogsQuery, FundsMoveToEscrow} from "./gql";
 import {useState, React}  from "react";
 import moment from "moment";

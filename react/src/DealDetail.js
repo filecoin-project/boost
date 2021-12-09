@@ -1,5 +1,5 @@
 import React, {useEffect} from "react";
-import {useMutation, useSubscription} from "./hooks";
+import {useMutation, useSubscription} from "@apollo/react-hooks";
 import {DealCancelMutation, DealSubscription} from "./gql";
 import {dateFormat} from "./util-date";
 import moment from "moment";
