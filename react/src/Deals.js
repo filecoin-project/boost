@@ -8,10 +8,11 @@ import {DealDetail} from "./DealDetail";
 var dealsPerPage = 10
 
 class NewDealsSubscriber {
-    constructor(initialDeals, onNewDeal) {
+    constructor(initialDeals, dealCount, onNewDeal) {
         this.pageNum = 1
         this.deals = initialDeals
         this.onNewDeal = onNewDeal
+        this.dealCount = dealCount
     }
 
     updateFields(deals, pageNum) {
@@ -38,14 +39,16 @@ class NewDealsSubscriber {
                     var dealNew = r.data.dealNew
                     var prevLength = that.deals.length
                     that.deals = uniqDeals([dealNew, ...that.deals])
+                    const isNewDeal = that.deals.length > prevLength
                     if (that.deals.length > dealsPerPage) {
                         nextCursor = that.deals[dealsPerPage].ID
                         that.deals = that.deals.slice(0, dealsPerPage)
                     }
 
                     // If a new deal was added, call the onNewDeal callback
-                    if (that.deals.length > prevLength) {
-                        that.onNewDeal(that.deals, nextCursor)
+                    if (isNewDeal) {
+                        that.dealCount++
+                        that.onNewDeal(that.deals, nextCursor, that.dealCount)
                     }
                 },
                 error(e) {
@@ -106,15 +109,16 @@ export function StorageDealsPage(props) {
             }
 
             // Subscribe to "new deal" events
-            newDealsSubscriber = new NewDealsSubscriber(res.deals, function (newDeals, nextCursor) {
+            function onNewDeal(newDeals, nextCursor, count) {
                 if (newDealsSubscriber.pageNum === 1) {
                     // If it's the first page, update the list of deals
                     // that is currently being displayed
                     setDeals(newDeals)
                     dealsPagination.addPageCursor(2, nextCursor)
                 }
-                setTotalCount(res.totalCount + 1)
-            })
+                setTotalCount(count)
+            }
+            newDealsSubscriber = new NewDealsSubscriber(res.deals, res.totalCount, onNewDeal)
             sub = newDealsSubscriber.subscribe()
 
             dealsPagination.addPageCursor(2, res.next)
