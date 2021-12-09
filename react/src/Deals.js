@@ -1,5 +1,5 @@
-import {customParse, useSubscription} from "./hooks";
-import {DealsListQuery, DealSubscription, gqlQuery, gqlSubscribe, NewDealsSubscription} from "./gql";
+import {useSubscription} from "@apollo/react-hooks";
+import {DealsListQuery, DealSubscription, gqlClient, NewDealsSubscription} from "./gql";
 import moment from "moment";
 import {humanFileSize} from "./util";
 import React, {useEffect, useState} from "react";
@@ -23,13 +23,11 @@ class NewDealsSubscriber {
         var that = this
 
         try {
-            var res = await gqlSubscribe({
+            var res = await gqlClient.subscribe({
                 query: NewDealsSubscription
             })
             res.subscribe({
                 next(r) {
-                    customParse(r)
-
                     // Don't add new deals to the list if we're not on the first page
                     if (that.pageNum > 1) {
                         return
@@ -67,7 +65,7 @@ export function StorageDealsPage(props) {
 
     async function dealsListQuery(cursor) {
         try {
-            var res = await gqlQuery({
+            var res = await gqlClient.query({
                 query: DealsListQuery,
                 variables: {
                     limit: dealsPerPage,

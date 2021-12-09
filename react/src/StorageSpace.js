@@ -1,4 +1,4 @@
-import {useQuery} from "./hooks";
+import {useQuery} from "@apollo/react-hooks";
 import {StorageQuery} from "./gql";
 import React from "react";
 import {humanFileSize, addCommas} from "./util";

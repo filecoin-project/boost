@@ -1,4 +1,4 @@
-import {useQuery} from "./hooks";
+import {useQuery} from "@apollo/react-hooks";
 import {MpoolQuery} from "./gql";
 import {React, useState} from "react";
 import {humanFIL} from "./util";

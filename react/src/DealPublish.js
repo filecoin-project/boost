@@ -1,4 +1,4 @@
-import {useMutation, useQuery} from "./hooks";
+import {useMutation, useQuery} from "@apollo/react-hooks";
 import {DealPublishNowMutation, DealPublishQuery} from "./gql";
 import React from "react";
 import moment from "moment";
