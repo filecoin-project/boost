@@ -11,10 +11,10 @@ import (
 )
 
 type StorageLog struct {
-	DealUUID  uuid.UUID
-	CreatedAt time.Time
-	PieceSize uint64
-	Text      string
+	DealUUID     uuid.UUID
+	CreatedAt    time.Time
+	TransferSize uint64
+	Text         string
 }
 
 type StorageDB struct {
@@ -25,16 +25,16 @@ func NewStorageDB(db *sql.DB) *StorageDB {
 	return &StorageDB{db: db}
 }
 
-func (s *StorageDB) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize uint64) error {
-	qry := "INSERT INTO StorageTagged (DealUUID, CreatedAt, PieceSize) "
+func (s *StorageDB) Tag(ctx context.Context, dealUuid uuid.UUID, size uint64) error {
+	qry := "INSERT INTO StorageTagged (DealUUID, CreatedAt, TransferSize) "
 	qry += "VALUES (?, ?, ?)"
-	values := []interface{}{dealUuid, time.Now(), fmt.Sprintf("%d", pieceSize)}
+	values := []interface{}{dealUuid, time.Now(), fmt.Sprintf("%d", size)}
 	_, err := s.db.ExecContext(ctx, qry, values...)
 	return err
 }
 
 func (s *StorageDB) Untag(ctx context.Context, dealUuid uuid.UUID) (uint64, error) {
-	qry := "SELECT PieceSize FROM StorageTagged WHERE DealUUID = ?"
+	qry := "SELECT TransferSize FROM StorageTagged WHERE DealUUID = ?"
 	row := s.db.QueryRowContext(ctx, qry, dealUuid)
 
 	ps := &bigIntFieldDef{f: new(big.Int)}
@@ -47,7 +47,7 @@ func (s *StorageDB) Untag(ctx context.Context, dealUuid uuid.UUID) (uint64, erro
 	}
 	err = ps.unmarshall()
 	if err != nil {
-		return 0, fmt.Errorf("unmarshalling untagged PieceSize")
+		return 0, fmt.Errorf("unmarshalling untagged TransferSize")
 	}
 
 	_, err = s.db.ExecContext(ctx, "DELETE FROM StorageTagged WHERE DealUUID = ?", dealUuid)
@@ -61,9 +61,9 @@ func (s *StorageDB) InsertLog(ctx context.Context, logs ...*StorageLog) error {
 			l.CreatedAt = now
 		}
 
-		qry := "INSERT INTO StorageLogs (DealUUID, CreatedAt, PieceSize, LogText) "
+		qry := "INSERT INTO StorageLogs (DealUUID, CreatedAt, TransferSize, LogText) "
 		qry += "VALUES (?, ?, ?, ?)"
-		values := []interface{}{l.DealUUID, l.CreatedAt, fmt.Sprintf("%d", l.PieceSize), l.Text}
+		values := []interface{}{l.DealUUID, l.CreatedAt, fmt.Sprintf("%d", l.TransferSize), l.Text}
 		_, err := s.db.ExecContext(ctx, qry, values...)
 		if err != nil {
 			return fmt.Errorf("inserting storage log: %w", err)
@@ -74,7 +74,7 @@ func (s *StorageDB) InsertLog(ctx context.Context, logs ...*StorageLog) error {
 }
 
 func (s *StorageDB) Logs(ctx context.Context) ([]StorageLog, error) {
-	qry := "SELECT DealUUID, CreatedAt, PieceSize, LogText FROM StorageLogs"
+	qry := "SELECT DealUUID, CreatedAt, TransferSize, LogText FROM StorageLogs"
 	rows, err := s.db.QueryContext(ctx, qry)
 	if err != nil {
 		return nil, err
@@ -98,10 +98,10 @@ func (s *StorageDB) Logs(ctx context.Context) ([]StorageLog, error) {
 
 		err = ps.unmarshall()
 		if err != nil {
-			return nil, fmt.Errorf("unmarshalling PieceSize: %w", err)
+			return nil, fmt.Errorf("unmarshalling TransferSize: %w", err)
 		}
 
-		storageLog.PieceSize = (*ps.f).Uint64()
+		storageLog.TransferSize = (*ps.f).Uint64()
 		storageLogs = append(storageLogs, storageLog)
 	}
 	if err := rows.Err(); err != nil {
@@ -112,7 +112,7 @@ func (s *StorageDB) Logs(ctx context.Context) ([]StorageLog, error) {
 }
 
 func (s *StorageDB) TotalTagged(ctx context.Context) (uint64, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT PieceSize FROM StorageTagged")
+	rows, err := s.db.QueryContext(ctx, "SELECT TransferSize FROM StorageTagged")
 	if err != nil {
 		return 0, fmt.Errorf("getting total tagged: %w", err)
 	}
@@ -124,12 +124,12 @@ func (s *StorageDB) TotalTagged(ctx context.Context) (uint64, error) {
 		val := &bigIntFieldDef{f: new(big.Int)}
 		err := rows.Scan(&val.marshalled)
 		if err != nil {
-			return 0, fmt.Errorf("getting piece size: %w", err)
+			return 0, fmt.Errorf("getting TransferSize: %w", err)
 		}
 
 		err = val.unmarshall()
 		if err != nil {
-			return 0, fmt.Errorf("unmarshalling untagged PieceSize: %w", err)
+			return 0, fmt.Errorf("unmarshalling untagged TransferSize: %w", err)
 		}
 		if val.f.Int != nil {
 			total = big.Add(total, *val.f)

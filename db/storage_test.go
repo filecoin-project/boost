@@ -43,7 +43,7 @@ func TestStorageDB(t *testing.T) {
 
 	fl := &StorageLog{
 		DealUUID:  dealUUID,
-		PieceSize: uint64(1234),
+		TransferSize: uint64(1234),
 		Text:      "Hello",
 	}
 	err = db.InsertLog(ctx, fl)
@@ -53,6 +53,6 @@ func TestStorageDB(t *testing.T) {
 	req.NoError(err)
 	req.Len(logs, 1)
 	req.Equal(fl.DealUUID, logs[0].DealUUID)
-	req.Equal(fl.PieceSize, logs[0].PieceSize)
+	req.Equal(fl.TransferSize, logs[0].TransferSize)
 	req.Equal(fl.Text, logs[0].Text)
 }
