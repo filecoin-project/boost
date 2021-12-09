@@ -20,6 +20,7 @@ func main() {
 	_ = logging.SetLogLevel("boost", "INFO")
 	_ = logging.SetLogLevel("provider", "INFO")
 	_ = logging.SetLogLevel("gql", "INFO")
+	_ = logging.SetLogLevel("boost-provider", "INFO")
 
 	app := &cli.App{
 		Name:                 "boost",
@@ -51,6 +52,9 @@ func main() {
 func before(cctx *cli.Context) error {
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boost", "DEBUG")
+		_ = logging.SetLogLevel("provider", "DEBUG")
+		_ = logging.SetLogLevel("gql", "DEBUG")
+		_ = logging.SetLogLevel("boost-provider", "DEBUG")
 	}
 
 	return nil

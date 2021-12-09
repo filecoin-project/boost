@@ -124,8 +124,8 @@ func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.Provide
 	return deal, nil
 }
 
-func (p *Provider) NBytesReceived(deal *types.ProviderDealState) uint64 {
-	return p.transfers.getBytes(deal.DealUuid)
+func (p *Provider) NBytesReceived(dealUuid uuid.UUID) uint64 {
+	return p.transfers.getBytes(dealUuid)
 }
 
 func (p *Provider) GetAsk() *types.StorageAsk {

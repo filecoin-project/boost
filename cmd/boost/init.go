@@ -38,6 +38,12 @@ var initCmd = &cli.Command{
 			Usage:    "wallet to be used for pledging collateral",
 			Required: true,
 		},
+		&cli.Int64Flag{
+			Name:     "max-staging-deals-bytes",
+			Usage:    "max size for staging area in bytes",
+			Value:    50_000_000_000,
+			Required: true,
+		},
 	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
@@ -59,6 +65,10 @@ var initCmd = &cli.Command{
 
 		if walletPSD.String() == walletCP.String() {
 			return xerrors.Errorf("wallets for PublishStorageDeals and pledging collateral must be different")
+		}
+
+		if cctx.Int64("max-staging-deals-bytes") <= 0 {
+			return xerrors.Errorf("max size for staging deals area must be > 0 bytes")
 		}
 
 		if err := checkV1ApiSupport(ctx, cctx); err != nil {
@@ -140,6 +150,7 @@ var initCmd = &cli.Command{
 				}
 				rcfg.SectorIndexApiInfo = ai
 
+				rcfg.Dealmaking.MaxStagingDealsBytes = cctx.Int64("max-staging-deals-bytes")
 				rcfg.Wallets.Miner = minerActor.String()
 				rcfg.Wallets.PledgeCollateral = walletCP.String()
 				rcfg.Wallets.PublishStorageDeals = walletPSD.String()

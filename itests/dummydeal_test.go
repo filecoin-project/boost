@@ -63,6 +63,8 @@ func setLogLevel() {
 	_ = logging.SetLogLevel("actors", "DEBUG")
 	_ = logging.SetLogLevel("provider", "DEBUG")
 	_ = logging.SetLogLevel("http-transfer", "DEBUG")
+	_ = logging.SetLogLevel("boost-provider", "DEBUG")
+	_ = logging.SetLogLevel("storagemanager", "DEBUG")
 }
 
 func TestDummydeal(t *testing.T) {
@@ -140,7 +142,7 @@ func TestDummydeal(t *testing.T) {
 	failingDealUuid := uuid.New()
 	res2, err2 := f.makeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
 	require.NoError(t, err2)
-	require.Equal(t, res2.Reason, "cannot accept piece of size 4194304, on top of already allocated 4194304 bytes, because it would exceed max staging area size 5000000")
+	require.Equal(t, "cannot accept piece of size 2254771, on top of already allocated 2254771 bytes, because it would exceed max staging area size 4000000", res2.Reason)
 	log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
 
 	// Wait for the deal to be added to a sector
@@ -290,7 +292,7 @@ func (f *testFramework) start() {
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
 	cfg.Dealmaking.PublishMsgPeriod = config.Duration(time.Second * 1)
-	cfg.Dealmaking.MaxStagingDealsBytes = 5000000
+	cfg.Dealmaking.MaxStagingDealsBytes = 4000000
 
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)

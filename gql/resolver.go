@@ -6,6 +6,7 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
+	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -25,41 +26,31 @@ type dealListResolver struct {
 // resolver translates from a request for a graphql field to the data for
 // that field
 type resolver struct {
-	dealsDB   *db.DealsDB
-	fundMgr   *fundmanager.FundManager
-	provider  *storagemarket.Provider
-	publisher *storagemarket.DealPublisher
-	fullNode  v1api.FullNode
+	dealsDB    *db.DealsDB
+	fundMgr    *fundmanager.FundManager
+	storageMgr *storagemanager.StorageManager
+	provider   *storagemarket.Provider
+	publisher  *storagemarket.DealPublisher
+	fullNode   v1api.FullNode
 }
 
-func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
-		dealsDB:   dealsDB,
-		fundMgr:   fundMgr,
-		provider:  provider,
-		publisher: publisher,
-		fullNode:  fullNode,
+		dealsDB:    dealsDB,
+		fundMgr:    fundMgr,
+		storageMgr: storageMgr,
+		provider:   provider,
+		publisher:  publisher,
+		fullNode:   fullNode,
 	}
 }
 
 type storageResolver struct {
-	Completed    float64
-	Transferring float64
-	Pending      float64
-	Free         float64
-	MountPoint   string
-}
-
-// query: storage: [Storage]
-func (r *resolver) Storage(ctx context.Context) (*storageResolver, error) {
-	// TODO: Get these values from storage space manager
-	return &storageResolver{
-		Completed:    8.5 * 1024 * 1024 * 1024,
-		Transferring: 5.2 * 1024 * 1024 * 1024,
-		Pending:      3.5 * 1024 * 1024 * 1024,
-		Free:         11.2 * 1024 * 1024 * 1024,
-		MountPoint:   "/data/deals-staging",
-	}, nil
+	Staged      float64
+	Transferred float64
+	Pending     float64
+	Free        float64
+	MountPoint  string
 }
 
 // query: deal(id) Deal
@@ -206,7 +197,7 @@ func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.Pro
 		return nil, err
 	}
 
-	deal.NBytesReceived = int64(r.provider.NBytesReceived(deal))
+	deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
 
 	return deal, nil
 }
@@ -237,7 +228,7 @@ func (r *resolver) dealList(ctx context.Context, first *graphql.ID, limit int) (
 	// Include data transfer information with the deal
 	dis := make([]types.ProviderDealState, 0, len(deals))
 	for _, deal := range deals {
-		deal.NBytesReceived = int64(r.provider.NBytesReceived(deal))
+		deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
 		dis = append(dis, *deal)
 	}
 

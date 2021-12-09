@@ -79,7 +79,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	if deal.Checkpoint < dealcheckpoints.Transferred {
 		if err := p.transferAndVerify(dh.transferCtx, pub, deal); err != nil {
 			dh.transferCancelled(nil)
-			return fmt.Errorf("failed data transfer: %w", err)
+			return fmt.Errorf("execDeal failed data transfer: %w", err)
 		}
 	}
 	// transfer can no longer be cancelled
@@ -115,7 +115,7 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 		DealSize:   int64(deal.Transfer.Size),
 	})
 	if err != nil {
-		return fmt.Errorf("failed data transfer: %w", err)
+		return fmt.Errorf("transferAndVerify failed data transfer: %w", err)
 	}
 
 	// wait for data-transfer to finish

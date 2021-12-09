@@ -4,48 +4,70 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"path/filepath"
 
 	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/boost/node/repo"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
 )
 
 var log = logging.Logger("storagemanager")
 
+var (
+	StagingAreaDirName = "deal-staging"
+)
+
 type Config struct {
 	MaxStagingDealsBytes uint64
 }
 
 type StorageManager struct {
-	db  *db.StorageDB
-	cfg Config
+	lr                 repo.LockedRepo
+	db                 *db.StorageDB
+	cfg                Config
+	StagingAreaDirPath string
 }
 
-func New(cfg Config) func(sqldb *sql.DB) *StorageManager {
-	return func(sqldb *sql.DB) *StorageManager {
+func New(cfg Config) func(lr repo.LockedRepo, sqldb *sql.DB) *StorageManager {
+	return func(lr repo.LockedRepo, sqldb *sql.DB) *StorageManager {
 		return &StorageManager{
-			db:  db.NewStorageDB(sqldb),
-			cfg: cfg,
+			db:                 db.NewStorageDB(sqldb),
+			cfg:                cfg,
+			lr:                 lr,
+			StagingAreaDirPath: filepath.Join(lr.Path(), StagingAreaDirName),
 		}
 	}
 }
 
-// Tag
-func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, pieceSize abi.PaddedPieceSize) error {
+// Free
+func (m *StorageManager) Free(ctx context.Context) (uint64, error) {
 	// Get the total tagged storage, so that we know how much is available.
-	tagged, err := m.totalTagged(ctx)
+	tagged, err := m.TotalTagged(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("getting total tagged: %w", err)
+	}
+
+	return m.cfg.MaxStagingDealsBytes - tagged, nil
+}
+
+// Tag
+func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, size uint64) error {
+	// Get the total tagged storage, so that we know how much is available.
+	log.Debugw("tagging", "id", dealUuid, "size", size, "maxbytes", m.cfg.MaxStagingDealsBytes)
+
+	tagged, err := m.TotalTagged(ctx)
 	if err != nil {
 		return fmt.Errorf("getting total tagged: %w", err)
 	}
 
 	if m.cfg.MaxStagingDealsBytes != 0 {
-		if tagged+uint64(pieceSize) >= m.cfg.MaxStagingDealsBytes {
-			return fmt.Errorf("cannot accept piece of size %d, on top of already allocated %d bytes, because it would exceed max staging area size %d", uint64(pieceSize), uint64(tagged), m.cfg.MaxStagingDealsBytes)
+		if tagged+uint64(size) >= m.cfg.MaxStagingDealsBytes {
+			return fmt.Errorf("cannot accept piece of size %d, on top of already allocated %d bytes, because it would exceed max staging area size %d", uint64(size), uint64(tagged), m.cfg.MaxStagingDealsBytes)
 		}
 	}
 
-	err = m.persistTagged(ctx, dealUuid, uint64(pieceSize))
+	err = m.persistTagged(ctx, dealUuid, uint64(size))
 	if err != nil {
 		return fmt.Errorf("saving total tagged storage: %w", err)
 	}
@@ -74,8 +96,7 @@ func (m *StorageManager) Untag(ctx context.Context, dealUuid uuid.UUID) error {
 	return nil
 }
 
-// unlocked
-func (m *StorageManager) totalTagged(ctx context.Context) (uint64, error) {
+func (m *StorageManager) TotalTagged(ctx context.Context) (uint64, error) {
 	total, err := m.db.TotalTagged(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("getting total tagged from DB: %w", err)

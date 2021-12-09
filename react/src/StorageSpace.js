@@ -16,8 +16,8 @@ export function StorageSpacePage(props) {
 
     var storage = data.storage
     var totalSize = 0
-    totalSize += storage.Completed
-    totalSize += storage.Transferring
+    totalSize += storage.Staged
+    totalSize += storage.Transferred
     totalSize += storage.Pending
     totalSize += storage.Free
 
@@ -27,21 +27,21 @@ export function StorageSpacePage(props) {
                 {humanFileSize(totalSize)}
             </div>
             <div className="bars">
-                <div className="completed" style={{width: Math.floor(100*storage.Completed/totalSize)+'%'}} />
-                <div className="transferring" style={{width: Math.floor(100*storage.Transferring/totalSize)+'%'}} />
+                <div className="staged" style={{width: Math.floor(100*storage.Staged/totalSize)+'%'}} />
+                <div className="transferred" style={{width: Math.floor(100*storage.Transferred/totalSize)+'%'}} />
                 <div className="pending" style={{width: Math.floor(100*storage.Pending/totalSize)+'%'}} />
                 <div className="free" style={{width: Math.floor(100*storage.Free/totalSize)+'%'}} />
             </div>
             <div className="labels">
-                <div className="label completed">
+                <div className="label staged">
                     <div className="bar-color"></div>
-                    <div className="text">Completed</div>
-                    <div className="amount">{humanFileSize(storage.Completed)}</div>
+                    <div className="text">Staged</div>
+                    <div className="amount">{humanFileSize(storage.Staged)}</div>
                 </div>
-                <div className="label transferring">
+                <div className="label transferred">
                     <div className="bar-color"></div>
-                    <div className="text">Transferring</div>
-                    <div className="amount">{humanFileSize(storage.Transferring)}</div>
+                    <div className="text">Transferred</div>
+                    <div className="amount">{humanFileSize(storage.Transferred)}</div>
                 </div>
                 <div className="label pending">
                     <div className="bar-color"></div>
@@ -59,12 +59,12 @@ export function StorageSpacePage(props) {
         <table className="storage-fields">
             <tbody>
                 <tr>
-                    <td>Completed</td>
-                    <td>{Math.round(storage.Completed).toLocaleString('en-US')} bytes</td>
+                    <td>Staged</td>
+                    <td>{Math.round(storage.Staged).toLocaleString('en-US')} bytes</td>
                 </tr>
                 <tr>
-                    <td>Transferring</td>
-                    <td>{Math.round(storage.Transferring).toLocaleString('en-US')} bytes</td>
+                    <td>Transferred</td>
+                    <td>{Math.round(storage.Transferred).toLocaleString('en-US')} bytes</td>
                 </tr>
                 <tr>
                     <td>Pending</td>
