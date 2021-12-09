@@ -48,21 +48,7 @@ func (m *StorageManager) Free(ctx context.Context) (uint64, error) {
 		return 0, fmt.Errorf("getting total tagged: %w", err)
 	}
 
-	if m.cfg.MaxStagingDealsBytes != 0 {
-		return m.cfg.MaxStagingDealsBytes - tagged, nil
-	} else {
-		// we don't have a max staging area configured, so
-		// return the actual free disk space
-
-		//TODO: fixme
-		//s, err := m.lr.Stat(m.StagingAreaDirPath)
-		//if err != nil {
-		//return 0, err
-		//}
-
-		//return uint64(s.Available), nil
-		return 100_000_000_000, nil // say we have 100GB free
-	}
+	return m.cfg.MaxStagingDealsBytes - tagged, nil
 }
 
 // Tag

@@ -67,6 +67,10 @@ var initCmd = &cli.Command{
 			return xerrors.Errorf("wallets for PublishStorageDeals and pledging collateral must be different")
 		}
 
+		if cctx.Int64("max-staging-deals-bytes") <= 0 {
+			return xerrors.Errorf("max size for staging deals area must be > 0 bytes")
+		}
+
 		if err := checkV1ApiSupport(ctx, cctx); err != nil {
 			return err
 		}
