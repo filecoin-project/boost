@@ -285,6 +285,20 @@ func (dr *dealResolver) PieceSize() gqltypes.Uint64 {
 	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.PieceSize)
 }
 
+type sectorResolver struct {
+	ID     gqltypes.Uint64
+	Offset gqltypes.Uint64
+	Length gqltypes.Uint64
+}
+
+func (dr *dealResolver) Sector() *sectorResolver {
+	return &sectorResolver{
+		ID:     gqltypes.Uint64(dr.ProviderDealState.SectorID),
+		Offset: gqltypes.Uint64(dr.ProviderDealState.Offset),
+		Length: gqltypes.Uint64(dr.ProviderDealState.Length),
+	}
+}
+
 type dealTransfer struct {
 	Type   string
 	Size   gqltypes.Uint64

@@ -91,6 +91,22 @@ export function DealDetail(props) {
                     <td>Transfer Size</td>
                     <td>{addCommas(deal.Transfer.Size)}</td>
                 </tr>
+                {deal.Sector.ID > 0 ? (
+                    <>
+                    <tr>
+                        <td>Sector ID</td>
+                        <td>{deal.Sector.ID + ''}</td>
+                    </tr>
+                    <tr>
+                        <td>Sector Data Offset</td>
+                        <td>{addCommas(deal.Sector.Offset)}</td>
+                    </tr>
+                    <tr>
+                        <td>Sector Data Length</td>
+                        <td>{addCommas(deal.Sector.Length)}</td>
+                    </tr>
+                    </>
+                ) : null}
                 <tr>
                     <td>Publish Message CID</td>
                     <td>{deal.PublishCid}</td>
