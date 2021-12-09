@@ -5,7 +5,7 @@ import {humanFileSize, addCommas} from "./util";
 import './StorageSpace.css'
 
 export function StorageSpacePage(props) {
-    const {loading, error, data} = useQuery(StorageQuery)
+    const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 1000 })
 
     if (loading) {
         return <div>Loading...</div>
