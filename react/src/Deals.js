@@ -26,7 +26,8 @@ class NewDealsSubscriber {
             var res = await gqlClient.subscribe({
                 query: NewDealsSubscription
             })
-            res.subscribe({
+
+            return res.subscribe({
                 next(r) {
                     // Don't add new deals to the list if we're not on the first page
                     if (that.pageNum > 1) {
@@ -91,6 +92,7 @@ export function StorageDealsPage(props) {
         // Create a pagination manager
         dealsPagination = new DealsPagination(setPageNum, dealsListQuery)
 
+        var sub
         async function onStart() {
             // Make a query to get the current list of deals
             var res = await dealsListQuery()
@@ -108,12 +110,18 @@ export function StorageDealsPage(props) {
                 }
                 setTotalCount(res.totalCount + 1)
             })
-            newDealsSubscriber.subscribe()
+            sub = newDealsSubscriber.subscribe()
 
             dealsPagination.addPageCursor(2, res.next)
         }
 
         onStart()
+
+        return async function () {
+            if (sub) {
+                (await sub).unsubscribe()
+            }
+        }
     }, [])
 
     // When the deals being displayed or the page number changes, update the
