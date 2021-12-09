@@ -33,7 +33,7 @@ func Run(ctx context.Context, tempHome string, done chan struct{}) {
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 
 		log.Debugw("lotus fetch-params 8388608")
-		cmd := exec.CommandContext(ctx, "lotus", "fetch-params", "8338608")
+		cmd := exec.CommandContext(ctx, "lotus", "fetch-params", "8388608")
 		cmd.Env = []string{fmt.Sprintf("HOME=%s", tempHome), "GOLOG_LOG_LEVEL=error"}
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
