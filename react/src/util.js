@@ -71,7 +71,7 @@ export function addCommas(num) {
     const numstr = num + ''
     for (let i = 0; i < numstr.length; i++) {
         withCommas = numstr[numstr.length-1-i] + withCommas
-        if (i % 3 === 2) {
+        if (i < numstr.length-1 && i % 3 === 2) {
             withCommas = ',' + withCommas
         }
     }

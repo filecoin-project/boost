@@ -25,6 +25,12 @@ type TransferParams {
   Params: String!
 }
 
+type Sector {
+  ID: Uint64!
+  Offset: Uint64!
+  Length: Uint64!
+}
+
 type Deal {
   ID: ID!
   ClientAddress: String!
@@ -40,6 +46,7 @@ type Deal {
   PublishCid: String!
   Transfer: TransferParams!
   Stage: String!
+  Sector: Sector!
   Message: String!
   Logs: [DealLog]!
 }

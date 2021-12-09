@@ -75,6 +75,11 @@ const DealsListQuery = gql`
                     Size
                     Params
                 }
+                Sector {
+                    ID
+                    Offset
+                    Length
+                }
                 Logs {
                     CreatedAt
                     Text
@@ -106,6 +111,11 @@ const DealSubscription = gql`
                 Type
                 Size
                 Params
+            }
+            Sector {
+                ID
+                Offset
+                Length
             }
             Logs {
                 CreatedAt
@@ -141,6 +151,11 @@ const NewDealsSubscription = gql`
                 Type
                 Size
                 Params
+            }
+            Sector {
+                ID
+                Offset
+                Length
             }
             Logs {
                 CreatedAt
