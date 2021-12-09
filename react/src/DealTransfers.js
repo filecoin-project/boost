@@ -22,7 +22,8 @@ export function DealTransfersPage(props) {
 
     var cols = ['Time', 'Transfers']
 
-    var points = data.transfers
+    // Clone from read-only to writable array
+    var points = data.transfers.map(p => ({ At: p.At, Bytes: p.Bytes }))
     points.sort((a, b) => a.At.getTime() - b.At.getTime())
 
     var chartData = [cols]
@@ -50,7 +51,7 @@ export function DealTransfersPage(props) {
             data={chartData}
             options={{
                 hAxis: { titleTextStyle: { color: '#333' } },
-                vAxis: { maxValue: maxMegabits || undefined },
+                vAxis: { minValue: 0, maxValue: maxMegabits || undefined },
             }}
         />
     </div>
