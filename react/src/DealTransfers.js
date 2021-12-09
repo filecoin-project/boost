@@ -1,6 +1,6 @@
 import React from "react";
 import { Chart } from "react-google-charts";
-import {useQuery} from "./hooks";
+import {useQuery} from "@apollo/react-hooks";
 import {TransfersQuery} from "./gql";
 import moment from "moment"
 

@@ -1,11 +1,20 @@
 import gql from "graphql-tag";
-import { ApolloClient, HttpLink, split } from "@apollo/client";
+import { ApolloClient, ApolloLink, HttpLink, InMemoryCache, split, from } from "@apollo/client";
 import { getMainDefinition } from '@apollo/client/utilities';
-import {WebSocketLink} from "apollo-link-ws";
-import {InMemoryCache} from "apollo-cache-inmemory";
-import { customParse } from "./hooks";
+import { WebSocketLink } from "@apollo/client/link/ws";
+import Observable from 'zen-observable';
+import { transformResponse } from "./transform";
 
 const graphqlEndpoint = "localhost:8080"
+
+// Transform response data (eg convert date string to Date object)
+const transformResponseLink = new ApolloLink((operation, forward) => {
+    const res = forward(operation)
+    return Observable.from(res).map(data => {
+        transformResponse(data)
+        return data
+    });
+});
 
 // HTTP Link
 const httpLink = new HttpLink({
@@ -22,17 +31,20 @@ const wsLink = new WebSocketLink({
 });
 
 // Send query request based on the type definition
-const link = split(
+const link = from([
+    transformResponseLink,
+    split(
     ({ query }) => {
-        const definition = getMainDefinition(query);
-        return (
-            definition.kind === 'OperationDefinition' &&
-            definition.operation === 'subscription'
-        );
-    },
-    wsLink,
-    httpLink
-);
+            const definition = getMainDefinition(query);
+            return (
+                definition.kind === 'OperationDefinition' &&
+                definition.operation === 'subscription'
+            );
+        },
+        wsLink,
+        httpLink
+    )
+]);
 
 const cache = new InMemoryCache();
 
@@ -40,20 +52,6 @@ const gqlClient = new ApolloClient({
     link,
     cache
 });
-
-const gqlQuery = function(...args) {
-    var res = gqlClient.query.apply(gqlClient, args)
-    return res.then(ret => {
-        if (ret && ret.data) {
-            customParse(ret.data)
-        }
-        return ret
-    })
-}
-
-const gqlSubscribe = function(...args) {
-    return gqlClient.subscribe.apply(gqlClient, args)
-}
 
 const DealsListQuery = gql`
     query AppDealsListQuery($first: ID, $limit: Int) {
@@ -251,8 +249,6 @@ const MpoolQuery = gql`
 
 export {
     gqlClient,
-    gqlQuery,
-    gqlSubscribe,
     DealsListQuery,
     DealSubscription,
     DealCancelMutation,
