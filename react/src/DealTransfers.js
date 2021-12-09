@@ -4,7 +4,7 @@ import {useQuery} from "./hooks";
 import {TransfersQuery} from "./gql";
 import moment from "moment"
 
-var maxBytes = 0
+var maxMegabits = 0
 
 export function DealTransfersPage(props) {
     const {loading, error, data} = useQuery(TransfersQuery, { pollInterval: 1000 })
@@ -27,9 +27,10 @@ export function DealTransfersPage(props) {
 
     var chartData = [cols]
     for (const point of points) {
-        chartData.push([moment(point.At).format('HH:mm:ss'), point.Bytes])
-        if (point.Bytes > maxBytes) {
-            maxBytes = point.Bytes
+        const megabits = 8 * Number(point.Bytes) / 1e6
+        chartData.push([moment(point.At).format('HH:mm:ss'), megabits])
+        if (megabits > maxMegabits) {
+            maxMegabits = megabits
         }
     }
 
@@ -49,7 +50,7 @@ export function DealTransfersPage(props) {
             data={chartData}
             options={{
                 hAxis: { titleTextStyle: { color: '#333' } },
-                vAxis: { maxValue: maxBytes || undefined },
+                vAxis: { maxValue: maxMegabits || undefined },
             }}
         />
     </div>

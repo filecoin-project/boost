@@ -3,7 +3,7 @@ import {useMutation, useSubscription} from "./hooks";
 import {DealCancelMutation, DealSubscription} from "./gql";
 import {dateFormat} from "./util-date";
 import moment from "moment";
-import {humanFIL} from "./util";
+import {humanFIL, addCommas} from "./util";
 
 export function DealDetail(props) {
     // Add a class to the document body when showing the deal detail page
@@ -31,7 +31,6 @@ export function DealDetail(props) {
     if (!loading) {
         deal = data.dealUpdate
     }
-
 
     var logRowData = []
     for (var i = 0; i < (deal.Logs || []).length; i++) {
@@ -70,7 +69,7 @@ export function DealDetail(props) {
                 </tr>
                 <tr>
                     <td>Piece Size</td>
-                    <td>{deal.PieceSize.toLocaleString()}</td>
+                    <td>{addCommas(deal.PieceSize)}</td>
                 </tr>
                 <tr>
                     <td>Provider Collateral</td>
@@ -90,7 +89,7 @@ export function DealDetail(props) {
                 </tr>
                 <tr>
                     <td>Transfer Size</td>
-                    <td>{deal.Transfer.Size.toLocaleString()}</td>
+                    <td>{addCommas(deal.Transfer.Size)}</td>
                 </tr>
                 <tr>
                     <td>Publish Message CID</td>

@@ -6,6 +6,7 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
+	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -46,10 +47,10 @@ func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageM
 }
 
 type storageResolver struct {
-	Staged      float64
-	Transferred float64
-	Pending     float64
-	Free        float64
+	Staged      gqltypes.Uint64
+	Transferred gqltypes.Uint64
+	Pending     gqltypes.Uint64
+	Free        gqltypes.Uint64
 	MountPoint  string
 }
 
@@ -280,20 +281,20 @@ func (dr *dealResolver) PublishCid() string {
 	return dr.ProviderDealState.PublishCID.String()
 }
 
-func (dr *dealResolver) PieceSize() float64 {
-	return float64(dr.ProviderDealState.ClientDealProposal.Proposal.PieceSize)
+func (dr *dealResolver) PieceSize() gqltypes.Uint64 {
+	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.PieceSize)
 }
 
 type dealTransfer struct {
 	Type   string
-	Size   float64
+	Size   gqltypes.Uint64
 	Params string
 }
 
 func (dr *dealResolver) Transfer() dealTransfer {
 	return dealTransfer{
 		Type:   dr.ProviderDealState.Transfer.Type,
-		Size:   float64(dr.ProviderDealState.Transfer.Size),
+		Size:   gqltypes.Uint64(dr.ProviderDealState.Transfer.Size),
 		Params: "TODO",
 	}
 }
@@ -302,12 +303,12 @@ func (dr *dealResolver) ProviderCollateral() float64 {
 	return float64(dr.ProviderDealState.ClientDealProposal.Proposal.ProviderCollateral.Int64())
 }
 
-func (dr *dealResolver) StartEpoch() float64 {
-	return float64(dr.ProviderDealState.ClientDealProposal.Proposal.StartEpoch)
+func (dr *dealResolver) StartEpoch() gqltypes.Uint64 {
+	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.StartEpoch)
 }
 
-func (dr *dealResolver) EndEpoch() float64 {
-	return float64(dr.ProviderDealState.ClientDealProposal.Proposal.EndEpoch)
+func (dr *dealResolver) EndEpoch() gqltypes.Uint64 {
+	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.EndEpoch)
 }
 
 func (dr *dealResolver) PieceCid() string {

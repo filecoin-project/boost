@@ -9,9 +9,19 @@ The `Time` scalar type represents a DateTime. The DateTime is serialized as an R
 """
 scalar Time
 
+"""
+The `Uint64` scalar type represents a uint64.
+"""
+scalar Uint64
+
+"""
+The `BigInt` scalar type represents a big integer.
+"""
+scalar BigInt
+
 type TransferParams {
   Type: String!
-  Size: Float!
+  Size: Uint64!
   Params: String!
 }
 
@@ -21,10 +31,10 @@ type Deal {
   ProviderAddress: String!
   CreatedAt: Time!
   PieceCid: String!
-  PieceSize: Float!
+  PieceSize: Uint64!
   ProviderCollateral: Float!
-  StartEpoch: Float!
-  EndEpoch: Float!
+  StartEpoch: Uint64!
+  EndEpoch: Uint64!
   ClientPeerID: String!
   DealDataRoot: String!
   PublishCid: String!
@@ -46,23 +56,23 @@ type DealLog {
 }
 
 type Storage {
-  Staged: Float!
-  Transferred: Float!
-  Pending: Float!
-  Free: Float!
+  Staged: Uint64!
+  Transferred: Uint64!
+  Pending: Uint64!
+  Free: Uint64!
   MountPoint: String!
 }
 
 type FundsEscrow {
-  Available: Float!
-  Locked: Float!
-  Tagged: Float!
+  Available: BigInt!
+  Locked: BigInt!
+  Tagged: BigInt!
 }
 
 type FundsWallet {
   Address: String!
-  Balance: Float!
-  Tagged: Float!
+  Balance: BigInt!
+  Tagged: BigInt!
 }
 
 type Funds {
@@ -80,7 +90,7 @@ type FundsLogList {
 type FundsLog {
   DealUUID: ID!
   CreatedAt: Time!
-  Amount: Float!
+  Amount: BigInt!
   Text: String!
 }
 
@@ -93,20 +103,20 @@ type DealPublish {
 
 type TransferPoint {
   At: Time!
-  Bytes: Float!
+  Bytes: Uint64!
 }
 
 type MpoolMessage {
   From: String!
   To: String!
-  Nonce: Float!
-  Value: Float!
-  GasFeeCap: Float!
-  GasLimit: Float!
-  GasPremium: Float!
+  Nonce: Uint64!
+  Value: BigInt!
+  GasFeeCap: BigInt!
+  GasLimit: Uint64!
+  GasPremium: BigInt!
   Method: String!
   Params: String!
-  BaseFee: Float!
+  BaseFee: BigInt!
 }
 
 type RootQuery {
@@ -143,7 +153,7 @@ type RootMutation {
   dealPublishNow: Boolean!
 
   """Top-up the available pledge collateral in escrow for deal publishing"""
-  fundsMoveToEscrow(amount: Float!): Boolean!
+  fundsMoveToEscrow(amount: BigInt!): Boolean!
 }
 
 type RootSubscription {

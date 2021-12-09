@@ -2,7 +2,7 @@ import {useMutation, useQuery} from "./hooks";
 import {FundsQuery, FundsLogsQuery, FundsMoveToEscrow} from "./gql";
 import {useState, React}  from "react";
 import moment from "moment";
-import {humanFIL} from "./util"
+import {humanFIL, max, parseFil} from "./util"
 import {Info} from "./Info"
 
 export function FundsPage(props) {
@@ -39,22 +39,24 @@ function FundsChart(props) {
     }
     pubMsg.available = pubMsg.total - pubMsg.tagged
 
-    const amtMax = Math.max(collatBalance, escrow.total, pubMsg.total)
-    const collatBarPct = 100 * collatBalance / amtMax
+    const amtMax = max(collatBalance, escrow.total, pubMsg.total)
+    const collatBarPct = toPercentage(collatBalance, amtMax)
 
     const escrowBar = {
-        tagged: Math.floor(100 * escrow.tagged / amtMax)-1,
-        available: Math.floor(100 * escrow.available / amtMax)-1,
-        locked: Math.floor(100 * escrow.locked / amtMax),
-        unit: Math.floor(100*escrow.total / amtMax)
+        tagged: toPercentage(escrow.tagged, amtMax) - 1,
+        available: toPercentage(escrow.available, amtMax) -1,
+        locked: toPercentage(escrow.locked, amtMax) - 1,
+        unit: toPercentage(escrow.total, amtMax) - 1,
     }
 
     const pubMsgBar = {
-        tagged: Math.floor(100 * pubMsg.tagged / pubMsg.total)-1,
-        available: Math.floor(100 * pubMsg.available / pubMsg.total)-2,
-        unit: Math.floor(100 * pubMsg.total / amtMax),
+        tagged: toPercentage(pubMsg.tagged, pubMsg.total) - 1,
+        available: toPercentage(pubMsg.available, pubMsg.total) - 1,
+        unit: toPercentage(pubMsg.total, amtMax),
     }
 
+    // Use 60% of the space for displaying the bar, and the rest for
+    // displaying the bar-total (the amount at the end of the bar)
     const barSpaceRatio = 0.6
 
     return <div className="chart">
@@ -63,6 +65,12 @@ function FundsChart(props) {
                 <div className="title">
                     Collateral Source Wallet
                     <Info>
+                        The Storage Provider must have sufficient collateral in escrow for each
+                        storage deal.<br/>
+                        <br/>
+                        When the deal is published, the network checks whether there is enough
+                        collateral in escrow.<br/>
+                        <br/>
                         The Collateral Source Wallet is the wallet from which funds
                         are moved to escrow.
                     </Info>
@@ -80,7 +88,8 @@ function FundsChart(props) {
                 <div className="title">
                     Collateral in Escrow
                     <Info>
-                        Collateral in Escrow is the funds that are kept in escrow on chain.<br/>
+                        The Storage Provider must have sufficient collateral in escrow for each
+                        storage deal.<br/>
                         <br/>
                         When a deal is accepted, the collateral for the deal is "tagged". Those
                         funds cannot be used as collateral for another deal.<br/>
@@ -160,6 +169,10 @@ function FundsChart(props) {
     </div>
 }
 
+function toPercentage(num, denom) {
+    return Math.floor(Number(1000n * num / denom) / 10)
+}
+
 function WalletAddress(props) {
     const shortAddr = props.address.substring(0, 8)+'…'+props.address.substring(props.address.length-8)
     return <div className="wallet-address">
@@ -172,10 +185,12 @@ function WalletAddress(props) {
 function TopupCollateral(props) {
     const [showForm, setShowForm] = useState(false)
     const [topupAmount, setTopupAmount] = useState('')
-    const handleTopupChange = event => setTopupAmount(event.target.value)
+    const handleTopupChange = event => {
+        setTopupAmount(event.target.value)
+    }
 
     const [fundsMoveToEscrow] = useMutation(FundsMoveToEscrow, {
-        variables: {amount: parseFloat(topupAmount*1e18)}
+        variables: {amount: parseFil(topupAmount)}
     })
 
     function topUpAvailable() {
@@ -195,7 +210,6 @@ function TopupCollateral(props) {
                 <div className={"top-up-form"}>
                     <input
                         type="number"
-                        max={props.maxTopup*1e-18}
                         value={topupAmount}
                         onChange={handleTopupChange}
                     />

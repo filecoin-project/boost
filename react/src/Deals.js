@@ -1,4 +1,4 @@
-import {parseDates, useSubscription} from "./hooks";
+import {customParse, useSubscription} from "./hooks";
 import {DealsListQuery, DealSubscription, gqlQuery, gqlSubscribe, NewDealsSubscription} from "./gql";
 import moment from "moment";
 import {humanFileSize} from "./util";
@@ -28,7 +28,7 @@ class NewDealsSubscriber {
             })
             res.subscribe({
                 next(r) {
-                    parseDates(r)
+                    customParse(r)
 
                     // Don't add new deals to the list if we're not on the first page
                     if (that.pageNum > 1) {
@@ -195,7 +195,7 @@ function DealRow(props) {
             <td className="deal-id" onClick={() => props.onDealRowClick(deal.ID)}>
                 <ShortDealID id={deal.ID} />
             </td>
-            <td className="size">{humanFileSize(deal.Transfer.Size, false, 0)}</td>
+            <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
             <td className="client">
                 <ShortClientAddress address={deal.ClientAddress} />
             </td>
