@@ -43,7 +43,7 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 			return nil, xerrors.Errorf("getting local addresses: %w", err)
 		}
 
-		filter := map[address.Address]struct{}{}
+		filter = make(map[address.Address]struct{})
 		for _, a := range addrs {
 			filter[a] = struct{}{}
 		}
