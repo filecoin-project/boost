@@ -3,7 +3,7 @@ import { ApolloClient, HttpLink, split } from "@apollo/client";
 import { getMainDefinition } from '@apollo/client/utilities';
 import {WebSocketLink} from "apollo-link-ws";
 import {InMemoryCache} from "apollo-cache-inmemory";
-import { parseDates } from "./hooks";
+import { customParse } from "./hooks";
 
 const graphqlEndpoint = "localhost:8080"
 
@@ -45,7 +45,7 @@ const gqlQuery = function(...args) {
     var res = gqlClient.query.apply(gqlClient, args)
     return res.then(ret => {
         if (ret && ret.data) {
-            parseDates(ret.data)
+            customParse(ret.data)
         }
         return ret
     })
@@ -227,7 +227,7 @@ const DealPublishNowMutation = gql`
 `;
 
 const FundsMoveToEscrow = gql`
-    mutation AppDealPublishNowMutation($amount: Float!) {
+    mutation AppDealPublishNowMutation($amount: BigInt!) {
         fundsMoveToEscrow(amount: $amount)
     }
 `;

@@ -3,6 +3,7 @@ package gql
 import (
 	"context"
 
+	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 )
 
@@ -34,10 +35,10 @@ func (r *resolver) Storage(ctx context.Context) (*storageResolver, error) {
 
 	staged := uint64(0)
 	return &storageResolver{
-		Staged:      float64(staged),
-		Transferred: float64(transferred),
-		Pending:     float64(tagged - transferred),
-		Free:        float64(free),
+		Staged:      gqltypes.Uint64(staged),
+		Transferred: gqltypes.Uint64(transferred),
+		Pending:     gqltypes.Uint64(tagged - transferred),
+		Free:        gqltypes.Uint64(free),
 		MountPoint:  r.storageMgr.StagingAreaDirPath,
 	}, nil
 }

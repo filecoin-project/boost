@@ -1,7 +1,7 @@
 import {useQuery} from "./hooks";
 import {StorageQuery} from "./gql";
 import React from "react";
-import {humanFileSize} from "./util";
+import {humanFileSize, addCommas} from "./util";
 import './StorageSpace.css'
 
 export function StorageSpacePage(props) {
@@ -15,7 +15,8 @@ export function StorageSpacePage(props) {
     }
 
     var storage = data.storage
-    var totalSize = 0
+
+    var totalSize = 0n
     totalSize += storage.Staged
     totalSize += storage.Transferred
     totalSize += storage.Pending
@@ -27,10 +28,10 @@ export function StorageSpacePage(props) {
                 {humanFileSize(totalSize)}
             </div>
             <div className="bars">
-                <div className="staged" style={{width: Math.floor(100*storage.Staged/totalSize)+'%'}} />
-                <div className="transferred" style={{width: Math.floor(100*storage.Transferred/totalSize)+'%'}} />
-                <div className="pending" style={{width: Math.floor(100*storage.Pending/totalSize)+'%'}} />
-                <div className="free" style={{width: Math.floor(100*storage.Free/totalSize)+'%'}} />
+                <div className="staged" style={{width: Number(storage.Staged*100n/totalSize)+'%'}} />
+                <div className="transferred" style={{width: Number(storage.Transferred*100n/totalSize)+'%'}} />
+                <div className="pending" style={{width: Number(storage.Pending*100n/totalSize)+'%'}} />
+                <div className="free" style={{width: Number(storage.Free*100n/totalSize)+'%'}} />
             </div>
             <div className="labels">
                 <div className="label staged">
@@ -60,19 +61,19 @@ export function StorageSpacePage(props) {
             <tbody>
                 <tr>
                     <td>Staged</td>
-                    <td>{Math.round(storage.Staged).toLocaleString('en-US')} bytes</td>
+                    <td>{addCommas(storage.Staged)} bytes</td>
                 </tr>
                 <tr>
                     <td>Transferred</td>
-                    <td>{Math.round(storage.Transferred).toLocaleString('en-US')} bytes</td>
+                    <td>{addCommas(storage.Transferred)} bytes</td>
                 </tr>
                 <tr>
                     <td>Pending</td>
-                    <td>{Math.round(storage.Pending).toLocaleString('en-US')} bytes</td>
+                    <td>{addCommas(storage.Pending)} bytes</td>
                 </tr>
                 <tr>
                     <td>Free</td>
-                    <td>{Math.round(storage.Free).toLocaleString('en-US')} bytes</td>
+                    <td>{addCommas(storage.Free)} bytes</td>
                 </tr>
                 <tr>
                     <td>Mount Point</td>

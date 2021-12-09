@@ -5,16 +5,17 @@ import (
 	"sort"
 	"time"
 
+	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/graph-gophers/graphql-go"
 )
 
 type transferPoint struct {
 	At    graphql.Time
-	Bytes float64
+	Bytes gqltypes.Uint64
 }
 
 // query: transfers: [TransferPoint]
-func (r *resolver) Transfers(ctx context.Context) ([]*transferPoint, error) {
+func (r *resolver) Transfers(_ context.Context) ([]*transferPoint, error) {
 	deals := r.provider.Transfers()
 
 	// We have
@@ -43,7 +44,7 @@ func (r *resolver) Transfers(ctx context.Context) ([]*transferPoint, error) {
 	for at, total := range totalAt {
 		pts = append(pts, &transferPoint{
 			At:    graphql.Time{Time: at},
-			Bytes: float64(total),
+			Bytes: gqltypes.Uint64(total),
 		})
 	}
 
