@@ -28,8 +28,8 @@ export function StorageSpacePage(props) {
                 {humanFileSize(totalSize)}
             </div>
             <div className="bars">
-                <div className="completed" style={{width: Number(storage.Staged*100n/totalSize)+'%'}} />
-                <div className="transferring" style={{width: Number(storage.Transferred*100n/totalSize)+'%'}} />
+                <div className="staged" style={{width: Number(storage.Staged*100n/totalSize)+'%'}} />
+                <div className="transferred" style={{width: Number(storage.Transferred*100n/totalSize)+'%'}} />
                 <div className="pending" style={{width: Number(storage.Pending*100n/totalSize)+'%'}} />
                 <div className="free" style={{width: Number(storage.Free*100n/totalSize)+'%'}} />
             </div>
