@@ -96,16 +96,17 @@ export function DealDetail(props) {
                     <td>{deal.PublishCid}</td>
                 </tr>
                 <tr>
-                    <td>State</td>
+                    <td>Status</td>
                     <td>{deal.Message}</td>
                 </tr>
                 </tbody>
             </table>
 
-            <div className="buttons">
-                <div className="button cancel" onClick={cancelDeal}>Cancel</div>
-                <div className="button retry">Retry</div>
-            </div>
+            {deal.Stage === 'Accepted' ? (
+                <div className="buttons">
+                    <div className="button cancel" onClick={cancelDeal}>Cancel Transfer</div>
+                </div>
+            ) : null}
 
             <table className="deal-logs">
                 <tbody>

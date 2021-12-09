@@ -68,6 +68,7 @@ const DealsListQuery = gql`
                 ClientPeerID
                 DealDataRoot
                 PublishCid
+                Stage
                 Message
                 Transfer {
                     Type
@@ -99,6 +100,7 @@ const DealSubscription = gql`
             ClientPeerID
             DealDataRoot
             PublishCid
+            Stage
             Message
             Transfer {
                 Type
@@ -133,6 +135,7 @@ const NewDealsSubscription = gql`
             ClientPeerID
             DealDataRoot
             PublishCid
+            Stage
             Message
             Transfer {
                 Type
