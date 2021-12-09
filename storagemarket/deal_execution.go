@@ -281,9 +281,21 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 		return fmt.Errorf("failed to open CARv2 file: %w", err)
 	}
 
+	var size uint64
+	switch v2r.Version {
+	case 1:
+		st, err := os.Stat(deal.InboundFilePath)
+		if err != nil {
+			return fmt.Errorf("failed to stat CARv1 file: %w", err)
+		}
+		size = uint64(st.Size())
+	case 2:
+		size = v2r.Header.DataSize
+	}
+
 	// Inflate the deal size so that it exactly fills a piece
 	proposal := deal.ClientDealProposal.Proposal
-	paddedReader, err := padreader.NewInflator(v2r.DataReader(), v2r.Header.DataSize, proposal.PieceSize.Unpadded())
+	paddedReader, err := padreader.NewInflator(v2r.DataReader(), size, proposal.PieceSize.Unpadded())
 	if err != nil {
 		return fmt.Errorf("failed to create inflator: %w", err)
 	}
