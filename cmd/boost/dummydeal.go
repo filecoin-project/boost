@@ -190,7 +190,7 @@ var dummydealCmd = &cli.Command{
 			return fmt.Errorf("creating deal proposal: %w", err)
 		}
 
-		dealParams := &types.ClientDealParams{
+		dealParams := types.DealParams{
 			DealUUID:           dealUuid,
 			MinerPeerID:        peerID,
 			ClientPeerID:       peerID,

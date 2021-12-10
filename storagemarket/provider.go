@@ -138,7 +138,7 @@ func (p *Provider) GetAsk() *types.StorageAsk {
 	}
 }
 
-func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDealRejectionInfo, err error) {
+func (p *Provider) ExecuteDeal(dp *types.DealParams) (pi *api.ProviderDealRejectionInfo, err error) {
 	log.Infow("execute deal", "uuid", dp.DealUUID)
 
 	ds := types.ProviderDealState{
@@ -265,12 +265,13 @@ func (p *Provider) Start(ctx context.Context) error {
 	return nil
 }
 
-func (p *Provider) Close() error {
+func (p *Provider) Stop() {
 	p.closeSync.Do(func() {
+		log.Infow("storage provider: stopping")
+
 		p.cancel()
 		p.wg.Wait()
 	})
-	return nil
 }
 
 // SubscribeNewDeals subscribes to "new deal" events

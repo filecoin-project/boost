@@ -5,18 +5,15 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/google/uuid"
-
-	"github.com/filecoin-project/boost/gql"
-	"github.com/filecoin-project/boost/storage/sectorblocks"
-
-	"github.com/filecoin-project/boost/storagemarket"
-
 	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/storage/sectorblocks"
+	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/google/uuid"
 	"go.uber.org/fx"
 )
 
@@ -64,8 +61,8 @@ func (sm *BoostAPI) ServeRemote(perm bool) func(w http.ResponseWriter, r *http.R
 	}
 }
 
-func (sm *BoostAPI) MarketDummyDeal(ctx context.Context, dealParams *types.ClientDealParams) (*api.ProviderDealRejectionInfo, error) {
-	return sm.StorageProvider.ExecuteDeal(dealParams)
+func (sm *BoostAPI) MarketDummyDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
+	return sm.StorageProvider.ExecuteDeal(&params)
 }
 
 func (sm *BoostAPI) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
