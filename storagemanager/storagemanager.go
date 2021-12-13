@@ -104,15 +104,15 @@ func (m *StorageManager) TotalTagged(ctx context.Context) (uint64, error) {
 	return total, nil
 }
 
-func (m *StorageManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, pieceSize uint64) error {
-	err := m.db.Tag(ctx, dealUuid, pieceSize)
+func (m *StorageManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, size uint64) error {
+	err := m.db.Tag(ctx, dealUuid, size)
 	if err != nil {
 		return fmt.Errorf("persisting tagged storage for deal to DB: %w", err)
 	}
 
 	storageLog := &db.StorageLog{
 		DealUUID:     dealUuid,
-		TransferSize: pieceSize,
+		TransferSize: size,
 		Text:         "Tag staging storage",
 	}
 	err = m.db.InsertLog(ctx, storageLog)
@@ -120,6 +120,6 @@ func (m *StorageManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, 
 		return fmt.Errorf("persisting tag storage log to DB: %w", err)
 	}
 
-	log.Infow("tag storage", "id", dealUuid, "pieceSize", pieceSize)
+	log.Infow("tag storage", "id", dealUuid, "size", size)
 	return nil
 }

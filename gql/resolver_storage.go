@@ -25,19 +25,27 @@ func (r *resolver) Storage(ctx context.Context) (*storageResolver, error) {
 	}
 
 	transferred := uint64(0)
+	staged := uint64(0)
+	sealing := uint64(0)
+
 	for _, deal := range activeDeals {
+		log.Debugw("deal", "uuid", deal.DealUuid, "checkpoint", deal.Checkpoint)
+
 		if deal.Checkpoint < dealcheckpoints.Transferred {
 			transferred += r.provider.NBytesReceived(deal.DealUuid)
+		} else if deal.Checkpoint < dealcheckpoints.AddedPiece {
+			staged += deal.Transfer.Size
 		} else {
-			transferred += deal.Transfer.Size
+			sealing += deal.Transfer.Size
 		}
 	}
 
-	staged := uint64(0)
+	log.Debugw("storage values", "tagged", tagged, "transferred", transferred, "staged", staged, "sealing", sealing)
+
 	return &storageResolver{
 		Staged:      gqltypes.Uint64(staged),
 		Transferred: gqltypes.Uint64(transferred),
-		Pending:     gqltypes.Uint64(tagged - transferred),
+		Pending:     gqltypes.Uint64(tagged - transferred - staged),
 		Free:        gqltypes.Uint64(free),
 		MountPoint:  r.storageMgr.StagingAreaDirPath,
 	}, nil
