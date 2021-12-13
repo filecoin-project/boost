@@ -19,9 +19,8 @@ type acceptDealReq struct {
 }
 
 type acceptDealResp struct {
-	accepted bool
-	ri       *api.ProviderDealRejectionInfo
-	err      error
+	ri  *api.ProviderDealRejectionInfo
+	err error
 }
 
 type finishedDealsReq struct {
@@ -56,7 +55,8 @@ func (p *Provider) loop() {
 			err := p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
 			if err != nil {
 				cleanup()
-				dealReq.rsp <- acceptDealResp{accepted: false, ri: &api.ProviderDealRejectionInfo{Reason: err.Error()}, err: nil}
+				ri := &api.ProviderDealRejectionInfo{Accepted: false, Reason: err.Error()}
+				dealReq.rsp <- acceptDealResp{ri: ri, err: nil}
 				continue
 			}
 
@@ -64,7 +64,8 @@ func (p *Provider) loop() {
 			err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.Transfer.Size)
 			if err != nil {
 				cleanup()
-				dealReq.rsp <- acceptDealResp{accepted: false, ri: &api.ProviderDealRejectionInfo{Reason: err.Error()}, err: nil}
+				ri := &api.ProviderDealRejectionInfo{Accepted: false, Reason: err.Error()}
+				dealReq.rsp <- acceptDealResp{ri: ri, err: nil}
 				continue
 			}
 
@@ -75,7 +76,7 @@ func (p *Provider) loop() {
 			err = p.dealsDB.Insert(p.ctx, deal)
 			if err != nil {
 				cleanup()
-				dealReq.rsp <- acceptDealResp{false, nil, fmt.Errorf("failed to insert deal in db: %w", err)}
+				dealReq.rsp <- acceptDealResp{nil, fmt.Errorf("failed to insert deal in db: %w", err)}
 				continue
 			}
 			log.Infow("inserted deal into DB", "id", deal.DealUuid)
@@ -87,7 +88,8 @@ func (p *Provider) loop() {
 				p.doDeal(deal, dealReq.dh)
 			}()
 
-			dealReq.rsp <- acceptDealResp{true, nil, nil}
+			ri := &api.ProviderDealRejectionInfo{Accepted: true}
+			dealReq.rsp <- acceptDealResp{ri, nil}
 			log.Infow("deal execution started", "id", deal.DealUuid)
 
 		case finishedDeal := <-p.finishedDealsChan:

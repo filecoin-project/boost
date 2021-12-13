@@ -14,13 +14,13 @@ import (
 	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 )
 
-// Client starts storage deals with Boost over libp2p
-type Client struct {
+// StorageClient starts storage deals with Boost over libp2p
+type StorageClient struct {
 	PeerStore  peerstore.Peerstore
 	dealClient *lp2pimpl.DealClient
 }
 
-func NewClient(ctx context.Context) (*Client, error) {
+func NewStorageClient(ctx context.Context) (*StorageClient, error) {
 	pstore := pstoremem.NewPeerstore()
 	opts := []libp2p.Option{
 		libp2p.DefaultTransports,
@@ -35,35 +35,21 @@ func NewClient(ctx context.Context) (*Client, error) {
 	}
 
 	retryOpts := lp2pimpl.RetryParameters(time.Millisecond, time.Millisecond, 1, 1)
-	return &Client{
-		dealClient: lp2pimpl.NewClient(h, retryOpts),
+	return &StorageClient{
+		dealClient: lp2pimpl.NewDealClient(h, retryOpts),
 		PeerStore:  pstore,
 	}, nil
 }
 
-func (c *Client) StorageDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
-	// Create a libp2p stream to boost
-	ds, err := c.dealClient.NewDealStream(ctx, params.MinerPeerID)
+func (c *StorageClient) StorageDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
+	// Send the deal proposal to the provider
+	resp, err := c.dealClient.SendDealProposal(ctx, params.MinerPeerID, params)
 	if err != nil {
-		return nil, xerrors.Errorf("opening dealstream to storage provider peer %s: %w", params.MinerPeerID, err)
-	}
-
-	// Write the deal proposal to the stream
-	if err = ds.WriteDealProposal(params); err != nil {
 		return nil, xerrors.Errorf("sending deal proposal: %w", err)
 	}
 
-	// Read the response from the stream
-	resp, err := ds.ReadDealResponse()
-	if err != nil {
-		return nil, xerrors.Errorf("reading proposal response: %w", err)
-	}
-
-	// Check if there was deal rejection message
-	if resp.Message != "" {
-		return &api.ProviderDealRejectionInfo{Reason: resp.Message}, nil
-	}
-
-	// Deal was accepted
-	return nil, nil
+	return &api.ProviderDealRejectionInfo{
+		Accepted: resp.Accepted,
+		Reason:   resp.Message,
+	}, nil
 }

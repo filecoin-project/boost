@@ -48,6 +48,7 @@ type Transfer struct {
 }
 
 type DealResponse struct {
+	Accepted bool
 	// Message is the reason the deal proposal was rejected. It is empty if
 	// the deal was accepted.
 	Message string

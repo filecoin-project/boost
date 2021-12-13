@@ -26,7 +26,9 @@ type Market interface {
 	Deal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)        //perm:admin
 }
 
-// ProviderDealRejectionInfo is the information sent by the Storage Provider to the Client when it rejects a valid deal.
+// ProviderDealRejectionInfo is the information sent by the Storage Provider
+// to the Client when it accepts or rejects a deal.
 type ProviderDealRejectionInfo struct {
-	Reason string
+	Accepted bool
+	Reason   string // The rejection reason, if the deal is rejected
 }

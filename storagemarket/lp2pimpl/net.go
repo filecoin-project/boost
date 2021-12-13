@@ -1,11 +1,12 @@
 package lp2pimpl
 
 import (
-	"bufio"
 	"context"
 	"time"
 
-	ma "github.com/multiformats/go-multiaddr"
+	"golang.org/x/xerrors"
+
+	cborutil "github.com/filecoin-project/go-cbor-util"
 
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -20,132 +21,128 @@ import (
 var log = logging.Logger("boost-net")
 
 const DealProtocolID = "/fil/storage/mk/1.2.0"
+const providerReadDeadline = 10 * time.Second
+const providerWriteDeadline = 10 * time.Second
+const clientReadDeadline = 10 * time.Second
+const clientWriteDeadline = 10 * time.Second
 
-// TagPriority is the priority of deal streams in the connection manager
-const TagPriority = 100
-
-// Option is an option for configuring the libp2p storage market network
-type Option func(*dealNet)
+// DealClientOption is an option for configuring the libp2p storage deal client
+type DealClientOption func(*DealClient)
 
 // RetryParameters changes the default parameters around connection reopening
-func RetryParameters(minDuration time.Duration, maxDuration time.Duration, attempts float64, backoffFactor float64) Option {
-	return func(n *dealNet) {
-		n.retryStream.SetOptions(shared.RetryParameters(minDuration, maxDuration, attempts, backoffFactor))
+func RetryParameters(minDuration time.Duration, maxDuration time.Duration, attempts float64, backoffFactor float64) DealClientOption {
+	return func(c *DealClient) {
+		c.retryStream.SetOptions(shared.RetryParameters(minDuration, maxDuration, attempts, backoffFactor))
 	}
-}
-
-type dealNet struct {
-	host        host.Host
-	retryStream *shared.RetryStream
-}
-
-// NewDealStream creates a new libp2p stream to send deal proposals to the
-// given peer
-func (n *dealNet) NewDealStream(ctx context.Context, id peer.ID) (*DealStream, error) {
-	s, err := n.retryStream.OpenStream(ctx, id, []protocol.ID{DealProtocolID})
-	if err != nil {
-		return nil, err
-	}
-	buffered := bufio.NewReaderSize(s, 16)
-	return &DealStream{p: id, rw: s, buffered: buffered, host: n.host}, nil
-}
-
-func (n *dealNet) ID() peer.ID {
-	return n.host.ID()
-}
-
-func (n *dealNet) AddAddrs(p peer.ID, addrs []ma.Multiaddr) {
-	n.host.Peerstore().AddAddrs(p, addrs, 8*time.Hour)
-}
-
-func (n *dealNet) TagPeer(p peer.ID, id string) {
-	n.host.ConnManager().TagPeer(p, id, TagPriority)
-}
-
-func (n *dealNet) UntagPeer(p peer.ID, id string) {
-	n.host.ConnManager().UntagPeer(p, id)
 }
 
 // DealClient sends deal proposals over libp2p
 type DealClient struct {
-	dealNet
+	retryStream *shared.RetryStream
 }
 
-func NewClient(h host.Host, options ...Option) *DealClient {
+// SendDealProposal sends a deal proposal over a libp2p stream to the peer
+func (c *DealClient) SendDealProposal(ctx context.Context, id peer.ID, params types.DealParams) (*types.DealResponse, error) {
+	log.Debugw("send deal proposal", "id", params.DealUUID, "provider-peer", id)
+
+	// Create a libp2p stream to the provider
+	s, err := c.retryStream.OpenStream(ctx, id, []protocol.ID{DealProtocolID})
+	if err != nil {
+		return nil, err
+	}
+
+	defer s.Close() // nolint
+
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(clientWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
+
+	// Write the deal proposal to the stream
+	if err = cborutil.WriteCborRPC(s, &params); err != nil {
+		return nil, xerrors.Errorf("sending deal proposal: %w", err)
+	}
+
+	// Set a deadline on reading from the stream so it doesn't hang
+	_ = s.SetReadDeadline(time.Now().Add(clientReadDeadline))
+	defer s.SetReadDeadline(time.Time{}) // nolint
+
+	// Read the response from the stream
+	var resp types.DealResponse
+	if err := resp.UnmarshalCBOR(s); err != nil {
+		return nil, xerrors.Errorf("reading proposal response: %w", err)
+	}
+
+	log.Debugw("received deal proposal response", "id", params.DealUUID, "accepted", resp.Accepted, "reason", resp.Message)
+
+	return &resp, nil
+}
+
+func NewDealClient(h host.Host, options ...DealClientOption) *DealClient {
 	c := &DealClient{
-		dealNet: dealNet{
-			host:        h,
-			retryStream: shared.NewRetryStream(h),
-		},
+		retryStream: shared.NewRetryStream(h),
 	}
 	for _, option := range options {
-		option(&c.dealNet)
+		option(c)
 	}
 	return c
 }
 
 // DealProvider listens for incoming deal proposals over libp2p
 type DealProvider struct {
-	dealNet
+	host host.Host
 	prov *storagemarket.Provider
 }
 
-func NewProvider(h host.Host, prov *storagemarket.Provider, options ...Option) *DealProvider {
+func NewDealProvider(h host.Host, prov *storagemarket.Provider) *DealProvider {
 	p := &DealProvider{
-		dealNet: dealNet{
-			host:        h,
-			retryStream: shared.NewRetryStream(h),
-		},
+		host: h,
 		prov: prov,
-	}
-	for _, option := range options {
-		option(&p.dealNet)
 	}
 	return p
 }
 
-func (n *DealProvider) Start() {
-	n.host.SetStreamHandler(DealProtocolID, n.handleNewDealStream)
+func (p *DealProvider) Start() {
+	p.host.SetStreamHandler(DealProtocolID, p.handleNewDealStream)
 }
 
-func (n *DealProvider) Stop() {
-	n.host.RemoveStreamHandler(DealProtocolID)
+func (p *DealProvider) Stop() {
+	p.host.RemoveStreamHandler(DealProtocolID)
 }
 
 // Called when the client opens a libp2p stream with a new deal proposal
-func (n *DealProvider) handleNewDealStream(s network.Stream) {
+func (p *DealProvider) handleNewDealStream(s network.Stream) {
 	defer s.Close()
 
+	// Set a deadline on reading from the stream so it doesn't hang
+	_ = s.SetReadDeadline(time.Now().Add(providerReadDeadline))
+	defer s.SetReadDeadline(time.Time{}) // nolint
+
 	// Read the deal proposal from the stream
-	reader := bufio.NewReaderSize(s, 16)
-	ds := &DealStream{s.Conn().RemotePeer(), n.host, s, reader}
-	proposal, err := ds.ReadDealProposal()
+	var proposal types.DealParams
+	err := proposal.UnmarshalCBOR(s)
 	if err != nil {
-		log.Warnw("reading storage deal proposal from stream", "id", proposal.DealUUID, "err", err)
+		log.Warnw("reading storage deal proposal from stream", "err", err)
 		return
 	}
 
-	log.Infow("new libp2p deal proposal", "id", proposal.DealUUID, "client-peer", s.Conn().RemotePeer())
+	log.Infow("received deal proposal", "id", proposal.DealUUID, "client-peer", s.Conn().RemotePeer())
 
 	// Start executing the deal.
 	// Note: This method just waits for the deal to be accepted, it doesn't
 	// wait for deal execution to complete.
-	res, err := n.prov.ExecuteDeal(&proposal)
+	res, err := p.prov.ExecuteDeal(&proposal)
 	if err != nil {
 		log.Warnw("executing deal proposal", "id", proposal.DealUUID, "err", err)
 		return
 	}
 
-	// If the deal was accepted, res is nil
-	message := ""
-	if res != nil {
-		// If the deal was rejected, res.Reason is the rejection reason
-		message = res.Reason
-	}
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
 
 	// Write the response to the client
-	log.Infow("send deal proposal response", "id", proposal.DealUUID, "msg", message)
-	err = ds.WriteDealResponse(types.DealResponse{Message: message})
+	log.Infow("send deal proposal response", "id", proposal.DealUUID, "accepted", res.Accepted, "msg", res.Reason)
+	err = cborutil.WriteCborRPC(s, &types.DealResponse{Accepted: res.Accepted, Message: res.Reason})
 	if err != nil {
 		log.Warnw("writing deal response", "id", proposal.DealUUID, "err", err)
 		return

@@ -277,11 +277,27 @@ func (t *DealResponse) MarshalCBOR(w io.Writer) error {
 		_, err := w.Write(cbg.CborNull)
 		return err
 	}
-	if _, err := w.Write([]byte{161}); err != nil {
+	if _, err := w.Write([]byte{162}); err != nil {
 		return err
 	}
 
 	scratch := make([]byte, 9)
+
+	// t.Accepted (bool) (bool)
+	if len("Accepted") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"Accepted\" was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("Accepted"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("Accepted")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteBool(w, t.Accepted); err != nil {
+		return err
+	}
 
 	// t.Message (string) (string)
 	if len("Message") > cbg.MaxLength {
@@ -341,7 +357,25 @@ func (t *DealResponse) UnmarshalCBOR(r io.Reader) error {
 		}
 
 		switch name {
-		// t.Message (string) (string)
+		// t.Accepted (bool) (bool)
+		case "Accepted":
+
+			maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
+			if err != nil {
+				return err
+			}
+			if maj != cbg.MajOther {
+				return fmt.Errorf("booleans must be major type 7")
+			}
+			switch extra {
+			case 20:
+				t.Accepted = false
+			case 21:
+				t.Accepted = true
+			default:
+				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
+			}
+			// t.Message (string) (string)
 		case "Message":
 
 			{

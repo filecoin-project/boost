@@ -193,15 +193,15 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams) (pi *api.ProviderDealReject
 		cleanup()
 		return nil, fmt.Errorf("failed to accept deal: %w", resp.err)
 	}
-	// return rejection reason as provider has rejected a valid deal.
-	if !resp.accepted {
+	// return rejection reason as provider has rejected the deal.
+	if !resp.ri.Accepted {
 		cleanup()
 		log.Infow("rejected deal: "+resp.ri.Reason, "id", dp.DealUUID)
 		return resp.ri, nil
 	}
 
 	log.Infow("scheduled deal for execution", "id", dp.DealUUID)
-	return nil, nil
+	return resp.ri, nil
 }
 
 func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealHandler) (acceptDealResp, error) {

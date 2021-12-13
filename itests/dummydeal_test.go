@@ -134,7 +134,7 @@ func TestDummydeal(t *testing.T) {
 
 	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath))
 	require.NoError(t, err)
-	require.Nil(t, res, "expected res to be nil")
+	require.True(t, res.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
 	time.Sleep(2 * time.Second)
@@ -152,7 +152,7 @@ func TestDummydeal(t *testing.T) {
 	passingDealUuid := uuid.New()
 	res2, err2 = f.makeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
 	require.NoError(t, err2)
-	require.Nil(t, res2, "expected res2 to be nil")
+	require.True(t, res2.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
 
 	// Wait for the deal to be added to a sector
@@ -172,7 +172,7 @@ type testFramework struct {
 	homedir string
 	stop    func()
 
-	client     *boostclient.Client
+	client     *boostclient.StorageClient
 	boost      api.Boost
 	fullNode   lapi.FullNode
 	clientAddr address.Address
@@ -189,7 +189,7 @@ func newTestFramework(ctx context.Context, t *testing.T, homedir string) *testFr
 
 func (f *testFramework) start() {
 	var err error
-	f.client, err = boostclient.NewClient(f.ctx)
+	f.client, err = boostclient.NewStorageClient(f.ctx)
 	require.NoError(f.t, err)
 
 	addr := "ws://127.0.0.1:1234/rpc/v1"
