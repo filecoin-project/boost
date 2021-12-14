@@ -5,12 +5,15 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/storagemanager"
@@ -525,15 +528,30 @@ func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
 	return db.NewDealsDB(sqldb)
 }
 
-func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks) (*storagemarket.Provider, error) {
-	return func(lc fx.Lifecycle, r repo.LockedRepo, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks) (*storagemarket.Provider, error) {
+func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks) (*storagemarket.Provider, error) {
+	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks) (*storagemarket.Provider, error) {
 		prov, err := storagemarket.NewProvider(r.Path(), sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb)
+		lp2pnet := lp2pimpl.NewDealProvider(h, prov)
 
 		if err != nil {
 			return nil, err
 		}
 
-		lc.Append(fx.Hook{OnStart: prov.Start})
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				err := prov.Start(ctx)
+				if err != nil {
+					return fmt.Errorf("starting storage provider: %w", err)
+				}
+				lp2pnet.Start()
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				lp2pnet.Stop()
+				prov.Stop()
+				return nil
+			},
+		})
 
 		return prov, nil
 	}

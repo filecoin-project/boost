@@ -22,11 +22,13 @@ import (
 type Market interface {
 	// MethodGroup: Market
 
-	MarketDummyDeal(context.Context, *smtypes.ClientDealParams) (*ProviderDealRejectionInfo, error) //perm:admin
-	Deal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)               //perm:admin
+	MarketDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error) //perm:admin
+	Deal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)        //perm:admin
 }
 
-// ProviderDealRejectionInfo is the information sent by the Storage Provider to the Client when it rejects a valid deal.
+// ProviderDealRejectionInfo is the information sent by the Storage Provider
+// to the Client when it accepts or rejects a deal.
 type ProviderDealRejectionInfo struct {
-	Reason string
+	Accepted bool
+	Reason   string // The rejection reason, if the deal is rejected
 }

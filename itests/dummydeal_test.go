@@ -14,11 +14,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/build"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/xerrors"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/build"
 	cliutil "github.com/filecoin-project/boost/cli/util"
+	boostclient "github.com/filecoin-project/boost/client"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
@@ -41,13 +44,10 @@ import (
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
-
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 )
 
 var log = logging.Logger("boosttest")
@@ -134,7 +134,7 @@ func TestDummydeal(t *testing.T) {
 
 	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath))
 	require.NoError(t, err)
-	require.Nil(t, res, "expected res to be nil")
+	require.True(t, res.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
 	time.Sleep(2 * time.Second)
@@ -152,7 +152,7 @@ func TestDummydeal(t *testing.T) {
 	passingDealUuid := uuid.New()
 	res2, err2 = f.makeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
 	require.NoError(t, err2)
-	require.Nil(t, res2, "expected res2 to be nil")
+	require.True(t, res2.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
 
 	// Wait for the deal to be added to a sector
@@ -172,6 +172,7 @@ type testFramework struct {
 	homedir string
 	stop    func()
 
+	client     *boostclient.StorageClient
 	boost      api.Boost
 	fullNode   lapi.FullNode
 	clientAddr address.Address
@@ -187,6 +188,10 @@ func newTestFramework(ctx context.Context, t *testing.T, homedir string) *testFr
 }
 
 func (f *testFramework) start() {
+	var err error
+	f.client, err = boostclient.NewStorageClient(f.ctx)
+	require.NoError(f.t, err)
+
 	addr := "ws://127.0.0.1:1234/rpc/v1"
 
 	// Get a FullNode API
@@ -339,6 +344,12 @@ func (f *testFramework) start() {
 	rpcStopper, err := node.ServeRPC(handler, "boost", endpoint)
 	require.NoError(f.t, err)
 
+	// Add boost libp2p address to test client peer store so the client knows
+	// how to connect to boost
+	boostAddrs, err := f.boost.NetAddrsListen(f.ctx)
+	require.NoError(f.t, err)
+	f.client.PeerStore.AddAddrs(boostAddrs.ID, boostAddrs.Addrs, time.Hour)
+
 	log.Debugw("monitoring for shutdown")
 
 	// Monitor for shutdown.
@@ -488,7 +499,7 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		return nil, err
 	}
 
-	dealParams := &types.ClientDealParams{
+	dealParams := types.DealParams{
 		DealUUID:           dealUuid,
 		MinerPeerID:        peerID,
 		ClientPeerID:       peerID,
@@ -501,7 +512,7 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		},
 	}
 
-	return f.boost.MarketDummyDeal(f.ctx, dealParams)
+	return f.client.StorageDeal(f.ctx, dealParams)
 }
 
 func (f *testFramework) signProposal(addr address.Address, proposal *market.DealProposal) (*market.ClientDealProposal, error) {

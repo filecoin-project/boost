@@ -138,7 +138,7 @@ func (p *Provider) GetAsk() *types.StorageAsk {
 	}
 }
 
-func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDealRejectionInfo, err error) {
+func (p *Provider) ExecuteDeal(dp *types.DealParams) (pi *api.ProviderDealRejectionInfo, err error) {
 	log.Infow("execute deal", "uuid", dp.DealUUID)
 
 	ds := types.ProviderDealState{
@@ -193,15 +193,15 @@ func (p *Provider) ExecuteDeal(dp *types.ClientDealParams) (pi *api.ProviderDeal
 		cleanup()
 		return nil, fmt.Errorf("failed to accept deal: %w", resp.err)
 	}
-	// return rejection reason as provider has rejected a valid deal.
-	if !resp.accepted {
+	// return rejection reason as provider has rejected the deal.
+	if !resp.ri.Accepted {
 		cleanup()
 		log.Infow("rejected deal: "+resp.ri.Reason, "id", dp.DealUUID)
 		return resp.ri, nil
 	}
 
 	log.Infow("scheduled deal for execution", "id", dp.DealUUID)
-	return nil, nil
+	return resp.ri, nil
 }
 
 func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealHandler) (acceptDealResp, error) {
@@ -265,12 +265,13 @@ func (p *Provider) Start(ctx context.Context) error {
 	return nil
 }
 
-func (p *Provider) Close() error {
+func (p *Provider) Stop() {
 	p.closeSync.Do(func() {
+		log.Infow("storage provider: stopping")
+
 		p.cancel()
 		p.wg.Wait()
 	})
-	return nil
 }
 
 // SubscribeNewDeals subscribes to "new deal" events

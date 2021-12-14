@@ -78,7 +78,7 @@ type MarketStruct struct {
 	Internal struct {
 		Deal func(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) `perm:"admin"`
 
-		MarketDummyDeal func(p0 context.Context, p1 *smtypes.ClientDealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
+		MarketDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 	}
 }
 
@@ -179,14 +179,14 @@ func (s *MarketStub) Deal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDe
 	return nil, ErrNotSupported
 }
 
-func (s *MarketStruct) MarketDummyDeal(p0 context.Context, p1 *smtypes.ClientDealParams) (*ProviderDealRejectionInfo, error) {
+func (s *MarketStruct) MarketDummyDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
 	if s.Internal.MarketDummyDeal == nil {
 		return nil, ErrNotSupported
 	}
 	return s.Internal.MarketDummyDeal(p0, p1)
 }
 
-func (s *MarketStub) MarketDummyDeal(p0 context.Context, p1 *smtypes.ClientDealParams) (*ProviderDealRejectionInfo, error) {
+func (s *MarketStub) MarketDummyDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
 	return nil, ErrNotSupported
 }
 
