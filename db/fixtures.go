@@ -54,7 +54,6 @@ func GenerateDeals() ([]types.ProviderDealState, error) {
 	if err != nil {
 		return nil, err
 	}
-	selfPeer := testutil.GeneratePeer()
 	publishCid := testutil.GenerateCid()
 
 	deals := []types.ProviderDealState{}
@@ -87,7 +86,6 @@ func GenerateDeals() ([]types.ProviderDealState, error) {
 					Data: []byte("sig"),
 				},
 			},
-			SelfPeerID:      selfPeer,
 			ClientPeerID:    testutil.GeneratePeer(),
 			DealDataRoot:    testutil.GenerateCid(),
 			InboundFilePath: fmt.Sprintf("/data/staging/inbound/file-%d.car", rand.Intn(10000)),

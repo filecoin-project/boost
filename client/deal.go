@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
+
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/boost/api"
@@ -41,9 +43,9 @@ func NewStorageClient(ctx context.Context) (*StorageClient, error) {
 	}, nil
 }
 
-func (c *StorageClient) StorageDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
+func (c *StorageClient) StorageDeal(ctx context.Context, params types.DealParams, providerID peer.ID) (*api.ProviderDealRejectionInfo, error) {
 	// Send the deal proposal to the provider
-	resp, err := c.dealClient.SendDealProposal(ctx, params.MinerPeerID, params)
+	resp, err := c.dealClient.SendDealProposal(ctx, providerID, params)
 	if err != nil {
 		return nil, xerrors.Errorf("sending deal proposal: %w", err)
 	}

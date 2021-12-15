@@ -21,8 +21,6 @@ type ProviderDealState struct {
 	// ClientDealProposal is the deal proposal sent by the client.
 	ClientDealProposal market.ClientDealProposal
 
-	// SelfPeerID is the Storage Provider's libp2p Peer ID.
-	SelfPeerID peer.ID
 	// ClientPeerID is the Clients libp2p Peer ID.
 	ClientPeerID peer.ID
 

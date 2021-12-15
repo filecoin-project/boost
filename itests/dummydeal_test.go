@@ -501,8 +501,6 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 
 	dealParams := types.DealParams{
 		DealUUID:           dealUuid,
-		MinerPeerID:        peerID,
-		ClientPeerID:       peerID,
 		ClientDealProposal: *signedProposal,
 		DealDataRoot:       rootCid,
 		Transfer: types.Transfer{
@@ -512,7 +510,7 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		},
 	}
 
-	return f.client.StorageDeal(f.ctx, dealParams)
+	return f.client.StorageDeal(f.ctx, dealParams, peerID)
 }
 
 func (f *testFramework) signProposal(addr address.Address, proposal *market.DealProposal) (*market.ClientDealProposal, error) {
