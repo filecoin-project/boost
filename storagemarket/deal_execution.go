@@ -32,6 +32,7 @@ import (
 type dealMakingError struct {
 	recoverable bool
 	err         error
+	uiMsg       string
 }
 
 func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
@@ -84,7 +85,6 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 
 func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState, dh *dealHandler) *dealMakingError {
 	// publish "new deal" event
-	// TODO Do we need to fire this event for resumed deals ?
 	p.fireEventDealNew(deal)
 	// publish an event with the current state of the deal
 	p.fireEventDealUpdate(pub, deal)
@@ -100,7 +100,8 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 			if xerrors.Is(err, context.Canceled) && !dh.TransferCancelledByUser() {
 				return &dealMakingError{
 					recoverable: true,
-					err:         fmt.Errorf("execDeal failed data transfer: %w", err),
+					err:         fmt.Errorf("data transfer failed after %d bytes with error: %w", deal.NBytesReceived, err),
+					uiMsg:       fmt.Sprintf("data transfer paused after transferring %d bytes because Boost is shutting down", deal.NBytesReceived),
 				}
 			}
 			return &dealMakingError{
@@ -122,16 +123,8 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	// Now that the deal has been published, we no longer need to have funds
 	// tagged as being for this deal (the publish message moves collateral
 	// from the storage market actor escrow balance to the locked balance)
-	presp := make(chan struct{}, 1)
-	select {
-	case p.publishedDealChan <- publishDealReq{deal: deal, done: presp}:
-	case <-ctx.Done():
-		return &dealMakingError{recoverable: true, err: ctx.Err()}
-	}
-	select {
-	case <-presp:
-	case <-ctx.Done():
-		return &dealMakingError{recoverable: true, err: ctx.Err()}
+	if derr := p.untagFundsAfterPublish(ctx, deal); derr != nil {
+		return derr
 	}
 
 	// AddPiece
@@ -141,6 +134,22 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 				err: fmt.Errorf("failed to add piece: %w", err),
 			}
 		}
+	}
+
+	return nil
+}
+
+func (p *Provider) untagFundsAfterPublish(ctx context.Context, deal *types.ProviderDealState) *dealMakingError {
+	presp := make(chan struct{}, 1)
+	select {
+	case p.publishedDealChan <- publishDealReq{deal: deal, done: presp}:
+	case <-ctx.Done():
+		return &dealMakingError{recoverable: true, err: ctx.Err(), uiMsg: "the deal was paused in the Publishing state because Boost was shut down"}
+	}
+	select {
+	case <-presp:
+	case <-ctx.Done():
+		return &dealMakingError{recoverable: true, err: ctx.Err(), uiMsg: "the deal was paused in the Publishing state because Boost was shut down"}
 	}
 
 	return nil
