@@ -55,8 +55,9 @@ type Provider struct {
 	fs filestore.FileStore
 
 	// event loop
-	acceptDealsChan   chan acceptDealReq
-	finishedDealsChan chan finishedDealsReq
+	acceptDealChan    chan acceptDealReq
+	finishedDealChan  chan finishedDealReq
+	publishedDealChan chan publishDealReq
 
 	// Database API
 	db      *sql.DB
@@ -97,8 +98,9 @@ func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *f
 		db:        sqldb,
 		dealsDB:   dealsDB,
 
-		acceptDealsChan:   make(chan acceptDealReq),
-		finishedDealsChan: make(chan finishedDealsReq),
+		acceptDealChan:    make(chan acceptDealReq),
+		finishedDealChan:  make(chan finishedDealReq),
+		publishedDealChan: make(chan publishDealReq),
 
 		Transport:      httptransport.New(),
 		fundManager:    fundMgr,
@@ -209,7 +211,7 @@ func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealH
 	// then wait for a response and return the response to the client.
 	respChan := make(chan acceptDealResp, 1)
 	select {
-	case p.acceptDealsChan <- acceptDealReq{rsp: respChan, deal: ds, dh: dh}:
+	case p.acceptDealChan <- acceptDealReq{rsp: respChan, deal: ds, dh: dh}:
 	case <-p.ctx.Done():
 		return acceptDealResp{}, p.ctx.Err()
 	}
@@ -256,9 +258,23 @@ func (p *Provider) Start(ctx context.Context) error {
 	}
 	log.Infow("db initialized")
 
+	// restart all active deals
+	pds, err := p.dealsDB.ListActive(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list active deals: %w", err)
+	}
+	for _, ds := range pds {
+		d := ds
+		dh := p.mkAndInsertDealHandler(d.DealUuid)
+		p.wg.Add(1)
+		go func() {
+			defer p.wg.Done()
+			p.doDeal(d, dh)
+		}()
+	}
+
 	p.wg.Add(1)
 	go p.loop()
-
 	go p.transfers.start(p.ctx)
 
 	log.Infow("storage provider: started")

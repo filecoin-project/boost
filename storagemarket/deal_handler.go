@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 
+	"go.uber.org/atomic"
+
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/libp2p/go-eventbus"
 	"github.com/libp2p/go-libp2p-core/event"
@@ -20,10 +22,11 @@ type dealHandler struct {
 	bus         event.Bus
 
 	// Transfer cancellation state
-	transferCtx    context.Context
-	transferCancel context.CancelFunc
-	tdOnce         sync.Once // ensures the transferDone channel is closed only once
-	transferDone   chan error
+	transferCtx             context.Context
+	transferCancel          context.CancelFunc
+	tdOnce                  sync.Once // ensures the transferDone channel is closed only once
+	transferDone            chan error
+	transferCancelledByUser atomic.Bool
 
 	transferMu       sync.Mutex
 	transferFinished bool
@@ -38,7 +41,12 @@ func (d *dealHandler) subscribeUpdates() (event.Subscription, error) {
 	return sub, nil
 }
 
+func (dh *dealHandler) TransferCancelledByUser() bool {
+	return dh.transferCancelledByUser.Load()
+}
+
 func (dh *dealHandler) cancel() error {
+	dh.transferCancelledByUser.Store(true)
 	dh.transferMu.Lock()
 	defer dh.transferMu.Unlock()
 

@@ -23,7 +23,12 @@ type acceptDealResp struct {
 	err error
 }
 
-type finishedDealsReq struct {
+type finishedDealReq struct {
+	deal *types.ProviderDealState
+	done chan struct{}
+}
+
+type publishDealReq struct {
 	deal *types.ProviderDealState
 	done chan struct{}
 }
@@ -33,7 +38,7 @@ func (p *Provider) loop() {
 
 	for {
 		select {
-		case dealReq := <-p.acceptDealsChan:
+		case dealReq := <-p.acceptDealChan:
 			deal := dealReq.deal
 			log.Infow("process accept deal request", "id", deal.DealUuid)
 
@@ -92,16 +97,24 @@ func (p *Provider) loop() {
 			dealReq.rsp <- acceptDealResp{ri, nil}
 			log.Infow("deal execution started", "id", deal.DealUuid)
 
-		case finishedDeal := <-p.finishedDealsChan:
-			deal := finishedDeal.deal
-			log.Infow("deal finished", "id", deal.DealUuid)
+		case publishedDeal := <-p.publishedDealChan:
+			deal := publishedDeal.deal
 			errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 			if errf != nil {
 				log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
 			}
+			publishedDeal.done <- struct{}{}
+
+		case finishedDeal := <-p.finishedDealChan:
+			deal := finishedDeal.deal
+			log.Infow("deal finished", "id", deal.DealUuid)
+			errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+			if errf != nil && errf != db.ErrNotFound {
+				log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
+			}
 
 			errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
-			if errs != nil {
+			if errs != nil && errf != db.ErrNotFound {
 				log.Errorw("untagging storage", "id", deal.DealUuid, "err", errs)
 			}
 			finishedDeal.done <- struct{}{}
