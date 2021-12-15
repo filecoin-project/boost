@@ -67,7 +67,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 			// recoverable errors as well and we will have to build the DB/UX/resumption support for it.
 
 			// if the error is recoverable, persist that fact to the deal log and return
-			p.addDealLog(deal.DealUuid, "Deal Paused because of recoverable error", derr.err)
+			p.addDealLog(deal.DealUuid, "Deal Paused because of recoverable error: %s", derr.err)
 		}
 		return
 	}
