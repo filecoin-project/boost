@@ -100,4 +100,5 @@ require (
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/multiformats/go-multihash v0.0.15
 	github.com/whyrusleeping/cbor-gen v0.0.0-20211110122933-f57984553008
+	go.uber.org/atomic v1.9.0
 )

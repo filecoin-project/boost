@@ -29,6 +29,11 @@ import (
 	"github.com/libp2p/go-libp2p-core/event"
 )
 
+type dealMakingError struct {
+	recoverable bool
+	err         error
+}
+
 func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	// Set up pubsub for deal updates
 	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
@@ -50,9 +55,20 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	deal.NBytesReceived = fi.Size()
 
 	// Execute the deal synchronously
-	if err := p.execDealUptoAddPiece(dh.providerCtx, pub, deal, dh); err != nil {
-		p.cleanupDeal(deal)
-		p.failDeal(pub, deal, err)
+	if derr := p.execDealUptoAddPiece(dh.providerCtx, pub, deal, dh); derr != nil {
+		// If the error is NOT recoverable, fail the deal and cleanup state.
+		if !derr.recoverable {
+			p.cleanupDeal(deal)
+			p.failDeal(pub, deal, err)
+		} else {
+			// TODO For now, we will get recoverable errors only when the process is gracefully shutdown and
+			// the provider context gets cancelled which in turn cancels the transfers.
+			// However, down the road, other stages of deal making will start returning
+			// recoverable errors as well and we will have to build the DB/UX/resumption support for it.
+
+			// if the error is recoverable, persist that fact to the deal log and return
+			p.addDealLog(deal.DealUuid, "Deal Paused because of recoverable error", derr.err)
+		}
 		return
 	}
 
@@ -66,20 +82,32 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	// will fail, we can look into it when we implement deal completion.
 }
 
-func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState, dh *dealHandler) error {
+func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState, dh *dealHandler) *dealMakingError {
 	// publish "new deal" event
+	// TODO Do we need to fire this event for resumed deals ?
 	p.fireEventDealNew(deal)
-
 	// publish an event with the current state of the deal
 	p.fireEventDealUpdate(pub, deal)
 
-	p.addDealLog(deal.DealUuid, "Deal Accepted")
+	p.addDealLog(deal.DealUuid, "Deal Execution Started")
 
 	// Transfer Data
 	if deal.Checkpoint < dealcheckpoints.Transferred {
 		if err := p.transferAndVerify(dh.transferCtx, pub, deal); err != nil {
 			dh.transferCancelled(nil)
-			return fmt.Errorf("execDeal failed data transfer: %w", err)
+
+			// if the transfer failed because of context cancellation and the context was not
+			// cancelled because of the user explicitly cancelling the transfer, this is a recoverable error.
+			if xerrors.Is(err, context.Canceled) && !dh.TransferCancelledByUser() {
+				return &dealMakingError{
+					recoverable: true,
+					err:         fmt.Errorf("execDeal failed data transfer: %w", err),
+				}
+			}
+
+			return &dealMakingError{
+				err: fmt.Errorf("execDeal failed data transfer: %w", err),
+			}
 		}
 	}
 	// transfer can no longer be cancelled
@@ -88,14 +116,18 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	// Publish
 	if deal.Checkpoint <= dealcheckpoints.Published {
 		if err := p.publishDeal(ctx, pub, deal); err != nil {
-			return fmt.Errorf("failed to publish deal: %w", err)
+			return &dealMakingError{
+				err: fmt.Errorf("failed to publish deal: %w", err),
+			}
 		}
 	}
 
 	// AddPiece
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
 		if err := p.addPiece(ctx, pub, deal); err != nil {
-			return fmt.Errorf("failed to add piece: %w", err)
+			return &dealMakingError{
+				err: fmt.Errorf("failed to add piece: %w", err),
+			}
 		}
 	}
 

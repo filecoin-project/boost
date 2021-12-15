@@ -256,9 +256,23 @@ func (p *Provider) Start(ctx context.Context) error {
 	}
 	log.Infow("db initialized")
 
+	// restart all active deals
+	pds, err := p.dealsDB.ListActive(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list active deals: %w", err)
+	}
+	for _, ds := range pds {
+		d := ds
+		dh := p.mkAndInsertDealHandler(d.DealUuid)
+		p.wg.Add(1)
+		go func() {
+			defer p.wg.Done()
+			p.doDeal(d, dh)
+		}()
+	}
+
 	p.wg.Add(1)
 	go p.loop()
-
 	go p.transfers.start(p.ctx)
 
 	log.Infow("storage provider: started")

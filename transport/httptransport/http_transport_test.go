@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/xerrors"
+
 	"golang.org/x/sync/errgroup"
 
 	"github.com/filecoin-project/boost/transport"
@@ -166,7 +168,7 @@ func TestTransferCancellation(t *testing.T) {
 
 	evts := waitForTransferComplete(t, th)
 	require.Len(t, evts, 1)
-	require.Contains(t, evts[0].Error.Error(), "context")
+	require.True(t, xerrors.Is(evts[0].Error, context.Canceled))
 }
 
 func executeTransfer(t *testing.T, ctx context.Context, ht *httpTransport, size int, url string, tmpFile string) transport.Handler {
