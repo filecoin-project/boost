@@ -38,7 +38,7 @@ func (p *Provider) loop() {
 
 	for {
 		select {
-		case dealReq := <-p.acceptDealsChan:
+		case dealReq := <-p.acceptDealChan:
 			deal := dealReq.deal
 			log.Infow("process accept deal request", "id", deal.DealUuid)
 
@@ -97,7 +97,7 @@ func (p *Provider) loop() {
 			dealReq.rsp <- acceptDealResp{ri, nil}
 			log.Infow("deal execution started", "id", deal.DealUuid)
 
-		case publishedDeal := <-p.dealPublishedChan:
+		case publishedDeal := <-p.publishedDealChan:
 			deal := publishedDeal.deal
 			errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 			if errf != nil {
@@ -105,7 +105,7 @@ func (p *Provider) loop() {
 			}
 			publishedDeal.done <- struct{}{}
 
-		case finishedDeal := <-p.finishedDealsChan:
+		case finishedDeal := <-p.finishedDealChan:
 			deal := finishedDeal.deal
 			log.Infow("deal finished", "id", deal.DealUuid)
 			errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)

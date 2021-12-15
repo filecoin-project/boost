@@ -124,7 +124,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	// from the storage market actor escrow balance to the locked balance)
 	presp := make(chan struct{}, 1)
 	select {
-	case p.dealPublishedChan <- publishDealReq{deal: deal, done: presp}:
+	case p.publishedDealChan <- publishDealReq{deal: deal, done: presp}:
 	case <-ctx.Done():
 		return &dealMakingError{recoverable: true, err: ctx.Err()}
 	}
@@ -417,7 +417,7 @@ func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 	done := make(chan struct{}, 1)
 	// submit req to event loop to untag tagged funds and storage space
 	select {
-	case p.finishedDealsChan <- finishedDealReq{deal: deal, done: done}:
+	case p.finishedDealChan <- finishedDealReq{deal: deal, done: done}:
 	case <-p.ctx.Done():
 	}
 
