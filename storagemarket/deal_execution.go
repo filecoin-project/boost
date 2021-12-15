@@ -62,7 +62,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 			p.failDeal(pub, deal, err)
 		} else {
 			// TODO For now, we will get recoverable errors only when the process is gracefully shutdown and
-			// the provider context gets cancelled which in turn cancels the transfers.
+			// the provider context gets cancelled.
 			// However, down the road, other stages of deal making will start returning
 			// recoverable errors as well and we will have to build the DB/UX/resumption support for it.
 
@@ -95,7 +95,6 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	if deal.Checkpoint < dealcheckpoints.Transferred {
 		if err := p.transferAndVerify(dh.transferCtx, pub, deal); err != nil {
 			dh.transferCancelled(nil)
-
 			// if the transfer failed because of context cancellation and the context was not
 			// cancelled because of the user explicitly cancelling the transfer, this is a recoverable error.
 			if xerrors.Is(err, context.Canceled) && !dh.TransferCancelledByUser() {
@@ -104,7 +103,6 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 					err:         fmt.Errorf("execDeal failed data transfer: %w", err),
 				}
 			}
-
 			return &dealMakingError{
 				err: fmt.Errorf("execDeal failed data transfer: %w", err),
 			}
@@ -120,6 +118,20 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 				err: fmt.Errorf("failed to publish deal: %w", err),
 			}
 		}
+	}
+	// Now that the deal has been published, we no longer need to have funds
+	// tagged as being for this deal (the publish message moves collateral
+	// from the storage market actor escrow balance to the locked balance)
+	presp := make(chan struct{}, 1)
+	select {
+	case p.dealPublishedChan <- publishDealReq{deal: deal, done: presp}:
+	case <-ctx.Done():
+		return &dealMakingError{recoverable: true, err: ctx.Err()}
+	}
+	select {
+	case <-presp:
+	case <-ctx.Done():
+		return &dealMakingError{recoverable: true, err: ctx.Err()}
 	}
 
 	// AddPiece
@@ -307,10 +319,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 
 	p.addDealLog(deal.DealUuid, "Deal published successfully")
 
-	// Now that the deal has been published, we no longer need to have funds
-	// tagged as being for this deal (the publish message moves collateral
-	// from the storage market actor escrow balance to the locked balance)
-	return p.fundManager.UntagFunds(ctx, deal.DealUuid)
+	return nil
 }
 
 // addPiece hands off a published deal for sealing and commitment in a sector
@@ -408,7 +417,7 @@ func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 	done := make(chan struct{}, 1)
 	// submit req to event loop to untag tagged funds and storage space
 	select {
-	case p.finishedDealsChan <- finishedDealsReq{deal: deal, done: done}:
+	case p.finishedDealsChan <- finishedDealReq{deal: deal, done: done}:
 	case <-p.ctx.Done():
 	}
 

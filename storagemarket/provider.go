@@ -56,7 +56,8 @@ type Provider struct {
 
 	// event loop
 	acceptDealsChan   chan acceptDealReq
-	finishedDealsChan chan finishedDealsReq
+	finishedDealsChan chan finishedDealReq
+	dealPublishedChan chan publishDealReq
 
 	// Database API
 	db      *sql.DB
@@ -98,7 +99,8 @@ func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *f
 		dealsDB:   dealsDB,
 
 		acceptDealsChan:   make(chan acceptDealReq),
-		finishedDealsChan: make(chan finishedDealsReq),
+		finishedDealsChan: make(chan finishedDealReq),
+		dealPublishedChan: make(chan publishDealReq),
 
 		Transport:      httptransport.New(),
 		fundManager:    fundMgr,
