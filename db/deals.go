@@ -70,7 +70,6 @@ func newDealAccessor(db *sql.DB, deal *types.ProviderDealState) *dealAccessor {
 			"StoragePricePerEpoch":  &bigIntFieldDef{f: &deal.ClientDealProposal.Proposal.StoragePricePerEpoch},
 			"ProviderCollateral":    &bigIntFieldDef{f: &deal.ClientDealProposal.Proposal.ProviderCollateral},
 			"ClientCollateral":      &bigIntFieldDef{f: &deal.ClientDealProposal.Proposal.ClientCollateral},
-			"SelfPeerID":            &fieldDef{f: &deal.SelfPeerID},
 			"ClientPeerID":          &fieldDef{f: &deal.ClientPeerID},
 			"DealDataRoot":          &cidFieldDef{f: &deal.DealDataRoot},
 			"InboundFilePath":       &fieldDef{f: &deal.InboundFilePath},

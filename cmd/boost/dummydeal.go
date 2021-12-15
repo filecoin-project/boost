@@ -172,11 +172,6 @@ var dummydealCmd = &cli.Command{
 			return fmt.Errorf("marshalling request parameters: %w", err)
 		}
 
-		peerID, err := boostApi.ID(ctx)
-		if err != nil {
-			return fmt.Errorf("getting boost peer ID: %w", err)
-		}
-
 		tipset, err := fullNodeApi.ChainHead(ctx)
 		if err != nil {
 			return fmt.Errorf("getting chain head: %w", err)
@@ -192,8 +187,6 @@ var dummydealCmd = &cli.Command{
 
 		dealParams := types.DealParams{
 			DealUUID:           dealUuid,
-			MinerPeerID:        peerID,
-			ClientPeerID:       peerID,
 			ClientDealProposal: *dealProposal,
 			DealDataRoot:       rootCid,
 			Transfer: types.Transfer{

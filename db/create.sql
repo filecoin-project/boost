@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS Deals (
     StoragePricePerEpoch TEXT,
     ProviderCollateral TEXT,
     ClientCollateral TEXT,
-    SelfPeerID TEXT,
     ClientPeerID TEXT,
     DealDataRoot TEXT,
     InboundFilePath TEXT,

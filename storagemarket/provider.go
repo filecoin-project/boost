@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-eventbus"
-
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/filestore"
@@ -26,7 +24,9 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/libp2p/go-eventbus"
 	"github.com/libp2p/go-libp2p-core/event"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"golang.org/x/xerrors"
 )
 
@@ -140,14 +140,13 @@ func (p *Provider) GetAsk() *types.StorageAsk {
 	}
 }
 
-func (p *Provider) ExecuteDeal(dp *types.DealParams) (pi *api.ProviderDealRejectionInfo, err error) {
+func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *api.ProviderDealRejectionInfo, err error) {
 	log.Infow("execute deal", "uuid", dp.DealUUID)
 
 	ds := types.ProviderDealState{
 		DealUuid:           dp.DealUUID,
 		ClientDealProposal: dp.ClientDealProposal,
-		SelfPeerID:         dp.MinerPeerID,
-		ClientPeerID:       dp.ClientPeerID,
+		ClientPeerID:       clientPeer,
 		DealDataRoot:       dp.DealDataRoot,
 		Transfer:           dp.Transfer,
 	}

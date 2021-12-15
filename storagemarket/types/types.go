@@ -2,8 +2,6 @@ package types
 
 import (
 	"github.com/google/uuid"
-	"github.com/libp2p/go-libp2p-core/peer"
-
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-address"
@@ -29,8 +27,6 @@ type StorageAsk struct {
 
 type DealParams struct {
 	DealUUID           uuid.UUID
-	MinerPeerID        peer.ID
-	ClientPeerID       peer.ID
 	ClientDealProposal market.ClientDealProposal
 	DealDataRoot       cid.Cid
 	Transfer           Transfer
