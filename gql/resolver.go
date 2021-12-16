@@ -7,6 +7,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -32,16 +33,18 @@ type resolver struct {
 	storageMgr *storagemanager.StorageManager
 	provider   *storagemarket.Provider
 	publisher  *storagemarket.DealPublisher
+	spApi      sealingpipeline.State
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.State, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		dealsDB:    dealsDB,
 		fundMgr:    fundMgr,
 		storageMgr: storageMgr,
 		provider:   provider,
 		publisher:  publisher,
+		spApi:      spApi,
 		fullNode:   fullNode,
 	}
 }

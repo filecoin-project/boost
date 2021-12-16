@@ -23,6 +23,7 @@ import (
 	"github.com/filecoin-project/boost/node/modules/helpers"
 	"github.com/filecoin-project/boost/node/modules/lp2p"
 	"github.com/filecoin-project/boost/node/repo"
+	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -379,8 +380,6 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(*stores.Local), modules.LocalStorage),
 		Override(new(*stores.Remote), modules.RemoteStorage),
 
-		Override(new(modules.MinerStorageService), modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
-
 		Override(new(*storagemarket.DealPublisher), storagemarket.NewDealPublisher(storagemarket.PublishMsgConfig{
 			Wallet:                  walletPSD,
 			Period:                  time.Duration(cfg.Dealmaking.PublishMsgPeriod),
@@ -404,6 +403,9 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(modules.MinerStorageService), modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
 		Override(new(sectorblocks.SectorBuilder), From(new(modules.MinerStorageService))),
 		Override(new(*sectorblocks.SectorBlocks), sectorblocks.NewSectorBlocks),
+
+		// Sealing Pipeline State API
+		Override(new(sealingpipeline.State), From(new(modules.MinerStorageService))),
 
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner)),
 	)

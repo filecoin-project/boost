@@ -5,6 +5,7 @@ import {gqlClient,} from "./gql";
 import {StorageSpacePage} from "./StorageSpace";
 import {FundsPage} from "./Funds";
 import {StorageDealsPage} from "./Deals";
+import {SealingPipelinePage} from "./SealingPipeline";
 import {DealPublishPage} from "./DealPublish";
 import {DealTransfersPage} from "./DealTransfers"
 import {MpoolPage} from "./Mpool";
@@ -53,6 +54,9 @@ var pages = [{
         title: 'Storage Space',
         pageType: 'storage-space',
     }, {
+        title: 'Sealing Pipeline',
+        pageType: 'sealing-pipeline',
+    }, {
         title: 'Funds',
         pageType: 'funds',
     }, {
@@ -87,6 +91,8 @@ class Pages extends React.Component {
                 return <StorageDealsPage key={page.pageType} />
             case 'storage-space':
                 return <StorageSpacePage key={page.pageType} />
+            case 'sealing-pipeline':
+                return <SealingPipelinePage key={page.pageType} />
             case 'funds':
                 return <FundsPage key={page.pageType} />
             case 'deal-publish':

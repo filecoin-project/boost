@@ -8,6 +8,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -38,6 +39,9 @@ type BoostAPI struct {
 	//Host              host.Host                         `optional:"true"`
 	//DAGStore          *dagstore.DAGStore                `optional:"true"`
 
+	// Sealing Pipeline API
+
+	Sps sealingpipeline.State
 	// TODO: Figure out how to start graphql server without it needing
 	// to be a dependency of another fx object
 	GraphqlServer *gql.Server

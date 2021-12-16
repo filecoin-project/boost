@@ -387,7 +387,14 @@ This parameter is ONLY applicable if the retrieval pricing policy strategy has b
 			Name: "PublishStorageDeals",
 			Type: "string",
 
-			Comment: `The wallet used to send PublishStorageDeals messages`,
+			Comment: `The wallet used to send PublishStorageDeals messages.
+Must be a control or worker address of the miner.`,
+		},
+		{
+			Name: "PledgeCollateral",
+			Type: "string",
+
+			Comment: `The wallet used as the source for pledge collateral`,
 		},
 	},
 }

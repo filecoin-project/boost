@@ -71,6 +71,12 @@ type Storage {
   MountPoint: String!
 }
 
+type SealingPipeline {
+  Committing: Int!
+  PreCommitting: Int!
+  WaitSeed: Int!
+}
+
 type FundsEscrow {
   Available: BigInt!
   Locked: BigInt!
@@ -136,6 +142,9 @@ type RootQuery {
 
   """Get storage space usage"""
   storage: Storage!
+
+  """Get sealing pipeline state"""
+  sealingpipeline: SealingPipeline!
 
   """Get funds available"""
   funds: Funds!
