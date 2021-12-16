@@ -208,10 +208,10 @@ func TestTransferResumption(t *testing.T) {
 		}
 
 		w.WriteHeader(200)
-		w.Write([]byte(str[start:end]))
+		w.Write([]byte(str[start:end])) //nolint:errcheck
 		// close the connection so user sees an error while reading the response
 		c := GetConn(r)
-		c.Close()
+		c.Close() //nolint:errcheck
 	}))
 	svr.Config.ConnContext = SaveConnInContext
 	svr.Start()
