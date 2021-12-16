@@ -60,7 +60,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 		// If the error is NOT recoverable, fail the deal and cleanup state.
 		if !derr.recoverable {
 			p.cleanupDeal(deal)
-			p.failDeal(pub, deal, err)
+			p.failDeal(pub, deal, derr.err)
 		} else {
 			// TODO For now, we will get recoverable errors only when the process is gracefully shutdown and
 			// the provider context gets cancelled.
