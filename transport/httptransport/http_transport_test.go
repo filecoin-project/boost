@@ -171,6 +171,50 @@ func TestTransferCancellation(t *testing.T) {
 	require.True(t, xerrors.Is(evts[0].Error, context.Canceled))
 }
 
+// TODO This is hard to test
+/*
+func TestTransferResumption(t *testing.T) {
+	// start server with data to send
+	size := (100 * readBufferSize) + 30
+	str := strings.Repeat("a", size)
+
+	// start http server that always sends 500Kb and disconnects
+	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		offset := r.Header.Get("Range")
+		finalOffset := strings.TrimSuffix(strings.TrimPrefix(offset, "bytes="), "-")
+		start, _ := strconv.ParseInt(finalOffset, 10, 64)
+
+		end := int(start + 512000)
+		if end > size {
+			end = size
+		}
+
+		fmt.Println(start)
+
+		w.Write([]byte(str[start:end]))
+	}))
+
+	go func() {
+		for {
+			time.Sleep(1 * time.Millisecond)
+			svr.CloseClientConnections()
+		}
+	}()
+
+	defer svr.Close()
+
+	of := getTempFilePath(t)
+	th := executeTransfer(t, context.Background(), New(BackOffRetryOpt(1*time.Second, 2*time.Second, 2, 1000)), size, svr.URL, of)
+	require.NotNil(t, th)
+
+	evts := waitForTransferComplete(t, th)
+	fmt.Println(evts)
+	require.NotEmpty(t, evts)
+	require.EqualValues(t, size, evts[len(evts)-1].NBytesReceived)
+
+	assertFileContents(t, of, str)
+}*/
+
 func executeTransfer(t *testing.T, ctx context.Context, ht *httpTransport, size int, url string, tmpFile string) transport.Handler {
 	dealInfo := &types.TransportDealInfo{
 		OutputFile: tmpFile,
