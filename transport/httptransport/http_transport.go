@@ -172,6 +172,12 @@ func (t *transfer) execute(ctx context.Context) error {
 			return fmt.Errorf("failed to create http req: %w", err)
 		}
 
+		st, err := os.Stat(t.dealInfo.OutputFile)
+		if err != nil {
+			return fmt.Errorf("failed to stat output file: %w", err)
+		}
+		t.nBytesReceived = st.Size()
+
 		// add range req to start reading from the last byte we have in the output file
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", t.nBytesReceived))
 		// init the request with the transfer context
