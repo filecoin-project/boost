@@ -51,7 +51,7 @@ export function DealTransfersPage(props) {
             data={chartData}
             options={{
                 hAxis: { titleTextStyle: { color: '#333' } },
-                vAxis: { minValue: 0, maxValue: maxMegabits || undefined },
+                vAxis: { minValue: 0, maxValue: maxMegabits || undefined, title: 'Megabits / s' },
             }}
         />
     </div>
