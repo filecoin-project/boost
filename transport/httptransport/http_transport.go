@@ -96,11 +96,17 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	tctx, cancel := context.WithCancel(ctx)
 	t := &transfer{
 		cancel:         cancel,
-		h:              h,
 		tInfo:          tInfo,
 		dealInfo:       dealInfo,
 		eventCh:        make(chan types.TransportEvent, 256),
 		nBytesReceived: fileSize,
+		backoff: &backoff.Backoff{
+			Min:    h.minBackOffWait,
+			Max:    h.maxBackoffWait,
+			Factor: h.backOffFactor,
+			Jitter: true,
+		},
+		maxReconnectAttempts: h.maxReconnectAttempts,
 	}
 
 	// is the transfer already complete ? we check this by comparing the number of bytes
@@ -138,7 +144,6 @@ type transfer struct {
 	closeOnce sync.Once
 	cancel    context.CancelFunc
 
-	h       *httpTransport
 	eventCh chan types.TransportEvent
 
 	tInfo    *types.HttpRequest
@@ -146,6 +151,9 @@ type transfer struct {
 	wg       sync.WaitGroup
 
 	nBytesReceived int64
+
+	backoff              *backoff.Backoff
+	maxReconnectAttempts float64
 }
 
 func (t *transfer) emitEvent(ctx context.Context, evt types.TransportEvent, id uuid.UUID) error {
@@ -158,12 +166,6 @@ func (t *transfer) emitEvent(ctx context.Context, evt types.TransportEvent, id u
 }
 
 func (t *transfer) execute(ctx context.Context) error {
-	b := &backoff.Backoff{
-		Min:    t.h.minBackOffWait,
-		Max:    t.h.maxBackoffWait,
-		Factor: t.h.backOffFactor,
-		Jitter: true,
-	}
 
 	for {
 		// construct request
@@ -202,18 +204,17 @@ func (t *transfer) execute(ctx context.Context) error {
 		}
 
 		// backoff-retry transfer if max number of attempts haven't been exhausted
-		nAttempts := b.Attempt() + 1
-		if nAttempts >= t.h.maxReconnectAttempts {
+		nAttempts := t.backoff.Attempt() + 1
+		if nAttempts >= t.maxReconnectAttempts {
 			return fmt.Errorf("could not finish transfer even after %d attempts, lastErr: %w", maxReconnectAttempts, err)
 		}
-		duration := b.Duration()
+		duration := t.backoff.Duration()
 		bt := time.NewTimer(duration)
-		fmt.Println(duration)
 		defer bt.Stop()
 		select {
 		case <-bt.C:
 		case <-ctx.Done():
-			return fmt.Errorf("transfer context err after %f attempts to finish transfer, lastErr=%s, contextErr=%w", b.Attempt(), err, ctx.Err())
+			return fmt.Errorf("transfer context err after %f attempts to finish transfer, lastErr=%s, contextErr=%w", t.backoff.Attempt(), err, ctx.Err())
 		}
 	}
 
