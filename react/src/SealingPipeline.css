@@ -1,0 +1,44 @@
+.sealing-pipeline .title {
+    padding: 1em;
+    color: #a61e4d;
+}
+
+.sealing-pipeline table {
+    font-size: 1em;
+    width: 100%;
+}
+
+.sealing-pipeline td, .sealing-pipeline th {
+    text-align: left;
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
+
+.sealing-pipeline td.deal-id {
+    width: 6em;
+}
+
+.sealing-pipeline td.deal-id .short-deal-id {
+    cursor: pointer;
+    color: #465298;
+}
+
+.sealing-pipeline td.state {
+    width: 8em;
+}
+
+.sealing-pipeline th.start, .sealing-pipeline td.start {
+    width: 5em;
+}
+
+.sealing-pipeline th.worker-id, .sealing-pipeline td.worker-id {
+    width: 3em;
+}
+
+.sealing-pipeline th.stage, .sealing-pipeline td.stage {
+    width: 4em;
+}
+
+.sealing-pipeline th.sector, .sealing-pipeline td.sector {
+    width: 3em;
+}

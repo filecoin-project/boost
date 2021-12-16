@@ -71,10 +71,40 @@ type Storage {
   MountPoint: String!
 }
 
-type SealingPipeline {
-  Committing: Int!
-  PreCommitting: Int!
+type WaitDeal {
+  ID: ID!
+  Size: Uint64!
+}
+
+type WaitDeals {
+  SectorSize: Uint64!
+  Deals: [WaitDeal]!
+}
+
+type SectorStates {
+  AddPiece: Int!
   WaitSeed: Int!
+  PreCommitting: Int!
+  Packing: Int!
+  PreCommit1: Int!
+  PreCommit2: Int!
+  PreCommitWait: Int!
+  Committing: Int!
+  CommittingWait: Int!
+  FinalizeSector: Int!
+}
+
+type Worker {
+  ID: String!
+  Start: Time!
+  Stage: String!
+  Sector: Int!
+}
+
+type SealingPipeline {
+  WaitDeals: WaitDeals!
+  SectorStates: SectorStates!
+  Workers: [Worker]!
 }
 
 type FundsEscrow {

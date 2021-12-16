@@ -180,9 +180,31 @@ const StorageQuery = gql`
 const SealingPipelineQuery = gql`
     query AppSealingPipelineQuery {
         sealingpipeline {
-            Committing
-            PreCommitting
-            WaitSeed
+            WaitDeals {
+                SectorSize
+                Deals {
+                    ID
+                    Size
+                }
+            }
+            SectorStates {
+                AddPiece
+                WaitSeed
+                PreCommitting
+                Packing
+                PreCommit1
+                PreCommit2
+                PreCommitWait
+                Committing
+                CommittingWait
+                FinalizeSector
+            }
+            Workers {
+                ID
+                Start
+                Stage
+                Sector
+            }
         }
     }
 `;

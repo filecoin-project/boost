@@ -4,6 +4,7 @@ import moment from "moment";
 import {humanFileSize} from "./util";
 import React, {useEffect, useState} from "react";
 import {DealDetail} from "./DealDetail";
+import {ShortClientAddress, ShortDealID} from "./Components";
 
 var dealsPerPage = 10
 
@@ -217,16 +218,6 @@ function DealRow(props) {
             <td className="message">{deal.Message}</td>
         </tr>
     )
-}
-
-function ShortDealID(props) {
-    const shortId = props.id.substring(0, 8)+'…'
-    return <div>{shortId}</div>
-}
-
-function ShortClientAddress(props) {
-    const shortAddr = props.address.substring(0, 8)+'…'
-    return <div>{shortAddr}</div>
 }
 
 class DealsPagination {
