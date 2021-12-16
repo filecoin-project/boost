@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/atomic"
+
 	"golang.org/x/xerrors"
 
 	"golang.org/x/sync/errgroup"
@@ -191,8 +193,11 @@ func TestTransferResumption(t *testing.T) {
 	size := (100 * readBufferSize) + 30
 	str := strings.Repeat("a", size)
 
+	var nAttempts atomic.Int32
+
 	// start http server that always sends 500Kb and disconnects (total file size is greater than 100 Mb)
 	svr := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nAttempts.Inc()
 		offset := r.Header.Get("Range")
 		finalOffset := strings.TrimSuffix(strings.TrimPrefix(offset, "bytes="), "-")
 		start, _ := strconv.ParseInt(finalOffset, 10, 64)
@@ -223,6 +228,9 @@ func TestTransferResumption(t *testing.T) {
 	require.EqualValues(t, size, evts[len(evts)-1].NBytesReceived)
 
 	assertFileContents(t, of, str)
+
+	// assert we had to make multiple connections to the server
+	require.True(t, nAttempts.Load() > 10)
 }
 
 func executeTransfer(t *testing.T, ctx context.Context, ht *httpTransport, size int, url string, tmpFile string) transport.Handler {
