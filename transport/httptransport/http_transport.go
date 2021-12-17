@@ -9,6 +9,11 @@ import (
 	"net/url"
 	"os"
 	"sync"
+	"time"
+
+	"golang.org/x/xerrors"
+
+	"github.com/jpillora/backoff"
 
 	"github.com/google/uuid"
 
@@ -24,16 +29,46 @@ var log = logging.Logger("http-transport")
 const (
 	// 1 Mb
 	readBufferSize = 1048576
+
+	minBackOff           = 1 * time.Minute
+	maxBackOff           = 1 * time.Hour
+	factor               = 2
+	maxReconnectAttempts = 8
 )
 
 var _ transport.Transport = (*httpTransport)(nil)
 
-func New() *httpTransport {
-	return &httpTransport{}
+type Option func(*httpTransport)
+
+func BackOffRetryOpt(minBackoff, maxBackoff time.Duration, factor, maxReconnectAttempts float64) Option {
+	return func(h *httpTransport) {
+		h.minBackOffWait = minBackoff
+		h.maxBackoffWait = maxBackoff
+		h.backOffFactor = factor
+		h.maxReconnectAttempts = maxReconnectAttempts
+	}
 }
 
 type httpTransport struct {
 	// TODO Construct and inject an http client here ?
+
+	minBackOffWait       time.Duration
+	maxBackoffWait       time.Duration
+	backOffFactor        float64
+	maxReconnectAttempts float64
+}
+
+func New(opts ...Option) *httpTransport {
+	ht := &httpTransport{
+		minBackOffWait:       minBackOff,
+		maxBackoffWait:       maxBackOff,
+		backOffFactor:        factor,
+		maxReconnectAttempts: maxReconnectAttempts,
+	}
+	for _, o := range opts {
+		o(ht)
+	}
+	return ht
 }
 
 func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealInfo *types.TransportDealInfo) (th transport.Handler, err error) {
@@ -65,6 +100,13 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 		dealInfo:       dealInfo,
 		eventCh:        make(chan types.TransportEvent, 256),
 		nBytesReceived: fileSize,
+		backoff: &backoff.Backoff{
+			Min:    h.minBackOffWait,
+			Max:    h.maxBackoffWait,
+			Factor: h.backOffFactor,
+			Jitter: true,
+		},
+		maxReconnectAttempts: h.maxReconnectAttempts,
 	}
 
 	// is the transfer already complete ? we check this by comparing the number of bytes
@@ -109,6 +151,9 @@ type transfer struct {
 	wg       sync.WaitGroup
 
 	nBytesReceived int64
+
+	backoff              *backoff.Backoff
+	maxReconnectAttempts float64
 }
 
 func (t *transfer) emitEvent(ctx context.Context, evt types.TransportEvent, id uuid.UUID) error {
@@ -121,40 +166,71 @@ func (t *transfer) emitEvent(ctx context.Context, evt types.TransportEvent, id u
 }
 
 func (t *transfer) execute(ctx context.Context) error {
-	// construct request
-	req, err := http.NewRequest("GET", t.tInfo.URL, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create http req: %w", err)
-	}
 
-	// add range req to start reading from the last byte we have in the output file
-	req.Header.Set("Range", fmt.Sprintf("bytes=%d-", t.nBytesReceived))
-	// init the request with the transfer context
-	req = req.WithContext(ctx)
-	// open output file in append-only mode for writing
-	of, err := os.OpenFile(t.dealInfo.OutputFile, os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open output file: %w", err)
-	}
-	defer of.Close()
-
-	// start the http transfer
-	remaining := t.dealInfo.DealSize - t.nBytesReceived
-	if err := t.doHttp(ctx, req, of, remaining); err != nil {
-		// do not resume transfer if context has been cancelled
-		if ctx.Err() == context.Canceled || ctx.Err() == context.DeadlineExceeded {
-			return fmt.Errorf("transfer context err: %w", ctx.Err())
+	for {
+		// construct request
+		req, err := http.NewRequest("GET", t.tInfo.URL, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create http req: %w", err)
 		}
 
-		//
-		// TODO: resumption
-		return fmt.Errorf("failed to execute http transfer: %w", err)
+		st, err := os.Stat(t.dealInfo.OutputFile)
+		if err != nil {
+			return fmt.Errorf("failed to stat output file: %w", err)
+		}
+		t.nBytesReceived = st.Size()
+
+		// add range req to start reading from the last byte we have in the output file
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", t.nBytesReceived))
+		// init the request with the transfer context
+		req = req.WithContext(ctx)
+		// open output file in append-only mode for writing
+		of, err := os.OpenFile(t.dealInfo.OutputFile, os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to open output file: %w", err)
+		}
+		defer of.Close()
+
+		// start the http transfer
+		remaining := t.dealInfo.DealSize - t.nBytesReceived
+		if err = t.doHttp(ctx, req, of, remaining); err == nil {
+			// if there's no error, transfer was successful
+			break
+		}
+		_ = of.Close()
+		// do not resume transfer if context has been cancelled or if the context deadline has exceeded
+		if xerrors.Is(err, context.Canceled) || xerrors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("transfer context err: %w", err)
+		}
+
+		// backoff-retry transfer if max number of attempts haven't been exhausted
+		nAttempts := t.backoff.Attempt() + 1
+		if nAttempts >= t.maxReconnectAttempts {
+			return fmt.Errorf("could not finish transfer even after %d attempts, lastErr: %w", maxReconnectAttempts, err)
+		}
+		duration := t.backoff.Duration()
+		bt := time.NewTimer(duration)
+		defer bt.Stop()
+		select {
+		case <-bt.C:
+		case <-ctx.Done():
+			return fmt.Errorf("transfer context err after %f attempts to finish transfer, lastErr=%s, contextErr=%w", t.backoff.Attempt(), err, ctx.Err())
+		}
 	}
+
 	// --- http request finished successfully. see if we got the number of bytes we expected.
 
 	// if the number of bytes we've received is not the same as the deal size, we have a failure.
 	if t.nBytesReceived != t.dealInfo.DealSize {
 		return fmt.Errorf("mismatch in dealSize vs received bytes, dealSize=%d, received=%d", t.dealInfo.DealSize, t.nBytesReceived)
+	}
+	// if the file size is not equal to the number of bytes received, something has gone wrong
+	st, err := os.Stat(t.dealInfo.OutputFile)
+	if err != nil {
+		return fmt.Errorf("failed to stat output file: %w", err)
+	}
+	if t.nBytesReceived != st.Size() {
+		return fmt.Errorf("mismtach in output file size vs received bytes, fileSize=%d, receivedBytes=%d", st.Size(), t.nBytesReceived)
 	}
 
 	return nil

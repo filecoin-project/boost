@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"go.uber.org/atomic"
 
 	"golang.org/x/xerrors"
 
@@ -38,7 +42,7 @@ func TestSimpleTransfer(t *testing.T) {
 	th := executeTransfer(t, ctx, &httpTransport{}, size, svr.URL, of)
 	require.NotNil(t, th)
 
-	evts := waitForTransferComplete(t, th)
+	evts := waitForTransferComplete(th)
 	require.NotEmpty(t, evts)
 	require.EqualValues(t, size, evts[len(evts)-1].NBytesReceived)
 
@@ -57,7 +61,7 @@ func TestTransportRespectsContext(t *testing.T) {
 	th := executeTransfer(t, ctx, &httpTransport{}, 100, svr.URL, of)
 	require.NotNil(t, th)
 
-	evts := waitForTransferComplete(t, th)
+	evts := waitForTransferComplete(th)
 	require.NotEmpty(t, evts)
 	require.Len(t, evts, 1)
 	require.Contains(t, evts[0].Error.Error(), "context")
@@ -82,7 +86,7 @@ func TestConcurrentTransfers(t *testing.T) {
 			of := getTempFilePath(t)
 			th := executeTransfer(t, ctx, ht, size, svr.URL, of)
 
-			evts := waitForTransferComplete(t, th)
+			evts := waitForTransferComplete(th)
 			if len(evts) == 0 {
 				return errors.New("events should NOT be empty")
 			}
@@ -131,7 +135,7 @@ func TestCompletionOnMultipleAttemptsWithSameFile(t *testing.T) {
 		th := executeTransfer(t, ctx, &httpTransport{}, size, svr.URL, of)
 		require.NotNil(t, th)
 
-		evts := waitForTransferComplete(t, th)
+		evts := waitForTransferComplete(th)
 
 		if len(evts) == 1 {
 			require.EqualValues(t, size, evts[0].NBytesReceived)
@@ -166,9 +170,67 @@ func TestTransferCancellation(t *testing.T) {
 	// close the transfer so context is cancelled
 	th.Close()
 
-	evts := waitForTransferComplete(t, th)
+	evts := waitForTransferComplete(th)
 	require.Len(t, evts, 1)
 	require.True(t, xerrors.Is(evts[0].Error, context.Canceled))
+}
+
+type contextKey struct {
+	key string
+}
+
+var ConnContextKey = &contextKey{"http-conn"}
+
+func SaveConnInContext(ctx context.Context, c net.Conn) context.Context {
+	return context.WithValue(ctx, ConnContextKey, c)
+}
+func GetConn(r *http.Request) net.Conn {
+	return r.Context().Value(ConnContextKey).(net.Conn)
+}
+
+func TestTransferResumption(t *testing.T) {
+	// start server with data to send
+	size := (100 * readBufferSize) + 30
+	str := strings.Repeat("a", size)
+
+	var nAttempts atomic.Int32
+
+	// start http server that always sends 500Kb and disconnects (total file size is greater than 100 Mb)
+	svr := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nAttempts.Inc()
+		offset := r.Header.Get("Range")
+		finalOffset := strings.TrimSuffix(strings.TrimPrefix(offset, "bytes="), "-")
+		start, _ := strconv.ParseInt(finalOffset, 10, 64)
+
+		end := int(start + (readBufferSize + 70))
+		if end > size {
+			end = size
+		}
+
+		w.WriteHeader(200)
+		w.Write([]byte(str[start:end])) //nolint:errcheck
+		// close the connection so user sees an error while reading the response
+		c := GetConn(r)
+		c.Close() //nolint:errcheck
+	}))
+	svr.Config.ConnContext = SaveConnInContext
+	svr.Start()
+
+	defer svr.Close()
+
+	ht := New(BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000))
+	of := getTempFilePath(t)
+	th := executeTransfer(t, context.Background(), ht, size, svr.URL, of)
+	require.NotNil(t, th)
+
+	evts := waitForTransferComplete(th)
+	require.NotEmpty(t, evts)
+	require.EqualValues(t, size, evts[len(evts)-1].NBytesReceived)
+
+	assertFileContents(t, of, str)
+
+	// assert we had to make multiple connections to the server
+	require.True(t, nAttempts.Load() > 10)
 }
 
 func executeTransfer(t *testing.T, ctx context.Context, ht *httpTransport, size int, url string, tmpFile string) transport.Handler {
@@ -204,7 +266,7 @@ func getTempFilePath(t *testing.T) string {
 	return of.Name()
 }
 
-func waitForTransferComplete(t *testing.T, th transport.Handler) []types.TransportEvent {
+func waitForTransferComplete(th transport.Handler) []types.TransportEvent {
 	var evts []types.TransportEvent
 
 	for evt := range th.Sub() {
