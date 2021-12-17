@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
@@ -28,6 +29,7 @@ type dealListResolver struct {
 // resolver translates from a request for a graphql field to the data for
 // that field
 type resolver struct {
+	minerAddr  address.Address
 	dealsDB    *db.DealsDB
 	fundMgr    *fundmanager.FundManager
 	storageMgr *storagemanager.StorageManager
@@ -37,8 +39,9 @@ type resolver struct {
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.State, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(minerAddr address.Address, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.State, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
+		minerAddr:  minerAddr,
 		dealsDB:    dealsDB,
 		fundMgr:    fundMgr,
 		storageMgr: storageMgr,

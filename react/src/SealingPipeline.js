@@ -8,7 +8,7 @@ import {dateFormat} from "./util-date";
 import moment from 'moment';
 
 export function SealingPipelinePage(props) {
-    const {loading, error, data} = useQuery(SealingPipelineQuery/*, { pollInterval: 1000 }*/)
+    const {loading, error, data} = useQuery(SealingPipelineQuery, { pollInterval: 2000 })
 
     if (loading) {
         return <div>Loading...</div>

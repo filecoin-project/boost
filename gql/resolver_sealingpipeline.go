@@ -2,30 +2,52 @@ package gql
 
 import (
 	"context"
-	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
-	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/api"
-	"github.com/google/uuid"
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/graph-gophers/graphql-go"
 )
 
 // query: sealingpipeline: [SealingPipeline]
 func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolver, error) {
-	committing := int32(0)
-	waitSeed := int32(0)
+	res, err := r.spApi.WorkerJobs(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	//res, err := r.spApi.WorkerJobs(ctx)
-	//if err != nil {
-	//return nil, err
-	//}
+	spew.Dump(res)
 
-	//_ = res
+	var workers []*worker
 
-	//spew.Dump(res)
+	for _, jobs := range res {
+		for _, j := range jobs {
+			workers = append(workers, &worker{
+				//ID: workerId.String(), // TODO:fixme
+				//JobID: j.ID
+				Start:  graphql.Time{j.Start},
+				Stage:  j.Task.Short(),
+				Sector: int32(j.Sector.Number),
+			})
+
+			// 1+ - assigned
+			// 0  - running
+			// -1 - ret-wait
+			// -2 - returned
+			// -3 - ret-done
+			//RunWait int
+		}
+	}
 
 	summary, err := r.spApi.SectorsSummary(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ssize, err := getSectorSize(ctx, r.fullNode, r.minerAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +58,7 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolve
 	}
 
 	taken := uint64(0)
-	deals := []abi.DealID{}
+	deals := []*waitDeal{}
 	for _, s := range wdSectors {
 		wdSectorStatus, err := r.spApi.SectorsStatus(ctx, s, false)
 		if err != nil {
@@ -44,60 +66,34 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolve
 		}
 
 		for _, p := range wdSectorStatus.Pieces {
+			deals = append(deals, &waitDeal{
+				//ID:   graphql.ID(p.DealInfo.DealID),
+				Size: gqltypes.Uint64(p.Piece.Size),
+			})
 			taken += uint64(p.Piece.Size)
 		}
 
-		deals = append(deals, wdSectorStatus.Deals...)
 	}
 
 	log.Debugw("sealing pipeline", "waitdeals", summary["WaitDeals"], "taken", taken, "deals", deals, "pc1", summary["PreCommit1"], "pc2", summary["PreCommit2"], "precommitwait", summary["PreCommitWait"], "waitseed", summary["WaitSeed"], "committing", summary["Committing"], "commitwait", summary["CommitWait"], "proving", summary["Proving"])
 
 	return &sealingPipelineResolver{
 		WaitDeals: waitDeals{
-			SectorSize: 32 * 1024 * 1024 * 1024,
-			Deals: []*waitDeal{{
-				ID:   graphql.ID(uuid.New().String()),
-				Size: 10 * 1024 * 1024 * 1024,
-			}, {
-				ID:   graphql.ID(uuid.New().String()),
-				Size: 7 * 1024 * 1024 * 1024,
-			}, {
-				ID:   graphql.ID(uuid.New().String()),
-				Size: 12 * 1024 * 1024 * 1024,
-			}},
+			SectorSize: gqltypes.Uint64(ssize),
+			Deals:      deals,
 		},
 		SectorStates: sectorStates{
-			AddPiece:       1,
-			Packing:        0,
-			PreCommit1:     0,
-			PreCommit2:     1,
-			PreCommitWait:  0,
-			WaitSeed:       waitSeed,
-			Committing:     committing,
-			CommittingWait: 1,
-			FinalizeSector: 0,
+			AddPiece:       1, //TODO: fixme
+			Packing:        0, //TODO: fixme
+			PreCommit1:     int32(summary["PreCommit1"]),
+			PreCommit2:     int32(summary["PreCommit2"]),
+			PreCommitWait:  int32(summary["PreCommitWait"]),
+			WaitSeed:       int32(summary["WaitSeed"]),
+			Committing:     int32(summary["Committing"]),
+			CommittingWait: int32(summary["CommitWait"]),
+			FinalizeSector: 0, //TODO: fixme
 		},
-		Workers: []*worker{{
-			ID:     "3152",
-			Start:  graphql.Time{Time: time.Now().Add(-20 * time.Minute)},
-			Stage:  "AddPiece",
-			Sector: 311,
-		}, {
-			ID:     "5231",
-			Start:  graphql.Time{Time: time.Now().Add(-23 * time.Minute)},
-			Stage:  "AddPiece",
-			Sector: 341,
-		}, {
-			ID:     "572",
-			Start:  graphql.Time{Time: time.Now().Add(-11 * time.Minute)},
-			Stage:  "Precommit2",
-			Sector: 633,
-		}, {
-			ID:     "9522",
-			Start:  graphql.Time{Time: time.Now().Add(-132 * time.Minute)},
-			Stage:  "WaitSeed",
-			Sector: 624,
-		}},
+		Workers: workers,
 	}, nil
 }
 
@@ -135,4 +131,13 @@ type sealingPipelineResolver struct {
 	WaitDeals    waitDeals
 	SectorStates sectorStates
 	Workers      []*worker
+}
+
+func getSectorSize(ctx context.Context, fullNode v1api.FullNode, maddr address.Address) (uint64, error) {
+	mi, err := fullNode.StateMinerInfo(ctx, maddr, types.EmptyTSK)
+	if err != nil {
+		return 0, err
+	}
+
+	return uint64(mi.SectorSize), nil
 }

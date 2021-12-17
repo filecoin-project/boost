@@ -336,7 +336,6 @@ var BoostNode = Options(
 	Override(new(dtypes.NetworkName), modules.StorageNetworkName),
 	Override(new(*sql.DB), modules.NewBoostDB),
 	Override(new(*db.DealsDB), modules.NewDealsDB),
-	Override(new(*gql.Server), modules.NewGraphqlServer),
 )
 
 func ConfigBoost(c interface{}) Option {
@@ -408,6 +407,9 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(sealingpipeline.State), From(new(modules.MinerStorageService))),
 
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner)),
+
+		// GraphQL server
+		Override(new(*gql.Server), modules.NewGraphqlServer),
 	)
 }
 
