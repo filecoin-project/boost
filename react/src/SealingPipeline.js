@@ -35,6 +35,16 @@ function WaitDeals(props) {
 
     return <div className="wait-deals">
         <div className="title">Wait Deals</div>
+
+        <div className="cumulative-bar-chart">
+            <div className="bars">
+                <div className="bar used" style={{width:(totalSize*100n/props.SectorSize)+'%'}}>
+                    <div className="bar-inner"></div>
+                </div>
+            </div>
+            <div className="total">{humanFileSize(props.SectorSize)}</div>
+        </div>
+
         <table>
             <tbody>
                 {props.Deals.map(deal => (
@@ -87,12 +97,40 @@ function Sealing(props) {
         Count: props.FinalizeSector,
     }]
 
+    var total = 0
+    var lastVisibleIndex = -1
+    for (let i = 0; i < sectorStates.length; i++) {
+        let sec = sectorStates[i]
+        total += sec.Count
+        if (sec.Count > 0) {
+            lastVisibleIndex = i
+        }
+        sec.className = sec.Name.replace(/ /g, '_')
+    }
+
     return <div className="sealing">
         <div className="title">Sealing</div>
+
+        <div className="cumulative-bar-chart">
+            <div className="bars">
+                {sectorStates.map((sec, i) => (
+                    <div
+                        key={sec.Name}
+                        className={"bar " + sec.className + ' ' + ((i === lastVisibleIndex) ? 'last-visible' : '')}
+                        style={{width:(100*sec.Count/total)+'%'}}
+                    >
+                        <div className="bar-inner"></div>
+                    </div>
+                ))}
+            </div>
+            <div className="total">{total}</div>
+        </div>
+
         <table className="sector-states">
             <tbody>
             {sectorStates.map(sec => (
                 <tr key={sec.Name}>
+                    <td className="color"><div className={sec.className} /></td>
                     <td className="state">{sec.Name}</td>
                     <td className="count">{sec.Count}</td>
                 </tr>
