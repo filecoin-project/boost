@@ -39,7 +39,9 @@ function WaitDeals(props) {
             <tbody>
                 {props.Deals.map(deal => (
                     <tr key={deal.ID}>
-                        <td className="deal-id"><ShortDealID id={deal.ID} /></td>
+                        <td className="deal-id" onClick={() => props.onDealRowClick(deal.ID)}>
+                            <ShortDealID id={deal.ID} />
+                        </td>
                         <td className="deal-size">{humanFileSize(deal.Size)}</td>
                     </tr>
                 ))}

@@ -16,6 +16,7 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
+	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/event"
 	"golang.org/x/xerrors"
 )
@@ -200,6 +201,17 @@ func (r *resolver) DealCancel(_ context.Context, args struct{ ID graphql.ID }) (
 
 func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
 	deal, err := r.dealsDB.ByID(ctx, dealUuid)
+	if err != nil {
+		return nil, err
+	}
+
+	deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
+
+	return deal, nil
+}
+
+func (r *resolver) dealByPublishCID(ctx context.Context, publishCid *cid.Cid) (*types.ProviderDealState, error) {
+	deal, err := r.dealsDB.ByPublishCID(ctx, publishCid.String())
 	if err != nil {
 		return nil, err
 	}

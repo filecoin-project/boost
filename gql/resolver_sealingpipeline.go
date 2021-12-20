@@ -23,10 +23,10 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolve
 
 	var workers []*worker
 
-	for _, jobs := range res {
+	for workerId, jobs := range res {
 		for _, j := range jobs {
 			workers = append(workers, &worker{
-				//ID: workerId.String(), // TODO:fixme
+				ID: workerId.String(),
 				//JobID: j.ID
 				Start:  graphql.Time{j.Start},
 				Stage:  j.Task.Short(),
@@ -66,8 +66,13 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolve
 		}
 
 		for _, p := range wdSectorStatus.Pieces {
+			//TODO: any other way to map deal from sector with deal from db?
+			d, err := r.dealByPublishCID(ctx, p.DealInfo.PublishCid)
+			if err != nil {
+				return nil, err
+			}
 			deals = append(deals, &waitDeal{
-				//ID:   graphql.ID(p.DealInfo.DealID),
+				ID:   graphql.ID(d.DealUuid.String()),
 				Size: gqltypes.Uint64(p.Piece.Size),
 			})
 			taken += uint64(p.Piece.Size)
