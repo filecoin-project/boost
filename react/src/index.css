@@ -72,12 +72,14 @@ body.modal-open {
 }
 
 .menu .menu-item {
+  display: block;
   color: #a61e4d;
   margin: 0.5em;
   cursor: pointer;
 }
 
 .page-content {
+  vertical-align: top;
   width: 90%;
 }
 

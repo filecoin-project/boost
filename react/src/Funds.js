@@ -4,13 +4,14 @@ import {useState, React}  from "react";
 import moment from "moment";
 import {humanFIL, max, parseFil} from "./util"
 import {Info} from "./Info"
+import {PageContainer} from "./Components";
 
 export function FundsPage(props) {
     return (
-        <>
+        <PageContainer pageType="funds" title="Funds">
             <FundsChart />
             <FundsLogs />
-        </>
+        </PageContainer>
     )
 }
 

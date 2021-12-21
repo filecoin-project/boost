@@ -2,12 +2,18 @@ import {useQuery} from "@apollo/react-hooks";
 import {SealingPipelineQuery} from "./gql";
 import React from "react";
 import {humanFileSize} from "./util";
-import {ShortDealID} from "./Components";
+import {PageContainer, ShortDealID} from "./Components";
 import './SealingPipeline.css'
 import {dateFormat} from "./util-date";
 import moment from 'moment';
 
 export function SealingPipelinePage(props) {
+    return <PageContainer pageType="sealing-pipeline" title="Sealing Pipeline">
+        <SealingPipelineContent />
+    </PageContainer>
+}
+
+function SealingPipelineContent(props) {
     const {loading, error, data} = useQuery(SealingPipelineQuery, { pollInterval: 2000 })
 
     if (loading) {

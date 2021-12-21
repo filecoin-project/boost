@@ -3,8 +3,15 @@ import {StorageQuery} from "./gql";
 import React from "react";
 import {humanFileSize, addCommas} from "./util";
 import './StorageSpace.css'
+import {PageContainer} from "./Components";
 
 export function StorageSpacePage(props) {
+    return <PageContainer pageType="storage-space" title="Storage Space">
+        <StorageSpaceContent />
+    </PageContainer>
+}
+
+function StorageSpaceContent(props) {
     const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 1000 })
 
     if (loading) {

@@ -3,10 +3,17 @@ import { Chart } from "react-google-charts";
 import {useQuery} from "@apollo/react-hooks";
 import {TransfersQuery} from "./gql";
 import moment from "moment"
+import {PageContainer} from "./Components";
 
 var maxMegabits = 0
 
 export function DealTransfersPage(props) {
+    return <PageContainer pageType="deal-transfers" title="Deal Transfers">
+        <DealTransfersContent />
+    </PageContainer>
+}
+
+function DealTransfersContent(props) {
     const {loading, error, data} = useQuery(TransfersQuery, { pollInterval: 1000 })
 
     if (loading) {
