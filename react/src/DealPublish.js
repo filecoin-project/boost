@@ -2,7 +2,7 @@ import {useMutation, useQuery} from "@apollo/react-hooks";
 import {DealPublishNowMutation, DealPublishQuery} from "./gql";
 import React from "react";
 import moment from "moment";
-import {PageContainer} from "./Components";
+import {PageContainer, ShortDealLink} from "./Components";
 
 export function DealPublishPage(props) {
     return <PageContainer pageType="deal-publish" title="Publish Deals">
@@ -74,7 +74,9 @@ function DealsTable(props) {
                     {props.deals.map(deal => (
                         <tr key={deal.ID}>
                             <td>{moment(deal.CreatedAt).fromNow()}</td>
-                            <td className="deal-id">{deal.ID}</td>
+                            <td className="deal-id">
+                                <ShortDealLink id={deal.ID} />
+                            </td>
                         </tr>
                     ))}
                 </tbody>

@@ -3,8 +3,7 @@ import {DealsListQuery, DealSubscription, gqlClient, NewDealsSubscription} from 
 import moment from "moment";
 import {humanFileSize} from "./util";
 import React, {useEffect, useState} from "react";
-import {DealDetail} from "./DealDetail";
-import {PageContainer, ShortClientAddress, ShortDealID} from "./Components";
+import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
 
 var dealsPerPage = 10
 
@@ -72,7 +71,6 @@ export function StorageDealsPage(props) {
 }
 
 function StorageDealsContent(props) {
-    const [dealToShow, setDealToShow] = useState(null)
     const [deals, setDeals] = useState([])
     const [totalCount, setTotalCount] = useState(0)
     const [pageNum, setPageNum] = useState(1)
@@ -149,11 +147,6 @@ function StorageDealsContent(props) {
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error.message}</div>;
 
-    var dealDetail
-    if (dealToShow) {
-        dealDetail = deals.find(dl => dl.ID === dealToShow)
-    }
-
     var totalPages = Math.ceil(totalCount / dealsPerPage)
 
     return <div className="deals">
@@ -168,7 +161,7 @@ function StorageDealsContent(props) {
             </tr>
 
             {deals.map(deal => (
-                <DealRow key={deal.ID} deal={deal} onDealRowClick={setDealToShow}/>
+                <DealRow key={deal.ID} deal={deal} />
             ))}
             </tbody>
         </table>
@@ -181,12 +174,6 @@ function StorageDealsContent(props) {
                 <div className="total">{totalCount} deals</div>
             </div>
         </div>
-
-        {dealDetail && (
-            <div id="deal-detail">
-                <DealDetail key={dealDetail.ID} deal={dealDetail} onCloseClick={() => setDealToShow("")}/>
-            </div>
-        )}
     </div>
 }
 
@@ -214,8 +201,8 @@ function DealRow(props) {
     return (
         <tr>
             <td className="start">{start}</td>
-            <td className="deal-id" onClick={() => props.onDealRowClick(deal.ID)}>
-                <ShortDealID id={deal.ID} />
+            <td className="deal-id">
+                <ShortDealLink id={deal.ID} />
             </td>
             <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
             <td className="client">

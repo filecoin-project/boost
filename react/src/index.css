@@ -149,42 +149,42 @@ body.modal-open {
   color: #999;
 }
 
-#deal-detail {
+.deal-detail {
   padding-top: 1em;
   margin: auto;
 }
 
-#deal-detail .title {
+.deal-detail .title {
   margin:  1em auto;
   text-align: center;
   font-size: 1.25em;
   color: #a61e4d;
 }
 
-#deal-detail table {
+.deal-detail table {
   font-size: 1em;
 }
 
-#deal-detail table.deal-fields {
+.deal-detail table.deal-fields {
   margin-bottom: 1em;
 }
 
-#deal-detail table.deal-fields tr td:first-child {
+.deal-detail table.deal-fields tr td:first-child {
   width: 8em;
 }
-#deal-detail table.deal-fields tr td:last-child {
+.deal-detail table.deal-fields tr td:last-child {
   line-break: anywhere;
 }
 
-#deal-detail td {
+.deal-detail td {
   padding: 0.5em 1em;
 }
 
-#deal-detail td.since-last {
+.deal-detail td.since-last {
   color:  #999;
 }
 
-#deal-detail .buttons {
+.deal-detail .buttons {
   display: inline-block;
   float: right;
 }

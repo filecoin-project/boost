@@ -2,7 +2,7 @@ import {useQuery} from "@apollo/react-hooks";
 import {SealingPipelineQuery} from "./gql";
 import React from "react";
 import {humanFileSize} from "./util";
-import {PageContainer, ShortDealID} from "./Components";
+import {PageContainer, ShortDealID, ShortDealLink} from "./Components";
 import './SealingPipeline.css'
 import {dateFormat} from "./util-date";
 import moment from 'moment';
@@ -55,8 +55,8 @@ function WaitDeals(props) {
             <tbody>
                 {props.Deals.map(deal => (
                     <tr key={deal.ID}>
-                        <td className="deal-id" onClick={() => props.onDealRowClick(deal.ID)}>
-                            <ShortDealID id={deal.ID} />
+                        <td className="deal-id">
+                            <ShortDealLink id={deal.ID} />
                         </td>
                         <td className="deal-size">{humanFileSize(deal.Size)}</td>
                     </tr>

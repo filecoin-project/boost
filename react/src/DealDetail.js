@@ -1,11 +1,16 @@
 import React, {useEffect} from "react";
 import {useMutation, useSubscription} from "@apollo/react-hooks";
 import {DealCancelMutation, DealSubscription} from "./gql";
+import { useNavigate } from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";
 import {humanFIL, addCommas} from "./util";
+import {useParams} from "react-router-dom";
 
 export function DealDetail(props) {
+    const params = useParams()
+    const navigate = useNavigate()
+
     // Add a class to the document body when showing the deal detail page
     useEffect(() => {
         document.body.classList.add('modal-open')
@@ -16,22 +21,22 @@ export function DealDetail(props) {
     })
 
     const [cancelDeal] = useMutation(DealCancelMutation, {
-        variables: {id: props.deal.ID}
+        variables: {id: params.dealID}
     })
 
     const {loading, error, data} = useSubscription(DealSubscription, {
-        variables: {id: props.deal.ID},
+        variables: {id: params.dealID},
     })
 
     if (error) {
         return <div>Error: {error.message}</div>
     }
 
-    var deal = props.deal
-    if (!loading) {
-        deal = data.dealUpdate
+    if (loading) {
+        return <div>Loading ...</div>
     }
 
+    var deal = data.dealUpdate
     var logRowData = []
     for (var i = 0; i < (deal.Logs || []).length; i++) {
         var log = deal.Logs[i]
@@ -41,7 +46,7 @@ export function DealDetail(props) {
 
     return <div className="deal-detail modal" id={deal.ID}>
         <div className="content">
-            <div className="close" onClick={props.onCloseClick}>
+            <div className="close" onClick={() => navigate(-1)}>
                 <div>X</div>
             </div>
             <div className="title">Deal {deal.ID}</div>
