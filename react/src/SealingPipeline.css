@@ -5,6 +5,10 @@
     color: #a61e4d;
 }
 
+.sealing-pipeline .wait-deals .no-deals {
+    padding: 1em;
+}
+
 .sealing-pipeline .cumulative-bar-chart {
     padding-left: 1em;
 }
