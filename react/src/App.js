@@ -10,6 +10,7 @@ import {SealingPipelinePage} from "./SealingPipeline";
 import {DealPublishPage} from "./DealPublish";
 import {DealTransfersPage} from "./DealTransfers"
 import {MpoolPage} from "./Mpool";
+import {DealDetail} from "./DealDetail";
 
 function App(props) {
     return (
@@ -28,6 +29,7 @@ function App(props) {
                                     <Route path="/deal-publish" element={<DealPublishPage />} />
                                     <Route path="/deal-transfers" element={<DealTransfersPage />} />
                                     <Route path="/mpool" element={<MpoolPage />} />
+                                    <Route path="/deals/:dealID" element={<DealDetail />} />
                                     <Route path="/" element={<StorageDealsPage />} />
                                 </Routes>
                             </td>

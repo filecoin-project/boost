@@ -1,4 +1,5 @@
 import React from "react";
+import {Link} from "react-router-dom";
 
 export function PageContainer(props) {
     return (
@@ -7,6 +8,12 @@ export function PageContainer(props) {
             {props.children}
         </div>
     )
+}
+
+export function ShortDealLink(props) {
+    return <Link to={"/deals/" + props.id}>
+        <ShortDealID id={props.id} />
+    </Link>
 }
 
 export function ShortDealID(props) {
