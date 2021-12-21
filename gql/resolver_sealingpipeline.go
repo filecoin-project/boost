@@ -19,23 +19,14 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolve
 	}
 
 	var workers []*worker
-
 	for workerId, jobs := range res {
 		for _, j := range jobs {
 			workers = append(workers, &worker{
-				ID: workerId.String(),
-				//JobID: j.ID
+				ID:     workerId.String(),
 				Start:  graphql.Time{Time: j.Start},
 				Stage:  j.Task.Short(),
 				Sector: int32(j.Sector.Number),
 			})
-
-			// 1+ - assigned
-			// 0  - running
-			// -1 - ret-wait
-			// -2 - returned
-			// -3 - ret-done
-			//RunWait int
 		}
 	}
 
@@ -90,8 +81,8 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolve
 			Deals:      deals,
 		},
 		SectorStates: sectorStates{
-			AddPiece:       int32(summary["AddPiece"]), // TODO: confirm this is correct
-			Packing:        int32(summary["Packing"]),  // TODO: confirm this is correct
+			AddPiece:       int32(summary["AddPiece"]),
+			Packing:        int32(summary["Packing"]),
 			PreCommit1:     int32(summary["PreCommit1"]),
 			PreCommit2:     int32(summary["PreCommit2"]),
 			PreCommitWait:  int32(summary["PreCommitWait"]),
