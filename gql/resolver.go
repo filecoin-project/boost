@@ -360,7 +360,9 @@ func (dr *dealResolver) Message() string {
 			return fmt.Sprintf("Transferring %d%%", pct)
 		}
 	case dealcheckpoints.Transferred:
-		return "Publishing"
+		return "Ready to Publish"
+	case dealcheckpoints.Published:
+		return "Awaiting Publish Confirmation"
 	case dealcheckpoints.PublishConfirmed:
 		return "Adding to Sector"
 	case dealcheckpoints.AddedPiece:
