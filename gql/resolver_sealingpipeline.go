@@ -47,7 +47,12 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolve
 		return nil, err
 	}
 
-	ssize, err := getSectorSize(ctx, r.fullNode, r.minerAddr)
+	minerAddr, err := r.spApi.ActorAddress(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ssize, err := getSectorSize(ctx, r.fullNode, minerAddr)
 	if err != nil {
 		return nil, err
 	}
