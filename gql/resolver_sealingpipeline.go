@@ -28,7 +28,7 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolve
 			workers = append(workers, &worker{
 				ID: workerId.String(),
 				//JobID: j.ID
-				Start:  graphql.Time{j.Start},
+				Start:  graphql.Time{Time: j.Start},
 				Stage:  j.Task.Short(),
 				Sector: int32(j.Sector.Number),
 			})
