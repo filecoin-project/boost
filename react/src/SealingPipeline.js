@@ -38,36 +38,45 @@ function WaitDeals(props) {
         totalSize += deal.Size
     }
     const free = props.SectorSize - totalSize
+    const haveDeals = props.Deals.length > 0
 
     return <div className="wait-deals">
         <div className="title">Wait Deals</div>
 
         <div className="cumulative-bar-chart">
             <div className="bars">
-                <div className="bar used" style={{width:(totalSize*100n/props.SectorSize)+'%'}}>
-                    <div className="bar-inner"></div>
-                </div>
+                {!haveDeals ? null : (
+                    <div className="bar used" style={{width: (totalSize * 100n / props.SectorSize) + '%'}}>
+                        <div className="bar-inner"></div>
+                    </div>
+                )}
             </div>
             <div className="total">{humanFileSize(props.SectorSize)}</div>
         </div>
 
-        <table>
-            <tbody>
-                {props.Deals.map(deal => (
-                    <tr key={deal.ID}>
-                        <td className="deal-id">
-                            <ShortDealLink id={deal.ID} />
-                        </td>
-                        <td className="deal-size">{humanFileSize(deal.Size)}</td>
-                    </tr>
-                ))}
-                <tr key="free">
-                    <td className="deal-id">Free</td>
-                    <td className="deal-size">{humanFileSize(free)}</td>
-                </tr>
-            </tbody>
-        </table>
+        { haveDeals ? <WaitDealsSizes free={free} deals={props.Deals} /> : (
+            <div className="no-deals">There are no deals in the Wait Deals state</div>
+        )}
     </div>
+}
+
+function WaitDealsSizes(props) {
+    return <table>
+        <tbody>
+            {props.deals.map(deal => (
+                <tr key={deal.ID}>
+                    <td className="deal-id">
+                        <ShortDealLink id={deal.ID} />
+                    </td>
+                    <td className="deal-size">{humanFileSize(deal.Size)}</td>
+                </tr>
+            ))}
+            <tr key="free">
+                <td className="deal-id">Free</td>
+                <td className="deal-size">{humanFileSize(props.free)}</td>
+            </tr>
+        </tbody>
+    </table>
 }
 
 function Sealing(props) {
@@ -116,7 +125,7 @@ function Sealing(props) {
 
         <div className="cumulative-bar-chart">
             <div className="bars">
-                {sectorStates.map((sec, i) => (
+                {sectorStates.map((sec, i) => sec.Count === 0 ? null : (
                     <div
                         key={sec.Name}
                         className={"bar " + sec.className + ' ' + ((i === lastVisibleIndex) ? 'last-visible' : '')}
