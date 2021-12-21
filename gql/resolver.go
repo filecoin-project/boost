@@ -107,6 +107,15 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 	}, nil
 }
 
+func (r *resolver) DealsCount(ctx context.Context) (int32, error) {
+	count, err := r.dealsDB.Count(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return int32(count), nil
+}
+
 // subscription: dealUpdate(id) <-chan Deal
 func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID }) (<-chan *dealResolver, error) {
 	dealUuid, err := toUuid(args.ID)

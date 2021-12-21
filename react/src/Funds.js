@@ -1,10 +1,11 @@
 import {useMutation, useQuery} from "@apollo/react-hooks";
-import {FundsQuery, FundsLogsQuery, FundsMoveToEscrow} from "./gql";
+import {FundsQuery, FundsLogsQuery, FundsMoveToEscrow, SealingPipelineQuery} from "./gql";
 import {useState, React}  from "react";
 import moment from "moment";
-import {humanFIL, max, parseFil} from "./util"
+import {humanFIL, max, parseFil, toFixed} from "./util"
 import {Info} from "./Info"
 import {PageContainer} from "./Components";
+import {Link} from "react-router-dom";
 
 export function FundsPage(props) {
     return (
@@ -262,4 +263,30 @@ function FundsLog(props) {
         <td>{humanFIL(props.log.Amount)}</td>
         <td>{props.log.Text}</td>
     </tr>
+}
+
+export function FundsMenuItem(props) {
+    const {data} = useQuery(FundsQuery, {
+        pollInterval: 5000,
+        fetchPolicy: "network-only",
+    })
+
+    var escrowPct = 0
+    var pubMsgPct = 0
+    if (data) {
+        const funds = data.funds
+        const escrowTotal = funds.Escrow.Tagged + funds.Escrow.Available + funds.Escrow.Locked
+        if (escrowTotal > 0) {
+            escrowPct = Number((escrowTotal - funds.Escrow.Available) * 100n / escrowTotal)
+        }
+        if (funds.PubMsg.Balance > 0) {
+            pubMsgPct = Number(funds.PubMsg.Tagged * 100n / funds.PubMsg.Balance)
+        }
+    }
+
+    return <Link key="funds" className="menu-item" to="/funds">
+        Funds
+        <div className="aux">Escrow: {toFixed(escrowPct, 1)}%</div>
+        <div className="aux">Publish Msg: {toFixed(pubMsgPct, 1)}%</div>
+    </Link>
 }

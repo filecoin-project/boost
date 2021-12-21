@@ -58,7 +58,7 @@ export function humanFIL(atto) {
     return atto + ' atto' // 123 atto
 }
 
-function toFixed(num, fractionDigits) {
+export function toFixed(num, fractionDigits) {
     return num.toFixed(fractionDigits).replace(/\.?0+$/, '')
 }
 

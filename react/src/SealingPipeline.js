@@ -2,10 +2,11 @@ import {useQuery} from "@apollo/react-hooks";
 import {SealingPipelineQuery} from "./gql";
 import React from "react";
 import {humanFileSize} from "./util";
-import {PageContainer, ShortDealID, ShortDealLink} from "./Components";
+import {PageContainer, ShortDealLink} from "./Components";
 import './SealingPipeline.css'
 import {dateFormat} from "./util-date";
 import moment from 'moment';
+import {Link} from "react-router-dom";
 
 export function SealingPipelinePage(props) {
     return <PageContainer pageType="sealing-pipeline" title="Sealing Pipeline">
@@ -79,8 +80,8 @@ function WaitDealsSizes(props) {
     </table>
 }
 
-function Sealing(props) {
-    const sectorStates = [{
+const sectorStates = function(props) {
+    return [{
         Name: 'Add Piece',
         Count: props.AddPiece,
     }, {
@@ -108,11 +109,14 @@ function Sealing(props) {
         Name: 'Finalize Sector',
         Count: props.FinalizeSector,
     }]
+}
 
+function Sealing(props) {
     var total = 0
     var lastVisibleIndex = -1
-    for (let i = 0; i < sectorStates.length; i++) {
-        let sec = sectorStates[i]
+    const states = sectorStates(props)
+    for (let i = 0; i < states.length; i++) {
+        let sec = states[i]
         total += sec.Count
         if (sec.Count > 0) {
             lastVisibleIndex = i
@@ -125,7 +129,7 @@ function Sealing(props) {
 
         <div className="cumulative-bar-chart">
             <div className="bars">
-                {sectorStates.map((sec, i) => sec.Count === 0 ? null : (
+                {states.map((sec, i) => sec.Count === 0 ? null : (
                     <div
                         key={sec.Name}
                         className={"bar " + sec.className + ' ' + ((i === lastVisibleIndex) ? 'last-visible' : '')}
@@ -140,7 +144,7 @@ function Sealing(props) {
 
         <table className="sector-states">
             <tbody>
-            {sectorStates.map(sec => (
+            {states.map(sec => (
                 <tr key={sec.Name}>
                     <td className="color"><div className={sec.className} /></td>
                     <td className="state">{sec.Name}</td>
@@ -174,4 +178,23 @@ function Workers(props) {
             </tbody>
         </table>
     </div>
+}
+
+export function SealingPipelineMenuItem(props) {
+    const {data} = useQuery(SealingPipelineQuery, {
+        pollInterval: 5000,
+        fetchPolicy: "network-only",
+    })
+
+    var total = 0
+    if (data) {
+        for (let sec of sectorStates(data.sealingpipeline.SectorStates)) {
+            total += sec.Count
+        }
+    }
+
+    return <Link key="sealing-pipeline" className="menu-item" to="/sealing-pipeline">
+        Sealing Pipeline
+        <div className="aux">Sealing: {total}</div>
+    </Link>
 }

@@ -169,6 +169,9 @@ type RootQuery {
   """Get all Deals"""
   deals(first: ID, limit: Int): DealList!
 
+  """Get the total number of deals"""
+  dealsCount: Int!
+
   """Get storage space usage"""
   storage: Storage!
 
