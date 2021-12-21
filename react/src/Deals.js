@@ -4,7 +4,7 @@ import moment from "moment";
 import {humanFileSize} from "./util";
 import React, {useEffect, useState} from "react";
 import {DealDetail} from "./DealDetail";
-import {ShortClientAddress, ShortDealID} from "./Components";
+import {PageContainer, ShortClientAddress, ShortDealID} from "./Components";
 
 var dealsPerPage = 10
 
@@ -66,6 +66,12 @@ var newDealsSubscriber
 var dealsPagination
 
 export function StorageDealsPage(props) {
+    return <PageContainer pageType="storage-deals" title="Storage Deals">
+        <StorageDealsContent />
+    </PageContainer>
+}
+
+function StorageDealsContent(props) {
     const [dealToShow, setDealToShow] = useState(null)
     const [deals, setDeals] = useState([])
     const [totalCount, setTotalCount] = useState(0)

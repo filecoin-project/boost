@@ -3,8 +3,15 @@ import {MpoolQuery} from "./gql";
 import {React, useState} from "react";
 import {humanFIL} from "./util";
 import './Mpool.css'
+import {PageContainer} from "./Components";
 
 export function MpoolPage(props) {
+    return <PageContainer pageType="mpool" title="Message Pool">
+        <MpoolContent />
+    </PageContainer>
+}
+
+function MpoolContent(props) {
     const [local, setLocal] = useState(true)
     const {loading, error, data} = useQuery(MpoolQuery, { variables: { local } })
 

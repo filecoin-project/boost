@@ -2,8 +2,15 @@ import {useMutation, useQuery} from "@apollo/react-hooks";
 import {DealPublishNowMutation, DealPublishQuery} from "./gql";
 import React from "react";
 import moment from "moment";
+import {PageContainer} from "./Components";
 
 export function DealPublishPage(props) {
+    return <PageContainer pageType="deal-publish" title="Publish Deals">
+        <DealPublishContent />
+    </PageContainer>
+}
+
+function DealPublishContent() {
     const {loading, error, data} = useQuery(DealPublishQuery)
     const [publishNow] = useMutation(DealPublishNowMutation, {
         refetchQueries: [{ query: DealPublishQuery }]
