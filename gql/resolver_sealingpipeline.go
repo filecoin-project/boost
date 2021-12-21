@@ -88,15 +88,15 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolve
 			Deals:      deals,
 		},
 		SectorStates: sectorStates{
-			AddPiece:       1, //TODO: fixme
-			Packing:        0, //TODO: fixme
+			AddPiece:       int32(summary["AddPiece"]), // TODO: confirm this is correct
+			Packing:        int32(summary["Packing"]),  // TODO: confirm this is correct
 			PreCommit1:     int32(summary["PreCommit1"]),
 			PreCommit2:     int32(summary["PreCommit2"]),
 			PreCommitWait:  int32(summary["PreCommitWait"]),
 			WaitSeed:       int32(summary["WaitSeed"]),
 			Committing:     int32(summary["Committing"]),
 			CommittingWait: int32(summary["CommitWait"]),
-			FinalizeSector: 0, //TODO: fixme
+			FinalizeSector: int32(summary["FinalizeSector"]), // TODO: confirm this is correct
 		},
 		Workers: workers,
 	}, nil
