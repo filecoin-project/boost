@@ -109,12 +109,12 @@ func (p *Provider) loop() {
 			deal := finishedDeal.deal
 			log.Infow("deal finished", "id", deal.DealUuid)
 			errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
-			if errf != nil && errf != db.ErrNotFound {
+			if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
 				log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
 			}
 
 			errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
-			if errs != nil && errf != db.ErrNotFound {
+			if errs != nil && !xerrors.Is(errs, db.ErrNotFound) {
 				log.Errorw("untagging storage", "id", deal.DealUuid, "err", errs)
 			}
 			finishedDeal.done <- struct{}{}

@@ -36,6 +36,11 @@ type dealMakingError struct {
 }
 
 func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
+	// Check if deal is already complete
+	if deal.Checkpoint >= dealcheckpoints.AddedPiece {
+		return
+	}
+
 	// Set up pubsub for deal updates
 	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
 	if err != nil {
