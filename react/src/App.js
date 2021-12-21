@@ -1,8 +1,9 @@
 import './App.css';
 import React from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import {ApolloProvider} from "@apollo/react-hooks";
 import {gqlClient,} from "./gql";
+import {Menu} from "./Menu";
 import {StorageSpacePage} from "./StorageSpace";
 import {FundsPage} from "./Funds";
 import {StorageDealsPage} from "./Deals";
@@ -47,41 +48,6 @@ function AppRoot(props) {
             <App />
         </ApolloProvider>
     );
-}
-
-var pages = [{
-    title: 'Storage Deals',
-    pageType: 'storage-deals',
-}, {
-    title: 'Storage Space',
-    pageType: 'storage-space',
-}, {
-    title: 'Sealing Pipeline',
-    pageType: 'sealing-pipeline',
-}, {
-    title: 'Funds',
-    pageType: 'funds',
-}, {
-    title: 'Publish Deals',
-    pageType: 'deal-publish',
-}, {
-    title: 'Deal Transfers',
-    pageType: 'deal-transfers',
-}, {
-    title: 'Message Pool',
-    pageType: 'mpool',
-}]
-
-function Menu(props) {
-    return (
-        <td className="menu">
-            {pages.map(page => (
-                <Link key={page.pageType} className="menu-item" to={page.pageType}>
-                    {page.title}
-                </Link>
-            ))}
-        </td>
-    )
 }
 
 export default AppRoot;

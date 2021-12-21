@@ -91,6 +91,12 @@ const DealsListQuery = gql`
     }
 `;
 
+const DealsCountQuery = gql`
+    query AppDealCountQuery {
+        dealsCount
+    }
+`;
+
 const DealSubscription = gql`
     subscription AppDealSubscription($id: ID!) {
         dealUpdate(id: $id) {
@@ -299,6 +305,7 @@ const MpoolQuery = gql`
 export {
     gqlClient,
     DealsListQuery,
+    DealsCountQuery,
     DealSubscription,
     DealCancelMutation,
     NewDealsSubscription,

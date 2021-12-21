@@ -1,9 +1,10 @@
 import {useQuery} from "@apollo/react-hooks";
 import {StorageQuery} from "./gql";
 import React from "react";
-import {humanFileSize, addCommas} from "./util";
+import {addCommas, humanFileSize} from "./util";
 import './StorageSpace.css'
 import {PageContainer} from "./Components";
+import {Link} from "react-router-dom";
 
 export function StorageSpacePage(props) {
     return <PageContainer pageType="storage-space" title="Storage Space">
@@ -89,4 +90,31 @@ function StorageSpaceContent(props) {
             </tbody>
         </table>
     </>
+}
+
+export function StorageSpaceMenuItem(props) {
+    const {data} = useQuery(StorageQuery, {
+        pollInterval: 5000,
+        fetchPolicy: 'network-only',
+    })
+
+    var pct = 0
+    if (data) {
+        var storage = data.storage
+
+        var totalSize = 0n
+        totalSize += storage.Staged
+        totalSize += storage.Transferred
+        totalSize += storage.Pending
+        totalSize += storage.Free
+
+        pct = ((totalSize - storage.Free) * 100n) / totalSize
+    }
+
+    return (
+        <Link key="storage-space" className="menu-item" to="/storage-space">
+            Storage Space
+            <div className="aux">Used: {pct.toString()}%</div>
+        </Link>
+    )
 }
