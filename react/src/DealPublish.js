@@ -3,6 +3,7 @@ import {DealPublishNowMutation, DealPublishQuery} from "./gql";
 import React from "react";
 import moment from "moment";
 import {PageContainer, ShortDealLink} from "./Components";
+import {Link} from "react-router-dom";
 
 export function DealPublishPage(props) {
     return <PageContainer pageType="deal-publish" title="Publish Deals">
@@ -11,7 +12,9 @@ export function DealPublishPage(props) {
 }
 
 function DealPublishContent() {
-    const {loading, error, data} = useQuery(DealPublishQuery)
+    const {loading, error, data} = useQuery(DealPublishQuery, {
+        pollInterval: 5000,
+    })
     const [publishNow] = useMutation(DealPublishNowMutation, {
         refetchQueries: [{ query: DealPublishQuery }]
     })
@@ -82,5 +85,21 @@ function DealsTable(props) {
                 </tbody>
             </table>
         </>
+    )
+}
+
+export function DealPublishMenuItem(props) {
+    const {data} = useQuery(DealPublishQuery, {
+        pollInterval: 5000,
+        fetchPolicy: 'network-only',
+    })
+
+    return (
+        <Link key="deal-publish" className="menu-item" to="/deal-publish">
+            Publish Deals
+            {data && data.dealPublish.Deals ? (
+                <div className="aux">Ready: {data.dealPublish.Deals.length}</div>
+            ) : null}
+        </Link>
     )
 }

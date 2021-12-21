@@ -74,8 +74,14 @@ body.modal-open {
 .menu .menu-item {
   display: block;
   color: #a61e4d;
-  margin: 0.5em;
+  margin: 1.5em 0.5em;
   cursor: pointer;
+}
+
+.menu .menu-item .aux {
+  font-size: 0.8em;
+  color: #999;
+  padding-top: 0.25em;
 }
 
 .page-content {

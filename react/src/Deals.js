@@ -1,9 +1,10 @@
-import {useSubscription} from "@apollo/react-hooks";
-import {DealsListQuery, DealSubscription, gqlClient, NewDealsSubscription} from "./gql";
+import {useQuery, useSubscription} from "@apollo/react-hooks";
+import {DealsCountQuery, DealsListQuery, DealSubscription, gqlClient, NewDealsSubscription} from "./gql";
 import moment from "moment";
 import {humanFileSize} from "./util";
 import React, {useEffect, useState} from "react";
 import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
+import {Link} from "react-router-dom";
 
 var dealsPerPage = 10
 
@@ -252,4 +253,18 @@ class DealsPagination {
 
 function uniqDeals(deals) {
     return new Array(...new Map(deals.map(el => [el.ID, el])).values())
+}
+
+export function StorageDealsMenuItem(props) {
+    const {data} = useQuery(DealsCountQuery, {
+        pollInterval: 5000,
+        fetchPolicy: 'network-only',
+    })
+
+    return (
+        <Link key="storage-deals" className="menu-item" to="/storage-deals">
+            Storage Deals
+            {data && data.dealsCount ? <div className="aux">Total: {data.dealsCount}</div> : null}
+        </Link>
+    )
 }
