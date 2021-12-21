@@ -3,7 +3,6 @@ package gql
 import (
 	"context"
 
-	"github.com/davecgh/go-spew/spew"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/api"
@@ -18,8 +17,6 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolve
 	if err != nil {
 		return nil, err
 	}
-
-	spew.Dump(res)
 
 	var workers []*worker
 
