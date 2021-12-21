@@ -116,15 +116,6 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 
 	net := make(chan *dealResolver, 1)
 
-	dealUpdatesSub, err := r.provider.SubscribeDealUpdates(dealUuid)
-	if err != nil {
-		if xerrors.Is(err, storagemarket.ErrDealHandlerNotFound) {
-			close(net)
-			return net, nil
-		}
-		return nil, xerrors.Errorf("%s: subscribing to deal updates: %w", args.ID, err)
-	}
-
 	// Send an update to the client with the initial state
 	deal, err := r.dealByID(ctx, dealUuid)
 	if err != nil {
@@ -139,6 +130,14 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 
 	// Updates to deal state are broadcast on pubsub. Pipe these updates to the
 	// client
+	dealUpdatesSub, err := r.provider.SubscribeDealUpdates(dealUuid)
+	if err != nil {
+		if xerrors.Is(err, storagemarket.ErrDealHandlerNotFound) {
+			close(net)
+			return net, nil
+		}
+		return nil, xerrors.Errorf("%s: subscribing to deal updates: %w", args.ID, err)
+	}
 	sub := &subLastUpdate{sub: dealUpdatesSub, dealsDB: r.dealsDB}
 	go sub.Pipe(ctx, net)
 
