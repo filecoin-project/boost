@@ -7,6 +7,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -14,6 +15,7 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
+	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/event"
 	"golang.org/x/xerrors"
 )
@@ -32,16 +34,18 @@ type resolver struct {
 	storageMgr *storagemanager.StorageManager
 	provider   *storagemarket.Provider
 	publisher  *storagemarket.DealPublisher
+	spApi      sealingpipeline.State
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.State, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		dealsDB:    dealsDB,
 		fundMgr:    fundMgr,
 		storageMgr: storageMgr,
 		provider:   provider,
 		publisher:  publisher,
+		spApi:      spApi,
 		fullNode:   fullNode,
 	}
 }
@@ -194,6 +198,17 @@ func (r *resolver) DealCancel(_ context.Context, args struct{ ID graphql.ID }) (
 
 func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
 	deal, err := r.dealsDB.ByID(ctx, dealUuid)
+	if err != nil {
+		return nil, err
+	}
+
+	deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
+
+	return deal, nil
+}
+
+func (r *resolver) dealByPublishCID(ctx context.Context, publishCid *cid.Cid) (*types.ProviderDealState, error) {
+	deal, err := r.dealsDB.ByPublishCID(ctx, publishCid.String())
 	if err != nil {
 		return nil, err
 	}

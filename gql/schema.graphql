@@ -71,6 +71,41 @@ type Storage {
   MountPoint: String!
 }
 
+type WaitDeal {
+  ID: ID!
+  Size: Uint64!
+}
+
+type WaitDeals {
+  SectorSize: Uint64!
+  Deals: [WaitDeal]!
+}
+
+type SectorStates {
+  AddPiece: Int!
+  Packing: Int!
+  PreCommit1: Int!
+  PreCommit2: Int!
+  PreCommitWait: Int!
+  WaitSeed: Int!
+  Committing: Int!
+  CommittingWait: Int!
+  FinalizeSector: Int!
+}
+
+type Worker {
+  ID: String!
+  Start: Time!
+  Stage: String!
+  Sector: Int!
+}
+
+type SealingPipeline {
+  WaitDeals: WaitDeals!
+  SectorStates: SectorStates!
+  Workers: [Worker]!
+}
+
 type FundsEscrow {
   Available: BigInt!
   Locked: BigInt!
@@ -136,6 +171,9 @@ type RootQuery {
 
   """Get storage space usage"""
   storage: Storage!
+
+  """Get sealing pipeline state"""
+  sealingpipeline: SealingPipeline!
 
   """Get funds available"""
   funds: Funds!

@@ -177,6 +177,37 @@ const StorageQuery = gql`
     }
 `;
 
+const SealingPipelineQuery = gql`
+    query AppSealingPipelineQuery {
+        sealingpipeline {
+            WaitDeals {
+                SectorSize
+                Deals {
+                    ID
+                    Size
+                }
+            }
+            SectorStates {
+                AddPiece
+                Packing
+                PreCommit1
+                PreCommit2
+                PreCommitWait
+                WaitSeed
+                Committing
+                CommittingWait
+                FinalizeSector
+            }
+            Workers {
+                ID
+                Start
+                Stage
+                Sector
+            }
+        }
+    }
+`;
+
 const FundsQuery = gql`
     query AppFundsQuery {
         funds {
@@ -279,4 +310,5 @@ export {
     FundsMoveToEscrow,
     TransfersQuery,
     MpoolQuery,
+    SealingPipelineQuery,
 }

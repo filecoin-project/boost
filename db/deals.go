@@ -192,6 +192,12 @@ func (d *DealsDB) ByID(ctx context.Context, id uuid.UUID) (*types.ProviderDealSt
 	return d.scanRow(row)
 }
 
+func (d *DealsDB) ByPublishCID(ctx context.Context, publishCid string) (*types.ProviderDealState, error) {
+	qry := "SELECT " + dealFieldsStr + " FROM Deals WHERE PublishCID=?"
+	row := d.db.QueryRowContext(ctx, qry, publishCid)
+	return d.scanRow(row)
+}
+
 func (d *DealsDB) Count(ctx context.Context) (int, error) {
 	var count int
 	row := d.db.QueryRowContext(ctx, "SELECT count(*) FROM Deals")

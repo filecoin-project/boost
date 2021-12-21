@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/filestore"
 	"github.com/filecoin-project/boost/fundmanager"
+	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -59,6 +60,9 @@ type Provider struct {
 	finishedDealChan  chan finishedDealReq
 	publishedDealChan chan publishDealReq
 
+	// Sealing Pipeline API
+	sps sealingpipeline.State
+
 	// Database API
 	db      *sql.DB
 	dealsDB *db.DealsDB
@@ -74,7 +78,7 @@ type Provider struct {
 	dhs   map[uuid.UUID]*dealHandler
 }
 
-func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address, secb *sectorblocks.SectorBlocks) (*Provider, error) {
+func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address, secb *sectorblocks.SectorBlocks, sps sealingpipeline.State) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -97,6 +101,7 @@ func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *f
 		fs:        fs,
 		db:        sqldb,
 		dealsDB:   dealsDB,
+		sps:       sps,
 
 		acceptDealChan:    make(chan acceptDealReq),
 		finishedDealChan:  make(chan finishedDealReq),

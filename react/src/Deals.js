@@ -3,7 +3,7 @@ import {DealsListQuery, DealSubscription, gqlClient, NewDealsSubscription} from 
 import moment from "moment";
 import {humanFileSize} from "./util";
 import React, {useEffect, useState} from "react";
-import {DealDetail} from "./DealDetail";
+import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
 
 var dealsPerPage = 10
 
@@ -65,7 +65,12 @@ var newDealsSubscriber
 var dealsPagination
 
 export function StorageDealsPage(props) {
-    const [dealToShow, setDealToShow] = useState(null)
+    return <PageContainer pageType="storage-deals" title="Storage Deals">
+        <StorageDealsContent />
+    </PageContainer>
+}
+
+function StorageDealsContent(props) {
     const [deals, setDeals] = useState([])
     const [totalCount, setTotalCount] = useState(0)
     const [pageNum, setPageNum] = useState(1)
@@ -142,11 +147,6 @@ export function StorageDealsPage(props) {
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error.message}</div>;
 
-    var dealDetail
-    if (dealToShow) {
-        dealDetail = deals.find(dl => dl.ID === dealToShow)
-    }
-
     var totalPages = Math.ceil(totalCount / dealsPerPage)
 
     return <div className="deals">
@@ -161,7 +161,7 @@ export function StorageDealsPage(props) {
             </tr>
 
             {deals.map(deal => (
-                <DealRow key={deal.ID} deal={deal} onDealRowClick={setDealToShow}/>
+                <DealRow key={deal.ID} deal={deal} />
             ))}
             </tbody>
         </table>
@@ -174,12 +174,6 @@ export function StorageDealsPage(props) {
                 <div className="total">{totalCount} deals</div>
             </div>
         </div>
-
-        {dealDetail && (
-            <div id="deal-detail">
-                <DealDetail key={dealDetail.ID} deal={dealDetail} onCloseClick={() => setDealToShow("")}/>
-            </div>
-        )}
     </div>
 }
 
@@ -207,8 +201,8 @@ function DealRow(props) {
     return (
         <tr>
             <td className="start">{start}</td>
-            <td className="deal-id" onClick={() => props.onDealRowClick(deal.ID)}>
-                <ShortDealID id={deal.ID} />
+            <td className="deal-id">
+                <ShortDealLink id={deal.ID} />
             </td>
             <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
             <td className="client">
@@ -217,16 +211,6 @@ function DealRow(props) {
             <td className="message">{deal.Message}</td>
         </tr>
     )
-}
-
-function ShortDealID(props) {
-    const shortId = props.id.substring(0, 8)+'…'
-    return <div>{shortId}</div>
-}
-
-function ShortClientAddress(props) {
-    const shortAddr = props.address.substring(0, 8)+'…'
-    return <div>{shortAddr}</div>
 }
 
 class DealsPagination {

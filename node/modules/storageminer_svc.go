@@ -10,6 +10,7 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node/modules/helpers"
+	"github.com/filecoin-project/boost/sealingpipeline"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	lclient "github.com/filecoin-project/lotus/api/client"
@@ -20,6 +21,8 @@ type MinerSealingService lapi.StorageMiner
 type MinerStorageService lapi.StorageMiner
 
 var _ sectorblocks.SectorBuilder = *new(MinerSealingService)
+
+var _ sealingpipeline.State = *new(MinerSealingService)
 
 func connectMinerService(apiInfo string) func(mctx helpers.MetricsCtx, lc fx.Lifecycle) (lapi.StorageMiner, error) {
 	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle) (lapi.StorageMiner, error) {

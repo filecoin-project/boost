@@ -1,28 +1,43 @@
 import './App.css';
-import React, {useState} from 'react';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import {ApolloProvider} from "@apollo/react-hooks";
 import {gqlClient,} from "./gql";
 import {StorageSpacePage} from "./StorageSpace";
 import {FundsPage} from "./Funds";
 import {StorageDealsPage} from "./Deals";
+import {SealingPipelinePage} from "./SealingPipeline";
 import {DealPublishPage} from "./DealPublish";
 import {DealTransfersPage} from "./DealTransfers"
 import {MpoolPage} from "./Mpool";
+import {DealDetail} from "./DealDetail";
 
 function App(props) {
-    const [pageToShow, setPageToShow] = useState('storage-deals');
-
     return (
-        <div id="content">
-            <table className="content-table">
-                <tbody>
-                <tr>
-                    <Menu pages={pages} pageToShow={pageToShow} onMenuItemClick={setPageToShow} />
-                    <Pages pages={pages} pageToShow={pageToShow} />
-                </tr>
-                </tbody>
-            </table>
-        </div>
+        <BrowserRouter>
+            <div id="content">
+                <table className="content-table">
+                    <tbody>
+                        <tr>
+                            <Menu />
+                            <td className="page-content">
+                                <Routes>
+                                    <Route path="/storage-deals" element={<StorageDealsPage />} />
+                                    <Route path="/storage-space" element={<StorageSpacePage />} />
+                                    <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
+                                    <Route path="/funds" element={<FundsPage />} />
+                                    <Route path="/deal-publish" element={<DealPublishPage />} />
+                                    <Route path="/deal-transfers" element={<DealTransfersPage />} />
+                                    <Route path="/mpool" element={<MpoolPage />} />
+                                    <Route path="/deals/:dealID" element={<DealDetail />} />
+                                    <Route path="/" element={<StorageDealsPage />} />
+                                </Routes>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </BrowserRouter>
     )
 }
 
@@ -34,71 +49,39 @@ function AppRoot(props) {
     );
 }
 
+var pages = [{
+    title: 'Storage Deals',
+    pageType: 'storage-deals',
+}, {
+    title: 'Storage Space',
+    pageType: 'storage-space',
+}, {
+    title: 'Sealing Pipeline',
+    pageType: 'sealing-pipeline',
+}, {
+    title: 'Funds',
+    pageType: 'funds',
+}, {
+    title: 'Publish Deals',
+    pageType: 'deal-publish',
+}, {
+    title: 'Deal Transfers',
+    pageType: 'deal-transfers',
+}, {
+    title: 'Message Pool',
+    pageType: 'mpool',
+}]
+
 function Menu(props) {
     return (
         <td className="menu">
-            {props.pages.map(page => (
-                <div key={page.pageType} className="menu-item" onClick={() => props.onMenuItemClick(page.pageType)}>
+            {pages.map(page => (
+                <Link key={page.pageType} className="menu-item" to={page.pageType}>
                     {page.title}
-                </div>
+                </Link>
             ))}
         </td>
     )
-}
-
-var pages = [{
-        title: 'Storage Deals',
-        pageType: 'storage-deals',
-    }, {
-        title: 'Storage Space',
-        pageType: 'storage-space',
-    }, {
-        title: 'Funds',
-        pageType: 'funds',
-    }, {
-        title: 'Deal Publish',
-        pageType: 'deal-publish',
-    }, {
-        title: 'Deal Transfers',
-        pageType: 'deal-transfers',
-    }, {
-        title: 'Message Pool',
-        pageType: 'mpool',
-    }
-]
-
-class Pages extends React.Component {
-    render() {
-        const pageType = this.props.pageToShow
-        const page = this.props.pages.find(p => p.pageType === pageType)
-
-        return (
-            <td className="page-content">
-                <div id={pageType}>
-                    <div className="page-title">{page.title}</div>
-                    <div className="page-content">{this.renderPage(page)}</div>
-                </div>
-            </td>)
-    }
-
-    renderPage(page) {
-        switch (page.pageType) {
-            case 'storage-deals':
-                return <StorageDealsPage key={page.pageType} />
-            case 'storage-space':
-                return <StorageSpacePage key={page.pageType} />
-            case 'funds':
-                return <FundsPage key={page.pageType} />
-            case 'deal-publish':
-                return <DealPublishPage key={page.pageType} />
-            case 'deal-transfers':
-                return <DealTransfersPage key={page.pageType} />
-            case 'mpool':
-                return <MpoolPage key={page.pageType} />
-            default:
-                throw new Error("unrecognized page type " + page.pageType)
-        }
-    }
 }
 
 export default AppRoot;

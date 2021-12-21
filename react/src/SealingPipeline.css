@@ -1,0 +1,144 @@
+.sealing-pipeline .title {
+    font-size: 1.2em;
+    padding: 1em;
+    margin-top: 1em;
+    color: #a61e4d;
+}
+
+.sealing-pipeline .cumulative-bar-chart {
+    padding-left: 1em;
+}
+
+.sealing-pipeline .cumulative-bar-chart .bars {
+    display: inline-block;
+    height: 2em;
+    width: 60%;
+    border: 1px solid #000;
+}
+
+.sealing-pipeline .cumulative-bar-chart .bars .bar {
+    height: 100%;
+    display: inline-block;
+    background-image: repeating-linear-gradient(
+            135deg,
+            #fff,
+            #fff 5px,
+            transparent 5px,
+            transparent 6px);
+}
+
+.sealing-pipeline .cumulative-bar-chart .bars .bar .bar-inner {
+    height: 100%;
+    border-right: 1px solid #000;
+}
+
+.sealing-pipeline .cumulative-bar-chart .bars .bar.last-visible .bar-inner {
+    border: none;
+}
+
+.sealing-pipeline .cumulative-bar-chart .total {
+    display: inline-block;
+    padding: 0 1em;
+    line-height: 2em;
+    vertical-align: top;
+}
+
+.sealing-pipeline table {
+    font-size: 1em;
+    width: 100%;
+}
+
+.sealing-pipeline td, .sealing-pipeline th {
+    text-align: left;
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
+
+.sealing-pipeline td.deal-id {
+    width: 6em;
+}
+
+.sealing-pipeline td.deal-id .short-deal-id {
+    cursor: pointer;
+    color: #465298;
+}
+
+.sealing-pipeline td.color {
+    width: 1em;
+    padding-right: 0;
+}
+
+.sealing-pipeline td.color > div {
+    height: 1em;
+    border: 1px solid #000;
+    background-image: repeating-linear-gradient(
+            135deg,
+            #fff,
+            #fff 3px,
+            transparent 3px,
+            transparent 4px);
+}
+
+.sealing-pipeline td.state {
+    width: 8em;
+}
+
+.sealing-pipeline th.start, .sealing-pipeline td.start {
+    width: 5em;
+}
+
+.sealing-pipeline th.worker-id, .sealing-pipeline td.worker-id {
+    width: 3em;
+}
+
+.sealing-pipeline th.stage, .sealing-pipeline td.stage {
+    width: 4em;
+}
+
+.sealing-pipeline th.sector, .sealing-pipeline td.sector {
+    width: 3em;
+}
+
+.sealing-pipeline .used {
+    background-color: #465298;
+}
+
+.sealing-pipeline .Add_Piece {
+    background-color: #465298;
+}
+
+.sealing-pipeline .Wait_Seed {
+    background-color: #fd7e14;
+}
+
+.sealing-pipeline .Pre-committing {
+    background-color: #61dafb;
+}
+
+.sealing-pipeline .Packing {
+    background-color: #e64980;
+}
+
+.sealing-pipeline .Pre-commit_1 {
+    background-color: #82c91e;
+}
+
+.sealing-pipeline .Pre-commit_2 {
+    background-color: #a61e4d;
+}
+
+.sealing-pipeline .Pre-commit_Wait {
+    background-color: #465298;
+}
+
+.sealing-pipeline .Committing {
+    background-color: #228be6;
+}
+
+.sealing-pipeline .Committing_Wait {
+    background-color: #40c057;
+}
+
+.sealing-pipeline .Finalize_Sector {
+    background-color: #be4bdb;
+}
