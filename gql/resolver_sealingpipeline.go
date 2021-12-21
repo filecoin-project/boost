@@ -116,13 +116,12 @@ type waitDeals struct {
 
 type sectorStates struct {
 	AddPiece       int32
-	Committing     int32
-	WaitSeed       int32
-	PreCommitting  int32
 	Packing        int32
 	PreCommit1     int32
 	PreCommit2     int32
+	WaitSeed       int32
 	PreCommitWait  int32
+	Committing     int32
 	CommittingWait int32
 	FinalizeSector int32
 }

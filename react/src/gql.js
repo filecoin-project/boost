@@ -189,12 +189,11 @@ const SealingPipelineQuery = gql`
             }
             SectorStates {
                 AddPiece
-                WaitSeed
-                PreCommitting
                 Packing
                 PreCommit1
                 PreCommit2
                 PreCommitWait
+                WaitSeed
                 Committing
                 CommittingWait
                 FinalizeSector

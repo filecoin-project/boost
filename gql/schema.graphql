@@ -83,12 +83,11 @@ type WaitDeals {
 
 type SectorStates {
   AddPiece: Int!
-  WaitSeed: Int!
-  PreCommitting: Int!
   Packing: Int!
   PreCommit1: Int!
   PreCommit2: Int!
   PreCommitWait: Int!
+  WaitSeed: Int!
   Committing: Int!
   CommittingWait: Int!
   FinalizeSector: Int!

@@ -75,12 +75,6 @@ function Sealing(props) {
         Name: 'Add Piece',
         Count: props.AddPiece,
     }, {
-        Name: 'Wait Seed',
-        Count: props.WaitSeed,
-    }, {
-        Name: 'Pre-committing',
-        Count: props.PreCommitting,
-    }, {
         Name: 'Packing',
         Count: props.Packing,
     }, {
@@ -92,6 +86,9 @@ function Sealing(props) {
     }, {
         Name: 'Pre-commit Wait',
         Count: props.PreCommitWait,
+    }, {
+        Name: 'Wait Seed',
+        Count: props.WaitSeed,
     }, {
         Name: 'Committing',
         Count: props.Committing,
