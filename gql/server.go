@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path"
 	"path/filepath"
 	"runtime"
 
@@ -30,14 +31,15 @@ func NewServer(resolver *resolver) *Server {
 func (s *Server) Serve(ctx context.Context) error {
 	log.Info("graphql server: starting")
 
-	// Serve react app
-	path := "/"
-	directory := "react/build"
-	http.Handle(path, http.StripPrefix(path, http.FileServer(http.Dir(directory))))
+	// Get the absolute path to the directory that this go file is in
+	_, goFilePath, _, ok := runtime.Caller(0)
+	goFileDir := filepath.Dir(goFilePath)
 
-	spath := "/static/"
-	sdirectory := "react/build/static"
-	http.Handle(spath, http.StripPrefix(spath, http.FileServer(http.Dir(sdirectory))))
+	// Serve react app
+	urlPath := "/"
+	directory := "react/build"
+	reactDir := path.Clean(filepath.Join(goFileDir, "..", directory))
+	http.Handle(urlPath, http.StripPrefix(urlPath, http.FileServer(http.Dir(reactDir))))
 
 	// Serve dummy deals
 	err := serveDummyDeals()
@@ -49,11 +51,10 @@ func (s *Server) Serve(ctx context.Context) error {
 	http.HandleFunc("/graphiql", graphiql(httpPort))
 
 	// Init graphQL schema
-	_, currentDir, _, ok := runtime.Caller(0)
 	if !ok {
 		return fmt.Errorf("couldnt call runtime.Caller")
 	}
-	fpath := filepath.Join(filepath.Dir(currentDir), "schema.graphql")
+	fpath := filepath.Join(goFileDir, "schema.graphql")
 
 	schemaText, err := ioutil.ReadFile(fpath)
 	if err != nil {

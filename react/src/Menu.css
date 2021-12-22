@@ -1,0 +1,55 @@
+.menu {
+    vertical-align: top;
+    white-space: nowrap;
+    width: 10em;
+}
+
+.menu .menu-item {
+    display: block;
+    background-color: #fff;
+    color: #12263f;
+    border: 1px solid #edf2f9;
+    box-shadow: 0 .75rem 1.5rem rgba(18,38,63,.1);
+    margin: 1.5em 0.5em;
+    padding: 1em;
+    border-radius: 0.25em;
+    cursor: pointer;
+}
+.menu .menu-item:first-child {
+    margin-top: 1em;
+}
+
+.menu .menu-item .icon {
+    display: inline-block;
+    vertical-align: text-top;
+    width: 1em;
+    height: 1em;
+    padding-right: 0.5em;
+}
+
+.menu .menu-item h3 {
+    display: inline-block;
+    vertical-align: text-top;
+    margin: 0;
+    font-weight: normal;
+    font-size: 1em;
+    color: #3b506c;
+}
+
+.menu .menu-item .menu-desc {
+    font-size: 1em;
+    padding-top: 0.5em;
+    margin-left: 1.55em;
+    color: #999;
+}
+
+.menu .menu-item .menu-desc .title {
+    margin: 0.5em 0 0.25em 0;
+    font-size: 0.8em;
+    color: #777;
+}
+
+.menu .menu-item .menu-desc b {
+    font-weight: normal;
+    color: #12263f;
+}

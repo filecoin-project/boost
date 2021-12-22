@@ -1,11 +1,15 @@
+/* global BigInt */
 import {useMutation, useQuery} from "@apollo/react-hooks";
-import {FundsQuery, FundsLogsQuery, FundsMoveToEscrow, SealingPipelineQuery} from "./gql";
+import {FundsQuery, FundsLogsQuery, FundsMoveToEscrow} from "./gql";
 import {useState, React}  from "react";
 import moment from "moment";
-import {humanFIL, max, parseFil, toFixed} from "./util"
+import {humanFIL, humanFileSize, max, parseFil, toFixed} from "./util"
 import {Info} from "./Info"
-import {PageContainer} from "./Components";
+import {PageContainer, ShortDealLink} from "./Components";
 import {Link} from "react-router-dom";
+import coinImg from './bootstrap-icons/icons/coin.svg'
+import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
+import './Funds.css'
 
 export function FundsPage(props) {
     return (
@@ -28,157 +32,143 @@ function FundsChart(props) {
 
     const funds = data.funds
     const collatBalance = funds.Collateral.Balance
-    const escrow = {
-        tagged: funds.Escrow.Tagged,
-        available: funds.Escrow.Available,
-        locked: funds.Escrow.Locked,
+
+    const total = {
+        collatBalance: funds.Collateral.Balance,
+        escrow: funds.Escrow.Tagged + funds.Escrow.Available + funds.Escrow.Locked,
+        pubMsg: funds.PubMsg.Balance,
     }
-    escrow.total = escrow.tagged + escrow.available + escrow.locked
-
-    const pubMsg = {
-        tagged: funds.PubMsg.Tagged,
-        total: funds.PubMsg.Balance,
-    }
-    pubMsg.available = pubMsg.total - pubMsg.tagged
-
-    const amtMax = max(collatBalance, escrow.total, pubMsg.total)
-    const collatBarPct = toPercentage(collatBalance, amtMax)
-
-    const escrowBar = {
-        tagged: toPercentage(escrow.tagged, amtMax) - 1,
-        available: toPercentage(escrow.available, amtMax) -1,
-        locked: toPercentage(escrow.locked, amtMax) - 1,
-        unit: toPercentage(escrow.total, amtMax) - 1,
-    }
-
-    const pubMsgBar = {
-        tagged: toPercentage(pubMsg.tagged, pubMsg.total) - 1,
-        available: toPercentage(pubMsg.available, pubMsg.total) - 1,
-        unit: toPercentage(pubMsg.total, amtMax),
-    }
-
-    // Use 60% of the space for displaying the bar, and the rest for
-    // displaying the bar-total (the amount at the end of the bar)
-    const barSpaceRatio = 0.6
+    const amtMax = max(total.collatBalance, total.escrow, total.pubMsg)
 
     return <div className="chart">
         <div className="amounts">
-            <div className="collateral-source">
-                <div className="title">
-                    Collateral Source Wallet
-                    <Info>
-                        The Storage Provider must have sufficient collateral in escrow for each
-                        storage deal.<br/>
-                        <br/>
-                        When the deal is published, the network checks whether there is enough
-                        collateral in escrow.<br/>
-                        <br/>
-                        The Collateral Source Wallet is the wallet from which funds
-                        are moved to escrow.
-                    </Info>
-                </div>
-                <WalletAddress address={funds.Collateral.Address} />
-                <div className="bar-content">
-                    <div className="bar" style={{ width: barSpaceRatio*collatBarPct+'%'}}>
-                        <div className="collat"></div>
-                    </div>
-                    <div className="bar-total">{humanFIL(collatBalance)}</div>
-                </div>
-            </div>
-
-            <div className="escrow">
-                <div className="title">
-                    Collateral in Escrow
-                    <Info>
-                        The Storage Provider must have sufficient collateral in escrow for each
-                        storage deal.<br/>
-                        <br/>
-                        When a deal is accepted, the collateral for the deal is "tagged". Those
-                        funds cannot be used as collateral for another deal.<br/>
-                        <br/>
-                        When a deal is published, there must be enough funds in escrow to cover
-                        the collateral for the deal. On publish, the tagged funds are moved on
-                        chain from "Available" to "Locked" until the deal is complete.<br/>
-                    </Info>
-                </div>
-                <div className="bar-content">
-                    <div className="bar" style={{ width: barSpaceRatio*escrowBar.unit+'%'}}>
-                        <div className="tagged" style={{width: escrowBar.tagged + '%'}} />
-                        { escrow.available ? (
-                            <div className="available" style={{width: escrowBar.available + '%'}} />
-                        ) : null }
-                        { escrow.locked ? (
-                            <div className="locked" style={{width: escrowBar.locked + '%'}} />
-                        ) : null }
-                    </div>
-
-                    <div className="bar-total">{humanFIL(escrow.total)}</div>
-
-                    <div className="labels">
-                        <div className="label tagged">
-                            <div className="bar-color"></div>
-                            <div className="text">Tagged</div>
-                            <div className="amount">{humanFIL(escrow.tagged)}</div>
-                        </div>
-                        <div className="label available">
-                            <div className="bar-color"></div>
-                            <div className="text">Available</div>
-                            <div className="amount">{humanFIL(escrow.available)}</div>
-                        </div>
-                        { escrow.locked ? (
-                            <div className="label locked">
-                                <div className="bar-color"></div>
-                                <div className="text">Locked</div>
-                                <div className="amount">{humanFIL(escrow.locked)}</div>
-                            </div>
-                        ) : null }
-                    </div>
-                </div>
-            </div>
-
-            <div className="pubmsg-wallet">
-                <div className="title">
-                    Publish Storage Deals Wallet
-                    <Info>
-                        The Publish Storage Deals Wallet is used to pay the gas cost
-                        for sending the Publish Storage Deals message on chain.
-                    </Info>
-                </div>
-                <WalletAddress address={funds.PubMsg.Address} />
-                <div className="bar-content">
-                    <div className="bar" style={{ width: barSpaceRatio*pubMsgBar.unit+'%'}} />
-                    <div className="bar-total">{humanFIL(pubMsg.total)}</div>
-
-                    <div className="labels">
-                        <div className="label tagged">
-                            <div className="bar-color"></div>
-                            <div className="text">Tagged</div>
-                            <div className="amount">{humanFIL(pubMsg.tagged)}</div>
-                        </div>
-                        { pubMsg.available ? (
-                            <div className="label available">
-                                <div className="bar-color"></div>
-                                <div className="text">Available</div>
-                                <div className="amount">{humanFIL(pubMsg.available)}</div>
-                            </div>
-                        ) : null }
-                    </div>
-                </div>
-            </div>
+            <CollateralSource collateral={funds.Collateral} amtMax={amtMax} />
+            <FundsEscrow escrow={funds.Escrow} amtMax={amtMax} />
+            <PubMsgWallet pubMsg={funds.PubMsg} address={funds.PubMsg.Address} amtMax={amtMax} />
         </div>
 
         <TopupCollateral maxTopup={collatBalance} />
     </div>
 }
 
+function CollateralSource(props) {
+    const barPct = toPercentage(props.collateral.Balance, props.amtMax)
+
+    const bars = [{
+        className: 'balance',
+        amount: props.collateral.Balance,
+    }]
+
+    return <div className="collateral-source">
+        <div className="title">
+            Collateral Source Wallet
+            <Info>
+                The Storage Provider must have sufficient collateral in escrow for each
+                storage deal.<br/>
+                <br/>
+                When the deal is published, the network checks whether there is enough
+                collateral in escrow.<br/>
+                <br/>
+                The Collateral Source Wallet is the wallet from which funds
+                are moved to escrow.
+            </Info>
+        </div>
+        <WalletAddress address={props.collateral.Address} />
+        <div className="bar-limit" style={{width: barPct + '%'}}>
+            <CumulativeBarChart bars={bars} unit="attoFIL" />
+        </div>
+    </div>
+
+}
+
+function FundsEscrow(props) {
+    const escrow = props.escrow
+    const bars = [{
+        name: 'Tagged',
+        className: 'tagged',
+        amount: escrow.Tagged,
+    }, {
+        name: 'Available',
+        className: 'available',
+        amount: escrow.Available,
+    }, {
+        name: 'Locked',
+        className: 'locked',
+        amount: escrow.Locked,
+    }]
+
+    var total = 0n
+    for (const bar of bars) {
+        total += bar.amount
+    }
+    const barPct = toPercentage(total, props.amtMax)
+
+    return <div className="escrow">
+        <div className="title">
+            Collateral in Escrow
+            <Info>
+                The Storage Provider must have sufficient collateral in escrow for each
+                storage deal.<br/>
+                <br/>
+                When a deal is accepted, the collateral for the deal is "tagged". Those
+                funds cannot be used as collateral for another deal.<br/>
+                <br/>
+                When a deal is published, there must be enough funds in escrow to cover
+                the collateral for the deal. On publish, the tagged funds are moved on
+                chain from "Available" to "Locked" until the deal is complete.<br/>
+            </Info>
+        </div>
+
+        <div className="bar-content">
+            <div className="bar-limit" style={{width: barPct + '%'}}>
+                <CumulativeBarChart bars={bars} unit="attoFIL" />
+            </div>
+            <CumulativeBarLabels bars={bars} unit="attoFIL" />
+        </div>
+    </div>
+}
+
+function PubMsgWallet(props) {
+    const pubMsg = props.pubMsg
+
+    const bars = [{
+        name: 'Tagged',
+        className: 'tagged',
+        amount: pubMsg.Tagged,
+    }, {
+        name: 'Available',
+        className: 'available',
+        amount: pubMsg.Balance - pubMsg.Tagged,
+    }]
+    const barPct = toPercentage(pubMsg.Balance, props.amtMax)
+
+    return <div className="pubmsg-wallet">
+        <div className="title">
+            Publish Storage Deals Wallet
+            <Info>
+                The Publish Storage Deals Wallet is used to pay the gas cost
+                for sending the Publish Storage Deals message on chain.
+            </Info>
+        </div>
+        <WalletAddress address={props.address} />
+        <div className="bar-content">
+            <div className="bar-limit" style={{width: barPct + '%'}}>
+                <CumulativeBarChart bars={bars} unit="attoFIL" />
+            </div>
+            <CumulativeBarLabels bars={bars} unit="attoFIL" />
+        </div>
+    </div>
+
+}
+
 function toPercentage(num, denom) {
-    return Math.floor(Number(1000n * num / denom) / 10)
+    return Math.floor(Number(1000n * BigInt(num) / BigInt(denom)) / 10)
 }
 
 function WalletAddress(props) {
     const shortAddr = props.address.substring(0, 8)+'…'+props.address.substring(props.address.length-8)
     return <div className="wallet-address">
-        <a href={"https://filfox.info/en/address/"+props.address}>
+        <a href={"https://filfox.info/en/address/"+props.address} target="_blank" rel="noreferrer">
             {shortAddr}
         </a>
     </div>
@@ -259,7 +249,7 @@ function FundsLogs(props) {
 function FundsLog(props) {
     return <tr>
         <td>{moment(props.log.CreatedAt).fromNow()}</td>
-        <td>{props.log.DealUUID}</td>
+        <td><ShortDealLink id={props.log.DealUUID} /></td>
         <td>{humanFIL(props.log.Amount)}</td>
         <td>{props.log.Text}</td>
     </tr>
@@ -271,22 +261,58 @@ export function FundsMenuItem(props) {
         fetchPolicy: "network-only",
     })
 
-    var escrowPct = 0
-    var pubMsgPct = 0
-    if (data) {
-        const funds = data.funds
-        const escrowTotal = funds.Escrow.Tagged + funds.Escrow.Available + funds.Escrow.Locked
-        if (escrowTotal > 0) {
-            escrowPct = Number((escrowTotal - funds.Escrow.Available) * 100n / escrowTotal)
-        }
-        if (funds.PubMsg.Balance > 0) {
-            pubMsgPct = Number(funds.PubMsg.Tagged * 100n / funds.PubMsg.Balance)
-        }
+    const escrow = {
+        used: 0n,
+        free: 0n,
+        total: 0n,
+    }
+    const pubMsg = {
+        used: 0n,
+        free: 0n,
+        total: 0n,
     }
 
-    return <Link key="funds" className="menu-item" to="/funds">
-        Funds
-        <div className="aux">Escrow: {toFixed(escrowPct, 1)}%</div>
-        <div className="aux">Publish Msg: {toFixed(pubMsgPct, 1)}%</div>
+    if (data) {
+        const funds = data.funds
+        escrow.free = funds.Escrow.Available
+        escrow.used = funds.Escrow.Tagged + funds.Escrow.Locked
+        escrow.total = escrow.used + escrow.free
+
+        pubMsg.total = funds.PubMsg.Balance
+        pubMsg.used = funds.PubMsg.Tagged
+        escrow.free = escrow.total - escrow.used
+    }
+
+    escrow.bars = [{
+        className: 'used',
+        amount: escrow.used,
+    }, {
+        className: 'free',
+        amount: escrow.free,
+    }]
+
+    pubMsg.bars = [{
+        className: 'used',
+        amount: pubMsg.used,
+    }, {
+        className: 'free',
+        amount: pubMsg.free,
+    }]
+
+    return <Link key="funds" className="funds menu-item" to="/funds">
+        <img className="icon" alt="" src={coinImg} />
+        <h3>Funds</h3>
+
+        <div className="menu-desc">
+            <div className="title">Escrow</div>
+            <CumulativeBarChart bars={escrow.bars} unit="byte" compact={true} />
+            <b>{humanFIL(escrow.used)}</b> of <b>{humanFIL(escrow.total)}</b> used
+        </div>
+
+        <div className="menu-desc">
+            <div className="title">Publish Message</div>
+            <CumulativeBarChart bars={pubMsg.bars} unit="byte" compact={true} />
+            <b>{humanFIL(pubMsg.used)}</b> of <b>{humanFIL(pubMsg.total)}</b> used
+        </div>
     </Link>
 }

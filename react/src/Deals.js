@@ -5,6 +5,9 @@ import {humanFileSize} from "./util";
 import React, {useEffect, useState} from "react";
 import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
 import {Link} from "react-router-dom";
+import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
+import './Deals.css'
+import {dateFormat} from "./util-date";
 
 var dealsPerPage = 10
 
@@ -71,12 +74,34 @@ export function StorageDealsPage(props) {
     </PageContainer>
 }
 
+const TimestampFormat = {
+    Ago: false,
+    DateTime: true,
+
+    settingsKey: "settings.deals.timestamp-format",
+
+    load: () => {
+        const saved = localStorage.getItem(TimestampFormat.settingsKey)
+        return JSON.parse(saved) || false
+    },
+
+    save: (val) => {
+        localStorage.setItem(TimestampFormat.settingsKey, JSON.stringify(val));
+    }
+}
+
 function StorageDealsContent(props) {
     const [deals, setDeals] = useState([])
     const [totalCount, setTotalCount] = useState(0)
     const [pageNum, setPageNum] = useState(1)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState()
+
+    const [timestampFormat, setTimestampFormat] = useState(TimestampFormat.load)
+    const saveTimestampFormat = (val) => {
+        TimestampFormat.save(val)
+        setTimestampFormat(val)
+    }
 
     async function dealsListQuery(cursor) {
         try {
@@ -150,11 +175,13 @@ function StorageDealsContent(props) {
 
     var totalPages = Math.ceil(totalCount / dealsPerPage)
 
+    var toggleTimestampFormat = () => saveTimestampFormat(!timestampFormat)
+
     return <div className="deals">
         <table>
             <tbody>
             <tr>
-                <th>Start</th>
+                <th onClick={toggleTimestampFormat} className="start">Start</th>
                 <th>Deal ID</th>
                 <th>Size</th>
                 <th>Client</th>
@@ -162,7 +189,12 @@ function StorageDealsContent(props) {
             </tr>
 
             {deals.map(deal => (
-                <DealRow key={deal.ID} deal={deal} />
+                <DealRow
+                    key={deal.ID}
+                    deal={deal}
+                    timestampFormat={timestampFormat}
+                    toggleTimestampFormat={toggleTimestampFormat}
+                />
             ))}
             </tbody>
         </table>
@@ -194,14 +226,19 @@ function DealRow(props) {
         deal = data.dealUpdate
     }
 
-    var start = '1m'
-    if (new Date().getTime() - deal.CreatedAt.getTime() > 60 * 1000) {
-        start = moment(deal.CreatedAt).fromNow()
+    var start = moment(deal.CreatedAt).format(dateFormat)
+    if (props.timestampFormat !== TimestampFormat.DateTime) {
+        start = '1m'
+        if (new Date().getTime() - deal.CreatedAt.getTime() > 60 * 1000) {
+            start = moment(deal.CreatedAt).fromNow()
+        }
     }
 
     return (
         <tr>
-            <td className="start">{start}</td>
+            <td className="start" onClick={props.toggleTimestampFormat}>
+                {start}
+            </td>
             <td className="deal-id">
                 <ShortDealLink id={deal.ID} />
             </td>
@@ -263,8 +300,14 @@ export function StorageDealsMenuItem(props) {
 
     return (
         <Link key="storage-deals" className="menu-item" to="/storage-deals">
-            Storage Deals
-            {data && data.dealsCount ? <div className="aux">Total: {data.dealsCount}</div> : null}
+            <img className="icon" alt="" src={columnsGapImg} />
+            <h3>Storage Deals</h3>
+
+            {data ? (
+                <div className="menu-desc">
+                    <b>{data.dealsCount}</b> deal{data.dealsCount === 1 ? '' : 's'}
+                </div>
+            ) : null}
         </Link>
     )
 }

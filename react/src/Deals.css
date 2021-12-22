@@ -1,0 +1,58 @@
+.deals table {
+    font-size: 1em;
+    width: 100%;
+}
+
+.deals td, .deals th {
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
+
+.deals th {
+    white-space: nowrap;
+    text-align: left;
+    opacity: 0.6;
+}
+
+.deals td.start, .deals th.start {
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.deals td.size {
+    width: 5em;
+    white-space: nowrap;
+}
+
+.deals td.deal-id {
+    cursor: pointer;
+    color: #465298;
+    width: 7em;
+}
+
+.deals td.client {
+    width: 6em;
+}
+
+.deals .pagination {
+    text-align: center;
+}
+
+.deals .pagination .controls {
+    margin-top: 1em;
+    display: inline-block;
+}
+
+.deals .pagination .left, .deals .pagination .right, .deals .pagination .page, .deals .pagination .total {
+    display: inline-block;
+    padding: 0 0.5em;
+}
+
+.deals .pagination .left, .deals .pagination .right {
+    color: #465298;
+    cursor: pointer;
+}
+
+.deals .pagination .total {
+    color: #999;
+}

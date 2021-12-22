@@ -6,6 +6,7 @@ import moment from "moment"
 import {PageContainer} from "./Components";
 import {Link} from "react-router-dom";
 import {toFixed} from "./util";
+import arrowLeftRightImg from './bootstrap-icons/icons/arrow-left-right.svg'
 
 var maxMegabits = 0
 
@@ -91,7 +92,10 @@ export function DealTransfersMenuItem(props) {
     }
 
     return <Link key="deal-transfers" className="menu-item" to="/deal-transfers">
-        Deal Transfers
-        <div className="aux">{toFixed(dataRate, 1)} Mbps</div>
+        <img className="icon" alt="" src={arrowLeftRightImg} />
+        <h3>Deal Transfers</h3>
+        <div className="menu-desc">
+            <b>{toFixed(dataRate, 1)}</b> Mbps
+        </div>
     </Link>
 }

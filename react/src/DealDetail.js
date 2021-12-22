@@ -1,11 +1,13 @@
 import React, {useEffect} from "react";
 import {useMutation, useSubscription} from "@apollo/react-hooks";
 import {DealCancelMutation, DealSubscription} from "./gql";
-import { useNavigate } from "react-router-dom";
+import {useNavigate} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";
-import {humanFIL, addCommas} from "./util";
+import {humanFIL, addCommas, humanFileSize} from "./util";
 import {useParams} from "react-router-dom";
+import './DealDetail.css'
+import closeImg from './bootstrap-icons/icons/x-circle.svg'
 
 export function DealDetail(props) {
     const params = useParams()
@@ -47,77 +49,97 @@ export function DealDetail(props) {
     return <div className="deal-detail modal" id={deal.ID}>
         <div className="content">
             <div className="close" onClick={() => navigate(-1)}>
-                <div>X</div>
+                <img className="icon" alt="" src={closeImg} />
             </div>
             <div className="title">Deal {deal.ID}</div>
             <table className="deal-fields">
                 <tbody>
                 <tr>
-                    <td>CreatedAt</td>
-                    <td>{moment(deal.CreatedAt).format(dateFormat)}</td>
+                    <th>CreatedAt</th>
+                    <td>
+                        {moment(deal.CreatedAt).format(dateFormat)}
+                        &nbsp;
+                        <span className="aux">({moment(deal.CreatedAt).fromNow()} ago)</span>
+                    </td>
                 </tr>
                 <tr>
-                    <td>Client Address</td>
-                    <td>{deal.ClientAddress}</td>
+                    <th>Client Address</th>
+                    <td>
+                        <a href={"https://filfox.info/en/address/"+deal.ClientAddress} target="_blank" rel="noreferrer">
+                            {deal.ClientAddress}
+                        </a>
+                    </td>
                 </tr>
                 <tr>
-                    <td>Client Peer ID</td>
+                    <th>Client Peer ID</th>
                     <td>{deal.ClientPeerID}</td>
                 </tr>
                 <tr>
-                    <td>Deal Data Root CID</td>
+                    <th>Deal Data Root CID</th>
                     <td>{deal.DealDataRoot}</td>
                 </tr>
                 <tr>
-                    <td>Piece CID</td>
+                    <th>Piece CID</th>
                     <td>{deal.PieceCid}</td>
                 </tr>
                 <tr>
-                    <td>Piece Size</td>
-                    <td>{addCommas(deal.PieceSize)}</td>
+                    <th>Piece Size</th>
+                    <td>
+                        {humanFileSize(deal.PieceSize)}
+                        &nbsp;
+                        <span className="aux">({addCommas(deal.PieceSize)} bytes)</span>
+                    </td>
                 </tr>
                 <tr>
-                    <td>Provider Collateral</td>
+                    <th>Provider Collateral</th>
                     <td>{humanFIL(deal.ProviderCollateral)}</td>
                 </tr>
                 <tr>
-                    <td>Start Epoch</td>
+                    <th>Start Epoch</th>
                     <td>{deal.StartEpoch}</td>
                 </tr>
                 <tr>
-                    <td>End Epoch</td>
+                    <th>End Epoch</th>
                     <td>{deal.EndEpoch}</td>
                 </tr>
                 <tr>
-                    <td>Transfer Type</td>
+                    <th>Transfer Type</th>
                     <td>{deal.Transfer.Type}</td>
                 </tr>
                 <tr>
-                    <td>Transfer Size</td>
-                    <td>{addCommas(deal.Transfer.Size)}</td>
+                    <th>Transfer Size</th>
+                    <td>
+                        {humanFileSize(deal.Transfer.Size)}
+                        &nbsp;
+                        <span className="aux">({addCommas(deal.Transfer.Size)} bytes)</span>
+                    </td>
                 </tr>
                 {deal.Sector.ID > 0 ? (
                     <>
                     <tr>
-                        <td>Sector ID</td>
+                        <th>Sector ID</th>
                         <td>{deal.Sector.ID + ''}</td>
                     </tr>
                     <tr>
-                        <td>Sector Data Offset</td>
+                        <th>Sector Data Offset</th>
                         <td>{addCommas(deal.Sector.Offset)}</td>
                     </tr>
                     <tr>
-                        <td>Sector Data Length</td>
+                        <th>Sector Data Length</th>
                         <td>{addCommas(deal.Sector.Length)}</td>
                     </tr>
                     </>
                 ) : null}
                 <tr>
-                    <td>Publish Message CID</td>
-                    <td>{deal.PublishCid}</td>
+                    <th>Publish Message CID</th>
+                    <td>
+                        <a href={"https://filfox.info/en/message/"+deal.PublishCid} target="_blank" rel="noreferrer">
+                        {deal.PublishCid}
+                        </a>
+                    </td>
                 </tr>
                 <tr>
-                    <td>Status</td>
+                    <th>Status</th>
                     <td>{deal.Message}</td>
                 </tr>
                 </tbody>
@@ -128,6 +150,8 @@ export function DealDetail(props) {
                     <div className="button cancel" onClick={cancelDeal}>Cancel Transfer</div>
                 </div>
             ) : null}
+
+            <h3>Deal Logs</h3>
 
             <table className="deal-logs">
                 <tbody>
