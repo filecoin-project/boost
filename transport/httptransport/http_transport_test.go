@@ -62,17 +62,13 @@ func TestTransportRespectsContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	closing := make(chan struct{}, 2)
-
 	svcs := serversWithCustomHandler(t, func(http.ResponseWriter, *http.Request) {
-		<-closing
-		return
+		time.Sleep(1 * time.Hour)
 	})
 
 	for name, init := range svcs {
 		t.Run(name, func(t *testing.T) {
-			url, close, h := init(t)
-			defer close()
+			url, _, h := init(t)
 
 			of := getTempFilePath(t)
 			th := executeTransfer(t, ctx, New(h), 100, url, of)
@@ -82,8 +78,6 @@ func TestTransportRespectsContext(t *testing.T) {
 			require.NotEmpty(t, evts)
 			require.Len(t, evts, 1)
 			require.Contains(t, evts[0].Error.Error(), "context")
-
-			closing <- struct{}{}
 		})
 	}
 }
@@ -378,7 +372,7 @@ func serversWithRangeHandler(t *testing.T, str string) map[string]func(t *testin
 		finalOffset := strings.TrimSuffix(strings.TrimPrefix(offset, "bytes="), "-")
 		start, _ := strconv.ParseInt(finalOffset, 10, 64)
 		w.WriteHeader(200)
-		w.Write([]byte(str[start:]))
+		w.Write([]byte(str[start:])) //nolint:errcheck
 	}
 
 	return serversWithCustomHandler(t, handler)
@@ -433,7 +427,7 @@ func newLibp2pHttpServer(t *testing.T, handler func(http.ResponseWriter, *http.R
 		http.HandleFunc("/"+patt, handler)
 		server := &http.Server{}
 		server.ConnContext = SaveConnInContext
-		server.Serve(listener)
+		server.Serve(listener) //nolint:errcheck
 	}()
 
 	l.URL = fmt.Sprintf("libp2p://%s/%s", l.srvHost.ID().Pretty(), patt)
