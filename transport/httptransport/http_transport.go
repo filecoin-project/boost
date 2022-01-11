@@ -11,6 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/host"
+	p2phttp "github.com/libp2p/go-libp2p-http"
+
 	"golang.org/x/xerrors"
 
 	"github.com/jpillora/backoff"
@@ -34,6 +37,8 @@ const (
 	maxBackOff           = 1 * time.Hour
 	factor               = 2
 	maxReconnectAttempts = 8
+
+	libp2pScheme = "libp2p"
 )
 
 var _ transport.Transport = (*httpTransport)(nil)
@@ -50,7 +55,7 @@ func BackOffRetryOpt(minBackoff, maxBackoff time.Duration, factor, maxReconnectA
 }
 
 type httpTransport struct {
-	// TODO Construct and inject an http client here ?
+	libp2pClient *http.Client
 
 	minBackOffWait       time.Duration
 	maxBackoffWait       time.Duration
@@ -58,7 +63,7 @@ type httpTransport struct {
 	maxReconnectAttempts float64
 }
 
-func New(opts ...Option) *httpTransport {
+func New(host host.Host, opts ...Option) *httpTransport {
 	ht := &httpTransport{
 		minBackOffWait:       minBackOff,
 		maxBackoffWait:       maxBackOff,
@@ -68,6 +73,12 @@ func New(opts ...Option) *httpTransport {
 	for _, o := range opts {
 		o(ht)
 	}
+
+	// init a libp2p-http client
+	tr := &http.Transport{}
+	tr.RegisterProtocol("libp2p", p2phttp.NewTransport(host))
+	ht.libp2pClient = &http.Client{Transport: tr}
+
 	return ht
 }
 
@@ -82,14 +93,17 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	if err != nil {
 		return nil, fmt.Errorf("output file state error: %w", err)
 	}
-	// validate req
-	if _, err := url.Parse(tInfo.URL); err != nil {
-		return nil, fmt.Errorf("failed to parse url: %w", err)
-	}
+
 	// do we have more bytes than required already ?
 	fileSize := fi.Size()
 	if fileSize > dealInfo.DealSize {
 		return nil, fmt.Errorf("deal size=%d but file size=%d", dealInfo.DealSize, fileSize)
+	}
+
+	// validate req
+	u, err := url.Parse(tInfo.URL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse url: %w", err)
 	}
 
 	// construct the transfer instance that will act as the transfer handler
@@ -107,6 +121,11 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 			Jitter: true,
 		},
 		maxReconnectAttempts: h.maxReconnectAttempts,
+	}
+	if u.Scheme == libp2pScheme {
+		t.client = h.libp2pClient
+	} else {
+		t.client = http.DefaultClient
 	}
 
 	// is the transfer already complete ? we check this by comparing the number of bytes
@@ -154,6 +173,8 @@ type transfer struct {
 
 	backoff              *backoff.Backoff
 	maxReconnectAttempts float64
+
+	client *http.Client
 }
 
 func (t *transfer) emitEvent(ctx context.Context, evt types.TransportEvent, id uuid.UUID) error {
@@ -166,8 +187,8 @@ func (t *transfer) emitEvent(ctx context.Context, evt types.TransportEvent, id u
 }
 
 func (t *transfer) execute(ctx context.Context) error {
-
 	for {
+
 		// construct request
 		req, err := http.NewRequest("GET", t.tInfo.URL, nil)
 		if err != nil {
@@ -238,7 +259,7 @@ func (t *transfer) execute(ctx context.Context) error {
 
 func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer, toRead int64) error {
 	// send http request and validate response
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := t.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send  http req: %w", err)
 	}

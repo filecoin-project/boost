@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/host"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/filestore"
@@ -78,7 +80,7 @@ type Provider struct {
 	dhs   map[uuid.UUID]*dealHandler
 }
 
-func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address, secb *sectorblocks.SectorBlocks, sps sealingpipeline.State) (*Provider, error) {
+func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dealPublisher *DealPublisher, addr address.Address, secb *sectorblocks.SectorBlocks, sps sealingpipeline.State) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -107,7 +109,7 @@ func NewProvider(repoRoot string, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *f
 		finishedDealChan:  make(chan finishedDealReq),
 		publishedDealChan: make(chan publishDealReq),
 
-		Transport:      httptransport.New(),
+		Transport:      httptransport.New(h),
 		fundManager:    fundMgr,
 		storageManager: storageMgr,
 
