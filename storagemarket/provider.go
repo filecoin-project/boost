@@ -76,6 +76,8 @@ type Provider struct {
 	adapter        *Adapter
 	transfers      *dealTransfers
 
+	fullnodeApi v1api.FullNode
+
 	dhsMu sync.RWMutex
 	dhs   map[uuid.UUID]*dealHandler
 }
@@ -114,6 +116,7 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		storageManager: storageMgr,
 
 		dealPublisher: dealPublisher,
+		fullnodeApi:   fullnodeApi,
 		adapter: &Adapter{
 			FullNode:                    fullnodeApi,
 			secb:                        secb,
