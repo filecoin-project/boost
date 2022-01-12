@@ -5,14 +5,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
-
 	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/filestore"
 	"github.com/filecoin-project/boost/fundmanager"
@@ -20,23 +20,43 @@ import (
 	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-fil-markets/shared"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/crypto"
+	"github.com/filecoin-project/go-state-types/exitcode"
+	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
+	ctypes "github.com/filecoin-project/lotus/chain/types"
+	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
+	"github.com/filecoin-project/lotus/lib/sigs"
+	"github.com/filecoin-project/lotus/markets/utils"
+	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-eventbus"
 	"github.com/libp2p/go-libp2p-core/event"
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"golang.org/x/xerrors"
 )
 
-var log = logging.Logger("boost-provider")
+var (
+	log = logging.Logger("boost-provider")
 
-var ErrDealNotFound = fmt.Errorf("deal not found")
-var ErrDealHandlerNotFound = errors.New("deal handler not found")
+	ErrDealNotFound        = fmt.Errorf("deal not found")
+	ErrDealHandlerNotFound = errors.New("deal handler not found")
+)
+
+var (
+	addPieceRetryWait    = 5 * time.Minute
+	addPieceRetryTimeout = 6 * time.Hour
+)
 
 type Config struct {
 	MaxTransferDuration time.Duration
@@ -73,8 +93,10 @@ type Provider struct {
 	fundManager    *fundmanager.FundManager
 	storageManager *storagemanager.StorageManager
 	dealPublisher  *DealPublisher
-	adapter        *Adapter
 	transfers      *dealTransfers
+
+	secb                        *sectorblocks.SectorBlocks
+	maxDealCollateralMultiplier uint64
 
 	fullnodeApi v1api.FullNode
 
@@ -115,14 +137,11 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		fundManager:    fundMgr,
 		storageManager: storageMgr,
 
-		dealPublisher: dealPublisher,
-		fullnodeApi:   fullnodeApi,
-		adapter: &Adapter{
-			FullNode:                    fullnodeApi,
-			secb:                        secb,
-			maxDealCollateralMultiplier: 2,
-		},
-		transfers: newDealTransfers(),
+		dealPublisher:               dealPublisher,
+		fullnodeApi:                 fullnodeApi,
+		secb:                        secb,
+		maxDealCollateralMultiplier: 2,
+		transfers:                   newDealTransfers(),
 
 		dhs: make(map[uuid.UUID]*dealHandler),
 	}, nil
@@ -334,4 +353,106 @@ func (p *Provider) delDealHandler(dealUuid uuid.UUID) {
 	p.dhsMu.Lock()
 	delete(p.dhs, dealUuid)
 	p.dhsMu.Unlock()
+}
+
+func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDealState, pieceData io.Reader) (*storagemarket.PackingResult, error) {
+	// Sanity check - we must have published the deal before handing it off
+	// to the sealing subsystem
+	if deal.PublishCID == nil {
+		return nil, xerrors.Errorf("deal.PublishCid can't be nil")
+	}
+
+	sdInfo := lapi.PieceDealInfo{
+		DealID:       deal.ChainDealID,
+		DealProposal: &deal.ClientDealProposal.Proposal,
+		PublishCid:   deal.PublishCID,
+		DealSchedule: lapi.DealSchedule{
+			StartEpoch: deal.ClientDealProposal.Proposal.StartEpoch,
+			EndEpoch:   deal.ClientDealProposal.Proposal.EndEpoch,
+		},
+		// Assume that it doesn't make sense for a miner not to keep an
+		// unsealed copy. TODO: Check that's a valid assumption.
+		//KeepUnsealed: deal.FastRetrieval,
+		KeepUnsealed: true,
+	}
+
+	// Attempt to add the piece to a sector (repeatedly if necessary)
+	pieceSize := deal.ClientDealProposal.Proposal.PieceSize.Unpadded()
+	sectorNum, offset, err := p.secb.AddPiece(ctx, pieceSize, pieceData, sdInfo)
+	curTime := build.Clock.Now()
+	for build.Clock.Since(curTime) < addPieceRetryTimeout {
+		if !xerrors.Is(err, sealing.ErrTooManySectorsSealing) {
+			if err != nil {
+				log.Errorw("failed to addPiece for deal", "id", deal.DealUuid, "err", err)
+			}
+			break
+		}
+		select {
+		case <-build.Clock.After(addPieceRetryWait):
+			sectorNum, offset, err = p.secb.AddPiece(ctx, pieceSize, pieceData, sdInfo)
+		case <-ctx.Done():
+			return nil, xerrors.New("context expired while waiting to retry AddPiece")
+		}
+	}
+
+	if err != nil {
+		return nil, xerrors.Errorf("AddPiece failed: %s", err)
+	}
+	log.Infow("Added new deal to sector", "id", deal.DealUuid, "sector", p)
+
+	return &storagemarket.PackingResult{
+		SectorNumber: sectorNum,
+		Offset:       offset,
+		Size:         pieceSize.Padded(),
+	}, nil
+}
+
+func (p *Provider) VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error) {
+	addr, err := p.fullnodeApi.StateAccountKey(ctx, addr, ctypes.EmptyTSK)
+	if err != nil {
+		return false, err
+	}
+
+	err = sigs.Verify(&sig, addr, input)
+	return err == nil, err
+}
+
+func (p *Provider) GetBalance(ctx context.Context, addr address.Address, encodedTs shared.TipSetToken) (storagemarket.Balance, error) {
+	tsk, err := ctypes.TipSetKeyFromBytes(encodedTs)
+	if err != nil {
+		return storagemarket.Balance{}, err
+	}
+
+	bal, err := p.fullnodeApi.StateMarketBalance(ctx, addr, tsk)
+	if err != nil {
+		return storagemarket.Balance{}, err
+	}
+
+	return utils.ToSharedBalance(bal), nil
+}
+
+func (p *Provider) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+	// Wait for deal to be published (plus additional time for confidence)
+	receipt, err := p.fullnodeApi.StateWaitMsg(ctx, publishCid, 2*build.MessageConfidence, api.LookbackNoLimit, true)
+	if err != nil {
+		return nil, xerrors.Errorf("WaitForPublishDeals errored: %w", err)
+	}
+	if receipt.Receipt.ExitCode != exitcode.Ok {
+		return nil, xerrors.Errorf("WaitForPublishDeals exit code: %s", receipt.Receipt.ExitCode)
+	}
+
+	// The deal ID may have changed since publish if there was a reorg, so
+	// get the current deal ID
+	//head, err := n.ChainHead(ctx)
+	//if err != nil {
+	//return nil, xerrors.Errorf("WaitForPublishDeals failed to get chain head: %w", err)
+	//}
+
+	//res, err := n.scMgr.dealInfo.GetCurrentDealInfo(ctx, head.Key().Bytes(), (*market.DealProposal)(&proposal), publishCid)
+	//if err != nil {
+	//return nil, xerrors.Errorf("WaitForPublishDeals getting deal info errored: %w", err)
+	//}
+
+	return &storagemarket.PublishDealsWaitResult{DealID: abi.DealID(4), FinalCid: receipt.Message}, nil
+	//return &storagemarket.PublishDealsWaitResult{DealID: res.DealID, FinalCid: receipt.Message}, nil
 }

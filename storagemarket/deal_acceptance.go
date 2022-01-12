@@ -83,7 +83,7 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 
 	// The maximum amount of collateral that the provider will put into escrow
 	// for a deal is calculated as a multiple of the minimum bounded amount
-	max := ctypes.BigMul(bounds.Min, ctypes.NewInt(p.adapter.maxDealCollateralMultiplier))
+	max := ctypes.BigMul(bounds.Min, ctypes.NewInt(p.maxDealCollateralMultiplier))
 
 	pcMin := bounds.Min
 	pcMax := max
@@ -172,7 +172,7 @@ func (p *Provider) validateSignature(tok shared.TipSetToken, deal types.Provider
 	//return fmt.Errorf("failed to serialize client deal proposal: %w", err)
 	//}
 
-	//verified, err := p.adapter.VerifySignature(p.ctx, deal.ClientDealProposal.ClientSignature, deal.ClientDealProposal.Proposal.Client, b, tok)
+	//verified, err := p.VerifySignature(p.ctx, deal.ClientDealProposal.ClientSignature, deal.ClientDealProposal.Proposal.Client, b, tok)
 	//if err != nil {
 	//return fmt.Errorf("error verifying signature: %w", err)
 	//}
