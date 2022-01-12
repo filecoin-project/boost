@@ -38,12 +38,8 @@ type Adapter struct {
 	v1api.FullNode
 
 	secb *sectorblocks.SectorBlocks
-	//ev   *events.Events
 
-	addBalanceSpec              *api.MessageSendSpec
 	maxDealCollateralMultiplier uint64
-	//dsMatcher                   *dealStateMatcher
-	scMgr *SectorCommittedManager
 }
 
 func (n *Adapter) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDealState, pieceData io.Reader) (*storagemarket.PackingResult, error) {
