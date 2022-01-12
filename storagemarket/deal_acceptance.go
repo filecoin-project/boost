@@ -6,6 +6,8 @@ import (
 
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-fil-markets/shared"
+	ctypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/markets/utils"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -19,10 +21,13 @@ const DealMaxLabelSize = 256
 // ValidateDealProposal validates a proposed deal against the provider criteria
 func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 	// TODO Audit based on current Markets code
-	tok, curEpoch, err := p.adapter.GetChainHead(p.ctx)
+	head, err := p.fullnodeApi.ChainHead(p.ctx)
 	if err != nil {
 		return fmt.Errorf("node error getting most recent state id: %w", err)
 	}
+
+	tok := head.Key().Bytes()
+	curEpoch := head.Height()
 
 	if err := p.validateSignature(tok, deal); err != nil {
 		return fmt.Errorf("validateSignature failed: %w", err)
@@ -71,10 +76,17 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 		return fmt.Errorf("invalid deal end epoch %d: cannot be more than %d past current epoch %d", proposal.EndEpoch, miner.MaxSectorExpirationExtension, curEpoch)
 	}
 
-	pcMin, pcMax, err := p.adapter.DealProviderCollateralBounds(p.ctx, proposal.PieceSize, proposal.VerifiedDeal)
+	bounds, err := p.fullnodeApi.StateDealProviderCollateralBounds(p.ctx, proposal.PieceSize, proposal.VerifiedDeal, ctypes.EmptyTSK)
 	if err != nil {
 		return fmt.Errorf("node error getting collateral bounds: %w", err)
 	}
+
+	// The maximum amount of collateral that the provider will put into escrow
+	// for a deal is calculated as a multiple of the minimum bounded amount
+	max := ctypes.BigMul(bounds.Min, ctypes.NewInt(p.maxDealCollateralMultiplier))
+
+	pcMin := bounds.Min
+	pcMax := max
 
 	if proposal.ProviderCollateral.LessThan(pcMin) {
 		return fmt.Errorf("proposed provider collateral below minimum: %s < %s", proposal.ProviderCollateral, pcMin)
@@ -88,22 +100,28 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 		return fmt.Errorf("validateAsk failed: %w", err)
 	}
 
-	// TODO: Uncomment when client has been implemented
-	//// check market funds
-	//clientMarketBalance, err := p.adapter.GetBalance(p.ctx, proposal.Client, tok)
-	//if err != nil {
-	//	return fmt.Errorf("node error getting client market balance failed: %w", err)
-	//}
-	//
-	//// This doesn't guarantee that the client won't withdraw / lock those funds
-	//// but it's a decent first filter
-	//if clientMarketBalance.Available.LessThan(proposal.ClientBalanceRequirement()) {
-	//	return fmt.Errorf("clientMarketBalance.Available too small: %d < %d", clientMarketBalance.Available, proposal.ClientBalanceRequirement())
-	//}
+	tsk, err := ctypes.TipSetKeyFromBytes(tok)
+	if err != nil {
+		return err
+	}
+
+	bal, err := p.fullnodeApi.StateMarketBalance(p.ctx, proposal.Client, tsk)
+	if err != nil {
+		return fmt.Errorf("node error getting client market balance failed: %w", err)
+	}
+
+	clientMarketBalance := utils.ToSharedBalance(bal)
+
+	// This doesn't guarantee that the client won't withdraw / lock those funds
+	// but it's a decent first filter
+	if clientMarketBalance.Available.LessThan(proposal.ClientBalanceRequirement()) {
+		return fmt.Errorf("clientMarketBalance.Available too small: %d < %d", clientMarketBalance.Available, proposal.ClientBalanceRequirement())
+	}
 
 	// Verified deal checks
 	if proposal.VerifiedDeal {
-		dataCap, err := p.adapter.GetDataCap(p.ctx, proposal.Client, tok)
+		// Get data cap
+		dataCap, err := p.fullnodeApi.StateVerifiedClientStatus(p.ctx, proposal.Client, tsk)
 		if err != nil {
 			return fmt.Errorf("node error fetching verified data cap: %w", err)
 		}
@@ -154,7 +172,7 @@ func (p *Provider) validateSignature(tok shared.TipSetToken, deal types.Provider
 	//return fmt.Errorf("failed to serialize client deal proposal: %w", err)
 	//}
 
-	//verified, err := p.adapter.VerifySignature(p.ctx, deal.ClientDealProposal.ClientSignature, deal.ClientDealProposal.Proposal.Client, b, tok)
+	//verified, err := p.VerifySignature(p.ctx, deal.ClientDealProposal.ClientSignature, deal.ClientDealProposal.Proposal.Client, b, tok)
 	//if err != nil {
 	//return fmt.Errorf("error verifying signature: %w", err)
 	//}

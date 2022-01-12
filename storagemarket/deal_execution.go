@@ -318,7 +318,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	// Note that multiple deals may be published in a batch, so the message CID
 	// may be for a batch of deals.
 	p.addDealLog(deal.DealUuid, "Awaiting deal publish confirmation")
-	res, err := p.adapter.WaitForPublishDeals(p.ctx, *deal.PublishCID, deal.ClientDealProposal.Proposal)
+	res, err := p.WaitForPublishDeals(p.ctx, *deal.PublishCID, deal.ClientDealProposal.Proposal)
 	if err != nil {
 		return fmt.Errorf("wait for publish message %s failed: %w", deal.PublishCID, err)
 	}
@@ -366,7 +366,7 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	}
 
 	// Add the piece to a sector
-	packingInfo, packingErr := p.adapter.AddPieceToSector(p.ctx, *deal, paddedReader)
+	packingInfo, packingErr := p.AddPieceToSector(p.ctx, *deal, paddedReader)
 
 	// Close the reader as we're done reading from it.
 	if err := v2r.Close(); err != nil {
