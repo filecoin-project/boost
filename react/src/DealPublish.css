@@ -1,0 +1,26 @@
+#deal-publish h3 {
+    margin-top: 2em;
+}
+
+#deal-publish p {
+    display: inline-block;
+    padding-left: 1em
+}
+
+#deal-publish .buttons {
+    display: inline-block;
+    position: relative;
+}
+
+#deal-publish .buttons .button {
+    margin-left: 2em;
+    display: inline-block;
+}
+
+.deal-publish th {
+    text-align: left;
+}
+
+.deal-publish td, .deal-publish th {
+    padding: 0.5em 1em;
+}

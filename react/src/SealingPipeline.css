@@ -13,39 +13,14 @@
     padding-left: 1em;
 }
 
-.sealing-pipeline .cumulative-bar-chart .bars {
-    display: inline-block;
-    height: 2em;
-    width: 60%;
-    border: 1px solid #000;
+.filled {
+    background-color: rgb(44, 123, 229);
 }
 
-.sealing-pipeline .cumulative-bar-chart .bars .bar {
-    height: 100%;
-    display: inline-block;
-    background-image: repeating-linear-gradient(
-            135deg,
-            #fff,
-            #fff 5px,
-            transparent 5px,
-            transparent 6px);
+.free {
+    background-color: rgb(210, 221, 236);
 }
 
-.sealing-pipeline .cumulative-bar-chart .bars .bar .bar-inner {
-    height: 100%;
-    border-right: 1px solid #000;
-}
-
-.sealing-pipeline .cumulative-bar-chart .bars .bar.last-visible .bar-inner {
-    border: none;
-}
-
-.sealing-pipeline .cumulative-bar-chart .total {
-    display: inline-block;
-    padding: 0 1em;
-    line-height: 2em;
-    vertical-align: top;
-}
 
 .sealing-pipeline table {
     font-size: 1em;
@@ -73,18 +48,18 @@
 }
 
 .sealing-pipeline td.color > div {
-    height: 1em;
-    border: 1px solid #000;
-    background-image: repeating-linear-gradient(
-            135deg,
-            #fff,
-            #fff 3px,
-            transparent 3px,
-            transparent 4px);
+    width: 0.8em;
+    height: 0.8em;
+    border-radius: 0.8em;
 }
 
 .sealing-pipeline td.state {
+    padding-left: 0.25em;
     width: 8em;
+}
+
+.sealing-pipeline td.count.zero {
+    color: #999;
 }
 
 .sealing-pipeline th.start, .sealing-pipeline td.start {
@@ -103,46 +78,42 @@
     width: 3em;
 }
 
-.sealing-pipeline .used {
-    background-color: #465298;
+.no-workers {
+    padding: 0 0 2em 1.25em;
 }
 
 .sealing-pipeline .Add_Piece {
-    background-color: #465298;
-}
-
-.sealing-pipeline .Wait_Seed {
-    background-color: #fd7e14;
-}
-
-.sealing-pipeline .Pre-committing {
-    background-color: #61dafb;
+    background-color: #2c7be5;
 }
 
 .sealing-pipeline .Packing {
-    background-color: #e64980;
+    background-color: #6b5eae
 }
 
 .sealing-pipeline .Pre-commit_1 {
-    background-color: #82c91e;
+    background-color: #e63757;
 }
 
 .sealing-pipeline .Pre-commit_2 {
-    background-color: #a61e4d;
+    background-color: #fd7e14;
 }
 
 .sealing-pipeline .Pre-commit_Wait {
-    background-color: #465298;
+    background-color: #f6c343;
+}
+
+.sealing-pipeline .Wait_Seed {
+    background-color: rgb(210, 221, 236);
 }
 
 .sealing-pipeline .Committing {
-    background-color: #228be6;
+    background-color: #00d97e;
 }
 
 .sealing-pipeline .Committing_Wait {
-    background-color: #40c057;
+    background-color: #02a8b5;
 }
 
 .sealing-pipeline .Finalize_Sector {
-    background-color: #be4bdb;
+    background-color: #39afd1;
 }

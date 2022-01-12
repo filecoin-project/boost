@@ -3,8 +3,10 @@ import {StorageQuery} from "./gql";
 import React from "react";
 import {addCommas, humanFileSize} from "./util";
 import './StorageSpace.css'
+import archiveImg from './bootstrap-icons/icons/archive.svg'
 import {PageContainer} from "./Components";
 import {Link} from "react-router-dom";
+import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 
 export function StorageSpacePage(props) {
     return <PageContainer pageType="storage-space" title="Storage Space">
@@ -24,65 +26,38 @@ function StorageSpaceContent(props) {
 
     var storage = data.storage
 
-    var totalSize = 0n
-    totalSize += storage.Staged
-    totalSize += storage.Transferred
-    totalSize += storage.Pending
-    totalSize += storage.Free
+    const bars = [{
+        name: 'Staged',
+        className: 'staged',
+        amount: storage.Staged,
+    }, {
+        name: 'Transferred',
+        className: 'transferred',
+        amount: storage.Transferred,
+    }, {
+        name: 'Pending',
+        className: 'pending',
+        amount: storage.Pending,
+    }, {
+        name: 'Free',
+        className: 'free',
+        amount: storage.Free,
+    }]
 
     return <>
         <div className="storage-chart">
-            <div className="total-size">
-                {humanFileSize(totalSize)}
-            </div>
-            <div className="bars">
-                <div className="staged" style={{width: Number(storage.Staged*100n/totalSize)+'%'}} />
-                <div className="transferred" style={{width: Number(storage.Transferred*100n/totalSize)+'%'}} />
-                <div className="pending" style={{width: Number(storage.Pending*100n/totalSize)+'%'}} />
-                <div className="free" style={{width: Number(storage.Free*100n/totalSize)+'%'}} />
-            </div>
-            <div className="labels">
-                <div className="label staged">
-                    <div className="bar-color"></div>
-                    <div className="text">Staged</div>
-                    <div className="amount">{humanFileSize(storage.Staged)}</div>
-                </div>
-                <div className="label transferred">
-                    <div className="bar-color"></div>
-                    <div className="text">Transferred</div>
-                    <div className="amount">{humanFileSize(storage.Transferred)}</div>
-                </div>
-                <div className="label pending">
-                    <div className="bar-color"></div>
-                    <div className="text">Pending</div>
-                    <div className="amount">{humanFileSize(storage.Pending)}</div>
-                </div>
-                <div className="label free">
-                    <div className="bar-color"></div>
-                    <div className="text">Free</div>
-                    <div className="amount">{humanFileSize(storage.Free)}</div>
-                </div>
-            </div>
+            <CumulativeBarChart bars={bars} unit="byte" />
+            <CumulativeBarLabels bars={bars} unit="byte" />
         </div>
 
         <table className="storage-fields">
             <tbody>
-                <tr>
-                    <td>Staged</td>
-                    <td>{addCommas(storage.Staged)} bytes</td>
-                </tr>
-                <tr>
-                    <td>Transferred</td>
-                    <td>{addCommas(storage.Transferred)} bytes</td>
-                </tr>
-                <tr>
-                    <td>Pending</td>
-                    <td>{addCommas(storage.Pending)} bytes</td>
-                </tr>
-                <tr>
-                    <td>Free</td>
-                    <td>{addCommas(storage.Free)} bytes</td>
-                </tr>
+                {bars.map(bar => (
+                    <tr key={bar.name}>
+                        <td>{bar.name}</td>
+                        <td>{humanFileSize(bar.amount)} <span className="aux">({addCommas(bar.amount)} bytes)</span></td>
+                    </tr>
+                ))}
                 <tr>
                     <td>Mount Point</td>
                     <td>{storage.MountPoint}</td>
@@ -98,23 +73,34 @@ export function StorageSpaceMenuItem(props) {
         fetchPolicy: 'network-only',
     })
 
-    var pct = 0
+    var totalSize = 0n
+    var used = 0n
     if (data) {
-        var storage = data.storage
+        const storage = data.storage
 
-        var totalSize = 0n
         totalSize += storage.Staged
         totalSize += storage.Transferred
         totalSize += storage.Pending
         totalSize += storage.Free
-
-        pct = ((totalSize - storage.Free) * 100n) / totalSize
+        used = totalSize - storage.Free
     }
 
+    const bars = [{
+        className: 'used',
+        amount: used,
+    }, {
+        className: 'free',
+        amount: totalSize - used,
+    }]
+
     return (
-        <Link key="storage-space" className="menu-item" to="/storage-space">
-            Storage Space
-            <div className="aux">Used: {pct.toString()}%</div>
+        <Link key="storage-space" className="menu-item storage-space" to="/storage-space">
+            <img className="icon" alt="" src={archiveImg} />
+            <h3>Storage Space</h3>
+            <div className="menu-desc">
+                <CumulativeBarChart bars={bars} unit="byte" compact={true} />
+                <b>{humanFileSize(used)}</b> of <b>{humanFileSize(totalSize)}</b> used
+            </div>
         </Link>
     )
 }

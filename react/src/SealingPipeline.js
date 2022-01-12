@@ -1,3 +1,4 @@
+/* global BigInt */
 import {useQuery} from "@apollo/react-hooks";
 import {SealingPipelineQuery} from "./gql";
 import React from "react";
@@ -7,6 +8,8 @@ import './SealingPipeline.css'
 import {dateFormat} from "./util-date";
 import moment from 'moment';
 import {Link} from "react-router-dom";
+import layerBackwardImg from './bootstrap-icons/icons/layer-backward.svg'
+import {CumulativeBarChart} from "./CumulativeBarChart";
 
 export function SealingPipelinePage(props) {
     return <PageContainer pageType="sealing-pipeline" title="Sealing Pipeline">
@@ -41,19 +44,21 @@ function WaitDeals(props) {
     const free = props.SectorSize - totalSize
     const haveDeals = props.Deals.length > 0
 
+    var bars = [{
+        className: 'free',
+        amount: free,
+    }]
+    if (haveDeals) {
+        bars = [{
+            className: 'filled',
+            amount: totalSize,
+        }].concat(bars)
+    }
+
     return <div className="wait-deals">
         <div className="title">Wait Deals</div>
 
-        <div className="cumulative-bar-chart">
-            <div className="bars">
-                {!haveDeals ? null : (
-                    <div className="bar used" style={{width: (totalSize * 100n / props.SectorSize) + '%'}}>
-                        <div className="bar-inner"></div>
-                    </div>
-                )}
-            </div>
-            <div className="total">{humanFileSize(props.SectorSize)}</div>
-        </div>
+        <CumulativeBarChart bars={bars} unit="byte" />
 
         { haveDeals ? <WaitDealsSizes free={free} deals={props.Deals} /> : (
             <div className="no-deals">There are no deals in the Wait Deals state</div>
@@ -113,34 +118,22 @@ const sectorStates = function(props) {
 
 function Sealing(props) {
     var total = 0
-    var lastVisibleIndex = -1
     const states = sectorStates(props)
+    var bars = []
     for (let i = 0; i < states.length; i++) {
         let sec = states[i]
         total += sec.Count
-        if (sec.Count > 0) {
-            lastVisibleIndex = i
-        }
         sec.className = sec.Name.replace(/ /g, '_')
+        bars.push({
+            className: sec.className,
+            amount: sec.Count,
+        })
     }
 
     return <div className="sealing">
         <div className="title">Sealing</div>
 
-        <div className="cumulative-bar-chart">
-            <div className="bars">
-                {states.map((sec, i) => sec.Count === 0 ? null : (
-                    <div
-                        key={sec.Name}
-                        className={"bar " + sec.className + ' ' + ((i === lastVisibleIndex) ? 'last-visible' : '')}
-                        style={{width:(100*sec.Count/total)+'%'}}
-                    >
-                        <div className="bar-inner"></div>
-                    </div>
-                ))}
-            </div>
-            <div className="total">{total}</div>
-        </div>
+        {total > 0 ? <CumulativeBarChart bars={bars} /> : null}
 
         <table className="sector-states">
             <tbody>
@@ -148,7 +141,7 @@ function Sealing(props) {
                 <tr key={sec.Name}>
                     <td className="color"><div className={sec.className} /></td>
                     <td className="state">{sec.Name}</td>
-                    <td className="count">{sec.Count}</td>
+                    <td className={"count " + (sec.Count ? '' : 'zero')}>{sec.Count}</td>
                 </tr>
             ))}
             </tbody>
@@ -159,24 +152,26 @@ function Sealing(props) {
 function Workers(props) {
     return <div className="workers">
         <div className="title">Workers</div>
-        <table>
-            <tbody>
-            <tr>
-                <th className="start">Start</th>
-                <th className="worker-id">ID</th>
-                <th className="stage">Stage</th>
-                <th className="sector">Sector</th>
-            </tr>
-            {props.workers.map(worker => (
-                <tr key={worker.ID}>
-                    <td className="start">{moment(worker.Start).format(dateFormat)}</td>
-                    <td className="worker-id">{worker.ID}</td>
-                    <td className="stage">{worker.Stage}</td>
-                    <td className="sector">{worker.Sector}</td>
+        {props.workers.length === 0 ? <div className="no-workers">No active workers</div> : (
+            <table>
+                <tbody>
+                <tr>
+                    <th className="start">Start</th>
+                    <th className="worker-id">ID</th>
+                    <th className="stage">Stage</th>
+                    <th className="sector">Sector</th>
                 </tr>
-            ))}
-            </tbody>
-        </table>
+                {props.workers.map(worker => (
+                    <tr key={worker.ID}>
+                        <td className="start">{moment(worker.Start).format(dateFormat)}</td>
+                        <td className="worker-id">{worker.ID}</td>
+                        <td className="stage">{worker.Stage}</td>
+                        <td className="sector">{worker.Sector}</td>
+                    </tr>
+                ))}
+                </tbody>
+            </table>
+        )}
     </div>
 }
 
@@ -194,7 +189,37 @@ export function SealingPipelineMenuItem(props) {
     }
 
     return <Link key="sealing-pipeline" className="menu-item" to="/sealing-pipeline">
-        Sealing Pipeline
-        <div className="aux">Sealing: {total}</div>
+        <img className="icon" alt="" src={layerBackwardImg} />
+        <h3>Sealing Pipeline</h3>
+        <div className="menu-desc">
+            <b>{total}</b> sector{total === 1 ? '' : 's'}
+        </div>
     </Link>
+}
+
+const mockData = {
+    sealingpipeline: {
+        WaitDeals: {
+            Deals: [{
+                ID: '1312-asdfd-234234-sadfsdfs',
+                Size: BigInt(2*1024*1024*1024),
+            }, {
+                ID: '4234-hfdsh-253524-kassdsss',
+                Size: BigInt(11*1024*1024*1024),
+            }],
+            SectorSize: BigInt(32*1024*1024*1024),
+        },
+        SectorStates: {
+            AddPiece: 1,
+            Packing: 1,
+            PreCommit1: 0,
+            PreCommit2: 2,
+            PreCommitWait: 0,
+            WaitSeed: 0,
+            Committing: 4,
+            CommittingWait: 0,
+            FinalizeSector: 1,
+        },
+        Workers: [],
+    }
 }

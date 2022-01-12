@@ -268,6 +268,11 @@ const DealPublishQuery = gql`
             Deals {
                 ID
                 CreatedAt
+                Transfer {
+                    Size
+                }
+                ClientAddress
+                PieceSize
             }
         }
     }

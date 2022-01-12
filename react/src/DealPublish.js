@@ -2,8 +2,11 @@ import {useMutation, useQuery} from "@apollo/react-hooks";
 import {DealPublishNowMutation, DealPublishQuery} from "./gql";
 import React from "react";
 import moment from "moment";
-import {PageContainer, ShortDealLink} from "./Components";
+import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
 import {Link} from "react-router-dom";
+import sendImg from './bootstrap-icons/icons/send.svg'
+import './DealPublish.css'
+import {humanFileSize} from "./util";
 
 export function DealPublishPage(props) {
     return <PageContainer pageType="deal-publish" title="Publish Deals">
@@ -33,25 +36,27 @@ function DealPublishContent() {
     return <div>
         {deals.length ? (
             <>
+            <p>
+                {deals.length} deal{deals.length === 1 ? '' : 's'} will be published
+                at <b>{publishTime.format('HH:mm:ss')}</b> (in {publishTime.toNow()})
+            </p>
+
             <div className="buttons">
                 <div className="button" onClick={publishNow}>Publish Now</div>
             </div>
-
-            <p>
-                {deals.length} deal{deals.length === 1 ? '' : 's'} will be published
-                at {publishTime.format('HH:mm:ss')} (in {publishTime.toNow()})
-            </p>
             </>
         ) : null}
+
+        <h3>Deal Publish Config</h3>
 
         <table className="deal-publish">
             <tbody>
                 <tr>
-                    <td>Deal publish period</td>
+                    <th>Deal publish period</th>
                     <td>{period.humanize()}</td>
                 </tr>
                 <tr>
-                    <td>Max deals per message</td>
+                    <th>Max deals per message</th>
                     <td>{data.dealPublish.MaxDealsPerMsg}</td>
                 </tr>
             </tbody>
@@ -73,12 +78,20 @@ function DealsTable(props) {
                     <tr>
                         <th>Created</th>
                         <th>Deal ID</th>
+                        <th>Size</th>
+                        <th>Piece Size</th>
+                        <th>Client</th>
                     </tr>
                     {props.deals.map(deal => (
                         <tr key={deal.ID}>
                             <td>{moment(deal.CreatedAt).fromNow()}</td>
                             <td className="deal-id">
                                 <ShortDealLink id={deal.ID} />
+                            </td>
+                            <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
+                            <td className="piece-size">{humanFileSize(deal.PieceSize)}</td>
+                            <td className="client">
+                                <ShortClientAddress address={deal.ClientAddress} />
                             </td>
                         </tr>
                     ))}
@@ -96,9 +109,13 @@ export function DealPublishMenuItem(props) {
 
     return (
         <Link key="deal-publish" className="menu-item" to="/deal-publish">
-            Publish Deals
+            <img className="icon" alt="" src={sendImg} />
+            <h3>Publish Deals</h3>
+
             {data && data.dealPublish.Deals ? (
-                <div className="aux">Ready: {data.dealPublish.Deals.length}</div>
+                <div className="menu-desc">
+                    <b>{data.dealPublish.Deals.length}</b> ready to publish
+                </div>
             ) : null}
         </Link>
     )

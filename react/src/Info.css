@@ -8,9 +8,11 @@
     border: 1px solid #465298;
     color: #465298;
     cursor: pointer;
-    border-radius: 2em;
-    padding: 0 0.5em;
     font-size: 0.6em;
+    width: 0.25em;
+    height: 1.2em;
+    border-radius: 2em;
+    padding: 0.2em 0.5em 0 0.55em;
     vertical-align: top;
     margin-left: 0.5em;
 }
@@ -24,7 +26,8 @@
     width: 20em;
     background: #fff;
     border: 1px solid #465298;
+    box-shadow: 0 .75rem 1.5rem rgba(18,38,63,.1);
     color: #465298;
     border-radius: 0.2em;
-    padding: 0.5em;
+    padding: 0.75em;
 }

@@ -1,7 +1,18 @@
-@font-face {
-  font-family: "Virgil";
-  src: local('Virgil'), url("./fonts/Virgil.woff2");
-  font-display: swap;
+body {
+  background-color: #f9fbfd;
+  color: #12263f;
+  margin: 0;
+  font-family: "Cerebri Sans",sans-serif
+}
+
+table {
+  padding: 0;
+  border-collapse: collapse;
+}
+
+table th {
+  color: #3b506c;
+  font-weight: normal;
 }
 
 a {
@@ -39,6 +50,7 @@ body.modal-open {
   left: 0;
   right: 0;
   overflow: auto;
+  cursor: auto;
 }
 
 .modal .content {
@@ -49,44 +61,40 @@ body.modal-open {
 
 .modal .close {
   position: absolute;
-  top: -0.5em;
+  top: -0.25em;
   right: -2em;
   font-size: 2em;
   cursor: pointer;
 }
 
+.modal .close .icon {
+  width: 0.8em;
+}
+
 #content {
-  font-family: Virgil;
-  font-size: 1.25em;
   padding-bottom: 3em;
 }
+
 #content table {
   font-size: 1em;
 }
 
-.menu {
-  width: 10em;
-  padding: 1em;
+.content-table {
+  width: 100%;
+}
+
+.main-content {
   vertical-align: top;
-  white-space: nowrap;
-}
-
-.menu .menu-item {
-  display: block;
-  color: #a61e4d;
-  margin: 1.5em 0.5em;
-  cursor: pointer;
-}
-
-.menu .menu-item .aux {
-  font-size: 0.8em;
-  color: #999;
-  padding-top: 0.25em;
+  width: 100%;
 }
 
 .page-content {
-  vertical-align: top;
-  width: 90%;
+  background-color: #fff;
+  border: 1px solid #edf2f9;
+  box-shadow: 0 .75rem 1.5rem rgba(18,38,63,.1);
+  border-radius: 0.25em;
+  margin: 1em;
+  padding: 1em;
 }
 
 .page-title {
@@ -96,355 +104,10 @@ body.modal-open {
   color: #a61e4d;
 }
 
-.deals table {
-  font-size: 1em;
-  width: 100%;
-}
-
-.deals td, .deals th {
-  padding: 0.5em 1em;
-  font-weight: normal;
-}
-
-.deals th {
-  white-space: nowrap;
+h3 {
+  margin: 1em 0.85em;
   text-align: left;
-}
-
-.deals td.start {
-  width: 3em;
-}
-
-.deals td.size {
-  width: 5em;
-  white-space: nowrap;
-}
-
-.deals td.deal-id {
-  cursor: pointer;
-  color: #465298;
-  width: 7em;
-}
-
-.deals td.client {
-  width: 6em;
-}
-
-.deals .pagination {
-  position: relative;
-}
-
-.deals .pagination .controls {
-  position: absolute;
-  margin-top: 1em;
-  left: 50%;
-  transform: translate(-50%, 0);
-}
-
-.deals .pagination .left, .deals .pagination .right, .deals .pagination .page, .deals .pagination .total {
-  display: inline-block;
-  padding: 0 0.5em;
-}
-
-.deals .pagination .left, .deals .pagination .right {
-  color: #465298;
-  cursor: pointer;
-}
-
-.deals .pagination .total {
-  color: #999;
-}
-
-.deal-detail {
-  padding-top: 1em;
-  margin: auto;
-}
-
-.deal-detail .title {
-  margin:  1em auto;
-  text-align: center;
-  font-size: 1.25em;
   color: #a61e4d;
-}
-
-.deal-detail table {
-  font-size: 1em;
-}
-
-.deal-detail table.deal-fields {
-  margin-bottom: 1em;
-}
-
-.deal-detail table.deal-fields tr td:first-child {
-  width: 8em;
-}
-.deal-detail table.deal-fields tr td:last-child {
-  line-break: anywhere;
-}
-
-.deal-detail td {
-  padding: 0.5em 1em;
-}
-
-.deal-detail td.since-last {
-  color:  #999;
-}
-
-.deal-detail .buttons {
-  display: inline-block;
-  float: right;
-}
-
-.bar-chart > table {
-  margin-top: 2.5em;
-}
-
-.bar-chart .field {
-  height: 200px;
-  width: 5em;
-}
-
-.bar-chart .field .size {
-  font-size: 0.8em;
-  position: absolute;
-  margin-top: -1.5em;
-}
-
-.bar-chart .field .size-text {
-  position: absolute;
-  bottom: -1em;
-  width: 5em;
-}
-
-.bar-chart .field .bar {
-  width: 3em;
-  border: 1px solid black;
-  margin: auto;
-}
-
-.bar-chart .field .bar .used {
-  background-image: repeating-linear-gradient(
-          135deg,
-          #fff,
-          #fff 5px,
-          #465298 5px,
-          #465298 6px);
-  border-top: 1px solid #465298;
-  border-bottom: 1px solid #000;
-}
-
-.bar-chart .label {
-  font-size: 0.8em;
-  text-align: center;
-  padding-top: 1em;
-  vertical-align: top;
-}
-
-#funds .chart {
-  padding: 1em;
-}
-
-#funds .chart .amounts {
-  width: 50%;
-  display: inline-block;
-}
-
-#funds .chart .wallet-address {
-  padding: 0.5em 0;
-  font-size: 0.8em;
-}
-
-#funds .chart .escrow {
-  margin-top: 1em;
-}
-
-#funds .chart .escrow .title {
-  padding: 0.5em 0;
-}
-
-#funds .chart .bar {
-  border: 1px solid #000;
-  display: inline-block;
-  height: 2.5em;
-  width: 100%;
-}
-
-#funds .chart .bar > div, #funds .chart .bar-total {
-  display: inline-block;
-  vertical-align: top;
-  height: 2.5em;
-}
-
-#funds .chart .bar-total {
-  line-height: 2.5em;
-}
-
-#funds .chart .bar > div {
-  border-right: 1px solid #000;
-  position: relative;
-}
-
-#funds .chart .bar > div:last-child {
-  border-right: none;
-}
-
-#funds .chart .bar .label {
-  position: absolute;
-  top: 3.2em;
-  font-size: 0.8em;
-  display: inline-block;
-  text-align: center;
-  left: 50%;
-  transform: translate(-50%, 0);
-}
-
-#funds .chart .bar .label .text {
-  padding: 0.5em;
-  white-space: nowrap;
-}
-
-#funds .chart .bar .label .tick {
-  border-left: 1px solid #000;
-  height: 0.5em;
-  margin-left: 50%
-}
-
-#funds .chart .bar-total {
-  padding-left: 1em;
-}
-
-#funds .chart .bar div.tagged {
-  background-image: repeating-linear-gradient(
-          135deg,
-          #fff,
-          #fff 5px,
-          #a61e4d 5px,
-          #a61e4d 6px);
-}
-
-#funds .chart .bar div.locked {
-  background-image: repeating-linear-gradient(
-          135deg,
-          #fff,
-          #fff 5px,
-          #465298 5px,
-          #465298 6px);
-}
-
-#funds .chart .pubmsg-wallet {
-  margin-top: 2em;
-}
-
-#funds .chart .pubmsg-wallet .bar-content {
-  height: 4em;
-}
-
-
-#funds .collateral {
-  display: inline-block;
-  vertical-align: top;
-}
-
-#funds .collateral td {
-  padding: 0.5em 1em;
   font-weight: normal;
-}
-
-#funds .chart .bar-keys {
-  font-size: 0.8em;
-}
-
-#funds .chart .labels .label {
-  display: inline-block;
-  padding: 0.5em 1em;
-  font-size: 0.8em;
-}
-
-#funds .chart .labels .bar-color {
-  border: 1px solid #000;
-  width: 0.8em;
-  height: 0.8em;
-  display: inline-block;
-}
-
-#funds .chart .labels .text {
-  display: inline-block;
-  padding-left: 0.5em;
-}
-
-#funds .chart .labels .amount {
-  padding: 0.5em 0 0 1.5em;
-}
-
-#funds .chart .labels .tagged .bar-color {
-  background-image: repeating-linear-gradient(
-          135deg,
-          #fff,
-          #fff 3px,
-          #a61e4d 3px,
-          #a61e4d 4px);
-}
-
-#funds .chart .labels .locked .bar-color {
-  background-image: repeating-linear-gradient(
-          135deg,
-          #fff,
-          #fff 3px,
-          #465298 3px,
-          #465298 4px);
-}
-
-#funds .chart .bar-keys .bar-key .bar-text {
-  display: inline-block;
-  padding: 0 0.5em;
-}
-
-.top-up {
-  display: inline-block;
-  width: 50%;
-  vertical-align: top;
-}
-
-.top-up .button {
-  display: inline-block;
-}
-
-.top-up-form .button.cancel {
-  background-color: #999;
-}
-
-.funds-logs {
-  margin-top: 2em;
-}
-
-.funds-logs td, .funds-logs th {
-  padding: 0.5em 1em;
-}
-
-.funds-logs th {
-  color: #a61e4d
-}
-
-#deal-publish h3 {
-  margin-top: 2em;
-  text-align: center;
-  color: #a61e4d;
-}
-
-#deal-publish p {
-  padding-left: 1em
-}
-
-#deal-publish .buttons {
-  position: relative;
-}
-
-#deal-publish .buttons .button {
-  position: absolute;
-  left: 30em;
-  top: -1em;
-}
-
-.deal-publish td {
-  padding: 0.5em 1em;
+  font-size: 1.25em;
 }

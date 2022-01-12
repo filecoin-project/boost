@@ -21,18 +21,20 @@ function App(props) {
                     <tbody>
                         <tr>
                             <Menu />
-                            <td className="page-content">
-                                <Routes>
-                                    <Route path="/storage-deals" element={<StorageDealsPage />} />
-                                    <Route path="/storage-space" element={<StorageSpacePage />} />
-                                    <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
-                                    <Route path="/funds" element={<FundsPage />} />
-                                    <Route path="/deal-publish" element={<DealPublishPage />} />
-                                    <Route path="/deal-transfers" element={<DealTransfersPage />} />
-                                    <Route path="/mpool" element={<MpoolPage />} />
-                                    <Route path="/deals/:dealID" element={<DealDetail />} />
-                                    <Route path="/" element={<StorageDealsPage />} />
-                                </Routes>
+                            <td className="main-content">
+                                <div className="page-content">
+                                    <Routes>
+                                        <Route path="/storage-deals" element={<StorageDealsPage />} />
+                                        <Route path="/storage-space" element={<StorageSpacePage />} />
+                                        <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
+                                        <Route path="/funds" element={<FundsPage />} />
+                                        <Route path="/deal-publish" element={<DealPublishPage />} />
+                                        <Route path="/deal-transfers" element={<DealTransfersPage />} />
+                                        <Route path="/mpool" element={<MpoolPage />} />
+                                        <Route path="/deals/:dealID" element={<DealDetail />} />
+                                        <Route path="/" element={<StorageDealsPage />} />
+                                    </Routes>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
