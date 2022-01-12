@@ -455,7 +455,6 @@ func (p *Provider) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, 
 		return nil, xerrors.Errorf("WaitForPublishDeals getting deal info errored: %w", err)
 	}
 
-	//return &storagemarket.PublishDealsWaitResult{DealID: abi.DealID(4), FinalCid: receipt.Message}, nil
 	return &storagemarket.PublishDealsWaitResult{DealID: res.DealID, FinalCid: receipt.Message}, nil
 }
 
