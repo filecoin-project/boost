@@ -498,8 +498,7 @@ func (p *Provider) dealIDFromPublishDealsMsg(ctx context.Context, tok ctypes.Tip
 	// Get the return value of the publish deals message
 	wmsg, err := p.fullnodeApi.StateSearchMsg(p.ctx, ctypes.EmptyTSK, publishCid, api.LookbackNoLimit, true)
 	if err != nil {
-		panic("smth")
-		//return nil, nil, err
+		return dealID, ctypes.EmptyTSK, xerrors.Errorf("getting publish deals message return value: %w", err)
 	}
 
 	if wmsg == nil {
