@@ -524,25 +524,6 @@ func (p *Provider) dealIDFromPublishDealsMsg(ctx context.Context, tok ctypes.Tip
 		return dealID, ctypes.EmptyTSK, xerrors.Errorf("looking for publish deal message %s: getting dealIDs: %w", publishCid, err)
 	}
 
-	// TODO: Can we delete this? We're well past the point when we first introduced the proposals into sealing deal info
-	// Previously, publish deals messages contained a single deal, and the
-	// deal proposal was not included in the sealing deal info.
-	// So check if the proposal is nil and check the number of deals published
-	// in the message.
-	if proposal == nil {
-		if len(dealIDs) > 1 {
-			return dealID, ctypes.EmptyTSK, xerrors.Errorf(
-				"getting deal ID from publish deal message %s: "+
-					"no deal proposal supplied but message return value has more than one deal (%d deals)",
-				publishCid, len(dealIDs))
-		}
-
-		// There is a single deal in this publish message and no deal proposal
-		// was supplied, so we have nothing to compare against. Just assume
-		// the deal ID is correct and that it was valid
-		return dealIDs[0], wmsg.TipSet, nil
-	}
-
 	// Get the parameters to the publish deals message
 	pubmsg, err := p.fullnodeApi.ChainGetMessage(ctx, publishCid)
 	if err != nil {
