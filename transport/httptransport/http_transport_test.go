@@ -435,10 +435,7 @@ func newLibp2pHttpServer(t *testing.T, handler func(http.ResponseWriter, *http.R
 }
 
 func newHost(t *testing.T, listen multiaddr.Multiaddr) host.Host {
-	h, err := libp2p.New(
-		context.Background(),
-		libp2p.ListenAddrs(listen),
-	)
+	h, err := libp2p.New(libp2p.ListenAddrs(listen))
 	require.NoError(t, err)
 	return h
 }

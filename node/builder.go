@@ -174,7 +174,7 @@ var LibP2P = Options(
 	Override(new(dtypes.Bootstrapper), dtypes.Bootstrapper(false)),
 
 	// Host dependencies
-	Override(new(peerstore.Peerstore), pstoremem.NewPeerstore),
+	Override(new(peerstore.Peerstore), func() (peerstore.Peerstore, error) { return pstoremem.NewPeerstore() }),
 	Override(PstoreAddSelfKeysKey, lp2p.PstoreAddSelfKeys),
 	Override(StartListeningKey, lp2p.StartListening([]string{"/ip4/127.0.0.1/tcp/1899"})),
 
