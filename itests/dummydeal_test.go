@@ -142,7 +142,7 @@ func TestDummydeal(t *testing.T) {
 	failingDealUuid := uuid.New()
 	res2, err2 := f.makeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
 	require.NoError(t, err2)
-	require.Equal(t, "cannot accept piece of size 2254771, on top of already allocated 2254771 bytes, because it would exceed max staging area size 4000000", res2.Reason)
+	require.Equal(t, "cannot accept piece of size 2254421, on top of already allocated 2254421 bytes, because it would exceed max staging area size 4000000", res2.Reason)
 	log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
 
 	// Wait for the deal to be added to a sector
