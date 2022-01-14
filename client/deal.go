@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -23,7 +24,10 @@ type StorageClient struct {
 }
 
 func NewStorageClient(ctx context.Context) (*StorageClient, error) {
-	pstore := pstoremem.NewPeerstore()
+	pstore, err := pstoremem.NewPeerstore()
+	if err != nil {
+		return nil, fmt.Errorf("creating peer store: %w", err)
+	}
 	opts := []libp2p.Option{
 		libp2p.DefaultTransports,
 		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
@@ -31,7 +35,7 @@ func NewStorageClient(ctx context.Context) (*StorageClient, error) {
 		libp2p.NoListenAddrs,
 	}
 
-	h, err := libp2p.New(ctx, opts...)
+	h, err := libp2p.New(opts...)
 	if err != nil {
 		return nil, err
 	}
