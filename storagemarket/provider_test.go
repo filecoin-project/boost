@@ -66,7 +66,7 @@ func TestSimpleDealHappy(t *testing.T) {
 	harness := NewHarness(t, ctx, 10000000000, minPublish)
 	defer harness.Stop()
 	// start the provider test harness
-	harness.Start(ctx)
+	harness.Start(t, ctx)
 
 	// build the deal proposal
 	dp, carV2FilePath := harness.mkDealProposal(t, harness.NormalServer.URL, 1)
@@ -117,7 +117,7 @@ func TestMultipleDealsConcurrent(t *testing.T) {
 	harness := NewHarness(t, ctx, 10000000000, minPublish)
 	defer harness.Stop()
 	// start the provider test harness
-	harness.Start(ctx)
+	harness.Start(t, ctx)
 
 	// setup wallet balances
 	harness.setupWalletBalances(t, big.NewInt(300), big.NewInt(500), 1000)
@@ -167,7 +167,7 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 	harness := NewHarness(t, ctx, 10000000000, minPublish)
 	defer harness.Stop()
 	// start the provider test harness
-	harness.Start(ctx)
+	harness.Start(t, ctx)
 
 	// setup wallet balances
 	harness.setupWalletBalances(t, big.NewInt(300), big.NewInt(500), 1000)
@@ -224,6 +224,7 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 			harness.AssertPublished(t, ctx, ti.dp, ti.so)
 		}
 	}
+
 	harness.EventuallyAssertStorageFundState(t, ctx, totalStorage, totalPublish, totalCollat)
 
 	// now confirm the publish for remaining deals and assert funds and storage
@@ -248,8 +249,10 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 	harness.EventuallyAssertNoTagged(t, ctx)
 	// assert that piece has been added for the deals
 	for i := 0; i < nDeals; i++ {
-		ti := tInfos[i]
-		harness.AssertPieceAdded(t, ctx, ti.dp, ti.so, ti.carV2FilePath)
+		if i%2 != 0 {
+			ti := tInfos[i]
+			harness.AssertPieceAdded(t, ctx, ti.dp, ti.so, ti.carV2FilePath)
+		}
 	}
 }
 
@@ -271,16 +274,13 @@ func (h *ProviderHarness) executeDeal(dp *types.DealParams) (event.Subscription,
 
 func (h *ProviderHarness) waitForCheckpoint(sub event.Subscription, cp dealcheckpoints.Checkpoint) error {
 LOOP:
-	for {
-		select {
-		case i, _ := <-sub.Out():
-			st := i.(types.ProviderDealState)
-			if len(st.Err) != 0 {
-				return errors.New(st.Err)
-			}
-			if st.Checkpoint == cp {
-				break LOOP
-			}
+	for i := range sub.Out() {
+		st := i.(types.ProviderDealState)
+		if len(st.Err) != 0 {
+			return errors.New(st.Err)
+		}
+		if st.Checkpoint == cp {
+			break LOOP
 		}
 	}
 
@@ -344,14 +344,12 @@ func (h *ProviderHarness) AssertSealedContents(t *testing.T, carV2FilePath strin
 	cr, err := carv2.OpenReader(carV2FilePath)
 	require.NoError(t, err)
 	defer cr.Close()
+
 	actual, err := ioutil.ReadAll(cr.DataReader())
 	require.NoError(t, err)
-	// the read-bytes also contains extra zeros for the padding magic, so just match without the padding bytes first.
+
+	// the read-bytes also contains extra zeros for the padding magic, so just match without the padding bytes.
 	require.EqualValues(t, actual, read[:len(actual)])
-	// ignore the padding but ensure that it's all zeroes
-	for _, v := range read[len(actual):] {
-		require.EqualValues(t, 0, v)
-	}
 }
 
 func (h *ProviderHarness) AssertEventuallyDealCleanedup(t *testing.T, ctx context.Context, dealUuid uuid.UUID) {
@@ -367,10 +365,7 @@ func (h *ProviderHarness) AssertEventuallyDealCleanedup(t *testing.T, ctx contex
 
 		// the deal inbound file should no longer exist
 		_, statErr := os.Stat(dbState.InboundFilePath)
-		if statErr == nil {
-			return false
-		}
-		return true
+		return statErr != nil
 	}, 5*time.Second, 200*time.Millisecond)
 }
 
@@ -480,9 +475,9 @@ func NewHarness(t *testing.T, ctx context.Context, maxStagingDealsBytes uint64, 
 	}
 }
 
-func (h *ProviderHarness) Start(ctx context.Context) {
+func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
 	h.NormalServer.Start()
-	h.Provider.Start(ctx)
+	require.NoError(t, h.Provider.Start(ctx))
 }
 
 func (h *ProviderHarness) Stop() {
@@ -522,6 +517,7 @@ func (h *ProviderHarness) mkDealProposal(t *testing.T, serverURL string, seed in
 	require.NoError(t, err)
 
 	carv2Fileinfo, err := os.Stat(carV2FilePath)
+	require.NoError(t, err)
 
 	// assemble the final deal params to send to the provider
 	dealParams := types.DealParams{
