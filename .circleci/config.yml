@@ -118,7 +118,7 @@ jobs:
         default: golang
       go-test-flags:
         type: string
-        default: "-race -v --tags=debug -timeout 4m"
+        default: "-v --tags=debug -timeout 4m"
         description: Flags passed to go test.
       target:
         type: string
