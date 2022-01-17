@@ -1,6 +1,14 @@
 package types
 
 import (
+	"context"
+	"io"
+
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
+
+	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
+
+	"github.com/filecoin-project/lotus/api"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 
@@ -48,4 +56,16 @@ type DealResponse struct {
 	// Message is the reason the deal proposal was rejected. It is empty if
 	// the deal was accepted.
 	Message string
+}
+
+type PieceAdder interface {
+	AddPiece(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, d api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error)
+}
+
+type DealPublisher interface {
+	Publish(ctx context.Context, dealUuid uuid.UUID, deal market2.ClientDealProposal) (cid.Cid, error)
+}
+
+type MinerHelper interface {
+	WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error)
 }

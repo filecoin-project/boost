@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -125,7 +123,7 @@ func TestDummydeal(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start a web server to serve the car files
-	server, err := runWebServer(tempdir)
+	server, err := testutil.HttpTestFileServer(t, tempdir)
 	require.NoError(t, err)
 	defer server.Close()
 
@@ -397,16 +395,6 @@ func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 		case <-time.After(time.Second):
 		}
 	}
-}
-
-func runWebServer(dir string) (*httptest.Server, error) {
-	// start server with data to send
-
-	fileSystem := &testutil.SlowFileOpener{Dir: dir}
-
-	handler := http.FileServer(fileSystem)
-	svr := httptest.NewServer(handler)
-	return svr, nil
 }
 
 func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string) (*api.ProviderDealRejectionInfo, error) {

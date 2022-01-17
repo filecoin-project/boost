@@ -88,6 +88,9 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	if err := json.Unmarshal(transportInfo, tInfo); err != nil {
 		return nil, fmt.Errorf("failed to de-serialize transport info bytes, bytes:%s, err:%w", string(transportInfo), err)
 	}
+	if len(tInfo.URL) == 0 {
+		return nil, xerrors.New("deal url is empty")
+	}
 	// check that the outputFile exists
 	fi, err := os.Stat(dealInfo.OutputFile)
 	if err != nil {

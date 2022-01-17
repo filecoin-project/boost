@@ -106,7 +106,7 @@ func NewDealPublisher(publishMsgCfg PublishMsgConfig) func(lc fx.Lifecycle, full
 	return func(lc fx.Lifecycle, full api.FullNode) *DealPublisher {
 		maxFee := abi.TokenAmount(publishMsgCfg.MaxPublishDealsFee)
 		publishSpec := &api.MessageSendSpec{MaxFee: maxFee}
-		dp := newDealPublisher(full, publishMsgCfg, publishSpec)
+		dp := NewDealPublisherSimple(full, publishMsgCfg, publishSpec)
 		lc.Append(fx.Hook{
 			OnStop: func(ctx context.Context) error {
 				dp.Shutdown()
@@ -117,7 +117,7 @@ func NewDealPublisher(publishMsgCfg PublishMsgConfig) func(lc fx.Lifecycle, full
 	}
 }
 
-func newDealPublisher(
+func NewDealPublisherSimple(
 	dpapi dealPublisherAPI,
 	publishMsgCfg PublishMsgConfig,
 	publishSpec *api.MessageSendSpec,
@@ -136,7 +136,7 @@ func newDealPublisher(
 }
 
 type PendingDealInfo struct {
-	DealUUIDs            []uuid.UUID
+	DealUUIDs          []uuid.UUID
 	PublishPeriodStart time.Time
 	PublishPeriod      time.Duration
 	MaxDealsPerMsg     uint64
@@ -161,7 +161,7 @@ func (p *DealPublisher) PendingDeals() PendingDealInfo {
 	}
 
 	return PendingDealInfo{
-		DealUUIDs:            pending,
+		DealUUIDs:          pending,
 		PublishPeriodStart: p.publishPeriodStart,
 		PublishPeriod:      p.publishPeriod,
 		MaxDealsPerMsg:     p.maxDealsPerPublishMsg,
