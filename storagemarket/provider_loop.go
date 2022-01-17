@@ -42,6 +42,30 @@ func (p *Provider) loop() {
 			deal := dealReq.deal
 			log.Infow("process accept deal request", "id", deal.DealUuid)
 
+			// run custom decision logic
+			params := types.DealParams{
+				DealUUID:           deal.DealUuid,
+				ClientDealProposal: deal.ClientDealProposal,
+				DealDataRoot:       deal.DealDataRoot,
+				Transfer:           deal.Transfer,
+			}
+			accept, reason, err := p.df(p.ctx, params)
+			if err != nil {
+				log.Errorw("rejecting storage deal due to err", "err", err)
+
+				ri := &api.ProviderDealRejectionInfo{Accepted: false, Reason: err.Error()}
+				dealReq.rsp <- acceptDealResp{ri: ri, err: nil}
+				continue
+			}
+
+			if !accept {
+				log.Warnw("rejecting storage deal as it failed storage deal filter", "reason", reason)
+
+				ri := &api.ProviderDealRejectionInfo{Accepted: false, Reason: reason}
+				dealReq.rsp <- acceptDealResp{ri: ri, err: nil}
+				continue
+			}
+
 			// setup cleanup function
 			cleanup := func() {
 				errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
@@ -57,7 +81,7 @@ func (p *Provider) loop() {
 
 			// Tag the funds required for escrow and sending the publish deal message
 			// so that they are not used for other deals
-			err := p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
+			err = p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
 			if err != nil {
 				cleanup()
 				ri := &api.ProviderDealRejectionInfo{Accepted: false, Reason: err.Error()}

@@ -27,6 +27,7 @@ import (
 	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
+	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -410,6 +411,11 @@ func ConfigBoost(c interface{}) Option {
 
 		// GraphQL server
 		Override(new(*gql.Server), modules.NewGraphqlServer),
+
+		// Storage deal filter
+		If(cfg.Dealmaking.Filter != "",
+			Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, dealfilter.CliStorageDealFilter(cfg.Dealmaking.Filter))),
+		),
 	)
 }
 

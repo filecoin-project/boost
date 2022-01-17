@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
+	"github.com/filecoin-project/boost/storagemarket/types"
 
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/sealingpipeline"
@@ -529,9 +530,9 @@ func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
 	return db.NewDealsDB(sqldb)
 }
 
-func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.State) (*storagemarket.Provider, error) {
-	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.State) (*storagemarket.Provider, error) {
-		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, sps, storagemarket.NewChainDealManager(a))
+func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.State, df dtypes.StorageDealFilter) (*storagemarket.Provider, error) {
+	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.State, df dtypes.StorageDealFilter) (*storagemarket.Provider, error) {
+		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, sps, storagemarket.NewChainDealManager(a), df)
 		lp2pnet := lp2pimpl.NewDealProvider(h, prov)
 
 		if err != nil {
@@ -567,4 +568,76 @@ func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, dealsDB *db
 	})
 
 	return server
+}
+
+func BasicDealFilter(cfg config.DealmakingConfig, user dtypes.StorageDealFilter) func(onlineOk dtypes.ConsiderOnlineStorageDealsConfigFunc,
+	offlineOk dtypes.ConsiderOfflineStorageDealsConfigFunc,
+	verifiedOk dtypes.ConsiderVerifiedStorageDealsConfigFunc,
+	unverifiedOk dtypes.ConsiderUnverifiedStorageDealsConfigFunc,
+	blocklistFunc dtypes.StorageDealPieceCidBlocklistConfigFunc,
+	expectedSealTimeFunc dtypes.GetExpectedSealDurationFunc,
+	startDelay dtypes.GetMaxDealStartDelayFunc,
+	r repo.LockedRepo,
+) dtypes.StorageDealFilter {
+	return func(onlineOk dtypes.ConsiderOnlineStorageDealsConfigFunc,
+		offlineOk dtypes.ConsiderOfflineStorageDealsConfigFunc,
+		verifiedOk dtypes.ConsiderVerifiedStorageDealsConfigFunc,
+		unverifiedOk dtypes.ConsiderUnverifiedStorageDealsConfigFunc,
+		blocklistFunc dtypes.StorageDealPieceCidBlocklistConfigFunc,
+		expectedSealTimeFunc dtypes.GetExpectedSealDurationFunc,
+		startDelay dtypes.GetMaxDealStartDelayFunc,
+		r repo.LockedRepo,
+	) dtypes.StorageDealFilter {
+		return func(ctx context.Context, deal types.DealParams) (bool, string, error) {
+			pr := deal.ClientDealProposal.Proposal
+
+			b, err := onlineOk()
+			if err != nil {
+				return false, "miner error", err
+			}
+
+			b, err = offlineOk()
+			if err != nil {
+				return false, "miner error", err
+			}
+
+			b, err = verifiedOk()
+			if err != nil {
+				return false, "miner error", err
+			}
+
+			if pr.VerifiedDeal && !b {
+				log.Warnf("verified storage deal consideration disabled; rejecting storage deal proposal from client: %s", pr.Client.String())
+				return false, "miner is not accepting verified storage deals", nil
+			}
+
+			b, err = unverifiedOk()
+			if err != nil {
+				return false, "miner error", err
+			}
+
+			if !pr.VerifiedDeal && !b {
+				log.Warnf("unverified storage deal consideration disabled; rejecting storage deal proposal from client: %s", pr.Client.String())
+				return false, "miner is not accepting unverified storage deals", nil
+			}
+
+			blocklist, err := blocklistFunc()
+			if err != nil {
+				return false, "miner error", err
+			}
+
+			for idx := range blocklist {
+				if deal.ClientDealProposal.Proposal.PieceCID.Equals(blocklist[idx]) {
+					log.Warnf("piece CID in proposal %s is blocklisted; rejecting storage deal proposal from client: %s", pr.PieceCID, pr.Client.String())
+					return false, fmt.Sprintf("miner has blocklisted piece CID %s", pr.PieceCID), nil
+				}
+			}
+
+			if user != nil {
+				return user(ctx, deal)
+			}
+
+			return true, "", nil
+		}
+	}
 }
