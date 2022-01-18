@@ -57,7 +57,7 @@ func TestSimpleDealHappy(t *testing.T) {
 	ctx := context.Background()
 
 	// setup the provider test harness
-	harness := NewHarness(t, ctx)
+	harness := NewHarness(t, ctx, MinPublishFee(abi.NewTokenAmount(150)), MaxStagingDealBytes(2000000000))
 	defer harness.Stop()
 	// start the provider test harness
 	harness.Start(t, ctx)
