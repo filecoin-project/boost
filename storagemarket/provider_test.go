@@ -55,15 +55,9 @@ import (
 
 func TestSimpleDealHappy(t *testing.T) {
 	ctx := context.Background()
-	testMode = true
-	defer func() {
-		testMode = false
-	}()
 
 	// setup the provider test harness
-	// TODO Do not hardcode these values
-	minPublish := abi.NewTokenAmount(100)
-	harness := NewHarness(t, ctx, 10000000000, minPublish)
+	harness := NewHarness(t, ctx)
 	defer harness.Stop()
 	// start the provider test harness
 	harness.Start(t, ctx)
@@ -106,15 +100,9 @@ func TestSimpleDealHappy(t *testing.T) {
 func TestMultipleDealsConcurrent(t *testing.T) {
 	nDeals := 10
 	ctx := context.Background()
-	testMode = true
-	defer func() {
-		testMode = false
-	}()
 
 	// setup the provider test harness
-	// TODO Do not hardcode these values
-	minPublish := abi.NewTokenAmount(100)
-	harness := NewHarness(t, ctx, 10000000000, minPublish)
+	harness := NewHarness(t, ctx)
 	defer harness.Stop()
 	// start the provider test harness
 	harness.Start(t, ctx)
@@ -156,15 +144,9 @@ func TestMultipleDealsConcurrent(t *testing.T) {
 func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 	nDeals := 10
 	ctx := context.Background()
-	testMode = true
-	defer func() {
-		testMode = false
-	}()
 
 	// setup the provider test harness
-	// TODO Do not hardcode these values
-	minPublish := abi.NewTokenAmount(100)
-	harness := NewHarness(t, ctx, 10000000000, minPublish)
+	harness := NewHarness(t, ctx)
 	defer harness.Stop()
 	// start the provider test harness
 	harness.Start(t, ctx)
@@ -390,17 +372,18 @@ func (h *ProviderHarness) AssertDealDBState(t *testing.T, ctx context.Context, d
 }
 
 type ProviderHarness struct {
-	GokMockCtrl    *gomock.Controller
-	TempDir        string
-	MinerAddr      address.Address
-	ClientAddr     address.Address
-	MockFullNode   *lotusmocks.MockFullNode
-	MinerStub      *smtestutil.MinerStub
-	DealsDB        *db.DealsDB
-	FundsDB        *db.FundsDB
-	StorageDB      *db.StorageDB
-	PublishWallet  address.Address
-	MinPublishFees abi.TokenAmount
+	GoMockCtrl          *gomock.Controller
+	TempDir             string
+	MinerAddr           address.Address
+	ClientAddr          address.Address
+	MockFullNode        *lotusmocks.MockFullNode
+	MinerStub           *smtestutil.MinerStub
+	DealsDB             *db.DealsDB
+	FundsDB             *db.FundsDB
+	StorageDB           *db.StorageDB
+	PublishWallet       address.Address
+	MinPublishFees      abi.TokenAmount
+	MaxStagingDealBytes uint64
 
 	Provider *Provider
 
@@ -408,7 +391,23 @@ type ProviderHarness struct {
 	NormalServer *httptest.Server
 }
 
-func NewHarness(t *testing.T, ctx context.Context, maxStagingDealsBytes uint64, minPublishBal abi.TokenAmount) *ProviderHarness {
+type HarnessOpt func(h *ProviderHarness)
+
+// configures the min publish balance for each deal
+func MinPublishFee(minPublishBal abi.TokenAmount) HarnessOpt {
+	return func(h *ProviderHarness) {
+		h.MinPublishFees = minPublishBal
+	}
+}
+
+// configures the max bytes allocated to the staging area
+func MaxStagingDealBytes(maxBytes uint64) HarnessOpt {
+	return func(h *ProviderHarness) {
+		h.MaxStagingDealBytes = maxBytes
+	}
+}
+
+func NewHarness(t *testing.T, ctx context.Context, opts ...HarnessOpt) *ProviderHarness {
 	// tempDir
 	dir := t.TempDir()
 
@@ -437,42 +436,54 @@ func NewHarness(t *testing.T, ctx context.Context, maxStagingDealsBytes uint64, 
 	require.NoError(t, err)
 	dealsDB := db.NewDealsDB(sqldb)
 
-	// fund manager
+	// publish wallet
 	pw, err := address.NewIDAddress(uint64(rand.Intn(100)))
 	require.NoError(t, err)
+
+	// create the harness with default values
+	ph := &ProviderHarness{
+		GoMockCtrl:          ctrl,
+		TempDir:             dir,
+		MinerAddr:           minerAddr,
+		ClientAddr:          cAddr,
+		NormalServer:        normalServer,
+		MockFullNode:        fn,
+		DealsDB:             dealsDB,
+		FundsDB:             db.NewFundsDB(sqldb),
+		StorageDB:           db.NewStorageDB(sqldb),
+		PublishWallet:       pw,
+		MinerStub:           bp,
+		MinPublishFees:      abi.NewTokenAmount(100),
+		MaxStagingDealBytes: 10000000000,
+	}
+
+	// apply the config options
+	for _, o := range opts {
+		o(ph)
+	}
+
+	// fund manager
 	fminitF := fundmanager.New(fundmanager.Config{
-		PubMsgBalMin: minPublishBal,
+		PubMsgBalMin: ph.MinPublishFees,
 		PubMsgWallet: pw,
 	})
 	fm := fminitF(fn, sqldb)
 
 	// storage manager
-	smInitF := storagemanager.New(storagemanager.Config{
-		MaxStagingDealsBytes: maxStagingDealsBytes,
-	})
 	fsRepo, err := repo.NewFS(dir)
 	require.NoError(t, err)
 	lr, err := fsRepo.Lock(repo.StorageMiner)
 	require.NoError(t, err)
+	smInitF := storagemanager.New(storagemanager.Config{
+		MaxStagingDealsBytes: ph.MaxStagingDealBytes,
+	})
 	sm := smInitF(lr, sqldb)
 	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, bp, address.Undef, bp, nil, bp)
 	require.NoError(t, err)
+	prov.testMode = true
+	ph.Provider = prov
 
-	return &ProviderHarness{
-		GokMockCtrl:    ctrl,
-		Provider:       prov,
-		TempDir:        dir,
-		MinerAddr:      minerAddr,
-		ClientAddr:     cAddr,
-		NormalServer:   normalServer,
-		MockFullNode:   fn,
-		DealsDB:        dealsDB,
-		FundsDB:        db.NewFundsDB(sqldb),
-		StorageDB:      db.NewStorageDB(sqldb),
-		PublishWallet:  pw,
-		MinerStub:      bp,
-		MinPublishFees: minPublishBal,
-	}
+	return ph
 }
 
 func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
@@ -481,7 +492,7 @@ func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
 }
 
 func (h *ProviderHarness) Stop() {
-	h.GokMockCtrl.Finish()
+	h.GoMockCtrl.Finish()
 	h.NormalServer.Close()
 }
 

@@ -15,7 +15,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
 
-	mock_types "github.com/filecoin-project/boost/storagemarket/types/mocks"
+	mock_types "github.com/filecoin-project/boost/storagemarket/types/mock_types"
 	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
@@ -24,7 +24,7 @@ import (
 
 type MinerStub struct {
 	*mock_types.MockDealPublisher
-	*mock_types.MockMinerHelper
+	*mock_types.MockChainDealManager
 	*mock_types.MockPieceAdder
 
 	lk                    sync.Mutex
@@ -35,9 +35,9 @@ type MinerStub struct {
 
 func NewMinerStub(ctrl *gomock.Controller) *MinerStub {
 	return &MinerStub{
-		MockDealPublisher: mock_types.NewMockDealPublisher(ctrl),
-		MockMinerHelper:   mock_types.NewMockMinerHelper(ctrl),
-		MockPieceAdder:    mock_types.NewMockPieceAdder(ctrl),
+		MockDealPublisher:    mock_types.NewMockDealPublisher(ctrl),
+		MockChainDealManager: mock_types.NewMockChainDealManager(ctrl),
+		MockPieceAdder:       mock_types.NewMockPieceAdder(ctrl),
 
 		unblockPublish:        make(map[uuid.UUID]chan struct{}),
 		unblockWaitForPublish: make(map[uuid.UUID]chan struct{}),
@@ -128,7 +128,7 @@ func (mb *MinerStubBuilder) SetupPublishConfirm(blocking bool) *MinerStubBuilder
 	}
 	mb.stub.lk.Unlock()
 
-	mb.stub.MockMinerHelper.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
 		mb.stub.lk.Lock()
 		ch := mb.stub.unblockWaitForPublish[mb.dp.DealUUID]
 		mb.stub.lk.Unlock()

@@ -44,7 +44,6 @@ import (
 
 var (
 	log                    = logging.Logger("boost-provider")
-	testMode               = false
 	ErrDealNotFound        = fmt.Errorf("deal not found")
 	ErrDealHandlerNotFound = errors.New("deal handler not found")
 )
@@ -59,6 +58,8 @@ type Config struct {
 }
 
 type Provider struct {
+	testMode bool
+
 	config Config
 	// Address of the provider on chain.
 	Address address.Address
@@ -93,16 +94,16 @@ type Provider struct {
 
 	pieceAdder                  types.PieceAdder
 	maxDealCollateralMultiplier uint64
+	chainDealManager            types.ChainDealManager
 
 	fullnodeApi v1api.FullNode
 
-	dhsMu  sync.RWMutex
-	dhs    map[uuid.UUID]*dealHandler
-	helper types.MinerHelper
+	dhsMu sync.RWMutex
+	dhs   map[uuid.UUID]*dealHandler
 }
 
 func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, sps sealingpipeline.State,
-	helper types.MinerHelper) (*Provider, error) {
+	cm types.ChainDealManager) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -138,11 +139,11 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		dealPublisher:               dp,
 		fullnodeApi:                 fullnodeApi,
 		pieceAdder:                  pa,
+		chainDealManager:            cm,
 		maxDealCollateralMultiplier: 2,
 		transfers:                   newDealTransfers(),
 
-		dhs:    make(map[uuid.UUID]*dealHandler),
-		helper: helper,
+		dhs: make(map[uuid.UUID]*dealHandler),
 	}, nil
 }
 
@@ -179,7 +180,7 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 		Transfer:           dp.Transfer,
 	}
 	// validate the deal proposal
-	if !testMode {
+	if !p.testMode {
 		if err := p.validateDealProposal(ds); err != nil {
 			return &api.ProviderDealRejectionInfo{
 				Reason: fmt.Sprintf("failed validation: %s", err),

@@ -18,17 +18,17 @@ import (
 	"golang.org/x/xerrors"
 )
 
-type MinerHelper struct {
+type ChainDealManager struct {
 	fullnodeApi v1api.FullNode
 }
 
-func NewMinerHelper(a v1api.FullNode) *MinerHelper {
-	return &MinerHelper{a}
+func NewChainDealManager(a v1api.FullNode) *ChainDealManager {
+	return &ChainDealManager{a}
 }
 
-func (m *MinerHelper) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+func (c *ChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
 	// Wait for deal to be published (plus additional time for confidence)
-	receipt, err := m.fullnodeApi.StateWaitMsg(ctx, publishCid, 2*build.MessageConfidence, api.LookbackNoLimit, true)
+	receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, 2*build.MessageConfidence, api.LookbackNoLimit, true)
 	if err != nil {
 		return nil, xerrors.Errorf("WaitForPublishDeals errored: %w", err)
 	}
@@ -38,12 +38,12 @@ func (m *MinerHelper) WaitForPublishDeals(ctx context.Context, publishCid cid.Ci
 
 	// The deal ID may have changed since publish if there was a reorg, so
 	// get the current deal ID
-	head, err := m.fullnodeApi.ChainHead(ctx)
+	head, err := c.fullnodeApi.ChainHead(ctx)
 	if err != nil {
 		return nil, xerrors.Errorf("WaitForPublishDeals failed to get chain head: %w", err)
 	}
 
-	res, err := m.GetCurrentDealInfo(ctx, head.Key(), (*market.DealProposal)(&proposal), publishCid)
+	res, err := c.GetCurrentDealInfo(ctx, head.Key(), (*market.DealProposal)(&proposal), publishCid)
 	if err != nil {
 		return nil, xerrors.Errorf("WaitForPublishDeals getting deal info errored: %w", err)
 	}
@@ -54,19 +54,19 @@ func (m *MinerHelper) WaitForPublishDeals(ctx context.Context, publishCid cid.Ci
 // GetCurrentDealInfo gets the current deal state and deal ID.
 // Note that the deal ID is assigned when the deal is published, so it may
 // have changed if there was a reorg after the deal was published.
-func (m *MinerHelper) GetCurrentDealInfo(ctx context.Context, tok ctypes.TipSetKey, proposal *market.DealProposal, publishCid cid.Cid) (CurrentDealInfo, error) {
+func (c *ChainDealManager) GetCurrentDealInfo(ctx context.Context, tok ctypes.TipSetKey, proposal *market.DealProposal, publishCid cid.Cid) (CurrentDealInfo, error) {
 	// Lookup the deal ID by comparing the deal proposal to the proposals in
 	// the publish deals message, and indexing into the message return value
-	dealID, pubMsgTok, err := m.dealIDFromPublishDealsMsg(ctx, tok, proposal, publishCid)
+	dealID, pubMsgTok, err := c.dealIDFromPublishDealsMsg(ctx, tok, proposal, publishCid)
 	if err != nil {
 		return CurrentDealInfo{}, err
 	}
 
 	// Lookup the deal state by deal ID
-	marketDeal, err := m.fullnodeApi.StateMarketStorageDeal(ctx, dealID, tok)
+	marketDeal, err := c.fullnodeApi.StateMarketStorageDeal(ctx, dealID, tok)
 	if err == nil && proposal != nil {
 		// Make sure the retrieved deal proposal matches the target proposal
-		equal, err := m.CheckDealEquality(ctx, tok, *proposal, marketDeal.Proposal)
+		equal, err := c.CheckDealEquality(ctx, tok, *proposal, marketDeal.Proposal)
 		if err != nil {
 			return CurrentDealInfo{}, err
 		}
@@ -79,11 +79,11 @@ func (m *MinerHelper) GetCurrentDealInfo(ctx context.Context, tok ctypes.TipSetK
 
 // dealIDFromPublishDealsMsg looks up the publish deals message by cid, and finds the deal ID
 // by looking at the message return value
-func (m *MinerHelper) dealIDFromPublishDealsMsg(ctx context.Context, tok ctypes.TipSetKey, proposal *market.DealProposal, publishCid cid.Cid) (abi.DealID, ctypes.TipSetKey, error) {
+func (c *ChainDealManager) dealIDFromPublishDealsMsg(ctx context.Context, tok ctypes.TipSetKey, proposal *market.DealProposal, publishCid cid.Cid) (abi.DealID, ctypes.TipSetKey, error) {
 	dealID := abi.DealID(0)
 
 	// Get the return value of the publish deals message
-	wmsg, err := m.fullnodeApi.StateSearchMsg(ctx, ctypes.EmptyTSK, publishCid, api.LookbackNoLimit, true)
+	wmsg, err := c.fullnodeApi.StateSearchMsg(ctx, ctypes.EmptyTSK, publishCid, api.LookbackNoLimit, true)
 	if err != nil {
 		return dealID, ctypes.EmptyTSK, xerrors.Errorf("getting publish deals message return value: %w", err)
 	}
@@ -96,7 +96,7 @@ func (m *MinerHelper) dealIDFromPublishDealsMsg(ctx context.Context, tok ctypes.
 		return dealID, ctypes.EmptyTSK, xerrors.Errorf("looking for publish deal message %s: non-ok exit code: %s", publishCid, wmsg.Receipt.ExitCode)
 	}
 
-	nv, err := m.fullnodeApi.StateNetworkVersion(ctx, wmsg.TipSet)
+	nv, err := c.fullnodeApi.StateNetworkVersion(ctx, wmsg.TipSet)
 	if err != nil {
 		return dealID, ctypes.EmptyTSK, xerrors.Errorf("getting network version: %w", err)
 	}
@@ -112,7 +112,7 @@ func (m *MinerHelper) dealIDFromPublishDealsMsg(ctx context.Context, tok ctypes.
 	}
 
 	// Get the parameters to the publish deals message
-	pubmsg, err := m.fullnodeApi.ChainGetMessage(ctx, publishCid)
+	pubmsg, err := c.fullnodeApi.ChainGetMessage(ctx, publishCid)
 	if err != nil {
 		return dealID, ctypes.EmptyTSK, xerrors.Errorf("getting publish deal message %s: %w", publishCid, err)
 	}
@@ -126,7 +126,7 @@ func (m *MinerHelper) dealIDFromPublishDealsMsg(ctx context.Context, tok ctypes.
 	// index of the target deal proposal
 	dealIdx := -1
 	for i, paramDeal := range pubDealsParams.Deals {
-		eq, err := m.CheckDealEquality(ctx, tok, *proposal, market.DealProposal(paramDeal.Proposal))
+		eq, err := c.CheckDealEquality(ctx, tok, *proposal, market.DealProposal(paramDeal.Proposal))
 		if err != nil {
 			return dealID, ctypes.EmptyTSK, xerrors.Errorf("comparing publish deal message %s proposal to deal proposal: %w", publishCid, err)
 		}
@@ -157,12 +157,12 @@ func (m *MinerHelper) dealIDFromPublishDealsMsg(ctx context.Context, tok ctypes.
 
 	return dealIDs[dealIdx], wmsg.TipSet, nil
 }
-func (m *MinerHelper) CheckDealEquality(ctx context.Context, tok ctypes.TipSetKey, p1, p2 market.DealProposal) (bool, error) {
-	p1ClientID, err := m.fullnodeApi.StateLookupID(ctx, p1.Client, tok)
+func (c *ChainDealManager) CheckDealEquality(ctx context.Context, tok ctypes.TipSetKey, p1, p2 market.DealProposal) (bool, error) {
+	p1ClientID, err := c.fullnodeApi.StateLookupID(ctx, p1.Client, tok)
 	if err != nil {
 		return false, err
 	}
-	p2ClientID, err := m.fullnodeApi.StateLookupID(ctx, p2.Client, tok)
+	p2ClientID, err := c.fullnodeApi.StateLookupID(ctx, p2.Client, tok)
 	if err != nil {
 		return false, err
 	}

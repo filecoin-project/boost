@@ -95,31 +95,31 @@ func (mr *MockDealPublisherMockRecorder) Publish(ctx, dealUuid, deal interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockDealPublisher)(nil).Publish), ctx, dealUuid, deal)
 }
 
-// MockMinerHelper is a mock of MinerHelper interface.
-type MockMinerHelper struct {
+// MockChainDealManager is a mock of ChainDealManager interface.
+type MockChainDealManager struct {
 	ctrl     *gomock.Controller
-	recorder *MockMinerHelperMockRecorder
+	recorder *MockChainDealManagerMockRecorder
 }
 
-// MockMinerHelperMockRecorder is the mock recorder for MockMinerHelper.
-type MockMinerHelperMockRecorder struct {
-	mock *MockMinerHelper
+// MockChainDealManagerMockRecorder is the mock recorder for MockChainDealManager.
+type MockChainDealManagerMockRecorder struct {
+	mock *MockChainDealManager
 }
 
-// NewMockMinerHelper creates a new mock instance.
-func NewMockMinerHelper(ctrl *gomock.Controller) *MockMinerHelper {
-	mock := &MockMinerHelper{ctrl: ctrl}
-	mock.recorder = &MockMinerHelperMockRecorder{mock}
+// NewMockChainDealManager creates a new mock instance.
+func NewMockChainDealManager(ctrl *gomock.Controller) *MockChainDealManager {
+	mock := &MockChainDealManager{ctrl: ctrl}
+	mock.recorder = &MockChainDealManagerMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockMinerHelper) EXPECT() *MockMinerHelperMockRecorder {
+func (m *MockChainDealManager) EXPECT() *MockChainDealManagerMockRecorder {
 	return m.recorder
 }
 
 // WaitForPublishDeals mocks base method.
-func (m *MockMinerHelper) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+func (m *MockChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitForPublishDeals", ctx, publishCid, proposal)
 	ret0, _ := ret[0].(*storagemarket.PublishDealsWaitResult)
@@ -128,7 +128,7 @@ func (m *MockMinerHelper) WaitForPublishDeals(ctx context.Context, publishCid ci
 }
 
 // WaitForPublishDeals indicates an expected call of WaitForPublishDeals.
-func (mr *MockMinerHelperMockRecorder) WaitForPublishDeals(ctx, publishCid, proposal interface{}) *gomock.Call {
+func (mr *MockChainDealManagerMockRecorder) WaitForPublishDeals(ctx, publishCid, proposal interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForPublishDeals", reflect.TypeOf((*MockMinerHelper)(nil).WaitForPublishDeals), ctx, publishCid, proposal)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForPublishDeals", reflect.TypeOf((*MockChainDealManager)(nil).WaitForPublishDeals), ctx, publishCid, proposal)
 }

@@ -66,6 +66,6 @@ type DealPublisher interface {
 	Publish(ctx context.Context, dealUuid uuid.UUID, deal market2.ClientDealProposal) (cid.Cid, error)
 }
 
-type MinerHelper interface {
+type ChainDealManager interface {
 	WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error)
 }
