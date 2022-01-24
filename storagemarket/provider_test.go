@@ -9,48 +9,35 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
-
-	"golang.org/x/sync/errgroup"
-
-	"github.com/filecoin-project/boost/storagemarket/smtestutil"
-
-	"github.com/libp2p/go-libp2p-core/event"
-
-	carv2 "github.com/ipld/go-car/v2"
-
-	"github.com/ipfs/go-cid"
-
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-
-	"github.com/filecoin-project/go-state-types/big"
-
-	"github.com/filecoin-project/lotus/api"
-
-	types2 "github.com/filecoin-project/boost/transport/types"
-
-	acrypto "github.com/filecoin-project/go-state-types/crypto"
-
-	"github.com/filecoin-project/boost/testutil"
-	"github.com/google/uuid"
-
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/storagemanager"
+	"github.com/filecoin-project/boost/storagemarket/smtestutil"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boost/testutil"
+	types2 "github.com/filecoin-project/boost/transport/types"
+
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
+	acrypto "github.com/filecoin-project/go-state-types/crypto"
+	"github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
-
-	"testing"
-
 	"github.com/filecoin-project/lotus/node/repo"
+	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
+	carv2 "github.com/ipld/go-car/v2"
+	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/peer"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestSimpleDealHappy(t *testing.T) {
@@ -63,7 +50,7 @@ func TestSimpleDealHappy(t *testing.T) {
 	harness.Start(t, ctx)
 
 	// build the deal proposal
-	dp, carV2FilePath := harness.mkDealProposal(t, harness.NormalServer.URL, 1)
+	dp, carV2FilePath := harness.newDealProposal(t, harness.NormalServer.URL, 1)
 
 	// setup mock publish & add-piece expectations
 	so := harness.MinerStub.ForDeal(dp).SetupAllBlocking().Output()
@@ -113,8 +100,7 @@ func TestMultipleDealsConcurrent(t *testing.T) {
 	var errGrp errgroup.Group
 	var testDeals []*testDealInfo
 	for i := 0; i < nDeals; i++ {
-		i := i
-		dp, carV2FilePath := harness.mkDealProposal(t, harness.NormalServer.URL, i)
+		dp, carV2FilePath := harness.newDealProposal(t, harness.NormalServer.URL, i)
 		// setup mock publish & add-piece expectations
 		so := harness.MinerStub.ForDeal(dp).SetupAllNonBlocking().Output()
 
@@ -162,7 +148,7 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 	// half the deals will finish, half will be blocked on the wait for publish call -> we will then assert that the funds and storage manager state is as expected
 	for i := 0; i < nDeals; i++ {
 		i := i
-		dp, carV2FilePath := harness.mkDealProposal(t, harness.NormalServer.URL, i)
+		dp, carV2FilePath := harness.newDealProposal(t, harness.NormalServer.URL, i)
 		var so *smtestutil.StubbedMinerOutput
 		// for even numbered deals, we will never block
 		if i%2 == 0 {
@@ -184,15 +170,16 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 			if err != nil {
 				return err
 			}
+			var checkpoint dealcheckpoints.Checkpoint
 			if i%2 == 0 {
-				if err := harness.waitForCheckpoint(sub, dealcheckpoints.AddedPiece); err != nil {
-					return err
-				}
+				checkpoint = dealcheckpoints.AddedPiece
 			} else {
-				if err := harness.waitForCheckpoint(sub, dealcheckpoints.Published); err != nil {
-					return err
-				}
+				checkpoint = dealcheckpoints.Published
 			}
+			if err := harness.waitForCheckpoint(sub, checkpoint); err != nil {
+				return err
+			}
+
 			return nil
 		})
 	}
@@ -393,14 +380,14 @@ type ProviderHarness struct {
 
 type HarnessOpt func(h *ProviderHarness)
 
-// configures the min publish balance for each deal
+// MinPublishFee configures the min publish balance for each deal
 func MinPublishFee(minPublishBal abi.TokenAmount) HarnessOpt {
 	return func(h *ProviderHarness) {
 		h.MinPublishFees = minPublishBal
 	}
 }
 
-// configures the max bytes allocated to the staging area
+// MaxStagingDealBytes configures the max bytes allocated to the staging area
 func MaxStagingDealBytes(maxBytes uint64) HarnessOpt {
 	return func(h *ProviderHarness) {
 		h.MaxStagingDealBytes = maxBytes
@@ -408,7 +395,7 @@ func MaxStagingDealBytes(maxBytes uint64) HarnessOpt {
 }
 
 func NewHarness(t *testing.T, ctx context.Context, opts ...HarnessOpt) *ProviderHarness {
-	// tempDir
+	// Create a temporary directory for all the tests.
 	dir := t.TempDir()
 
 	// setup mocks
@@ -496,7 +483,7 @@ func (h *ProviderHarness) Stop() {
 	h.NormalServer.Close()
 }
 
-func (h *ProviderHarness) mkDealProposal(t *testing.T, serverURL string, seed int) (dp *types.DealParams, carV2FilePath string) {
+func (h *ProviderHarness) newDealProposal(t *testing.T, serverURL string, seed int) (dp *types.DealParams, carV2FilePath string) {
 	// generate a CARv2 file using a random seed in the tempDir
 	randomFilepath, err := testutil.CreateRandomFile(h.TempDir, seed, 2000000)
 	require.NoError(t, err)

@@ -42,9 +42,9 @@ func TestStorageDB(t *testing.T) {
 	req.Equal(uint64(1111), amt)
 
 	fl := &StorageLog{
-		DealUUID:  dealUUID,
+		DealUUID:     dealUUID,
 		TransferSize: uint64(1234),
-		Text:      "Hello",
+		Text:         "Hello",
 	}
 	err = db.InsertLog(ctx, fl)
 	req.NoError(err)

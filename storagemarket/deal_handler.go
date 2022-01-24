@@ -41,10 +41,13 @@ func (d *dealHandler) subscribeUpdates() (event.Subscription, error) {
 	return sub, nil
 }
 
+// TransferCancelledByUser returns true if the user explicitly cancelled the transfer by calling `dealhandler.cancel()`
 func (dh *dealHandler) TransferCancelledByUser() bool {
 	return dh.transferCancelledByUser.Load()
 }
 
+// cancel idempotently cancels the context associated with the transfer so the transfer errors out and then waits
+// for the transfer to fail. If the transfer is already cancelled, this is a no-op.
 func (dh *dealHandler) cancel() error {
 	dh.transferCancelledByUser.Store(true)
 	dh.transferMu.Lock()
@@ -66,6 +69,7 @@ func (dh *dealHandler) cancel() error {
 	}
 }
 
+// transferCancelled idempotently marks the transfer as cancelled with the given error.
 func (dh *dealHandler) transferCancelled(err error) {
 	dh.tdOnce.Do(func() {
 		dh.transferDone <- err

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestCancellationSimple tests that we are able to cancel an ongoing transfer.
 func TestCancellationSimple(t *testing.T) {
 	_, tCancel := context.WithCancel(context.Background())
 
@@ -25,6 +26,8 @@ func TestCancellationSimple(t *testing.T) {
 	require.True(t, dh.TransferCancelledByUser())
 }
 
+// TestCancellationByCancel tests that concurrent calls to cancel a transfer lead to the transfer being cancelled only once and
+// other calls are no-op
 func TestCancellationByCancel(t *testing.T) {
 	smErr := errors.New("some error")
 	transferCtx, tCancel := context.WithCancel(context.Background())
