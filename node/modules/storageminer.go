@@ -531,7 +531,7 @@ func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
 
 func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.State) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.State) (*storagemarket.Provider, error) {
-		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, sps)
+		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, sps, storagemarket.NewChainDealManager(a))
 		lp2pnet := lp2pimpl.NewDealProvider(h, prov)
 
 		if err != nil {

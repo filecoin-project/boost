@@ -318,7 +318,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	// Note that multiple deals may be published in a batch, so the message CID
 	// may be for a batch of deals.
 	p.addDealLog(deal.DealUuid, "Awaiting deal publish confirmation")
-	res, err := p.WaitForPublishDeals(p.ctx, *deal.PublishCID, deal.ClientDealProposal.Proposal)
+	res, err := p.chainDealManager.WaitForPublishDeals(p.ctx, *deal.PublishCID, deal.ClientDealProposal.Proposal)
 	if err != nil {
 		return fmt.Errorf("wait for publish message %s failed: %w", deal.PublishCID, err)
 	}
