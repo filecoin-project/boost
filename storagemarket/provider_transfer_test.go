@@ -42,7 +42,7 @@ func TestMultipleDealsConcurrentResumptionDisconnect(t *testing.T) {
 	// start the provider test harness
 	harness.Start(t, ctx)
 
-	tds := harness.executeNDealsConcurrentAndWaitfor(t, nDeals, dealcheckpoints.AddedPiece, func(i int) *testDeal {
+	tds := harness.executeNDealsConcurrentAndWaitFor(t, nDeals, dealcheckpoints.AddedPiece, func(i int) *testDeal {
 		return harness.newDealBuilder(t, i, withNormalFileSize(fileSize)).withDisconnectingHttpServer().build()
 	})
 

@@ -91,7 +91,7 @@ func TestMultipleDealsConcurrent(t *testing.T) {
 	// start the provider test harness
 	harness.Start(t, ctx)
 
-	tds := harness.executeNDealsConcurrentAndWaitfor(t, nDeals, dealcheckpoints.AddedPiece, func(i int) *testDeal {
+	tds := harness.executeNDealsConcurrentAndWaitFor(t, nDeals, dealcheckpoints.AddedPiece, func(i int) *testDeal {
 		return harness.newDealBuilder(t, 1).withNormalHttpServer().build()
 	})
 
@@ -197,7 +197,7 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 	}
 }
 
-func (h *ProviderHarness) executeNDealsConcurrentAndWaitfor(t *testing.T, nDeals int, checkpoint dealcheckpoints.Checkpoint,
+func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals int, checkpoint dealcheckpoints.Checkpoint,
 	buildDeal func(i int) *testDeal) []*testDeal {
 	tds := make([]*testDeal, 0, nDeals)
 	var errG errgroup.Group
@@ -679,16 +679,7 @@ LOOP:
 }
 
 func (td *testDeal) waitForAndAssert(t *testing.T, ctx context.Context, cp dealcheckpoints.Checkpoint) {
-LOOP:
-	for i := range td.sub.Out() {
-		st := i.(types.ProviderDealState)
-		if len(st.Err) != 0 {
-			t.Fatal(st.Err)
-		}
-		if st.Checkpoint == cp {
-			break LOOP
-		}
-	}
+	require.NoError(t, td.waitForCheckpoint(cp))
 
 	switch cp {
 	case dealcheckpoints.Accepted:
