@@ -50,9 +50,7 @@ func NewBlockingHttpTestServer(t *testing.T, dir string) *BlockingHttpTestServer
 		b.mu.Lock()
 		ch := b.unblock[name]
 		b.mu.Unlock()
-		select {
-		case <-ch:
-		}
+		<-ch
 
 		// serve the file
 		upath := r.URL.Path
@@ -125,7 +123,7 @@ func HttpTestDisconnectingServer(t *testing.T, dir string, afterEvery int64) *ht
 		absPath := filepath.Join(dir, fp)
 		f, err := os.Open(absPath)
 		if err != nil {
-			t.Logf("failed to open file to serve: %w", err)
+			t.Logf("failed to open file to serve: %s", err)
 			w.WriteHeader(500)
 			return
 		}
@@ -134,7 +132,7 @@ func HttpTestDisconnectingServer(t *testing.T, dir string, afterEvery int64) *ht
 		// prevent buffer overflow
 		fi, err := f.Stat()
 		if err != nil {
-			t.Logf("failed to stat file: %w", err)
+			t.Logf("failed to stat file: %s", err)
 			w.WriteHeader(500)
 			return
 		}
@@ -146,7 +144,7 @@ func HttpTestDisconnectingServer(t *testing.T, dir string, afterEvery int64) *ht
 		bz := make([]byte, end-start)
 		n, err := f.ReadAt(bz, start)
 		if err != nil {
-			t.Logf("failed to read file: %w", err)
+			t.Logf("failed to read file: %s", err)
 			w.WriteHeader(500)
 			return
 		}
@@ -158,7 +156,7 @@ func HttpTestDisconnectingServer(t *testing.T, dir string, afterEvery int64) *ht
 		w.WriteHeader(200)
 		_, err = w.Write(bz)
 		if err != nil {
-			t.Logf("failed to write file: %w", err)
+			t.Logf("failed to write file: %s", err)
 			w.WriteHeader(500)
 			return
 		}

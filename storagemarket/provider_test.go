@@ -364,33 +364,10 @@ type providerConfig struct {
 
 type harnessOpt func(pc *providerConfig)
 
-// withFundAndWalletBal configures the funds and wallet balances for the provider
-func withFundAndWalletBal(locked, escrow big.Int, publishWalletBal int64) harnessOpt {
-	return func(pc *providerConfig) {
-		pc.lockedFunds = locked
-		pc.escrowFunds = escrow
-		pc.publishWalletBal = publishWalletBal
-	}
-}
-
-// withMinPublishFee configures the min publish balance for each deal
-func withMinPublishFee(minPublishBal abi.TokenAmount) harnessOpt {
-	return func(pc *providerConfig) {
-		pc.minPublishFees = minPublishBal
-	}
-}
-
 // withHttpTransportOpts configures the http transport config for the provider
 func withHttpTransportOpts(opts []httptransport.Option) harnessOpt {
 	return func(pc *providerConfig) {
 		pc.httpOpts = opts
-	}
-}
-
-// withMaxStagingDealBytes configures the max bytes allocated to the staging area
-func withMaxStagingDealBytes(maxBytes uint64) harnessOpt {
-	return func(pc *providerConfig) {
-		pc.maxStagingDealBytes = maxBytes
 	}
 }
 
@@ -602,10 +579,11 @@ type testDealBuilder struct {
 	msAddPieceBlocking       bool
 }
 
+/*
 func (tbuilder *testDealBuilder) withPublishBlocking() *testDealBuilder {
 	tbuilder.msPublishBlocking = true
 	return tbuilder
-}
+}*/
 
 func (tbuilder *testDealBuilder) withPublishConfirmBlocking() *testDealBuilder {
 	tbuilder.msPublishConfirmBlocking = true
