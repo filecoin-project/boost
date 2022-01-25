@@ -30,7 +30,7 @@ import (
 var log = logging.Logger("http-transport")
 
 const (
-	// 1 Mb
+	// 1 Mib
 	readBufferSize = 1048576
 
 	minBackOff           = 1 * time.Minute
