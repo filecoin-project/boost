@@ -49,7 +49,7 @@ require (
 	github.com/ipfs/go-ipfs-routing v0.2.1
 	github.com/ipfs/go-log/v2 v2.4.0
 	github.com/ipfs/go-metrics-interface v0.0.1
-	github.com/ipld/go-car/v2 v2.1.1
+	github.com/ipld/go-car/v2 v2.1.2-0.20220124154420-9c7956a6eb9d
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/libp2p/go-eventbus v0.2.1
@@ -96,11 +96,13 @@ require (
 	github.com/ipfs/go-ipfs-files v0.0.9
 	github.com/ipfs/go-ipld-format v0.2.0
 	github.com/ipfs/go-merkledag v0.5.1
-	github.com/ipfs/go-unixfs v0.2.6
+	github.com/ipfs/go-unixfs v0.3.1
+	github.com/ipld/go-car v0.3.4-0.20220124154420-9c7956a6eb9d
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
-	github.com/libp2p/go-libp2p-gostream v0.3.0
+	github.com/libp2p/go-libp2p-gostream v0.3.1
 	github.com/libp2p/go-libp2p-http v0.2.1
+	github.com/multiformats/go-multiaddr-fmt v0.1.0
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/whyrusleeping/cbor-gen v0.0.0-20211110122933-f57984553008
 	go.uber.org/atomic v1.9.0

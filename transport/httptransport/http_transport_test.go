@@ -1,10 +1,12 @@
 package httptransport
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -16,44 +18,85 @@ import (
 	"testing"
 	"time"
 
-	p2phttp "github.com/libp2p/go-libp2p-http"
-
+	"github.com/filecoin-project/boost/transport"
+	"github.com/filecoin-project/boost/transport/types"
+	"github.com/ipfs/go-blockservice"
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-cidutil"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	bstore "github.com/ipfs/go-ipfs-blockstore"
+	chunk "github.com/ipfs/go-ipfs-chunker"
+	format "github.com/ipfs/go-ipld-format"
+	"github.com/ipfs/go-merkledag"
+	"github.com/ipfs/go-unixfs/importer/balanced"
+	"github.com/ipfs/go-unixfs/importer/helpers"
+	"github.com/ipld/go-car"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	gostream "github.com/libp2p/go-libp2p-gostream"
 	"github.com/multiformats/go-multiaddr"
-
-	"github.com/libp2p/go-libp2p-core/host"
-	"go.uber.org/atomic"
-
-	"golang.org/x/xerrors"
-
-	"golang.org/x/sync/errgroup"
-
-	"github.com/filecoin-project/boost/transport"
-
-	"github.com/filecoin-project/boost/transport/types"
+	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/xerrors"
 )
+
+type serverTest struct {
+	t        *testing.T
+	data     []byte
+	ds       datastore.Batching
+	bs       bstore.Blockstore
+	root     format.Node
+	carBytes []byte
+}
+
+func newServerTest(t *testing.T, size int) *serverTest {
+	data := []byte(randSeq(size))
+	ds := dssync.MutexWrap(datastore.NewMapDatastore())
+	bs := bstore.NewBlockstore(ds)
+	bserv := blockservice.New(bs, nil)
+	dserv := merkledag.NewDAGService(bserv)
+	source := bytes.NewBuffer(data)
+
+	nd, err := dagImport(dserv, source)
+	require.NoError(t, err)
+
+	var buff bytes.Buffer
+	err = car.WriteCar(context.Background(), dserv, []cid.Cid{nd.Cid()}, &buff)
+	require.NoError(t, err)
+
+	return &serverTest{
+		t:        t,
+		data:     data,
+		ds:       ds,
+		bs:       bs,
+		root:     nd,
+		carBytes: buff.Bytes(),
+	}
+}
 
 func TestSimpleTransfer(t *testing.T) {
 	ctx := context.Background()
-	size := (100 * readBufferSize) + 30
-	str := randSeq(size)
-	svcs := serversWithRangeHandler(t, str)
+	rawSize := (100 * readBufferSize) + 30
+	st := newServerTest(t, rawSize)
+	carSize := len(st.carBytes)
+	svcs := serversWithRangeHandler(st)
 
 	for name, init := range svcs {
 		t.Run(name, func(t *testing.T) {
-			url, closer, h := init(t)
+			req, closer, h := init(t)
 			defer closer()
 			of := getTempFilePath(t)
-			th := executeTransfer(t, ctx, New(h), size, url, of)
+			th := executeTransfer(t, ctx, New(h), carSize, req, of)
 			require.NotNil(t, th)
 
 			evts := waitForTransferComplete(th)
 			require.NotEmpty(t, evts)
-			require.EqualValues(t, size, evts[len(evts)-1].NBytesReceived)
-			assertFileContents(t, of, str)
+			require.EqualValues(t, carSize, evts[len(evts)-1].NBytesReceived)
+			assertFileContents(t, of, st.carBytes)
 		})
 	}
 }
@@ -63,7 +106,7 @@ func TestTransportRespectsContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	svcs := serversWithCustomHandler(t, func(http.ResponseWriter, *http.Request) {
+	svcs := serversWithCustomHandler(func(http.ResponseWriter, *http.Request) {
 		time.Sleep(1 * time.Hour)
 	})
 
@@ -87,9 +130,10 @@ func TestConcurrentTransfers(t *testing.T) {
 	ctx := context.Background()
 
 	// start server with data to send
-	size := (100 * readBufferSize) + 30
-	str := randSeq(size)
-	svcs := serversWithRangeHandler(t, str)
+	rawSize := (100 * readBufferSize) + 30
+	st := newServerTest(t, rawSize)
+	size := len(st.carBytes)
+	svcs := serversWithRangeHandler(st)
 
 	for name, s := range svcs {
 		t.Run(name, func(t *testing.T) {
@@ -120,7 +164,7 @@ func TestConcurrentTransfers(t *testing.T) {
 						return err
 					}
 
-					if str != string(bz) {
+					if !bytes.Equal(st.carBytes, bz) {
 						return errors.New("content mismatch")
 					}
 					return nil
@@ -151,18 +195,18 @@ func TestCompletionOnMultipleAttemptsWithSameFile(t *testing.T) {
 	}
 
 	svcs := map[string]struct {
-		init func(t *testing.T, i int) (url string, close func(), h host.Host)
+		init func(t *testing.T, i int) (req types.HttpRequest, close func(), h host.Host)
 	}{
 		"http": {
-			init: func(t *testing.T, i int) (string, func(), host.Host) {
+			init: func(t *testing.T, i int) (types.HttpRequest, func(), host.Host) {
 				svr := httptest.NewServer(http.HandlerFunc(handler((i))))
-				return svr.URL, svr.Close, nil
+				return types.HttpRequest{URL: svr.URL}, svr.Close, nil
 			},
 		},
 		"libp2p-http": {
-			init: func(t *testing.T, i int) (string, func(), host.Host) {
-				svr := newLibp2pHttpServer(t, handler(i))
-				return svr.URL, svr.Close, svr.clientHost
+			init: func(t *testing.T, i int) (types.HttpRequest, func(), host.Host) {
+				svr := newTestLibp2pHttpServer(t, handler(i))
+				return svr.Req, svr.Close, svr.clientHost
 			},
 		},
 	}
@@ -184,7 +228,7 @@ func TestCompletionOnMultipleAttemptsWithSameFile(t *testing.T) {
 				}
 				require.Contains(t, evts[len(evts)-1].Error.Error(), "mismatch")
 
-				assertFileContents(t, of, str[:end])
+				assertFileContents(t, of, []byte(str[:end]))
 				closer()
 				end = end + readBufferSize
 				if end > size {
@@ -193,7 +237,7 @@ func TestCompletionOnMultipleAttemptsWithSameFile(t *testing.T) {
 			}
 
 			// ensure file contents are correct in the end
-			assertFileContents(t, of, str)
+			assertFileContents(t, of, []byte(str))
 		})
 	}
 }
@@ -203,7 +247,7 @@ func TestTransferCancellation(t *testing.T) {
 	size := (100 * readBufferSize) + 30
 
 	closing := make(chan struct{}, 2)
-	svcs := serversWithCustomHandler(t, func(http.ResponseWriter, *http.Request) {
+	svcs := serversWithCustomHandler(func(http.ResponseWriter, *http.Request) {
 		fmt.Println("Hello")
 		<-closing
 	})
@@ -270,14 +314,14 @@ func TestTransferResumption(t *testing.T) {
 
 	ht := New(nil, BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000))
 	of := getTempFilePath(t)
-	th := executeTransfer(t, context.Background(), ht, size, svr.URL, of)
+	th := executeTransfer(t, context.Background(), ht, size, types.HttpRequest{URL: svr.URL}, of)
 	require.NotNil(t, th)
 
 	evts := waitForTransferComplete(th)
 	require.NotEmpty(t, evts)
 	require.EqualValues(t, size, evts[len(evts)-1].NBytesReceived)
 
-	assertFileContents(t, of, str)
+	assertFileContents(t, of, []byte(str))
 
 	// assert we had to make multiple connections to the server
 	require.True(t, nAttempts.Load() > 10)
@@ -291,7 +335,7 @@ func TestLibp2pTransferResumption(t *testing.T) {
 	var nAttempts atomic.Int32
 
 	// start http server that always sends 500Kb and disconnects (total file size is greater than 100 Mb)
-	svr := newLibp2pHttpServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	svr := newTestLibp2pHttpServer(t, func(w http.ResponseWriter, r *http.Request) {
 		nAttempts.Inc()
 		offset := r.Header.Get("Range")
 		finalOffset := strings.TrimSuffix(strings.TrimPrefix(offset, "bytes="), "-")
@@ -307,33 +351,31 @@ func TestLibp2pTransferResumption(t *testing.T) {
 		// close the connection so user sees an error while reading the response
 		c := GetConn(r)
 		c.Close() //nolint:errcheck
-	}))
+	})
 
 	defer svr.Close()
 
 	ht := New(svr.clientHost, BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000))
 	of := getTempFilePath(t)
-	th := executeTransfer(t, context.Background(), ht, size, svr.URL, of)
+	th := executeTransfer(t, context.Background(), ht, size, svr.Req, of)
 	require.NotNil(t, th)
 
 	evts := waitForTransferComplete(th)
 	require.NotEmpty(t, evts)
 	require.EqualValues(t, size, evts[len(evts)-1].NBytesReceived)
 
-	assertFileContents(t, of, str)
+	assertFileContents(t, of, []byte(str))
 
 	// assert we had to make multiple connections to the server
 	require.True(t, nAttempts.Load() > 10)
 }
 
-func executeTransfer(t *testing.T, ctx context.Context, ht *httpTransport, size int, url string, tmpFile string) transport.Handler {
+func executeTransfer(t *testing.T, ctx context.Context, ht *httpTransport, size int, req types.HttpRequest, tmpFile string) transport.Handler {
 	dealInfo := &types.TransportDealInfo{
 		OutputFile: tmpFile,
 		DealSize:   int64(size),
 	}
-	bz, err := json.Marshal(types.HttpRequest{
-		URL: url,
-	})
+	bz, err := json.Marshal(req)
 	require.NoError(t, err)
 
 	th, err := ht.Execute(ctx, bz, dealInfo)
@@ -343,10 +385,11 @@ func executeTransfer(t *testing.T, ctx context.Context, ht *httpTransport, size 
 	return th
 }
 
-func assertFileContents(t *testing.T, file string, expected string) {
+func assertFileContents(t *testing.T, file string, expected []byte) {
 	bz, err := ioutil.ReadFile(file)
 	require.NoError(t, err)
-	require.EqualValues(t, expected, string(bz))
+	require.Equal(t, len(expected), len(bz))
+	require.Equal(t, expected, bz)
 }
 
 func getTempFilePath(t *testing.T) string {
@@ -367,38 +410,96 @@ func waitForTransferComplete(th transport.Handler) []types.TransportEvent {
 	return evts
 }
 
-func serversWithRangeHandler(t *testing.T, str string) map[string]func(t *testing.T) (url string, close func(), h host.Host) {
+func serversWithRangeHandler(st *serverTest) map[string]func(t *testing.T) (req types.HttpRequest, close func(), h host.Host) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		offset := r.Header.Get("Range")
 		finalOffset := strings.TrimSuffix(strings.TrimPrefix(offset, "bytes="), "-")
 		start, _ := strconv.ParseInt(finalOffset, 10, 64)
 		w.WriteHeader(200)
-		w.Write([]byte(str[start:])) //nolint:errcheck
+		w.Write(st.carBytes[start:]) //nolint:errcheck
 	}
 
-	return serversWithCustomHandler(t, handler)
+	svcs := serversWithCustomHandler(handler)
+	svcs["libp2p-http"] = func(t *testing.T) (types.HttpRequest, func(), host.Host) {
+		return newLibp2pHttpServer(st)
+	}
+	return svcs
 }
 
-func serversWithCustomHandler(t *testing.T, handler http.HandlerFunc) map[string]func(t *testing.T) (url string, close func(), h host.Host) {
-	svcs := map[string]func(t *testing.T) (url string, close func(), h host.Host){
-		"http": func(t *testing.T) (string, func(), host.Host) {
+func serversWithCustomHandler(handler http.HandlerFunc) map[string]func(t *testing.T) (req types.HttpRequest, close func(), h host.Host) {
+	svcs := map[string]func(t *testing.T) (req types.HttpRequest, close func(), h host.Host){
+		"http": func(t *testing.T) (types.HttpRequest, func(), host.Host) {
 			svr := httptest.NewServer(handler)
-			return svr.URL, svr.Close, nil
+			return types.HttpRequest{URL: svr.URL}, svr.Close, nil
 		},
-		"libp2p-http": func(t *testing.T) (string, func(), host.Host) {
-			svr := newLibp2pHttpServer(t, handler)
-			return svr.URL, svr.Close, svr.clientHost
+		"libp2p-http-test": func(t *testing.T) (types.HttpRequest, func(), host.Host) {
+			svr := newTestLibp2pHttpServer(t, handler)
+			return svr.Req, svr.Close, svr.clientHost
 		},
 	}
 
 	return svcs
 }
 
+func newLibp2pHttpServer(st *serverTest) (types.HttpRequest, func(), host.Host) {
+	clientHost, srvHost := setupLibp2pHosts(st.t)
+	srv := NewLibp2pCarServer(srvHost, st.ds, st.bs, ServerConfig{
+		AnnounceAddr: srvHost.Addrs()[0],
+		RetryTimeout: time.Minute,
+	})
+	err := srv.Start()
+	require.NoError(st.t, err)
+
+	proposalCid, err := cid.Parse("bafkqaaa")
+	require.NoError(st.t, err)
+	xfer, err := srv.PrepareForDataRequest(context.Background(), 1, proposalCid, st.root.Cid(), uint64(len(st.carBytes)))
+	require.NoError(st.t, err)
+
+	req := newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+
+	closeServer := func() {
+		srvHost.Close()    //nolint:errcheck
+		clientHost.Close() //nolint:errcheck
+		srv.Stop()         //nolint:errcheck
+	}
+	return req, closeServer, clientHost
+}
+
+var defaultHashFunction = uint64(multihash.SHA2_256)
+
+func dagImport(dserv format.DAGService, fi io.Reader) (format.Node, error) {
+	prefix, err := merkledag.PrefixForCidVersion(1)
+	if err != nil {
+		return nil, err
+	}
+	prefix.MhType = defaultHashFunction
+
+	spl := chunk.NewSizeSplitter(fi, 1024*1024)
+	dbp := helpers.DagBuilderParams{
+		Maxlinks:  1024,
+		RawLeaves: true,
+
+		CidBuilder: cidutil.InlineBuilder{
+			Builder: prefix,
+			Limit:   32,
+		},
+
+		Dagserv: dserv,
+	}
+
+	db, err := dbp.New(spl)
+	if err != nil {
+		return nil, err
+	}
+
+	return balanced.Layout(db)
+}
+
 type lip2pHttpServer struct {
 	srvHost    host.Host
 	clientHost host.Host
 	listener   net.Listener
-	URL        string
+	Req        types.HttpRequest
 }
 
 func (l *lip2pHttpServer) Close() {
@@ -407,7 +508,7 @@ func (l *lip2pHttpServer) Close() {
 	l.listener.Close()
 }
 
-func newLibp2pHttpServer(t *testing.T, handler func(http.ResponseWriter, *http.Request)) *lip2pHttpServer {
+func newTestLibp2pHttpServer(t *testing.T, handler func(http.ResponseWriter, *http.Request)) *lip2pHttpServer {
 	l := &lip2pHttpServer{}
 
 	m1, _ := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/0")
@@ -418,20 +519,19 @@ func newLibp2pHttpServer(t *testing.T, handler func(http.ResponseWriter, *http.R
 	l.srvHost.Peerstore().AddAddrs(l.clientHost.ID(), l.clientHost.Addrs(), peerstore.PermanentAddrTTL)
 	l.clientHost.Peerstore().AddAddrs(l.srvHost.ID(), l.srvHost.Addrs(), peerstore.PermanentAddrTTL)
 
-	listener, err := gostream.Listen(l.srvHost, p2phttp.DefaultP2PProtocol)
+	listener, err := gostream.Listen(l.srvHost, types.DataTransferProtocol)
 	require.NoError(t, err)
 	l.listener = listener
 
-	patt := randSeq(10)
-
 	go func() {
-		http.HandleFunc("/"+patt, handler)
-		server := &http.Server{}
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", handler)
+		server := &http.Server{Handler: mux}
 		server.ConnContext = SaveConnInContext
 		server.Serve(listener) //nolint:errcheck
 	}()
 
-	l.URL = fmt.Sprintf("libp2p://%s/%s", l.srvHost.ID().Pretty(), patt)
+	l.Req = newLibp2pHttpRequest(l.srvHost, "")
 	return l
 }
 

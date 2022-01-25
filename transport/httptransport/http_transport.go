@@ -6,25 +6,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/transport"
+	"github.com/filecoin-project/boost/transport/types"
+	"github.com/google/uuid"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/jpillora/backoff"
 	"github.com/libp2p/go-libp2p-core/host"
 	p2phttp "github.com/libp2p/go-libp2p-http"
-
 	"golang.org/x/xerrors"
-
-	"github.com/jpillora/backoff"
-
-	"github.com/google/uuid"
-
-	logging "github.com/ipfs/go-log/v2"
-
-	"github.com/filecoin-project/boost/transport/types"
-
-	"github.com/filecoin-project/boost/transport"
 )
 
 var log = logging.Logger("http-transport")
@@ -55,6 +48,7 @@ func BackOffRetryOpt(minBackoff, maxBackoff time.Duration, factor, maxReconnectA
 }
 
 type httpTransport struct {
+	libp2pHost   host.Host
 	libp2pClient *http.Client
 
 	minBackOffWait       time.Duration
@@ -65,6 +59,7 @@ type httpTransport struct {
 
 func New(host host.Host, opts ...Option) *httpTransport {
 	ht := &httpTransport{
+		libp2pHost:           host,
 		minBackOffWait:       minBackOff,
 		maxBackoffWait:       maxBackOff,
 		backOffFactor:        factor,
@@ -76,7 +71,8 @@ func New(host host.Host, opts ...Option) *httpTransport {
 
 	// init a libp2p-http client
 	tr := &http.Transport{}
-	tr.RegisterProtocol("libp2p", p2phttp.NewTransport(host))
+	p2ptr := p2phttp.NewTransport(host, p2phttp.ProtocolOption(types.DataTransferProtocol))
+	tr.RegisterProtocol("libp2p", p2ptr)
 	ht.libp2pClient = &http.Client{Transport: tr}
 
 	return ht
@@ -88,9 +84,18 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	if err := json.Unmarshal(transportInfo, tInfo); err != nil {
 		return nil, fmt.Errorf("failed to de-serialize transport info bytes, bytes:%s, err:%w", string(transportInfo), err)
 	}
+
 	if len(tInfo.URL) == 0 {
 		return nil, xerrors.New("deal url is empty")
 	}
+
+	// parse request URL
+	u, err := parseUrl(tInfo.URL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse request url: %w", err)
+	}
+	tInfo.URL = u.URL
+
 	// check that the outputFile exists
 	fi, err := os.Stat(dealInfo.OutputFile)
 	if err != nil {
@@ -101,12 +106,6 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	fileSize := fi.Size()
 	if fileSize > dealInfo.DealSize {
 		return nil, fmt.Errorf("deal size=%d but file size=%d", dealInfo.DealSize, fileSize)
-	}
-
-	// validate req
-	u, err := url.Parse(tInfo.URL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse url: %w", err)
 	}
 
 	// construct the transfer instance that will act as the transfer handler
@@ -125,8 +124,13 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 		},
 		maxReconnectAttempts: h.maxReconnectAttempts,
 	}
+
+	// If this is a libp2p URL
 	if u.Scheme == libp2pScheme {
+		// Use the libp2p client
 		t.client = h.libp2pClient
+		// Add the peer's address to the peerstore so we can dial it
+		h.libp2pHost.Peerstore().AddAddr(u.PeerID, u.Multiaddr, time.Hour)
 	} else {
 		t.client = http.DefaultClient
 	}
@@ -198,11 +202,17 @@ func (t *transfer) execute(ctx context.Context) error {
 			return fmt.Errorf("failed to create http req: %w", err)
 		}
 
+		// get the number of bytes already received (the size of the output file)
 		st, err := os.Stat(t.dealInfo.OutputFile)
 		if err != nil {
 			return fmt.Errorf("failed to stat output file: %w", err)
 		}
 		t.nBytesReceived = st.Size()
+
+		// add request headers
+		for name, val := range t.tInfo.Headers {
+			req.Header.Set(name, val)
+		}
 
 		// add range req to start reading from the last byte we have in the output file
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", t.nBytesReceived))
@@ -217,12 +227,21 @@ func (t *transfer) execute(ctx context.Context) error {
 
 		// start the http transfer
 		remaining := t.dealInfo.DealSize - t.nBytesReceived
-		if err = t.doHttp(ctx, req, of, remaining); err == nil {
+		reqErr := t.doHttp(ctx, req, of, remaining)
+		if reqErr == nil {
 			// if there's no error, transfer was successful
 			break
 		}
 		_ = of.Close()
+
+		// check if the error is a 4xx error, meaning there is a problem with
+		// the request (eg 401 Unauthorized)
+		if reqErr.code/100 == 4 {
+			return reqErr.error
+		}
+
 		// do not resume transfer if context has been cancelled or if the context deadline has exceeded
+		err = reqErr.error
 		if xerrors.Is(err, context.Canceled) || xerrors.Is(err, context.DeadlineExceeded) {
 			return fmt.Errorf("transfer context err: %w", err)
 		}
@@ -230,7 +249,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		// backoff-retry transfer if max number of attempts haven't been exhausted
 		nAttempts := t.backoff.Attempt() + 1
 		if nAttempts >= t.maxReconnectAttempts {
-			return fmt.Errorf("could not finish transfer even after %f attempts, lastErr: %w", t.maxReconnectAttempts, err)
+			return fmt.Errorf("could not finish transfer even after %.0f attempts, lastErr: %w", t.maxReconnectAttempts, err)
 		}
 		duration := t.backoff.Duration()
 		bt := time.NewTimer(duration)
@@ -260,16 +279,19 @@ func (t *transfer) execute(ctx context.Context) error {
 	return nil
 }
 
-func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer, toRead int64) error {
+func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer, toRead int64) *httpError {
 	// send http request and validate response
 	resp, err := t.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to send  http req: %w", err)
+		return &httpError{error: fmt.Errorf("failed to send  http req: %w", err)}
 	}
 	// we should either get back a 200 or a 206 -> anything else means something has gone wrong and we return an error.
 	defer resp.Body.Close() // nolint
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
-		return fmt.Errorf("http req failed: code:%d, status:%s", resp.StatusCode, resp.Status)
+		return &httpError{
+			error: fmt.Errorf("http req failed: code: %d, status: %s", resp.StatusCode, resp.Status),
+			code:  resp.StatusCode,
+		}
 	}
 
 	//  start reading the response stream `readBufferSize` at a time using a limit reader so we only read as many bytes as we need to.
@@ -285,9 +307,9 @@ func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer,
 			// if the number of read and written bytes don't match -> something has gone wrong, abort the http req.
 			if nw < 0 || nr != nw {
 				if writeErr != nil {
-					return fmt.Errorf("failed to write to output file: %w", err)
+					return &httpError{error: fmt.Errorf("failed to write to output file: %w", writeErr)}
 				}
-				return fmt.Errorf("read-write mismatch writing to the output file, read=%d, written=%d", nr, nw)
+				return &httpError{error: fmt.Errorf("read-write mismatch writing to the output file, read=%d, written=%d", nr, nw)}
 			}
 
 			t.nBytesReceived = t.nBytesReceived + int64(nw)
@@ -303,7 +325,7 @@ func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer,
 			return nil
 		}
 		if readErr != nil {
-			return fmt.Errorf("error reading from http response stream: %w", err)
+			return &httpError{error: fmt.Errorf("error reading from http response stream: %w", readErr)}
 		}
 	}
 }
