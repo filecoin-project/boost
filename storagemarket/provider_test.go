@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/storagemanager"
@@ -19,6 +21,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/boost/transport/httptransport"
 	types2 "github.com/filecoin-project/boost/transport/types"
 
 	"github.com/filecoin-project/go-address"
@@ -37,50 +40,44 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
 )
 
 func TestSimpleDealHappy(t *testing.T) {
 	ctx := context.Background()
 
 	// setup the provider test harness
-	harness := NewHarness(t, ctx, MinPublishFee(abi.NewTokenAmount(150)), MaxStagingDealBytes(2000000000))
+	harness := NewHarness(t, ctx)
 	defer harness.Stop()
 	// start the provider test harness
 	harness.Start(t, ctx)
 
-	// build the deal proposal
-	dp, carV2FilePath := harness.newDealProposal(t, harness.NormalServer.URL, 1)
-
-	// setup mock publish & add-piece expectations
-	so := harness.MinerStub.ForDeal(dp).SetupAllBlocking().Output()
-	harness.setupWalletBalances(t, big.NewInt(300), big.NewInt(500), 1000)
+	// build the deal proposal with the blocking http test server and a completely blocking miner stub
+	td := harness.newDealBuilder(t, 1).withAllMinerCallsBlocking().withBlockingHttpServer().build()
 
 	// execute deal
-	sub, err := harness.executeDeal(dp)
-	require.NoError(t, err)
+	require.NoError(t, td.execute())
 
-	// wait for Transferred checkpoint and assert deals db and storage and fund manager
-	require.NoError(t, harness.waitForCheckpoint(sub, dealcheckpoints.Transferred))
-	harness.AssertTransferred(t, ctx, dp)
-	harness.AssertStorageAndFundManagerState(t, ctx, dp.Transfer.Size, harness.MinPublishFees, dp.ClientDealProposal.Proposal.ProviderCollateral)
+	// wait for Accepted checkpoint
+	td.waitForAndAssert(t, ctx, dealcheckpoints.Accepted)
+
+	// unblock transfer -> wait for Transferred checkpoint and assert deals db and storage and fund manager
+	td.unblockTransfer()
+	td.waitForAndAssert(t, ctx, dealcheckpoints.Transferred)
+	harness.AssertStorageAndFundManagerState(t, ctx, td.params.Transfer.Size, harness.MinPublishFees, td.params.ClientDealProposal.Proposal.ProviderCollateral)
 
 	// unblock publish -> wait for published checkpoint and assert
-	harness.MinerStub.UnblockPublish(dp.DealUUID)
-	require.NoError(t, harness.waitForCheckpoint(sub, dealcheckpoints.Published))
-	harness.AssertPublished(t, ctx, dp, so)
-	harness.AssertStorageAndFundManagerState(t, ctx, dp.Transfer.Size, harness.MinPublishFees, dp.ClientDealProposal.Proposal.ProviderCollateral)
+	td.unblockPublish()
+	td.waitForAndAssert(t, ctx, dealcheckpoints.Published)
+	harness.AssertStorageAndFundManagerState(t, ctx, td.params.Transfer.Size, harness.MinPublishFees, td.params.ClientDealProposal.Proposal.ProviderCollateral)
 
 	// unblock publish confirmation -> wait for publish confirmed and assert
-	harness.MinerStub.UnblockWaitForPublish(dp.DealUUID)
-	require.NoError(t, harness.waitForCheckpoint(sub, dealcheckpoints.PublishConfirmed))
-	harness.AssertPublishConfirmed(t, ctx, dp, so)
-	harness.EventuallyAssertStorageFundState(t, ctx, dp.Transfer.Size, abi.NewTokenAmount(0), abi.NewTokenAmount(0))
+	td.unblockWaitForPublish()
+	td.waitForAndAssert(t, ctx, dealcheckpoints.PublishConfirmed)
+	harness.EventuallyAssertStorageFundState(t, ctx, td.params.Transfer.Size, abi.NewTokenAmount(0), abi.NewTokenAmount(0))
 
 	// unblock adding piece -> wait for piece to be added and assert
-	harness.MinerStub.UnblockAddPiece(dp.DealUUID)
-	require.NoError(t, harness.waitForCheckpoint(sub, dealcheckpoints.AddedPiece))
-	harness.AssertPieceAdded(t, ctx, dp, so, carV2FilePath)
+	td.unblockAddPiece()
+	td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
 	harness.EventuallyAssertNoTagged(t, ctx)
 }
 
@@ -94,34 +91,13 @@ func TestMultipleDealsConcurrent(t *testing.T) {
 	// start the provider test harness
 	harness.Start(t, ctx)
 
-	// setup wallet balances
-	harness.setupWalletBalances(t, big.NewInt(300), big.NewInt(500), 1000)
+	tds := harness.executeNDealsConcurrentAndWaitfor(t, nDeals, dealcheckpoints.AddedPiece, func(i int) *testDeal {
+		return harness.newDealBuilder(t, 1).withNormalHttpServer().build()
+	})
 
-	var errGrp errgroup.Group
-	var testDeals []*testDealInfo
 	for i := 0; i < nDeals; i++ {
-		dp, carV2FilePath := harness.newDealProposal(t, harness.NormalServer.URL, i)
-		// setup mock publish & add-piece expectations
-		so := harness.MinerStub.ForDeal(dp).SetupAllNonBlocking().Output()
-
-		testDeals = append(testDeals, &testDealInfo{dp, so, carV2FilePath})
-
-		errGrp.Go(func() error {
-			sub, err := harness.executeDeal(dp)
-			if err != nil {
-				return err
-			}
-			if err := harness.waitForCheckpoint(sub, dealcheckpoints.AddedPiece); err != nil {
-				return err
-			}
-			return nil
-		})
-	}
-
-	require.NoError(t, errGrp.Wait())
-	for i := 0; i < nDeals; i++ {
-		td := testDeals[i]
-		harness.AssertPieceAdded(t, ctx, td.dp, td.so, td.carV2FilePath)
+		td := tds[i]
+		td.assertPieceAdded(t, ctx)
 	}
 
 	harness.EventuallyAssertNoTagged(t, ctx)
@@ -137,36 +113,32 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 	// start the provider test harness
 	harness.Start(t, ctx)
 
-	// setup wallet balances
-	harness.setupWalletBalances(t, big.NewInt(300), big.NewInt(500), 1000)
-
 	var errGrp errgroup.Group
-	var tInfos []*testDealInfo
+	var tds []*testDeal
 	totalStorage := uint64(0)
 	totalCollat := abi.NewTokenAmount(0)
 	totalPublish := abi.NewTokenAmount(0)
 	// half the deals will finish, half will be blocked on the wait for publish call -> we will then assert that the funds and storage manager state is as expected
 	for i := 0; i < nDeals; i++ {
 		i := i
-		dp, carV2FilePath := harness.newDealProposal(t, harness.NormalServer.URL, i)
-		var so *smtestutil.StubbedMinerOutput
+		var td *testDeal
 		// for even numbered deals, we will never block
 		if i%2 == 0 {
 			// setup mock publish & add-piece expectations with non-blocking behaviours -> the associated tagged funds and storage will be released
-			so = harness.MinerStub.ForDeal(dp).SetupAllNonBlocking().Output()
+			td = harness.newDealBuilder(t, i).withNormalHttpServer().build()
 		} else {
 			// for odd numbered deals, we will block on the publish-confirm step
 			// setup mock publish & add-piece expectations with blocking wait-for-publish behaviours -> the associated tagged funds and storage will not be released
-			so = harness.MinerStub.ForDeal(dp).SetupPublish(false).SetupPublishConfirm(true).SetupAddPiece(true).Output()
-			totalStorage = totalStorage + dp.Transfer.Size
-			totalCollat = abi.NewTokenAmount(totalCollat.Add(totalCollat.Int, dp.ClientDealProposal.Proposal.ProviderCollateral.Int).Int64())
+			td = harness.newDealBuilder(t, i).withPublishConfirmBlocking().withAddPieceBlocking().withNormalHttpServer().build()
+			totalStorage = totalStorage + td.params.Transfer.Size
+			totalCollat = abi.NewTokenAmount(totalCollat.Add(totalCollat.Int, td.params.ClientDealProposal.Proposal.ProviderCollateral.Int).Int64())
 			totalPublish = abi.NewTokenAmount(totalPublish.Add(totalPublish.Int, harness.MinPublishFees.Int).Int64())
 		}
 
-		tInfos = append(tInfos, &testDealInfo{dp, so, carV2FilePath})
+		tds = append(tds, td)
 
 		errGrp.Go(func() error {
-			sub, err := harness.executeDeal(dp)
+			err := td.execute()
 			if err != nil {
 				return err
 			}
@@ -176,7 +148,7 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 			} else {
 				checkpoint = dealcheckpoints.Published
 			}
-			if err := harness.waitForCheckpoint(sub, checkpoint); err != nil {
+			if err := td.waitForCheckpoint(checkpoint); err != nil {
 				return err
 			}
 
@@ -186,11 +158,11 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 	require.NoError(t, errGrp.Wait())
 
 	for i := 0; i < nDeals; i++ {
-		ti := tInfos[i]
+		td := tds[i]
 		if i%2 == 0 {
-			harness.AssertPieceAdded(t, ctx, ti.dp, ti.so, ti.carV2FilePath)
+			td.assertPieceAdded(t, ctx)
 		} else {
-			harness.AssertPublished(t, ctx, ti.dp, ti.so)
+			td.assertDealPublished(t, ctx)
 		}
 	}
 
@@ -198,62 +170,61 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 
 	// now confirm the publish for remaining deals and assert funds and storage
 	for i := 0; i < nDeals; i++ {
-		ti := tInfos[i]
+		td := tds[i]
 		if i%2 != 0 {
-			harness.MinerStub.UnblockWaitForPublish(ti.dp.DealUUID)
+			td.unblockWaitForPublish()
 			totalPublish = abi.NewTokenAmount(totalPublish.Sub(totalPublish.Int, harness.MinPublishFees.Int).Int64())
-			totalCollat = abi.NewTokenAmount(totalCollat.Sub(totalCollat.Int, ti.dp.ClientDealProposal.Proposal.ProviderCollateral.Int).Int64())
+			totalCollat = abi.NewTokenAmount(totalCollat.Sub(totalCollat.Int, td.params.ClientDealProposal.Proposal.ProviderCollateral.Int).Int64())
 		}
 	}
 	harness.EventuallyAssertStorageFundState(t, ctx, totalStorage, totalPublish, totalCollat)
 
 	// now finish the remaining deals and assert funds and storage
 	for i := 0; i < nDeals; i++ {
-		ti := tInfos[i]
+		td := tds[i]
 		if i%2 != 0 {
-			harness.MinerStub.UnblockAddPiece(ti.dp.DealUUID)
-			totalStorage = totalStorage - ti.dp.Transfer.Size
+			td.unblockAddPiece()
+			totalStorage = totalStorage - td.params.Transfer.Size
 		}
 	}
 	harness.EventuallyAssertNoTagged(t, ctx)
 	// assert that piece has been added for the deals
 	for i := 0; i < nDeals; i++ {
 		if i%2 != 0 {
-			ti := tInfos[i]
-			harness.AssertPieceAdded(t, ctx, ti.dp, ti.so, ti.carV2FilePath)
+			td := tds[i]
+			td.assertPieceAdded(t, ctx)
 		}
 	}
 }
 
-func (h *ProviderHarness) executeDeal(dp *types.DealParams) (event.Subscription, error) {
-	pi, err := h.Provider.ExecuteDeal(dp, peer.ID(""))
-	if err != nil {
-		return nil, err
-	}
-	if !pi.Accepted {
-		return nil, errors.New("deal not accepted")
+func (h *ProviderHarness) executeNDealsConcurrentAndWaitfor(t *testing.T, nDeals int, checkpoint dealcheckpoints.Checkpoint,
+	buildDeal func(i int) *testDeal) []*testDeal {
+	tds := make([]*testDeal, 0, nDeals)
+	var errG errgroup.Group
+	for i := 0; i < nDeals; i++ {
+		// build the deal proposal
+		td := buildDeal(i)
+		tds = append(tds, td)
+
+		errG.Go(func() error {
+			err := td.execute()
+			if err != nil {
+				return err
+			}
+			if err := td.waitForCheckpoint(checkpoint); err != nil {
+				return err
+			}
+			return nil
+		})
 	}
 
-	sub, err := h.Provider.SubscribeDealUpdates(dp.DealUUID)
-	if err != nil {
-		return nil, err
-	}
-	return sub, nil
+	require.NoError(t, errG.Wait())
+
+	return tds
 }
 
-func (h *ProviderHarness) waitForCheckpoint(sub event.Subscription, cp dealcheckpoints.Checkpoint) error {
-LOOP:
-	for i := range sub.Out() {
-		st := i.(types.ProviderDealState)
-		if len(st.Err) != 0 {
-			return errors.New(st.Err)
-		}
-		if st.Checkpoint == cp {
-			break LOOP
-		}
-	}
-
-	return nil
+func (h *ProviderHarness) AssertAccepted(t *testing.T, ctx context.Context, dp *types.DealParams) {
+	h.AssertDealDBState(t, ctx, dp, abi.DealID(0), nil, dealcheckpoints.Accepted, abi.SectorNumber(0), abi.PaddedPieceSize(0), abi.PaddedPieceSize(0))
 }
 
 func (h *ProviderHarness) AssertTransferred(t *testing.T, ctx context.Context, dp *types.DealParams) {
@@ -375,26 +346,74 @@ type ProviderHarness struct {
 	Provider *Provider
 
 	// http test servers
-	NormalServer *httptest.Server
+	NormalServer        *httptest.Server
+	BlockingServer      *testutil.BlockingHttpTestServer
+	DisconnectingServer *httptest.Server
 }
 
-type HarnessOpt func(h *ProviderHarness)
+type providerConfig struct {
+	maxStagingDealBytes  uint64
+	minPublishFees       abi.TokenAmount
+	disconnectAfterEvery int64
+	httpOpts             []httptransport.Option
 
-// MinPublishFee configures the min publish balance for each deal
-func MinPublishFee(minPublishBal abi.TokenAmount) HarnessOpt {
-	return func(h *ProviderHarness) {
-		h.MinPublishFees = minPublishBal
+	lockedFunds      big.Int
+	escrowFunds      big.Int
+	publishWalletBal int64
+}
+
+type harnessOpt func(pc *providerConfig)
+
+// withFundAndWalletBal configures the funds and wallet balances for the provider
+func withFundAndWalletBal(locked, escrow big.Int, publishWalletBal int64) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.lockedFunds = locked
+		pc.escrowFunds = escrow
+		pc.publishWalletBal = publishWalletBal
 	}
 }
 
-// MaxStagingDealBytes configures the max bytes allocated to the staging area
-func MaxStagingDealBytes(maxBytes uint64) HarnessOpt {
-	return func(h *ProviderHarness) {
-		h.MaxStagingDealBytes = maxBytes
+// withMinPublishFee configures the min publish balance for each deal
+func withMinPublishFee(minPublishBal abi.TokenAmount) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.minPublishFees = minPublishBal
 	}
 }
 
-func NewHarness(t *testing.T, ctx context.Context, opts ...HarnessOpt) *ProviderHarness {
+// withHttpTransportOpts configures the http transport config for the provider
+func withHttpTransportOpts(opts []httptransport.Option) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.httpOpts = opts
+	}
+}
+
+// withMaxStagingDealBytes configures the max bytes allocated to the staging area
+func withMaxStagingDealBytes(maxBytes uint64) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.maxStagingDealBytes = maxBytes
+	}
+}
+
+// withHttpDisconnectServerAfter configures the disconnecting server of the harness to disconnect after sending `after` bytes.
+// TODO: This should be per-deal rather than at the harness level
+func withHttpDisconnectServerAfter(afterEvery int64) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.disconnectAfterEvery = afterEvery
+	}
+}
+
+func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *ProviderHarness {
+	pc := &providerConfig{
+		minPublishFees:       abi.NewTokenAmount(100),
+		maxStagingDealBytes:  10000000000,
+		disconnectAfterEvery: 1048600,
+		lockedFunds:          big.NewInt(300),
+		escrowFunds:          big.NewInt(500),
+		publishWalletBal:     1000,
+	}
+	for _, opt := range opts {
+		opt(pc)
+	}
 	// Create a temporary directory for all the tests.
 	dir := t.TempDir()
 
@@ -410,8 +429,9 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...HarnessOpt) *Provider
 	require.NoError(t, err)
 
 	// instantiate the http servers that will serve the files
-	normalServer, err := testutil.HttpTestUnstartedFileServer(t, dir)
-	require.NoError(t, err)
+	normalServer := testutil.HttpTestUnstartedFileServer(t, dir)
+	blockingServer := testutil.NewBlockingHttpTestServer(t, dir)
+	disconnServer := testutil.HttpTestDisconnectingServer(t, dir, pc.disconnectAfterEvery)
 
 	// create a provider libp2p peer
 	mn := mocknet.New(ctx)
@@ -434,19 +454,17 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...HarnessOpt) *Provider
 		MinerAddr:           minerAddr,
 		ClientAddr:          cAddr,
 		NormalServer:        normalServer,
+		BlockingServer:      blockingServer,
+		DisconnectingServer: disconnServer,
+
 		MockFullNode:        fn,
 		DealsDB:             dealsDB,
 		FundsDB:             db.NewFundsDB(sqldb),
 		StorageDB:           db.NewStorageDB(sqldb),
 		PublishWallet:       pw,
 		MinerStub:           bp,
-		MinPublishFees:      abi.NewTokenAmount(100),
-		MaxStagingDealBytes: 10000000000,
-	}
-
-	// apply the config options
-	for _, o := range opts {
-		o(ph)
+		MinPublishFees:      pc.minPublishFees,
+		MaxStagingDealBytes: pc.maxStagingDealBytes,
 	}
 
 	// fund manager
@@ -465,42 +483,77 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...HarnessOpt) *Provider
 		MaxStagingDealsBytes: ph.MaxStagingDealBytes,
 	})
 	sm := smInitF(lr, sqldb)
-	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, bp, address.Undef, bp, nil, bp)
+	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, bp, address.Undef, bp, nil, bp, pc.httpOpts...)
 	require.NoError(t, err)
 	prov.testMode = true
 	ph.Provider = prov
+
+	ph.MockFullNode.EXPECT().StateMarketBalance(gomock.Any(), gomock.Any(), gomock.Any()).Return(api.MarketBalance{
+		Locked: pc.lockedFunds,
+		Escrow: pc.escrowFunds,
+	}, nil).AnyTimes()
+
+	ph.MockFullNode.EXPECT().WalletBalance(gomock.Any(), ph.PublishWallet).Return(abi.NewTokenAmount(pc.publishWalletBal), nil).AnyTimes()
 
 	return ph
 }
 
 func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
 	h.NormalServer.Start()
+	h.BlockingServer.Start()
+	h.DisconnectingServer.Start()
 	require.NoError(t, h.Provider.Start(ctx))
 }
 
 func (h *ProviderHarness) Stop() {
 	h.GoMockCtrl.Finish()
 	h.NormalServer.Close()
+	h.BlockingServer.Close()
+	h.DisconnectingServer.Close()
 }
 
-func (h *ProviderHarness) newDealProposal(t *testing.T, serverURL string, seed int) (dp *types.DealParams, carV2FilePath string) {
+type dealProposalConfig struct {
+	normalFileSize int
+}
+
+// dealProposalOpt allows configuration of the deal proposal
+type dealProposalOpt func(dc *dealProposalConfig)
+
+// withNormalFileSize configures the deal proposal to use a normal file of the given size.
+// note: the carv2 file size will be larger than this
+func withNormalFileSize(normalFileSize int) dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.normalFileSize = normalFileSize
+	}
+}
+
+func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealProposalOpt) *testDealBuilder {
+	tbuilder := &testDealBuilder{t: t, ph: ph}
+
+	dc := &dealProposalConfig{
+		normalFileSize: 2000000,
+	}
+	for _, opt := range opts {
+		opt(dc)
+	}
+
 	// generate a CARv2 file using a random seed in the tempDir
-	randomFilepath, err := testutil.CreateRandomFile(h.TempDir, seed, 2000000)
-	require.NoError(t, err)
-	rootCid, carV2FilePath, err := testutil.CreateDenseCARv2(h.TempDir, randomFilepath)
-	require.NoError(t, err)
+	randomFilepath, err := testutil.CreateRandomFile(tbuilder.ph.TempDir, seed, dc.normalFileSize)
+	require.NoError(tbuilder.t, err)
+	rootCid, carV2FilePath, err := testutil.CreateDenseCARv2(tbuilder.ph.TempDir, randomFilepath)
+	require.NoError(tbuilder.t, err)
 
 	// generate CommP of the CARv2 file
 	cidAndSize, err := GenerateCommP(carV2FilePath)
-	require.NoError(t, err)
+	require.NoError(tbuilder.t, err)
 
 	// build the deal proposal
 	proposal := market.DealProposal{
 		PieceCID:             cidAndSize.PieceCID,
 		PieceSize:            cidAndSize.PieceSize,
 		VerifiedDeal:         false,
-		Client:               h.ClientAddr,
-		Provider:             h.MinerAddr,
+		Client:               tbuilder.ph.ClientAddr,
+		Provider:             tbuilder.ph.MinerAddr,
 		Label:                rootCid.String(),
 		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
 		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
@@ -509,16 +562,12 @@ func (h *ProviderHarness) newDealProposal(t *testing.T, serverURL string, seed i
 		ClientCollateral:     abi.NewTokenAmount(1),
 	}
 
-	// build the transfer params to send in the deal proposal
-	transferParams := &types2.HttpRequest{URL: serverURL + "/" + filepath.Base(carV2FilePath)}
-	transferParamsJSON, err := json.Marshal(transferParams)
-	require.NoError(t, err)
-
 	carv2Fileinfo, err := os.Stat(carV2FilePath)
-	require.NoError(t, err)
+	require.NoError(tbuilder.t, err)
+	name := carv2Fileinfo.Name()
 
 	// assemble the final deal params to send to the provider
-	dealParams := types.DealParams{
+	dealParams := &types.DealParams{
 		DealUUID: uuid.New(),
 		ClientDealProposal: market.ClientDealProposal{
 			Proposal:        proposal,
@@ -526,25 +575,177 @@ func (h *ProviderHarness) newDealProposal(t *testing.T, serverURL string, seed i
 		},
 		DealDataRoot: rootCid,
 		Transfer: types.Transfer{
-			Type:   "http",
-			Params: transferParamsJSON,
-			Size:   uint64(carv2Fileinfo.Size()),
+			Type: "http",
+			Size: uint64(carv2Fileinfo.Size()),
 		},
 	}
-	return &dealParams, carV2FilePath
+
+	td := &testDeal{
+		ph:            tbuilder.ph,
+		params:        dealParams,
+		carv2FilePath: carV2FilePath,
+		carv2FileName: name,
+	}
+	tbuilder.ms = tbuilder.ph.MinerStub.ForDeal(dealParams)
+	tbuilder.td = td
+	return tbuilder
 }
 
-func (h *ProviderHarness) setupWalletBalances(t *testing.T, locked big.Int, escrow big.Int, publishWalletBal int64) {
-	h.MockFullNode.EXPECT().StateMarketBalance(gomock.Any(), gomock.Any(), gomock.Any()).Return(api.MarketBalance{
-		Locked: locked,
-		Escrow: escrow,
-	}, nil).AnyTimes()
+type testDealBuilder struct {
+	t  *testing.T
+	td *testDeal
+	ph *ProviderHarness
 
-	h.MockFullNode.EXPECT().WalletBalance(gomock.Any(), h.PublishWallet).Return(abi.NewTokenAmount(publishWalletBal), nil).AnyTimes()
+	ms                       *smtestutil.MinerStubBuilder
+	msPublishBlocking        bool
+	msPublishConfirmBlocking bool
+	msAddPieceBlocking       bool
 }
 
-type testDealInfo struct {
-	dp            *types.DealParams
-	so            *smtestutil.StubbedMinerOutput
-	carV2FilePath string
+func (tbuilder *testDealBuilder) withPublishBlocking() *testDealBuilder {
+	tbuilder.msPublishBlocking = true
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withPublishConfirmBlocking() *testDealBuilder {
+	tbuilder.msPublishConfirmBlocking = true
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withAddPieceBlocking() *testDealBuilder {
+	tbuilder.msAddPieceBlocking = true
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withAllMinerCallsBlocking() *testDealBuilder {
+	tbuilder.msPublishBlocking = true
+	tbuilder.msPublishConfirmBlocking = true
+	tbuilder.msAddPieceBlocking = true
+
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withBlockingHttpServer() *testDealBuilder {
+	tbuilder.ph.BlockingServer.AddFile(tbuilder.td.carv2FileName)
+	tbuilder.setTransferParams(tbuilder.td.ph.BlockingServer.URL)
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withDisconnectingHttpServer() *testDealBuilder {
+	tbuilder.setTransferParams(tbuilder.ph.DisconnectingServer.URL)
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withNormalHttpServer() *testDealBuilder {
+	tbuilder.setTransferParams(tbuilder.ph.NormalServer.URL)
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) setTransferParams(serverURL string) {
+	transferParams := &types2.HttpRequest{URL: serverURL + "/" + filepath.Base(tbuilder.td.carv2FilePath)}
+	transferParamsJSON, err := json.Marshal(transferParams)
+	if err != nil {
+		panic(err)
+	}
+	tbuilder.td.params.Transfer.Params = transferParamsJSON
+}
+
+func (tbuilder *testDealBuilder) build() *testDeal {
+	tbuilder.ms.SetupPublish(tbuilder.msPublishBlocking)
+	tbuilder.ms.SetupPublishConfirm(tbuilder.msPublishConfirmBlocking)
+	tbuilder.ms.SetupAddPiece(tbuilder.msAddPieceBlocking)
+
+	tbuilder.td.stubOutput = tbuilder.ms.Output()
+	return tbuilder.td
+}
+
+type testDeal struct {
+	ph            *ProviderHarness
+	params        *types.DealParams
+	carv2FilePath string
+	carv2FileName string
+	stubOutput    *smtestutil.StubbedMinerOutput
+	sub           event.Subscription
+}
+
+func (td *testDeal) execute() error {
+	pi, err := td.ph.Provider.ExecuteDeal(td.params, peer.ID(""))
+	if err != nil {
+		return err
+	}
+	if !pi.Accepted {
+		return errors.New("deal not accepted")
+	}
+
+	sub, err := td.ph.Provider.SubscribeDealUpdates(td.params.DealUUID)
+	if err != nil {
+		return err
+	}
+	td.sub = sub
+	return nil
+}
+
+func (td *testDeal) waitForCheckpoint(cp dealcheckpoints.Checkpoint) error {
+LOOP:
+	for i := range td.sub.Out() {
+		st := i.(types.ProviderDealState)
+		if len(st.Err) != 0 {
+			return errors.New(st.Err)
+		}
+		if st.Checkpoint == cp {
+			break LOOP
+		}
+	}
+
+	return nil
+}
+
+func (td *testDeal) waitForAndAssert(t *testing.T, ctx context.Context, cp dealcheckpoints.Checkpoint) {
+LOOP:
+	for i := range td.sub.Out() {
+		st := i.(types.ProviderDealState)
+		if len(st.Err) != 0 {
+			t.Fatal(st.Err)
+		}
+		if st.Checkpoint == cp {
+			break LOOP
+		}
+	}
+
+	switch cp {
+	case dealcheckpoints.Accepted:
+		td.ph.AssertAccepted(t, ctx, td.params)
+	case dealcheckpoints.Transferred:
+		td.ph.AssertTransferred(t, ctx, td.params)
+	case dealcheckpoints.Published:
+		td.ph.AssertPublished(t, ctx, td.params, td.stubOutput)
+	case dealcheckpoints.PublishConfirmed:
+		td.ph.AssertPublishConfirmed(t, ctx, td.params, td.stubOutput)
+	case dealcheckpoints.AddedPiece:
+		td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2FilePath)
+	}
+}
+
+func (td *testDeal) unblockTransfer() {
+	td.ph.BlockingServer.UnblockFile(td.carv2FileName)
+}
+
+func (td *testDeal) unblockPublish() {
+	td.ph.MinerStub.UnblockPublish(td.params.DealUUID)
+}
+
+func (td *testDeal) unblockWaitForPublish() {
+	td.ph.MinerStub.UnblockWaitForPublish(td.params.DealUUID)
+}
+
+func (td *testDeal) unblockAddPiece() {
+	td.ph.MinerStub.UnblockAddPiece(td.params.DealUUID)
+}
+
+func (td *testDeal) assertPieceAdded(t *testing.T, ctx context.Context) {
+	td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2FilePath)
+}
+
+func (td *testDeal) assertDealPublished(t *testing.T, ctx context.Context) {
+	td.ph.AssertPublished(t, ctx, td.params, td.stubOutput)
 }

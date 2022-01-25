@@ -102,8 +102,9 @@ type Provider struct {
 	dhs   map[uuid.UUID]*dealHandler
 }
 
-func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, sps sealingpipeline.State,
-	cm types.ChainDealManager) (*Provider, error) {
+func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode,
+	dp types.DealPublisher, addr address.Address, pa types.PieceAdder, sps sealingpipeline.State,
+	cm types.ChainDealManager, httpOpts ...httptransport.Option) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -132,7 +133,7 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		finishedDealChan:  make(chan finishedDealReq),
 		publishedDealChan: make(chan publishDealReq),
 
-		Transport:      httptransport.New(h),
+		Transport:      httptransport.New(h, httpOpts...),
 		fundManager:    fundMgr,
 		storageManager: storageMgr,
 
