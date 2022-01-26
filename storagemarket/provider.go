@@ -121,6 +121,7 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 	}
 
 	return &Provider{
+		// TODO Make this configurable
 		config:    Config{MaxTransferDuration: 24 * 3600 * time.Second},
 		Address:   addr,
 		newDealPS: newDealPS,
@@ -336,13 +337,13 @@ func (p *Provider) SubscribeDealUpdates(dealUuid uuid.UUID) (event.Subscription,
 	return dh.subscribeUpdates()
 }
 
-func (p *Provider) CancelDeal(dealUuid uuid.UUID) error {
+func (p *Provider) CancelDealDataTransfer(dealUuid uuid.UUID) error {
 	dh := p.getDealHandler(dealUuid)
 	if dh == nil {
 		return ErrDealHandlerNotFound
 	}
 
-	return dh.cancel()
+	return dh.cancelTransfer()
 }
 
 func (p *Provider) getDealHandler(id uuid.UUID) *dealHandler {

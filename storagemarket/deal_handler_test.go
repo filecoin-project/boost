@@ -22,7 +22,7 @@ func TestCancellationSimple(t *testing.T) {
 
 	require.False(t, dh.TransferCancelledByUser())
 	dh.transferCancelled(nil)
-	require.NoError(t, dh.cancel())
+	require.NoError(t, dh.cancelTransfer())
 	require.True(t, dh.TransferCancelledByUser())
 }
 
@@ -53,7 +53,7 @@ func TestCancellationByCancel(t *testing.T) {
 	// once cancellation is in effect, all callers see it as cancelled
 	for i := 0; i < 100; i++ {
 		errGrp.Go(func() error {
-			if err := dh.cancel(); err != smErr {
+			if err := dh.cancelTransfer(); err != smErr {
 				return err
 			} else if err == nil {
 				return errors.New("expected error")

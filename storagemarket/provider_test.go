@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,8 +93,10 @@ func TestMultipleDealsConcurrent(t *testing.T) {
 	// start the provider test harness
 	harness.Start(t, ctx)
 
-	tds := harness.executeNDealsConcurrentAndWaitFor(t, nDeals, dealcheckpoints.AddedPiece, func(i int) *testDeal {
-		return harness.newDealBuilder(t, 1).withNormalHttpServer().build()
+	tds := harness.executeNDealsConcurrentAndWaitFor(t, nDeals, func(i int) *testDeal {
+		return harness.newDealBuilder(t, 1).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
+	}, func(_ int, td *testDeal) error {
+		return td.waitForCheckpoint(dealcheckpoints.AddedPiece)
 	})
 
 	for i := 0; i < nDeals; i++ {
@@ -125,11 +129,11 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 		// for even numbered deals, we will never block
 		if i%2 == 0 {
 			// setup mock publish & add-piece expectations with non-blocking behaviours -> the associated tagged funds and storage will be released
-			td = harness.newDealBuilder(t, i).withNormalHttpServer().build()
+			td = harness.newDealBuilder(t, i).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
 		} else {
 			// for odd numbered deals, we will block on the publish-confirm step
 			// setup mock publish & add-piece expectations with blocking wait-for-publish behaviours -> the associated tagged funds and storage will not be released
-			td = harness.newDealBuilder(t, i).withPublishConfirmBlocking().withAddPieceBlocking().withNormalHttpServer().build()
+			td = harness.newDealBuilder(t, i).withPublishNonBlocking().withPublishConfirmBlocking().withAddPieceBlocking().withNormalHttpServer().build()
 			totalStorage = totalStorage + td.params.Transfer.Size
 			totalCollat = abi.NewTokenAmount(totalCollat.Add(totalCollat.Int, td.params.ClientDealProposal.Proposal.ProviderCollateral.Int).Int64())
 			totalPublish = abi.NewTokenAmount(totalPublish.Add(totalPublish.Int, harness.MinPublishFees.Int).Int64())
@@ -197,11 +201,75 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 	}
 }
 
-func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals int, checkpoint dealcheckpoints.Checkpoint,
-	buildDeal func(i int) *testDeal) []*testDeal {
+func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
+	ctx := context.Background()
+	// setup the provider test harness with a disconnecting server that disconnects after sending the given number of bytes
+	harness := NewHarness(t, ctx, withHttpDisconnectServerAfter(1),
+		withHttpTransportOpts([]httptransport.Option{httptransport.BackOffRetryOpt(1*time.Millisecond, 1*time.Millisecond, 2, 1)}))
+	defer harness.Stop()
+	// start the provider test harness
+	harness.Start(t, ctx)
+
+	// spin up four deals
+	// deal 1 -> fails transfer, deal 2 -> fails publish, deal 3 -> fails publish confirm, deal 4 -> fails add piece
+	publishErr := errors.New("publish failed")
+	publishConfirmErr := errors.New("publish confirm error")
+	addPieceErr := errors.New("add piece error")
+	deals := []struct {
+		dealBuilder func() *testDeal
+		errContains string
+	}{
+		{
+			dealBuilder: func() *testDeal {
+				return harness.newDealBuilder(t, 1).withDisconnectingHttpServer().build()
+			},
+			errContains: "failed data transfer",
+		},
+		{
+			dealBuilder: func() *testDeal {
+				return harness.newDealBuilder(t, 1).withPublishFailing(publishErr).withNormalHttpServer().build()
+			},
+			errContains: publishErr.Error(),
+		},
+		{
+			dealBuilder: func() *testDeal {
+				return harness.newDealBuilder(t, 1).withPublishNonBlocking().withPublishConfirmFailing(publishConfirmErr).withNormalHttpServer().build()
+			},
+			errContains: publishConfirmErr.Error(),
+		},
+		{
+			dealBuilder: func() *testDeal {
+				return harness.newDealBuilder(t, 1).withPublishNonBlocking().
+					withPublishConfirmNonBlocking().withAddPieceFailing(addPieceErr).withNormalHttpServer().build()
+			},
+			errContains: addPieceErr.Error(),
+		},
+	}
+
+	tds := harness.executeNDealsConcurrentAndWaitFor(t, len(deals), func(i int) *testDeal {
+		return deals[i].dealBuilder()
+	}, func(i int, td *testDeal) error {
+		return td.waitForError(deals[i].errContains)
+	})
+
+	// assert cleanup of deal and db state
+	for i := range tds {
+		td := tds[i]
+		derr := deals[i].errContains
+		td.assertEventuallyDealCleanedup(t, ctx)
+		td.assertDealFailedNonRecoverable(t, ctx, derr)
+	}
+
+	// assert storage manager and funds
+	harness.EventuallyAssertNoTagged(t, ctx)
+}
+
+func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals int,
+	buildDeal func(i int) *testDeal, waitF func(i int, td *testDeal) error) []*testDeal {
 	tds := make([]*testDeal, 0, nDeals)
 	var errG errgroup.Group
 	for i := 0; i < nDeals; i++ {
+		i := i
 		// build the deal proposal
 		td := buildDeal(i)
 		tds = append(tds, td)
@@ -211,7 +279,7 @@ func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals
 			if err != nil {
 				return err
 			}
-			if err := td.waitForCheckpoint(checkpoint); err != nil {
+			if err := waitF(i, td); err != nil {
 				return err
 			}
 			return nil
@@ -224,24 +292,28 @@ func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals
 }
 
 func (h *ProviderHarness) AssertAccepted(t *testing.T, ctx context.Context, dp *types.DealParams) {
-	h.AssertDealDBState(t, ctx, dp, abi.DealID(0), nil, dealcheckpoints.Accepted, abi.SectorNumber(0), abi.PaddedPieceSize(0), abi.PaddedPieceSize(0))
+	h.AssertDealDBState(t, ctx, dp, abi.DealID(0), nil, dealcheckpoints.Accepted, abi.SectorNumber(0), abi.PaddedPieceSize(0), abi.PaddedPieceSize(0), "")
 }
 
 func (h *ProviderHarness) AssertTransferred(t *testing.T, ctx context.Context, dp *types.DealParams) {
-	h.AssertDealDBState(t, ctx, dp, abi.DealID(0), nil, dealcheckpoints.Transferred, abi.SectorNumber(0), abi.PaddedPieceSize(0), abi.PaddedPieceSize(0))
+	h.AssertDealDBState(t, ctx, dp, abi.DealID(0), nil, dealcheckpoints.Transferred, abi.SectorNumber(0), abi.PaddedPieceSize(0), abi.PaddedPieceSize(0), "")
 }
 
 func (h *ProviderHarness) AssertPublished(t *testing.T, ctx context.Context, dp *types.DealParams, so *smtestutil.StubbedMinerOutput) {
-	h.AssertDealDBState(t, ctx, dp, abi.DealID(0), &so.PublishCid, dealcheckpoints.Published, abi.SectorNumber(0), abi.PaddedPieceSize(0), abi.PaddedPieceSize(0))
+	h.AssertDealDBState(t, ctx, dp, abi.DealID(0), &so.PublishCid, dealcheckpoints.Published, abi.SectorNumber(0), abi.PaddedPieceSize(0), abi.PaddedPieceSize(0), "")
+}
+
+func (h *ProviderHarness) AssertDealFailedTransferNonRecoverable(t *testing.T, ctx context.Context, dp *types.DealParams, errStr string) {
+	h.AssertDealDBState(t, ctx, dp, abi.DealID(0), nil, dealcheckpoints.Complete, abi.SectorNumber(0), abi.PaddedPieceSize(0), abi.PaddedPieceSize(0), errStr)
 }
 
 func (h *ProviderHarness) AssertPublishConfirmed(t *testing.T, ctx context.Context, dp *types.DealParams, so *smtestutil.StubbedMinerOutput) {
-	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.PublishConfirmed, abi.SectorNumber(0), abi.PaddedPieceSize(0), abi.PaddedPieceSize(0))
+	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.PublishConfirmed, abi.SectorNumber(0), abi.PaddedPieceSize(0), abi.PaddedPieceSize(0), "")
 }
 
 func (h *ProviderHarness) AssertPieceAdded(t *testing.T, ctx context.Context, dp *types.DealParams, so *smtestutil.StubbedMinerOutput, carv2FilePath string) {
 	h.AssertEventuallyDealCleanedup(t, ctx, dp.DealUUID)
-	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.AddedPiece, so.SectorID, so.Offset, dp.ClientDealProposal.Proposal.PieceSize.Unpadded().Padded())
+	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.AddedPiece, so.SectorID, so.Offset, dp.ClientDealProposal.Proposal.PieceSize.Unpadded().Padded(), "")
 	// Assert that the original file data we sent matches what was sent to the sealer
 	h.AssertSealedContents(t, carv2FilePath, *so.SealedBytes)
 }
@@ -310,7 +382,7 @@ func (h *ProviderHarness) AssertEventuallyDealCleanedup(t *testing.T, ctx contex
 }
 
 func (h *ProviderHarness) AssertDealDBState(t *testing.T, ctx context.Context, dp *types.DealParams, expectedDealID abi.DealID, publishCid *cid.Cid,
-	checkpoint dealcheckpoints.Checkpoint, sector abi.SectorNumber, offset, length abi.PaddedPieceSize) {
+	checkpoint dealcheckpoints.Checkpoint, sector abi.SectorNumber, offset, length abi.PaddedPieceSize, errStr string) {
 	dbState, err := h.DealsDB.ByID(ctx, dp.DealUUID)
 	require.NoError(t, err)
 	require.EqualValues(t, dp.DealUUID, dbState.DealUuid)
@@ -321,6 +393,12 @@ func (h *ProviderHarness) AssertDealDBState(t *testing.T, ctx context.Context, d
 	require.EqualValues(t, offset, dbState.Offset)
 	require.EqualValues(t, length, dbState.Length)
 	require.EqualValues(t, dp.Transfer, dbState.Transfer)
+
+	if len(errStr) == 0 {
+		require.Empty(t, dbState.Err)
+	} else {
+		require.Contains(t, dbState.Err, errStr)
+	}
 
 	if publishCid == nil {
 		require.Empty(t, dbState.PublishCID)
@@ -568,37 +646,78 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	return tbuilder
 }
 
+type minerStubCall struct {
+	err      error
+	blocking bool
+}
+
 type testDealBuilder struct {
 	t  *testing.T
 	td *testDeal
 	ph *ProviderHarness
 
-	ms                       *smtestutil.MinerStubBuilder
-	msPublishBlocking        bool
-	msPublishConfirmBlocking bool
-	msAddPieceBlocking       bool
+	ms               *smtestutil.MinerStubBuilder
+	msPublish        *minerStubCall
+	msPublishConfirm *minerStubCall
+	msAddPiece       *minerStubCall
 }
 
-/*
-func (tbuilder *testDealBuilder) withPublishBlocking() *testDealBuilder {
-	tbuilder.msPublishBlocking = true
+func (tbuilder *testDealBuilder) withPublishFailing(err error) *testDealBuilder {
+	tbuilder.msPublish = &minerStubCall{err: err}
 	return tbuilder
-}*/
+}
+
+func (tbuilder *testDealBuilder) withPublishConfirmFailing(err error) *testDealBuilder {
+	tbuilder.msPublishConfirm = &minerStubCall{err: err}
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withAddPieceFailing(err error) *testDealBuilder {
+	tbuilder.msAddPiece = &minerStubCall{err: err}
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withPublishBlocking() *testDealBuilder {
+	tbuilder.msPublish = &minerStubCall{blocking: true}
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withPublishNonBlocking() *testDealBuilder {
+	tbuilder.msPublish = &minerStubCall{blocking: false}
+	return tbuilder
+}
 
 func (tbuilder *testDealBuilder) withPublishConfirmBlocking() *testDealBuilder {
-	tbuilder.msPublishConfirmBlocking = true
+	tbuilder.msPublishConfirm = &minerStubCall{blocking: true}
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withPublishConfirmNonBlocking() *testDealBuilder {
+	tbuilder.msPublishConfirm = &minerStubCall{blocking: false}
 	return tbuilder
 }
 
 func (tbuilder *testDealBuilder) withAddPieceBlocking() *testDealBuilder {
-	tbuilder.msAddPieceBlocking = true
+	tbuilder.msAddPiece = &minerStubCall{blocking: true}
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withAddPieceNonBlocking() *testDealBuilder {
+	tbuilder.msAddPiece = &minerStubCall{blocking: false}
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withAllMinerCallsNonBlocking() *testDealBuilder {
+	tbuilder.msPublish = &minerStubCall{blocking: false}
+	tbuilder.msPublishConfirm = &minerStubCall{blocking: false}
+	tbuilder.msAddPiece = &minerStubCall{blocking: false}
 	return tbuilder
 }
 
 func (tbuilder *testDealBuilder) withAllMinerCallsBlocking() *testDealBuilder {
-	tbuilder.msPublishBlocking = true
-	tbuilder.msPublishConfirmBlocking = true
-	tbuilder.msAddPieceBlocking = true
+	tbuilder.msPublish = &minerStubCall{blocking: true}
+	tbuilder.msPublishConfirm = &minerStubCall{blocking: true}
+	tbuilder.msAddPiece = &minerStubCall{blocking: true}
 
 	return tbuilder
 }
@@ -629,9 +748,30 @@ func (tbuilder *testDealBuilder) setTransferParams(serverURL string) {
 }
 
 func (tbuilder *testDealBuilder) build() *testDeal {
-	tbuilder.ms.SetupPublish(tbuilder.msPublishBlocking)
-	tbuilder.ms.SetupPublishConfirm(tbuilder.msPublishConfirmBlocking)
-	tbuilder.ms.SetupAddPiece(tbuilder.msAddPieceBlocking)
+	if tbuilder.msPublish != nil {
+
+		if err := tbuilder.msPublish.err; err != nil {
+			tbuilder.ms.SetupPublishFailure(err)
+		} else {
+			tbuilder.ms.SetupPublish(tbuilder.msPublish.blocking)
+		}
+	}
+
+	if tbuilder.msPublishConfirm != nil {
+		if err := tbuilder.msPublishConfirm.err; err != nil {
+			tbuilder.ms.SetupPublishConfirmFailure(err)
+		} else {
+			tbuilder.ms.SetupPublishConfirm(tbuilder.msPublishConfirm.blocking)
+		}
+	}
+
+	if tbuilder.msAddPiece != nil {
+		if err := tbuilder.msAddPiece.err; err != nil {
+			tbuilder.ms.SetupAddPieceFailure(err)
+		} else {
+			tbuilder.ms.SetupAddPiece(tbuilder.msAddPiece.blocking)
+		}
+	}
 
 	tbuilder.td.stubOutput = tbuilder.ms.Output()
 	return tbuilder.td
@@ -661,6 +801,21 @@ func (td *testDeal) execute() error {
 	}
 	td.sub = sub
 	return nil
+}
+
+func (td *testDeal) waitForError(errContains string) error {
+	for i := range td.sub.Out() {
+		st := i.(types.ProviderDealState)
+		if len(st.Err) != 0 {
+			if !strings.Contains(st.Err, errContains) {
+				return fmt.Errorf("actual error does not contain expected error, expected: %s, actual:%s", errContains, st.Err)
+			}
+
+			return nil
+		}
+	}
+
+	return errors.New("did not get any error")
 }
 
 func (td *testDeal) waitForCheckpoint(cp dealcheckpoints.Checkpoint) error {
@@ -717,4 +872,21 @@ func (td *testDeal) assertPieceAdded(t *testing.T, ctx context.Context) {
 
 func (td *testDeal) assertDealPublished(t *testing.T, ctx context.Context) {
 	td.ph.AssertPublished(t, ctx, td.params, td.stubOutput)
+}
+
+func (td *testDeal) assertDealFailedTransferNonRecoverable(t *testing.T, ctx context.Context, errStr string) {
+	td.ph.AssertDealFailedTransferNonRecoverable(t, ctx, td.params, errStr)
+}
+
+func (td *testDeal) assertEventuallyDealCleanedup(t *testing.T, ctx context.Context) {
+	td.ph.AssertEventuallyDealCleanedup(t, ctx, td.params.DealUUID)
+}
+
+func (td *testDeal) assertDealFailedNonRecoverable(t *testing.T, ctx context.Context, errContains string) {
+	dbState, err := td.ph.DealsDB.ByID(ctx, td.params.DealUUID)
+	require.NoError(t, err)
+
+	require.NotEmpty(t, dbState.Err)
+	require.Contains(t, dbState.Err, errContains)
+	require.EqualValues(t, dealcheckpoints.Complete, dbState.Checkpoint)
 }

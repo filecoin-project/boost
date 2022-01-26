@@ -22,7 +22,7 @@ func TestSingleDealResumptionDisconnect(t *testing.T) {
 	harness.Start(t, ctx)
 
 	// build the deal proposal
-	td := harness.newDealBuilder(t, 1, withNormalFileSize(fileSize)).withDisconnectingHttpServer().build()
+	td := harness.newDealBuilder(t, 1, withNormalFileSize(fileSize)).withAllMinerCallsNonBlocking().withDisconnectingHttpServer().build()
 
 	// execute deal and ensure it finishes even with the disconnects
 	err := td.execute()
@@ -42,12 +42,78 @@ func TestMultipleDealsConcurrentResumptionDisconnect(t *testing.T) {
 	// start the provider test harness
 	harness.Start(t, ctx)
 
-	tds := harness.executeNDealsConcurrentAndWaitFor(t, nDeals, dealcheckpoints.AddedPiece, func(i int) *testDeal {
-		return harness.newDealBuilder(t, i, withNormalFileSize(fileSize)).withDisconnectingHttpServer().build()
+	tds := harness.executeNDealsConcurrentAndWaitFor(t, nDeals, func(i int) *testDeal {
+		return harness.newDealBuilder(t, i, withNormalFileSize(fileSize)).withAllMinerCallsNonBlocking().withDisconnectingHttpServer().build()
+	}, func(_ int, td *testDeal) error {
+		return td.waitForCheckpoint(dealcheckpoints.AddedPiece)
 	})
 
 	for i := 0; i < nDeals; i++ {
 		td := tds[i]
 		td.assertPieceAdded(t, ctx)
 	}
+}
+
+func TestTransferCancelledByUser(t *testing.T) {
+	ctx := context.Background()
+
+	// setup the provider test harness
+	harness := NewHarness(t, ctx)
+	defer harness.Stop()
+	// start the provider test harness
+	harness.Start(t, ctx)
+
+	// build the deal proposal
+	td := harness.newDealBuilder(t, 1).withBlockingHttpServer().build()
+
+	// execute deal
+	err := td.execute()
+	require.NoError(t, err)
+
+	// assert deal is accepted and funds tagged
+	require.NoError(t, td.waitForCheckpoint(dealcheckpoints.Accepted))
+	harness.AssertStorageAndFundManagerState(t, ctx, td.params.Transfer.Size, harness.MinPublishFees, td.params.ClientDealProposal.Proposal.ProviderCollateral)
+
+	// cancel transfer for the deal
+	require.NoError(t, harness.Provider.CancelDealDataTransfer(td.params.DealUUID))
+
+	require.NoError(t, td.waitForError(DealCancelled))
+
+	// assert cleanup of deal
+	td.assertEventuallyDealCleanedup(t, ctx)
+	// assert db state
+	td.assertDealFailedTransferNonRecoverable(t, ctx, DealCancelled)
+	// assert storage manager and funds
+	harness.EventuallyAssertNoTagged(t, ctx)
+
+	// cancelling the same deal again will error out as deal handler will be absent
+	require.ErrorIs(t, harness.Provider.CancelDealDataTransfer(td.params.DealUUID), ErrDealHandlerNotFound)
+}
+
+func TestCancelTransferForTransferredDealFails(t *testing.T) {
+	ctx := context.Background()
+
+	// setup the provider test harness
+	harness := NewHarness(t, ctx)
+	defer harness.Stop()
+	// start the provider test harness
+	harness.Start(t, ctx)
+
+	// build the deal proposal
+	td := harness.newDealBuilder(t, 1).withPublishBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().withNormalHttpServer().build()
+
+	// execute deal
+	err := td.execute()
+	require.NoError(t, err)
+
+	// wait for deal to finish transferring
+	require.NoError(t, td.waitForCheckpoint(dealcheckpoints.Transferred))
+
+	// cancelling the transfer fails  as deal has already finished transferring
+	require.Contains(t, harness.Provider.CancelDealDataTransfer(td.params.DealUUID).Error(), "transfer already complete")
+
+	// deal still finishes
+	td.unblockPublish()
+	require.NoError(t, td.waitForCheckpoint(dealcheckpoints.AddedPiece))
+	td.assertPieceAdded(t, ctx)
 }
