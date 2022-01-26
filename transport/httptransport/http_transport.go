@@ -230,7 +230,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		// backoff-retry transfer if max number of attempts haven't been exhausted
 		nAttempts := t.backoff.Attempt() + 1
 		if nAttempts >= t.maxReconnectAttempts {
-			return fmt.Errorf("could not finish transfer even after %d attempts, lastErr: %w", maxReconnectAttempts, err)
+			return fmt.Errorf("could not finish transfer even after %f attempts, lastErr: %w", t.maxReconnectAttempts, err)
 		}
 		duration := t.backoff.Duration()
 		bt := time.NewTimer(duration)

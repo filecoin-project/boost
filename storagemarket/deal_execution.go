@@ -29,6 +29,11 @@ import (
 	"github.com/libp2p/go-libp2p-core/event"
 )
 
+const (
+	// DealCancelled means that a deal has been cancelled by the caller
+	DealCancelled = "Cancelled"
+)
+
 type dealMakingError struct {
 	recoverable bool
 	err         error
@@ -399,7 +404,7 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 	// Update state in DB with error
 	deal.Checkpoint = dealcheckpoints.Complete
 	if xerrors.Is(err, context.Canceled) {
-		deal.Err = "Cancelled"
+		deal.Err = DealCancelled
 		p.addDealLog(deal.DealUuid, "Deal cancelled")
 	} else {
 		deal.Err = err.Error()

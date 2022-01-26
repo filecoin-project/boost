@@ -200,7 +200,7 @@ func (r *resolver) DealCancel(_ context.Context, args struct{ ID graphql.ID }) (
 		return args.ID, err
 	}
 
-	err = r.provider.CancelDeal(dealUuid)
+	err = r.provider.CancelDealDataTransfer(dealUuid)
 	return args.ID, err
 }
 

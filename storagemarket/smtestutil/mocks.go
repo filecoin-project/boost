@@ -118,6 +118,14 @@ func (mb *MinerStubBuilder) SetupPublish(blocking bool) *MinerStubBuilder {
 	return mb
 }
 
+func (mb *MinerStubBuilder) SetupPublishFailure(err error) *MinerStubBuilder {
+	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.DealUUID), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(_ context.Context, _ uuid.UUID, _ market2.ClientDealProposal) (cid.Cid, error) {
+		return cid.Undef, err
+	})
+
+	return mb
+}
+
 func (mb *MinerStubBuilder) SetupPublishConfirm(blocking bool) *MinerStubBuilder {
 	finalPublishCid := testutil.GenerateCid()
 	dealId := abi.DealID(rand.Intn(100))
@@ -144,6 +152,14 @@ func (mb *MinerStubBuilder) SetupPublishConfirm(blocking bool) *MinerStubBuilder
 
 	mb.finalPublishCid = finalPublishCid
 	mb.dealId = dealId
+	return mb
+}
+
+func (mb *MinerStubBuilder) SetupPublishConfirmFailure(err error) *MinerStubBuilder {
+	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+		return nil, err
+	})
+
 	return mb
 }
 
@@ -188,6 +204,23 @@ func (mb *MinerStubBuilder) SetupAddPiece(blocking bool) *MinerStubBuilder {
 	mb.rb = &readBytes
 
 	return mb
+}
+
+func (mb *MinerStubBuilder) SetupAddPieceFailure(err error) {
+	sdInfo := lapi.PieceDealInfo{
+		DealID:       mb.dealId,
+		DealProposal: &mb.dp.ClientDealProposal.Proposal,
+		PublishCid:   &mb.finalPublishCid,
+		DealSchedule: lapi.DealSchedule{
+			StartEpoch: mb.dp.ClientDealProposal.Proposal.StartEpoch,
+			EndEpoch:   mb.dp.ClientDealProposal.Proposal.EndEpoch,
+		},
+		KeepUnsealed: true,
+	}
+
+	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+		return abi.SectorNumber(0), abi.PaddedPieceSize(0), err
+	})
 }
 
 func (mb *MinerStubBuilder) Output() *StubbedMinerOutput {
