@@ -2,8 +2,6 @@ package httptransport
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,8 +12,6 @@ import (
 
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/namespace"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -28,7 +24,7 @@ import (
 // of a DAG in a blockstore, and serving the data as a CAR
 type Libp2pCarServer struct {
 	h      host.Host
-	authds datastore.Batching
+	auth   *AuthTokenDB
 	bstore blockstore.Blockstore
 	cfg    ServerConfig
 
@@ -40,26 +36,22 @@ type Libp2pCarServer struct {
 	eventListenersLk sync.Mutex
 	eventListeners   map[*EventListenerFn]struct{}
 
-	transfersLk sync.Mutex
-	transfers   map[cid.Cid]*transferTimer
+	transfersLk sync.RWMutex
+	transfers   map[cid.Cid]*Libp2pTransfer
 }
 
 type ServerConfig struct {
 	AnnounceAddr multiaddr.Multiaddr
-	// If there is an error transferring data, wait for the data receiver to
-	// retry the transfer for up to RetryTimeout before giving up
-	RetryTimeout time.Duration
 }
 
-func NewLibp2pCarServer(h host.Host, ds datastore.Batching, bstore blockstore.Blockstore, cfg ServerConfig) *Libp2pCarServer {
-	authds := namespace.Wrap(ds, datastore.NewKey("/libp2p-car-server-auth"))
+func NewLibp2pCarServer(h host.Host, auth *AuthTokenDB, bstore blockstore.Blockstore, cfg ServerConfig) *Libp2pCarServer {
 	return &Libp2pCarServer{
 		h:              h,
-		authds:         authds,
+		auth:           auth,
 		bstore:         bstore,
 		cfg:            cfg,
 		eventListeners: make(map[*EventListenerFn]struct{}),
-		transfers:      make(map[cid.Cid]*transferTimer),
+		transfers:      make(map[cid.Cid]*Libp2pTransfer),
 	}
 }
 
@@ -96,15 +88,7 @@ func (s *Libp2pCarServer) Stop() error {
 // PrepareForDataRequest creates an auth token and saves some parameters
 // in the datastore, in preparation for a request with that auth token.
 func (s *Libp2pCarServer) PrepareForDataRequest(ctx context.Context, dbID uint, proposalCid cid.Cid, payloadCid cid.Cid, size uint64) (*DealTransfer, error) {
-	// Create a new auth token and add it to the datastore
-	authTokenBuff := make([]byte, 1024)
-	if _, err := rand.Read(authTokenBuff); err != nil {
-		return nil, fmt.Errorf("generating auth token: %w", err)
-	}
-	authToken := hex.EncodeToString(authTokenBuff)
-
 	authValueJson, err := json.Marshal(&authValue{
-		CreatedAt:   time.Now(),
 		ProposalCid: proposalCid,
 		PayloadCid:  payloadCid,
 		Size:        size,
@@ -114,10 +98,9 @@ func (s *Libp2pCarServer) PrepareForDataRequest(ctx context.Context, dbID uint, 
 		return nil, fmt.Errorf("marshaling auth value JSON: %w", err)
 	}
 
-	authTokenKey := datastore.NewKey(authToken)
-	err = s.authds.Put(ctx, authTokenKey, authValueJson)
+	authToken, err := s.auth.Put(ctx, authValueJson)
 	if err != nil {
-		return nil, fmt.Errorf("adding auth token to datastore: %w", err)
+		return nil, fmt.Errorf("adding new auth token: %w", err)
 	}
 
 	dt := &DealTransfer{
@@ -127,15 +110,10 @@ func (s *Libp2pCarServer) PrepareForDataRequest(ctx context.Context, dbID uint, 
 	return dt, nil
 }
 
-// Cleanup removes an auth token from the datastore
-func (s *Libp2pCarServer) Cleanup(authToken string) error {
-	return s.authds.Delete(s.ctx, datastore.NewKey(authToken))
-}
-
 func (s *Libp2pCarServer) handler(w http.ResponseWriter, r *http.Request) {
 	err := s.handleNewReq(w, r)
 	if err != nil {
-		log.Infof(err.Error())
+		log.Infow("data transfer request failed", "code", err.code, "err", err)
 		w.WriteHeader(err.code)
 	}
 }
@@ -151,8 +129,8 @@ func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *
 	}
 
 	// Get proposal CID from auth datastore
-	authValueJson, err := s.authds.Get(s.ctx, datastore.NewKey(authToken))
-	if xerrors.Is(err, datastore.ErrNotFound) {
+	authValueJson, err := s.auth.Get(s.ctx, authToken)
+	if xerrors.Is(err, ErrTokenNotFound) {
 		return &httpError{
 			error: fmt.Errorf("rejected unrecognized auth token"),
 			code:  401,
@@ -180,92 +158,105 @@ func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *
 		return nil
 	}
 
-	s.sendCar(r, w, authToken, val, content)
+	err = s.sendCar(r, w, val, authToken, content)
+	if err != nil {
+		return &httpError{
+			error: err,
+			code:  500,
+		}
+	}
+
 	return nil
 }
 
-func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, authToken string, val authValue, content *car.CarReaderSeeker) {
-	var transferred uint64
-	local := s.h.ID().String()
-	remote := r.RemoteAddr // TODO: Check that RemoteAddr is the remote Peer ID
-	fireEvent := func(transferred uint64, status types.TransferStatus, msg string) {
-		evt := transferEvent(local, remote, transferred, status, msg)
-		s.eventListenersLk.Lock()
-		for l := range s.eventListeners {
-			(*l)(val.DBID, evt)
-		}
-		s.eventListenersLk.Unlock()
-	}
-
+func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val authValue, authToken string, content *car.CarReaderSeeker) error {
+	// Check if there's an existing transfer for the deal that is now being retried
 	s.transfersLk.Lock()
-	existing, ok := s.transfers[val.ProposalCid]
-	if ok {
-		log.Infow("restarting transfer", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
-		existing.cancelTimeout()
-	} else {
-		log.Infof("starting transfer", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
+	xfer, isRetry := s.transfers[val.ProposalCid]
+	if isRetry {
+		// Use the existing reader because it has a cache that we can re-use
+		// TODO: make the cache shareable so we can just create a new reader
+		// every time (and so that multiple concurrent requests for the same
+		// data can share a cache)
+		// TODO: make the underlying cache threadsafe
+		content = xfer.content
+
+		// Seek back to the start of the reader
+		_, err := content.Seek(0, io.SeekStart)
+		if err != nil {
+			return fmt.Errorf("resetting reader to zero: %w", err)
+		}
 	}
-	xfer := &transferTimer{
-		authValue:    &val,
-		retryTimeout: s.cfg.RetryTimeout,
-		onTimeout: func(orig error) {
-			s.transfersLk.Lock()
-			delete(s.transfers, val.ProposalCid)
-			s.transfersLk.Unlock()
 
-			log.Infof("failed transfer after timeout", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid,
-				"error", orig, "timeout", s.cfg.RetryTimeout)
-			_ = s.Cleanup(authToken)
-
-			msg := fmt.Sprintf("timed out waiting %s for data receiver to restart transfer ", s.cfg.RetryTimeout)
-			msg += "after error " + orig.Error()
-			msg += "\nfor proposal CID " + val.ProposalCid.String() + ", payloadCID " + val.PayloadCid.String()
-			fireEvent(transferred, types.TransferStatusFailed, msg)
-		},
+	// Create a new transfer
+	xfer = &Libp2pTransfer{
+		CreatedAt:  time.Now(),
+		DBID:       val.DBID,
+		AuthToken:  authToken,
+		LocalAddr:  s.h.ID().String(),
+		RemoteAddr: r.RemoteAddr,
+		content:    content,
 	}
 	s.transfers[val.ProposalCid] = xfer
 	s.transfersLk.Unlock()
 
+	if isRetry {
+		log.Infow("restarting transfer", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
+	} else {
+		log.Infow("starting transfer", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
+	}
+
 	// Fire event before starting transfer
-	fireEvent(0, types.TransferStatusStarted, "")
+	xfer.onStarted()
+	s.fireEvent(val.DBID, xfer.State())
 
 	// Fire progress events during transfer.
 	// We fire a progress event each time bytes are read from the CAR.
 	// Note that we can't fire events when bytes are written to the HTTP stream
 	// because there may be some transformation first (eg adding headers etc).
-	readEmitter := &readEmitter{ReadSeeker: content, emit: func(count int, err error) {
+	readEmitter := &readEmitter{rs: content, emit: func(totalRead uint64, err error) {
 		if err != nil {
-			xfer.startRetryTimer(err)
+			xfer.onError(err)
+			// Note: The error event gets fired at the end of the method
 			return
 		}
-		transferred += uint64(count)
-		fireEvent(transferred, types.TransferStatusOngoing, "")
+		xfer.onSent(totalRead)
+		s.fireEvent(val.DBID, xfer.State())
 	}}
 
 	// http.ServeContent ignores errors when writing to the stream, so we
 	// replace the writer with a class that watches for errors
-	writeErrWatcher := &writeErrorWatcher{ResponseWriter: w, onError: xfer.startRetryTimer}
+	writeErrWatcher := &writeErrorWatcher{ResponseWriter: w, onError: xfer.onError}
 
+	// Send the content
 	http.ServeContent(writeErrWatcher, r, "", time.Time{}, readEmitter)
 
 	// Check if there was an error during the transfer
-	if xfer.errored() {
-		// There was an error, just wait for the data receiver to retry
-		return
+	if err := xfer.error(); err != nil {
+		// There was an error, fire an error event
+		log.Infow("transfer failed", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid, "error", err)
+		s.fireEvent(val.DBID, xfer.State())
+		return nil
 	}
 
-	s.transfersLk.Lock()
-	delete(s.transfers, val.ProposalCid)
-	s.transfersLk.Unlock()
-
 	// Fire event at the end of the transfer
-	fireEvent(transferred, types.TransferStatusCompleted, "")
+	xfer.onCompleted()
+	s.fireEvent(val.DBID, xfer.State())
 
 	log.Infow("completed serving request", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
+	return nil
 }
 
 type EventListenerFn func(dbid uint, st types.TransferState)
 type UnsubFn func()
+
+func (s *Libp2pCarServer) fireEvent(dbid uint, state types.TransferState) {
+	s.eventListenersLk.Lock()
+	for l := range s.eventListeners {
+		(*l)(dbid, state)
+	}
+	s.eventListenersLk.Unlock()
+}
 
 func (s *Libp2pCarServer) Subscribe(cb EventListenerFn) UnsubFn {
 	s.eventListenersLk.Lock()
@@ -279,16 +270,56 @@ func (s *Libp2pCarServer) Subscribe(cb EventListenerFn) UnsubFn {
 	}
 }
 
-type transferTimer struct {
-	*authValue
-	retryTimeout time.Duration
-	onTimeout    func(orig error)
-	retryTimer   *time.Timer
-	lk           sync.Mutex
-	err          error
+// ForEach is called once for each active data transfer
+func (s *Libp2pCarServer) ForEach(cb func(xfer *Libp2pTransfer) error) error {
+	return s.Filter(func(xfer *Libp2pTransfer) (bool, error) {
+		return true, cb(xfer)
+	})
 }
 
-func (t *transferTimer) startRetryTimer(err error) {
+// Filter is called once for each active data transfer. If the callback
+// function returns false, the transfer is removed.
+func (s *Libp2pCarServer) Filter(cb func(xfer *Libp2pTransfer) (bool, error)) error {
+	s.transfersLk.RLock()
+	defer s.transfersLk.RUnlock()
+
+	for propcid, xfer := range s.transfers {
+		keep, err := cb(xfer)
+		if err != nil {
+			return err
+		}
+		if !keep {
+			delete(s.transfers, propcid)
+		}
+	}
+	return nil
+}
+
+// Libp2pTransfer keeps track of a data transfer
+type Libp2pTransfer struct {
+	CreatedAt  time.Time
+	DBID       uint
+	AuthToken  string
+	LocalAddr  string
+	RemoteAddr string
+	content    *car.CarReaderSeeker
+
+	lk        sync.RWMutex
+	cancelled bool
+	err       error
+	sent      uint64
+	status    types.TransferStatus
+}
+
+func (t *Libp2pTransfer) error() error {
+	t.lk.RLock()
+	defer t.lk.RUnlock()
+
+	return t.err
+}
+
+// onError is called when a transfer error occurs
+func (t *Libp2pTransfer) onError(err error) {
 	t.lk.Lock()
 	defer t.lk.Unlock()
 
@@ -296,36 +327,99 @@ func (t *transferTimer) startRetryTimer(err error) {
 		return
 	}
 	t.err = err
-
-	msg := "error in transfer for proposal CID %s / payload CID %s: %s"
-	msg += "\nwaiting %s for data receiver to retry"
-	log.Infof(msg, t.ProposalCid, t.PayloadCid, err, t.retryTimeout)
-	t.retryTimer = time.AfterFunc(t.retryTimeout, func() {
-		t.onTimeout(err)
-	})
+	t.status = types.TransferStatusFailed
 }
 
-func (t *transferTimer) cancelTimeout() {
-	if t.retryTimer != nil {
-		t.retryTimer.Stop()
-	}
-}
-
-func (t *transferTimer) errored() bool {
+// onStarted is called when a transfer starts / restarts
+func (t *Libp2pTransfer) onStarted() {
 	t.lk.Lock()
 	defer t.lk.Unlock()
 
-	return t.err != nil
+	// If the transfer has been permanently cancelled, it cannot be restarted.
+	// Note: if there was a transfer error it can be restarted.
+	if t.cancelled {
+		return
+	}
+
+	t.err = nil
+	t.status = types.TransferStatusStarted
+}
+
+// onSent is called when some bytes are sent
+func (t *Libp2pTransfer) onSent(sent uint64) {
+	t.lk.Lock()
+	defer t.lk.Unlock()
+
+	// If there was a data transfer error, ignore any subsequent sent events
+	if t.status == types.TransferStatusFailed {
+		return
+	}
+
+	t.sent = sent
+	t.status = types.TransferStatusOngoing
+}
+
+// onCompleted is called when the transfer completes successfully
+func (t *Libp2pTransfer) onCompleted() {
+	t.lk.Lock()
+	defer t.lk.Unlock()
+
+	// If there was a data transfer error, ignore the completed event
+	if t.status == types.TransferStatusFailed {
+		return
+	}
+
+	t.status = types.TransferStatusCompleted
+}
+
+func (t *Libp2pTransfer) State() types.TransferState {
+	t.lk.RLock()
+	defer t.lk.RUnlock()
+
+	msg := ""
+	if t.err != nil {
+		msg = t.err.Error()
+	} else {
+		msg = fmt.Sprintf("transferred %d bytes", t.sent)
+		if t.sent == 0 {
+			msg = "pull data transfer queued"
+		}
+	}
+	return types.TransferState{
+		LocalAddr:  t.LocalAddr,
+		RemoteAddr: t.RemoteAddr,
+		Status:     t.status,
+		Sent:       t.sent,
+		Message:    msg,
+	}
+}
+
+// Cancel permanently fails the transfer
+func (t *Libp2pTransfer) Cancel(err error) {
+	t.lk.Lock()
+	defer t.lk.Unlock()
+
+	t.cancelled = true
+	t.err = err
+	t.status = types.TransferStatusFailed
 }
 
 type readEmitter struct {
-	io.ReadSeeker
-	emit func(count int, err error)
+	rs     io.ReadSeeker
+	emit   func(count uint64, err error)
+	offset uint64
+}
+
+func (e *readEmitter) Seek(offset int64, whence int) (int64, error) {
+	newOffset, err := e.rs.Seek(offset, whence)
+	e.offset = uint64(newOffset)
+	return newOffset, err
 }
 
 func (e *readEmitter) Read(p []byte) (n int, err error) {
-	count, err := e.ReadSeeker.Read(p)
-	e.emit(count, err)
+	count, err := e.rs.Read(p)
+	e.offset += uint64(count)
+	e.emit(e.offset, err)
 	return count, err
 }
 
@@ -342,29 +436,12 @@ func (w *writeErrorWatcher) Write(bz []byte) (int, error) {
 	return count, err
 }
 
-func transferEvent(localAddr string, remoteAddr string, transferred uint64, status types.TransferStatus, msg string) types.TransferState {
-	if msg == "" {
-		msg = fmt.Sprintf("transferred %d bytes", transferred)
-		if transferred == 0 {
-			msg = "pull data transfer queued"
-		}
-	}
-	return types.TransferState{
-		LocalAddr:  localAddr,
-		RemoteAddr: remoteAddr,
-		Status:     status,
-		Sent:       transferred,
-		Message:    msg,
-	}
-}
-
 type DealTransfer struct {
 	MultiAddress multiaddr.Multiaddr
 	AuthToken    string
 }
 
 type authValue struct {
-	CreatedAt   time.Time
 	ProposalCid cid.Cid
 	PayloadCid  cid.Cid
 	Size        uint64

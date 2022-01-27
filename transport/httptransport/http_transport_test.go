@@ -443,9 +443,9 @@ func serversWithCustomHandler(handler http.HandlerFunc) map[string]func(t *testi
 
 func newLibp2pHttpServer(st *serverTest) (types.HttpRequest, func(), host.Host) {
 	clientHost, srvHost := setupLibp2pHosts(st.t)
-	srv := NewLibp2pCarServer(srvHost, st.ds, st.bs, ServerConfig{
+	authDB := NewAuthTokenDB(st.ds)
+	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{
 		AnnounceAddr: srvHost.Addrs()[0],
-		RetryTimeout: time.Minute,
 	})
 	err := srv.Start()
 	require.NoError(st.t, err)
