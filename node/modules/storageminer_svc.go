@@ -22,7 +22,7 @@ type MinerStorageService lapi.StorageMiner
 
 var _ sectorblocks.SectorBuilder = *new(MinerSealingService)
 
-var _ sealingpipeline.State = *new(MinerSealingService)
+var _ sealingpipeline.API = *new(MinerSealingService)
 
 func connectMinerService(apiInfo string) func(mctx helpers.MetricsCtx, lc fx.Lifecycle) (lapi.StorageMiner, error) {
 	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle) (lapi.StorageMiner, error) {

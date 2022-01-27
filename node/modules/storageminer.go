@@ -530,8 +530,8 @@ func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
 	return db.NewDealsDB(sqldb)
 }
 
-func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.State, df dtypes.StorageDealFilter) (*storagemarket.Provider, error) {
-	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.State, df dtypes.StorageDealFilter) (*storagemarket.Provider, error) {
+func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter) (*storagemarket.Provider, error) {
+	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter) (*storagemarket.Provider, error) {
 		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, sps, storagemarket.NewChainDealManager(a), df)
 		lp2pnet := lp2pimpl.NewDealProvider(h, prov)
 
@@ -559,7 +559,7 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 	}
 }
 
-func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storagemarket.DealPublisher, spApi sealingpipeline.State, fullNode v1api.FullNode) *gql.Server {
+func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storagemarket.DealPublisher, spApi sealingpipeline.API, fullNode v1api.FullNode) *gql.Server {
 	resolver := gql.NewResolver(dealsDB, fundMgr, storageMgr, spApi, prov, publisher, fullNode)
 	server := gql.NewServer(resolver)
 
@@ -591,17 +591,29 @@ func BasicDealFilter(cfg config.DealmakingConfig, user dtypes.StorageDealFilter)
 		return func(ctx context.Context, deal types.DealParams) (bool, string, error) {
 			pr := deal.ClientDealProposal.Proposal
 
-			b, err := onlineOk()
-			if err != nil {
-				return false, "miner error", err
-			}
+			// TODO: handle in userCmd
+			//b, err := onlineOk()
+			//if err != nil {
+			//return false, "miner error", err
+			//}
 
-			b, err = offlineOk()
-			if err != nil {
-				return false, "miner error", err
-			}
+			//if deal.Ref != nil && deal.Ref.TransferType != storagemarket.TTManual && !b {
+			//log.Warnf("online storage deal consideration disabled; rejecting storage deal proposal from client: %s", deal.Client.String())
+			//return false, "miner is not considering online storage deals", nil
+			//}
 
-			b, err = verifiedOk()
+			// TODO: handle in userCmd
+			//b, err = offlineOk()
+			//if err != nil {
+			//return false, "miner error", err
+			//}
+
+			//if deal.Ref != nil && deal.Ref.TransferType == storagemarket.TTManual && !b {
+			//log.Warnf("offline storage deal consideration disabled; rejecting storage deal proposal from client: %s", deal.Client.String())
+			//return false, "miner is not accepting offline storage deals", nil
+			//}
+
+			b, err := verifiedOk()
 			if err != nil {
 				return false, "miner error", err
 			}

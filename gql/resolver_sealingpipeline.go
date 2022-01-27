@@ -70,12 +70,11 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolve
 			})
 			taken += uint64(p.Piece.Size)
 		}
-
 	}
 
 	log.Debugw("sealing pipeline", "waitdeals", summary["WaitDeals"], "taken", taken, "deals", deals, "pc1", summary["PreCommit1"], "pc2", summary["PreCommit2"], "precommitwait", summary["PreCommitWait"], "waitseed", summary["WaitSeed"], "committing", summary["Committing"], "commitwait", summary["CommitWait"], "proving", summary["Proving"])
 
-	return &sealingPipelineResolver{
+	st := SealingPipelineState{
 		WaitDeals: waitDeals{
 			SectorSize: gqltypes.Uint64(ssize),
 			Deals:      deals,
@@ -92,6 +91,10 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineResolve
 			FinalizeSector: int32(summary["FinalizeSector"]), // TODO: confirm this is correct
 		},
 		Workers: workers,
+	}
+
+	return &sealingPipelineResolver{
+		st,
 	}, nil
 }
 
@@ -124,10 +127,14 @@ type worker struct {
 	Sector int32
 }
 
-type sealingPipelineResolver struct {
+type SealingPipelineState struct {
 	WaitDeals    waitDeals
 	SectorStates sectorStates
 	Workers      []*worker
+}
+
+type sealingPipelineResolver struct {
+	SealingPipelineState
 }
 
 func getSectorSize(ctx context.Context, fullNode v1api.FullNode, maddr address.Address) (uint64, error) {

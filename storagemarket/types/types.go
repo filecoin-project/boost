@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 
 	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
@@ -34,10 +35,11 @@ type StorageAsk struct {
 }
 
 type DealParams struct {
-	DealUUID           uuid.UUID
-	ClientDealProposal market.ClientDealProposal
-	DealDataRoot       cid.Cid
-	Transfer           Transfer
+	DealUUID             uuid.UUID
+	ClientDealProposal   market.ClientDealProposal
+	DealDataRoot         cid.Cid
+	Transfer             Transfer
+	SealingPipelineState *sealingpipeline.Status
 }
 
 // Transfer has the parameters for a data transfer

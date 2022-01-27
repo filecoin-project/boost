@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/sealingpipeline"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/boost/api"
@@ -42,12 +43,23 @@ func (p *Provider) loop() {
 			deal := dealReq.deal
 			log.Infow("process accept deal request", "id", deal.DealUuid)
 
+			// get current sealing pipeline status
+			status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
+			if err != nil {
+				log.Errorw("rejecting storage deal due to err", "err", err)
+
+				ri := &api.ProviderDealRejectionInfo{Accepted: false, Reason: err.Error()}
+				dealReq.rsp <- acceptDealResp{ri: ri, err: nil}
+				continue
+			}
+
 			// run custom decision logic
 			params := types.DealParams{
-				DealUUID:           deal.DealUuid,
-				ClientDealProposal: deal.ClientDealProposal,
-				DealDataRoot:       deal.DealDataRoot,
-				Transfer:           deal.Transfer,
+				DealUUID:             deal.DealUuid,
+				ClientDealProposal:   deal.ClientDealProposal,
+				DealDataRoot:         deal.DealDataRoot,
+				Transfer:             deal.Transfer,
+				SealingPipelineState: status,
 			}
 			accept, reason, err := p.df(p.ctx, params)
 			if err != nil {

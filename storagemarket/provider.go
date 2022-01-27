@@ -81,7 +81,7 @@ type Provider struct {
 	publishedDealChan chan publishDealReq
 
 	// Sealing Pipeline API
-	sps sealingpipeline.State
+	sps sealingpipeline.API
 
 	// Deal Filter
 	df dtypes.StorageDealFilter
@@ -106,7 +106,7 @@ type Provider struct {
 	dhs   map[uuid.UUID]*dealHandler
 }
 
-func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, sps sealingpipeline.State, cm types.ChainDealManager, df dtypes.StorageDealFilter, httpOpts ...httptransport.Option) (*Provider, error) {
+func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, httpOpts ...httptransport.Option) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -172,10 +172,6 @@ func (p *Provider) GetAsk() *types.StorageAsk {
 		MaxPieceSize:  64 * 1024 * 1024 * 1024,
 		Miner:         p.Address,
 	}
-}
-
-func (p *Provider) DealFilter(dp *types.DealParams) (bool, string, error) {
-	return true, "", nil
 }
 
 func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *api.ProviderDealRejectionInfo, err error) {

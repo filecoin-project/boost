@@ -405,7 +405,7 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(*sectorblocks.SectorBlocks), sectorblocks.NewSectorBlocks),
 
 		// Sealing Pipeline State API
-		Override(new(sealingpipeline.State), From(new(modules.MinerStorageService))),
+		Override(new(sealingpipeline.API), From(new(modules.MinerStorageService))),
 
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner)),
 

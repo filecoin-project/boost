@@ -538,7 +538,13 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		MaxStagingDealsBytes: ph.MaxStagingDealBytes,
 	})
 	sm := smInitF(lr, sqldb)
-	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, bp, address.Undef, bp, nil, bp, pc.httpOpts...)
+
+	// deal filter
+	df := func(ctx context.Context, deal types.DealParams) (bool, string, error) {
+		return true, "", nil
+	}
+
+	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, bp, address.Undef, bp, nil, bp, df, pc.httpOpts...)
 	require.NoError(t, err)
 	prov.testMode = true
 	ph.Provider = prov
