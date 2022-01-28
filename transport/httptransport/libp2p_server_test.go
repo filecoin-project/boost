@@ -2,6 +2,7 @@ package httptransport
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -198,6 +199,79 @@ func TestLibp2pCarServerResume(t *testing.T) {
 	lastSrvEvt := srvEvts[len(srvEvts)-1]
 	require.Equal(t, types.TransferStatusCompleted, lastSrvEvt.Status)
 	require.EqualValues(t, carSize, int(lastSrvEvt.Sent))
+}
+
+// TestLibp2pCarServerCancelTransfer verifies that cancelling a transfer
+// works as expected
+func TestLibp2pCarServerCancelTransfer(t *testing.T) {
+	ctx := context.Background()
+
+	rawSize := 2 * 1024 * 1024
+	st := newServerTest(t, rawSize)
+
+	clientHost, srvHost := setupLibp2pHosts(t)
+	defer srvHost.Close()
+	defer clientHost.Close()
+
+	authDB := NewAuthTokenDB(st.ds)
+	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{
+		AnnounceAddr: srvHost.Addrs()[0],
+	})
+	err := srv.Start()
+	require.NoError(t, err)
+	defer srv.Stop() //nolint:errcheck
+
+	// Create an auth token
+	carSize := len(st.carBytes)
+	proposalCid, err := cid.Parse("bafkqaaa")
+	require.NoError(t, err)
+	dbid := uint(1)
+	xfer, err := srv.PrepareForDataRequest(context.Background(), dbid, proposalCid, st.root.Cid(), uint64(carSize))
+	require.NoError(t, err)
+
+	srvEvts := []types.TransferState{}
+	srv.Subscribe(func(sdbid uint, st types.TransferState) {
+		if dbid == sdbid {
+			srvEvts = append(srvEvts, st)
+		}
+	})
+
+	// Perform retrieval with the auth token
+	req := newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+	of := getTempFilePath(t)
+	noRetry := BackOffRetryOpt(0, 0, 1, 1)
+	th := executeTransfer(t, ctx, New(clientHost, noRetry), carSize, req, of)
+	require.NotNil(t, th)
+
+	// Wait for some data to be received by the client
+	clientSub := th.Sub()
+	evt := <-clientSub
+	require.NoError(t, evt.Error)
+	clientReceived := evt.NBytesReceived
+
+	// Cancel the transfer on the server side
+	var srvXfer *Libp2pTransfer
+	err = srv.ForEach(func(lt *Libp2pTransfer) error {
+		srvXfer = lt
+		return nil
+	})
+	require.NoError(t, err)
+
+	srvXfer.Cancel(fmt.Errorf("cancelled"))
+
+	// Wait for the transfer to complete on the client
+	clientEvts := waitForTransferComplete(th)
+	require.NotEmpty(t, clientEvts)
+	lastClientEvt := clientEvts[len(clientEvts)-1]
+
+	// Expect not all bytes to have been transferred
+	require.Error(t, lastClientEvt.Error)
+	require.Less(t, int(clientReceived), carSize)
+
+	require.NotEmpty(t, srvEvts)
+	lastSrvEvt := srvEvts[len(srvEvts)-1]
+	require.Equal(t, types.TransferStatusFailed, lastSrvEvt.Status)
+	require.Less(t, int(lastSrvEvt.Sent), carSize)
 }
 
 func min(a int, b int) int {

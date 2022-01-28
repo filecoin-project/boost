@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/car"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-libp2p-core/host"
 	gostream "github.com/libp2p/go-libp2p-gostream"
 	"github.com/multiformats/go-multiaddr"
@@ -28,6 +28,7 @@ type Libp2pCarServer struct {
 	auth   *AuthTokenDB
 	bstore blockstore.Blockstore
 	cfg    ServerConfig
+	bicm   car.BlockInfoCacheManager
 
 	ctx         context.Context
 	cancel      context.CancelFunc
@@ -42,15 +43,21 @@ type Libp2pCarServer struct {
 }
 
 type ServerConfig struct {
-	AnnounceAddr multiaddr.Multiaddr
+	AnnounceAddr          multiaddr.Multiaddr
+	BlockInfoCacheManager car.BlockInfoCacheManager
 }
 
 func NewLibp2pCarServer(h host.Host, auth *AuthTokenDB, bstore blockstore.Blockstore, cfg ServerConfig) *Libp2pCarServer {
+	bcim := cfg.BlockInfoCacheManager
+	if bcim == nil {
+		bcim = car.NewRefCountBICM()
+	}
 	return &Libp2pCarServer{
 		h:              h,
 		auth:           auth,
 		bstore:         bstore,
 		cfg:            cfg,
+		bicm:           bcim,
 		eventListeners: make(map[*EventListenerFn]struct{}),
 		transfers:      make(map[cid.Cid]*Libp2pTransfer),
 	}
@@ -131,6 +138,22 @@ func (s *Libp2pCarServer) PrepareForDataRequest(ctx context.Context, dbID uint, 
 	return dt, nil
 }
 
+// CleanupPreparedRequest is called when a request cannot be fulfilled,
+// for example because the provider rejected the deal proposal
+func (s *Libp2pCarServer) CleanupPreparedRequest(ctx context.Context, authToken string, proposalCid cid.Cid) error {
+	// Clean up any transfer that was created
+	s.transfersLk.Lock()
+	xfer, ok := s.transfers[proposalCid]
+	if ok {
+		delete(s.transfers, proposalCid)
+		xfer.Cancel(fmt.Errorf("cancelled"))
+	}
+	s.transfersLk.Unlock()
+
+	// Delete the auth token for the request
+	return s.auth.Delete(ctx, authToken)
+}
+
 func (s *Libp2pCarServer) handler(w http.ResponseWriter, r *http.Request) {
 	err := s.handleNewReq(w, r)
 	if err != nil {
@@ -174,13 +197,25 @@ func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *
 		}
 	}
 
+	// Get a block info cache for the CarOffsetWriter
+	bic := s.bicm.Get(val.PayloadCid)
+	defer s.bicm.Unref(val.PayloadCid)
+
+	// Create a CarOffsetWriter and a reader for it
+	cow := car.NewCarOffsetWriter(val.PayloadCid, s.bstore, bic)
+	content := car.NewCarReaderSeeker(ctx, cow, val.Size)
+
+	// Set the Content-Type header explicitly so that http.ServeContent doesn't
+	// try to do it implicitly
 	w.Header().Set("Content-Type", "application/car")
-	content := car.NewCarReaderSeeker(ctx, val.PayloadCid, s.bstore, val.Size)
+
 	if r.Method == "HEAD" {
+		// For an HTTP HEAD request we don't send any data (just headers)
 		http.ServeContent(w, r, "", time.Time{}, content)
 		return nil
 	}
 
+	// Send the CAR file
 	err = s.sendCar(r, w, val, authToken, content)
 	if err != nil {
 		return &httpError{
@@ -193,27 +228,10 @@ func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *
 }
 
 func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val authValue, authToken string, content *car.CarReaderSeeker) error {
-	// Check if there's an existing transfer for the deal that is now being retried
-	s.transfersLk.Lock()
-	xfer, isRetry := s.transfers[val.ProposalCid]
-	if isRetry {
-		// Use the existing reader because it has a cache that we can re-use
-		// TODO: make the cache shareable so we can just create a new reader
-		// every time (and so that multiple concurrent requests for the same
-		// data can share a cache)
-		// TODO: make the underlying cache threadsafe
-		// TODO: cancel existing ReadSeeker
-		content = xfer.content
-
-		// Seek back to the start of the reader
-		_, err := content.Seek(0, io.SeekStart)
-		if err != nil {
-			return fmt.Errorf("resetting reader to zero: %w", err)
-		}
-	}
-
 	// Create a new transfer
-	xfer = &Libp2pTransfer{
+	s.transfersLk.Lock()
+	_, isRetry := s.transfers[val.ProposalCid]
+	xfer := &Libp2pTransfer{
 		CreatedAt:  time.Now(),
 		DBID:       val.DBID,
 		AuthToken:  authToken,
@@ -260,6 +278,7 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val au
 		// There was an error, fire an error event
 		log.Infow("transfer failed", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid, "error", err)
 		s.fireEvent(val.DBID, xfer.State())
+
 		return nil
 	}
 
@@ -423,8 +442,11 @@ func (t *Libp2pTransfer) Cancel(err error) {
 	t.lk.Lock()
 	defer t.lk.Unlock()
 
-	// TODO: Add CloseWithError to CarReaderSeeker
-	//t.content.CloseWithError(err)
+	if t.cancelled {
+		return
+	}
+
+	t.content.CloseWithError(err) //nolint:errcheck
 	t.cancelled = true
 	t.err = err
 	t.status = types.TransferStatusFailed
