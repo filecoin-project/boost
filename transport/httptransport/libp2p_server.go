@@ -69,7 +69,14 @@ func (s *Libp2pCarServer) Start() error {
 
 	handler := http.NewServeMux()
 	handler.HandleFunc("/", s.handler)
-	s.server = &http.Server{Handler: handler}
+	s.server = &http.Server{
+		Handler: handler,
+		// This context will be the parent of the context associated with all
+		// incoming requests
+		BaseContext: func(listener net.Listener) context.Context {
+			return s.ctx
+		},
+	}
 	go s.server.Serve(listener) //nolint:errcheck
 
 	return nil
@@ -133,6 +140,8 @@ func (s *Libp2pCarServer) handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *httpError {
+	ctx := r.Context()
+
 	// Get auth token from Authorization header
 	_, authToken, ok := r.BasicAuth()
 	if !ok {
@@ -143,7 +152,7 @@ func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *
 	}
 
 	// Get proposal CID from auth datastore
-	authValueJson, err := s.auth.Get(s.ctx, authToken)
+	authValueJson, err := s.auth.Get(ctx, authToken)
 	if xerrors.Is(err, ErrTokenNotFound) {
 		return &httpError{
 			error: errors.New("rejected unrecognized auth token"),
@@ -166,7 +175,7 @@ func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *
 	}
 
 	w.Header().Set("Content-Type", "application/car")
-	content := car.NewCarReaderSeeker(s.ctx, val.PayloadCid, s.bstore, val.Size)
+	content := car.NewCarReaderSeeker(ctx, val.PayloadCid, s.bstore, val.Size)
 	if r.Method == "HEAD" {
 		http.ServeContent(w, r, "", time.Time{}, content)
 		return nil
