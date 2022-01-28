@@ -110,7 +110,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 			if xerrors.Is(err, context.Canceled) && !dh.TransferCancelledByUser() {
 				return &dealMakingError{
 					recoverable: true,
-					err:         fmt.Errorf("data transfer failed after %d bytes with error: %w", deal.NBytesReceived, err),
+					err:         fmt.Errorf("data transfer failed with a recoverable error after %d bytes with error: %w", deal.NBytesReceived, err),
 					uiMsg:       fmt.Sprintf("data transfer paused after transferring %d bytes because Boost is shutting down", deal.NBytesReceived),
 				}
 			}
@@ -125,6 +125,14 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	// Publish
 	if deal.Checkpoint <= dealcheckpoints.Published {
 		if err := p.publishDeal(ctx, pub, deal); err != nil {
+			if xerrors.Is(err, context.Canceled) {
+				return &dealMakingError{
+					recoverable: true,
+					err:         fmt.Errorf("deal publish failed with a recoverable error: %w", err),
+					uiMsg:       "deal was paused in the publish state because Boost was shut down",
+				}
+			}
+
 			return &dealMakingError{
 				err: fmt.Errorf("failed to publish deal: %w", err),
 			}
@@ -133,13 +141,29 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	// Now that the deal has been published, we no longer need to have funds
 	// tagged as being for this deal (the publish message moves collateral
 	// from the storage market actor escrow balance to the locked balance)
-	if derr := p.untagFundsAfterPublish(ctx, deal); derr != nil {
-		return derr
+	if err := p.untagFundsAfterPublish(ctx, deal); err != nil {
+		if xerrors.Is(err, context.Canceled) {
+			return &dealMakingError{recoverable: true,
+				err:   fmt.Errorf("deal failed with recoverbale error while untagging funds after publish: %w", err),
+				uiMsg: "the deal was paused in the Publishing state because Boost was shut down"}
+		}
+
+		return &dealMakingError{
+			err: fmt.Errorf("failed to untag funds after sending publish message: %w", err),
+		}
 	}
 
 	// AddPiece
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
 		if err := p.addPiece(ctx, pub, deal); err != nil {
+			if xerrors.Is(err, context.Canceled) {
+				return &dealMakingError{
+					recoverable: true,
+					err:         fmt.Errorf("add piece failed with a recoverable error: %w", err),
+					uiMsg:       "deal was paused while being sent to the sealing subsystem because Boost was shut down",
+				}
+			}
+
 			return &dealMakingError{
 				err: fmt.Errorf("failed to add piece: %w", err),
 			}
@@ -149,17 +173,17 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	return nil
 }
 
-func (p *Provider) untagFundsAfterPublish(ctx context.Context, deal *types.ProviderDealState) *dealMakingError {
+func (p *Provider) untagFundsAfterPublish(ctx context.Context, deal *types.ProviderDealState) error {
 	presp := make(chan struct{}, 1)
 	select {
 	case p.publishedDealChan <- publishDealReq{deal: deal, done: presp}:
 	case <-ctx.Done():
-		return &dealMakingError{recoverable: true, err: ctx.Err(), uiMsg: "the deal was paused in the Publishing state because Boost was shut down"}
+		return ctx.Err()
 	}
 	select {
 	case <-presp:
 	case <-ctx.Done():
-		return &dealMakingError{recoverable: true, err: ctx.Err(), uiMsg: "the deal was paused in the Publishing state because Boost was shut down"}
+		return ctx.Err()
 	}
 
 	return nil
