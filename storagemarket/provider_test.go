@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/host"
+
 	"golang.org/x/sync/errgroup"
 
 	"github.com/filecoin-project/boost/db"
@@ -57,7 +59,7 @@ func TestSimpleDealHappy(t *testing.T) {
 	td := harness.newDealBuilder(t, 1).withAllMinerCallsBlocking().withBlockingHttpServer().build()
 
 	// execute deal
-	require.NoError(t, td.execute())
+	require.NoError(t, td.executeAndSubscribeToNotifs())
 
 	// wait for Accepted checkpoint
 	td.waitForAndAssert(t, ctx, dealcheckpoints.Accepted)
@@ -142,7 +144,7 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 		tds = append(tds, td)
 
 		errGrp.Go(func() error {
-			err := td.execute()
+			err := td.executeAndSubscribeToNotifs()
 			if err != nil {
 				return err
 			}
@@ -275,7 +277,7 @@ func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals
 		tds = append(tds, td)
 
 		errG.Go(func() error {
-			err := td.execute()
+			err := td.executeAndSubscribeToNotifs()
 			if err != nil {
 				return err
 			}
@@ -408,6 +410,7 @@ func (h *ProviderHarness) AssertDealDBState(t *testing.T, ctx context.Context, d
 }
 
 type ProviderHarness struct {
+	Host                host.Host
 	GoMockCtrl          *gomock.Controller
 	TempDir             string
 	MinerAddr           address.Address
@@ -475,7 +478,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	// setup mocks
 	ctrl := gomock.NewController(t)
 	fn := lotusmocks.NewMockFullNode(ctrl)
-	bp := smtestutil.NewMinerStub(ctrl)
+	minerStub := smtestutil.NewMinerStub(ctrl)
 
 	// setup client and miner addrs
 	minerAddr, err := address.NewIDAddress(1011)
@@ -504,6 +507,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 
 	// create the harness with default values
 	ph := &ProviderHarness{
+		Host:                h,
 		GoMockCtrl:          ctrl,
 		TempDir:             dir,
 		MinerAddr:           minerAddr,
@@ -517,7 +521,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		FundsDB:             db.NewFundsDB(sqldb),
 		StorageDB:           db.NewStorageDB(sqldb),
 		PublishWallet:       pw,
-		MinerStub:           bp,
+		MinerStub:           minerStub,
 		MinPublishFees:      pc.minPublishFees,
 		MaxStagingDealBytes: pc.maxStagingDealBytes,
 	}
@@ -538,7 +542,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		MaxStagingDealsBytes: ph.MaxStagingDealBytes,
 	})
 	sm := smInitF(lr, sqldb)
-	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, bp, address.Undef, bp, nil, bp, pc.httpOpts...)
+	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, minerStub, address.Undef, minerStub, nil, minerStub, pc.httpOpts...)
 	require.NoError(t, err)
 	prov.testMode = true
 	ph.Provider = prov
@@ -551,6 +555,29 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	ph.MockFullNode.EXPECT().WalletBalance(gomock.Any(), ph.PublishWallet).Return(abi.NewTokenAmount(pc.publishWalletBal), nil).AnyTimes()
 
 	return ph
+}
+
+func (h *ProviderHarness) shutdownAndResumeProvider(t *testing.T, ctx context.Context, opts ...harnessOpt) {
+	pc := &providerConfig{
+		minPublishFees:       abi.NewTokenAmount(100),
+		maxStagingDealBytes:  10000000000,
+		disconnectAfterEvery: 1048600,
+		lockedFunds:          big.NewInt(300),
+		escrowFunds:          big.NewInt(500),
+		publishWalletBal:     1000,
+	}
+	for _, opt := range opts {
+		opt(pc)
+	}
+	// shutdown old provider
+	h.Provider.Stop()
+
+	// construct a new provider with pre-existing state
+	prov, err := NewProvider("", h.Host, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager, h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, address.Undef, h.MinerStub, nil,
+		h.MinerStub, pc.httpOpts...)
+	require.NoError(t, err)
+	h.Provider = prov
+	require.NoError(t, prov.Start(ctx))
 }
 
 func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
@@ -625,8 +652,11 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	dealParams := &types.DealParams{
 		DealUUID: uuid.New(),
 		ClientDealProposal: market.ClientDealProposal{
-			Proposal:        proposal,
-			ClientSignature: acrypto.Signature{}, // We don't do signature verification in Boost SM testing.
+			Proposal: proposal,
+			ClientSignature: acrypto.Signature{
+				Type: acrypto.SigTypeBLS,
+				Data: []byte("sig"),
+			}, // We don't do signature verification in Boost SM testing.
 		},
 		DealDataRoot: rootCid,
 		Transfer: types.Transfer{
@@ -786,6 +816,16 @@ type testDeal struct {
 	sub           event.Subscription
 }
 
+func (td *testDeal) executeAndSubscribeToNotifs() error {
+	if err := td.execute(); err != nil {
+		return err
+	}
+	if err := td.subscribeToNotifs(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (td *testDeal) execute() error {
 	pi, err := td.ph.Provider.ExecuteDeal(td.params, peer.ID(""))
 	if err != nil {
@@ -795,6 +835,14 @@ func (td *testDeal) execute() error {
 		return errors.New("deal not accepted")
 	}
 
+	return nil
+}
+
+func (td *testDeal) updateSubscription() error {
+	return td.subscribeToNotifs()
+}
+
+func (td *testDeal) subscribeToNotifs() error {
 	sub, err := td.ph.Provider.SubscribeDealUpdates(td.params.DealUUID)
 	if err != nil {
 		return err
