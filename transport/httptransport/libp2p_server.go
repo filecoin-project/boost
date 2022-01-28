@@ -202,6 +202,7 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val au
 		// every time (and so that multiple concurrent requests for the same
 		// data can share a cache)
 		// TODO: make the underlying cache threadsafe
+		// TODO: cancel existing ReadSeeker
 		content = xfer.content
 
 		// Seek back to the start of the reader
@@ -422,6 +423,8 @@ func (t *Libp2pTransfer) Cancel(err error) {
 	t.lk.Lock()
 	defer t.lk.Unlock()
 
+	// TODO: Add CloseWithError to CarReaderSeeker
+	//t.content.CloseWithError(err)
 	t.cancelled = true
 	t.err = err
 	t.status = types.TransferStatusFailed
