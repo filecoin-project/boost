@@ -102,7 +102,6 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	github.com/libp2p/go-libp2p-gostream v0.3.1
 	github.com/libp2p/go-libp2p-http v0.2.1
-	github.com/multiformats/go-multiaddr-fmt v0.1.0
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/whyrusleeping/cbor-gen v0.0.0-20211110122933-f57984553008
 	go.uber.org/atomic v1.9.0
