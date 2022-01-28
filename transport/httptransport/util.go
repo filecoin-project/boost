@@ -3,11 +3,10 @@ package httptransport
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
-	mafmt "github.com/multiformats/go-multiaddr-fmt"
-	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 type httpError struct {
@@ -16,69 +15,48 @@ type httpError struct {
 }
 
 type transportUrl struct {
-	Scheme    string
-	URL       string
-	Host      string
-	PeerID    peer.ID
-	Multiaddr multiaddr.Multiaddr
+	scheme    string
+	url       string
+	peerID    peer.ID
+	multiaddr multiaddr.Multiaddr
 }
 
 func parseUrl(urlStr string) (*transportUrl, error) {
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parsing url '%s': %w", urlStr, err)
+	}
+	if u.Scheme == "" {
+		return nil, fmt.Errorf("parsing url '%s': could not parse scheme", urlStr)
 	}
 	if u.Scheme == libp2pScheme {
 		return parseLibp2pUrl(urlStr)
 	}
-	return &transportUrl{Scheme: u.Scheme, URL: urlStr}, nil
+	return &transportUrl{scheme: u.Scheme, url: urlStr}, nil
 }
 
 func parseLibp2pUrl(urlStr string) (*transportUrl, error) {
 	// Remove libp2p prefix
 	prefix := libp2pScheme + "://"
-	mastr := urlStr[len(prefix):]
-	addr, err := multiaddr.NewMultiaddr(mastr)
+	if !strings.HasPrefix(urlStr, prefix) {
+		return nil, fmt.Errorf("libp2p URL '%s' must start with prefix '%s'", urlStr, prefix)
+	}
+
+	// Convert to AddrInfo
+	addrInfo, err := peer.AddrInfoFromString(urlStr[len(prefix):])
 	if err != nil {
-		return nil, fmt.Errorf("parsing '%s' as multiaddr: %w", mastr, err)
+		return nil, fmt.Errorf("parsing address info from url '%s': %w", urlStr, err)
 	}
 
-	// Must have a P2P component so we can get the peer ID
-	httpAddr, last := multiaddr.SplitLast(addr)
-	if last.Protocol().Code != multiaddr.P_P2P {
-		return nil, fmt.Errorf("missing peerID in url '%s'", urlStr)
-	}
-	peerID := last.Value()
-
-	// If it's a DNS address like "/dnsaddr/bootstrap.libp2p.io"
-	if mafmt.DNS.Matches(httpAddr) {
-		// Get the host part of the address
-		host := ""
-		multiaddr.ForEach(httpAddr, func(c multiaddr.Component) bool {
-			host = c.Value()
-			return false
-		})
-
-		return &transportUrl{
-			Scheme:    libp2pScheme,
-			Host:      host,
-			URL:       libp2pScheme + "://" + peerID,
-			PeerID:    peer.ID(peerID),
-			Multiaddr: httpAddr,
-		}, nil
-	}
-
-	// Convert multi-address to HTTP url
-	netaddr, err := manet.ToNetAddr(httpAddr)
-	if err != nil {
-		return nil, fmt.Errorf("parsing '%s' as HTTP url: %w", httpAddr.String(), err)
+	// There should be exactly one address
+	if len(addrInfo.Addrs) != 1 {
+		return nil, fmt.Errorf("expected only one address in url '%s'", urlStr)
 	}
 
 	return &transportUrl{
-		Scheme:    libp2pScheme,
-		Host:      netaddr.String(),
-		URL:       libp2pScheme + "://" + peerID,
-		PeerID:    peer.ID(peerID),
-		Multiaddr: httpAddr,
+		scheme:    libp2pScheme,
+		url:       libp2pScheme + "://" + addrInfo.ID.String(),
+		peerID:    addrInfo.ID,
+		multiaddr: addrInfo.Addrs[0],
 	}, nil
 }

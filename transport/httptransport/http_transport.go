@@ -94,7 +94,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse request url: %w", err)
 	}
-	tInfo.URL = u.URL
+	tInfo.URL = u.url
 
 	// check that the outputFile exists
 	fi, err := os.Stat(dealInfo.OutputFile)
@@ -126,11 +126,11 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	}
 
 	// If this is a libp2p URL
-	if u.Scheme == libp2pScheme {
+	if u.scheme == libp2pScheme {
 		// Use the libp2p client
 		t.client = h.libp2pClient
 		// Add the peer's address to the peerstore so we can dial it
-		h.libp2pHost.Peerstore().AddAddr(u.PeerID, u.Multiaddr, time.Hour)
+		h.libp2pHost.Peerstore().AddAddr(u.peerID, u.multiaddr, time.Hour)
 	} else {
 		t.client = http.DefaultClient
 	}

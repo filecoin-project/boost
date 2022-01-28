@@ -3,6 +3,7 @@ package httptransport
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -85,6 +86,19 @@ func (s *Libp2pCarServer) Stop() error {
 	return serr
 }
 
+// authValue is the data associated with an auth token in the auth DB
+type authValue struct {
+	ProposalCid cid.Cid
+	PayloadCid  cid.Cid
+	Size        uint64
+	DBID        uint
+}
+
+type DealTransfer struct {
+	MultiAddress multiaddr.Multiaddr
+	AuthToken    string
+}
+
 // PrepareForDataRequest creates an auth token and saves some parameters
 // in the datastore, in preparation for a request with that auth token.
 func (s *Libp2pCarServer) PrepareForDataRequest(ctx context.Context, dbID uint, proposalCid cid.Cid, payloadCid cid.Cid, size uint64) (*DealTransfer, error) {
@@ -123,7 +137,7 @@ func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *
 	_, authToken, ok := r.BasicAuth()
 	if !ok {
 		return &httpError{
-			error: fmt.Errorf("rejected request with no Authorization header"),
+			error: errors.New("rejected request with no Authorization header"),
 			code:  401,
 		}
 	}
@@ -132,7 +146,7 @@ func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *
 	authValueJson, err := s.auth.Get(s.ctx, authToken)
 	if xerrors.Is(err, ErrTokenNotFound) {
 		return &httpError{
-			error: fmt.Errorf("rejected unrecognized auth token"),
+			error: errors.New("rejected unrecognized auth token"),
 			code:  401,
 		}
 	} else if err != nil {
@@ -239,11 +253,11 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val au
 		return nil
 	}
 
-	// Fire event at the end of the transfer
+	// Fire complete event
+	log.Infow("completed serving request", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
 	xfer.onCompleted()
 	s.fireEvent(val.DBID, xfer.State())
 
-	log.Infow("completed serving request", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
 	return nil
 }
 
@@ -404,6 +418,8 @@ func (t *Libp2pTransfer) Cancel(err error) {
 	t.status = types.TransferStatusFailed
 }
 
+// readEmitter emits an event with the current offset into the read stream
+// each time there is a read
 type readEmitter struct {
 	rs     io.ReadSeeker
 	emit   func(count uint64, err error)
@@ -423,6 +439,7 @@ func (e *readEmitter) Read(p []byte) (n int, err error) {
 	return count, err
 }
 
+// writeErrorWatcher calls onError if there is an error writing to the writer
 type writeErrorWatcher struct {
 	http.ResponseWriter
 	onError func(err error)
@@ -434,16 +451,4 @@ func (w *writeErrorWatcher) Write(bz []byte) (int, error) {
 		w.onError(err)
 	}
 	return count, err
-}
-
-type DealTransfer struct {
-	MultiAddress multiaddr.Multiaddr
-	AuthToken    string
-}
-
-type authValue struct {
-	ProposalCid cid.Cid
-	PayloadCid  cid.Cid
-	Size        uint64
-	DBID        uint
 }
