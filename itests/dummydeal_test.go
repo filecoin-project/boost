@@ -133,6 +133,7 @@ func TestDummydeal(t *testing.T) {
 	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath))
 	require.NoError(t, err)
 	require.True(t, res.Accepted)
+	fmt.Println(res.Reason)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
 	time.Sleep(2 * time.Second)
@@ -415,8 +416,8 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		Client:               f.clientAddr,
 		Provider:             f.minerAddr,
 		Label:                rootCid.String(),
-		StartEpoch:           head.Height() + 800000 + abi.ChainEpoch(rand.Intn(100000)),
-		EndEpoch:             head.Height() + 900000 + abi.ChainEpoch(rand.Intn(10000)),
+		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
+		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
 		ProviderCollateral:   abi.NewTokenAmount(0),
 		ClientCollateral:     abi.NewTokenAmount(0),
