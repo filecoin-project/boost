@@ -403,6 +403,11 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		return nil, err
 	}
 
+	head, err := f.fullNode.ChainHead(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	proposal := market.DealProposal{
 		PieceCID:             cidAndSize.PieceCID,
 		PieceSize:            cidAndSize.PieceSize,
@@ -410,8 +415,8 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		Client:               f.clientAddr,
 		Provider:             f.minerAddr,
 		Label:                rootCid.String(),
-		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
-		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
+		StartEpoch:           head.Height() + 800000 + abi.ChainEpoch(rand.Intn(100000)),
+		EndEpoch:             head.Height() + 900000 + abi.ChainEpoch(rand.Intn(10000)),
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
 		ProviderCollateral:   abi.NewTokenAmount(0),
 		ClientCollateral:     abi.NewTokenAmount(0),
