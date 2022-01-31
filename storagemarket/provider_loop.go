@@ -38,7 +38,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	// get current sealing pipeline status
 	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
 	if err != nil {
-		return false, err.Error(), nil
+		return false, "server error", err
 	}
 
 	// run custom decision logic
