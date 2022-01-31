@@ -34,9 +34,7 @@ type publishDealReq struct {
 	done chan struct{}
 }
 
-func (p *Provider) processDealRequest(dealReq acceptDealReq) (ok bool, reason string, rerr error) {
-	deal := dealReq.deal
-
+func (p *Provider) processDealRequest(deal *types.ProviderDealState) (ok bool, reason string, rerr error) {
 	// get current sealing pipeline status
 	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
 	if err != nil {
@@ -120,7 +118,7 @@ func (p *Provider) loop() {
 			deal := dealReq.deal
 			log.Infow("process accept deal request", "id", deal.DealUuid)
 
-			ok, reason, err := p.processDealRequest(dealReq)
+			ok, reason, err := p.processDealRequest(dealReq.deal)
 			if !ok {
 				if err != nil {
 
