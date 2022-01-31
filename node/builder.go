@@ -413,7 +413,6 @@ func ConfigBoost(c interface{}) Option {
 		// GraphQL server
 		Override(new(*gql.Server), modules.NewGraphqlServer),
 
-		// Config (todo: get a real property system)
 		Override(new(dtypes.ConsiderOnlineStorageDealsConfigFunc), modules.NewConsiderOnlineStorageDealsConfigFunc),
 		Override(new(dtypes.SetConsiderOnlineStorageDealsConfigFunc), modules.NewSetConsideringOnlineStorageDealsFunc),
 		Override(new(dtypes.ConsiderOnlineRetrievalDealsConfigFunc), modules.NewConsiderOnlineRetrievalDealsConfigFunc),
