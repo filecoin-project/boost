@@ -130,7 +130,11 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 		// Use the libp2p client
 		t.client = h.libp2pClient
 		// Add the peer's address to the peerstore so we can dial it
-		h.libp2pHost.Peerstore().AddAddr(u.peerID, u.multiaddr, time.Hour)
+		addrTtl := time.Hour
+		if deadline, ok := ctx.Deadline(); ok {
+			addrTtl = deadline.Sub(time.Now())
+		}
+		h.libp2pHost.Peerstore().AddAddr(u.peerID, u.multiaddr, addrTtl)
 	} else {
 		t.client = http.DefaultClient
 	}
