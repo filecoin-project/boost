@@ -30,7 +30,7 @@ func TestCarReaderSeeker(t *testing.T) {
 	require.NoError(t, err)
 
 	// Write the CAR to a buffer so it can be used for comparisons
-	fullCarCow := NewCarOffsetWriter(nd.Cid(), bs)
+	fullCarCow := NewCarOffsetWriter(nd.Cid(), bs, NewBlockInfoCache())
 	var fullBuff bytes.Buffer
 	err = fullCarCow.Write(context.Background(), &fullBuff, 0)
 	require.NoError(t, err)
@@ -55,7 +55,8 @@ func TestCarReaderSeeker(t *testing.T) {
 
 	for _, tc := range readTestCases {
 		t.Run(tc.name, func(t *testing.T) {
-			crs := NewCarReaderSeeker(ctx, nd.Cid(), bs, uint64(carSize))
+			cow := NewCarOffsetWriter(nd.Cid(), bs, NewBlockInfoCache())
+			crs := NewCarReaderSeeker(ctx, cow, uint64(carSize))
 			if tc.offset > 0 {
 				_, err := crs.Seek(tc.offset, io.SeekStart)
 				require.NoError(t, err)
@@ -137,7 +138,8 @@ func TestCarReaderSeeker(t *testing.T) {
 
 	for _, tc := range seekTestCases {
 		t.Run(tc.name, func(t *testing.T) {
-			crs := NewCarReaderSeeker(ctx, nd.Cid(), bs, uint64(carSize))
+			cow := NewCarOffsetWriter(nd.Cid(), bs, NewBlockInfoCache())
+			crs := NewCarReaderSeeker(ctx, cow, uint64(carSize))
 			newOffset, err := crs.Seek(tc.offset, tc.whence)
 			if tc.expectSeekErr {
 				require.Error(t, err)
@@ -161,7 +163,8 @@ func TestCarReaderSeeker(t *testing.T) {
 	}
 
 	t.Run("double seek", func(t *testing.T) {
-		crs := NewCarReaderSeeker(ctx, nd.Cid(), bs, uint64(carSize))
+		cow := NewCarOffsetWriter(nd.Cid(), bs, NewBlockInfoCache())
+		crs := NewCarReaderSeeker(ctx, cow, uint64(carSize))
 		_, err := crs.Seek(10, io.SeekStart)
 		require.NoError(t, err)
 		newOffset, err := crs.Seek(-5, io.SeekCurrent)

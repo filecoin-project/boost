@@ -55,7 +55,7 @@ func (c *CarReaderSeeker) Read(p []byte) (n int, err error) {
 		go func() {
 			err := c.cow.Write(writeCtx, pw, uint64(c.offset))
 			if err != nil && !xerrors.Is(err, context.Canceled) {
-				pw.CloseWithError(err)
+				pw.CloseWithError(err) //nolint:errcheck
 			} else {
 				pw.Close()
 			}
