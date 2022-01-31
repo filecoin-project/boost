@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-
-	"golang.org/x/xerrors"
 )
 
 // CarReaderSeeker wraps CarOffsetWriter with a ReadSeeker implementation.
@@ -54,10 +52,10 @@ func (c *CarReaderSeeker) Read(p []byte) (n int, err error) {
 
 		go func() {
 			err := c.cow.Write(writeCtx, pw, uint64(c.offset))
-			if err != nil && !xerrors.Is(err, context.Canceled) {
+			if err != nil {
 				pw.CloseWithError(err) //nolint:errcheck
 			} else {
-				pw.Close()
+				pw.Close() //nolint:errcheck
 			}
 			c.writeComplete <- struct{}{}
 		}()
@@ -93,7 +91,7 @@ func (c *CarReaderSeeker) Seek(offset int64, whence int) (int64, error) {
 	if c.reader != nil {
 		c.writeCancel()
 
-		c.reader.Close()
+		c.reader.Close() //nolint:errcheck
 
 		select {
 		case <-c.parentCtx.Done():
