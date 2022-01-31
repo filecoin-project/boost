@@ -42,6 +42,7 @@ type dealMakingError struct {
 
 func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	// Check if deal is already complete
+	// TODO Update this once we start listening for expired/slashed deals etc
 	if deal.Checkpoint >= dealcheckpoints.AddedPiece {
 		return
 	}
@@ -152,7 +153,6 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 			err: fmt.Errorf("failed to untag funds after sending publish message: %w", err),
 		}
 	}
-
 	// AddPiece
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
 		if err := p.addPiece(ctx, pub, deal); err != nil {
@@ -396,6 +396,10 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 
 	// Add the piece to a sector
 	packingInfo, packingErr := p.AddPieceToSector(p.ctx, *deal, paddedReader)
+	if xerrors.Is(packingErr, context.Canceled) {
+		_ = v2r.Close()
+		return packingErr
+	}
 
 	// Close the reader as we're done reading from it.
 	if err := v2r.Close(); err != nil {
