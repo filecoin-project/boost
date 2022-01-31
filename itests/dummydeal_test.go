@@ -404,11 +404,6 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		return nil, err
 	}
 
-	head, err := f.fullNode.ChainHead(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
 	proposal := market.DealProposal{
 		PieceCID:             cidAndSize.PieceCID,
 		PieceSize:            cidAndSize.PieceSize,
