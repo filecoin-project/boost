@@ -34,12 +34,11 @@ type publishDealReq struct {
 	done chan struct{}
 }
 
-func (p *Provider) processDealRequest(deal *types.ProviderDealState) (ok bool, reason string, rerr error) {
+func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, string, error) {
 	// get current sealing pipeline status
 	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
 	if err != nil {
-		reason = err.Error()
-		return
+		return false, err.Error(), nil
 	}
 
 	// run custom decision logic
@@ -52,12 +51,11 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (ok bool, r
 	}
 	accept, reason, err := p.df(p.ctx, params)
 	if err != nil {
-		reason = err.Error()
-		return
+		return false, err.Error(), nil
 	}
 
 	if !accept {
-		return
+		return false, reason, nil
 	}
 
 	cleanup := func() {
@@ -78,8 +76,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (ok bool, r
 	if err != nil {
 		cleanup()
 
-		reason = err.Error()
-		return
+		return false, err.Error(), nil
 	}
 
 	// tag the storage required for the deal in the staging area
@@ -87,8 +84,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (ok bool, r
 	if err != nil {
 		cleanup()
 
-		reason = err.Error()
-		return
+		return false, err.Error(), nil
 	}
 
 	// write deal state to the database
@@ -99,14 +95,12 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (ok bool, r
 	if err != nil {
 		cleanup()
 
-		rerr = fmt.Errorf("failed to insert deal in db: %w", err)
-		return
+		return false, "", fmt.Errorf("failed to insert deal in db: %w", err)
 	}
 
 	log.Infow("inserted deal into DB", "id", deal.DealUuid)
 
-	ok = true
-	return
+	return true, "", nil
 }
 
 func (p *Provider) loop() {
@@ -121,10 +115,9 @@ func (p *Provider) loop() {
 			ok, reason, err := p.processDealRequest(dealReq.deal)
 			if !ok {
 				if err != nil {
-
 					log.Error("rejecting storage deal", "err", err)
 
-					dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: ""}, err: err}
+					dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: reason}, err: err}
 					continue
 				}
 
