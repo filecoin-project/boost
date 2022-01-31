@@ -570,7 +570,7 @@ func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, dealsDB *db
 	return server
 }
 
-func BasicDealFilter(cfg config.DealmakingConfig, user dtypes.StorageDealFilter) func(onlineOk dtypes.ConsiderOnlineStorageDealsConfigFunc,
+func BasicDealFilter(cfg config.DealmakingConfig, userCmd dtypes.StorageDealFilter) func(onlineOk dtypes.ConsiderOnlineStorageDealsConfigFunc,
 	offlineOk dtypes.ConsiderOfflineStorageDealsConfigFunc,
 	verifiedOk dtypes.ConsiderVerifiedStorageDealsConfigFunc,
 	unverifiedOk dtypes.ConsiderUnverifiedStorageDealsConfigFunc,
@@ -591,29 +591,30 @@ func BasicDealFilter(cfg config.DealmakingConfig, user dtypes.StorageDealFilter)
 		return func(ctx context.Context, deal types.DealParams) (bool, string, error) {
 			pr := deal.ClientDealProposal.Proposal
 
-			// TODO: handle in userCmd
-			//b, err := onlineOk()
-			//if err != nil {
-			//return false, "miner error", err
-			//}
+			// TODO: maybe handle in userCmd?
+			b, err := onlineOk()
+			if err != nil {
+				return false, "miner error", err
+			}
 
-			//if deal.Ref != nil && deal.Ref.TransferType != storagemarket.TTManual && !b {
-			//log.Warnf("online storage deal consideration disabled; rejecting storage deal proposal from client: %s", deal.Client.String())
-			//return false, "miner is not considering online storage deals", nil
-			//}
+			if deal.Transfer.Type != "manual" && !b {
+				log.Warnf("online storage deal consideration disabled; rejecting storage deal proposal from client: %s", deal.ClientDealProposal.Proposal.Client.String())
+				return false, "miner is not considering online storage deals", nil
+			}
 
-			// TODO: handle in userCmd
-			//b, err = offlineOk()
-			//if err != nil {
-			//return false, "miner error", err
-			//}
+			// TODO: maybe handle in userCmd?
+			b, err = offlineOk()
+			if err != nil {
+				return false, "miner error", err
+			}
 
-			//if deal.Ref != nil && deal.Ref.TransferType == storagemarket.TTManual && !b {
-			//log.Warnf("offline storage deal consideration disabled; rejecting storage deal proposal from client: %s", deal.Client.String())
-			//return false, "miner is not accepting offline storage deals", nil
-			//}
+			if deal.Transfer.Type == "manual" && !b {
+				log.Warnf("offline storage deal consideration disabled; rejecting storage deal proposal from client: %s", deal.ClientDealProposal.Proposal.Client.String())
+				return false, "miner is not accepting offline storage deals", nil
+			}
 
-			b, err := verifiedOk()
+			// TODO: maybe handle in userCmd?
+			b, err = verifiedOk()
 			if err != nil {
 				return false, "miner error", err
 			}
@@ -623,6 +624,7 @@ func BasicDealFilter(cfg config.DealmakingConfig, user dtypes.StorageDealFilter)
 				return false, "miner is not accepting verified storage deals", nil
 			}
 
+			// TODO: maybe handle in userCmd?
 			b, err = unverifiedOk()
 			if err != nil {
 				return false, "miner error", err
@@ -633,6 +635,7 @@ func BasicDealFilter(cfg config.DealmakingConfig, user dtypes.StorageDealFilter)
 				return false, "miner is not accepting unverified storage deals", nil
 			}
 
+			// TODO: maybe handle in userCmd?
 			blocklist, err := blocklistFunc()
 			if err != nil {
 				return false, "miner error", err
@@ -645,8 +648,8 @@ func BasicDealFilter(cfg config.DealmakingConfig, user dtypes.StorageDealFilter)
 				}
 			}
 
-			if user != nil {
-				return user(ctx, deal)
+			if userCmd != nil {
+				return userCmd(ctx, deal)
 			}
 
 			return true, "", nil
