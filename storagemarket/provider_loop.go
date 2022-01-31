@@ -95,7 +95,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	if err != nil {
 		cleanup()
 
-		return false, "", fmt.Errorf("failed to insert deal in db: %w", err)
+		return false, "server error", fmt.Errorf("failed to insert deal in db: %w", err)
 	}
 
 	log.Infow("inserted deal into DB", "id", deal.DealUuid)
