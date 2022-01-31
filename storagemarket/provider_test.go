@@ -557,7 +557,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	})
 	sm := smInitF(lr, sqldb)
 
-	// deal filter
+	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
 	df := func(ctx context.Context, deal types.DealParams) (bool, string, error) {
 		return true, "", nil
 	}
