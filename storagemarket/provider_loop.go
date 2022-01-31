@@ -34,6 +34,83 @@ type publishDealReq struct {
 	done chan struct{}
 }
 
+func (p *Provider) processDealRequest(dealReq acceptDealReq) (ok bool, reason string, rerr error) {
+	deal := dealReq.deal
+
+	// get current sealing pipeline status
+	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
+	if err != nil {
+		reason = err.Error()
+		return
+	}
+
+	// run custom decision logic
+	params := types.DealParams{
+		DealUUID:             deal.DealUuid,
+		ClientDealProposal:   deal.ClientDealProposal,
+		DealDataRoot:         deal.DealDataRoot,
+		Transfer:             deal.Transfer,
+		SealingPipelineState: status,
+	}
+	accept, reason, err := p.df(p.ctx, params)
+	if err != nil {
+		reason = err.Error()
+		return
+	}
+
+	if !accept {
+		return
+	}
+
+	cleanup := func() {
+		errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
+			log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
+		}
+
+		errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
+		if errs != nil && !xerrors.Is(errf, db.ErrNotFound) {
+			log.Errorw("untagging storage", "id", deal.DealUuid, "err", errs)
+		}
+	}
+
+	// tag the funds required for escrow and sending the publish deal message
+	// so that they are not used for other deals
+	err = p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
+	if err != nil {
+		cleanup()
+
+		reason = err.Error()
+		return
+	}
+
+	// tag the storage required for the deal in the staging area
+	err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.Transfer.Size)
+	if err != nil {
+		cleanup()
+
+		reason = err.Error()
+		return
+	}
+
+	// write deal state to the database
+	log.Infow("inserting deal into DB", "id", deal.DealUuid)
+	deal.CreatedAt = time.Now()
+	deal.Checkpoint = dealcheckpoints.Accepted
+	err = p.dealsDB.Insert(p.ctx, deal)
+	if err != nil {
+		cleanup()
+
+		rerr = fmt.Errorf("failed to insert deal in db: %w", err)
+		return
+	}
+
+	log.Infow("inserted deal into DB", "id", deal.DealUuid)
+
+	ok = true
+	return
+}
+
 func (p *Provider) loop() {
 	defer p.wg.Done()
 
@@ -43,84 +120,21 @@ func (p *Provider) loop() {
 			deal := dealReq.deal
 			log.Infow("process accept deal request", "id", deal.DealUuid)
 
-			// get current sealing pipeline status
-			status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
-			if err != nil {
-				log.Errorw("rejecting storage deal due to err", "err", err)
+			ok, reason, err := p.processDealRequest(dealReq)
+			if !ok {
+				if err != nil {
 
-				ri := &api.ProviderDealRejectionInfo{Accepted: false, Reason: err.Error()}
-				dealReq.rsp <- acceptDealResp{ri: ri, err: nil}
-				continue
-			}
+					log.Error("rejecting storage deal", "err", err)
 
-			// run custom decision logic
-			params := types.DealParams{
-				DealUUID:             deal.DealUuid,
-				ClientDealProposal:   deal.ClientDealProposal,
-				DealDataRoot:         deal.DealDataRoot,
-				Transfer:             deal.Transfer,
-				SealingPipelineState: status,
-			}
-			accept, reason, err := p.df(p.ctx, params)
-			if err != nil {
-				log.Errorw("rejecting storage deal due to err", "err", err)
-
-				ri := &api.ProviderDealRejectionInfo{Accepted: false, Reason: err.Error()}
-				dealReq.rsp <- acceptDealResp{ri: ri, err: nil}
-				continue
-			}
-
-			if !accept {
-				log.Warnw("rejecting storage deal as it failed storage deal filter", "reason", reason)
-
-				ri := &api.ProviderDealRejectionInfo{Accepted: false, Reason: reason}
-				dealReq.rsp <- acceptDealResp{ri: ri, err: nil}
-				continue
-			}
-
-			// setup cleanup function
-			cleanup := func() {
-				errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
-				if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
-					log.Errorw("untagging funds", "id", deal.DealUuid, "err", errf)
+					dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: ""}, err: err}
+					continue
 				}
 
-				errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
-				if errs != nil && !xerrors.Is(errf, db.ErrNotFound) {
-					log.Errorw("untagging storage", "id", deal.DealUuid, "err", errs)
-				}
-			}
+				log.Warnw("rejecting storage deal", "reason", reason)
 
-			// Tag the funds required for escrow and sending the publish deal message
-			// so that they are not used for other deals
-			err = p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
-			if err != nil {
-				cleanup()
-				ri := &api.ProviderDealRejectionInfo{Accepted: false, Reason: err.Error()}
-				dealReq.rsp <- acceptDealResp{ri: ri, err: nil}
+				dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: reason}, err: nil}
 				continue
 			}
-
-			// Tag the storage required for the deal in the staging area
-			err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.Transfer.Size)
-			if err != nil {
-				cleanup()
-				ri := &api.ProviderDealRejectionInfo{Accepted: false, Reason: err.Error()}
-				dealReq.rsp <- acceptDealResp{ri: ri, err: nil}
-				continue
-			}
-
-			// write deal state to the database
-			log.Infow("inserting deal into DB", "id", deal.DealUuid)
-			deal.CreatedAt = time.Now()
-			deal.Checkpoint = dealcheckpoints.Accepted
-			err = p.dealsDB.Insert(p.ctx, deal)
-			if err != nil {
-				cleanup()
-				dealReq.rsp <- acceptDealResp{nil, fmt.Errorf("failed to insert deal in db: %w", err)}
-				continue
-			}
-			log.Infow("inserted deal into DB", "id", deal.DealUuid)
 
 			// start executing the deal
 			p.wg.Add(1)
@@ -129,8 +143,7 @@ func (p *Provider) loop() {
 				p.doDeal(deal, dealReq.dh)
 			}()
 
-			ri := &api.ProviderDealRejectionInfo{Accepted: true}
-			dealReq.rsp <- acceptDealResp{ri, nil}
+			dealReq.rsp <- acceptDealResp{&api.ProviderDealRejectionInfo{Accepted: true}, nil}
 			log.Infow("deal execution started", "id", deal.DealUuid)
 
 		case publishedDeal := <-p.publishedDealChan:
