@@ -76,7 +76,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	if err != nil {
 		cleanup()
 
-		return false, err.Error(), nil
+		return false, "server error", err
 	}
 
 	// tag the storage required for the deal in the staging area
