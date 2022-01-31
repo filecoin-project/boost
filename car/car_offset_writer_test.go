@@ -37,7 +37,7 @@ func TestCarOffsetWriter(t *testing.T) {
 	// Write the CAR to a buffer from offset 0 so the buffer can be used for
 	// comparison
 	payloadCid := nd.Cid()
-	fullCarCow := NewCarOffsetWriter(payloadCid, bs)
+	fullCarCow := NewCarOffsetWriter(payloadCid, bs, NewBlockInfoCache())
 	var fullBuff bytes.Buffer
 	err = fullCarCow.Write(context.Background(), &fullBuff, 0)
 	require.NoError(t, err)
@@ -81,13 +81,13 @@ func TestCarOffsetWriter(t *testing.T) {
 
 	// Run tests with a new CarOffsetWriter
 	runTestCases("new car offset writer", func() *CarOffsetWriter {
-		return NewCarOffsetWriter(payloadCid, bs)
+		return NewCarOffsetWriter(payloadCid, bs, NewBlockInfoCache())
 	})
 
 	// Run tests with a CarOffsetWriter that has already been used to write
 	// a CAR starting at offset 0
 	runTestCases("fully written car offset writer", func() *CarOffsetWriter {
-		fullCarCow := NewCarOffsetWriter(payloadCid, bs)
+		fullCarCow := NewCarOffsetWriter(payloadCid, bs, NewBlockInfoCache())
 		var buff bytes.Buffer
 		err = fullCarCow.Write(context.Background(), &buff, 0)
 		require.NoError(t, err)
@@ -97,7 +97,7 @@ func TestCarOffsetWriter(t *testing.T) {
 	// Run tests with a CarOffsetWriter that has already been used to write
 	// a CAR starting at offset 1
 	runTestCases("car offset writer written from offset 1", func() *CarOffsetWriter {
-		fullCarCow := NewCarOffsetWriter(payloadCid, bs)
+		fullCarCow := NewCarOffsetWriter(payloadCid, bs, NewBlockInfoCache())
 		var buff bytes.Buffer
 		err = fullCarCow.Write(context.Background(), &buff, 1)
 		require.NoError(t, err)
@@ -107,7 +107,7 @@ func TestCarOffsetWriter(t *testing.T) {
 	// Run tests with a CarOffsetWriter that has already been used to write
 	// a CAR starting part way through the second block
 	runTestCases("car offset writer written from offset 1.5 blocks", func() *CarOffsetWriter {
-		fullCarCow := NewCarOffsetWriter(payloadCid, bs)
+		fullCarCow := NewCarOffsetWriter(payloadCid, bs, NewBlockInfoCache())
 		var buff bytes.Buffer
 		err = fullCarCow.Write(context.Background(), &buff, 1024*1024+512*1024)
 		require.NoError(t, err)
@@ -117,15 +117,13 @@ func TestCarOffsetWriter(t *testing.T) {
 	// Run tests with a CarOffsetWriter that has already been used to write
 	// a CAR repeatedly
 	runTestCases("car offset writer written from offset repeatedly", func() *CarOffsetWriter {
-		fullCarCow := NewCarOffsetWriter(payloadCid, bs)
+		fullCarCow := NewCarOffsetWriter(payloadCid, bs, NewBlockInfoCache())
 		var buff bytes.Buffer
 		err = fullCarCow.Write(context.Background(), &buff, 1024)
 		require.NoError(t, err)
-		fullCarCow = NewCarOffsetWriter(payloadCid, bs)
 		var buff2 bytes.Buffer
 		err = fullCarCow.Write(context.Background(), &buff2, 10)
 		require.NoError(t, err)
-		fullCarCow = NewCarOffsetWriter(payloadCid, bs)
 		var buff3 bytes.Buffer
 		err = fullCarCow.Write(context.Background(), &buff3, 1024*1024+512*1024)
 		require.NoError(t, err)

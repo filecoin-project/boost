@@ -14,8 +14,11 @@ import (
 type BlockInfoCacheManager interface {
 	// Get the BlockInfoCache by payload cid
 	Get(payloadCid cid.Cid) *BlockInfoCache
-	// Unref is called when a request no longer needs the cache
-	Unref(payloadCid cid.Cid)
+	// Unref is called when a request no longer needs the cache.
+	// If err is not nil, the data transfer failed.
+	Unref(payloadCid cid.Cid, err error)
+	// Close the block info cache manager
+	Close() error
 }
 
 type cacheRefs struct {
@@ -44,13 +47,13 @@ func (bm *RefCountBICM) Get(payloadCid cid.Cid) *BlockInfoCache {
 	if ok {
 		bic.refs++
 	} else {
-		bic = &cacheRefs{cache: NewBlockInfoCache()}
+		bic = &cacheRefs{cache: NewBlockInfoCache(), refs: 1}
 		bm.cache[payloadCid] = bic
 	}
 	return bic.cache
 }
 
-func (bm *RefCountBICM) Unref(payloadCid cid.Cid) {
+func (bm *RefCountBICM) Unref(payloadCid cid.Cid, err error) {
 	bm.lk.Lock()
 	defer bm.lk.Unlock()
 
@@ -65,14 +68,19 @@ func (bm *RefCountBICM) Unref(payloadCid cid.Cid) {
 	}
 }
 
-// DelayedUnrefBICM is like RefCountBCIM but when the last reference is
-// unrefed, the cache is not removed for some delay. This is useful for the
-// case where a connection goes down momentarily and then a new request
-// is made (and we want to keep the cache for the new request).
+func (bm *RefCountBICM) Close() error {
+	return nil
+}
+
+// DelayedUnrefBICM is like RefCountBCIM but if there was a data transfer
+// error, the cache is not unrefed until after some delay.
+// This is useful for the case where a connection goes down momentarily and
+// then a new request is made (and we want to keep the cache for the new
+// request).
 type DelayedUnrefBICM struct {
 	*RefCountBICM
 	unrefDelay time.Duration
-	timers     map[cid.Cid]*time.Timer
+	timers     map[*time.Timer]struct{}
 }
 
 var _ BlockInfoCacheManager = (*DelayedUnrefBICM)(nil)
@@ -81,55 +89,34 @@ func NewDelayedUnrefBICM(unrefDelay time.Duration) *DelayedUnrefBICM {
 	return &DelayedUnrefBICM{
 		RefCountBICM: NewRefCountBICM(),
 		unrefDelay:   unrefDelay,
-		timers:       make(map[cid.Cid]*time.Timer),
+		timers:       make(map[*time.Timer]struct{}),
 	}
 }
 
-func (d *DelayedUnrefBICM) Unref(payloadCid cid.Cid) {
-	d.unref(payloadCid, true)
-}
-
-func (d *DelayedUnrefBICM) unref(payloadCid cid.Cid, withDelay bool) {
-	d.lk.Lock()
-	defer d.lk.Unlock()
-
-	bic, ok := d.cache[payloadCid]
-	if !ok {
-		return
+func (d *DelayedUnrefBICM) Unref(payloadCid cid.Cid, err error) {
+	if err == nil {
+		// No delay, just unref immediately
+		d.RefCountBICM.Unref(payloadCid, nil)
 	}
 
-	bic.refs--
-
-	// If there are no more references to the cache for this payload cid
-	if bic.refs == 0 {
-		if withDelay {
-			// If there's already a timer running, stop it
-			timer, ok := d.timers[payloadCid]
-			if ok {
-				timer.Stop()
-			}
-
-			// Start a new timer
-			timer = time.AfterFunc(d.unrefDelay, func() {
-				// When the timer expires, remove the cache for this payload cid
-				d.unref(payloadCid, false)
-			})
-			d.timers[payloadCid] = timer
-		} else {
-			// Delete the timer for this payload cid
-			delete(d.timers, payloadCid)
-		}
-
-		// Delete the cache for this payload cid
-		delete(d.cache, payloadCid)
-	}
+	// There should be a delay before the unref.
+	// Start a new timer
+	var timer *time.Timer
+	timer = time.AfterFunc(d.unrefDelay, func() {
+		// When the timer expires, unref the cache
+		delete(d.timers, timer)
+		d.RefCountBICM.Unref(payloadCid, nil)
+	})
+	d.timers[timer] = struct{}{}
 }
 
-func (d *DelayedUnrefBICM) Close() {
+func (d *DelayedUnrefBICM) Close() error {
 	// Stop any running timers
-	for _, timer := range d.timers {
+	for timer := range d.timers {
 		timer.Stop()
 	}
+
+	return nil
 }
 
 // BlockInfo keeps track of blocks in a CAR file

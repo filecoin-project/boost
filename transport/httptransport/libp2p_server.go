@@ -90,6 +90,7 @@ func (s *Libp2pCarServer) Start() error {
 }
 
 func (s *Libp2pCarServer) Stop() error {
+	bicmerr := s.bicm.Close()
 	s.cancel()
 	lerr := s.netListener.Close()
 	serr := s.server.Close()
@@ -97,7 +98,10 @@ func (s *Libp2pCarServer) Stop() error {
 	if lerr != nil {
 		return lerr
 	}
-	return serr
+	if serr != nil {
+		return serr
+	}
+	return bicmerr
 }
 
 // authValue is the data associated with an auth token in the auth DB
@@ -155,20 +159,26 @@ func (s *Libp2pCarServer) CleanupPreparedRequest(ctx context.Context, authToken 
 }
 
 func (s *Libp2pCarServer) handler(w http.ResponseWriter, r *http.Request) {
-	err := s.handleNewReq(w, r)
-	if err != nil {
-		log.Infow("data transfer request failed", "code", err.code, "err", err)
-		w.WriteHeader(err.code)
+	authToken, authVal, herr := s.checkAuth(r)
+	if herr != nil {
+		log.Infow("data transfer request failed", "code", herr.code, "err", herr.error)
+		w.WriteHeader(herr.code)
+		return
 	}
+
+	// Get a block info cache for the CarOffsetWriter
+	bic := s.bicm.Get(authVal.PayloadCid)
+	err := s.serveContent(w, r, authToken, authVal, bic)
+	s.bicm.Unref(authVal.PayloadCid, err)
 }
 
-func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *httpError {
+func (s *Libp2pCarServer) checkAuth(r *http.Request) (string, *authValue, *httpError) {
 	ctx := r.Context()
 
 	// Get auth token from Authorization header
 	_, authToken, ok := r.BasicAuth()
 	if !ok {
-		return &httpError{
+		return "", nil, &httpError{
 			error: errors.New("rejected request with no Authorization header"),
 			code:  401,
 		}
@@ -177,12 +187,12 @@ func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *
 	// Get proposal CID from auth datastore
 	authValueJson, err := s.auth.Get(ctx, authToken)
 	if xerrors.Is(err, ErrTokenNotFound) {
-		return &httpError{
+		return "", nil, &httpError{
 			error: errors.New("rejected unrecognized auth token"),
 			code:  401,
 		}
 	} else if err != nil {
-		return &httpError{
+		return "", nil, &httpError{
 			error: fmt.Errorf("getting key from datastore: %w", err),
 			code:  500,
 		}
@@ -191,15 +201,17 @@ func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *
 	var val authValue
 	err = json.Unmarshal(authValueJson, &val)
 	if err != nil {
-		return &httpError{
+		return "", nil, &httpError{
 			error: fmt.Errorf("unmarshaling json from datastore: %w", err),
 			code:  500,
 		}
 	}
 
-	// Get a block info cache for the CarOffsetWriter
-	bic := s.bicm.Get(val.PayloadCid)
-	defer s.bicm.Unref(val.PayloadCid)
+	return authToken, &val, nil
+}
+
+func (s *Libp2pCarServer) serveContent(w http.ResponseWriter, r *http.Request, authToken string, val *authValue, bic *car.BlockInfoCache) error {
+	ctx := r.Context()
 
 	// Create a CarOffsetWriter and a reader for it
 	cow := car.NewCarOffsetWriter(val.PayloadCid, s.bstore, bic)
@@ -212,22 +224,15 @@ func (s *Libp2pCarServer) handleNewReq(w http.ResponseWriter, r *http.Request) *
 	if r.Method == "HEAD" {
 		// For an HTTP HEAD request we don't send any data (just headers)
 		http.ServeContent(w, r, "", time.Time{}, content)
+
 		return nil
 	}
 
 	// Send the CAR file
-	err = s.sendCar(r, w, val, authToken, content)
-	if err != nil {
-		return &httpError{
-			error: err,
-			code:  500,
-		}
-	}
-
-	return nil
+	return s.sendCar(r, w, val, authToken, content)
 }
 
-func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val authValue, authToken string, content *car.CarReaderSeeker) error {
+func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *authValue, authToken string, content *car.CarReaderSeeker) error {
 	// Create a new transfer
 	s.transfersLk.Lock()
 	_, isRetry := s.transfers[val.ProposalCid]
@@ -279,7 +284,7 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val au
 		log.Infow("transfer failed", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid, "error", err)
 		s.fireEvent(val.DBID, xfer.State())
 
-		return nil
+		return err
 	}
 
 	// Fire complete event
