@@ -51,7 +51,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	}
 	accept, reason, err := p.df(p.ctx, params)
 	if err != nil {
-		return false, err.Error(), nil
+		return false, "deal filter error", err
 	}
 
 	if !accept {
