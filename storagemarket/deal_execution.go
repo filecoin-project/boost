@@ -42,6 +42,7 @@ type dealMakingError struct {
 
 func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	// Check if deal is already complete
+	// TODO Update this once we start listening for expired/slashed deals etc
 	if deal.Checkpoint >= dealcheckpoints.AddedPiece {
 		return
 	}
@@ -152,7 +153,6 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 			err: fmt.Errorf("failed to untag funds after sending publish message: %w", err),
 		}
 	}
-
 	// AddPiece
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
 		if err := p.addPiece(ctx, pub, deal); err != nil {
@@ -374,6 +374,11 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	if err != nil {
 		return fmt.Errorf("failed to open CARv2 file: %w", err)
 	}
+	defer func() {
+		if err := v2r.Close(); err != nil {
+			log.Errorw("failed to close carv2 reader", "err", err)
+		}
+	}()
 
 	var size uint64
 	switch v2r.Version {
@@ -396,12 +401,6 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 
 	// Add the piece to a sector
 	packingInfo, packingErr := p.AddPieceToSector(p.ctx, *deal, paddedReader)
-
-	// Close the reader as we're done reading from it.
-	if err := v2r.Close(); err != nil {
-		return fmt.Errorf("failed to close CARv2 reader: %w", err)
-	}
-
 	if packingErr != nil {
 		return fmt.Errorf("packing piece %s: %w", proposal.PieceCID, packingErr)
 	}
@@ -409,14 +408,6 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	deal.SectorID = packingInfo.SectorNumber
 	deal.Offset = packingInfo.Offset
 	deal.Length = packingInfo.Size
-
-	// TODO:
-	//// Register the deal data as a "shard" with the DAG store. Later it can be
-	//// fetched from the DAG store during retrieval.
-	//if err := stores.RegisterShardSync(p.ctx, p.dagStore, ds.ClientDealProposal.Proposal.PieceCID, ds.InboundCARPath, true); err != nil {
-	//err = fmt.Errorf("failed to activate shard: %w", err)
-	//log.Error(err)
-	//}
 
 	p.addDealLog(deal.DealUuid, "Deal handed off to sealer successfully")
 

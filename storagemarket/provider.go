@@ -399,12 +399,12 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 		case <-build.Clock.After(addPieceRetryWait):
 			sectorNum, offset, err = p.pieceAdder.AddPiece(ctx, pieceSize, pieceData, sdInfo)
 		case <-ctx.Done():
-			return nil, xerrors.New("context expired while waiting to retry AddPiece")
+			return nil, fmt.Errorf("error while waiting to retry AddPiece: %w", ctx.Err())
 		}
 	}
 
 	if err != nil {
-		return nil, xerrors.Errorf("AddPiece failed: %s", err)
+		return nil, fmt.Errorf("AddPiece failed: %w", err)
 	}
 	log.Infow("Added new deal to sector", "id", deal.DealUuid, "sector", p)
 

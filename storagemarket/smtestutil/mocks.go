@@ -4,13 +4,11 @@ import (
 	"context"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"sync"
 
 	lapi "github.com/filecoin-project/lotus/api"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
@@ -65,10 +63,17 @@ func (ms *MinerStub) UnblockAddPiece(id uuid.UUID) {
 	close(ch)
 }
 
-func (ms *MinerStub) ForDeal(dp *types.DealParams) *MinerStubBuilder {
+func (ms *MinerStub) ForDeal(dp *types.DealParams, publishCid, finalPublishCid cid.Cid, dealId abi.DealID, sectorId abi.SectorNumber,
+	offset abi.PaddedPieceSize) *MinerStubBuilder {
 	return &MinerStubBuilder{
 		stub: ms,
 		dp:   dp,
+
+		publishCid:      publishCid,
+		finalPublishCid: finalPublishCid,
+		dealId:          dealId,
+		sectorId:        sectorId,
+		offset:          offset,
 	}
 }
 
@@ -94,26 +99,30 @@ func (mb *MinerStubBuilder) SetupAllBlocking() *MinerStubBuilder {
 }
 
 func (mb *MinerStubBuilder) SetupPublish(blocking bool) *MinerStubBuilder {
-	publishCid := testutil.GenerateCid()
-
 	mb.stub.lk.Lock()
 	if blocking {
 		mb.stub.unblockPublish[mb.dp.DealUUID] = make(chan struct{})
 	}
 	mb.stub.lk.Unlock()
 
-	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.DealUUID), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(_ context.Context, _ uuid.UUID, _ market2.ClientDealProposal) (cid.Cid, error) {
+	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.DealUUID), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(ctx context.Context, _ uuid.UUID, _ market2.ClientDealProposal) (cid.Cid, error) {
 		mb.stub.lk.Lock()
 		ch := mb.stub.unblockPublish[mb.dp.DealUUID]
 		mb.stub.lk.Unlock()
 		if ch != nil {
-			<-ch
+			select {
+			case <-ctx.Done():
+				return cid.Undef, ctx.Err()
+			case <-ch:
+			}
+
+		}
+		if ctx.Err() != nil {
+			return cid.Undef, ctx.Err()
 		}
 
-		return publishCid, nil
+		return mb.publishCid, nil
 	})
-
-	mb.publishCid = publishCid
 
 	return mb
 }
@@ -127,31 +136,34 @@ func (mb *MinerStubBuilder) SetupPublishFailure(err error) *MinerStubBuilder {
 }
 
 func (mb *MinerStubBuilder) SetupPublishConfirm(blocking bool) *MinerStubBuilder {
-	finalPublishCid := testutil.GenerateCid()
-	dealId := abi.DealID(rand.Intn(100))
-
 	mb.stub.lk.Lock()
 	if blocking {
 		mb.stub.unblockWaitForPublish[mb.dp.DealUUID] = make(chan struct{})
 	}
 	mb.stub.lk.Unlock()
 
-	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(ctx context.Context, _ cid.Cid, _ market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
 		mb.stub.lk.Lock()
 		ch := mb.stub.unblockWaitForPublish[mb.dp.DealUUID]
 		mb.stub.lk.Unlock()
 		if ch != nil {
-			<-ch
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-ch:
+			}
+
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
 		}
 
 		return &storagemarket.PublishDealsWaitResult{
-			DealID:   dealId,
-			FinalCid: finalPublishCid,
+			DealID:   mb.dealId,
+			FinalCid: mb.finalPublishCid,
 		}, nil
 	})
 
-	mb.finalPublishCid = finalPublishCid
-	mb.dealId = dealId
 	return mb
 }
 
@@ -181,28 +193,29 @@ func (mb *MinerStubBuilder) SetupAddPiece(blocking bool) *MinerStubBuilder {
 		KeepUnsealed: true,
 	}
 
-	sectorID := abi.SectorNumber(rand.Intn(100))
-	offset := abi.PaddedPieceSize(rand.Intn(101))
-
 	var readBytes []byte
-	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(ctx context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 		mb.stub.lk.Lock()
 		ch := mb.stub.unblockAddPiece[mb.dp.DealUUID]
 		mb.stub.lk.Unlock()
-
 		if ch != nil {
-			<-ch
+			select {
+			case <-ctx.Done():
+				return abi.SectorNumber(0), abi.PaddedPieceSize(0), ctx.Err()
+			case <-ch:
+			}
+
+		}
+		if ctx.Err() != nil {
+			return abi.SectorNumber(0), abi.PaddedPieceSize(0), ctx.Err()
 		}
 
 		var err error
 		readBytes, err = ioutil.ReadAll(r)
-		return sectorID, offset, err
+		return mb.sectorId, mb.offset, err
 	})
 
-	mb.sectorId = sectorID
-	mb.offset = offset
 	mb.rb = &readBytes
-
 	return mb
 }
 
