@@ -412,21 +412,20 @@ func (h *ProviderHarness) AssertDealDBState(t *testing.T, ctx context.Context, d
 }
 
 type ProviderHarness struct {
-	Host                host.Host
-	GoMockCtrl          *gomock.Controller
-	TempDir             string
-	MinerAddr           address.Address
-	ClientAddr          address.Address
-	MockFullNode        *lotusmocks.MockFullNode
-	MinerStub           *smtestutil.MinerStub
-	DealsDB             *db.DealsDB
-	FundsDB             *db.FundsDB
-	StorageDB           *db.StorageDB
-	PublishWallet       address.Address
-	MinPublishFees      abi.TokenAmount
-	MaxStagingDealBytes uint64
+	Host                   host.Host
+	GoMockCtrl             *gomock.Controller
+	TempDir                string
+	MinerAddr              address.Address
+	ClientAddr             address.Address
+	MockFullNode           *lotusmocks.MockFullNode
+	MinerStub              *smtestutil.MinerStub
+	DealsDB                *db.DealsDB
+	FundsDB                *db.FundsDB
+	StorageDB              *db.StorageDB
+	PublishWallet          address.Address
+	MinPublishFees         abi.TokenAmount
+	MaxStagingDealBytes    uint64
 	MockSealingPipelineAPI *mock_sealingpipeline.MockAPI
-
 
 	Provider *Provider
 
@@ -540,10 +539,9 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		FundsDB:                db.NewFundsDB(sqldb),
 		StorageDB:              db.NewStorageDB(sqldb),
 		PublishWallet:          pw,
-		MinerStub:              bp,
+		MinerStub:              minerStub,
 		MinPublishFees:         pc.minPublishFees,
 		MaxStagingDealBytes:    pc.maxStagingDealBytes,
-
 	}
 
 	// fund manager
@@ -563,13 +561,12 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	})
 	sm := smInitF(lr, sqldb)
 
-
 	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
 	df := func(ctx context.Context, deal types.DealParams) (bool, string, error) {
 		return true, "", nil
 	}
 
-	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, bp, address.Undef, bp, sps, bp, df, pc.httpOpts...)
+	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, minerStub, address.Undef, minerStub, sps, minerStub, df, pc.httpOpts...)
 	require.NoError(t, err)
 	prov.testMode = true
 	ph.Provider = prov
@@ -603,10 +600,16 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, ctx context
 	// shutdown old provider
 	h.Provider.Stop()
 	h.MinerStub = smtestutil.NewMinerStub(h.GoMockCtrl)
+	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
+	df := func(ctx context.Context, deal types.DealParams) (bool, string, error) {
+		return true, "", nil
+	}
 
 	// construct a new provider with pre-existing state
-	prov, err := NewProvider("", h.Host, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager, h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, address.Undef, h.MinerStub, nil,
-		h.MinerStub, pc.httpOpts...)
+	prov, err := NewProvider("", h.Host, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
+		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, address.Undef, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
+		df, pc.httpOpts...)
+
 	require.NoError(t, err)
 	h.Provider = prov
 }
