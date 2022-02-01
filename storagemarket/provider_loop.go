@@ -84,7 +84,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	if err != nil {
 		cleanup()
 
-		return false, "server error", err
+		return false, err.Error(), nil
 	}
 
 	// write deal state to the database
