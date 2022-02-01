@@ -78,6 +78,7 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 			harness := NewHarness(t, ctx)
 			// start the provider test harness
 			harness.Start(t, ctx)
+			defer harness.Stop()
 
 			// start executing the deal
 			td := tc.dealBuilderF(harness)
@@ -107,7 +108,6 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 			td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
 			// assert funds and storage are no longer tagged
 			harness.EventuallyAssertNoTagged(t, ctx)
-			harness.Stop()
 		})
 	}
 }

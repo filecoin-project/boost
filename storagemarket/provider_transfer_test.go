@@ -19,6 +19,7 @@ func TestSingleDealResumptionDisconnect(t *testing.T) {
 		withHttpTransportOpts([]httptransport.Option{httptransport.BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000)}))
 	// start the provider test harness
 	harness.Start(t, ctx)
+	defer harness.Stop()
 
 	// build the deal proposal
 	td := harness.newDealBuilder(t, 1, withNormalFileSize(fileSize)).withAllMinerCallsNonBlocking().withDisconnectingHttpServer().build()
@@ -27,8 +28,6 @@ func TestSingleDealResumptionDisconnect(t *testing.T) {
 	err := td.executeAndSubscribeToNotifs()
 	require.NoError(t, err)
 	td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
-
-	harness.Stop()
 }
 
 func TestMultipleDealsConcurrentResumptionDisconnect(t *testing.T) {
@@ -41,6 +40,7 @@ func TestMultipleDealsConcurrentResumptionDisconnect(t *testing.T) {
 		withHttpTransportOpts([]httptransport.Option{httptransport.BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000)}))
 	// start the provider test harness
 	harness.Start(t, ctx)
+	defer harness.Stop()
 
 	tds := harness.executeNDealsConcurrentAndWaitFor(t, nDeals, func(i int) *testDeal {
 		return harness.newDealBuilder(t, i, withNormalFileSize(fileSize)).withAllMinerCallsNonBlocking().withDisconnectingHttpServer().build()
@@ -52,8 +52,6 @@ func TestMultipleDealsConcurrentResumptionDisconnect(t *testing.T) {
 		td := tds[i]
 		td.assertPieceAdded(t, ctx)
 	}
-
-	harness.Stop()
 }
 
 func TestTransferCancelledByUser(t *testing.T) {
@@ -63,6 +61,7 @@ func TestTransferCancelledByUser(t *testing.T) {
 	harness := NewHarness(t, ctx)
 	// start the provider test harness
 	harness.Start(t, ctx)
+	defer harness.Stop()
 
 	// build the deal proposal
 	td := harness.newDealBuilder(t, 1).withBlockingHttpServer().build()
@@ -89,8 +88,6 @@ func TestTransferCancelledByUser(t *testing.T) {
 
 	// cancelling the same deal again will error out as deal handler will be absent
 	require.ErrorIs(t, harness.Provider.CancelDealDataTransfer(td.params.DealUUID), ErrDealHandlerNotFound)
-
-	harness.Stop()
 }
 
 func TestCancelTransferForTransferredDealFails(t *testing.T) {
@@ -100,6 +97,7 @@ func TestCancelTransferForTransferredDealFails(t *testing.T) {
 	harness := NewHarness(t, ctx)
 	// start the provider test harness
 	harness.Start(t, ctx)
+	defer harness.Stop()
 
 	// build the deal proposal
 	td := harness.newDealBuilder(t, 1).withPublishBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().withNormalHttpServer().build()
@@ -118,6 +116,4 @@ func TestCancelTransferForTransferredDealFails(t *testing.T) {
 	td.unblockPublish()
 	require.NoError(t, td.waitForCheckpoint(dealcheckpoints.AddedPiece))
 	td.assertPieceAdded(t, ctx)
-
-	harness.Stop()
 }

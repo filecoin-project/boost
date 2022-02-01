@@ -133,7 +133,6 @@ func TestDummydeal(t *testing.T) {
 	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath))
 	require.NoError(t, err)
 	require.True(t, res.Accepted)
-	fmt.Println(res.Reason)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
 	time.Sleep(2 * time.Second)

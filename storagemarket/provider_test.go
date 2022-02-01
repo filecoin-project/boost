@@ -53,6 +53,7 @@ func TestSimpleDealHappy(t *testing.T) {
 	harness := NewHarness(t, ctx)
 	// start the provider test harness
 	harness.Start(t, ctx)
+	defer harness.Stop()
 
 	// build the deal proposal with the blocking http test server and a completely blocking miner stub
 	td := harness.newDealBuilder(t, 1).withAllMinerCallsBlocking().withBlockingHttpServer().build()
@@ -82,9 +83,6 @@ func TestSimpleDealHappy(t *testing.T) {
 	td.unblockAddPiece()
 	td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
 	harness.EventuallyAssertNoTagged(t, ctx)
-
-	// stop the harness -> this will also assert the stubs and mocks
-	harness.Stop()
 }
 
 func TestMultipleDealsConcurrent(t *testing.T) {
@@ -95,6 +93,7 @@ func TestMultipleDealsConcurrent(t *testing.T) {
 	harness := NewHarness(t, ctx)
 	// start the provider test harness
 	harness.Start(t, ctx)
+	defer harness.Stop()
 
 	tds := harness.executeNDealsConcurrentAndWaitFor(t, nDeals, func(i int) *testDeal {
 		return harness.newDealBuilder(t, 1).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
@@ -108,7 +107,6 @@ func TestMultipleDealsConcurrent(t *testing.T) {
 	}
 
 	harness.EventuallyAssertNoTagged(t, ctx)
-	harness.Stop()
 }
 
 func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
@@ -119,6 +117,7 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 	harness := NewHarness(t, ctx)
 	// start the provider test harness
 	harness.Start(t, ctx)
+	defer harness.Stop()
 
 	var errGrp errgroup.Group
 	var tds []*testDeal
@@ -202,8 +201,6 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 			td.assertPieceAdded(t, ctx)
 		}
 	}
-
-	harness.Stop()
 }
 
 func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
@@ -213,6 +210,7 @@ func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
 		withHttpTransportOpts([]httptransport.Option{httptransport.BackOffRetryOpt(1*time.Millisecond, 1*time.Millisecond, 2, 1)}))
 	// start the provider test harness
 	harness.Start(t, ctx)
+	defer harness.Stop()
 
 	// spin up four deals
 	// deal 1 -> fails transfer, deal 2 -> fails publish, deal 3 -> fails publish confirm, deal 4 -> fails add piece
@@ -266,7 +264,6 @@ func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
 
 	// assert storage manager and funds
 	harness.EventuallyAssertNoTagged(t, ctx)
-	harness.Stop()
 }
 
 func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals int,
