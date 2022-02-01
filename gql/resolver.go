@@ -34,11 +34,11 @@ type resolver struct {
 	storageMgr *storagemanager.StorageManager
 	provider   *storagemarket.Provider
 	publisher  *storagemarket.DealPublisher
-	spApi      sealingpipeline.State
+	spApi      sealingpipeline.API
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.State, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		dealsDB:    dealsDB,
 		fundMgr:    fundMgr,

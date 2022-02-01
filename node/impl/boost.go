@@ -41,7 +41,7 @@ type BoostAPI struct {
 
 	// Sealing Pipeline API
 
-	Sps sealingpipeline.State
+	Sps sealingpipeline.API
 	// TODO: Figure out how to start graphql server without it needing
 	// to be a dependency of another fx object
 	GraphqlServer *gql.Server

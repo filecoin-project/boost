@@ -16,6 +16,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/filestore"
 	"github.com/filecoin-project/boost/fundmanager"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -80,7 +81,10 @@ type Provider struct {
 	publishedDealChan chan publishDealReq
 
 	// Sealing Pipeline API
-	sps sealingpipeline.State
+	sps sealingpipeline.API
+
+	// Deal Filter
+	df dtypes.StorageDealFilter
 
 	// Database API
 	db      *sql.DB
@@ -102,9 +106,7 @@ type Provider struct {
 	dhs   map[uuid.UUID]*dealHandler
 }
 
-func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode,
-	dp types.DealPublisher, addr address.Address, pa types.PieceAdder, sps sealingpipeline.State,
-	cm types.ChainDealManager, httpOpts ...httptransport.Option) (*Provider, error) {
+func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, httpOpts ...httptransport.Option) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -129,6 +131,7 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		db:        sqldb,
 		dealsDB:   dealsDB,
 		sps:       sps,
+		df:        df,
 
 		acceptDealChan:    make(chan acceptDealReq),
 		finishedDealChan:  make(chan finishedDealReq),
