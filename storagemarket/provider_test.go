@@ -25,7 +25,9 @@ import (
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	types2 "github.com/filecoin-project/boost/transport/types"
+	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
 
+	mock_sealingpipeline "github.com/filecoin-project/boost/sealingpipeline/mock"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -408,18 +410,19 @@ func (h *ProviderHarness) AssertDealDBState(t *testing.T, ctx context.Context, d
 }
 
 type ProviderHarness struct {
-	GoMockCtrl          *gomock.Controller
-	TempDir             string
-	MinerAddr           address.Address
-	ClientAddr          address.Address
-	MockFullNode        *lotusmocks.MockFullNode
-	MinerStub           *smtestutil.MinerStub
-	DealsDB             *db.DealsDB
-	FundsDB             *db.FundsDB
-	StorageDB           *db.StorageDB
-	PublishWallet       address.Address
-	MinPublishFees      abi.TokenAmount
-	MaxStagingDealBytes uint64
+	GoMockCtrl             *gomock.Controller
+	TempDir                string
+	MinerAddr              address.Address
+	ClientAddr             address.Address
+	MockFullNode           *lotusmocks.MockFullNode
+	MockSealingPipelineAPI *mock_sealingpipeline.MockAPI
+	MinerStub              *smtestutil.MinerStub
+	DealsDB                *db.DealsDB
+	FundsDB                *db.FundsDB
+	StorageDB              *db.StorageDB
+	PublishWallet          address.Address
+	MinPublishFees         abi.TokenAmount
+	MaxStagingDealBytes    uint64
 
 	Provider *Provider
 
@@ -466,6 +469,19 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		escrowFunds:          big.NewInt(500),
 		publishWalletBal:     1000,
 	}
+
+	sealingpipelineStatus := map[api.SectorState]int{
+		"AddPiece":       0,
+		"Packing":        0,
+		"PreCommit1":     1,
+		"PreCommit2":     0,
+		"PreCommitWait":  0,
+		"WaitSeed":       1,
+		"Committing":     0,
+		"CommitWait":     0,
+		"FinalizeSector": 0,
+	}
+
 	for _, opt := range opts {
 		opt(pc)
 	}
@@ -476,6 +492,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	ctrl := gomock.NewController(t)
 	fn := lotusmocks.NewMockFullNode(ctrl)
 	bp := smtestutil.NewMinerStub(ctrl)
+	sps := mock_sealingpipeline.NewMockAPI(ctrl)
 
 	// setup client and miner addrs
 	minerAddr, err := address.NewIDAddress(1011)
@@ -512,14 +529,15 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		BlockingServer:      blockingServer,
 		DisconnectingServer: disconnServer,
 
-		MockFullNode:        fn,
-		DealsDB:             dealsDB,
-		FundsDB:             db.NewFundsDB(sqldb),
-		StorageDB:           db.NewStorageDB(sqldb),
-		PublishWallet:       pw,
-		MinerStub:           bp,
-		MinPublishFees:      pc.minPublishFees,
-		MaxStagingDealBytes: pc.maxStagingDealBytes,
+		MockFullNode:           fn,
+		MockSealingPipelineAPI: sps,
+		DealsDB:                dealsDB,
+		FundsDB:                db.NewFundsDB(sqldb),
+		StorageDB:              db.NewStorageDB(sqldb),
+		PublishWallet:          pw,
+		MinerStub:              bp,
+		MinPublishFees:         pc.minPublishFees,
+		MaxStagingDealBytes:    pc.maxStagingDealBytes,
 	}
 
 	// fund manager
@@ -538,7 +556,13 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		MaxStagingDealsBytes: ph.MaxStagingDealBytes,
 	})
 	sm := smInitF(lr, sqldb)
-	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, bp, address.Undef, bp, nil, bp, pc.httpOpts...)
+
+	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
+	df := func(ctx context.Context, deal types.DealParams) (bool, string, error) {
+		return true, "", nil
+	}
+
+	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, bp, address.Undef, bp, sps, bp, df, pc.httpOpts...)
 	require.NoError(t, err)
 	prov.testMode = true
 	ph.Provider = prov
@@ -549,6 +573,10 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	}, nil).AnyTimes()
 
 	ph.MockFullNode.EXPECT().WalletBalance(gomock.Any(), ph.PublishWallet).Return(abi.NewTokenAmount(pc.publishWalletBal), nil).AnyTimes()
+
+	ph.MockSealingPipelineAPI.EXPECT().WorkerJobs(gomock.Any()).Return(map[uuid.UUID][]storiface.WorkerJob{}, nil).AnyTimes()
+
+	ph.MockSealingPipelineAPI.EXPECT().SectorsSummary(gomock.Any()).Return(sealingpipelineStatus, nil).AnyTimes()
 
 	return ph
 }
