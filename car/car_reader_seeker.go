@@ -40,6 +40,12 @@ func NewCarReaderSeeker(ctx context.Context, cow *CarOffsetWriter, size uint64) 
 func (c *CarReaderSeeker) Read(p []byte) (int, error) {
 	c.lk.Lock()
 
+	// Check if the CarReadSeeker has been cancelled
+	if c.ctx.Err() != nil {
+		c.lk.Unlock()
+		return 0, c.ctx.Err()
+	}
+
 	// Check if the offset is at the end of the file
 	if uint64(c.offset) >= c.size {
 		defer c.lk.Unlock()
@@ -50,12 +56,6 @@ func (c *CarReaderSeeker) Read(p []byte) (int, error) {
 		}
 		// Otherwise it's an error
 		return 0, fmt.Errorf("cannot read from offset %d >= file size %d", c.offset, c.size)
-	}
-
-	// Check if the CarReadSeeker has been cancelled
-	if c.ctx.Err() != nil {
-		c.lk.Unlock()
-		return 0, c.ctx.Err()
 	}
 
 	// Check if there's already a write in progress
@@ -76,10 +76,6 @@ func (c *CarReaderSeeker) Read(p []byte) (int, error) {
 			c.lk.Lock()
 			defer c.lk.Unlock()
 
-			// Set the offset to the end of the file so that the next call to
-			// Read() returns io.EOF
-			c.offset = int64(c.size)
-
 			// Reset and close the write complete channel
 			writeCompleteCh := c.writeCompleteCh
 			c.writeCompleteCh = nil
@@ -90,13 +86,13 @@ func (c *CarReaderSeeker) Read(p []byte) (int, error) {
 	// Don't hold the lock while reading as Read may block
 	c.lk.Unlock()
 
-	return c.reader.Read(p)
+	count, err := c.reader.Read(p)
+	c.offset += int64(count)
+	return count, err
 }
 
 // Seek changes the offset into the stream. Not thread-safe to call concurrently with Read.
 func (c *CarReaderSeeker) Seek(offset int64, whence int) (int64, error) {
-	c.lk.Lock()
-
 	// Update the offset
 	switch whence {
 	case io.SeekStart:
@@ -116,11 +112,11 @@ func (c *CarReaderSeeker) Seek(offset int64, whence int) (int64, error) {
 		c.offset = int64(c.size) + offset
 	}
 
-	newOffset := c.offset
+	c.lk.Lock()
 	if c.writeCompleteCh == nil {
 		// No ongoing write so we can return immediately
 		c.lk.Unlock()
-		return newOffset, nil
+		return c.offset, nil
 	}
 
 	// There is an ongoing write, so close the pipe and wait for the write to
@@ -140,7 +136,7 @@ func (c *CarReaderSeeker) Seek(offset int64, whence int) (int64, error) {
 	case <-writeCompleteCh:
 	}
 
-	return newOffset, nil
+	return c.offset, nil
 }
 
 // Cancel aborts any read operation: Once Cancel returns, all subsequent calls
@@ -153,7 +149,7 @@ func (c *CarReaderSeeker) Cancel(ctx context.Context) error {
 
 	// Check if there's an ongoing write
 	writeCompleteCh := c.writeCompleteCh
-	if c.writeCompleteCh != nil {
+	if writeCompleteCh != nil {
 		// Close the writer. This will cause any subsequent reads to fail.
 		c.writer.CloseWithError(context.Canceled) //nolint:errcheck
 	}
@@ -165,7 +161,7 @@ func (c *CarReaderSeeker) Cancel(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-c.writeCompleteCh:
+		case <-writeCompleteCh:
 		}
 	}
 	return nil
