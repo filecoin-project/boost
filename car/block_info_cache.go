@@ -80,7 +80,9 @@ func (bm *RefCountBICM) Close() error {
 type DelayedUnrefBICM struct {
 	*RefCountBICM
 	unrefDelay time.Duration
-	timers     map[*time.Timer]struct{}
+
+	lk     sync.Mutex
+	timers map[*time.Timer]struct{}
 }
 
 var _ BlockInfoCacheManager = (*DelayedUnrefBICM)(nil)
@@ -104,13 +106,22 @@ func (d *DelayedUnrefBICM) Unref(payloadCid cid.Cid, err error) {
 	var timer *time.Timer
 	timer = time.AfterFunc(d.unrefDelay, func() {
 		// When the timer expires, unref the cache
+		d.lk.Lock()
 		delete(d.timers, timer)
+		d.lk.Unlock()
+
 		d.RefCountBICM.Unref(payloadCid, nil)
 	})
+
+	d.lk.Lock()
 	d.timers[timer] = struct{}{}
+	d.lk.Unlock()
 }
 
 func (d *DelayedUnrefBICM) Close() error {
+	d.lk.Lock()
+	defer d.lk.Unlock()
+
 	// Stop any running timers
 	for timer := range d.timers {
 		timer.Stop()
