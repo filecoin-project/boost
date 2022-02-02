@@ -227,6 +227,7 @@ func TestDealsRejectedForFunds(t *testing.T) {
 
 		errg.Go(func() error {
 			if err := td.executeAndSubscribeToNotifs(); err != nil {
+				// deal should be rejected only for lack of funds
 				if !strings.Contains(err.Error(), "available funds") {
 					return errors.New("did not get expected error")
 				}
@@ -248,7 +249,6 @@ func TestDealsRejectedForFunds(t *testing.T) {
 	require.Len(t, successTds, 10)
 	require.Len(t, failedTds, 5)
 	mu.Unlock()
-
 }
 
 func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
