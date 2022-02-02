@@ -41,8 +41,8 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 	xfer, err := srv.PrepareForDataRequest(context.Background(), dbid, proposalCid, st.root.Cid(), uint64(carSize))
 	require.NoError(t, err)
 
-	srvEvts := []*types.TransferState{}
-	srv.Subscribe(func(sdbid uint, st *types.TransferState) {
+	srvEvts := []types.TransferState{}
+	srv.Subscribe(func(sdbid uint, st types.TransferState) {
 		if dbid == sdbid {
 			srvEvts = append(srvEvts, st)
 		}
@@ -110,8 +110,8 @@ func TestLibp2pCarServerResume(t *testing.T) {
 	xfer, err := srv.PrepareForDataRequest(context.Background(), dbid, proposalCid, st.root.Cid(), uint64(carSize))
 	require.NoError(t, err)
 
-	srvEvts := []*types.TransferState{}
-	srv.Subscribe(func(sdbid uint, st *types.TransferState) {
+	srvEvts := []types.TransferState{}
+	srv.Subscribe(func(sdbid uint, st types.TransferState) {
 		if dbid == sdbid {
 			srvEvts = append(srvEvts, st)
 		}
@@ -228,8 +228,8 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	xfer, err := srv.PrepareForDataRequest(context.Background(), dbid, proposalCid, st.root.Cid(), uint64(carSize))
 	require.NoError(t, err)
 
-	srvEvts := []*types.TransferState{}
-	srv.Subscribe(func(sdbid uint, st *types.TransferState) {
+	srvEvts := []types.TransferState{}
+	srv.Subscribe(func(sdbid uint, st types.TransferState) {
 		if dbid == sdbid {
 			srvEvts = append(srvEvts, st)
 		}
@@ -265,6 +265,97 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	lastSrvEvt := srvEvts[len(srvEvts)-1]
 	require.Equal(t, types.TransferStatusFailed, lastSrvEvt.Status)
 	require.Less(t, int(lastSrvEvt.Sent), carSize)
+}
+
+// TestLibp2pCarServerNewTransferCancelsPreviousTransfer verifies that
+// starting a new transfer with the same auth token automatically cancels
+// the previous transfer
+func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
+	ctx := context.Background()
+
+	rawSize := 2 * 1024 * 1024
+	st := newServerTest(t, rawSize)
+
+	clientHost, srvHost := setupLibp2pHosts(t)
+	defer srvHost.Close()
+	defer clientHost.Close()
+
+	authDB := NewAuthTokenDB(st.ds)
+	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{
+		AnnounceAddr: srvHost.Addrs()[0],
+	})
+	err := srv.Start(ctx)
+	require.NoError(t, err)
+	defer srv.Stop(ctx) //nolint:errcheck
+
+	// Create an auth token
+	carSize := len(st.carBytes)
+	proposalCid, err := cid.Parse("bafkqaaa")
+	require.NoError(t, err)
+	dbid := uint(1)
+	xfer, err := srv.PrepareForDataRequest(context.Background(), dbid, proposalCid, st.root.Cid(), uint64(carSize))
+	require.NoError(t, err)
+
+	srvEvts := []types.TransferState{}
+	srv.Subscribe(func(sdbid uint, st types.TransferState) {
+		if dbid == sdbid {
+			srvEvts = append(srvEvts, st)
+		}
+	})
+
+	// Perform retrieval with the auth token
+	req1 := newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+	of1 := getTempFilePath(t)
+	noRetry := BackOffRetryOpt(0, 0, 1, 1)
+	th1 := executeTransfer(t, ctx, New(clientHost, noRetry), carSize, req1, of1)
+	require.NotNil(t, th1)
+
+	// Wait for some data to be received by the client
+	clientSub1 := th1.Sub()
+	evt1 := <-clientSub1
+	require.NoError(t, evt1.Error)
+	clientReceived := evt1.NBytesReceived
+
+	// Start a new transfer with the same auth token
+	req2 := newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+	of2 := getTempFilePath(t)
+	th2 := executeTransfer(t, ctx, New(clientHost, noRetry), carSize, req2, of2)
+	require.NotNil(t, th2)
+
+	// Expect an error for the first transfer on the client side
+	clientEvts1 := waitForTransferComplete(th1)
+	require.NotEmpty(t, clientEvts1)
+	lastClientEvt1 := clientEvts1[len(clientEvts1)-1]
+	require.Error(t, lastClientEvt1.Error)
+	require.Less(t, int(clientReceived), carSize)
+
+	// Expect the second transfer to complete successfully
+	clientEvts2 := waitForTransferComplete(th2)
+	require.NotEmpty(t, clientEvts2)
+	lastClientEvt2 := clientEvts2[len(clientEvts2)-1]
+	require.EqualValues(t, carSize, lastClientEvt2.NBytesReceived)
+	assertFileContents(t, of2, st.carBytes)
+
+	// Check that all bytes were transferred successfully on the server
+	require.NotEmpty(t, srvEvts)
+	lastSrvEvt := srvEvts[len(srvEvts)-1]
+	require.Equal(t, types.TransferStatusCompleted, lastSrvEvt.Status)
+	require.EqualValues(t, carSize, int(lastSrvEvt.Sent))
+
+	// Expect that there was an error then a start event on the server side
+	require.NotEmpty(t, srvEvts)
+	errIndex := -1
+	restartIndex := -1
+	for i, evt := range srvEvts[1:] {
+		switch evt.Status {
+		case types.TransferStatusFailed:
+			errIndex = i
+		case types.TransferStatusStarted:
+			restartIndex = i
+		}
+	}
+	require.Greater(t, errIndex, -1)
+	require.Greater(t, restartIndex, -1)
 }
 
 func min(a int, b int) int {

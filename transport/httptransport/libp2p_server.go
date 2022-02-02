@@ -284,7 +284,7 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *a
 	return nil
 }
 
-type EventListenerFn func(dbid uint, st *types.TransferState)
+type EventListenerFn func(dbid uint, st types.TransferState)
 type UnsubFn func()
 
 func (s *Libp2pCarServer) Subscribe(cb EventListenerFn) UnsubFn {
@@ -389,7 +389,8 @@ func (m *transfersMgr) newTransfer(val *authValue, authToken string, localAddr s
 		// Queue up an action that fires an event with the current transfer state.
 		// Note: enqueueAction returns an error only if the context is cancelled,
 		// which we can safely ignore.
-		_ = m.enqueueAction(&xferAction{dbID: val.DBID, transferState: xfer.State()}) //nolint:errcheck
+		st := xfer.State()
+		_ = m.enqueueAction(&xferAction{dbID: val.DBID, transferState: &st}) //nolint:errcheck
 	}
 
 	return xfer, fireEvent, nil
@@ -425,6 +426,10 @@ func (m *transfersMgr) run(ctx context.Context) {
 		// 1. Add a new transfer to the list of active transfers
 		if action.xfer != nil {
 			m.transfersLk.Lock()
+			if existing, ok := m.transfers[action.authToken]; ok {
+				// Cancel any existing transfer with the same auth token
+				go existing.cancel(ctx, errors.New("transfer restarted")) //nolint:errcheck
+			}
 			m.transfers[action.authToken] = action.xfer
 			m.transfersLk.Unlock()
 			return
@@ -470,7 +475,7 @@ func (m *transfersMgr) awaitStop(ctx context.Context) {
 func (m *transfersMgr) publishEvent(dbid uint, state *types.TransferState) {
 	m.eventListenersLk.Lock()
 	for l := range m.eventListeners {
-		(*l)(dbid, state)
+		(*l)(dbid, *state)
 	}
 	m.eventListenersLk.Unlock()
 }
@@ -549,7 +554,7 @@ func (t *Libp2pTransfer) onCompleted() {
 	t.status = types.TransferStatusCompleted
 }
 
-func (t *Libp2pTransfer) State() *types.TransferState {
+func (t *Libp2pTransfer) State() types.TransferState {
 	t.lk.RLock()
 	defer t.lk.RUnlock()
 
@@ -562,7 +567,7 @@ func (t *Libp2pTransfer) State() *types.TransferState {
 			msg = "pull data transfer queued"
 		}
 	}
-	return &types.TransferState{
+	return types.TransferState{
 		LocalAddr:  t.LocalAddr,
 		RemoteAddr: t.RemoteAddr,
 		Status:     t.status,
