@@ -522,21 +522,6 @@ func (t *Libp2pTransfer) onError(err error) {
 	t.status = types.TransferStatusFailed
 }
 
-// onStarted is called when a transfer starts / restarts
-func (t *Libp2pTransfer) onStarted() {
-	t.lk.Lock()
-	defer t.lk.Unlock()
-
-	// If the transfer has been permanently cancelled, it cannot be restarted.
-	// Note: if there was a transfer error it can be restarted.
-	if t.cancelled {
-		return
-	}
-
-	t.err = nil
-	t.status = types.TransferStatusStarted
-}
-
 // onSent is called when some bytes are sent
 func (t *Libp2pTransfer) onSent(sent uint64) {
 	t.lk.Lock()
