@@ -442,12 +442,13 @@ func serversWithCustomHandler(handler http.HandlerFunc) map[string]func(t *testi
 }
 
 func newLibp2pHttpServer(st *serverTest) (types.HttpRequest, func(), host.Host) {
+	ctx := context.Background()
 	clientHost, srvHost := setupLibp2pHosts(st.t)
 	authDB := NewAuthTokenDB(st.ds)
 	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{
 		AnnounceAddr: srvHost.Addrs()[0],
 	})
-	err := srv.Start()
+	err := srv.Start(ctx)
 	require.NoError(st.t, err)
 
 	proposalCid, err := cid.Parse("bafkqaaa")
@@ -460,7 +461,7 @@ func newLibp2pHttpServer(st *serverTest) (types.HttpRequest, func(), host.Host) 
 	closeServer := func() {
 		srvHost.Close()    //nolint:errcheck
 		clientHost.Close() //nolint:errcheck
-		srv.Stop()         //nolint:errcheck
+		srv.Stop(ctx)      //nolint:errcheck
 	}
 	return req, closeServer, clientHost
 }
