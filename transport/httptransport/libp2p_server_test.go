@@ -2,7 +2,6 @@ package httptransport
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -30,9 +29,9 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{
 		AnnounceAddr: srvHost.Addrs()[0],
 	})
-	err := srv.Start()
+	err := srv.Start(ctx)
 	require.NoError(t, err)
-	defer srv.Stop() //nolint:errcheck
+	defer srv.Stop(ctx) //nolint:errcheck
 
 	// Create an auth token
 	carSize := len(st.carBytes)
@@ -42,8 +41,8 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 	xfer, err := srv.PrepareForDataRequest(context.Background(), dbid, proposalCid, st.root.Cid(), uint64(carSize))
 	require.NoError(t, err)
 
-	srvEvts := []types.TransferState{}
-	srv.Subscribe(func(sdbid uint, st types.TransferState) {
+	srvEvts := []*types.TransferState{}
+	srv.Subscribe(func(sdbid uint, st *types.TransferState) {
 		if dbid == sdbid {
 			srvEvts = append(srvEvts, st)
 		}
@@ -99,9 +98,9 @@ func TestLibp2pCarServerResume(t *testing.T) {
 	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{
 		AnnounceAddr: srvHost.Addrs()[0],
 	})
-	err := srv.Start()
+	err := srv.Start(ctx)
 	require.NoError(t, err)
-	defer srv.Stop() //nolint:errcheck
+	defer srv.Stop(ctx) //nolint:errcheck
 
 	// Create an auth token
 	carSize := len(st.carBytes)
@@ -111,8 +110,8 @@ func TestLibp2pCarServerResume(t *testing.T) {
 	xfer, err := srv.PrepareForDataRequest(context.Background(), dbid, proposalCid, st.root.Cid(), uint64(carSize))
 	require.NoError(t, err)
 
-	srvEvts := []types.TransferState{}
-	srv.Subscribe(func(sdbid uint, st types.TransferState) {
+	srvEvts := []*types.TransferState{}
+	srv.Subscribe(func(sdbid uint, st *types.TransferState) {
 		if dbid == sdbid {
 			srvEvts = append(srvEvts, st)
 		}
@@ -217,9 +216,9 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{
 		AnnounceAddr: srvHost.Addrs()[0],
 	})
-	err := srv.Start()
+	err := srv.Start(ctx)
 	require.NoError(t, err)
-	defer srv.Stop() //nolint:errcheck
+	defer srv.Stop(ctx) //nolint:errcheck
 
 	// Create an auth token
 	carSize := len(st.carBytes)
@@ -229,8 +228,8 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	xfer, err := srv.PrepareForDataRequest(context.Background(), dbid, proposalCid, st.root.Cid(), uint64(carSize))
 	require.NoError(t, err)
 
-	srvEvts := []types.TransferState{}
-	srv.Subscribe(func(sdbid uint, st types.TransferState) {
+	srvEvts := []*types.TransferState{}
+	srv.Subscribe(func(sdbid uint, st *types.TransferState) {
 		if dbid == sdbid {
 			srvEvts = append(srvEvts, st)
 		}
@@ -250,14 +249,8 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	clientReceived := evt.NBytesReceived
 
 	// Cancel the transfer on the server side
-	var srvXfer *Libp2pTransfer
-	err = srv.ForEach(func(lt *Libp2pTransfer) error {
-		srvXfer = lt
-		return nil
-	})
+	err = srv.CleanupPreparedRequest(ctx, xfer.AuthToken)
 	require.NoError(t, err)
-
-	srvXfer.Cancel(fmt.Errorf("cancelled"))
 
 	// Wait for the transfer to complete on the client
 	clientEvts := waitForTransferComplete(th)

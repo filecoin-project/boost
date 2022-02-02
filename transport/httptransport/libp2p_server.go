@@ -35,11 +35,7 @@ type Libp2pCarServer struct {
 	server      *http.Server
 	netListener net.Listener
 
-	eventListenersLk sync.Mutex
-	eventListeners   map[*EventListenerFn]struct{}
-
-	transfersLk sync.RWMutex
-	transfers   map[cid.Cid]*Libp2pTransfer
+	xferMgr *transfersMgr
 }
 
 type ServerConfig struct {
@@ -53,18 +49,20 @@ func NewLibp2pCarServer(h host.Host, auth *AuthTokenDB, bstore blockstore.Blocks
 		bcim = car.NewRefCountBICM()
 	}
 	return &Libp2pCarServer{
-		h:              h,
-		auth:           auth,
-		bstore:         bstore,
-		cfg:            cfg,
-		bicm:           bcim,
-		eventListeners: make(map[*EventListenerFn]struct{}),
-		transfers:      make(map[cid.Cid]*Libp2pTransfer),
+		h:       h,
+		auth:    auth,
+		bstore:  bstore,
+		cfg:     cfg,
+		bicm:    bcim,
+		xferMgr: newTransfersManager(),
 	}
 }
 
-func (s *Libp2pCarServer) Start() error {
-	s.ctx, s.cancel = context.WithCancel(context.Background())
+func (s *Libp2pCarServer) Start(ctx context.Context) error {
+	s.ctx, s.cancel = context.WithCancel(ctx)
+
+	// Start up the transfers manager
+	go s.xferMgr.run(s.ctx)
 
 	// Listen on HTTP over libp2p
 	listener, err := gostream.Listen(s.h, types.DataTransferProtocol)
@@ -89,11 +87,14 @@ func (s *Libp2pCarServer) Start() error {
 	return nil
 }
 
-func (s *Libp2pCarServer) Stop() error {
+func (s *Libp2pCarServer) Stop(ctx context.Context) error {
 	bicmerr := s.bicm.Close()
 	s.cancel()
 	lerr := s.netListener.Close()
 	serr := s.server.Close()
+
+	// Wait for all events to be processed
+	s.xferMgr.awaitStop(ctx)
 
 	if lerr != nil {
 		return lerr
@@ -144,21 +145,22 @@ func (s *Libp2pCarServer) PrepareForDataRequest(ctx context.Context, dbID uint, 
 
 // CleanupPreparedRequest is called when a request cannot be fulfilled,
 // for example because the provider rejected the deal proposal
-func (s *Libp2pCarServer) CleanupPreparedRequest(ctx context.Context, authToken string, proposalCid cid.Cid) error {
-	// Clean up any transfer that was created
-	s.transfersLk.Lock()
-	xfer, ok := s.transfers[proposalCid]
-	if ok {
-		delete(s.transfers, proposalCid)
-		xfer.Cancel(fmt.Errorf("cancelled"))
-	}
-	s.transfersLk.Unlock()
-
+func (s *Libp2pCarServer) CleanupPreparedRequest(ctx context.Context, authToken string) error {
 	// Delete the auth token for the request
-	return s.auth.Delete(ctx, authToken)
+	aterr := s.auth.Delete(ctx, authToken)
+
+	// Cancel the transfer
+	xfererr := s.xferMgr.cancel(ctx, authToken)
+
+	if aterr != nil {
+		return aterr
+	}
+	return xfererr
 }
 
+// handler is called by the http library to handle an incoming HTTP request
 func (s *Libp2pCarServer) handler(w http.ResponseWriter, r *http.Request) {
+	// Check authentication
 	authToken, authVal, herr := s.checkAuth(r)
 	if herr != nil {
 		log.Infow("data transfer request failed", "code", herr.code, "err", herr.error)
@@ -233,29 +235,15 @@ func (s *Libp2pCarServer) serveContent(w http.ResponseWriter, r *http.Request, a
 }
 
 func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *authValue, authToken string, content *car.CarReaderSeeker) error {
-	// Create a new transfer
-	s.transfersLk.Lock()
-	_, isRetry := s.transfers[val.ProposalCid]
-	xfer := &Libp2pTransfer{
-		CreatedAt:  time.Now(),
-		DBID:       val.DBID,
-		AuthToken:  authToken,
-		LocalAddr:  s.h.ID().String(),
-		RemoteAddr: r.RemoteAddr,
-		content:    content,
-	}
-	s.transfers[val.ProposalCid] = xfer
-	s.transfersLk.Unlock()
-
-	if isRetry {
-		log.Infow("restarting transfer", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
-	} else {
-		log.Infow("starting transfer", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
+	// Create transfer
+	xfer, fireEvent, err := s.xferMgr.newTransfer(val, authToken, s.h.ID().String(), r.RemoteAddr, content)
+	if err != nil {
+		return fmt.Errorf("creating new transfer: %w", err)
 	}
 
-	// Fire event before starting transfer
-	xfer.onStarted()
-	s.fireEvent(val.DBID, xfer.State())
+	// Fire transfer started event
+	log.Infow("starting transfer", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
+	fireEvent()
 
 	// Fire progress events during transfer.
 	// We fire a progress event each time bytes are read from the CAR.
@@ -263,12 +251,13 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *a
 	// because there may be some transformation first (eg adding headers etc).
 	readEmitter := &readEmitter{rs: content, emit: func(totalRead uint64, err error) {
 		if err != nil {
+			// Note that the error event is fired at the end of sendCar so that
+			// it is fired after the read has completed
 			xfer.onError(err)
-			// Note: The error event gets fired at the end of the method
 			return
 		}
 		xfer.onSent(totalRead)
-		s.fireEvent(val.DBID, xfer.State())
+		fireEvent()
 	}}
 
 	// http.ServeContent ignores errors when writing to the stream, so we
@@ -280,67 +269,222 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *a
 
 	// Check if there was an error during the transfer
 	if err := xfer.error(); err != nil {
-		// There was an error, fire an error event
+		// There was an error, fire a transfer error event
 		log.Infow("transfer failed", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid, "error", err)
-		s.fireEvent(val.DBID, xfer.State())
+		fireEvent()
 
 		return err
 	}
 
-	// Fire complete event
+	// Fire transfer complete event
 	log.Infow("completed serving request", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
 	xfer.onCompleted()
-	s.fireEvent(val.DBID, xfer.State())
+	fireEvent()
 
 	return nil
 }
 
-type EventListenerFn func(dbid uint, st types.TransferState)
+type EventListenerFn func(dbid uint, st *types.TransferState)
 type UnsubFn func()
 
-func (s *Libp2pCarServer) fireEvent(dbid uint, state types.TransferState) {
-	s.eventListenersLk.Lock()
-	for l := range s.eventListeners {
-		(*l)(dbid, state)
-	}
-	s.eventListenersLk.Unlock()
-}
-
 func (s *Libp2pCarServer) Subscribe(cb EventListenerFn) UnsubFn {
-	s.eventListenersLk.Lock()
-	s.eventListeners[&cb] = struct{}{}
-	s.eventListenersLk.Unlock()
-
-	return func() {
-		s.eventListenersLk.Lock()
-		delete(s.eventListeners, &cb)
-		s.eventListenersLk.Unlock()
-	}
+	return s.xferMgr.subscribe(cb)
 }
 
-// ForEach is called once for each active data transfer
-func (s *Libp2pCarServer) ForEach(cb func(xfer *Libp2pTransfer) error) error {
-	return s.Filter(func(xfer *Libp2pTransfer) (bool, error) {
-		return true, cb(xfer)
+type MatchFn func(xfer *Libp2pTransfer) (bool, error)
+
+// Matching returns all transfers selected by the match function
+func (s *Libp2pCarServer) Matching(match MatchFn) ([]*Libp2pTransfer, error) {
+	return s.xferMgr.matching(func(xfer *Libp2pTransfer) (bool, error) {
+		return match(xfer)
 	})
 }
 
-// Filter is called once for each active data transfer. If the callback
-// function returns false, the transfer is removed.
-func (s *Libp2pCarServer) Filter(cb func(xfer *Libp2pTransfer) (bool, error)) error {
-	s.transfersLk.RLock()
-	defer s.transfersLk.RUnlock()
+// transfersMgr keeps a list of active transfers.
+// It provides methods to subscribe to and fire events, and runs a
+// go-routine to process new transfers and transfer events.
+type transfersMgr struct {
+	transfersLk sync.RWMutex
+	transfers   map[string]*Libp2pTransfer
 
-	for propcid, xfer := range s.transfers {
-		keep, err := cb(xfer)
-		if err != nil {
-			return err
-		}
-		if !keep {
-			delete(s.transfers, propcid)
-		}
+	eventListenersLk sync.Mutex
+	eventListeners   map[*EventListenerFn]struct{}
+
+	ctx     context.Context
+	actions chan *xferAction
+	done    chan struct{}
+}
+
+func newTransfersManager() *transfersMgr {
+	return &transfersMgr{
+		transfers:      make(map[string]*Libp2pTransfer),
+		eventListeners: make(map[*EventListenerFn]struct{}),
+		// Keep some buffer in the channel so that it doesn't get blocked when
+		// there is a burst of events to process.
+		actions: make(chan *xferAction, 1024),
+		done:    make(chan struct{}),
+	}
+}
+
+// cancel removes the transfer from the list of active transfers and cancels
+// the transfer (closing its read / write pipe)
+func (m *transfersMgr) cancel(ctx context.Context, authToken string) error {
+	// Remove the transfer from the list of active transfers
+	m.transfersLk.Lock()
+	xfer, ok := m.transfers[authToken]
+	if ok {
+		delete(m.transfers, authToken)
+	}
+	m.transfersLk.Unlock()
+
+	if ok {
+		// Cancel the transfer
+		return xfer.cancel(ctx, fmt.Errorf("cancelled"))
 	}
 	return nil
+}
+
+// matching returns the transfers selected by the match function
+func (m *transfersMgr) matching(match MatchFn) ([]*Libp2pTransfer, error) {
+	m.transfersLk.RLock()
+	defer m.transfersLk.RUnlock()
+
+	matching := make([]*Libp2pTransfer, 0)
+	for _, xfer := range m.transfers {
+		matches, err := match(xfer)
+		if err != nil {
+			return nil, err
+		}
+		if matches {
+			matching = append(matching, xfer)
+		}
+	}
+
+	return matching, nil
+}
+
+// newTransfer creates a new transfer and adds it to the list of active transfers.
+// It returns the transfer and a function that fires an event with the current
+// state of the transfer. The function is guaranteed to fire the event after the
+// transfer has been added to the list of active transfers.
+func (m *transfersMgr) newTransfer(val *authValue, authToken string, localAddr string, remoteAddr string, content *car.CarReaderSeeker) (*Libp2pTransfer, func(), error) {
+	xfer := &Libp2pTransfer{
+		CreatedAt:  time.Now(),
+		DBID:       val.DBID,
+		AuthToken:  authToken,
+		LocalAddr:  localAddr,
+		RemoteAddr: remoteAddr,
+		content:    content,
+		status:     types.TransferStatusStarted,
+	}
+
+	// Queue up an action that adds the transfer to the map of transfers
+	err := m.enqueueAction(&xferAction{authToken: authToken, xfer: xfer})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// fireEvent is called when the state changes (eg data is sent, or there's an error)
+	fireEvent := func() {
+		// Queue up an action that fires an event with the current transfer state.
+		// Note: enqueueAction returns an error only if the context is cancelled,
+		// which we can safely ignore.
+		_ = m.enqueueAction(&xferAction{dbID: val.DBID, transferState: xfer.State()}) //nolint:errcheck
+	}
+
+	return xfer, fireEvent, nil
+}
+
+type xferAction struct {
+	authToken     string
+	xfer          *Libp2pTransfer
+	dbID          uint
+	transferState *types.TransferState
+}
+
+func (m *transfersMgr) enqueueAction(evt *xferAction) error {
+	select {
+	case <-m.ctx.Done():
+		return m.ctx.Err()
+	case m.actions <- evt:
+		return nil
+	}
+}
+
+func (m *transfersMgr) run(ctx context.Context) {
+	defer close(m.done)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	m.ctx = ctx
+
+	processAction := func(action *xferAction) {
+		// There are two types of action:
+
+		// 1. Add a new transfer to the list of active transfers
+		if action.xfer != nil {
+			m.transfersLk.Lock()
+			m.transfers[action.authToken] = action.xfer
+			m.transfersLk.Unlock()
+			return
+		}
+
+		// 2. Publish an event
+		m.publishEvent(action.dbID, action.transferState)
+	}
+
+	// When the event queue is shut down, drain the remaining events
+	drainEvents := func() {
+		for {
+			select {
+			case action := <-m.actions:
+				processAction(action)
+			default:
+				return
+			}
+		}
+	}
+	defer drainEvents()
+
+	// Process events until the event queue is shut down
+	for {
+		select {
+		case <-m.ctx.Done():
+			return
+		case action := <-m.actions:
+			processAction(action)
+		}
+	}
+}
+
+// awaitStop blocks until the context expires or the event queue has completed
+// and drained
+func (m *transfersMgr) awaitStop(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+	case <-m.done:
+	}
+}
+
+func (m *transfersMgr) publishEvent(dbid uint, state *types.TransferState) {
+	m.eventListenersLk.Lock()
+	for l := range m.eventListeners {
+		(*l)(dbid, state)
+	}
+	m.eventListenersLk.Unlock()
+}
+
+func (m *transfersMgr) subscribe(cb EventListenerFn) UnsubFn {
+	m.eventListenersLk.Lock()
+	m.eventListeners[&cb] = struct{}{}
+	m.eventListenersLk.Unlock()
+
+	return func() {
+		m.eventListenersLk.Lock()
+		delete(m.eventListeners, &cb)
+		m.eventListenersLk.Unlock()
+	}
 }
 
 // Libp2pTransfer keeps track of a data transfer
@@ -420,7 +564,7 @@ func (t *Libp2pTransfer) onCompleted() {
 	t.status = types.TransferStatusCompleted
 }
 
-func (t *Libp2pTransfer) State() types.TransferState {
+func (t *Libp2pTransfer) State() *types.TransferState {
 	t.lk.RLock()
 	defer t.lk.RUnlock()
 
@@ -433,7 +577,7 @@ func (t *Libp2pTransfer) State() types.TransferState {
 			msg = "pull data transfer queued"
 		}
 	}
-	return types.TransferState{
+	return &types.TransferState{
 		LocalAddr:  t.LocalAddr,
 		RemoteAddr: t.RemoteAddr,
 		Status:     t.status,
@@ -443,18 +587,21 @@ func (t *Libp2pTransfer) State() types.TransferState {
 }
 
 // Cancel permanently fails the transfer
-func (t *Libp2pTransfer) Cancel(err error) {
+func (t *Libp2pTransfer) cancel(ctx context.Context, err error) error {
 	t.lk.Lock()
-	defer t.lk.Unlock()
 
 	if t.cancelled {
-		return
+		t.lk.Unlock()
+		return nil
 	}
 
-	t.content.CloseWithError(err) //nolint:errcheck
 	t.cancelled = true
 	t.err = err
 	t.status = types.TransferStatusFailed
+
+	t.lk.Unlock()
+
+	return t.content.Cancel(ctx)
 }
 
 // readEmitter emits an event with the current offset into the read stream

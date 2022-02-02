@@ -131,7 +131,7 @@ func (c *CarReaderSeeker) Seek(offset int64, whence int) (int64, error) {
 
 // Cancel aborts any read operation: Once Cancel returns, all subsequent calls
 // to Read() will return context.Canceled.
-func (c *CarReaderSeeker) Cancel() {
+func (c *CarReaderSeeker) Cancel(ctx context.Context) error {
 	c.lk.Lock()
 
 	// Cancel the context
@@ -141,13 +141,18 @@ func (c *CarReaderSeeker) Cancel() {
 	writeCompleteCh := c.writeCompleteCh
 	if c.writeCompleteCh != nil {
 		// Close the writer. This will cause any subsequent reads to fail.
-		c.writer.CloseWithError(context.Canceled)
+		c.writer.CloseWithError(context.Canceled) //nolint:errcheck
 	}
 
 	c.lk.Unlock()
 
 	// Wait for the write to complete
 	if writeCompleteCh != nil {
-		c.writeCompleteCh <- struct{}{}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-c.writeCompleteCh:
+		}
 	}
+	return nil
 }
