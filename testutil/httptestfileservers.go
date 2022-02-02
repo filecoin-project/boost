@@ -86,6 +86,13 @@ func (b *BlockingHttpTestServer) Start() {
 }
 
 func (b *BlockingHttpTestServer) Close() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, ch := range b.unblock {
+		close(ch)
+	}
+
+	b.svc.CloseClientConnections()
 	b.svc.Close()
 }
 
