@@ -40,8 +40,15 @@ func NewCarReaderSeeker(ctx context.Context, cow *CarOffsetWriter, size uint64) 
 func (c *CarReaderSeeker) Read(p []byte) (int, error) {
 	c.lk.Lock()
 
+	// Check if the offset is at the end of the file
 	if uint64(c.offset) >= c.size {
-		defer c.lk.Unlock() // use defer so that we can read c.offset in error message
+		defer c.lk.Unlock()
+
+		// If the offset is exactly at the end of the file just return EOF
+		if uint64(c.offset) == c.size {
+			return 0, io.EOF
+		}
+		// Otherwise it's an error
 		return 0, fmt.Errorf("cannot read from offset %d >= file size %d", c.offset, c.size)
 	}
 
@@ -61,15 +68,22 @@ func (c *CarReaderSeeker) Read(p []byte) (int, error) {
 		c.reader = pr
 		c.writer = pw
 
+		offset := c.offset
 		go func() {
-			err := c.cow.Write(c.ctx, pw, uint64(c.offset))
+			err := c.cow.Write(c.ctx, pw, uint64(offset))
 			pw.CloseWithError(err) //nolint:errcheck
 
 			c.lk.Lock()
 			defer c.lk.Unlock()
 
-			close(c.writeCompleteCh)
+			// Set the offset to the end of the file so that the next call to
+			// Read() returns io.EOF
+			c.offset = int64(c.size)
+
+			// Reset and close the write complete channel
+			writeCompleteCh := c.writeCompleteCh
 			c.writeCompleteCh = nil
+			close(writeCompleteCh)
 		}()
 	}
 
@@ -130,7 +144,7 @@ func (c *CarReaderSeeker) Seek(offset int64, whence int) (int64, error) {
 }
 
 // Cancel aborts any read operation: Once Cancel returns, all subsequent calls
-// to Read() will return context.Canceled.
+// to Read() will return context.Canceled
 func (c *CarReaderSeeker) Cancel(ctx context.Context) error {
 	c.lk.Lock()
 
