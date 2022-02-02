@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"golang.org/x/xerrors"
+
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-datastore"
 	dss "github.com/ipfs/go-datastore/sync"
@@ -173,5 +175,34 @@ func TestCarReaderSeeker(t *testing.T) {
 
 		require.Equal(t, carSize-5, len(buff))
 		require.Equal(t, fullBuff.Bytes()[5:], buff)
+	})
+
+	t.Run("cancel with ongoing write", func(t *testing.T) {
+		cow := NewCarOffsetWriter(nd.Cid(), bs, NewBlockInfoCache())
+		crs := NewCarReaderSeeker(ctx, cow, uint64(carSize))
+
+		buff := make([]byte, 1024)
+		_, err := crs.Read(buff)
+		require.NoError(t, err)
+
+		err = crs.Cancel(context.Background())
+		require.NoError(t, err)
+
+		_, err = crs.Read(buff)
+		require.Error(t, err)
+		require.True(t, xerrors.Is(err, context.Canceled))
+	})
+
+	t.Run("cancel with no ongoing write", func(t *testing.T) {
+		cow := NewCarOffsetWriter(nd.Cid(), bs, NewBlockInfoCache())
+		crs := NewCarReaderSeeker(ctx, cow, uint64(carSize))
+
+		err = crs.Cancel(context.Background())
+		require.NoError(t, err)
+
+		buff := make([]byte, 1024)
+		_, err = crs.Read(buff)
+		require.Error(t, err)
+		require.True(t, xerrors.Is(err, context.Canceled))
 	})
 }
