@@ -43,13 +43,14 @@ func carHeader(payloadCid cid.Cid) car.CarHeader {
 	}
 }
 
-func (s *CarOffsetWriter) Write(ctx context.Context, w io.Writer, offset uint64) error {
-	headerSize, err := s.writeHeader(w, offset)
+// Write writes the CAR file to the writer, starting from writeOffset
+func (s *CarOffsetWriter) Write(ctx context.Context, w io.Writer, writeOffset uint64) error {
+	headerSize, err := s.writeHeader(w, writeOffset)
 	if err != nil {
 		return err
 	}
 
-	return s.writeBlocks(ctx, w, headerSize, offset)
+	return s.writeBlocks(ctx, w, headerSize, writeOffset)
 }
 
 // writeHeader writes the header to the writer, starting from writeOffset
