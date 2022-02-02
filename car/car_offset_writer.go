@@ -17,7 +17,8 @@ import (
 )
 
 // CarOffsetWriter turns a blockstore and a root CID into a CAR file stream,
-// starting from an offset
+// starting from an offset. The traversal is depth-first. Other selectors are
+// not yet supported.
 type CarOffsetWriter struct {
 	payloadCid cid.Cid
 	nodeGetter format.NodeGetter
@@ -51,19 +52,20 @@ func (s *CarOffsetWriter) Write(ctx context.Context, w io.Writer, offset uint64)
 	return s.writeBlocks(ctx, w, headerSize, offset)
 }
 
-func (s *CarOffsetWriter) writeHeader(w io.Writer, offset uint64) (uint64, error) {
+// writeHeader writes the header to the writer, starting from writeOffset
+func (s *CarOffsetWriter) writeHeader(w io.Writer, writeOffset uint64) (uint64, error) {
 	headerSize, err := car.HeaderSize(&s.header)
 	if err != nil {
 		return 0, fmt.Errorf("failed to size car header: %w", err)
 	}
 
 	// Check if the offset from which to start writing is after the header
-	if offset >= headerSize {
+	if writeOffset >= headerSize {
 		return headerSize, nil
 	}
 
 	// Write out the header, starting at the offset
-	_, err = skipWrite(w, offset, func(sw io.Writer) (int, error) {
+	_, err = skipWrite(w, writeOffset, func(sw io.Writer) (int, error) {
 		return 0, car.WriteHeader(&s.header, sw)
 	})
 	if err != nil {
@@ -73,6 +75,9 @@ func (s *CarOffsetWriter) writeHeader(w io.Writer, offset uint64) (uint64, error
 	return headerSize, nil
 }
 
+// writeBlocks does a depth first search of the blocks in the blockstore,
+// starting at the root, and writes the blocks to the writer, starting from
+// writeOffset
 func (s *CarOffsetWriter) writeBlocks(ctx context.Context, w io.Writer, headerSize uint64, writeOffset uint64) error {
 	// The first block's offset is the size of the header
 	offset := headerSize
