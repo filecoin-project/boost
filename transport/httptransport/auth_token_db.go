@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"github.com/ipfs/go-datastore"
@@ -12,7 +13,7 @@ import (
 )
 
 // ErrTokenNotFound is returned when an auth token is not found in the database
-var ErrTokenNotFound = fmt.Errorf("auth token not found")
+var ErrTokenNotFound = errors.New("auth token not found")
 
 // AuthTokenDB keeps a database of auth tokens with associated data
 type AuthTokenDB struct {
@@ -28,7 +29,7 @@ func NewAuthTokenDB(ds datastore.Batching) *AuthTokenDB {
 // Put adds some data to the DB and returns an auth token
 func (db *AuthTokenDB) Put(ctx context.Context, data []byte) (authtok string, e error) {
 	// Create a new auth token and add it to the datastore
-	authTokenBuff := make([]byte, 1024)
+	authTokenBuff := make([]byte, 256)
 	if _, err := rand.Read(authTokenBuff); err != nil {
 		return "", fmt.Errorf("generating auth token: %w", err)
 	}
@@ -50,10 +51,10 @@ func (db *AuthTokenDB) Get(ctx context.Context, authToken string) ([]byte, error
 		if xerrors.Is(err, datastore.ErrNotFound) {
 			return nil, ErrTokenNotFound
 		}
-		return nil, err
+		return nil, fmt.Errorf("getting auth token from datastore: %w", err)
 	}
 
-	return data, err
+	return data, nil
 }
 
 // Delete data by auth token
