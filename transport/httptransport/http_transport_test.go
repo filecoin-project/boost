@@ -20,6 +20,7 @@ import (
 
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/boost/transport/types"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-cidutil"
@@ -87,10 +88,10 @@ func TestSimpleTransfer(t *testing.T) {
 
 	for name, init := range svcs {
 		t.Run(name, func(t *testing.T) {
-			req, closer, h := init(t)
+			reqFn, closer, h := init(t)
 			defer closer()
 			of := getTempFilePath(t)
-			th := executeTransfer(t, ctx, New(h), carSize, req, of)
+			th := executeTransfer(t, ctx, New(h), carSize, reqFn(), of)
 			require.NotNil(t, th)
 
 			evts := waitForTransferComplete(th)
@@ -112,10 +113,10 @@ func TestTransportRespectsContext(t *testing.T) {
 
 	for name, init := range svcs {
 		t.Run(name, func(t *testing.T) {
-			url, _, h := init(t)
+			reqFn, _, h := init(t)
 
 			of := getTempFilePath(t)
-			th := executeTransfer(t, ctx, New(h), 100, url, of)
+			th := executeTransfer(t, ctx, New(h), 100, reqFn(), of)
 			require.NotNil(t, th)
 
 			evts := waitForTransferComplete(th)
@@ -135,16 +136,19 @@ func TestConcurrentTransfers(t *testing.T) {
 	size := len(st.carBytes)
 	svcs := serversWithRangeHandler(st)
 
+	delete(svcs, "http")
+	delete(svcs, "libp2p-http-test")
+
 	for name, s := range svcs {
 		t.Run(name, func(t *testing.T) {
-			url, closer, h := s(t)
+			reqFn, closer, h := s(t)
 			defer closer()
 
 			var errG errgroup.Group
 			for i := 0; i < 10; i++ {
 				errG.Go(func() error {
 					of := getTempFilePath(t)
-					th := executeTransfer(t, ctx, New(h), size, url, of)
+					th := executeTransfer(t, ctx, New(h), size, reqFn(), of)
 
 					evts := waitForTransferComplete(th)
 					if len(evts) == 0 {
@@ -254,10 +258,10 @@ func TestTransferCancellation(t *testing.T) {
 
 	for name, s := range svcs {
 		t.Run(name, func(t *testing.T) {
-			url, closer, h := s(t)
+			reqFn, closer, h := s(t)
 			defer closer()
 			of := getTempFilePath(t)
-			th := executeTransfer(t, context.Background(), New(h), size, url, of)
+			th := executeTransfer(t, context.Background(), New(h), size, reqFn(), of)
 			require.NotNil(t, th)
 			// close the transfer so context is cancelled
 			th.Close()
@@ -410,7 +414,7 @@ func waitForTransferComplete(th transport.Handler) []types.TransportEvent {
 	return evts
 }
 
-func serversWithRangeHandler(st *serverTest) map[string]func(t *testing.T) (req types.HttpRequest, close func(), h host.Host) {
+func serversWithRangeHandler(st *serverTest) map[string]func(t *testing.T) (req func() types.HttpRequest, close func(), h host.Host) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		offset := r.Header.Get("Range")
 		finalOffset := strings.TrimSuffix(strings.TrimPrefix(offset, "bytes="), "-")
@@ -420,28 +424,34 @@ func serversWithRangeHandler(st *serverTest) map[string]func(t *testing.T) (req 
 	}
 
 	svcs := serversWithCustomHandler(handler)
-	svcs["libp2p-http"] = func(t *testing.T) (types.HttpRequest, func(), host.Host) {
+	svcs["libp2p-http"] = func(t *testing.T) (func() types.HttpRequest, func(), host.Host) {
 		return newLibp2pHttpServer(st)
 	}
 	return svcs
 }
 
-func serversWithCustomHandler(handler http.HandlerFunc) map[string]func(t *testing.T) (req types.HttpRequest, close func(), h host.Host) {
-	svcs := map[string]func(t *testing.T) (req types.HttpRequest, close func(), h host.Host){
-		"http": func(t *testing.T) (types.HttpRequest, func(), host.Host) {
+func serversWithCustomHandler(handler http.HandlerFunc) map[string]func(t *testing.T) (req func() types.HttpRequest, close func(), h host.Host) {
+	svcs := map[string]func(t *testing.T) (req func() types.HttpRequest, close func(), h host.Host){
+		"http": func(t *testing.T) (func() types.HttpRequest, func(), host.Host) {
 			svr := httptest.NewServer(handler)
-			return types.HttpRequest{URL: svr.URL}, svr.Close, nil
+			reqFn := func() types.HttpRequest {
+				return types.HttpRequest{URL: svr.URL}
+			}
+			return reqFn, svr.Close, nil
 		},
-		"libp2p-http-test": func(t *testing.T) (types.HttpRequest, func(), host.Host) {
+		"libp2p-http-test": func(t *testing.T) (func() types.HttpRequest, func(), host.Host) {
 			svr := newTestLibp2pHttpServer(t, handler)
-			return svr.Req, svr.Close, svr.clientHost
+			reqFn := func() types.HttpRequest {
+				return svr.Req
+			}
+			return reqFn, svr.Close, svr.clientHost
 		},
 	}
 
 	return svcs
 }
 
-func newLibp2pHttpServer(st *serverTest) (types.HttpRequest, func(), host.Host) {
+func newLibp2pHttpServer(st *serverTest) (func() types.HttpRequest, func(), host.Host) {
 	ctx := context.Background()
 	clientHost, srvHost := setupLibp2pHosts(st.t)
 	authDB := NewAuthTokenDB(st.ds)
@@ -453,10 +463,13 @@ func newLibp2pHttpServer(st *serverTest) (types.HttpRequest, func(), host.Host) 
 
 	proposalCid, err := cid.Parse("bafkqaaa")
 	require.NoError(st.t, err)
-	xfer, err := srv.PrepareForDataRequest(context.Background(), 1, proposalCid, st.root.Cid(), uint64(len(st.carBytes)))
-	require.NoError(st.t, err)
 
-	req := newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+	req := func() types.HttpRequest {
+		id := uuid.New().String()
+		xfer, err := srv.PrepareForDataRequest(context.Background(), id, proposalCid, st.root.Cid(), uint64(len(st.carBytes)))
+		require.NoError(st.t, err)
+		return newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+	}
 
 	closeServer := func() {
 		srvHost.Close()    //nolint:errcheck

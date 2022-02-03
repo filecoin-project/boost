@@ -37,13 +37,13 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 	carSize := len(st.carBytes)
 	proposalCid, err := cid.Parse("bafkqaaa")
 	require.NoError(t, err)
-	dbid := uint(1)
-	xfer, err := srv.PrepareForDataRequest(context.Background(), dbid, proposalCid, st.root.Cid(), uint64(carSize))
+	id := "1"
+	xfer, err := srv.PrepareForDataRequest(context.Background(), id, proposalCid, st.root.Cid(), uint64(carSize))
 	require.NoError(t, err)
 
 	srvEvts := []types.TransferState{}
-	srv.Subscribe(func(sdbid uint, st types.TransferState) {
-		if dbid == sdbid {
+	srv.Subscribe(func(txid string, st types.TransferState) {
+		if id == txid {
 			srvEvts = append(srvEvts, st)
 		}
 	})
@@ -106,13 +106,13 @@ func TestLibp2pCarServerResume(t *testing.T) {
 	carSize := len(st.carBytes)
 	proposalCid, err := cid.Parse("bafkqaaa")
 	require.NoError(t, err)
-	dbid := uint(1)
-	xfer, err := srv.PrepareForDataRequest(context.Background(), dbid, proposalCid, st.root.Cid(), uint64(carSize))
+	id := "1"
+	xfer, err := srv.PrepareForDataRequest(context.Background(), id, proposalCid, st.root.Cid(), uint64(carSize))
 	require.NoError(t, err)
 
 	srvEvts := []types.TransferState{}
-	srv.Subscribe(func(sdbid uint, st types.TransferState) {
-		if dbid == sdbid {
+	srv.Subscribe(func(txid string, st types.TransferState) {
+		if id == txid {
 			srvEvts = append(srvEvts, st)
 		}
 	})
@@ -224,13 +224,13 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	carSize := len(st.carBytes)
 	proposalCid, err := cid.Parse("bafkqaaa")
 	require.NoError(t, err)
-	dbid := uint(1)
-	xfer, err := srv.PrepareForDataRequest(context.Background(), dbid, proposalCid, st.root.Cid(), uint64(carSize))
+	id := "1"
+	xfer, err := srv.PrepareForDataRequest(context.Background(), id, proposalCid, st.root.Cid(), uint64(carSize))
 	require.NoError(t, err)
 
 	srvEvts := []types.TransferState{}
-	srv.Subscribe(func(sdbid uint, st types.TransferState) {
-		if dbid == sdbid {
+	srv.Subscribe(func(txid string, st types.TransferState) {
+		if id == txid {
 			srvEvts = append(srvEvts, st)
 		}
 	})
@@ -249,7 +249,7 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	clientReceived := evt.NBytesReceived
 
 	// Cancel the transfer on the server side
-	err = srv.CleanupPreparedRequest(ctx, xfer.AuthToken)
+	err = srv.CleanupPreparedRequest(ctx, id, xfer.AuthToken)
 	require.NoError(t, err)
 
 	// Wait for the transfer to complete on the client
@@ -292,13 +292,13 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	carSize := len(st.carBytes)
 	proposalCid, err := cid.Parse("bafkqaaa")
 	require.NoError(t, err)
-	dbid := uint(1)
-	xfer, err := srv.PrepareForDataRequest(context.Background(), dbid, proposalCid, st.root.Cid(), uint64(carSize))
+	id := "1"
+	xfer, err := srv.PrepareForDataRequest(context.Background(), id, proposalCid, st.root.Cid(), uint64(carSize))
 	require.NoError(t, err)
 
 	srvEvts := []types.TransferState{}
-	srv.Subscribe(func(sdbid uint, st types.TransferState) {
-		if dbid == sdbid {
+	srv.Subscribe(func(txid string, st types.TransferState) {
+		if id == txid {
 			srvEvts = append(srvEvts, st)
 		}
 	})
