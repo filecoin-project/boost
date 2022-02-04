@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/filecoin-project/boost/transport/types"
@@ -38,18 +39,21 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 	proposalCid, err := cid.Parse("bafkqaaa")
 	require.NoError(t, err)
 	id := "1"
-	xfer, err := srv.PrepareForDataRequest(context.Background(), id, proposalCid, st.root.Cid(), uint64(carSize))
+	authToken, err := GenerateAuthToken()
+	require.NoError(st.t, err)
+	err = authDB.Put(ctx, authToken, AuthValue{
+		ID:          id,
+		ProposalCid: proposalCid,
+		PayloadCid:  st.root.Cid(),
+		RemoteAddr:  "",
+		Size:        uint64(carSize),
+	})
 	require.NoError(t, err)
 
-	srvEvts := []types.TransferState{}
-	srv.Subscribe(func(txid string, st types.TransferState) {
-		if id == txid {
-			srvEvts = append(srvEvts, st)
-		}
-	})
+	getServerEvents := recordServerEvents(srv, id)
 
 	// Perform retrieval with the auth token
-	req := newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+	req := newLibp2pHttpRequest(srvHost, authToken)
 	of := getTempFilePath(t)
 	th := executeTransfer(t, ctx, New(clientHost), carSize, req, of)
 	require.NotNil(t, th)
@@ -62,6 +66,7 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 	assertFileContents(t, of, st.carBytes)
 
 	// Check that the server event subscription is working correctly
+	srvEvts := getServerEvents()
 	require.NotEmpty(t, srvEvts)
 	lastSrvEvt := srvEvts[len(srvEvts)-1]
 	require.Equal(t, types.TransferStatusStarted, srvEvts[0].Status)
@@ -69,7 +74,7 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 	require.EqualValues(t, int(lastClientEvt.NBytesReceived), int(lastSrvEvt.Sent))
 
 	// Remove the auth token from the server
-	err = authDB.Delete(ctx, xfer.AuthToken)
+	err = authDB.Delete(ctx, authToken)
 	require.NoError(t, err)
 
 	// Attempt a second retrieval - it should fail with a 401 HTTP error
@@ -107,15 +112,18 @@ func TestLibp2pCarServerResume(t *testing.T) {
 	proposalCid, err := cid.Parse("bafkqaaa")
 	require.NoError(t, err)
 	id := "1"
-	xfer, err := srv.PrepareForDataRequest(context.Background(), id, proposalCid, st.root.Cid(), uint64(carSize))
+	authToken, err := GenerateAuthToken()
+	require.NoError(st.t, err)
+	err = authDB.Put(ctx, authToken, AuthValue{
+		ID:          id,
+		ProposalCid: proposalCid,
+		PayloadCid:  st.root.Cid(),
+		RemoteAddr:  "",
+		Size:        uint64(carSize),
+	})
 	require.NoError(t, err)
 
-	srvEvts := []types.TransferState{}
-	srv.Subscribe(func(txid string, st types.TransferState) {
-		if id == txid {
-			srvEvts = append(srvEvts, st)
-		}
-	})
+	getServerEvents := recordServerEvents(srv, id)
 
 	outFile := getTempFilePath(t)
 	retrieveData := func(readCount int, of string) {
@@ -123,7 +131,7 @@ func TestLibp2pCarServerResume(t *testing.T) {
 		defer cancel()
 
 		// Perform retrieval with the auth token
-		req := newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+		req := newLibp2pHttpRequest(srvHost, authToken)
 		th := executeTransfer(t, ctx, New(clientHost), carSize, req, of)
 		require.NotNil(t, th)
 
@@ -180,7 +188,7 @@ func TestLibp2pCarServerResume(t *testing.T) {
 	truncateFromEnd(outFile, 1024)
 
 	// Now retrieve all bytes
-	req := newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+	req := newLibp2pHttpRequest(srvHost, authToken)
 	th := executeTransfer(t, ctx, New(clientHost), carSize, req, outFile)
 	require.NotNil(t, th)
 
@@ -194,6 +202,7 @@ func TestLibp2pCarServerResume(t *testing.T) {
 	assertFileContents(t, outFile, st.carBytes)
 
 	// Check that all bytes were transferred successfully on the server
+	srvEvts := getServerEvents()
 	require.NotEmpty(t, srvEvts)
 	lastSrvEvt := srvEvts[len(srvEvts)-1]
 	require.Equal(t, types.TransferStatusCompleted, lastSrvEvt.Status)
@@ -225,18 +234,21 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	proposalCid, err := cid.Parse("bafkqaaa")
 	require.NoError(t, err)
 	id := "1"
-	xfer, err := srv.PrepareForDataRequest(context.Background(), id, proposalCid, st.root.Cid(), uint64(carSize))
+	authToken, err := GenerateAuthToken()
+	require.NoError(st.t, err)
+	err = authDB.Put(ctx, authToken, AuthValue{
+		ID:          id,
+		ProposalCid: proposalCid,
+		PayloadCid:  st.root.Cid(),
+		RemoteAddr:  "",
+		Size:        uint64(carSize),
+	})
 	require.NoError(t, err)
 
-	srvEvts := []types.TransferState{}
-	srv.Subscribe(func(txid string, st types.TransferState) {
-		if id == txid {
-			srvEvts = append(srvEvts, st)
-		}
-	})
+	getServerEvents := recordServerEvents(srv, id)
 
 	// Perform retrieval with the auth token
-	req := newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+	req := newLibp2pHttpRequest(srvHost, authToken)
 	of := getTempFilePath(t)
 	noRetry := BackOffRetryOpt(0, 0, 1, 1)
 	th := executeTransfer(t, ctx, New(clientHost, noRetry), carSize, req, of)
@@ -249,7 +261,7 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	clientReceived := evt.NBytesReceived
 
 	// Cancel the transfer on the server side
-	err = srv.CleanupPreparedRequest(ctx, id, xfer.AuthToken)
+	_, err = srv.CancelTransfer(ctx, id)
 	require.NoError(t, err)
 
 	// Wait for the transfer to complete on the client
@@ -261,6 +273,7 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	require.Error(t, lastClientEvt.Error)
 	require.Less(t, int(clientReceived), carSize)
 
+	srvEvts := getServerEvents()
 	require.NotEmpty(t, srvEvts)
 	lastSrvEvt := srvEvts[len(srvEvts)-1]
 	require.Equal(t, types.TransferStatusFailed, lastSrvEvt.Status)
@@ -293,18 +306,21 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	proposalCid, err := cid.Parse("bafkqaaa")
 	require.NoError(t, err)
 	id := "1"
-	xfer, err := srv.PrepareForDataRequest(context.Background(), id, proposalCid, st.root.Cid(), uint64(carSize))
+	authToken, err := GenerateAuthToken()
+	require.NoError(st.t, err)
+	err = authDB.Put(ctx, authToken, AuthValue{
+		ID:          id,
+		ProposalCid: proposalCid,
+		PayloadCid:  st.root.Cid(),
+		RemoteAddr:  "",
+		Size:        uint64(carSize),
+	})
 	require.NoError(t, err)
 
-	srvEvts := []types.TransferState{}
-	srv.Subscribe(func(txid string, st types.TransferState) {
-		if id == txid {
-			srvEvts = append(srvEvts, st)
-		}
-	})
+	getServerEvents := recordServerEvents(srv, id)
 
 	// Perform retrieval with the auth token
-	req1 := newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+	req1 := newLibp2pHttpRequest(srvHost, authToken)
 	of1 := getTempFilePath(t)
 	noRetry := BackOffRetryOpt(0, 0, 1, 1)
 	th1 := executeTransfer(t, ctx, New(clientHost, noRetry), carSize, req1, of1)
@@ -317,7 +333,7 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	clientReceived := evt1.NBytesReceived
 
 	// Start a new transfer with the same auth token
-	req2 := newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+	req2 := newLibp2pHttpRequest(srvHost, authToken)
 	of2 := getTempFilePath(t)
 	th2 := executeTransfer(t, ctx, New(clientHost, noRetry), carSize, req2, of2)
 	require.NotNil(t, th2)
@@ -337,6 +353,7 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	assertFileContents(t, of2, st.carBytes)
 
 	// Check that all bytes were transferred successfully on the server
+	srvEvts := getServerEvents()
 	require.NotEmpty(t, srvEvts)
 	lastSrvEvt := srvEvts[len(srvEvts)-1]
 	require.Equal(t, types.TransferStatusCompleted, lastSrvEvt.Status)
@@ -384,4 +401,22 @@ func setupLibp2pHosts(t *testing.T) (host.Host, host.Host) {
 	clientHost.Peerstore().AddAddrs(srvHost.ID(), srvHost.Addrs(), peerstore.PermanentAddrTTL)
 
 	return clientHost, srvHost
+}
+
+func recordServerEvents(srv *Libp2pCarServer, id string) func() []types.TransferState {
+	var lk sync.Mutex
+	srvEvts := []types.TransferState{}
+	srv.Subscribe(func(txid string, st types.TransferState) {
+		if id == txid {
+			lk.Lock()
+			srvEvts = append(srvEvts, st)
+			lk.Unlock()
+		}
+	})
+
+	return func() []types.TransferState {
+		lk.Lock()
+		defer lk.Unlock()
+		return srvEvts
+	}
 }
