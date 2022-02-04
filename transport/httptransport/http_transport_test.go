@@ -466,9 +466,17 @@ func newLibp2pHttpServer(st *serverTest) (func() types.HttpRequest, func(), host
 
 	req := func() types.HttpRequest {
 		id := uuid.New().String()
-		xfer, err := srv.PrepareForDataRequest(context.Background(), id, proposalCid, st.root.Cid(), uint64(len(st.carBytes)))
+		authToken, err := GenerateAuthToken()
 		require.NoError(st.t, err)
-		return newLibp2pHttpRequest(srvHost, xfer.AuthToken)
+		err = authDB.Put(ctx, authToken, AuthValue{
+			ID:          id,
+			ProposalCid: proposalCid,
+			PayloadCid:  st.root.Cid(),
+			RemoteAddr:  "",
+			Size:        uint64(len(st.carBytes)),
+		})
+		require.NoError(st.t, err)
+		return newLibp2pHttpRequest(srvHost, authToken)
 	}
 
 	closeServer := func() {
