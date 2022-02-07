@@ -472,7 +472,6 @@ func newLibp2pHttpServer(st *serverTest) (func() types.HttpRequest, func(), host
 			ID:          id,
 			ProposalCid: proposalCid,
 			PayloadCid:  st.root.Cid(),
-			RemoteAddr:  "",
 			Size:        uint64(len(st.carBytes)),
 		})
 		require.NoError(st.t, err)

@@ -45,7 +45,6 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 		ID:          id,
 		ProposalCid: proposalCid,
 		PayloadCid:  st.root.Cid(),
-		RemoteAddr:  "",
 		Size:        uint64(carSize),
 	})
 	require.NoError(t, err)
@@ -118,7 +117,6 @@ func TestLibp2pCarServerResume(t *testing.T) {
 		ID:          id,
 		ProposalCid: proposalCid,
 		PayloadCid:  st.root.Cid(),
-		RemoteAddr:  "",
 		Size:        uint64(carSize),
 	})
 	require.NoError(t, err)
@@ -240,7 +238,6 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 		ID:          id,
 		ProposalCid: proposalCid,
 		PayloadCid:  st.root.Cid(),
-		RemoteAddr:  "",
 		Size:        uint64(carSize),
 	})
 	require.NoError(t, err)
@@ -312,7 +309,6 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 		ID:          id,
 		ProposalCid: proposalCid,
 		PayloadCid:  st.root.Cid(),
-		RemoteAddr:  "",
 		Size:        uint64(carSize),
 	})
 	require.NoError(t, err)

@@ -24,7 +24,6 @@ type AuthValue struct {
 	ID          string
 	ProposalCid cid.Cid
 	PayloadCid  cid.Cid
-	RemoteAddr  string
 	Size        uint64
 }
 
