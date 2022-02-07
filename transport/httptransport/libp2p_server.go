@@ -186,7 +186,8 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *A
 	}
 
 	// Fire transfer started event
-	log.Infow("starting transfer", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
+	logParams := []interface{}{"id", val.ID, "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid, "size", val.Size}
+	log.Infow("starting transfer", logParams...)
 	fireEvent(xfer.State())
 
 	// Fire progress events during transfer.
@@ -221,9 +222,9 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *A
 
 	// Check if there was an error during the transfer
 	if err != nil {
-		log.Infow("transfer failed", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid, "error", err)
+		log.Infow("transfer failed", append(logParams, "error", err))
 	} else {
-		log.Infow("completed serving request", "proposalCID", val.ProposalCid, "payloadCID", val.PayloadCid)
+		log.Infow("completed serving request", logParams)
 	}
 
 	st := xfer.setComplete(err)

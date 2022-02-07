@@ -35,7 +35,6 @@ func TestNewAuthTokenDB(t *testing.T) {
 		ID:          "12345",
 		ProposalCid: proposalCid,
 		PayloadCid:  payloadCid,
-		RemoteAddr:  "Addr",
 		Size:        1234,
 	}
 	err = db.Put(ctx, authToken, val)
@@ -54,7 +53,6 @@ func TestNewAuthTokenDB(t *testing.T) {
 		ID:          "54321",
 		ProposalCid: proposalCid,
 		PayloadCid:  payloadCid,
-		RemoteAddr:  "Addr2",
 		Size:        4321,
 	}
 	err = db.Put(ctx, authToken2, val2)
