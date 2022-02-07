@@ -89,7 +89,7 @@ func (c *CarReaderSeeker) Cancel(ctx context.Context) error {
 	}
 
 	pw := c.writer.Load().(*io.PipeWriter)
-	pw.CloseWithError(context.Canceled)
+	pw.CloseWithError(context.Canceled) //nolint:errcheck
 
 	// Wait for the write to complete
 	select {
