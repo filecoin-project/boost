@@ -2,6 +2,7 @@ package types
 
 import (
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 )
 
 const DataTransferProtocol = "/fil/storage/transfer/1.0.0"
@@ -37,7 +38,10 @@ type TransportEvent struct {
 type TransferStatus string
 
 const (
-	TransferStatusStarted   TransferStatus = "TransferStatusStarted"
+	// TransferStatusStarted is set when the transfer starts
+	TransferStatusStarted TransferStatus = "TransferStatusStarted"
+	// TransferStatusStarted is set when the transfer restarts after previously starting
+	TransferStatusRestarted TransferStatus = "TransferStatusRestarted"
 	TransferStatusOngoing   TransferStatus = "TransferStatusOngoing"
 	TransferStatusCompleted TransferStatus = "TransferStatusCompleted"
 	TransferStatusFailed    TransferStatus = "TransferStatusFailed"
@@ -51,4 +55,5 @@ type TransferState struct {
 	Sent       uint64
 	Received   uint64
 	Message    string
+	PayloadCid cid.Cid
 }

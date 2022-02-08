@@ -12,6 +12,7 @@ import (
 
 	"github.com/filecoin-project/boost/car"
 	"github.com/filecoin-project/boost/transport/types"
+	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -177,7 +178,7 @@ func (s *Libp2pCarServer) serveContent(w http.ResponseWriter, r *http.Request, a
 
 func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *AuthValue, authToken string, content *car.CarReaderSeeker) error {
 	// Create transfer
-	xfer := newLibp2pTransfer(val.ID, authToken, s.h.ID().String(), r.RemoteAddr, content)
+	xfer := newLibp2pTransfer(val, authToken, s.h.ID().String(), r.RemoteAddr, content)
 
 	// Add transfer to the list of active transfers
 	fireEvent, err := s.transfersMgr.add(xfer)
@@ -369,8 +370,10 @@ func (m *transfersMgr) run(ctx context.Context) {
 		if action.transferState == nil {
 			m.transfersLk.Lock()
 			if existing, ok := m.transfers[xfer.ID]; ok {
-				// Cancel any existing transfer with the same id
-				go existing.cancel(ctx) //nolint:errcheck
+				xfer.isRestart = true
+				// Close any existing transfer with the same id and prevent
+				// it from firing any more events
+				existing.close(ctx)
 			}
 			m.transfers[xfer.ID] = xfer
 			m.transfersLk.Unlock()
@@ -378,8 +381,15 @@ func (m *transfersMgr) run(ctx context.Context) {
 		}
 
 		// 2. Publish an event
-		m.publishEvent(xfer.ID, action.transferState)
-		xfer.eventPublished(action.transferState.Status)
+		if xfer.isRestart && action.transferState.Status == types.TransferStatusStarted {
+			// If this transfer replaces an event with the same id, it's a
+			// restart
+			action.transferState.Status = types.TransferStatusRestarted
+		}
+		if !xfer.closed {
+			m.publishEvent(xfer.ID, action.transferState)
+			xfer.eventPublished(action.transferState.Status)
+		}
 	}
 
 	// When the event queue is shut down, drain the remaining events
@@ -440,25 +450,36 @@ func (m *transfersMgr) Subscribe(cb EventListenerFn) UnsubFn {
 
 // Libp2pTransfer keeps track of a data transfer
 type Libp2pTransfer struct {
-	ID         string
-	CreatedAt  time.Time
-	AuthToken  string
-	LocalAddr  string
-	RemoteAddr string
-	content    *car.CarReaderSeeker
+	ID          string
+	PayloadCid  cid.Cid
+	ProposalCid cid.Cid
+	CreatedAt   time.Time
+	AuthToken   string
+	LocalAddr   string
+	RemoteAddr  string
+	content     *car.CarReaderSeeker
+	// indicates whether this transfer replaces a previous transfer with the
+	// same id
+	isRestart bool
 
 	lk     sync.RWMutex
 	err    error
 	sent   uint64
 	status types.TransferStatus
 
+	// Set when the transfer is replaced with a new transfer with the same id.
+	// This prevents the replaced transfer from firing any more events.
+	closed bool
+
 	// When the error or complete event has been fired
 	eventsDrained chan struct{}
 }
 
-func newLibp2pTransfer(id string, authToken string, localAddr string, remoteAddr string, content *car.CarReaderSeeker) *Libp2pTransfer {
+func newLibp2pTransfer(val *AuthValue, authToken string, localAddr string, remoteAddr string, content *car.CarReaderSeeker) *Libp2pTransfer {
 	return &Libp2pTransfer{
-		ID:            id,
+		ID:            val.ID,
+		PayloadCid:    val.PayloadCid,
+		ProposalCid:   val.ProposalCid,
 		CreatedAt:     time.Now(),
 		AuthToken:     authToken,
 		LocalAddr:     localAddr,
@@ -520,6 +541,7 @@ func (t *Libp2pTransfer) state() types.TransferState {
 		Status:     t.status,
 		Sent:       t.sent,
 		Message:    msg,
+		PayloadCid: t.PayloadCid,
 	}
 }
 
@@ -544,6 +566,13 @@ func (t *Libp2pTransfer) cancel(ctx context.Context) (*types.TransferState, erro
 		st := t.state()
 		return &st, nil
 	}
+}
+
+func (t *Libp2pTransfer) close(ctx context.Context) {
+	t.closed = true
+
+	// Cancel the read / write stream
+	t.content.Cancel(ctx) //nolint:errcheck
 }
 
 // eventPublished is called when an event for this transfer is emitted

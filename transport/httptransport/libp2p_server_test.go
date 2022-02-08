@@ -355,20 +355,16 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	require.Equal(t, types.TransferStatusCompleted, lastSrvEvt.Status)
 	require.EqualValues(t, carSize, int(lastSrvEvt.Sent))
 
-	// Expect that there was an error then a start event on the server side
+	// Expect that there was a restart event on the server side
 	require.NotEmpty(t, srvEvts)
-	errIndex := -1
 	restartIndex := -1
 	for i, evt := range srvEvts[1:] {
-		switch evt.Status {
-		case types.TransferStatusFailed:
-			errIndex = i
-		case types.TransferStatusStarted:
+		if evt.Status == types.TransferStatusRestarted {
 			restartIndex = i
 		}
 	}
-	require.Greater(t, errIndex, -1)
 	require.Greater(t, restartIndex, -1)
+	require.Less(t, restartIndex, len(srvEvts))
 }
 
 func min(a int, b int) int {
