@@ -15,10 +15,6 @@ import (
 	"github.com/filecoin-project/lotus/node/repo/imports"
 )
 
-// MetadataDS stores metadata. By default it's namespaced under /metadata in
-// main repo datastore.
-type MetadataDS datastore.Batching
-
 type (
 	// UniversalBlockstore is the universal blockstore backend.
 	UniversalBlockstore blockstore.Blockstore
@@ -82,9 +78,6 @@ type ProviderDealStore *statestore.StateStore
 type ProviderPieceStore piecestore.PieceStore
 
 type ProviderRequestValidator *requestvalidation.UnifiedRequestValidator
-
-// ProviderDataTransfer is a data transfer manager for the provider
-type ProviderDataTransfer datatransfer.Manager
 
 type StagingBlockstore blockstore.BasicBlockstore
 type StagingGraphsync graphsync.GraphExchange

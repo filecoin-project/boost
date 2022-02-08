@@ -8,10 +8,11 @@ import (
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/go-address"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 
 	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
@@ -101,7 +102,7 @@ var initCmd = &cli.Command{
 		repoPath := cctx.String(FlagBoostRepo)
 		log.Debugw("Checking if repo exists", "path", repoPath)
 
-		r, err := repo.NewFS(repoPath)
+		r, err := lotus_repo.NewFS(repoPath)
 		if err != nil {
 			return err
 		}
@@ -125,12 +126,12 @@ var initCmd = &cli.Command{
 			return xerrors.Errorf("Remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion1, v.APIVersion)
 		}
 
-		if err := r.Init(repo.Boost); err != nil {
+		if err := r.Init(node.BoostRepoType{}); err != nil {
 			return err
 		}
 
 		{
-			lr, err := r.Lock(repo.Boost)
+			lr, err := r.Lock(node.BoostRepoType{})
 			if err != nil {
 				return err
 			}

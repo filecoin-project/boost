@@ -10,10 +10,6 @@ import (
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/go-data-transfer/channelmonitor"
-	dtimpl "github.com/filecoin-project/go-data-transfer/impl"
-	dtnet "github.com/filecoin-project/go-data-transfer/network"
-	dtgstransport "github.com/filecoin-project/go-data-transfer/transport/graphsync"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
@@ -39,11 +35,12 @@ import (
 	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/impl/full"
 	payapi "github.com/filecoin-project/lotus/node/impl/paych"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/node/repo/imports"
 )
 
-func HandleMigrateClientFunds(lc fx.Lifecycle, ds dtypes.MetadataDS, wallet full.WalletAPI, fundMgr *market.FundManager) {
+func HandleMigrateClientFunds(lc fx.Lifecycle, ds lotus_dtypes.MetadataDS, wallet full.WalletAPI, fundMgr *market.FundManager) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			addr, err := wallet.WalletDefaultAddress(ctx)
@@ -77,7 +74,7 @@ func HandleMigrateClientFunds(lc fx.Lifecycle, ds dtypes.MetadataDS, wallet full
 	})
 }
 
-func ClientImportMgr(ds dtypes.MetadataDS, r repo.LockedRepo) (dtypes.ClientImportMgr, error) {
+func ClientImportMgr(ds lotus_dtypes.MetadataDS, r repo.LockedRepo) (lotus_dtypes.ClientImportMgr, error) {
 	// store the imports under the repo's `imports` subdirectory.
 	dir := filepath.Join(r.Path(), "imports")
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -103,59 +100,8 @@ func RegisterClientValidator(crv dtypes.ClientRequestValidator, dtm dtypes.Clien
 	}
 }
 
-// NewClientGraphsyncDataTransfer returns a data transfer manager that just
-// uses the clients's Client DAG service for transfers
-func NewClientGraphsyncDataTransfer(lc fx.Lifecycle, h host.Host, gs dtypes.Graphsync, ds dtypes.MetadataDS, r repo.LockedRepo) (dtypes.ClientDataTransfer, error) {
-	// go-data-transfer protocol retries:
-	// 1s, 5s, 25s, 2m5s, 5m x 11 ~= 1 hour
-	dtRetryParams := dtnet.RetryParameters(time.Second, 5*time.Minute, 15, 5)
-	net := dtnet.NewFromLibp2pHost(h, dtRetryParams)
-
-	dtDs := namespace.Wrap(ds, datastore.NewKey("/datatransfer/client/transfers"))
-	transport := dtgstransport.NewTransport(h.ID(), gs, net)
-	err := os.MkdirAll(filepath.Join(r.Path(), "data-transfer"), 0755) //nolint: gosec
-	if err != nil && !os.IsExist(err) {
-		return nil, err
-	}
-
-	// data-transfer push / pull channel restart configuration:
-	dtRestartConfig := dtimpl.ChannelRestartConfig(channelmonitor.Config{
-		// Disable Accept and Complete timeouts until this issue is resolved:
-		// https://github.com/filecoin-project/lotus/issues/6343#
-		// Wait for the other side to respond to an Open channel message
-		AcceptTimeout: 0,
-		// Wait for the other side to send a Complete message once all
-		// data has been sent / received
-		CompleteTimeout: 0,
-
-		// When an error occurs, wait a little while until all related errors
-		// have fired before sending a restart message
-		RestartDebounce: 10 * time.Second,
-		// After sending a restart, wait for at least 1 minute before sending another
-		RestartBackoff: time.Minute,
-		// After trying to restart 3 times, give up and fail the transfer
-		MaxConsecutiveRestarts: 3,
-	})
-	dt, err := dtimpl.NewDataTransfer(dtDs, filepath.Join(r.Path(), "data-transfer"), net, transport, dtRestartConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	dt.OnReady(marketevents.ReadyLogger("client data transfer"))
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			dt.SubscribeToEvents(marketevents.DataTransferLogger)
-			return dt.Start(ctx)
-		},
-		OnStop: func(ctx context.Context) error {
-			return dt.Stop(ctx)
-		},
-	})
-	return dt, nil
-}
-
 // NewClientDatastore creates a datastore for the client to store its deals
-func NewClientDatastore(ds dtypes.MetadataDS) dtypes.ClientDatastore {
+func NewClientDatastore(ds lotus_dtypes.MetadataDS) dtypes.ClientDatastore {
 	return namespace.Wrap(ds, datastore.NewKey("/deals/client"))
 }
 
@@ -205,7 +151,7 @@ func StorageClient(lc fx.Lifecycle, h host.Host, dataTransfer dtypes.ClientDataT
 
 // RetrievalClient creates a new retrieval client attached to the client blockstore
 func RetrievalClient(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dt dtypes.ClientDataTransfer, payAPI payapi.PaychAPI, resolver discovery.PeerResolver,
-	ds dtypes.MetadataDS, chainAPI full.ChainAPI, stateAPI full.StateAPI, accessor retrievalmarket.BlockstoreAccessor, j journal.Journal) (retrievalmarket.RetrievalClient, error) {
+	ds lotus_dtypes.MetadataDS, chainAPI full.ChainAPI, stateAPI full.StateAPI, accessor retrievalmarket.BlockstoreAccessor, j journal.Journal) (retrievalmarket.RetrievalClient, error) {
 
 	adapter := retrievaladapter.NewRetrievalClientNode(payAPI, chainAPI, stateAPI)
 	network := rmnet.NewFromLibp2pHost(h)

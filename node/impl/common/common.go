@@ -13,8 +13,9 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
-	"github.com/filecoin-project/boost/journal/alerting"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
+
+	"github.com/filecoin-project/lotus/journal/alerting"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 var session = uuid.New()
@@ -23,8 +24,8 @@ type CommonAPI struct {
 	fx.In
 
 	Alerting     *alerting.Alerting
-	APISecret    *dtypes.APIAlg
-	ShutdownChan dtypes.ShutdownChan
+	APISecret    *lotus_dtypes.APIAlg
+	ShutdownChan lotus_dtypes.ShutdownChan
 }
 
 type jwtPayload struct {

@@ -21,7 +21,9 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/api/client"
-	"github.com/filecoin-project/boost/node/repo"
+	"github.com/filecoin-project/boost/node"
+	"github.com/filecoin-project/lotus/node/repo"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 
 const (
@@ -33,18 +35,18 @@ var log = logging.Logger("cli")
 // flagsForAPI returns flags passed on the command line with the listen address
 // of the API server (only used by the tests), in the order of precedence they
 // should be applied for the requested kind of node.
-func flagsForAPI(t repo.RepoType) []string {
-	switch t {
-	case repo.Boost:
+func flagsForAPI(t lotus_repo.RepoType) []string {
+	switch t.Type() {
+	case "Boost":
 		return []string{"boost-api-url"}
 	default:
 		panic(fmt.Sprintf("Unknown repo type: %v", t))
 	}
 }
 
-func flagsForRepo(t repo.RepoType) []string {
-	switch t {
-	case repo.Boost:
+func flagsForRepo(t lotus_repo.RepoType) []string {
+	switch t.Type() {
+	case "Boost":
 		return []string{"boost-repo"}
 	default:
 		panic(fmt.Sprintf("Unknown repo type: %v", t))
@@ -56,9 +58,9 @@ func flagsForRepo(t repo.RepoType) []string {
 //
 // It returns the current variables and deprecated ones separately, so that
 // the user can log a warning when deprecated ones are found to be in use.
-func EnvsForAPIInfos(t repo.RepoType) (primary string, fallbacks []string, deprecated []string) {
-	switch t {
-	case repo.Boost:
+func EnvsForAPIInfos(t lotus_repo.RepoType) (primary string, fallbacks []string, deprecated []string) {
+	switch t.Type() {
+	case "Boost":
 		return "BOOST_API_INFO", []string{"BOOST_API_INFO"}, nil
 	default:
 		panic(fmt.Sprintf("Unknown repo type: %v", t))
@@ -73,7 +75,7 @@ func EnvsForAPIInfos(t repo.RepoType) (primary string, fallbacks []string, depre
 //  2. *_API_INFO environment variables
 //  3. deprecated *_API_INFO environment variables
 //  4. *-repo command line flags.
-func GetAPIInfo(ctx *cli.Context, t repo.RepoType) (APIInfo, error) {
+func GetAPIInfo(ctx *cli.Context, t lotus_repo.RepoType) (APIInfo, error) {
 	// Check if there was a flag passed with the listen address of the API
 	// server (only used by the tests)
 	apiFlags := flagsForAPI(t)
@@ -118,7 +120,7 @@ func GetAPIInfo(ctx *cli.Context, t repo.RepoType) (APIInfo, error) {
 			return APIInfo{}, xerrors.Errorf("could not expand home dir (%s): %w", f, err)
 		}
 
-		r, err := repo.NewFS(p)
+		r, err := lotus_repo.NewFS(p)
 		if err != nil {
 			return APIInfo{}, xerrors.Errorf("could not open repo at path: %s; %w", p, err)
 		}
@@ -178,7 +180,7 @@ func GetBoostAPI(ctx *cli.Context, opts ...GetBoostOption) (api.Boost, jsonrpc.C
 		return tn.(api.Boost), func() {}, nil
 	}
 
-	addr, headers, err := GetRawAPI(ctx, repo.Boost, "v0")
+	addr, headers, err := GetRawAPI(ctx, node.BoostRepoType{}, "v0")
 	if err != nil {
 		return nil, nil, err
 	}

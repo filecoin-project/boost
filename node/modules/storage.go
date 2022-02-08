@@ -7,15 +7,15 @@ import (
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/boost/node/modules/helpers"
-	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/lib/backupds"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/filecoin-project/lotus/node/modules/helpers"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 
-func LockedRepo(lr repo.LockedRepo) func(lc fx.Lifecycle) repo.LockedRepo {
-	return func(lc fx.Lifecycle) repo.LockedRepo {
+func LockedRepo(lr lotus_repo.LockedRepo) func(lc fx.Lifecycle) lotus_repo.LockedRepo {
+	return func(lc fx.Lifecycle) lotus_repo.LockedRepo {
 		lc.Append(fx.Hook{
 			OnStop: func(_ context.Context) error {
 				return lr.Close()
@@ -26,12 +26,12 @@ func LockedRepo(lr repo.LockedRepo) func(lc fx.Lifecycle) repo.LockedRepo {
 	}
 }
 
-func KeyStore(lr repo.LockedRepo) (types.KeyStore, error) {
+func KeyStore(lr lotus_repo.LockedRepo) (types.KeyStore, error) {
 	return lr.KeyStore()
 }
 
-func Datastore(disableLog bool) func(lc fx.Lifecycle, mctx helpers.MetricsCtx, r repo.LockedRepo) (dtypes.MetadataDS, error) {
-	return func(lc fx.Lifecycle, mctx helpers.MetricsCtx, r repo.LockedRepo) (dtypes.MetadataDS, error) {
+func Datastore(disableLog bool) func(lc fx.Lifecycle, mctx helpers.MetricsCtx, r lotus_repo.LockedRepo) (lotus_dtypes.MetadataDS, error) {
+	return func(lc fx.Lifecycle, mctx helpers.MetricsCtx, r lotus_repo.LockedRepo) (lotus_dtypes.MetadataDS, error) {
 		ctx := helpers.LifecycleCtx(mctx, lc)
 		mds, err := r.Datastore(ctx, "/metadata")
 		if err != nil {

@@ -17,15 +17,15 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/filecoin-project/boost/api"
-	"github.com/filecoin-project/boost/node/modules/lp2p"
+	lotus_lp2p "github.com/filecoin-project/lotus/node/modules/lp2p"
 )
 
 type NetAPI struct {
 	fx.In
 
-	RawHost   lp2p.RawHost
+	RawHost   lotus_lp2p.RawHost
 	Host      host.Host
-	Router    lp2p.BaseIpfsRouting
+	Router    lotus_lp2p.BaseIpfsRouting
 	ConnGater *conngater.BasicConnectionGater
 	Reporter  metrics.Reporter
 }

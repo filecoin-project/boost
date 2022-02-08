@@ -573,7 +573,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	failingServer := testutil.HttpTestUnstartedFailingServer(t)
 
 	// create a provider libp2p peer
-	mn := mocknet.New(ctx)
+	mn := mocknet.New()
 	h, err := mn.GenPeer()
 	require.NoError(t, err)
 
@@ -619,7 +619,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	// storage manager
 	fsRepo, err := repo.NewFS(dir)
 	require.NoError(t, err)
-	lr, err := fsRepo.Lock(repo.StorageMiner)
+	lr, err := fsRepo.Lock(repo.StorageMinerRepoType{})
 	require.NoError(t, err)
 	smInitF := storagemanager.New(storagemanager.Config{
 		MaxStagingDealsBytes: ph.MaxStagingDealBytes,

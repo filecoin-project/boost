@@ -6,8 +6,8 @@ import (
 
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 
 func BasicDealFilter(cfg config.DealmakingConfig, userCmd dtypes.StorageDealFilter) func(onlineOk dtypes.ConsiderOnlineStorageDealsConfigFunc,
@@ -17,7 +17,7 @@ func BasicDealFilter(cfg config.DealmakingConfig, userCmd dtypes.StorageDealFilt
 	blocklistFunc dtypes.StorageDealPieceCidBlocklistConfigFunc,
 	expectedSealTimeFunc dtypes.GetExpectedSealDurationFunc,
 	startDelay dtypes.GetMaxDealStartDelayFunc,
-	r repo.LockedRepo,
+	r lotus_repo.LockedRepo,
 ) dtypes.StorageDealFilter {
 	return func(onlineOk dtypes.ConsiderOnlineStorageDealsConfigFunc,
 		offlineOk dtypes.ConsiderOfflineStorageDealsConfigFunc,
@@ -26,7 +26,7 @@ func BasicDealFilter(cfg config.DealmakingConfig, userCmd dtypes.StorageDealFilt
 		blocklistFunc dtypes.StorageDealPieceCidBlocklistConfigFunc,
 		expectedSealTimeFunc dtypes.GetExpectedSealDurationFunc,
 		startDelay dtypes.GetMaxDealStartDelayFunc,
-		r repo.LockedRepo,
+		r lotus_repo.LockedRepo,
 	) dtypes.StorageDealFilter {
 		return func(ctx context.Context, deal types.DealParams) (bool, string, error) {
 			pr := deal.ClientDealProposal.Proposal

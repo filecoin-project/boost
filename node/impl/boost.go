@@ -7,14 +7,20 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/sealingpipeline"
-	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/dagstore"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
+
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/markets/storageadapter"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/filecoin-project/lotus/storage/sectorblocks"
+
 	"github.com/google/uuid"
+	"github.com/libp2p/go-libp2p-core/host"
 	"go.uber.org/fx"
 )
 
@@ -28,25 +34,28 @@ type BoostAPI struct {
 	//LocalStore  *stores.Local
 	//RemoteStore *stores.Remote
 
-	// Markets
+	Host     host.Host
+	DAGStore *dagstore.DAGStore
+
+	// Boost
 	StorageProvider *storagemarket.Provider
-	SectorBlocks    *sectorblocks.SectorBlocks
-	//PieceStore        dtypes.ProviderPieceStore         `optional:"true"`
-	//RetrievalProvider retrievalmarket.RetrievalProvider `optional:"true"`
-	//SectorAccessor    retrievalmarket.SectorAccessor    `optional:"true"`
-	//DataTransfer      dtypes.ProviderDataTransfer       `optional:"true"`
-	//DealPublisher     *storageadapter.DealPublisher     `optional:"true"`
-	//Host              host.Host                         `optional:"true"`
-	//DAGStore          *dagstore.DAGStore                `optional:"true"`
+
+	// Lotus Markets
+	SectorBlocks *sectorblocks.SectorBlocks
+	PieceStore   lotus_dtypes.ProviderPieceStore
+	DataTransfer lotus_dtypes.ProviderDataTransfer
+
+	RetrievalProvider retrievalmarket.RetrievalProvider
+	SectorAccessor    retrievalmarket.SectorAccessor
+	DealPublisher     *storageadapter.DealPublisher
 
 	// Sealing Pipeline API
-
 	Sps sealingpipeline.API
 	// TODO: Figure out how to start graphql server without it needing
 	// to be a dependency of another fx object
 	GraphqlServer *gql.Server
 
-	DS dtypes.MetadataDS
+	DS lotus_dtypes.MetadataDS
 }
 
 var _ api.Boost = &BoostAPI{}
