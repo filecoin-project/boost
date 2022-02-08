@@ -572,7 +572,7 @@ func (t *Libp2pTransfer) close(ctx context.Context) {
 	t.closed = true
 
 	// Cancel the read / write stream
-	t.content.Cancel(ctx) //nolint:errcheck
+	go t.content.Cancel(ctx) //nolint:errcheck
 }
 
 // eventPublished is called when an event for this transfer is emitted
