@@ -30,27 +30,32 @@ func HttpTestUnstartedFileServer(t *testing.T, dir string) *httptest.Server {
 	return svr
 }
 
+type unblockInfo struct {
+	ch        chan struct{}
+	closeOnce sync.Once
+}
+
 // BlockingHttpTestServer returns an http server that blocks for a given file until the client unblocks the serving of the file.
 type BlockingHttpTestServer struct {
 	URL string
 	svc *httptest.Server
 
 	mu      sync.Mutex
-	unblock map[string]chan struct{}
+	unblock map[string]*unblockInfo
 }
 
 func NewBlockingHttpTestServer(t *testing.T, dir string) *BlockingHttpTestServer {
 	b := &BlockingHttpTestServer{
-		unblock: make(map[string]chan struct{}),
+		unblock: make(map[string]*unblockInfo),
 	}
 
 	svc := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// wait till serving the file is unblocked
 		name := path.Clean(strings.TrimPrefix(r.URL.Path, "/"))
 		b.mu.Lock()
-		ch := b.unblock[name]
+		ubi := b.unblock[name]
 		b.mu.Unlock()
-		<-ch
+		<-ubi.ch
 
 		// serve the file
 		upath := r.URL.Path
@@ -69,15 +74,17 @@ func NewBlockingHttpTestServer(t *testing.T, dir string) *BlockingHttpTestServer
 
 func (b *BlockingHttpTestServer) AddFile(name string) {
 	b.mu.Lock()
-	b.unblock[name] = make(chan struct{})
+	b.unblock[name] = &unblockInfo{ch: make(chan struct{})}
 	b.mu.Unlock()
 }
 
 func (b *BlockingHttpTestServer) UnblockFile(name string) {
 	b.mu.Lock()
-	ch := b.unblock[name]
+	ubi := b.unblock[name]
 	b.mu.Unlock()
-	close(ch)
+	ubi.closeOnce.Do(func() {
+		close(ubi.ch)
+	})
 }
 
 func (b *BlockingHttpTestServer) Start() {
@@ -86,6 +93,16 @@ func (b *BlockingHttpTestServer) Start() {
 }
 
 func (b *BlockingHttpTestServer) Close() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, ubi := range b.unblock {
+		ub := ubi
+		ub.closeOnce.Do(func() {
+			close(ubi.ch)
+		})
+	}
+
+	b.svc.CloseClientConnections()
 	b.svc.Close()
 }
 

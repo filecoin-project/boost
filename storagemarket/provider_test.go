@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -203,6 +204,49 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 			td.assertPieceAdded(t, ctx)
 		}
 	}
+}
+
+func TestDealsRejectedForFunds(t *testing.T) {
+	ctx := context.Background()
+	// setup the provider test harness with configured publish fee per deal and a total wallet balance.
+	harness := NewHarness(t, ctx, withMinPublishFees(abi.NewTokenAmount(100)), withPublishWalletBal(1000))
+	// start the provider test harness
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	// 10 deals should get accepted and 5 deals should fail as we wont have enough funds to pay for the publishing costs.
+	nDeals := 15
+	var errg errgroup.Group
+
+	var mu sync.Mutex
+	var failedTds []*testDeal
+	var successTds []*testDeal
+
+	for i := 0; i < nDeals; i++ {
+		td := harness.newDealBuilder(t, i).withBlockingHttpServer().build()
+
+		errg.Go(func() error {
+			if err := td.executeAndSubscribeToNotifs(); err != nil {
+				// deal should be rejected only for lack of funds
+				if !strings.Contains(err.Error(), "available funds") {
+					return errors.New("did not get expected error")
+				}
+
+				mu.Lock()
+				failedTds = append(failedTds, td)
+				mu.Unlock()
+			} else {
+				mu.Lock()
+				successTds = append(successTds, td)
+				mu.Unlock()
+			}
+			return nil
+		})
+	}
+	require.NoError(t, errg.Wait())
+	// ensure 10 deals got accepted and five deals failed
+	require.Len(t, successTds, 10)
+	require.Len(t, failedTds, 5)
 }
 
 func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
@@ -460,6 +504,18 @@ func withHttpTransportOpts(opts []httptransport.Option) harnessOpt {
 func withHttpDisconnectServerAfter(afterEvery int64) harnessOpt {
 	return func(pc *providerConfig) {
 		pc.disconnectAfterEvery = afterEvery
+	}
+}
+
+func withMinPublishFees(fee abi.TokenAmount) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.minPublishFees = fee
+	}
+}
+
+func withPublishWalletBal(bal int64) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.publishWalletBal = bal
 	}
 }
 
@@ -892,6 +948,10 @@ func (td *testDeal) subscribeToNotifs() error {
 }
 
 func (td *testDeal) waitForError(errContains string) error {
+	if td.sub == nil {
+		return errors.New("no subcription for deal")
+	}
+
 	for i := range td.sub.Out() {
 		st := i.(types.ProviderDealState)
 		if len(st.Err) != 0 {
@@ -907,6 +967,10 @@ func (td *testDeal) waitForError(errContains string) error {
 }
 
 func (td *testDeal) waitForCheckpoint(cp dealcheckpoints.Checkpoint) error {
+	if td.sub == nil {
+		return errors.New("no subcription for deal")
+	}
+
 LOOP:
 	for i := range td.sub.Out() {
 		st := i.(types.ProviderDealState)
