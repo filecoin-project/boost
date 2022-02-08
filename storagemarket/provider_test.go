@@ -244,11 +244,9 @@ func TestDealsRejectedForFunds(t *testing.T) {
 		})
 	}
 	require.NoError(t, errg.Wait())
-	mu.Lock()
 	// ensure 10 deals got accepted and five deals failed
 	require.Len(t, successTds, 10)
 	require.Len(t, failedTds, 5)
-	mu.Unlock()
 }
 
 func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
