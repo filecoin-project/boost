@@ -98,6 +98,25 @@ func (mb *MinerStubBuilder) SetupAllBlocking() *MinerStubBuilder {
 	return mb.SetupPublish(true).SetupPublishConfirm(true).SetupAddPiece(true)
 }
 
+func (mb *MinerStubBuilder) SetupNoOp() *MinerStubBuilder {
+	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.DealUUID), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(_ context.Context, _ uuid.UUID, _ market2.ClientDealProposal) (cid.Cid, error) {
+		return mb.publishCid, nil
+	}).AnyTimes()
+
+	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+		return &storagemarket.PublishDealsWaitResult{
+			DealID:   mb.dealId,
+			FinalCid: mb.finalPublishCid,
+		}, nil
+	}).AnyTimes()
+
+	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+		return mb.sectorId, mb.offset, nil
+	}).AnyTimes()
+
+	return mb
+}
+
 func (mb *MinerStubBuilder) SetupPublish(blocking bool) *MinerStubBuilder {
 	mb.stub.lk.Lock()
 	if blocking {

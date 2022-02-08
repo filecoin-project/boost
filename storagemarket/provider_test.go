@@ -223,7 +223,7 @@ func TestDealsRejectedForFunds(t *testing.T) {
 	var successTds []*testDeal
 
 	for i := 0; i < nDeals; i++ {
-		td := harness.newDealBuilder(t, i).withBlockingHttpServer().build()
+		td := harness.newDealBuilder(t, i).withNoOpMinerStub().withBlockingHttpServer().build()
 
 		errg.Go(func() error {
 			if err := td.executeAndSubscribeToNotifs(); err != nil {
@@ -247,6 +247,7 @@ func TestDealsRejectedForFunds(t *testing.T) {
 	// ensure 10 deals got accepted and five deals failed
 	require.Len(t, successTds, 10)
 	require.Len(t, failedTds, 5)
+
 }
 
 func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
@@ -678,10 +679,10 @@ func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
 }
 
 func (h *ProviderHarness) Stop() {
-	h.GoMockCtrl.Finish()
 	h.NormalServer.Close()
 	h.BlockingServer.Close()
 	h.DisconnectingServer.Close()
+	h.GoMockCtrl.Finish()
 }
 
 type dealProposalConfig struct {
@@ -784,6 +785,7 @@ type testDealBuilder struct {
 	ph *ProviderHarness
 
 	ms               *smtestutil.MinerStubBuilder
+	msNoOp           bool
 	msPublish        *minerStubCall
 	msPublishConfirm *minerStubCall
 	msAddPiece       *minerStubCall
@@ -855,6 +857,11 @@ func (tbuilder *testDealBuilder) withBlockingHttpServer() *testDealBuilder {
 	return tbuilder
 }
 
+func (tbuilder *testDealBuilder) withNoOpMinerStub() *testDealBuilder {
+	tbuilder.msNoOp = true
+	return tbuilder
+}
+
 func (tbuilder *testDealBuilder) withDisconnectingHttpServer() *testDealBuilder {
 	tbuilder.setTransferParams(tbuilder.ph.DisconnectingServer.URL)
 	return tbuilder
@@ -875,15 +882,32 @@ func (tbuilder *testDealBuilder) setTransferParams(serverURL string) {
 }
 
 func (tbuilder *testDealBuilder) build() *testDeal {
-	if tbuilder.msPublish != nil {
+	// if the miner stub is supposed to be a no-op, setup a no-op and don't build any other stub behaviour
+	if tbuilder.msNoOp {
+		tbuilder.ms.SetupNoOp()
+	} else {
+		tbuilder.buildPublish().buildPublishConfirm().buildAddPiece()
+	}
 
+	testDeal := tbuilder.td
+
+	testDeal.stubOutput = tbuilder.ms.Output()
+	testDeal.tBuilder = tbuilder
+	return testDeal
+}
+
+func (tbuilder *testDealBuilder) buildPublish() *testDealBuilder {
+	if tbuilder.msPublish != nil {
 		if err := tbuilder.msPublish.err; err != nil {
 			tbuilder.ms.SetupPublishFailure(err)
 		} else {
 			tbuilder.ms.SetupPublish(tbuilder.msPublish.blocking)
 		}
 	}
+	return tbuilder
+}
 
+func (tbuilder *testDealBuilder) buildPublishConfirm() *testDealBuilder {
 	if tbuilder.msPublishConfirm != nil {
 		if err := tbuilder.msPublishConfirm.err; err != nil {
 			tbuilder.ms.SetupPublishConfirmFailure(err)
@@ -892,6 +916,10 @@ func (tbuilder *testDealBuilder) build() *testDeal {
 		}
 	}
 
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) buildAddPiece() *testDealBuilder {
 	if tbuilder.msAddPiece != nil {
 		if err := tbuilder.msAddPiece.err; err != nil {
 			tbuilder.ms.SetupAddPieceFailure(err)
@@ -900,9 +928,7 @@ func (tbuilder *testDealBuilder) build() *testDeal {
 		}
 	}
 
-	tbuilder.td.stubOutput = tbuilder.ms.Output()
-	tbuilder.td.tBuilder = tbuilder
-	return tbuilder.td
+	return tbuilder
 }
 
 type testDeal struct {
