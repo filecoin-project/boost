@@ -71,7 +71,7 @@ func newServerTest(t *testing.T, size int) *serverTest {
 	dserv := merkledag.NewDAGService(bserv)
 	source := bytes.NewBuffer(data)
 
-	nd, err := dagImport(dserv, source)
+	nd, err := DagImport(dserv, source)
 	require.NoError(t, err)
 
 	var buff bytes.Buffer
@@ -498,7 +498,7 @@ func newLibp2pHttpServer(st *serverTest) (func() types.HttpRequest, func(), host
 
 var defaultHashFunction = uint64(multihash.SHA2_256)
 
-func dagImport(dserv format.DAGService, fi io.Reader) (format.Node, error) {
+func DagImport(dserv format.DAGService, fi io.Reader) (format.Node, error) {
 	prefix, err := merkledag.PrefixForCidVersion(1)
 	if err != nil {
 		return nil, err
