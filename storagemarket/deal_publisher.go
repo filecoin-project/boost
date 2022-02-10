@@ -24,7 +24,11 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/types"
+
+	logging "github.com/ipfs/go-log/v2"
 )
+
+var dealPublisherLogger = logging.Logger("boost-deal-publisher")
 
 type dealPublisherAPI interface {
 	ChainHead(context.Context) (*types.TipSet, error)
@@ -174,7 +178,7 @@ func (p *DealPublisher) ForcePublishPendingDeals() {
 	p.lk.Lock()
 	defer p.lk.Unlock()
 
-	log.Infof("force publishing deals")
+	dealPublisherLogger.Info("force publishing deals")
 	p.publishAllDeals()
 }
 
@@ -213,13 +217,13 @@ func (p *DealPublisher) processNewDeal(pdeal *pendingDeal) {
 
 	// Add the new deal to the queue
 	p.pending = append(p.pending, pdeal)
-	log.Infof("add deal with piece CID %s to publish deals queue - %d deals in queue (max queue size %d)",
+	dealPublisherLogger.Infof("add deal with piece CID %s to publish deals queue - %d deals in queue (max queue size %d)",
 		pdeal.deal.Proposal.PieceCID, len(p.pending), p.maxDealsPerPublishMsg)
 
 	// If the maximum number of deals per message has been reached or we're not batching, send a
 	// publish message
 	if uint64(len(p.pending)) >= p.maxDealsPerPublishMsg || p.publishPeriod == 0 {
-		log.Infof("publish deals queue has reached max size of %d, publishing deals", p.maxDealsPerPublishMsg)
+		dealPublisherLogger.Infof("publish deals queue has reached max size of %d, publishing deals", p.maxDealsPerPublishMsg)
 		p.publishAllDeals()
 		return
 	}
@@ -232,13 +236,13 @@ func (p *DealPublisher) waitForMoreDeals() {
 	// Check if we're already waiting for deals
 	if !p.publishPeriodStart.IsZero() {
 		elapsed := build.Clock.Since(p.publishPeriodStart)
-		log.Infof("%s elapsed of / %s until publish deals queue is published",
+		dealPublisherLogger.Infof("%s elapsed of / %s until publish deals queue is published",
 			elapsed, p.publishPeriod)
 		return
 	}
 
 	// Set a timeout to wait for more deals to arrive
-	log.Infof("waiting publish deals queue period of %s before publishing", p.publishPeriod)
+	dealPublisherLogger.Infof("waiting publish deals queue period of %s before publishing", p.publishPeriod)
 	ctx, cancel := context.WithCancel(p.ctx)
 
 	// Create the timer _before_ taking the current time so publishPeriod+timeout is always >=
@@ -257,7 +261,7 @@ func (p *DealPublisher) waitForMoreDeals() {
 			defer p.lk.Unlock()
 
 			// The timeout has expired so publish all pending deals
-			log.Infof("publish deals queue period of %s has expired, publishing deals", p.publishPeriod)
+			dealPublisherLogger.Infof("publish deals queue period of %s has expired, publishing deals", p.publishPeriod)
 			p.publishAllDeals()
 		}
 	}()
@@ -366,7 +370,7 @@ func (p *DealPublisher) validateDeal(deal market2.ClientDealProposal) error {
 	}
 
 	took := time.Since(start)
-	log.Infow("validating deal", "took", took, "proposal", pcid)
+	dealPublisherLogger.Infow("validating deal", "took", took, "proposal", pcid)
 
 	return nil
 }
@@ -377,7 +381,7 @@ func (p *DealPublisher) publishDealProposals(deals []market2.ClientDealProposal)
 		return cid.Undef, nil
 	}
 
-	log.Infof("publishing %d deals in publish deals queue with piece CIDs: %s", len(deals), pieceCids(deals))
+	dealPublisherLogger.Infof("publishing %d deals in publish deals queue with piece CIDs: %s", len(deals), pieceCids(deals))
 
 	provider := deals[0].Proposal.Provider
 	for _, dl := range deals {
