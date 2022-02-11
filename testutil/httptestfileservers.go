@@ -26,7 +26,6 @@ func HttpTestFileServer(t *testing.T, dir string) (*httptest.Server, error) {
 func HttpTestUnstartedFailingServer(t *testing.T) *httptest.Server {
 	svr := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(401)
-		return
 	}))
 	return svr
 }
