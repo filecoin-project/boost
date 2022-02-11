@@ -60,7 +60,9 @@ type DealList {
 type DealLog {
   DealUUID: ID!
   CreatedAt: Time!
-  Text: String!
+  LogLevel: String!
+  LogMsg: String!
+  LogParams: String!
 }
 
 type Storage {
