@@ -573,7 +573,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	failingServer := testutil.HttpTestUnstartedFailingServer(t)
 
 	// create a provider libp2p peer
-	mn := mocknet.New(ctx)
+	mn := mocknet.New()
 	h, err := mn.GenPeer()
 	require.NoError(t, err)
 
