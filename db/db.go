@@ -50,7 +50,7 @@ func createTables(ctx context.Context, db *sql.DB, file string) error {
 	}
 	_, err = db.ExecContext(ctx, string(createScript))
 	if err != nil {
-		fmt.Errorf("failed to create DB: %w", err)
+		return fmt.Errorf("failed to create DB: %w", err)
 	}
 
 	return nil
