@@ -22,6 +22,11 @@ func main() {
 	_ = logging.SetLogLevel("gql", "INFO")
 	_ = logging.SetLogLevel("boost-provider", "INFO")
 	_ = logging.SetLogLevel("storagemanager", "INFO")
+	_ = logging.SetLogLevel("boost-storage-deal", "INFO")
+	_ = logging.SetLogLevel("boost-provider", "INFO")
+	_ = logging.SetLogLevel("http-transport", "INFO")
+	_ = logging.SetLogLevel("libp2p-server", "INFO")
+	_ = logging.SetLogLevel("boost-deal-publisher", "INFO")
 
 	app := &cli.App{
 		Name:                 "boost",
