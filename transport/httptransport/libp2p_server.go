@@ -65,8 +65,8 @@ func (s *Libp2pCarServer) ID() peer.ID {
 func (s *Libp2pCarServer) Start(ctx context.Context) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
-	// Start up the transfers manager
-	go s.transfersMgr.run(s.ctx)
+	// Start up the transfers manager (asynchronous)
+	s.transfersMgr.start(s.ctx)
 
 	// Listen on HTTP over libp2p
 	listener, err := gostream.Listen(s.h, types.DataTransferProtocol)
@@ -356,11 +356,15 @@ func (m *transfersMgr) enqueueAction(evt *xferAction) error {
 	}
 }
 
+func (m *transfersMgr) start(ctx context.Context) {
+	m.ctx = ctx
+
+	go m.run(ctx)
+}
+
 // run processes actions on the queue until the context is cancelled
 func (m *transfersMgr) run(ctx context.Context) {
 	defer close(m.done)
-
-	m.ctx = ctx
 
 	processAction := func(action *xferAction) {
 		xfer := action.xfer
