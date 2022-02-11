@@ -337,7 +337,9 @@ var BoostNode = Options(
 
 	Override(new(dtypes.NetworkName), modules.StorageNetworkName),
 	Override(new(*sql.DB), modules.NewBoostDB),
+	Override(new(*modules.LogSqlDB), modules.NewLogsDB),
 	Override(new(*db.DealsDB), modules.NewDealsDB),
+	Override(new(*db.LogsDB), modules.NewLogsDB),
 )
 
 func ConfigBoost(c interface{}) Option {

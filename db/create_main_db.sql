@@ -1,9 +1,3 @@
-CREATE TABLE IF NOT EXISTS DealLogs (
-    DealUUID TEXT,
-    CreatedAt DateTime,
-    LogText TEXT
-);
-
 CREATE TABLE IF NOT EXISTS Deals (
     ID TEXT,
     CreatedAt DateTime,
@@ -47,6 +41,14 @@ CREATE TABLE IF NOT EXISTS FundsTagged (
     CreatedAt DateTime,
     Collateral TEXT,
     PubMsg TEXT
+);
+
+CREATE TABLE IF NOT EXISTS DealLogs (
+    DealUUID TEXT,
+    CreatedAt DateTime,
+    LogLevel TEXT,
+    LogMsg TEXT,
+    LogParams TEXT
 );
 
 CREATE TABLE IF NOT EXISTS StorageLogs (

@@ -90,8 +90,9 @@ type Provider struct {
 	df dtypes.StorageDealFilter
 
 	// Database API
-	db      *sql.DB
-	dealsDB *db.DealsDB
+	db        *sql.DB
+	dealsDB   *db.DealsDB
+	logsSqlDB *sql.DB
 
 	Transport      transport.Transport
 	fundManager    *fundmanager.FundManager
@@ -111,7 +112,8 @@ type Provider struct {
 	dealLogger *logs.DealLogger
 }
 
-func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, httpOpts ...httptransport.Option) (*Provider, error) {
+func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
+	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB, httpOpts ...httptransport.Option) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -126,8 +128,10 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 	if err != nil {
 		return nil, err
 	}
-
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Provider{
+		ctx:    ctx,
+		cancel: cancel,
 		// TODO Make this configurable
 		config:    Config{MaxTransferDuration: 24 * 3600 * time.Second},
 		Address:   addr,
@@ -135,6 +139,7 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		fs:        fs,
 		db:        sqldb,
 		dealsDB:   dealsDB,
+		logsSqlDB: logsSqlDB,
 		sps:       sps,
 		df:        df,
 
@@ -154,6 +159,8 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		transfers:                   newDealTransfers(),
 
 		dhs: make(map[uuid.UUID]*dealHandler),
+
+		dealLogger: logs.NewDealLogger(ctx, logsDB),
 	}, nil
 }
 
@@ -291,22 +298,19 @@ func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) *dealHandler {
 	return dh
 }
 
-func (p *Provider) Start(ctx context.Context) error {
-	p.dealLogger = logs.NewDealLogger(ctx, p.dealsDB)
+func (p *Provider) Start() error {
 
 	log.Infow("storage provider: starting")
 
-	p.ctx, p.cancel = context.WithCancel(ctx)
-
 	// initialize the database
-	err := db.CreateTables(p.ctx, p.db)
+	err := db.CreateAllBoostTables(p.ctx, p.db, p.logsSqlDB)
 	if err != nil {
 		return fmt.Errorf("failed to init db: %w", err)
 	}
 	log.Infow("db initialized")
 
 	// restart all active deals
-	pds, err := p.dealsDB.ListActive(ctx)
+	pds, err := p.dealsDB.ListActive(p.ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list active deals: %w", err)
 	}

@@ -623,7 +623,8 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		return true, "", nil
 	}
 
-	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, minerStub, address.Undef, minerStub, sps, minerStub, df, pc.httpOpts...)
+	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, minerStub, address.Undef, minerStub, sps, minerStub, df, sqldb,
+		db.NewLogsDB(sqldb), pc.httpOpts...)
 	require.NoError(t, err)
 	prov.testMode = true
 	ph.Provider = prov
@@ -665,7 +666,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, ctx context
 	// construct a new provider with pre-existing state
 	prov, err := NewProvider("", h.Host, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, address.Undef, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
-		df, pc.httpOpts...)
+		df, h.Provider.logsSqlDB, db.NewLogsDB(h.Provider.logsSqlDB), pc.httpOpts...)
 
 	require.NoError(t, err)
 	h.Provider = prov
@@ -675,7 +676,7 @@ func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
 	h.NormalServer.Start()
 	h.BlockingServer.Start()
 	h.DisconnectingServer.Start()
-	require.NoError(t, h.Provider.Start(ctx))
+	require.NoError(t, h.Provider.Start())
 }
 
 func (h *ProviderHarness) Stop() {
