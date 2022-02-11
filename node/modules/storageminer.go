@@ -542,8 +542,8 @@ func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
 	return db.NewDealsDB(sqldb)
 }
 
-func NewLogsDB(lsd *LogSqlDB) *db.LogsDB {
-	return db.NewLogsDB(lsd.db)
+func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
+	return db.NewLogsDB(logsSqlDB.db)
 }
 
 func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode,
@@ -552,7 +552,9 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB) (*storagemarket.Provider, error) {
-		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, sps, storagemarket.NewChainDealManager(a), df, logsSqlDB, logsDB)
+
+		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
+			sps, storagemarket.NewChainDealManager(a), df, logsSqlDB, logsDB)
 		lp2pnet := lp2pimpl.NewDealProvider(h, prov)
 
 		if err != nil {
