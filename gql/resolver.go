@@ -418,6 +418,18 @@ func (lr *logsResolver) CreatedAt() graphql.Time {
 	return graphql.Time{Time: lr.DealLog.CreatedAt}
 }
 
+func (lr *logsResolver) LogLevel() graphql.NullString {
+	return graphql.NullString{Value: &lr.DealLog.LogLevel}
+}
+
+func (lr *logsResolver) LogMsg() graphql.NullString {
+	return graphql.NullString{Value: &lr.DealLog.LogMsg}
+}
+
+func (lr *logsResolver) LogParams() graphql.NullString {
+	return graphql.NullString{Value: &lr.DealLog.LogParams}
+}
+
 func toUuid(id graphql.ID) (uuid.UUID, error) {
 	var dealUuid uuid.UUID
 	err := dealUuid.UnmarshalText([]byte(id))
