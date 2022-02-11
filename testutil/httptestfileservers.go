@@ -23,6 +23,13 @@ func HttpTestFileServer(t *testing.T, dir string) (*httptest.Server, error) {
 	return svr, nil
 }
 
+func HttpTestUnstartedFailingServer(t *testing.T) *httptest.Server {
+	svr := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(401)
+	}))
+	return svr
+}
+
 // HttpTestUnstartedFileServer returns a http server that serves files from the given directory
 func HttpTestUnstartedFileServer(t *testing.T, dir string) *httptest.Server {
 	handler := http.FileServer(http.Dir(dir))
