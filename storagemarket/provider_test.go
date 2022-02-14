@@ -685,7 +685,7 @@ func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
 	h.BlockingServer.Start()
 	h.DisconnectingServer.Start()
 	h.FailingServer.Start()
-	require.NoError(t, h.Provider.Start(ctx))
+	require.NoError(t, h.Provider.Start())
 }
 
 func (h *ProviderHarness) Stop() {
