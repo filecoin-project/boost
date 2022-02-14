@@ -14,6 +14,7 @@ type DealLog struct {
 	LogLevel  string
 	LogMsg    string
 	LogParams string
+	Subsystem string
 }
 
 type LogsDB struct {
@@ -25,15 +26,15 @@ func NewLogsDB(db *sql.DB) *LogsDB {
 }
 
 func (d *LogsDB) InsertLog(ctx context.Context, l *DealLog) error {
-	qry := "INSERT INTO DealLogs (DealUUID, CreatedAt, LogLevel, LogMsg, LogParams) "
-	qry += "VALUES (?, ?, ?, ?, ?)"
-	values := []interface{}{l.DealUUID, l.CreatedAt, l.LogLevel, l.LogMsg, l.LogParams}
+	qry := "INSERT INTO DealLogs (DealUUID, CreatedAt, LogLevel, LogMsg, LogParams, Subsystem) "
+	qry += "VALUES (?, ?, ?, ?, ?, ?)"
+	values := []interface{}{l.DealUUID.String(), l.CreatedAt, l.LogLevel, l.LogMsg, l.LogParams, l.Subsystem}
 	_, err := d.db.ExecContext(ctx, qry, values...)
 	return err
 }
 
 func (d *LogsDB) Logs(ctx context.Context, dealID uuid.UUID) ([]DealLog, error) {
-	qry := "SELECT DealUUID, CreatedAt, LogLevel, LogMsg, LogParams FROM DealLogs WHERE DealUUID=?"
+	qry := "SELECT DealUUID, CreatedAt, LogLevel, LogMsg, LogParams, Subsystem FROM DealLogs WHERE DealUUID=?"
 	rows, err := d.db.QueryContext(ctx, qry, dealID)
 	if err != nil {
 		return nil, err
@@ -48,7 +49,8 @@ func (d *LogsDB) Logs(ctx context.Context, dealID uuid.UUID) ([]DealLog, error) 
 			&dealLog.CreatedAt,
 			&dealLog.LogLevel,
 			&dealLog.LogMsg,
-			&dealLog.LogParams)
+			&dealLog.LogParams,
+			&dealLog.Subsystem)
 
 		if err != nil {
 			return nil, err

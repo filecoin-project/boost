@@ -129,7 +129,7 @@ func (p *Provider) loop() {
 			go func() {
 				defer p.wg.Done()
 				p.doDeal(deal, dealReq.dh)
-				p.dealLogger.Infow(deal.DealUuid, "deal sent for execution")
+				p.dealLogger.Infow(deal.DealUuid, "deal go-routine finished execution")
 			}()
 
 			dealReq.rsp <- acceptDealResp{&api.ProviderDealRejectionInfo{Accepted: true}, nil}

@@ -430,6 +430,10 @@ func (lr *logsResolver) LogParams() string {
 	return lr.DealLog.LogParams
 }
 
+func (lr *logsResolver) Subsystem() string {
+	return lr.DealLog.Subsystem
+}
+
 func toUuid(id graphql.ID) (uuid.UUID, error) {
 	var dealUuid uuid.UUID
 	err := dealUuid.UnmarshalText([]byte(id))

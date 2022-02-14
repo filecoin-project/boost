@@ -3,5 +3,6 @@ CREATE TABLE IF NOT EXISTS DealLogs (
     CreatedAt DateTime,
     LogLevel TEXT,
     LogMsg TEXT,
-    LogParams TEXT
+    LogParams TEXT,
+    Subsystem TEXT
 );
