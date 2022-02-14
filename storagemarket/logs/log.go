@@ -39,20 +39,20 @@ func (d *DealLogger) Infow(dealId uuid.UUID, msg string, kvs ...interface{}) {
 	kvs = paramsWithDealID(dealId, kvs...)
 
 	d.logger.Infow(msg, kvs...)
-	d.updateLogDB(dealId, msg, "INFO", kvs)
+	d.updateLogDB(dealId, msg, "INFO", kvs...)
 }
 
 func (d *DealLogger) Warnw(dealId uuid.UUID, msg string, kvs ...interface{}) {
 	kvs = paramsWithDealID(dealId, kvs...)
 	d.logger.Warnw(msg, kvs...)
-	d.updateLogDB(dealId, msg, "WARN", kvs)
+	d.updateLogDB(dealId, msg, "WARN", kvs...)
 }
 
 func (d *DealLogger) Errorw(dealId uuid.UUID, errMsg string, kvs ...interface{}) {
 	kvs = paramsWithDealID(dealId, kvs...)
 
 	d.logger.Errorw(errMsg, kvs...)
-	d.updateLogDB(dealId, errMsg, "ERROR", kvs)
+	d.updateLogDB(dealId, errMsg, "ERROR", kvs...)
 }
 
 func (d *DealLogger) LogError(dealId uuid.UUID, errMsg string, err error) {
