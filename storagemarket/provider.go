@@ -93,6 +93,7 @@ type Provider struct {
 	db        *sql.DB
 	dealsDB   *db.DealsDB
 	logsSqlDB *sql.DB
+	logsDB    *db.LogsDB
 
 	Transport      transport.Transport
 	fundManager    *fundmanager.FundManager
@@ -129,6 +130,8 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	dl := logs.NewDealLogger(ctx, logsDB)
+
 	return &Provider{
 		ctx:    ctx,
 		cancel: cancel,
@@ -147,7 +150,7 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		finishedDealChan:  make(chan finishedDealReq),
 		publishedDealChan: make(chan publishDealReq),
 
-		Transport:      httptransport.New(h, httpOpts...),
+		Transport:      httptransport.New(h, dl, httpOpts...),
 		fundManager:    fundMgr,
 		storageManager: storageMgr,
 
@@ -158,9 +161,9 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		maxDealCollateralMultiplier: 2,
 		transfers:                   newDealTransfers(),
 
-		dhs: make(map[uuid.UUID]*dealHandler),
-
-		dealLogger: logs.NewDealLogger(ctx, logsDB),
+		dhs:        make(map[uuid.UUID]*dealHandler),
+		dealLogger: dl,
+		logsDB:     logsDB,
 	}, nil
 }
 

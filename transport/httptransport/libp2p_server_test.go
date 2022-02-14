@@ -54,7 +54,7 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 	// Perform retrieval with the auth token
 	req := newLibp2pHttpRequest(srvHost, authToken)
 	of := getTempFilePath(t)
-	th := executeTransfer(t, ctx, New(clientHost), carSize, req, of)
+	th := executeTransfer(t, ctx, New(clientHost, newDealLogger(t, ctx)), carSize, req, of)
 	require.NotNil(t, th)
 
 	// Wait for the transfer to complete
@@ -78,7 +78,7 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 
 	// Attempt a second retrieval - it should fail with a 401 HTTP error
 	of2 := getTempFilePath(t)
-	th2 := executeTransfer(t, ctx, New(clientHost), carSize, req, of2)
+	th2 := executeTransfer(t, ctx, New(clientHost, newDealLogger(t, ctx)), carSize, req, of2)
 	require.NotNil(t, th2)
 
 	evts2 := waitForTransferComplete(th2)
@@ -130,7 +130,7 @@ func TestLibp2pCarServerResume(t *testing.T) {
 
 		// Perform retrieval with the auth token
 		req := newLibp2pHttpRequest(srvHost, authToken)
-		th := executeTransfer(t, ctx, New(clientHost), carSize, req, of)
+		th := executeTransfer(t, ctx, New(clientHost, newDealLogger(t, ctx)), carSize, req, of)
 		require.NotNil(t, th)
 
 		// Wait for some data to be received by the client
@@ -187,7 +187,7 @@ func TestLibp2pCarServerResume(t *testing.T) {
 
 	// Now retrieve all bytes
 	req := newLibp2pHttpRequest(srvHost, authToken)
-	th := executeTransfer(t, ctx, New(clientHost), carSize, req, outFile)
+	th := executeTransfer(t, ctx, New(clientHost, newDealLogger(t, ctx)), carSize, req, outFile)
 	require.NotNil(t, th)
 
 	// Wait for the transfer to complete
@@ -248,7 +248,7 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	req := newLibp2pHttpRequest(srvHost, authToken)
 	of := getTempFilePath(t)
 	noRetry := BackOffRetryOpt(0, 0, 1, 1)
-	th := executeTransfer(t, ctx, New(clientHost, noRetry), carSize, req, of)
+	th := executeTransfer(t, ctx, New(clientHost, newDealLogger(t, ctx), noRetry), carSize, req, of)
 	require.NotNil(t, th)
 
 	// Wait for some data to be received by the client
@@ -319,7 +319,7 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	req1 := newLibp2pHttpRequest(srvHost, authToken)
 	of1 := getTempFilePath(t)
 	noRetry := BackOffRetryOpt(0, 0, 1, 1)
-	th1 := executeTransfer(t, ctx, New(clientHost, noRetry), carSize, req1, of1)
+	th1 := executeTransfer(t, ctx, New(clientHost, newDealLogger(t, ctx), noRetry), carSize, req1, of1)
 	require.NotNil(t, th1)
 
 	// Wait for some data to be received by the client
@@ -331,7 +331,7 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	// Start a new transfer with the same auth token
 	req2 := newLibp2pHttpRequest(srvHost, authToken)
 	of2 := getTempFilePath(t)
-	th2 := executeTransfer(t, ctx, New(clientHost, noRetry), carSize, req2, of2)
+	th2 := executeTransfer(t, ctx, New(clientHost, newDealLogger(t, ctx), noRetry), carSize, req2, of2)
 	require.NotNil(t, th2)
 
 	// Expect an error for the first transfer on the client side

@@ -86,6 +86,11 @@ func TestSimpleDealHappy(t *testing.T) {
 	td.unblockAddPiece()
 	td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
 	harness.EventuallyAssertNoTagged(t, ctx)
+
+	// assert logs
+	lgs, err := harness.Provider.logsDB.Logs(ctx, td.params.DealUUID)
+	require.NoError(t, err)
+	require.NotEmpty(t, lgs)
 }
 
 func TestMultipleDealsConcurrent(t *testing.T) {
@@ -666,7 +671,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, ctx context
 	// construct a new provider with pre-existing state
 	prov, err := NewProvider("", h.Host, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, address.Undef, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
-		df, h.Provider.logsSqlDB, db.NewLogsDB(h.Provider.logsSqlDB), pc.httpOpts...)
+		df, h.Provider.logsSqlDB, h.Provider.logsDB, pc.httpOpts...)
 
 	require.NoError(t, err)
 	h.Provider = prov

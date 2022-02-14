@@ -18,6 +18,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/storagemarket/logs"
+
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/google/uuid"
@@ -52,6 +55,12 @@ type serverTest struct {
 	bs       bstore.Blockstore
 	root     format.Node
 	carBytes []byte
+}
+
+func newDealLogger(t *testing.T, ctx context.Context) *logs.DealLogger {
+	tmp, err := db.CreateTmpDB(ctx)
+	require.NoError(t, err)
+	return logs.NewDealLogger(ctx, db.NewLogsDB(tmp))
 }
 
 func newServerTest(t *testing.T, size int) *serverTest {
@@ -91,7 +100,7 @@ func TestSimpleTransfer(t *testing.T) {
 			reqFn, closer, h := init(t)
 			defer closer()
 			of := getTempFilePath(t)
-			th := executeTransfer(t, ctx, New(h), carSize, reqFn(), of)
+			th := executeTransfer(t, ctx, New(h, newDealLogger(t, ctx)), carSize, reqFn(), of)
 			require.NotNil(t, th)
 
 			evts := waitForTransferComplete(th)
@@ -116,7 +125,7 @@ func TestTransportRespectsContext(t *testing.T) {
 			reqFn, _, h := init(t)
 
 			of := getTempFilePath(t)
-			th := executeTransfer(t, ctx, New(h), 100, reqFn(), of)
+			th := executeTransfer(t, ctx, New(h, newDealLogger(t, ctx)), 100, reqFn(), of)
 			require.NotNil(t, th)
 
 			evts := waitForTransferComplete(th)
@@ -148,7 +157,7 @@ func TestConcurrentTransfers(t *testing.T) {
 			for i := 0; i < 10; i++ {
 				errG.Go(func() error {
 					of := getTempFilePath(t)
-					th := executeTransfer(t, ctx, New(h), size, reqFn(), of)
+					th := executeTransfer(t, ctx, New(h, newDealLogger(t, ctx)), size, reqFn(), of)
 
 					evts := waitForTransferComplete(th)
 					if len(evts) == 0 {
@@ -221,7 +230,7 @@ func TestCompletionOnMultipleAttemptsWithSameFile(t *testing.T) {
 			for i := 1; ; i++ {
 				url, closer, h := s.init(t, i)
 
-				th := executeTransfer(t, ctx, New(h), size, url, of)
+				th := executeTransfer(t, ctx, New(h, newDealLogger(t, ctx)), size, url, of)
 				require.NotNil(t, th)
 
 				evts := waitForTransferComplete(th)
@@ -247,6 +256,7 @@ func TestCompletionOnMultipleAttemptsWithSameFile(t *testing.T) {
 }
 
 func TestTransferCancellation(t *testing.T) {
+	ctx := context.Background()
 	// start server with data to send
 	size := (100 * readBufferSize) + 30
 
@@ -261,7 +271,7 @@ func TestTransferCancellation(t *testing.T) {
 			reqFn, closer, h := s(t)
 			defer closer()
 			of := getTempFilePath(t)
-			th := executeTransfer(t, context.Background(), New(h), size, reqFn(), of)
+			th := executeTransfer(t, ctx, New(h, newDealLogger(t, ctx)), size, reqFn(), of)
 			require.NotNil(t, th)
 			// close the transfer so context is cancelled
 			th.Close()
@@ -288,6 +298,7 @@ func GetConn(r *http.Request) net.Conn {
 }
 
 func TestTransferResumption(t *testing.T) {
+	ctx := context.Background()
 	// start server with data to send
 	size := (100 * readBufferSize) + 30
 	str := strings.Repeat("a", size)
@@ -316,9 +327,9 @@ func TestTransferResumption(t *testing.T) {
 	svr.Start()
 	defer svr.Close()
 
-	ht := New(nil, BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000))
+	ht := New(nil, newDealLogger(t, ctx), BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000))
 	of := getTempFilePath(t)
-	th := executeTransfer(t, context.Background(), ht, size, types.HttpRequest{URL: svr.URL}, of)
+	th := executeTransfer(t, ctx, ht, size, types.HttpRequest{URL: svr.URL}, of)
 	require.NotNil(t, th)
 
 	evts := waitForTransferComplete(th)
@@ -332,6 +343,7 @@ func TestTransferResumption(t *testing.T) {
 }
 
 func TestLibp2pTransferResumption(t *testing.T) {
+	ctx := context.Background()
 	// start server with data to send
 	size := (100 * readBufferSize) + 30
 	str := strings.Repeat("a", size)
@@ -359,7 +371,7 @@ func TestLibp2pTransferResumption(t *testing.T) {
 
 	defer svr.Close()
 
-	ht := New(svr.clientHost, BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000))
+	ht := New(svr.clientHost, newDealLogger(t, ctx), BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000))
 	of := getTempFilePath(t)
 	th := executeTransfer(t, context.Background(), ht, size, svr.Req, of)
 	require.NotNil(t, th)
