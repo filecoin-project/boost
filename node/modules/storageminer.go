@@ -525,13 +525,36 @@ func NewBoostDB(r repo.LockedRepo) (*sql.DB, error) {
 	return db.SqlDB(dbPath)
 }
 
+type LogSqlDB struct {
+	db *sql.DB
+}
+
+func NewLogsSqlDB(r repo.LockedRepo) (*LogSqlDB, error) {
+	dbPath := path.Join(r.Path(), "boost.logs.db")
+	d, err := db.SqlDB(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	return &LogSqlDB{d}, nil
+}
+
 func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
 	return db.NewDealsDB(sqldb)
 }
 
-func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter) (*storagemarket.Provider, error) {
-	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter) (*storagemarket.Provider, error) {
-		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, sps, storagemarket.NewChainDealManager(a), df)
+func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
+	return db.NewLogsDB(logsSqlDB.db)
+}
+
+func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode,
+	sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
+	dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB) (*storagemarket.Provider, error) {
+	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
+		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API,
+		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB) (*storagemarket.Provider, error) {
+
+		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
+			sps, storagemarket.NewChainDealManager(a), df, logsSqlDB.db, logsDB)
 		lp2pnet := lp2pimpl.NewDealProvider(h, prov)
 
 		if err != nil {
@@ -540,7 +563,7 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				err := prov.Start(ctx)
+				err := prov.Start()
 				if err != nil {
 					return fmt.Errorf("starting storage provider: %w", err)
 				}
@@ -558,8 +581,9 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 	}
 }
 
-func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storagemarket.DealPublisher, spApi sealingpipeline.API, fullNode v1api.FullNode) *gql.Server {
-	resolver := gql.NewResolver(dealsDB, fundMgr, storageMgr, spApi, prov, publisher, fullNode)
+func NewGraphqlServer(lc fx.Lifecycle, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager,
+	storageMgr *storagemanager.StorageManager, publisher *storagemarket.DealPublisher, spApi sealingpipeline.API, fullNode v1api.FullNode) *gql.Server {
+	resolver := gql.NewResolver(dealsDB, logsDB, fundMgr, storageMgr, spApi, prov, publisher, fullNode)
 	server := gql.NewServer(resolver)
 
 	lc.Append(fx.Hook{

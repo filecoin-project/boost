@@ -30,6 +30,7 @@ type dealListResolver struct {
 // that field
 type resolver struct {
 	dealsDB    *db.DealsDB
+	logsDB     *db.LogsDB
 	fundMgr    *fundmanager.FundManager
 	storageMgr *storagemanager.StorageManager
 	provider   *storagemarket.Provider
@@ -38,9 +39,11 @@ type resolver struct {
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
+	spApi sealingpipeline.API, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		dealsDB:    dealsDB,
+		logsDB:     logsDB,
 		fundMgr:    fundMgr,
 		storageMgr: storageMgr,
 		provider:   provider,
@@ -70,7 +73,7 @@ func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dea
 		return nil, err
 	}
 
-	return newDealResolver(deal, r.dealsDB), nil
+	return newDealResolver(deal, r.dealsDB, r.logsDB), nil
 }
 
 type dealsArgs struct {
@@ -92,7 +95,7 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 
 	resolvers := make([]*dealResolver, 0, len(deals))
 	for _, deal := range deals {
-		resolvers = append(resolvers, newDealResolver(&deal, r.dealsDB))
+		resolvers = append(resolvers, newDealResolver(&deal, r.dealsDB, r.logsDB))
 	}
 
 	var nextID *graphql.ID
@@ -134,7 +137,7 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case net <- newDealResolver(deal, r.dealsDB):
+	case net <- newDealResolver(deal, r.dealsDB, r.logsDB):
 	}
 
 	// Updates to deal state are broadcast on pubsub. Pipe these updates to the
@@ -147,7 +150,7 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 		}
 		return nil, xerrors.Errorf("%s: subscribing to deal updates: %w", args.ID, err)
 	}
-	sub := &subLastUpdate{sub: dealUpdatesSub, dealsDB: r.dealsDB}
+	sub := &subLastUpdate{sub: dealUpdatesSub, dealsDB: r.dealsDB, logsDB: r.logsDB}
 	go sub.Pipe(ctx, net)
 
 	return net, nil
@@ -178,7 +181,7 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealResolver, error) {
 			case evti := <-sub.Out():
 				// Pipe the deal to the new deal channel
 				di := evti.(types.ProviderDealState)
-				rsv := newDealResolver(&di, r.dealsDB)
+				rsv := newDealResolver(&di, r.dealsDB, r.logsDB)
 
 				select {
 				case <-ctx.Done():
@@ -263,13 +266,15 @@ type dealResolver struct {
 	types.ProviderDealState
 	transferred uint64
 	dealsDB     *db.DealsDB
+	logsDB      *db.LogsDB
 }
 
-func newDealResolver(deal *types.ProviderDealState, dealsDB *db.DealsDB) *dealResolver {
+func newDealResolver(deal *types.ProviderDealState, dealsDB *db.DealsDB, logsDB *db.LogsDB) *dealResolver {
 	return &dealResolver{
 		ProviderDealState: *deal,
 		transferred:       uint64(deal.NBytesReceived),
 		dealsDB:           dealsDB,
+		logsDB:            logsDB,
 	}
 }
 
@@ -389,7 +394,7 @@ func (dr *dealResolver) Message() string {
 }
 
 func (dr *dealResolver) Logs(ctx context.Context) ([]*logsResolver, error) {
-	logs, err := dr.dealsDB.Logs(ctx, dr.ProviderDealState.DealUuid)
+	logs, err := dr.logsDB.Logs(ctx, dr.ProviderDealState.DealUuid)
 	if err != nil {
 		return nil, err
 	}
@@ -413,6 +418,22 @@ func (lr *logsResolver) CreatedAt() graphql.Time {
 	return graphql.Time{Time: lr.DealLog.CreatedAt}
 }
 
+func (lr *logsResolver) LogLevel() string {
+	return lr.DealLog.LogLevel
+}
+
+func (lr *logsResolver) LogMsg() string {
+	return lr.DealLog.LogMsg
+}
+
+func (lr *logsResolver) LogParams() string {
+	return lr.DealLog.LogParams
+}
+
+func (lr *logsResolver) Subsystem() string {
+	return lr.DealLog.Subsystem
+}
+
 func toUuid(id graphql.ID) (uuid.UUID, error) {
 	var dealUuid uuid.UUID
 	err := dealUuid.UnmarshalText([]byte(id))
@@ -425,6 +446,7 @@ func toUuid(id graphql.ID) (uuid.UUID, error) {
 type subLastUpdate struct {
 	sub     event.Subscription
 	dealsDB *db.DealsDB
+	logsDB  *db.LogsDB
 }
 
 func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
@@ -456,7 +478,7 @@ func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
 	loop:
 		for {
 			di := lastUpdate.(types.ProviderDealState)
-			rsv := newDealResolver(&di, s.dealsDB)
+			rsv := newDealResolver(&di, s.dealsDB, s.logsDB)
 
 			select {
 			case <-ctx.Done():

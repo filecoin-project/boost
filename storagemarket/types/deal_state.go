@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -49,4 +50,8 @@ type ProviderDealState struct {
 
 	// NBytesReceived is the number of bytes Received for this deal
 	NBytesReceived int64
+}
+
+func (d *ProviderDealState) String() string {
+	return fmt.Sprintf("%+v", *d)
 }

@@ -1,9 +1,3 @@
-CREATE TABLE IF NOT EXISTS DealLogs (
-    DealUUID TEXT,
-    CreatedAt DateTime,
-    LogText TEXT
-);
-
 CREATE TABLE IF NOT EXISTS Deals (
     ID TEXT,
     CreatedAt DateTime,

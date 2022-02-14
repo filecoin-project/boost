@@ -13,7 +13,6 @@ import (
 
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	transporttypes "github.com/filecoin-project/boost/transport/types"
 
@@ -22,7 +21,6 @@ import (
 	commcid "github.com/filecoin-project/go-fil-commcid"
 	commp "github.com/filecoin-project/go-fil-commp-hashhash"
 	"github.com/filecoin-project/go-padreader"
-	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-eventbus"
@@ -44,8 +42,12 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	// Check if deal is already complete
 	// TODO Update this once we start listening for expired/slashed deals etc
 	if deal.Checkpoint >= dealcheckpoints.AddedPiece {
+		// cleanup if cleanup didn't finish before we restarted
+		p.cleanupDeal(deal)
 		return
 	}
+
+	p.dealLogger.Infow(deal.DealUuid, "deal execution initiated", "deal state", *deal)
 
 	// Set up pubsub for deal updates
 	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
@@ -72,6 +74,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 		if !derr.recoverable {
 			p.cleanupDeal(deal)
 			p.failDeal(pub, deal, derr.err)
+			p.dealLogger.Infow(deal.DealUuid, "deal cleanup complete")
 		} else {
 			// TODO For now, we will get recoverable errors only when the process is gracefully shutdown and
 			// the provider context gets cancelled.
@@ -79,15 +82,16 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 			// recoverable errors as well and we will have to build the DB/UX/resumption support for it.
 
 			// if the error is recoverable, persist that fact to the deal log and return
-			p.addDealLog(deal.DealUuid, "Deal Paused because of recoverable error: %s", derr.err)
+			p.dealLogger.Infow(deal.DealUuid, "deal paused because of recoverable error", "err", derr.err)
 		}
 		return
 	}
 
+	p.dealLogger.Infow(deal.DealUuid, "deal execution completed successfully")
 	// deal has been sent for sealing -> we can cleanup the deal state now and simply watch the deal on chain
 	// to wait for deal completion/slashing and update the state in DB accordingly.
 	p.cleanupDeal(deal)
-
+	p.dealLogger.Infow(deal.DealUuid, "finished deal cleanup after successful execution")
 	// TODO
 	// Watch deal on chain and change state in DB and emit notifications.
 	// Given that cleanup deal above also gets rid of the deal handler, subscriptions to deal updates from here on
@@ -100,7 +104,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	// publish an event with the current state of the deal
 	p.fireEventDealUpdate(pub, deal)
 
-	p.addDealLog(deal.DealUuid, "Deal Execution Started")
+	p.dealLogger.Infow(deal.DealUuid, "deal execution in progress")
 
 	// Transfer Data
 	if deal.Checkpoint < dealcheckpoints.Transferred {
@@ -119,9 +123,14 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 				err: fmt.Errorf("execDeal failed data transfer: %w", err),
 			}
 		}
+
+		p.dealLogger.Infow(deal.DealUuid, "deal data transfer finished successfully")
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "deal data transfer has already been completed")
 	}
 	// transfer can no longer be cancelled
 	dh.transferCancelled(errors.New("transfer already complete"))
+	p.dealLogger.Infow(deal.DealUuid, "deal data-transfer can no longer be cancelled")
 
 	// Publish
 	if deal.Checkpoint <= dealcheckpoints.Published {
@@ -138,7 +147,11 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 				err: fmt.Errorf("failed to publish deal: %w", err),
 			}
 		}
+		p.dealLogger.Infow(deal.DealUuid, "deal successfully published and confirmed-publish")
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "deal has already been published and confirmed-publish")
 	}
+
 	// Now that the deal has been published, we no longer need to have funds
 	// tagged as being for this deal (the publish message moves collateral
 	// from the storage market actor escrow balance to the locked balance)
@@ -153,6 +166,8 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 			err: fmt.Errorf("failed to untag funds after sending publish message: %w", err),
 		}
 	}
+	p.dealLogger.Infow(deal.DealUuid, "funds successfully untagged for deal after publish")
+
 	// AddPiece
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
 		if err := p.addPiece(ctx, pub, deal); err != nil {
@@ -168,6 +183,9 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 				err: fmt.Errorf("failed to add piece: %w", err),
 			}
 		}
+		p.dealLogger.Infow(deal.DealUuid, "deal successfully handed over to the sealing subsystem")
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "deal has already been handed over to the sealing subsystem")
 	}
 
 	return nil
@@ -190,12 +208,12 @@ func (p *Provider) untagFundsAfterPublish(ctx context.Context, deal *types.Provi
 }
 
 func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
-	log.Infow("transferring deal data", "id", deal.DealUuid)
-	p.addDealLog(deal.DealUuid, "Start data transfer")
+	p.dealLogger.Infow(deal.DealUuid, "transferring deal data")
 
 	tctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.config.MaxTransferDuration))
 	defer cancel()
 
+	st := time.Now()
 	handler, err := p.Transport.Execute(tctx, deal.Transfer.Params, &transporttypes.TransportDealInfo{
 		OutputFile: deal.InboundFilePath,
 		DealUuid:   deal.DealUuid,
@@ -209,8 +227,8 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 	if err := p.waitForTransferFinish(tctx, handler, pub, deal); err != nil {
 		return fmt.Errorf("data-transfer failed: %w", err)
 	}
-
-	p.addDealLog(deal.DealUuid, "Data transfer complete")
+	p.dealLogger.Infow(deal.DealUuid, "deal data-transfer completed successfully", "bytes received", deal.NBytesReceived, "time taken",
+		time.Since(st).String())
 
 	// Verify CommP matches
 	pieceCid, err := GeneratePieceCommitment(deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize)
@@ -223,8 +241,7 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 		return fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid)
 	}
 
-	p.addDealLog(deal.DealUuid, "Data verification successful")
-
+	p.dealLogger.Infow(deal.DealUuid, "commP matched successfully: deal-data verified")
 	return p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.Transferred)
 }
 
@@ -330,7 +347,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	// deal are locked and can no longer be withdrawn. Payment is transferred
 	// to the provider's wallet at each epoch.
 	if deal.Checkpoint < dealcheckpoints.Published {
-		p.addDealLog(deal.DealUuid, "Publishing deal")
+		p.dealLogger.Infow(deal.DealUuid, "publishing deal")
 
 		mcid, err := p.dealPublisher.Publish(p.ctx, deal.DealUuid, deal.ClientDealProposal)
 		if err != nil {
@@ -341,16 +358,20 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 		if err := p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.Published); err != nil {
 			return err
 		}
+		p.dealLogger.Infow(deal.DealUuid, "deal published successfully, will await deal publish confirmation")
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "deal has already been published")
 	}
 
 	// Wait for the publish deals message to land on chain.
 	// Note that multiple deals may be published in a batch, so the message CID
 	// may be for a batch of deals.
-	p.addDealLog(deal.DealUuid, "Awaiting deal publish confirmation")
+	p.dealLogger.Infow(deal.DealUuid, "awaiting deal publish confirmation")
 	res, err := p.chainDealManager.WaitForPublishDeals(p.ctx, *deal.PublishCID, deal.ClientDealProposal.Proposal)
 	if err != nil {
 		return fmt.Errorf("wait for publish message %s failed: %w", deal.PublishCID, err)
 	}
+	p.dealLogger.Infow(deal.DealUuid, "successfully finished deal publish confirmation")
 
 	// If there's a re-org, the publish deal CID may change, so use the
 	// final CID.
@@ -360,14 +381,12 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 		return err
 	}
 
-	p.addDealLog(deal.DealUuid, "Deal published successfully")
-
 	return nil
 }
 
 // addPiece hands off a published deal for sealing and commitment in a sector
 func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
-	p.addDealLog(deal.DealUuid, "Hand off deal to sealer")
+	p.dealLogger.Infow(deal.DealUuid, "add piece called")
 
 	// Open a reader against the CAR file with the deal data
 	v2r, err := carv2.OpenReader(deal.InboundFilePath)
@@ -376,7 +395,7 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	}
 	defer func() {
 		if err := v2r.Close(); err != nil {
-			log.Errorw("failed to close carv2 reader", "err", err)
+			p.dealLogger.Warnw(deal.DealUuid, "failed to close carv2 reader in addpiece", "err", err)
 		}
 	}()
 
@@ -408,26 +427,24 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	deal.SectorID = packingInfo.SectorNumber
 	deal.Offset = packingInfo.Offset
 	deal.Length = packingInfo.Size
-
-	p.addDealLog(deal.DealUuid, "Deal handed off to sealer successfully")
+	p.dealLogger.Infow(deal.DealUuid, "deal successfully handed to the sealing subsystem")
 
 	return p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.AddedPiece)
 }
 
 func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, err error) {
-	log.Errorw("deal failed", "id", deal.DealUuid, "err", err)
 	// Update state in DB with error
 	deal.Checkpoint = dealcheckpoints.Complete
 	if xerrors.Is(err, context.Canceled) {
 		deal.Err = DealCancelled
-		p.addDealLog(deal.DealUuid, "Deal cancelled")
+		p.dealLogger.Infow(deal.DealUuid, "deal cancelled")
 	} else {
 		deal.Err = err.Error()
-		p.addDealLog(deal.DealUuid, "Deal failed: %s", deal.Err)
+		p.dealLogger.LogError(deal.DealUuid, "deal failed", err)
 	}
 	dberr := p.dealsDB.Update(p.ctx, deal)
 	if dberr != nil {
-		log.Errorw("updating failed deal in db", "id", deal.DealUuid, "err", dberr)
+		p.dealLogger.LogError(deal.DealUuid, "failed to update deal failure error in DB", dberr)
 	}
 
 	// Fire deal update event
@@ -466,33 +483,24 @@ func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 
 func (p *Provider) fireEventDealNew(deal *types.ProviderDealState) {
 	if err := p.newDealPS.NewDeals.Emit(*deal); err != nil {
-		log.Warn("publishing new deal event", "id", deal.DealUuid, "err", err)
+		p.dealLogger.Warnw(deal.DealUuid, "publishing new deal event", "err", err)
 	}
 }
 
 func (p *Provider) fireEventDealUpdate(pub event.Emitter, deal *types.ProviderDealState) {
 	if err := pub.Emit(*deal); err != nil {
-		log.Warn("publishing deal state update", "id", deal.DealUuid, "err", err)
+		p.dealLogger.Warnw(deal.DealUuid, "publishing deal state update", "err", err)
 	}
 }
 
 func (p *Provider) updateCheckpoint(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState, ckpt dealcheckpoints.Checkpoint) error {
+	prev := deal.Checkpoint
 	deal.Checkpoint = ckpt
 	if err := p.dealsDB.Update(ctx, deal); err != nil {
 		return fmt.Errorf("failed to persist deal state: %w", err)
 	}
-
+	p.dealLogger.Infow(deal.DealUuid, "updated deal checkpoint in DB", "old checkpoint", prev, "new checkpoint", ckpt)
 	p.fireEventDealUpdate(pub, deal)
-	return nil
-}
 
-func (p *Provider) addDealLog(dealUuid uuid.UUID, format string, args ...interface{}) {
-	l := &db.DealLog{
-		DealUUID:  dealUuid,
-		Text:      fmt.Sprintf(format, args...),
-		CreatedAt: time.Now(),
-	}
-	if err := p.dealsDB.InsertLog(p.ctx, l); err != nil {
-		log.Warnw("failed to persist deal log", "id", dealUuid, "err", err)
-	}
+	return nil
 }

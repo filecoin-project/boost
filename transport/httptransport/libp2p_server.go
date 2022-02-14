@@ -19,7 +19,11 @@ import (
 	gostream "github.com/libp2p/go-libp2p-gostream"
 	"github.com/multiformats/go-multiaddr"
 	"golang.org/x/xerrors"
+
+	logging "github.com/ipfs/go-log/v2"
 )
+
+var log = logging.Logger("libp2p-server")
 
 // Libp2pCarServer serves deal data by matching an auth token to the root CID
 // of a DAG in a blockstore, and serving the data as a CAR

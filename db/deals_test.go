@@ -68,12 +68,4 @@ func TestDealsDB(t *testing.T) {
 	deal.CreatedAt = time.Time{}
 	storedDeal.CreatedAt = time.Time{}
 	req.Equal(deal, *storedDeal)
-
-	err = db.InsertLog(ctx, &DealLog{DealUUID: deal.DealUuid, Text: "Test"})
-	req.NoError(err)
-
-	logs, err := db.Logs(ctx, deal.DealUuid)
-	req.NoError(err)
-	req.Len(logs, 1)
-	req.Equal("Test", logs[0].Text)
 }

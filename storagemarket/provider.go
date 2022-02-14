@@ -11,6 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/storagemarket/logs"
+	logging "github.com/ipfs/go-log/v2"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
@@ -35,7 +38,6 @@ import (
 	"github.com/filecoin-project/lotus/lib/sigs"
 	"github.com/filecoin-project/lotus/markets/utils"
 	"github.com/google/uuid"
-	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-eventbus"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -44,7 +46,6 @@ import (
 )
 
 var (
-	log                    = logging.Logger("boost-provider")
 	ErrDealNotFound        = fmt.Errorf("deal not found")
 	ErrDealHandlerNotFound = errors.New("deal handler not found")
 )
@@ -57,6 +58,8 @@ var (
 type Config struct {
 	MaxTransferDuration time.Duration
 }
+
+var log = logging.Logger("boost-provider")
 
 type Provider struct {
 	testMode bool
@@ -87,8 +90,10 @@ type Provider struct {
 	df dtypes.StorageDealFilter
 
 	// Database API
-	db      *sql.DB
-	dealsDB *db.DealsDB
+	db        *sql.DB
+	dealsDB   *db.DealsDB
+	logsSqlDB *sql.DB
+	logsDB    *db.LogsDB
 
 	Transport      transport.Transport
 	fundManager    *fundmanager.FundManager
@@ -104,9 +109,12 @@ type Provider struct {
 
 	dhsMu sync.RWMutex
 	dhs   map[uuid.UUID]*dealHandler
+
+	dealLogger *logs.DealLogger
 }
 
-func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, httpOpts ...httptransport.Option) (*Provider, error) {
+func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
+	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB, httpOpts ...httptransport.Option) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -121,8 +129,12 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 	if err != nil {
 		return nil, err
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	dl := logs.NewDealLogger(ctx, logsDB)
 
 	return &Provider{
+		ctx:    ctx,
+		cancel: cancel,
 		// TODO Make this configurable
 		config:    Config{MaxTransferDuration: 24 * 3600 * time.Second},
 		Address:   addr,
@@ -130,6 +142,7 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		fs:        fs,
 		db:        sqldb,
 		dealsDB:   dealsDB,
+		logsSqlDB: logsSqlDB,
 		sps:       sps,
 		df:        df,
 
@@ -137,7 +150,7 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		finishedDealChan:  make(chan finishedDealReq),
 		publishedDealChan: make(chan publishDealReq),
 
-		Transport:      httptransport.New(h, httpOpts...),
+		Transport:      httptransport.New(h, dl, httpOpts...),
 		fundManager:    fundMgr,
 		storageManager: storageMgr,
 
@@ -148,7 +161,9 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		maxDealCollateralMultiplier: 2,
 		transfers:                   newDealTransfers(),
 
-		dhs: make(map[uuid.UUID]*dealHandler),
+		dhs:        make(map[uuid.UUID]*dealHandler),
+		dealLogger: dl,
+		logsDB:     logsDB,
 	}, nil
 }
 
@@ -175,7 +190,7 @@ func (p *Provider) GetAsk() *types.StorageAsk {
 }
 
 func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *api.ProviderDealRejectionInfo, err error) {
-	log.Infow("execute deal", "uuid", dp.DealUUID)
+	p.dealLogger.Infow(dp.DealUUID, "execute deal called")
 
 	ds := types.ProviderDealState{
 		DealUuid:           dp.DealUUID,
@@ -187,6 +202,8 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 	// validate the deal proposal
 	if !p.testMode {
 		if err := p.validateDealProposal(ds); err != nil {
+			p.dealLogger.Infow(dp.DealUUID, "deal proposal failed validation", "err", err)
+
 			return &api.ProviderDealRejectionInfo{
 				Reason: fmt.Sprintf("failed validation: %s", err),
 			}, nil
@@ -210,10 +227,12 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 	tmpFile, err = p.fs.CreateTemp()
 	if err != nil {
 		cleanup()
+		p.dealLogger.LogError(dp.DealUUID, "failed to create temp file for inbound data transfer", err)
 		return nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
 	if err := tmpFile.Close(); err != nil {
 		cleanup()
+		p.dealLogger.LogError(dp.DealUUID, "failed to close temp file created for inbound data transfer", err)
 		return nil, fmt.Errorf("failed to close temp file: %w", err)
 	}
 
@@ -222,6 +241,7 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 	resp, err := p.checkForDealAcceptance(&ds, dh)
 	if err != nil {
 		cleanup()
+		p.dealLogger.LogError(dp.DealUUID, "failed to send deal for acceptance", err)
 		return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
 	}
 
@@ -233,11 +253,11 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 	// return rejection reason as provider has rejected the deal.
 	if !resp.ri.Accepted {
 		cleanup()
-		log.Infow("rejected deal: "+resp.ri.Reason, "id", dp.DealUUID)
+		p.dealLogger.Infow(dp.DealUUID, "deal rejected by provider", "reason", resp.ri.Reason)
 		return resp.ri, nil
 	}
 
-	log.Infow("scheduled deal for execution", "id", dp.DealUUID)
+	p.dealLogger.Infow(dp.DealUUID, "deal accepted and scheduled for execution")
 	return resp.ri, nil
 }
 
@@ -281,20 +301,19 @@ func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) *dealHandler {
 	return dh
 }
 
-func (p *Provider) Start(ctx context.Context) error {
+func (p *Provider) Start() error {
+
 	log.Infow("storage provider: starting")
 
-	p.ctx, p.cancel = context.WithCancel(ctx)
-
 	// initialize the database
-	err := db.CreateTables(p.ctx, p.db)
+	err := db.CreateAllBoostTables(p.ctx, p.db, p.logsSqlDB)
 	if err != nil {
 		return fmt.Errorf("failed to init db: %w", err)
 	}
 	log.Infow("db initialized")
 
 	// restart all active deals
-	pds, err := p.dealsDB.ListActive(ctx)
+	pds, err := p.dealsDB.ListActive(p.ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list active deals: %w", err)
 	}
@@ -391,7 +410,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 	for build.Clock.Since(curTime) < addPieceRetryTimeout {
 		if !xerrors.Is(err, sealing.ErrTooManySectorsSealing) {
 			if err != nil {
-				log.Errorw("failed to addPiece for deal", "id", deal.DealUuid, "err", err)
+				p.dealLogger.Warnw(deal.DealUuid, "failed to addPiece for deal, will-retry", err)
 			}
 			break
 		}
@@ -406,7 +425,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 	if err != nil {
 		return nil, fmt.Errorf("AddPiece failed: %w", err)
 	}
-	log.Infow("Added new deal to sector", "id", deal.DealUuid, "sector", p)
+	p.dealLogger.Infow(deal.DealUuid, "added new deal to sector", "sector", sectorNum)
 
 	return &storagemarket.PackingResult{
 		SectorNumber: sectorNum,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"strings"
-	"time"
 
 	"github.com/graph-gophers/graphql-go"
 
@@ -17,12 +16,6 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 )
-
-type DealLog struct {
-	DealUUID  uuid.UUID
-	CreatedAt time.Time
-	Text      string
-}
 
 // Used for SELECT statements: "ID, CreatedAt, ..."
 var dealFields []string
@@ -259,40 +252,4 @@ func (d *DealsDB) scanRow(row Scannable) (*types.ProviderDealState, error) {
 	}
 	err := d.newDealDef(&deal).scan(row)
 	return &deal, err
-}
-
-func (d *DealsDB) InsertLog(ctx context.Context, l *DealLog) error {
-	qry := "INSERT INTO DealLogs (DealUUID, CreatedAt, LogText) "
-	qry += "VALUES (?, ?, ?)"
-	values := []interface{}{l.DealUUID, l.CreatedAt, l.Text}
-	_, err := d.db.ExecContext(ctx, qry, values...)
-	return err
-}
-
-func (d *DealsDB) Logs(ctx context.Context, dealID uuid.UUID) ([]DealLog, error) {
-	qry := "SELECT DealUUID, CreatedAt, LogText FROM DealLogs WHERE DealUUID=?"
-	rows, err := d.db.QueryContext(ctx, qry, dealID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	dealLogs := make([]DealLog, 0, 16)
-	for rows.Next() {
-		var dealLog DealLog
-		err := rows.Scan(
-			&dealLog.DealUUID,
-			&dealLog.CreatedAt,
-			&dealLog.Text)
-
-		if err != nil {
-			return nil, err
-		}
-		dealLogs = append(dealLogs, dealLog)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return dealLogs, nil
 }

@@ -95,7 +95,7 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 			td = tc.stubAfterResumeF(tbuilder)
 
 			// start the provider -> this will restart the deal
-			require.NoError(t, harness.Provider.Start(ctx))
+			require.NoError(t, harness.Provider.Start())
 
 			// update subscription and mock assertions as provider has restarted
 			if tc.unblockF != nil {

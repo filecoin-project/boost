@@ -28,6 +28,11 @@ func TestSingleDealResumptionDisconnect(t *testing.T) {
 	err := td.executeAndSubscribeToNotifs()
 	require.NoError(t, err)
 	td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
+
+	// assert logs
+	lgs, err := harness.Provider.logsDB.Logs(ctx, td.params.DealUUID)
+	require.NoError(t, err)
+	require.NotEmpty(t, lgs)
 }
 
 func TestMultipleDealsConcurrentResumptionDisconnect(t *testing.T) {
