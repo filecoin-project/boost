@@ -61,12 +61,12 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	cleanup := func() {
 		errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
-			p.dealLogger.Errorw(deal.DealUuid, "failed to untag funds during deal cleanup", err)
+			p.dealLogger.LogError(deal.DealUuid, "failed to untag funds during deal cleanup", err)
 		}
 
 		errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
 		if errs != nil && !xerrors.Is(errf, db.ErrNotFound) {
-			p.dealLogger.Errorw(deal.DealUuid, "failed to untag storage during deal cleanup", err)
+			p.dealLogger.LogError(deal.DealUuid, "failed to untag storage during deal cleanup", err)
 		}
 	}
 
@@ -88,7 +88,6 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	}
 
 	// write deal state to the database
-	p.dealLogger.Infow(deal.DealUuid, "inserting deal into deals DB")
 	deal.CreatedAt = time.Now()
 	deal.Checkpoint = dealcheckpoints.Accepted
 	err = p.dealsDB.Insert(p.ctx, deal)
@@ -115,12 +114,12 @@ func (p *Provider) loop() {
 			ok, reason, err := p.processDealRequest(dealReq.deal)
 			if !ok {
 				if err != nil {
-					p.dealLogger.Errorw(deal.DealUuid, "error while processing deal acceptance request", err)
+					p.dealLogger.LogError(deal.DealUuid, "error while processing deal acceptance request", err)
 					dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: reason}, err: err}
 					continue
 				}
 
-				p.dealLogger.Warnw(deal.DealUuid, "deal acceptance request rejected", "reason", reason)
+				p.dealLogger.Infow(deal.DealUuid, "deal acceptance request rejected", "reason", reason)
 				dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: reason}, err: nil}
 				continue
 			}
@@ -139,7 +138,7 @@ func (p *Provider) loop() {
 			deal := publishedDeal.deal
 			errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 			if errf != nil {
-				p.dealLogger.Errorw(deal.DealUuid, "failed to untag funds", errf)
+				p.dealLogger.LogError(deal.DealUuid, "failed to untag funds", errf)
 			}
 			publishedDeal.done <- struct{}{}
 
@@ -148,12 +147,12 @@ func (p *Provider) loop() {
 			p.dealLogger.Infow(deal.DealUuid, "deal finished")
 			errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 			if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
-				p.dealLogger.Errorw(deal.DealUuid, "failed to untag funds", errf)
+				p.dealLogger.LogError(deal.DealUuid, "failed to untag funds", errf)
 			}
 
 			errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
 			if errs != nil && !xerrors.Is(errs, db.ErrNotFound) {
-				p.dealLogger.Errorw(deal.DealUuid, "failed to untag storage", errs)
+				p.dealLogger.LogError(deal.DealUuid, "failed to untag storage", errs)
 			}
 			finishedDeal.done <- struct{}{}
 

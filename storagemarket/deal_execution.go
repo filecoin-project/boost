@@ -55,7 +55,6 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 		err = fmt.Errorf("failed to create event emitter: %w", err)
 		p.cleanupDeal(deal)
 		p.failDeal(pub, deal, err)
-		p.dealLogger.Errorw(deal.DealUuid, "failed to create pub-sub for deal", err)
 		return
 	}
 
@@ -65,7 +64,6 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 		err := fmt.Errorf("failed to stat output file: %w", err)
 		p.cleanupDeal(deal)
 		p.failDeal(pub, deal, err)
-		p.dealLogger.Errorw(deal.DealUuid, "failed to stat file created for inbound deal data transfer", err)
 		return
 	}
 	deal.NBytesReceived = fi.Size()
@@ -74,7 +72,6 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	if derr := p.execDealUptoAddPiece(dh.providerCtx, pub, deal, dh); derr != nil {
 		// If the error is NOT recoverable, fail the deal and cleanup state.
 		if !derr.recoverable {
-			p.dealLogger.Errorw(deal.DealUuid, "deal execution failed", derr.err)
 			p.cleanupDeal(deal)
 			p.failDeal(pub, deal, derr.err)
 			p.dealLogger.Infow(deal.DealUuid, "deal cleanup complete")
@@ -230,8 +227,8 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 	if err := p.waitForTransferFinish(tctx, handler, pub, deal); err != nil {
 		return fmt.Errorf("data-transfer failed: %w", err)
 	}
-	p.dealLogger.Infow(deal.DealUuid, "deal data-transfer completed successfully", "bytes received", deal.NBytesReceived, "time in minutes",
-		time.Since(st).Minutes())
+	p.dealLogger.Infow(deal.DealUuid, "deal data-transfer completed successfully", "bytes received", deal.NBytesReceived, "time taken",
+		time.Since(st).String())
 
 	// Verify CommP matches
 	pieceCid, err := GeneratePieceCommitment(deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize)
@@ -398,7 +395,7 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	}
 	defer func() {
 		if err := v2r.Close(); err != nil {
-			p.dealLogger.Warnw(deal.DealUuid, "failed to close carv2 reader in addpiece", err)
+			p.dealLogger.Warnw(deal.DealUuid, "failed to close carv2 reader in addpiece", "err", err)
 		}
 	}()
 
@@ -443,11 +440,11 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 		p.dealLogger.Infow(deal.DealUuid, "deal cancelled")
 	} else {
 		deal.Err = err.Error()
-		p.dealLogger.Errorw(deal.DealUuid, "deal failed", err)
+		p.dealLogger.LogError(deal.DealUuid, "deal failed", err)
 	}
 	dberr := p.dealsDB.Update(p.ctx, deal)
 	if dberr != nil {
-		p.dealLogger.Errorw(deal.DealUuid, "updating failed deal in db", dberr)
+		p.dealLogger.LogError(deal.DealUuid, "failed to update deal failure error in DB", dberr)
 	}
 
 	// Fire deal update event

@@ -15,15 +15,11 @@ import (
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/google/uuid"
-	logging "github.com/ipfs/go-log/v2"
 	"github.com/jpillora/backoff"
 	"github.com/libp2p/go-libp2p-core/host"
 	p2phttp "github.com/libp2p/go-libp2p-http"
 	"golang.org/x/xerrors"
 )
-
-var log = logging.Logger("http-transport")
-var transportLog = "http-transport: %s"
 
 const (
 	// 1 Mib
@@ -69,7 +65,7 @@ func New(host host.Host, dealLogger *logs.DealLogger, opts ...Option) *httpTrans
 		maxBackoffWait:       maxBackOff,
 		backOffFactor:        factor,
 		maxReconnectAttempts: maxReconnectAttempts,
-		dl:                   dealLogger,
+		dl:                   dealLogger.Subsystem("http-transport"),
 	}
 	for _, o := range opts {
 		o(ht)
@@ -87,8 +83,8 @@ func New(host host.Host, dealLogger *logs.DealLogger, opts ...Option) *httpTrans
 func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealInfo *types.TransportDealInfo) (th transport.Handler, err error) {
 	deadline, _ := ctx.Deadline()
 	duuid := dealInfo.DealUuid
-	h.dl.Infow(duuid, fmt.Sprintf(transportLog, "execute called"), "deal size", dealInfo.DealSize, "output file", dealInfo.OutputFile,
-		"number of minutes before context deadline", time.Until(deadline).Minutes())
+	h.dl.Infow(duuid, "execute called", "deal size", dealInfo.DealSize, "output file", dealInfo.OutputFile,
+		"time before context deadline", time.Until(deadline).String())
 
 	// de-serialize transport opaque token
 	tInfo := &types.HttpRequest{}
@@ -118,7 +114,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	if fileSize > dealInfo.DealSize {
 		return nil, fmt.Errorf("deal size=%d but file size=%d", dealInfo.DealSize, fileSize)
 	}
-	h.dl.Infow(duuid, fmt.Sprintf(transportLog, "got existing file size"), "file size", fileSize, "deal size", dealInfo.DealSize)
+	h.dl.Infow(duuid, "got existing file size", "file size", fileSize, "deal size", dealInfo.DealSize)
 
 	// construct the transfer instance that will act as the transfer handler
 	tctx, cancel := context.WithCancel(ctx)
@@ -148,10 +144,10 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 			addrTtl = time.Until(deadline)
 		}
 		h.libp2pHost.Peerstore().AddAddr(u.peerID, u.multiaddr, addrTtl)
-		h.dl.Infow(duuid, fmt.Sprintf(transportLog, "is a libp2p-http url"), "url", tInfo.URL)
+		h.dl.Infow(duuid, "is a libp2p-http url", "url", tInfo.URL)
 	} else {
 		t.client = http.DefaultClient
-		h.dl.Infow(duuid, fmt.Sprintf(transportLog, "is a http url"), "url", tInfo.URL)
+		h.dl.Infow(duuid, "is a http url", "url", tInfo.URL)
 	}
 
 	// is the transfer already complete ? we check this by comparing the number of bytes
@@ -166,7 +162,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 			return nil, fmt.Errorf("failed to publish transfer completion event, id: %s, err: %w", t.dealInfo.DealUuid, err)
 		}
 
-		h.dl.Infow(duuid, fmt.Sprintf(transportLog, "file size is already equal to deal size, returning"))
+		h.dl.Infow(duuid, "file size is already equal to deal size, returning")
 		return t, nil
 	}
 	// start executing the transfer
@@ -180,12 +176,12 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 			if err := t.emitEvent(tctx, types.TransportEvent{
 				Error: err,
 			}, dealInfo.DealUuid); err != nil {
-				log.Errorw("failed to publish transport error", "id", t.dealInfo.DealUuid, "err", err)
+				t.dl.LogError(duuid, "failed to publish transport error", err)
 			}
 		}
 	}()
 
-	h.dl.Infow(duuid, fmt.Sprintf(transportLog, "started async http transfer"))
+	h.dl.Infow(duuid, "started async http transfer")
 	return t, nil
 }
 
@@ -252,9 +248,9 @@ func (t *transfer) execute(ctx context.Context) error {
 		// start the http transfer
 		remaining := t.dealInfo.DealSize - t.nBytesReceived
 		reqErr := t.doHttp(ctx, req, of, remaining)
-		t.dl.Infow(duuid, fmt.Sprintf(transportLog, "one http req done"), "outputErr", reqErr)
+		t.dl.Infow(duuid, "one http req done", "outputErr", reqErr)
 		if reqErr == nil {
-			t.dl.Infow(duuid, fmt.Sprintf(transportLog, "http req done without any errors"))
+			t.dl.Infow(duuid, "http req done without any errors")
 			// if there's no error, transfer was successful
 			break
 		}
@@ -263,32 +259,32 @@ func (t *transfer) execute(ctx context.Context) error {
 		// check if the error is a 4xx error, meaning there is a problem with
 		// the request (eg 401 Unauthorized)
 		if reqErr.code/100 == 4 {
-			t.dl.Errorw(duuid, fmt.Sprintf(transportLog, "terminating http req as got 4xx code"), reqErr)
+			t.dl.LogError(duuid, "terminating http req as got 4xx code", reqErr)
 			return reqErr.error
 		}
 
 		// do not resume transfer if context has been cancelled or if the context deadline has exceeded
 		err = reqErr.error
 		if xerrors.Is(err, context.Canceled) || xerrors.Is(err, context.DeadlineExceeded) {
-			t.dl.Errorw(duuid, fmt.Sprintf(transportLog, "terminating http req as context cancelled or deadline exceeded"), err)
+			t.dl.LogError(duuid, "terminating http req as context cancelled or deadline exceeded", err)
 			return fmt.Errorf("transfer context err: %w", err)
 		}
 
 		// backoff-retry transfer if max number of attempts haven't been exhausted
 		nAttempts := t.backoff.Attempt() + 1
 		if nAttempts >= t.maxReconnectAttempts {
-			t.dl.Errorw(duuid, fmt.Sprintf(transportLog, fmt.Sprintf("terminating http req as exhautsed max attempts: %f", t.maxReconnectAttempts)), err)
+			t.dl.Errorw(duuid, "terminating http req as exhausted max attempts", "err", err, "maxAttempts", t.maxReconnectAttempts)
 			return fmt.Errorf("could not finish transfer even after %.0f attempts, lastErr: %w", t.maxReconnectAttempts, err)
 		}
 		duration := t.backoff.Duration()
 		bt := time.NewTimer(duration)
-		t.dl.Infow(duuid, fmt.Sprintf(transportLog, "retrying http req after waiting"), "wait time in minutes", duration.Minutes(),
+		t.dl.Infow(duuid, "retrying http req after waiting", "wait time", duration.String(),
 			"nAttempts", nAttempts)
 		defer bt.Stop()
 		select {
 		case <-bt.C:
 		case <-ctx.Done():
-			t.dl.Errorw(duuid, fmt.Sprintf(transportLog, "did not proceed with retry as context cancelled"), ctx.Err())
+			t.dl.LogError(duuid, "did not proceed with retry as context cancelled", ctx.Err())
 			return fmt.Errorf("transfer context err after %f attempts to finish transfer, lastErr=%s, contextErr=%w", t.backoff.Attempt(), err, ctx.Err())
 		}
 	}
@@ -308,7 +304,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		return fmt.Errorf("mismtach in output file size vs received bytes, fileSize=%d, receivedBytes=%d", st.Size(), t.nBytesReceived)
 	}
 
-	t.dl.Infow(duuid, fmt.Sprintf(transportLog, "http req finished successfully"), "nBytesReceived", t.nBytesReceived,
+	t.dl.Infow(duuid, "http req finished successfully", "nBytesReceived", t.nBytesReceived,
 		"file size", st.Size())
 
 	return nil
@@ -316,7 +312,7 @@ func (t *transfer) execute(ctx context.Context) error {
 
 func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer, toRead int64) *httpError {
 	duid := t.dealInfo.DealUuid
-	t.dl.Infow(duid, fmt.Sprintf(transportLog, "sending http req"), "received", t.nBytesReceived, "remaining",
+	t.dl.Infow(duid, "sending http req", "received", t.nBytesReceived, "remaining",
 		toRead, "range-rq", req.Header.Get("Range"))
 
 	// send http request and validate response
@@ -357,12 +353,12 @@ func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer,
 			if err := t.emitEvent(ctx, types.TransportEvent{
 				NBytesReceived: t.nBytesReceived,
 			}, t.dealInfo.DealUuid); err != nil {
-				log.Errorw("failed to publish transport event", "id", t.dealInfo.DealUuid, "err", err)
+				t.dl.LogError(duid, "failed to publish transport event", err)
 			}
 		}
 		// the http stream we're reading from has sent us an EOF, nothing to do here.
 		if readErr == io.EOF {
-			t.dl.Infow(duid, fmt.Sprintf(transportLog, "http server sent EOF"), "received", t.nBytesReceived, "deal-size", t.dealInfo.DealSize)
+			t.dl.Infow(duid, "http server sent EOF", "received", t.nBytesReceived, "deal-size", t.dealInfo.DealSize)
 			return nil
 		}
 		if readErr != nil {

@@ -43,14 +43,6 @@ CREATE TABLE IF NOT EXISTS FundsTagged (
     PubMsg TEXT
 );
 
-CREATE TABLE IF NOT EXISTS DealLogs (
-    DealUUID TEXT,
-    CreatedAt DateTime,
-    LogLevel TEXT,
-    LogMsg TEXT,
-    LogParams TEXT
-);
-
 CREATE TABLE IF NOT EXISTS StorageLogs (
     DealUUID TEXT,
     CreatedAt DateTime,

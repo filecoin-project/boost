@@ -202,7 +202,7 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 	// validate the deal proposal
 	if !p.testMode {
 		if err := p.validateDealProposal(ds); err != nil {
-			p.dealLogger.Errorw(dp.DealUUID, "deal proposal failed validation", err)
+			p.dealLogger.Infow(dp.DealUUID, "deal proposal failed validation", "err", err)
 
 			return &api.ProviderDealRejectionInfo{
 				Reason: fmt.Sprintf("failed validation: %s", err),
@@ -227,12 +227,12 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 	tmpFile, err = p.fs.CreateTemp()
 	if err != nil {
 		cleanup()
-		p.dealLogger.Errorw(dp.DealUUID, "failed to create temp file for inbound data transfer", err)
+		p.dealLogger.LogError(dp.DealUUID, "failed to create temp file for inbound data transfer", err)
 		return nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
 	if err := tmpFile.Close(); err != nil {
 		cleanup()
-		p.dealLogger.Errorw(dp.DealUUID, "failed to close temp file created for inbound data transfer", err)
+		p.dealLogger.LogError(dp.DealUUID, "failed to close temp file created for inbound data transfer", err)
 		return nil, fmt.Errorf("failed to close temp file: %w", err)
 	}
 
@@ -241,7 +241,7 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 	resp, err := p.checkForDealAcceptance(&ds, dh)
 	if err != nil {
 		cleanup()
-		p.dealLogger.Errorw(dp.DealUUID, "failed to send deal for acceptance", err)
+		p.dealLogger.LogError(dp.DealUUID, "failed to send deal for acceptance", err)
 		return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
 	}
 
@@ -253,7 +253,7 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 	// return rejection reason as provider has rejected the deal.
 	if !resp.ri.Accepted {
 		cleanup()
-		p.dealLogger.Warnw(dp.DealUUID, "deal rejected by provider", "reason", resp.ri.Reason)
+		p.dealLogger.Infow(dp.DealUUID, "deal rejected by provider", "reason", resp.ri.Reason)
 		return resp.ri, nil
 	}
 
