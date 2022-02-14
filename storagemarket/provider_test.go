@@ -91,11 +91,6 @@ func TestSimpleDealHappy(t *testing.T) {
 	lgs, err := harness.Provider.logsDB.Logs(ctx, td.params.DealUUID)
 	require.NoError(t, err)
 	require.NotEmpty(t, lgs)
-
-	/*
-		for _, lg := range lgs {
-			fmt.Printf("\n %+v", lg)
-		}*/
 }
 
 func TestMultipleDealsConcurrent(t *testing.T) {

@@ -3,7 +3,6 @@ package logs
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/filecoin-project/boost/db"
@@ -57,18 +56,7 @@ func (d *DealLogger) Errorw(dealId uuid.UUID, errMsg string, kvs ...interface{})
 }
 
 func (d *DealLogger) LogError(dealId uuid.UUID, errMsg string, err error) {
-	d.logger.Errorw(errMsg, "id", dealId, "err", err)
-
-	l := &db.DealLog{
-		DealUUID:  dealId,
-		CreatedAt: time.Now(),
-		LogLevel:  "ERROR",
-		LogMsg:    fmt.Sprintf("msg: %s, err: %s", errMsg, err),
-		Subsystem: d.subsystem,
-	}
-	if err := d.logsDB.InsertLog(d.ctx, l); err != nil {
-		d.logger.Warnw("failed to persist deal log", "id", dealId, "err", err)
-	}
+	d.Errorw(dealId, errMsg, "err", err)
 }
 
 func (d *DealLogger) updateLogDB(dealId uuid.UUID, msg string, level string, kvs ...interface{}) {
