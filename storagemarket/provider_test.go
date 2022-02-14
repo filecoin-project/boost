@@ -275,7 +275,7 @@ func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
 	}{
 		{
 			dealBuilder: func() *testDeal {
-				return harness.newDealBuilder(t, 1).withDisconnectingHttpServer().build()
+				return harness.newDealBuilder(t, 1).withFailingHttpServer().build()
 			},
 			errContains: "failed data transfer",
 		},
@@ -483,6 +483,7 @@ type ProviderHarness struct {
 	NormalServer        *httptest.Server
 	BlockingServer      *testutil.BlockingHttpTestServer
 	DisconnectingServer *httptest.Server
+	FailingServer       *httptest.Server
 }
 
 type providerConfig struct {
@@ -569,6 +570,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	normalServer := testutil.HttpTestUnstartedFileServer(t, dir)
 	blockingServer := testutil.NewBlockingHttpTestServer(t, dir)
 	disconnServer := testutil.HttpTestDisconnectingServer(t, dir, pc.disconnectAfterEvery)
+	failingServer := testutil.HttpTestUnstartedFailingServer(t)
 
 	// create a provider libp2p peer
 	mn := mocknet.New(ctx)
@@ -594,6 +596,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		NormalServer:        normalServer,
 		BlockingServer:      blockingServer,
 		DisconnectingServer: disconnServer,
+		FailingServer:       failingServer,
 
 		MockFullNode:           fn,
 		MockSealingPipelineAPI: sps,
@@ -681,10 +684,12 @@ func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
 	h.NormalServer.Start()
 	h.BlockingServer.Start()
 	h.DisconnectingServer.Start()
-	require.NoError(t, h.Provider.Start())
+	h.FailingServer.Start()
+	require.NoError(t, h.Provider.Start(ctx))
 }
 
 func (h *ProviderHarness) Stop() {
+	h.FailingServer.Close()
 	h.NormalServer.Close()
 	h.BlockingServer.Close()
 	h.DisconnectingServer.Close()
@@ -854,6 +859,11 @@ func (tbuilder *testDealBuilder) withAllMinerCallsBlocking() *testDealBuilder {
 	tbuilder.msPublishConfirm = &minerStubCall{blocking: true}
 	tbuilder.msAddPiece = &minerStubCall{blocking: true}
 
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withFailingHttpServer() *testDealBuilder {
+	tbuilder.setTransferParams(tbuilder.td.ph.FailingServer.URL)
 	return tbuilder
 }
 
