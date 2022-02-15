@@ -179,6 +179,6 @@ function DealLog(props) {
     return <tr>
         <td>{moment(log.CreatedAt).format(dateFormat)}</td>
         <td className="since-last">{sinceLast}</td>
-        <td>{log.Text}</td>
+        <td>{log.LogMsg}</td>
     </tr>
 }

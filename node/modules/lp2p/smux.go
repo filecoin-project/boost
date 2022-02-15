@@ -21,7 +21,7 @@ func makeSmuxTransportOption(mplexExp bool) libp2p.Option {
 		ymxtpt.LogOutput = os.Stderr
 	}
 
-	muxers := map[string]smux.Multiplexer{yamuxID: &ymxtpt}
+	muxers := map[string]smux.Multiplexer{yamuxID: &ymxtpt} // nolint:staticcheck
 	if mplexExp {
 		muxers[mplexID] = mplex.DefaultTransport
 	}

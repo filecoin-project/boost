@@ -112,7 +112,7 @@ func NewClientGraphsyncDataTransfer(lc fx.Lifecycle, h host.Host, gs dtypes.Grap
 	net := dtnet.NewFromLibp2pHost(h, dtRetryParams)
 
 	dtDs := namespace.Wrap(ds, datastore.NewKey("/datatransfer/client/transfers"))
-	transport := dtgstransport.NewTransport(h.ID(), gs, net)
+	transport := dtgstransport.NewTransport(h.ID(), gs)
 	err := os.MkdirAll(filepath.Join(r.Path(), "data-transfer"), 0755) //nolint: gosec
 	if err != nil && !os.IsExist(err) {
 		return nil, err
@@ -136,7 +136,7 @@ func NewClientGraphsyncDataTransfer(lc fx.Lifecycle, h host.Host, gs dtypes.Grap
 		// After trying to restart 3 times, give up and fail the transfer
 		MaxConsecutiveRestarts: 3,
 	})
-	dt, err := dtimpl.NewDataTransfer(dtDs, filepath.Join(r.Path(), "data-transfer"), net, transport, dtRestartConfig)
+	dt, err := dtimpl.NewDataTransfer(dtDs, net, transport, dtRestartConfig)
 	if err != nil {
 		return nil, err
 	}

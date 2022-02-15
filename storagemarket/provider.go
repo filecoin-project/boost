@@ -179,10 +179,10 @@ func (p *Provider) NBytesReceived(dealUuid uuid.UUID) uint64 {
 	return p.transfers.getBytes(dealUuid)
 }
 
-func (p *Provider) GetAsk() *types.StorageAsk {
-	return &types.StorageAsk{
-		Price:         abi.NewTokenAmount(1),
-		VerifiedPrice: abi.NewTokenAmount(1),
+func (p *Provider) GetAsk() *storagemarket.StorageAsk {
+	return &storagemarket.StorageAsk{
+		Price:         abi.NewTokenAmount(0),
+		VerifiedPrice: abi.NewTokenAmount(0),
 		MinPieceSize:  0,
 		MaxPieceSize:  64 * 1024 * 1024 * 1024,
 		Miner:         p.Address,
