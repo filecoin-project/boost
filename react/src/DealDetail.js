@@ -1,4 +1,4 @@
-import React, {useEffect} from "react";
+import React, {useEffect, useState} from "react";
 import {useMutation, useSubscription} from "@apollo/react-hooks";
 import {DealCancelMutation, DealSubscription} from "./gql";
 import {useNavigate} from "react-router-dom";
@@ -187,7 +187,8 @@ function DealLog(props) {
                     k = JSON.stringify(k)
                 }
                 if (typeof v === "object") {
-                    v = JSON.stringify(v)
+                    console.log(v)
+                    // v = JSON.stringify(v)
                 }
                 logParams[k] = v
             }
@@ -201,11 +202,35 @@ function DealLog(props) {
         <td className="since-last">{sinceLast}</td>
         <td className="log-line">
             <div className="message">{log.LogMsg}</div>
-            {Object.keys(logParams).map((k, i) => (
-                <div className="param" key={i}>
-                    {k}: {logParams[k]}
-                </div>
-            ))}
+            {Object.keys(logParams).sort().map(k => <LogParam k={k} v={logParams[k]} topLevel={true} key={k} />)}
         </td>
     </tr>
+}
+
+function LogParam(props) {
+    const [expanded, setExpanded] = useState(false)
+
+    var val = props.v
+    const isObject = (val && typeof val === 'object')
+    if (isObject) {
+        val = Object.keys(val).sort().map(ck => <LogParam k={ck} v={val[ck]} key={ck} />)
+    }
+
+    function toggleExpandState() {
+        setExpanded(!expanded)
+    }
+
+    const expandable = isObject && props.topLevel
+    return (
+        <div className={"param" + (expandable ? ' expandable' : '') + (expanded ? ' expanded' : '')}>
+            <span className="param-name" onClick={toggleExpandState}>
+                {props.k}:
+                {expandable ? (
+                    <div className="expand-collapse"></div>
+                ) : null}
+            </span>
+            &nbsp;
+            {val}
+        </div>
+    )
 }

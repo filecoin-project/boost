@@ -55,6 +55,33 @@
 }
 
 .deal-detail .deal-logs .param {
+    position: relative;
     color: #777777;
     line-height: 1.5em;
+}
+
+.deal-detail .deal-logs .param.expandable > .param-name {
+    cursor: pointer;
+}
+
+.deal-detail .deal-logs .param .param {
+    padding-left: 1em;
+    display: none;
+}
+.deal-detail .deal-logs .param.expanded .param {
+    display: block;
+}
+
+.deal-detail .deal-logs .param .expand-collapse {
+    margin-left: 0.5em;
+    opacity: 0.5;
+    width: 0.8em;
+    height: 0.8em;
+    display: inline-block;
+    background: url("./bootstrap-icons/icons/caret-right-fill.svg");
+    background-size: cover;
+}
+
+.deal-detail .deal-logs .param.expanded .expand-collapse {
+    background: url("./bootstrap-icons/icons/caret-down-fill.svg")
 }
