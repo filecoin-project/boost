@@ -7,7 +7,10 @@ export function transformResponse(obj, parent, parentKey) {
             if (typeof obj === 'string') {
                 // If the string is a date, convert it to a date object
                 if (obj.match(dateRegExp)) {
-                    parent[parentKey] = new Date(obj)
+                    const asDate = new Date(obj)
+                    if (!isNaN(asDate.valueOf())) {
+                        parent[parentKey] = asDate
+                    }
                 }
             } else if (typeof obj === 'object') {
                 // If the object represents a BigInt, convert it to a BigInt

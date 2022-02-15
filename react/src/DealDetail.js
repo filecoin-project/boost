@@ -195,7 +195,7 @@ function DealLog(props) {
         } catch(_) {
         }
     }
-    
+
     return <tr>
         <td className="at">{moment(log.CreatedAt).format(dateFormat)}</td>
         <td className="since-last">{sinceLast}</td>
