@@ -273,7 +273,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		// backoff-retry transfer if max number of attempts haven't been exhausted
 		nAttempts := t.backoff.Attempt() + 1
 		if nAttempts >= t.maxReconnectAttempts {
-			t.dl.Errorw(duuid, "terminating http req as exhausted max attempts", "err", err, "maxAttempts", t.maxReconnectAttempts)
+			t.dl.Errorw(duuid, "terminating http req as exhausted max attempts", "err", err.Error(), "maxAttempts", t.maxReconnectAttempts)
 			return fmt.Errorf("could not finish transfer even after %.0f attempts, lastErr: %w", t.maxReconnectAttempts, err)
 		}
 		duration := t.backoff.Duration()

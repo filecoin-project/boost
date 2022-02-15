@@ -202,7 +202,7 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 	// validate the deal proposal
 	if !p.testMode {
 		if err := p.validateDealProposal(ds); err != nil {
-			p.dealLogger.Infow(dp.DealUUID, "deal proposal failed validation", "err", err)
+			p.dealLogger.Infow(dp.DealUUID, "deal proposal failed validation", "err", err.Error())
 
 			return &api.ProviderDealRejectionInfo{
 				Reason: fmt.Sprintf("failed validation: %s", err),

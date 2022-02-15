@@ -82,7 +82,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 			// recoverable errors as well and we will have to build the DB/UX/resumption support for it.
 
 			// if the error is recoverable, persist that fact to the deal log and return
-			p.dealLogger.Infow(deal.DealUuid, "deal paused because of recoverable error", "err", derr.err)
+			p.dealLogger.Infow(deal.DealUuid, "deal paused because of recoverable error", "err", derr.err.Error())
 		}
 		return
 	}
@@ -395,7 +395,7 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	}
 	defer func() {
 		if err := v2r.Close(); err != nil {
-			p.dealLogger.Warnw(deal.DealUuid, "failed to close carv2 reader in addpiece", "err", err)
+			p.dealLogger.Warnw(deal.DealUuid, "failed to close carv2 reader in addpiece", "err", err.Error())
 		}
 	}()
 
@@ -483,13 +483,13 @@ func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 
 func (p *Provider) fireEventDealNew(deal *types.ProviderDealState) {
 	if err := p.newDealPS.NewDeals.Emit(*deal); err != nil {
-		p.dealLogger.Warnw(deal.DealUuid, "publishing new deal event", "err", err)
+		p.dealLogger.Warnw(deal.DealUuid, "publishing new deal event", "err", err.Error())
 	}
 }
 
 func (p *Provider) fireEventDealUpdate(pub event.Emitter, deal *types.ProviderDealState) {
 	if err := pub.Emit(*deal); err != nil {
-		p.dealLogger.Warnw(deal.DealUuid, "publishing deal state update", "err", err)
+		p.dealLogger.Warnw(deal.DealUuid, "publishing deal state update", "err", err.Error())
 	}
 }
 
