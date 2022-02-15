@@ -11,6 +11,8 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 )
 
+var baseLogger = logging.Logger("boost-storage-deal")
+
 type DealLogger struct {
 	ctx       context.Context
 	logger    *logging.ZapEventLogger
@@ -21,7 +23,7 @@ type DealLogger struct {
 func NewDealLogger(ctx context.Context, logsDB *db.LogsDB) *DealLogger {
 	return &DealLogger{
 		ctx:    ctx,
-		logger: logging.Logger("boost-storage-deal"),
+		logger: baseLogger,
 		logsDB: logsDB,
 	}
 }
