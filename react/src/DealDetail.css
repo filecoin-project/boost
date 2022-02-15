@@ -45,3 +45,16 @@
 .deal-detail h3 {
     margin-top: 2em;
 }
+
+.deal-detail .deal-logs .at {
+    white-space: nowrap;
+}
+
+.deal-detail .deal-logs td {
+    vertical-align: top;
+}
+
+.deal-detail .deal-logs .param {
+    color: #777777;
+    line-height: 1.5em;
+}

@@ -176,9 +176,28 @@ function DealLog(props) {
         }
     }
 
+    var logParams = {}
+    if (log.LogParams && typeof log.LogParams === 'string') {
+        try {
+            const params = JSON.parse(log.LogParams)
+            for (let i = 0; i < params.length; i+=2) {
+                logParams[params[i]] = params[i+1]
+            }
+            delete logParams.id
+        } catch(_) {
+        }
+    }
+    
     return <tr>
-        <td>{moment(log.CreatedAt).format(dateFormat)}</td>
+        <td className="at">{moment(log.CreatedAt).format(dateFormat)}</td>
         <td className="since-last">{sinceLast}</td>
-        <td>{log.LogMsg}</td>
+        <td className="log-line">
+            <div className="message">{log.LogMsg}</div>
+            {Object.keys(logParams).map(k => (
+                <div className="param">
+                    {k}: {logParams[k]}
+                </div>
+            ))}
+        </td>
     </tr>
 }
