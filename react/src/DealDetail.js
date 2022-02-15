@@ -181,7 +181,15 @@ function DealLog(props) {
         try {
             const params = JSON.parse(log.LogParams)
             for (let i = 0; i < params.length; i+=2) {
-                logParams[params[i]] = params[i+1]
+                var k = params[i]
+                var v = params[i+1]
+                if (typeof k !== "string") {
+                    k = JSON.stringify(k)
+                }
+                if (typeof v === "object") {
+                    v = JSON.stringify(v)
+                }
+                logParams[k] = v
             }
             delete logParams.id
         } catch(_) {
@@ -193,8 +201,8 @@ function DealLog(props) {
         <td className="since-last">{sinceLast}</td>
         <td className="log-line">
             <div className="message">{log.LogMsg}</div>
-            {Object.keys(logParams).map(k => (
-                <div className="param">
+            {Object.keys(logParams).map((k, i) => (
+                <div className="param" key={i}>
                     {k}: {logParams[k]}
                 </div>
             ))}
