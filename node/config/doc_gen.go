@@ -40,6 +40,12 @@ your node if metadata log is disabled`,
 	},
 	"Boost": []DocField{
 		{
+			Name: "Storage",
+			Type: "sectorstorage.SealerConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "SealerApiInfo",
 			Type: "string",
 
@@ -58,8 +64,14 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "LotusDealmaking",
+			Type: "lotus_config.DealmakingConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "DAGStore",
-			Type: "DAGStoreConfig",
+			Type: "lotus_config.DAGStoreConfig",
 
 			Comment: ``,
 		},
@@ -334,6 +346,105 @@ count towards this limit.`,
 
 			Comment: `ConnMgrGrace is a time duration that new connections are immune from being
 closed by the connection manager.`,
+		},
+	},
+	"LotusDealmakingConfig": []DocField{
+		{
+			Name: "PieceCidBlocklist",
+			Type: "[]cid.Cid",
+
+			Comment: `A list of Data CIDs to reject when making deals`,
+		},
+		{
+			Name: "ExpectedSealDuration",
+			Type: "Duration",
+
+			Comment: `Maximum expected amount of time getting the deal into a sealed sector will take
+This includes the time the deal will need to get transferred and published
+before being assigned to a sector`,
+		},
+		{
+			Name: "MaxDealStartDelay",
+			Type: "Duration",
+
+			Comment: `Maximum amount of time proposed deal StartEpoch can be in future`,
+		},
+		{
+			Name: "PublishMsgPeriod",
+			Type: "Duration",
+
+			Comment: `When a deal is ready to publish, the amount of time to wait for more
+deals to be ready to publish before publishing them all as a batch`,
+		},
+		{
+			Name: "MaxDealsPerPublishMsg",
+			Type: "uint64",
+
+			Comment: `The maximum number of deals to include in a single PublishStorageDeals
+message`,
+		},
+		{
+			Name: "MaxProviderCollateralMultiplier",
+			Type: "uint64",
+
+			Comment: `The maximum collateral that the provider will put up against a deal,
+as a multiplier of the minimum collateral bound`,
+		},
+		{
+			Name: "MaxStagingDealsBytes",
+			Type: "int64",
+
+			Comment: `The maximum allowed disk usage size in bytes of staging deals not yet
+passed to the sealing node by the markets service. 0 is unlimited.`,
+		},
+		{
+			Name: "SimultaneousTransfersForStorage",
+			Type: "uint64",
+
+			Comment: `The maximum number of parallel online data transfers for storage deals`,
+		},
+		{
+			Name: "SimultaneousTransfersForStoragePerClient",
+			Type: "uint64",
+
+			Comment: `The maximum number of simultaneous data transfers from any single client
+for storage deals.
+Unset by default (0), and values higher than SimultaneousTransfersForStorage
+will have no effect; i.e. the total number of simultaneous data transfers
+across all storage clients is bound by SimultaneousTransfersForStorage
+regardless of this number.`,
+		},
+		{
+			Name: "SimultaneousTransfersForRetrieval",
+			Type: "uint64",
+
+			Comment: `The maximum number of parallel online data transfers for retrieval deals`,
+		},
+		{
+			Name: "StartEpochSealingBuffer",
+			Type: "uint64",
+
+			Comment: `Minimum start epoch buffer to give time for sealing of sector with deal.`,
+		},
+		{
+			Name: "Filter",
+			Type: "string",
+
+			Comment: `A command used for fine-grained evaluation of storage deals
+see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-fine-grained-storage-and-retrieval-deal-acceptance for more details`,
+		},
+		{
+			Name: "RetrievalFilter",
+			Type: "string",
+
+			Comment: `A command used for fine-grained evaluation of retrieval deals
+see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-fine-grained-storage-and-retrieval-deal-acceptance for more details`,
+		},
+		{
+			Name: "RetrievalPricing",
+			Type: "*RetrievalPricing",
+
+			Comment: ``,
 		},
 	},
 	"RetrievalPricing": []DocField{

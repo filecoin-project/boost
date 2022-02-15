@@ -22,7 +22,7 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/boost/node/repo"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/lib/addrutil"
@@ -67,7 +67,7 @@ func MemoryConstraints() system.MemoryConstraints {
 
 // MemoryWatchdog starts the memory watchdog, applying the computed resource
 // constraints.
-func MemoryWatchdog(lr repo.LockedRepo, lc fx.Lifecycle, constraints system.MemoryConstraints) {
+func MemoryWatchdog(lr lotus_repo.LockedRepo, lc fx.Lifecycle, constraints system.MemoryConstraints) {
 	if os.Getenv(EnvWatchdogDisabled) == "1" {
 		log.Infof("memory watchdog is disabled via %s", EnvWatchdogDisabled)
 		return
@@ -138,7 +138,7 @@ type JwtPayload struct {
 	Allow []auth.Permission
 }
 
-func APISecret(keystore types.KeyStore, lr repo.LockedRepo) (*dtypes.APIAlg, error) {
+func APISecret(keystore types.KeyStore, lr lotus_repo.LockedRepo) (*dtypes.APIAlg, error) {
 	key, err := keystore.Get(JWTSecretName)
 
 	if errors.Is(err, types.ErrKeyInfoNotFound) {
@@ -183,32 +183,3 @@ func ConfigBootstrap(peers []string) func() (dtypes.BootstrapPeers, error) {
 		return addrutil.ParseAddresses(context.TODO(), peers)
 	}
 }
-
-//func BuiltinBootstrap() (dtypes.BootstrapPeers, error) {
-//return build.BuiltinBootstrap()
-//}
-
-//func NewDefaultMaxFeeFunc(r repo.LockedRepo) dtypes.DefaultMaxFeeFunc {
-//return func() (out abi.TokenAmount, err error) {
-//err = readNodeCfg(r, func(cfg *config.FullNode) {
-//out = abi.TokenAmount(cfg.Fees.DefaultMaxFee)
-//})
-//return
-//}
-//}
-
-//func readNodeCfg(r repo.LockedRepo, accessor func(node *config.FullNode)) error {
-//raw, err := r.Config()
-//if err != nil {
-//return err
-//}
-
-//cfg, ok := raw.(*config.FullNode)
-//if !ok {
-//return xerrors.New("expected config.FullNode")
-//}
-
-//accessor(cfg)
-
-//return nil
-//}

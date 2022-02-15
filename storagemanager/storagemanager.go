@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/node/repo"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
 )
@@ -23,14 +23,14 @@ type Config struct {
 }
 
 type StorageManager struct {
-	lr                 repo.LockedRepo
+	lr                 lotus_repo.LockedRepo
 	db                 *db.StorageDB
 	cfg                Config
 	StagingAreaDirPath string
 }
 
-func New(cfg Config) func(lr repo.LockedRepo, sqldb *sql.DB) *StorageManager {
-	return func(lr repo.LockedRepo, sqldb *sql.DB) *StorageManager {
+func New(cfg Config) func(lr lotus_repo.LockedRepo, sqldb *sql.DB) *StorageManager {
+	return func(lr lotus_repo.LockedRepo, sqldb *sql.DB) *StorageManager {
 		return &StorageManager{
 			db:                 db.NewStorageDB(sqldb),
 			cfg:                cfg,

@@ -9,6 +9,7 @@ import (
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/lotus/chain/types"
+	lotus_config "github.com/filecoin-project/lotus/node/config"
 )
 
 const (
@@ -90,10 +91,10 @@ func DefaultBoost() *Boost {
 			},
 		},
 
-		DAGStore: DAGStoreConfig{
+		DAGStore: lotus_config.DAGStoreConfig{
 			MaxConcurrentIndex:         5,
 			MaxConcurrencyStorageCalls: 100,
-			GCInterval:                 Duration(1 * time.Minute),
+			GCInterval:                 lotus_config.Duration(1 * time.Minute),
 		},
 	}
 	return cfg

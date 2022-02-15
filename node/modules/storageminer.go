@@ -7,9 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -25,15 +23,9 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/gql"
-	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/go-address"
-	dtimpl "github.com/filecoin-project/go-data-transfer/impl"
-	dtnet "github.com/filecoin-project/go-data-transfer/network"
-	dtgstransport "github.com/filecoin-project/go-data-transfer/transport/graphsync"
-	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
 	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -45,45 +37,31 @@ import (
 
 	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
 	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
+	"github.com/filecoin-project/lotus/storage/sectorblocks"
 
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/boost/node/modules/helpers"
-	"github.com/filecoin-project/boost/node/repo"
+	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
 	lapi "github.com/filecoin-project/lotus/api"
+	lotus_config "github.com/filecoin-project/lotus/node/config"
+	"github.com/filecoin-project/lotus/node/repo"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/markets"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	marketevents "github.com/filecoin-project/lotus/markets/loggers"
+	"github.com/filecoin-project/lotus/markets/pricing"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/filecoin-project/lotus/node/modules/helpers"
 )
 
 var (
 	StorageCounterDSPrefix = "/storage/nextid"
 	StagingAreaDirName     = "deal-staging"
 )
-
-func minerAddrFromDS(ctx context.Context, ds dtypes.MetadataDS) (address.Address, error) {
-	maddrb, err := ds.Get(ctx, datastore.NewKey("miner-address"))
-	if err != nil {
-		return address.Undef, err
-	}
-
-	return address.NewFromBytes(maddrb)
-}
-
-func MinerAddress(ctx context.Context, ds dtypes.MetadataDS) (dtypes.MinerAddress, error) {
-	ma, err := minerAddrFromDS(ctx, ds)
-	return dtypes.MinerAddress(ma), err
-}
-
-func MinerID(ma dtypes.MinerAddress) (dtypes.MinerID, error) {
-	id, err := address.IDFromAddress(address.Address(ma))
-	return dtypes.MinerID(id), err
-}
 
 func HandleRetrieval(host host.Host, lc fx.Lifecycle, m retrievalmarket.RetrievalProvider, j journal.Journal) {
 	m.OnReady(marketevents.ReadyLogger("retrieval provider"))
@@ -103,7 +81,7 @@ func HandleRetrieval(host host.Host, lc fx.Lifecycle, m retrievalmarket.Retrieva
 	})
 }
 
-func HandleMigrateProviderFunds(lc fx.Lifecycle, ds dtypes.MetadataDS, node lapi.FullNode, minerAddress dtypes.MinerAddress) {
+func HandleMigrateProviderFunds(lc fx.Lifecycle, ds lotus_dtypes.MetadataDS, node lapi.FullNode, minerAddress lotus_dtypes.MinerAddress) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			b, err := ds.Get(ctx, datastore.NewKey("/marketfunds/provider"))
@@ -142,55 +120,9 @@ func HandleMigrateProviderFunds(lc fx.Lifecycle, ds dtypes.MetadataDS, node lapi
 	})
 }
 
-// NewProviderDAGServiceDataTransfer returns a data transfer manager that just
-// uses the provider's Staging DAG service for transfers
-func NewProviderDAGServiceDataTransfer(lc fx.Lifecycle, h host.Host, gs dtypes.StagingGraphsync, ds dtypes.MetadataDS, r repo.LockedRepo) (dtypes.ProviderDataTransfer, error) {
-	net := dtnet.NewFromLibp2pHost(h)
-
-	dtDs := namespace.Wrap(ds, datastore.NewKey("/datatransfer/provider/transfers"))
-	transport := dtgstransport.NewTransport(h.ID(), gs, net)
-	err := os.MkdirAll(filepath.Join(r.Path(), "data-transfer"), 0755) //nolint: gosec
-	if err != nil && !os.IsExist(err) {
-		return nil, err
-	}
-
-	dt, err := dtimpl.NewDataTransfer(dtDs, filepath.Join(r.Path(), "data-transfer"), net, transport)
-	if err != nil {
-		return nil, err
-	}
-
-	dt.OnReady(marketevents.ReadyLogger("provider data transfer"))
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			dt.SubscribeToEvents(marketevents.DataTransferLogger)
-			return dt.Start(ctx)
-		},
-		OnStop: func(ctx context.Context) error {
-			return dt.Stop(ctx)
-		},
-	})
-	return dt, nil
-}
-
-// NewProviderPieceStore creates a statestore for storing metadata about pieces
-// shared by the storage and retrieval providers
-func NewProviderPieceStore(lc fx.Lifecycle, ds dtypes.MetadataDS) (dtypes.ProviderPieceStore, error) {
-	ps, err := piecestoreimpl.NewPieceStore(namespace.Wrap(ds, datastore.NewKey("/storagemarket")))
-	if err != nil {
-		return nil, err
-	}
-	ps.OnReady(marketevents.ReadyLogger("piecestore"))
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			return ps.Start(ctx)
-		},
-	})
-	return ps, nil
-}
-
 // StagingBlockstore creates a blockstore for staging blocks for a miner
 // in a storage deal, prior to sealing
-func StagingBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, r repo.LockedRepo) (dtypes.StagingBlockstore, error) {
+func StagingBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, r lotus_repo.LockedRepo) (lotus_dtypes.StagingBlockstore, error) {
 	ctx := helpers.LifecycleCtx(mctx, lc)
 	stagingds, err := r.Datastore(ctx, "/staging")
 	if err != nil {
@@ -237,34 +169,6 @@ func RetrievalNetwork(h host.Host) rmnet.RetrievalMarketNetwork {
 	return rmnet.NewFromLibp2pHost(h)
 }
 
-// RetrievalProvider creates a new retrieval provider attached to the provider blockstore
-func RetrievalProvider(
-	maddr dtypes.MinerAddress,
-	adapter retrievalmarket.RetrievalProviderNode,
-	sa retrievalmarket.SectorAccessor,
-	netwk rmnet.RetrievalMarketNetwork,
-	ds dtypes.MetadataDS,
-	pieceStore dtypes.ProviderPieceStore,
-	dt dtypes.ProviderDataTransfer,
-	pricingFnc dtypes.RetrievalPricingFunc,
-	userFilter dtypes.RetrievalDealFilter,
-	dagStore *dagstore.Wrapper,
-) (retrievalmarket.RetrievalProvider, error) {
-	opt := retrievalimpl.DealDeciderOpt(retrievalimpl.DealDecider(userFilter))
-	return retrievalimpl.NewProvider(
-		address.Address(maddr),
-		adapter,
-		sa,
-		netwk,
-		pieceStore,
-		dagStore,
-		dt,
-		namespace.Wrap(ds, datastore.NewKey("/retrievals/provider")),
-		retrievalimpl.RetrievalPricingFunc(pricingFnc),
-		opt,
-	)
-}
-
 var WorkerCallsPrefix = datastore.NewKey("/worker/calls")
 var ManagerWorkPrefix = datastore.NewKey("/stmgr/calls")
 
@@ -277,7 +181,7 @@ func RemoteStorage(lstor *stores.Local, si stores.SectorIndex, sa sectorstorage.
 	return stores.NewRemote(lstor, si, http.Header(sa), sc.ParallelFetchLimit, &stores.DefaultPartialFileHandler{})
 }
 
-func SectorStorage(mctx helpers.MetricsCtx, lc fx.Lifecycle, lstor *stores.Local, stor *stores.Remote, ls stores.LocalStorage, si stores.SectorIndex, sc sectorstorage.SealerConfig, ds dtypes.MetadataDS) (*sectorstorage.Manager, error) {
+func SectorStorage(mctx helpers.MetricsCtx, lc fx.Lifecycle, lstor *stores.Local, stor *stores.Remote, ls stores.LocalStorage, si stores.SectorIndex, sc sectorstorage.SealerConfig, ds lotus_dtypes.MetadataDS) (*sectorstorage.Manager, error) {
 	ctx := helpers.LifecycleCtx(mctx, lc)
 
 	wsts := statestore.New(namespace.Wrap(ds, WorkerCallsPrefix))
@@ -293,6 +197,22 @@ func SectorStorage(mctx helpers.MetricsCtx, lc fx.Lifecycle, lstor *stores.Local
 	})
 
 	return sst, nil
+}
+
+// LotusRetrievalPricingFunc configures the pricing function to use for retrieval deals. // TODO(anteva): Fix me
+func LotusRetrievalPricingFunc() func(_ lotus_dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
+	_ lotus_dtypes.ConsiderOfflineRetrievalDealsConfigFunc) lotus_dtypes.RetrievalPricingFunc {
+
+	cfg := lotus_config.DealmakingConfig{}
+
+	return func(_ lotus_dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
+		_ lotus_dtypes.ConsiderOfflineRetrievalDealsConfigFunc) lotus_dtypes.RetrievalPricingFunc {
+		if cfg.RetrievalPricing.Strategy == lotus_config.RetrievalPricingExternalMode {
+			return pricing.ExternalRetrievalPricingFunc(cfg.RetrievalPricing.External.Path)
+		}
+
+		return retrievalimpl.DefaultPricingFunc(cfg.RetrievalPricing.Default.VerifiedDealsFreeTransfer)
+	}
 }
 
 func StorageAuth(ctx helpers.MetricsCtx, ca v0api.Common) (sectorstorage.StorageAuth, error) {
@@ -318,7 +238,7 @@ func StorageAuthWithURL(apiInfo string) func(ctx helpers.MetricsCtx, ca v0api.Co
 	}
 }
 
-func NewConsiderOnlineStorageDealsConfigFunc(r repo.LockedRepo) (dtypes.ConsiderOnlineStorageDealsConfigFunc, error) {
+func NewConsiderOnlineStorageDealsConfigFunc(r lotus_repo.LockedRepo) (dtypes.ConsiderOnlineStorageDealsConfigFunc, error) {
 	return func() (out bool, err error) {
 		err = readCfg(r, func(cfg *config.Boost) {
 			out = cfg.Dealmaking.ConsiderOnlineStorageDeals
@@ -327,7 +247,7 @@ func NewConsiderOnlineStorageDealsConfigFunc(r repo.LockedRepo) (dtypes.Consider
 	}, nil
 }
 
-func NewSetConsideringOnlineStorageDealsFunc(r repo.LockedRepo) (dtypes.SetConsiderOnlineStorageDealsConfigFunc, error) {
+func NewSetConsideringOnlineStorageDealsFunc(r lotus_repo.LockedRepo) (dtypes.SetConsiderOnlineStorageDealsConfigFunc, error) {
 	return func(b bool) (err error) {
 		err = mutateCfg(r, func(cfg *config.Boost) {
 			cfg.Dealmaking.ConsiderOnlineStorageDeals = b
@@ -336,7 +256,7 @@ func NewSetConsideringOnlineStorageDealsFunc(r repo.LockedRepo) (dtypes.SetConsi
 	}, nil
 }
 
-func NewConsiderOnlineRetrievalDealsConfigFunc(r repo.LockedRepo) (dtypes.ConsiderOnlineRetrievalDealsConfigFunc, error) {
+func NewConsiderOnlineRetrievalDealsConfigFunc(r lotus_repo.LockedRepo) (dtypes.ConsiderOnlineRetrievalDealsConfigFunc, error) {
 	return func() (out bool, err error) {
 		err = readCfg(r, func(cfg *config.Boost) {
 			out = cfg.Dealmaking.ConsiderOnlineRetrievalDeals
@@ -345,7 +265,7 @@ func NewConsiderOnlineRetrievalDealsConfigFunc(r repo.LockedRepo) (dtypes.Consid
 	}, nil
 }
 
-func NewSetConsiderOnlineRetrievalDealsConfigFunc(r repo.LockedRepo) (dtypes.SetConsiderOnlineRetrievalDealsConfigFunc, error) {
+func NewSetConsiderOnlineRetrievalDealsConfigFunc(r lotus_repo.LockedRepo) (dtypes.SetConsiderOnlineRetrievalDealsConfigFunc, error) {
 	return func(b bool) (err error) {
 		err = mutateCfg(r, func(cfg *config.Boost) {
 			cfg.Dealmaking.ConsiderOnlineRetrievalDeals = b
@@ -354,7 +274,7 @@ func NewSetConsiderOnlineRetrievalDealsConfigFunc(r repo.LockedRepo) (dtypes.Set
 	}, nil
 }
 
-func NewStorageDealPieceCidBlocklistConfigFunc(r repo.LockedRepo) (dtypes.StorageDealPieceCidBlocklistConfigFunc, error) {
+func NewStorageDealPieceCidBlocklistConfigFunc(r lotus_repo.LockedRepo) (dtypes.StorageDealPieceCidBlocklistConfigFunc, error) {
 	return func() (out []cid.Cid, err error) {
 		err = readCfg(r, func(cfg *config.Boost) {
 			out = cfg.Dealmaking.PieceCidBlocklist
@@ -363,7 +283,7 @@ func NewStorageDealPieceCidBlocklistConfigFunc(r repo.LockedRepo) (dtypes.Storag
 	}, nil
 }
 
-func NewSetStorageDealPieceCidBlocklistConfigFunc(r repo.LockedRepo) (dtypes.SetStorageDealPieceCidBlocklistConfigFunc, error) {
+func NewSetStorageDealPieceCidBlocklistConfigFunc(r lotus_repo.LockedRepo) (dtypes.SetStorageDealPieceCidBlocklistConfigFunc, error) {
 	return func(blocklist []cid.Cid) (err error) {
 		err = mutateCfg(r, func(cfg *config.Boost) {
 			cfg.Dealmaking.PieceCidBlocklist = blocklist
@@ -372,7 +292,7 @@ func NewSetStorageDealPieceCidBlocklistConfigFunc(r repo.LockedRepo) (dtypes.Set
 	}, nil
 }
 
-func NewConsiderOfflineStorageDealsConfigFunc(r repo.LockedRepo) (dtypes.ConsiderOfflineStorageDealsConfigFunc, error) {
+func NewConsiderOfflineStorageDealsConfigFunc(r lotus_repo.LockedRepo) (dtypes.ConsiderOfflineStorageDealsConfigFunc, error) {
 	return func() (out bool, err error) {
 		err = readCfg(r, func(cfg *config.Boost) {
 			out = cfg.Dealmaking.ConsiderOfflineStorageDeals
@@ -381,7 +301,7 @@ func NewConsiderOfflineStorageDealsConfigFunc(r repo.LockedRepo) (dtypes.Conside
 	}, nil
 }
 
-func NewSetConsideringOfflineStorageDealsFunc(r repo.LockedRepo) (dtypes.SetConsiderOfflineStorageDealsConfigFunc, error) {
+func NewSetConsideringOfflineStorageDealsFunc(r lotus_repo.LockedRepo) (dtypes.SetConsiderOfflineStorageDealsConfigFunc, error) {
 	return func(b bool) (err error) {
 		err = mutateCfg(r, func(cfg *config.Boost) {
 			cfg.Dealmaking.ConsiderOfflineStorageDeals = b
@@ -390,7 +310,7 @@ func NewSetConsideringOfflineStorageDealsFunc(r repo.LockedRepo) (dtypes.SetCons
 	}, nil
 }
 
-func NewConsiderOfflineRetrievalDealsConfigFunc(r repo.LockedRepo) (dtypes.ConsiderOfflineRetrievalDealsConfigFunc, error) {
+func NewConsiderOfflineRetrievalDealsConfigFunc(r lotus_repo.LockedRepo) (dtypes.ConsiderOfflineRetrievalDealsConfigFunc, error) {
 	return func() (out bool, err error) {
 		err = readCfg(r, func(cfg *config.Boost) {
 			out = cfg.Dealmaking.ConsiderOfflineRetrievalDeals
@@ -399,7 +319,7 @@ func NewConsiderOfflineRetrievalDealsConfigFunc(r repo.LockedRepo) (dtypes.Consi
 	}, nil
 }
 
-func NewSetConsiderOfflineRetrievalDealsConfigFunc(r repo.LockedRepo) (dtypes.SetConsiderOfflineRetrievalDealsConfigFunc, error) {
+func NewSetConsiderOfflineRetrievalDealsConfigFunc(r lotus_repo.LockedRepo) (dtypes.SetConsiderOfflineRetrievalDealsConfigFunc, error) {
 	return func(b bool) (err error) {
 		err = mutateCfg(r, func(cfg *config.Boost) {
 			cfg.Dealmaking.ConsiderOfflineRetrievalDeals = b
@@ -408,7 +328,7 @@ func NewSetConsiderOfflineRetrievalDealsConfigFunc(r repo.LockedRepo) (dtypes.Se
 	}, nil
 }
 
-func NewConsiderVerifiedStorageDealsConfigFunc(r repo.LockedRepo) (dtypes.ConsiderVerifiedStorageDealsConfigFunc, error) {
+func NewConsiderVerifiedStorageDealsConfigFunc(r lotus_repo.LockedRepo) (dtypes.ConsiderVerifiedStorageDealsConfigFunc, error) {
 	return func() (out bool, err error) {
 		err = readCfg(r, func(cfg *config.Boost) {
 			out = cfg.Dealmaking.ConsiderVerifiedStorageDeals
@@ -417,7 +337,7 @@ func NewConsiderVerifiedStorageDealsConfigFunc(r repo.LockedRepo) (dtypes.Consid
 	}, nil
 }
 
-func NewSetConsideringVerifiedStorageDealsFunc(r repo.LockedRepo) (dtypes.SetConsiderVerifiedStorageDealsConfigFunc, error) {
+func NewSetConsideringVerifiedStorageDealsFunc(r lotus_repo.LockedRepo) (dtypes.SetConsiderVerifiedStorageDealsConfigFunc, error) {
 	return func(b bool) (err error) {
 		err = mutateCfg(r, func(cfg *config.Boost) {
 			cfg.Dealmaking.ConsiderVerifiedStorageDeals = b
@@ -426,7 +346,7 @@ func NewSetConsideringVerifiedStorageDealsFunc(r repo.LockedRepo) (dtypes.SetCon
 	}, nil
 }
 
-func NewConsiderUnverifiedStorageDealsConfigFunc(r repo.LockedRepo) (dtypes.ConsiderUnverifiedStorageDealsConfigFunc, error) {
+func NewConsiderUnverifiedStorageDealsConfigFunc(r lotus_repo.LockedRepo) (dtypes.ConsiderUnverifiedStorageDealsConfigFunc, error) {
 	return func() (out bool, err error) {
 		err = readCfg(r, func(cfg *config.Boost) {
 			out = cfg.Dealmaking.ConsiderUnverifiedStorageDeals
@@ -435,7 +355,7 @@ func NewConsiderUnverifiedStorageDealsConfigFunc(r repo.LockedRepo) (dtypes.Cons
 	}, nil
 }
 
-func NewSetConsideringUnverifiedStorageDealsFunc(r repo.LockedRepo) (dtypes.SetConsiderUnverifiedStorageDealsConfigFunc, error) {
+func NewSetConsideringUnverifiedStorageDealsFunc(r lotus_repo.LockedRepo) (dtypes.SetConsiderUnverifiedStorageDealsConfigFunc, error) {
 	return func(b bool) (err error) {
 		err = mutateCfg(r, func(cfg *config.Boost) {
 			cfg.Dealmaking.ConsiderUnverifiedStorageDeals = b
@@ -444,7 +364,7 @@ func NewSetConsideringUnverifiedStorageDealsFunc(r repo.LockedRepo) (dtypes.SetC
 	}, nil
 }
 
-func NewSetExpectedSealDurationFunc(r repo.LockedRepo) (dtypes.SetExpectedSealDurationFunc, error) {
+func NewSetExpectedSealDurationFunc(r lotus_repo.LockedRepo) (dtypes.SetExpectedSealDurationFunc, error) {
 	return func(delay time.Duration) (err error) {
 		err = mutateCfg(r, func(cfg *config.Boost) {
 			cfg.Dealmaking.ExpectedSealDuration = config.Duration(delay)
@@ -453,7 +373,7 @@ func NewSetExpectedSealDurationFunc(r repo.LockedRepo) (dtypes.SetExpectedSealDu
 	}, nil
 }
 
-func NewGetExpectedSealDurationFunc(r repo.LockedRepo) (dtypes.GetExpectedSealDurationFunc, error) {
+func NewGetExpectedSealDurationFunc(r lotus_repo.LockedRepo) (dtypes.GetExpectedSealDurationFunc, error) {
 	return func() (out time.Duration, err error) {
 		err = readCfg(r, func(cfg *config.Boost) {
 			out = time.Duration(cfg.Dealmaking.ExpectedSealDuration)
@@ -462,7 +382,7 @@ func NewGetExpectedSealDurationFunc(r repo.LockedRepo) (dtypes.GetExpectedSealDu
 	}, nil
 }
 
-func NewSetMaxDealStartDelayFunc(r repo.LockedRepo) (dtypes.SetMaxDealStartDelayFunc, error) {
+func NewSetMaxDealStartDelayFunc(r lotus_repo.LockedRepo) (dtypes.SetMaxDealStartDelayFunc, error) {
 	return func(delay time.Duration) (err error) {
 		err = mutateCfg(r, func(cfg *config.Boost) {
 			cfg.Dealmaking.MaxDealStartDelay = config.Duration(delay)
@@ -471,7 +391,7 @@ func NewSetMaxDealStartDelayFunc(r repo.LockedRepo) (dtypes.SetMaxDealStartDelay
 	}, nil
 }
 
-func NewGetMaxDealStartDelayFunc(r repo.LockedRepo) (dtypes.GetMaxDealStartDelayFunc, error) {
+func NewGetMaxDealStartDelayFunc(r lotus_repo.LockedRepo) (dtypes.GetMaxDealStartDelayFunc, error) {
 	return func() (out time.Duration, err error) {
 		err = readCfg(r, func(cfg *config.Boost) {
 			out = time.Duration(cfg.Dealmaking.MaxDealStartDelay)
@@ -480,7 +400,7 @@ func NewGetMaxDealStartDelayFunc(r repo.LockedRepo) (dtypes.GetMaxDealStartDelay
 	}, nil
 }
 
-func readCfg(r repo.LockedRepo, accessor func(*config.Boost)) error {
+func readCfg(r lotus_repo.LockedRepo, accessor func(*config.Boost)) error {
 	raw, err := r.Config()
 	if err != nil {
 		return err
@@ -496,7 +416,7 @@ func readCfg(r repo.LockedRepo, accessor func(*config.Boost)) error {
 	return nil
 }
 
-func mutateCfg(r repo.LockedRepo, mutator func(*config.Boost)) error {
+func mutateCfg(r lotus_repo.LockedRepo, mutator func(*config.Boost)) error {
 	var typeErr error
 
 	setConfigErr := r.SetConfig(func(raw interface{}) {
@@ -520,7 +440,7 @@ func StorageNetworkName(ctx helpers.MetricsCtx, a v1api.FullNode) (dtypes.Networ
 	return dtypes.NetworkName(n), nil
 }
 
-func NewBoostDB(r repo.LockedRepo) (*sql.DB, error) {
+func NewBoostDB(r lotus_repo.LockedRepo) (*sql.DB, error) {
 	dbPath := path.Join(r.Path(), "boost.db")
 	return db.SqlDB(dbPath)
 }

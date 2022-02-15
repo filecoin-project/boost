@@ -23,7 +23,6 @@ import (
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/pkg/devnet"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -40,10 +39,15 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
+	lotus_config "github.com/filecoin-project/lotus/node/config"
+	"github.com/filecoin-project/lotus/node/modules"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
+	"github.com/filecoin-project/lotus/storage"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -277,9 +281,15 @@ func (f *testFramework) start() {
 	f.setControlAddress(psdWalletAddr)
 
 	// Create an in-memory repo
-	r := repo.NewMemory(nil)
+	r := lotus_repo.NewMemory(nil)
 
-	lr, err := r.Lock(repo.Boost)
+	lr, err := r.Lock(node.BoostRepoType{})
+	require.NoError(f.t, err)
+
+	ds, err := lr.Datastore(context.Background(), "/metadata")
+	require.NoError(f.t, err)
+
+	err = ds.Put(context.Background(), datastore.NewKey("miner-address"), minerAddr.Bytes())
 	require.NoError(f.t, err)
 
 	// Set some config values on the repo
@@ -291,6 +301,7 @@ func (f *testFramework) start() {
 		f.t.Fatalf("invalid config from repo, got: %T", c)
 	}
 	cfg.SectorIndexApiInfo = minerEndpoint
+	cfg.SealerApiInfo = minerEndpoint
 	cfg.Wallets.Miner = minerAddr.String()
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
@@ -315,6 +326,14 @@ func (f *testFramework) start() {
 		node.Base(),
 		node.Repo(r),
 		node.Override(new(v1api.FullNode), fullnodeApi),
+
+		node.Override(new(*storage.AddressSelector), modules.AddressSelector(&lotus_config.MinerAddressConfig{
+			DealPublishControl: []string{
+				psdWalletAddr.String(),
+			},
+			DisableOwnerFallback:  true,
+			DisableWorkerFallback: true,
+		})),
 	)
 	require.NoError(f.t, err)
 

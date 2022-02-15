@@ -86,7 +86,7 @@ type Provider struct {
 	// Sealing Pipeline API
 	sps sealingpipeline.API
 
-	// Deal Filter
+	// Boost deal filter
 	df dtypes.StorageDealFilter
 
 	// Database API

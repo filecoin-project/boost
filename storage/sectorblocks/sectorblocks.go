@@ -18,8 +18,8 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/specs-storage/storage"
 
-	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/api"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 type SealSerialization uint8
@@ -59,7 +59,7 @@ type SectorBlocks struct {
 	keyLk sync.Mutex
 }
 
-func NewSectorBlocks(sb SectorBuilder, ds dtypes.MetadataDS) *SectorBlocks {
+func NewSectorBlocks(sb SectorBuilder, ds lotus_dtypes.MetadataDS) *SectorBlocks {
 	sbc := &SectorBlocks{
 		SectorBuilder: sb,
 		keys:          namespace.Wrap(ds, dsPrefix),

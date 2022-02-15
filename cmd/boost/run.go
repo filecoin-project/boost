@@ -6,15 +6,15 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/boost/node/repo"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/api/v1api"
+	lcli "github.com/filecoin-project/lotus/cli"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
+
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
-
-	lcli "github.com/filecoin-project/lotus/cli"
 )
 
 var runCmd = &cli.Command{
@@ -53,7 +53,7 @@ var runCmd = &cli.Command{
 
 		boostRepoPath := cctx.String(FlagBoostRepo)
 
-		r, err := repo.NewFS(boostRepoPath)
+		r, err := lotus_repo.NewFS(boostRepoPath)
 		if err != nil {
 			return err
 		}

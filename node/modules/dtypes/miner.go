@@ -7,14 +7,12 @@ import (
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/filecoin-project/lotus/extern/storage-sealing/sealiface"
 )
 
-type MinerAddress address.Address
 type MinerID abi.ActorID
 
 // ConsiderOnlineStorageDealsConfigFunc is a function which reads from miner

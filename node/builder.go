@@ -12,32 +12,49 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
-	"github.com/filecoin-project/boost/journal"
-	"github.com/filecoin-project/boost/journal/alerting"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/impl"
 	"github.com/filecoin-project/boost/node/impl/common"
 	"github.com/filecoin-project/boost/node/impl/net"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/boost/node/modules/helpers"
-	"github.com/filecoin-project/boost/node/modules/lp2p"
-	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/sealingpipeline"
-	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
-	"github.com/filecoin-project/boost/storagemarket/dealfilter"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
+
+	lotus_api "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
+	lotus_sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
 	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
 	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
+	lotus_journal "github.com/filecoin-project/lotus/journal"
+	"github.com/filecoin-project/lotus/journal/alerting"
 	_ "github.com/filecoin-project/lotus/lib/sigs/bls"
 	_ "github.com/filecoin-project/lotus/lib/sigs/secp"
+	"github.com/filecoin-project/lotus/markets/dagstore"
+	lotus_dealfilter "github.com/filecoin-project/lotus/markets/dealfilter"
+	"github.com/filecoin-project/lotus/markets/retrievaladapter"
+	"github.com/filecoin-project/lotus/markets/sectoraccessor"
+	lotus_storageadapter "github.com/filecoin-project/lotus/markets/storageadapter"
+	lotus_config "github.com/filecoin-project/lotus/node/config"
+	lotus_common "github.com/filecoin-project/lotus/node/impl/common"
+	lotus_net "github.com/filecoin-project/lotus/node/impl/net"
+	lotus_modules "github.com/filecoin-project/lotus/node/modules"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
+	lotus_helpers "github.com/filecoin-project/lotus/node/modules/helpers"
+	lotus_lp2p "github.com/filecoin-project/lotus/node/modules/lp2p"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
+	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/filecoin-project/lotus/system"
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipfs/go-metrics-interface"
+
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
+	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
+	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+
 	ci "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -47,6 +64,9 @@ import (
 	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 	record "github.com/libp2p/go-libp2p-record"
 	"github.com/libp2p/go-libp2p/p2p/net/conngater"
+
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipfs/go-metrics-interface"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
@@ -140,7 +160,7 @@ type Settings struct {
 	// type, and must be applied in correct order
 	invokes []fx.Option
 
-	nodeType repo.RepoType
+	nodeType lotus_repo.RepoType
 
 	Base   bool // Base option applied
 	Config bool // Config option applied
@@ -150,62 +170,59 @@ type Settings struct {
 // Basic lotus-app services
 func defaults() []Option {
 	return []Option{
-		// global system journal.
-		//TODO (anteva): FIXME: not sure why these are not working
-
-		Override(new(journal.DisabledEvents), journal.EnvDisabledEvents),
-		Override(new(journal.Journal), modules.OpenFilesystemJournal),
+		// global system journal
+		Override(new(lotus_journal.DisabledEvents), lotus_journal.EnvDisabledEvents),
+		Override(new(lotus_journal.Journal), lotus_modules.OpenFilesystemJournal),
 		Override(new(*alerting.Alerting), alerting.NewAlertingSystem),
 
-		Override(CheckFDLimit, modules.CheckFdLimit(build.DefaultFDLimit)),
+		Override(CheckFDLimit, lotus_modules.CheckFdLimit(build.DefaultFDLimit)),
 
 		Override(new(system.MemoryConstraints), modules.MemoryConstraints),
-		//Override(InitMemoryWatchdog, modules.MemoryWatchdog),
 
-		Override(new(helpers.MetricsCtx), func() context.Context {
+		Override(new(lotus_helpers.MetricsCtx), func() context.Context {
 			return metrics.CtxScope(context.Background(), "boost")
 		}),
 
-		Override(new(dtypes.ShutdownChan), make(chan struct{})),
+		Override(new(lotus_dtypes.ShutdownChan), make(chan struct{})),
 	}
 }
 
 var LibP2P = Options(
 	// Host config
-	Override(new(dtypes.Bootstrapper), dtypes.Bootstrapper(false)),
+	Override(new(lotus_dtypes.Bootstrapper), lotus_dtypes.Bootstrapper(false)),
 
 	// Host dependencies
 	Override(new(peerstore.Peerstore), func() (peerstore.Peerstore, error) { return pstoremem.NewPeerstore() }),
-	Override(PstoreAddSelfKeysKey, lp2p.PstoreAddSelfKeys),
-	Override(StartListeningKey, lp2p.StartListening([]string{"/ip4/127.0.0.1/tcp/1899"})),
+	Override(PstoreAddSelfKeysKey, lotus_lp2p.PstoreAddSelfKeys),
+	Override(StartListeningKey, lotus_lp2p.StartListening([]string{"/ip4/127.0.0.1/tcp/1899"})),
 
 	// Host settings
-	Override(DefaultTransportsKey, lp2p.DefaultTransports),
-	Override(AddrsFactoryKey, lp2p.AddrsFactory(nil, nil)),
-	Override(SmuxTransportKey, lp2p.SmuxTransport(true)),
-	Override(RelayKey, lp2p.NoRelay()),
-	Override(SecurityKey, lp2p.Security(true, false)),
+	Override(DefaultTransportsKey, lotus_lp2p.DefaultTransports),
+	Override(AddrsFactoryKey, lotus_lp2p.AddrsFactory(nil, nil)),
+	Override(SmuxTransportKey, lotus_lp2p.SmuxTransport()),
+	Override(RelayKey, lotus_lp2p.NoRelay()),
+	Override(SecurityKey, lotus_lp2p.Security(true, false)),
 
 	// Host
-	Override(new(lp2p.RawHost), lp2p.Host),
-	Override(new(host.Host), lp2p.RoutedHost),
-	Override(new(lp2p.BaseIpfsRouting), lp2p.DHTRouting(dht.ModeAuto)),
+	Override(new(lotus_lp2p.RawHost), lotus_lp2p.Host),
+	Override(new(host.Host), lotus_lp2p.RoutedHost),
+	Override(new(lotus_lp2p.BaseIpfsRouting), lotus_lp2p.DHTRouting(dht.ModeAuto)),
 
-	Override(DiscoveryHandlerKey, lp2p.DiscoveryHandler),
+	Override(DiscoveryHandlerKey, lotus_lp2p.DiscoveryHandler),
 
 	// Routing
 	Override(new(record.Validator), modules.RecordValidator),
-	Override(BaseRoutingKey, lp2p.BaseRouting),
-	Override(new(routing.Routing), lp2p.Routing),
+	Override(BaseRoutingKey, lotus_lp2p.BaseRouting),
+	Override(new(routing.Routing), lotus_lp2p.Routing),
 
 	// Services
-	Override(BandwidthReporterKey, lp2p.BandwidthCounter),
-	Override(AutoNATSvcKey, lp2p.AutoNATService),
+	Override(BandwidthReporterKey, lotus_lp2p.BandwidthCounter),
+	Override(AutoNATSvcKey, lotus_lp2p.AutoNATService),
 
 	// Services (connection management)
-	Override(ConnectionManagerKey, lp2p.ConnectionManager(50, 200, 20*time.Second, nil)),
-	Override(new(*conngater.BasicConnectionGater), lp2p.ConnGater),
-	Override(ConnGaterKey, lp2p.ConnGaterOption),
+	Override(ConnectionManagerKey, lotus_lp2p.ConnectionManager(50, 200, 20*time.Second, nil)),
+	Override(new(*conngater.BasicConnectionGater), lotus_lp2p.ConnGater),
+	Override(ConnGaterKey, lotus_lp2p.ConnGaterOption),
 )
 
 func Base() Option {
@@ -226,7 +243,7 @@ func ConfigCommon(cfg *config.Common) Option {
 		Override(new(dtypes.APIEndpoint), func() (dtypes.APIEndpoint, error) {
 			return multiaddr.NewMultiaddr(cfg.API.ListenAddress)
 		}),
-		Override(SetApiEndpointKey, func(lr repo.LockedRepo, e dtypes.APIEndpoint) error {
+		Override(SetApiEndpointKey, func(lr lotus_repo.LockedRepo, e dtypes.APIEndpoint) error {
 			return lr.SetAPIEndpoint(e)
 		}),
 		Override(new(stores.URLs), func(e dtypes.APIEndpoint) (stores.URLs, error) {
@@ -239,25 +256,29 @@ func ConfigCommon(cfg *config.Common) Option {
 		ApplyIf(func(s *Settings) bool { return s.Base }), // apply only if Base has already been applied
 		Override(new(api.Net), From(new(net.NetAPI))),
 		Override(new(api.Common), From(new(common.CommonAPI))),
-		Override(new(dtypes.MetadataDS), modules.Datastore(cfg.Backup.DisableMetadataLog)),
-		Override(StartListeningKey, lp2p.StartListening(cfg.Libp2p.ListenAddresses)),
-		Override(ConnectionManagerKey, lp2p.ConnectionManager(
+
+		Override(new(lotus_api.Net), From(new(lotus_net.NetAPI))),
+		Override(new(lotus_api.Common), From(new(lotus_common.CommonAPI))),
+
+		Override(new(lotus_dtypes.MetadataDS), lotus_modules.Datastore(cfg.Backup.DisableMetadataLog)),
+		Override(StartListeningKey, lotus_lp2p.StartListening(cfg.Libp2p.ListenAddresses)),
+		Override(ConnectionManagerKey, lotus_lp2p.ConnectionManager(
 			cfg.Libp2p.ConnMgrLow,
 			cfg.Libp2p.ConnMgrHigh,
 			time.Duration(cfg.Libp2p.ConnMgrGrace),
 			cfg.Libp2p.ProtectedPeers)),
 		ApplyIf(func(s *Settings) bool { return len(cfg.Libp2p.BootstrapPeers) > 0 },
-			Override(new(dtypes.BootstrapPeers), modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)),
+			Override(new(lotus_dtypes.BootstrapPeers), modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)),
 		),
 
-		Override(AddrsFactoryKey, lp2p.AddrsFactory(
+		Override(AddrsFactoryKey, lotus_lp2p.AddrsFactory(
 			cfg.Libp2p.AnnounceAddresses,
 			cfg.Libp2p.NoAnnounceAddresses)),
-		If(!cfg.Libp2p.DisableNatPortMap, Override(NatPortMapKey, lp2p.NatPortMap)),
+		If(!cfg.Libp2p.DisableNatPortMap, Override(NatPortMapKey, lotus_lp2p.NatPortMap)),
 	)
 }
 
-func Repo(r repo.Repo) Option {
+func Repo(r lotus_repo.Repo) Option {
 	return func(settings *Settings) error {
 		lr, err := r.Lock(settings.nodeType)
 		if err != nil {
@@ -268,15 +289,15 @@ func Repo(r repo.Repo) Option {
 			return err
 		}
 		return Options(
-			Override(new(repo.LockedRepo), modules.LockedRepo(lr)), // module handles closing
+			Override(new(lotus_repo.LockedRepo), lotus_modules.LockedRepo(lr)), // module handles closing
 
-			Override(new(ci.PrivKey), lp2p.PrivKey),
+			Override(new(ci.PrivKey), lotus_lp2p.PrivKey),
 			Override(new(ci.PubKey), ci.PrivKey.GetPublic),
 			Override(new(peer.ID), peer.IDFromPublicKey),
 
 			Override(new(types.KeyStore), modules.KeyStore),
 
-			Override(new(*dtypes.APIAlg), modules.APISecret),
+			Override(new(*lotus_dtypes.APIAlg), lotus_modules.APISecret),
 
 			ConfigBoost(c),
 		)(settings)
@@ -329,13 +350,13 @@ func New(ctx context.Context, opts ...Option) (StopFunc, error) {
 }
 
 var BoostNode = Options(
-	Override(new(sectorstorage.StorageAuth), modules.StorageAuth),
+	Override(new(lotus_sectorstorage.StorageAuth), lotus_modules.StorageAuth),
 
 	// Actor config
-	Override(new(dtypes.MinerAddress), modules.MinerAddress),
-	Override(new(dtypes.MinerID), modules.MinerID),
+	Override(new(lotus_dtypes.MinerAddress), lotus_modules.MinerAddress),
+	Override(new(lotus_dtypes.MinerID), lotus_modules.MinerID),
 
-	Override(new(dtypes.NetworkName), modules.StorageNetworkName),
+	Override(new(lotus_dtypes.NetworkName), lotus_modules.StorageNetworkName),
 	Override(new(*sql.DB), modules.NewBoostDB),
 	Override(new(*modules.LogSqlDB), modules.NewLogsSqlDB),
 	Override(new(*db.DealsDB), modules.NewDealsDB),
@@ -377,11 +398,11 @@ func ConfigBoost(c interface{}) Option {
 	return Options(
 		ConfigCommon(&cfg.Common),
 
-		Override(CheckFDLimit, modules.CheckFdLimit(build.BoostFDLimit)), // recommend at least 100k FD limit to miners
+		Override(CheckFDLimit, lotus_modules.CheckFdLimit(build.BoostFDLimit)), // recommend at least 100k FD limit to miners
 
-		Override(new(stores.LocalStorage), From(new(repo.LockedRepo))),
-		Override(new(*stores.Local), modules.LocalStorage),
-		Override(new(*stores.Remote), modules.RemoteStorage),
+		Override(new(stores.LocalStorage), From(new(lotus_repo.LockedRepo))),
+		Override(new(*stores.Local), lotus_modules.LocalStorage),
+		Override(new(*stores.Remote), lotus_modules.RemoteStorage),
 
 		Override(new(*storagemarket.DealPublisher), storagemarket.NewDealPublisher(storagemarket.PublishMsgConfig{
 			Wallet:                  walletPSD,
@@ -403,18 +424,107 @@ func ConfigBoost(c interface{}) Option {
 		})),
 
 		// Sector API
-		Override(new(modules.MinerStorageService), modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
-		Override(new(sectorblocks.SectorBuilder), From(new(modules.MinerStorageService))),
+		Override(new(sectorblocks.SectorBuilder), From(new(lotus_modules.MinerStorageService))),
+
 		Override(new(*sectorblocks.SectorBlocks), sectorblocks.NewSectorBlocks),
 
 		// Sealing Pipeline State API
-		Override(new(sealingpipeline.API), From(new(modules.MinerStorageService))),
+		Override(new(sealingpipeline.API), From(new(lotus_modules.MinerStorageService))),
 
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner)),
 
 		// GraphQL server
 		Override(new(*gql.Server), modules.NewGraphqlServer),
 
+		// Lotus Markets
+		Override(new(lotus_dtypes.StagingBlockstore), lotus_modules.StagingBlockstore),
+		Override(new(lotus_dtypes.StagingGraphsync), lotus_modules.StagingGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
+		Override(new(lotus_dtypes.ProviderPieceStore), lotus_modules.NewProviderPieceStore),
+
+		// Lotus Markets (retrieval deps)
+		Override(new(lotus_sectorstorage.PieceProvider), lotus_sectorstorage.NewPieceProvider),
+
+		Override(new(lotus_dtypes.RetrievalPricingFunc), lotus_modules.RetrievalPricingFunc(lotus_config.DealmakingConfig{
+			RetrievalPricing: &lotus_config.RetrievalPricing{
+				Strategy: config.RetrievalPricingDefaultMode,
+				Default:  &lotus_config.RetrievalPricingDefault{},
+			},
+		})),
+
+		// DAG Store
+		Override(new(dagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
+		Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
+
+		// Lotus Markets (retrieval)
+		Override(new(dagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
+		Override(new(retrievalmarket.SectorAccessor), From(new(dagstore.SectorAccessor))),
+		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
+		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
+		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
+		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
+
+		// Lotus Markets (storage)
+		Override(new(lotus_dtypes.ProviderTransferNetwork), lotus_modules.NewProviderTransferNetwork),
+		Override(new(lotus_dtypes.ProviderTransport), lotus_modules.NewProviderTransport),
+		Override(new(lotus_dtypes.ProviderDataTransfer), lotus_modules.NewProviderDataTransfer),
+		Override(new(*storedask.StoredAsk), lotus_modules.NewStorageAsk),
+
+		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&cfg.LotusFees, &cfg.LotusDealmaking)),
+		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(nil, nil)),
+		Override(new(lotus_storagemarket.StorageProvider), lotus_modules.StorageProvider),
+		Override(new(*lotus_storageadapter.DealPublisher), lotus_storageadapter.NewDealPublisher(nil, lotus_storageadapter.PublishMsgConfig{})),
+
+		// Boost storage deal filter
+		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),
+
+		// Lotus markets storage deal filter
+		Override(new(lotus_dtypes.StorageDealFilter), lotus_modules.BasicDealFilter(cfg.LotusDealmaking, nil)),
+		If(cfg.LotusDealmaking.Filter != "",
+			Override(new(lotus_dtypes.StorageDealFilter), lotus_modules.BasicDealFilter(cfg.LotusDealmaking, lotus_dealfilter.CliStorageDealFilter(cfg.LotusDealmaking.Filter))),
+		),
+
+		// Lotus markets retrieval deal filter
+		Override(new(lotus_dtypes.RetrievalDealFilter), lotus_modules.RetrievalDealFilter(nil)),
+		If(cfg.Dealmaking.RetrievalFilter != "",
+			Override(new(lotus_dtypes.RetrievalDealFilter), lotus_modules.RetrievalDealFilter(lotus_dealfilter.CliRetrievalDealFilter(cfg.LotusDealmaking.RetrievalFilter))),
+		),
+
+		Override(new(*lotus_storageadapter.DealPublisher), lotus_storageadapter.NewDealPublisher(&cfg.LotusFees, lotus_storageadapter.PublishMsgConfig{
+			Period:                  time.Duration(cfg.Dealmaking.PublishMsgPeriod),
+			MaxDealsPerMsg:          cfg.LotusDealmaking.MaxDealsPerPublishMsg,
+			StartEpochSealingBuffer: cfg.LotusDealmaking.StartEpochSealingBuffer,
+		})),
+
+		Override(new(sectorstorage.Unsealer), From(new(lotus_modules.MinerStorageService))),
+		Override(new(stores.SectorIndex), From(new(lotus_modules.MinerSealingService))),
+		Override(new(sectorstorage.SealerConfig), cfg.Storage),
+
+		Override(new(lotus_modules.MinerStorageService), lotus_modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
+		Override(new(lotus_modules.MinerSealingService), lotus_modules.ConnectSealingService(cfg.SealerApiInfo)),
+
+		Override(new(sectorstorage.StorageAuth), lotus_modules.StorageAuthWithURL(cfg.SectorIndexApiInfo)),
+
+		// Dynamic Lotus configs
+		Override(new(lotus_dtypes.ConsiderOnlineStorageDealsConfigFunc), lotus_modules.NewConsiderOnlineStorageDealsConfigFunc),
+		Override(new(lotus_dtypes.SetConsiderOnlineStorageDealsConfigFunc), lotus_modules.NewSetConsideringOnlineStorageDealsFunc),
+		Override(new(lotus_dtypes.ConsiderOnlineRetrievalDealsConfigFunc), lotus_modules.NewConsiderOnlineRetrievalDealsConfigFunc),
+		Override(new(lotus_dtypes.SetConsiderOnlineRetrievalDealsConfigFunc), lotus_modules.NewSetConsiderOnlineRetrievalDealsConfigFunc),
+		Override(new(lotus_dtypes.StorageDealPieceCidBlocklistConfigFunc), lotus_modules.NewStorageDealPieceCidBlocklistConfigFunc),
+		Override(new(lotus_dtypes.SetStorageDealPieceCidBlocklistConfigFunc), lotus_modules.NewSetStorageDealPieceCidBlocklistConfigFunc),
+		Override(new(lotus_dtypes.ConsiderOfflineStorageDealsConfigFunc), lotus_modules.NewConsiderOfflineStorageDealsConfigFunc),
+		Override(new(lotus_dtypes.SetConsiderOfflineStorageDealsConfigFunc), lotus_modules.NewSetConsideringOfflineStorageDealsFunc),
+		Override(new(lotus_dtypes.ConsiderOfflineRetrievalDealsConfigFunc), lotus_modules.NewConsiderOfflineRetrievalDealsConfigFunc),
+		Override(new(lotus_dtypes.SetConsiderOfflineRetrievalDealsConfigFunc), lotus_modules.NewSetConsiderOfflineRetrievalDealsConfigFunc),
+		Override(new(lotus_dtypes.ConsiderVerifiedStorageDealsConfigFunc), lotus_modules.NewConsiderVerifiedStorageDealsConfigFunc),
+		Override(new(lotus_dtypes.SetConsiderVerifiedStorageDealsConfigFunc), lotus_modules.NewSetConsideringVerifiedStorageDealsFunc),
+		Override(new(lotus_dtypes.ConsiderUnverifiedStorageDealsConfigFunc), lotus_modules.NewConsiderUnverifiedStorageDealsConfigFunc),
+		Override(new(lotus_dtypes.SetConsiderUnverifiedStorageDealsConfigFunc), lotus_modules.NewSetConsideringUnverifiedStorageDealsFunc),
+		Override(new(lotus_dtypes.SetExpectedSealDurationFunc), lotus_modules.NewSetExpectedSealDurationFunc),
+		Override(new(lotus_dtypes.GetExpectedSealDurationFunc), lotus_modules.NewGetExpectedSealDurationFunc),
+		Override(new(lotus_dtypes.SetMaxDealStartDelayFunc), lotus_modules.NewSetMaxDealStartDelayFunc),
+		Override(new(lotus_dtypes.GetMaxDealStartDelayFunc), lotus_modules.NewGetMaxDealStartDelayFunc),
+
+		// Dynamic Boost configs
 		Override(new(dtypes.ConsiderOnlineStorageDealsConfigFunc), modules.NewConsiderOnlineStorageDealsConfigFunc),
 		Override(new(dtypes.SetConsiderOnlineStorageDealsConfigFunc), modules.NewSetConsideringOnlineStorageDealsFunc),
 		Override(new(dtypes.ConsiderOnlineRetrievalDealsConfigFunc), modules.NewConsiderOnlineRetrievalDealsConfigFunc),
@@ -433,14 +543,6 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(dtypes.GetExpectedSealDurationFunc), modules.NewGetExpectedSealDurationFunc),
 		Override(new(dtypes.SetMaxDealStartDelayFunc), modules.NewSetMaxDealStartDelayFunc),
 		Override(new(dtypes.GetMaxDealStartDelayFunc), modules.NewGetMaxDealStartDelayFunc),
-
-		// Default storage deal filter
-		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),
-
-		// Storage deal filter
-		If(cfg.Dealmaking.Filter != "",
-			Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, dealfilter.CliStorageDealFilter(cfg.Dealmaking.Filter))),
-		),
 	)
 }
 
@@ -451,7 +553,7 @@ func Boost(out *api.Boost) Option {
 		),
 
 		func(s *Settings) error {
-			s.nodeType = repo.Boost
+			s.nodeType = BoostRepoType{}
 			return nil
 		},
 
@@ -462,4 +564,15 @@ func Boost(out *api.Boost) Option {
 			return nil
 		},
 	)
+}
+
+type BoostRepoType struct {
+}
+
+func (f BoostRepoType) Type() string {
+	return "Boost"
+}
+
+func (f BoostRepoType) Config() interface{} {
+	return config.DefaultBoost()
 }
