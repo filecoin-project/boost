@@ -323,6 +323,7 @@ func (p *Provider) Start() error {
 		p.wg.Add(1)
 		go func() {
 			defer p.wg.Done()
+			p.dealLogger.Infow(d.DealUuid, "resuming deal on boost restart")
 			p.doDeal(d, dh)
 		}()
 	}
@@ -410,7 +411,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 	for build.Clock.Since(curTime) < addPieceRetryTimeout {
 		if !xerrors.Is(err, sealing.ErrTooManySectorsSealing) {
 			if err != nil {
-				p.dealLogger.Warnw(deal.DealUuid, "failed to addPiece for deal, will-retry", err)
+				p.dealLogger.Warnw(deal.DealUuid, "failed to addPiece for deal, will-retry", "err", err.Error())
 			}
 			break
 		}

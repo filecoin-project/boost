@@ -248,7 +248,12 @@ func (t *transfer) execute(ctx context.Context) error {
 		// start the http transfer
 		remaining := t.dealInfo.DealSize - t.nBytesReceived
 		reqErr := t.doHttp(ctx, req, of, remaining)
-		t.dl.Infow(duuid, "one http req done", "outputErr", reqErr)
+		if reqErr != nil {
+			t.dl.Infow(duuid, "one http req done", "http code", reqErr.code, "outputErr", reqErr.Error())
+		} else {
+			t.dl.Infow(duuid, "http req finished with no error")
+		}
+
 		if reqErr == nil {
 			t.dl.Infow(duuid, "http req done without any errors")
 			// if there's no error, transfer was successful
@@ -333,6 +338,10 @@ func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer,
 	buf := make([]byte, readBufferSize)
 	limitR := io.LimitReader(resp.Body, toRead)
 	for {
+		if ctx.Err() != nil {
+			t.dl.LogError(duid, "not reading http response anymore", ctx.Err())
+			return &httpError{error: ctx.Err()}
+		}
 		nr, readErr := limitR.Read(buf)
 
 		// if we read more than zero bytes, write whatever read.
