@@ -53,8 +53,8 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
 	if err != nil {
 		err = fmt.Errorf("failed to create event emitter: %w", err)
-		p.cleanupDeal(deal)
 		p.failDeal(pub, deal, err)
+		p.cleanupDeal(deal)
 		return
 	}
 
@@ -62,8 +62,8 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	fi, err := os.Stat(deal.InboundFilePath)
 	if err != nil {
 		err := fmt.Errorf("failed to stat output file: %w", err)
-		p.cleanupDeal(deal)
 		p.failDeal(pub, deal, err)
+		p.cleanupDeal(deal)
 		return
 	}
 	deal.NBytesReceived = fi.Size()
@@ -72,8 +72,8 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	if derr := p.execDealUptoAddPiece(dh.providerCtx, pub, deal, dh); derr != nil {
 		// If the error is NOT recoverable, fail the deal and cleanup state.
 		if !derr.recoverable {
-			p.cleanupDeal(deal)
 			p.failDeal(pub, deal, derr.err)
+			p.cleanupDeal(deal)
 			p.dealLogger.Infow(deal.DealUuid, "deal cleanup complete")
 		} else {
 			// TODO For now, we will get recoverable errors only when the process is gracefully shutdown and
@@ -454,6 +454,7 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 }
 
 func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
+	p.dealLogger.Infow(deal.DealUuid, "cleaning up deal state")
 	// remove the temp file created for inbound deal data
 	_ = os.Remove(deal.InboundFilePath)
 
@@ -479,6 +480,7 @@ func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 	case <-done:
 	case <-p.ctx.Done():
 	}
+	p.dealLogger.Infow(deal.DealUuid, "finished cleaning up deal state")
 }
 
 func (p *Provider) fireEventDealNew(deal *types.ProviderDealState) {
@@ -499,7 +501,7 @@ func (p *Provider) updateCheckpoint(ctx context.Context, pub event.Emitter, deal
 	if err := p.dealsDB.Update(ctx, deal); err != nil {
 		return fmt.Errorf("failed to persist deal state: %w", err)
 	}
-	p.dealLogger.Infow(deal.DealUuid, "updated deal checkpoint in DB", "old checkpoint", prev, "new checkpoint", ckpt)
+	p.dealLogger.Infow(deal.DealUuid, "updated deal checkpoint in DB", "old checkpoint", prev.String(), "new checkpoint", ckpt.String())
 	p.fireEventDealUpdate(pub, deal)
 
 	return nil
