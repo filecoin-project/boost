@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	acrypto "github.com/filecoin-project/go-state-types/crypto"
+
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/go-state-types/abi"
 
@@ -38,7 +40,7 @@ type dealMakingError struct {
 	uiMsg       string
 }
 
-func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
+func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler, isRestart bool) {
 	// Check if deal is already complete
 	// TODO Update this once we start listening for expired/slashed deals etc
 	if deal.Checkpoint >= dealcheckpoints.AddedPiece {
@@ -47,14 +49,21 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 		return
 	}
 
-	p.dealLogger.Infow(deal.DealUuid, "deal execution initiated", "deal state", *deal)
+	if isRestart {
+		p.dealLogger.Infow(deal.DealUuid, "resuming deal on boost restart")
+	}
+
+	dcpy := *deal
+	dcpy.Transfer.Params = nil
+	dcpy.ClientDealProposal.ClientSignature = acrypto.Signature{}
+	p.dealLogger.Infow(deal.DealUuid, "deal execution initiated", "deal state", dcpy)
 
 	// Set up pubsub for deal updates
 	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
 	if err != nil {
 		err = fmt.Errorf("failed to create event emitter: %w", err)
 		p.failDeal(pub, deal, err)
-		p.cleanupDeal(deal)
+		p.cleanupDealLogged(deal)
 		return
 	}
 
@@ -63,7 +72,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	if err != nil {
 		err := fmt.Errorf("failed to stat output file: %w", err)
 		p.failDeal(pub, deal, err)
-		p.cleanupDeal(deal)
+		p.cleanupDealLogged(deal)
 		return
 	}
 	deal.NBytesReceived = fi.Size()
@@ -73,7 +82,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 		// If the error is NOT recoverable, fail the deal and cleanup state.
 		if !derr.recoverable {
 			p.failDeal(pub, deal, derr.err)
-			p.cleanupDeal(deal)
+			p.cleanupDealLogged(deal)
 			p.dealLogger.Infow(deal.DealUuid, "deal cleanup complete")
 		} else {
 			// TODO For now, we will get recoverable errors only when the process is gracefully shutdown and
@@ -82,7 +91,8 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 			// recoverable errors as well and we will have to build the DB/UX/resumption support for it.
 
 			// if the error is recoverable, persist that fact to the deal log and return
-			p.dealLogger.Infow(deal.DealUuid, "deal paused because of recoverable error", "err", derr.err.Error())
+			p.dealLogger.Infow(deal.DealUuid, "deal paused because of recoverable error", "err", derr.err.Error(),
+				"current deal state", deal.Checkpoint.String())
 		}
 		return
 	}
@@ -90,7 +100,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	p.dealLogger.Infow(deal.DealUuid, "deal execution completed successfully")
 	// deal has been sent for sealing -> we can cleanup the deal state now and simply watch the deal on chain
 	// to wait for deal completion/slashing and update the state in DB accordingly.
-	p.cleanupDeal(deal)
+	p.cleanupDealLogged(deal)
 	p.dealLogger.Infow(deal.DealUuid, "finished deal cleanup after successful execution")
 	// TODO
 	// Watch deal on chain and change state in DB and emit notifications.
@@ -242,12 +252,30 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 	}
 
 	p.dealLogger.Infow(deal.DealUuid, "commP matched successfully: deal-data verified")
-	return p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.Transferred)
+	return p.updateCheckpoint(pub, deal, dealcheckpoints.Transferred)
 }
 
 func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.Handler, pub event.Emitter, deal *types.ProviderDealState) error {
 	defer handler.Close()
 	defer p.transfers.complete(deal.DealUuid)
+	tlog := make(map[int]struct{})
+
+	logTransferProgress := func(received int64) {
+		pct := (100 * received) / int64(deal.Transfer.Size)
+		if pct == 0 {
+			return
+		}
+		for i := 10; i < 100; i = i + 10 {
+			if i >= int(pct) {
+				if _, ok := tlog[i]; !ok {
+					tlog[i] = struct{}{}
+					p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received,
+						"deal size", deal.Transfer.Size, "~ percent complete", pct)
+					return
+				}
+			}
+		}
+	}
 
 	for {
 		select {
@@ -261,6 +289,7 @@ func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.
 			deal.NBytesReceived = evt.NBytesReceived
 			p.transfers.setBytes(deal.DealUuid, uint64(evt.NBytesReceived))
 			p.fireEventDealUpdate(pub, deal)
+			logTransferProgress(deal.NBytesReceived)
 
 		case <-ctx.Done():
 			return ctx.Err()
@@ -355,7 +384,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 		}
 
 		deal.PublishCID = &mcid
-		if err := p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.Published); err != nil {
+		if err := p.updateCheckpoint(pub, deal, dealcheckpoints.Published); err != nil {
 			return err
 		}
 		p.dealLogger.Infow(deal.DealUuid, "deal published successfully, will await deal publish confirmation")
@@ -377,7 +406,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	// final CID.
 	deal.PublishCID = &res.FinalCid
 	deal.ChainDealID = res.DealID
-	if err := p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.PublishConfirmed); err != nil {
+	if err := p.updateCheckpoint(pub, deal, dealcheckpoints.PublishConfirmed); err != nil {
 		return err
 	}
 
@@ -429,7 +458,7 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	deal.Length = packingInfo.Size
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully handed to the sealing subsystem")
 
-	return p.updateCheckpoint(ctx, pub, deal, dealcheckpoints.AddedPiece)
+	return p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece)
 }
 
 func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, err error) {
@@ -442,7 +471,7 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 		deal.Err = err.Error()
 		p.dealLogger.LogError(deal.DealUuid, "deal failed", err)
 	}
-	dberr := p.dealsDB.Update(p.ctx, deal)
+	dberr := p.dealsDB.Update(context.TODO(), deal)
 	if dberr != nil {
 		p.dealLogger.LogError(deal.DealUuid, "failed to update deal failure error in DB", dberr)
 	}
@@ -453,8 +482,13 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 	}
 }
 
+func (p *Provider) cleanupDealLogged(deal *types.ProviderDealState) {
+	p.dealLogger.Infow(deal.DealUuid, "cleaning up deal")
+	p.cleanupDeal(deal)
+	p.dealLogger.Infow(deal.DealUuid, "finished cleaning up deal")
+}
+
 func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
-	p.dealLogger.Infow(deal.DealUuid, "cleaning up deal state")
 	// remove the temp file created for inbound deal data
 	_ = os.Remove(deal.InboundFilePath)
 
@@ -480,7 +514,6 @@ func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 	case <-done:
 	case <-p.ctx.Done():
 	}
-	p.dealLogger.Infow(deal.DealUuid, "finished cleaning up deal state")
 }
 
 func (p *Provider) fireEventDealNew(deal *types.ProviderDealState) {
@@ -495,10 +528,11 @@ func (p *Provider) fireEventDealUpdate(pub event.Emitter, deal *types.ProviderDe
 	}
 }
 
-func (p *Provider) updateCheckpoint(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState, ckpt dealcheckpoints.Checkpoint) error {
+func (p *Provider) updateCheckpoint(pub event.Emitter, deal *types.ProviderDealState, ckpt dealcheckpoints.Checkpoint) error {
 	prev := deal.Checkpoint
 	deal.Checkpoint = ckpt
-	if err := p.dealsDB.Update(ctx, deal); err != nil {
+	// we don't want a graceful shutdown to mess with db updates
+	if err := p.dealsDB.Update(context.TODO(), deal); err != nil {
 		return fmt.Errorf("failed to persist deal state: %w", err)
 	}
 	p.dealLogger.Infow(deal.DealUuid, "updated deal checkpoint in DB", "old checkpoint", prev.String(), "new checkpoint", ckpt.String())

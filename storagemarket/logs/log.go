@@ -14,15 +14,13 @@ import (
 var baseLogger = logging.Logger("boost-storage-deal")
 
 type DealLogger struct {
-	ctx       context.Context
 	logger    *logging.ZapEventLogger
 	logsDB    *db.LogsDB
 	subsystem string
 }
 
-func NewDealLogger(ctx context.Context, logsDB *db.LogsDB) *DealLogger {
+func NewDealLogger(logsDB *db.LogsDB) *DealLogger {
 	return &DealLogger{
-		ctx:    ctx,
 		logger: baseLogger,
 		logsDB: logsDB,
 	}
@@ -30,7 +28,6 @@ func NewDealLogger(ctx context.Context, logsDB *db.LogsDB) *DealLogger {
 
 func (d *DealLogger) Subsystem(name string) *DealLogger {
 	return &DealLogger{
-		ctx:       d.ctx,
 		logger:    logging.Logger(d.subsystem + name),
 		logsDB:    d.logsDB,
 		subsystem: name,
@@ -75,7 +72,8 @@ func (d *DealLogger) updateLogDB(dealId uuid.UUID, msg string, level string, kvs
 		LogParams: string(jsn),
 		Subsystem: d.subsystem,
 	}
-	if err := d.logsDB.InsertLog(d.ctx, l); err != nil {
+	// we don't want context cancellations to mess up our logging
+	if err := d.logsDB.InsertLog(context.TODO(), l); err != nil {
 		d.logger.Warnw("failed to persist deal log", "id", dealId, "err", err)
 	}
 }

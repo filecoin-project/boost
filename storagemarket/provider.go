@@ -130,7 +130,7 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	dl := logs.NewDealLogger(ctx, logsDB)
+	dl := logs.NewDealLogger(logsDB)
 
 	return &Provider{
 		ctx:    ctx,
@@ -324,7 +324,7 @@ func (p *Provider) Start() error {
 		go func() {
 			defer p.wg.Done()
 			p.dealLogger.Infow(d.DealUuid, "resuming deal on boost restart")
-			p.doDeal(d, dh)
+			p.doDeal(d, dh, true)
 		}()
 	}
 

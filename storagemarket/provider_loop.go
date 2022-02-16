@@ -59,9 +59,12 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	}
 
 	cleanup := func() {
-		errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+		pub, collat, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
 			p.dealLogger.LogError(deal.DealUuid, "failed to untag funds during deal cleanup", err)
+		} else {
+			p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal cleanup", "untagged publish", pub, "untagged collateral", collat,
+				"err", errf)
 		}
 
 		errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
@@ -72,12 +75,19 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 
 	// tag the funds required for escrow and sending the publish deal message
 	// so that they are not used for other deals
-	err = p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
+	trsp, err := p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
 	if err != nil {
 		cleanup()
 
 		return false, "server error", fmt.Errorf("failed to tag funds for deal: %w", err)
 	}
+	p.dealLogger.Infow(deal.DealUuid, "tagged funds for deal",
+		"tagged for deal publish", trsp.ForPublish,
+		"tagged for deal collateral", trsp.ForCollat,
+		"total tagged for publish", trsp.TotalTaggedPublish,
+		"total tagged for collateral", trsp.TotalTaggedCollat,
+		"total remaining for publish", trsp.RemainingPublish,
+		"total remaining for collateral", trsp.RemainingCollat)
 
 	// tag the storage required for the deal in the staging area
 	err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.Transfer.Size)
@@ -128,7 +138,7 @@ func (p *Provider) loop() {
 			p.wg.Add(1)
 			go func() {
 				defer p.wg.Done()
-				p.doDeal(deal, dealReq.dh)
+				p.doDeal(deal, dealReq.dh, false)
 				p.dealLogger.Infow(deal.DealUuid, "deal go-routine finished execution")
 			}()
 
@@ -136,18 +146,23 @@ func (p *Provider) loop() {
 
 		case publishedDeal := <-p.publishedDealChan:
 			deal := publishedDeal.deal
-			errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+			pub, collat, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 			if errf != nil {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag funds", errf)
+			} else {
+				p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal after publish", "untagged publish", pub, "untagged collateral", collat)
 			}
 			publishedDeal.done <- struct{}{}
 
 		case finishedDeal := <-p.finishedDealChan:
 			deal := finishedDeal.deal
 			p.dealLogger.Infow(deal.DealUuid, "deal finished")
-			errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+			pub, collat, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 			if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag funds", errf)
+			} else {
+				p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal as deal as finished", "untagged publish", pub, "untagged collateral", collat,
+					"err", errf)
 			}
 
 			errs := p.storageManager.Untag(p.ctx, deal.DealUuid)

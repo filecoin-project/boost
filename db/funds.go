@@ -36,7 +36,7 @@ func (f *FundsDB) Tag(ctx context.Context, dealUuid uuid.UUID, collateral abi.To
 	return err
 }
 
-func (f *FundsDB) Untag(ctx context.Context, dealUuid uuid.UUID) (abi.TokenAmount, error) {
+func (f *FundsDB) Untag(ctx context.Context, dealUuid uuid.UUID) (clt abi.TokenAmount, pub abi.TokenAmount, e error) {
 	qry := "SELECT Collateral, PubMsg FROM FundsTagged WHERE DealUUID = ?"
 	row := f.db.QueryRowContext(ctx, qry, dealUuid)
 
@@ -45,21 +45,21 @@ func (f *FundsDB) Untag(ctx context.Context, dealUuid uuid.UUID) (abi.TokenAmoun
 	err := row.Scan(&collat.marshalled, &pubMsg.marshalled)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return abi.NewTokenAmount(0), ErrNotFound
+			return abi.NewTokenAmount(0), abi.NewTokenAmount(0), ErrNotFound
 		}
-		return abi.NewTokenAmount(0), fmt.Errorf("getting untagged amount: %w", err)
+		return abi.NewTokenAmount(0), abi.NewTokenAmount(0), fmt.Errorf("getting untagged amount: %w", err)
 	}
 	err = collat.unmarshall()
 	if err != nil {
-		return abi.NewTokenAmount(0), fmt.Errorf("unmarshalling untagged Collateral")
+		return abi.NewTokenAmount(0), abi.NewTokenAmount(0), fmt.Errorf("unmarshalling untagged Collateral")
 	}
 	err = pubMsg.unmarshall()
 	if err != nil {
-		return abi.NewTokenAmount(0), fmt.Errorf("unmarshalling untagged PubMsg")
+		return abi.NewTokenAmount(0), abi.NewTokenAmount(0), fmt.Errorf("unmarshalling untagged PubMsg")
 	}
 
 	_, err = f.db.ExecContext(ctx, "DELETE FROM FundsTagged WHERE DealUUID = ?", dealUuid)
-	return big.Add(*collat.f, *pubMsg.f), err
+	return *collat.f, *pubMsg.f, err
 }
 
 func (f *FundsDB) InsertLog(ctx context.Context, logs ...*FundsLog) error {
