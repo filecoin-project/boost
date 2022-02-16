@@ -461,7 +461,7 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 	}
 
 	// we don't want a graceful shutdown to mess up our db update, so pass a background context
-	dberr := p.dealsDB.Update(context.Background(), deal)
+	dberr := p.dealsDB.Update(p.dbCtx, deal)
 	if dberr != nil {
 		p.dealLogger.LogError(deal.DealUuid, "failed to update deal failure error in DB", dberr)
 	}
@@ -522,7 +522,7 @@ func (p *Provider) updateCheckpoint(pub event.Emitter, deal *types.ProviderDealS
 	prev := deal.Checkpoint
 	deal.Checkpoint = ckpt
 	// we don't want a graceful shutdown to mess with db updates so pass a background context
-	if err := p.dealsDB.Update(context.Background(), deal); err != nil {
+	if err := p.dealsDB.Update(p.dbCtx, deal); err != nil {
 		return fmt.Errorf("failed to persist deal state: %w", err)
 	}
 	p.dealLogger.Infow(deal.DealUuid, "updated deal checkpoint in DB", "old checkpoint", prev.String(), "new checkpoint", ckpt.String())

@@ -146,12 +146,13 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 	if err != nil {
 		return nil, err
 	}
-	dl := logs.NewDealLogger(logsDB)
 
 	evLoopCtx, evLoopCancel := context.WithCancel(context.Background())
 	dCtx, dCancel := context.WithCancel(context.Background())
 	acceptCtx, acceptCancel := context.WithCancel(context.Background())
 	dbCtx, dbCancel := context.WithCancel(context.Background())
+
+	dl := logs.NewDealLogger(dbCtx, logsDB)
 
 	return &Provider{
 		acceptCtx:      acceptCtx,
