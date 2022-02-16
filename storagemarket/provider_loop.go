@@ -161,7 +161,7 @@ func (p *Provider) loop() {
 			if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag funds", errf)
 			} else {
-				p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal as deal as finished", "untagged publish", pub, "untagged collateral", collat,
+				p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal as deal finished", "untagged publish", pub, "untagged collateral", collat,
 					"err", errf)
 			}
 
