@@ -388,8 +388,8 @@ func (p *Provider) Stop() {
 		log.Info("event loop returned")
 
 		// shut down deal go-routines
-		log.Info("cancelled the deals context")
 		p.dCancel()
+		log.Info("cancelled the deals context")
 		p.dWg.Wait()
 		log.Info("all deal go-routines returned")
 
