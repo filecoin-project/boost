@@ -51,7 +51,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	if err != nil {
 		err = fmt.Errorf("failed to create event emitter: %w", err)
 		p.failDeal(pub, deal, err)
-		p.cleanupDealLogged(deal)
+		p.cleanupDealLogged(dh.dealCtx, deal)
 		return
 	}
 
@@ -60,17 +60,17 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	if err != nil {
 		err := fmt.Errorf("failed to stat output file: %w", err)
 		p.failDeal(pub, deal, err)
-		p.cleanupDealLogged(deal)
+		p.cleanupDealLogged(dh.dealCtx, deal)
 		return
 	}
 	deal.NBytesReceived = fi.Size()
 
 	// Execute the deal synchronously
-	if derr := p.execDealUptoAddPiece(dh.providerCtx, pub, deal, dh); derr != nil {
+	if derr := p.execDealUptoAddPiece(dh.dealCtx, pub, deal, dh); derr != nil {
 		// If the error is NOT recoverable, fail the deal and cleanup state.
 		if !derr.recoverable {
 			p.failDeal(pub, deal, derr.err)
-			p.cleanupDealLogged(deal)
+			p.cleanupDealLogged(dh.dealCtx, deal)
 			p.dealLogger.Infow(deal.DealUuid, "deal cleanup complete")
 		} else {
 			// TODO For now, we will get recoverable errors only when the process is gracefully shutdown and
@@ -88,7 +88,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	p.dealLogger.Infow(deal.DealUuid, "deal execution completed successfully")
 	// deal has been sent for sealing -> we can cleanup the deal state now and simply watch the deal on chain
 	// to wait for deal completion/slashing and update the state in DB accordingly.
-	p.cleanupDealLogged(deal)
+	p.cleanupDealLogged(dh.dealCtx, deal)
 	p.dealLogger.Infow(deal.DealUuid, "finished deal cleanup after successful execution")
 	// TODO
 	// Watch deal on chain and change state in DB and emit notifications.
@@ -366,7 +366,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	if deal.Checkpoint < dealcheckpoints.Published {
 		p.dealLogger.Infow(deal.DealUuid, "publishing deal")
 
-		mcid, err := p.dealPublisher.Publish(p.ctx, deal.DealUuid, deal.ClientDealProposal)
+		mcid, err := p.dealPublisher.Publish(ctx, deal.DealUuid, deal.ClientDealProposal)
 		if err != nil {
 			return fmt.Errorf("failed to publish deal %s: %w", deal.DealUuid, err)
 		}
@@ -384,7 +384,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	// Note that multiple deals may be published in a batch, so the message CID
 	// may be for a batch of deals.
 	p.dealLogger.Infow(deal.DealUuid, "awaiting deal publish confirmation")
-	res, err := p.chainDealManager.WaitForPublishDeals(p.ctx, *deal.PublishCID, deal.ClientDealProposal.Proposal)
+	res, err := p.chainDealManager.WaitForPublishDeals(ctx, *deal.PublishCID, deal.ClientDealProposal.Proposal)
 	if err != nil {
 		return fmt.Errorf("wait for publish message %s failed: %w", deal.PublishCID, err)
 	}
@@ -436,7 +436,7 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	}
 
 	// Add the piece to a sector
-	packingInfo, packingErr := p.AddPieceToSector(p.ctx, *deal, paddedReader)
+	packingInfo, packingErr := p.AddPieceToSector(ctx, *deal, paddedReader)
 	if packingErr != nil {
 		return fmt.Errorf("packing piece %s: %w", proposal.PieceCID, packingErr)
 	}
@@ -472,13 +472,13 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 	}
 }
 
-func (p *Provider) cleanupDealLogged(deal *types.ProviderDealState) {
+func (p *Provider) cleanupDealLogged(ctx context.Context, deal *types.ProviderDealState) {
 	p.dealLogger.Infow(deal.DealUuid, "cleaning up deal")
-	p.cleanupDeal(deal)
+	p.cleanupDeal(ctx, deal)
 	p.dealLogger.Infow(deal.DealUuid, "finished cleaning up deal")
 }
 
-func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
+func (p *Provider) cleanupDeal(ctx context.Context, deal *types.ProviderDealState) {
 	// remove the temp file created for inbound deal data
 	_ = os.Remove(deal.InboundFilePath)
 
@@ -494,7 +494,7 @@ func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 	// submit req to event loop to untag tagged funds and storage space
 	select {
 	case p.finishedDealChan <- finishedDealReq{deal: deal, done: done}:
-	case <-p.ctx.Done():
+	case <-ctx.Done():
 	}
 
 	// wait for event loop to finish cleanup and return before we return from here
@@ -502,7 +502,7 @@ func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 	// taking further action.
 	select {
 	case <-done:
-	case <-p.ctx.Done():
+	case <-ctx.Done():
 	}
 }
 

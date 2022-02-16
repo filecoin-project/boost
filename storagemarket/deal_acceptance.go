@@ -21,7 +21,7 @@ const DealMaxLabelSize = 256
 // ValidateDealProposal validates a proposed deal against the provider criteria
 func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 	// TODO Audit based on current Markets code
-	head, err := p.fullnodeApi.ChainHead(p.ctx)
+	head, err := p.fullnodeApi.ChainHead(p.acceptCtx)
 	if err != nil {
 		return fmt.Errorf("node error getting most recent state id: %w", err)
 	}
@@ -76,7 +76,7 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 		return fmt.Errorf("invalid deal end epoch %d: cannot be more than %d past current epoch %d", proposal.EndEpoch, miner.MaxSectorExpirationExtension, curEpoch)
 	}
 
-	bounds, err := p.fullnodeApi.StateDealProviderCollateralBounds(p.ctx, proposal.PieceSize, proposal.VerifiedDeal, ctypes.EmptyTSK)
+	bounds, err := p.fullnodeApi.StateDealProviderCollateralBounds(p.acceptCtx, proposal.PieceSize, proposal.VerifiedDeal, ctypes.EmptyTSK)
 	if err != nil {
 		return fmt.Errorf("node error getting collateral bounds: %w", err)
 	}
@@ -105,7 +105,7 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 		return err
 	}
 
-	bal, err := p.fullnodeApi.StateMarketBalance(p.ctx, proposal.Client, tsk)
+	bal, err := p.fullnodeApi.StateMarketBalance(p.acceptCtx, proposal.Client, tsk)
 	if err != nil {
 		return fmt.Errorf("node error getting client market balance failed: %w", err)
 	}
@@ -121,7 +121,7 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 	// Verified deal checks
 	if proposal.VerifiedDeal {
 		// Get data cap
-		dataCap, err := p.fullnodeApi.StateVerifiedClientStatus(p.ctx, proposal.Client, tsk)
+		dataCap, err := p.fullnodeApi.StateVerifiedClientStatus(p.acceptCtx, proposal.Client, tsk)
 		if err != nil {
 			return fmt.Errorf("node error fetching verified data cap: %w", err)
 		}

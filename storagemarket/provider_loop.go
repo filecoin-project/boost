@@ -36,7 +36,7 @@ type publishDealReq struct {
 
 func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, string, error) {
 	// get current sealing pipeline status
-	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
+	status, err := sealingpipeline.GetStatus(p.acceptCtx, p.fullnodeApi, p.sps)
 	if err != nil {
 		return false, "server error", fmt.Errorf("failed to fetch sealing pipleine status: %w", err)
 	}
@@ -49,7 +49,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 		Transfer:             deal.Transfer,
 		SealingPipelineState: status,
 	}
-	accept, reason, err := p.df(p.ctx, params)
+	accept, reason, err := p.df(p.acceptCtx, params)
 	if err != nil {
 		return false, "deal filter error", fmt.Errorf("failed to invoke deal filter: %w", err)
 	}
@@ -59,7 +59,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	}
 
 	cleanup := func() {
-		collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+		collat, pub, errf := p.fundManager.UntagFunds(p.acceptCtx, deal.DealUuid)
 		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
 			p.dealLogger.LogError(deal.DealUuid, "failed to untag funds during deal cleanup", err)
 		} else {
@@ -67,7 +67,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 				"err", errf)
 		}
 
-		errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
+		errs := p.storageManager.Untag(p.acceptCtx, deal.DealUuid)
 		if errs != nil && !xerrors.Is(errf, db.ErrNotFound) {
 			p.dealLogger.LogError(deal.DealUuid, "failed to untag storage during deal cleanup", err)
 		}
@@ -75,7 +75,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 
 	// tag the funds required for escrow and sending the publish deal message
 	// so that they are not used for other deals
-	trsp, err := p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
+	trsp, err := p.fundManager.TagFunds(p.acceptCtx, deal.DealUuid, deal.ClientDealProposal.Proposal)
 	if err != nil {
 		cleanup()
 
@@ -90,7 +90,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 		"total available for collateral", trsp.AvailableCollateral)
 
 	// tag the storage required for the deal in the staging area
-	err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.Transfer.Size)
+	err = p.storageManager.Tag(p.acceptCtx, deal.DealUuid, deal.Transfer.Size)
 	if err != nil {
 		cleanup()
 
@@ -100,7 +100,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	// write deal state to the database
 	deal.CreatedAt = time.Now()
 	deal.Checkpoint = dealcheckpoints.Accepted
-	err = p.dealsDB.Insert(p.ctx, deal)
+	err = p.dealsDB.Insert(p.acceptCtx, deal)
 	if err != nil {
 		cleanup()
 
@@ -113,7 +113,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 }
 
 func (p *Provider) loop() {
-	defer p.wg.Done()
+	defer p.eventLoopWg.Done()
 
 	for {
 		select {
@@ -135,9 +135,9 @@ func (p *Provider) loop() {
 			}
 
 			// start executing the deal
-			p.wg.Add(1)
+			p.dWg.Add(1)
 			go func() {
-				defer p.wg.Done()
+				defer p.dWg.Done()
 				p.doDeal(deal, dealReq.dh)
 				p.dealLogger.Infow(deal.DealUuid, "deal go-routine finished execution")
 			}()
@@ -146,7 +146,7 @@ func (p *Provider) loop() {
 
 		case publishedDeal := <-p.publishedDealChan:
 			deal := publishedDeal.deal
-			collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+			collat, pub, errf := p.fundManager.UntagFunds(p.dbCtx, deal.DealUuid)
 			if errf != nil {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag funds", errf)
 			} else {
@@ -157,7 +157,7 @@ func (p *Provider) loop() {
 		case finishedDeal := <-p.finishedDealChan:
 			deal := finishedDeal.deal
 			p.dealLogger.Infow(deal.DealUuid, "deal finished")
-			collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+			collat, pub, errf := p.fundManager.UntagFunds(p.dbCtx, deal.DealUuid)
 			if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag funds", errf)
 			} else {
@@ -165,13 +165,13 @@ func (p *Provider) loop() {
 					"err", errf)
 			}
 
-			errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
+			errs := p.storageManager.Untag(p.dbCtx, deal.DealUuid)
 			if errs != nil && !xerrors.Is(errs, db.ErrNotFound) {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag storage", errs)
 			}
 			finishedDeal.done <- struct{}{}
 
-		case <-p.ctx.Done():
+		case <-p.eventLoopCtx.Done():
 			return
 		}
 	}

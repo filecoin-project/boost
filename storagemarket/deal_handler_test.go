@@ -15,7 +15,7 @@ func TestCancellationSimple(t *testing.T) {
 	_, tCancel := context.WithCancel(context.Background())
 
 	dh := &dealHandler{
-		providerCtx:    context.Background(),
+		dealCtx:        context.Background(),
 		transferCancel: tCancel,
 		transferDone:   make(chan error, 1),
 	}
@@ -33,7 +33,7 @@ func TestCancellationByCancel(t *testing.T) {
 	transferCtx, tCancel := context.WithCancel(context.Background())
 	dh := &dealHandler{
 		transferCtx:    transferCtx,
-		providerCtx:    context.Background(),
+		dealCtx:        context.Background(),
 		transferCancel: tCancel,
 		transferDone:   make(chan error, 1),
 	}

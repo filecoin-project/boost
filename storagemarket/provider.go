@@ -70,10 +70,25 @@ type Provider struct {
 	// Address of the provider on chain.
 	Address address.Address
 
-	ctx       context.Context
-	cancel    context.CancelFunc
+	// deal acceptance
+	acceptCtx    context.Context
+	acceptCancel context.CancelFunc
+
+	// event loop lifecycle
+	eventLoopCtx   context.Context
+	eventLoopCanel context.CancelFunc
+	eventLoopWg    sync.WaitGroup
+
+	// deal lifecycle
+	dCtx    context.Context
+	dCancel context.CancelFunc
+	dWg     sync.WaitGroup
+
+	// db lifecycle
+	dbCtx    context.Context
+	dbCancel context.CancelFunc
+
 	closeSync sync.Once
-	wg        sync.WaitGroup
 
 	newDealPS *newDealPS
 
@@ -131,12 +146,23 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
 	dl := logs.NewDealLogger(logsDB)
 
+	evLoopCtx, evLoopCancel := context.WithCancel(context.Background())
+	dCtx, dCancel := context.WithCancel(context.Background())
+	acceptCtx, acceptCancel := context.WithCancel(context.Background())
+	dbCtx, dbCancel := context.WithCancel(context.Background())
+
 	return &Provider{
-		ctx:    ctx,
-		cancel: cancel,
+		acceptCtx:      acceptCtx,
+		acceptCancel:   acceptCancel,
+		eventLoopCtx:   evLoopCtx,
+		eventLoopCanel: evLoopCancel,
+		dCtx:           dCtx,
+		dCancel:        dCancel,
+		dbCtx:          dbCtx,
+		dbCancel:       dbCancel,
+
 		// TODO Make this configurable
 		config:    Config{MaxTransferDuration: 24 * 3600 * time.Second},
 		Address:   addr,
@@ -269,15 +295,15 @@ func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealH
 	respChan := make(chan acceptDealResp, 1)
 	select {
 	case p.acceptDealChan <- acceptDealReq{rsp: respChan, deal: ds, dh: dh}:
-	case <-p.ctx.Done():
-		return acceptDealResp{}, p.ctx.Err()
+	case <-p.acceptCtx.Done():
+		return acceptDealResp{}, p.acceptCtx.Err()
 	}
 
 	var resp acceptDealResp
 	select {
 	case resp = <-respChan:
-	case <-p.ctx.Done():
-		return acceptDealResp{}, p.ctx.Err()
+	case <-p.acceptCtx.Done():
+		return acceptDealResp{}, p.acceptCtx.Err()
 	}
 
 	return resp, nil
@@ -286,11 +312,11 @@ func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealH
 func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) *dealHandler {
 	bus := eventbus.NewBus()
 
-	transferCtx, cancel := context.WithCancel(p.ctx)
+	transferCtx, cancel := context.WithCancel(p.dCtx)
 	dh := &dealHandler{
-		providerCtx: p.ctx,
-		dealUuid:    dealUuid,
-		bus:         bus,
+		dealCtx:  p.dCtx,
+		dealUuid: dealUuid,
+		bus:      bus,
 
 		transferCtx:    transferCtx,
 		transferCancel: cancel,
@@ -308,29 +334,29 @@ func (p *Provider) Start() error {
 	log.Infow("storage provider: starting")
 
 	// initialize the database
-	err := db.CreateAllBoostTables(p.ctx, p.db, p.logsSqlDB)
+	err := db.CreateAllBoostTables(p.dbCtx, p.db, p.logsSqlDB)
 	if err != nil {
 		return fmt.Errorf("failed to init db: %w", err)
 	}
 	log.Infow("db initialized")
 
 	// restart all active deals
-	pds, err := p.dealsDB.ListActive(p.ctx)
+	pds, err := p.dealsDB.ListActive(p.dbCtx)
 	if err != nil {
 		return fmt.Errorf("failed to list active deals: %w", err)
 	}
 	for _, ds := range pds {
 		d := ds
 		dh := p.mkAndInsertDealHandler(d.DealUuid)
-		p.wg.Add(1)
+		p.dWg.Add(1)
 		go func() {
-			defer p.wg.Done()
+			defer p.dWg.Done()
 
 			// Check if deal is already complete
 			// TODO Update this once we start listening for expired/slashed deals etc
 			if d.Checkpoint >= dealcheckpoints.AddedPiece {
 				// cleanup if cleanup didn't finish before we restarted
-				p.cleanupDeal(d)
+				p.cleanupDeal(p.dCtx, d)
 				return
 			}
 
@@ -339,9 +365,9 @@ func (p *Provider) Start() error {
 		}()
 	}
 
-	p.wg.Add(1)
+	p.eventLoopWg.Add(1)
 	go p.loop()
-	go p.transfers.start(p.ctx)
+	go p.transfers.start(p.acceptCtx)
 
 	log.Infow("storage provider: started")
 	return nil
@@ -349,10 +375,26 @@ func (p *Provider) Start() error {
 
 func (p *Provider) Stop() {
 	p.closeSync.Do(func() {
-		log.Infow("storage provider: stopping")
+		log.Infow("shutting down boost process")
 
-		p.cancel()
-		p.wg.Wait()
+		// shut down provider context
+		p.acceptCancel()
+		log.Info("cancelled all deals in accepting state")
+
+		// shut down the event loop
+		p.eventLoopCanel()
+		log.Info("cancelled the event loop context")
+		p.eventLoopWg.Wait()
+		log.Info("event loop returned")
+
+		// shut down deal go-routines
+		log.Info("cancelled the deals context")
+		p.dCancel()
+		p.dWg.Wait()
+		log.Info("all deal go-routines returned")
+
+		// shut down DB ctx
+		p.dbCancel()
 	})
 }
 

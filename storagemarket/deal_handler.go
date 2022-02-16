@@ -17,9 +17,9 @@ import (
 
 // dealHandler keeps track of the deal while it's executing
 type dealHandler struct {
-	providerCtx context.Context
-	dealUuid    uuid.UUID
-	bus         event.Bus
+	dealCtx  context.Context
+	dealUuid uuid.UUID
+	bus      event.Bus
 
 	// Transfer cancellation state
 	transferCtx             context.Context
@@ -64,7 +64,7 @@ func (dh *dealHandler) cancelTransfer() error {
 		dh.transferFinished = true
 		dh.transferErr = err
 		return err
-	case <-dh.providerCtx.Done():
+	case <-dh.dealCtx.Done():
 		return nil
 	}
 }
