@@ -61,14 +61,14 @@ func TestFundManager(t *testing.T) {
 	avail := big.Sub(mb.Escrow, mb.Locked)
 
 	ex := &TagFundsResp{
-		ForCollat:  prop.ProviderCollateral,
-		ForPublish: fm.cfg.PubMsgBalMin,
+		Collateral:     prop.ProviderCollateral,
+		PublishMessage: fm.cfg.PubMsgBalMin,
 
-		TotalTaggedCollat:  prop.ProviderCollateral,
-		TotalTaggedPublish: fm.cfg.PubMsgBalMin,
+		TotalCollateral:     prop.ProviderCollateral,
+		TotalPublishMessage: fm.cfg.PubMsgBalMin,
 
-		RemainingCollat:  big.Sub(avail, prop.ProviderCollateral),
-		RemainingPublish: big.Sub(b, fm.cfg.PubMsgBalMin),
+		AvailableCollateral:     big.Sub(avail, prop.ProviderCollateral),
+		AvailablePublishMessage: big.Sub(b, fm.cfg.PubMsgBalMin),
 	}
 	req.Equal(ex, rsp)
 

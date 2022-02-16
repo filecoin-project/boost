@@ -72,8 +72,8 @@ func (d *DealLogger) updateLogDB(dealId uuid.UUID, msg string, level string, kvs
 		LogParams: string(jsn),
 		Subsystem: d.subsystem,
 	}
-	// we don't want context cancellations to mess up our logging
-	if err := d.logsDB.InsertLog(context.TODO(), l); err != nil {
+	// we don't want context cancellations to mess up our logging, so pass a background context
+	if err := d.logsDB.InsertLog(context.Background(), l); err != nil {
 		d.logger.Warnw("failed to persist deal log", "id", dealId, "err", err)
 	}
 }

@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+
 	"github.com/filecoin-project/boost/storagemarket/logs"
 	logging "github.com/ipfs/go-log/v2"
 
@@ -323,8 +325,17 @@ func (p *Provider) Start() error {
 		p.wg.Add(1)
 		go func() {
 			defer p.wg.Done()
+
+			// Check if deal is already complete
+			// TODO Update this once we start listening for expired/slashed deals etc
+			if d.Checkpoint >= dealcheckpoints.AddedPiece {
+				// cleanup if cleanup didn't finish before we restarted
+				p.cleanupDeal(d)
+				return
+			}
+
 			p.dealLogger.Infow(d.DealUuid, "resuming deal on boost restart")
-			p.doDeal(d, dh, true)
+			p.doDeal(d, dh)
 		}()
 	}
 

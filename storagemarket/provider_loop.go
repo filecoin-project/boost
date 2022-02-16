@@ -59,7 +59,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	}
 
 	cleanup := func() {
-		pub, collat, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+		collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
 			p.dealLogger.LogError(deal.DealUuid, "failed to untag funds during deal cleanup", err)
 		} else {
@@ -82,12 +82,12 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 		return false, "server error", fmt.Errorf("failed to tag funds for deal: %w", err)
 	}
 	p.dealLogger.Infow(deal.DealUuid, "tagged funds for deal",
-		"tagged for deal publish", trsp.ForPublish,
-		"tagged for deal collateral", trsp.ForCollat,
-		"total tagged for publish", trsp.TotalTaggedPublish,
-		"total tagged for collateral", trsp.TotalTaggedCollat,
-		"total remaining for publish", trsp.RemainingPublish,
-		"total remaining for collateral", trsp.RemainingCollat)
+		"tagged for deal publish", trsp.PublishMessage,
+		"tagged for deal collateral", trsp.Collateral,
+		"total tagged for publish", trsp.TotalPublishMessage,
+		"total tagged for collateral", trsp.TotalCollateral,
+		"total available for publish", trsp.AvailablePublishMessage,
+		"total available for collateral", trsp.AvailableCollateral)
 
 	// tag the storage required for the deal in the staging area
 	err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.Transfer.Size)
@@ -138,7 +138,7 @@ func (p *Provider) loop() {
 			p.wg.Add(1)
 			go func() {
 				defer p.wg.Done()
-				p.doDeal(deal, dealReq.dh, false)
+				p.doDeal(deal, dealReq.dh)
 				p.dealLogger.Infow(deal.DealUuid, "deal go-routine finished execution")
 			}()
 
@@ -146,7 +146,7 @@ func (p *Provider) loop() {
 
 		case publishedDeal := <-p.publishedDealChan:
 			deal := publishedDeal.deal
-			pub, collat, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+			collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 			if errf != nil {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag funds", errf)
 			} else {
@@ -157,7 +157,7 @@ func (p *Provider) loop() {
 		case finishedDeal := <-p.finishedDealChan:
 			deal := finishedDeal.deal
 			p.dealLogger.Infow(deal.DealUuid, "deal finished")
-			pub, collat, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+			collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 			if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag funds", errf)
 			} else {

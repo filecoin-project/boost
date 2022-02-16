@@ -40,19 +40,7 @@ type dealMakingError struct {
 	uiMsg       string
 }
 
-func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler, isRestart bool) {
-	// Check if deal is already complete
-	// TODO Update this once we start listening for expired/slashed deals etc
-	if deal.Checkpoint >= dealcheckpoints.AddedPiece {
-		// cleanup if cleanup didn't finish before we restarted
-		p.cleanupDeal(deal)
-		return
-	}
-
-	if isRestart {
-		p.dealLogger.Infow(deal.DealUuid, "resuming deal on boost restart")
-	}
-
+func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	dcpy := *deal
 	dcpy.Transfer.Params = nil
 	dcpy.ClientDealProposal.ClientSignature = acrypto.Signature{}
@@ -258,22 +246,18 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.Handler, pub event.Emitter, deal *types.ProviderDealState) error {
 	defer handler.Close()
 	defer p.transfers.complete(deal.DealUuid)
-	tlog := make(map[int]struct{})
-
+	var lastOutputPct int64
 	logTransferProgress := func(received int64) {
 		pct := (100 * received) / int64(deal.Transfer.Size)
 		if pct == 0 {
 			return
 		}
-		for i := 10; i < 100; i = i + 10 {
-			if i >= int(pct) {
-				if _, ok := tlog[i]; !ok {
-					tlog[i] = struct{}{}
-					p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received,
-						"deal size", deal.Transfer.Size, "~ percent complete", pct)
-					return
-				}
-			}
+
+		outputPct := pct % 10
+		if outputPct != lastOutputPct {
+			lastOutputPct = outputPct
+			p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received,
+				"deal size", deal.Transfer.Size, "~ percent complete", pct)
 		}
 	}
 
@@ -471,7 +455,9 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 		deal.Err = err.Error()
 		p.dealLogger.LogError(deal.DealUuid, "deal failed", err)
 	}
-	dberr := p.dealsDB.Update(context.TODO(), deal)
+
+	// we don't want a graceful shutdown to mess up our db update, so pass a background context
+	dberr := p.dealsDB.Update(context.Background(), deal)
 	if dberr != nil {
 		p.dealLogger.LogError(deal.DealUuid, "failed to update deal failure error in DB", dberr)
 	}
@@ -531,8 +517,8 @@ func (p *Provider) fireEventDealUpdate(pub event.Emitter, deal *types.ProviderDe
 func (p *Provider) updateCheckpoint(pub event.Emitter, deal *types.ProviderDealState, ckpt dealcheckpoints.Checkpoint) error {
 	prev := deal.Checkpoint
 	deal.Checkpoint = ckpt
-	// we don't want a graceful shutdown to mess with db updates
-	if err := p.dealsDB.Update(context.TODO(), deal); err != nil {
+	// we don't want a graceful shutdown to mess with db updates so pass a background context
+	if err := p.dealsDB.Update(context.Background(), deal); err != nil {
 		return fmt.Errorf("failed to persist deal state: %w", err)
 	}
 	p.dealLogger.Infow(deal.DealUuid, "updated deal checkpoint in DB", "old checkpoint", prev.String(), "new checkpoint", ckpt.String())

@@ -57,14 +57,14 @@ func New(cfg Config) func(api v1api.FullNode, sqldb *sql.DB) *FundManager {
 }
 
 type TagFundsResp struct {
-	ForCollat  abi.TokenAmount
-	ForPublish abi.TokenAmount
+	Collateral     abi.TokenAmount
+	PublishMessage abi.TokenAmount
 
-	TotalTaggedCollat  abi.TokenAmount
-	TotalTaggedPublish abi.TokenAmount
+	TotalCollateral     abi.TokenAmount
+	TotalPublishMessage abi.TokenAmount
 
-	RemainingCollat  abi.TokenAmount
-	RemainingPublish abi.TokenAmount
+	AvailableCollateral     abi.TokenAmount
+	AvailablePublishMessage abi.TokenAmount
 }
 
 // TagFunds tags funds for deal collateral and for the publish storage
@@ -112,14 +112,14 @@ func (m *FundManager) TagFunds(ctx context.Context, dealUuid uuid.UUID, proposal
 	}
 
 	return &TagFundsResp{
-		ForCollat:  dealCollateral,
-		ForPublish: m.cfg.PubMsgBalMin,
+		Collateral:     dealCollateral,
+		PublishMessage: m.cfg.PubMsgBalMin,
 
-		TotalTaggedPublish: big.Add(tagged.PubMsg, m.cfg.PubMsgBalMin),
-		TotalTaggedCollat:  big.Add(tagged.Collateral, dealCollateral),
+		TotalPublishMessage: big.Add(tagged.PubMsg, m.cfg.PubMsgBalMin),
+		TotalCollateral:     big.Add(tagged.Collateral, dealCollateral),
 
-		RemainingPublish: big.Sub(availForPubMsg, m.cfg.PubMsgBalMin),
-		RemainingCollat:  big.Sub(availForDealCollat, dealCollateral),
+		AvailablePublishMessage: big.Sub(availForPubMsg, m.cfg.PubMsgBalMin),
+		AvailableCollateral:     big.Sub(availForDealCollat, dealCollateral),
 	}, nil
 }
 
@@ -141,7 +141,7 @@ func (m *FundManager) totalTagged(ctx context.Context) (*db.TotalTagged, error) 
 // UntagFunds untags funds that were associated (tagged) with a deal.
 // It's called when it's no longer necessary to prevent the funds from being
 // used for a different deal (eg because the deal failed / was published)
-func (m *FundManager) UntagFunds(ctx context.Context, dealUuid uuid.UUID) (pub, collat abi.TokenAmount, err error) {
+func (m *FundManager) UntagFunds(ctx context.Context, dealUuid uuid.UUID) (collat, pub abi.TokenAmount, err error) {
 	untaggedCollat, untaggedPublish, err := m.db.Untag(ctx, dealUuid)
 	if err != nil {
 		return abi.NewTokenAmount(0), abi.NewTokenAmount(0), fmt.Errorf("persisting untag funds for deal to DB: %w", err)
@@ -160,7 +160,7 @@ func (m *FundManager) UntagFunds(ctx context.Context, dealUuid uuid.UUID) (pub, 
 	}
 
 	log.Infow("untag", "id", dealUuid, "amount", tot)
-	return untaggedPublish, untaggedCollat, nil
+	return untaggedCollat, untaggedPublish, nil
 }
 
 func (m *FundManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, dealCollateral abi.TokenAmount, pubMsgBal abi.TokenAmount) error {
