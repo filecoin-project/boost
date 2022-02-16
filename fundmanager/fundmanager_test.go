@@ -95,7 +95,7 @@ func TestFundManager(t *testing.T) {
 	req.EqualValues(20, total.PubMsg.Int64())
 
 	// Untag second deal
-	pub, collat, err := fm.UntagFunds(ctx, deal2.DealUuid)
+	collat, pub, err := fm.UntagFunds(ctx, deal2.DealUuid)
 	req.NoError(err)
 	req.EqualValues(fm.cfg.PubMsgBalMin.Int64(), pub.Int64())
 	req.EqualValues(prop2.ProviderCollateral.Int64(), collat.Int64())
