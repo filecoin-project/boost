@@ -246,18 +246,22 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.Handler, pub event.Emitter, deal *types.ProviderDealState) error {
 	defer handler.Close()
 	defer p.transfers.complete(deal.DealUuid)
-	var lastOutputPct int64
+	tlog := make(map[int]struct{})
+
 	logTransferProgress := func(received int64) {
 		pct := (100 * received) / int64(deal.Transfer.Size)
 		if pct == 0 {
 			return
 		}
-
-		outputPct := pct % 10
-		if outputPct != lastOutputPct {
-			lastOutputPct = outputPct
-			p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received,
-				"deal size", deal.Transfer.Size, "~ percent complete", pct)
+		for i := 10; i < 100; i = i + 10 {
+			if i >= int(pct) {
+				if _, ok := tlog[i]; !ok {
+					tlog[i] = struct{}{}
+					p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received,
+						"deal size", deal.Transfer.Size, "~ percent complete", pct)
+					return
+				}
+			}
 		}
 	}
 
