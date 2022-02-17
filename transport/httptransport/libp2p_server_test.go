@@ -27,9 +27,7 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 	defer clientHost.Close()
 
 	authDB := NewAuthTokenDB(st.ds)
-	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{
-		AnnounceAddr: srvHost.Addrs()[0],
-	})
+	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{})
 	err := srv.Start(ctx)
 	require.NoError(t, err)
 	defer srv.Stop(ctx) //nolint:errcheck
@@ -99,9 +97,7 @@ func TestLibp2pCarServerResume(t *testing.T) {
 	defer clientHost.Close()
 
 	authDB := NewAuthTokenDB(st.ds)
-	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{
-		AnnounceAddr: srvHost.Addrs()[0],
-	})
+	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{})
 	err := srv.Start(ctx)
 	require.NoError(t, err)
 	defer srv.Stop(ctx) //nolint:errcheck
@@ -220,9 +216,7 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	defer clientHost.Close()
 
 	authDB := NewAuthTokenDB(st.ds)
-	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{
-		AnnounceAddr: srvHost.Addrs()[0],
-	})
+	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{})
 	err := srv.Start(ctx)
 	require.NoError(t, err)
 	defer srv.Stop(ctx) //nolint:errcheck
@@ -291,9 +285,7 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	defer clientHost.Close()
 
 	authDB := NewAuthTokenDB(st.ds)
-	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{
-		AnnounceAddr: srvHost.Addrs()[0],
-	})
+	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{})
 	err := srv.Start(ctx)
 	require.NoError(t, err)
 	defer srv.Stop(ctx) //nolint:errcheck

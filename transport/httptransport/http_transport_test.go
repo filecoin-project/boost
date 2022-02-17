@@ -467,9 +467,7 @@ func newLibp2pHttpServer(st *serverTest) (func() types.HttpRequest, func(), host
 	ctx := context.Background()
 	clientHost, srvHost := setupLibp2pHosts(st.t)
 	authDB := NewAuthTokenDB(st.ds)
-	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{
-		AnnounceAddr: srvHost.Addrs()[0],
-	})
+	srv := NewLibp2pCarServer(srvHost, authDB, st.bs, ServerConfig{})
 	err := srv.Start(ctx)
 	require.NoError(st.t, err)
 
