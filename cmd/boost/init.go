@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ipfs/go-datastore"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 
@@ -161,6 +162,16 @@ var initCmd = &cli.Command{
 			}
 			if err != nil {
 				return xerrors.Errorf("setting config: %w", err)
+			}
+
+			ds, err := lr.Datastore(context.Background(), "/metadata")
+			if err != nil {
+				return err
+			}
+
+			err = ds.Put(context.Background(), datastore.NewKey("miner-address"), minerActor.Bytes())
+			if err != nil {
+				return err
 			}
 
 			if err := lr.Close(); err != nil {
