@@ -368,6 +368,9 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	// may be for a batch of deals.
 	p.dealLogger.Infow(deal.DealUuid, "awaiting deal publish confirmation")
 	res, err := p.chainDealManager.WaitForPublishDeals(p.ctx, *deal.PublishCID, deal.ClientDealProposal.Proposal)
+	if xerrors.Is(err, context.Canceled) {
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("wait for publish message %s failed: %w", deal.PublishCID, err)
 	}
