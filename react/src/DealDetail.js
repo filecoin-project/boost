@@ -1,3 +1,5 @@
+/* global BigInt */
+
 import React, {useEffect, useState} from "react";
 import {useMutation, useSubscription} from "@apollo/react-hooks";
 import {DealCancelMutation, DealSubscription} from "./gql";
@@ -221,6 +223,8 @@ function LogParam(props) {
     const isObject = (val && typeof val === 'object')
     if (isObject) {
         val = Object.keys(val).sort().map(ck => <LogParam k={ck} v={val[ck]} key={ck} />)
+    } else if ((typeof val === 'string' || typeof val === 'number') && (''+val).match(/^[0-9]+$/)) {
+        val = addCommas(BigInt(val))
     }
 
     function toggleExpandState() {
