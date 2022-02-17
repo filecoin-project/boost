@@ -82,7 +82,9 @@ const DealsListQuery = gql`
                 }
                 Logs {
                     CreatedAt
-                    Text
+                    LogMsg
+                    LogParams
+                    Subsystem
                 }
             }
             totalCount
@@ -125,7 +127,9 @@ const DealSubscription = gql`
             }
             Logs {
                 CreatedAt
-                Text
+                LogMsg
+                LogParams
+                Subsystem
             }
         }
     }
@@ -165,7 +169,9 @@ const NewDealsSubscription = gql`
             }
             Logs {
                 CreatedAt
-                Text
+                LogMsg
+                LogParams
+                Subsystem
             }
         }
     }

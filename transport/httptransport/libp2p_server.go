@@ -544,6 +544,7 @@ func (t *Libp2pTransfer) state() types.TransferState {
 		}
 	}
 	return types.TransferState{
+		ID:         t.ID,
 		LocalAddr:  t.LocalAddr,
 		RemoteAddr: t.RemoteAddr,
 		Status:     t.status,

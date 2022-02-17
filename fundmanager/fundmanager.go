@@ -56,32 +56,43 @@ func New(cfg Config) func(api v1api.FullNode, sqldb *sql.DB) *FundManager {
 	}
 }
 
+type TagFundsResp struct {
+	Collateral     abi.TokenAmount
+	PublishMessage abi.TokenAmount
+
+	TotalCollateral     abi.TokenAmount
+	TotalPublishMessage abi.TokenAmount
+
+	AvailableCollateral     abi.TokenAmount
+	AvailablePublishMessage abi.TokenAmount
+}
+
 // TagFunds tags funds for deal collateral and for the publish storage
 // deals message, so those funds cannot be used for other deals.
 // It fails if there are not enough funds available in the respective
 // wallets to cover either of these operations.
-func (m *FundManager) TagFunds(ctx context.Context, dealUuid uuid.UUID, proposal market.DealProposal) error {
+func (m *FundManager) TagFunds(ctx context.Context, dealUuid uuid.UUID, proposal market.DealProposal) (*TagFundsResp, error) {
 	marketBal, err := m.BalanceMarket(ctx)
 	if err != nil {
-		return fmt.Errorf("getting market balance: %w", err)
+		return nil, fmt.Errorf("getting market balance: %w", err)
 	}
 
 	pubMsgBal, err := m.BalancePublishMsg(ctx)
 	if err != nil {
-		return fmt.Errorf("getting publish deals message wallet balance: %w", err)
+		return nil, fmt.Errorf("getting publish deals message wallet balance: %w", err)
 	}
 
 	// Check that the provider has enough funds in escrow to cover the
 	// collateral requirement for the deal
 	tagged, err := m.totalTagged(ctx)
 	if err != nil {
-		return fmt.Errorf("getting total tagged: %w", err)
+		return nil, fmt.Errorf("getting total tagged: %w", err)
 	}
 
 	dealCollateral := proposal.ProviderBalanceRequirement()
 	availForDealCollat := big.Sub(marketBal.Available, tagged.Collateral)
 	if availForDealCollat.LessThan(dealCollateral) {
-		return fmt.Errorf("available funds %d is less than collateral needed for deal %d: "+
+		return nil, fmt.Errorf("available funds %d is less than collateral needed for deal %d: "+
 			"available = funds in escrow %d - amount reserved for other deals %d",
 			availForDealCollat, dealCollateral, marketBal.Available, tagged.Collateral)
 	}
@@ -89,7 +100,7 @@ func (m *FundManager) TagFunds(ctx context.Context, dealUuid uuid.UUID, proposal
 	// Check that the provider has enough funds to send a PublishStorageDeals message
 	availForPubMsg := big.Sub(pubMsgBal, tagged.PubMsg)
 	if availForPubMsg.LessThan(m.cfg.PubMsgBalMin) {
-		return fmt.Errorf("available funds %d is less than needed for publish deals message %d: "+
+		return nil, fmt.Errorf("available funds %d is less than needed for publish deals message %d: "+
 			"available = funds in publish deals wallet %d - amount reserved for other deals %d",
 			availForPubMsg, m.cfg.PubMsgBalMin, pubMsgBal, tagged.PubMsg)
 	}
@@ -97,10 +108,19 @@ func (m *FundManager) TagFunds(ctx context.Context, dealUuid uuid.UUID, proposal
 	// Provider has enough funds to make deal, so persist tagged funds
 	err = m.persistTagged(ctx, dealUuid, dealCollateral, m.cfg.PubMsgBalMin)
 	if err != nil {
-		return fmt.Errorf("saving total tagged: %w", err)
+		return nil, fmt.Errorf("saving total tagged: %w", err)
 	}
 
-	return nil
+	return &TagFundsResp{
+		Collateral:     dealCollateral,
+		PublishMessage: m.cfg.PubMsgBalMin,
+
+		TotalPublishMessage: big.Add(tagged.PubMsg, m.cfg.PubMsgBalMin),
+		TotalCollateral:     big.Add(tagged.Collateral, dealCollateral),
+
+		AvailablePublishMessage: big.Sub(availForPubMsg, m.cfg.PubMsgBalMin),
+		AvailableCollateral:     big.Sub(availForDealCollat, dealCollateral),
+	}, nil
 }
 
 // TotalTagged returns the total funds tagged for specific deals for
@@ -121,24 +141,26 @@ func (m *FundManager) totalTagged(ctx context.Context) (*db.TotalTagged, error) 
 // UntagFunds untags funds that were associated (tagged) with a deal.
 // It's called when it's no longer necessary to prevent the funds from being
 // used for a different deal (eg because the deal failed / was published)
-func (m *FundManager) UntagFunds(ctx context.Context, dealUuid uuid.UUID) error {
-	untaggedAmt, err := m.db.Untag(ctx, dealUuid)
+func (m *FundManager) UntagFunds(ctx context.Context, dealUuid uuid.UUID) (collat, pub abi.TokenAmount, err error) {
+	untaggedCollat, untaggedPublish, err := m.db.Untag(ctx, dealUuid)
 	if err != nil {
-		return fmt.Errorf("persisting untag funds for deal to DB: %w", err)
+		return abi.NewTokenAmount(0), abi.NewTokenAmount(0), fmt.Errorf("persisting untag funds for deal to DB: %w", err)
 	}
+
+	tot := big.Add(untaggedCollat, untaggedPublish)
 
 	fundsLog := &db.FundsLog{
 		DealUUID: dealUuid,
 		Text:     "Untag funds for deal",
-		Amount:   untaggedAmt,
+		Amount:   tot,
 	}
 	err = m.db.InsertLog(ctx, fundsLog)
 	if err != nil {
-		return fmt.Errorf("persisting untag funds log to DB: %w", err)
+		return abi.NewTokenAmount(0), abi.NewTokenAmount(0), fmt.Errorf("persisting untag funds log to DB: %w", err)
 	}
 
-	log.Infow("untag", "id", dealUuid, "amount", untaggedAmt)
-	return nil
+	log.Infow("untag", "id", dealUuid, "amount", tot)
+	return untaggedCollat, untaggedPublish, nil
 }
 
 func (m *FundManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, dealCollateral abi.TokenAmount, pubMsgBal abi.TokenAmount) error {

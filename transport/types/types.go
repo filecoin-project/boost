@@ -49,6 +49,7 @@ const (
 
 // TransferState describes a transfer's current state
 type TransferState struct {
+	ID         string
 	LocalAddr  string
 	RemoteAddr string
 	Status     TransferStatus

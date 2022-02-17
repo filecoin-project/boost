@@ -1,4 +1,4 @@
-import React, {useEffect} from "react";
+import React, {useEffect, useState} from "react";
 import {useMutation, useSubscription} from "@apollo/react-hooks";
 import {DealCancelMutation, DealSubscription} from "./gql";
 import {useNavigate} from "react-router-dom";
@@ -176,9 +176,60 @@ function DealLog(props) {
         }
     }
 
+    var logParams = {}
+    if (log.LogParams && typeof log.LogParams === 'string') {
+        try {
+            const params = JSON.parse(log.LogParams)
+            for (let i = 0; i < params.length; i+=2) {
+                var k = params[i]
+                var v = params[i+1]
+                if (typeof k !== "string") {
+                    k = JSON.stringify(k)
+                }
+                logParams[k] = v
+            }
+            delete logParams.id
+        } catch(_) {
+        }
+    }
+
     return <tr>
-        <td>{moment(log.CreatedAt).format(dateFormat)}</td>
+        <td className="at">{moment(log.CreatedAt).format(dateFormat)}</td>
         <td className="since-last">{sinceLast}</td>
-        <td>{log.Text}</td>
+        <td className="log-line">
+            <div className="message">
+                <span className="subsystem">{log.Subsystem}{log.Subsystem ? ': ' : ''}</span>
+                {log.LogMsg}
+            </div>
+            {Object.keys(logParams).sort().map(k => <LogParam k={k} v={logParams[k]} topLevel={true} key={k} />)}
+        </td>
     </tr>
+}
+
+function LogParam(props) {
+    const [expanded, setExpanded] = useState(false)
+
+    var val = props.v
+    const isObject = (val && typeof val === 'object')
+    if (isObject) {
+        val = Object.keys(val).sort().map(ck => <LogParam k={ck} v={val[ck]} key={ck} />)
+    }
+
+    function toggleExpandState() {
+        setExpanded(!expanded)
+    }
+
+    const expandable = isObject && props.topLevel
+    return (
+        <div className={"param" + (expandable ? ' expandable' : '') + (expanded ? ' expanded' : '')}>
+            <span className="param-name" onClick={toggleExpandState}>
+                {props.k}:
+                {expandable ? (
+                    <div className="expand-collapse"></div>
+                ) : null}
+            </span>
+            &nbsp;
+            {val}
+        </div>
+    )
 }

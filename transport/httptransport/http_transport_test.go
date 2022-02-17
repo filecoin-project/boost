@@ -60,7 +60,7 @@ type serverTest struct {
 func newDealLogger(t *testing.T, ctx context.Context) *logs.DealLogger {
 	tmp, err := db.CreateTmpDB(ctx)
 	require.NoError(t, err)
-	return logs.NewDealLogger(ctx, db.NewLogsDB(tmp))
+	return logs.NewDealLogger(db.NewLogsDB(tmp))
 }
 
 func newServerTest(t *testing.T, size int) *serverTest {

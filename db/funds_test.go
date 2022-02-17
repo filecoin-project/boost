@@ -28,9 +28,10 @@ func TestFundsDB(t *testing.T) {
 	req.Equal(int64(0), tt.Collateral.Int64())
 
 	dealUUID := uuid.New()
-	amt, err := db.Untag(ctx, dealUUID)
+	collat, pub, err := db.Untag(ctx, dealUUID)
 	req.True(xerrors.Is(err, ErrNotFound))
-	req.Equal(int64(0), amt.Int64())
+	req.Equal(int64(0), collat.Int64())
+	req.True(pub.IsZero())
 
 	err = db.Tag(ctx, dealUUID, abi.NewTokenAmount(1111), abi.NewTokenAmount(2222))
 	req.NoError(err)
@@ -40,9 +41,10 @@ func TestFundsDB(t *testing.T) {
 	req.Equal(int64(1111), tt.Collateral.Int64())
 	req.Equal(int64(2222), tt.PubMsg.Int64())
 
-	amt, err = db.Untag(ctx, dealUUID)
+	collat, pub, err = db.Untag(ctx, dealUUID)
 	req.NoError(err)
-	req.Equal(int64(3333), amt.Int64())
+	req.Equal(int64(1111), collat.Int64())
+	req.Equal(int64(2222), pub.Int64())
 
 	fl := &FundsLog{
 		DealUUID: dealUUID,

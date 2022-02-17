@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+
 	"github.com/filecoin-project/boost/storagemarket/logs"
 	logging "github.com/ipfs/go-log/v2"
 
@@ -130,7 +132,7 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	dl := logs.NewDealLogger(ctx, logsDB)
+	dl := logs.NewDealLogger(logsDB)
 
 	return &Provider{
 		ctx:    ctx,
@@ -179,10 +181,10 @@ func (p *Provider) NBytesReceived(dealUuid uuid.UUID) uint64 {
 	return p.transfers.getBytes(dealUuid)
 }
 
-func (p *Provider) GetAsk() *types.StorageAsk {
-	return &types.StorageAsk{
-		Price:         abi.NewTokenAmount(1),
-		VerifiedPrice: abi.NewTokenAmount(1),
+func (p *Provider) GetAsk() *storagemarket.StorageAsk {
+	return &storagemarket.StorageAsk{
+		Price:         abi.NewTokenAmount(0),
+		VerifiedPrice: abi.NewTokenAmount(0),
 		MinPieceSize:  0,
 		MaxPieceSize:  64 * 1024 * 1024 * 1024,
 		Miner:         p.Address,
@@ -202,7 +204,7 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 	// validate the deal proposal
 	if !p.testMode {
 		if err := p.validateDealProposal(ds); err != nil {
-			p.dealLogger.Infow(dp.DealUUID, "deal proposal failed validation", "err", err)
+			p.dealLogger.Infow(dp.DealUUID, "deal proposal failed validation", "err", err.Error())
 
 			return &api.ProviderDealRejectionInfo{
 				Reason: fmt.Sprintf("failed validation: %s", err),
@@ -323,6 +325,16 @@ func (p *Provider) Start() error {
 		p.wg.Add(1)
 		go func() {
 			defer p.wg.Done()
+
+			// Check if deal is already complete
+			// TODO Update this once we start listening for expired/slashed deals etc
+			if d.Checkpoint >= dealcheckpoints.AddedPiece {
+				// cleanup if cleanup didn't finish before we restarted
+				p.cleanupDeal(d)
+				return
+			}
+
+			p.dealLogger.Infow(d.DealUuid, "resuming deal on boost restart")
 			p.doDeal(d, dh)
 		}()
 	}
@@ -410,7 +422,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 	for build.Clock.Since(curTime) < addPieceRetryTimeout {
 		if !xerrors.Is(err, sealing.ErrTooManySectorsSealing) {
 			if err != nil {
-				p.dealLogger.Warnw(deal.DealUuid, "failed to addPiece for deal, will-retry", err)
+				p.dealLogger.Warnw(deal.DealUuid, "failed to addPiece for deal, will-retry", "err", err.Error())
 			}
 			break
 		}

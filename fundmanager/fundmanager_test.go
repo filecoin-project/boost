@@ -51,8 +51,26 @@ func TestFundManager(t *testing.T) {
 	deal := deals[0]
 	prop := deal.ClientDealProposal.Proposal
 	prop.ProviderCollateral = abi.NewTokenAmount(3)
-	err = fm.TagFunds(ctx, deal.DealUuid, prop)
+	rsp, err := fm.TagFunds(ctx, deal.DealUuid, prop)
 	req.NoError(err)
+	req.NotNil(rsp)
+	b, err := api.WalletBalance(ctx, address.TestAddress2)
+	req.NoError(err)
+	mb, err := api.StateMarketBalance(ctx, address.TestAddress2, types.TipSetKey{})
+	req.NoError(err)
+	avail := big.Sub(mb.Escrow, mb.Locked)
+
+	ex := &TagFundsResp{
+		Collateral:     prop.ProviderCollateral,
+		PublishMessage: fm.cfg.PubMsgBalMin,
+
+		TotalCollateral:     prop.ProviderCollateral,
+		TotalPublishMessage: fm.cfg.PubMsgBalMin,
+
+		AvailableCollateral:     big.Sub(avail, prop.ProviderCollateral),
+		AvailablePublishMessage: big.Sub(b, fm.cfg.PubMsgBalMin),
+	}
+	req.Equal(ex, rsp)
 
 	total, err = fm.TotalTagged(ctx)
 	req.NoError(err)
@@ -65,8 +83,9 @@ func TestFundManager(t *testing.T) {
 	deal2 := deals[1]
 	prop2 := deal2.ClientDealProposal.Proposal
 	prop2.ProviderCollateral = abi.NewTokenAmount(4)
-	err = fm.TagFunds(ctx, deal2.DealUuid, prop2)
+	rsp, err = fm.TagFunds(ctx, deal2.DealUuid, prop2)
 	req.NoError(err)
+	req.NotNil(rsp)
 
 	total, err = fm.TotalTagged(ctx)
 	req.NoError(err)
@@ -76,8 +95,10 @@ func TestFundManager(t *testing.T) {
 	req.EqualValues(20, total.PubMsg.Int64())
 
 	// Untag second deal
-	err = fm.UntagFunds(ctx, deal2.DealUuid)
+	collat, pub, err := fm.UntagFunds(ctx, deal2.DealUuid)
 	req.NoError(err)
+	req.EqualValues(fm.cfg.PubMsgBalMin.Int64(), pub.Int64())
+	req.EqualValues(prop2.ProviderCollateral.Int64(), collat.Int64())
 
 	// Totals should go back to what they were before tagging the second deal
 	total, err = fm.TotalTagged(ctx)
