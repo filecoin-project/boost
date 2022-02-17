@@ -91,6 +91,58 @@ func DefaultBoost() *Boost {
 			},
 		},
 
+		LotusDealmaking: lotus_config.DealmakingConfig{
+			ConsiderOnlineStorageDeals:     true,
+			ConsiderOfflineStorageDeals:    true,
+			ConsiderOnlineRetrievalDeals:   true,
+			ConsiderOfflineRetrievalDeals:  true,
+			ConsiderVerifiedStorageDeals:   true,
+			ConsiderUnverifiedStorageDeals: true,
+			PieceCidBlocklist:              []cid.Cid{},
+			MakeNewSectorForDeals:          true,
+			// TODO: It'd be nice to set this based on sector size
+			MaxDealStartDelay:               lotus_config.Duration(time.Hour * 24 * 14),
+			ExpectedSealDuration:            lotus_config.Duration(time.Hour * 24),
+			PublishMsgPeriod:                lotus_config.Duration(time.Hour),
+			MaxDealsPerPublishMsg:           8,
+			MaxProviderCollateralMultiplier: 2,
+
+			SimultaneousTransfersForStorage:          DefaultSimultaneousTransfers,
+			SimultaneousTransfersForStoragePerClient: 0,
+			SimultaneousTransfersForRetrieval:        DefaultSimultaneousTransfers,
+
+			StartEpochSealingBuffer: 480, // 480 epochs buffer == 4 hours from adding deal to sector to sector being sealed
+
+			RetrievalPricing: &lotus_config.RetrievalPricing{
+				Strategy: RetrievalPricingDefaultMode,
+				Default: &lotus_config.RetrievalPricingDefault{
+					VerifiedDealsFreeTransfer: true,
+				},
+				External: &lotus_config.RetrievalPricingExternal{
+					Path: "",
+				},
+			},
+		},
+
+		LotusFees: lotus_config.MinerFeeConfig{
+			MaxPreCommitGasFee: types.MustParseFIL("0.025"),
+			MaxCommitGasFee:    types.MustParseFIL("0.05"),
+
+			MaxPreCommitBatchGasFee: lotus_config.BatchFeeConfig{
+				Base:      types.MustParseFIL("0"),
+				PerSector: types.MustParseFIL("0.02"),
+			},
+			MaxCommitBatchGasFee: lotus_config.BatchFeeConfig{
+				Base:      types.MustParseFIL("0"),
+				PerSector: types.MustParseFIL("0.03"), // enough for 6 agg and 1nFIL base fee
+			},
+
+			MaxTerminateGasFee:     types.MustParseFIL("0.5"),
+			MaxWindowPoStGasFee:    types.MustParseFIL("5"),
+			MaxPublishDealsFee:     types.MustParseFIL("0.05"),
+			MaxMarketBalanceAddFee: types.MustParseFIL("0.007"),
+		},
+
 		DAGStore: lotus_config.DAGStoreConfig{
 			MaxConcurrentIndex:         5,
 			MaxConcurrencyStorageCalls: 100,
