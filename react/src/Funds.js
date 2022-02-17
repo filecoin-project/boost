@@ -3,7 +3,7 @@ import {useMutation, useQuery} from "@apollo/react-hooks";
 import {FundsQuery, FundsLogsQuery, FundsMoveToEscrow} from "./gql";
 import {useState, React}  from "react";
 import moment from "moment";
-import {humanFIL, humanFileSize, max, parseFil, toFixed} from "./util"
+import {humanFIL, max, parseFil} from "./util"
 import {Info} from "./Info"
 import {PageContainer, ShortDealLink} from "./Components";
 import {Link} from "react-router-dom";
