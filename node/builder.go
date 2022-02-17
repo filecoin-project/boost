@@ -44,6 +44,7 @@ import (
 	lotus_helpers "github.com/filecoin-project/lotus/node/modules/helpers"
 	lotus_lp2p "github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
+	"github.com/filecoin-project/lotus/storage"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/filecoin-project/lotus/system"
 
@@ -435,6 +436,11 @@ func ConfigBoost(c interface{}) Option {
 
 		// GraphQL server
 		Override(new(*gql.Server), modules.NewGraphqlServer),
+
+		// Address selector
+		Override(new(*storage.AddressSelector), lotus_modules.AddressSelector(&lotus_config.MinerAddressConfig{
+			DealPublishControl: []string{cfg.Wallets.PublishStorageDeals},
+		})),
 
 		// Lotus Markets
 		Override(new(lotus_dtypes.StagingBlockstore), lotus_modules.StagingBlockstore),
