@@ -186,10 +186,6 @@ function DealLog(props) {
                 if (typeof k !== "string") {
                     k = JSON.stringify(k)
                 }
-                if (typeof v === "object") {
-                    console.log(v)
-                    // v = JSON.stringify(v)
-                }
                 logParams[k] = v
             }
             delete logParams.id
@@ -201,7 +197,10 @@ function DealLog(props) {
         <td className="at">{moment(log.CreatedAt).format(dateFormat)}</td>
         <td className="since-last">{sinceLast}</td>
         <td className="log-line">
-            <div className="message">{log.LogMsg}</div>
+            <div className="message">
+                <span className="subsystem">{log.Subsystem}{log.Subsystem ? ': ' : ''}</span>
+                {log.LogMsg}
+            </div>
             {Object.keys(logParams).sort().map(k => <LogParam k={k} v={logParams[k]} topLevel={true} key={k} />)}
         </td>
     </tr>

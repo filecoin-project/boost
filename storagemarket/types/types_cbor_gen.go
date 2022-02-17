@@ -296,6 +296,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := t.Transfer.MarshalCBOR(w); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -403,7 +404,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 		_, err := w.Write(cbg.CborNull)
 		return err
 	}
-	if _, err := w.Write([]byte{163}); err != nil {
+	if _, err := w.Write([]byte{164}); err != nil {
 		return err
 	}
 
@@ -429,6 +430,29 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 	if _, err := io.WriteString(w, string(t.Type)); err != nil {
+		return err
+	}
+
+	// t.ClientID (string) (string)
+	if len("ClientID") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"ClientID\" was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("ClientID"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("ClientID")); err != nil {
+		return err
+	}
+
+	if len(t.ClientID) > cbg.MaxLength {
+		return xerrors.Errorf("Value in field t.ClientID was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len(t.ClientID))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string(t.ClientID)); err != nil {
 		return err
 	}
 
@@ -518,6 +542,17 @@ func (t *Transfer) UnmarshalCBOR(r io.Reader) error {
 				}
 
 				t.Type = string(sval)
+			}
+			// t.ClientID (string) (string)
+		case "ClientID":
+
+			{
+				sval, err := cbg.ReadStringBuf(br, scratch)
+				if err != nil {
+					return err
+				}
+
+				t.ClientID = string(sval)
 			}
 			// t.Params ([]uint8) (slice)
 		case "Params":

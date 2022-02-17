@@ -83,7 +83,7 @@ func New(host host.Host, dealLogger *logs.DealLogger, opts ...Option) *httpTrans
 func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealInfo *types.TransportDealInfo) (th transport.Handler, err error) {
 	deadline, _ := ctx.Deadline()
 	duuid := dealInfo.DealUuid
-	h.dl.Infow(duuid, "execute called", "deal size", dealInfo.DealSize, "output file", dealInfo.OutputFile,
+	h.dl.Infow(duuid, "execute transfer", "deal size", dealInfo.DealSize, "output file", dealInfo.OutputFile,
 		"time before context deadline", time.Until(deadline).String())
 
 	// de-serialize transport opaque token
@@ -114,7 +114,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	if fileSize > dealInfo.DealSize {
 		return nil, fmt.Errorf("deal size=%d but file size=%d", dealInfo.DealSize, fileSize)
 	}
-	h.dl.Infow(duuid, "got existing file size", "file size", fileSize, "deal size", dealInfo.DealSize)
+	h.dl.Infow(duuid, "existing file size", "file size", fileSize, "deal size", dealInfo.DealSize)
 
 	// construct the transfer instance that will act as the transfer handler
 	tctx, cancel := context.WithCancel(ctx)
@@ -144,10 +144,10 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 			addrTtl = time.Until(deadline)
 		}
 		h.libp2pHost.Peerstore().AddAddr(u.peerID, u.multiaddr, addrTtl)
-		h.dl.Infow(duuid, "is a libp2p-http url", "url", tInfo.URL)
+		h.dl.Infow(duuid, "libp2p-http url", "url", tInfo.URL, "peer id", u.peerID, "multiaddr", u.multiaddr)
 	} else {
 		t.client = http.DefaultClient
-		h.dl.Infow(duuid, "is a http url", "url", tInfo.URL)
+		h.dl.Infow(duuid, "http url", "url", tInfo.URL)
 	}
 
 	// is the transfer already complete ? we check this by comparing the number of bytes

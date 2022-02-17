@@ -206,7 +206,7 @@ func (p *Provider) untagFundsAfterPublish(ctx context.Context, deal *types.Provi
 }
 
 func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
-	p.dealLogger.Infow(deal.DealUuid, "transferring deal data")
+	p.dealLogger.Infow(deal.DealUuid, "transferring deal data", "transfer client id", deal.Transfer.ClientID)
 
 	tctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.config.MaxTransferDuration))
 	defer cancel()

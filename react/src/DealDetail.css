@@ -54,6 +54,10 @@
     vertical-align: top;
 }
 
+.deal-detail .deal-logs .subsystem {
+    color: #2c7be5;
+}
+
 .deal-detail .deal-logs .param {
     position: relative;
     color: #777777;

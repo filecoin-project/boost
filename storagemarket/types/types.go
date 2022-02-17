@@ -46,6 +46,8 @@ type DealParams struct {
 type Transfer struct {
 	// The type of transfer eg "http"
 	Type string
+	// An optional ID that can be supplied by the client to identify the deal
+	ClientID string
 	// A byte array containing marshalled data specific to the transfer type
 	// eg a JSON encoded struct { URL: "<url>", Headers: {...} }
 	Params []byte

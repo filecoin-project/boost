@@ -84,6 +84,7 @@ const DealsListQuery = gql`
                     CreatedAt
                     LogMsg
                     LogParams
+                    Subsystem
                 }
             }
             totalCount
@@ -128,6 +129,7 @@ const DealSubscription = gql`
                 CreatedAt
                 LogMsg
                 LogParams
+                Subsystem
             }
         }
     }
@@ -169,6 +171,7 @@ const NewDealsSubscription = gql`
                 CreatedAt
                 LogMsg
                 LogParams
+                Subsystem
             }
         }
     }
