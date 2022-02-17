@@ -246,22 +246,15 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.Handler, pub event.Emitter, deal *types.ProviderDealState) error {
 	defer handler.Close()
 	defer p.transfers.complete(deal.DealUuid)
-	tlog := make(map[int]struct{})
+	var lastOutputPct int64
 
 	logTransferProgress := func(received int64) {
 		pct := (100 * received) / int64(deal.Transfer.Size)
-		if pct == 0 {
-			return
-		}
-		for i := 10; i < 100; i = i + 10 {
-			if i >= int(pct) {
-				if _, ok := tlog[i]; !ok {
-					tlog[i] = struct{}{}
-					p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received,
-						"deal size", deal.Transfer.Size, "~ percent complete", pct)
-					return
-				}
-			}
+		outputPct := pct / 10
+		if outputPct != lastOutputPct {
+			lastOutputPct = outputPct
+			p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received,
+				"deal size", deal.Transfer.Size, "~ percent complete", pct)
 		}
 	}
 
@@ -385,6 +378,10 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	// may be for a batch of deals.
 	p.dealLogger.Infow(deal.DealUuid, "awaiting deal publish confirmation")
 	res, err := p.chainDealManager.WaitForPublishDeals(p.ctx, *deal.PublishCID, deal.ClientDealProposal.Proposal)
+	if xerrors.Is(err, context.Canceled) {
+		p.dealLogger.Warnw(deal.DealUuid, "context cancelled while waiting for publish message confirmation, will retry on resumption")
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("wait for publish message %s failed: %w", deal.PublishCID, err)
 	}
