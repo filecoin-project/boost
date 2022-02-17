@@ -254,7 +254,7 @@ func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.
 		if outputPct != lastOutputPct {
 			lastOutputPct = outputPct
 			p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received,
-				"deal size", deal.Transfer.Size, "~ percent complete", pct)
+				"deal size", deal.Transfer.Size, "percent complete", pct)
 		}
 	}
 
