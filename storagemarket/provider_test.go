@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	logging "github.com/ipfs/go-log/v2"
+
 	"github.com/libp2p/go-libp2p-core/host"
 
 	"golang.org/x/sync/errgroup"
@@ -256,6 +258,8 @@ func TestDealsRejectedForFunds(t *testing.T) {
 }
 
 func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
+	require.NoError(t, logging.SetLogLevel("*", "INFO"))
+
 	ctx := context.Background()
 	// setup the provider test harness with a disconnecting server that disconnects after sending the given number of bytes
 	harness := NewHarness(t, ctx, withHttpDisconnectServerAfter(1),

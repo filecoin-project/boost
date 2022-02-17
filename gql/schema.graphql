@@ -63,6 +63,7 @@ type DealLog {
   LogLevel: String!
   LogMsg: String!
   LogParams: String!
+  Subsystem: String!
 }
 
 type Storage {

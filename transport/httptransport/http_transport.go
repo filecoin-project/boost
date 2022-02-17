@@ -83,7 +83,7 @@ func New(host host.Host, dealLogger *logs.DealLogger, opts ...Option) *httpTrans
 func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealInfo *types.TransportDealInfo) (th transport.Handler, err error) {
 	deadline, _ := ctx.Deadline()
 	duuid := dealInfo.DealUuid
-	h.dl.Infow(duuid, "execute called", "deal size", dealInfo.DealSize, "output file", dealInfo.OutputFile,
+	h.dl.Infow(duuid, "execute transfer", "deal size", dealInfo.DealSize, "output file", dealInfo.OutputFile,
 		"time before context deadline", time.Until(deadline).String())
 
 	// de-serialize transport opaque token
@@ -114,7 +114,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	if fileSize > dealInfo.DealSize {
 		return nil, fmt.Errorf("deal size=%d but file size=%d", dealInfo.DealSize, fileSize)
 	}
-	h.dl.Infow(duuid, "got existing file size", "file size", fileSize, "deal size", dealInfo.DealSize)
+	h.dl.Infow(duuid, "existing file size", "file size", fileSize, "deal size", dealInfo.DealSize)
 
 	// construct the transfer instance that will act as the transfer handler
 	tctx, cancel := context.WithCancel(ctx)
@@ -144,10 +144,10 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 			addrTtl = time.Until(deadline)
 		}
 		h.libp2pHost.Peerstore().AddAddr(u.peerID, u.multiaddr, addrTtl)
-		h.dl.Infow(duuid, "is a libp2p-http url", "url", tInfo.URL)
+		h.dl.Infow(duuid, "libp2p-http url", "url", tInfo.URL, "peer id", u.peerID, "multiaddr", u.multiaddr)
 	} else {
 		t.client = http.DefaultClient
-		h.dl.Infow(duuid, "is a http url", "url", tInfo.URL)
+		h.dl.Infow(duuid, "http url", "url", tInfo.URL)
 	}
 
 	// is the transfer already complete ? we check this by comparing the number of bytes
@@ -248,7 +248,12 @@ func (t *transfer) execute(ctx context.Context) error {
 		// start the http transfer
 		remaining := t.dealInfo.DealSize - t.nBytesReceived
 		reqErr := t.doHttp(ctx, req, of, remaining)
-		t.dl.Infow(duuid, "one http req done", "outputErr", reqErr)
+		if reqErr != nil {
+			t.dl.Infow(duuid, "one http req done", "http code", reqErr.code, "outputErr", reqErr.Error())
+		} else {
+			t.dl.Infow(duuid, "http req finished with no error")
+		}
+
 		if reqErr == nil {
 			t.dl.Infow(duuid, "http req done without any errors")
 			// if there's no error, transfer was successful
@@ -273,7 +278,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		// backoff-retry transfer if max number of attempts haven't been exhausted
 		nAttempts := t.backoff.Attempt() + 1
 		if nAttempts >= t.maxReconnectAttempts {
-			t.dl.Errorw(duuid, "terminating http req as exhausted max attempts", "err", err, "maxAttempts", t.maxReconnectAttempts)
+			t.dl.Errorw(duuid, "terminating http req as exhausted max attempts", "err", err.Error(), "maxAttempts", t.maxReconnectAttempts)
 			return fmt.Errorf("could not finish transfer even after %.0f attempts, lastErr: %w", t.maxReconnectAttempts, err)
 		}
 		duration := t.backoff.Duration()
@@ -333,6 +338,10 @@ func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer,
 	buf := make([]byte, readBufferSize)
 	limitR := io.LimitReader(resp.Body, toRead)
 	for {
+		if ctx.Err() != nil {
+			t.dl.LogError(duid, "not reading http response anymore", ctx.Err())
+			return &httpError{error: ctx.Err()}
+		}
 		nr, readErr := limitR.Read(buf)
 
 		// if we read more than zero bytes, write whatever read.

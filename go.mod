@@ -4,10 +4,6 @@ go 1.16
 
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
-//replace github.com/filecoin-project/lotus => ../lotus
-
-//replace github.com/ipfs/go-datastore => ../../ipfs/go-datastore
-
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
 	github.com/BurntSushi/toml v0.4.1

@@ -17,11 +17,7 @@ const (
 )
 
 func main() {
-	_ = logging.SetLogLevel("boost", "INFO")
-	_ = logging.SetLogLevel("provider", "INFO")
-	_ = logging.SetLogLevel("gql", "INFO")
-	_ = logging.SetLogLevel("boost-provider", "INFO")
-	_ = logging.SetLogLevel("storagemanager", "INFO")
+	_ = logging.SetLogLevel("*", "INFO")
 
 	app := &cli.App{
 		Name:                 "boost",
