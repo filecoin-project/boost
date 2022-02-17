@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
 	"strings"
 
 	"github.com/ipfs/go-datastore"
@@ -175,6 +177,7 @@ var initCmd = &cli.Command{
 				return xerrors.Errorf("setting config: %w", err)
 			}
 
+			// Add the miner address to the metadata datastore
 			ds, err := lr.Datastore(context.Background(), "/metadata")
 			if err != nil {
 				return err
@@ -183,6 +186,14 @@ var initCmd = &cli.Command{
 			err = ds.Put(context.Background(), datastore.NewKey("miner-address"), minerActor.Bytes())
 			if err != nil {
 				return err
+			}
+
+			// Create an empty .storagejson file
+			// TODO: This is needed by markets, although it's not clear why as
+			// it seems like this should be the responsibility of the sealer
+			err = os.WriteFile(path.Join(lr.Path(), "storage.json"), []byte("{}"), 0666)
+			if err != nil {
+				return fmt.Errorf("creating storage.json file: %w", err)
 			}
 
 			if err := lr.Close(); err != nil {
