@@ -5,14 +5,20 @@ import (
 	"testing"
 	"time"
 
+	logging "github.com/ipfs/go-log/v2"
+
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/stretchr/testify/require"
 )
 
+const testFileSize = (10 * 1048576) + 75 // ~10Mib
+
 func TestSingleDealResumptionDisconnect(t *testing.T) {
+	logging.SetLogLevel("http-transport", "WARN") //nolint:errcheck
+
 	ctx := context.Background()
-	fileSize := (100 * 1048576) + 75 // ~100Mib
+	fileSize := testFileSize
 
 	// setup the provider test harness with a disconnecting server that disconnects after sending the given number of bytes
 	harness := NewHarness(t, ctx, withHttpDisconnectServerAfter(int64(fileSize/101)),
@@ -36,9 +42,11 @@ func TestSingleDealResumptionDisconnect(t *testing.T) {
 }
 
 func TestMultipleDealsConcurrentResumptionDisconnect(t *testing.T) {
+	logging.SetLogLevel("http-transport", "WARN") //nolint:errcheck
+
 	nDeals := 5
 	ctx := context.Background()
-	fileSize := (100 * 1048576) + 75 // ~100Mib
+	fileSize := testFileSize
 
 	// setup the provider test harness with a disconnecting server that disconnects after sending the given number of bytes
 	harness := NewHarness(t, ctx, withHttpDisconnectServerAfter(int64(fileSize/101)),
