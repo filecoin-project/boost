@@ -122,6 +122,7 @@ function StorageDealsContent(props) {
             return dealList
         } catch (e) {
             console.error(e)
+            e.message += " - check connection to Boost server"
             setError(e)
         }
     }
@@ -135,7 +136,7 @@ function StorageDealsContent(props) {
         async function onStart() {
             // Make a query to get the current list of deals
             var res = await dealsListQuery()
-            if (!res.deals) {
+            if (!(res || {}).deals) {
                 return
             }
 
@@ -170,8 +171,8 @@ function StorageDealsContent(props) {
         newDealsSubscriber && newDealsSubscriber.updateFields(deals, pageNum)
     }, [deals, pageNum])
 
-    if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error.message}</div>;
+    if (loading) return <div>Loading...</div>;
 
     var totalPages = Math.ceil(totalCount / dealsPerPage)
 
