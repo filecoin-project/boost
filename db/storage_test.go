@@ -15,11 +15,10 @@ func TestStorageDB(t *testing.T) {
 	req := require.New(t)
 	ctx := context.Background()
 
-	sqldb, err := CreateTmpDB(ctx)
-	req.NoError(err)
+	sqldb := CreateTestTmpDB(t)
+	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
 
 	db := NewStorageDB(sqldb)
-	req.NoError(err)
 
 	tt, err := db.TotalTagged(ctx)
 	req.NoError(err)

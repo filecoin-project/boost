@@ -58,8 +58,8 @@ type serverTest struct {
 }
 
 func newDealLogger(t *testing.T, ctx context.Context) *logs.DealLogger {
-	tmp, err := db.CreateTmpDB(ctx)
-	require.NoError(t, err)
+	tmp := db.CreateTestTmpDB(t)
+	require.NoError(t, db.CreateAllBoostTables(ctx, tmp, tmp))
 	return logs.NewDealLogger(db.NewLogsDB(tmp))
 }
 

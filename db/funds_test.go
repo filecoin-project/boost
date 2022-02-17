@@ -16,12 +16,10 @@ func TestFundsDB(t *testing.T) {
 	req := require.New(t)
 	ctx := context.Background()
 
-	sqldb, err := CreateTmpDB(ctx)
-	req.NoError(err)
+	sqldb := CreateTestTmpDB(t)
+	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
 
 	db := NewFundsDB(sqldb)
-	req.NoError(err)
-
 	tt, err := db.TotalTagged(ctx)
 	req.NoError(err)
 	req.Equal(int64(0), tt.PubMsg.Int64())

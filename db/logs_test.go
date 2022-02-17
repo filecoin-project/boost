@@ -11,8 +11,8 @@ func TestLogsDB(t *testing.T) {
 	req := require.New(t)
 	ctx := context.Background()
 
-	sqldb, err := CreateTmpDB(ctx)
-	req.NoError(err)
+	sqldb := CreateTestTmpDB(t)
+	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
 
 	ldb := NewLogsDB(sqldb)
 

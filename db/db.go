@@ -8,6 +8,9 @@ import (
 	"io/ioutil"
 	"path"
 	"runtime"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -20,15 +23,6 @@ func SqlDB(dbPath string) (*sql.DB, error) {
 	return sql.Open("sqlite3", "file:"+dbPath)
 }
 
-func CreateTmpDB(ctx context.Context) (*sql.DB, error) {
-	sqldb, err := SqlDB("test.db?cache=shared&mode=memory")
-	if err != nil {
-		return nil, nil
-	}
-
-	return sqldb, CreateAllBoostTables(ctx, sqldb, sqldb)
-}
-
 func CreateAllBoostTables(ctx context.Context, mainDB *sql.DB, logsDB *sql.DB) error {
 	if err := createTables(ctx, mainDB, "/create_main_db.sql"); err != nil {
 		return fmt.Errorf("failed to create tables in main DB: %w", err)
@@ -37,7 +31,6 @@ func CreateAllBoostTables(ctx context.Context, mainDB *sql.DB, logsDB *sql.DB) e
 	if err := createTables(ctx, logsDB, "/create_logs_db.sql"); err != nil {
 		return fmt.Errorf("failed to create tables in logs DB: %w", err)
 	}
-
 	return nil
 }
 
@@ -54,4 +47,13 @@ func createTables(ctx context.Context, db *sql.DB, file string) error {
 	}
 
 	return nil
+}
+
+func CreateTestTmpDB(t *testing.T) *sql.DB {
+	f, err := ioutil.TempFile(t.TempDir(), "*.db")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	d, err := SqlDB(f.Name())
+	require.NoError(t, err)
+	return d
 }
