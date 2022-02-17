@@ -17,7 +17,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	gostream "github.com/libp2p/go-libp2p-gostream"
-	"github.com/multiformats/go-multiaddr"
 	"golang.org/x/xerrors"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -43,7 +42,6 @@ type Libp2pCarServer struct {
 }
 
 type ServerConfig struct {
-	AnnounceAddr          multiaddr.Multiaddr
 	BlockInfoCacheManager car.BlockInfoCacheManager
 }
 
