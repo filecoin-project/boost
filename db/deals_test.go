@@ -16,12 +16,10 @@ func TestDealsDB(t *testing.T) {
 	req := require.New(t)
 	ctx := context.Background()
 
-	sqldb, err := CreateTmpDB(ctx)
-	req.NoError(err)
+	sqldb := CreateTestTmpDB(t)
+	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
 
 	db := NewDealsDB(sqldb)
-	req.NoError(err)
-
 	deals, err := GenerateDeals()
 	req.NoError(err)
 

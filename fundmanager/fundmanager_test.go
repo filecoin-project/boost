@@ -22,8 +22,8 @@ func TestFundManager(t *testing.T) {
 	req := require.New(t)
 	ctx := context.Background()
 
-	sqldb, err := db.CreateTmpDB(ctx)
-	req.NoError(err)
+	sqldb := db.CreateTestTmpDB(t)
+	require.NoError(t, db.CreateAllBoostTables(ctx, sqldb, sqldb))
 
 	fundsDB := db.NewFundsDB(sqldb)
 

@@ -582,7 +582,10 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	require.NoError(t, err)
 
 	// setup the databases
-	sqldb, err := db.CreateTmpDB(ctx)
+	f, err := ioutil.TempFile(dir, "*.db")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	sqldb, err := db.SqlDB(f.Name())
 	require.NoError(t, err)
 	dealsDB := db.NewDealsDB(sqldb)
 
