@@ -283,7 +283,7 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	ctx := context.Background()
 
-	rawSize := 2 * 1024 * 1024
+	rawSize := 10 * 1024 * 1024
 	st := newServerTest(t, rawSize)
 
 	clientHost, srvHost := setupLibp2pHosts(t)
