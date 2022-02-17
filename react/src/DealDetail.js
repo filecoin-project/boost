@@ -42,7 +42,8 @@ export function DealDetail(props) {
 
     var deal = data.dealUpdate
     var logRowData = []
-    for (var i = 0; i < (deal.Logs || []).length; i++) {
+    var logs = (deal.Logs || []).sort((a, b) => a.CreatedAt.getTime() - b.CreatedAt.getTime())
+    for (var i = 0; i < logs.length; i++) {
         var log = deal.Logs[i]
         var prev = i === 0 ? null : deal.Logs[i - 1]
         logRowData.push({log: log, prev: prev})
