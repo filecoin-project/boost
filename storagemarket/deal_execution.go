@@ -383,6 +383,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 		return err
 	}
 	if err != nil {
+		p.dealLogger.LogError(deal.DealUuid, "error while waiting for publish confirm", err)
 		return fmt.Errorf("wait for publish message %s failed: %w", deal.PublishCID, err)
 	}
 	p.dealLogger.Infow(deal.DealUuid, "successfully finished deal publish confirmation")
