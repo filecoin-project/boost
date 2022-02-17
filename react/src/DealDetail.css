@@ -34,7 +34,7 @@
 }
 
 .since-last, .aux {
-    color:  #999;
+    color: #999;
 }
 
 .deal-detail .buttons {
@@ -44,6 +44,14 @@
 
 .deal-detail h3 {
     margin-top: 2em;
+}
+
+.deal-detail .deal-logs .deal-log.since-s td {
+    padding-top: 2em;
+}
+
+.deal-detail .deal-logs .deal-log.since-multi-s td {
+    padding-top: 4em;
 }
 
 .deal-detail .deal-logs .at {

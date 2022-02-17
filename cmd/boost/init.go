@@ -26,8 +26,13 @@ var initCmd = &cli.Command{
 	Usage: "Initialize a boost repository",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
+			Name:     "api-sealer",
+			Usage:    "miner/sealer API info (lotus-miner auth api-info --perm=admin)",
+			Required: true,
+		},
+		&cli.StringFlag{
 			Name:     "api-sector-index",
-			Usage:    "miner sector index API info",
+			Usage:    "miner sector Index API info (lotus-miner auth api-info --perm=admin)",
 			Required: true,
 		},
 		&cli.StringFlag{
@@ -43,7 +48,6 @@ var initCmd = &cli.Command{
 		&cli.Int64Flag{
 			Name:     "max-staging-deals-bytes",
 			Usage:    "max size for staging area in bytes",
-			Value:    50_000_000_000,
 			Required: true,
 		},
 	},
@@ -145,12 +149,19 @@ var initCmd = &cli.Command{
 					return
 				}
 
-				ai, err := checkApiInfo(ctx, cctx.String("api-sector-index"))
+				asi, err := checkApiInfo(ctx, cctx.String("api-sector-index"))
 				if err != nil {
 					cerr = xerrors.Errorf("checking sector index API: %w", err)
 					return
 				}
-				rcfg.SectorIndexApiInfo = ai
+				rcfg.SectorIndexApiInfo = asi
+
+				ai, err := checkApiInfo(ctx, cctx.String("api-sealer"))
+				if err != nil {
+					cerr = xerrors.Errorf("checking sealer API: %w", err)
+					return
+				}
+				rcfg.SealerApiInfo = ai
 
 				rcfg.Dealmaking.MaxStagingDealsBytes = cctx.Int64("max-staging-deals-bytes")
 				rcfg.Wallets.Miner = minerActor.String()

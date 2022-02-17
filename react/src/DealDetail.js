@@ -1,3 +1,5 @@
+/* global BigInt */
+
 import React, {useEffect, useState} from "react";
 import {useMutation, useSubscription} from "@apollo/react-hooks";
 import {DealCancelMutation, DealSubscription} from "./gql";
@@ -166,13 +168,21 @@ function DealLog(props) {
     var prev = props.prev
     var log = props.log
     var sinceLast = ''
+    var sinceScale = ''
     if (prev != null) {
         var logMs = log.CreatedAt.getTime()
         var prevMs = prev.CreatedAt.getTime()
-        if (logMs - prevMs < 1000) {
+        var deltaMillis = logMs - prevMs
+        if (deltaMillis < 1000) {
+            sinceScale = 'since-ms'
             sinceLast = (logMs - prevMs) + 'ms'
         } else {
             sinceLast = moment(prev.CreatedAt).from(log.CreatedAt)
+            if (deltaMillis < 10000) {
+                sinceScale = 'since-s'
+            } else {
+                sinceScale = 'since-multi-s'
+            }
         }
     }
 
@@ -193,7 +203,7 @@ function DealLog(props) {
         }
     }
 
-    return <tr>
+    return <tr className={'deal-log ' + sinceScale}>
         <td className="at">{moment(log.CreatedAt).format(dateFormat)}</td>
         <td className="since-last">{sinceLast}</td>
         <td className="log-line">
@@ -213,6 +223,8 @@ function LogParam(props) {
     const isObject = (val && typeof val === 'object')
     if (isObject) {
         val = Object.keys(val).sort().map(ck => <LogParam k={ck} v={val[ck]} key={ck} />)
+    } else if ((typeof val === 'string' || typeof val === 'number') && (''+val).match(/^[0-9]+$/)) {
+        val = addCommas(BigInt(val))
     }
 
     function toggleExpandState() {
