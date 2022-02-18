@@ -188,7 +188,7 @@ var initCmd = &cli.Command{
 				return err
 			}
 
-			// Create an empty .storagejson file
+			// Create an empty storage.json file
 			// TODO: This is needed by markets, although it's not clear why as
 			// it seems like this should be the responsibility of the sealer
 			err = os.WriteFile(path.Join(lr.Path(), "storage.json"), []byte("{}"), 0666)
