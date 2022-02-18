@@ -230,7 +230,7 @@ func TestDealsRejectedForFunds(t *testing.T) {
 	var successTds []*testDeal
 
 	for i := 0; i < nDeals; i++ {
-		td := harness.newDealBuilder(t, i).withBlockingHttpServer().build()
+		td := harness.newDealBuilder(t, i).withNoOpMinerStub().withBlockingHttpServer().build()
 		errg.Go(func() error {
 			if err := td.execute(); err != nil {
 				// deal should be rejected only for lack of funds
