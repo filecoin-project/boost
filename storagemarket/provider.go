@@ -11,11 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-
-	"github.com/filecoin-project/boost/storagemarket/logs"
-	logging "github.com/ipfs/go-log/v2"
-
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
@@ -24,8 +19,10 @@ import (
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
+	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/go-address"
@@ -40,6 +37,8 @@ import (
 	"github.com/filecoin-project/lotus/lib/sigs"
 	"github.com/filecoin-project/lotus/markets/utils"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-eventbus"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -468,6 +467,17 @@ func (p *Provider) GetBalance(ctx context.Context, addr address.Address, encoded
 	}
 
 	return utils.ToSharedBalance(bal), nil
+}
+
+func (p *Provider) DealBySignedProposalCID(ctx context.Context, signedPropCid cid.Cid) (*smtypes.ProviderDealState, error) {
+	deal, err := p.dealsDB.BySignedProposalCID(ctx, signedPropCid.String())
+	if err != nil {
+		if xerrors.Is(err, sql.ErrNoRows) {
+			err = ErrDealNotFound
+		}
+		return nil, fmt.Errorf("getting deal by signed proposal cid %s: %w", signedPropCid, err)
+	}
+	return deal, nil
 }
 
 type CurrentDealInfo struct {

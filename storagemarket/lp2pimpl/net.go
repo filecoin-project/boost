@@ -2,14 +2,20 @@ package lp2pimpl
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	mktssm "github.com/filecoin-project/go-fil-markets/storagemarket"
 	mktnet "github.com/filecoin-project/go-fil-markets/storagemarket/network"
+	"github.com/filecoin-project/go-state-types/crypto"
+	"github.com/filecoin-project/lotus/api/v1api"
+	chaintypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -89,14 +95,16 @@ func NewDealClient(h host.Host, options ...DealClientOption) *DealClient {
 
 // DealProvider listens for incoming deal proposals over libp2p
 type DealProvider struct {
-	host host.Host
-	prov *storagemarket.Provider
+	host     host.Host
+	prov     *storagemarket.Provider
+	fullNode v1api.FullNode
 }
 
-func NewDealProvider(h host.Host, prov *storagemarket.Provider) *DealProvider {
+func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode) *DealProvider {
 	p := &DealProvider{
-		host: h,
-		prov: prov,
+		host:     h,
+		prov:     prov,
+		fullNode: fullNodeApi,
 	}
 	return p
 }
@@ -104,11 +112,13 @@ func NewDealProvider(h host.Host, prov *storagemarket.Provider) *DealProvider {
 func (p *DealProvider) Start() {
 	p.host.SetStreamHandler(DealProtocolID, p.handleNewDealStream)
 	p.host.SetStreamHandler(mktssm.AskProtocolID, p.handleNewAskStream)
+	p.host.SetStreamHandler(mktssm.DealStatusProtocolID, p.handleNewDealStatusStream)
 }
 
 func (p *DealProvider) Stop() {
 	p.host.RemoveStreamHandler(DealProtocolID)
 	p.host.RemoveStreamHandler(mktssm.AskProtocolID)
+	p.host.RemoveStreamHandler(mktssm.DealStatusProtocolID)
 }
 
 // Called when the client opens a libp2p stream with a new deal proposal
@@ -156,7 +166,7 @@ func (p *DealProvider) handleNewAskStream(s network.Stream) {
 
 	var a mktnet.AskRequest
 	if err := a.UnmarshalCBOR(s); err != nil {
-		log.Errorf("failed to read AskRequest from incoming stream: %s", err)
+		log.Warnw("failed to read AskRequest from incoming stream", "err", err)
 		return
 	}
 
@@ -167,7 +177,120 @@ func (p *DealProvider) handleNewAskStream(s network.Stream) {
 	}
 
 	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
-		log.Errorf("failed to write ask response: %s", err)
+		log.Warnw("failed to write ask response", "err", err)
 		return
 	}
+}
+
+func (p *DealProvider) handleNewDealStatusStream(s network.Stream) {
+	ctx := context.Background()
+	defer s.Close()
+
+	var q mktnet.DealStatusRequest
+	if err := q.UnmarshalCBOR(s); err != nil {
+		log.Warnw("failed to read DealStatusRequest from incoming stream", "err", err)
+		return
+	}
+
+	dealState, err := p.getMarketsDealState(ctx, q.Proposal)
+	if err != nil {
+		if xerrors.Is(err, storagemarket.ErrDealNotFound) {
+			dealState = &mktssm.ProviderDealState{
+				State:   mktssm.StorageDealUnknown,
+				Message: "deal not found: no deal with proposal cid " + q.Proposal.String(),
+			}
+		} else {
+			log.Errorw("failed to process deal status request", "err", err)
+			dealState = &mktssm.ProviderDealState{
+				State:   mktssm.StorageDealError,
+				Message: "server error: failed to process deal status request",
+			}
+		}
+	}
+
+	signature, err := p.sign(ctx, dealState)
+	if err != nil {
+		log.Errorw("failed to sign deal status response", "err", err)
+		return
+	}
+
+	response := &mktnet.DealStatusResponse{
+		DealState: *dealState,
+		Signature: *signature,
+	}
+
+	if err := cborutil.WriteCborRPC(s, response); err != nil {
+		log.Warnw("failed to write deal status response", "err", err)
+		return
+	}
+}
+
+func (p *DealProvider) getMarketsDealState(ctx context.Context, proposalCid cid.Cid) (*mktssm.ProviderDealState, error) {
+	deal, err := p.prov.DealBySignedProposalCID(ctx, proposalCid)
+	if err != nil {
+		return nil, err
+	}
+
+	signedPropNd, err := cborutil.AsIpld(&deal.ClientDealProposal)
+	if err != nil {
+		return nil, fmt.Errorf("calculating signed deal proposal ipld root: %w", err)
+	}
+	signedPropCid := signedPropNd.Cid()
+
+	dealState := mktssm.ProviderDealState{
+		State:         toLegacyMarketsState(deal),
+		Proposal:      &deal.ClientDealProposal.Proposal,
+		ProposalCid:   &signedPropCid,
+		PublishCid:    deal.PublishCID,
+		DealID:        deal.ChainDealID,
+		FastRetrieval: true,
+	}
+	return &dealState, nil
+}
+
+func (p *DealProvider) sign(ctx context.Context, dealState *mktssm.ProviderDealState) (*crypto.Signature, error) {
+	msg, err := cborutil.Dump(dealState)
+	if err != nil {
+		return nil, fmt.Errorf("sign deal: serializing deal state: %w", err)
+	}
+
+	minerAddr := p.prov.Address
+	mi, err := p.fullNode.StateMinerInfo(ctx, minerAddr, chaintypes.EmptyTSK)
+	if err != nil {
+		return nil, fmt.Errorf("sign deal: getting state miner info: %w", err)
+	}
+
+	signerAct, err := p.fullNode.StateAccountKey(ctx, mi.Worker, chaintypes.EmptyTSK)
+	if err != nil {
+		return nil, fmt.Errorf("sign deal: getting state account key: %w", err)
+	}
+
+	sig, err := p.fullNode.WalletSign(ctx, signerAct, msg)
+	if err != nil {
+		return nil, fmt.Errorf("sign deal: wallet sign: %w", err)
+	}
+	return sig, nil
+}
+
+func toLegacyMarketsState(deal *types.ProviderDealState) mktssm.StorageDealStatus {
+	if deal.Err != "" {
+		return mktssm.StorageDealError
+	}
+
+	switch deal.Checkpoint {
+	case dealcheckpoints.Accepted:
+		return mktssm.StorageDealProposalAccepted
+	case dealcheckpoints.Transferred:
+		return mktssm.StorageDealCheckForAcceptance
+	case dealcheckpoints.Published:
+		return mktssm.StorageDealPublishing
+	case dealcheckpoints.PublishConfirmed:
+		return mktssm.StorageDealStaged
+	case dealcheckpoints.AddedPiece:
+		return mktssm.StorageDealAwaitingPreCommit
+	case dealcheckpoints.Complete:
+		return mktssm.StorageDealActive
+	}
+
+	return mktssm.StorageDealUnknown
 }
