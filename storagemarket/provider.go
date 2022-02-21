@@ -452,7 +452,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 	if err != nil {
 		return nil, fmt.Errorf("AddPiece failed: %w", err)
 	}
-	p.dealLogger.Infow(deal.DealUuid, "added new deal to sector", "sector", sectorNum)
+	p.dealLogger.Infow(deal.DealUuid, "added new deal to sector", "sector", sectorNum.String())
 
 	return &storagemarket.PackingResult{
 		SectorNumber: sectorNum,
