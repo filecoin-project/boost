@@ -453,7 +453,8 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	deal.SectorID = packingInfo.SectorNumber
 	deal.Offset = packingInfo.Offset
 	deal.Length = packingInfo.Size
-	p.dealLogger.Infow(deal.DealUuid, "deal successfully handed to the sealing subsystem")
+	p.dealLogger.Infow(deal.DealUuid, "deal successfully handed to the sealing subsystem",
+		"sectorNum", deal.SectorID.String(), "offset", deal.Offset, "length", deal.Length)
 
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece)
 }

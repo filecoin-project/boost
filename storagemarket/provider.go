@@ -341,7 +341,7 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 				return
 			}
 
-			p.dealLogger.Infow(d.DealUuid, "resuming deal on boost restart")
+			p.dealLogger.Infow(d.DealUuid, "resuming deal on boost restart", "checkpoint on resumption", d.Checkpoint.String())
 			p.doDeal(d, dh)
 		}()
 	}
@@ -456,7 +456,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 	if err != nil {
 		return nil, fmt.Errorf("AddPiece failed: %w", err)
 	}
-	p.dealLogger.Infow(deal.DealUuid, "added new deal to sector", "sector", sectorNum)
+	p.dealLogger.Infow(deal.DealUuid, "added new deal to sector", "sector", sectorNum.String())
 
 	return &storagemarket.PackingResult{
 		SectorNumber: sectorNum,
