@@ -324,7 +324,10 @@ func (p *Provider) Start() error {
 		dh := p.mkAndInsertDealHandler(d.DealUuid)
 		p.wg.Add(1)
 		go func() {
-			defer p.wg.Done()
+			defer func() {
+				p.wg.Done()
+				log.Infow("deal returned", "id", d.DealUuid)
+			}()
 
 			// Check if deal is already complete
 			// TODO Update this once we start listening for expired/slashed deals etc
@@ -351,8 +354,20 @@ func (p *Provider) Stop() {
 	p.closeSync.Do(func() {
 		log.Infow("storage provider: stopping")
 
+		deals, err := p.dealsDB.ListActive(p.ctx)
+		if err == nil {
+			for i := range deals {
+				dl := deals[i]
+				if dl.Checkpoint < dealcheckpoints.AddedPiece {
+					log.Infow("will shutdown pending deal", "id", dl.DealUuid.String(), "ckp", dl.Checkpoint.String())
+				}
+			}
+		}
+
 		p.cancel()
+		log.Infow("cancelled context")
 		p.wg.Wait()
+		log.Info("finished waiting for all go-routines to return")
 	})
 }
 
