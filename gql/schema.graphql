@@ -51,10 +51,36 @@ type Deal {
   Logs: [DealLog]!
 }
 
+type LegacyDeal {
+  ID: ID!
+  ClientAddress: String!
+  ProviderAddress: String!
+  CreatedAt: Time!
+  PieceCid: String!
+  PieceSize: Uint64!
+  ProviderCollateral: Float!
+  StartEpoch: Uint64!
+  EndEpoch: Uint64!
+  ClientPeerID: String!
+  DealDataRoot: String!
+  PublishCid: String!
+  TransferType: String!
+  TransferSize: Uint64!
+  Status: String!
+  SectorNumber: Uint64!
+  Message: String!
+}
+
 type DealList {
   totalCount: Int!
   next: ID
   deals: [Deal]!
+}
+
+type LegacyDealList {
+  totalCount: Int!
+  next: ID
+  deals: [LegacyDeal]!
 }
 
 type DealLog {
@@ -172,11 +198,20 @@ type RootQuery {
   """Get Deal by ID"""
   deal(id: ID!): Deal
 
+  """Get Deal made with legacy markets endpoint by ID"""
+  legacyDeal(id: ID!): LegacyDeal
+
   """Get all Deals"""
   deals(first: ID, limit: Int): DealList!
 
+  """Get all Deals made with legacy markets endpoint"""
+  legacyDeals(first: ID, limit: Int): LegacyDealList!
+
   """Get the total number of deals"""
   dealsCount: Int!
+
+  """Get the total number of deals made with legacy markets endpoint"""
+  legacyDealsCount: Int!
 
   """Get storage space usage"""
   storage: Storage!

@@ -7,12 +7,14 @@ import {Menu} from "./Menu";
 import {StorageSpacePage} from "./StorageSpace";
 import {FundsPage} from "./Funds";
 import {StorageDealsPage} from "./Deals";
+import {LegacyStorageDealsPage} from "./LegacyDeals";
 import {SealingPipelinePage} from "./SealingPipeline";
 import {DealPublishPage} from "./DealPublish";
 import {DealTransfersPage} from "./DealTransfers"
 import {MpoolPage} from "./Mpool";
 import {DealDetail} from "./DealDetail";
 import {Epoch} from "./Epoch";
+import {LegacyDealDetail} from "./LegacyDealDetail"
 
 function App(props) {
     return (
@@ -27,6 +29,7 @@ function App(props) {
                                     <Epoch />
                                     <Routes>
                                         <Route path="/storage-deals" element={<StorageDealsPage />} />
+                                        <Route path="/legacy-storage-deals" element={<LegacyStorageDealsPage />} />
                                         <Route path="/storage-space" element={<StorageSpacePage />} />
                                         <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
                                         <Route path="/funds" element={<FundsPage />} />
@@ -34,6 +37,7 @@ function App(props) {
                                         <Route path="/deal-transfers" element={<DealTransfersPage />} />
                                         <Route path="/mpool" element={<MpoolPage />} />
                                         <Route path="/deals/:dealID" element={<DealDetail />} />
+                                        <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
                                         <Route path="/" element={<StorageDealsPage />} />
                                     </Routes>
                                 </div>
