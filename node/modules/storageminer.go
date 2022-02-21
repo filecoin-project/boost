@@ -483,7 +483,7 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				err := prov.Start()
+				_, err := prov.Start()
 				if err != nil {
 					return fmt.Errorf("starting storage provider: %w", err)
 				}

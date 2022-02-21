@@ -75,7 +75,8 @@ func (sm *BoostAPI) ServeRemote(perm bool) func(w http.ResponseWriter, r *http.R
 }
 
 func (sm *BoostAPI) MarketDummyDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
-	return sm.StorageProvider.ExecuteDeal(&params, "dummy")
+	info, _, err := sm.StorageProvider.ExecuteDeal(&params, "dummy")
+	return info, err
 }
 
 func (sm *BoostAPI) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {

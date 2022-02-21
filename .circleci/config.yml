@@ -124,6 +124,10 @@ jobs:
         type: string
         default: "./..."
         description: Import paths of packages to be tested.
+      suite:
+        type: string
+        default: unit
+        description: Test suite name to report to CircleCI.
     executor: << parameters.executor >>
     steps:
       - install-deps
@@ -271,4 +275,11 @@ workflows:
             tags:
               only:
                 - /^v\d+\.\d+\.\d+(-rc\d+)?$/
-      - test
+      - test:
+          name: test-itest
+          suite: itest
+          target: "./itests/..."
+      - test:
+          name: test-all
+          suite: all
+          target: "`go list ./... | grep -v boost/itests`"
