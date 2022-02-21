@@ -231,9 +231,8 @@ func TestDealsRejectedForFunds(t *testing.T) {
 
 	for i := 0; i < nDeals; i++ {
 		td := harness.newDealBuilder(t, i).withNoOpMinerStub().withBlockingHttpServer().build()
-
 		errg.Go(func() error {
-			if err := td.executeAndSubscribeToNotifs(); err != nil {
+			if err := td.execute(); err != nil {
 				// deal should be rejected only for lack of funds
 				if !strings.Contains(err.Error(), "available funds") {
 					return errors.New("did not get expected error")
@@ -247,6 +246,7 @@ func TestDealsRejectedForFunds(t *testing.T) {
 				successTds = append(successTds, td)
 				mu.Unlock()
 			}
+
 			return nil
 		})
 	}
@@ -255,6 +255,11 @@ func TestDealsRejectedForFunds(t *testing.T) {
 	require.Len(t, successTds, 10)
 	require.Len(t, failedTds, 5)
 
+	// cancel all transfers so all deals finish and db files can be deleted
+	for i := range successTds {
+		td := successTds[i]
+		require.NoError(t, harness.Provider.CancelDealDataTransfer(td.params.DealUUID))
+	}
 }
 
 func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {

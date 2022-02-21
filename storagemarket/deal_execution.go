@@ -360,6 +360,11 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 		p.dealLogger.Infow(deal.DealUuid, "publishing deal")
 
 		mcid, err := p.dealPublisher.Publish(p.ctx, deal.DealUuid, deal.ClientDealProposal)
+		if err != nil && ctx.Err() != nil {
+			p.dealLogger.Warnw(deal.DealUuid, "context timed out while waiting for publish")
+			return fmt.Errorf("publish did not complete: boost shutdown")
+		}
+
 		if err != nil {
 			return fmt.Errorf("failed to publish deal %s: %w", deal.DealUuid, err)
 		}
@@ -378,13 +383,20 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	// may be for a batch of deals.
 	p.dealLogger.Infow(deal.DealUuid, "awaiting deal publish confirmation")
 	res, err := p.chainDealManager.WaitForPublishDeals(p.ctx, *deal.PublishCID, deal.ClientDealProposal.Proposal)
-	if xerrors.Is(err, context.Canceled) {
-		p.dealLogger.Warnw(deal.DealUuid, "context cancelled while waiting for publish message confirmation, will retry on resumption")
-		return err
+
+	// The `WaitForPublishDeals` call above is a remote RPC call to the full node
+	// and if it fails because of a context cancellation, the error we get back doesn't
+	// unwrap into a context cancelled error because of how error handling is implemented in the RPC layer.
+	// The below check is a work around for that.
+	if err != nil && ctx.Err() != nil {
+		p.dealLogger.Warnw(deal.DealUuid, "context timed out while waiting for publish confirmation")
+		return fmt.Errorf("wait for publish confirmation did not complete: boost shutdown")
 	}
 	if err != nil {
+		p.dealLogger.LogError(deal.DealUuid, "error while waiting for publish confirm", err)
 		return fmt.Errorf("wait for publish message %s failed: %w", deal.PublishCID, err)
 	}
+
 	p.dealLogger.Infow(deal.DealUuid, "successfully finished deal publish confirmation")
 
 	// If there's a re-org, the publish deal CID may change, so use the
