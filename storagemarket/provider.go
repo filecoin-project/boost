@@ -326,7 +326,7 @@ func (p *Provider) Start() error {
 		go func() {
 			defer func() {
 				p.wg.Done()
-				log.Infow("deal returned", "id", d.DealUuid)
+				log.Infow("finished running deal", "id", d.DealUuid)
 			}()
 
 			// Check if deal is already complete
@@ -359,15 +359,15 @@ func (p *Provider) Stop() {
 			for i := range deals {
 				dl := deals[i]
 				if dl.Checkpoint < dealcheckpoints.AddedPiece {
-					log.Infow("will shutdown pending deal", "id", dl.DealUuid.String(), "ckp", dl.Checkpoint.String())
+					log.Infow("shutting down running deal", "id", dl.DealUuid.String(), "ckp", dl.Checkpoint.String())
 				}
 			}
 		}
 
 		p.cancel()
-		log.Infow("cancelled context")
+		log.Infow("stopping provider event loop")
 		p.wg.Wait()
-		log.Info("finished waiting for all go-routines to return")
+		log.Info("provider shutdown complete")
 	})
 }
 

@@ -116,7 +116,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 func (p *Provider) loop() {
 	defer func() {
 		p.wg.Done()
-		log.Info("finished provider loop")
+		log.Info("provider event loop complete")
 	}()
 
 	for {
