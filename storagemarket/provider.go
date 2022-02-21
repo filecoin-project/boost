@@ -337,7 +337,7 @@ func (p *Provider) Start() error {
 				return
 			}
 
-			p.dealLogger.Infow(d.DealUuid, "resuming deal on boost restart")
+			p.dealLogger.Infow(d.DealUuid, "resuming deal on boost restart", "checkpoint on resumption", d.Checkpoint.String())
 			p.doDeal(d, dh)
 		}()
 	}
