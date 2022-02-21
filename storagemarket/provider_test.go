@@ -988,15 +988,6 @@ func (td *testDeal) executeAndSubscribe() error {
 	return nil
 }
 
-/*func (td *testDeal) subscribeToNotifs() error {
-	sub, err := td.ph.Provider.SubscribeDealUpdates(td.params.DealUUID)
-	if err != nil {
-		return err
-	}
-	td.sub = sub
-	return nil
-}*/
-
 func (td *testDeal) waitForError(errContains string) error {
 	if td.sub == nil {
 		return errors.New("no subcription for deal")
