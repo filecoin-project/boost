@@ -390,7 +390,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	// The below check is a work around for that.
 	if err != nil && ctx.Err() != nil {
 		p.dealLogger.Warnw(deal.DealUuid, "context timed out while waiting for publish confirmation")
-		return fmt.Errorf("wait for publish confirmation failed: %w", ctx.Err())
+		return fmt.Errorf("wait for publish confirmation did not complete: boost shutdown")
 	}
 	if err != nil {
 		p.dealLogger.LogError(deal.DealUuid, "error while waiting for publish confirm", err)
