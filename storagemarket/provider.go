@@ -191,7 +191,7 @@ func (p *Provider) GetAsk() *storagemarket.StorageAsk {
 	}
 }
 
-func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *api.ProviderDealRejectionInfo, err error) {
+func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *api.ProviderDealRejectionInfo, handler *dealHandler, err error) {
 	p.dealLogger.Infow(dp.DealUUID, "execute deal called")
 
 	ds := types.ProviderDealState{
@@ -208,7 +208,7 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 
 			return &api.ProviderDealRejectionInfo{
 				Reason: fmt.Sprintf("failed validation: %s", err),
-			}, nil
+			}, nil, nil
 		}
 	}
 
@@ -230,12 +230,12 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 	if err != nil {
 		cleanup()
 		p.dealLogger.LogError(dp.DealUUID, "failed to create temp file for inbound data transfer", err)
-		return nil, fmt.Errorf("failed to create temp file: %w", err)
+		return nil, nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
 	if err := tmpFile.Close(); err != nil {
 		cleanup()
 		p.dealLogger.LogError(dp.DealUUID, "failed to close temp file created for inbound data transfer", err)
-		return nil, fmt.Errorf("failed to close temp file: %w", err)
+		return nil, nil, fmt.Errorf("failed to close temp file: %w", err)
 	}
 
 	ds.InboundFilePath = string(tmpFile.OsPath())
@@ -244,23 +244,23 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 	if err != nil {
 		cleanup()
 		p.dealLogger.LogError(dp.DealUUID, "failed to send deal for acceptance", err)
-		return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
+		return nil, nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
 	}
 
 	// if there was an error, we return no rejection reason as well.
 	if resp.err != nil {
 		cleanup()
-		return nil, fmt.Errorf("failed to accept deal: %w", resp.err)
+		return nil, nil, fmt.Errorf("failed to accept deal: %w", resp.err)
 	}
 	// return rejection reason as provider has rejected the deal.
 	if !resp.ri.Accepted {
 		cleanup()
 		p.dealLogger.Infow(dp.DealUUID, "deal rejected by provider", "reason", resp.ri.Reason)
-		return resp.ri, nil
+		return resp.ri, nil, nil
 	}
 
 	p.dealLogger.Infow(dp.DealUUID, "deal accepted and scheduled for execution")
-	return resp.ri, nil
+	return resp.ri, dh, nil
 }
 
 func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealHandler) (acceptDealResp, error) {
@@ -303,26 +303,30 @@ func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) *dealHandler {
 	return dh
 }
 
-func (p *Provider) Start() error {
+func (p *Provider) Start() ([]*dealHandler, error) {
 
 	log.Infow("storage provider: starting")
 
 	// initialize the database
 	err := db.CreateAllBoostTables(p.ctx, p.db, p.logsSqlDB)
 	if err != nil {
-		return fmt.Errorf("failed to init db: %w", err)
+		return nil, fmt.Errorf("failed to init db: %w", err)
 	}
 	log.Infow("db initialized")
 
 	// restart all active deals
 	pds, err := p.dealsDB.ListActive(p.ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list active deals: %w", err)
+		return nil, fmt.Errorf("failed to list active deals: %w", err)
 	}
+
+	var dhs []*dealHandler
+
 	for _, ds := range pds {
 		d := ds
 		dh := p.mkAndInsertDealHandler(d.DealUuid)
 		p.wg.Add(1)
+		dhs = append(dhs, dh)
 		go func() {
 			defer func() {
 				p.wg.Done()
@@ -347,7 +351,7 @@ func (p *Provider) Start() error {
 	go p.transfers.start(p.ctx)
 
 	log.Infow("storage provider: started")
-	return nil
+	return dhs, nil
 }
 
 func (p *Provider) Stop() {

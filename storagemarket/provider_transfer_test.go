@@ -31,7 +31,7 @@ func TestSingleDealResumptionDisconnect(t *testing.T) {
 	td := harness.newDealBuilder(t, 1, withNormalFileSize(fileSize)).withAllMinerCallsNonBlocking().withDisconnectingHttpServer().build()
 
 	// execute deal and ensure it finishes even with the disconnects
-	err := td.executeAndSubscribeToNotifs()
+	err := td.executeAndSubscribe()
 	require.NoError(t, err)
 	td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
 
@@ -80,7 +80,7 @@ func TestTransferCancelledByUser(t *testing.T) {
 	td := harness.newDealBuilder(t, 1).withBlockingHttpServer().build()
 
 	// execute deal
-	err := td.executeAndSubscribeToNotifs()
+	err := td.executeAndSubscribe()
 	require.NoError(t, err)
 
 	// assert deal is accepted and funds tagged
@@ -116,7 +116,7 @@ func TestCancelTransferForTransferredDealFails(t *testing.T) {
 	td := harness.newDealBuilder(t, 1).withPublishBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().withNormalHttpServer().build()
 
 	// execute deal
-	err := td.executeAndSubscribeToNotifs()
+	err := td.executeAndSubscribe()
 	require.NoError(t, err)
 
 	// wait for deal to finish transferring

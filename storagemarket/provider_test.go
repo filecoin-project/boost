@@ -64,7 +64,7 @@ func TestSimpleDealHappy(t *testing.T) {
 	td := harness.newDealBuilder(t, 1).withAllMinerCallsBlocking().withBlockingHttpServer().build()
 
 	// execute deal
-	require.NoError(t, td.executeAndSubscribeToNotifs())
+	require.NoError(t, td.executeAndSubscribe())
 
 	// wait for Accepted checkpoint
 	td.waitForAndAssert(t, ctx, dealcheckpoints.Accepted)
@@ -154,7 +154,7 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 		tds = append(tds, td)
 
 		errGrp.Go(func() error {
-			err := td.executeAndSubscribeToNotifs()
+			err := td.executeAndSubscribe()
 			if err != nil {
 				return err
 			}
@@ -232,7 +232,7 @@ func TestDealsRejectedForFunds(t *testing.T) {
 	for i := 0; i < nDeals; i++ {
 		td := harness.newDealBuilder(t, i).withNoOpMinerStub().withBlockingHttpServer().build()
 		errg.Go(func() error {
-			if err := td.execute(); err != nil {
+			if err := td.executeAndSubscribe(); err != nil {
 				// deal should be rejected only for lack of funds
 				if !strings.Contains(err.Error(), "available funds") {
 					return errors.New("did not get expected error")
@@ -338,7 +338,7 @@ func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals
 		tds = append(tds, td)
 
 		errG.Go(func() error {
-			err := td.executeAndSubscribeToNotifs()
+			err := td.executeAndSubscribe()
 			if err != nil {
 				return err
 			}
@@ -697,7 +697,8 @@ func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
 	h.BlockingServer.Start()
 	h.DisconnectingServer.Start()
 	h.FailingServer.Start()
-	require.NoError(t, h.Provider.Start())
+	_, err := h.Provider.Start()
+	require.NoError(t, err)
 }
 
 func (h *ProviderHarness) Stop() {
@@ -970,36 +971,31 @@ type testDeal struct {
 	tBuilder *testDealBuilder
 }
 
-func (td *testDeal) executeAndSubscribeToNotifs() error {
-	if err := td.execute(); err != nil {
-		return err
-	}
-	if err := td.subscribeToNotifs(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (td *testDeal) execute() error {
-	pi, err := td.ph.Provider.ExecuteDeal(td.params, peer.ID(""))
+func (td *testDeal) executeAndSubscribe() error {
+	pi, dh, err := td.ph.Provider.ExecuteDeal(td.params, peer.ID(""))
 	if err != nil {
 		return err
 	}
 	if !pi.Accepted {
 		return errors.New("deal not accepted")
 	}
+	sub, err := dh.subscribeUpdates()
+	if err != nil {
+		return err
+	}
+	td.sub = sub
 
-	return err
+	return nil
 }
 
-func (td *testDeal) subscribeToNotifs() error {
+/*func (td *testDeal) subscribeToNotifs() error {
 	sub, err := td.ph.Provider.SubscribeDealUpdates(td.params.DealUUID)
 	if err != nil {
 		return err
 	}
 	td.sub = sub
 	return nil
-}
+}*/
 
 func (td *testDeal) waitForError(errContains string) error {
 	if td.sub == nil {

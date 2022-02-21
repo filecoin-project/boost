@@ -82,7 +82,7 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 
 			// start executing the deal
 			td := tc.dealBuilderF(harness)
-			require.NoError(t, td.executeAndSubscribeToNotifs())
+			require.NoError(t, td.executeAndSubscribe())
 
 			// wait for state after which to resume and assert funds and storage
 			tc.waitForAndAssertBeforeResumeF(t, harness, td)
@@ -95,15 +95,18 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 			td = tc.stubAfterResumeF(tbuilder)
 
 			// start the provider -> this will restart the deal
-			require.NoError(t, harness.Provider.Start())
+			dhs, err := harness.Provider.Start()
+			require.NoError(t, err)
+			require.Len(t, dhs, 1)
+			dh := dhs[0]
+			sub, err := dh.subscribeUpdates()
+			require.NoError(t, err)
+			td.sub = sub
 
 			// update subscription and mock assertions as provider has restarted
 			if tc.unblockF != nil {
 				tc.unblockF(td)
 			}
-
-			// subscribe again -> deal should finish now
-			require.NoError(t, td.subscribeToNotifs())
 
 			td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
 			// assert funds and storage are no longer tagged
