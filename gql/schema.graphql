@@ -166,6 +166,9 @@ type MpoolMessage {
 }
 
 type RootQuery {
+  """Get height of chain"""
+  epoch: Uint64!
+
   """Get Deal by ID"""
   deal(id: ID!): Deal
 

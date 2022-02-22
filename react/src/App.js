@@ -12,6 +12,7 @@ import {DealPublishPage} from "./DealPublish";
 import {DealTransfersPage} from "./DealTransfers"
 import {MpoolPage} from "./Mpool";
 import {DealDetail} from "./DealDetail";
+import {Epoch} from "./Epoch";
 
 function App(props) {
     return (
@@ -23,6 +24,7 @@ function App(props) {
                             <Menu />
                             <td className="main-content">
                                 <div className="page-content">
+                                    <Epoch />
                                     <Routes>
                                         <Route path="/storage-deals" element={<StorageDealsPage />} />
                                         <Route path="/storage-space" element={<StorageSpacePage />} />
