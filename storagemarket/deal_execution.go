@@ -445,7 +445,7 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	}
 
 	// Add the piece to a sector
-	packingInfo, packingErr := p.AddPieceToSector(p.ctx, *deal, paddedReader)
+	packingInfo, packingErr := p.AddPieceToSector(ctx, *deal, paddedReader)
 	if packingErr != nil && ctx.Err() != nil {
 		p.dealLogger.Warnw(deal.DealUuid, "context timed out while trying to add piece")
 		return fmt.Errorf("add piece did not complete: %w", ctx.Err())
