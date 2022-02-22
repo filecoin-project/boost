@@ -8,8 +8,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-fil-markets/shared"
-	mktssm "github.com/filecoin-project/go-fil-markets/storagemarket"
-	mktnet "github.com/filecoin-project/go-fil-markets/storagemarket/network"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -103,12 +101,10 @@ func NewDealProvider(h host.Host, prov *storagemarket.Provider) *DealProvider {
 
 func (p *DealProvider) Start() {
 	p.host.SetStreamHandler(DealProtocolID, p.handleNewDealStream)
-	p.host.SetStreamHandler(mktssm.AskProtocolID, p.handleNewAskStream)
 }
 
 func (p *DealProvider) Stop() {
 	p.host.RemoveStreamHandler(DealProtocolID)
-	p.host.RemoveStreamHandler(mktssm.AskProtocolID)
 }
 
 // Called when the client opens a libp2p stream with a new deal proposal
@@ -147,27 +143,6 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 	err = cborutil.WriteCborRPC(s, &types.DealResponse{Accepted: res.Accepted, Message: res.Reason})
 	if err != nil {
 		log.Warnw("writing deal response", "id", proposal.DealUUID, "err", err)
-		return
-	}
-}
-
-func (p *DealProvider) handleNewAskStream(s network.Stream) {
-	defer s.Close()
-
-	var a mktnet.AskRequest
-	if err := a.UnmarshalCBOR(s); err != nil {
-		log.Errorf("failed to read AskRequest from incoming stream: %s", err)
-		return
-	}
-
-	resp := mktnet.AskResponse{
-		Ask: &mktssm.SignedStorageAsk{
-			Ask: p.prov.GetAsk(),
-		},
-	}
-
-	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
-		log.Errorf("failed to write ask response: %s", err)
 		return
 	}
 }
