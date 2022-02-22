@@ -53,6 +53,12 @@ const gqlClient = new ApolloClient({
     cache
 });
 
+const EpochQuery = gql`
+    query AppEpochQuery {
+        epoch
+    }
+`;
+
 const DealsListQuery = gql`
     query AppDealsListQuery($first: ID, $limit: Int) {
         deals(first: $first, limit: $limit) {
@@ -315,6 +321,7 @@ const MpoolQuery = gql`
 
 export {
     gqlClient,
+    EpochQuery,
     DealsListQuery,
     DealsCountQuery,
     DealSubscription,
