@@ -99,11 +99,11 @@ export function DealDetail(props) {
                 </tr>
                 <tr>
                     <th>Start Epoch</th>
-                    <td>{deal.StartEpoch}</td>
+                    <td>{addCommas(deal.StartEpoch)}</td>
                 </tr>
                 <tr>
                     <th>End Epoch</th>
-                    <td>{deal.EndEpoch}</td>
+                    <td>{addCommas(deal.EndEpoch)}</td>
                 </tr>
                 <tr>
                     <th>Transfer Type</th>
