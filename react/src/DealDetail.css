@@ -10,6 +10,27 @@
     color: #a61e4d;
 }
 
+.deal-detail .title .copy {
+    display: inline-block;
+    vertical-align: text-top;
+    width: 0.8em;
+    height: 0.8em;
+    margin-left: 0.5em;
+    margin-top: 0.1em;
+    cursor: pointer;
+    background: url("./bootstrap-icons/icons/clipboard.svg");
+    background-size: cover;
+}
+
+.deal-detail .title .copy.copied {
+    animation: rotate 0.5s infinite;
+}
+
+@keyframes rotate {
+    from{ transform: rotate(0deg); }
+    to{ transform: rotate(360deg); }
+}
+
 .deal-detail table {
     font-size: 1em;
 }
