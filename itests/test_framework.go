@@ -491,20 +491,13 @@ func (f *testFramework) WaitMsg(mcid cid.Cid) error {
 	return err
 }
 
-func (f *testFramework) WaitDealSealed(ctx context.Context, deal *cid.Cid, noseal, noSealStart bool, cb func()) {
-loop:
+func (f *testFramework) WaitDealSealed(ctx context.Context, deal *cid.Cid) {
 	for {
 		di, err := f.fullNode.ClientGetDealInfo(ctx, *deal)
 		require.NoError(f.t, err)
 
 		switch di.State {
 		case lotus_storagemarket.StorageDealAwaitingPreCommit, lotus_storagemarket.StorageDealSealing:
-			//if noseal {
-			//return
-			//}
-			//if !noSealStart {
-			//dh.StartSealingWaiting(ctx)
-			//}
 		case lotus_storagemarket.StorageDealProposalRejected:
 			f.t.Fatal("deal rejected")
 		case lotus_storagemarket.StorageDealFailing:
@@ -512,27 +505,12 @@ loop:
 		case lotus_storagemarket.StorageDealError:
 			f.t.Fatal("deal errored", di.Message)
 		case lotus_storagemarket.StorageDealActive:
-			f.t.Log("COMPLETE", di)
-			break loop
+			f.t.Log("complete", di)
+
+			return
 		}
 
-		//mds, err := f.boost.MarketListIncompleteDeals(ctx)
-		//require.NoError(f.t, err)
-
-		//var minerState lotus_storagemarket.StorageDealStatus
-		//for _, md := range mds {
-		//if md.DealID == di.DealID {
-		//minerState = md.State
-		//break
-		//}
-		//}
-
-		//f.t.Logf("Deal %d state: client:%s provider:%s\n", di.DealID, lotus_storagemarket.DealStates[di.State], lotus_storagemarket.DealStates[minerState])
 		f.t.Logf("Deal %d state: client:%s \n", di.DealID, lotus_storagemarket.DealStates[di.State])
-		time.Sleep(time.Second / 2)
-		if cb != nil {
-			cb()
-		}
+		time.Sleep(2 * time.Second)
 	}
-	fmt.Printf("WAIT DEAL SEALED LOOP BROKEN\n")
 }

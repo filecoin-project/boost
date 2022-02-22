@@ -78,9 +78,7 @@ func TestMarketsV1Deal(t *testing.T) {
 	_ = dealProposalCid
 	require.NoError(t, err)
 
-	f.WaitDealSealed(ctx, dealProposalCid, false, false, nil)
-
-	time.Sleep(2 * time.Second)
+	f.WaitDealSealed(ctx, dealProposalCid)
 
 	cancel()
 	go f.stop()
