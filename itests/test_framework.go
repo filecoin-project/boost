@@ -429,15 +429,14 @@ func (f *testFramework) signProposal(addr address.Address, proposal *market.Deal
 }
 
 func (f *testFramework) DefaultMarketsV1DealParams() lapi.StartDealParams {
-	dp := lapi.StartDealParams{
+	return lapi.StartDealParams{
 		Data:              &lotus_storagemarket.DataRef{TransferType: lotus_storagemarket.TTGraphsync},
-		EpochPrice:        ltypes.NewInt(1000000),
+		EpochPrice:        ltypes.NewInt(62500000), // minimum asking price
 		MinBlocksDuration: uint64(lbuild.MinDealDuration),
 		Miner:             f.minerAddr,
 		Wallet:            f.defaultWallet,
+		FastRetrieval:     true,
 	}
-
-	return dp
 }
 
 func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Address, amount abi.TokenAmount) error {

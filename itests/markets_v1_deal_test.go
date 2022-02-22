@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/pkg/devnet"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/stretchr/testify/require"
 
 	lapi "github.com/filecoin-project/lotus/api"
@@ -72,13 +71,13 @@ func TestMarketsV1Deal(t *testing.T) {
 	// Create a new markets v1 deal
 	dp := f.DefaultMarketsV1DealParams()
 	dp.Data.Root = res.Root
-	dp.FastRetrieval = true
-	dp.EpochPrice = abi.NewTokenAmount(62500000) // minimum asking price.
+
 	dealProposalCid, err := f.fullNode.ClientStartDeal(ctx, &dp)
-	_ = dealProposalCid
 	require.NoError(t, err)
 
 	f.WaitDealSealed(ctx, dealProposalCid)
+
+	//TODO: confirm retrieval works
 
 	cancel()
 	go f.stop()
