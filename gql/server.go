@@ -39,7 +39,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	urlPath := "/"
 	directory := "react/build"
 	reactDir := path.Clean(filepath.Join(goFileDir, "..", directory))
-	http.Handle(urlPath, http.StripPrefix(urlPath, http.FileServer(http.Dir(reactDir))))
+	mux := http.NewServeMux()
+	mux.Handle(urlPath, http.StripPrefix(urlPath, http.FileServer(http.Dir(reactDir))))
 
 	// Serve dummy deals
 	err := serveDummyDeals()
@@ -48,7 +49,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	}
 
 	// Graphiql handler (GUI for making graphql queries)
-	http.HandleFunc("/graphiql", graphiql(httpPort))
+	mux.HandleFunc("/graphiql", graphiql(httpPort))
 
 	// Init graphQL schema
 	if !ok {
@@ -76,10 +77,10 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() {
 		listenAddr := fmt.Sprintf(":%d", httpPort)
 		fmt.Printf("Graphql server listening on %s\n", listenAddr)
-		http.Handle("/graphql/subscription", &corsHandler{wsHandler})
-		http.Handle("/graphql/query", &corsHandler{queryHandler})
+		mux.Handle("/graphql/subscription", &corsHandler{wsHandler})
+		mux.Handle("/graphql/query", &corsHandler{queryHandler})
 
-		_ = http.ListenAndServe(listenAddr, nil)
+		_ = http.ListenAndServe(listenAddr, mux)
 	}()
 
 	return nil
