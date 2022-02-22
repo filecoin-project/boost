@@ -2,6 +2,7 @@ package storagemarket
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -259,7 +260,9 @@ func TestDealsRejectedForFunds(t *testing.T) {
 	for i := range successTds {
 		td := successTds[i]
 		require.NoError(t, harness.Provider.CancelDealDataTransfer(td.params.DealUUID))
+		td.assertEventuallyDealCleanedup(t, ctx)
 	}
+
 }
 
 func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
@@ -493,6 +496,8 @@ type ProviderHarness struct {
 	BlockingServer      *testutil.BlockingHttpTestServer
 	DisconnectingServer *httptest.Server
 	FailingServer       *httptest.Server
+
+	SqlDB *sql.DB
 }
 
 type providerConfig struct {
@@ -619,6 +624,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		MinerStub:              minerStub,
 		MinPublishFees:         pc.minPublishFees,
 		MaxStagingDealBytes:    pc.maxStagingDealBytes,
+		SqlDB:                  sqldb,
 	}
 
 	// fund manager
@@ -702,11 +708,13 @@ func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
 }
 
 func (h *ProviderHarness) Stop() {
+	_ = h.SqlDB.Close()
 	h.FailingServer.Close()
 	h.NormalServer.Close()
 	h.BlockingServer.Close()
 	h.DisconnectingServer.Close()
 	h.GoMockCtrl.Finish()
+
 }
 
 type dealProposalConfig struct {
