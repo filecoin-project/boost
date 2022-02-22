@@ -46,7 +46,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.Handle(urlPath, http.StripPrefix(urlPath, http.FileServer(http.Dir(reactDir))))
 
 	// Serve dummy deals
-	err := serveDummyDeals()
+	err := serveDummyDeals(mux)
 	if err != nil {
 		return err
 	}
