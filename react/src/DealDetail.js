@@ -24,6 +24,15 @@ export function DealDetail(props) {
         }
     })
 
+    function dealIDToClipboard() {
+        navigator.clipboard.writeText(deal.ID)
+        const el = document.body.querySelector('.content .title .copy')
+        el.classList.add('copied')
+        setTimeout(function() {
+            el.classList.remove('copied')
+        }, 500)
+    }
+
     const [cancelDeal] = useMutation(DealCancelMutation, {
         variables: {id: params.dealID}
     })
@@ -54,7 +63,10 @@ export function DealDetail(props) {
             <div className="close" onClick={() => navigate(-1)}>
                 <img className="icon" alt="" src={closeImg} />
             </div>
-            <div className="title">Deal {deal.ID}</div>
+            <div className="title">
+                <span>Deal {deal.ID}</span>
+                <span className="copy" onClick={dealIDToClipboard}></span>
+            </div>
             <table className="deal-fields">
                 <tbody>
                 <tr>
