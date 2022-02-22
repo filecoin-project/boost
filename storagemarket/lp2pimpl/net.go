@@ -164,6 +164,10 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 func (p *DealProvider) handleNewAskStream(s network.Stream) {
 	defer s.Close()
 
+	// Set a deadline on reading from the stream so it doesn't hang
+	_ = s.SetReadDeadline(time.Now().Add(providerReadDeadline))
+	defer s.SetReadDeadline(time.Time{}) // nolint
+
 	var a mktnet.AskRequest
 	if err := a.UnmarshalCBOR(s); err != nil {
 		log.Warnw("failed to read AskRequest from incoming stream", "err", err)
@@ -176,6 +180,10 @@ func (p *DealProvider) handleNewAskStream(s network.Stream) {
 		},
 	}
 
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
+
 	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
 		log.Warnw("failed to write ask response", "err", err)
 		return
@@ -185,6 +193,10 @@ func (p *DealProvider) handleNewAskStream(s network.Stream) {
 func (p *DealProvider) handleNewDealStatusStream(s network.Stream) {
 	ctx := context.Background()
 	defer s.Close()
+
+	// Set a deadline on reading from the stream so it doesn't hang
+	_ = s.SetReadDeadline(time.Now().Add(providerReadDeadline))
+	defer s.SetReadDeadline(time.Time{}) // nolint
 
 	var q mktnet.DealStatusRequest
 	if err := q.UnmarshalCBOR(s); err != nil {
@@ -218,6 +230,10 @@ func (p *DealProvider) handleNewDealStatusStream(s network.Stream) {
 		DealState: *dealState,
 		Signature: *signature,
 	}
+
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
 
 	if err := cborutil.WriteCborRPC(s, response); err != nil {
 		log.Warnw("failed to write deal status response", "err", err)
