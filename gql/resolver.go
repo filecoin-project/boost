@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
@@ -34,19 +35,23 @@ type resolver struct {
 	fundMgr    *fundmanager.FundManager
 	storageMgr *storagemanager.StorageManager
 	provider   *storagemarket.Provider
+	legacyProv lotus_storagemarket.StorageProvider
 	publisher  *storagemarket.DealPublisher
 	spApi      sealingpipeline.API
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
-	spApi sealingpipeline.API, provider *storagemarket.Provider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager,
+	storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider,
+	legacyProv lotus_storagemarket.StorageProvider, publisher *storagemarket.DealPublisher,
+	fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		dealsDB:    dealsDB,
 		logsDB:     logsDB,
 		fundMgr:    fundMgr,
 		storageMgr: storageMgr,
 		provider:   provider,
+		legacyProv: legacyProv,
 		publisher:  publisher,
 		spApi:      spApi,
 		fullNode:   fullNode,

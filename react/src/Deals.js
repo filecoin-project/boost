@@ -8,6 +8,7 @@ import {Link} from "react-router-dom";
 import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import './Deals.css'
 import {dateFormat} from "./util-date";
+import {LegacyStorageDealsCount} from "./LegacyDeals";
 
 var dealsPerPage = 10
 
@@ -300,15 +301,20 @@ export function StorageDealsMenuItem(props) {
     })
 
     return (
-        <Link key="storage-deals" className="menu-item" to="/storage-deals">
+        <div className="menu-item" >
             <img className="icon" alt="" src={columnsGapImg} />
-            <h3>Storage Deals</h3>
-
+            <Link key="storage-deals" to="/storage-deals">
+                    <h3>Storage Deals</h3>
+            </Link>
             {data ? (
-                <div className="menu-desc">
-                    <b>{data.dealsCount}</b> deal{data.dealsCount === 1 ? '' : 's'}
-                </div>
+                <Link key="legacy-storage-deals" to="/storage-deals">
+                    <div className="menu-desc">
+                        <b>{data.dealsCount}</b> deal{data.dealsCount === 1 ? '' : 's'}
+                    </div>
+                </Link>
             ) : null}
-        </Link>
+
+            <LegacyStorageDealsCount />
+        </div>
     )
 }

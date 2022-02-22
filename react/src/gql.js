@@ -99,9 +99,40 @@ const DealsListQuery = gql`
     }
 `;
 
+const LegacyDealsListQuery = gql`
+    query AppLegacyDealsListQuery($first: ID, $limit: Int) {
+        legacyDeals(first: $first, limit: $limit) {
+            deals {
+                ID
+                CreatedAt
+                PieceCid
+                PieceSize
+                ClientAddress
+                StartEpoch
+                EndEpoch
+                ProviderCollateral
+                ClientPeerID
+                DealDataRoot
+                PublishCid
+                Status
+                Message
+                SectorNumber
+            }
+            totalCount
+            next
+        }
+    }
+`;
+
 const DealsCountQuery = gql`
     query AppDealCountQuery {
         dealsCount
+    }
+`;
+
+const LegacyDealsCountQuery = gql`
+    query AppLegacyDealCountQuery {
+        legacyDealsCount
     }
 `;
 
@@ -179,6 +210,29 @@ const NewDealsSubscription = gql`
                 LogParams
                 Subsystem
             }
+        }
+    }
+`;
+
+const LegacyDealQuery = gql`
+    query AppLegacyDealQuery($id: ID!) {
+        legacyDeal(id: $id) {
+            ID
+            CreatedAt
+            PieceCid
+            PieceSize
+            ClientAddress
+            StartEpoch
+            EndEpoch
+            ProviderCollateral
+            ClientPeerID
+            DealDataRoot
+            PublishCid
+            TransferType
+            TransferSize
+            Status
+            Message
+            SectorNumber
         }
     }
 `;
@@ -323,7 +377,10 @@ export {
     gqlClient,
     EpochQuery,
     DealsListQuery,
+    LegacyDealsListQuery,
     DealsCountQuery,
+    LegacyDealsCountQuery,
+    LegacyDealQuery,
     DealSubscription,
     DealCancelMutation,
     NewDealsSubscription,
