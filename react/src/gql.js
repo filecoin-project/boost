@@ -373,6 +373,28 @@ const MpoolQuery = gql`
     }
 `;
 
+const Libp2pAddrInfoQuery = gql`
+    query AppLibp2pAddrInfoQuery {
+        libp2pAddrInfo {
+            Addresses
+            PeerID
+        }
+    }
+`;
+
+const StorageAskQuery = gql`
+    query AppStorageAskQuery {
+        storageAsk {
+            Price
+            VerifiedPrice
+            MinPieceSize
+            MaxPieceSize
+            ExpiryEpoch
+            ExpiryTime
+        }
+    }
+`;
+
 export {
     gqlClient,
     EpochQuery,
@@ -393,4 +415,6 @@ export {
     TransfersQuery,
     MpoolQuery,
     SealingPipelineQuery,
+    Libp2pAddrInfoQuery,
+    StorageAskQuery,
 }
