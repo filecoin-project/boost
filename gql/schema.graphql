@@ -191,6 +191,11 @@ type MpoolMessage {
   BaseFee: BigInt!
 }
 
+type Libp2pAddrInfo {
+  Addresses: [String]!
+  PeerID: String!
+}
+
 type RootQuery {
   """Get height of chain"""
   epoch: Uint64!
@@ -233,6 +238,9 @@ type RootQuery {
 
   """Get local messages in the mpool"""
   mpool(local: Boolean!): [MpoolMessage]!
+
+  """Get libp2p addresses and peer id"""
+  libp2pAddrInfo: Libp2pAddrInfo!
 }
 
 type RootMutation {

@@ -1,0 +1,14 @@
+#settings td, #settings th {
+    vertical-align: top;
+    text-align: left;
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
+
+#settings th {
+    color: #777;
+}
+
+#settings td .address {
+    padding-bottom: 0.5em;
+}

@@ -373,6 +373,15 @@ const MpoolQuery = gql`
     }
 `;
 
+const Libp2pAddrInfoQuery = gql`
+    query AppLibp2pAddrInfoQuery {
+        libp2pAddrInfo {
+            Addresses
+            PeerID
+        }
+    }
+`;
+    
 export {
     gqlClient,
     EpochQuery,
@@ -393,4 +402,5 @@ export {
     TransfersQuery,
     MpoolQuery,
     SealingPipelineQuery,
+    Libp2pAddrInfoQuery,
 }
