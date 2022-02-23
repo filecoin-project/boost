@@ -283,7 +283,7 @@ func (f *testFramework) start() {
 	// Create an in-memory repo
 	r := lotus_repo.NewMemory(nil)
 
-	lr, err := r.Lock(node.BoostRepoType{})
+	lr, err := r.Lock(node.Boost)
 	require.NoError(f.t, err)
 
 	ds, err := lr.Datastore(context.Background(), "/metadata")
@@ -321,7 +321,7 @@ func (f *testFramework) start() {
 
 	// Create Boost API
 	stop, err := node.New(f.ctx,
-		node.Boost(&f.boost),
+		node.BoostAPI(&f.boost),
 		node.Override(new(dtypes.ShutdownChan), shutdownChan),
 		node.Base(),
 		node.Repo(r),
