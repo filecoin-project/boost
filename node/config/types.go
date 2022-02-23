@@ -43,6 +43,14 @@ type Boost struct {
 	DAGStore        lotus_config.DAGStoreConfig
 }
 
+func (b *Boost) GetDealmakingConfig() lotus_config.DealmakingConfig {
+	return b.LotusDealmaking
+}
+
+func (b *Boost) SetDealmakingConfig(other lotus_config.DealmakingConfig) {
+	b.LotusDealmaking = other
+}
+
 type WalletsConfig struct {
 	// The "owner" address of the miner
 	Miner string

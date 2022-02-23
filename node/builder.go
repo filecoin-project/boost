@@ -553,14 +553,14 @@ func ConfigBoost(c interface{}) Option {
 	)
 }
 
-func Boost(out *api.Boost) Option {
+func BoostAPI(out *api.Boost) Option {
 	return Options(
 		ApplyIf(func(s *Settings) bool { return s.Config },
 			Error(errors.New("the StorageMiner option must be set before Config option")),
 		),
 
 		func(s *Settings) error {
-			s.nodeType = BoostRepoType{}
+			s.nodeType = Boost
 			return nil
 		},
 
@@ -573,13 +573,16 @@ func Boost(out *api.Boost) Option {
 	)
 }
 
-type BoostRepoType struct {
-}
+var Boost boost
 
-func (f BoostRepoType) Type() string {
+type boost struct{}
+
+func (f boost) Type() string {
 	return "Boost"
 }
 
-func (f BoostRepoType) Config() interface{} {
+func (f boost) Config() interface{} {
 	return config.DefaultBoost()
 }
+
+func (boost) SupportsStagingDeals() {}
