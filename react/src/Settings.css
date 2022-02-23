@@ -12,3 +12,8 @@
 #settings td .address {
     padding-bottom: 0.5em;
 }
+
+#settings td .expiry-time {
+    padding-left: 0.5em;
+    color: #777777;
+}

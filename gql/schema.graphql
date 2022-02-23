@@ -196,6 +196,15 @@ type Libp2pAddrInfo {
   PeerID: String!
 }
 
+type StorageAsk {
+  Price: Uint64!
+  VerifiedPrice: Uint64!
+  MinPieceSize: Uint64!
+  MaxPieceSize: Uint64!
+  ExpiryEpoch: Uint64!
+  ExpiryTime: Time!
+}
+
 type RootQuery {
   """Get height of chain"""
   epoch: Uint64!
@@ -241,6 +250,9 @@ type RootQuery {
 
   """Get libp2p addresses and peer id"""
   libp2pAddrInfo: Libp2pAddrInfo!
+
+  """Get storage ask (price of doing a storage deal)"""
+  storageAsk: StorageAsk!
 }
 
 type RootMutation {

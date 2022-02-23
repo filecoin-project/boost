@@ -381,7 +381,20 @@ const Libp2pAddrInfoQuery = gql`
         }
     }
 `;
-    
+
+const StorageAskQuery = gql`
+    query AppStorageAskQuery {
+        storageAsk {
+            Price
+            VerifiedPrice
+            MinPieceSize
+            MaxPieceSize
+            ExpiryEpoch
+            ExpiryTime
+        }
+    }
+`;
+
 export {
     gqlClient,
     EpochQuery,
@@ -403,4 +416,5 @@ export {
     MpoolQuery,
     SealingPipelineQuery,
     Libp2pAddrInfoQuery,
+    StorageAskQuery,
 }
