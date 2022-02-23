@@ -404,7 +404,7 @@ func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 			switch {
 			case deal.Checkpoint == dealcheckpoints.Complete:
 				return nil
-			case deal.Checkpoint == dealcheckpoints.IndexedAndAnnounced:
+			case deal.Checkpoint == dealcheckpoints.AddedPiece:
 				return nil
 			}
 		}
