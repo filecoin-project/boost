@@ -631,7 +631,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	// storage manager
 	fsRepo, err := repo.NewFS(dir)
 	require.NoError(t, err)
-	lr, err := fsRepo.Lock(repo.StorageMinerRepoType{})
+	lr, err := fsRepo.Lock(repo.StorageMiner)
 	require.NoError(t, err)
 	smInitF := storagemanager.New(storagemanager.Config{
 		MaxStagingDealsBytes: ph.MaxStagingDealBytes,
