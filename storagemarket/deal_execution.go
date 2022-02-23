@@ -484,6 +484,7 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 
 // TODO Index Provider integration to announce deals to the network Indexer
 func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
+	fmt.Println("\n will announce")
 	pc := deal.ClientDealProposal.Proposal.PieceCID
 
 	// add deal to piecestore
@@ -497,11 +498,13 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	}
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piecestore")
 
+	fmt.Println("\n will register with dagstore")
 	// register with dagstore
 	if err := stores.RegisterShardSync(ctx, p.dagst, pc, deal.InboundFilePath, true); err != nil {
 		return fmt.Errorf("failed to register deal with dagstore: %w", err)
 	}
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully registered in dagstore")
+	fmt.Println("\n registered with dagstore")
 
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced)
 }
