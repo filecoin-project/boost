@@ -195,7 +195,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 		if err := p.indexAndAnnounce(ctx, pub, deal); err != nil {
 			// any error here is always a recoverable error as this step is completely idempotent
 			return &dealMakingError{
-				recoverable: true,
+				recoverable: false,
 				err:         fmt.Errorf("failed to add deal to dagstore/piecestore with recoverable error: %w", err),
 				uiMsg:       "deal was paused while indexing because Boost was shut down",
 			}
