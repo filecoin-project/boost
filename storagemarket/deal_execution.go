@@ -8,6 +8,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/filecoin-project/go-fil-markets/piecestore"
+
+	"github.com/filecoin-project/go-fil-markets/stores"
+
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 
 	"github.com/filecoin-project/boost/transport"
@@ -184,6 +188,21 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 		p.dealLogger.Infow(deal.DealUuid, "deal successfully handed over to the sealing subsystem")
 	} else {
 		p.dealLogger.Infow(deal.DealUuid, "deal has already been handed over to the sealing subsystem")
+	}
+
+	// Index deal in DAGStore and Announce deal
+	if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
+		if err := p.indexAndAnnounce(ctx, pub, deal); err != nil {
+			// any error here is always a recoverable error as this step is completely idempotent
+			return &dealMakingError{
+				recoverable: true,
+				err:         fmt.Errorf("failed to add deal to dagstore/piecestore with recoverable error: %w", err),
+				uiMsg:       "deal was paused while indexing because Boost was shut down",
+			}
+		}
+		p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed in dagstore and added to piecestore")
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "deal has already been indexed in dagstore and added to piecestore")
 	}
 
 	return nil
@@ -461,6 +480,27 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 		"sectorNum", deal.SectorID.String(), "offset", deal.Offset, "length", deal.Length)
 
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece)
+}
+
+// TODO Index Provider integration to announce deals to the network Indexer
+func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
+	pc := deal.ClientDealProposal.Proposal.PieceCID
+	if err := stores.RegisterShardSync(ctx, p.dagst, pc, deal.InboundFilePath, true); err != nil {
+		return fmt.Errorf("failed to register deal with dagstore: %w", err)
+	}
+	p.dealLogger.Infow(deal.DealUuid, "deal successfully registered in dagstore")
+
+	if err := p.ps.AddDealForPiece(pc, piecestore.DealInfo{
+		DealID:   deal.ChainDealID,
+		SectorID: deal.SectorID,
+		Offset:   deal.Offset,
+		Length:   deal.Length,
+	}); err != nil {
+		return fmt.Errorf("failed to add deal to piecestore: %w", err)
+	}
+	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piecestore")
+
+	return p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced)
 }
 
 func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, err error) {

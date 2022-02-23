@@ -11,6 +11,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/go-fil-markets/stores"
+
+	"github.com/filecoin-project/go-fil-markets/piecestore"
+
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -113,10 +117,14 @@ type Provider struct {
 	dhs   map[uuid.UUID]*dealHandler
 
 	dealLogger *logs.DealLogger
+
+	dagst stores.DAGStoreWrapper
+	ps    piecestore.PieceStore
 }
 
 func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
-	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB, httpOpts ...httptransport.Option) (*Provider, error) {
+	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
+	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, httpOpts ...httptransport.Option) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -166,6 +174,9 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		dhs:        make(map[uuid.UUID]*dealHandler),
 		dealLogger: dl,
 		logsDB:     logsDB,
+
+		dagst: dagst,
+		ps:    ps,
 	}, nil
 }
 
@@ -335,7 +346,7 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 
 			// Check if deal is already complete
 			// TODO Update this once we start listening for expired/slashed deals etc
-			if d.Checkpoint >= dealcheckpoints.AddedPiece {
+			if d.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
 				// cleanup if cleanup didn't finish before we restarted
 				p.cleanupDeal(d)
 				return
