@@ -205,6 +205,13 @@ type StorageAsk {
   ExpiryTime: Time!
 }
 
+input StorageAskUpdate {
+  Price: Uint64
+  VerifiedPrice: Uint64
+  MinPieceSize: Uint64
+  MaxPieceSize: Uint64
+}
+
 type RootQuery {
   """Get height of chain"""
   epoch: Uint64!
@@ -264,6 +271,9 @@ type RootMutation {
 
   """Top-up the available pledge collateral in escrow for deal publishing"""
   fundsMoveToEscrow(amount: BigInt!): Boolean!
+
+  """Update the Storage Ask (price of doing a storage deal)"""
+  storageAskUpdate(update: StorageAskUpdate!): Boolean!
 }
 
 type RootSubscription {
