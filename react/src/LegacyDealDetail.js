@@ -1,6 +1,6 @@
 import React, {useEffect} from "react";
 import {useQuery} from "@apollo/react-hooks";
-import {LegacyDealQuery} from "./gql";
+import {EpochQuery, LegacyDealQuery} from "./gql";
 import {useNavigate} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";
@@ -22,6 +22,8 @@ export function LegacyDealDetail(props) {
         }
     })
 
+    const currentEpochData = useQuery(EpochQuery)
+
     const {loading, error, data} = useQuery(LegacyDealQuery, {
         variables: {id: params.dealID},
     })
@@ -35,6 +37,16 @@ export function LegacyDealDetail(props) {
     }
 
     var deal = data.legacyDeal
+
+    const currentEpoch = (((currentEpochData || {}).data || {}).epoch || {}).Epoch
+    var startEpochTime, endEpochTime
+    if (currentEpoch) {
+        const secondsPerEpoch = currentEpochData.data.epoch.SecondsPerEpoch
+        const startEpochDelta = Number(deal.StartEpoch - currentEpoch)
+        startEpochTime = new Date(new Date().getTime() + startEpochDelta*secondsPerEpoch*1000)
+        const endEpochDelta = Number(deal.EndEpoch - currentEpoch)
+        endEpochTime = new Date(new Date().getTime() + endEpochDelta*secondsPerEpoch*1000)
+    }
 
     return <div className="deal-detail modal" id={deal.ID}>
         <div className="content">
@@ -85,12 +97,26 @@ export function LegacyDealDetail(props) {
                     <td>{humanFIL(deal.ProviderCollateral)}</td>
                 </tr>
                 <tr>
+                    <th>Current Epoch</th>
+                    <td>{currentEpoch ? addCommas(currentEpoch) : null}</td>
+                </tr>
+                <tr>
                     <th>Start Epoch</th>
-                    <td>{addCommas(deal.StartEpoch)}</td>
+                    <td>
+                        {addCommas(deal.StartEpoch)}
+                        <span className="aux">
+                            {startEpochTime ? ' (' + moment(startEpochTime).fromNow() + ')' : null}
+                        </span>
+                    </td>
                 </tr>
                 <tr>
                     <th>End Epoch</th>
-                    <td>{addCommas(deal.EndEpoch)}</td>
+                    <td>
+                        {addCommas(deal.EndEpoch)}
+                        <span className="aux">
+                            {endEpochTime ? ' (' + moment(endEpochTime).fromNow() + ')' : null}
+                        </span>
+                    </td>
                 </tr>
                 <tr>
                     <th>Transfer Type</th>
@@ -120,6 +146,10 @@ export function LegacyDealDetail(props) {
                 </tr>
                 <tr>
                     <th>Status</th>
+                    <td>{deal.Status}</td>
+                </tr>
+                <tr>
+                    <th>Message</th>
                     <td>{deal.Message}</td>
                 </tr>
                 </tbody>

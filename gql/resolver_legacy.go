@@ -172,5 +172,5 @@ func (r *legacyDealResolver) Status() string {
 }
 
 func (r *legacyDealResolver) Message() string {
-	return r.Status()
+	return r.MinerDeal.Message
 }

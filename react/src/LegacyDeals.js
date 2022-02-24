@@ -8,6 +8,7 @@ import {Link} from "react-router-dom";
 import './Deals.css'
 import './LegacyDeals.css'
 import {dateFormat} from "./util-date";
+import {TimestampFormat} from "./timestamp";
 
 var dealsPerPage = 10
 
@@ -24,11 +25,16 @@ function LegacyStorageDealsContent(props) {
     const {loading, error, data} = useQuery(LegacyDealsListQuery, {
         variables: {first}
     })
+    const [timestampFormat, setTimestampFormat] = useState(TimestampFormat.load)
+    const saveTimestampFormat = (val) => {
+        TimestampFormat.save(val)
+        setTimestampFormat(val)
+    }
+    var toggleTimestampFormat = () => saveTimestampFormat(!timestampFormat)
 
     if (error) return <div>Error: {error.message}</div>;
     if (loading) return <div>Loading...</div>;
 
-    console.log(data)
     const deals = data.legacyDeals.deals
     const totalCount = data.legacyDeals.totalCount
     var totalPages = Math.ceil(totalCount / dealsPerPage)
@@ -55,7 +61,7 @@ function LegacyStorageDealsContent(props) {
         <table>
             <tbody>
             <tr>
-                <th>Start</th>
+                <th className="start" onClick={toggleTimestampFormat}>Start</th>
                 <th>Deal ID</th>
                 <th>Piece Size</th>
                 <th>Client</th>
@@ -63,7 +69,12 @@ function LegacyStorageDealsContent(props) {
             </tr>
 
             {deals.map(deal => (
-                <DealRow key={deal.ID} deal={deal} />
+                <DealRow
+                    key={deal.ID}
+                    deal={deal}
+                    timestampFormat={timestampFormat}
+                    toggleTimestampFormat={toggleTimestampFormat}
+                />
             ))}
             </tbody>
         </table>
@@ -81,17 +92,23 @@ function LegacyStorageDealsContent(props) {
 
 function DealRow(props) {
     var deal = props.deal
+
     var start = moment(deal.CreatedAt).format(dateFormat)
-    var since = '1m'
-    if (new Date().getTime() - deal.CreatedAt.getTime() > 60 * 1000) {
-        since = moment(deal.CreatedAt).fromNow()
+    if (props.timestampFormat !== TimestampFormat.DateTime) {
+        start = '1m'
+        if (new Date().getTime() - deal.CreatedAt.getTime() > 60 * 1000) {
+            start = moment(deal.CreatedAt).fromNow()
+        }
+    }
+
+    var message = deal.Status
+    if (deal.Message) {
+        message += ": " + deal.Message
     }
 
     return (
         <tr>
-            <td className="start">
-                {start} <span className="since">{since}</span>
-            </td>
+            <td className="start" onClick={props.toggleTimestampFormat}>{start}</td>
             <td className="deal-id">
                 <Link to={"/legacy-deals/" + deal.ID}>
                     <ShortDealID id={deal.ID} />
@@ -101,50 +118,13 @@ function DealRow(props) {
             <td className="client">
                 <ShortClientAddress address={deal.ClientAddress} />
             </td>
-            <td className="message">{deal.Message}</td>
+            <td className="message">{message}</td>
         </tr>
     )
 }
 
-class DealsPagination {
-    constructor(setPageNum, dealsListQuery) {
-        this.pageCursors = {}
-        this.setPageNum = setPageNum
-        this.dealsListQuery = dealsListQuery
-    }
-
-    addPageCursor(num, cursor) {
-        var newPageCursors = {}
-        newPageCursors[num] = cursor
-        this.pageCursors = Object.assign(this.pageCursors, newPageCursors)
-    }
-
-    async nextPage(currentPage) {
-        var newPageNum = currentPage + 1
-        var nextCursor = this.pageCursors[newPageNum]
-        if (!nextCursor) {
-            return
-        }
-
-        var dealList = await this.dealsListQuery(nextCursor)
-        this.setPageNum(newPageNum)
-        this.addPageCursor(newPageNum + 1, dealList.next)
-    }
-
-    async prevPage(currentPage) {
-        if (currentPage <= 1) {
-            return
-        }
-
-        var newPageNum = currentPage - 1
-        var prevCursor = this.pageCursors[newPageNum]
-        await this.dealsListQuery(prevCursor)
-        this.setPageNum(newPageNum)
-    }
-}
-
 export function LegacyStorageDealsCount(props) {
-    const {data, error} = useQuery(LegacyDealsCountQuery, {
+    const {data} = useQuery(LegacyDealsCountQuery, {
         pollInterval: 5000,
         fetchPolicy: 'network-only',
     })
