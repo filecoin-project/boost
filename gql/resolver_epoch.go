@@ -5,13 +5,22 @@ import (
 	"fmt"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/lotus/build"
 )
 
-func (r *resolver) Epoch(ctx context.Context) (gqltypes.Uint64, error) {
+type epochInfo struct {
+	Epoch           gqltypes.Uint64
+	SecondsPerEpoch int32
+}
+
+func (r *resolver) Epoch(ctx context.Context) (*epochInfo, error) {
 	head, err := r.fullNode.ChainHead(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("getting chain head: %w", err)
+		return nil, fmt.Errorf("getting chain head: %w", err)
 	}
 
-	return gqltypes.Uint64(head.Height()), nil
+	return &epochInfo{
+		Epoch:           gqltypes.Uint64(head.Height()),
+		SecondsPerEpoch: int32(build.BlockDelaySecs),
+	}, nil
 }

@@ -55,7 +55,10 @@ const gqlClient = new ApolloClient({
 
 const EpochQuery = gql`
     query AppEpochQuery {
-        epoch
+        epoch {
+            Epoch
+            SecondsPerEpoch
+        }
     }
 `;
 
