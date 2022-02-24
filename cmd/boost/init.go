@@ -133,12 +133,12 @@ var initCmd = &cli.Command{
 			return xerrors.Errorf("Remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion1, v.APIVersion)
 		}
 
-		if err := r.Init(node.BoostRepoType{}); err != nil {
+		if err := r.Init(node.Boost); err != nil {
 			return err
 		}
 
 		{
-			lr, err := r.Lock(node.BoostRepoType{})
+			lr, err := r.Lock(node.Boost)
 			if err != nil {
 				return err
 			}

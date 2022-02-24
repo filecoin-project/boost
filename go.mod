@@ -20,7 +20,7 @@ require (
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-state-types v0.1.3
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/lotus v1.14.0-rc6.0.20220214114358-4df3c89b7282
+	github.com/filecoin-project/lotus v1.14.0-rc6.0.20220223143230-2514e988cdb0
 	github.com/filecoin-project/specs-actors v0.9.14
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v5 v5.0.4
