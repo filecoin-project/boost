@@ -1,13 +1,14 @@
-import {useQuery} from "@apollo/react-hooks";
-import {Libp2pAddrInfoQuery, StorageAskQuery} from "./gql";
-import React from "react";
+/* global BigInt */
+
+import {useMutation, useQuery} from "@apollo/react-hooks";
+import {Libp2pAddrInfoQuery, StorageAskQuery, StorageAskUpdate} from "./gql";
+import React, {useState} from "react";
 import {PageContainer} from "./Components";
 import {Link} from "react-router-dom";
 import moment from "moment"
 import settingsImg from './bootstrap-icons/icons/gear.svg'
 import './Settings.css'
-import {addCommas, humanFIL, humanFileSize} from "./util";
-import {dateFormat} from "./util-date";
+import {addCommas, humanFileSize} from "./util";
 
 export function SettingsPage(props) {
     return <PageContainer pageType="settings" title="Settings">
@@ -61,10 +62,10 @@ function StorageAsk(props) {
     const {loading, error, data} = useQuery(StorageAskQuery)
 
     if (loading) {
-        return <tr><td colSpan="2">Loading...</td></tr>
+        return <div>Loading...</div>
     }
     if (error) {
-        return <tr><td colSpan="2">Error: {error.message}</td></tr>
+        return <div>Error: {error.message}</div>
     }
 
     return (
@@ -72,22 +73,28 @@ function StorageAsk(props) {
             <h3>Storage Ask</h3>
             <table>
                 <tbody>
-                    <tr>
-                        <th>Price</th>
-                        <td>{humanFIL(data.storageAsk.Price)}</td>
-                    </tr>
-                    <tr>
-                        <th>Verified Price</th>
-                        <td>{humanFIL(data.storageAsk.VerifiedPrice)}</td>
-                    </tr>
-                    <tr>
-                        <th>Min Piece Size</th>
-                        <td>{humanFileSize(data.storageAsk.MinPieceSize)}</td>
-                    </tr>
-                    <tr>
-                        <th>Max Piece Size</th>
-                        <td>{humanFileSize(data.storageAsk.MaxPieceSize)}</td>
-                    </tr>
+                    <EditableField
+                        name="Price"
+                        fieldName="Price"
+                        type="fil"
+                        value={data.storageAsk.Price}
+                    />
+                    <EditableField
+                        name="Verified Price"
+                        fieldName="VerifiedPrice"
+                        type="fil"
+                        value={data.storageAsk.VerifiedPrice}
+                    />
+                    <EditableField
+                        name="Min Piece Size"
+                        fieldName="MinPieceSize"
+                        value={data.storageAsk.MinPieceSize}
+                    />
+                    <EditableField
+                        name="Max Piece Size"
+                        fieldName="MaxPieceSize"
+                        value={data.storageAsk.MaxPieceSize}
+                    />
                     <tr>
                         <th>Expiry Epoch</th>
                         <td>
@@ -100,6 +107,69 @@ function StorageAsk(props) {
                 </tbody>
             </table>
         </div>
+    )
+}
+
+export function EditableField(props) {
+    const isCurrency = props.type === 'fil'
+    const [editing, setEditing] = useState(false)
+    const [currentVal, setCurrentVal] = useState(props.value)
+    const [storageAskUpdate] = useMutation(StorageAskUpdate, {
+        refetchQueries: [{ query: StorageAskQuery }],
+    })
+    const handleValChange = (event) => {
+        if (isCurrency) {
+            setCurrentVal(BigInt(event.target.value * 1e9))
+        } else {
+            setCurrentVal(BigInt(event.target.value))
+        }
+    }
+    const save = () => {
+        const update = {}
+        update[props.fieldName] = currentVal
+        storageAskUpdate({
+            variables: {update}
+        })
+        setEditing(false)
+    }
+
+    function toNano(num) {
+        const tmp = (BigInt(1e6)*BigInt(num))/BigInt(1e9)
+        return Number(tmp)/1e6
+    }
+
+    var inputVal = currentVal + ''
+    var displayVal = humanFileSize(currentVal)
+    if (isCurrency) {
+        displayVal = toNano(currentVal) + ' nano'
+        inputVal = toNano(currentVal)
+    }
+
+    const cancel = () => {
+        setEditing(false)
+        setCurrentVal(props.value)
+    }
+
+    return (
+        <tr>
+            <th>{props.name}</th>
+            {editing ? (
+                <td className="editor">
+                    <input
+                        type="number"
+                        value={inputVal}
+                        onChange={handleValChange}
+                    /> {isCurrency ? 'nano' : 'bytes'}
+                    <div className="button" onClick={save}>Save</div>
+                    <div className="button cancel" onClick={cancel}>Cancel</div>
+                </td>
+            ) : (
+                <td className="val" onClick={() => setEditing(true)}>
+                    {displayVal}
+                    <span className="edit" />
+                </td>
+            )}
+        </tr>
     )
 }
 

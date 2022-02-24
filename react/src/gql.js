@@ -356,6 +356,12 @@ const FundsMoveToEscrow = gql`
     }
 `;
 
+const StorageAskUpdate = gql`
+    mutation AppStorageAskUpdateMutation($update: StorageAskUpdate!) {
+        storageAskUpdate(update: $update)
+    }
+`;
+
 const MpoolQuery = gql`
     query AppMpoolQuery($local: Boolean!) {
         mpool(local: $local) {
@@ -412,6 +418,7 @@ export {
     DealPublishQuery,
     DealPublishNowMutation,
     FundsMoveToEscrow,
+    StorageAskUpdate,
     TransfersQuery,
     MpoolQuery,
     SealingPipelineQuery,
