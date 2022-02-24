@@ -110,44 +110,45 @@ function StorageAsk(props) {
     )
 }
 
+function toNano(num) {
+    const tmp = (BigInt(1e6)*BigInt(num))/BigInt(1e9)
+    return Number(tmp)/1e6
+}
+
 export function EditableField(props) {
     const isCurrency = props.type === 'fil'
+    const initialValue = isCurrency ? toNano(props.value)+'' : props.value+''
     const [editing, setEditing] = useState(false)
-    const [currentVal, setCurrentVal] = useState(props.value)
+    const [currentVal, setCurrentVal] = useState(initialValue)
     const [storageAskUpdate] = useMutation(StorageAskUpdate, {
         refetchQueries: [{ query: StorageAskQuery }],
     })
     const handleValChange = (event) => {
-        if (isCurrency) {
-            setCurrentVal(BigInt(event.target.value * 1e9))
-        } else {
-            setCurrentVal(BigInt(event.target.value))
-        }
+        setCurrentVal(event.target.value)
     }
     const save = () => {
         const update = {}
-        update[props.fieldName] = currentVal
+        var rawVal = currentVal || 0
+        if (isCurrency) {
+            rawVal = BigInt(currentVal * 1e9)
+        }
+        update[props.fieldName] = rawVal
         storageAskUpdate({
             variables: {update}
         })
         setEditing(false)
     }
 
-    function toNano(num) {
-        const tmp = (BigInt(1e6)*BigInt(num))/BigInt(1e9)
-        return Number(tmp)/1e6
-    }
-
-    var inputVal = currentVal + ''
-    var displayVal = humanFileSize(currentVal)
+    var displayVal
     if (isCurrency) {
-        displayVal = toNano(currentVal) + ' nano'
-        inputVal = toNano(currentVal)
+        displayVal = currentVal + ' nano'
+    } else {
+        displayVal = humanFileSize(BigInt(currentVal)) + ''
     }
 
     const cancel = () => {
         setEditing(false)
-        setCurrentVal(props.value)
+        setCurrentVal(initialValue)
     }
 
     return (
@@ -157,7 +158,7 @@ export function EditableField(props) {
                 <td className="editor">
                     <input
                         type="number"
-                        value={inputVal}
+                        value={currentVal}
                         onChange={handleValChange}
                     /> {isCurrency ? 'nano' : 'bytes'}
                     <div className="button" onClick={save}>Save</div>
