@@ -369,6 +369,7 @@ func ConfigBoost(c interface{}) Option {
 	if !ok {
 		return Error(xerrors.Errorf("invalid config from repo, got: %T", c))
 	}
+	cfg.Storage.ParallelFetchLimit = 10
 
 	pricingConfig := cfg.Dealmaking.RetrievalPricing
 	if pricingConfig.Strategy == config.RetrievalPricingExternalMode {
