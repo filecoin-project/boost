@@ -19,6 +19,11 @@ The `BigInt` scalar type represents a big integer.
 """
 scalar BigInt
 
+type EpochInfo {
+  Epoch: Uint64!
+  SecondsPerEpoch: Int!
+}
+
 type TransferParams {
   Type: String!
   Size: Uint64!
@@ -207,7 +212,7 @@ type StorageAsk {
 
 type RootQuery {
   """Get height of chain"""
-  epoch: Uint64!
+  epoch: EpochInfo!
 
   """Get Deal by ID"""
   deal(id: ID!): Deal
