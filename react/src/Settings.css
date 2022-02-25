@@ -1,3 +1,13 @@
+#settings .libp2p h3 {
+    margin-top: 2em;
+}
+
+#settings .libp2p td {
+    font-size: 0.8em;
+    line-height: 1.7em;
+    font-family: "Monaco";
+}
+
 #settings td, #settings th {
     vertical-align: top;
     text-align: left;
@@ -7,11 +17,10 @@
 
 #settings th {
     color: #777;
-    vertical-align: middle;
 }
 
-#settings td .address {
-    padding-bottom: 0.5em;
+#settings .storage-ask th {
+    vertical-align: middle;
 }
 
 #settings td .expiry-time {

@@ -19,13 +19,13 @@ export function SettingsPage(props) {
 function SettingsContent() {
     return (
         <>
-            <AddrInfo />
             <StorageAsk />
+            <Libp2pInfo />
         </>
     )
 }
 
-function AddrInfo(props) {
+function Libp2pInfo(props) {
     const {loading, error, data} = useQuery(Libp2pAddrInfoQuery)
 
     if (loading) {
@@ -36,8 +36,8 @@ function AddrInfo(props) {
     }
 
     return (
-        <div>
-            <h3>Libp2p Address Info</h3>
+        <div className="libp2p">
+            <h3>Libp2p</h3>
             <table>
                 <tbody>
                     <tr>
@@ -48,7 +48,15 @@ function AddrInfo(props) {
                         <th>Addresses</th>
                         <td>
                             {data.libp2pAddrInfo.Addresses.map(addr => {
-                                return <div className="address" key={addr}>{addr}</div>
+                                return <div key={addr}>{addr}</div>
+                            })}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Protocols</th>
+                        <td>
+                            {data.libp2pAddrInfo.Protocols.map(proto => {
+                                return <div key={proto}>{proto}</div>
                             })}
                         </td>
                     </tr>
@@ -69,7 +77,7 @@ function StorageAsk(props) {
     }
 
     return (
-        <div>
+        <div className="storage-ask">
             <h3>Storage Ask</h3>
             <table>
                 <tbody>
