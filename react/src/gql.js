@@ -385,8 +385,9 @@ const MpoolQuery = gql`
 const Libp2pAddrInfoQuery = gql`
     query AppLibp2pAddrInfoQuery {
         libp2pAddrInfo {
-            Addresses
             PeerID
+            Addresses
+            Protocols
         }
     }
 `;

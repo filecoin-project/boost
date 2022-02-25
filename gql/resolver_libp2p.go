@@ -1,29 +1,33 @@
 package gql
 
-import (
-	"context"
-	"fmt"
-)
+import "sort"
 
 type libp2pAddrInfoResolver struct {
 	Addresses []*string
 	PeerID    string
+	Protocols []*string
 }
 
-func (r *resolver) Libp2pAddrInfo(ctx context.Context) (*libp2pAddrInfoResolver, error) {
-	addrInfo, err := r.fullNode.NetAddrsListen(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting p2p listen address: %w", err)
-	}
-
-	addrs := make([]*string, 0, len(addrInfo.Addrs))
-	for _, a := range addrInfo.Addrs {
+func (r *resolver) Libp2pAddrInfo() (*libp2pAddrInfoResolver, error) {
+	addrs := make([]*string, 0, len(r.h.Addrs()))
+	for _, a := range r.h.Addrs() {
 		addr := a.String()
 		addrs = append(addrs, &addr)
 	}
 
+	protos := make([]*string, 0, len(r.h.Mux().Protocols()))
+	for _, proto := range r.h.Mux().Protocols() {
+		cp := proto
+		protos = append(protos, &cp)
+	}
+
+	sort.Slice(protos, func(i, j int) bool {
+		return *protos[i] < *protos[j]
+	})
+
 	return &libp2pAddrInfoResolver{
 		Addresses: addrs,
-		PeerID:    addrInfo.ID.String(),
+		PeerID:    r.h.ID().String(),
+		Protocols: protos,
 	}, nil
 }
