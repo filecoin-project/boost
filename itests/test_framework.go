@@ -29,6 +29,7 @@ import (
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/exitcode"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v1api"
@@ -258,6 +259,29 @@ func (f *testFramework) start() {
 	require.NoError(f.t, err)
 	f.client.PeerStore.AddAddrs(boostAddrs.ID, boostAddrs.Addrs, time.Hour)
 
+	// Add boost libp2p to chain
+	log.Debugw("serialize params")
+	params, err := actors.SerializeParams(&miner2.ChangePeerIDParams{NewID: abi.PeerID(boostAddrs.ID)})
+	require.NoError(f.t, err)
+
+	msg := &ltypes.Message{
+		To: minerAddr,
+		//From:   minerAddr,
+		From:   defaultWallet,
+		Method: miner.Methods.ChangePeerID,
+		Params: params,
+		Value:  ltypes.NewInt(0),
+	}
+
+	log.Debugw("push message to mpool")
+	signed, err2 := fullnodeApi.MpoolPushMessage(f.ctx, msg, nil)
+	require.NoError(f.t, err2)
+
+	log.Debugw("wait for state msg")
+	mw, err2 := fullnodeApi.StateWaitMsg(f.ctx, signed.Cid(), 2, api.LookbackNoLimit, true)
+	require.NoError(f.t, err2)
+	require.Equal(f.t, exitcode.Ok, mw.Receipt.ExitCode)
+
 	log.Debugw("monitoring for shutdown")
 
 	// Monitor for shutdown.
@@ -320,7 +344,7 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		Client:               f.clientAddr,
 		Provider:             f.minerAddr,
 		Label:                rootCid.String(),
-		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
+		StartEpoch:           10000 + abi.ChainEpoch(rand.Intn(30000)),
 		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
 		ProviderCollateral:   abi.NewTokenAmount(0),
@@ -435,6 +459,7 @@ func (f *testFramework) DefaultMarketsV1DealParams() lapi.StartDealParams {
 		MinBlocksDuration: uint64(lbuild.MinDealDuration),
 		Miner:             f.minerAddr,
 		Wallet:            f.defaultWallet,
+		DealStartEpoch:    10000 + abi.ChainEpoch(rand.Intn(30000)),
 		FastRetrieval:     true,
 	}
 }
