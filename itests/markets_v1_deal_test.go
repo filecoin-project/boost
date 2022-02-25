@@ -3,14 +3,12 @@ package itests
 import (
 	"context"
 	"fmt"
-	"io"
-	"math/rand"
-	"os"
 	"os/exec"
 	"testing"
 	"time"
 
 	"github.com/filecoin-project/boost/pkg/devnet"
+	"github.com/filecoin-project/boost/testutil"
 	"github.com/stretchr/testify/require"
 
 	lapi "github.com/filecoin-project/lotus/api"
@@ -64,7 +62,8 @@ func TestMarketsV1Deal(t *testing.T) {
 	rseed := 0
 	size := 7 << 20 // 7MiB file
 
-	path := CreateRandomFile(f.t, rseed, size)
+	path, err := testutil.CreateRandomFile(f.t.TempDir(), rseed, size)
+	require.NoError(f.t, err)
 	res, err := f.fullNode.ClientImport(ctx, lapi.FileRef{Path: path})
 	require.NoError(f.t, err)
 
@@ -82,21 +81,4 @@ func TestMarketsV1Deal(t *testing.T) {
 	cancel()
 	go f.stop()
 	<-done
-}
-
-func CreateRandomFile(t *testing.T, rseed, size int) (path string) {
-	if size == 0 {
-		size = 1600
-	}
-
-	source := io.LimitReader(rand.New(rand.NewSource(int64(rseed))), int64(size))
-
-	file, err := os.CreateTemp(t.TempDir(), "sourcefile.dat")
-	require.NoError(t, err)
-
-	n, err := io.Copy(file, source)
-	require.NoError(t, err)
-	require.EqualValues(t, n, size)
-
-	return file.Name()
 }

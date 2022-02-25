@@ -459,7 +459,7 @@ func (f *testFramework) DefaultMarketsV1DealParams() lapi.StartDealParams {
 		MinBlocksDuration: uint64(lbuild.MinDealDuration),
 		Miner:             f.minerAddr,
 		Wallet:            f.defaultWallet,
-		DealStartEpoch:    10000 + abi.ChainEpoch(rand.Intn(30000)),
+		DealStartEpoch:    20000 + abi.ChainEpoch(rand.Intn(20000)),
 		FastRetrieval:     true,
 	}
 }
