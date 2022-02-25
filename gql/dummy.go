@@ -13,12 +13,12 @@ const DummyDealsPrefix = "dummy"
 
 var DummyDealsBase = fmt.Sprintf("http://localhost:%d/"+DummyDealsPrefix, httpPort)
 
-func serveDummyDeals() error {
+func serveDummyDeals(mux *http.ServeMux) error {
 	dpath := "/" + DummyDealsPrefix + "/"
 	if err := os.MkdirAll(DummyDealsDir, 0755); err != nil {
 		return fmt.Errorf("failed to mk directory %s for dummy deals: %w", DummyDealsDir, err)
 	}
 	fileSystem := &testutil.SlowFileOpener{Dir: DummyDealsDir}
-	http.Handle(dpath, http.StripPrefix(dpath, http.FileServer(fileSystem)))
+	mux.Handle(dpath, http.StripPrefix(dpath, http.FileServer(fileSystem)))
 	return nil
 }

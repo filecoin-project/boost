@@ -503,7 +503,8 @@ func NewGraphqlServer(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider
 	server := gql.NewServer(resolver)
 
 	lc.Append(fx.Hook{
-		OnStart: server.Serve,
+		OnStart: server.Start,
+		OnStop:  server.Stop,
 	})
 
 	return server

@@ -128,6 +128,9 @@ func runLotusMiner(ctx context.Context, home string) {
 		{"sed", "-Ei", "-e", "s/#AggregateCommits\\ =\\ true/AggregateCommits=false/",
 			filepath.Join(home, ".lotusminer", "config.toml")},
 
+		{"sed", "-Ei", "-e", "s/#EnableMarkets\\ =\\ true/EnableMarkets=false/",
+			filepath.Join(home, ".lotusminer", "config.toml")},
+
 		{"lotus-miner", "run", "--nosync"},
 	}
 
