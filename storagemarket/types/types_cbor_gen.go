@@ -219,7 +219,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 		_, err := w.Write(cbg.CborNull)
 		return err
 	}
-	if _, err := w.Write([]byte{164}); err != nil {
+	if _, err := w.Write([]byte{165}); err != nil {
 		return err
 	}
 
@@ -713,6 +713,280 @@ func (t *DealResponse) UnmarshalCBOR(r io.Reader) error {
 				}
 
 				t.Message = string(sval)
+			}
+
+		default:
+			// Field doesn't exist on this type, so ignore it
+			cbg.ScanForLinks(r, func(cid.Cid) {})
+		}
+	}
+
+	return nil
+}
+func (t *DealStatusRequest) MarshalCBOR(w io.Writer) error {
+	if t == nil {
+		_, err := w.Write(cbg.CborNull)
+		return err
+	}
+	if _, err := w.Write([]byte{161}); err != nil {
+		return err
+	}
+
+	scratch := make([]byte, 9)
+
+	// t.DealUUID (uuid.UUID) (array)
+	if len("DealUUID") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"DealUUID\" was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("DealUUID")); err != nil {
+		return err
+	}
+
+	if len(t.DealUUID) > cbg.ByteArrayMaxLen {
+		return xerrors.Errorf("Byte array in field t.DealUUID was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajByteString, uint64(len(t.DealUUID))); err != nil {
+		return err
+	}
+
+	if _, err := w.Write(t.DealUUID[:]); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *DealStatusRequest) UnmarshalCBOR(r io.Reader) error {
+	*t = DealStatusRequest{}
+
+	br := cbg.GetPeeker(r)
+	scratch := make([]byte, 8)
+
+	maj, extra, err := cbg.CborReadHeaderBuf(br, scratch)
+	if err != nil {
+		return err
+	}
+	if maj != cbg.MajMap {
+		return fmt.Errorf("cbor input should be of type map")
+	}
+
+	if extra > cbg.MaxLength {
+		return fmt.Errorf("DealStatusRequest: map struct too large (%d)", extra)
+	}
+
+	var name string
+	n := extra
+
+	for i := uint64(0); i < n; i++ {
+
+		{
+			sval, err := cbg.ReadStringBuf(br, scratch)
+			if err != nil {
+				return err
+			}
+
+			name = string(sval)
+		}
+
+		switch name {
+		// t.DealUUID (uuid.UUID) (array)
+		case "DealUUID":
+
+			maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
+			if err != nil {
+				return err
+			}
+
+			if extra > cbg.ByteArrayMaxLen {
+				return fmt.Errorf("t.DealUUID: byte array too large (%d)", extra)
+			}
+			if maj != cbg.MajByteString {
+				return fmt.Errorf("expected byte array")
+			}
+
+			if extra != 16 {
+				return fmt.Errorf("expected array to have 16 elements")
+			}
+
+			t.DealUUID = [16]uint8{}
+
+			if _, err := io.ReadFull(br, t.DealUUID[:]); err != nil {
+				return err
+			}
+
+		default:
+			// Field doesn't exist on this type, so ignore it
+			cbg.ScanForLinks(r, func(cid.Cid) {})
+		}
+	}
+
+	return nil
+}
+func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
+	if t == nil {
+		_, err := w.Write(cbg.CborNull)
+		return err
+	}
+	if _, err := w.Write([]byte{163}); err != nil {
+		return err
+	}
+
+	scratch := make([]byte, 9)
+
+	// t.DealUUID (uuid.UUID) (array)
+	if len("DealUUID") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"DealUUID\" was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("DealUUID")); err != nil {
+		return err
+	}
+
+	if len(t.DealUUID) > cbg.ByteArrayMaxLen {
+		return xerrors.Errorf("Byte array in field t.DealUUID was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajByteString, uint64(len(t.DealUUID))); err != nil {
+		return err
+	}
+
+	if _, err := w.Write(t.DealUUID[:]); err != nil {
+		return err
+	}
+
+	// t.Error (string) (string)
+	if len("Error") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"Error\" was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("Error"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("Error")); err != nil {
+		return err
+	}
+
+	if len(t.Error) > cbg.MaxLength {
+		return xerrors.Errorf("Value in field t.Error was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len(t.Error))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string(t.Error)); err != nil {
+		return err
+	}
+
+	// t.DealStatus (string) (string)
+	if len("DealStatus") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"DealStatus\" was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("DealStatus"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("DealStatus")); err != nil {
+		return err
+	}
+
+	if len(t.DealStatus) > cbg.MaxLength {
+		return xerrors.Errorf("Value in field t.DealStatus was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len(t.DealStatus))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string(t.DealStatus)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *DealStatusResponse) UnmarshalCBOR(r io.Reader) error {
+	*t = DealStatusResponse{}
+
+	br := cbg.GetPeeker(r)
+	scratch := make([]byte, 8)
+
+	maj, extra, err := cbg.CborReadHeaderBuf(br, scratch)
+	if err != nil {
+		return err
+	}
+	if maj != cbg.MajMap {
+		return fmt.Errorf("cbor input should be of type map")
+	}
+
+	if extra > cbg.MaxLength {
+		return fmt.Errorf("DealStatusResponse: map struct too large (%d)", extra)
+	}
+
+	var name string
+	n := extra
+
+	for i := uint64(0); i < n; i++ {
+
+		{
+			sval, err := cbg.ReadStringBuf(br, scratch)
+			if err != nil {
+				return err
+			}
+
+			name = string(sval)
+		}
+
+		switch name {
+		// t.DealUUID (uuid.UUID) (array)
+		case "DealUUID":
+
+			maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
+			if err != nil {
+				return err
+			}
+
+			if extra > cbg.ByteArrayMaxLen {
+				return fmt.Errorf("t.DealUUID: byte array too large (%d)", extra)
+			}
+			if maj != cbg.MajByteString {
+				return fmt.Errorf("expected byte array")
+			}
+
+			if extra != 16 {
+				return fmt.Errorf("expected array to have 16 elements")
+			}
+
+			t.DealUUID = [16]uint8{}
+
+			if _, err := io.ReadFull(br, t.DealUUID[:]); err != nil {
+				return err
+			}
+			// t.Error (string) (string)
+		case "Error":
+
+			{
+				sval, err := cbg.ReadStringBuf(br, scratch)
+				if err != nil {
+					return err
+				}
+
+				t.Error = string(sval)
+			}
+			// t.DealStatus (string) (string)
+		case "DealStatus":
+
+			{
+				sval, err := cbg.ReadStringBuf(br, scratch)
+				if err != nil {
+					return err
+				}
+
+				t.DealStatus = string(sval)
 			}
 
 		default:

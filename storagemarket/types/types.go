@@ -18,7 +18,7 @@ import (
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 )
 
-//go:generate cbor-gen-for --map-encoding StorageAsk DealParams Transfer DealResponse
+//go:generate cbor-gen-for --map-encoding StorageAsk DealParams Transfer DealResponse DealStatusRequest DealStatusResponse
 
 // StorageAsk defines the parameters by which a miner will choose to accept or
 // reject a deal. Note: making a storage deal proposal which matches the miner's
@@ -32,6 +32,16 @@ type StorageAsk struct {
 	MinPieceSize abi.PaddedPieceSize
 	MaxPieceSize abi.PaddedPieceSize
 	Miner        address.Address
+}
+
+type DealStatusRequest struct {
+	DealUUID uuid.UUID
+}
+
+type DealStatusResponse struct {
+	DealUUID   uuid.UUID
+	Error      string
+	DealStatus string
 }
 
 type DealParams struct {

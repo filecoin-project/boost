@@ -21,6 +21,7 @@ import (
 var log = logging.Logger("boost-net")
 
 const DealProtocolID = "/fil/storage/mk/1.2.0"
+const DealStatusV2ProtocolID = "/fil/storage/mk/dealstatus/1.2.0"
 const providerReadDeadline = 10 * time.Second
 const providerWriteDeadline = 10 * time.Second
 const clientReadDeadline = 10 * time.Second
@@ -89,6 +90,7 @@ func NewDealClient(h host.Host, options ...DealClientOption) *DealClient {
 
 // DealProvider listens for incoming deal proposals over libp2p
 type DealProvider struct {
+	ctx  context.Context
 	host host.Host
 	prov *storagemarket.Provider
 }
@@ -101,14 +103,17 @@ func NewDealProvider(h host.Host, prov *storagemarket.Provider) *DealProvider {
 	return p
 }
 
-func (p *DealProvider) Start() {
+func (p *DealProvider) Start(ctx context.Context) {
+	p.ctx = ctx
 	p.host.SetStreamHandler(DealProtocolID, p.handleNewDealStream)
 	p.host.SetStreamHandler(mktssm.AskProtocolID, p.handleNewAskStream)
+	p.host.SetStreamHandler(DealStatusV2ProtocolID, p.handleNewDealStatusStream)
 }
 
 func (p *DealProvider) Stop() {
 	p.host.RemoveStreamHandler(DealProtocolID)
 	p.host.RemoveStreamHandler(mktssm.AskProtocolID)
+	p.host.RemoveStreamHandler(DealStatusV2ProtocolID)
 }
 
 // Called when the client opens a libp2p stream with a new deal proposal
@@ -147,6 +152,47 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 	err = cborutil.WriteCborRPC(s, &types.DealResponse{Accepted: res.Accepted, Message: res.Reason})
 	if err != nil {
 		log.Warnw("writing deal response", "id", proposal.DealUUID, "err", err)
+		return
+	}
+}
+
+func (p *DealProvider) handleNewDealStatusStream(s network.Stream) {
+	defer s.Close()
+
+	_ = s.SetReadDeadline(time.Now().Add(providerReadDeadline))
+	defer s.SetReadDeadline(time.Time{}) // nolint
+
+	var req types.DealStatusRequest
+	err := req.UnmarshalCBOR(s)
+	if err != nil {
+		log.Warnw("reading deal status request from stream", "err", err)
+		return
+	}
+	log.Debugw("received deal status request", "id", req.DealUUID, "client-peer", s.Conn().RemotePeer())
+
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
+
+	pds, err := p.prov.Deal(p.ctx, req.DealUUID)
+	if err != nil && err == storagemarket.ErrDealNotFound {
+		if err := cborutil.WriteCborRPC(s, &types.DealStatusResponse{DealUUID: req.DealUUID, Error: err.Error()}); err != nil {
+			log.Errorf("failed to write deal status response: %s", err)
+		}
+		return
+	}
+
+	if err != nil {
+		log.Errorf("failed to fetch deal status: %s", err)
+		return
+	}
+
+	resp := types.DealStatusResponse{
+		DealUUID:   req.DealUUID,
+		DealStatus: pds.Checkpoint.String(),
+	}
+	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
+		log.Errorf("failed to write deal status response: %s", err)
 		return
 	}
 }
