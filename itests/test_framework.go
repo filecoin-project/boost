@@ -199,6 +199,7 @@ func (f *testFramework) start() {
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
 	cfg.Dealmaking.PublishMsgPeriod = config.Duration(time.Second * 1)
 	cfg.Dealmaking.MaxStagingDealsBytes = 4000000
+	cfg.Storage.ParallelFetchLimit = 10
 
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
@@ -318,7 +319,7 @@ func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 			switch {
 			case deal.Checkpoint == dealcheckpoints.Complete:
 				return nil
-			case deal.Checkpoint == dealcheckpoints.AddedPiece:
+			case deal.Checkpoint == dealcheckpoints.IndexedAndAnnounced:
 				return nil
 			}
 		}

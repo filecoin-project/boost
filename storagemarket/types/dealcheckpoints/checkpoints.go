@@ -10,16 +10,18 @@ const (
 	Published
 	PublishConfirmed
 	AddedPiece
+	IndexedAndAnnounced
 	Complete
 )
 
 var names = map[Checkpoint]string{
-	Accepted:         "Accepted",
-	Transferred:      "Transferred",
-	Published:        "Published",
-	PublishConfirmed: "PublishConfirmed",
-	AddedPiece:       "AddedPiece",
-	Complete:         "Complete",
+	Accepted:            "Accepted",
+	Transferred:         "Transferred",
+	Published:           "Published",
+	PublishConfirmed:    "PublishConfirmed",
+	AddedPiece:          "AddedPiece",
+	IndexedAndAnnounced: "IndexedAndAnnounced",
+	Complete:            "Complete",
 }
 
 var strToCP map[string]Checkpoint

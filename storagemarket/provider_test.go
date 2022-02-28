@@ -16,6 +16,11 @@ import (
 	"testing"
 	"time"
 
+	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
+	"github.com/filecoin-project/go-fil-markets/shared_testutil"
+	ds "github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+
 	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/libp2p/go-libp2p-core/host"
@@ -379,9 +384,16 @@ func (h *ProviderHarness) AssertPublishConfirmed(t *testing.T, ctx context.Conte
 
 func (h *ProviderHarness) AssertPieceAdded(t *testing.T, ctx context.Context, dp *types.DealParams, so *smtestutil.StubbedMinerOutput, carv2FilePath string) {
 	h.AssertEventuallyDealCleanedup(t, ctx, dp.DealUUID)
-	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.AddedPiece, so.SectorID, so.Offset, dp.ClientDealProposal.Proposal.PieceSize.Unpadded().Padded(), "")
+	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.IndexedAndAnnounced, so.SectorID, so.Offset, dp.ClientDealProposal.Proposal.PieceSize.Unpadded().Padded(), "")
 	// Assert that the original file data we sent matches what was sent to the sealer
 	h.AssertSealedContents(t, carv2FilePath, *so.SealedBytes)
+	// assert that dagstore and piecestore have this deal
+	dbState, err := h.DealsDB.ByID(ctx, dp.DealUUID)
+	require.NoError(t, err)
+	rg, ok := h.DAGStore.GetRegistration(dbState.ClientDealProposal.Proposal.PieceCID)
+	require.True(t, ok)
+	require.True(t, rg.EagerInit)
+	require.EqualValues(t, dbState.InboundFilePath, rg.CarPath)
 }
 
 func (h *ProviderHarness) EventuallyAssertNoTagged(t *testing.T, ctx context.Context) {
@@ -497,7 +509,8 @@ type ProviderHarness struct {
 	DisconnectingServer *httptest.Server
 	FailingServer       *httptest.Server
 
-	SqlDB *sql.DB
+	SqlDB    *sql.DB
+	DAGStore *shared_testutil.MockDagStoreWrapper
 }
 
 type providerConfig struct {
@@ -649,8 +662,12 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		return true, "", nil
 	}
 
+	ps, err := piecestoreimpl.NewPieceStore(dssync.MutexWrap(ds.NewMapDatastore()))
+	require.NoError(t, err)
+	dagStore := shared_testutil.NewMockDagStoreWrapper(ps, nil)
+
 	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, minerStub, address.Undef, minerStub, sps, minerStub, df, sqldb,
-		db.NewLogsDB(sqldb), pc.httpOpts...)
+		db.NewLogsDB(sqldb), dagStore, ps, pc.httpOpts...)
 	require.NoError(t, err)
 	prov.testMode = true
 	ph.Provider = prov
@@ -665,6 +682,8 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	ph.MockSealingPipelineAPI.EXPECT().WorkerJobs(gomock.Any()).Return(map[uuid.UUID][]storiface.WorkerJob{}, nil).AnyTimes()
 
 	ph.MockSealingPipelineAPI.EXPECT().SectorsSummary(gomock.Any()).Return(sealingpipelineStatus, nil).AnyTimes()
+
+	ph.DAGStore = dagStore
 
 	return ph
 }
@@ -692,13 +711,21 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, ctx context
 	// construct a new provider with pre-existing state
 	prov, err := NewProvider("", h.Host, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, address.Undef, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
-		df, h.Provider.logsSqlDB, h.Provider.logsDB, pc.httpOpts...)
+		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.dagst, h.Provider.ps, pc.httpOpts...)
 
 	require.NoError(t, err)
 	h.Provider = prov
 }
 
 func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
+	require.NoError(t, h.Provider.ps.Start(ctx))
+	ready := make(chan error)
+	h.Provider.ps.OnReady(func(err error) {
+		ready <- err
+	})
+
+	require.NoError(t, <-ready)
+
 	h.NormalServer.Start()
 	h.BlockingServer.Start()
 	h.DisconnectingServer.Start()
@@ -1063,6 +1090,8 @@ func (td *testDeal) waitForAndAssert(t *testing.T, ctx context.Context, cp dealc
 		td.ph.AssertPublishConfirmed(t, ctx, td.params, td.stubOutput)
 	case dealcheckpoints.AddedPiece:
 		td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2FilePath)
+	default:
+		t.Fail()
 	}
 }
 
