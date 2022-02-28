@@ -369,7 +369,6 @@ func ConfigBoost(c interface{}) Option {
 	if !ok {
 		return Error(xerrors.Errorf("invalid config from repo, got: %T", c))
 	}
-	cfg.Storage.ParallelFetchLimit = 10
 
 	pricingConfig := cfg.Dealmaking.RetrievalPricing
 	if pricingConfig.Strategy == config.RetrievalPricingExternalMode {
@@ -480,6 +479,7 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(nil, nil)),
 		Override(new(lotus_storagemarket.StorageProvider), lotus_modules.StorageProvider),
 		Override(new(*lotus_storageadapter.DealPublisher), lotus_storageadapter.NewDealPublisher(nil, lotus_storageadapter.PublishMsgConfig{})),
+		Override(HandleDealsKey, lotus_modules.HandleDeals),
 
 		// Boost storage deal filter
 		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),
@@ -553,14 +553,14 @@ func ConfigBoost(c interface{}) Option {
 	)
 }
 
-func Boost(out *api.Boost) Option {
+func BoostAPI(out *api.Boost) Option {
 	return Options(
 		ApplyIf(func(s *Settings) bool { return s.Config },
 			Error(errors.New("the StorageMiner option must be set before Config option")),
 		),
 
 		func(s *Settings) error {
-			s.nodeType = BoostRepoType{}
+			s.nodeType = Boost
 			return nil
 		},
 
@@ -573,13 +573,16 @@ func Boost(out *api.Boost) Option {
 	)
 }
 
-type BoostRepoType struct {
-}
+var Boost boost
 
-func (f BoostRepoType) Type() string {
+type boost struct{}
+
+func (f boost) Type() string {
 	return "Boost"
 }
 
-func (f BoostRepoType) Config() interface{} {
+func (f boost) Config() interface{} {
 	return config.DefaultBoost()
 }
+
+func (boost) SupportsStagingDeals() {}

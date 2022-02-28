@@ -180,7 +180,7 @@ func GetBoostAPI(ctx *cli.Context, opts ...GetBoostOption) (api.Boost, jsonrpc.C
 		return tn.(api.Boost), func() {}, nil
 	}
 
-	addr, headers, err := GetRawAPI(ctx, node.BoostRepoType{}, "v0")
+	addr, headers, err := GetRawAPI(ctx, node.Boost, "v0")
 	if err != nil {
 		return nil, nil, err
 	}

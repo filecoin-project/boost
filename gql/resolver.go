@@ -18,6 +18,7 @@ import (
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/event"
+	"github.com/libp2p/go-libp2p-core/host"
 	"golang.org/x/xerrors"
 )
 
@@ -30,6 +31,7 @@ type dealListResolver struct {
 // resolver translates from a request for a graphql field to the data for
 // that field
 type resolver struct {
+	h          host.Host
 	dealsDB    *db.DealsDB
 	logsDB     *db.LogsDB
 	fundMgr    *fundmanager.FundManager
@@ -41,11 +43,12 @@ type resolver struct {
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager,
+func NewResolver(h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager,
 	storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider,
-	legacyProv lotus_storagemarket.StorageProvider, publisher *storagemarket.DealPublisher,
-	fullNode v1api.FullNode) *resolver {
+	legacyProv lotus_storagemarket.StorageProvider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode,
+) *resolver {
 	return &resolver{
+		h:          h,
 		dealsDB:    dealsDB,
 		logsDB:     logsDB,
 		fundMgr:    fundMgr,

@@ -71,7 +71,7 @@ var runCmd = &cli.Command{
 
 		var boostApi api.Boost
 		stop, err := node.New(ctx,
-			node.Boost(&boostApi),
+			node.BoostAPI(&boostApi),
 			node.Override(new(dtypes.ShutdownChan), shutdownChan),
 			node.Base(),
 			node.Repo(r),

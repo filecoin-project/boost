@@ -2,28 +2,12 @@ package gql
 
 import (
 	"fmt"
-	"math/rand"
-	"time"
+	"sort"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
-	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/graph-gophers/graphql-go"
-	cbg "github.com/whyrusleeping/cbor-gen"
 )
-
-var localDeals []storagemarket.MinerDeal
-
-func init() {
-	var err error
-	localDeals, err = mockListLocalDeals()
-	if err != nil {
-		panic(err)
-	}
-}
 
 type legacyDealResolver struct {
 	storagemarket.MinerDeal
@@ -36,7 +20,12 @@ type legacyDealListResolver struct {
 }
 
 func (r *resolver) LegacyDeal(args struct{ ID graphql.ID }) (*legacyDealResolver, error) {
-	for _, dl := range localDeals {
+	allDeals, err := r.legacyProv.ListLocalDeals()
+	if err != nil {
+		return nil, fmt.Errorf("getting legacy deals: %w", err)
+	}
+
+	for _, dl := range allDeals {
 		if dl.ProposalCid.String() == string(args.ID) {
 			return &legacyDealResolver{MinerDeal: dl}, nil
 		}
@@ -53,12 +42,14 @@ func (r *resolver) LegacyDeals(args dealsArgs) (*legacyDealListResolver, error) 
 	}
 
 	// Get all deals in descending order by creation time
-	//allDeals, err := r.legacyProv.ListLocalDeals()
-	//if err != nil {
-	//	return nil, err
-	//}
+	allDeals, err := r.legacyProv.ListLocalDeals()
+	if err != nil {
+		return nil, fmt.Errorf("getting legacy deals: %w", err)
+	}
+	sort.Slice(allDeals, func(i, j int) bool {
+		return allDeals[j].CreationTime.Time().Before(allDeals[i].CreationTime.Time())
+	})
 
-	allDeals := localDeals
 	// Skip over deals until the first deal in the given page
 	pageDeals := allDeals
 	if args.First != nil {
@@ -106,13 +97,10 @@ func (r *resolver) LegacyDeals(args dealsArgs) (*legacyDealListResolver, error) 
 }
 
 func (r *resolver) LegacyDealsCount() (int32, error) {
-	//allDeals, err := r.legacyProv.ListLocalDeals()
-	//allDeals, err := mockListLocalDeals()
-	//if err != nil {
-	//	return 0, err
-	//}
-	allDeals := localDeals
-
+	allDeals, err := r.legacyProv.ListLocalDeals()
+	if err != nil {
+		return 0, fmt.Errorf("getting legacy deals: %w", err)
+	}
 	return int32(len(allDeals)), nil
 }
 
@@ -184,54 +172,5 @@ func (r *legacyDealResolver) Status() string {
 }
 
 func (r *legacyDealResolver) Message() string {
-	return r.Status()
-}
-
-func mockListLocalDeals() ([]storagemarket.MinerDeal, error) {
-	clientAddr, err := address.NewFromString("t01001")
-	if err != nil {
-		return nil, err
-	}
-	provAddr, err := address.NewFromString("t01000")
-	if err != nil {
-		return nil, err
-	}
-	pieceCid := testutil.GenerateCid()
-
-	deals := []storagemarket.MinerDeal{}
-	for i := 0; i < 30; i++ {
-		deal := storagemarket.MinerDeal{
-			ClientDealProposal: market.ClientDealProposal{
-				Proposal: market.DealProposal{
-					PieceCID:             testutil.GenerateCid(),
-					PieceSize:            abi.PaddedPieceSize(8 * 1024 * 1024 * 1024),
-					VerifiedDeal:         false,
-					Client:               clientAddr,
-					Provider:             provAddr,
-					Label:                "",
-					StartEpoch:           31231,
-					EndEpoch:             38132,
-					StoragePricePerEpoch: abi.NewTokenAmount(1024),
-					ProviderCollateral:   abi.NewTokenAmount(1024 * 8),
-					ClientCollateral:     abi.NewTokenAmount(0),
-				},
-			},
-			ProposalCid: testutil.GenerateCid(),
-			Miner:       "miner1",
-			Client:      "client1",
-			State:       storagemarket.StorageDealActive,
-			Message:     "Storage deal is active",
-			Ref: &storagemarket.DataRef{
-				TransferType: "graphsync",
-				PieceCid:     &pieceCid,
-				PieceSize:    abi.UnpaddedPieceSize(8 * 1024 * 1024 * 1024),
-				RawBlockSize: 1024 * 1024 * 1024,
-			},
-			DealID:       abi.DealID(rand.Intn(1024)),
-			SectorNumber: abi.SectorNumber(rand.Intn(1024)),
-			CreationTime: cbg.CborTime(time.Now().Add(-time.Hour + time.Duration(i)*time.Minute)),
-		}
-		deals = append(deals, deal)
-	}
-	return deals, nil
+	return r.MinerDeal.Message
 }

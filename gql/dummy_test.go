@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,14 +18,22 @@ func TestDummyServer(t *testing.T) {
 	rq := require.New(t)
 	ctx := context.Background()
 
+	mux := http.NewServeMux()
 	listenAddr := fmt.Sprintf(":%d", httpPort)
 	t.Logf("server listening on %s\n", listenAddr)
-	err := serveDummyDeals()
+	err := serveDummyDeals(mux)
 	rq.NoError(err)
 
+	srv := &http.Server{Addr: listenAddr, Handler: mux}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		err := http.ListenAndServe(listenAddr, nil)
-		rq.Fail(err.Error())
+		defer wg.Done()
+
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			rq.Fail(err.Error())
+		}
 	}()
 
 	var sourceBuff bytes.Buffer
@@ -58,4 +67,10 @@ func TestDummyServer(t *testing.T) {
 	rq.Equal(randBytes.String(), buf.String())
 
 	t.Logf("Read %d bytes", len(buf.Bytes()))
+
+	if err := srv.Shutdown(ctx); err != nil {
+		rq.Fail(err.Error())
+	}
+
+	wg.Wait()
 }

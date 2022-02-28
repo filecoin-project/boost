@@ -7,10 +7,15 @@ import {SealingPipelineMenuItem} from "./SealingPipeline";
 import {FundsMenuItem} from "./Funds";
 import gridImg from './bootstrap-icons/icons/grid-3x3-gap.svg'
 import './Menu.css'
+import {SettingsMenuItem} from "./Settings";
 
 export function Menu(props) {
+    function scrollToTop() {
+        window.scrollTo({ top: 0, behavior: "smooth" })
+    }
+
     return (
-        <td className="menu">
+        <td onClick={scrollToTop} className="menu">
             <StorageDealsMenuItem />
             <StorageSpaceMenuItem />
             <SealingPipelineMenuItem />
@@ -21,6 +26,7 @@ export function Menu(props) {
                 <img className="icon" alt="" src={gridImg} />
                 <h3>Message Pool</h3>
             </Link>
+            <SettingsMenuItem />
         </td>
     )
 }
