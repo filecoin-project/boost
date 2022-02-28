@@ -13,12 +13,12 @@ import (
 )
 
 func CliStorageDealFilter(cmd string) dtypes.StorageDealFilter {
-	return func(ctx context.Context, deal types.DealParams) (bool, string, error) {
+	return func(ctx context.Context, deal types.DealFilterParams) (bool, string, error) {
 		d := struct {
 			types.DealParams
 			DealType string
 		}{
-			DealParams: deal,
+			DealParams: *deal.DealParams,
 			DealType:   "storage",
 		}
 		return runDealFilter(ctx, cmd, d)

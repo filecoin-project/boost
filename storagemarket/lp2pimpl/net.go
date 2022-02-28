@@ -2,6 +2,7 @@ package lp2pimpl
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/filecoin-project/boost/storagemarket"
@@ -78,6 +79,41 @@ func (c *DealClient) SendDealProposal(ctx context.Context, id peer.ID, params ty
 	return &resp, nil
 }
 
+func (c *DealClient) SendDealStatusRequest(ctx context.Context, id peer.ID, req types.DealStatusRequest) (*types.DealStatusResponse, error) {
+	log.Debugw("send deal status req", "id", req.DealUUID)
+
+	// Create a libp2p stream to the provider
+	s, err := c.retryStream.OpenStream(ctx, id, []protocol.ID{DealStatusV2ProtocolID})
+	if err != nil {
+		return nil, err
+	}
+
+	defer s.Close() // nolint
+
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(clientWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
+
+	// Write the deal proposal to the stream
+	if err = cborutil.WriteCborRPC(s, &req); err != nil {
+		return nil, xerrors.Errorf("sending deal status req: %w", err)
+	}
+
+	// Set a deadline on reading from the stream so it doesn't hang
+	_ = s.SetReadDeadline(time.Now().Add(clientReadDeadline))
+	defer s.SetReadDeadline(time.Time{}) // nolint
+
+	// Read the response from the stream
+	var resp types.DealStatusResponse
+	if err := resp.UnmarshalCBOR(s); err != nil {
+		return nil, xerrors.Errorf("reading deal status response: %w", err)
+	}
+
+	log.Debugw("received deal status response", "id", resp.DealUUID, "status", resp.DealStatus)
+
+	return &resp, nil
+}
+
 func NewDealClient(h host.Host, options ...DealClientOption) *DealClient {
 	c := &DealClient{
 		retryStream: shared.NewRetryStream(h),
@@ -118,6 +154,8 @@ func (p *DealProvider) Stop() {
 
 // Called when the client opens a libp2p stream with a new deal proposal
 func (p *DealProvider) handleNewDealStream(s network.Stream) {
+	fmt.Println("\n HELLO")
+
 	defer s.Close()
 
 	// Set a deadline on reading from the stream so it doesn't hang

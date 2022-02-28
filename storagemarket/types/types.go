@@ -45,10 +45,14 @@ type DealStatusResponse struct {
 }
 
 type DealParams struct {
-	DealUUID             uuid.UUID
-	ClientDealProposal   market.ClientDealProposal
-	DealDataRoot         cid.Cid
-	Transfer             Transfer
+	DealUUID           uuid.UUID
+	ClientDealProposal market.ClientDealProposal
+	DealDataRoot       cid.Cid
+	Transfer           Transfer
+}
+
+type DealFilterParams struct {
+	DealParams           *DealParams
 	SealingPipelineState *sealingpipeline.Status
 }
 
