@@ -43,7 +43,7 @@ type Deal {
   CreatedAt: Time!
   PieceCid: String!
   PieceSize: Uint64!
-  ProviderCollateral: Float!
+  ProviderCollateral: Uint64!
   StartEpoch: Uint64!
   EndEpoch: Uint64!
   ClientPeerID: String!
@@ -63,7 +63,7 @@ type LegacyDeal {
   CreatedAt: Time!
   PieceCid: String!
   PieceSize: Uint64!
-  ProviderCollateral: Float!
+  ProviderCollateral: Uint64!
   StartEpoch: Uint64!
   EndEpoch: Uint64!
   ClientPeerID: String!
@@ -73,6 +73,24 @@ type LegacyDeal {
   TransferSize: Uint64!
   Status: String!
   SectorNumber: Uint64!
+  Message: String!
+}
+
+type DealBasic {
+  ID: ID!
+  IsLegacy: Boolean!
+  ClientAddress: String!
+  ProviderAddress: String!
+  CreatedAt: Time!
+  PieceCid: String!
+  PieceSize: Uint64!
+  ProviderCollateral: Uint64!
+  StartEpoch: Uint64!
+  EndEpoch: Uint64!
+  ClientPeerID: String!
+  DealDataRoot: String!
+  PublishCid: String!
+  Transfer: TransferParams!
   Message: String!
 }
 
@@ -175,7 +193,7 @@ type DealPublish {
   Period: Int!
   Start: Time!
   MaxDealsPerMsg: Int!
-  Deals: [Deal]!
+  Deals: [DealBasic]!
 }
 
 type TransferPoint {

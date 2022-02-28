@@ -2,11 +2,12 @@ import {useMutation, useQuery} from "@apollo/react-hooks";
 import {DealPublishNowMutation, DealPublishQuery} from "./gql";
 import React from "react";
 import moment from "moment";
-import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
+import {PageContainer, ShortClientAddress, ShortDealID, ShortDealLink} from "./Components";
 import {Link} from "react-router-dom";
 import sendImg from './bootstrap-icons/icons/send.svg'
 import './DealPublish.css'
 import {humanFileSize} from "./util";
+import {ShowBanner} from "./Banner";
 
 export function DealPublishPage(props) {
     return <PageContainer pageType="deal-publish" title="Publish Deals">
@@ -29,6 +30,12 @@ function DealPublishContent() {
         return <div>Error: {error.message}</div>
     }
 
+    async function doPublish() {
+        const dealCount = deals.length
+        await publishNow()
+        ShowBanner('Published '+dealCount+' deals')
+    }
+
     var period = moment.duration(data.dealPublish.Period, 'seconds')
     var publishTime = moment(data.dealPublish.Start).add(period)
 
@@ -42,7 +49,7 @@ function DealPublishContent() {
             </p>
 
             <div className="buttons">
-                <div className="button" onClick={publishNow}>Publish Now</div>
+                <div className="button" onClick={doPublish}>Publish Now</div>
             </div>
             </>
         ) : null}
@@ -86,7 +93,13 @@ function DealsTable(props) {
                         <tr key={deal.ID}>
                             <td>{moment(deal.CreatedAt).fromNow()}</td>
                             <td className="deal-id">
-                                <ShortDealLink id={deal.ID} />
+                                {deal.IsLegacy ? (
+                                    <Link to={"/legacy-deals/" + deal.ID}>
+                                        <ShortDealID id={deal.ID} />
+                                    </Link>
+                                ) : (
+                                    <ShortDealLink id={deal.ID} />
+                                )}
                             </td>
                             <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
                             <td className="piece-size">{humanFileSize(deal.PieceSize)}</td>

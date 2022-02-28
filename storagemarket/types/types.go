@@ -67,7 +67,7 @@ type PieceAdder interface {
 }
 
 type DealPublisher interface {
-	Publish(ctx context.Context, dealUuid uuid.UUID, deal market2.ClientDealProposal) (cid.Cid, error)
+	Publish(ctx context.Context, deal market2.ClientDealProposal) (cid.Cid, error)
 }
 
 type ChainDealManager interface {

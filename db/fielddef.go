@@ -5,8 +5,10 @@ import (
 
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
+	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/crypto"
+	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
 )
@@ -190,5 +192,38 @@ func (fd *ckptFieldDef) unmarshall() error {
 	}
 
 	*fd.f = cp
+	return nil
+}
+
+type signedPropFieldDef struct {
+	marshalled string
+	f          *cid.Cid
+	prop       market.ClientDealProposal
+}
+
+func (fd *signedPropFieldDef) fieldPtr() interface{} {
+	return &fd.marshalled
+}
+
+func (fd *signedPropFieldDef) marshall() (interface{}, error) {
+	propnd, err := cborutil.AsIpld(&fd.prop)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to compute signed deal proposal ipld node: %w", err)
+	}
+
+	return propnd.String(), nil
+}
+
+func (fd *signedPropFieldDef) unmarshall() error {
+	if fd.f == nil {
+		return nil
+	}
+
+	c, err := cid.Parse(fd.marshalled)
+	if err != nil {
+		return xerrors.Errorf("parsing CID from string '%s': %w", fd.marshalled, err)
+	}
+
+	*fd.f = c
 	return nil
 }

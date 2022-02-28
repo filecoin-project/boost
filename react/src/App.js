@@ -16,6 +16,7 @@ import {DealDetail} from "./DealDetail";
 import {Epoch} from "./Epoch";
 import {LegacyDealDetail} from "./LegacyDealDetail"
 import {SettingsPage} from "./Settings";
+import {Banner} from "./Banner";
 
 function App(props) {
     return (
@@ -28,6 +29,7 @@ function App(props) {
                             <td className="main-content">
                                 <div className="page-content">
                                     <Epoch />
+                                    <Banner />
                                     <Routes>
                                         <Route path="/storage-deals" element={<StorageDealsPage />} />
                                         <Route path="/legacy-storage-deals" element={<LegacyStorageDealsPage />} />

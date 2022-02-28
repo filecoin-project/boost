@@ -405,14 +405,6 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(*stores.Local), lotus_modules.LocalStorage),
 		Override(new(*stores.Remote), lotus_modules.RemoteStorage),
 
-		Override(new(*storagemarket.DealPublisher), storagemarket.NewDealPublisher(storagemarket.PublishMsgConfig{
-			Wallet:                  walletPSD,
-			Period:                  time.Duration(cfg.Dealmaking.PublishMsgPeriod),
-			MaxDealsPerMsg:          cfg.Dealmaking.PublishMsgMaxDealsPerMsg,
-			StartEpochSealingBuffer: cfg.Dealmaking.StartEpochSealingBuffer,
-			MaxPublishDealsFee:      cfg.Dealmaking.PublishMsgMaxFee,
-		})),
-
 		Override(new(*fundmanager.FundManager), fundmanager.New(fundmanager.Config{
 			StorageMiner: walletMiner,
 			CollatWallet: walletPledgeCollat,
@@ -435,7 +427,7 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner)),
 
 		// GraphQL server
-		Override(new(*gql.Server), modules.NewGraphqlServer),
+		Override(new(*gql.Server), modules.NewGraphqlServer(cfg)),
 
 		// Address selector
 		Override(new(*storage.AddressSelector), lotus_modules.AddressSelector(&lotus_config.MinerAddressConfig{
@@ -477,7 +469,6 @@ func ConfigBoost(c interface{}) Option {
 
 		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&cfg.LotusFees, &cfg.LotusDealmaking)),
 		Override(new(lotus_storagemarket.StorageProvider), lotus_modules.StorageProvider),
-		Override(new(*lotus_storageadapter.DealPublisher), lotus_storageadapter.NewDealPublisher(nil, lotus_storageadapter.PublishMsgConfig{})),
 		Override(HandleDealsKey, lotus_modules.HandleDeals),
 
 		// Boost storage deal filter

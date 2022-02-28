@@ -6,3 +6,5 @@ CREATE TABLE IF NOT EXISTS DealLogs (
     LogParams TEXT,
     Subsystem TEXT
 );
+
+CREATE INDEX IF NOT EXISTS index_deal_logs_deal_uuid on DealLogs(DealUUID);

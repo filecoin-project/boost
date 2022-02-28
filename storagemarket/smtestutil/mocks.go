@@ -99,7 +99,7 @@ func (mb *MinerStubBuilder) SetupAllBlocking() *MinerStubBuilder {
 }
 
 func (mb *MinerStubBuilder) SetupNoOp() *MinerStubBuilder {
-	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.DealUUID), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(_ context.Context, _ uuid.UUID, _ market2.ClientDealProposal) (cid.Cid, error) {
+	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(_ context.Context, _ market2.ClientDealProposal) (cid.Cid, error) {
 		return mb.publishCid, nil
 	}).AnyTimes()
 
@@ -124,7 +124,7 @@ func (mb *MinerStubBuilder) SetupPublish(blocking bool) *MinerStubBuilder {
 	}
 	mb.stub.lk.Unlock()
 
-	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.DealUUID), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(ctx context.Context, _ uuid.UUID, _ market2.ClientDealProposal) (cid.Cid, error) {
+	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(ctx context.Context, _ market2.ClientDealProposal) (cid.Cid, error) {
 		mb.stub.lk.Lock()
 		ch := mb.stub.unblockPublish[mb.dp.DealUUID]
 		mb.stub.lk.Unlock()
@@ -147,7 +147,7 @@ func (mb *MinerStubBuilder) SetupPublish(blocking bool) *MinerStubBuilder {
 }
 
 func (mb *MinerStubBuilder) SetupPublishFailure(err error) *MinerStubBuilder {
-	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.DealUUID), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(_ context.Context, _ uuid.UUID, _ market2.ClientDealProposal) (cid.Cid, error) {
+	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(_ context.Context, _ market2.ClientDealProposal) (cid.Cid, error) {
 		return cid.Undef, err
 	})
 

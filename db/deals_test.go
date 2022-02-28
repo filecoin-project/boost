@@ -5,10 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-
 	"github.com/filecoin-project/boost/storagemarket/types"
-
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,6 +36,12 @@ func TestDealsDB(t *testing.T) {
 	deal.CreatedAt = time.Time{}
 	storedDeal.CreatedAt = time.Time{}
 	req.Equal(deal, *storedDeal)
+
+	propnd, err := cborutil.AsIpld(&deal.ClientDealProposal)
+	req.NoError(err)
+	storedDealBySignedPropCid, err := db.BySignedProposalCID(ctx, propnd.Cid().String())
+	req.NoError(err)
+	req.Equal(deal.DealUuid, storedDealBySignedPropCid.DealUuid)
 
 	dealList, err := db.List(ctx, nil, 100)
 	req.NoError(err)

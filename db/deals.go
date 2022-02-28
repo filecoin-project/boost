@@ -5,15 +5,13 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/graph-gophers/graphql-go"
-
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
+	"github.com/graph-gophers/graphql-go"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -76,6 +74,8 @@ func newDealAccessor(db *sql.DB, deal *types.ProviderDealState) *dealAccessor {
 			"Length":                &fieldDef{f: &deal.Length},
 			"Checkpoint":            &ckptFieldDef{f: &deal.Checkpoint},
 			"Error":                 &fieldDef{f: &deal.Err},
+			// Needed so the deal can be looked up by signed proposal cid
+			"SignedProposalCID": &signedPropFieldDef{prop: deal.ClientDealProposal},
 		},
 	}
 }
@@ -188,6 +188,12 @@ func (d *DealsDB) ByID(ctx context.Context, id uuid.UUID) (*types.ProviderDealSt
 func (d *DealsDB) ByPublishCID(ctx context.Context, publishCid string) (*types.ProviderDealState, error) {
 	qry := "SELECT " + dealFieldsStr + " FROM Deals WHERE PublishCID=?"
 	row := d.db.QueryRowContext(ctx, qry, publishCid)
+	return d.scanRow(row)
+}
+
+func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid string) (*types.ProviderDealState, error) {
+	qry := "SELECT " + dealFieldsStr + " FROM Deals WHERE SignedProposalCID=?"
+	row := d.db.QueryRowContext(ctx, qry, proposalCid)
 	return d.scanRow(row)
 }
 
