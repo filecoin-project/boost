@@ -64,5 +64,5 @@ func (c *StorageClient) StorageDeal(ctx context.Context, params types.DealParams
 
 func (c *StorageClient) DealStatus(ctx context.Context, providerID peer.ID, dealUUid uuid.UUID) (*types.DealStatusResponse, error) {
 	// Send the deal proposal to the provider
-	return c.dealClient.SendDealStatusRequest(ctx, providerID, types.DealStatusRequest{dealUUid})
+	return c.dealClient.SendDealStatusRequest(ctx, providerID, types.DealStatusRequest{DealUUID: dealUUid})
 }

@@ -49,7 +49,10 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 		Transfer:           deal.Transfer,
 	}
 
-	accept, reason, err := p.df(p.ctx, types.DealFilterParams{&params, status})
+	accept, reason, err := p.df(p.ctx, types.DealFilterParams{
+		DealParams:           &params,
+		SealingPipelineState: status})
+
 	if err != nil {
 		return false, "deal filter error", fmt.Errorf("failed to invoke deal filter: %w", err)
 	}
