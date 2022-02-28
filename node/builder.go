@@ -476,7 +476,6 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(*storedask.StoredAsk), lotus_modules.NewStorageAsk),
 
 		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&cfg.LotusFees, &cfg.LotusDealmaking)),
-		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(nil, nil)),
 		Override(new(lotus_storagemarket.StorageProvider), lotus_modules.StorageProvider),
 		Override(new(*lotus_storageadapter.DealPublisher), lotus_storageadapter.NewDealPublisher(nil, lotus_storageadapter.PublishMsgConfig{})),
 		Override(HandleDealsKey, lotus_modules.HandleDeals),
