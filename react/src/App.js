@@ -15,6 +15,7 @@ import {MpoolPage} from "./Mpool";
 import {DealDetail} from "./DealDetail";
 import {Epoch} from "./Epoch";
 import {LegacyDealDetail} from "./LegacyDealDetail"
+import {SettingsPage} from "./Settings";
 
 function App(props) {
     return (
@@ -36,6 +37,7 @@ function App(props) {
                                         <Route path="/deal-publish" element={<DealPublishPage />} />
                                         <Route path="/deal-transfers" element={<DealTransfersPage />} />
                                         <Route path="/mpool" element={<MpoolPage />} />
+                                        <Route path="/settings" element={<SettingsPage />} />
                                         <Route path="/deals/:dealID" element={<DealDetail />} />
                                         <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
                                         <Route path="/" element={<StorageDealsPage />} />

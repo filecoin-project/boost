@@ -19,6 +19,11 @@ The `BigInt` scalar type represents a big integer.
 """
 scalar BigInt
 
+type EpochInfo {
+  Epoch: Uint64!
+  SecondsPerEpoch: Int!
+}
+
 type TransferParams {
   Type: String!
   Size: Uint64!
@@ -191,9 +196,31 @@ type MpoolMessage {
   BaseFee: BigInt!
 }
 
+type Libp2pAddrInfo {
+  Addresses: [String]!
+  PeerID: String!
+  Protocols: [String]!
+}
+
+type StorageAsk {
+  Price: Uint64!
+  VerifiedPrice: Uint64!
+  MinPieceSize: Uint64!
+  MaxPieceSize: Uint64!
+  ExpiryEpoch: Uint64!
+  ExpiryTime: Time!
+}
+
+input StorageAskUpdate {
+  Price: Uint64
+  VerifiedPrice: Uint64
+  MinPieceSize: Uint64
+  MaxPieceSize: Uint64
+}
+
 type RootQuery {
   """Get height of chain"""
-  epoch: Uint64!
+  epoch: EpochInfo!
 
   """Get Deal by ID"""
   deal(id: ID!): Deal
@@ -233,6 +260,12 @@ type RootQuery {
 
   """Get local messages in the mpool"""
   mpool(local: Boolean!): [MpoolMessage]!
+
+  """Get libp2p addresses and peer id"""
+  libp2pAddrInfo: Libp2pAddrInfo!
+
+  """Get storage ask (price of doing a storage deal)"""
+  storageAsk: StorageAsk!
 }
 
 type RootMutation {
@@ -244,6 +277,9 @@ type RootMutation {
 
   """Top-up the available pledge collateral in escrow for deal publishing"""
   fundsMoveToEscrow(amount: BigInt!): Boolean!
+
+  """Update the Storage Ask (price of doing a storage deal)"""
+  storageAskUpdate(update: StorageAskUpdate!): Boolean!
 }
 
 type RootSubscription {

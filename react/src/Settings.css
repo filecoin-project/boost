@@ -1,0 +1,67 @@
+#settings .libp2p h3 {
+    margin-top: 2em;
+}
+
+#settings .libp2p td {
+    font-size: 0.8em;
+    line-height: 1.7em;
+    font-family: "Monaco";
+}
+
+#settings td, #settings th {
+    vertical-align: top;
+    text-align: left;
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
+
+#settings th {
+    color: #777;
+}
+
+#settings .storage-ask th {
+    vertical-align: middle;
+}
+
+#settings td .expiry-time {
+    padding-left: 0.5em;
+    color: #777777;
+}
+
+#settings td.val {
+    cursor: pointer;
+    line-height: 2em;
+}
+
+#settings td.val .edit {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    margin-left: 0.5em;
+    background: url("./bootstrap-icons/icons/pencil-square.svg");
+    opacity: 0.5;
+}
+
+#settings td.val:hover .edit {
+    opacity: 1;
+}
+
+#settings td.editor {
+    line-height: 2em;
+}
+
+#settings td.editor input {
+    margin: 0;
+}
+
+#settings td.editor .button {
+    display: inline-block;
+    margin: 0;
+    padding: 0 0.5em;
+    margin-left: 1em;
+}
+
+#settings td.editor .button.cancel {
+    margin-left: 0.5em;
+    background-color: #777;
+}

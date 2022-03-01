@@ -9,8 +9,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-fil-markets/shared"
-	mktssm "github.com/filecoin-project/go-fil-markets/storagemarket"
-	mktnet "github.com/filecoin-project/go-fil-markets/storagemarket/network"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -193,6 +191,7 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 		return
 	}
 }
+
 
 func (p *DealProvider) handleNewDealStatusStream(s network.Stream) {
 	defer s.Close()

@@ -55,7 +55,10 @@ const gqlClient = new ApolloClient({
 
 const EpochQuery = gql`
     query AppEpochQuery {
-        epoch
+        epoch {
+            Epoch
+            SecondsPerEpoch
+        }
     }
 `;
 
@@ -356,6 +359,12 @@ const FundsMoveToEscrow = gql`
     }
 `;
 
+const StorageAskUpdate = gql`
+    mutation AppStorageAskUpdateMutation($update: StorageAskUpdate!) {
+        storageAskUpdate(update: $update)
+    }
+`;
+
 const MpoolQuery = gql`
     query AppMpoolQuery($local: Boolean!) {
         mpool(local: $local) {
@@ -369,6 +378,29 @@ const MpoolQuery = gql`
             Method
             Params
             BaseFee
+        }
+    }
+`;
+
+const Libp2pAddrInfoQuery = gql`
+    query AppLibp2pAddrInfoQuery {
+        libp2pAddrInfo {
+            PeerID
+            Addresses
+            Protocols
+        }
+    }
+`;
+
+const StorageAskQuery = gql`
+    query AppStorageAskQuery {
+        storageAsk {
+            Price
+            VerifiedPrice
+            MinPieceSize
+            MaxPieceSize
+            ExpiryEpoch
+            ExpiryTime
         }
     }
 `;
@@ -390,7 +422,10 @@ export {
     DealPublishQuery,
     DealPublishNowMutation,
     FundsMoveToEscrow,
+    StorageAskUpdate,
     TransfersQuery,
     MpoolQuery,
     SealingPipelineQuery,
+    Libp2pAddrInfoQuery,
+    StorageAskQuery,
 }

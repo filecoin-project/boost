@@ -1,8 +1,8 @@
 /* global BigInt */
 
 import React, {useEffect, useState} from "react";
-import {useMutation, useSubscription} from "@apollo/react-hooks";
-import {DealCancelMutation, DealSubscription} from "./gql";
+import {useMutation, useQuery, useSubscription} from "@apollo/react-hooks";
+import {DealCancelMutation, DealSubscription, EpochQuery} from "./gql";
 import {useNavigate} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";
@@ -33,6 +33,8 @@ export function DealDetail(props) {
         }, 500)
     }
 
+    const currentEpochData = useQuery(EpochQuery)
+
     const [cancelDeal] = useMutation(DealCancelMutation, {
         variables: {id: params.dealID}
     })
@@ -50,6 +52,17 @@ export function DealDetail(props) {
     }
 
     var deal = data.dealUpdate
+
+    const currentEpoch = (((currentEpochData || {}).data || {}).epoch || {}).Epoch
+    var startEpochTime, endEpochTime
+    if (currentEpoch) {
+        const secondsPerEpoch = currentEpochData.data.epoch.SecondsPerEpoch
+        const startEpochDelta = Number(deal.StartEpoch - currentEpoch)
+        startEpochTime = new Date(new Date().getTime() + startEpochDelta*secondsPerEpoch*1000)
+        const endEpochDelta = Number(deal.EndEpoch - currentEpoch)
+        endEpochTime = new Date(new Date().getTime() + endEpochDelta*secondsPerEpoch*1000)
+    }
+
     var logRowData = []
     var logs = (deal.Logs || []).sort((a, b) => a.CreatedAt.getTime() - b.CreatedAt.getTime())
     for (var i = 0; i < logs.length; i++) {
@@ -110,12 +123,26 @@ export function DealDetail(props) {
                     <td>{humanFIL(deal.ProviderCollateral)}</td>
                 </tr>
                 <tr>
+                    <th>Current Epoch</th>
+                    <td>{currentEpoch ? addCommas(currentEpoch) : null}</td>
+                </tr>
+                <tr>
                     <th>Start Epoch</th>
-                    <td>{addCommas(deal.StartEpoch)}</td>
+                    <td>
+                        {addCommas(deal.StartEpoch)}
+                        <span className="aux">
+                            {startEpochTime ? ' (' + moment(startEpochTime).fromNow() + ')' : null}
+                        </span>
+                    </td>
                 </tr>
                 <tr>
                     <th>End Epoch</th>
-                    <td>{addCommas(deal.EndEpoch)}</td>
+                    <td>
+                        {addCommas(deal.EndEpoch)}
+                        <span className="aux">
+                            {endEpochTime ? ' (' + moment(endEpochTime).fromNow() + ')' : null}
+                        </span>
+                    </td>
                 </tr>
                 <tr>
                     <th>Transfer Type</th>

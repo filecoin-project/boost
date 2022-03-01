@@ -9,6 +9,7 @@ import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import './Deals.css'
 import {dateFormat} from "./util-date";
 import {LegacyStorageDealsCount} from "./LegacyDeals";
+import {TimestampFormat} from "./timestamp";
 
 var dealsPerPage = 10
 
@@ -73,22 +74,6 @@ export function StorageDealsPage(props) {
     return <PageContainer pageType="storage-deals" title="Storage Deals">
         <StorageDealsContent />
     </PageContainer>
-}
-
-const TimestampFormat = {
-    Ago: false,
-    DateTime: true,
-
-    settingsKey: "settings.deals.timestamp-format",
-
-    load: () => {
-        const saved = localStorage.getItem(TimestampFormat.settingsKey)
-        return JSON.parse(saved) || false
-    },
-
-    save: (val) => {
-        localStorage.setItem(TimestampFormat.settingsKey, JSON.stringify(val));
-    }
 }
 
 function StorageDealsContent(props) {

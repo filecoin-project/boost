@@ -2,136 +2,60 @@ package itests
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"os/exec"
-	"path/filepath"
+	"math/rand"
+	"os"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/filecoin-project/boost/build"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/xerrors"
+
+	"github.com/filecoin-project/boost/api"
+
+	cliutil "github.com/filecoin-project/boost/cli/util"
+	boostclient "github.com/filecoin-project/boost/client"
+	"github.com/filecoin-project/boost/node"
+	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/pkg/devnet"
-	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/boost/storagemarket"
+	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	types2 "github.com/filecoin-project/boost/transport/types"
+	"github.com/filecoin-project/go-address"
+	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/exitcode"
+	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/client"
+	"github.com/filecoin-project/lotus/api/v1api"
+	lbuild "github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/chain/actors"
+
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	chaintypes "github.com/filecoin-project/lotus/chain/types"
+	ltypes "github.com/filecoin-project/lotus/chain/types"
+	lotus_config "github.com/filecoin-project/lotus/node/config"
+	"github.com/filecoin-project/lotus/node/modules"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
+	"github.com/filecoin-project/lotus/storage"
+
+	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
+	"github.com/filecoin-project/specs-actors/actors/builtin/market"
+	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	"github.com/google/uuid"
-	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
 	"github.com/stretchr/testify/require"
+
+	logging "github.com/ipfs/go-log/v2"
 )
 
-func init() {
-	build.MessageConfidence = 1
-}
-
-func setLogLevel() {
-	_ = logging.SetLogLevel("boosttest", "DEBUG")
-	_ = logging.SetLogLevel("devnet", "DEBUG")
-	_ = logging.SetLogLevel("boost", "DEBUG")
-	_ = logging.SetLogLevel("actors", "DEBUG")
-	_ = logging.SetLogLevel("provider", "DEBUG")
-	_ = logging.SetLogLevel("http-transfer", "DEBUG")
-	_ = logging.SetLogLevel("boost-provider", "DEBUG")
-	_ = logging.SetLogLevel("storagemanager", "DEBUG")
-}
-
-func TestDummydeal(t *testing.T) {
-	setLogLevel()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	tempHome := t.TempDir()
-
-	done := make(chan struct{})
-	go devnet.Run(ctx, tempHome, done)
-
-	// Wait for the miner to start up by polling it
-	minerReadyCmd := "lotus-miner sectors list"
-	for waitAttempts := 0; ; waitAttempts++ {
-		// Check every second
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(time.Second):
-		}
-
-		cmd := exec.CommandContext(ctx, "sh", "-c", minerReadyCmd)
-		cmd.Env = []string{fmt.Sprintf("HOME=%s", tempHome)}
-		_, err := cmd.CombinedOutput()
-		if err != nil {
-			// Still not ready
-			if waitAttempts%5 == 0 {
-				log.Debugw("miner not ready")
-			}
-			continue
-		}
-
-		// Miner is ready
-		log.Debugw("miner ready")
-		time.Sleep(5 * time.Second) // wait for AddPiece
-		break
-	}
-
-	f := newTestFramework(ctx, t, tempHome)
-	f.start()
-
-	// Create a CAR file
-	tempdir := t.TempDir()
-	log.Debugw("using tempdir", "dir", tempdir)
-
-	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
-	require.NoError(t, err)
-
-	failingFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
-	require.NoError(t, err)
-
-	rootCid, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
-	require.NoError(t, err)
-
-	failingRootCid, failingCarFilepath, err := testutil.CreateDenseCARv2(tempdir, failingFilepath)
-	require.NoError(t, err)
-
-	// Start a web server to serve the car files
-	server, err := testutil.HttpTestFileServer(t, tempdir)
-	require.NoError(t, err)
-	defer server.Close()
-
-	// Create a new dummy deal
-	dealUuid := uuid.New()
-
-	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath))
-	require.NoError(t, err)
-	require.True(t, res.Accepted)
-	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
-
-	time.Sleep(2 * time.Second)
-
-	failingDealUuid := uuid.New()
-	res2, err2 := f.makeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
-	require.NoError(t, err2)
-	require.Equal(t, "cannot accept piece of size 2254421, on top of already allocated 2254421 bytes, because it would exceed max staging area size 4000000", res2.Reason)
-	log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
-
-	// Wait for the deal to be added to a sector and be cleanedup so space is made
-	err = f.waitForDealAddedToSector(dealUuid)
-	require.NoError(t, err)
-	time.Sleep(100 * time.Millisecond)
-
-	passingDealUuid := uuid.New()
-	res2, err2 = f.makeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
-	require.NoError(t, err2)
-	require.True(t, res2.Accepted)
-	log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
-
-	// Wait for the deal to be added to a sector
-	err = f.waitForDealAddedToSector(passingDealUuid)
-	require.NoError(t, err)
-
-	time.Sleep(3 * time.Second)
-
-	cancel()
-	go f.stop()
-	<-done
-}
-
+var log = logging.Logger("boosttest")
 
 type testFramework struct {
 	ctx     context.Context
@@ -139,11 +63,12 @@ type testFramework struct {
 	homedir string
 	stop    func()
 
-	client     *boostclient.StorageClient
-	boost      api.Boost
-	fullNode   lapi.FullNode
-	clientAddr address.Address
-	minerAddr  address.Address
+	client        *boostclient.StorageClient
+	boost         api.Boost
+	fullNode      lapi.FullNode
+	clientAddr    address.Address
+	minerAddr     address.Address
+	defaultWallet address.Address
 }
 
 func newTestFramework(ctx context.Context, t *testing.T, homedir string) *testFramework {
@@ -185,6 +110,8 @@ func (f *testFramework) start() {
 	// Make sure that default wallet has been setup successfully
 	defaultWallet, err := fullnodeApi.WalletDefaultAddress(f.ctx)
 	require.NoError(f.t, err)
+
+	f.defaultWallet = defaultWallet
 
 	bal, err := fullnodeApi.WalletBalance(f.ctx, defaultWallet)
 	require.NoError(f.t, err)
@@ -248,7 +175,7 @@ func (f *testFramework) start() {
 	// Create an in-memory repo
 	r := lotus_repo.NewMemory(nil)
 
-	lr, err := r.Lock(node.BoostRepoType{})
+	lr, err := r.Lock(node.Boost)
 	require.NoError(f.t, err)
 
 	ds, err := lr.Datastore(context.Background(), "/metadata")
@@ -272,6 +199,7 @@ func (f *testFramework) start() {
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
 	cfg.Dealmaking.PublishMsgPeriod = config.Duration(time.Second * 1)
 	cfg.Dealmaking.MaxStagingDealsBytes = 4000000
+	cfg.Storage.ParallelFetchLimit = 10
 
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
@@ -286,7 +214,7 @@ func (f *testFramework) start() {
 
 	// Create Boost API
 	stop, err := node.New(f.ctx,
-		node.Boost(&f.boost),
+		node.BoostAPI(&f.boost),
 		node.Override(new(dtypes.ShutdownChan), shutdownChan),
 		node.Base(),
 		node.Repo(r),
@@ -332,6 +260,29 @@ func (f *testFramework) start() {
 	require.NoError(f.t, err)
 	f.client.PeerStore.AddAddrs(boostAddrs.ID, boostAddrs.Addrs, time.Hour)
 
+	// Add boost libp2p to chain
+	log.Debugw("serialize params")
+	params, err := actors.SerializeParams(&miner2.ChangePeerIDParams{NewID: abi.PeerID(boostAddrs.ID)})
+	require.NoError(f.t, err)
+
+	msg := &ltypes.Message{
+		To: minerAddr,
+		//From:   minerAddr,
+		From:   defaultWallet,
+		Method: miner.Methods.ChangePeerID,
+		Params: params,
+		Value:  ltypes.NewInt(0),
+	}
+
+	log.Debugw("push message to mpool")
+	signed, err2 := fullnodeApi.MpoolPushMessage(f.ctx, msg, nil)
+	require.NoError(f.t, err2)
+
+	log.Debugw("wait for state msg")
+	mw, err2 := fullnodeApi.StateWaitMsg(f.ctx, signed.Cid(), 2, api.LookbackNoLimit, true)
+	require.NoError(f.t, err2)
+	require.Equal(f.t, exitcode.Ok, mw.Receipt.ExitCode)
+
 	log.Debugw("monitoring for shutdown")
 
 	// Monitor for shutdown.
@@ -352,23 +303,23 @@ func (f *testFramework) start() {
 func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 	publishCtx, cancel := context.WithTimeout(f.ctx, 300*time.Second)
 	defer cancel()
-	peerID, err := f.boost.ID(f.ctx)
-	if err != nil {
-		return err
-	}
 
 	for {
-		resp, err := f.client.DealStatus(f.ctx, peerID, dealUuid)
+		deal, err := f.boost.Deal(f.ctx, dealUuid)
 		if err != nil && !xerrors.Is(err, storagemarket.ErrDealNotFound) {
-			return fmt.Errorf("error getting status: %s", err.Error())
+			return fmt.Errorf("error getting deal: %s", err.Error())
 		}
 
 		if err == nil {
-			log.Infof("deal state: %s", resp.DealStatus)
+			if deal.Err != "" {
+				return fmt.Errorf(deal.Err)
+			}
+
+			log.Infof("deal state: %s", deal.Checkpoint)
 			switch {
-			case resp.DealStatus == dealcheckpoints.Complete.String():
+			case deal.Checkpoint == dealcheckpoints.Complete:
 				return nil
-			case resp.DealStatus == dealcheckpoints.IndexedAndAnnounced.String():
+			case deal.Checkpoint == dealcheckpoints.IndexedAndAnnounced:
 				return nil
 			}
 		}
@@ -394,7 +345,7 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		Client:               f.clientAddr,
 		Provider:             f.minerAddr,
 		Label:                rootCid.String(),
-		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
+		StartEpoch:           10000 + abi.ChainEpoch(rand.Intn(30000)),
 		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
 		ProviderCollateral:   abi.NewTokenAmount(0),
@@ -502,6 +453,18 @@ func (f *testFramework) signProposal(addr address.Address, proposal *market.Deal
 	}, nil
 }
 
+func (f *testFramework) DefaultMarketsV1DealParams() lapi.StartDealParams {
+	return lapi.StartDealParams{
+		Data:              &lotus_storagemarket.DataRef{TransferType: lotus_storagemarket.TTGraphsync},
+		EpochPrice:        ltypes.NewInt(62500000), // minimum asking price
+		MinBlocksDuration: uint64(lbuild.MinDealDuration),
+		Miner:             f.minerAddr,
+		Wallet:            f.defaultWallet,
+		DealStartEpoch:    20000 + abi.ChainEpoch(rand.Intn(20000)),
+		FastRetrieval:     true,
+	}
+}
+
 func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Address, amount abi.TokenAmount) error {
 	senderAddr, err := sender.WalletDefaultAddress(ctx)
 	if err != nil {
@@ -551,4 +514,28 @@ func (f *testFramework) setControlAddress(psdAddr address.Address) {
 func (f *testFramework) WaitMsg(mcid cid.Cid) error {
 	_, err := f.fullNode.StateWaitMsg(f.ctx, mcid, 1, 1e10, true)
 	return err
+}
+
+func (f *testFramework) WaitDealSealed(ctx context.Context, deal *cid.Cid) {
+	for {
+		di, err := f.fullNode.ClientGetDealInfo(ctx, *deal)
+		require.NoError(f.t, err)
+
+		switch di.State {
+		case lotus_storagemarket.StorageDealAwaitingPreCommit, lotus_storagemarket.StorageDealSealing:
+		case lotus_storagemarket.StorageDealProposalRejected:
+			f.t.Fatal("deal rejected")
+		case lotus_storagemarket.StorageDealFailing:
+			f.t.Fatal("deal failed")
+		case lotus_storagemarket.StorageDealError:
+			f.t.Fatal("deal errored", di.Message)
+		case lotus_storagemarket.StorageDealActive:
+			f.t.Log("complete", di)
+
+			return
+		}
+
+		f.t.Logf("Deal %d state: client:%s \n", di.DealID, lotus_storagemarket.DealStates[di.State])
+		time.Sleep(2 * time.Second)
+	}
 }
