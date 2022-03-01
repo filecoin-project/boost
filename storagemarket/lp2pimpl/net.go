@@ -19,7 +19,7 @@ import (
 var log = logging.Logger("boost-net")
 
 const DealProtocolID = "/fil/storage/mk/1.2.0"
-const DealStatusV2ProtocolID = "/fil/storage/mk/dealstatus/1.2.0"
+const DealStatusV12ProtocolID = "/fil/storage/mk/dealstatus/1.2.0"
 const providerReadDeadline = 10 * time.Second
 const providerWriteDeadline = 10 * time.Second
 const clientReadDeadline = 10 * time.Second
@@ -80,7 +80,7 @@ func (c *DealClient) SendDealStatusRequest(ctx context.Context, id peer.ID, req 
 	log.Debugw("send deal status req", "id", req.DealUUID)
 
 	// Create a libp2p stream to the provider
-	s, err := c.retryStream.OpenStream(ctx, id, []protocol.ID{DealStatusV2ProtocolID})
+	s, err := c.retryStream.OpenStream(ctx, id, []protocol.ID{DealStatusV12ProtocolID})
 	if err != nil {
 		return nil, err
 	}
@@ -139,12 +139,12 @@ func NewDealProvider(h host.Host, prov *storagemarket.Provider) *DealProvider {
 func (p *DealProvider) Start(ctx context.Context) {
 	p.ctx = ctx
 	p.host.SetStreamHandler(DealProtocolID, p.handleNewDealStream)
-	p.host.SetStreamHandler(DealStatusV2ProtocolID, p.handleNewDealStatusStream)
+	p.host.SetStreamHandler(DealStatusV12ProtocolID, p.handleNewDealStatusStream)
 }
 
 func (p *DealProvider) Stop() {
 	p.host.RemoveStreamHandler(DealProtocolID)
-	p.host.RemoveStreamHandler(DealStatusV2ProtocolID)
+	p.host.RemoveStreamHandler(DealStatusV12ProtocolID)
 }
 
 // Called when the client opens a libp2p stream with a new deal proposal
@@ -206,15 +206,16 @@ func (p *DealProvider) handleNewDealStatusStream(s network.Stream) {
 	defer s.SetWriteDeadline(time.Time{}) // nolint
 
 	pds, err := p.prov.Deal(p.ctx, req.DealUUID)
-	if err != nil && err == storagemarket.ErrDealNotFound {
-		if err := cborutil.WriteCborRPC(s, &types.DealStatusResponse{DealUUID: req.DealUUID, Error: err.Error()}); err != nil {
-			log.Errorf("failed to write deal status response: %s", err)
+	if err != nil && xerrors.Is(err, storagemarket.ErrDealNotFound) {
+		res := &types.DealStatusResponse{DealUUID: req.DealUUID, Error: err.Error()}
+		if err := cborutil.WriteCborRPC(s, res); err != nil {
+			log.Errorw("failed to write deal status response", "err", err)
 		}
 		return
 	}
 
 	if err != nil {
-		log.Errorf("failed to fetch deal status: %s", err)
+		log.Errorw("failed to fetch deal status: %s", "err", err)
 		return
 	}
 
@@ -223,7 +224,7 @@ func (p *DealProvider) handleNewDealStatusStream(s network.Stream) {
 		DealStatus: pds.Checkpoint.String(),
 	}
 	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
-		log.Errorf("failed to write deal status response: %s", err)
+		log.Errorw("failed to write deal status response: %s", "err", err)
 		return
 	}
 }
