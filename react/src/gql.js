@@ -336,6 +336,7 @@ const DealPublishQuery = gql`
             MaxDealsPerMsg
             Deals {
                 ID
+                IsLegacy
                 CreatedAt
                 Transfer {
                     Size

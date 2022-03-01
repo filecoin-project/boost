@@ -378,7 +378,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	if deal.Checkpoint < dealcheckpoints.Published {
 		p.dealLogger.Infow(deal.DealUuid, "publishing deal")
 
-		mcid, err := p.dealPublisher.Publish(p.ctx, deal.DealUuid, deal.ClientDealProposal)
+		mcid, err := p.dealPublisher.Publish(p.ctx, deal.ClientDealProposal)
 		if err != nil && ctx.Err() != nil {
 			p.dealLogger.Warnw(deal.DealUuid, "context timed out while waiting for publish")
 			return fmt.Errorf("publish did not complete: %w", ctx.Err())

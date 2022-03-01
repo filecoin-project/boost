@@ -143,8 +143,8 @@ func (r *legacyDealResolver) SectorNumber() gqltypes.Uint64 {
 	return gqltypes.Uint64(r.MinerDeal.SectorNumber)
 }
 
-func (r *legacyDealResolver) ProviderCollateral() float64 {
-	return float64(r.ClientDealProposal.Proposal.ProviderCollateral.Int64())
+func (r *legacyDealResolver) ProviderCollateral() gqltypes.Uint64 {
+	return gqltypes.Uint64(r.ClientDealProposal.Proposal.ProviderCollateral.Int64())
 }
 
 func (r *legacyDealResolver) StartEpoch() gqltypes.Uint64 {

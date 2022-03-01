@@ -94,7 +94,7 @@ var runCmd = &cli.Command{
 			return xerrors.Errorf("getting boost libp2p address: %w", err)
 		}
 
-		log.Debugw("Boost libp2p node listening", "maddr", maddr)
+		log.Infow("Boost libp2p node listening", "maddr", maddr)
 
 		// Bootstrap with full node
 		remoteAddrs, err := fullnodeApi.NetAddrsListen(ctx)
@@ -114,7 +114,7 @@ var runCmd = &cli.Command{
 			return xerrors.Errorf("failed to instantiate rpc handler: %w", err)
 		}
 
-		log.Debugw("Boost JSON RPC server is listening", "endpoint", endpoint)
+		log.Infow("Boost JSON RPC server is listening", "endpoint", endpoint)
 
 		// Serve the RPC.
 		rpcStopper, err := node.ServeRPC(handler, "boost", endpoint)

@@ -14,7 +14,6 @@ import (
 	api "github.com/filecoin-project/lotus/api"
 	market "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 	gomock "github.com/golang/mock/gomock"
-	uuid "github.com/google/uuid"
 	cid "github.com/ipfs/go-cid"
 )
 
@@ -81,18 +80,18 @@ func (m *MockDealPublisher) EXPECT() *MockDealPublisherMockRecorder {
 }
 
 // Publish mocks base method.
-func (m *MockDealPublisher) Publish(ctx context.Context, dealUuid uuid.UUID, deal market.ClientDealProposal) (cid.Cid, error) {
+func (m *MockDealPublisher) Publish(ctx context.Context, deal market.ClientDealProposal) (cid.Cid, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Publish", ctx, dealUuid, deal)
+	ret := m.ctrl.Call(m, "Publish", ctx, deal)
 	ret0, _ := ret[0].(cid.Cid)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Publish indicates an expected call of Publish.
-func (mr *MockDealPublisherMockRecorder) Publish(ctx, dealUuid, deal interface{}) *gomock.Call {
+func (mr *MockDealPublisherMockRecorder) Publish(ctx, deal interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockDealPublisher)(nil).Publish), ctx, dealUuid, deal)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockDealPublisher)(nil).Publish), ctx, deal)
 }
 
 // MockChainDealManager is a mock of ChainDealManager interface.

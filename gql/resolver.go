@@ -7,6 +7,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -14,6 +15,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/markets/storageadapter"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
@@ -31,6 +33,7 @@ type dealListResolver struct {
 // resolver translates from a request for a graphql field to the data for
 // that field
 type resolver struct {
+	cfg        *config.Boost
 	h          host.Host
 	dealsDB    *db.DealsDB
 	logsDB     *db.LogsDB
@@ -38,16 +41,14 @@ type resolver struct {
 	storageMgr *storagemanager.StorageManager
 	provider   *storagemarket.Provider
 	legacyProv lotus_storagemarket.StorageProvider
-	publisher  *storagemarket.DealPublisher
+	publisher  *storageadapter.DealPublisher
 	spApi      sealingpipeline.API
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager,
-	storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider,
-	legacyProv lotus_storagemarket.StorageProvider, publisher *storagemarket.DealPublisher, fullNode v1api.FullNode,
-) *resolver {
+func NewResolver(cfg *config.Boost, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
+		cfg:        cfg,
 		h:          h,
 		dealsDB:    dealsDB,
 		logsDB:     logsDB,
@@ -349,8 +350,8 @@ func (dr *dealResolver) Transfer() dealTransfer {
 	}
 }
 
-func (dr *dealResolver) ProviderCollateral() float64 {
-	return float64(dr.ProviderDealState.ClientDealProposal.Proposal.ProviderCollateral.Int64())
+func (dr *dealResolver) ProviderCollateral() gqltypes.Uint64 {
+	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.ProviderCollateral.Int64())
 }
 
 func (dr *dealResolver) StartEpoch() gqltypes.Uint64 {

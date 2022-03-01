@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/lotus/markets/dagstore"
-
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
@@ -38,8 +36,10 @@ import (
 	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/markets"
+	"github.com/filecoin-project/lotus/markets/dagstore"
 	marketevents "github.com/filecoin-project/lotus/markets/loggers"
 	"github.com/filecoin-project/lotus/markets/pricing"
+	"github.com/filecoin-project/lotus/markets/storageadapter"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
@@ -465,10 +465,10 @@ func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
 
 func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode,
 	sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
-	dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
+	dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
 	dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
-		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storagemarket.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API,
+		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
 		dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore) (*storagemarket.Provider, error) {
 
@@ -500,16 +500,19 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 	}
 }
 
-func NewGraphqlServer(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager,
-	storageMgr *storagemanager.StorageManager, publisher *storagemarket.DealPublisher, spApi sealingpipeline.API,
-	legacyProv lotus_storagemarket.StorageProvider, fullNode v1api.FullNode) *gql.Server {
-	resolver := gql.NewResolver(h, dealsDB, logsDB, fundMgr, storageMgr, spApi, prov, legacyProv, publisher, fullNode)
-	server := gql.NewServer(resolver)
+func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyProv lotus_storagemarket.StorageProvider, fullNode v1api.FullNode) *gql.Server {
+	return func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager,
+		storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API,
+		legacyProv lotus_storagemarket.StorageProvider, fullNode v1api.FullNode) *gql.Server {
 
-	lc.Append(fx.Hook{
-		OnStart: server.Start,
-		OnStop:  server.Stop,
-	})
+		resolver := gql.NewResolver(cfg, h, dealsDB, logsDB, fundMgr, storageMgr, spApi, prov, legacyProv, publisher, fullNode)
+		server := gql.NewServer(resolver)
 
-	return server
+		lc.Append(fx.Hook{
+			OnStart: server.Start,
+			OnStop:  server.Stop,
+		})
+
+		return server
+	}
 }
