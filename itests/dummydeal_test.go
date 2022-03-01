@@ -1,78 +1,17 @@
 package itests
 
 import (
-	"context"
-	"fmt"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/filecoin-project/boost/build"
-	"github.com/filecoin-project/boost/pkg/devnet"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/google/uuid"
-	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
 )
 
-func init() {
-	build.MessageConfidence = 1
-}
-
-func setLogLevel() {
-	_ = logging.SetLogLevel("boosttest", "DEBUG")
-	_ = logging.SetLogLevel("devnet", "DEBUG")
-	_ = logging.SetLogLevel("boost", "DEBUG")
-	_ = logging.SetLogLevel("actors", "DEBUG")
-	_ = logging.SetLogLevel("provider", "DEBUG")
-	_ = logging.SetLogLevel("http-transfer", "DEBUG")
-	_ = logging.SetLogLevel("boost-provider", "DEBUG")
-	_ = logging.SetLogLevel("storagemanager", "DEBUG")
-}
-
 func TestDummydeal(t *testing.T) {
-	setLogLevel()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	tempHome := t.TempDir()
-
-	done := make(chan struct{})
-	go devnet.Run(ctx, tempHome, done)
-
-	// Wait for the miner to start up by polling it
-	minerReadyCmd := "lotus-miner sectors list"
-	for waitAttempts := 0; ; waitAttempts++ {
-		// Check every second
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(time.Second):
-		}
-
-		cmd := exec.CommandContext(ctx, "sh", "-c", minerReadyCmd)
-		cmd.Env = []string{fmt.Sprintf("HOME=%s", tempHome)}
-		_, err := cmd.CombinedOutput()
-		if err != nil {
-			// Still not ready
-			if waitAttempts%5 == 0 {
-				log.Debugw("miner not ready")
-			}
-			continue
-		}
-
-		// Miner is ready
-		log.Debugw("miner ready")
-		time.Sleep(5 * time.Second) // wait for AddPiece
-		break
-	}
-
-	f := newTestFramework(ctx, t, tempHome)
-	f.start()
-
 	// Create a CAR file
 	tempdir := t.TempDir()
 	log.Debugw("using tempdir", "dir", tempdir)
@@ -124,10 +63,4 @@ func TestDummydeal(t *testing.T) {
 	// Wait for the deal to be added to a sector
 	err = f.waitForDealAddedToSector(passingDealUuid)
 	require.NoError(t, err)
-
-	time.Sleep(3 * time.Second)
-
-	cancel()
-	go f.stop()
-	<-done
 }
