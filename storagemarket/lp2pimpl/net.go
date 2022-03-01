@@ -2,7 +2,6 @@ package lp2pimpl
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/filecoin-project/boost/storagemarket"
@@ -140,20 +139,16 @@ func NewDealProvider(h host.Host, prov *storagemarket.Provider) *DealProvider {
 func (p *DealProvider) Start(ctx context.Context) {
 	p.ctx = ctx
 	p.host.SetStreamHandler(DealProtocolID, p.handleNewDealStream)
-	p.host.SetStreamHandler(mktssm.AskProtocolID, p.handleNewAskStream)
 	p.host.SetStreamHandler(DealStatusV2ProtocolID, p.handleNewDealStatusStream)
 }
 
 func (p *DealProvider) Stop() {
 	p.host.RemoveStreamHandler(DealProtocolID)
-	p.host.RemoveStreamHandler(mktssm.AskProtocolID)
 	p.host.RemoveStreamHandler(DealStatusV2ProtocolID)
 }
 
 // Called when the client opens a libp2p stream with a new deal proposal
 func (p *DealProvider) handleNewDealStream(s network.Stream) {
-	fmt.Println("\n HELLO")
-
 	defer s.Close()
 
 	// Set a deadline on reading from the stream so it doesn't hang
@@ -192,7 +187,6 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 	}
 }
 
-
 func (p *DealProvider) handleNewDealStatusStream(s network.Stream) {
 	defer s.Close()
 
@@ -230,27 +224,6 @@ func (p *DealProvider) handleNewDealStatusStream(s network.Stream) {
 	}
 	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
 		log.Errorf("failed to write deal status response: %s", err)
-		return
-	}
-}
-
-func (p *DealProvider) handleNewAskStream(s network.Stream) {
-	defer s.Close()
-
-	var a mktnet.AskRequest
-	if err := a.UnmarshalCBOR(s); err != nil {
-		log.Errorf("failed to read AskRequest from incoming stream: %s", err)
-		return
-	}
-
-	resp := mktnet.AskResponse{
-		Ask: &mktssm.SignedStorageAsk{
-			Ask: p.prov.GetAsk(),
-		},
-	}
-
-	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
-		log.Errorf("failed to write ask response: %s", err)
 		return
 	}
 }

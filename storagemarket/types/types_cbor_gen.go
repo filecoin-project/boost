@@ -219,7 +219,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 		_, err := w.Write(cbg.CborNull)
 		return err
 	}
-	if _, err := w.Write([]byte{165}); err != nil {
+	if _, err := w.Write([]byte{164}); err != nil {
 		return err
 	}
 

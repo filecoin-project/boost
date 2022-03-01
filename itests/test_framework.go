@@ -303,23 +303,23 @@ func (f *testFramework) start() {
 func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 	publishCtx, cancel := context.WithTimeout(f.ctx, 300*time.Second)
 	defer cancel()
+	peerID, err := f.boost.ID(f.ctx)
+	if err != nil {
+		return err
+	}
 
 	for {
-		deal, err := f.boost.Deal(f.ctx, dealUuid)
+		resp, err := f.client.DealStatus(f.ctx, peerID, dealUuid)
 		if err != nil && !xerrors.Is(err, storagemarket.ErrDealNotFound) {
-			return fmt.Errorf("error getting deal: %s", err.Error())
+			return fmt.Errorf("error getting status: %s", err.Error())
 		}
 
 		if err == nil {
-			if deal.Err != "" {
-				return fmt.Errorf(deal.Err)
-			}
-
-			log.Infof("deal state: %s", deal.Checkpoint)
+			log.Infof("deal state: %s", resp.DealStatus)
 			switch {
-			case deal.Checkpoint == dealcheckpoints.Complete:
+			case resp.DealStatus == dealcheckpoints.Complete.String():
 				return nil
-			case deal.Checkpoint == dealcheckpoints.IndexedAndAnnounced:
+			case resp.DealStatus == dealcheckpoints.IndexedAndAnnounced.String():
 				return nil
 			}
 		}
