@@ -28,7 +28,8 @@ func BasicDealFilter(cfg config.DealmakingConfig, userCmd dtypes.StorageDealFilt
 		startDelay dtypes.GetMaxDealStartDelayFunc,
 		r lotus_repo.LockedRepo,
 	) dtypes.StorageDealFilter {
-		return func(ctx context.Context, deal types.DealParams) (bool, string, error) {
+		return func(ctx context.Context, params types.DealFilterParams) (bool, string, error) {
+			deal := params.DealParams
 			pr := deal.ClientDealProposal.Proposal
 
 			// TODO: maybe handle in userCmd?
@@ -89,7 +90,7 @@ func BasicDealFilter(cfg config.DealmakingConfig, userCmd dtypes.StorageDealFilt
 			}
 
 			if userCmd != nil {
-				return userCmd(ctx, deal)
+				return userCmd(ctx, params)
 			}
 
 			return true, "", nil

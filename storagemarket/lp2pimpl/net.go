@@ -19,6 +19,7 @@ import (
 var log = logging.Logger("boost-net")
 
 const DealProtocolID = "/fil/storage/mk/1.2.0"
+const DealStatusV12ProtocolID = "/fil/storage/mk/dealstatus/1.2.0"
 const providerReadDeadline = 10 * time.Second
 const providerWriteDeadline = 10 * time.Second
 const clientReadDeadline = 10 * time.Second
@@ -75,6 +76,41 @@ func (c *DealClient) SendDealProposal(ctx context.Context, id peer.ID, params ty
 	return &resp, nil
 }
 
+func (c *DealClient) SendDealStatusRequest(ctx context.Context, id peer.ID, req types.DealStatusRequest) (*types.DealStatusResponse, error) {
+	log.Debugw("send deal status req", "id", req.DealUUID)
+
+	// Create a libp2p stream to the provider
+	s, err := c.retryStream.OpenStream(ctx, id, []protocol.ID{DealStatusV12ProtocolID})
+	if err != nil {
+		return nil, err
+	}
+
+	defer s.Close() // nolint
+
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(clientWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
+
+	// Write the deal proposal to the stream
+	if err = cborutil.WriteCborRPC(s, &req); err != nil {
+		return nil, xerrors.Errorf("sending deal status req: %w", err)
+	}
+
+	// Set a deadline on reading from the stream so it doesn't hang
+	_ = s.SetReadDeadline(time.Now().Add(clientReadDeadline))
+	defer s.SetReadDeadline(time.Time{}) // nolint
+
+	// Read the response from the stream
+	var resp types.DealStatusResponse
+	if err := resp.UnmarshalCBOR(s); err != nil {
+		return nil, xerrors.Errorf("reading deal status response: %w", err)
+	}
+
+	log.Debugw("received deal status response", "id", resp.DealUUID, "status", resp.DealStatus)
+
+	return &resp, nil
+}
+
 func NewDealClient(h host.Host, options ...DealClientOption) *DealClient {
 	c := &DealClient{
 		retryStream: shared.NewRetryStream(h),
@@ -87,6 +123,7 @@ func NewDealClient(h host.Host, options ...DealClientOption) *DealClient {
 
 // DealProvider listens for incoming deal proposals over libp2p
 type DealProvider struct {
+	ctx  context.Context
 	host host.Host
 	prov *storagemarket.Provider
 }
@@ -99,12 +136,15 @@ func NewDealProvider(h host.Host, prov *storagemarket.Provider) *DealProvider {
 	return p
 }
 
-func (p *DealProvider) Start() {
+func (p *DealProvider) Start(ctx context.Context) {
+	p.ctx = ctx
 	p.host.SetStreamHandler(DealProtocolID, p.handleNewDealStream)
+	p.host.SetStreamHandler(DealStatusV12ProtocolID, p.handleNewDealStatusStream)
 }
 
 func (p *DealProvider) Stop() {
 	p.host.RemoveStreamHandler(DealProtocolID)
+	p.host.RemoveStreamHandler(DealStatusV12ProtocolID)
 }
 
 // Called when the client opens a libp2p stream with a new deal proposal
@@ -143,6 +183,48 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 	err = cborutil.WriteCborRPC(s, &types.DealResponse{Accepted: res.Accepted, Message: res.Reason})
 	if err != nil {
 		log.Warnw("writing deal response", "id", proposal.DealUUID, "err", err)
+		return
+	}
+}
+
+func (p *DealProvider) handleNewDealStatusStream(s network.Stream) {
+	defer s.Close()
+
+	_ = s.SetReadDeadline(time.Now().Add(providerReadDeadline))
+	defer s.SetReadDeadline(time.Time{}) // nolint
+
+	var req types.DealStatusRequest
+	err := req.UnmarshalCBOR(s)
+	if err != nil {
+		log.Warnw("reading deal status request from stream", "err", err)
+		return
+	}
+	log.Debugw("received deal status request", "id", req.DealUUID, "client-peer", s.Conn().RemotePeer())
+
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
+
+	pds, err := p.prov.Deal(p.ctx, req.DealUUID)
+	if err != nil && xerrors.Is(err, storagemarket.ErrDealNotFound) {
+		res := &types.DealStatusResponse{DealUUID: req.DealUUID, Error: err.Error()}
+		if err := cborutil.WriteCborRPC(s, res); err != nil {
+			log.Errorw("failed to write deal status response", "err", err)
+		}
+		return
+	}
+
+	if err != nil {
+		log.Errorw("failed to fetch deal status: %s", "err", err)
+		return
+	}
+
+	resp := types.DealStatusResponse{
+		DealUUID:   req.DealUUID,
+		DealStatus: pds.Checkpoint.String(),
+	}
+	if err := cborutil.WriteCborRPC(s, &resp); err != nil {
+		log.Errorw("failed to write deal status response: %s", "err", err)
 		return
 	}
 }

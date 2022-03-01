@@ -486,7 +486,7 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 				if err != nil {
 					return fmt.Errorf("starting storage provider: %w", err)
 				}
-				lp2pnet.Start()
+				lp2pnet.Start(ctx)
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {

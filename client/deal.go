@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"golang.org/x/xerrors"
@@ -58,4 +60,9 @@ func (c *StorageClient) StorageDeal(ctx context.Context, params types.DealParams
 		Accepted: resp.Accepted,
 		Reason:   resp.Message,
 	}, nil
+}
+
+func (c *StorageClient) DealStatus(ctx context.Context, providerID peer.ID, dealUUid uuid.UUID) (*types.DealStatusResponse, error) {
+	// Send the deal proposal to the provider
+	return c.dealClient.SendDealStatusRequest(ctx, providerID, types.DealStatusRequest{DealUUID: dealUUid})
 }
