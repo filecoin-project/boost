@@ -5,18 +5,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
-
-	"github.com/libp2p/go-libp2p-core/peer"
-
-	"golang.org/x/xerrors"
-
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
+	"golang.org/x/xerrors"
 )
 
 // StorageClient starts storage deals with Boost over libp2p
@@ -25,7 +24,7 @@ type StorageClient struct {
 	dealClient *lp2pimpl.DealClient
 }
 
-func NewStorageClient(ctx context.Context) (*StorageClient, error) {
+func NewStorageClient(addr address.Address, fullNodeApi v1api.FullNode) (*StorageClient, error) {
 	pstore, err := pstoremem.NewPeerstore()
 	if err != nil {
 		return nil, fmt.Errorf("creating peer store: %w", err)
@@ -44,7 +43,7 @@ func NewStorageClient(ctx context.Context) (*StorageClient, error) {
 
 	retryOpts := lp2pimpl.RetryParameters(time.Millisecond, time.Millisecond, 1, 1)
 	return &StorageClient{
-		dealClient: lp2pimpl.NewDealClient(h, retryOpts),
+		dealClient: lp2pimpl.NewDealClient(h, addr, fullNodeApi, retryOpts),
 		PeerStore:  pstore,
 	}, nil
 }
@@ -64,5 +63,5 @@ func (c *StorageClient) StorageDeal(ctx context.Context, params types.DealParams
 
 func (c *StorageClient) DealStatus(ctx context.Context, providerID peer.ID, dealUUid uuid.UUID) (*types.DealStatusResponse, error) {
 	// Send the deal proposal to the provider
-	return c.dealClient.SendDealStatusRequest(ctx, providerID, types.DealStatusRequest{DealUUID: dealUUid})
+	return c.dealClient.SendDealStatusRequest(ctx, providerID, dealUUid)
 }

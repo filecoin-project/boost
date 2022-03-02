@@ -5,20 +5,18 @@ import (
 	"io"
 
 	"github.com/filecoin-project/boost/sealingpipeline"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
-
-	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
-
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/specs-actors/actors/builtin/market"
+	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 )
 
-//go:generate cbor-gen-for --map-encoding StorageAsk DealParams Transfer DealResponse DealStatusRequest DealStatusResponse
+//go:generate cbor-gen-for --map-encoding StorageAsk DealParams Transfer DealResponse DealStatusRequest DealStatusResponse DealStatus
 
 // StorageAsk defines the parameters by which a miner will choose to accept or
 // reject a deal. Note: making a storage deal proposal which matches the miner's
@@ -34,14 +32,36 @@ type StorageAsk struct {
 	Miner        address.Address
 }
 
+// DealStatusRequest is sent to get the current state of a deal from a
+// storage provider
 type DealStatusRequest struct {
-	DealUUID uuid.UUID
+	DealUUID  uuid.UUID
+	Signature crypto.Signature
 }
 
+// DealStatusResponse is the current state of a deal
 type DealStatusResponse struct {
-	DealUUID   uuid.UUID
+	DealUUID uuid.UUID
+	// Error is non-empty if there is an error getting the deal status
+	// (eg invalid request signature)
 	Error      string
-	DealStatus string
+	DealStatus *DealStatus
+}
+
+type DealStatus struct {
+	// Error is non-empty if the deal is in the error state
+	Error string
+	// Status is a string corresponding to a deal checkpoint
+	Status string
+	// Proposal is the deal proposal
+	Proposal market.DealProposal
+	// SignedProposalCid is the cid of the client deal proposal + signature
+	SignedProposalCid cid.Cid
+	// PublishCid is the cid of the Publish message sent on chain, if the deal
+	// has reached the publish stage
+	PublishCid *cid.Cid
+	// ChainDealID is the id of the deal in chain state
+	ChainDealID abi.DealID
 }
 
 type DealParams struct {
