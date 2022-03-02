@@ -5,16 +5,19 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 
-	logging "github.com/ipfs/go-log/v2"
+	"golang.org/x/xerrors"
 
 	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
 	"github.com/graph-gophers/graphql-transport-ws/graphqlws"
+	logging "github.com/ipfs/go-log/v2"
 )
 
 var log = logging.Logger("gql")
@@ -39,14 +42,14 @@ func (s *Server) Start(ctx context.Context) error {
 	goFileDir := filepath.Dir(goFilePath)
 
 	// Serve React app
-	urlPath := "/"
-	directory := "react/build"
-	reactDir := path.Clean(filepath.Join(goFileDir, "..", directory))
 	mux := http.NewServeMux()
-	mux.Handle(urlPath, http.StripPrefix(urlPath, http.FileServer(http.Dir(reactDir))))
+	err := serveReactApp(mux, goFileDir)
+	if err != nil {
+		return err
+	}
 
 	// Serve dummy deals
-	err := serveDummyDeals(mux)
+	err = serveDummyDeals(mux)
 	if err != nil {
 		return err
 	}
@@ -91,6 +94,63 @@ func (s *Server) Start(ctx context.Context) error {
 			log.Fatalf("gql.ListenAndServe(): %v", err)
 		}
 	}()
+
+	return nil
+}
+
+func serveReactApp(mux *http.ServeMux, goFileDir string) error {
+	// Catch all requests that are not handled by other handlers
+	urlPath := "/"
+
+	// Path from root of project to static react build
+	directory := "react/build"
+	reactDir := path.Clean(filepath.Join(goFileDir, "..", directory))
+	reactFiles, err := ioutil.ReadDir(reactDir)
+	if err != nil {
+		if !xerrors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("reading files in react dir '%s': %w", reactDir, err)
+		}
+
+		log.Warnw("not serving react app: no files found in react directory", "directory", directory)
+		return nil
+	}
+
+	// Serves files in the react dir
+	reactApp := http.StripPrefix(urlPath, http.FileServer(http.Dir(reactDir)))
+
+	mux.HandleFunc(urlPath, func(writer http.ResponseWriter, request *http.Request) {
+		matchesFile := func() bool {
+			// Check each file in the react build path for a match against
+			// the URL path
+			for _, f := range reactFiles {
+				basePath := urlPath + f.Name()
+				if f.IsDir() {
+					// If the file is a directory, the URL must have the
+					// directory as a prefix
+					// eg "/static/somefile.js" matches "/static/"
+					if strings.HasPrefix(request.URL.Path, basePath+"/") {
+						return true
+					}
+				} else if request.URL.Path == basePath {
+					// If it's not a directory, the file must be an exact match
+					// eg favicon.ico
+					return true
+				}
+			}
+			return false
+		}()
+		if !matchesFile {
+			// The URL doesn't match anything in the react build path, so just
+			// serve the root of the react app.
+			// The react app javascript will read the URL from the browser and
+			// navigate to the path.
+			// eg for the url "/storage-deals":
+			// - serve the root react app from the server
+			// - the react app javascript will navigate to "/storage-deals"
+			request.URL.Path = "/"
+		}
+		reactApp.ServeHTTP(writer, request)
+	})
 
 	return nil
 }
