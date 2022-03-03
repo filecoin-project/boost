@@ -76,7 +76,6 @@ func (sm *BoostAPI) MarketSetRetrievalAsk(ctx context.Context, rask *retrievalma
 func (sm *BoostAPI) MarketGetRetrievalAsk(ctx context.Context) (*retrievalmarket.Ask, error) {
 	return sm.RetrievalProvider.GetAsk(), nil
 }
-<<<<<<< HEAD
 
 func (sm *BoostAPI) DealsConsiderOnlineStorageDeals(ctx context.Context) (bool, error) {
 	return sm.ConsiderOnlineStorageDealsConfigFunc()
