@@ -29,6 +29,7 @@ type BoostAPI struct {
 
 	api.Common
 	api.Net
+	api.LegacyMarket
 
 	Full lapi.FullNode
 	//LocalStore  *stores.Local

@@ -22,6 +22,8 @@ import (
 var ErrNotSupported = xerrors.New("method not supported")
 
 type BoostStruct struct {
+	LegacyMarketStruct
+
 	MarketStruct
 
 	CommonStruct
@@ -72,6 +74,8 @@ type BoostStruct struct {
 }
 
 type BoostStub struct {
+	LegacyMarketStub
+
 	MarketStub
 
 	CommonStub
@@ -114,6 +118,19 @@ type CommonNetStub struct {
 	CommonStub
 
 	NetStub
+}
+
+type LegacyMarketStruct struct {
+	Internal struct {
+		MarketDataTransferUpdates func(p0 context.Context) (<-chan lapi.DataTransferChannel, error) ``
+
+		MarketListDataTransfers func(p0 context.Context) ([]lapi.DataTransferChannel, error) `perm:"write"`
+
+		MarketRestartDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error ``
+	}
+}
+
+type LegacyMarketStub struct {
 }
 
 type MarketStruct struct {
@@ -430,6 +447,39 @@ func (s *CommonStub) AuthVerify(p0 context.Context, p1 string) ([]auth.Permissio
 	return *new([]auth.Permission), ErrNotSupported
 }
 
+func (s *LegacyMarketStruct) MarketDataTransferUpdates(p0 context.Context) (<-chan lapi.DataTransferChannel, error) {
+	if s.Internal.MarketDataTransferUpdates == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.MarketDataTransferUpdates(p0)
+}
+
+func (s *LegacyMarketStub) MarketDataTransferUpdates(p0 context.Context) (<-chan lapi.DataTransferChannel, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) MarketListDataTransfers(p0 context.Context) ([]lapi.DataTransferChannel, error) {
+	if s.Internal.MarketListDataTransfers == nil {
+		return *new([]lapi.DataTransferChannel), ErrNotSupported
+	}
+	return s.Internal.MarketListDataTransfers(p0)
+}
+
+func (s *LegacyMarketStub) MarketListDataTransfers(p0 context.Context) ([]lapi.DataTransferChannel, error) {
+	return *new([]lapi.DataTransferChannel), ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) MarketRestartDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
+	if s.Internal.MarketRestartDataTransfer == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.MarketRestartDataTransfer(p0, p1, p2, p3)
+}
+
+func (s *LegacyMarketStub) MarketRestartDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
+	return ErrNotSupported
+}
+
 func (s *MarketStruct) Deal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {
 	if s.Internal.Deal == nil {
 		return nil, ErrNotSupported
@@ -632,5 +682,6 @@ var _ Boost = new(BoostStruct)
 var _ ChainIO = new(ChainIOStruct)
 var _ Common = new(CommonStruct)
 var _ CommonNet = new(CommonNetStruct)
+var _ LegacyMarket = new(LegacyMarketStruct)
 var _ Market = new(MarketStruct)
 var _ Net = new(NetStruct)
