@@ -2,6 +2,7 @@ package impl
 
 import (
 	"context"
+	"time"
 
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
@@ -73,4 +74,60 @@ func (sm *BoostAPI) MarketSetRetrievalAsk(ctx context.Context, rask *retrievalma
 
 func (sm *BoostAPI) MarketGetRetrievalAsk(ctx context.Context) (*retrievalmarket.Ask, error) {
 	return sm.RetrievalProvider.GetAsk(), nil
+}
+
+func (sm *BoostAPI) DealsConsiderOnlineStorageDeals(ctx context.Context) (bool, error) {
+	return sm.ConsiderOnlineStorageDealsConfigFunc()
+}
+
+func (sm *BoostAPI) DealsSetConsiderOnlineStorageDeals(ctx context.Context, b bool) error {
+	return sm.SetConsiderOnlineStorageDealsConfigFunc(b)
+}
+
+func (sm *BoostAPI) DealsConsiderOnlineRetrievalDeals(ctx context.Context) (bool, error) {
+	return sm.ConsiderOnlineRetrievalDealsConfigFunc()
+}
+
+func (sm *BoostAPI) DealsSetConsiderOnlineRetrievalDeals(ctx context.Context, b bool) error {
+	return sm.SetConsiderOnlineRetrievalDealsConfigFunc(b)
+}
+
+func (sm *BoostAPI) DealsConsiderOfflineStorageDeals(ctx context.Context) (bool, error) {
+	return sm.ConsiderOfflineStorageDealsConfigFunc()
+}
+
+func (sm *BoostAPI) DealsSetConsiderOfflineStorageDeals(ctx context.Context, b bool) error {
+	return sm.SetConsiderOfflineStorageDealsConfigFunc(b)
+}
+
+func (sm *BoostAPI) DealsConsiderOfflineRetrievalDeals(ctx context.Context) (bool, error) {
+	return sm.ConsiderOfflineRetrievalDealsConfigFunc()
+}
+
+func (sm *BoostAPI) DealsSetConsiderOfflineRetrievalDeals(ctx context.Context, b bool) error {
+	return sm.SetConsiderOfflineRetrievalDealsConfigFunc(b)
+}
+
+func (sm *BoostAPI) DealsConsiderVerifiedStorageDeals(ctx context.Context) (bool, error) {
+	return sm.ConsiderVerifiedStorageDealsConfigFunc()
+}
+
+func (sm *BoostAPI) DealsSetConsiderVerifiedStorageDeals(ctx context.Context, b bool) error {
+	return sm.SetConsiderVerifiedStorageDealsConfigFunc(b)
+}
+
+func (sm *BoostAPI) DealsConsiderUnverifiedStorageDeals(ctx context.Context) (bool, error) {
+	return sm.ConsiderUnverifiedStorageDealsConfigFunc()
+}
+
+func (sm *BoostAPI) DealsSetConsiderUnverifiedStorageDeals(ctx context.Context, b bool) error {
+	return sm.SetConsiderUnverifiedStorageDealsConfigFunc(b)
+}
+
+func (sm *BoostAPI) DealsGetExpectedSealDurationFunc(ctx context.Context) (time.Duration, error) {
+	return sm.GetExpectedSealDurationFunc()
+}
+
+func (sm *BoostAPI) DealsSetExpectedSealDurationFunc(ctx context.Context, d time.Duration) error {
+	return sm.SetExpectedSealDurationFunc(d)
 }
