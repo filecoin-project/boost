@@ -38,6 +38,7 @@ func main() {
 			initCmd,
 			dummydealCmd,
 			dataTransfersCmd,
+			retrievalDealsCmd,
 		},
 	}
 	app.Setup()

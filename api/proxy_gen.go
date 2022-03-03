@@ -7,6 +7,7 @@ import (
 
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/google/uuid"
@@ -82,11 +83,45 @@ type CommonNetStub struct {
 
 type LegacyMarketStruct struct {
 	Internal struct {
+		DealsConsiderOfflineRetrievalDeals func(p0 context.Context) (bool, error) `perm:"admin"`
+
+		DealsConsiderOfflineStorageDeals func(p0 context.Context) (bool, error) `perm:"admin"`
+
+		DealsConsiderOnlineRetrievalDeals func(p0 context.Context) (bool, error) `perm:"admin"`
+
+		DealsConsiderOnlineStorageDeals func(p0 context.Context) (bool, error) `perm:"admin"`
+
+		DealsConsiderUnverifiedStorageDeals func(p0 context.Context) (bool, error) `perm:"admin"`
+
+		DealsConsiderVerifiedStorageDeals func(p0 context.Context) (bool, error) `perm:"admin"`
+
+		DealsPieceCidBlocklist func(p0 context.Context) ([]cid.Cid, error) `perm:"admin"`
+
+		DealsSetConsiderOfflineRetrievalDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
+
+		DealsSetConsiderOfflineStorageDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
+
+		DealsSetConsiderOnlineRetrievalDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
+
+		DealsSetConsiderOnlineStorageDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
+
+		DealsSetConsiderUnverifiedStorageDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
+
+		DealsSetConsiderVerifiedStorageDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
+
+		DealsSetPieceCidBlocklist func(p0 context.Context, p1 []cid.Cid) error `perm:"admin"`
+
 		MarketDataTransferUpdates func(p0 context.Context) (<-chan lapi.DataTransferChannel, error) ``
+
+		MarketGetRetrievalAsk func(p0 context.Context) (*retrievalmarket.Ask, error) `perm:"read"`
 
 		MarketListDataTransfers func(p0 context.Context) ([]lapi.DataTransferChannel, error) `perm:"write"`
 
+		MarketListRetrievalDeals func(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) `perm:"read"`
+
 		MarketRestartDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error ``
+
+		MarketSetRetrievalAsk func(p0 context.Context, p1 *retrievalmarket.Ask) error `perm:"admin"`
 	}
 }
 
@@ -187,6 +222,160 @@ func (s *CommonStub) AuthVerify(p0 context.Context, p1 string) ([]auth.Permissio
 	return *new([]auth.Permission), ErrNotSupported
 }
 
+func (s *LegacyMarketStruct) DealsConsiderOfflineRetrievalDeals(p0 context.Context) (bool, error) {
+	if s.Internal.DealsConsiderOfflineRetrievalDeals == nil {
+		return false, ErrNotSupported
+	}
+	return s.Internal.DealsConsiderOfflineRetrievalDeals(p0)
+}
+
+func (s *LegacyMarketStub) DealsConsiderOfflineRetrievalDeals(p0 context.Context) (bool, error) {
+	return false, ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsConsiderOfflineStorageDeals(p0 context.Context) (bool, error) {
+	if s.Internal.DealsConsiderOfflineStorageDeals == nil {
+		return false, ErrNotSupported
+	}
+	return s.Internal.DealsConsiderOfflineStorageDeals(p0)
+}
+
+func (s *LegacyMarketStub) DealsConsiderOfflineStorageDeals(p0 context.Context) (bool, error) {
+	return false, ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsConsiderOnlineRetrievalDeals(p0 context.Context) (bool, error) {
+	if s.Internal.DealsConsiderOnlineRetrievalDeals == nil {
+		return false, ErrNotSupported
+	}
+	return s.Internal.DealsConsiderOnlineRetrievalDeals(p0)
+}
+
+func (s *LegacyMarketStub) DealsConsiderOnlineRetrievalDeals(p0 context.Context) (bool, error) {
+	return false, ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsConsiderOnlineStorageDeals(p0 context.Context) (bool, error) {
+	if s.Internal.DealsConsiderOnlineStorageDeals == nil {
+		return false, ErrNotSupported
+	}
+	return s.Internal.DealsConsiderOnlineStorageDeals(p0)
+}
+
+func (s *LegacyMarketStub) DealsConsiderOnlineStorageDeals(p0 context.Context) (bool, error) {
+	return false, ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsConsiderUnverifiedStorageDeals(p0 context.Context) (bool, error) {
+	if s.Internal.DealsConsiderUnverifiedStorageDeals == nil {
+		return false, ErrNotSupported
+	}
+	return s.Internal.DealsConsiderUnverifiedStorageDeals(p0)
+}
+
+func (s *LegacyMarketStub) DealsConsiderUnverifiedStorageDeals(p0 context.Context) (bool, error) {
+	return false, ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsConsiderVerifiedStorageDeals(p0 context.Context) (bool, error) {
+	if s.Internal.DealsConsiderVerifiedStorageDeals == nil {
+		return false, ErrNotSupported
+	}
+	return s.Internal.DealsConsiderVerifiedStorageDeals(p0)
+}
+
+func (s *LegacyMarketStub) DealsConsiderVerifiedStorageDeals(p0 context.Context) (bool, error) {
+	return false, ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsPieceCidBlocklist(p0 context.Context) ([]cid.Cid, error) {
+	if s.Internal.DealsPieceCidBlocklist == nil {
+		return *new([]cid.Cid), ErrNotSupported
+	}
+	return s.Internal.DealsPieceCidBlocklist(p0)
+}
+
+func (s *LegacyMarketStub) DealsPieceCidBlocklist(p0 context.Context) ([]cid.Cid, error) {
+	return *new([]cid.Cid), ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsSetConsiderOfflineRetrievalDeals(p0 context.Context, p1 bool) error {
+	if s.Internal.DealsSetConsiderOfflineRetrievalDeals == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.DealsSetConsiderOfflineRetrievalDeals(p0, p1)
+}
+
+func (s *LegacyMarketStub) DealsSetConsiderOfflineRetrievalDeals(p0 context.Context, p1 bool) error {
+	return ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsSetConsiderOfflineStorageDeals(p0 context.Context, p1 bool) error {
+	if s.Internal.DealsSetConsiderOfflineStorageDeals == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.DealsSetConsiderOfflineStorageDeals(p0, p1)
+}
+
+func (s *LegacyMarketStub) DealsSetConsiderOfflineStorageDeals(p0 context.Context, p1 bool) error {
+	return ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsSetConsiderOnlineRetrievalDeals(p0 context.Context, p1 bool) error {
+	if s.Internal.DealsSetConsiderOnlineRetrievalDeals == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.DealsSetConsiderOnlineRetrievalDeals(p0, p1)
+}
+
+func (s *LegacyMarketStub) DealsSetConsiderOnlineRetrievalDeals(p0 context.Context, p1 bool) error {
+	return ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsSetConsiderOnlineStorageDeals(p0 context.Context, p1 bool) error {
+	if s.Internal.DealsSetConsiderOnlineStorageDeals == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.DealsSetConsiderOnlineStorageDeals(p0, p1)
+}
+
+func (s *LegacyMarketStub) DealsSetConsiderOnlineStorageDeals(p0 context.Context, p1 bool) error {
+	return ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsSetConsiderUnverifiedStorageDeals(p0 context.Context, p1 bool) error {
+	if s.Internal.DealsSetConsiderUnverifiedStorageDeals == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.DealsSetConsiderUnverifiedStorageDeals(p0, p1)
+}
+
+func (s *LegacyMarketStub) DealsSetConsiderUnverifiedStorageDeals(p0 context.Context, p1 bool) error {
+	return ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsSetConsiderVerifiedStorageDeals(p0 context.Context, p1 bool) error {
+	if s.Internal.DealsSetConsiderVerifiedStorageDeals == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.DealsSetConsiderVerifiedStorageDeals(p0, p1)
+}
+
+func (s *LegacyMarketStub) DealsSetConsiderVerifiedStorageDeals(p0 context.Context, p1 bool) error {
+	return ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) DealsSetPieceCidBlocklist(p0 context.Context, p1 []cid.Cid) error {
+	if s.Internal.DealsSetPieceCidBlocklist == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.DealsSetPieceCidBlocklist(p0, p1)
+}
+
+func (s *LegacyMarketStub) DealsSetPieceCidBlocklist(p0 context.Context, p1 []cid.Cid) error {
+	return ErrNotSupported
+}
+
 func (s *LegacyMarketStruct) MarketDataTransferUpdates(p0 context.Context) (<-chan lapi.DataTransferChannel, error) {
 	if s.Internal.MarketDataTransferUpdates == nil {
 		return nil, ErrNotSupported
@@ -195,6 +384,17 @@ func (s *LegacyMarketStruct) MarketDataTransferUpdates(p0 context.Context) (<-ch
 }
 
 func (s *LegacyMarketStub) MarketDataTransferUpdates(p0 context.Context) (<-chan lapi.DataTransferChannel, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) MarketGetRetrievalAsk(p0 context.Context) (*retrievalmarket.Ask, error) {
+	if s.Internal.MarketGetRetrievalAsk == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.MarketGetRetrievalAsk(p0)
+}
+
+func (s *LegacyMarketStub) MarketGetRetrievalAsk(p0 context.Context) (*retrievalmarket.Ask, error) {
 	return nil, ErrNotSupported
 }
 
@@ -209,6 +409,17 @@ func (s *LegacyMarketStub) MarketListDataTransfers(p0 context.Context) ([]lapi.D
 	return *new([]lapi.DataTransferChannel), ErrNotSupported
 }
 
+func (s *LegacyMarketStruct) MarketListRetrievalDeals(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) {
+	if s.Internal.MarketListRetrievalDeals == nil {
+		return *new([]retrievalmarket.ProviderDealState), ErrNotSupported
+	}
+	return s.Internal.MarketListRetrievalDeals(p0)
+}
+
+func (s *LegacyMarketStub) MarketListRetrievalDeals(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) {
+	return *new([]retrievalmarket.ProviderDealState), ErrNotSupported
+}
+
 func (s *LegacyMarketStruct) MarketRestartDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
 	if s.Internal.MarketRestartDataTransfer == nil {
 		return ErrNotSupported
@@ -217,6 +428,17 @@ func (s *LegacyMarketStruct) MarketRestartDataTransfer(p0 context.Context, p1 da
 }
 
 func (s *LegacyMarketStub) MarketRestartDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
+	return ErrNotSupported
+}
+
+func (s *LegacyMarketStruct) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmarket.Ask) error {
+	if s.Internal.MarketSetRetrievalAsk == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.MarketSetRetrievalAsk(p0, p1)
+}
+
+func (s *LegacyMarketStub) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmarket.Ask) error {
 	return ErrNotSupported
 }
 

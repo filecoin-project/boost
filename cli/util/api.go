@@ -211,7 +211,7 @@ func GetBoostAPI(ctx *cli.Context, opts ...GetBoostOption) (api.Boost, jsonrpc.C
 func GetRawAPI(ctx *cli.Context, t repo.RepoType, version string) (string, http.Header, error) {
 	ainfo, err := GetAPIInfo(ctx, t)
 	if err != nil {
-		return "", nil, xerrors.Errorf("could not get API info for %s: %w", t, err)
+		return "", nil, xerrors.Errorf("could not get API info for %s: %w", t.Type(), err)
 	}
 
 	addr, err := ainfo.DialArgs(version)

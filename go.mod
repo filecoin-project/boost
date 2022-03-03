@@ -9,6 +9,7 @@ require (
 	github.com/BurntSushi/toml v0.4.1
 	github.com/buger/goterm v1.0.3
 	github.com/davecgh/go-spew v1.1.1
+	github.com/docker/go-units v0.4.0
 	github.com/filecoin-project/dagstore v0.4.4
 	github.com/filecoin-project/go-address v0.0.6
 	github.com/filecoin-project/go-bitfield v0.2.4
