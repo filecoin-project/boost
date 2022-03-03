@@ -8,4 +8,5 @@ import (
 var GetBoostAPI = cliutil.GetBoostAPI
 var GetFullNodeAPI = lcliutil.GetFullNodeAPI
 
+var ReqContext = cliutil.ReqContext
 var DaemonContext = cliutil.DaemonContext

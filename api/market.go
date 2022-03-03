@@ -3,9 +3,8 @@ package api
 import (
 	"context"
 
-	"github.com/google/uuid"
-
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/google/uuid"
 )
 
 //                       MODIFYING THE API INTERFACE

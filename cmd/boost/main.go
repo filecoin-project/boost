@@ -37,6 +37,7 @@ func main() {
 			runCmd,
 			initCmd,
 			dummydealCmd,
+			dataTransfersCmd,
 		},
 	}
 	app.Setup()
