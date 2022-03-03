@@ -153,7 +153,7 @@ func StorageClient(lc fx.Lifecycle, h host.Host, dataTransfer dtypes.ClientDataT
 func RetrievalClient(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dt dtypes.ClientDataTransfer, payAPI payapi.PaychAPI, resolver discovery.PeerResolver,
 	ds lotus_dtypes.MetadataDS, chainAPI full.ChainAPI, stateAPI full.StateAPI, accessor retrievalmarket.BlockstoreAccessor, j journal.Journal) (retrievalmarket.RetrievalClient, error) {
 
-	adapter := retrievaladapter.NewRetrievalClientNode(payAPI, chainAPI, stateAPI)
+	adapter := retrievaladapter.NewRetrievalClientNode(false, payAPI, chainAPI, stateAPI)
 	network := rmnet.NewFromLibp2pHost(h)
 	ds = namespace.Wrap(ds, datastore.NewKey("/retrievals/client"))
 	client, err := retrievalimpl.NewClient(network, dt, adapter, resolver, ds, accessor)
