@@ -474,7 +474,7 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 
 		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
 			sps, storagemarket.NewChainDealManager(a), df, logsSqlDB.db, logsDB, dagst, ps)
-		lp2pnet := lp2pimpl.NewDealProvider(h, prov)
+		lp2pnet := lp2pimpl.NewDealProvider(h, prov, a)
 
 		if err != nil {
 			return nil, err

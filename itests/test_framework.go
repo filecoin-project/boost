@@ -77,12 +77,6 @@ func newTestFramework(ctx context.Context, homedir string) *testFramework {
 }
 
 func (f *testFramework) start() error {
-	var err error
-	f.client, err = boostclient.NewStorageClient(f.ctx)
-	if err != nil {
-		return err
-	}
-
 	addr := "ws://127.0.0.1:1234/rpc/v1"
 
 	// Get a FullNode API
@@ -161,6 +155,11 @@ func (f *testFramework) start() error {
 	wg.Wait()
 
 	f.clientAddr = clientAddr
+
+	f.client, err = boostclient.NewStorageClient(f.clientAddr, f.fullNode)
+	if err != nil {
+		return err
+	}
 
 	minerEndpoint, err := devnet.GetMinerEndpoint(f.ctx, f.homedir)
 	if err != nil {
@@ -367,12 +366,12 @@ func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 			return fmt.Errorf("error getting status: %s", err.Error())
 		}
 
-		if err == nil {
+		if err == nil && resp.Error == "" {
 			log.Infof("deal state: %s", resp.DealStatus)
 			switch {
-			case resp.DealStatus == dealcheckpoints.Complete.String():
+			case resp.DealStatus.Status == dealcheckpoints.Complete.String():
 				return nil
-			case resp.DealStatus == dealcheckpoints.IndexedAndAnnounced.String():
+			case resp.DealStatus.Status == dealcheckpoints.IndexedAndAnnounced.String():
 				return nil
 			}
 		}
