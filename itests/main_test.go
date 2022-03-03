@@ -75,6 +75,7 @@ func TestMain(m *testing.M) {
 	f = newTestFramework(ctx, tempHome)
 	err := f.start()
 	if err != nil {
+		log.Fatalw("test framework failed to start", "err", err.Error())
 		os.Exit(1)
 	}
 
