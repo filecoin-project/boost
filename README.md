@@ -38,8 +38,8 @@ rm -rf ~/.lotus ~/.lotusminer
 2. Create Boost repository
 
 ```
-export `lotus auth api-info --perm=admin`
-export `lotus-miner auth api-info --perm=admin`
+export $(lotus auth api-info --perm=admin)
+export $(lotus-miner auth api-info --perm=admin)
 
 boost --vv init \
       --api-sealer=`lotus-miner auth api-info --perm=admin` \
@@ -52,8 +52,9 @@ boost --vv init \
 3. Run Boost service
 
 ```
-`lotus auth api-info --perm=admin` \
-boost run
+export $(lotus auth api-info --perm=admin)
+
+boost --vv run
 ```
 
 4. Interact with Boost
