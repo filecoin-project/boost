@@ -57,7 +57,7 @@ type BoostStruct struct {
 
 		DealsSetPieceCidBlocklist func(p0 context.Context, p1 []cid.Cid) error `perm:"admin"`
 
-		MarketDataTransferUpdates func(p0 context.Context) (<-chan lapi.DataTransferChannel, error) ``
+		MarketDataTransferUpdates func(p0 context.Context) (<-chan lapi.DataTransferChannel, error) `perm:"write"`
 
 		MarketGetRetrievalAsk func(p0 context.Context) (*retrievalmarket.Ask, error) `perm:"read"`
 
@@ -65,7 +65,7 @@ type BoostStruct struct {
 
 		MarketListRetrievalDeals func(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) `perm:"read"`
 
-		MarketRestartDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error ``
+		MarketRestartDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error `perm:"write"`
 
 		MarketSetRetrievalAsk func(p0 context.Context, p1 *retrievalmarket.Ask) error `perm:"admin"`
 	}
