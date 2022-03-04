@@ -7,6 +7,7 @@ import (
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
@@ -130,4 +131,12 @@ func (sm *BoostAPI) DealsGetExpectedSealDurationFunc(ctx context.Context) (time.
 
 func (sm *BoostAPI) DealsSetExpectedSealDurationFunc(ctx context.Context, d time.Duration) error {
 	return sm.SetExpectedSealDurationFunc(d)
+}
+
+func (sm *BoostAPI) DealsPieceCidBlocklist(ctx context.Context) ([]cid.Cid, error) {
+	return sm.StorageDealPieceCidBlocklistConfigFunc()
+}
+
+func (sm *BoostAPI) DealsSetPieceCidBlocklist(ctx context.Context, cids []cid.Cid) error {
+	return sm.SetStorageDealPieceCidBlocklistConfigFunc(cids)
 }
