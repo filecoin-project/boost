@@ -34,6 +34,7 @@ func main() {
 			cliutil.FlagVeryVerbose,
 		},
 		Commands: []*cli.Command{
+			authCmd,
 			runCmd,
 			initCmd,
 			dummydealCmd,
