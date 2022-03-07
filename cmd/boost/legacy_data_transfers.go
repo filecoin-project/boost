@@ -19,7 +19,7 @@ import (
 
 var dataTransfersCmd = &cli.Command{
 	Name:     "data-transfers",
-	Usage:    "Manage data transfers",
+	Usage:    "Manage legacy data transfers (Markets V1)",
 	Category: "legacy",
 	Subcommands: []*cli.Command{
 		transfersListCmd,

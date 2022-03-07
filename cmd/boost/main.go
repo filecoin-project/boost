@@ -21,7 +21,7 @@ func main() {
 
 	app := &cli.App{
 		Name:                 "boost",
-		Usage:                "Filecoin Markets V2 MVP",
+		Usage:                "Markets V2 module for Filecoin",
 		EnableBashCompletion: true,
 		Version:              build.UserVersion(),
 		Flags: []cli.Flag{

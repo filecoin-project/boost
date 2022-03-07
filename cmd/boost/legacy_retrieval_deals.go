@@ -18,7 +18,7 @@ import (
 
 var retrievalDealsCmd = &cli.Command{
 	Name:     "retrieval-deals",
-	Usage:    "Manage retrieval deals and related configuration",
+	Usage:    "Manage legacy retrieval deals and related configuration (Markets V1)",
 	Category: "legacy",
 	Subcommands: []*cli.Command{
 		retrievalDealSelectionCmd,
