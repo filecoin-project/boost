@@ -14,15 +14,18 @@ import (
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	gostream "github.com/libp2p/go-libp2p-gostream"
 	"golang.org/x/xerrors"
-
-	logging "github.com/ipfs/go-log/v2"
 )
 
 var log = logging.Logger("libp2p-server")
+
+// closeTimeout is the time to wait for the downloader to close the connection
+// after all data has been sent
+const closeTimeout = 5 * time.Second
 
 // Libp2pCarServer serves deal data by matching an auth token to the root CID
 // of a DAG in a blockstore, and serving the data as a CAR
@@ -225,15 +228,49 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *A
 
 	// Check if there was an error during the transfer
 	if err != nil {
-		log.Infow("transfer failed", append(logParams, "error", err))
+		log.Infow("transfer failed", append(logParams, "err", err)...)
+
+		st := xfer.setComplete(err)
+		fireEvent(st)
+		return err
+	}
+
+	// Wait for the client to receive all data and close the connection
+	err = waitForClientClose(s.ctx, r)
+	if err == nil {
+		log.Infow("completed serving request", logParams...)
 	} else {
-		log.Infow("completed serving request", logParams)
+		log.Infow("error waiting for client to close connection", append(logParams, "err", err)...)
 	}
 
 	st := xfer.setComplete(err)
 	fireEvent(st)
 
-	return nil
+	return err
+}
+
+// waitForClientClose waits for the client to close the connection
+func waitForClientClose(ctx context.Context, r *http.Request) error {
+	streamClosed := make(chan error, 1)
+	go func() {
+		// Block until Read returns an EOF, which means the connection has
+		// been closed
+		_, err := r.Body.Read(make([]byte, 1024))
+		if err == io.EOF {
+			err = nil
+		}
+		streamClosed <- err
+	}()
+
+	ctx, cancel := context.WithTimeout(ctx, closeTimeout)
+	defer cancel()
+
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("timed out waiting for client to close connection: %w", ctx.Err())
+	case err := <-streamClosed:
+		return err
+	}
 }
 
 // transfersMgr keeps a list of active transfers.

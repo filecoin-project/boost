@@ -264,7 +264,8 @@ func (t *transfer) execute(ctx context.Context) error {
 		// check if the error is a 4xx error, meaning there is a problem with
 		// the request (eg 401 Unauthorized)
 		if reqErr.code/100 == 4 {
-			t.dl.LogError(duuid, "terminating http req as got 4xx code", reqErr)
+			msg := fmt.Sprintf("terminating http req: received %d response from server", reqErr.code)
+			t.dl.LogError(duuid, msg, reqErr)
 			return reqErr.error
 		}
 
@@ -290,7 +291,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		case <-bt.C:
 		case <-ctx.Done():
 			t.dl.LogError(duuid, "did not proceed with retry as context cancelled", ctx.Err())
-			return fmt.Errorf("transfer context err after %f attempts to finish transfer, lastErr=%s, contextErr=%w", t.backoff.Attempt(), err, ctx.Err())
+			return fmt.Errorf("transfer context err after %.0f attempts to finish transfer, lastErr=%s, contextErr=%w", t.backoff.Attempt(), err, ctx.Err())
 		}
 	}
 
