@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"runtime"
+	"runtime/pprof"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node"
@@ -13,6 +16,9 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 )
@@ -22,6 +28,39 @@ var runCmd = &cli.Command{
 	Usage:  "Start a boost process",
 	Before: before,
 	Action: func(cctx *cli.Context) error {
+		if cpuprofile := cctx.String("pprof.cpu"); cpuprofile != "" {
+			profile, err := os.Create(cpuprofile)
+			if err != nil {
+				return err
+			}
+
+			if err := pprof.StartCPUProfile(profile); err != nil {
+				return err
+			}
+			defer pprof.StopCPUProfile()
+		}
+
+		if memprofile := cctx.String("pprof.mem"); memprofile != "" {
+			f, err := os.Create(memprofile)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			runtime.GC() // get up-to-date statistics
+			if err := pprof.WriteHeapProfile(f); err != nil {
+				return err
+			}
+		}
+
+		if cctx.Bool("pprof") {
+			go func() {
+				err := http.ListenAndServe("localhost:6060", nil)
+				if err != nil {
+					log.Error(err)
+				}
+			}()
+		}
+
 		fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx)
 		if err != nil {
 			return xerrors.Errorf("getting full node api: %w", err)
