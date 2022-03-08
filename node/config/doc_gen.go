@@ -64,20 +64,26 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "Wallets",
+			Type: "WalletsConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "LotusDealmaking",
 			Type: "lotus_config.DealmakingConfig",
+
+			Comment: `Lotus configs`,
+		},
+		{
+			Name: "LotusFees",
+			Type: "lotus_config.MinerFeeConfig",
 
 			Comment: ``,
 		},
 		{
 			Name: "DAGStore",
 			Type: "lotus_config.DAGStoreConfig",
-
-			Comment: ``,
-		},
-		{
-			Name: "Wallets",
-			Type: "WalletsConfig",
 
 			Comment: ``,
 		},
