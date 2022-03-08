@@ -12,6 +12,7 @@ import (
 
 	"github.com/filecoin-project/boost/car"
 	"github.com/filecoin-project/boost/transport/types"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	logging "github.com/ipfs/go-log/v2"
@@ -124,9 +125,23 @@ func (s *Libp2pCarServer) handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get the peer ID from the RemoteAddr
+	pid, err := peer.Decode(r.RemoteAddr)
+	if err != nil {
+		log.Infow("data transfer request failed: parsing remote address as peer ID",
+			"remote-addr", r.RemoteAddr, "err", err)
+		http.Error(w, "Failed to parse remote address '"+r.RemoteAddr+"' as peer ID", http.StatusBadRequest)
+		return
+	}
+
+	// Protect the libp2p connection for the lifetime of the transfer
+	tag := uuid.New().String()
+	s.h.ConnManager().Protect(pid, tag)
+	defer s.h.ConnManager().Unprotect(pid, tag)
+
 	// Get a block info cache for the CarOffsetWriter
 	bic := s.bicm.Get(authVal.PayloadCid)
-	err := s.serveContent(w, r, authToken, authVal, bic)
+	err = s.serveContent(w, r, authToken, authVal, bic)
 	s.bicm.Unref(authVal.PayloadCid, err)
 }
 
@@ -138,7 +153,7 @@ func (s *Libp2pCarServer) checkAuth(r *http.Request) (string, *AuthValue, *httpE
 	if !ok {
 		return "", nil, &httpError{
 			error: errors.New("rejected request with no Authorization header"),
-			code:  401,
+			code:  http.StatusUnauthorized,
 		}
 	}
 
@@ -147,12 +162,12 @@ func (s *Libp2pCarServer) checkAuth(r *http.Request) (string, *AuthValue, *httpE
 	if xerrors.Is(err, ErrTokenNotFound) {
 		return "", nil, &httpError{
 			error: errors.New("rejected unrecognized auth token"),
-			code:  401,
+			code:  http.StatusUnauthorized,
 		}
 	} else if err != nil {
 		return "", nil, &httpError{
 			error: fmt.Errorf("getting key from datastore: %w", err),
-			code:  500,
+			code:  http.StatusInternalServerError,
 		}
 	}
 
