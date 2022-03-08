@@ -86,7 +86,7 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDeal
 	}
 	// ensure we have a connection with the full node host so that the index provider gossip sub announcements make their
 	// way to the filecoin bootstrapper network
-	w.meshCreator.Connect(ctx)
+	_ = w.meshCreator.Connect(ctx)
 
 	propCid, err := pds.SignedProposalCid()
 	if err != nil {
