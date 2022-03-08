@@ -149,7 +149,7 @@ func DefaultBoost() *Boost {
 			GCInterval:                 lotus_config.Duration(1 * time.Minute),
 		},
 		IndexProvider: lotus_config.IndexProviderConfig{
-			Enable:               false,
+			Enable:               true,
 			EntriesCacheCapacity: 1024,
 			EntriesChunkSize:     16384,
 			TopicName:            "/indexer/ingest/mainnet",
