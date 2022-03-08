@@ -41,6 +41,7 @@ type Boost struct {
 	LotusDealmaking lotus_config.DealmakingConfig
 	LotusFees       lotus_config.MinerFeeConfig
 	DAGStore        lotus_config.DAGStoreConfig
+	IndexProvider   lotus_config.IndexProviderConfig
 }
 
 func (b *Boost) GetDealmakingConfig() lotus_config.DealmakingConfig {

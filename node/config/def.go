@@ -148,6 +148,14 @@ func DefaultBoost() *Boost {
 			MaxConcurrencyStorageCalls: 100,
 			GCInterval:                 lotus_config.Duration(1 * time.Minute),
 		},
+
+		IndexProvider: lotus_config.IndexProviderConfig{
+			Enable:               false,
+			EntriesCacheCapacity: 1024,
+			EntriesChunkSize:     16384,
+			TopicName:            "/indexer/ingest/mainnet",
+			PurgeCacheOnStart:    false,
+		},
 	}
 	return cfg
 }

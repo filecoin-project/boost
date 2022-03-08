@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"time"
 
+	provider "github.com/filecoin-project/index-provider"
+	"github.com/filecoin-project/lotus/markets/idxprov"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
@@ -468,6 +471,9 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(*storedask.StoredAsk), lotus_modules.NewStorageAsk),
 
 		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&cfg.LotusFees, &cfg.LotusDealmaking)),
+		Override(new(idxprov.MeshCreator), idxprov.NewMeshCreator),
+		Override(new(provider.Interface), lotus_modules.IndexProvider(cfg.IndexProvider)),
+
 		Override(new(lotus_storagemarket.StorageProvider), lotus_modules.StorageProvider),
 		Override(HandleDealsKey, lotus_modules.HandleDeals),
 
@@ -576,3 +582,16 @@ func (f boost) Config() interface{} {
 }
 
 func (boost) SupportsStagingDeals() {}
+
+func (boost) APIFlags() []string {
+	return []string{"boost-api-url"}
+}
+
+func (boost) RepoFlags() []string {
+	return []string{"boost-repo"}
+}
+
+func (boost) APIInfoEnvVars() (primary string, fallbacks []string, deprecated []string) {
+	// TODO remove deprecated deprecation period
+	return "BOOST_API_INFO", nil, nil
+}

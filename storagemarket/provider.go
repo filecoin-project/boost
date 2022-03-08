@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/indexprovider"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
@@ -116,11 +118,14 @@ type Provider struct {
 
 	dagst stores.DAGStoreWrapper
 	ps    piecestore.PieceStore
+
+	ip indexprovider.Wrapper
 }
 
 func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
-	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, httpOpts ...httptransport.Option) (*Provider, error) {
+	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip indexprovider.Wrapper,
+	httpOpts ...httptransport.Option) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -173,6 +178,8 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 
 		dagst: dagst,
 		ps:    ps,
+
+		ip: ip,
 	}, nil
 }
 
@@ -320,6 +327,9 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 		return nil, fmt.Errorf("failed to init db: %w", err)
 	}
 	log.Infow("db initialized")
+
+	// start the index provider
+	p.ip.Start()
 
 	// restart all active deals
 	pds, err := p.dealsDB.ListActive(p.ctx)

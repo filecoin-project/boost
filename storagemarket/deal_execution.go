@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/filecoin-project/dagstore/shard"
+
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 
 	"github.com/filecoin-project/go-fil-markets/stores"
@@ -501,7 +503,14 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	if err := stores.RegisterShardSync(ctx, p.dagst, pc, deal.InboundFilePath, true); err != nil {
 		return fmt.Errorf("failed to register deal with dagstore: %w", err)
 	}
-	p.dealLogger.Infow(deal.DealUuid, "deal successfully registered in dagstore")
+	p.dealLogger.Infow(deal.DealUuid, "deal successfully registered in dagstore", "shard-key", shard.KeyFromCID(pc).String())
+
+	annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
+	if err != nil {
+		return fmt.Errorf("failed to announce deal to index provider: %w", err)
+	}
+	deal.IndexerAnnouncementCID = &annCid
+	p.dealLogger.Infow(deal.DealUuid, "announced to index provider", "announcementCID", annCid.String())
 
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced)
 }

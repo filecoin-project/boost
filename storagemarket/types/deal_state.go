@@ -49,6 +49,9 @@ type ProviderDealState struct {
 	// set if there's an error
 	Err string
 
+	// IndexerAnnouncementCID is the cid of the announcement made for the deal to the network Indexer
+	IndexerAnnouncementCID *cid.Cid
+
 	// NBytesReceived is the number of bytes Received for this deal
 	NBytesReceived int64
 }
