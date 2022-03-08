@@ -86,9 +86,7 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDeal
 	}
 	// ensure we have a connection with the full node host so that the index provider gossip sub announcements make their
 	// way to the filecoin bootstrapper network
-	if err := w.meshCreator.Connect(ctx); err != nil {
-		return cid.Undef, fmt.Errorf("cannot publish index record as indexer host failed to connect to the full node: %w", err)
-	}
+	w.meshCreator.Connect(ctx)
 
 	propCid, err := pds.SignedProposalCid()
 	if err != nil {
