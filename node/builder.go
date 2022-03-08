@@ -7,6 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost/indexprovider"
+
+	provider "github.com/filecoin-project/index-provider"
+	"github.com/filecoin-project/lotus/markets/idxprov"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
@@ -424,6 +429,8 @@ func ConfigBoost(c interface{}) Option {
 		// Sealing Pipeline State API
 		Override(new(sealingpipeline.API), From(new(lotus_modules.MinerStorageService))),
 
+		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper),
+
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner)),
 
 		// GraphQL server
@@ -460,6 +467,8 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
 		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
+		Override(new(idxprov.MeshCreator), idxprov.NewMeshCreator),
+		Override(new(provider.Interface), lotus_modules.IndexProvider(cfg.IndexProvider)),
 
 		// Lotus Markets (storage)
 		Override(new(lotus_dtypes.ProviderTransferNetwork), lotus_modules.NewProviderTransferNetwork),
@@ -576,3 +585,16 @@ func (f boost) Config() interface{} {
 }
 
 func (boost) SupportsStagingDeals() {}
+
+func (boost) APIFlags() []string {
+	return []string{"boost-api-url"}
+}
+
+func (boost) RepoFlags() []string {
+	return []string{"boost-repo"}
+}
+
+func (boost) APIInfoEnvVars() (primary string, fallbacks []string, deprecated []string) {
+	// TODO remove deprecated deprecation period
+	return "BOOST_API_INFO", nil, nil
+}

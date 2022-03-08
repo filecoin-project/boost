@@ -120,6 +120,8 @@ type MarketStruct struct {
 	Internal struct {
 		Deal func(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) `perm:"admin"`
 
+		IndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
+
 		MarketDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 	}
 }
@@ -439,6 +441,17 @@ func (s *MarketStruct) Deal(p0 context.Context, p1 uuid.UUID) (*smtypes.Provider
 
 func (s *MarketStub) Deal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {
 	return nil, ErrNotSupported
+}
+
+func (s *MarketStruct) IndexerAnnounceAllDeals(p0 context.Context) error {
+	if s.Internal.IndexerAnnounceAllDeals == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.IndexerAnnounceAllDeals(p0)
+}
+
+func (s *MarketStub) IndexerAnnounceAllDeals(p0 context.Context) error {
+	return ErrNotSupported
 }
 
 func (s *MarketStruct) MarketDummyDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {

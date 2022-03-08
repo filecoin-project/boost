@@ -107,3 +107,8 @@ type DealPublisher interface {
 type ChainDealManager interface {
 	WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error)
 }
+
+type IndexProvider interface {
+	AnnounceBoostDeal(ctx context.Context, pds *ProviderDealState) (cid.Cid, error)
+	Start()
+}

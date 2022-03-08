@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/filecoin-project/boost/indexprovider"
+
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
@@ -466,14 +468,14 @@ func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
 func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode,
 	sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
 	dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
-	dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore) (*storagemarket.Provider, error) {
+	dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
-		dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore) (*storagemarket.Provider, error) {
+		dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper) (*storagemarket.Provider, error) {
 
 		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
-			sps, storagemarket.NewChainDealManager(a), df, logsSqlDB.db, logsDB, dagst, ps)
+			sps, storagemarket.NewChainDealManager(a), df, logsSqlDB.db, logsDB, dagst, ps, ip)
 		lp2pnet := lp2pimpl.NewDealProvider(h, prov, a)
 
 		if err != nil {
