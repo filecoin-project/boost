@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/hashicorp/go-multierror"
+	logging "github.com/ipfs/go-log/v2"
+
 	"github.com/filecoin-project/boost/storagemarket/types"
 	metadata2 "github.com/filecoin-project/index-provider/metadata"
 	"github.com/filecoin-project/lotus/markets/dagstore"
@@ -14,6 +18,8 @@ import (
 	provider "github.com/filecoin-project/index-provider"
 	"github.com/ipfs/go-cid"
 )
+
+var log = logging.Logger("index-provider-wrapper")
 
 type Wrapper struct {
 	dealsDB     *db.DealsDB
@@ -32,6 +38,35 @@ func NewWrapper(dealsDB *db.DealsDB, legacyProv lotus_storagemarket.StorageProvi
 		dagStore:    dagStore,
 		meshCreator: meshCreator,
 	}
+}
+
+func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
+	log.Info("will announce all Boost deals to Indexer")
+	deals, err := w.dealsDB.ListActive(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list deals: %w", err)
+	}
+
+	shards := make(map[string]struct{})
+	var nSuccess int
+	var merr error
+
+	for _, d := range deals {
+		if d.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
+			continue
+		}
+
+		if _, err := w.AnnounceBoostDeal(ctx, d); err != nil {
+			merr = multierror.Append(merr, err)
+			log.Errorw("failed to announce boost deal to Index provider", "dealId", d.DealUuid, "err", err)
+			continue
+		}
+		shards[d.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
+		nSuccess++
+	}
+
+	log.Infow("finished announcing boost deals to index provider", "number of deals", nSuccess, "number of shards", shards)
+	return merr
 }
 
 func (w *Wrapper) Start() {
