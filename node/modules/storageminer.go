@@ -465,6 +465,26 @@ func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
 	return db.NewLogsDB(logsSqlDB.db)
 }
 
+func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode) {
+	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a)
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			_, err := prov.Start()
+			if err != nil {
+				return fmt.Errorf("starting storage provider: %w", err)
+			}
+			lp2pnet.Start(ctx)
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			lp2pnet.Stop()
+			prov.Stop()
+			return nil
+		},
+	})
+}
+
 func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode,
 	sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
 	dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
@@ -476,27 +496,9 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 
 		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
 			sps, storagemarket.NewChainDealManager(a), df, logsSqlDB.db, logsDB, dagst, ps, ip)
-		lp2pnet := lp2pimpl.NewDealProvider(h, prov, a)
-
 		if err != nil {
 			return nil, err
 		}
-
-		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				_, err := prov.Start()
-				if err != nil {
-					return fmt.Errorf("starting storage provider: %w", err)
-				}
-				lp2pnet.Start(ctx)
-				return nil
-			},
-			OnStop: func(ctx context.Context) error {
-				lp2pnet.Stop()
-				prov.Stop()
-				return nil
-			},
-		})
 
 		return prov, nil
 	}
