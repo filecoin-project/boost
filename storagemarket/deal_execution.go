@@ -506,9 +506,8 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	// announce to the network indexer
 	annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
 	if err != nil {
-		return fmt.Errorf("failed to annoucne deal to index provider: %w", err)
+		return fmt.Errorf("failed to announce deal to index provider: %w", err)
 	}
-	deal.IndexerAnnouncementCID = &annCid
 	p.dealLogger.Infow(deal.DealUuid, "announced to index provider", "announcementCID", annCid.String())
 
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced)

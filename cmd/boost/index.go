@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/fatih/color"
 	bcli "github.com/filecoin-project/boost/cli"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/urfave/cli/v2"
@@ -28,10 +27,6 @@ var indexProvAnnounceAllCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		if cctx.IsSet("color") {
-			color.NoColor = !cctx.Bool("color")
-		}
-
 		ctx := lcli.ReqContext(cctx)
 
 		// announce markets deals

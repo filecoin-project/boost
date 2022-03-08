@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS Deals (
     TransferSize INT,
     ChainDealID INT,
     PublishCID TEXT,
-    IndexerAnnouncementCID TEXT,
     SectorID INT,
     Offset INT,
     Length INT,

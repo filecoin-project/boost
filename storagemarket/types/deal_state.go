@@ -39,8 +39,6 @@ type ProviderDealState struct {
 	ChainDealID abi.DealID
 	PublishCID  *cid.Cid
 
-	IndexerAnnouncementCID *cid.Cid
-
 	// sector packing info
 	SectorID abi.SectorNumber
 	Offset   abi.PaddedPieceSize

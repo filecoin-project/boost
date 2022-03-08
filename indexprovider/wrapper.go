@@ -65,7 +65,7 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 		nSuccess++
 	}
 
-	log.Infow("finished announcing boost deals to index provider", "number of deals", nSuccess, "number of shards", shards)
+	log.Infow("finished announcing boost deals to index provider", "number of deals", nSuccess, "number of shards", len(shards))
 	return merr
 }
 

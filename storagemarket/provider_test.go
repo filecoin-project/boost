@@ -394,8 +394,6 @@ func (h *ProviderHarness) AssertPieceAdded(t *testing.T, ctx context.Context, dp
 	require.True(t, ok)
 	require.True(t, rg.EagerInit)
 	require.EqualValues(t, dbState.InboundFilePath, rg.CarPath)
-
-	require.NotNil(t, dbState.IndexerAnnouncementCID)
 }
 
 func (h *ProviderHarness) EventuallyAssertNoTagged(t *testing.T, ctx context.Context) {
