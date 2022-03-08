@@ -9,6 +9,7 @@ import (
 	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 
+	boostcliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/lotus/api"
 	lcli "github.com/filecoin-project/lotus/cli"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
@@ -130,7 +131,7 @@ var AuthApiInfoToken = &cli.Command{
 
 		// TODO: Log in audit log when it is implemented
 
-		currentEnv, _, _ := cliutil.EnvsForAPIInfos(t)
+		currentEnv, _, _ := boostcliutil.EnvsForAPIInfos(t)
 		fmt.Printf("%s=%s:%s\n", currentEnv, string(token), ainfo.Addr)
 		return nil
 	},

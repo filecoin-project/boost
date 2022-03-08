@@ -40,6 +40,7 @@ func main() {
 			dummydealCmd,
 			dataTransfersCmd,
 			retrievalDealsCmd,
+			indexProvCmd,
 		},
 	}
 	app.Setup()

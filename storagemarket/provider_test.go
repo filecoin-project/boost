@@ -394,6 +394,8 @@ func (h *ProviderHarness) AssertPieceAdded(t *testing.T, ctx context.Context, dp
 	require.True(t, ok)
 	require.True(t, rg.EagerInit)
 	require.EqualValues(t, dbState.InboundFilePath, rg.CarPath)
+
+	require.NotNil(t, dbState.IndexerAnnouncementCID)
 }
 
 func (h *ProviderHarness) EventuallyAssertNoTagged(t *testing.T, ctx context.Context) {
@@ -667,7 +669,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	dagStore := shared_testutil.NewMockDagStoreWrapper(ps, nil)
 
 	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, minerStub, address.Undef, minerStub, sps, minerStub, df, sqldb,
-		db.NewLogsDB(sqldb), dagStore, ps, pc.httpOpts...)
+		db.NewLogsDB(sqldb), dagStore, ps, &NoOpIndexProvider{}, pc.httpOpts...)
 	require.NoError(t, err)
 	prov.testMode = true
 	ph.Provider = prov
@@ -711,7 +713,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, ctx context
 	// construct a new provider with pre-existing state
 	prov, err := NewProvider("", h.Host, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, address.Undef, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
-		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.dagst, h.Provider.ps, pc.httpOpts...)
+		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.dagst, h.Provider.ps, &NoOpIndexProvider{}, pc.httpOpts...)
 
 	require.NoError(t, err)
 	h.Provider = prov
@@ -1134,4 +1136,14 @@ func (td *testDeal) assertDealFailedNonRecoverable(t *testing.T, ctx context.Con
 	require.NotEmpty(t, dbState.Err)
 	require.Contains(t, dbState.Err, errContains)
 	require.EqualValues(t, dealcheckpoints.Complete, dbState.Checkpoint)
+}
+
+type NoOpIndexProvider struct{}
+
+func (n *NoOpIndexProvider) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDealState) (cid.Cid, error) {
+	return testutil.GenerateCid(), nil
+}
+
+func (n *NoOpIndexProvider) Start() {
+
 }

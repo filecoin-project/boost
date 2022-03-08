@@ -101,3 +101,7 @@ func (sm *BoostAPI) MarketDummyDeal(ctx context.Context, params types.DealParams
 func (sm *BoostAPI) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
 	return sm.StorageProvider.Deal(ctx, dealUuid)
 }
+
+func (sm *BoostAPI) IndexerAnnounceAllDeals(ctx context.Context) error {
+	return sm.StorageProvider.IndexerAnnounceAllDeals(ctx)
+}
