@@ -25,10 +25,11 @@ const (
 	// 1 Mib
 	readBufferSize = 1048576
 
-	minBackOff           = 1 * time.Minute
-	maxBackOff           = 1 * time.Hour
-	factor               = 2
-	maxReconnectAttempts = 8
+	// 5s, 7s, 11s, 16s, 25s, 38s, 1m, 1m30s, 2m, 3m, 7m, 10m, 10m, 10m, 10m
+	minBackOff           = 5 * time.Second
+	maxBackOff           = 10 * time.Minute
+	factor               = 1.5
+	maxReconnectAttempts = 15
 
 	libp2pScheme = "libp2p"
 )
@@ -248,23 +249,20 @@ func (t *transfer) execute(ctx context.Context) error {
 		// start the http transfer
 		remaining := t.dealInfo.DealSize - t.nBytesReceived
 		reqErr := t.doHttp(ctx, req, of, remaining)
-		if reqErr != nil {
-			t.dl.Infow(duuid, "one http req done", "http code", reqErr.code, "outputErr", reqErr.Error())
-		} else {
-			t.dl.Infow(duuid, "http req finished with no error")
-		}
-
 		if reqErr == nil {
-			t.dl.Infow(duuid, "http req done without any errors")
+			t.dl.Infow(duuid, "http request completed successfully")
 			// if there's no error, transfer was successful
 			break
 		}
+
+		t.dl.Infow(duuid, "http request error", "http code", reqErr.code, "outputErr", reqErr.Error())
+
 		_ = of.Close()
 
 		// check if the error is a 4xx error, meaning there is a problem with
 		// the request (eg 401 Unauthorized)
 		if reqErr.code/100 == 4 {
-			msg := fmt.Sprintf("terminating http req: received %d response from server", reqErr.code)
+			msg := fmt.Sprintf("terminating http request: received %d response from server", reqErr.code)
 			t.dl.LogError(duuid, msg, reqErr)
 			return reqErr.error
 		}
@@ -272,26 +270,33 @@ func (t *transfer) execute(ctx context.Context) error {
 		// do not resume transfer if context has been cancelled or if the context deadline has exceeded
 		err = reqErr.error
 		if xerrors.Is(err, context.Canceled) || xerrors.Is(err, context.DeadlineExceeded) {
-			t.dl.LogError(duuid, "terminating http req as context cancelled or deadline exceeded", err)
-			return fmt.Errorf("transfer context err: %w", err)
+			t.dl.LogError(duuid, "terminating http request: context cancelled or deadline exceeded", err)
+			return fmt.Errorf("transfer context canceled err: %w", err)
+		}
+
+		// If some data was transferred, reset the back-off count to zero
+		if t.nBytesReceived > st.Size() {
+			t.dl.Infow(duuid, "some data was transferred before connection error, so resetting backoff to zero",
+				"transferred", t.nBytesReceived-st.Size())
 		}
 
 		// backoff-retry transfer if max number of attempts haven't been exhausted
 		nAttempts := t.backoff.Attempt() + 1
 		if nAttempts >= t.maxReconnectAttempts {
-			t.dl.Errorw(duuid, "terminating http req as exhausted max attempts", "err", err.Error(), "maxAttempts", t.maxReconnectAttempts)
+			t.dl.Errorw(duuid, "terminating http request: exhausted max attempts", "err", err.Error(), "maxAttempts", t.maxReconnectAttempts)
 			return fmt.Errorf("could not finish transfer even after %.0f attempts, lastErr: %w", t.maxReconnectAttempts, err)
 		}
 		duration := t.backoff.Duration()
 		bt := time.NewTimer(duration)
-		t.dl.Infow(duuid, "retrying http req after waiting", "wait time", duration.String(),
-			"nAttempts", nAttempts)
+		t.dl.Infow(duuid, "backing off before retrying http request", "backoff time", duration.String(),
+			"attempts", nAttempts)
 		defer bt.Stop()
 		select {
 		case <-bt.C:
+			t.dl.Infow(duuid, "back-off complete, retrying http request", "backoff time", duration.String())
 		case <-ctx.Done():
-			t.dl.LogError(duuid, "did not proceed with retry as context cancelled", ctx.Err())
-			return fmt.Errorf("transfer context err after %.0f attempts to finish transfer, lastErr=%s, contextErr=%w", t.backoff.Attempt(), err, ctx.Err())
+			t.dl.LogError(duuid, "did not retry http request: context cancelled", ctx.Err())
+			return fmt.Errorf("transfer canceled after %.0f attempts to finish transfer, lastErr=%s, contextErr=%w", t.backoff.Attempt(), err, ctx.Err())
 		}
 	}
 
@@ -318,7 +323,7 @@ func (t *transfer) execute(ctx context.Context) error {
 
 func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer, toRead int64) *httpError {
 	duid := t.dealInfo.DealUuid
-	t.dl.Infow(duid, "sending http req", "received", t.nBytesReceived, "remaining",
+	t.dl.Infow(duid, "sending http request", "received", t.nBytesReceived, "remaining",
 		toRead, "range-rq", req.Header.Get("Range"))
 
 	// send http request and validate response
@@ -340,7 +345,7 @@ func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer,
 	limitR := io.LimitReader(resp.Body, toRead)
 	for {
 		if ctx.Err() != nil {
-			t.dl.LogError(duid, "not reading http response anymore", ctx.Err())
+			t.dl.LogError(duid, "stopped reading http response: context canceled", ctx.Err())
 			return &httpError{error: ctx.Err()}
 		}
 		nr, readErr := limitR.Read(buf)
