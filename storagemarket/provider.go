@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
@@ -192,35 +190,6 @@ func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.Provide
 
 func (p *Provider) NBytesReceived(dealUuid uuid.UUID) uint64 {
 	return p.transfers.getBytes(dealUuid)
-}
-
-func (p *Provider) IndexerAnnounceAllDeals(ctx context.Context) error {
-	log.Info("will announce all Boost deals to Indexer")
-	deals, err := p.dealsDB.ListActive(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to list deals: %w", err)
-	}
-
-	shards := make(map[string]struct{})
-	var nSuccess int
-	var merr error
-
-	for _, d := range deals {
-		if d.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
-			continue
-		}
-
-		if _, err := p.ip.AnnounceBoostDeal(ctx, d); err != nil {
-			merr = multierror.Append(merr, err)
-			log.Errorw("failed to announce deal to Index provider", "dealId", d.DealUuid, "err", err)
-			continue
-		}
-		shards[d.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
-		nSuccess++
-	}
-
-	log.Infow("finished announcing active deals to index provider", "number of deals", nSuccess, "number of shards", shards)
-	return merr
 }
 
 func (p *Provider) GetAsk() *storagemarket.StorageAsk {
