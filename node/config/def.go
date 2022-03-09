@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
+
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/lotus/chain/types"
@@ -58,6 +60,10 @@ var DefaultSimultaneousTransfers = uint64(20)
 func DefaultBoost() *Boost {
 	cfg := &Boost{
 		Common: defCommon(),
+
+		Storage: sectorstorage.SealerConfig{
+			ParallelFetchLimit: 10,
+		},
 
 		Dealmaking: DealmakingConfig{
 			ConsiderOnlineStorageDeals:     true,
