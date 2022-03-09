@@ -278,6 +278,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		if t.nBytesReceived > st.Size() {
 			t.dl.Infow(duuid, "some data was transferred before connection error, so resetting backoff to zero",
 				"transferred", t.nBytesReceived-st.Size())
+			t.backoff.Reset()
 		}
 
 		// backoff-retry transfer if max number of attempts haven't been exhausted
