@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 
 	lapi "github.com/filecoin-project/lotus/api"
@@ -42,6 +43,9 @@ type BoostAPI struct {
 	// Boost
 	StorageProvider *storagemarket.Provider
 	IndexProvider   *indexprovider.Wrapper
+
+	// Legacy Lotus
+	LegacyStorageProvider lotus_storagemarket.StorageProvider
 
 	// Lotus Markets
 	SectorBlocks *sectorblocks.SectorBlocks
