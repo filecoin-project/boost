@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/filecoin-project/dagstore"
+
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 
 	"github.com/filecoin-project/go-fil-markets/stores"
@@ -498,7 +500,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piecestore")
 
 	// register with dagstore
-	if err := stores.RegisterShardSync(ctx, p.dagst, pc, deal.InboundFilePath, true); err != nil {
+	if err := stores.RegisterShardSync(ctx, p.dagst, pc, deal.InboundFilePath, true); err != nil && err != dagstore.ErrShardExists {
 		return fmt.Errorf("failed to register deal with dagstore: %w", err)
 	}
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully registered in dagstore")
