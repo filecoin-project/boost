@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	provider "github.com/filecoin-project/index-provider"
+
 	"github.com/filecoin-project/dagstore"
 
 	"github.com/filecoin-project/go-fil-markets/piecestore"
@@ -202,9 +204,9 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 				uiMsg:       "deal was paused while indexing because Boost was shut down",
 			}
 		}
-		p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed in dagstore and added to piecestore")
+		p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed and announced")
 	} else {
-		p.dealLogger.Infow(deal.DealUuid, "deal has already been indexed in dagstore and added to piecestore")
+		p.dealLogger.Infow(deal.DealUuid, "deal has already been indexed and announced")
 	}
 
 	return nil
@@ -507,10 +509,10 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 
 	// announce to the network indexer
 	annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
-	if err != nil {
+	if err != nil && !xerrors.Is(err, provider.ErrAlreadyAdvertised) {
 		return fmt.Errorf("failed to announce deal to index provider: %w", err)
 	}
-	p.dealLogger.Infow(deal.DealUuid, "announced to index provider", "announcementCID", annCid.String())
+	p.dealLogger.Infow(deal.DealUuid, "deal successfully announced to index provider", "announcementCID", annCid.String())
 
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced)
 }
