@@ -145,6 +145,8 @@ const (
 	// boost -> should be started after markets
 	HandleBoostDealsKey
 
+	HandleIndexProviderKey
+
 	// daemon
 	ExtractApiKey
 	HeadMetricsKey
@@ -484,6 +486,7 @@ func ConfigBoost(c interface{}) Option {
 		Override(HandleDealsKey, lotus_modules.HandleDeals),
 
 		Override(HandleBoostDealsKey, modules.HandleBoostDeals),
+		Override(HandleIndexProviderKey, modules.HandleIndexProvider),
 
 		// Boost storage deal filter
 		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),
@@ -600,6 +603,5 @@ func (boost) RepoFlags() []string {
 }
 
 func (boost) APIInfoEnvVars() (primary string, fallbacks []string, deprecated []string) {
-	// TODO remove deprecated deprecation period
 	return "BOOST_API_INFO", nil, nil
 }
