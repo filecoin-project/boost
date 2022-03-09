@@ -315,7 +315,6 @@ func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) *dealHandler {
 }
 
 func (p *Provider) Start() ([]*dealHandler, error) {
-
 	log.Infow("storage provider: starting")
 
 	// initialize the database
@@ -324,9 +323,6 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 		return nil, fmt.Errorf("failed to init db: %w", err)
 	}
 	log.Infow("db initialized")
-
-	// start the index provider
-	p.ip.Start()
 
 	// restart all active deals
 	pds, err := p.dealsDB.ListActive(p.ctx)
