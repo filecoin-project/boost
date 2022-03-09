@@ -41,6 +41,10 @@ func NewWrapper(dealsDB *db.DealsDB, legacyProv lotus_storagemarket.StorageProvi
 }
 
 func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
+	log.Info("will announce all Markets deals to Indexer")
+	err := w.legacyProv.AnnounceAllDealsToIndexer(ctx)
+	log.Infof("finished announcing markets deals to indexer, err:%s", err)
+
 	log.Info("will announce all Boost deals to Indexer")
 	deals, err := w.dealsDB.ListActive(ctx)
 	if err != nil {
