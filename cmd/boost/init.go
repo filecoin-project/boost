@@ -1,27 +1,35 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 
-	"github.com/ipfs/go-datastore"
-	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
-
-	"github.com/filecoin-project/go-address"
-	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-
+	"github.com/chzyer/readline"
+	"github.com/dustin/go-humanize"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/go-address"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v0api"
 	lcli "github.com/filecoin-project/lotus/cli"
+	lotus_config "github.com/filecoin-project/lotus/node/config"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
+	"github.com/ipfs/go-datastore"
+	dsq "github.com/ipfs/go-datastore/query"
+	"github.com/urfave/cli/v2"
+	"golang.org/x/xerrors"
 )
+
+const metadataNamespace = "/metadata"
 
 var initCmd = &cli.Command{
 	Name:  "init",
@@ -55,156 +63,576 @@ var initCmd = &cli.Command{
 	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
-		log.Info("Initializing boost repo")
-
-		ctx := lcli.ReqContext(cctx)
-
-		log.Debug("Trying to connect to full node RPC")
-
-		walletPSD, err := address.NewFromString(cctx.String("wallet-publish-storage-deals"))
-		if err != nil {
-			return fmt.Errorf("failed to parse wallet-publish-storage-deals: %s; err: %w", cctx.String("wallet-publish-storage-deals"), err)
-		}
-
-		walletCP, err := address.NewFromString(cctx.String("wallet-collateral-pledge"))
-		if err != nil {
-			return fmt.Errorf("failed to parse wallet-collateral-pledge: %s; err: %w", cctx.String("wallet-collateral-pledge"), err)
-		}
-
-		if walletPSD.String() == walletCP.String() {
-			return xerrors.Errorf("wallets for PublishStorageDeals and pledging collateral must be different")
-		}
-
-		if cctx.Int64("max-staging-deals-bytes") <= 0 {
-			return xerrors.Errorf("max size for staging deals area must be > 0 bytes")
-		}
-
-		if err := checkV1ApiSupport(ctx, cctx); err != nil {
-			return err
-		}
-
-		api, closer, err := lcli.GetFullNodeAPIV1(cctx)
-		if err != nil {
-			return err
-		}
-		defer closer()
-
-		smApi, smCloser, err := lcli.GetStorageMinerAPI(cctx)
-		if err != nil {
-			return err
-		}
-		defer smCloser()
-
-		minerActor, err := smApi.ActorAddress(ctx)
-		if err != nil {
-			return xerrors.Errorf("getting miner actor address: %w", err)
-		}
-
-		log.Debug("Checking full node sync status")
-
-		if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false); err != nil {
-			return xerrors.Errorf("sync wait: %w", err)
-		}
-
-		repoPath := cctx.String(FlagBoostRepo)
-		log.Debugw("Checking if repo exists", "path", repoPath)
-
-		r, err := lotus_repo.NewFS(repoPath)
+		bp, err := initBoost(cctx)
 		if err != nil {
 			return err
 		}
 
-		ok, err := r.Exists()
+		lr, err := bp.repo.Lock(node.Boost)
 		if err != nil {
 			return err
 		}
-		if ok {
-			return xerrors.Errorf("repo at '%s' is already initialized", cctx.String(FlagBoostRepo))
-		}
+		defer lr.Close()
 
-		log.Debug("Checking full node version")
-
-		v, err := api.Version(ctx)
+		ds, err := lr.Datastore(context.Background(), metadataNamespace)
 		if err != nil {
 			return err
 		}
 
-		if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
-			return xerrors.Errorf("Remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion1, v.APIVersion)
-		}
+		log.Debug("Creating boost config")
+		var cerr error
+		err = lr.SetConfig(func(raw interface{}) {
+			rcfg, ok := raw.(*config.Boost)
+			if !ok {
+				cerr = xerrors.New("expected boost config")
+				return
+			}
 
-		if err := r.Init(node.Boost); err != nil {
-			return err
-		}
-
-		{
-			lr, err := r.Lock(node.Boost)
+			asi, err := checkApiInfo(cctx.Context, cctx.String("api-sector-index"))
 			if err != nil {
-				return err
+				cerr = xerrors.Errorf("checking sector index API: %w", err)
+				return
 			}
+			log.Debugf("Sector index api info: %s", asi)
+			rcfg.SectorIndexApiInfo = asi
 
-			var cerr error
-			err = lr.SetConfig(func(raw interface{}) {
-				rcfg, ok := raw.(*config.Boost)
-				if !ok {
-					cerr = xerrors.New("expected boost config")
-					return
-				}
-
-				asi, err := checkApiInfo(ctx, cctx.String("api-sector-index"))
-				if err != nil {
-					cerr = xerrors.Errorf("checking sector index API: %w", err)
-					return
-				}
-				rcfg.SectorIndexApiInfo = asi
-
-				ai, err := checkApiInfo(ctx, cctx.String("api-sealer"))
-				if err != nil {
-					cerr = xerrors.Errorf("checking sealer API: %w", err)
-					return
-				}
-				rcfg.SealerApiInfo = ai
-
-				rcfg.Dealmaking.MaxStagingDealsBytes = cctx.Int64("max-staging-deals-bytes")
-				rcfg.Wallets.Miner = minerActor.String()
-				rcfg.Wallets.PledgeCollateral = walletCP.String()
-				rcfg.Wallets.PublishStorageDeals = walletPSD.String()
-			})
-			if cerr != nil {
-				return cerr
-			}
+			ai, err := checkApiInfo(cctx.Context, cctx.String("api-sealer"))
 			if err != nil {
-				return xerrors.Errorf("setting config: %w", err)
+				cerr = xerrors.Errorf("checking sealer API: %w", err)
+				return
 			}
+			log.Debugf("Sealer api info: %s", ai)
+			rcfg.SealerApiInfo = ai
 
-			// Add the miner address to the metadata datastore
-			ds, err := lr.Datastore(context.Background(), "/metadata")
-			if err != nil {
-				return err
-			}
+			setCommonConfig(cctx, rcfg, bp)
+		})
+		if cerr != nil {
+			return cerr
+		}
+		if err != nil {
+			return xerrors.Errorf("setting config: %w", err)
+		}
 
-			err = ds.Put(context.Background(), datastore.NewKey("miner-address"), minerActor.Bytes())
-			if err != nil {
-				return err
-			}
+		// Add the miner address to the metadata datastore
+		log.Debugf("Adding miner address %s to datastore", bp.minerActor)
+		err = addMinerAddressToDatastore(ds, bp.minerActor)
+		if err != nil {
+			return err
+		}
 
-			// Create an empty storage.json file
-			// TODO: This is needed by markets, although it's not clear why as
-			// it seems like this should be the responsibility of the sealer
-			err = os.WriteFile(path.Join(lr.Path(), "storage.json"), []byte("{}"), 0666)
-			if err != nil {
-				return fmt.Errorf("creating storage.json file: %w", err)
-			}
-
-			if err := lr.Close(); err != nil {
-				return err
-			}
+		// Create an empty storage.json file
+		// TODO: This is needed by markets, although it's not clear why as
+		// it seems like this should be the responsibility of the sealer
+		log.Debug("Creating empty storage.json file")
+		err = os.WriteFile(path.Join(lr.Path(), "storage.json"), []byte("{}"), 0666)
+		if err != nil {
+			return fmt.Errorf("creating storage.json file: %w", err)
 		}
 
 		log.Info("Boost repo successfully created, you can now start boost with 'boost run'")
 
 		return nil
 	},
+}
+
+var migrateCmd = &cli.Command{
+	Name:  "migrate",
+	Usage: "Migrate from an existing markets repo to Boost",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "import-markets-repo",
+			Usage:    "initialize boost from an existing markets repo",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "wallet-publish-storage-deals",
+			Usage:    "wallet to be used for PublishStorageDeals messages",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "wallet-collateral-pledge",
+			Usage:    "wallet to be used for pledging collateral",
+			Required: true,
+		},
+		&cli.Int64Flag{
+			Name:     "max-staging-deals-bytes",
+			Usage:    "max size for staging area in bytes",
+			Required: true,
+		},
+	},
+	Before: before,
+	Action: func(cctx *cli.Context) error {
+		ctx := cliutil.ReqContext(cctx)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		bp, err := initBoost(cctx)
+		if err != nil {
+			return err
+		}
+
+		boostRepo, err := bp.repo.Lock(node.Boost)
+		if err != nil {
+			return err
+		}
+		defer boostRepo.Close()
+
+		ds, err := boostRepo.Datastore(context.Background(), metadataNamespace)
+		if err != nil {
+			return err
+		}
+
+		mktsRepoPath := cctx.String("import-markets-repo")
+		log.Debugf("Getting markets repo '%s'", mktsRepoPath)
+		mktsRepo, err := getMarketsRepo(mktsRepoPath)
+		if err != nil {
+			return err
+		}
+		defer mktsRepo.Close() //nolint:errcheck
+
+		// Migrate datastore keys
+		log.Info("Migrating datastore keys")
+		err = migrateMarketsDatastore(cctx.Context, ds, mktsRepo)
+		if err != nil {
+			return err
+		}
+
+		// Migrate keystore
+		log.Info("Migrating markets keystore")
+		err = migrateMarketsKeystore(mktsRepo, boostRepo)
+		if err != nil {
+			return err
+		}
+
+		// Migrate config
+		log.Info("Migrating markets config")
+		err = migrateMarketsConfig(cctx, mktsRepo, boostRepo, bp)
+		if err != nil {
+			return err
+		}
+
+		// Add the miner address to the metadata datastore
+		log.Infof("Adding miner address %s to datastore", bp.minerActor)
+		err = addMinerAddressToDatastore(ds, bp.minerActor)
+		if err != nil {
+			return err
+		}
+
+		// Create an empty storage.json file
+		log.Debug("Creating empty storage.json file")
+		err = os.WriteFile(path.Join(boostRepo.Path(), "storage.json"), []byte("{}"), 0666)
+		if err != nil {
+			return fmt.Errorf("creating storage.json file: %w", err)
+		}
+
+		// Migrate DAG store
+		err = migrateDirectory(ctx, mktsRepo.Path(), boostRepo.Path(), "dagstore")
+		if err != nil {
+			return err
+		}
+
+		log.Info("Boost repo successfully created, you can now start boost with 'boost run'")
+
+		return nil
+	},
+}
+
+func migrateDirectory(ctx context.Context, mktsRepoPath string, boostRepoPath string, subdir string) error {
+	mktsSubdirPath := path.Join(mktsRepoPath, subdir)
+	boostSubdirPath := path.Join(boostRepoPath, subdir)
+	dirInfo, err := os.Lstat(mktsSubdirPath)
+	if err != nil {
+		if xerrors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("reading %s path %s", subdir, mktsSubdirPath)
+	}
+
+	// If it's a sym-link just copy the sym-link
+	if dirInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
+		log.Infof("copying sym-link %s to %s", mktsSubdirPath, boostSubdirPath)
+		cmd := exec.Command("cp", "-a", mktsSubdirPath, boostSubdirPath)
+		err = cmd.Run()
+		if err != nil {
+			return fmt.Errorf("Copying sym-link %s %s to %s: %w", subdir, mktsSubdirPath, boostSubdirPath, err)
+		}
+		return nil
+	}
+
+	if !dirInfo.IsDir() {
+		return fmt.Errorf("expected %s to be a directory but it's not", mktsSubdirPath)
+	}
+
+	dirSizeBytes, err := dirSize(mktsSubdirPath)
+	if err != nil {
+		return fmt.Errorf("getting size of %s: %w", mktsSubdirPath, err)
+	}
+
+	humanSize := humanize.Bytes(uint64(dirSizeBytes))
+	log.Debugf("%s directory size: %s", subdir, humanSize)
+
+	// If the directory is small enough, just copy it
+	if dirSizeBytes < 1024 {
+		log.Infof("Copying %s to %s", mktsSubdirPath, boostSubdirPath)
+		cmd := exec.Command("cp", "-r", mktsSubdirPath, boostSubdirPath)
+		err = cmd.Run()
+		if err != nil {
+			return fmt.Errorf("Copying %s directory %s to %s: %w", subdir, mktsSubdirPath, boostSubdirPath, err)
+		}
+		return nil
+	}
+
+	cs := readline.NewCancelableStdin(os.Stdin)
+	go func() {
+		<-ctx.Done()
+		cs.Close() // nolint:errcheck
+	}()
+	rl := bufio.NewReader(cs)
+	for {
+		fmt.Printf("%s directory size is %s. Copy [c] / Move [m] / Ignore [i]:\n", subdir, humanSize)
+
+		line, _, err := rl.ReadLine()
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				return fmt.Errorf("boost initialize canceled: %w", err)
+			}
+
+			return fmt.Errorf("reading input: %w", err)
+		}
+
+		switch string(line) {
+		case "c", "y":
+			log.Infof("Copying %s to %s", mktsSubdirPath, boostSubdirPath)
+			cmd := exec.Command("cp", "-r", mktsSubdirPath, boostSubdirPath)
+			err = cmd.Run()
+			if err != nil {
+				return fmt.Errorf("Copying %s directory %s to %s: %w", subdir, mktsSubdirPath, boostSubdirPath, err)
+			}
+			return nil
+		case "m":
+			log.Infof("Moving %s to %s", mktsSubdirPath, boostSubdirPath)
+			cmd := exec.Command("mv", mktsSubdirPath, boostSubdirPath)
+			err = cmd.Run()
+			if err != nil {
+				return fmt.Errorf("Moving %s directory %s to %s: %w", subdir, mktsSubdirPath, boostSubdirPath, err)
+			}
+			return nil
+		case "i":
+			log.Info("Not copying %s directory from markets to boost", subdir)
+			return nil
+		}
+	}
+}
+
+func migrateMarketsConfig(cctx *cli.Context, mktsRepo lotus_repo.LockedRepo, boostRepo lotus_repo.LockedRepo, bp *boostParams) error {
+	var cerr error
+	err := boostRepo.SetConfig(func(raw interface{}) {
+		rcfg, ok := raw.(*config.Boost)
+		if !ok {
+			cerr = xerrors.New("expected boost config")
+			return
+		}
+
+		rawMktsCfg, err := mktsRepo.Config()
+		if err != nil {
+			cerr = fmt.Errorf("getting markets repo config: %w", err)
+			return
+		}
+		mktsCfg, ok := rawMktsCfg.(*lotus_config.StorageMiner)
+		if !ok {
+			cerr = fmt.Errorf("expected legacy markets config, got %T", rawMktsCfg)
+			return
+		}
+
+		rcfg.Common.API = mktsCfg.Common.API
+		rcfg.Common.Backup = mktsCfg.Common.Backup
+		rcfg.Common.Libp2p = mktsCfg.Common.Libp2p
+		rcfg.Storage = mktsCfg.Storage
+		rcfg.SealerApiInfo = mktsCfg.Subsystems.SealerApiInfo
+		rcfg.SectorIndexApiInfo = mktsCfg.Subsystems.SectorIndexApiInfo
+		rcfg.Dealmaking = boostDealMakingCfg(mktsCfg)
+		rcfg.LotusDealmaking = mktsCfg.Dealmaking
+		rcfg.LotusFees = mktsCfg.Fees
+		rcfg.DAGStore = mktsCfg.DAGStore
+
+		setCommonConfig(cctx, rcfg, bp)
+	})
+	if cerr != nil {
+		return cerr
+	}
+	if err != nil {
+		return xerrors.Errorf("setting config: %w", err)
+	}
+
+	return nil
+}
+
+type boostParams struct {
+	repo       *lotus_repo.FsRepo
+	minerActor address.Address
+	walletPSD  address.Address
+	walletCP   address.Address
+}
+
+func initBoost(cctx *cli.Context) (*boostParams, error) {
+	log.Info("Initializing boost repo")
+
+	ctx := lcli.ReqContext(cctx)
+
+	walletPSD, err := address.NewFromString(cctx.String("wallet-publish-storage-deals"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse wallet-publish-storage-deals: %s; err: %w", cctx.String("wallet-publish-storage-deals"), err)
+	}
+
+	walletCP, err := address.NewFromString(cctx.String("wallet-collateral-pledge"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse wallet-collateral-pledge: %s; err: %w", cctx.String("wallet-collateral-pledge"), err)
+	}
+
+	if walletPSD.String() == walletCP.String() {
+		return nil, xerrors.Errorf("wallets for PublishStorageDeals and pledging collateral must be different")
+	}
+
+	if cctx.Int64("max-staging-deals-bytes") <= 0 {
+		return nil, xerrors.Errorf("max size for staging deals area must be > 0 bytes")
+	}
+
+	log.Debug("Trying to connect to full node RPC")
+	if err := checkV1ApiSupport(ctx, cctx); err != nil {
+		return nil, err
+	}
+
+	api, closer, err := lcli.GetFullNodeAPIV1(cctx)
+	if err != nil {
+		return nil, err
+	}
+	defer closer()
+
+	smApi, smCloser, err := lcli.GetStorageMinerAPI(cctx)
+	if err != nil {
+		return nil, err
+	}
+	defer smCloser()
+
+	minerActor, err := smApi.ActorAddress(ctx)
+	if err != nil {
+		return nil, xerrors.Errorf("getting miner actor address: %w", err)
+	}
+
+	log.Debug("Checking full node sync status")
+
+	if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false); err != nil {
+		return nil, xerrors.Errorf("sync wait: %w", err)
+	}
+
+	repoPath := cctx.String(FlagBoostRepo)
+	log.Debugw("Checking if repo exists", "path", repoPath)
+
+	r, err := lotus_repo.NewFS(repoPath)
+	if err != nil {
+		return nil, err
+	}
+
+	ok, err := r.Exists()
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		return nil, xerrors.Errorf("repo at '%s' is already initialized", repoPath)
+	}
+
+	log.Debug("Checking full node version")
+
+	v, err := api.Version(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
+		msg := fmt.Sprintf("Remote API version didn't match (expected %s, remote %s)",
+			lapi.FullAPIVersion1, v.APIVersion)
+		return nil, xerrors.Errorf(msg + ". Boost and Lotus Daemon must have the same API version")
+	}
+
+	log.Debug("Creating boost repo")
+	if err := r.Init(node.Boost); err != nil {
+		return nil, err
+	}
+
+	return &boostParams{
+		repo:       r,
+		minerActor: minerActor,
+		walletPSD:  walletPSD,
+		walletCP:   walletCP,
+	}, nil
+}
+
+func setCommonConfig(cctx *cli.Context, rcfg *config.Boost, bp *boostParams) {
+	rcfg.Dealmaking.MaxStagingDealsBytes = cctx.Int64("max-staging-deals-bytes")
+	rcfg.Wallets.Miner = bp.minerActor.String()
+	rcfg.Wallets.PledgeCollateral = bp.walletCP.String()
+	rcfg.Wallets.PublishStorageDeals = bp.walletPSD.String()
+}
+
+func addMinerAddressToDatastore(ds datastore.Batching, minerActor address.Address) error {
+	return ds.Put(context.Background(), datastore.NewKey("miner-address"), minerActor.Bytes())
+}
+
+func boostDealMakingCfg(mktsCfg *lotus_config.StorageMiner) config.DealmakingConfig {
+	ldm := mktsCfg.Dealmaking
+	return config.DealmakingConfig{
+		ConsiderOnlineStorageDeals:        ldm.ConsiderOnlineStorageDeals,
+		ConsiderOfflineStorageDeals:       ldm.ConsiderOfflineStorageDeals,
+		ConsiderOnlineRetrievalDeals:      ldm.ConsiderOnlineRetrievalDeals,
+		ConsiderOfflineRetrievalDeals:     ldm.ConsiderOfflineRetrievalDeals,
+		ConsiderVerifiedStorageDeals:      ldm.ConsiderVerifiedStorageDeals,
+		ConsiderUnverifiedStorageDeals:    ldm.ConsiderUnverifiedStorageDeals,
+		PieceCidBlocklist:                 ldm.PieceCidBlocklist,
+		ExpectedSealDuration:              config.Duration(ldm.ExpectedSealDuration),
+		MaxDealStartDelay:                 config.Duration(ldm.MaxDealStartDelay),
+		PublishMsgPeriod:                  config.Duration(ldm.PublishMsgPeriod),
+		PublishMsgMaxDealsPerMsg:          ldm.MaxDealsPerPublishMsg,
+		PublishMsgMaxFee:                  mktsCfg.Fees.MaxPublishDealsFee,
+		MaxProviderCollateralMultiplier:   ldm.MaxProviderCollateralMultiplier,
+		MaxStagingDealsBytes:              ldm.MaxStagingDealsBytes,
+		SimultaneousTransfersForStorage:   ldm.SimultaneousTransfersForStorage,
+		SimultaneousTransfersForRetrieval: ldm.SimultaneousTransfersForRetrieval,
+		StartEpochSealingBuffer:           ldm.StartEpochSealingBuffer,
+		Filter:                            ldm.Filter,
+		RetrievalFilter:                   ldm.RetrievalFilter,
+		RetrievalPricing:                  ldm.RetrievalPricing,
+	}
+}
+
+func getMarketsRepo(repoPath string) (lotus_repo.LockedRepo, error) {
+	// Open the repo at the repo path
+	mktsRepo, err := lotus_repo.NewFS(repoPath)
+	if err != nil {
+		return nil, fmt.Errorf("opening legacy markets repo %s: %w", repoPath, err)
+	}
+
+	// Make sure the repo exists
+	exists, err := mktsRepo.Exists()
+	if err != nil {
+		return nil, xerrors.Errorf("checking legacy markets repo %s exists: %w", repoPath, err)
+	}
+	if !exists {
+		return nil, xerrors.Errorf("legacy markets repo %s does not exist", repoPath)
+	}
+
+	// Lock the repo
+	lr, err := mktsRepo.LockRO(lotus_repo.StorageMiner)
+	if err != nil {
+		return nil, xerrors.Errorf("locking legacy markets repo %s: %w", repoPath, err)
+	}
+	return lr, nil
+}
+
+func migrateMarketsDatastore(ctx context.Context, boostDS datastore.Batching, mktsRepo lotus_repo.LockedRepo) error {
+	// Open the metadata datastore on the repo
+	mktsDS, err := mktsRepo.Datastore(ctx, metadataNamespace)
+	if err != nil {
+		return xerrors.Errorf("opening datastore %s on legacy markets repo %s: %w",
+			metadataNamespace, mktsRepo.Path(), err)
+	}
+
+	// Import the key / values from the markets metadata datastore
+	prefixes := []string{
+		// Storage deals
+		"/deals/provider",
+		// Retrieval deals
+		"/retrievals/provider",
+		// Piece store
+		"/storagemarket",
+	}
+	for _, prefix := range prefixes {
+		err := importPrefix(ctx, prefix, mktsDS, boostDS)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func importPrefix(ctx context.Context, prefix string, mktsDS datastore.Batching, boostDS datastore.Batching) error {
+	log.Infof("Importing all legacy markets datastore keys under %s", prefix)
+
+	q, err := mktsDS.Query(ctx, dsq.Query{
+		Prefix: prefix,
+	})
+	if err != nil {
+		return xerrors.Errorf("legacy markets datastore query: %w", err)
+	}
+	defer q.Close() //nolint:errcheck
+
+	// Import keys in batches
+	totalCount := 0
+	batchSize := 1024
+	results := q.Next()
+	for {
+		batch, err := boostDS.Batch(ctx)
+		if err != nil {
+			return xerrors.Errorf("creating boost datastore batch: %w", err)
+		}
+
+		complete := false
+		count := 0
+		for ; count < batchSize; count++ {
+			res, ok := <-results
+			if !ok {
+				complete = true
+				break
+			}
+
+			err := batch.Put(ctx, datastore.NewKey(res.Key), res.Value)
+			if err != nil {
+				return xerrors.Errorf("putting %s to Boost datastore: %w", res.Key, err)
+			}
+		}
+
+		log.Debugf("Importing %d legacy markets datastore keys", count)
+		err = batch.Commit(ctx)
+		if err != nil {
+			return xerrors.Errorf("saving %d datastore keys to Boost datastore: %w", count, err)
+		}
+
+		totalCount += count
+		if complete {
+			log.Infof("Imported %d legacy markets datastore keys under %s", totalCount, prefix)
+			return nil
+		}
+	}
+}
+
+func migrateMarketsKeystore(mktsRepo lotus_repo.LockedRepo, boostRepo lotus_repo.LockedRepo) error {
+	boostKS, err := boostRepo.KeyStore()
+	if err != nil {
+		return err
+	}
+
+	mktsKS, err := mktsRepo.KeyStore()
+	if err != nil {
+		return err
+	}
+
+	keys, err := mktsKS.List()
+	if err != nil {
+		return err
+	}
+
+	for _, k := range keys {
+		ki, err := mktsKS.Get(k)
+		if err != nil {
+			return err
+		}
+		err = boostKS.Put(k, ki)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // checkV1ApiSupport uses v0 api version to signal support for v1 API
@@ -256,4 +684,18 @@ func checkApiInfo(ctx context.Context, ai string) (string, error) {
 	}
 
 	return ai, nil
+}
+
+func dirSize(path string) (int64, error) {
+	var size int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return err
+	})
+	return size, err
 }

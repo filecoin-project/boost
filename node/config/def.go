@@ -34,11 +34,11 @@ func init() {
 
 func defCommon() Common {
 	return Common{
-		API: API{
+		API: lotus_config.API{
 			ListenAddress: "/ip4/127.0.0.1/tcp/1288/http",
-			Timeout:       Duration(30 * time.Second),
+			Timeout:       lotus_config.Duration(30 * time.Second),
 		},
-		Libp2p: Libp2p{
+		Libp2p: lotus_config.Libp2p{
 			ListenAddresses: []string{
 				"/ip4/0.0.0.0/tcp/0",
 				"/ip6/::/tcp/0",
@@ -48,7 +48,7 @@ func defCommon() Common {
 
 			ConnMgrLow:   150,
 			ConnMgrHigh:  180,
-			ConnMgrGrace: Duration(20 * time.Second),
+			ConnMgrGrace: lotus_config.Duration(20 * time.Second),
 		},
 	}
 
@@ -86,12 +86,12 @@ func DefaultBoost() *Boost {
 
 			StartEpochSealingBuffer: 480, // 480 epochs buffer == 4 hours from adding deal to sector to sector being sealed
 
-			RetrievalPricing: &RetrievalPricing{
+			RetrievalPricing: &lotus_config.RetrievalPricing{
 				Strategy: RetrievalPricingDefaultMode,
-				Default: &RetrievalPricingDefault{
+				Default: &lotus_config.RetrievalPricingDefault{
 					VerifiedDealsFreeTransfer: true,
 				},
-				External: &RetrievalPricingExternal{
+				External: &lotus_config.RetrievalPricingExternal{
 					Path: "",
 				},
 			},
