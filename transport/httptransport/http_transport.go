@@ -135,17 +135,36 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 		dl:                   h.dl,
 	}
 
+	cleanupFns := []func(){
+		cancel,
+		func() { close(t.eventCh) },
+	}
+	cleanup := func() {
+		for _, fn := range cleanupFns {
+			fn()
+		}
+	}
+
 	// If this is a libp2p URL
 	if u.scheme == libp2pScheme {
+		h.dl.Infow(duuid, "libp2p-http url", "url", tInfo.URL, "peer id", u.peerID, "multiaddr", u.multiaddr)
+
 		// Use the libp2p client
 		t.client = h.libp2pClient
+
 		// Add the peer's address to the peerstore so we can dial it
 		addrTtl := time.Hour
 		if deadline, ok := ctx.Deadline(); ok {
 			addrTtl = time.Until(deadline)
 		}
 		h.libp2pHost.Peerstore().AddAddr(u.peerID, u.multiaddr, addrTtl)
-		h.dl.Infow(duuid, "libp2p-http url", "url", tInfo.URL, "peer id", u.peerID, "multiaddr", u.multiaddr)
+
+		// Protect the connection for the lifetime of the data transfer
+		tag := uuid.New().String()
+		h.libp2pHost.ConnManager().Protect(u.peerID, tag)
+		cleanupFns = append(cleanupFns, func() {
+			h.libp2pHost.ConnManager().Unprotect(u.peerID, tag)
+		})
 	} else {
 		t.client = http.DefaultClient
 		h.dl.Infow(duuid, "http url", "url", tInfo.URL)
@@ -154,8 +173,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	// is the transfer already complete ? we check this by comparing the number of bytes
 	// in the output file with the deal size.
 	if fileSize == dealInfo.DealSize {
-		defer close(t.eventCh)
-		defer cancel()
+		defer cleanup()
 
 		if err := t.emitEvent(tctx, types.TransportEvent{
 			NBytesReceived: fileSize,
@@ -166,12 +184,12 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 		h.dl.Infow(duuid, "file size is already equal to deal size, returning")
 		return t, nil
 	}
+
 	// start executing the transfer
 	t.wg.Add(1)
 	go func() {
 		defer t.wg.Done()
-		defer close(t.eventCh)
-		defer t.cancel()
+		defer cleanup()
 
 		if err := t.execute(tctx); err != nil {
 			if err := t.emitEvent(tctx, types.TransportEvent{
