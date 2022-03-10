@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"sync"
 	"testing"
 
 	"github.com/filecoin-project/boost/transport/types"
@@ -47,7 +46,7 @@ func TestLibp2pCarServerAuth(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	getServerEvents := recordServerEvents(srv, id)
+	getServerEvents := recordServerEvents(srv, id, types.TransferStatusCompleted)
 
 	// Perform retrieval with the auth token
 	req := newLibp2pHttpRequest(srvHost, authToken)
@@ -117,7 +116,7 @@ func TestLibp2pCarServerResume(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	getServerEvents := recordServerEvents(srv, id)
+	getServerEvents := recordServerEvents(srv, id, types.TransferStatusCompleted)
 
 	outFile := getTempFilePath(t)
 	retrieveData := func(readCount int, of string) {
@@ -236,7 +235,7 @@ func TestLibp2pCarServerCancelTransfer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	getServerEvents := recordServerEvents(srv, id)
+	getServerEvents := recordServerEvents(srv, id, types.TransferStatusFailed)
 
 	// Perform retrieval with the auth token
 	req := newLibp2pHttpRequest(srvHost, authToken)
@@ -305,7 +304,24 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	getServerEvents := recordServerEvents(srv, id)
+	// Record server events
+	svrTransferComplete := make(chan struct{})
+	srvEvts := []types.TransferState{}
+	srvRestartEventRcvd := false
+	srv.Subscribe(func(txid string, st types.TransferState) {
+		if id == txid {
+			srvEvts = append(srvEvts, st)
+
+			// Expect a restart event when the first transfer fails and then is restarted
+			if st.Status == types.TransferStatusRestarted {
+				srvRestartEventRcvd = true
+			}
+			// After the restart event, expect a completed event
+			if srvRestartEventRcvd && st.Status == types.TransferStatusCompleted {
+				close(svrTransferComplete)
+			}
+		}
+	})
 
 	// Perform retrieval with the auth token
 	req1 := newLibp2pHttpRequest(srvHost, authToken)
@@ -345,8 +361,10 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	require.EqualValues(t, carSize, lastClientEvt2.NBytesReceived)
 	assertFileContents(t, of2, st.carBytes)
 
+	// Wait for transfer to complete on server
+	<-svrTransferComplete
+
 	// Check that all bytes were transferred successfully on the server
-	srvEvts := getServerEvents()
 	require.NotEmpty(t, srvEvts)
 	lastSrvEvt := srvEvts[len(srvEvts)-1]
 	require.Equal(t, types.TransferStatusCompleted, lastSrvEvt.Status)
@@ -392,20 +410,20 @@ func setupLibp2pHosts(t *testing.T) (host.Host, host.Host) {
 	return clientHost, srvHost
 }
 
-func recordServerEvents(srv *Libp2pCarServer, id string) func() []types.TransferState {
-	var lk sync.Mutex
+func recordServerEvents(srv *Libp2pCarServer, id string, stopStatus types.TransferStatus) func() []types.TransferState {
+	done := make(chan struct{})
 	srvEvts := []types.TransferState{}
 	srv.Subscribe(func(txid string, st types.TransferState) {
 		if id == txid {
-			lk.Lock()
 			srvEvts = append(srvEvts, st)
-			lk.Unlock()
+			if st.Status == stopStatus {
+				close(done)
+			}
 		}
 	})
 
 	return func() []types.TransferState {
-		lk.Lock()
-		defer lk.Unlock()
+		<-done
 		return srvEvts
 	}
 }

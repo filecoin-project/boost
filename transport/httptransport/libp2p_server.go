@@ -17,8 +17,10 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	gostream "github.com/libp2p/go-libp2p-gostream"
+	"github.com/multiformats/go-multiaddr"
 	"golang.org/x/xerrors"
 )
 
@@ -37,10 +39,11 @@ type Libp2pCarServer struct {
 	cfg    ServerConfig
 	bicm   car.BlockInfoCacheManager
 
-	ctx         context.Context
-	cancel      context.CancelFunc
-	server      *http.Server
-	netListener net.Listener
+	ctx           context.Context
+	cancel        context.CancelFunc
+	server        *http.Server
+	netListener   net.Listener
+	streamMonitor *streamCloseMonitor
 
 	*transfersMgr
 }
@@ -82,6 +85,10 @@ func (s *Libp2pCarServer) Start(ctx context.Context) error {
 
 	s.netListener = listener
 
+	// Listen for stream events
+	s.streamMonitor = newStreamCloseMonitor()
+	s.h.Network().Notify(s.streamMonitor)
+
 	handler := http.NewServeMux()
 	handler.HandleFunc("/", s.handler)
 	s.server = &http.Server{
@@ -91,6 +98,9 @@ func (s *Libp2pCarServer) Start(ctx context.Context) error {
 		BaseContext: func(listener net.Listener) context.Context {
 			return s.ctx
 		},
+		// Save the connection in the context so that later we can get it from
+		// the http.Request instance
+		ConnContext: saveConnInContext,
 	}
 	go s.server.Serve(listener) //nolint:errcheck
 
@@ -238,6 +248,10 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *A
 		err = e
 	}}
 
+	// Get a channel that will be closed when the client closes the connection
+	stream := getConn(r).(gostream.Stream)
+	closeCh := s.streamMonitor.getCloseChan(stream.ID())
+
 	// Send the content
 	http.ServeContent(writeErrWatcher, r, "", time.Time{}, readEmitter)
 
@@ -250,43 +264,86 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *A
 		return err
 	}
 
-	// Wait for the client to receive all data and close the connection
-	err = waitForClientClose(s.ctx, r)
-	if err == nil {
-		log.Infow("completed serving request", logParams...)
-	} else {
-		log.Infow("error waiting for client to close connection", append(logParams, "err", err)...)
-	}
-
-	st := xfer.setComplete(err)
-	fireEvent(st)
-
-	return err
-}
-
-// waitForClientClose waits for the client to close the connection
-func waitForClientClose(ctx context.Context, r *http.Request) error {
-	streamClosed := make(chan error, 1)
 	go func() {
-		// Block until Read returns an EOF, which means the connection has
-		// been closed
-		_, err := r.Body.Read(make([]byte, 1024))
-		if err == io.EOF {
-			err = nil
+		// Wait for the client to receive all data and close the connection
+		log.Infow("completed transferring data, waiting for client to close connection", logParams...)
+		err = waitForClientClose(s.ctx, closeCh)
+		if err == nil {
+			log.Infow("completed serving request", logParams...)
+		} else {
+			log.Infow("error waiting for client to close connection", append(logParams, "err", err)...)
 		}
-		streamClosed <- err
+
+		st := xfer.setComplete(err)
+		fireEvent(st)
 	}()
 
+	return nil
+}
+
+// waitForClientClose waits for the client to close the libp2p stream, so
+// that the the server knows that the client has received all data
+func waitForClientClose(ctx context.Context, streamClosed chan struct{}) error {
 	ctx, cancel := context.WithTimeout(ctx, closeTimeout)
 	defer cancel()
 
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("timed out waiting for client to close connection: %w", ctx.Err())
-	case err := <-streamClosed:
-		return err
+	case <-streamClosed:
+		return nil
 	}
 }
+
+// streamCloseMonitor watches stream open and close events
+type streamCloseMonitor struct {
+	lk      sync.Mutex
+	streams map[string]chan struct{}
+}
+
+func newStreamCloseMonitor() *streamCloseMonitor {
+	return &streamCloseMonitor{
+		streams: make(map[string]chan struct{}),
+	}
+}
+
+// getCloseChan gets a channel that is closed when the stream with that ID is closed.
+// If the stream is already closed, returns a closed channel.
+func (c *streamCloseMonitor) getCloseChan(streamID string) chan struct{} {
+	c.lk.Lock()
+	defer c.lk.Unlock()
+
+	ch, ok := c.streams[streamID]
+	if !ok {
+		// If the stream was already closed, just return a closed channel
+		ch = make(chan struct{})
+		close(ch)
+	}
+	return ch
+}
+
+func (c *streamCloseMonitor) OpenedStream(n network.Network, stream network.Stream) {
+	c.lk.Lock()
+	defer c.lk.Unlock()
+
+	c.streams[stream.ID()] = make(chan struct{})
+}
+
+func (c *streamCloseMonitor) ClosedStream(n network.Network, stream network.Stream) {
+	c.lk.Lock()
+	defer c.lk.Unlock()
+
+	ch, ok := c.streams[stream.ID()]
+	if ok {
+		close(ch)
+		delete(c.streams, stream.ID())
+	}
+}
+
+func (c *streamCloseMonitor) Listen(n network.Network, multiaddr multiaddr.Multiaddr)      {}
+func (c *streamCloseMonitor) ListenClose(n network.Network, multiaddr multiaddr.Multiaddr) {}
+func (c *streamCloseMonitor) Connected(n network.Network, conn network.Conn)               {}
+func (c *streamCloseMonitor) Disconnected(n network.Network, conn network.Conn)            {}
 
 // transfersMgr keeps a list of active transfers.
 // It provides methods to subscribe to and fire events, and runs a
@@ -676,4 +733,18 @@ func (w *writeErrorWatcher) Write(bz []byte) (int, error) {
 		w.onError(err)
 	}
 	return count, err
+}
+
+type ctxKey struct {
+	key string
+}
+
+var connCtxKey = &ctxKey{"http-conn"}
+
+func saveConnInContext(ctx context.Context, c net.Conn) context.Context {
+	return context.WithValue(ctx, connCtxKey, c)
+}
+
+func getConn(r *http.Request) net.Conn {
+	return r.Context().Value(connCtxKey).(net.Conn)
 }
