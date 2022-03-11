@@ -8,6 +8,10 @@ import (
 	"os"
 	"time"
 
+	provider "github.com/filecoin-project/index-provider"
+
+	"github.com/filecoin-project/dagstore"
+
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 
 	"github.com/filecoin-project/go-fil-markets/stores"
@@ -200,9 +204,9 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 				uiMsg:       "deal was paused while indexing because Boost was shut down",
 			}
 		}
-		p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed in dagstore and added to piecestore")
+		p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed and announced")
 	} else {
-		p.dealLogger.Infow(deal.DealUuid, "deal has already been indexed in dagstore and added to piecestore")
+		p.dealLogger.Infow(deal.DealUuid, "deal has already been indexed and announced")
 	}
 
 	return nil
@@ -498,10 +502,22 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piecestore")
 
 	// register with dagstore
-	if err := stores.RegisterShardSync(ctx, p.dagst, pc, deal.InboundFilePath, true); err != nil {
+	if err := stores.RegisterShardSync(ctx, p.dagst, pc, deal.InboundFilePath, true); err != nil && !xerrors.Is(err, dagstore.ErrShardExists) {
 		return fmt.Errorf("failed to register deal with dagstore: %w", err)
 	}
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully registered in dagstore")
+
+	// announce to the network indexer
+	annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
+	if err != nil && !xerrors.Is(err, provider.ErrAlreadyAdvertised) {
+		return fmt.Errorf("failed to announce deal to index provider: %w", err)
+	}
+
+	if err == nil {
+		p.dealLogger.Infow(deal.DealUuid, "deal successfully announced to index provider", "announcementCID", annCid.String())
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "deal has previously been announced to the network indexer")
+	}
 
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced)
 }

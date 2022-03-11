@@ -87,6 +87,12 @@ your node if metadata log is disabled`,
 
 			Comment: ``,
 		},
+		{
+			Name: "IndexProvider",
+			Type: "lotus_config.IndexProviderConfig",
+
+			Comment: ``,
+		},
 	},
 	"Common": []DocField{
 		{

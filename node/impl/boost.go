@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/filecoin-project/boost/indexprovider"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/sealingpipeline"
@@ -39,6 +41,7 @@ type BoostAPI struct {
 
 	// Boost
 	StorageProvider *storagemarket.Provider
+	IndexProvider   *indexprovider.Wrapper
 
 	// Lotus Markets
 	SectorBlocks *sectorblocks.SectorBlocks
@@ -100,4 +103,8 @@ func (sm *BoostAPI) MarketDummyDeal(ctx context.Context, params types.DealParams
 
 func (sm *BoostAPI) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
 	return sm.StorageProvider.Deal(ctx, dealUuid)
+}
+
+func (sm *BoostAPI) IndexerAnnounceAllDeals(ctx context.Context) error {
+	return sm.IndexProvider.IndexerAnnounceAllDeals(ctx)
 }

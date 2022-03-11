@@ -7,6 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost/indexprovider"
+
+	provider "github.com/filecoin-project/index-provider"
+	"github.com/filecoin-project/lotus/markets/idxprov"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
@@ -136,6 +141,11 @@ const (
 	HandleDealsKey
 	HandleRetrievalKey
 	RunSectorServiceKey
+
+	// boost -> should be started after markets
+	HandleBoostDealsKey
+
+	HandleIndexProviderKey
 
 	// daemon
 	ExtractApiKey
@@ -424,6 +434,8 @@ func ConfigBoost(c interface{}) Option {
 		// Sealing Pipeline State API
 		Override(new(sealingpipeline.API), From(new(lotus_modules.MinerStorageService))),
 
+		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper),
+
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner)),
 
 		// GraphQL server
@@ -460,6 +472,8 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
 		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
+		Override(new(idxprov.MeshCreator), idxprov.NewMeshCreator),
+		Override(new(provider.Interface), lotus_modules.IndexProvider(cfg.IndexProvider)),
 
 		// Lotus Markets (storage)
 		Override(new(lotus_dtypes.ProviderTransferNetwork), lotus_modules.NewProviderTransferNetwork),
@@ -470,6 +484,9 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&cfg.LotusFees, &cfg.LotusDealmaking)),
 		Override(new(lotus_storagemarket.StorageProvider), lotus_modules.StorageProvider),
 		Override(HandleDealsKey, lotus_modules.HandleDeals),
+
+		Override(HandleBoostDealsKey, modules.HandleBoostDeals),
+		Override(HandleIndexProviderKey, modules.HandleIndexProvider),
 
 		// Boost storage deal filter
 		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),
@@ -576,3 +593,15 @@ func (f boost) Config() interface{} {
 }
 
 func (boost) SupportsStagingDeals() {}
+
+func (boost) APIFlags() []string {
+	return []string{"boost-api-url"}
+}
+
+func (boost) RepoFlags() []string {
+	return []string{"boost-repo"}
+}
+
+func (boost) APIInfoEnvVars() (primary string, fallbacks []string, deprecated []string) {
+	return "BOOST_API_INFO", nil, nil
+}

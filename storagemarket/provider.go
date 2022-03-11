@@ -116,11 +116,13 @@ type Provider struct {
 
 	dagst stores.DAGStoreWrapper
 	ps    piecestore.PieceStore
+
+	ip types.IndexProvider
 }
 
 func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
-	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, httpOpts ...httptransport.Option) (*Provider, error) {
+	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, httpOpts ...httptransport.Option) (*Provider, error) {
 	fspath := path.Join(repoRoot, "incoming")
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -173,6 +175,8 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 
 		dagst: dagst,
 		ps:    ps,
+
+		ip: ip,
 	}, nil
 }
 
@@ -311,7 +315,6 @@ func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) *dealHandler {
 }
 
 func (p *Provider) Start() ([]*dealHandler, error) {
-
 	log.Infow("storage provider: starting")
 
 	// initialize the database
