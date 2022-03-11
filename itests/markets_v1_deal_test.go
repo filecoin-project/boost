@@ -3,6 +3,7 @@ package itests
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -30,13 +31,12 @@ import (
 
 func TestMarketsV1Deal(t *testing.T) {
 	// Create a CAR file
-	tempdir := t.TempDir()
-	log.Debugw("using tempdir", "dir", tempdir)
+	log.Debugw("using tempdir", "dir", tempHome)
 
 	rseed := 0
 	size := 7 << 20 // 7MiB file
 
-	inPath, err := testutil.CreateRandomFile(t.TempDir(), rseed, size)
+	inPath, err := testutil.CreateRandomFile(tempHome, rseed, size)
 	require.NoError(t, err)
 	res, err := f.fullNode.ClientImport(f.ctx, lapi.FileRef{Path: inPath})
 	require.NoError(t, err)
@@ -63,13 +63,12 @@ func TestMarketsV1Deal(t *testing.T) {
 
 func TestMarketsV1OfflineDeal(t *testing.T) {
 	// Create a CAR file
-	tempdir := t.TempDir()
-	log.Debugw("using tempdir", "dir", tempdir)
+	log.Debugw("using tempdir", "dir", tempHome)
 
-	rseed := 0
+	rseed := 1
 	size := 7 << 20 // 7MiB file
 
-	inPath, err := testutil.CreateRandomFile(tempdir, rseed, size)
+	inPath, err := testutil.CreateRandomFile(tempHome, rseed, size)
 	require.NoError(t, err)
 	res, err := f.fullNode.ClientImport(f.ctx, lapi.FileRef{Path: inPath})
 	require.NoError(t, err)
@@ -97,12 +96,13 @@ func TestMarketsV1OfflineDeal(t *testing.T) {
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
 		cd, _ := f.fullNode.ClientGetDealInfo(f.ctx, *dealProposalCid)
+		fmt.Println(storagemarket.DealStates[cd.State])
 		return cd.State == storagemarket.StorageDealCheckForAcceptance
-	}, 30*time.Second, 1*time.Second, "actual deal status is %s", storagemarket.DealStates[cd.State])
+	}, 60*time.Second, 500*time.Millisecond, "actual deal status is %s", storagemarket.DealStates[cd.State])
 
 	// Create a CAR file from the raw file
 	log.Debugw("generate out.car for miner")
-	carFilePath := filepath.Join(tempdir, "out.car")
+	carFilePath := filepath.Join(tempHome, "out.car")
 	err = f.fullNode.ClientGenCar(f.ctx, api.FileRef{Path: inPath}, carFilePath)
 	require.NoError(t, err)
 
@@ -158,7 +158,7 @@ func retrieve(t *testing.T, ctx context.Context, deal *cid.Cid, root cid.Cid, ca
 	require.NoError(t, err)
 	require.NotEmpty(t, offers, "no offers")
 
-	carFile, err := ioutil.TempFile(t.TempDir(), "ret-car")
+	carFile, err := ioutil.TempFile(tempHome, "ret-car")
 	require.NoError(t, err)
 
 	defer carFile.Close() //nolint:errcheck
@@ -231,7 +231,7 @@ func extractFileFromCAR(t *testing.T, ctx context.Context, file *os.File) (out *
 	fil, err := unixfile.NewUnixfsFile(ctx, dserv, nd)
 	require.NoError(t, err)
 
-	tmpfile, err := ioutil.TempFile(t.TempDir(), "file-in-car")
+	tmpfile, err := ioutil.TempFile(tempHome, "file-in-car")
 	require.NoError(t, err)
 
 	defer tmpfile.Close() //nolint:errcheck
