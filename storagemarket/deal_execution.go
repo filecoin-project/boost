@@ -512,7 +512,12 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	if err != nil && !xerrors.Is(err, provider.ErrAlreadyAdvertised) {
 		return fmt.Errorf("failed to announce deal to index provider: %w", err)
 	}
-	p.dealLogger.Infow(deal.DealUuid, "deal successfully announced to index provider", "announcementCID", annCid.String())
+
+	if err == nil {
+		p.dealLogger.Infow(deal.DealUuid, "deal successfully announced to index provider", "announcementCID", annCid.String())
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "deal has previously been announced to the network indexer")
+	}
 
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced)
 }
