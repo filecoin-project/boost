@@ -17,8 +17,6 @@ const (
 )
 
 func main() {
-	_ = logging.SetLogLevel("*", "INFO")
-
 	app := &cli.App{
 		Name:                 "boost",
 		Usage:                "Markets V2 module for Filecoin",
