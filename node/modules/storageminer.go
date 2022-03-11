@@ -465,9 +465,6 @@ func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
 	return db.NewLogsDB(logsSqlDB.db)
 }
 
-// We start Boost in this way because we want to ensure Boost is started after the legacy markets Provider.
-// We want to do this so that the index provider callback registered by Boost can overwrite the index
-// provider callback registered by legacy markets as legacy markets does NOT know about Boost storage deals.
 func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode) {
 	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a)
 
