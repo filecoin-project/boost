@@ -376,7 +376,7 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	// deal are locked and can no longer be withdrawn. Payment is transferred
 	// to the provider's wallet at each epoch.
 	if deal.Checkpoint < dealcheckpoints.Published {
-		p.dealLogger.Infow(deal.DealUuid, "publishing deal")
+		p.dealLogger.Infow(deal.DealUuid, "sending deal to deal publisher")
 
 		mcid, err := p.dealPublisher.Publish(p.ctx, deal.ClientDealProposal)
 		if err != nil && ctx.Err() != nil {
