@@ -18,11 +18,6 @@ var indexProvAnnounceAllCmd = &cli.Command{
 	Name:  "announce-all",
 	Usage: "Announce all active deals to indexers so they can download the indices",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:        "color",
-			Usage:       "use color in display output",
-			DefaultText: "depends on output being a TTY",
-		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
