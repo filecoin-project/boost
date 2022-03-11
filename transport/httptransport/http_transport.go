@@ -268,7 +268,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		remaining := t.dealInfo.DealSize - t.nBytesReceived
 		reqErr := t.doHttp(ctx, req, of, remaining)
 		if reqErr == nil {
-			t.dl.Infow(duuid, "http request completed successfully")
+			t.dl.Infow(duuid, "http transfer completed successfully")
 			// if there's no error, transfer was successful
 			break
 		}
@@ -288,7 +288,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		// do not resume transfer if context has been cancelled or if the context deadline has exceeded
 		err = reqErr.error
 		if xerrors.Is(err, context.Canceled) || xerrors.Is(err, context.DeadlineExceeded) {
-			t.dl.LogError(duuid, "terminating http request: context cancelled or deadline exceeded", err)
+			t.dl.LogError(duuid, "terminating http transfer: context cancelled or deadline exceeded", err)
 			return fmt.Errorf("transfer context canceled err: %w", err)
 		}
 
@@ -302,7 +302,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		// backoff-retry transfer if max number of attempts haven't been exhausted
 		nAttempts := t.backoff.Attempt() + 1
 		if nAttempts >= t.maxReconnectAttempts {
-			t.dl.Errorw(duuid, "terminating http request: exhausted max attempts", "err", err.Error(), "maxAttempts", t.maxReconnectAttempts)
+			t.dl.Errorw(duuid, "terminating http transfer: exhausted max attempts", "err", err.Error(), "maxAttempts", t.maxReconnectAttempts)
 			return fmt.Errorf("could not finish transfer even after %.0f attempts, lastErr: %w", t.maxReconnectAttempts, err)
 		}
 		duration := t.backoff.Duration()
@@ -334,7 +334,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		return fmt.Errorf("mismtach in output file size vs received bytes, fileSize=%d, receivedBytes=%d", st.Size(), t.nBytesReceived)
 	}
 
-	t.dl.Infow(duuid, "http req finished successfully", "nBytesReceived", t.nBytesReceived,
+	t.dl.Infow(duuid, "http request finished successfully", "nBytesReceived", t.nBytesReceived,
 		"file size", st.Size())
 
 	return nil
