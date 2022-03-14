@@ -406,7 +406,13 @@ func (p *Provider) CancelDealDataTransfer(dealUuid uuid.UUID) error {
 		return ErrDealHandlerNotFound
 	}
 
-	return dh.cancelTransfer()
+	err := dh.cancelTransfer()
+	if err == nil {
+		p.dealLogger.Infow(dealUuid, "deal data transfer cancelled by user")
+	} else {
+		p.dealLogger.Warnw(dealUuid, "error when user tried to cancel deal data transfer", "err", err)
+	}
+	return err
 }
 
 func (p *Provider) getDealHandler(id uuid.UUID) *dealHandler {

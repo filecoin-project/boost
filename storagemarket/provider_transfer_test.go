@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/filecoin-project/boost/storagemarket/types"
+
 	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -39,6 +41,39 @@ func TestSingleDealResumptionDisconnect(t *testing.T) {
 	lgs, err := harness.Provider.logsDB.Logs(ctx, td.params.DealUUID)
 	require.NoError(t, err)
 	require.NotEmpty(t, lgs)
+}
+
+func TestRetryShutdownRecoverable(t *testing.T) {
+	logging.SetLogLevel("http-transport", "WARN") //nolint:errcheck
+
+	ctx := context.Background()
+	fileSize := testFileSize
+
+	// setup the provider test harness with a disconnecting server that disconnects after sending the given number of bytes
+	harness := NewHarness(t, ctx, withHttpDisconnectServerAfter(int64(fileSize/101)))
+	// start the provider test harness
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	// build the deal proposal
+	td := harness.newDealBuilder(t, 1, withNormalFileSize(fileSize)).withDisconnectingHttpServer().build()
+
+	// execute deal and ensure it finishes even with the disconnects
+	err := td.executeAndSubscribe()
+	require.NoError(t, err)
+
+	for evt := range td.sub.Out() {
+		// wait to receive some bytes and then shutdown
+		if evt.(types.ProviderDealState).NBytesReceived > 0 {
+			harness.Provider.Stop()
+			break
+		}
+	}
+
+	// deal should have failed with a recoverable error i.e. it should not be marked as failed or complete
+	pds, err := harness.DealsDB.ByID(ctx, td.params.DealUUID)
+	require.NoError(t, err)
+	require.EqualValues(t, dealcheckpoints.Accepted, pds.Checkpoint)
 }
 
 func TestMultipleDealsConcurrentResumptionDisconnect(t *testing.T) {
