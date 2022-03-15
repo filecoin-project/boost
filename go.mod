@@ -10,6 +10,7 @@ require (
 	github.com/buger/goterm v1.0.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/go-units v0.4.0
+	github.com/dustin/go-humanize v1.0.0
 	github.com/filecoin-project/dagstore v0.5.2
 	github.com/filecoin-project/go-address v0.0.6
 	github.com/filecoin-project/go-bitfield v0.2.4
@@ -18,7 +19,7 @@ require (
 	github.com/filecoin-project/go-data-transfer v1.14.0
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
-	github.com/filecoin-project/go-fil-markets v1.20.2-0.20220308103848-0f34bb886d26
+	github.com/filecoin-project/go-fil-markets v1.20.2-0.20220310135109-c16479e60a2e
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-state-types v0.1.3

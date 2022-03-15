@@ -16,6 +16,7 @@ import (
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
@@ -41,12 +42,13 @@ type resolver struct {
 	storageMgr *storagemanager.StorageManager
 	provider   *storagemarket.Provider
 	legacyProv lotus_storagemarket.StorageProvider
+	legacyDT   lotus_dtypes.ProviderDataTransfer
 	publisher  *storageadapter.DealPublisher
 	spApi      sealingpipeline.API
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(cfg *config.Boost, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(cfg *config.Boost, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		cfg:        cfg,
 		h:          h,
@@ -56,6 +58,7 @@ func NewResolver(cfg *config.Boost, h host.Host, dealsDB *db.DealsDB, logsDB *db
 		storageMgr: storageMgr,
 		provider:   provider,
 		legacyProv: legacyProv,
+		legacyDT:   legacyDT,
 		publisher:  publisher,
 		spApi:      spApi,
 		fullNode:   fullNode,

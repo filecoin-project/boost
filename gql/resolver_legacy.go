@@ -1,16 +1,19 @@
 package gql
 
 import (
+	"context"
 	"fmt"
-	"sort"
 
+	"github.com/dustin/go-humanize"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/graph-gophers/graphql-go"
+	"github.com/ipfs/go-cid"
 )
 
 type legacyDealResolver struct {
 	storagemarket.MinerDeal
+	transferred uint64
 }
 
 type legacyDealListResolver struct {
@@ -19,52 +22,58 @@ type legacyDealListResolver struct {
 	Deals      []*legacyDealResolver
 }
 
-func (r *resolver) LegacyDeal(args struct{ ID graphql.ID }) (*legacyDealResolver, error) {
-	allDeals, err := r.legacyProv.ListLocalDeals()
+func (r *resolver) LegacyDeal(ctx context.Context, args struct{ ID graphql.ID }) (*legacyDealResolver, error) {
+	signedPropCid, err := cid.Parse(string(args.ID))
 	if err != nil {
-		return nil, fmt.Errorf("getting legacy deals: %w", err)
+		return nil, fmt.Errorf("parsing deal signed proposal cid %s: %w", args.ID, err)
 	}
 
-	for _, dl := range allDeals {
-		if dl.ProposalCid.String() == string(args.ID) {
-			return &legacyDealResolver{MinerDeal: dl}, nil
+	dl, err := r.legacyProv.GetLocalDeal(signedPropCid)
+	if err != nil {
+		return nil, fmt.Errorf("getting deal with signed proposal cid %s: %w", args.ID, err)
+	}
+
+	return r.withTransferState(ctx, dl), nil
+}
+
+func (r *resolver) withTransferState(ctx context.Context, dl storagemarket.MinerDeal) *legacyDealResolver {
+	dr := &legacyDealResolver{MinerDeal: dl}
+	if dl.State == storagemarket.StorageDealTransferring && dl.TransferChannelId != nil {
+		st, err := r.legacyDT.ChannelState(ctx, *dl.TransferChannelId)
+		if err != nil {
+			log.Warnw("getting transfer channel id %s: %s", *dl.TransferChannelId, err)
+			dr.transferred = st.Received()
 		}
 	}
-
-	return nil, fmt.Errorf("deal with id '%s' not found", args.ID)
+	return dr
 }
 
 // query: legacyDeals(first, limit) DealList
-func (r *resolver) LegacyDeals(args dealsArgs) (*legacyDealListResolver, error) {
+func (r *resolver) LegacyDeals(ctx context.Context, args dealsArgs) (*legacyDealListResolver, error) {
 	limit := 10
 	if args.Limit.Set && args.Limit.Value != nil && *args.Limit.Value > 0 {
 		limit = int(*args.Limit.Value)
 	}
 
-	// Get all deals in descending order by creation time
-	allDeals, err := r.legacyProv.ListLocalDeals()
-	if err != nil {
-		return nil, fmt.Errorf("getting legacy deals: %w", err)
-	}
-	sort.Slice(allDeals, func(i, j int) bool {
-		return allDeals[j].CreationTime.Time().Before(allDeals[i].CreationTime.Time())
-	})
-
-	// Skip over deals until the first deal in the given page
-	pageDeals := allDeals
+	var offsetPropCid *cid.Cid
 	if args.First != nil {
-		propcid := string(*args.First)
-		first := -1
-		for i, dl := range allDeals {
-			if dl.ProposalCid.String() == propcid {
-				first = i
-				break
-			}
+		signedPropCid, err := cid.Parse(string(*args.First))
+		if err != nil {
+			return nil, fmt.Errorf("parsing offset signed proposal cid %s: %w", *args.First, err)
 		}
+		offsetPropCid = &signedPropCid
+	}
 
-		if first >= 0 {
-			pageDeals = allDeals[first:]
-		}
+	// Get the total number of deals
+	dealCount, err := r.legacyProv.LocalDealCount()
+	if err != nil {
+		return nil, fmt.Errorf("getting deal count: %w", err)
+	}
+
+	// Get a page worth of deals, plus one extra so we can get a "next" cursor
+	pageDeals, err := r.legacyProv.ListLocalDealsPage(offsetPropCid, limit+1)
+	if err != nil {
+		return nil, fmt.Errorf("getting page of deals: %w", err)
 	}
 
 	// If there is another page of deals available
@@ -79,9 +88,7 @@ func (r *resolver) LegacyDeals(args dealsArgs) (*legacyDealListResolver, error) 
 
 	resolvers := make([]*legacyDealResolver, 0, len(pageDeals))
 	for _, deal := range pageDeals {
-		resolvers = append(resolvers, &legacyDealResolver{
-			MinerDeal: deal,
-		})
+		resolvers = append(resolvers, r.withTransferState(ctx, deal))
 	}
 
 	var nextID *graphql.ID
@@ -90,18 +97,18 @@ func (r *resolver) LegacyDeals(args dealsArgs) (*legacyDealListResolver, error) 
 		nextID = &gqlid
 	}
 	return &legacyDealListResolver{
-		TotalCount: int32(len(allDeals)),
+		TotalCount: int32(dealCount),
 		Next:       nextID,
 		Deals:      resolvers,
 	}, nil
 }
 
 func (r *resolver) LegacyDealsCount() (int32, error) {
-	allDeals, err := r.legacyProv.ListLocalDeals()
+	dealCount, err := r.legacyProv.LocalDealCount()
 	if err != nil {
-		return 0, fmt.Errorf("getting legacy deals: %w", err)
+		return 0, fmt.Errorf("getting deal count: %w", err)
 	}
-	return int32(len(allDeals)), nil
+	return int32(dealCount), nil
 }
 
 func (r *legacyDealResolver) ID() (graphql.ID, error) {
@@ -172,5 +179,20 @@ func (r *legacyDealResolver) Status() string {
 }
 
 func (r *legacyDealResolver) Message() string {
+	if r.MinerDeal.Message == "" && r.State == storagemarket.StorageDealTransferring {
+		switch r.transferred {
+		case 0:
+			return "Transferring"
+		case 100:
+			return "Transfer Complete"
+		default:
+			if r.Ref.RawBlockSize > 0 {
+				pct := (100 * r.transferred) / r.Ref.RawBlockSize
+				return fmt.Sprintf("Transferring: %d%%", pct)
+			} else {
+				return fmt.Sprintf("Transferring: %s", humanize.Bytes(r.transferred))
+			}
+		}
+	}
 	return r.MinerDeal.Message
 }
