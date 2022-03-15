@@ -25,6 +25,7 @@ export function LegacyDealDetail(props) {
     const currentEpochData = useQuery(EpochQuery)
 
     const {loading, error, data} = useQuery(LegacyDealQuery, {
+        pollInterval: 5000,
         variables: {id: params.dealID},
     })
 
