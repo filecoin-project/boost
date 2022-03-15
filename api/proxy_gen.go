@@ -61,6 +61,8 @@ type BoostStruct struct {
 
 		MarketGetRetrievalAsk func(p0 context.Context) (*retrievalmarket.Ask, error) `perm:"read"`
 
+		MarketImportDealData func(p0 context.Context, p1 cid.Cid, p2 string) error `perm:"write"`
+
 		MarketListDataTransfers func(p0 context.Context) ([]lapi.DataTransferChannel, error) `perm:"write"`
 
 		MarketListRetrievalDeals func(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) `perm:"read"`
@@ -342,6 +344,17 @@ func (s *BoostStruct) MarketGetRetrievalAsk(p0 context.Context) (*retrievalmarke
 
 func (s *BoostStub) MarketGetRetrievalAsk(p0 context.Context) (*retrievalmarket.Ask, error) {
 	return nil, ErrNotSupported
+}
+
+func (s *BoostStruct) MarketImportDealData(p0 context.Context, p1 cid.Cid, p2 string) error {
+	if s.Internal.MarketImportDealData == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.MarketImportDealData(p0, p1, p2)
+}
+
+func (s *BoostStub) MarketImportDealData(p0 context.Context, p1 cid.Cid, p2 string) error {
+	return ErrNotSupported
 }
 
 func (s *BoostStruct) MarketListDataTransfers(p0 context.Context) ([]lapi.DataTransferChannel, error) {

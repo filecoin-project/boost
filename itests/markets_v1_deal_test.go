@@ -3,10 +3,13 @@ package itests
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	files "github.com/ipfs/go-ipfs-files"
@@ -19,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/lotus/api"
 	lapi "github.com/filecoin-project/lotus/api"
 
@@ -27,13 +31,12 @@ import (
 
 func TestMarketsV1Deal(t *testing.T) {
 	// Create a CAR file
-	tempdir := t.TempDir()
-	log.Debugw("using tempdir", "dir", tempdir)
+	log.Debugw("using tempdir", "dir", tempHome)
 
 	rseed := 0
 	size := 7 << 20 // 7MiB file
 
-	inPath, err := testutil.CreateRandomFile(t.TempDir(), rseed, size)
+	inPath, err := testutil.CreateRandomFile(tempHome, rseed, size)
 	require.NoError(t, err)
 	res, err := f.fullNode.ClientImport(f.ctx, lapi.FileRef{Path: inPath})
 	require.NoError(t, err)
@@ -55,6 +58,68 @@ func TestMarketsV1Deal(t *testing.T) {
 	outPath := retrieve(t, f.ctx, dealProposalCid, res.Root, true)
 
 	log.Debugw("retrieval is done, compare in- and out- files", "in", inPath, "out", outPath)
+	assertFilesEqual(t, inPath, outPath)
+}
+
+func TestMarketsV1OfflineDeal(t *testing.T) {
+	// Create a CAR file
+	log.Debugw("using tempdir", "dir", tempHome)
+
+	rseed := 1
+	size := 7 << 20 // 7MiB file
+
+	inPath, err := testutil.CreateRandomFile(tempHome, rseed, size)
+	require.NoError(t, err)
+	res, err := f.fullNode.ClientImport(f.ctx, lapi.FileRef{Path: inPath})
+	require.NoError(t, err)
+
+	// Get the piece size and commP
+	rootCid := res.Root
+	pieceInfo, err := f.fullNode.ClientDealPieceCID(f.ctx, rootCid)
+	require.NoError(t, err)
+
+	// Create a new markets v1 deal
+	dp := f.DefaultMarketsV1DealParams()
+	dp.Data.Root = res.Root
+	// Replace with params for manual storage deal (offline deal)
+	dp.Data.TransferType = storagemarket.TTManual
+	dp.Data.PieceCid = &pieceInfo.PieceCID
+	dp.Data.PieceSize = pieceInfo.PieceSize.Unpadded()
+
+	log.Debugw("starting offline deal", "root", res.Root)
+	dealProposalCid, err := f.fullNode.ClientStartDeal(f.ctx, &dp)
+	require.NoError(t, err)
+	log.Debugw("got deal proposal cid", "cid", dealProposalCid)
+
+	// Wait for the deal to reach StorageDealCheckForAcceptance on the client
+	cd, err := f.fullNode.ClientGetDealInfo(f.ctx, *dealProposalCid)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		cd, _ := f.fullNode.ClientGetDealInfo(f.ctx, *dealProposalCid)
+		fmt.Println(storagemarket.DealStates[cd.State])
+		return cd.State == storagemarket.StorageDealCheckForAcceptance
+	}, 60*time.Second, 500*time.Millisecond, "actual deal status is %s", storagemarket.DealStates[cd.State])
+
+	// Create a CAR file from the raw file
+	log.Debugw("generate out.car for miner")
+	carFilePath := filepath.Join(tempHome, "out.car")
+	err = f.fullNode.ClientGenCar(f.ctx, api.FileRef{Path: inPath}, carFilePath)
+	require.NoError(t, err)
+
+	// Import the CAR file on the miner - this is the equivalent to
+	// transferring the file across the wire in a normal (non-offline) deal
+	log.Debugw("import out.car in boost")
+	err = f.boost.MarketImportDealData(f.ctx, *dealProposalCid, carFilePath)
+	require.NoError(t, err)
+
+	log.Debugw("wait until offline deal is sealed")
+	err = f.WaitDealSealed(f.ctx, dealProposalCid)
+	require.NoError(t, err)
+
+	log.Debugw("offline deal is sealed, starting retrieval", "cid", dealProposalCid, "root", res.Root)
+	outPath := retrieve(t, f.ctx, dealProposalCid, res.Root, true)
+
+	log.Debugw("retrieval of offline deal is done, compare in- and out- files", "in", inPath, "out", outPath)
 	assertFilesEqual(t, inPath, outPath)
 }
 
@@ -93,7 +158,7 @@ func retrieve(t *testing.T, ctx context.Context, deal *cid.Cid, root cid.Cid, ca
 	require.NoError(t, err)
 	require.NotEmpty(t, offers, "no offers")
 
-	carFile, err := ioutil.TempFile(t.TempDir(), "ret-car")
+	carFile, err := ioutil.TempFile(tempHome, "ret-car")
 	require.NoError(t, err)
 
 	defer carFile.Close() //nolint:errcheck
@@ -166,7 +231,7 @@ func extractFileFromCAR(t *testing.T, ctx context.Context, file *os.File) (out *
 	fil, err := unixfile.NewUnixfsFile(ctx, dserv, nd)
 	require.NoError(t, err)
 
-	tmpfile, err := ioutil.TempFile(t.TempDir(), "file-in-car")
+	tmpfile, err := ioutil.TempFile(tempHome, "file-in-car")
 	require.NoError(t, err)
 
 	defer tmpfile.Close() //nolint:errcheck

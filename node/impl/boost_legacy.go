@@ -2,6 +2,7 @@ package impl
 
 import (
 	"context"
+	"os"
 	"time"
 
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -9,6 +10,7 @@ import (
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	"golang.org/x/xerrors"
 )
 
 func (sm *BoostAPI) MarketListDataTransfers(ctx context.Context) ([]lapi.DataTransferChannel, error) {
@@ -66,6 +68,16 @@ func (sm *BoostAPI) MarketListRetrievalDeals(ctx context.Context) ([]retrievalma
 	}
 
 	return out, nil
+}
+
+func (sm *BoostAPI) MarketImportDealData(ctx context.Context, propCid cid.Cid, path string) error {
+	fi, err := os.Open(path)
+	if err != nil {
+		return xerrors.Errorf("failed to open file: %w", err)
+	}
+	defer fi.Close() //nolint:errcheck
+
+	return sm.LegacyStorageProvider.ImportDataForDeal(ctx, propCid, fi)
 }
 
 func (sm *BoostAPI) MarketSetRetrievalAsk(ctx context.Context, rask *retrievalmarket.Ask) error {

@@ -36,6 +36,7 @@ func main() {
 			runCmd,
 			initCmd,
 			dummydealCmd,
+			storageDealsCmd,
 			dataTransfersCmd,
 			retrievalDealsCmd,
 			indexProvCmd,
