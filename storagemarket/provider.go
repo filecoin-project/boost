@@ -208,7 +208,7 @@ func (p *Provider) MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) 
 	// db should already have a deal with this uuid as the deal proposal should have been agreed before hand
 	ds, err := p.dealsDB.ByID(p.ctx, dealUuid)
 	if err != nil {
-		return nil, nil, fmt.Errorf("no pre-existing deal proposal for offline deal: %s", err)
+		return nil, nil, fmt.Errorf("no pre-existing deal proposal for offline deal: %w", err)
 	}
 	if !ds.IsOffline {
 		return nil, nil, errors.New("deal for the given id is not an offline deal")
