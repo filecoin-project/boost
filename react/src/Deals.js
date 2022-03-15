@@ -188,6 +188,9 @@ function StorageDealsContent(props) {
 
         <div className="pagination">
             <div className="controls">
+                {pageNum > 1 ? (
+                    <div className="first" onClick={() => dealsPagination.firstPage(pageNum)}>&lt;&lt;</div>
+                ) : null}
                 <div className="left" onClick={() => dealsPagination.prevPage(pageNum)}>&lt;</div>
                 <div className="page">{pageNum} of {totalPages}</div>
                 <div className="right" onClick={() => dealsPagination.nextPage(pageNum)}>&gt;</div>
@@ -261,6 +264,8 @@ class DealsPagination {
         var dealList = await this.dealsListQuery(nextCursor)
         this.setPageNum(newPageNum)
         this.addPageCursor(newPageNum + 1, dealList.next)
+
+        window.scrollTo({ top: 0, behavior: "smooth" })
     }
 
     async prevPage(currentPage) {
@@ -272,6 +277,19 @@ class DealsPagination {
         var prevCursor = this.pageCursors[newPageNum]
         await this.dealsListQuery(prevCursor)
         this.setPageNum(newPageNum)
+
+        window.scrollTo({ top: 0, behavior: "smooth" })
+    }
+
+    async firstPage(currentPage) {
+        if (currentPage <= 1) {
+            return
+        }
+
+        await this.dealsListQuery(null)
+        this.setPageNum(1)
+
+        window.scrollTo({ top: 0, behavior: "smooth" })
     }
 }
 

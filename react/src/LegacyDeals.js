@@ -23,6 +23,7 @@ function LegacyStorageDealsContent(props) {
     const [previous, setPrevious] = useState([])
     const [pageNum, setPageNum] = useState(1)
     const {loading, error, data} = useQuery(LegacyDealsListQuery, {
+        pollInterval: 5000,
         variables: {first}
     })
     const [timestampFormat, setTimestampFormat] = useState(TimestampFormat.load)
@@ -43,6 +44,7 @@ function LegacyStorageDealsContent(props) {
         if (!data.legacyDeals.next) {
             return
         }
+        window.scrollTo({ top: 0, behavior: "smooth" })
         setPrevious(previous.concat([first]))
         setFirst(data.legacyDeals.next)
         setPageNum(pageNum+1)
@@ -52,9 +54,20 @@ function LegacyStorageDealsContent(props) {
         if (previous.length === 0) {
             return
         }
+        window.scrollTo({ top: 0, behavior: "smooth" })
         setFirst(previous[previous.length-1])
         setPrevious(previous.slice(0, previous.length-1))
         setPageNum(pageNum-1)
+    }
+
+    function pageFirst() {
+        if (previous.length === 0) {
+            return
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" })
+        setFirst(null)
+        setPrevious([])
+        setPageNum(1)
     }
 
     return <div className="deals">
@@ -81,6 +94,9 @@ function LegacyStorageDealsContent(props) {
 
         <div className="pagination">
             <div className="controls">
+                {pageNum > 1 ? (
+                    <div className="first" onClick={pageFirst}>&lt;&lt;</div>
+                ) : null}
                 <div className="left" onClick={pageBack}>&lt;</div>
                 <div className="page">{pageNum} of {totalPages}</div>
                 <div className="right" onClick={pageForward}>&gt;</div>
