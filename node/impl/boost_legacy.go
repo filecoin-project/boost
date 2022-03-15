@@ -5,9 +5,13 @@ import (
 	"os"
 	"time"
 
+	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
+	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	"golang.org/x/xerrors"
@@ -151,4 +155,25 @@ func (sm *BoostAPI) DealsPieceCidBlocklist(ctx context.Context) ([]cid.Cid, erro
 
 func (sm *BoostAPI) DealsSetPieceCidBlocklist(ctx context.Context, cids []cid.Cid) error {
 	return sm.SetStorageDealPieceCidBlocklistConfigFunc(cids)
+}
+
+func (sm *BoostAPI) MarketSetAsk(ctx context.Context, price types.BigInt, verifiedPrice types.BigInt, duration abi.ChainEpoch, minPieceSize abi.PaddedPieceSize, maxPieceSize abi.PaddedPieceSize) error {
+	options := []storagemarket.StorageAskOption{
+		storagemarket.MinPieceSize(minPieceSize),
+		storagemarket.MaxPieceSize(maxPieceSize),
+	}
+
+	return sm.LegacyStorageProvider.SetAsk(price, verifiedPrice, duration, options...)
+}
+
+func (sm *BoostAPI) MarketGetAsk(ctx context.Context) (*storagemarket.SignedStorageAsk, error) {
+	return sm.LegacyStorageProvider.GetAsk(), nil
+}
+
+func (sm *BoostAPI) ActorSectorSize(ctx context.Context, addr address.Address) (abi.SectorSize, error) {
+	mi, err := sm.Full.StateMinerInfo(ctx, addr, types.EmptyTSK)
+	if err != nil {
+		return 0, err
+	}
+	return mi.SectorSize, nil
 }
