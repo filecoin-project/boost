@@ -11,6 +11,10 @@ BigInt.prototype.toJSON = function() {
 const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB']
 
 export function humanFileSize(size, unitIndex = 0) {
+    if (typeof size === 'undefined' || size === null) {
+        return ''
+    }
+
     const isBigInt = typeof size == 'bigint'
     if (size < 1024) {
         size = isBigInt ? Number(size) : size

@@ -82,6 +82,10 @@ export function LegacyDealDetail(props) {
                     <td>{deal.DealDataRoot}</td>
                 </tr>
                 <tr>
+                    <th>CAR File Path</th>
+                    <td>{deal.InboundCARPath}</td>
+                </tr>
+                <tr>
                     <th>Piece CID</th>
                     <td>{deal.PieceCid}</td>
                 </tr>
@@ -94,8 +98,16 @@ export function LegacyDealDetail(props) {
                     </td>
                 </tr>
                 <tr>
+                    <th>Piece File Path</th>
+                    <td>{deal.PiecePath}</td>
+                </tr>
+                <tr>
                     <th>Provider Collateral</th>
                     <td>{humanFIL(deal.ProviderCollateral)}</td>
+                </tr>
+                <tr>
+                    <th>Funds Reserved</th>
+                    <td>{humanFIL(deal.FundsReserved)}</td>
                 </tr>
                 <tr>
                     <th>Current Epoch</th>
@@ -124,6 +136,10 @@ export function LegacyDealDetail(props) {
                     <td>{deal.TransferType}</td>
                 </tr>
                 <tr>
+                    <th>Transferred</th>
+                    <td>{humanFileSize(deal.Transferred)}</td>
+                </tr>
+                <tr>
                     <th>Transfer Size</th>
                     <td>
                         {deal.TransferSize ? addCommas(deal.TransferSize) : null}
@@ -134,6 +150,18 @@ export function LegacyDealDetail(props) {
                         <tr>
                             <th>Sector ID</th>
                             <td>{deal.SectorNumber + ''}</td>
+                        </tr>
+                    </>
+                ) : null}
+                <tr>
+                    <th>Available for Retrieval</th>
+                    <td>{deal.AvailableForRetrieval ? 'Yes' : 'No'}</td>
+                </tr>
+                {deal.ChainDealID > 0 ? (
+                    <>
+                        <tr>
+                            <th>Chain Deal ID</th>
+                            <td>{deal.ChainDealID + ''}</td>
                         </tr>
                     </>
                 ) : null}

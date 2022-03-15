@@ -38,7 +38,7 @@ func (r *resolver) LegacyDeal(ctx context.Context, args struct{ ID graphql.ID })
 
 func (r *resolver) withTransferState(ctx context.Context, dl storagemarket.MinerDeal) *legacyDealResolver {
 	dr := &legacyDealResolver{MinerDeal: dl}
-	if dl.State == storagemarket.StorageDealTransferring && dl.TransferChannelId != nil {
+	if dl.TransferChannelId != nil {
 		st, err := r.legacyDT.ChannelState(ctx, *dl.TransferChannelId)
 		if err != nil {
 			log.Warnw("getting transfer channel id %s: %s", *dl.TransferChannelId, err)
@@ -147,12 +147,16 @@ func (r *legacyDealResolver) PieceSize() gqltypes.Uint64 {
 	return gqltypes.Uint64(r.ClientDealProposal.Proposal.PieceSize)
 }
 
+func (r *legacyDealResolver) PiecePath() string {
+	return string(r.MinerDeal.PiecePath)
+}
+
 func (r *legacyDealResolver) SectorNumber() gqltypes.Uint64 {
 	return gqltypes.Uint64(r.MinerDeal.SectorNumber)
 }
 
 func (r *legacyDealResolver) ProviderCollateral() gqltypes.Uint64 {
-	return gqltypes.Uint64(r.ClientDealProposal.Proposal.ProviderCollateral.Int64())
+	return gqltypes.Uint64(r.ClientDealProposal.Proposal.ProviderCollateral.Uint64())
 }
 
 func (r *legacyDealResolver) StartEpoch() gqltypes.Uint64 {
@@ -161,6 +165,10 @@ func (r *legacyDealResolver) StartEpoch() gqltypes.Uint64 {
 
 func (r *legacyDealResolver) EndEpoch() gqltypes.Uint64 {
 	return gqltypes.Uint64(r.ClientDealProposal.Proposal.EndEpoch)
+}
+
+func (r *legacyDealResolver) FundsReserved() gqltypes.Uint64 {
+	return gqltypes.Uint64(r.MinerDeal.FundsReserved.Uint64())
 }
 
 func (r *legacyDealResolver) PieceCid() string {
@@ -173,6 +181,26 @@ func (r *legacyDealResolver) TransferType() string {
 
 func (r *legacyDealResolver) TransferSize() gqltypes.Uint64 {
 	return gqltypes.Uint64(r.Ref.RawBlockSize)
+}
+
+func (r *legacyDealResolver) TransferChannelID() *string {
+	if r.TransferChannelId == nil {
+		return nil
+	}
+	chid := r.TransferChannelId.String()
+	return &chid
+}
+
+func (r *legacyDealResolver) Transferred() gqltypes.Uint64 {
+	return gqltypes.Uint64(r.transferred)
+}
+
+func (r *legacyDealResolver) ChainDealID() gqltypes.Uint64 {
+	return gqltypes.Uint64(r.DealID)
+}
+
+func (r *legacyDealResolver) InboundCARPath() string {
+	return r.InboundCAR
 }
 
 func (r *legacyDealResolver) Status() string {

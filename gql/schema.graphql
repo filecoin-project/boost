@@ -62,6 +62,7 @@ type LegacyDeal {
   ProviderAddress: String!
   CreatedAt: Time!
   PieceCid: String!
+  PiecePath: String!
   PieceSize: Uint64!
   ProviderCollateral: Uint64!
   StartEpoch: Uint64!
@@ -70,10 +71,16 @@ type LegacyDeal {
   DealDataRoot: String!
   PublishCid: String!
   TransferType: String!
+  Transferred: Uint64!
   TransferSize: Uint64!
+  TransferChannelID: String
   Status: String!
   SectorNumber: Uint64!
   Message: String!
+  AvailableForRetrieval: Boolean!
+  FundsReserved: Uint64!
+  ChainDealID: Uint64!
+  InboundCARPath: String!
 }
 
 type DealBasic {
