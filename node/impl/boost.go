@@ -108,3 +108,8 @@ func (sm *BoostAPI) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.Provid
 func (sm *BoostAPI) IndexerAnnounceAllDeals(ctx context.Context) error {
 	return sm.IndexProvider.IndexerAnnounceAllDeals(ctx)
 }
+
+func (sm *BoostAPI) MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
+	res, _, err := sm.StorageProvider.MakeOfflineDealWithData(dealUuid, filePath)
+	return res, err
+}

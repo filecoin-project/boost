@@ -66,9 +66,10 @@ type DealStatus struct {
 
 type DealParams struct {
 	DealUUID           uuid.UUID
+	IsOffline          bool
 	ClientDealProposal market.ClientDealProposal
 	DealDataRoot       cid.Cid
-	Transfer           Transfer
+	Transfer           Transfer // Transfer params will be a no-op of this is an offline deal
 }
 
 type DealFilterParams struct {

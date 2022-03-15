@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS Deals (
     DealProposalSignature BLOB,
     PieceCID TEXT,
     PieceSize INT,
+    IsOffline BOOL,
     VerifiedDeal BOOL,
     ClientAddress TEXT,
     ProviderAddress TEXT,

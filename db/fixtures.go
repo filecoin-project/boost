@@ -68,6 +68,7 @@ func GenerateDeals() ([]types.ProviderDealState, error) {
 		deal := types.ProviderDealState{
 			DealUuid:  uuid.New(),
 			CreatedAt: time.Now(),
+			IsOffline: true,
 			ClientDealProposal: market.ClientDealProposal{
 				Proposal: market.DealProposal{
 					PieceCID:             testutil.GenerateCid(),

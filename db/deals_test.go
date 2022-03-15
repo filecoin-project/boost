@@ -71,4 +71,5 @@ func TestDealsDB(t *testing.T) {
 	deal.CreatedAt = time.Time{}
 	storedDeal.CreatedAt = time.Time{}
 	req.Equal(deal, *storedDeal)
+	req.True(deal.IsOffline)
 }

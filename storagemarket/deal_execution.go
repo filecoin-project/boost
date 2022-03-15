@@ -112,31 +112,33 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 
 	p.dealLogger.Infow(deal.DealUuid, "deal execution in progress")
 
-	// Transfer Data
-	if deal.Checkpoint < dealcheckpoints.Transferred {
-		if err := p.transferAndVerify(dh.transferCtx, pub, deal); err != nil {
-			dh.transferCancelled(nil)
-			// if the transfer failed because of context cancellation and the context was not
-			// cancelled because of the user explicitly cancelling the transfer, this is a recoverable error.
-			if xerrors.Is(err, context.Canceled) && !dh.TransferCancelledByUser() {
+	// Transfer Data step will be executed only if it's NOT an offline deal
+	if !deal.IsOffline {
+		if deal.Checkpoint < dealcheckpoints.Transferred {
+			if err := p.transferAndVerify(dh.transferCtx, pub, deal); err != nil {
+				dh.transferCancelled(nil)
+				// if the transfer failed because of context cancellation and the context was not
+				// cancelled because of the user explicitly cancelling the transfer, this is a recoverable error.
+				if xerrors.Is(err, context.Canceled) && !dh.TransferCancelledByUser() {
+					return &dealMakingError{
+						recoverable: true,
+						err:         fmt.Errorf("data transfer failed with a recoverable error after %d bytes with error: %w", deal.NBytesReceived, err),
+						uiMsg:       fmt.Sprintf("data transfer paused after transferring %d bytes because Boost is shutting down", deal.NBytesReceived),
+					}
+				}
 				return &dealMakingError{
-					recoverable: true,
-					err:         fmt.Errorf("data transfer failed with a recoverable error after %d bytes with error: %w", deal.NBytesReceived, err),
-					uiMsg:       fmt.Sprintf("data transfer paused after transferring %d bytes because Boost is shutting down", deal.NBytesReceived),
+					err: fmt.Errorf("execDeal failed data transfer: %w", err),
 				}
 			}
-			return &dealMakingError{
-				err: fmt.Errorf("execDeal failed data transfer: %w", err),
-			}
-		}
 
-		p.dealLogger.Infow(deal.DealUuid, "deal data transfer finished successfully")
-	} else {
-		p.dealLogger.Infow(deal.DealUuid, "deal data transfer has already been completed")
+			p.dealLogger.Infow(deal.DealUuid, "deal data transfer finished successfully")
+		} else {
+			p.dealLogger.Infow(deal.DealUuid, "deal data transfer has already been completed")
+		}
+		// transfer can no longer be cancelled
+		dh.transferCancelled(errors.New("transfer already complete"))
+		p.dealLogger.Infow(deal.DealUuid, "deal data-transfer can no longer be cancelled")
 	}
-	// transfer can no longer be cancelled
-	dh.transferCancelled(errors.New("transfer already complete"))
-	p.dealLogger.Infow(deal.DealUuid, "deal data-transfer can no longer be cancelled")
 
 	// Publish
 	if deal.Checkpoint <= dealcheckpoints.Published {
@@ -552,8 +554,10 @@ func (p *Provider) cleanupDealLogged(deal *types.ProviderDealState) {
 }
 
 func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
-	// remove the temp file created for inbound deal data
-	_ = os.Remove(deal.InboundFilePath)
+	// remove the temp file created for inbound deal data if it is not an offline deal
+	if !deal.IsOffline {
+		_ = os.Remove(deal.InboundFilePath)
+	}
 
 	// close and clean up the deal handler
 	dh := p.getDealHandler(deal.DealUuid)
