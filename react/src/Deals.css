@@ -43,12 +43,12 @@
     display: inline-block;
 }
 
-.deals .pagination .left, .deals .pagination .right, .deals .pagination .page, .deals .pagination .total {
+.deals .pagination .first, .deals .pagination .left, .deals .pagination .right, .deals .pagination .page, .deals .pagination .total {
     display: inline-block;
     padding: 0 0.5em;
 }
 
-.deals .pagination .left, .deals .pagination .right {
+.deals .pagination .first, .deals .pagination .left, .deals .pagination .right {
     color: #465298;
     cursor: pointer;
 }
