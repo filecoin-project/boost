@@ -35,6 +35,7 @@ func main() {
 			authCmd,
 			runCmd,
 			initCmd,
+			migrateCmd,
 			dummydealCmd,
 			storageDealsCmd,
 			dataTransfersCmd,
