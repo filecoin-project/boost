@@ -63,7 +63,9 @@ var initCmd = &cli.Command{
 	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
-		bp, err := initBoost(cctx)
+		ctx := cliutil.ReqContext(cctx)
+
+		bp, err := initBoost(ctx, cctx)
 		if err != nil {
 			return err
 		}
@@ -88,7 +90,7 @@ var initCmd = &cli.Command{
 				return
 			}
 
-			asi, err := checkApiInfo(cctx.Context, cctx.String("api-sector-index"))
+			asi, err := checkApiInfo(ctx, cctx.String("api-sector-index"))
 			if err != nil {
 				cerr = xerrors.Errorf("checking sector index API: %w", err)
 				return
@@ -96,7 +98,7 @@ var initCmd = &cli.Command{
 			log.Debugf("Sector index api info: %s", asi)
 			rcfg.SectorIndexApiInfo = asi
 
-			ai, err := checkApiInfo(cctx.Context, cctx.String("api-sealer"))
+			ai, err := checkApiInfo(ctx, cctx.String("api-sealer"))
 			if err != nil {
 				cerr = xerrors.Errorf("checking sealer API: %w", err)
 				return
@@ -163,10 +165,8 @@ var migrateCmd = &cli.Command{
 	Before: before,
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
 
-		bp, err := initBoost(cctx)
+		bp, err := initBoost(ctx, cctx)
 		if err != nil {
 			return err
 		}
@@ -192,7 +192,7 @@ var migrateCmd = &cli.Command{
 
 		// Migrate datastore keys
 		log.Info("Migrating datastore keys")
-		err = migrateMarketsDatastore(cctx.Context, ds, mktsRepo)
+		err = migrateMarketsDatastore(ctx, ds, mktsRepo)
 		if err != nil {
 			return err
 		}
@@ -374,10 +374,8 @@ type boostParams struct {
 	walletCP   address.Address
 }
 
-func initBoost(cctx *cli.Context) (*boostParams, error) {
+func initBoost(ctx context.Context, cctx *cli.Context) (*boostParams, error) {
 	log.Info("Initializing boost repo")
-
-	ctx := lcli.ReqContext(cctx)
 
 	walletPSD, err := address.NewFromString(cctx.String("wallet-publish-storage-deals"))
 	if err != nil {
