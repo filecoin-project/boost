@@ -42,6 +42,7 @@ func (r *resolver) withTransferState(ctx context.Context, dl storagemarket.Miner
 		st, err := r.legacyDT.ChannelState(ctx, *dl.TransferChannelId)
 		if err != nil {
 			log.Warnw("getting transfer channel id %s: %s", *dl.TransferChannelId, err)
+		} else {
 			dr.transferred = st.Received()
 		}
 	}
@@ -188,7 +189,7 @@ func (r *legacyDealResolver) Message() string {
 		default:
 			if r.Ref.RawBlockSize > 0 {
 				pct := (100 * r.transferred) / r.Ref.RawBlockSize
-				return fmt.Sprintf("Transferring: %d%%", pct)
+				return fmt.Sprintf("Transferring: %s (%d%%)", humanize.Bytes(r.transferred), pct)
 			} else {
 				return fmt.Sprintf("Transferring: %s", humanize.Bytes(r.transferred))
 			}
