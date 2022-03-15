@@ -232,10 +232,15 @@ const LegacyDealQuery = gql`
             DealDataRoot
             PublishCid
             TransferType
+            Transferred
             TransferSize
             Status
             Message
             SectorNumber
+            FundsReserved
+            ChainDealID
+            InboundCARPath
+            AvailableForRetrieval
         }
     }
 `;
