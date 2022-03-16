@@ -34,6 +34,11 @@ type publishDealReq struct {
 	done chan struct{}
 }
 
+type storageSpaceDealReq struct {
+	deal *types.ProviderDealState
+	done chan struct{}
+}
+
 func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, string, error) {
 	// get current sealing pipeline status
 	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
@@ -149,6 +154,15 @@ func (p *Provider) loop() {
 			}()
 
 			dealReq.rsp <- acceptDealResp{&api.ProviderDealRejectionInfo{Accepted: true}, nil}
+
+		case storageSpaceDealReq := <-p.storageSpaceChan:
+			deal := storageSpaceDealReq.deal
+			if err := p.storageManager.Untag(p.ctx, deal.DealUuid); err != nil && !xerrors.Is(err, db.ErrNotFound) {
+				p.dealLogger.LogError(deal.DealUuid, "failed to untag storage space", err)
+			} else {
+				p.dealLogger.Infow(deal.DealUuid, "untagged storage space")
+			}
+			storageSpaceDealReq.done <- struct{}{}
 
 		case publishedDeal := <-p.publishedDealChan:
 			deal := publishedDeal.deal
