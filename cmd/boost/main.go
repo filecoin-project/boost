@@ -41,6 +41,7 @@ func main() {
 			dataTransfersCmd,
 			retrievalDealsCmd,
 			indexProvCmd,
+			dealCmd,
 		},
 	}
 	app.Setup()

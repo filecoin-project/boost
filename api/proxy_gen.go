@@ -124,6 +124,8 @@ type MarketStruct struct {
 
 		IndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
 
+		MakeOfflineDealWithData func(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
+
 		MarketDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 	}
 }
@@ -465,6 +467,17 @@ func (s *MarketStruct) IndexerAnnounceAllDeals(p0 context.Context) error {
 
 func (s *MarketStub) IndexerAnnounceAllDeals(p0 context.Context) error {
 	return ErrNotSupported
+}
+
+func (s *MarketStruct) MakeOfflineDealWithData(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) {
+	if s.Internal.MakeOfflineDealWithData == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.MakeOfflineDealWithData(p0, p1)
+}
+
+func (s *MarketStub) MakeOfflineDealWithData(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) {
+	return nil, ErrNotSupported
 }
 
 func (s *MarketStruct) MarketDummyDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {

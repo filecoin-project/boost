@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost/fundmanager"
+	"github.com/google/uuid"
+
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"golang.org/x/xerrors"
@@ -32,6 +35,16 @@ type finishedDealReq struct {
 type publishDealReq struct {
 	deal *types.ProviderDealState
 	done chan struct{}
+}
+
+func (p *Provider) logFunds(id uuid.UUID, trsp *fundmanager.TagFundsResp) {
+	p.dealLogger.Infow(id, "tagged funds for deal",
+		"tagged for deal publish", trsp.PublishMessage,
+		"tagged for deal collateral", trsp.Collateral,
+		"total tagged for publish", trsp.TotalPublishMessage,
+		"total tagged for collateral", trsp.TotalCollateral,
+		"total available for publish", trsp.AvailablePublishMessage,
+		"total available for collateral", trsp.AvailableCollateral)
 }
 
 func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, string, error) {
@@ -64,15 +77,17 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	cleanup := func() {
 		collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
-			p.dealLogger.LogError(deal.DealUuid, "failed to untag funds during deal cleanup", err)
-		} else {
+			p.dealLogger.LogError(deal.DealUuid, "failed to untag funds during deal cleanup", errf)
+		} else if errf == nil {
 			p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal cleanup", "untagged publish", pub, "untagged collateral", collat,
 				"err", errf)
 		}
 
 		errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
-		if errs != nil && !xerrors.Is(errf, db.ErrNotFound) {
-			p.dealLogger.LogError(deal.DealUuid, "failed to untag storage during deal cleanup", err)
+		if errs != nil && !xerrors.Is(errs, db.ErrNotFound) {
+			p.dealLogger.LogError(deal.DealUuid, "failed to untag storage during deal cleanup", errs)
+		} else if errs == nil {
+			p.dealLogger.Infow(deal.DealUuid, "untagged storage for deal cleanup", deal.Transfer.Size)
 		}
 	}
 
@@ -84,13 +99,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 
 		return false, "server error", fmt.Errorf("failed to tag funds for deal: %w", err)
 	}
-	p.dealLogger.Infow(deal.DealUuid, "tagged funds for deal",
-		"tagged for deal publish", trsp.PublishMessage,
-		"tagged for deal collateral", trsp.Collateral,
-		"total tagged for publish", trsp.TotalPublishMessage,
-		"total tagged for collateral", trsp.TotalCollateral,
-		"total available for publish", trsp.AvailablePublishMessage,
-		"total available for collateral", trsp.AvailableCollateral)
+	p.logFunds(deal.DealUuid, trsp)
 
 	// tag the storage required for the deal in the staging area
 	err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.Transfer.Size)
@@ -115,6 +124,29 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	return true, "", nil
 }
 
+func (p *Provider) processOfflineDealRequest(deal *types.ProviderDealState) (bool, string, error) {
+	// tag funds and start executing deal
+	cleanup := func() {
+		collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
+			p.dealLogger.LogError(deal.DealUuid, "failed to untag funds during deal cleanup", errf)
+		} else if errf == nil {
+			p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal cleanup", "untagged publish", pub, "untagged collateral", collat,
+				)
+		}
+	}
+
+	// tag the funds required for escrow and sending the publish deal message
+	// so that they are not used for other deals
+	trsp, err := p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
+	if err != nil {
+		cleanup()
+		return false, "server error", fmt.Errorf("failed to tag funds for deal: %w", err)
+	}
+	p.logFunds(deal.DealUuid, trsp)
+	return true, "", nil
+}
+
 func (p *Provider) loop() {
 	defer func() {
 		p.wg.Done()
@@ -127,7 +159,14 @@ func (p *Provider) loop() {
 			deal := dealReq.deal
 			p.dealLogger.Infow(deal.DealUuid, "processing deal acceptance request")
 
-			ok, reason, err := p.processDealRequest(dealReq.deal)
+			var ok bool
+			var reason string
+			var err error
+			if deal.IsOffline {
+				ok, reason, err = p.processOfflineDealRequest(dealReq.deal)
+			} else {
+				ok, reason, err = p.processDealRequest(dealReq.deal)
+			}
 			if !ok {
 				if err != nil {
 					p.dealLogger.LogError(deal.DealUuid, "error while processing deal acceptance request", err)
