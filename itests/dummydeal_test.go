@@ -36,7 +36,7 @@ func TestDummydeal(t *testing.T) {
 	// Create a new dummy deal
 	dealUuid := uuid.New()
 
-	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath))
+	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false)
 	require.NoError(t, err)
 	require.True(t, res.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
@@ -44,7 +44,7 @@ func TestDummydeal(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	failingDealUuid := uuid.New()
-	res2, err2 := f.makeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
+	res2, err2 := f.makeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
 	require.NoError(t, err2)
 	require.Equal(t, "cannot accept piece of size 2254421, on top of already allocated 2254421 bytes, because it would exceed max staging area size 4000000", res2.Reason)
 	log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
@@ -55,12 +55,23 @@ func TestDummydeal(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	passingDealUuid := uuid.New()
-	res2, err2 = f.makeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath))
+	res2, err2 = f.makeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
 	require.NoError(t, err2)
 	require.True(t, res2.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
 
 	// Wait for the deal to be added to a sector
 	err = f.waitForDealAddedToSector(passingDealUuid)
+	require.NoError(t, err)
+
+	// make an offline deal
+	offlineDealUuid := uuid.New()
+	res, err = f.makeDummyDeal(offlineDealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), true)
+	require.NoError(t, err)
+	require.True(t, res.Accepted)
+	res, err = f.boost.MakeOfflineDealWithData(offlineDealUuid, carFilepath)
+	require.NoError(t, err)
+	require.True(t, res.Accepted)
+	err = f.waitForDealAddedToSector(offlineDealUuid)
 	require.NoError(t, err)
 }

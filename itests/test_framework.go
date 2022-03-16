@@ -384,7 +384,7 @@ func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 	}
 }
 
-func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string) (*api.ProviderDealRejectionInfo, error) {
+func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool) (*api.ProviderDealRejectionInfo, error) {
 	cidAndSize, err := storagemarket.GenerateCommP(carFilepath)
 	if err != nil {
 		return nil, err
@@ -477,6 +477,7 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 	dealParams := types.DealParams{
 		DealUUID:           dealUuid,
 		ClientDealProposal: *signedProposal,
+		IsOffline:          isOffline,
 		DealDataRoot:       rootCid,
 		Transfer: types.Transfer{
 			Type:   "http",
