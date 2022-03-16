@@ -10,7 +10,7 @@
     color: #a61e4d;
 }
 
-.deal-detail .title .copy {
+.deal-detail .title .copy, .deal-detail .title .copy-all {
     display: inline-block;
     vertical-align: text-top;
     width: 0.8em;
@@ -22,13 +22,39 @@
     background-size: cover;
 }
 
-.deal-detail .title .copy.copied {
+.deal-detail .title .copy-all {
+    background: url("./bootstrap-icons/icons/clipboard-plus.svg");
+}
+
+.deal-detail .title .copy.copied, .deal-detail .title .copy-all.copied {
     animation: rotate 0.5s infinite;
 }
 
 @keyframes rotate {
     from{ transform: rotate(0deg); }
     to{ transform: rotate(360deg); }
+}
+
+.deal-detail .popup {
+    display: none;
+    position: absolute;
+    font-size: 1em;
+    top: -3em;
+    text-align: center;
+    width: 100%;
+}
+.deal-detail .popup.showing {
+    display: inline-block;
+}
+
+.deal-detail .popup .message {
+    display: inline-block;
+    color: #777777;
+    border: 1px solid #aaa;
+    border-radius: 0.2em;
+    padding: 0.5em;
+    font-size: 0.8em;
+    margin-top: 0.8em;
 }
 
 .deal-detail table {
@@ -117,4 +143,8 @@
 
 .deal-detail .deal-logs .param.expanded .expand-collapse {
     background: url("./bootstrap-icons/icons/caret-down-fill.svg")
+}
+
+.deal-detail .copy-buffer {
+    display: none;
 }
