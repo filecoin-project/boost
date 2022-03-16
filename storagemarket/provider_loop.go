@@ -130,9 +130,9 @@ func (p *Provider) processOfflineDealRequest(deal *types.ProviderDealState) (boo
 		collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
 			p.dealLogger.LogError(deal.DealUuid, "failed to untag funds during deal cleanup", errf)
-		} else if errf != nil {
+		} else if errf == nil {
 			p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal cleanup", "untagged publish", pub, "untagged collateral", collat,
-				"err", errf)
+				)
 		}
 	}
 

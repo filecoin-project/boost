@@ -69,7 +69,7 @@ type DealParams struct {
 	IsOffline          bool
 	ClientDealProposal market.ClientDealProposal
 	DealDataRoot       cid.Cid
-	Transfer           Transfer // Transfer params will be a no-op if this is an offline deal
+	Transfer           Transfer // Transfer params will be the zero value if this is an offline deal
 }
 
 type DealFilterParams struct {

@@ -22,7 +22,7 @@ type ProviderDealState struct {
 	CreatedAt time.Time
 	// ClientDealProposal is the deal proposal sent by the client.
 	ClientDealProposal market.ClientDealProposal
-	// IsOffline is true for offline deals i.e. deals where the actual data to be stored by the SP is sent offband
+	// IsOffline is true for offline deals i.e. deals where the actual data to be stored by the SP is sent out of band
 	// and not via an online data transfer.
 	IsOffline bool
 
