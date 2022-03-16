@@ -9,26 +9,6 @@ type DocField struct {
 }
 
 var Doc = map[string][]DocField{
-	"API": []DocField{
-		{
-			Name: "ListenAddress",
-			Type: "string",
-
-			Comment: `Binding address for the Lotus API`,
-		},
-		{
-			Name: "RemoteListenAddress",
-			Type: "string",
-
-			Comment: ``,
-		},
-		{
-			Name: "Timeout",
-			Type: "Duration",
-
-			Comment: ``,
-		},
-	},
 	"Backup": []DocField{
 		{
 			Name: "DisableMetadataLog",
@@ -97,70 +77,21 @@ your node if metadata log is disabled`,
 	"Common": []DocField{
 		{
 			Name: "API",
-			Type: "API",
+			Type: "lotus_config.API",
 
 			Comment: ``,
 		},
 		{
 			Name: "Backup",
-			Type: "Backup",
+			Type: "lotus_config.Backup",
 
 			Comment: ``,
 		},
 		{
 			Name: "Libp2p",
-			Type: "Libp2p",
+			Type: "lotus_config.Libp2p",
 
 			Comment: ``,
-		},
-	},
-	"DAGStoreConfig": []DocField{
-		{
-			Name: "RootDir",
-			Type: "string",
-
-			Comment: `Path to the dagstore root directory. This directory contains three
-subdirectories, which can be symlinked to alternative locations if
-need be:
-- ./transients: caches unsealed deals that have been fetched from the
-storage subsystem for serving retrievals.
-- ./indices: stores shard indices.
-- ./datastore: holds the KV store tracking the state of every shard
-known to the DAG store.
-Default value: <LOTUS_MARKETS_PATH>/dagstore (split deployment) or
-<LOTUS_MINER_PATH>/dagstore (monolith deployment)`,
-		},
-		{
-			Name: "MaxConcurrentIndex",
-			Type: "int",
-
-			Comment: `The maximum amount of indexing jobs that can run simultaneously.
-0 means unlimited.
-Default value: 5.`,
-		},
-		{
-			Name: "MaxConcurrentReadyFetches",
-			Type: "int",
-
-			Comment: `The maximum amount of unsealed deals that can be fetched simultaneously
-from the storage subsystem. 0 means unlimited.
-Default value: 0 (unlimited).`,
-		},
-		{
-			Name: "MaxConcurrencyStorageCalls",
-			Type: "int",
-
-			Comment: `The maximum number of simultaneous inflight API calls to the storage
-subsystem.
-Default value: 100.`,
-		},
-		{
-			Name: "GCInterval",
-			Type: "Duration",
-
-			Comment: `The time between calls to periodic dagstore GC, in time.Duration string
-representation, e.g. 1m, 5m, 1h.
-Default value: 1 minute.`,
 		},
 	},
 	"DealmakingConfig": []DocField{
@@ -288,76 +219,9 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 		},
 		{
 			Name: "RetrievalPricing",
-			Type: "*RetrievalPricing",
+			Type: "*lotus_config.RetrievalPricing",
 
 			Comment: ``,
-		},
-	},
-	"Libp2p": []DocField{
-		{
-			Name: "ListenAddresses",
-			Type: "[]string",
-
-			Comment: `Binding address for the libp2p host - 0 means random port.
-Format: multiaddress; see https://multiformats.io/multiaddr/`,
-		},
-		{
-			Name: "AnnounceAddresses",
-			Type: "[]string",
-
-			Comment: `Addresses to explicitally announce to other peers. If not specified,
-all interface addresses are announced
-Format: multiaddress`,
-		},
-		{
-			Name: "NoAnnounceAddresses",
-			Type: "[]string",
-
-			Comment: `Addresses to not announce
-Format: multiaddress`,
-		},
-		{
-			Name: "BootstrapPeers",
-			Type: "[]string",
-
-			Comment: ``,
-		},
-		{
-			Name: "ProtectedPeers",
-			Type: "[]string",
-
-			Comment: ``,
-		},
-		{
-			Name: "DisableNatPortMap",
-			Type: "bool",
-
-			Comment: `When not disabled (default), lotus asks NAT devices (e.g., routers), to
-open up an external port and forward it to the port lotus is running on.
-When this works (i.e., when your router supports NAT port forwarding),
-it makes the local lotus node accessible from the public internet`,
-		},
-		{
-			Name: "ConnMgrLow",
-			Type: "uint",
-
-			Comment: `ConnMgrLow is the number of connections that the basic connection manager
-will trim down to.`,
-		},
-		{
-			Name: "ConnMgrHigh",
-			Type: "uint",
-
-			Comment: `ConnMgrHigh is the number of connections that, when exceeded, will trigger
-a connection GC operation. Note: protected/recently formed connections don't
-count towards this limit.`,
-		},
-		{
-			Name: "ConnMgrGrace",
-			Type: "Duration",
-
-			Comment: `ConnMgrGrace is a time duration that new connections are immune from being
-closed by the connection manager.`,
 		},
 	},
 	"LotusDealmakingConfig": []DocField{
@@ -454,49 +318,9 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 		},
 		{
 			Name: "RetrievalPricing",
-			Type: "*RetrievalPricing",
+			Type: "*lotus_config.RetrievalPricing",
 
 			Comment: ``,
-		},
-	},
-	"RetrievalPricing": []DocField{
-		{
-			Name: "Strategy",
-			Type: "string",
-
-			Comment: ``,
-		},
-		{
-			Name: "Default",
-			Type: "*RetrievalPricingDefault",
-
-			Comment: ``,
-		},
-		{
-			Name: "External",
-			Type: "*RetrievalPricingExternal",
-
-			Comment: ``,
-		},
-	},
-	"RetrievalPricingDefault": []DocField{
-		{
-			Name: "VerifiedDealsFreeTransfer",
-			Type: "bool",
-
-			Comment: `VerifiedDealsFreeTransfer configures zero fees for data transfer for a retrieval deal
-of a payloadCid that belongs to a verified storage deal.
-This parameter is ONLY applicable if the retrieval pricing policy strategy has been configured to "default".
-default value is true`,
-		},
-	},
-	"RetrievalPricingExternal": []DocField{
-		{
-			Name: "Path",
-			Type: "string",
-
-			Comment: `Path of the external script that will be run to price a retrieval deal.
-This parameter is ONLY applicable if the retrieval pricing policy strategy has been configured to "external".`,
 		},
 	},
 	"WalletsConfig": []DocField{

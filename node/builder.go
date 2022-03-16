@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 
 	provider "github.com/filecoin-project/index-provider"
 	"github.com/filecoin-project/lotus/markets/idxprov"
@@ -490,6 +491,9 @@ func ConfigBoost(c interface{}) Option {
 
 		// Boost storage deal filter
 		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),
+		If(cfg.Dealmaking.Filter != "",
+			Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, dealfilter.CliStorageDealFilter(cfg.Dealmaking.Filter))),
+		),
 
 		// Lotus markets storage deal filter
 		Override(new(lotus_dtypes.StorageDealFilter), lotus_modules.BasicDealFilter(cfg.LotusDealmaking, nil)),
@@ -497,9 +501,15 @@ func ConfigBoost(c interface{}) Option {
 			Override(new(lotus_dtypes.StorageDealFilter), lotus_modules.BasicDealFilter(cfg.LotusDealmaking, lotus_dealfilter.CliStorageDealFilter(cfg.LotusDealmaking.Filter))),
 		),
 
+		// Boost retrieval deal filter
+		Override(new(dtypes.RetrievalDealFilter), modules.RetrievalDealFilter(nil)),
+		If(cfg.Dealmaking.RetrievalFilter != "",
+			Override(new(dtypes.RetrievalDealFilter), modules.RetrievalDealFilter(dealfilter.CliRetrievalDealFilter(cfg.Dealmaking.RetrievalFilter))),
+		),
+
 		// Lotus markets retrieval deal filter
 		Override(new(lotus_dtypes.RetrievalDealFilter), lotus_modules.RetrievalDealFilter(nil)),
-		If(cfg.Dealmaking.RetrievalFilter != "",
+		If(cfg.LotusDealmaking.RetrievalFilter != "",
 			Override(new(lotus_dtypes.RetrievalDealFilter), lotus_modules.RetrievalDealFilter(lotus_dealfilter.CliRetrievalDealFilter(cfg.LotusDealmaking.RetrievalFilter))),
 		),
 
