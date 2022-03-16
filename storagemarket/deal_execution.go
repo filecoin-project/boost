@@ -138,6 +138,12 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 		// transfer can no longer be cancelled
 		dh.transferCancelled(errors.New("transfer already complete"))
 		p.dealLogger.Infow(deal.DealUuid, "deal data-transfer can no longer be cancelled")
+	} else {
+		// verify CommP matches for an offline deal
+		if err := p.verifyCommP(deal); err != nil {
+			return &dealMakingError{err: fmt.Errorf("error when matching commP for imported data for offline deal: %w", err)}
+		}
+		p.dealLogger.Infow(deal.DealUuid, "commp matched successfully for imported data for offline deal")
 	}
 
 	// Publish
@@ -254,6 +260,15 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 		time.Since(st).String())
 
 	// Verify CommP matches
+	if err := p.verifyCommP(deal); err != nil {
+		return fmt.Errorf("failed to verify CommP: %w", err)
+	}
+
+	p.dealLogger.Infow(deal.DealUuid, "commP matched successfully: deal-data verified")
+	return p.updateCheckpoint(pub, deal, dealcheckpoints.Transferred)
+}
+
+func (p *Provider) verifyCommP(deal *types.ProviderDealState) error {
 	pieceCid, err := GeneratePieceCommitment(deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize)
 	if err != nil {
 		return fmt.Errorf("failed to generate CommP: %w", err)
@@ -264,8 +279,7 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 		return fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid)
 	}
 
-	p.dealLogger.Infow(deal.DealUuid, "commP matched successfully: deal-data verified")
-	return p.updateCheckpoint(pub, deal, dealcheckpoints.Transferred)
+	return nil
 }
 
 func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.Handler, pub event.Emitter, deal *types.ProviderDealState) error {

@@ -383,7 +383,7 @@ func (h *ProviderHarness) AssertPublishConfirmed(t *testing.T, ctx context.Conte
 }
 
 func (h *ProviderHarness) AssertPieceAdded(t *testing.T, ctx context.Context, dp *types.DealParams, so *smtestutil.StubbedMinerOutput, carv2FilePath string) {
-	h.AssertEventuallyDealCleanedup(t, ctx, dp.DealUUID)
+	h.AssertEventuallyDealCleanedup(t, ctx, dp)
 	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.IndexedAndAnnounced, so.SectorID, so.Offset, dp.ClientDealProposal.Proposal.PieceSize.Unpadded().Padded(), "")
 	// Assert that the original file data we sent matches what was sent to the sealer
 	h.AssertSealedContents(t, carv2FilePath, *so.SealedBytes)
@@ -442,8 +442,8 @@ func (h *ProviderHarness) AssertSealedContents(t *testing.T, carV2FilePath strin
 	require.EqualValues(t, actual, read[:len(actual)])
 }
 
-func (h *ProviderHarness) AssertEventuallyDealCleanedup(t *testing.T, ctx context.Context, dealUuid uuid.UUID) {
-	dbState, err := h.DealsDB.ByID(ctx, dealUuid)
+func (h *ProviderHarness) AssertEventuallyDealCleanedup(t *testing.T, ctx context.Context, dp *types.DealParams) {
+	dbState, err := h.DealsDB.ByID(ctx, dp.DealUUID)
 	require.NoError(t, err)
 	// assert that the deal has been cleanedup and there are no leaks
 	require.Eventually(t, func() bool {
@@ -453,9 +453,12 @@ func (h *ProviderHarness) AssertEventuallyDealCleanedup(t *testing.T, ctx contex
 			return false
 		}
 
-		// the deal inbound file should no longer exist
-		_, statErr := os.Stat(dbState.InboundFilePath)
-		return statErr != nil
+		// the deal inbound file should no longer exist if it is an online deal
+		if !dp.IsOffline {
+			_, statErr := os.Stat(dbState.InboundFilePath)
+			return statErr != nil
+		}
+		return true
 	}, 5*time.Second, 200*time.Millisecond)
 }
 
@@ -746,6 +749,7 @@ func (h *ProviderHarness) Stop() {
 
 type dealProposalConfig struct {
 	normalFileSize int
+	offlineDeal    bool
 }
 
 // dealProposalOpt allows configuration of the deal proposal
@@ -756,6 +760,12 @@ type dealProposalOpt func(dc *dealProposalConfig)
 func withNormalFileSize(normalFileSize int) dealProposalOpt {
 	return func(dc *dealProposalConfig) {
 		dc.normalFileSize = normalFileSize
+	}
+}
+
+func withOfflineDeal() dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.offlineDeal = true
 	}
 }
 
@@ -800,7 +810,8 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 
 	// assemble the final deal params to send to the provider
 	dealParams := &types.DealParams{
-		DealUUID: uuid.New(),
+		DealUUID:  uuid.New(),
+		IsOffline: dc.offlineDeal,
 		ClientDealProposal: market.ClientDealProposal{
 			Proposal: proposal,
 			ClientSignature: acrypto.Signature{
@@ -1006,6 +1017,23 @@ type testDeal struct {
 	tBuilder *testDealBuilder
 }
 
+func (td *testDeal) executeAndSubscribeOfflineDeal() error {
+	pi, dh, err := td.ph.Provider.MakeOfflineDealWithData(td.params.DealUUID, td.carv2FilePath)
+	if err != nil {
+		return err
+	}
+	if !pi.Accepted {
+		return errors.New("deal not accepted")
+	}
+	sub, err := dh.subscribeUpdates()
+	if err != nil {
+		return err
+	}
+	td.sub = sub
+
+	return nil
+}
+
 func (td *testDeal) executeAndSubscribe() error {
 	pi, dh, err := td.ph.Provider.ExecuteDeal(td.params, peer.ID(""))
 	if err != nil {
@@ -1124,7 +1152,7 @@ func (td *testDeal) assertDealFailedTransferNonRecoverable(t *testing.T, ctx con
 }
 
 func (td *testDeal) assertEventuallyDealCleanedup(t *testing.T, ctx context.Context) {
-	td.ph.AssertEventuallyDealCleanedup(t, ctx, td.params.DealUUID)
+	td.ph.AssertEventuallyDealCleanedup(t, ctx, td.params)
 }
 
 func (td *testDeal) assertDealFailedNonRecoverable(t *testing.T, ctx context.Context, errContains string) {
