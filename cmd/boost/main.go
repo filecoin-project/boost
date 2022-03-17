@@ -29,14 +29,6 @@ func main() {
 				Usage:   "boost repo path",
 				Value:   "~/.boost",
 			},
-			&cli.StringFlag{
-				Name:  "pprof.cpu",
-				Usage: "specify name of file for writing cpu profile to",
-			},
-			&cli.StringFlag{
-				Name:  "pprof.mem",
-				Usage: "specify name of file for writing mem profile to",
-			},
 			&cli.BoolFlag{
 				Name:  "pprof",
 				Usage: "run pprof web server on localhost:6060",

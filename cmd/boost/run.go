@@ -2,9 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"runtime"
-	"runtime/pprof"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node"
@@ -28,30 +25,6 @@ var runCmd = &cli.Command{
 	Usage:  "Start a boost process",
 	Before: before,
 	Action: func(cctx *cli.Context) error {
-		if cpuprofile := cctx.String("pprof.cpu"); cpuprofile != "" {
-			profile, err := os.Create(cpuprofile)
-			if err != nil {
-				return err
-			}
-
-			if err := pprof.StartCPUProfile(profile); err != nil {
-				return err
-			}
-			defer pprof.StopCPUProfile()
-		}
-
-		if memprofile := cctx.String("pprof.mem"); memprofile != "" {
-			f, err := os.Create(memprofile)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-			runtime.GC() // get up-to-date statistics
-			if err := pprof.WriteHeapProfile(f); err != nil {
-				return err
-			}
-		}
-
 		if cctx.Bool("pprof") {
 			go func() {
 				err := http.ListenAndServe("localhost:6060", nil)
