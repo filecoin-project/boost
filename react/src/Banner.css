@@ -18,6 +18,11 @@
     background-color: #fff;
 }
 
+#banner.error .message {
+    color: crimson;
+    border-color: crimson;
+}
+
 #banner.showing {
     display: block;
 }
