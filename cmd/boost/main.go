@@ -37,11 +37,13 @@ func main() {
 			initCmd,
 			migrateCmd,
 			dummydealCmd,
+			proposeDealCmd,
 			storageDealsCmd,
 			dataTransfersCmd,
 			retrievalDealsCmd,
 			indexProvCmd,
 			dealCmd,
+			utilsCmd,
 		},
 	}
 	app.Setup()
@@ -52,6 +54,8 @@ func main() {
 }
 
 func before(cctx *cli.Context) error {
+	_ = logging.SetLogLevel("boost", "INFO")
+
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boost", "DEBUG")
 		_ = logging.SetLogLevel("provider", "DEBUG")
