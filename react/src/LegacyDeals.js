@@ -127,7 +127,7 @@ function DealRow(props) {
             <td className="start" onClick={props.toggleTimestampFormat}>{start}</td>
             <td className="deal-id">
                 <Link to={"/legacy-deals/" + deal.ID}>
-                    <ShortDealID id={deal.ID} />
+                    <div className="short-deal-id">{deal.ID.substring(0, 12) + '…'}</div>
                 </Link>
             </td>
             <td className="piece-size">{humanFileSize(deal.PieceSize)}</td>
