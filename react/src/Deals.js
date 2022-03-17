@@ -10,13 +10,13 @@ import './Deals.css'
 import {dateFormat} from "./util-date";
 import {LegacyStorageDealsCount} from "./LegacyDeals";
 import {TimestampFormat} from "./timestamp";
-
-var dealsPerPage = 10
+import {DealsPerPage} from "./deals-per-page";
 
 class NewDealsSubscriber {
-    constructor(initialDeals, dealCount, onNewDeal) {
+    constructor(initialDeals, dealsPerPage, dealCount, onNewDeal) {
         this.pageNum = 1
         this.deals = initialDeals
+        this.dealsPerPage = dealsPerPage
         this.onNewDeal = onNewDeal
         this.dealCount = dealCount
     }
@@ -46,9 +46,9 @@ class NewDealsSubscriber {
                     var prevLength = that.deals.length
                     that.deals = uniqDeals([dealNew, ...that.deals])
                     const isNewDeal = that.deals.length > prevLength
-                    if (that.deals.length > dealsPerPage) {
-                        nextCursor = that.deals[dealsPerPage].ID
-                        that.deals = that.deals.slice(0, dealsPerPage)
+                    if (that.deals.length > that.dealsPerPage) {
+                        nextCursor = that.deals[that.dealsPerPage].ID
+                        that.deals = that.deals.slice(0, that.dealsPerPage)
                     }
 
                     // If a new deal was added, call the onNewDeal callback
@@ -87,6 +87,13 @@ function StorageDealsContent(props) {
     const saveTimestampFormat = (val) => {
         TimestampFormat.save(val)
         setTimestampFormat(val)
+    }
+
+    var [dealsPerPage, setDealsPerPage] = useState(DealsPerPage.load)
+    const onDealsPerPageChange = (e) => {
+        const val = parseInt(e.target.value)
+        DealsPerPage.save(val)
+        setDealsPerPage(val)
     }
 
     async function dealsListQuery(cursor) {
@@ -136,7 +143,7 @@ function StorageDealsContent(props) {
                 }
                 setTotalCount(count)
             }
-            newDealsSubscriber = new NewDealsSubscriber(res.deals, res.totalCount, onNewDeal)
+            newDealsSubscriber = new NewDealsSubscriber(res.deals, dealsPerPage, res.totalCount, onNewDeal)
             sub = newDealsSubscriber.subscribe()
 
             dealsPagination.addPageCursor(2, res.next)
@@ -149,7 +156,7 @@ function StorageDealsContent(props) {
                 (await sub).unsubscribe()
             }
         }
-    }, [])
+    }, [dealsPerPage])
 
     // When the deals being displayed or the page number changes, update the
     // deals subscriber fields
@@ -195,6 +202,14 @@ function StorageDealsContent(props) {
                 <div className="page">{pageNum} of {totalPages}</div>
                 <div className="right" onClick={() => dealsPagination.nextPage(pageNum)}>&gt;</div>
                 <div className="total">{totalCount} deals</div>
+                <div className="per-page">
+                    <select value={dealsPerPage} onChange={onDealsPerPageChange}>
+                        <option value={10}>10 pp</option>
+                        <option value={25}>25 pp</option>
+                        <option value={50}>50 pp</option>
+                        <option value={100}>100 pp</option>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
