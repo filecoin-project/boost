@@ -212,7 +212,7 @@ var dealCmd = &cli.Command{
 		// Create a deal proposal to storage provider using deal protocol v1.2.0 format
 		dealProposal, err := dealProposal(ctx, node, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, minerAddr, head, cctx.Int("days"), cctx.Bool("verified"), providerCollateral)
 		if err != nil {
-			return fmt.Errorf("creating deal proposal: %w", err)
+			return fmt.Errorf("failed to create a deal proposal: %w", err)
 		}
 
 		dealParams := types.DealParams{
@@ -226,7 +226,7 @@ var dealCmd = &cli.Command{
 			},
 		}
 
-		log.Debugw("about to submit deal", "uuid", dealUuid.String())
+		log.Debugw("about to submit deal proposal", "uuid", dealUuid.String())
 
 		var resp types.DealResponse
 		if err := doRpc(ctx, s, &dealParams, &resp); err != nil {

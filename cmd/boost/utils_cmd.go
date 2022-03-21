@@ -267,6 +267,15 @@ var generatecarCmd = &cli.Command{
 			return xerrors.Errorf("failed to write CAR to output file: %w", err)
 		}
 
-		return f.Close()
+		err = f.Close()
+		if err != nil {
+			return err
+		}
+
+		encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
+
+		log.Infow("payload cid", "cid", encoder.Encode(root))
+
+		return nil
 	},
 }

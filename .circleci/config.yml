@@ -56,7 +56,7 @@ commands:
       - restore_cache:
           name: Restore lotus artefacts cache
           keys:
-            - 'lotus-v1.14.3'
+            - 'lotus-d118ef92'
           paths:
             - /tmp/lotus-artefacts
       - setup_remote_docker:
@@ -64,8 +64,8 @@ commands:
       - run:
           name: copy latest stable lotus binaries
           command: |
-            docker pull nonsens3/lotus:v1.14.3
-            id=$(docker create nonsens3/lotus:v1.14.3)
+            docker pull public.ecr.aws/p5f3y3g5/lotus-test:d118ef92
+            id=$(docker create public.ecr.aws/p5f3y3g5/lotus-test:d118ef92)
             mkdir -p /tmp/lotus-artefacts
             docker cp $id:/usr/local/bin/lotus-seed /tmp/lotus-artefacts/lotus-seed
             docker cp $id:/usr/local/bin/lotus-miner /tmp/lotus-artefacts/lotus-miner
@@ -74,7 +74,7 @@ commands:
             docker rm -v $id
       - save_cache:
           name: Save lotus artefacts cache
-          key: 'lotus-v1.14.3'
+          key: 'lotus-d118ef92'
           paths:
             - /tmp/lotus-artefacts
   git_fetch_all_tags:
