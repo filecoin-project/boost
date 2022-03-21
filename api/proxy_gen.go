@@ -107,6 +107,10 @@ type CommonStruct struct {
 		AuthNew func(p0 context.Context, p1 []auth.Permission) ([]byte, error) `perm:"admin"`
 
 		AuthVerify func(p0 context.Context, p1 string) ([]auth.Permission, error) `perm:"read"`
+
+		LogList func(p0 context.Context) ([]string, error) `perm:"write"`
+
+		LogSetLevel func(p0 context.Context, p1 string, p2 string) error `perm:"write"`
 	}
 }
 
@@ -488,6 +492,28 @@ func (s *CommonStruct) AuthVerify(p0 context.Context, p1 string) ([]auth.Permiss
 
 func (s *CommonStub) AuthVerify(p0 context.Context, p1 string) ([]auth.Permission, error) {
 	return *new([]auth.Permission), ErrNotSupported
+}
+
+func (s *CommonStruct) LogList(p0 context.Context) ([]string, error) {
+	if s.Internal.LogList == nil {
+		return *new([]string), ErrNotSupported
+	}
+	return s.Internal.LogList(p0)
+}
+
+func (s *CommonStub) LogList(p0 context.Context) ([]string, error) {
+	return *new([]string), ErrNotSupported
+}
+
+func (s *CommonStruct) LogSetLevel(p0 context.Context, p1 string, p2 string) error {
+	if s.Internal.LogSetLevel == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.LogSetLevel(p0, p1, p2)
+}
+
+func (s *CommonStub) LogSetLevel(p0 context.Context, p1 string, p2 string) error {
+	return ErrNotSupported
 }
 
 func (s *MarketStruct) Deal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {
