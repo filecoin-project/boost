@@ -68,8 +68,9 @@ deps: $(BUILD_DEPS)
 .PHONY: deps
 
 boost: $(BUILD_DEPS)
-	rm -f boost
+	rm -f boost boostd
 	$(GOCC) build $(GOFLAGS) -o boost ./cmd/boost
+	$(GOCC) build $(GOFLAGS) -o boostd ./cmd/boostd
 .PHONY: boost
 BINS+=boost
 
@@ -86,6 +87,7 @@ install: install-boost install-devnet
 
 install-boost:
 	install -C ./boost /usr/local/bin/boost
+	install -C ./boostd /usr/local/bin/boostd
 
 install-devnet:
 	install -C ./devnet /usr/local/bin/devnet

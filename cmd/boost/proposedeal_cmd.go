@@ -28,8 +28,8 @@ import (
 const DealProtocolv120 = "/fil/storage/mk/1.2.0"
 
 var proposeDealCmd = &cli.Command{
-	Name:  "propose-deal",
-	Usage: "Trigger a deal",
+	Name:  "deal",
+	Usage: "Make an online deal with Boost",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "url",
@@ -42,8 +42,9 @@ var proposeDealCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.StringFlag{
-			Name:  "commp",
-			Usage: "commp of the CAR file",
+			Name:     "commp",
+			Usage:    "commp of the CAR file",
+			Required: true,
 		},
 		&cli.Uint64Flag{
 			Name:     "piece-size",
@@ -56,8 +57,9 @@ var proposeDealCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.StringFlag{
-			Name:  "payload-cid",
-			Usage: "root CID of the CAR file",
+			Name:     "payload-cid",
+			Usage:    "root CID of the CAR file",
+			Required: true,
 		},
 		&cli.IntFlag{
 			Name:  "days",
@@ -147,10 +149,6 @@ var proposeDealCmd = &cli.Command{
 		}
 
 		payloadCidStr := cctx.String("payload-cid")
-		if payloadCidStr == "" {
-			return fmt.Errorf("must provide payload-cid parameter for CAR url")
-		}
-
 		rootCid, err := cid.Parse(payloadCidStr)
 		if err != nil {
 			return fmt.Errorf("parsing payload cid %s: %w", payloadCidStr, err)
