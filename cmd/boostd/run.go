@@ -13,6 +13,9 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 )
@@ -21,7 +24,22 @@ var runCmd = &cli.Command{
 	Name:   "run",
 	Usage:  "Start a boost process",
 	Before: before,
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "pprof",
+			Usage: "run pprof web server on localhost:6060",
+		},
+	},
 	Action: func(cctx *cli.Context) error {
+		if cctx.Bool("pprof") {
+			go func() {
+				err := http.ListenAndServe("localhost:6060", nil)
+				if err != nil {
+					log.Error(err)
+				}
+			}()
+		}
+
 		fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx)
 		if err != nil {
 			return xerrors.Errorf("getting full node api: %w", err)
