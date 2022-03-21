@@ -15,7 +15,7 @@ var log = logging.Logger("boost")
 func main() {
 	app := &cli.App{
 		Name:                 "boost",
-		Usage:                "Markets V2 module for Filecoin",
+		Usage:                "Boost client for Filecoin",
 		EnableBashCompletion: true,
 		Version:              build.UserVersion(),
 		Flags: []cli.Flag{

@@ -43,8 +43,7 @@ func setup(ctx context.Context, cfgdir string) (*Node, error) {
 	bwc := metrics.NewBandwidthCounter()
 
 	h, err := libp2p.New(
-		//libp2p.ConnectionManager(connmgr.NewConnManager(500, 800, time.Minute)),
-		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/6755"),
+		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/6766"),
 		libp2p.Identity(peerkey),
 		libp2p.BandwidthReporter(bwc),
 	)

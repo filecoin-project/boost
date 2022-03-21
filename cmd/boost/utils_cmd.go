@@ -54,7 +54,6 @@ var marketCmd = &cli.Command{
 	ArgsUsage: "<amount>",
 	Before:    before,
 	Action: func(cctx *cli.Context) error {
-		// Get amount param
 		if !cctx.Args().Present() {
 			return fmt.Errorf("must pass amount to add")
 		}
@@ -111,6 +110,9 @@ var marketCmd = &cli.Command{
 		}
 
 		head, err := api.ChainHead(ctx)
+		if err != nil {
+			return err
+		}
 
 		basefee := head.Blocks()[0].ParentBaseFee
 
@@ -123,7 +125,7 @@ var marketCmd = &cli.Command{
 			return xerrors.Errorf("GasEstimateMessageGas error: %w", err)
 		}
 
-		msg.GasFeeCap = big.Mul(big.Int(basefee), big.NewInt(2))
+		msg.GasFeeCap = big.Mul(big.Int(basefee), big.NewInt(2)) // use 2*basefee, so that this message confirms quickly
 
 		smsg, err := msigner.SignMessage(ctx, msg, func(*types.SignedMessage) error { return nil })
 		if err != nil {
