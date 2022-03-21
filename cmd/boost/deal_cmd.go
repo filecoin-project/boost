@@ -188,7 +188,6 @@ var dealCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("failed to open stream to peer: %w", err)
 		}
-
 		defer s.Close()
 
 		// Store the path to the CAR file as a transfer parameter
@@ -234,7 +233,6 @@ var dealCmd = &cli.Command{
 			return fmt.Errorf("send proposal rpc: %w", err)
 		}
 
-		// Check if the deal proposal was accepted
 		if !resp.Accepted {
 			return fmt.Errorf("deal proposal rejected: %s", resp.Message)
 		}
@@ -251,7 +249,7 @@ func dealProposal(ctx context.Context, node *Node, rootCid cid.Cid, pieceSize ab
 		return nil, err
 	}
 
-	startEpoch := head + abi.ChainEpoch(5760)
+	startEpoch := head + abi.ChainEpoch(5760)          // head + 2 days
 	endEpoch := startEpoch + abi.ChainEpoch(2880*days) // startEpoch + N days
 	proposal := market.DealProposal{
 		PieceCID:             pieceCid,
@@ -270,8 +268,6 @@ func dealProposal(ctx context.Context, node *Node, rootCid cid.Cid, pieceSize ab
 	if err != nil {
 		return nil, err
 	}
-
-	log.Debugf("about to sign with clientAddr: %s", clientAddr)
 
 	sig, err := node.Wallet.WalletSign(ctx, clientAddr, buf, api.MsgMeta{Type: api.MTDealProposal})
 	if err != nil {

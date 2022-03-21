@@ -40,7 +40,7 @@ import (
 
 var utilsCmd = &cli.Command{
 	Name:  "utils",
-	Usage: "Utils",
+	Usage: "Various helpful utilities for online deals",
 	Subcommands: []*cli.Command{
 		commpCmd,
 		generatecarCmd,
@@ -89,14 +89,10 @@ var marketCmd = &cli.Command{
 
 		log.Infow("selected wallet", "wallet", walletAddr)
 
-		addr := walletAddr
-
-		mnapi := &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}
-
 		ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
-		msigner := messagesigner.NewMessageSigner(node.Wallet, mnapi, ds)
+		messagesigner := messagesigner.NewMessageSigner(node.Wallet, &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}, ds)
 
-		params, err := actors.SerializeParams(&addr)
+		params, err := actors.SerializeParams(&walletAddr)
 		if err != nil {
 			return err
 		}
@@ -113,13 +109,11 @@ var marketCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-
 		basefee := head.Blocks()[0].ParentBaseFee
 
 		spec := &lapi.MessageSendSpec{
 			MaxFee: abi.NewTokenAmount(1000000000), // 1 nFIL
 		}
-
 		msg, err = api.GasEstimateMessageGas(ctx, msg, spec, types.EmptyTSK)
 		if err != nil {
 			return xerrors.Errorf("GasEstimateMessageGas error: %w", err)
@@ -127,7 +121,7 @@ var marketCmd = &cli.Command{
 
 		msg.GasFeeCap = big.Mul(big.Int(basefee), big.NewInt(2)) // use 2*basefee, so that this message confirms quickly
 
-		smsg, err := msigner.SignMessage(ctx, msg, func(*types.SignedMessage) error { return nil })
+		smsg, err := messagesigner.SignMessage(ctx, msg, func(*types.SignedMessage) error { return nil })
 		if err != nil {
 			return err
 		}
@@ -143,17 +137,18 @@ var marketCmd = &cli.Command{
 }
 
 var commpCmd = &cli.Command{
-	Name:   "commp",
-	Usage:  "",
-	Before: before,
+	Name:      "commp",
+	Usage:     "",
+	ArgsUsage: "<inputPath>",
+	Before:    before,
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() != 1 {
 			return fmt.Errorf("usage: commP <inputPath>")
 		}
 
-		inpath := cctx.Args().Get(0)
+		inPath := cctx.Args().Get(0)
 
-		rdr, err := os.Open(inpath)
+		rdr, err := os.Open(inPath)
 		if err != nil {
 			return err
 		}
@@ -180,10 +175,7 @@ var commpCmd = &cli.Command{
 			return xerrors.Errorf("computing commP failed: %w", err)
 		}
 
-		encoder, err := GetCidEncoder(cctx)
-		if err != nil {
-			return err
-		}
+		encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
 
 		fmt.Println("CID: ", encoder.Encode(commp.PieceCID))
 		fmt.Println("Piece size: ", types.NewInt(uint64(commp.PieceSize.Unpadded().Padded())))
@@ -191,28 +183,11 @@ var commpCmd = &cli.Command{
 	},
 }
 
-// GetCidEncoder returns an encoder using the `cid-base` flag if provided, or
-// the default (Base32) encoder if not.
-func GetCidEncoder(cctx *cli.Context) (cidenc.Encoder, error) {
-	val := cctx.String("cid-base")
-
-	e := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
-
-	if val != "" {
-		var err error
-		e.Base, err = multibase.EncoderByName(val)
-		if err != nil {
-			return e, err
-		}
-	}
-
-	return e, nil
-}
-
 var generatecarCmd = &cli.Command{
-	Name:   "generate-car",
-	Usage:  "",
-	Before: before,
+	Name:      "generate-car",
+	Usage:     "",
+	ArgsUsage: "<inputPath> <outputPath>",
+	Before:    before,
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() != 2 {
 			return fmt.Errorf("usage: generate-car <inputPath> <outputPath>")
@@ -221,28 +196,23 @@ var generatecarCmd = &cli.Command{
 		inPath := cctx.Args().First()
 		outPath := cctx.Args().Get(1)
 
-		ctx := lcli.DaemonContext(cctx)
+		ctx := lcli.ReqContext(cctx)
 
-		// Create an in-memory repo
 		r := lotus_repo.NewMemory(nil)
-
 		lr, err := r.Lock(node.Boost)
 		if err != nil {
 			return err
 		}
-
-		// datastore
 		mds, err := lr.Datastore(ctx, "/metadata")
 		if err != nil {
 			return err
 		}
-
 		ds, err := backupds.Wrap(mds, "")
 		if err != nil {
 			return xerrors.Errorf("opening backupds: %w", err)
 		}
 
-		// import mgr - store the imports under the repo's `imports` subdirectory.
+		// import manager - store the imports under the repo's `imports` subdirectory.
 		dir := filepath.Join(lr.Path(), "imports")
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return xerrors.Errorf("failed to create directory %s: %w", dir, err)
