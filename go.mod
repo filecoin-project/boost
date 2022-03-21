@@ -4,7 +4,7 @@ go 1.16
 
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
-replace github.com/filecoin-project/lotus => ../lotus
+// replace github.com/filecoin-project/lotus => ../lotus
 
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
@@ -30,7 +30,7 @@ require (
 	github.com/filecoin-project/go-state-types v0.1.3
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/index-provider v0.5.0
-	github.com/filecoin-project/lotus v1.14.3-0.20220307105128-b9fe61f9da77
+	github.com/filecoin-project/lotus v1.15.1-0.20220321111228-3c1edca90295
 	github.com/filecoin-project/specs-actors v0.9.14
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v5 v5.0.4
@@ -70,7 +70,7 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/libp2p/go-eventbus v0.2.1
-	github.com/libp2p/go-libp2p v0.18.0-rc6
+	github.com/libp2p/go-libp2p v0.18.0
 	github.com/libp2p/go-libp2p-core v0.14.0
 	github.com/libp2p/go-libp2p-gostream v0.3.2-0.20220309102559-3d4abe2a19ac
 	github.com/libp2p/go-libp2p-http v0.2.1

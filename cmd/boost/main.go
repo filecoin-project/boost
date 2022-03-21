@@ -12,10 +12,6 @@ import (
 
 var log = logging.Logger("boost")
 
-const (
-	FlagBoostRepo = "boost-repo"
-)
-
 func main() {
 	app := &cli.App{
 		Name:                 "boost",
@@ -26,7 +22,7 @@ func main() {
 			cliutil.FlagVeryVerbose,
 		},
 		Commands: []*cli.Command{
-			proposeDealCmd,
+			dealCmd,
 			utilsCmd,
 		},
 	}

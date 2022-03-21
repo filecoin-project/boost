@@ -27,7 +27,7 @@ import (
 
 const DealProtocolv120 = "/fil/storage/mk/1.2.0"
 
-var proposeDealCmd = &cli.Command{
+var dealCmd = &cli.Command{
 	Name:  "deal",
 	Usage: "Make an online deal with Boost",
 	Flags: []cli.Flag{
@@ -239,7 +239,7 @@ func dealProposal(ctx context.Context, node *Node, rootCid cid.Cid, pieceSize ab
 		StartEpoch:           startEpoch,
 		EndEpoch:             endEpoch,
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
-		ProviderCollateral:   abi.NewTokenAmount(23775644862274), // TODO: fixme
+		ProviderCollateral:   abi.NewTokenAmount(87706268881983), // TODO: fixme
 		//ClientCollateral:   abi.NewTokenAmount(0),
 	}
 
@@ -264,8 +264,8 @@ func dealProposal(ctx context.Context, node *Node, rootCid cid.Cid, pieceSize ab
 func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}) error {
 	dline, ok := ctx.Deadline()
 	if ok {
-		s.SetDeadline(dline)
-		defer s.SetDeadline(time.Time{})
+		s.SetDeadline(dline)             //nolint:errcheck
+		defer s.SetDeadline(time.Time{}) //nolint:errcheck
 	}
 
 	if err := cborutil.WriteCborRPC(s, req); err != nil {
