@@ -177,7 +177,7 @@ var commpCmd = &cli.Command{
 
 		encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
 
-		fmt.Println("CID: ", encoder.Encode(commp.PieceCID))
+		fmt.Println("CommP CID: ", encoder.Encode(commp.PieceCID))
 		fmt.Println("Piece size: ", types.NewInt(uint64(commp.PieceSize.Unpadded().Padded())))
 		return nil
 	},
