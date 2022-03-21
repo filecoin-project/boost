@@ -22,6 +22,7 @@ func main() {
 			cliutil.FlagVeryVerbose,
 		},
 		Commands: []*cli.Command{
+			initCmd,
 			dealCmd,
 			utilsCmd,
 		},
