@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/mitchellh/go-homedir"
 
 	types2 "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
@@ -81,7 +82,13 @@ var dealCmd = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.DaemonContext(cctx)
 
-		node, err := setup(ctx, "/Users/nonsense/boost-libp2p-node")
+		dir := "~/.boost-client"
+		sdir, err := homedir.Expand(dir)
+		if err != nil {
+			return err
+		}
+
+		node, err := setup(ctx, sdir)
 		if err != nil {
 			return err
 		}

@@ -11,16 +11,26 @@ import (
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/filecoin-project/go-fil-markets/stores"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
+	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/actors"
+	marketactor "github.com/filecoin-project/lotus/chain/actors/builtin/market"
+	"github.com/filecoin-project/lotus/chain/messagesigner"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/backupds"
+
 	"github.com/filecoin-project/lotus/lib/unixfs"
+	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/repo/imports"
 	"github.com/ipfs/go-cidutil/cidenc"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
+	ds_sync "github.com/ipfs/go-datastore/sync"
 	"github.com/ipld/go-car"
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
+	"github.com/mitchellh/go-homedir"
 	"github.com/multiformats/go-multibase"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
@@ -34,6 +44,99 @@ var utilsCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		commpCmd,
 		generatecarCmd,
+		marketCmd,
+	},
+}
+
+var marketCmd = &cli.Command{
+	Name:      "market-add",
+	Usage:     "Add funds to the Storage Market Actor",
+	ArgsUsage: "<amount>",
+	Before:    before,
+	Action: func(cctx *cli.Context) error {
+		// Get amount param
+		if !cctx.Args().Present() {
+			return fmt.Errorf("must pass amount to add")
+		}
+		f, err := types.ParseFIL(cctx.Args().First())
+		if err != nil {
+			return xerrors.Errorf("parsing 'amount' argument: %w", err)
+		}
+
+		amt := abi.TokenAmount(f)
+
+		ctx := lcli.ReqContext(cctx)
+		dir := "~/.boost-client"
+		sdir, err := homedir.Expand(dir)
+		if err != nil {
+			return err
+		}
+
+		node, err := setup(ctx, sdir)
+		if err != nil {
+			return err
+		}
+
+		api, closer, err := lcli.GetGatewayAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("cant setup gateway connection: %w", err)
+		}
+		defer closer()
+
+		walletAddr, err := node.Wallet.GetDefault()
+		if err != nil {
+			return err
+		}
+
+		log.Infow("selected wallet", "wallet", walletAddr)
+
+		addr := walletAddr
+
+		mnapi := &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}
+
+		ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
+		msigner := messagesigner.NewMessageSigner(node.Wallet, mnapi, ds)
+
+		params, err := actors.SerializeParams(&addr)
+		if err != nil {
+			return err
+		}
+
+		msg := &types.Message{
+			To:     marketactor.Address,
+			From:   walletAddr,
+			Value:  amt,
+			Method: marketactor.Methods.AddBalance,
+			Params: params,
+		}
+
+		head, err := api.ChainHead(ctx)
+
+		basefee := head.Blocks()[0].ParentBaseFee
+
+		spec := &lapi.MessageSendSpec{
+			MaxFee: abi.NewTokenAmount(1000000000), // 1 nFIL
+		}
+
+		msg, err = api.GasEstimateMessageGas(ctx, msg, spec, types.EmptyTSK)
+		if err != nil {
+			return xerrors.Errorf("GasEstimateMessageGas error: %w", err)
+		}
+
+		msg.GasFeeCap = big.Mul(big.Int(basefee), big.NewInt(2))
+
+		smsg, err := msigner.SignMessage(ctx, msg, func(*types.SignedMessage) error { return nil })
+		if err != nil {
+			return err
+		}
+
+		cid, err := api.MpoolPush(ctx, smsg)
+		if err != nil {
+			return xerrors.Errorf("mpool push: failed to push message: %w", err)
+		}
+		log.Infow("submitted market-add message", "cid", cid.String())
+
+		return nil
 	},
 }
 
