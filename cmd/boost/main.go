@@ -42,6 +42,7 @@ func main() {
 			retrievalDealsCmd,
 			indexProvCmd,
 			dealCmd,
+			logCmd,
 		},
 	}
 	app.Setup()
