@@ -274,7 +274,7 @@ var generatecarCmd = &cli.Command{
 
 		encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
 
-		log.Infow("payload cid", "cid", encoder.Encode(root))
+		fmt.Println("Payload CID: ", encoder.Encode(root))
 
 		return nil
 	},

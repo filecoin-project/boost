@@ -1,7 +1,10 @@
 package main
 
 import (
+	"io/ioutil"
 	"os"
+
+	llog "log"
 
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
@@ -11,6 +14,10 @@ import (
 )
 
 var log = logging.Logger("boost")
+
+func init() {
+	llog.SetOutput(ioutil.Discard)
+}
 
 func main() {
 	app := &cli.App{
