@@ -62,6 +62,11 @@ var dealCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.IntFlag{
+			Name:  "provider-collateral",
+			Usage: "",
+			Value: 0,
+		},
+		&cli.IntFlag{
 			Name:  "days",
 			Usage: "how many days should this deal be active for",
 			Value: 181,
@@ -186,8 +191,20 @@ var dealCmd = &cli.Command{
 			return fmt.Errorf("marshalling request parameters: %w", err)
 		}
 
+		var providerCollateral abi.TokenAmount
+		if cctx.Int("provider-collateral") != 0 {
+			providerCollateral = abi.NewTokenAmount(cctx.Int64("provider-collateral"))
+		} else {
+			bounds, err := api.StateDealProviderCollateralBounds(ctx, abi.PaddedPieceSize(pieceSize), cctx.Bool("verified"), chain_types.EmptyTSK)
+			if err != nil {
+				return fmt.Errorf("node error getting collateral bounds: %w", err)
+			}
+
+			providerCollateral = bounds.Min
+		}
+
 		// Create a deal proposal to storage provider using deal protocol v1.2.0 format
-		dealProposal, err := dealProposal(ctx, node, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, minerAddr, head, cctx.Int("days"), cctx.Bool("verified"))
+		dealProposal, err := dealProposal(ctx, node, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, minerAddr, head, cctx.Int("days"), cctx.Bool("verified"), providerCollateral)
 		if err != nil {
 			return fmt.Errorf("creating deal proposal: %w", err)
 		}
@@ -221,7 +238,7 @@ var dealCmd = &cli.Command{
 	},
 }
 
-func dealProposal(ctx context.Context, node *Node, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, head abi.ChainEpoch, days int, verified bool) (*market.ClientDealProposal, error) {
+func dealProposal(ctx context.Context, node *Node, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, head abi.ChainEpoch, days int, verified bool, providerCollateral abi.TokenAmount) (*market.ClientDealProposal, error) {
 	clientAddr, err := node.Wallet.GetDefault()
 	if err != nil {
 		return nil, err
@@ -239,8 +256,7 @@ func dealProposal(ctx context.Context, node *Node, rootCid cid.Cid, pieceSize ab
 		StartEpoch:           startEpoch,
 		EndEpoch:             endEpoch,
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
-		ProviderCollateral:   abi.NewTokenAmount(87706268881983), // TODO: fixme
-		//ClientCollateral:   abi.NewTokenAmount(0),
+		ProviderCollateral:   providerCollateral,
 	}
 
 	buf, err := cborutil.Dump(&proposal)
