@@ -330,13 +330,23 @@ func dealProposal(ctx context.Context, n *clinode.Node, rootCid cid.Cid, pieceSi
 }
 
 func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}) error {
-	if err := cborutil.WriteCborRPC(s, req); err != nil {
-		return fmt.Errorf("failed to send request: %w", err)
-	}
+	errc := make(chan error)
+	go func() {
+		if err := cborutil.WriteCborRPC(s, req); err != nil {
+			errc <- fmt.Errorf("failed to send request: %w", err)
+		}
 
-	if err := cborutil.ReadCborRPC(s, resp); err != nil {
-		return fmt.Errorf("failed to read response: %w", err)
-	}
+		if err := cborutil.ReadCborRPC(s, resp); err != nil {
+			errc <- fmt.Errorf("failed to read response: %w", err)
+		}
 
-	return nil
+		errc <- nil
+	}()
+
+	select {
+	case err := <-errc:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
