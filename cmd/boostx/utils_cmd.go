@@ -40,8 +40,9 @@ import (
 )
 
 var marketCmd = &cli.Command{
-	Name:  "market-add",
-	Usage: "Add funds to the Storage Market Actor",
+	Name:        "market-add",
+	Usage:       "Add funds to the Storage Market actor",
+	Description: "Send signed message to add funds for the default wallet to the Storage Market actor. Uses 2x current BaseFee and a maximum fee of 1 nFIL. This is an experimental utility, do not use in production.",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "repo",

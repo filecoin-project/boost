@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
+
+	"github.com/filecoin-project/go-state-types/big"
 
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -46,11 +47,11 @@ var dealCmd = &cli.Command{
 		},
 		&cli.StringSliceFlag{
 			Name:  "http-headers",
-			Usage: "http headers to be passed with the request",
+			Usage: "http headers to be passed with the request (e.g key=value)",
 		},
 		&cli.StringFlag{
 			Name:     "provider",
-			Usage:    "provider address",
+			Usage:    "storage provider on-chain address",
 			Required: true,
 		},
 		&cli.StringFlag{
@@ -75,7 +76,7 @@ var dealCmd = &cli.Command{
 		},
 		&cli.IntFlag{
 			Name:  "start-epoch",
-			Usage: "",
+			Usage: "start epoch by when the deal should be proved by provider on-chain",
 		},
 		&cli.IntFlag{
 			Name:  "duration",
@@ -84,7 +85,7 @@ var dealCmd = &cli.Command{
 		},
 		&cli.IntFlag{
 			Name:  "provider-collateral",
-			Usage: "deal collateral that storage miner must put in escrow",
+			Usage: "deal collateral that storage miner must put in escrow; if empty, the min collateral for the given piece size will be used",
 		},
 		&cli.Int64Flag{
 			Name:  "storage-price-per-epoch",
@@ -274,6 +275,8 @@ var dealCmd = &cli.Command{
 			return fmt.Errorf("deal proposal rejected: %s", resp.Message)
 		}
 
+		totalClientCost := big.Add(dealProposal.Proposal.ClientCollateral, big.Mul(abi.NewTokenAmount(cctx.Int64("duration")), abi.NewTokenAmount(cctx.Int64("storage-price-per-epoch"))))
+
 		msg := fmt.Sprintf("sent deal proposal %s to storage provider %s:\n", dealUuid, maddr)
 		msg += fmt.Sprintf("  client wallet: %s\n", walletAddr)
 		msg += fmt.Sprintf("  payload cid: %s\n", rootCid)
@@ -283,6 +286,7 @@ var dealCmd = &cli.Command{
 		msg += fmt.Sprintf("  end epoch: %d\n", dealProposal.Proposal.EndEpoch)
 		msg += fmt.Sprintf("  client collateral: %s\n", chain_types.FIL(dealProposal.Proposal.ClientCollateral).Short())
 		msg += fmt.Sprintf("  provider collateral: %s\n", chain_types.FIL(dealProposal.Proposal.ProviderCollateral).Short())
+		msg += fmt.Sprintf("  total client cost: %d\n", totalClientCost)
 		fmt.Println(msg)
 
 		return nil
@@ -326,12 +330,6 @@ func dealProposal(ctx context.Context, n *clinode.Node, rootCid cid.Cid, pieceSi
 }
 
 func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}) error {
-	dline, ok := ctx.Deadline()
-	if ok {
-		s.SetDeadline(dline)             //nolint:errcheck
-		defer s.SetDeadline(time.Time{}) //nolint:errcheck
-	}
-
 	if err := cborutil.WriteCborRPC(s, req); err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}

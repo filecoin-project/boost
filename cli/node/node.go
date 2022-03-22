@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -22,6 +23,11 @@ type Node struct {
 }
 
 func Setup(ctx context.Context, cfgdir string) (*Node, error) {
+	_, err := os.Stat(cfgdir)
+	if err != nil && errors.Is(err, os.ErrNotExist) {
+		return nil, errors.New("repo dir doesn't exist. run `boost init` first.")
+	}
+
 	peerkey, err := loadOrInitPeerKey(keyPath(cfgdir))
 	if err != nil {
 		return nil, err
