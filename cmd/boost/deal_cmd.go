@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -39,9 +40,13 @@ var dealCmd = &cli.Command{
 			Value:    "~/.boost-client",
 		},
 		&cli.StringFlag{
-			Name:     "url",
-			Usage:    "url to CAR file",
+			Name:     "http-url",
+			Usage:    "http url to CAR file",
 			Required: true,
+		},
+		&cli.StringSliceFlag{
+			Name:  "http-headers",
+			Usage: "http headers to be passed with the request",
 		},
 		&cli.StringFlag{
 			Name:     "provider",
@@ -194,7 +199,21 @@ var dealCmd = &cli.Command{
 		defer s.Close()
 
 		// Store the path to the CAR file as a transfer parameter
-		transferParams := &types2.HttpRequest{URL: cctx.String("url")}
+		transferParams := &types2.HttpRequest{URL: cctx.String("http-url")}
+
+		if cctx.IsSet("http-headers") {
+			transferParams.Headers = make(map[string]string)
+
+			for _, header := range cctx.StringSlice("http-headers") {
+				sp := strings.Split(header, "=")
+				if len(sp) != 2 {
+					return fmt.Errorf("malformed http header: %s", header)
+				}
+
+				transferParams.Headers[sp[0]] = sp[1]
+			}
+		}
+
 		paramsBytes, err := json.Marshal(transferParams)
 		if err != nil {
 			return fmt.Errorf("marshalling request parameters: %w", err)
