@@ -133,7 +133,7 @@ var dealCmd = &cli.Command{
 			return err
 		}
 		if minfo.PeerId == nil {
-			return fmt.Errorf("could not find peer ID for stoarge provider %s", maddr)
+			return fmt.Errorf("storage provider %s has no peer ID set on-chain", maddr)
 		}
 
 		var maddrs []multiaddr.Multiaddr
