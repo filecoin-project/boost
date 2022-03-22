@@ -100,7 +100,7 @@ var dealCmd = &cli.Command{
 	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
-		ctx := lcli.DaemonContext(cctx)
+		ctx := lcli.ReqContext(cctx)
 
 		sdir, err := homedir.Expand(cctx.String("repo"))
 		if err != nil {

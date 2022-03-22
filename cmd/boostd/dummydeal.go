@@ -58,7 +58,7 @@ var dummydealCmd = &cli.Command{
 		}
 		defer ncloser()
 
-		ctx := lcli.DaemonContext(cctx)
+		ctx := lcli.ReqContext(cctx)
 		fullNodeApi, fncloser, err := lcli.GetFullNodeAPI(cctx)
 		if err != nil {
 			return fmt.Errorf("getting full node api: %w", err)

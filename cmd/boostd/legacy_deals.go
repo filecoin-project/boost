@@ -28,7 +28,7 @@ var dealsImportDataCmd = &cli.Command{
 		}
 		defer closer()
 
-		ctx := bcli.DaemonContext(cctx)
+		ctx := bcli.ReqContext(cctx)
 
 		if cctx.Args().Len() < 2 {
 			return fmt.Errorf("must specify proposal CID and file path")
