@@ -79,7 +79,7 @@ var dealCmd = &cli.Command{
 		},
 		&cli.IntFlag{
 			Name:  "duration",
-			Usage: "epochs for this deal to be active for",
+			Usage: "duration of the deal in epochs",
 			Value: 518400, // default is 2880 * 180 == 180 days
 		},
 		&cli.IntFlag{
