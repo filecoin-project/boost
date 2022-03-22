@@ -93,7 +93,7 @@ var dealCmd = &cli.Command{
 		},
 		&cli.BoolFlag{
 			Name:  "verified",
-			Usage: "whether deal should be verified or not",
+			Usage: "whether the deal funds should come from verified client data-cap",
 			Value: true,
 		},
 	},
