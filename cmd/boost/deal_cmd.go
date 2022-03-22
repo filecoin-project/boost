@@ -63,14 +63,23 @@ var dealCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.IntFlag{
+			Name:  "start-epoch",
+			Usage: "",
+		},
+		&cli.IntFlag{
+			Name:  "duration",
+			Usage: "epochs for this deal to be active for",
+			Value: 518400, // default is 2880 * 180 == 180 days
+		},
+		&cli.IntFlag{
 			Name:  "provider-collateral",
 			Usage: "",
 			Value: 0,
 		},
-		&cli.IntFlag{
-			Name:  "days",
-			Usage: "how many days should this deal be active for",
-			Value: 181,
+		&cli.Int64Flag{
+			Name:  "storage-price-per-epoch",
+			Usage: "",
+			Value: 1,
 		},
 		&cli.BoolFlag{
 			Name:  "verified",
@@ -116,14 +125,14 @@ var dealCmd = &cli.Command{
 		}
 
 		if minfo.PeerId == nil {
-			return fmt.Errorf("could not find peer ID for miner %s", maddr)
+			return fmt.Errorf("could not find peer ID for stoarge provider %s", maddr)
 		}
 
 		var maddrs []multiaddr.Multiaddr
 		for _, mma := range minfo.Multiaddrs {
 			ma, err := multiaddr.NewMultiaddrBytes(mma)
 			if err != nil {
-				return fmt.Errorf("miner %s had invalid multiaddrs in their info: %w", maddr, err)
+				return fmt.Errorf("storage provider %s had invalid multiaddrs in their info: %w", maddr, err)
 			}
 			maddrs = append(maddrs, ma)
 		}
@@ -133,23 +142,19 @@ var dealCmd = &cli.Command{
 			Addrs: maddrs,
 		}
 
-		log.Infow("found miner", "id", *minfo.PeerId, "multiaddr", maddrs)
+		log.Infow("found storage provider", "id", *minfo.PeerId, "multiaddr", maddrs)
 
 		providerStr := cctx.String("provider")
 		minerAddr, err := address.NewFromString(providerStr)
 		if err != nil {
-			return fmt.Errorf("invalid miner address '%s': %w", providerStr, err)
+			return fmt.Errorf("invalid storage provider address '%s': %w", providerStr, err)
 		}
 
-		log.Infow("miner on-chain address", "addr", minerAddr)
+		log.Infow("storage provider on-chain address", "addr", minerAddr)
 
 		dealUuid := uuid.New()
 
 		commp := cctx.String("commp")
-		if commp == "" {
-			return fmt.Errorf("must provide commp parameter for CAR url")
-		}
-
 		pieceCid, err := cid.Parse(commp)
 		if err != nil {
 			return fmt.Errorf("parsing commp '%s': %w", commp, err)
@@ -170,15 +175,6 @@ var dealCmd = &cli.Command{
 		if carFileSize == 0 {
 			return fmt.Errorf("size of car file cannot be 0")
 		}
-
-		tipset, err := api.ChainHead(ctx)
-		if err != nil {
-			return fmt.Errorf("getting chain head: %w", err)
-		}
-
-		head := tipset.Height()
-
-		log.Infow("current block height", "number", head)
 
 		if err := node.Host.Connect(ctx, *addrInfo); err != nil {
 			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
@@ -209,8 +205,24 @@ var dealCmd = &cli.Command{
 			providerCollateral = bounds.Min
 		}
 
+		var startEpoch abi.ChainEpoch
+		if cctx.IsSet("start-epoch") {
+			startEpoch = abi.ChainEpoch(cctx.Int("start-epoch"))
+		} else {
+			tipset, err := api.ChainHead(ctx)
+			if err != nil {
+				return fmt.Errorf("getting chain head: %w", err)
+			}
+
+			head := tipset.Height()
+
+			log.Infow("current block height", "number", head)
+
+			startEpoch = head + abi.ChainEpoch(5760) // head + 2 days
+		}
+
 		// Create a deal proposal to storage provider using deal protocol v1.2.0 format
-		dealProposal, err := dealProposal(ctx, node, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, minerAddr, head, cctx.Int("days"), cctx.Bool("verified"), providerCollateral)
+		dealProposal, err := dealProposal(ctx, node, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, minerAddr, startEpoch, cctx.Int("duration"), cctx.Bool("verified"), providerCollateral, abi.NewTokenAmount(cctx.Int64("storage-price-per-epoch")))
 		if err != nil {
 			return fmt.Errorf("failed to create a deal proposal: %w", err)
 		}
@@ -243,14 +255,13 @@ var dealCmd = &cli.Command{
 	},
 }
 
-func dealProposal(ctx context.Context, node *Node, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, head abi.ChainEpoch, days int, verified bool, providerCollateral abi.TokenAmount) (*market.ClientDealProposal, error) {
+func dealProposal(ctx context.Context, node *Node, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, startEpoch abi.ChainEpoch, duration int, verified bool, providerCollateral abi.TokenAmount, storagePricePerEpoch abi.TokenAmount) (*market.ClientDealProposal, error) {
 	clientAddr, err := node.Wallet.GetDefault()
 	if err != nil {
 		return nil, err
 	}
 
-	startEpoch := head + abi.ChainEpoch(5760)          // head + 2 days
-	endEpoch := startEpoch + abi.ChainEpoch(2880*days) // startEpoch + N days
+	endEpoch := startEpoch + abi.ChainEpoch(duration)
 	proposal := market.DealProposal{
 		PieceCID:             pieceCid,
 		PieceSize:            pieceSize,
@@ -260,7 +271,7 @@ func dealProposal(ctx context.Context, node *Node, rootCid cid.Cid, pieceSize ab
 		Label:                rootCid.String(),
 		StartEpoch:           startEpoch,
 		EndEpoch:             endEpoch,
-		StoragePricePerEpoch: abi.NewTokenAmount(1),
+		StoragePricePerEpoch: storagePricePerEpoch,
 		ProviderCollateral:   providerCollateral,
 	}
 
