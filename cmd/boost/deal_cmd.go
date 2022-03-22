@@ -128,7 +128,6 @@ var dealCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-
 		if minfo.PeerId == nil {
 			return fmt.Errorf("could not find peer ID for stoarge provider %s", maddr)
 		}
@@ -140,6 +139,9 @@ var dealCmd = &cli.Command{
 				return fmt.Errorf("storage provider %s had invalid multiaddrs in their info: %w", maddr, err)
 			}
 			maddrs = append(maddrs, ma)
+		}
+		if len(maddrs) == 0 {
+			return fmt.Errorf("storage provider %s has no multiaddrs set on-chain", maddr)
 		}
 
 		addrInfo := &peer.AddrInfo{
