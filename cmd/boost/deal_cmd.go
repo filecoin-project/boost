@@ -257,13 +257,14 @@ var dealCmd = &cli.Command{
 		}
 
 		msg := fmt.Sprintf("sent deal proposal %s to storage provider %s:\n", dealUuid, maddr)
+		msg += fmt.Sprintf("  client wallet: %s\n", walletAddr)
 		msg += fmt.Sprintf("  payload cid: %s\n", rootCid)
 		msg += fmt.Sprintf("  url: %s\n", transferParams.URL)
 		msg += fmt.Sprintf("  commp: %s\n", dealProposal.Proposal.PieceCID)
 		msg += fmt.Sprintf("  start epoch: %d\n", dealProposal.Proposal.StartEpoch)
 		msg += fmt.Sprintf("  end epoch: %d\n", dealProposal.Proposal.EndEpoch)
-		msg += fmt.Sprintf("  client collateral: %d\n", dealProposal.Proposal.ClientCollateral)
-		msg += fmt.Sprintf("  provider collateral: %d\n", dealProposal.Proposal.ProviderCollateral)
+		msg += fmt.Sprintf("  client collateral: %s\n", chain_types.FIL(dealProposal.Proposal.ClientCollateral).Short())
+		msg += fmt.Sprintf("  provider collateral: %s\n", chain_types.FIL(dealProposal.Proposal.ProviderCollateral).Short())
 		fmt.Println(msg)
 
 		return nil
