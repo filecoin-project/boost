@@ -8,30 +8,21 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var dealCmd = &cli.Command{
-	Name:  "deal",
-	Usage: "Manage Boost deals",
-	Subcommands: []*cli.Command{
-		makeOfflineDealWithData,
-	},
-}
-
-var makeOfflineDealWithData = &cli.Command{
+var offlineDealCmd = &cli.Command{
 	Name:  "offline-deal",
-	Usage: "Make offline deal with data",
-	Flags: []cli.Flag{&cli.StringFlag{
-		Name:     "deal-uuid",
-		Usage:    "uuid of the offline deal",
-		Required: true,
-	},
-
+	Usage: "Make offline deal on Boost",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "deal-uuid",
+			Usage:    "uuid of the offline deal",
+			Required: true,
+		},
 		&cli.StringFlag{
 			Name:     "filepath",
 			Usage:    "path of the file containing the offline deal data",
 			Required: true,
 		},
 	},
-
 	Action: func(cctx *cli.Context) error {
 		napi, closer, err := bcli.GetBoostAPI(cctx)
 		if err != nil {

@@ -58,7 +58,7 @@ var dummydealCmd = &cli.Command{
 		}
 		defer ncloser()
 
-		ctx := lcli.DaemonContext(cctx)
+		ctx := lcli.ReqContext(cctx)
 		fullNodeApi, fncloser, err := lcli.GetFullNodeAPI(cctx)
 		if err != nil {
 			return fmt.Errorf("getting full node api: %w", err)
@@ -180,7 +180,7 @@ var dummydealCmd = &cli.Command{
 		head := tipset.Height()
 
 		// Create a deal proposal
-		dealProposal, err := dealProposal(ctx, fullNodeApi, rootCid, pieceSize, pieceCid, clientAddr, minerAddr, head)
+		dealProposal, err := dummydealProposal(ctx, fullNodeApi, rootCid, pieceSize, pieceCid, clientAddr, minerAddr, head)
 		if err != nil {
 			return fmt.Errorf("creating deal proposal: %w", err)
 		}
@@ -254,7 +254,7 @@ func serveCarFile(dealUuid uuid.UUID, fpath string) (string, error) {
 	return url, nil
 }
 
-func dealProposal(ctx context.Context, fullNode v0api.FullNode, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, clientAddr address.Address, minerAddr address.Address, head abi.ChainEpoch) (*market.ClientDealProposal, error) {
+func dummydealProposal(ctx context.Context, fullNode v0api.FullNode, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, clientAddr address.Address, minerAddr address.Address, head abi.ChainEpoch) (*market.ClientDealProposal, error) {
 	startEpoch := head + abi.ChainEpoch(5760)
 	endEpoch := startEpoch + 521280 // startEpoch + 181 days
 	proposal := market.DealProposal{

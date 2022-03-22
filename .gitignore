@@ -1,4 +1,6 @@
 /boost
+/boostx
+/boostd
 /devnet
 extern/filecoin-ffi/rust/target
 **/*.a

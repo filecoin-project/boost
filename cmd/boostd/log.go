@@ -23,7 +23,7 @@ var logListCmd = &cli.Command{
 	Name:  "list",
 	Usage: "List all available log subsystems",
 	Action: func(cctx *cli.Context) error {
-		ctx := lcli.DaemonContext(cctx)
+		ctx := lcli.ReqContext(cctx)
 
 		boostApi, ncloser, err := boostcli.GetBoostAPI(cctx)
 		if err != nil {
@@ -68,7 +68,7 @@ $ boost log set-level *=info provider=warn gql=debug`,
 			return fmt.Errorf("must specify level or subsystem=level, eg boost log set-level boost=debug")
 		}
 
-		ctx := lcli.DaemonContext(cctx)
+		ctx := lcli.ReqContext(cctx)
 
 		boostApi, ncloser, err := boostcli.GetBoostAPI(cctx)
 		if err != nil {

@@ -191,7 +191,7 @@ var retrievalSetAskCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		ctx := lcli.DaemonContext(cctx)
+		ctx := lcli.ReqContext(cctx)
 
 		api, closer, err := bcli.GetBoostAPI(cctx)
 		if err != nil {
@@ -245,7 +245,7 @@ var retrievalGetAskCmd = &cli.Command{
 	Usage: "Get the provider's current retrieval ask configured by the provider in the ask-store using the set-ask CLI command",
 	Flags: []cli.Flag{},
 	Action: func(cctx *cli.Context) error {
-		ctx := lcli.DaemonContext(cctx)
+		ctx := lcli.ReqContext(cctx)
 
 		api, closer, err := bcli.GetBoostAPI(cctx)
 		if err != nil {

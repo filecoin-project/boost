@@ -24,6 +24,12 @@ var runCmd = &cli.Command{
 	Name:   "run",
 	Usage:  "Start a boost process",
 	Before: before,
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "pprof",
+			Usage: "run pprof web server on localhost:6060",
+		},
+	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
 			go func() {
@@ -40,7 +46,7 @@ var runCmd = &cli.Command{
 		}
 		defer ncloser()
 
-		ctx := lcli.DaemonContext(cctx)
+		ctx := lcli.ReqContext(cctx)
 
 		log.Debug("Checking full node version")
 
