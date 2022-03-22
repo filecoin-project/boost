@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/filecoin-project/go-state-types/big"
-
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/mitchellh/go-homedir"
@@ -275,18 +273,16 @@ var dealCmd = &cli.Command{
 			return fmt.Errorf("deal proposal rejected: %s", resp.Message)
 		}
 
-		totalClientCost := big.Add(dealProposal.Proposal.ClientCollateral, big.Mul(abi.NewTokenAmount(cctx.Int64("duration")), abi.NewTokenAmount(cctx.Int64("storage-price-per-epoch"))))
-
-		msg := fmt.Sprintf("sent deal proposal %s to storage provider %s:\n", dealUuid, maddr)
+		msg := fmt.Sprintf("sent deal proposal\n")
+		msg += fmt.Sprintf("  deal uuid: %s\n", dealUuid)
+		msg += fmt.Sprintf("  storage provider: %s\n", maddr)
 		msg += fmt.Sprintf("  client wallet: %s\n", walletAddr)
 		msg += fmt.Sprintf("  payload cid: %s\n", rootCid)
 		msg += fmt.Sprintf("  url: %s\n", transferParams.URL)
 		msg += fmt.Sprintf("  commp: %s\n", dealProposal.Proposal.PieceCID)
 		msg += fmt.Sprintf("  start epoch: %d\n", dealProposal.Proposal.StartEpoch)
 		msg += fmt.Sprintf("  end epoch: %d\n", dealProposal.Proposal.EndEpoch)
-		msg += fmt.Sprintf("  client collateral: %s\n", chain_types.FIL(dealProposal.Proposal.ClientCollateral).Short())
 		msg += fmt.Sprintf("  provider collateral: %s\n", chain_types.FIL(dealProposal.Proposal.ProviderCollateral).Short())
-		msg += fmt.Sprintf("  total client cost: %d\n", totalClientCost)
 		fmt.Println(msg)
 
 		return nil
