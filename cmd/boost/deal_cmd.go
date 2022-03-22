@@ -198,7 +198,7 @@ var dealCmd = &cli.Command{
 		}
 
 		var providerCollateral abi.TokenAmount
-		if cctx.Int("provider-collateral") != 0 {
+		if cctx.IsSet("provider-collateral") {
 			providerCollateral = abi.NewTokenAmount(cctx.Int64("provider-collateral"))
 		} else {
 			bounds, err := api.StateDealProviderCollateralBounds(ctx, abi.PaddedPieceSize(pieceSize), cctx.Bool("verified"), chain_types.EmptyTSK)
