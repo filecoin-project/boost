@@ -116,7 +116,7 @@ var dealCmd = &cli.Command{
 		}
 
 		if minfo.PeerId == nil {
-			return fmt.Errorf("miner %s has no peer ID set", maddr)
+			return fmt.Errorf("could not find peer ID for miner %s", maddr)
 		}
 
 		var maddrs []multiaddr.Multiaddr
