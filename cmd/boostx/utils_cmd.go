@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-commp-utils/writer"
@@ -61,7 +62,7 @@ var marketCmd = &cli.Command{
 			return err
 		}
 
-		node, err := setup(ctx, sdir)
+		n, err := clinode.Setup(ctx, sdir)
 		if err != nil {
 			return err
 		}
@@ -72,7 +73,7 @@ var marketCmd = &cli.Command{
 		}
 		defer closer()
 
-		walletAddr, err := node.Wallet.GetDefault()
+		walletAddr, err := n.Wallet.GetDefault()
 		if err != nil {
 			return err
 		}
@@ -80,7 +81,7 @@ var marketCmd = &cli.Command{
 		log.Infow("selected wallet", "wallet", walletAddr)
 
 		ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
-		messagesigner := messagesigner.NewMessageSigner(node.Wallet, &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}, ds)
+		messagesigner := messagesigner.NewMessageSigner(n.Wallet, &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}, ds)
 
 		params, err := actors.SerializeParams(&walletAddr)
 		if err != nil {

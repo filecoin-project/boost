@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/mitchellh/go-homedir"
 
@@ -105,7 +106,7 @@ var dealCmd = &cli.Command{
 			return err
 		}
 
-		node, err := setup(ctx, sdir)
+		n, err := clinode.Setup(ctx, sdir)
 		if err != nil {
 			return err
 		}
@@ -116,7 +117,7 @@ var dealCmd = &cli.Command{
 		}
 		defer closer()
 
-		walletAddr, err := node.Wallet.GetDefault()
+		walletAddr, err := n.Wallet.GetDefault()
 		if err != nil {
 			return err
 		}
@@ -186,11 +187,11 @@ var dealCmd = &cli.Command{
 			return fmt.Errorf("size of car file cannot be 0")
 		}
 
-		if err := node.Host.Connect(ctx, *addrInfo); err != nil {
+		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
 			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
 		}
 
-		s, err := node.Host.NewStream(ctx, addrInfo.ID, DealProtocolv120)
+		s, err := n.Host.NewStream(ctx, addrInfo.ID, DealProtocolv120)
 		if err != nil {
 			return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
 		}
@@ -246,7 +247,7 @@ var dealCmd = &cli.Command{
 		}
 
 		// Create a deal proposal to storage provider using deal protocol v1.2.0 format
-		dealProposal, err := dealProposal(ctx, node, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, minerAddr, startEpoch, cctx.Int("duration"), cctx.Bool("verified"), providerCollateral, abi.NewTokenAmount(cctx.Int64("storage-price-per-epoch")))
+		dealProposal, err := dealProposal(ctx, n, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, minerAddr, startEpoch, cctx.Int("duration"), cctx.Bool("verified"), providerCollateral, abi.NewTokenAmount(cctx.Int64("storage-price-per-epoch")))
 		if err != nil {
 			return fmt.Errorf("failed to create a deal proposal: %w", err)
 		}
@@ -288,8 +289,8 @@ var dealCmd = &cli.Command{
 	},
 }
 
-func dealProposal(ctx context.Context, node *Node, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, startEpoch abi.ChainEpoch, duration int, verified bool, providerCollateral abi.TokenAmount, storagePricePerEpoch abi.TokenAmount) (*market.ClientDealProposal, error) {
-	clientAddr, err := node.Wallet.GetDefault()
+func dealProposal(ctx context.Context, n *clinode.Node, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, startEpoch abi.ChainEpoch, duration int, verified bool, providerCollateral abi.TokenAmount, storagePricePerEpoch abi.TokenAmount) (*market.ClientDealProposal, error) {
+	clientAddr, err := n.Wallet.GetDefault()
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +314,7 @@ func dealProposal(ctx context.Context, node *Node, rootCid cid.Cid, pieceSize ab
 		return nil, err
 	}
 
-	sig, err := node.Wallet.WalletSign(ctx, clientAddr, buf, api.MsgMeta{Type: api.MTDealProposal})
+	sig, err := n.Wallet.WalletSign(ctx, clientAddr, buf, api.MsgMeta{Type: api.MTDealProposal})
 	if err != nil {
 		return nil, fmt.Errorf("wallet sign failed: %w", err)
 	}

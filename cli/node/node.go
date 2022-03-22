@@ -1,4 +1,4 @@
-package main
+package node
 
 import (
 	"context"
@@ -34,7 +34,7 @@ type Node struct {
 	Wallet *wallet.LocalWallet
 }
 
-func setup(ctx context.Context, cfgdir string) (*Node, error) {
+func Setup(ctx context.Context, cfgdir string) (*Node, error) {
 	peerkey, err := loadOrInitPeerKey(keyPath(cfgdir))
 	if err != nil {
 		return nil, err

@@ -7,6 +7,7 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 
+	"github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	cli "github.com/urfave/cli/v2"
@@ -33,7 +34,7 @@ var initCmd = &cli.Command{
 
 		os.Mkdir(sdir, 0755) //nolint:errcheck
 
-		node, err := setup(ctx, sdir)
+		n, err := node.Setup(ctx, sdir)
 		if err != nil {
 			return err
 		}
@@ -44,7 +45,7 @@ var initCmd = &cli.Command{
 		}
 		defer closer()
 
-		walletAddr, err := node.Wallet.GetDefault()
+		walletAddr, err := n.Wallet.GetDefault()
 		if err != nil {
 			return err
 		}
