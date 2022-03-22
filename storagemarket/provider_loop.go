@@ -162,7 +162,7 @@ func (p *Provider) loop() {
 			} else {
 				p.dealLogger.Infow(deal.DealUuid, "untagged storage space")
 			}
-			storageSpaceDealReq.done <- struct{}{}
+			close(storageSpaceDealReq.done)
 
 		case publishedDeal := <-p.publishedDealChan:
 			deal := publishedDeal.deal

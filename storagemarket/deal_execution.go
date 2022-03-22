@@ -196,7 +196,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	if err := p.untagStorageSpaceAfterSealing(ctx, deal); err != nil {
 		if xerrors.Is(err, context.Canceled) {
 			return &dealMakingError{recoverable: true,
-				err:   fmt.Errorf("deal failed with recoverbale error while untagging storage space after handing to sealer: %w", err),
+				err:   fmt.Errorf("deal failed with recoverable error while untagging storage space after handing to sealer: %w", err),
 				uiMsg: "the deal was paused in the Sealing state because Boost was shut down"}
 		}
 
@@ -532,20 +532,21 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	// register with dagstore
 	err := stores.RegisterShardSync(ctx, p.dagst, pc, "", true)
 
-	if err != nil && !xerrors.Is(err, dagstore.ErrShardExists) {
-		return fmt.Errorf("failed to register deal with dagstore: %w", err)
-	} else if err != nil && xerrors.Is(err, dagstore.ErrShardExists) {
+	if err != nil {
+	        if !xerrors.Is(err, dagstore.ErrShardExists) {
+    		    return fmt.Errorf("failed to register deal with dagstore: %w", err)
+		}
 		p.dealLogger.Infow(deal.DealUuid, "deal has previously been registered in dagstore")
 	} else {
 		p.dealLogger.Infow(deal.DealUuid, "deal has successfully been registered in the dagstore")
 	}
 
-	// announce to the network indexer but do not fail it the announcement fails
+	// announce to the network indexer but do not fail the deal if the announcement fails
 	annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
 	if err != nil {
 		p.dealLogger.LogError(deal.DealUuid, "failed to announce deal to network indexer "+
 			"but not failing deal as it's already been handed for sealing", err)
-	} else if err == nil {
+	} else {
 		p.dealLogger.Infow(deal.DealUuid, "announced deal to network indexer", "announcement-cid", annCid)
 	}
 
