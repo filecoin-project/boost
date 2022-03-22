@@ -17,10 +17,9 @@ var initCmd = &cli.Command{
 	Usage: "Initialise Boost client repo",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:     "repo",
-			Usage:    "repo directory for Boost client",
-			Required: true,
-			Value:    "~/.boost-client",
+			Name:  "repo",
+			Usage: "repo directory for Boost client",
+			Value: "~/.boost-client",
 		},
 	},
 	Before: before,

@@ -13,7 +13,7 @@ import (
 	cliutil "github.com/filecoin-project/boost/cli/util"
 )
 
-var log = logging.Logger("boost")
+var log = logging.Logger("boostx")
 
 func init() {
 	llog.SetOutput(ioutil.Discard)
@@ -21,16 +21,17 @@ func init() {
 
 func main() {
 	app := &cli.App{
-		Name:                 "boost",
-		Usage:                "Boost client for Filecoin",
+		Name:                 "boostx",
+		Usage:                "Various experimental utilities for Boost",
 		EnableBashCompletion: true,
 		Version:              build.UserVersion(),
 		Flags: []cli.Flag{
 			cliutil.FlagVeryVerbose,
 		},
 		Commands: []*cli.Command{
-			initCmd,
-			dealCmd,
+			commpCmd,
+			generatecarCmd,
+			marketCmd,
 		},
 	}
 	app.Setup()
@@ -41,10 +42,10 @@ func main() {
 }
 
 func before(cctx *cli.Context) error {
-	_ = logging.SetLogLevel("boost", "INFO")
+	_ = logging.SetLogLevel("boostx", "INFO")
 
 	if cliutil.IsVeryVerbose {
-		_ = logging.SetLogLevel("boost", "DEBUG")
+		_ = logging.SetLogLevel("boostx", "DEBUG")
 	}
 
 	return nil

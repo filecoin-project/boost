@@ -38,16 +38,6 @@ import (
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 
-var utilsCmd = &cli.Command{
-	Name:  "utils",
-	Usage: "Various helpful utilities for online deals",
-	Subcommands: []*cli.Command{
-		commpCmd,
-		generatecarCmd,
-		marketCmd,
-	},
-}
-
 var marketCmd = &cli.Command{
 	Name:      "market-add",
 	Usage:     "Add funds to the Storage Market Actor",

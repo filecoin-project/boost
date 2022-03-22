@@ -34,10 +34,9 @@ var dealCmd = &cli.Command{
 	Usage: "Make an online deal with Boost",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:     "repo",
-			Usage:    "repo directory for Boost client",
-			Required: true,
-			Value:    "~/.boost-client",
+			Name:  "repo",
+			Usage: "repo directory for Boost client",
+			Value: "~/.boost-client",
 		},
 		&cli.StringFlag{
 			Name:     "http-url",
@@ -84,8 +83,7 @@ var dealCmd = &cli.Command{
 		},
 		&cli.IntFlag{
 			Name:  "provider-collateral",
-			Usage: "",
-			Value: 0,
+			Usage: "provider collateral required from storage miner",
 		},
 		&cli.Int64Flag{
 			Name:  "storage-price-per-epoch",
