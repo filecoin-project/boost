@@ -15,7 +15,7 @@ import (
 var log = logging.Logger("storagemanager")
 
 var (
-	StagingAreaDirName = "deal-staging"
+	StagingAreaDirName = "deal-downloads"
 )
 
 type Config struct {

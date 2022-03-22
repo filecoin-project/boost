@@ -1,5 +1,5 @@
 import {useQuery} from "@apollo/react-hooks";
-import {StorageQuery} from "./gql";
+import {LegacyStorageQuery, StorageQuery} from "./gql";
 import React from "react";
 import {addCommas, humanFileSize} from "./util";
 import './StorageSpace.css'
@@ -7,10 +7,12 @@ import archiveImg from './bootstrap-icons/icons/archive.svg'
 import {PageContainer} from "./Components";
 import {Link} from "react-router-dom";
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
+import {Info} from "./Info"
 
 export function StorageSpacePage(props) {
     return <PageContainer pageType="storage-space" title="Storage Space">
         <StorageSpaceContent />
+        <LegacyStorageSpaceContent />
     </PageContainer>
 }
 
@@ -30,21 +32,27 @@ function StorageSpaceContent(props) {
         name: 'Staged',
         className: 'staged',
         amount: storage.Staged,
+        description: 'Deal data that has completed downloading and is waiting to be added to a sector'
     }, {
         name: 'Transferred',
         className: 'transferred',
         amount: storage.Transferred,
+        description: 'Deal data that has been downloaded so far in an ongoing transfer'
     }, {
         name: 'Pending',
         className: 'pending',
         amount: storage.Pending,
+        description: 'The total space needed for data that is currently being downloaded'
     }, {
         name: 'Free',
         className: 'free',
         amount: storage.Free,
+        description: 'Available space for future downloads'
     }]
 
     return <>
+        <h3>Deal transfers</h3>
+
         <div className="storage-chart">
             <CumulativeBarChart bars={bars} unit="byte" />
             <CumulativeBarLabels bars={bars} unit="byte" />
@@ -54,17 +62,79 @@ function StorageSpaceContent(props) {
             <tbody>
                 {bars.map(bar => (
                     <tr key={bar.name}>
-                        <td>{bar.name}</td>
+                        <td>
+                            {bar.name}
+                            <Info>{bar.description}</Info>
+                        </td>
                         <td>{humanFileSize(bar.amount)} <span className="aux">({addCommas(bar.amount)} bytes)</span></td>
                     </tr>
                 ))}
                 <tr>
-                    <td>Mount Point</td>
+                    <td>
+                        Mount Point
+                        <Info>The path to the directory where downloaded data is kept until the deal is added to a sector</Info>
+                    </td>
                     <td>{storage.MountPoint}</td>
                 </tr>
             </tbody>
         </table>
     </>
+}
+
+function LegacyStorageSpaceContent(props) {
+    const {loading, error, data} = useQuery(LegacyStorageQuery, { pollInterval: 1000 })
+
+    if (loading) {
+        return <div>Loading...</div>
+    }
+    if (error) {
+        return <div>Error: {error.message}</div>
+    }
+
+    var storage = data.legacyStorage
+    console.log(storage)
+    if (storage.Capacity === 0n) {
+        return null
+    }
+
+    const bars = [{
+        name: 'Used',
+        className: 'used',
+        amount: storage.Used,
+    }, {
+        name: 'Free',
+        className: 'free',
+        amount: storage.Capacity - storage.Used,
+    }]
+
+    return <div className="legacy-deal-transfers">
+        <h3>Legacy Deal transfers</h3>
+
+        <div className="storage-chart">
+            <CumulativeBarChart bars={bars} unit="byte" />
+            <CumulativeBarLabels bars={bars} unit="byte" />
+        </div>
+
+        <table className="storage-fields">
+            <tbody>
+            {bars.map(bar => (
+                <tr key={bar.name}>
+                    <td>
+                        {bar.name}
+                    </td>
+                    <td>{humanFileSize(bar.amount)} <span className="aux">({addCommas(bar.amount)} bytes)</span></td>
+                </tr>
+            ))}
+            <tr>
+                <td>
+                    Mount Point
+                    <Info>The path to the directory where downloaded data is kept until the deal is added to a sector</Info>
+                </td>
+                <td>{storage.MountPoint}</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
 }
 
 export function StorageSpaceMenuItem(props) {

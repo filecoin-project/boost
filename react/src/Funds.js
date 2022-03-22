@@ -1,7 +1,7 @@
 /* global BigInt */
 import {useMutation, useQuery} from "@apollo/react-hooks";
 import {FundsQuery, FundsLogsQuery, FundsMoveToEscrow} from "./gql";
-import {useState, React}  from "react";
+import {useState, useEffect, React}  from "react";
 import moment from "moment";
 import {humanFIL, max, parseFil} from "./util"
 import {Info} from "./Info"
@@ -10,6 +10,7 @@ import {Link} from "react-router-dom";
 import coinImg from './bootstrap-icons/icons/coin.svg'
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import './Funds.css'
+import {ShowBanner} from "./Banner";
 
 export function FundsPage(props) {
     return (
@@ -61,7 +62,7 @@ function CollateralSource(props) {
 
     return <div className="collateral-source">
         <div className="title">
-            Collateral Source Wallet
+            Deal Collateral Source Wallet
             <Info>
                 The Storage Provider must have sufficient collateral in escrow for each
                 storage deal.<br/>
@@ -105,7 +106,7 @@ function FundsEscrow(props) {
 
     return <div className="escrow">
         <div className="title">
-            Collateral in Escrow
+            Deal Collateral in Escrow
             <Info>
                 The Storage Provider must have sufficient collateral in escrow for each
                 storage deal.<br/>
@@ -185,10 +186,23 @@ function TopupCollateral(props) {
         variables: {amount: parseFil(topupAmount)}
     })
 
-    function topUpAvailable() {
-        fundsMoveToEscrow()
+    useEffect(() => {
+        const el = document.getElementById('topup-amount')
+        el && el.focus()
+    })
+
+    async function topUpAvailable() {
+        const amt = topupAmount
+        const res = fundsMoveToEscrow()
         setTopupAmount('')
         setShowForm(false)
+        try {
+            await res
+            ShowBanner('Moved ' + amt + ' FIL to escrow (page will update after 1 epoch)')
+        } catch(e) {
+            console.log(e)
+            ShowBanner(e.message, true)
+        }
     }
 
     function handleCancel() {
@@ -199,8 +213,9 @@ function TopupCollateral(props) {
     return (
         <div className="top-up">
             { showForm ? (
-                <div className={"top-up-form"}>
+                <div className="top-up-form">
                     <input
+                        id="topup-amount"
                         type="number"
                         value={topupAmount}
                         onChange={handleTopupChange}

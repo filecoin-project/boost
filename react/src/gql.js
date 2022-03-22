@@ -257,6 +257,16 @@ const StorageQuery = gql`
     }
 `;
 
+const LegacyStorageQuery = gql`
+    query AppLegacyStorageQuery {
+        legacyStorage {
+            Capacity
+            Used
+            MountPoint
+        }
+    }
+`;
+
 const SealingPipelineQuery = gql`
     query AppSealingPipelineQuery {
         sealingpipeline {
@@ -423,6 +433,7 @@ export {
     DealCancelMutation,
     NewDealsSubscription,
     StorageQuery,
+    LegacyStorageQuery,
     FundsQuery,
     FundsLogsQuery,
     DealPublishQuery,

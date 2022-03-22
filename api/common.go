@@ -26,8 +26,8 @@ type Common interface {
 
 	// MethodGroup: Log
 
-	//LogList(context.Context) ([]string, error)         //perm:write
-	//LogSetLevel(context.Context, string, string) error //perm:write
+	LogList(context.Context) ([]string, error)         //perm:write
+	LogSetLevel(context.Context, string, string) error //perm:write
 
 	//// LogAlerts returns list of all, active and inactive alerts tracked by the
 	//// node

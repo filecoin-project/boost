@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/chzyer/readline"
@@ -16,6 +15,7 @@ import (
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/util"
 	"github.com/filecoin-project/go-address"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
@@ -263,7 +263,7 @@ func migrateDirectory(ctx context.Context, mktsRepoPath string, boostRepoPath st
 		return fmt.Errorf("expected %s to be a directory but it's not", mktsSubdirPath)
 	}
 
-	dirSizeBytes, err := dirSize(mktsSubdirPath)
+	dirSizeBytes, err := util.DirSize(mktsSubdirPath)
 	if err != nil {
 		return fmt.Errorf("getting size of %s: %w", mktsSubdirPath, err)
 	}
@@ -682,18 +682,4 @@ func checkApiInfo(ctx context.Context, ai string) (string, error) {
 	}
 
 	return ai, nil
-}
-
-func dirSize(path string) (int64, error) {
-	var size int64
-	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			size += info.Size()
-		}
-		return err
-	})
-	return size, err
 }

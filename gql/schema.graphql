@@ -130,6 +130,12 @@ type Storage {
   MountPoint: String!
 }
 
+type LegacyStorage {
+  Capacity: Uint64!
+  Used: Uint64!
+  MountPoint: String!
+}
+
 type WaitDeal {
   ID: ID!
   Size: Uint64!
@@ -267,6 +273,9 @@ type RootQuery {
 
   """Get storage space usage"""
   storage: Storage!
+
+  """Get storage space usage of deals made with legacy markets endpoint"""
+  legacyStorage: LegacyStorage!
 
   """Get sealing pipeline state"""
   sealingpipeline: SealingPipeline!

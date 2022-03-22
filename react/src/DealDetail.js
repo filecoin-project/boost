@@ -24,13 +24,29 @@ export function DealDetail(props) {
         }
     })
 
+    var popupTimeout
+    function showPopup(msg) {
+        clearTimeout(popupTimeout)
+        const el = document.body.querySelector('.content .popup')
+        popupTimeout = addClassFor(el, 'showing', 2000)
+        const msgEl = document.body.querySelector('.content .popup .message')
+        msgEl.textContent = msg
+    }
+
     function dealIDToClipboard() {
         navigator.clipboard.writeText(deal.ID)
         const el = document.body.querySelector('.content .title .copy')
-        el.classList.add('copied')
-        setTimeout(function() {
-            el.classList.remove('copied')
-        }, 500)
+        addClassFor(el, 'copied', 500)
+        showPopup("Copied " + deal.ID + " to clipboard")
+    }
+
+    function allToClipboard() {
+        const detailTableEl = document.body.querySelector('.deal-detail .deal-fields')
+        const allDataAsText = getAllDataAsText(detailTableEl, deal.ID, logs)
+        navigator.clipboard.writeText(allDataAsText)
+        const el = document.body.querySelector('.content .title .copy-all')
+        addClassFor(el, 'copied', 500)
+        showPopup("Copied all data to clipboard")
     }
 
     const currentEpochData = useQuery(EpochQuery)
@@ -76,9 +92,13 @@ export function DealDetail(props) {
             <div className="close" onClick={() => navigate(-1)}>
                 <img className="icon" alt="" src={closeImg} />
             </div>
+            <div className="popup">
+                <div className="message"></div>
+            </div>
             <div className="title">
                 <span>Deal {deal.ID}</span>
-                <span className="copy" onClick={dealIDToClipboard}></span>
+                <span className="copy" onClick={dealIDToClipboard} title="Copy deal uuid to clipboard"></span>
+                <span className="copy-all" onClick={allToClipboard} title="Copy all deal info to clipboard"></span>
             </div>
             <table className="deal-fields">
                 <tbody>
@@ -284,4 +304,49 @@ function LogParam(props) {
             {val}
         </div>
     )
+}
+
+function getAllDataAsText(detailTableEl, dealID, logs) {
+    var lines = []
+    lines.push('=== Deal ' + dealID + ' ===')
+    lines.push('')
+    for (var row of detailTableEl.querySelectorAll('tr')) {
+        var fieldName = row.querySelector('th').textContent
+        var fieldValue = row.querySelector('td').textContent
+        lines.push(fieldName + ': ' + fieldValue)
+    }
+
+    lines.push('')
+    lines.push('=== Logs ===')
+    for (var log of logs) {
+        var line = moment(log.CreatedAt).format(dateFormat)
+        if (log.Subsystem) {
+            line += ' [' + log.Subsystem + ']'
+        }
+        line += ': ' + log.LogMsg
+        lines.push(line)
+        if (log.LogParams) {
+            try {
+                var logParams = JSON.parse(log.LogParams)
+                var obj = {}
+                for (var i = 0; i < logParams.length; i+=2) {
+                    obj[logParams[i]] = logParams[i+1]
+                }
+                delete obj.id
+                var keys = Object.keys(obj)
+                if (keys.length) {
+                    lines.push(JSON.stringify(obj, null, "  "))
+                }
+            } catch (e) {}
+        }
+    }
+
+    return lines.join('\n')+'\n'
+}
+
+function addClassFor(el, className, duration) {
+    el.classList.add(className)
+    return setTimeout(function() {
+        el.classList.remove(className)
+    }, duration)
 }

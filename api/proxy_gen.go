@@ -6,10 +6,14 @@ import (
 	"context"
 
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
+	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	metrics "github.com/libp2p/go-libp2p-core/metrics"
@@ -29,6 +33,8 @@ type BoostStruct struct {
 	NetStruct
 
 	Internal struct {
+		ActorSectorSize func(p0 context.Context, p1 address.Address) (abi.SectorSize, error) `perm:"read"`
+
 		DealsConsiderOfflineRetrievalDeals func(p0 context.Context) (bool, error) `perm:"admin"`
 
 		DealsConsiderOfflineStorageDeals func(p0 context.Context) (bool, error) `perm:"admin"`
@@ -59,6 +65,8 @@ type BoostStruct struct {
 
 		MarketDataTransferUpdates func(p0 context.Context) (<-chan lapi.DataTransferChannel, error) `perm:"write"`
 
+		MarketGetAsk func(p0 context.Context) (*storagemarket.SignedStorageAsk, error) `perm:"read"`
+
 		MarketGetRetrievalAsk func(p0 context.Context) (*retrievalmarket.Ask, error) `perm:"read"`
 
 		MarketImportDealData func(p0 context.Context, p1 cid.Cid, p2 string) error `perm:"write"`
@@ -68,6 +76,8 @@ type BoostStruct struct {
 		MarketListRetrievalDeals func(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) `perm:"read"`
 
 		MarketRestartDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error `perm:"write"`
+
+		MarketSetAsk func(p0 context.Context, p1 types.BigInt, p2 types.BigInt, p3 abi.ChainEpoch, p4 abi.PaddedPieceSize, p5 abi.PaddedPieceSize) error `perm:"admin"`
 
 		MarketSetRetrievalAsk func(p0 context.Context, p1 *retrievalmarket.Ask) error `perm:"admin"`
 	}
@@ -97,6 +107,10 @@ type CommonStruct struct {
 		AuthNew func(p0 context.Context, p1 []auth.Permission) ([]byte, error) `perm:"admin"`
 
 		AuthVerify func(p0 context.Context, p1 string) ([]auth.Permission, error) `perm:"read"`
+
+		LogList func(p0 context.Context) ([]string, error) `perm:"write"`
+
+		LogSetLevel func(p0 context.Context, p1 string, p2 string) error `perm:"write"`
 	}
 }
 
@@ -123,6 +137,8 @@ type MarketStruct struct {
 		Deal func(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) `perm:"admin"`
 
 		IndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
+
+		MakeOfflineDealWithData func(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
 		MarketDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 	}
@@ -168,6 +184,17 @@ type NetStruct struct {
 }
 
 type NetStub struct {
+}
+
+func (s *BoostStruct) ActorSectorSize(p0 context.Context, p1 address.Address) (abi.SectorSize, error) {
+	if s.Internal.ActorSectorSize == nil {
+		return *new(abi.SectorSize), ErrNotSupported
+	}
+	return s.Internal.ActorSectorSize(p0, p1)
+}
+
+func (s *BoostStub) ActorSectorSize(p0 context.Context, p1 address.Address) (abi.SectorSize, error) {
+	return *new(abi.SectorSize), ErrNotSupported
 }
 
 func (s *BoostStruct) DealsConsiderOfflineRetrievalDeals(p0 context.Context) (bool, error) {
@@ -335,6 +362,17 @@ func (s *BoostStub) MarketDataTransferUpdates(p0 context.Context) (<-chan lapi.D
 	return nil, ErrNotSupported
 }
 
+func (s *BoostStruct) MarketGetAsk(p0 context.Context) (*storagemarket.SignedStorageAsk, error) {
+	if s.Internal.MarketGetAsk == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.MarketGetAsk(p0)
+}
+
+func (s *BoostStub) MarketGetAsk(p0 context.Context) (*storagemarket.SignedStorageAsk, error) {
+	return nil, ErrNotSupported
+}
+
 func (s *BoostStruct) MarketGetRetrievalAsk(p0 context.Context) (*retrievalmarket.Ask, error) {
 	if s.Internal.MarketGetRetrievalAsk == nil {
 		return nil, ErrNotSupported
@@ -387,6 +425,17 @@ func (s *BoostStruct) MarketRestartDataTransfer(p0 context.Context, p1 datatrans
 }
 
 func (s *BoostStub) MarketRestartDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
+	return ErrNotSupported
+}
+
+func (s *BoostStruct) MarketSetAsk(p0 context.Context, p1 types.BigInt, p2 types.BigInt, p3 abi.ChainEpoch, p4 abi.PaddedPieceSize, p5 abi.PaddedPieceSize) error {
+	if s.Internal.MarketSetAsk == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.MarketSetAsk(p0, p1, p2, p3, p4, p5)
+}
+
+func (s *BoostStub) MarketSetAsk(p0 context.Context, p1 types.BigInt, p2 types.BigInt, p3 abi.ChainEpoch, p4 abi.PaddedPieceSize, p5 abi.PaddedPieceSize) error {
 	return ErrNotSupported
 }
 
@@ -445,6 +494,28 @@ func (s *CommonStub) AuthVerify(p0 context.Context, p1 string) ([]auth.Permissio
 	return *new([]auth.Permission), ErrNotSupported
 }
 
+func (s *CommonStruct) LogList(p0 context.Context) ([]string, error) {
+	if s.Internal.LogList == nil {
+		return *new([]string), ErrNotSupported
+	}
+	return s.Internal.LogList(p0)
+}
+
+func (s *CommonStub) LogList(p0 context.Context) ([]string, error) {
+	return *new([]string), ErrNotSupported
+}
+
+func (s *CommonStruct) LogSetLevel(p0 context.Context, p1 string, p2 string) error {
+	if s.Internal.LogSetLevel == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.LogSetLevel(p0, p1, p2)
+}
+
+func (s *CommonStub) LogSetLevel(p0 context.Context, p1 string, p2 string) error {
+	return ErrNotSupported
+}
+
 func (s *MarketStruct) Deal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {
 	if s.Internal.Deal == nil {
 		return nil, ErrNotSupported
@@ -465,6 +536,17 @@ func (s *MarketStruct) IndexerAnnounceAllDeals(p0 context.Context) error {
 
 func (s *MarketStub) IndexerAnnounceAllDeals(p0 context.Context) error {
 	return ErrNotSupported
+}
+
+func (s *MarketStruct) MakeOfflineDealWithData(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) {
+	if s.Internal.MakeOfflineDealWithData == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.MakeOfflineDealWithData(p0, p1)
+}
+
+func (s *MarketStub) MakeOfflineDealWithData(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) {
+	return nil, ErrNotSupported
 }
 
 func (s *MarketStruct) MarketDummyDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {

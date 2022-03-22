@@ -43,7 +43,7 @@
     display: inline-block;
 }
 
-.deals .pagination .first, .deals .pagination .left, .deals .pagination .right, .deals .pagination .page, .deals .pagination .total {
+.deals .pagination .controls > div {
     display: inline-block;
     padding: 0 0.5em;
 }
@@ -54,5 +54,19 @@
 }
 
 .deals .pagination .total {
+    color: #999;
+}
+
+.deals .pagination .per-page select {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    outline: none;
     color: #999;
 }

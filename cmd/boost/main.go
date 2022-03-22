@@ -29,6 +29,10 @@ func main() {
 				Usage:   "boost repo path",
 				Value:   "~/.boost",
 			},
+			&cli.BoolFlag{
+				Name:  "pprof",
+				Usage: "run pprof web server on localhost:6060",
+			},
 			cliutil.FlagVeryVerbose,
 		},
 		Commands: []*cli.Command{
@@ -41,6 +45,8 @@ func main() {
 			dataTransfersCmd,
 			retrievalDealsCmd,
 			indexProvCmd,
+			dealCmd,
+			logCmd,
 		},
 	}
 	app.Setup()

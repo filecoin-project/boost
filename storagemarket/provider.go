@@ -204,6 +204,51 @@ func (p *Provider) GetAsk() *storagemarket.StorageAsk {
 	}
 }
 
+func (p *Provider) MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) (pi *api.ProviderDealRejectionInfo, handler *dealHandler, err error) {
+	p.dealLogger.Infow(dealUuid, "execute offline deal called", "filepath", filePath)
+
+	// db should already have a deal with this uuid as the deal proposal should have been agreed before hand
+	ds, err := p.dealsDB.ByID(p.ctx, dealUuid)
+	if err != nil {
+		return nil, nil, fmt.Errorf("no pre-existing deal proposal for offline deal: %w", err)
+	}
+	if !ds.IsOffline {
+		return nil, nil, errors.New("deal for the given id is not an offline deal")
+	}
+	ds.InboundFilePath = filePath
+
+	// setup clean-up code
+	var dh *dealHandler
+	cleanup := func() {
+		if dh != nil {
+			dh.close()
+			p.delDealHandler(dealUuid)
+		}
+	}
+
+	dh = p.mkAndInsertDealHandler(dealUuid)
+	resp, err := p.checkForDealAcceptance(ds, dh)
+	if err != nil {
+		cleanup()
+		p.dealLogger.LogError(dealUuid, "failed to send deal for acceptance", err)
+		return nil, nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
+	}
+	// if there was an error, we return no rejection reason as well.
+	if resp.err != nil {
+		cleanup()
+		return nil, nil, fmt.Errorf("failed to accept deal: %w", resp.err)
+	}
+	// return rejection reason as provider has rejected the deal.
+	if !resp.ri.Accepted {
+		cleanup()
+		p.dealLogger.Infow(dealUuid, "deal execution rejected by provider", "reason", resp.ri.Reason)
+		return resp.ri, nil, nil
+	}
+
+	p.dealLogger.Infow(dealUuid, "deal accepted and scheduled for execution")
+	return resp.ri, dh, nil
+}
+
 func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *api.ProviderDealRejectionInfo, handler *dealHandler, err error) {
 	p.dealLogger.Infow(dp.DealUUID, "execute deal called")
 
@@ -213,6 +258,7 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 		ClientPeerID:       clientPeer,
 		DealDataRoot:       dp.DealDataRoot,
 		Transfer:           dp.Transfer,
+		IsOffline:          dp.IsOffline,
 	}
 	// validate the deal proposal
 	if !p.testMode {
@@ -223,6 +269,16 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 				Reason: fmt.Sprintf("failed validation: %s", err),
 			}, nil, nil
 		}
+	}
+
+	// if it is an offline deal  just persist it in the DB here and return
+	if dp.IsOffline {
+		ds.CreatedAt = time.Now()
+		ds.Checkpoint = dealcheckpoints.Accepted
+		if err := p.dealsDB.Insert(p.ctx, &ds); err != nil {
+			return nil, nil, fmt.Errorf("failed to insert deal in db: %w", err)
+		}
+		return &api.ProviderDealRejectionInfo{Accepted: true}, nil, nil
 	}
 
 	// setup clean-up code
@@ -403,12 +459,21 @@ func (p *Provider) SubscribeDealUpdates(dealUuid uuid.UUID) (event.Subscription,
 }
 
 func (p *Provider) CancelDealDataTransfer(dealUuid uuid.UUID) error {
+	// Ideally, the UI should never show the cancel data transfer button for an offline deal
+	pds, err := p.dealsDB.ByID(p.ctx, dealUuid)
+	if err != nil {
+		return fmt.Errorf("failed to lookup deal in DB: %w", err)
+	}
+	if pds.IsOffline {
+		return errors.New("cannot cancel data transfer for an offline deal")
+	}
+
 	dh := p.getDealHandler(dealUuid)
 	if dh == nil {
 		return ErrDealHandlerNotFound
 	}
 
-	err := dh.cancelTransfer()
+	err = dh.cancelTransfer()
 	if err == nil {
 		p.dealLogger.Infow(dealUuid, "deal data transfer cancelled by user")
 	} else {
