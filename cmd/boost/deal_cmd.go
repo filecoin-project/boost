@@ -273,7 +273,7 @@ var dealCmd = &cli.Command{
 			return fmt.Errorf("deal proposal rejected: %s", resp.Message)
 		}
 
-		msg := fmt.Sprintf("sent deal proposal\n")
+		msg := "sent deal proposal\n"
 		msg += fmt.Sprintf("  deal uuid: %s\n", dealUuid)
 		msg += fmt.Sprintf("  storage provider: %s\n", maddr)
 		msg += fmt.Sprintf("  client wallet: %s\n", walletAddr)
