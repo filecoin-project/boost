@@ -330,10 +330,12 @@ func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}
 	go func() {
 		if err := cborutil.WriteCborRPC(s, req); err != nil {
 			errc <- fmt.Errorf("failed to send request: %w", err)
+			return
 		}
 
 		if err := cborutil.ReadCborRPC(s, resp); err != nil {
 			errc <- fmt.Errorf("failed to read response: %w", err)
+			return
 		}
 
 		errc <- nil
