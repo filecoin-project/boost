@@ -201,6 +201,10 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	}
 
 	// as deal has already been handed to the sealer, we can remove the inbound file and reclaim the tagged space
+	if !deal.IsOffline {
+		_ = os.Remove(deal.InboundFilePath)
+		p.dealLogger.Infow(deal.DealUuid, "removed inbound file as deal handed to sealer", "path", deal.InboundFilePath)
+	}
 	if err := p.untagStorageSpaceAfterSealing(ctx, deal); err != nil {
 		if xerrors.Is(err, context.Canceled) {
 			return &dealMakingError{recoverable: true,
@@ -549,8 +553,8 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	err := stores.RegisterShardSync(ctx, p.dagst, pc, "", true)
 
 	if err != nil {
-	        if !xerrors.Is(err, dagstore.ErrShardExists) {
-    		    return fmt.Errorf("failed to register deal with dagstore: %w", err)
+		if !xerrors.Is(err, dagstore.ErrShardExists) {
+			return fmt.Errorf("failed to register deal with dagstore: %w", err)
 		}
 		p.dealLogger.Infow(deal.DealUuid, "deal has previously been registered in dagstore")
 	} else {
