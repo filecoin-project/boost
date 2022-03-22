@@ -37,6 +37,12 @@ type publishDealReq struct {
 	done chan struct{}
 }
 
+
+type storageSpaceDealReq struct {
+	deal *types.ProviderDealState
+	done chan struct{}
+}
+
 func (p *Provider) logFunds(id uuid.UUID, trsp *fundmanager.TagFundsResp) {
 	p.dealLogger.Infow(id, "tagged funds for deal",
 		"tagged for deal publish", trsp.PublishMessage,
@@ -188,6 +194,15 @@ func (p *Provider) loop() {
 			}()
 
 			dealReq.rsp <- acceptDealResp{&api.ProviderDealRejectionInfo{Accepted: true}, nil}
+
+		case storageSpaceDealReq := <-p.storageSpaceChan:
+			deal := storageSpaceDealReq.deal
+			if err := p.storageManager.Untag(p.ctx, deal.DealUuid); err != nil && !xerrors.Is(err, db.ErrNotFound) {
+				p.dealLogger.LogError(deal.DealUuid, "failed to untag storage space", err)
+			} else {
+				p.dealLogger.Infow(deal.DealUuid, "untagged storage space")
+			}
+			close(storageSpaceDealReq.done)
 
 		case publishedDeal := <-p.publishedDealChan:
 			deal := publishedDeal.deal

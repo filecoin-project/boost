@@ -393,7 +393,7 @@ func (h *ProviderHarness) AssertPieceAdded(t *testing.T, ctx context.Context, dp
 	rg, ok := h.DAGStore.GetRegistration(dbState.ClientDealProposal.Proposal.PieceCID)
 	require.True(t, ok)
 	require.True(t, rg.EagerInit)
-	require.EqualValues(t, dbState.InboundFilePath, rg.CarPath)
+	require.Empty(t, rg.CarPath)
 }
 
 func (h *ProviderHarness) EventuallyAssertNoTagged(t *testing.T, ctx context.Context) {

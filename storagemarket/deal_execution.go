@@ -8,8 +8,6 @@ import (
 	"os"
 	"time"
 
-	provider "github.com/filecoin-project/index-provider"
-
 	"github.com/filecoin-project/dagstore"
 
 	"github.com/filecoin-project/go-fil-markets/piecestore"
@@ -202,6 +200,24 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 		p.dealLogger.Infow(deal.DealUuid, "deal has already been handed over to the sealing subsystem")
 	}
 
+	// as deal has already been handed to the sealer, we can remove the inbound file and reclaim the tagged space
+	if !deal.IsOffline {
+		_ = os.Remove(deal.InboundFilePath)
+		p.dealLogger.Infow(deal.DealUuid, "removed inbound file as deal handed to sealer", "path", deal.InboundFilePath)
+	}
+	if err := p.untagStorageSpaceAfterSealing(ctx, deal); err != nil {
+		if xerrors.Is(err, context.Canceled) {
+			return &dealMakingError{recoverable: true,
+				err:   fmt.Errorf("deal failed with recoverable error while untagging storage space after handing to sealer: %w", err),
+				uiMsg: "the deal was paused in the Sealing state because Boost was shut down"}
+		}
+
+		return &dealMakingError{
+			err: fmt.Errorf("failed to untag storage space after handing deal to sealer: %w", err),
+		}
+	}
+	p.dealLogger.Infow(deal.DealUuid, "storage space successfully untagged for deal after it was handed to sealer")
+
 	// Index deal in DAGStore and Announce deal
 	if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
 		if err := p.indexAndAnnounce(ctx, pub, deal); err != nil {
@@ -215,6 +231,22 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 		p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed and announced")
 	} else {
 		p.dealLogger.Infow(deal.DealUuid, "deal has already been indexed and announced")
+	}
+
+	return nil
+}
+
+func (p *Provider) untagStorageSpaceAfterSealing(ctx context.Context, deal *types.ProviderDealState) error {
+	presp := make(chan struct{}, 1)
+	select {
+	case p.storageSpaceChan <- storageSpaceDealReq{deal: deal, done: presp}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	select {
+	case <-presp:
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 
 	return nil
@@ -518,21 +550,24 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piecestore")
 
 	// register with dagstore
-	if err := stores.RegisterShardSync(ctx, p.dagst, pc, deal.InboundFilePath, true); err != nil && !xerrors.Is(err, dagstore.ErrShardExists) {
-		return fmt.Errorf("failed to register deal with dagstore: %w", err)
-	}
-	p.dealLogger.Infow(deal.DealUuid, "deal successfully registered in dagstore")
+	err := stores.RegisterShardSync(ctx, p.dagst, pc, "", true)
 
-	// announce to the network indexer
-	annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
-	if err != nil && !xerrors.Is(err, provider.ErrAlreadyAdvertised) {
-		return fmt.Errorf("failed to announce deal to index provider: %w", err)
-	}
-
-	if err == nil {
-		p.dealLogger.Infow(deal.DealUuid, "deal successfully announced to index provider", "announcementCID", annCid.String())
+	if err != nil {
+		if !xerrors.Is(err, dagstore.ErrShardExists) {
+			return fmt.Errorf("failed to register deal with dagstore: %w", err)
+		}
+		p.dealLogger.Infow(deal.DealUuid, "deal has previously been registered in dagstore")
 	} else {
-		p.dealLogger.Infow(deal.DealUuid, "deal has previously been announced to the network indexer")
+		p.dealLogger.Infow(deal.DealUuid, "deal has successfully been registered in the dagstore")
+	}
+
+	// announce to the network indexer but do not fail the deal if the announcement fails
+	annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
+	if err != nil {
+		p.dealLogger.LogError(deal.DealUuid, "failed to announce deal to network indexer "+
+			"but not failing deal as it's already been handed for sealing", err)
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "announced deal to network indexer", "announcement-cid", annCid)
 	}
 
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced)

@@ -84,6 +84,7 @@ type Provider struct {
 	acceptDealChan    chan acceptDealReq
 	finishedDealChan  chan finishedDealReq
 	publishedDealChan chan publishDealReq
+	storageSpaceChan  chan storageSpaceDealReq
 
 	// Sealing Pipeline API
 	sps sealingpipeline.API
@@ -157,6 +158,7 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		acceptDealChan:    make(chan acceptDealReq),
 		finishedDealChan:  make(chan finishedDealReq),
 		publishedDealChan: make(chan publishDealReq),
+		storageSpaceChan:  make(chan storageSpaceDealReq),
 
 		Transport:      httptransport.New(h, dl, httpOpts...),
 		fundManager:    fundMgr,
