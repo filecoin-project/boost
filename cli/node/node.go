@@ -102,14 +102,6 @@ func keyPath(baseDir string) string {
 	return filepath.Join(baseDir, "libp2p.key")
 }
 
-func datastorePath(baseDir string) string {
-	return filepath.Join(baseDir, "datastore")
-}
-
 func walletPath(baseDir string) string {
 	return filepath.Join(baseDir, "wallet")
-}
-
-func blockstorePath(baseDir string) string {
-	return filepath.Join(baseDir, "blockstore")
 }
