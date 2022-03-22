@@ -9,7 +9,6 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
 	github.com/BurntSushi/toml v0.4.1
-	github.com/application-research/filclient v0.0.0-20220304144045-7dd52bc99baf
 	github.com/buger/goterm v1.0.3
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/davecgh/go-spew v1.1.1
@@ -87,11 +86,13 @@ require (
 	github.com/raulk/go-watchdog v1.2.0
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli/v2 v2.3.0
+	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
 	github.com/whyrusleeping/cbor-gen v0.0.0-20220302191723-37c43cae8e14
 	go.opencensus.io v0.23.0
 	go.uber.org/atomic v1.9.0
 	go.uber.org/fx v1.15.0
 	go.uber.org/multierr v1.7.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 )

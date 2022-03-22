@@ -9,7 +9,7 @@ import (
 
 	crand "crypto/rand"
 
-	"github.com/application-research/filclient/keystore"
+	"github.com/filecoin-project/boost/lib/keystore"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
 	"github.com/libp2p/go-libp2p"
