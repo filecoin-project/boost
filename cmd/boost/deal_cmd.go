@@ -33,6 +33,12 @@ var dealCmd = &cli.Command{
 	Usage: "Make an online deal with Boost",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
+			Name:     "repo",
+			Usage:    "repo directory for Boost client",
+			Required: true,
+			Value:    "~/.boost-client",
+		},
+		&cli.StringFlag{
 			Name:     "url",
 			Usage:    "url to CAR file",
 			Required: true,
@@ -91,8 +97,7 @@ var dealCmd = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.DaemonContext(cctx)
 
-		dir := "~/.boost-client"
-		sdir, err := homedir.Expand(dir)
+		sdir, err := homedir.Expand(cctx.String("repo"))
 		if err != nil {
 			return err
 		}

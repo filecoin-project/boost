@@ -13,14 +13,21 @@ import (
 )
 
 var initCmd = &cli.Command{
-	Name:   "init",
-	Usage:  "Initialise Boost client repo",
+	Name:  "init",
+	Usage: "Initialise Boost client repo",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "repo",
+			Usage:    "repo directory for Boost client",
+			Required: true,
+			Value:    "~/.boost-client",
+		},
+	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.DaemonContext(cctx)
 
-		dir := "~/.boost-client"
-		sdir, err := homedir.Expand(dir)
+		sdir, err := homedir.Expand(cctx.String("repo"))
 		if err != nil {
 			return err
 		}
