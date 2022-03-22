@@ -84,7 +84,7 @@ var dealCmd = &cli.Command{
 		},
 		&cli.IntFlag{
 			Name:  "provider-collateral",
-			Usage: "provider collateral required from storage miner",
+			Usage: "deal collateral that storage miner must put in escrow",
 		},
 		&cli.Int64Flag{
 			Name:  "storage-price-per-epoch",
