@@ -118,7 +118,7 @@ var dealCmd = &cli.Command{
 			return err
 		}
 
-		log.Infow("selected wallet", "wallet", walletAddr)
+		log.Debugw("selected wallet", "wallet", walletAddr)
 
 		maddr, err := address.NewFromString(cctx.String("provider"))
 		if err != nil {
@@ -149,7 +149,7 @@ var dealCmd = &cli.Command{
 			Addrs: maddrs,
 		}
 
-		log.Infow("found storage provider", "id", *minfo.PeerId, "multiaddr", maddrs)
+		log.Debugw("found storage provider", "id", *minfo.PeerId, "multiaddr", maddrs)
 
 		providerStr := cctx.String("provider")
 		minerAddr, err := address.NewFromString(providerStr)
@@ -157,7 +157,7 @@ var dealCmd = &cli.Command{
 			return fmt.Errorf("invalid storage provider address '%s': %w", providerStr, err)
 		}
 
-		log.Infow("storage provider on-chain address", "addr", minerAddr)
+		log.Debugw("storage provider on-chain address", "addr", minerAddr)
 
 		dealUuid := uuid.New()
 
@@ -223,7 +223,7 @@ var dealCmd = &cli.Command{
 
 			head := tipset.Height()
 
-			log.Infow("current block height", "number", head)
+			log.Debugw("current block height", "number", head)
 
 			startEpoch = head + abi.ChainEpoch(5760) // head + 2 days
 		}
@@ -256,7 +256,15 @@ var dealCmd = &cli.Command{
 			return fmt.Errorf("deal proposal rejected: %s", resp.Message)
 		}
 
-		log.Infow("submitted deal", "uuid", dealUuid.String())
+		msg := fmt.Sprintf("sent deal proposal %s to storage provider %s:\n", dealUuid, maddr)
+		msg += fmt.Sprintf("  payload cid: %s\n", rootCid)
+		msg += fmt.Sprintf("  url: %s\n", transferParams.URL)
+		msg += fmt.Sprintf("  commp: %s\n", dealProposal.Proposal.PieceCID)
+		msg += fmt.Sprintf("  start epoch: %d\n", dealProposal.Proposal.StartEpoch)
+		msg += fmt.Sprintf("  end epoch: %d\n", dealProposal.Proposal.EndEpoch)
+		msg += fmt.Sprintf("  client collateral: %d\n", dealProposal.Proposal.ClientCollateral)
+		msg += fmt.Sprintf("  provider collateral: %d\n", dealProposal.Proposal.ProviderCollateral)
+		fmt.Println(msg)
 
 		return nil
 	},
