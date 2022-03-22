@@ -181,7 +181,7 @@ var dealCmd = &cli.Command{
 		log.Infow("current block height", "number", head)
 
 		if err := node.Host.Connect(ctx, *addrInfo); err != nil {
-			return err
+			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
 		}
 
 		s, err := node.Host.NewStream(ctx, addrInfo.ID, DealProtocolv120)
