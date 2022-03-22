@@ -9,28 +9,15 @@ import (
 	crand "crypto/rand"
 
 	"github.com/application-research/filclient/keystore"
-	lmdb "github.com/filecoin-project/go-bs-lmdb"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
-	"github.com/ipfs/go-bitswap"
-	"github.com/ipfs/go-datastore"
-	levelds "github.com/ipfs/go-ds-leveldb"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/metrics"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 )
 
 type Node struct {
-	Host host.Host
-
-	Datastore  datastore.Batching
-	DHT        *dht.IpfsDHT
-	Blockstore blockstore.Blockstore
-	Bitswap    *bitswap.Bitswap
-
+	Host   host.Host
 	Wallet *wallet.LocalWallet
 }
 
@@ -40,39 +27,9 @@ func Setup(ctx context.Context, cfgdir string) (*Node, error) {
 		return nil, err
 	}
 
-	bwc := metrics.NewBandwidthCounter()
-
 	h, err := libp2p.New(
 		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
 		libp2p.Identity(peerkey),
-		libp2p.BandwidthReporter(bwc),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	bstore, err := lmdb.Open(&lmdb.Options{
-		Path:   blockstorePath(cfgdir),
-		NoSync: true,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	ds, err := levelds.NewDatastore(datastorePath(cfgdir), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	dht, err := dht.New(
-		ctx,
-		h,
-		dht.Mode(dht.ModeClient),
-		dht.QueryFilter(dht.PublicQueryFilter),
-		dht.RoutingTableFilter(dht.PublicRoutingTableFilter),
-		dht.BootstrapPeersFunc(dht.GetDefaultBootstrapPeerAddrInfos),
-		dht.Datastore(ds),
-		dht.RoutingTablePeerDiversityFilter(dht.NewRTPeerDiversityFilter(h, 2, 3)),
 	)
 	if err != nil {
 		return nil, err
@@ -84,11 +41,8 @@ func Setup(ctx context.Context, cfgdir string) (*Node, error) {
 	}
 
 	return &Node{
-		Host:       h,
-		Blockstore: bstore,
-		DHT:        dht,
-		Datastore:  ds,
-		Wallet:     wallet,
+		Host:   h,
+		Wallet: wallet,
 	}, nil
 }
 

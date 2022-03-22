@@ -40,8 +40,15 @@ import (
 )
 
 var marketCmd = &cli.Command{
-	Name:      "market-add",
-	Usage:     "Add funds to the Storage Market Actor",
+	Name:  "market-add",
+	Usage: "Add funds to the Storage Market Actor",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "repo",
+			Usage: "repo directory for Boost client",
+			Value: "~/.boost-client",
+		},
+	},
 	ArgsUsage: "<amount>",
 	Before:    before,
 	Action: func(cctx *cli.Context) error {
@@ -56,8 +63,8 @@ var marketCmd = &cli.Command{
 		amt := abi.TokenAmount(f)
 
 		ctx := lcli.ReqContext(cctx)
-		dir := "~/.boost-client"
-		sdir, err := homedir.Expand(dir)
+
+		sdir, err := homedir.Expand(cctx.String("repo"))
 		if err != nil {
 			return err
 		}
