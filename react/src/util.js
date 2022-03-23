@@ -24,7 +24,7 @@ export function humanFileSize(size, unitIndex = 0) {
 
     if (isBigInt) {
         size = size / 1024n
-        if (size <= Math.MAX_SAFE_INTEGER) {
+        if (size <= Number.MAX_SAFE_INTEGER) {
             size = Number(size)
         }
     } else {

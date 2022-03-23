@@ -3,7 +3,7 @@ import {LegacyDealsCountQuery, LegacyDealsListQuery} from "./gql";
 import moment from "moment";
 import {humanFileSize} from "./util";
 import React, {useState} from "react";
-import {PageContainer, ShortClientAddress, ShortDealID} from "./Components";
+import {PageContainer, ShortClientAddress} from "./Components";
 import {Link} from "react-router-dom";
 import './Deals.css'
 import './LegacyDeals.css'
