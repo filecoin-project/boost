@@ -2,6 +2,7 @@
 /boostx
 /boostd
 /devnet
+/docgen-md
 extern/filecoin-ffi/rust/target
 **/*.a
 **/*.pc

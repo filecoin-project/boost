@@ -19,8 +19,6 @@ import (
 //  * Generate openrpc blobs
 
 type Market interface {
-	// MethodGroup: Market
-
 	MarketDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)         //perm:admin
 	Deal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                //perm:admin
 	IndexerAnnounceAllDeals(ctx context.Context) error                                               //perm:admin
