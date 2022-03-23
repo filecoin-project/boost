@@ -37,7 +37,6 @@ type publishDealReq struct {
 	done chan struct{}
 }
 
-
 type storageSpaceDealReq struct {
 	deal *types.ProviderDealState
 	done chan struct{}
@@ -137,8 +136,7 @@ func (p *Provider) processOfflineDealRequest(deal *types.ProviderDealState) (boo
 		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
 			p.dealLogger.LogError(deal.DealUuid, "failed to untag funds during deal cleanup", errf)
 		} else if errf == nil {
-			p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal cleanup", "untagged publish", pub, "untagged collateral", collat,
-				)
+			p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal cleanup", "untagged publish", pub, "untagged collateral", collat)
 		}
 	}
 
