@@ -24,7 +24,7 @@ func graphiql(httpPort int) func(w http.ResponseWriter, r *http.Request) {
                <div id="graphiql" style="height: 100vh;">Loading...</div>
                <script>
                        function graphQLFetcher(graphQLParams) {
-                               return fetch("/graphql", {
+                               return fetch("/graphql/query", {
                                        method: "post",
                                        body: JSON.stringify(graphQLParams),
                                        credentials: "include",
