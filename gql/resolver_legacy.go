@@ -217,9 +217,9 @@ func (r *legacyDealResolver) Message() string {
 		default:
 			if r.Ref.RawBlockSize > 0 {
 				pct := (100 * r.transferred) / r.Ref.RawBlockSize
-				return fmt.Sprintf("Transferring: %s (%d%%)", humanize.Bytes(r.transferred), pct)
+				return fmt.Sprintf("Transferring: %s (%d%%)", humanize.IBytes(r.transferred), pct)
 			} else {
-				return fmt.Sprintf("Transferring: %s", humanize.Bytes(r.transferred))
+				return fmt.Sprintf("Transferring: %s", humanize.IBytes(r.transferred))
 			}
 		}
 	}
