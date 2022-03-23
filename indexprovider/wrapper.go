@@ -223,12 +223,6 @@ func (w *Wrapper) DagstoreReinitBoostDeals(ctx context.Context) (bool, error) {
 		}
 	}()
 
-	// Filter for deals that are handed off.
-	//
-	// If the deal has not yet been handed off to the sealing subsystem, we
-	// don't need to call RegisterShard in this migration; RegisterShard will
-	// be called in the new code once the deal reaches the state where it's
-	// handed off to the sealing subsystem.
 	var registered int
 	for _, deal := range deals {
 		pieceCid := deal.ClientDealProposal.Proposal.PieceCID
@@ -236,7 +230,7 @@ func (w *Wrapper) DagstoreReinitBoostDeals(ctx context.Context) (bool, error) {
 		// enrich log statements in this iteration with deal ID and piece CID.
 		log := log.With("deal_id", deal.ChainDealID, "piece_cid", pieceCid)
 
-		// Filter for inflight deals as they will be re-indexed anyways
+		// Filter out deals that have not yet been indexed and announced as they will be re-indexed anyways
 		if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
 			continue
 		}
@@ -256,7 +250,11 @@ func (w *Wrapper) DagstoreReinitBoostDeals(ctx context.Context) (bool, error) {
 
 	log.Infow("finished registering all boost shards", "total", registered)
 	totalCh <- registered
-	<-doneCh
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	case <-doneCh:
+	}
 
 	log.Infow("confirmed registration of all boost shards")
 
