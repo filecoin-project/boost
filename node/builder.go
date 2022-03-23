@@ -146,6 +146,7 @@ const (
 	// boost -> should be started after markets
 	HandleBoostDealsKey
 
+	// index-provider should be started after Boost
 	HandleIndexProviderKey
 
 	// daemon
@@ -435,7 +436,7 @@ func ConfigBoost(c interface{}) Option {
 		// Sealing Pipeline State API
 		Override(new(sealingpipeline.API), From(new(lotus_modules.MinerStorageService))),
 
-		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper),
+		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg.DAGStore)),
 
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner)),
 
