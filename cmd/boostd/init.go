@@ -131,7 +131,7 @@ var initCmd = &cli.Command{
 			return fmt.Errorf("creating storage.json file: %w", err)
 		}
 
-		log.Info("Boost repo successfully created, you can now start boost with 'boost run'")
+		log.Info("Boost repo successfully created, you can now start boost with 'boostd run'")
 
 		return nil
 	},
@@ -166,6 +166,16 @@ var migrateCmd = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
 
+		// Open markets repo
+		mktsRepoPath := cctx.String("import-markets-repo")
+		log.Debugf("Getting markets repo '%s'", mktsRepoPath)
+		mktsRepo, err := getMarketsRepo(mktsRepoPath)
+		if err != nil {
+			return err
+		}
+		defer mktsRepo.Close() //nolint:errcheck
+
+		// Initialize boost repo
 		bp, err := initBoost(ctx, cctx)
 		if err != nil {
 			return err
@@ -181,14 +191,6 @@ var migrateCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-
-		mktsRepoPath := cctx.String("import-markets-repo")
-		log.Debugf("Getting markets repo '%s'", mktsRepoPath)
-		mktsRepo, err := getMarketsRepo(mktsRepoPath)
-		if err != nil {
-			return err
-		}
-		defer mktsRepo.Close() //nolint:errcheck
 
 		// Migrate datastore keys
 		log.Info("Migrating datastore keys")
@@ -218,11 +220,10 @@ var migrateCmd = &cli.Command{
 			return err
 		}
 
-		// Create an empty storage.json file
-		log.Debug("Creating empty storage.json file")
-		err = os.WriteFile(path.Join(boostRepo.Path(), "storage.json"), []byte("{}"), 0666)
+		// Copy the storage.json file if there is one, otherwise create an empty one
+		err = migrateStorageJson(mktsRepo.Path(), boostRepo.Path())
 		if err != nil {
-			return fmt.Errorf("creating storage.json file: %w", err)
+			return err
 		}
 
 		// Migrate DAG store
@@ -231,10 +232,38 @@ var migrateCmd = &cli.Command{
 			return err
 		}
 
-		log.Info("Boost repo successfully created, you can now start boost with 'boost run'")
+		log.Info("Boost repo successfully created, you can now start boost with 'boostd run'")
 
 		return nil
 	},
+}
+
+func migrateStorageJson(mktsRepoPath string, boostRepoPath string) error {
+	mktsFilePath := path.Join(mktsRepoPath, "storage.json")
+	boostFilePath := path.Join(boostRepoPath, "storage.json")
+
+	// Read storage.json in the markets repo
+	bz, err := os.ReadFile(mktsFilePath)
+	if err != nil {
+		if !xerrors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("reading %s: %w", mktsFilePath, err)
+		}
+
+		// There is no storage.json in the markets repo, so create an empty one
+		// in the Boost repo
+		log.Debug("Creating storage.json file")
+		bz = []byte("{}")
+	} else {
+		log.Debug("Migrating storage.json file")
+	}
+
+	// Write storage.json in the boost repo
+	err = os.WriteFile(boostFilePath, bz, 0666)
+	if err != nil {
+		return fmt.Errorf("writing %s: %w", boostFilePath, err)
+	}
+
+	return nil
 }
 
 func migrateDirectory(ctx context.Context, mktsRepoPath string, boostRepoPath string, subdir string) error {
