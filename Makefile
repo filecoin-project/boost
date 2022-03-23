@@ -81,7 +81,12 @@ devnet: $(BUILD_DEPS)
 .PHONY: devnet
 BINS+=devnet
 
-build: boost devnet
+react:
+	npm install --prefix react
+	npm run --prefix react build
+.PHONY: react
+
+build: boost devnet react
 .PHONY: build
 
 install: install-boost install-devnet
