@@ -124,7 +124,7 @@ type Provider struct {
 func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, httpOpts ...httptransport.Option) (*Provider, error) {
-	fspath := path.Join(repoRoot, "incoming")
+	fspath := path.Join(repoRoot, storagemanager.StagingAreaDirName)
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
 		return nil, err
