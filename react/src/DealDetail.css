@@ -148,3 +148,8 @@
 .deal-detail .copy-buffer {
     display: none;
 }
+
+.deal-status-info .info .content {
+    width: 42em;
+    left: 0;
+}

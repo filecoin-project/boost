@@ -419,6 +419,8 @@ func (dr *dealResolver) Message() string {
 	case dealcheckpoints.PublishConfirmed:
 		return "Adding to Sector"
 	case dealcheckpoints.AddedPiece:
+		return "Announcing"
+	case dealcheckpoints.IndexedAndAnnounced:
 		return "Sealing"
 	case dealcheckpoints.Complete:
 		switch dr.Err {
