@@ -10,6 +10,7 @@ import {humanFIL, addCommas, humanFileSize} from "./util";
 import {useParams} from "react-router-dom";
 import './DealDetail.css'
 import closeImg from './bootstrap-icons/icons/x-circle.svg'
+import {Info} from "./Info";
 
 export function DealDetail(props) {
     const params = useParams()
@@ -253,7 +254,10 @@ export function DealDetail(props) {
                 </tr>
                 <tr>
                     <th>Status</th>
-                    <td>{deal.Message}</td>
+                    <td>
+                        {deal.Message}
+                        <DealStatusInfo />
+                    </td>
                 </tr>
                 </tbody>
             </table>
@@ -400,4 +404,74 @@ function addClassFor(el, className, duration) {
     return setTimeout(function() {
         el.classList.remove(className)
     }, duration)
+}
+
+function DealStatusInfo(props) {
+    return <span className="deal-status-info">
+        <Info>
+            The deal can be in one of the following states:
+            <p>
+                <i>Transfer queued</i><br/>
+                <p>
+                    The storage deal proposal has been accepted, and Boost is
+                    about to start the data transfer.
+                </p>
+            </p>
+            <p>
+                <i>Transferring</i>
+                <p>
+                    The data for the deal is transferring.
+                </p>
+            </p>
+            <p>
+                <i>Transfer Complete</i>
+                <p>
+                    The data transfer is complete and Boost is verifying the data matches commp.
+                </p>
+            </p>
+            <p>
+                <i>Ready to Publish</i>
+                <p>
+                    The deal is in the batch publish queue, ready to be published.
+                </p>
+            </p>
+            <p>
+                <i>Awaiting Publish Confirmation</i>
+                <p>
+                    Boost sent a publish deal message for the deal and is waiting for on-chain confirmation.
+                </p>
+            </p>
+            <p>
+                <i>Adding to Sector</i>
+                <p>
+                    Boost is handing the deal off to the lotus-miner sealing subsystem
+                    to be added to a sector.
+                </p>
+            </p>
+            <p>
+                <i>Announcing</i>
+                <p>
+                    Boost is announcing the deal to the network so that clients know where to retrieve it.
+                </p>
+            </p>
+            <p>
+                <i>Sealing</i>
+                <p>
+                    The deal has been added to a sector and is now sealing.
+                </p>
+            </p>
+            <p>
+                <i>Complete</i>
+                <p>
+                    The deal has reached its duration and expired.
+                </p>
+            </p>
+            <p>
+                <i>Cancelled</i>
+                <p>
+                    The deal was cancelled.
+                </p>
+            </p>
+        </Info>
+    </span>
 }
