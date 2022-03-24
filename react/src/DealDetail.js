@@ -127,6 +127,10 @@ export function DealDetail(props) {
                     <td>{deal.DealDataRoot}</td>
                 </tr>
                 <tr>
+                    <th>Verified</th>
+                    <td>{deal.IsVerified ? 'Yes' : 'No'}</td>
+                </tr>
+                <tr>
                     <th>Piece CID</th>
                     <td>{deal.PieceCid}</td>
                 </tr>
@@ -139,8 +143,16 @@ export function DealDetail(props) {
                     </td>
                 </tr>
                 <tr>
+                    <th>Client Collateral</th>
+                    <td>{humanFIL(deal.ClientCollateral)}</td>
+                </tr>
+                <tr>
                     <th>Provider Collateral</th>
                     <td>{humanFIL(deal.ProviderCollateral)}</td>
+                </tr>
+                <tr>
+                    <th>Storage Price Per Epoch</th>
+                    <td>{humanFIL(deal.StoragePricePerEpoch)}</td>
                 </tr>
                 <tr>
                     <th>Current Epoch</th>
@@ -165,6 +177,29 @@ export function DealDetail(props) {
                     </td>
                 </tr>
                 <tr>
+                    <th>Duration</th>
+                    <td>
+                        {addCommas(deal.EndEpoch-deal.StartEpoch)}
+                        <span className="aux">
+                            {startEpochTime && endEpochTime ? ' (' + moment(endEpochTime).diff(startEpochTime, 'days') + ' days)' : null}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Storage Fee</th>
+                    <td>
+                        {humanFIL(deal.StoragePricePerEpoch * BigInt(deal.EndEpoch-deal.StartEpoch))}
+                        &nbsp;
+                        <span className="aux">
+                            (Price per epoch x Duration)
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Transfer Mode</th>
+                    <td>{deal.IsOffline ? 'Offline' : 'Online'}</td>
+                </tr>
+                <tr>
                     <th>Transfer Type</th>
                     <td>{deal.Transfer.Type}</td>
                 </tr>
@@ -175,6 +210,18 @@ export function DealDetail(props) {
                         &nbsp;
                         <span className="aux">({addCommas(deal.Transfer.Size)} bytes)</span>
                     </td>
+                </tr>
+                <tr>
+                    <th>Transferred</th>
+                    <td>
+                        {humanFileSize(deal.Transferred)}
+                        &nbsp;
+                        <span className="aux">({addCommas(deal.Transferred)} bytes)</span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Inbound File Path</th>
+                    <td>{deal.InboundFilePath}</td>
                 </tr>
                 {deal.Sector.ID > 0 ? (
                     <>
@@ -199,6 +246,10 @@ export function DealDetail(props) {
                         {deal.PublishCid}
                         </a>
                     </td>
+                </tr>
+                <tr>
+                    <th>Chain Deal ID</th>
+                    <td>{deal.ChainDealID ? addCommas(deal.ChainDealID) : null}</td>
                 </tr>
                 <tr>
                     <th>Status</th>

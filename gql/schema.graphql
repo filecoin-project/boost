@@ -43,14 +43,23 @@ type Deal {
   CreatedAt: Time!
   PieceCid: String!
   PieceSize: Uint64!
+  IsVerified: Boolean!
+  ProposalLabel: String!
   ProviderCollateral: Uint64!
+  ClientCollateral: Uint64!
+  StoragePricePerEpoch: Uint64!
   StartEpoch: Uint64!
   EndEpoch: Uint64!
   ClientPeerID: String!
   DealDataRoot: String!
+  InboundFilePath: String!
+  ChainDealID: Uint64!
   PublishCid: String!
+  IsOffline: Boolean!
   Transfer: TransferParams!
   Stage: String!
+  Err: String!
+  Transferred: Uint64!
   Sector: Sector!
   Message: String!
   Logs: [DealLog]!
