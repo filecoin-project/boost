@@ -26,14 +26,20 @@ import (
 var ErrNotSupported = xerrors.New("method not supported")
 
 type BoostStruct struct {
-	MarketStruct
-
 	CommonStruct
 
 	NetStruct
 
 	Internal struct {
 		ActorSectorSize func(p0 context.Context, p1 address.Address) (abi.SectorSize, error) `perm:"read"`
+
+		BoostDeal func(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) `perm:"admin"`
+
+		BoostDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
+
+		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
+
+		BoostOfflineDealWithData func(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
 		DealsConsiderOfflineRetrievalDeals func(p0 context.Context) (bool, error) `perm:"admin"`
 
@@ -84,8 +90,6 @@ type BoostStruct struct {
 }
 
 type BoostStub struct {
-	MarketStub
-
 	CommonStub
 
 	NetStub
@@ -130,21 +134,6 @@ type CommonNetStub struct {
 	CommonStub
 
 	NetStub
-}
-
-type MarketStruct struct {
-	Internal struct {
-		Deal func(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) `perm:"admin"`
-
-		IndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
-
-		MakeOfflineDealWithData func(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
-
-		MarketDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
-	}
-}
-
-type MarketStub struct {
 }
 
 type NetStruct struct {
@@ -195,6 +184,50 @@ func (s *BoostStruct) ActorSectorSize(p0 context.Context, p1 address.Address) (a
 
 func (s *BoostStub) ActorSectorSize(p0 context.Context, p1 address.Address) (abi.SectorSize, error) {
 	return *new(abi.SectorSize), ErrNotSupported
+}
+
+func (s *BoostStruct) BoostDeal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {
+	if s.Internal.BoostDeal == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.BoostDeal(p0, p1)
+}
+
+func (s *BoostStub) BoostDeal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *BoostStruct) BoostDummyDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
+	if s.Internal.BoostDummyDeal == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.BoostDummyDeal(p0, p1)
+}
+
+func (s *BoostStub) BoostDummyDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *BoostStruct) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
+	if s.Internal.BoostIndexerAnnounceAllDeals == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.BoostIndexerAnnounceAllDeals(p0)
+}
+
+func (s *BoostStub) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
+	return ErrNotSupported
+}
+
+func (s *BoostStruct) BoostOfflineDealWithData(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) {
+	if s.Internal.BoostOfflineDealWithData == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.BoostOfflineDealWithData(p0, p1)
+}
+
+func (s *BoostStub) BoostOfflineDealWithData(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) {
+	return nil, ErrNotSupported
 }
 
 func (s *BoostStruct) DealsConsiderOfflineRetrievalDeals(p0 context.Context) (bool, error) {
@@ -516,50 +549,6 @@ func (s *CommonStub) LogSetLevel(p0 context.Context, p1 string, p2 string) error
 	return ErrNotSupported
 }
 
-func (s *MarketStruct) Deal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {
-	if s.Internal.Deal == nil {
-		return nil, ErrNotSupported
-	}
-	return s.Internal.Deal(p0, p1)
-}
-
-func (s *MarketStub) Deal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {
-	return nil, ErrNotSupported
-}
-
-func (s *MarketStruct) IndexerAnnounceAllDeals(p0 context.Context) error {
-	if s.Internal.IndexerAnnounceAllDeals == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.IndexerAnnounceAllDeals(p0)
-}
-
-func (s *MarketStub) IndexerAnnounceAllDeals(p0 context.Context) error {
-	return ErrNotSupported
-}
-
-func (s *MarketStruct) MakeOfflineDealWithData(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) {
-	if s.Internal.MakeOfflineDealWithData == nil {
-		return nil, ErrNotSupported
-	}
-	return s.Internal.MakeOfflineDealWithData(p0, p1)
-}
-
-func (s *MarketStub) MakeOfflineDealWithData(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) {
-	return nil, ErrNotSupported
-}
-
-func (s *MarketStruct) MarketDummyDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
-	if s.Internal.MarketDummyDeal == nil {
-		return nil, ErrNotSupported
-	}
-	return s.Internal.MarketDummyDeal(p0, p1)
-}
-
-func (s *MarketStub) MarketDummyDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
-	return nil, ErrNotSupported
-}
-
 func (s *NetStruct) ID(p0 context.Context) (peer.ID, error) {
 	if s.Internal.ID == nil {
 		return *new(peer.ID), ErrNotSupported
@@ -740,5 +729,4 @@ var _ Boost = new(BoostStruct)
 var _ ChainIO = new(ChainIOStruct)
 var _ Common = new(CommonStruct)
 var _ CommonNet = new(CommonNetStruct)
-var _ Market = new(MarketStruct)
 var _ Net = new(NetStruct)

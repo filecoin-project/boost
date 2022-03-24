@@ -19,6 +19,13 @@ import (
 
 // TODO: check if this exists anywhere else
 
+// ProviderDealRejectionInfo is the information sent by the Storage Provider
+// to the Client when it accepts or rejects a deal.
+type ProviderDealRejectionInfo struct {
+	Accepted bool
+	Reason   string // The rejection reason, if the deal is rejected
+}
+
 type MultiaddrSlice []ma.Multiaddr
 
 func (m *MultiaddrSlice) UnmarshalJSON(raw []byte) (err error) {

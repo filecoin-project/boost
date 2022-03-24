@@ -3,6 +3,7 @@
 /boostd
 /devnet
 /docgen-md
+/docgen-openrpc
 extern/filecoin-ffi/rust/target
 **/*.a
 **/*.pc

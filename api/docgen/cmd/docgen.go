@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api/docgen"
 )
 
@@ -99,7 +98,6 @@ func main() {
 				}
 			}
 			if !ok {
-				spew.Dump(g.Methods)
 				panic("no perms for method: " + m.Name)
 			}
 

@@ -100,20 +100,20 @@ func (sm *BoostAPI) ServeRemote(perm bool) func(w http.ResponseWriter, r *http.R
 	}
 }
 
-func (sm *BoostAPI) MarketDummyDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
+func (sm *BoostAPI) BoostDummyDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
 	info, _, err := sm.StorageProvider.ExecuteDeal(&params, "dummy")
 	return info, err
 }
 
-func (sm *BoostAPI) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
+func (sm *BoostAPI) BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
 	return sm.StorageProvider.Deal(ctx, dealUuid)
 }
 
-func (sm *BoostAPI) IndexerAnnounceAllDeals(ctx context.Context) error {
+func (sm *BoostAPI) BoostIndexerAnnounceAllDeals(ctx context.Context) error {
 	return sm.IndexProvider.IndexerAnnounceAllDeals(ctx)
 }
 
-func (sm *BoostAPI) MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
+func (sm *BoostAPI) BoostOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
 	res, _, err := sm.StorageProvider.MakeOfflineDealWithData(dealUuid, filePath)
 	return res, err
 }

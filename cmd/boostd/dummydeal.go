@@ -197,7 +197,8 @@ var dummydealCmd = &cli.Command{
 		}
 
 		log.Debug("Make API call to start dummy deal " + dealUuid.String())
-		rej, err := boostApi.MarketDummyDeal(ctx, dealParams)
+
+		rej, err := boostApi.BoostDummyDeal(ctx, dealParams)
 		if err != nil {
 			return xerrors.Errorf("creating dummy deal: %w", err)
 		}
