@@ -68,15 +68,7 @@ const DealsListQuery = gql`
             deals {
                 ID
                 CreatedAt
-                PieceCid
-                PieceSize
                 ClientAddress
-                StartEpoch
-                EndEpoch
-                ProviderCollateral
-                ClientPeerID
-                DealDataRoot
-                PublishCid
                 Stage
                 Message
                 Transfer {
@@ -88,12 +80,6 @@ const DealsListQuery = gql`
                     ID
                     Offset
                     Length
-                }
-                Logs {
-                    CreatedAt
-                    LogMsg
-                    LogParams
-                    Subsystem
                 }
             }
             totalCount
@@ -146,15 +132,23 @@ const DealSubscription = gql`
             CreatedAt
             PieceCid
             PieceSize
+            IsVerified
+            ProposalLabel
             ClientAddress
             StartEpoch
             EndEpoch
             ProviderCollateral
+            ClientCollateral
+            StoragePricePerEpoch
             ClientPeerID
             DealDataRoot
+            InboundFilePath
+            ChainDealID
             PublishCid
+            IsOffline
             Stage
             Message
+            Transferred
             Transfer {
                 Type
                 Size

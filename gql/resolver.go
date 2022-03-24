@@ -309,6 +309,14 @@ func (dr *dealResolver) ProviderAddress() string {
 	return dr.ProviderDealState.ClientDealProposal.Proposal.Provider.String()
 }
 
+func (dr *dealResolver) IsVerified() bool {
+	return dr.ProviderDealState.ClientDealProposal.Proposal.VerifiedDeal
+}
+
+func (dr *dealResolver) ProposalLabel() string {
+	return dr.ProviderDealState.ClientDealProposal.Proposal.Label
+}
+
 func (dr *dealResolver) ClientPeerID() string {
 	return dr.ProviderDealState.ClientPeerID.String()
 }
@@ -326,6 +334,14 @@ func (dr *dealResolver) PublishCid() string {
 
 func (dr *dealResolver) PieceSize() gqltypes.Uint64 {
 	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.PieceSize)
+}
+
+func (dr *dealResolver) ChainDealID() gqltypes.Uint64 {
+	return gqltypes.Uint64(dr.ProviderDealState.ChainDealID)
+}
+
+func (dr *dealResolver) Transferred() gqltypes.Uint64 {
+	return gqltypes.Uint64(dr.ProviderDealState.NBytesReceived)
 }
 
 type sectorResolver struct {
@@ -358,6 +374,14 @@ func (dr *dealResolver) Transfer() dealTransfer {
 
 func (dr *dealResolver) ProviderCollateral() gqltypes.Uint64 {
 	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.ProviderCollateral.Int64())
+}
+
+func (dr *dealResolver) ClientCollateral() gqltypes.Uint64 {
+	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.ClientCollateral.Uint64())
+}
+
+func (dr *dealResolver) StoragePricePerEpoch() gqltypes.Uint64 {
+	return gqltypes.Uint64(dr.ProviderDealState.ClientDealProposal.Proposal.StoragePricePerEpoch.Uint64())
 }
 
 func (dr *dealResolver) StartEpoch() gqltypes.Uint64 {
