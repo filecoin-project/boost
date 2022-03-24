@@ -43,6 +43,7 @@ func main() {
 			indexProvCmd,
 			offlineDealCmd,
 			logCmd,
+			dagstoreCmd,
 		},
 	}
 	app.Setup()

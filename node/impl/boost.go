@@ -3,7 +3,13 @@ package impl
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+
+	"github.com/filecoin-project/dagstore/shard"
+
+	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/filecoin-project/boost/indexprovider"
 
@@ -26,6 +32,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"go.uber.org/fx"
 )
+
+var log = logging.Logger("boost-api")
 
 type BoostAPI struct {
 	fx.In
@@ -116,4 +124,186 @@ func (sm *BoostAPI) IndexerAnnounceAllDeals(ctx context.Context) error {
 func (sm *BoostAPI) MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
 	res, _, err := sm.StorageProvider.MakeOfflineDealWithData(dealUuid, filePath)
 	return res, err
+}
+
+func (sm *BoostAPI) DagstoreInitializeAll(ctx context.Context, params api.DagstoreInitializeAllParams) (<-chan api.DagstoreInitializeAllEvent, error) {
+	if sm.DAGStore == nil {
+		return nil, fmt.Errorf("dagstore not available on this node")
+	}
+
+	if sm.SectorAccessor == nil {
+		return nil, fmt.Errorf("sector accessor not available on this node")
+	}
+
+	// prepare the thottler tokens.
+	var throttle chan struct{}
+	if c := params.MaxConcurrency; c > 0 {
+		throttle = make(chan struct{}, c)
+		for i := 0; i < c; i++ {
+			throttle <- struct{}{}
+		}
+	}
+
+	// are we initializing only unsealed pieces?
+	onlyUnsealed := !params.IncludeSealed
+
+	info := sm.DAGStore.AllShardsInfo()
+	var toInitialize []string
+	for k, i := range info {
+		if i.ShardState != dagstore.ShardStateNew {
+			continue
+		}
+
+		// if we're initializing only unsealed pieces, check if there's an
+		// unsealed deal for this piece available.
+		if onlyUnsealed {
+			pieceCid, err := cid.Decode(k.String())
+			if err != nil {
+				log.Warnw("DagstoreInitializeAll: failed to decode shard key as piece CID; skipping", "shard_key", k.String(), "error", err)
+				continue
+			}
+
+			pi, err := sm.PieceStore.GetPieceInfo(pieceCid)
+			if err != nil {
+				log.Warnw("DagstoreInitializeAll: failed to get piece info; skipping", "piece_cid", pieceCid, "error", err)
+				continue
+			}
+
+			var isUnsealed bool
+			for _, d := range pi.Deals {
+				isUnsealed, err = sm.SectorAccessor.IsUnsealed(ctx, d.SectorID, d.Offset.Unpadded(), d.Length.Unpadded())
+				if err != nil {
+					log.Warnw("DagstoreInitializeAll: failed to get unsealed status; skipping deal", "deal_id", d.DealID, "error", err)
+					continue
+				}
+				if isUnsealed {
+					break
+				}
+			}
+
+			if !isUnsealed {
+				log.Infow("DagstoreInitializeAll: skipping piece because it's sealed", "piece_cid", pieceCid, "error", err)
+				continue
+			}
+		}
+
+		// yes, we're initializing this shard.
+		toInitialize = append(toInitialize, k.String())
+	}
+
+	total := len(toInitialize)
+	if total == 0 {
+		out := make(chan api.DagstoreInitializeAllEvent)
+		close(out)
+		return out, nil
+	}
+
+	// response channel must be closed when we're done, or the context is cancelled.
+	// this buffering is necessary to prevent inflight children goroutines from
+	// publishing to a closed channel (res) when the context is cancelled.
+	out := make(chan api.DagstoreInitializeAllEvent, 32) // internal buffer.
+	res := make(chan api.DagstoreInitializeAllEvent, 32) // returned to caller.
+
+	// pump events back to caller.
+	// two events per shard.
+	go func() {
+		defer close(res)
+
+		for i := 0; i < total*2; i++ {
+			select {
+			case res <- <-out:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	go func() {
+		for i, k := range toInitialize {
+			if throttle != nil {
+				select {
+				case <-throttle:
+					// acquired a throttle token, proceed.
+				case <-ctx.Done():
+					return
+				}
+			}
+
+			go func(k string, i int) {
+				r := api.DagstoreInitializeAllEvent{
+					Key:     k,
+					Event:   "start",
+					Total:   total,
+					Current: i + 1, // start with 1
+				}
+				select {
+				case out <- r:
+				case <-ctx.Done():
+					return
+				}
+
+				err := sm.DagstoreInitializeShard(ctx, k)
+
+				if throttle != nil {
+					throttle <- struct{}{}
+				}
+
+				r.Event = "end"
+				if err == nil {
+					r.Success = true
+				} else {
+					r.Success = false
+					r.Error = err.Error()
+				}
+
+				select {
+				case out <- r:
+				case <-ctx.Done():
+				}
+			}(k, i)
+		}
+	}()
+
+	return res, nil
+}
+
+func (sm *BoostAPI) DagstoreInitializeShard(ctx context.Context, key string) error {
+	if sm.DAGStore == nil {
+		return fmt.Errorf("dagstore not available on this node")
+	}
+
+	k := shard.KeyFromString(key)
+
+	info, err := sm.DAGStore.GetShardInfo(k)
+	if err != nil {
+		return fmt.Errorf("failed to get shard info: %w", err)
+	}
+	if st := info.ShardState; st != dagstore.ShardStateNew {
+		return fmt.Errorf("cannot initialize shard; expected state ShardStateNew, was: %s", st.String())
+	}
+
+	ch := make(chan dagstore.ShardResult, 1)
+	if err = sm.DAGStore.AcquireShard(ctx, k, ch, dagstore.AcquireOpts{}); err != nil {
+		return fmt.Errorf("failed to acquire shard: %w", err)
+	}
+
+	var res dagstore.ShardResult
+	select {
+	case res = <-ch:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	if err := res.Error; err != nil {
+		return fmt.Errorf("failed to acquire shard: %w", err)
+	}
+
+	if res.Accessor != nil {
+		err = res.Accessor.Close()
+		if err != nil {
+			log.Warnw("failed to close shard accessor; continuing", "shard_key", k, "error", err)
+		}
+	}
+
+	return nil
 }
