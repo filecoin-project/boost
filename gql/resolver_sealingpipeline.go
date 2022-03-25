@@ -59,6 +59,9 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		}
 
 		for _, p := range wdSectorStatus.Pieces {
+			if p.DealInfo == nil {
+				continue
+			}
 			//TODO: any other way to map deal from sector with deal from db?
 			d, err := r.dealByPublishCID(ctx, p.DealInfo.PublishCid)
 			if err != nil {
