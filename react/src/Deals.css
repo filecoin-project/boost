@@ -34,6 +34,10 @@
     width: 6em;
 }
 
+.deals td.message {
+    width: 100%;
+}
+
 .deals .pagination {
     text-align: center;
 }
@@ -48,9 +52,21 @@
     padding: 0 0.5em;
 }
 
-.deals .pagination .first, .deals .pagination .left, .deals .pagination .right {
+.deals .pagination a {
     color: #465298;
     cursor: pointer;
+}
+
+.deals .pagination .controls > span {
+    cursor: pointer;
+}
+
+.deals .pagination .first {
+    padding-right: 0.5em;
+}
+
+.deals .pagination span.first {
+    color: transparent;
 }
 
 .deals .pagination .total {

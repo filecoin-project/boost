@@ -28,8 +28,8 @@ import (
 
 type dealListResolver struct {
 	TotalCount int32
-	Next       *graphql.ID
 	Deals      []*dealResolver
+	More       bool
 }
 
 // resolver translates from a request for a graphql field to the data for
@@ -92,18 +92,24 @@ func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dea
 }
 
 type dealsArgs struct {
-	First *graphql.ID
-	Limit graphql.NullInt
+	First  *graphql.ID
+	Offset graphql.NullInt
+	Limit  graphql.NullInt
 }
 
-// query: deals(first, limit) DealList
+// query: deals(first, offset, limit) DealList
 func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver, error) {
+	offset := 0
+	if args.Offset.Set && args.Offset.Value != nil && *args.Offset.Value > 0 {
+		offset = int(*args.Offset.Value)
+	}
+
 	limit := 10
 	if args.Limit.Set && args.Limit.Value != nil && *args.Limit.Value > 0 {
 		limit = int(*args.Limit.Value)
 	}
 
-	deals, count, next, err := r.dealList(ctx, args.First, limit)
+	deals, count, more, err := r.dealList(ctx, args.First, offset, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -113,15 +119,10 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 		resolvers = append(resolvers, newDealResolver(&deal, r.dealsDB, r.logsDB))
 	}
 
-	var nextID *graphql.ID
-	if next != nil {
-		gqlid := graphql.ID(next.String())
-		nextID = &gqlid
-	}
 	return &dealListResolver{
 		TotalCount: int32(count),
-		Next:       nextID,
 		Deals:      resolvers,
+		More:       more,
 	}, nil
 }
 
@@ -171,9 +172,14 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 	return net, nil
 }
 
-// subscription: dealNew() <-chan Deal
-func (r *resolver) DealNew(ctx context.Context) (<-chan *dealResolver, error) {
-	c := make(chan *dealResolver, 1)
+type dealNewResolver struct {
+	TotalCount int32
+	Deal       *dealResolver
+}
+
+// subscription: dealNew() <-chan DealNew
+func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error) {
+	c := make(chan *dealNewResolver, 1)
 
 	sub, err := r.provider.SubscribeNewDeals()
 	if err != nil {
@@ -197,12 +203,20 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealResolver, error) {
 				// Pipe the deal to the new deal channel
 				di := evti.(types.ProviderDealState)
 				rsv := newDealResolver(&di, r.dealsDB, r.logsDB)
+				totalCount, err := r.dealsDB.Count(ctx)
+				if err != nil {
+					log.Errorf("getting total deal count: %w", err)
+				}
+				dealNew := &dealNewResolver{
+					TotalCount: int32(totalCount),
+					Deal:       rsv,
+				}
 
 				select {
 				case <-ctx.Done():
 					return
 
-				case c <- rsv:
+				case c <- dealNew:
 				}
 			}
 		}
@@ -244,27 +258,24 @@ func (r *resolver) dealByPublishCID(ctx context.Context, publishCid *cid.Cid) (*
 	return deal, nil
 }
 
-func (r *resolver) dealList(ctx context.Context, first *graphql.ID, limit int) ([]types.ProviderDealState, int, *uuid.UUID, error) {
-	// Get one extra deal so we can get the first deal UUID of the next page
-	allDeals, err := r.dealsDB.List(ctx, first, limit+1)
+func (r *resolver) dealList(ctx context.Context, first *graphql.ID, offset int, limit int) ([]types.ProviderDealState, int, bool, error) {
+	// Fetch one extra deal so that we can check if there are more deals
+	// beyond the limit
+	deals, err := r.dealsDB.List(ctx, first, offset, limit+1)
 	if err != nil {
-		return nil, 0, nil, err
+		return nil, 0, false, err
 	}
-
-	deals := allDeals
-	var nextDealUuid *uuid.UUID
-	// If there was more than one page of deals available
-	if len(allDeals) > limit {
-		// Get the first deal UUID of the next page
-		nextDealUuid = &allDeals[len(allDeals)-1].DealUuid
-		// Filter for deals on this page
-		deals = allDeals[:limit]
+	more := len(deals) > limit
+	if !more {
+		limit = len(deals)
 	}
+	// Truncate deal list to limit
+	deals = deals[:limit]
 
 	// Get the total deal count
 	count, err := r.dealsDB.Count(ctx)
 	if err != nil {
-		return nil, 0, nil, err
+		return nil, 0, false, err
 	}
 
 	// Include data transfer information with the deal
@@ -274,7 +285,7 @@ func (r *resolver) dealList(ctx context.Context, first *graphql.ID, limit int) (
 		dis = append(dis, *deal)
 	}
 
-	return dis, count, nextDealUuid, nil
+	return dis, count, more, nil
 }
 
 type dealResolver struct {

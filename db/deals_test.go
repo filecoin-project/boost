@@ -43,9 +43,14 @@ func TestDealsDB(t *testing.T) {
 	req.NoError(err)
 	req.Equal(deal.DealUuid, storedDealBySignedPropCid.DealUuid)
 
-	dealList, err := db.List(ctx, nil, 100)
+	dealList, err := db.List(ctx, nil, 0, 0)
 	req.NoError(err)
 	req.Len(dealList, len(deals))
+
+	limitedDealList, err := db.List(ctx, nil, 1, 1)
+	req.NoError(err)
+	req.Len(limitedDealList, 1)
+	req.Equal(dealList[1].DealUuid, limitedDealList[0].DealUuid)
 
 	count, err := db.Count(ctx)
 	req.NoError(err)

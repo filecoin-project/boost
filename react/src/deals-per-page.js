@@ -5,7 +5,6 @@ export const DealsPerPage = {
 
     load: () => {
         const saved = localStorage.getItem(DealsPerPage.settingsKey)
-        console.log('load', typeof JSON.parse(saved))
         return JSON.parse(saved) || DealsPerPage.Default
     },
 

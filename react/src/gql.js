@@ -63,8 +63,8 @@ const EpochQuery = gql`
 `;
 
 const DealsListQuery = gql`
-    query AppDealsListQuery($first: ID, $limit: Int) {
-        deals(first: $first, limit: $limit) {
+    query AppDealsListQuery($first: ID, $offset: Int, $limit: Int) {
+        deals(first: $first, offset: $offset, limit: $limit) {
             deals {
                 ID
                 CreatedAt
@@ -83,7 +83,7 @@ const DealsListQuery = gql`
                 }
             }
             totalCount
-            next
+            more
         }
     }
 `;
@@ -178,35 +178,38 @@ const DealCancelMutation = gql`
 const NewDealsSubscription = gql`
     subscription AppNewDealsSubscription {
         dealNew {
-            ID
-            CreatedAt
-            PieceCid
-            PieceSize
-            ClientAddress
-            StartEpoch
-            EndEpoch
-            ProviderCollateral
-            ClientPeerID
-            DealDataRoot
-            PublishCid
-            Stage
-            Message
-            Transfer {
-                Type
-                Size
-                Params
-            }
-            Sector {
+            deal {
                 ID
-                Offset
-                Length
-            }
-            Logs {
                 CreatedAt
-                LogMsg
-                LogParams
-                Subsystem
+                PieceCid
+                PieceSize
+                ClientAddress
+                StartEpoch
+                EndEpoch
+                ProviderCollateral
+                ClientPeerID
+                DealDataRoot
+                PublishCid
+                Stage
+                Message
+                Transfer {
+                    Type
+                    Size
+                    Params
+                }
+                Sector {
+                    ID
+                    Offset
+                    Length
+                }
+                Logs {
+                    CreatedAt
+                    LogMsg
+                    LogParams
+                    Subsystem
+                }
             }
+            totalCount
         }
     }
 `;
