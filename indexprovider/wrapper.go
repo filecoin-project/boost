@@ -176,6 +176,7 @@ func (w *Wrapper) DagstoreReinitBoostDeals(ctx context.Context) (bool, error) {
 	}
 
 	log := log.Named("boost-migrator")
+	log.Infof("dagstore root is %s", w.cfg.RootDir)
 
 	// Check if all deals have already been registered as shards
 	isComplete, err := w.boostRegistrationComplete()

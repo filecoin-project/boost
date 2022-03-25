@@ -62,6 +62,8 @@ func before(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("gql", "DEBUG")
 		_ = logging.SetLogLevel("boost-provider", "DEBUG")
 		_ = logging.SetLogLevel("storagemanager", "DEBUG")
+		_ = logging.SetLogLevel("index-provider-wrapper", "DEBUG")
+		_ = logging.SetLogLevel("boost-migrator", "DEBUG")
 	}
 
 	return nil
