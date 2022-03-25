@@ -62,7 +62,7 @@ build/.update-modules:
 CLEAN+=build/.update-modules
 
 debug: GOFLAGS+=-tags=debug
-debug: build
+debug: build-go
 
 deps: $(BUILD_DEPS)
 .PHONY: deps
@@ -86,7 +86,10 @@ react:
 	npm run --prefix react build
 .PHONY: react
 
-build: boost devnet react
+build-go: boost devnet
+.PHONY: build-go
+
+build: build-go react
 .PHONY: build
 
 install: install-boost install-devnet

@@ -100,7 +100,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt-get install npm
       - run:
-          command: make buildall
+          command: make build-go
       - store_artifacts:
           path: boost
       - run: mkdir linux && mv boost linux/
