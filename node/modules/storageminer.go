@@ -487,7 +487,7 @@ func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider
 func HandleIndexProvider(lc fx.Lifecycle, prov *indexprovider.Wrapper) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			prov.Start()
+			prov.Start(ctx)
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {

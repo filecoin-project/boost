@@ -134,6 +134,10 @@ type CommonNetStub struct {
 
 type MarketStruct struct {
 	Internal struct {
+		DagstoreInitializeAll func(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) `perm:"admin"`
+
+		DagstoreInitializeShard func(p0 context.Context, p1 string) error `perm:"admin"`
+
 		Deal func(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) `perm:"admin"`
 
 		IndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
@@ -513,6 +517,28 @@ func (s *CommonStruct) LogSetLevel(p0 context.Context, p1 string, p2 string) err
 }
 
 func (s *CommonStub) LogSetLevel(p0 context.Context, p1 string, p2 string) error {
+	return ErrNotSupported
+}
+
+func (s *MarketStruct) DagstoreInitializeAll(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) {
+	if s.Internal.DagstoreInitializeAll == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.DagstoreInitializeAll(p0, p1)
+}
+
+func (s *MarketStub) DagstoreInitializeAll(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *MarketStruct) DagstoreInitializeShard(p0 context.Context, p1 string) error {
+	if s.Internal.DagstoreInitializeShard == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.DagstoreInitializeShard(p0, p1)
+}
+
+func (s *MarketStub) DagstoreInitializeShard(p0 context.Context, p1 string) error {
 	return ErrNotSupported
 }
 

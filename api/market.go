@@ -21,10 +21,12 @@ import (
 type Market interface {
 	// MethodGroup: Market
 
-	MarketDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)         //perm:admin
-	Deal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                //perm:admin
-	IndexerAnnounceAllDeals(ctx context.Context) error                                               //perm:admin
-	MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*ProviderDealRejectionInfo, error) //perm:admin
+	MarketDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                  //perm:admin
+	Deal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                                         //perm:admin
+	IndexerAnnounceAllDeals(ctx context.Context) error                                                                        //perm:admin
+	MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*ProviderDealRejectionInfo, error)                          //perm:admin
+	DagstoreInitializeShard(ctx context.Context, key string) error                                                            //perm:admin
+	DagstoreInitializeAll(ctx context.Context, params DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) //perm:admin
 }
 
 // ProviderDealRejectionInfo is the information sent by the Storage Provider

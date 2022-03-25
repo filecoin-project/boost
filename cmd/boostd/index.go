@@ -17,8 +17,7 @@ var indexProvCmd = &cli.Command{
 var indexProvAnnounceAllCmd = &cli.Command{
 	Name:  "announce-all",
 	Usage: "Announce all active deals to indexers so they can download the indices",
-	Flags: []cli.Flag{
-	},
+	Flags: []cli.Flag{},
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
