@@ -39,7 +39,6 @@ function LegacyStorageDealsContent(props) {
         navigate('/legacy-storage-deals')
         scrollTop()
     }
-    dealsPerPage = 2
 
     const dealListOffset = (pageNum-1) * dealsPerPage
     const queryCursor = pageNum === 1 ? null : params.cursor
