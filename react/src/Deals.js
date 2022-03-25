@@ -70,7 +70,7 @@ function StorageDealsContent(props) {
         }
     }
 
-    if (error) return <div>Error: {error.message}</div>
+    if (error) return <div>Error: {error.message + " - check connection to Boost server"}</div>
     if (loading) return <div>Loading...</div>
 
     var deals = data.deals.deals
@@ -82,27 +82,17 @@ function StorageDealsContent(props) {
     const totalCount = subNewDeal ? subNewDeal.totalCount : data.deals.totalCount
     const moreDeals = data.deals.more
 
-    var totalPages = Math.ceil(totalCount / dealsPerPage)
-
     var cursor = params.cursor
     if (pageNum === 1 && deals.length) {
         cursor = deals[0].ID
     }
 
-    var pageLinks = {}
-    if (cursor) {
-        if (pageNum === 2) {
-            pageLinks.prev = '/storage-deals'
-        } else if (pageNum > 2) {
-            pageLinks.prev = '/storage-deals/from/' + cursor + '/page/' + (pageNum - 1)
-        }
-
-        if (moreDeals) {
-            pageLinks.next = '/storage-deals/from/' + cursor + '/page/' + (pageNum + 1)
-        }
-    }
-
     var toggleTimestampFormat = () => saveTimestampFormat(!timestampFormat)
+
+    const paginationParams = {
+        basePath: '/storage-deals',
+        cursor, pageNum, moreDeals, totalCount, dealsPerPage, onDealsPerPageChange
+    }
 
     return <div className="deals">
         <table>
@@ -126,10 +116,31 @@ function StorageDealsContent(props) {
             </tbody>
         </table>
 
+        <Pagination {...paginationParams} />
+    </div>
+}
+
+export function Pagination({basePath, cursor, pageNum, moreDeals, totalCount, dealsPerPage, onDealsPerPageChange}) {
+    var totalPages = Math.ceil(totalCount / dealsPerPage)
+
+    var pageLinks = {}
+    if (cursor) {
+        if (pageNum === 2) {
+            pageLinks.prev = basePath
+        } else if (pageNum > 2) {
+            pageLinks.prev = basePath + '/from/' + cursor + '/page/' + (pageNum - 1)
+        }
+
+        if (moreDeals) {
+            pageLinks.next = basePath + '/from/' + cursor + '/page/' + (pageNum + 1)
+        }
+    }
+
+    return (
         <div className="pagination">
             <div className="controls">
                 {pageNum > 1 ? (
-                    <Link className="first" to="/storage-deals" onClick={scrollTop}>&lt;&lt;</Link>
+                    <Link className="first" to={basePath} onClick={scrollTop}>&lt;&lt;</Link>
                 ) : <span className="first">&lt;&lt;</span>}
                 {pageLinks.prev ? <Link to={pageLinks.prev} onClick={scrollTop}>&lt;</Link> : <span>&lt;</span>}
                 <div className="page">{pageNum} of {totalPages}</div>
@@ -145,7 +156,7 @@ function StorageDealsContent(props) {
                 </div>
             </div>
         </div>
-    </div>
+    )
 }
 
 function DealRow(props) {

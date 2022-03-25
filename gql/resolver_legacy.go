@@ -18,7 +18,7 @@ type legacyDealResolver struct {
 
 type legacyDealListResolver struct {
 	TotalCount int32
-	Next       *graphql.ID
+	More       bool
 	Deals      []*legacyDealResolver
 }
 
@@ -51,18 +51,23 @@ func (r *resolver) withTransferState(ctx context.Context, dl storagemarket.Miner
 
 // query: legacyDeals(first, limit) DealList
 func (r *resolver) LegacyDeals(ctx context.Context, args dealsArgs) (*legacyDealListResolver, error) {
+	offset := 0
+	if args.Offset.Set && args.Offset.Value != nil && *args.Offset.Value > 0 {
+		offset = int(*args.Offset.Value)
+	}
+
 	limit := 10
 	if args.Limit.Set && args.Limit.Value != nil && *args.Limit.Value > 0 {
 		limit = int(*args.Limit.Value)
 	}
 
-	var offsetPropCid *cid.Cid
+	var startPropCid *cid.Cid
 	if args.First != nil {
 		signedPropCid, err := cid.Parse(string(*args.First))
 		if err != nil {
 			return nil, fmt.Errorf("parsing offset signed proposal cid %s: %w", *args.First, err)
 		}
-		offsetPropCid = &signedPropCid
+		startPropCid = &signedPropCid
 	}
 
 	// Get the total number of deals
@@ -71,18 +76,15 @@ func (r *resolver) LegacyDeals(ctx context.Context, args dealsArgs) (*legacyDeal
 		return nil, fmt.Errorf("getting deal count: %w", err)
 	}
 
-	// Get a page worth of deals, plus one extra so we can get a "next" cursor
-	pageDeals, err := r.legacyProv.ListLocalDealsPage(offsetPropCid, limit+1)
+	// Get a page worth of deals, plus one extra so we can see if there are more deals
+	pageDeals, err := r.legacyProv.ListLocalDealsPage(startPropCid, offset, limit+1)
 	if err != nil {
 		return nil, fmt.Errorf("getting page of deals: %w", err)
 	}
 
 	// If there is another page of deals available
-	var next *string
-	if len(pageDeals) > limit {
-		// Get the cursor at the start of the next page
-		propCid := pageDeals[limit].ProposalCid.String()
-		next = &propCid
+	more := len(pageDeals) > limit
+	if more {
 		// Filter for deals on the current page
 		pageDeals = pageDeals[:limit]
 	}
@@ -92,14 +94,9 @@ func (r *resolver) LegacyDeals(ctx context.Context, args dealsArgs) (*legacyDeal
 		resolvers = append(resolvers, r.withTransferState(ctx, deal))
 	}
 
-	var nextID *graphql.ID
-	if next != nil {
-		gqlid := graphql.ID(*next)
-		nextID = &gqlid
-	}
 	return &legacyDealListResolver{
 		TotalCount: int32(dealCount),
-		Next:       nextID,
+		More:       more,
 		Deals:      resolvers,
 	}, nil
 }
