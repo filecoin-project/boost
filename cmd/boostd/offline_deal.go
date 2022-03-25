@@ -37,7 +37,7 @@ var offlineDealCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("failed to parse deal uuid")
 		}
-		rej, err := napi.MakeOfflineDealWithData(dealUuid, filePath)
+		rej, err := napi.BoostOfflineDealWithData(dealUuid, filePath)
 		if err != nil {
 			return fmt.Errorf("failed to execute offline deal: %w", err)
 		}

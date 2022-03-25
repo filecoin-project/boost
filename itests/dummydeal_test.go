@@ -69,7 +69,7 @@ func TestDummydeal(t *testing.T) {
 	res, err = f.makeDummyDeal(offlineDealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), true)
 	require.NoError(t, err)
 	require.True(t, res.Accepted)
-	res, err = f.boost.MakeOfflineDealWithData(offlineDealUuid, carFilepath)
+	res, err = f.boost.BoostOfflineDealWithData(offlineDealUuid, carFilepath)
 	require.NoError(t, err)
 	require.True(t, res.Accepted)
 	err = f.waitForDealAddedToSector(offlineDealUuid)

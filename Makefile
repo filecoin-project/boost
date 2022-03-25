@@ -120,3 +120,22 @@ cfgdoc-gen:
 
 print-%:
 	@echo $*=$($*)
+
+docsgen: docsgen-md docsgen-openrpc
+
+docsgen-md-bin: api-gen
+	$(GOCC) build $(GOFLAGS) -o docgen-md ./api/docgen/cmd
+docsgen-openrpc-bin: api-gen
+	$(GOCC) build $(GOFLAGS) -o docgen-openrpc ./api/docgen-openrpc/cmd
+
+docsgen-md: docsgen-md-boost
+
+docsgen-md-boost: docsgen-md-bin
+	./docgen-md "api/api.go" "Boost" "api" "./api" > documentation/en/api-v1-methods.md
+
+docsgen-openrpc: docsgen-openrpc-boost
+
+docsgen-openrpc-boost: docsgen-openrpc-bin
+	./docgen-openrpc "api/api.go" "Boost" "api" "./api" -gzip > build/openrpc/boost.json.gz
+
+.PHONY: docsgen docsgen-md-bin docsgen-openrpc-bin

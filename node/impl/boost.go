@@ -108,25 +108,25 @@ func (sm *BoostAPI) ServeRemote(perm bool) func(w http.ResponseWriter, r *http.R
 	}
 }
 
-func (sm *BoostAPI) MarketDummyDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
+func (sm *BoostAPI) BoostDummyDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
 	info, _, err := sm.StorageProvider.ExecuteDeal(&params, "dummy")
 	return info, err
 }
 
-func (sm *BoostAPI) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
+func (sm *BoostAPI) BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
 	return sm.StorageProvider.Deal(ctx, dealUuid)
 }
 
-func (sm *BoostAPI) IndexerAnnounceAllDeals(ctx context.Context) error {
+func (sm *BoostAPI) BoostIndexerAnnounceAllDeals(ctx context.Context) error {
 	return sm.IndexProvider.IndexerAnnounceAllDeals(ctx)
 }
 
-func (sm *BoostAPI) MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
+func (sm *BoostAPI) BoostOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
 	res, _, err := sm.StorageProvider.MakeOfflineDealWithData(dealUuid, filePath)
 	return res, err
 }
 
-func (sm *BoostAPI) DagstoreInitializeAll(ctx context.Context, params api.DagstoreInitializeAllParams) (<-chan api.DagstoreInitializeAllEvent, error) {
+func (sm *BoostAPI) BoostDagstoreInitializeAll(ctx context.Context, params api.DagstoreInitializeAllParams) (<-chan api.DagstoreInitializeAllEvent, error) {
 	if sm.DAGStore == nil {
 		return nil, fmt.Errorf("dagstore not available on this node")
 	}
@@ -242,7 +242,7 @@ func (sm *BoostAPI) DagstoreInitializeAll(ctx context.Context, params api.Dagsto
 					return
 				}
 
-				err := sm.DagstoreInitializeShard(ctx, k)
+				err := sm.BoostDagstoreInitializeShard(ctx, k)
 
 				if throttle != nil {
 					throttle <- struct{}{}
@@ -267,7 +267,7 @@ func (sm *BoostAPI) DagstoreInitializeAll(ctx context.Context, params api.Dagsto
 	return res, nil
 }
 
-func (sm *BoostAPI) DagstoreInitializeShard(ctx context.Context, key string) error {
+func (sm *BoostAPI) BoostDagstoreInitializeShard(ctx context.Context, key string) error {
 	if sm.DAGStore == nil {
 		return fmt.Errorf("dagstore not available on this node")
 	}

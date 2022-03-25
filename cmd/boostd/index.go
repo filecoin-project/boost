@@ -28,6 +28,6 @@ var indexProvAnnounceAllCmd = &cli.Command{
 		}
 		defer closer()
 
-		return napi.IndexerAnnounceAllDeals(ctx)
+		return napi.BoostIndexerAnnounceAllDeals(ctx)
 	},
 }

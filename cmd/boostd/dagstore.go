@@ -75,7 +75,7 @@ var dagstoreInitializeAllCmd = &cli.Command{
 			IncludeSealed:  sealed,
 		}
 
-		ch, err := napi.DagstoreInitializeAll(ctx, params)
+		ch, err := napi.BoostDagstoreInitializeAll(ctx, params)
 		if err != nil {
 			return err
 		}

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
@@ -10,6 +11,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -26,12 +28,18 @@ import (
 //  * Generate openrpc blobs
 
 type Boost interface {
-	Market
 	Common
 	Net
 
-	// MethodGroup: LegacyMarket
+	// MethodGroup: Boost
+	BoostIndexerAnnounceAllDeals(ctx context.Context) error                                                                        //perm:admin
+	BoostOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*ProviderDealRejectionInfo, error)                              //perm:admin
+	BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                                         //perm:admin
+	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                        //perm:admin
+	BoostDagstoreInitializeShard(ctx context.Context, key string) error                                                            //perm:admin
+	BoostDagstoreInitializeAll(ctx context.Context, params DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) //perm:admin
 
+	// MethodGroup: LegacyMarket
 	MarketListRetrievalDeals(ctx context.Context) ([]retrievalmarket.ProviderDealState, error)                                                                                           //perm:read
 	MarketSetRetrievalAsk(ctx context.Context, rask *retrievalmarket.Ask) error                                                                                                          //perm:admin
 	MarketGetRetrievalAsk(ctx context.Context) (*retrievalmarket.Ask, error)                                                                                                             //perm:read
@@ -42,8 +50,10 @@ type Boost interface {
 	MarketRestartDataTransfer(ctx context.Context, transferID datatransfer.TransferID, otherPeer peer.ID, isInitiator bool) error                                                        //perm:write
 	MarketImportDealData(ctx context.Context, propcid cid.Cid, path string) error                                                                                                        //perm:write
 
+	// MethodGroup: Actor
 	ActorSectorSize(context.Context, address.Address) (abi.SectorSize, error) //perm:read
 
+	// MethodGroup: Deals
 	DealsConsiderOnlineStorageDeals(context.Context) (bool, error)      //perm:admin
 	DealsSetConsiderOnlineStorageDeals(context.Context, bool) error     //perm:admin
 	DealsConsiderOnlineRetrievalDeals(context.Context) (bool, error)    //perm:admin
