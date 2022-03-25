@@ -32,6 +32,7 @@ function App(props) {
                                     <Banner />
                                     <Routes>
                                         <Route path="/storage-deals" element={<StorageDealsPage />} />
+                                        <Route path="/storage-deals/from/:cursor/page/:pageNum" element={<StorageDealsPage />} />
                                         <Route path="/legacy-storage-deals" element={<LegacyStorageDealsPage />} />
                                         <Route path="/storage-space" element={<StorageSpacePage />} />
                                         <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />

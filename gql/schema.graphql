@@ -112,8 +112,13 @@ type DealBasic {
 
 type DealList {
   totalCount: Int!
-  next: ID
   deals: [Deal]!
+  more: Boolean!
+}
+
+type DealNew {
+  totalCount: Int!
+  deal: Deal!
 }
 
 type LegacyDealList {
@@ -269,7 +274,7 @@ type RootQuery {
   legacyDeal(id: ID!): LegacyDeal
 
   """Get all Deals"""
-  deals(first: ID, limit: Int): DealList!
+  deals(first: ID, offset: Int, limit: Int): DealList!
 
   """Get all Deals made with legacy markets endpoint"""
   legacyDeals(first: ID, limit: Int): LegacyDealList!
@@ -329,5 +334,5 @@ type RootSubscription {
   """Subscribe to Deal updates by ID"""
   dealUpdate(id: ID!): Deal
   """Subscribe to new Deals"""
-  dealNew: Deal
+  dealNew: DealNew
 }
