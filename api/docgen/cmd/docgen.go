@@ -70,9 +70,9 @@ func main() {
 	fmt.Printf("# Groups\n")
 
 	for _, g := range groupslice {
-		fmt.Printf("* [%s](#%s)\n", g.GroupName, g.GroupName)
+		fmt.Printf("* [%s](#%s)\n", g.GroupName, strings.ToLower(g.GroupName))
 		for _, method := range g.Methods {
-			fmt.Printf("  * [%s](#%s)\n", method.Name, method.Name)
+			fmt.Printf("  * [%s](#%s)\n", method.Name, strings.ToLower(method.Name))
 		}
 	}
 
