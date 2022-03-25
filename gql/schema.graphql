@@ -123,7 +123,7 @@ type DealNew {
 
 type LegacyDealList {
   totalCount: Int!
-  next: ID
+  more: Boolean!
   deals: [LegacyDeal]!
 }
 
@@ -277,7 +277,7 @@ type RootQuery {
   deals(first: ID, offset: Int, limit: Int): DealList!
 
   """Get all Deals made with legacy markets endpoint"""
-  legacyDeals(first: ID, limit: Int): LegacyDealList!
+  legacyDeals(first: ID, offset: Int, limit: Int): LegacyDealList!
 
   """Get the total number of deals"""
   dealsCount: Int!

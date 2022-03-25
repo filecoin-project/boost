@@ -4,12 +4,13 @@ import moment from "moment";
 import {humanFileSize} from "./util";
 import React, {useState} from "react";
 import {PageContainer, ShortClientAddress} from "./Components";
-import {Link} from "react-router-dom";
+import {Link, useNavigate, useParams} from "react-router-dom";
 import './Deals.css'
 import './LegacyDeals.css'
 import {dateFormat} from "./util-date";
 import {TimestampFormat} from "./timestamp";
 import {DealsPerPage} from "./deals-per-page";
+import {Pagination} from "./Deals";
 
 export function LegacyStorageDealsPage(props) {
     return <PageContainer pageType="legacy-storage-deals" title="Legacy Storage Deals">
@@ -18,9 +19,11 @@ export function LegacyStorageDealsPage(props) {
 }
 
 function LegacyStorageDealsContent(props) {
+    const navigate = useNavigate()
+    const params = useParams()
+    const pageNum = params.pageNum ? parseInt(params.pageNum) : 1
     const [first, setFirst] = useState(null)
     const [previous, setPrevious] = useState([])
-    const [pageNum, setPageNum] = useState(1)
     const [timestampFormat, setTimestampFormat] = useState(TimestampFormat.load)
     const saveTimestampFormat = (val) => {
         TimestampFormat.save(val)
@@ -32,15 +35,29 @@ function LegacyStorageDealsContent(props) {
     const onDealsPerPageChange = (e) => {
         const val = parseInt(e.target.value)
         DealsPerPage.save(val)
-        setPageNum(1)
         setDealsPerPage(val)
+        navigate('/legacy-storage-deals')
+        scrollTop()
     }
+    dealsPerPage = 2
 
+    const dealListOffset = (pageNum-1) * dealsPerPage
+    const queryCursor = pageNum === 1 ? null : params.cursor
+    console.log('params', params)
+    console.log({
+            first: queryCursor,
+            limit: dealsPerPage,
+            offset: dealListOffset,
+    })
     const {loading, error, data} = useQuery(LegacyDealsListQuery, {
         pollInterval: 5000,
-        variables: {first, limit: dealsPerPage}
+        variables: {
+            first: queryCursor,
+            limit: dealsPerPage,
+            offset: dealListOffset,
+        }
     })
-    if (error) return <div>Error: {error.message}</div>;
+    if (error) return <div>Error: {error.message + " - check connection to Boost server"}</div>;
     if (loading) return <div>Loading...</div>;
 
     const deals = data.legacyDeals.deals
@@ -54,7 +71,7 @@ function LegacyStorageDealsContent(props) {
         window.scrollTo({ top: 0, behavior: "smooth" })
         setPrevious(previous.concat([first]))
         setFirst(data.legacyDeals.next)
-        setPageNum(pageNum+1)
+        // setPageNum(pageNum+1)
     }
 
     function pageBack() {
@@ -64,7 +81,7 @@ function LegacyStorageDealsContent(props) {
         window.scrollTo({ top: 0, behavior: "smooth" })
         setFirst(previous[previous.length-1])
         setPrevious(previous.slice(0, previous.length-1))
-        setPageNum(pageNum-1)
+        // setPageNum(pageNum-1)
     }
 
     function pageFirst() {
@@ -74,7 +91,18 @@ function LegacyStorageDealsContent(props) {
         window.scrollTo({ top: 0, behavior: "smooth" })
         setFirst(null)
         setPrevious([])
-        setPageNum(1)
+        // setPageNum(1)
+    }
+
+    var cursor = params.cursor
+    if (pageNum === 1 && deals.length) {
+        cursor = deals[0].ID
+    }
+
+    const paginationParams = {
+        basePath: '/legacy-storage-deals',
+        moreDeals: data.legacyDeals.more,
+        cursor, pageNum, totalCount, dealsPerPage, onDealsPerPageChange
     }
 
     return <div className="deals">
@@ -99,25 +127,7 @@ function LegacyStorageDealsContent(props) {
             </tbody>
         </table>
 
-        <div className="pagination">
-            <div className="controls">
-                {pageNum > 1 ? (
-                    <div className="first" onClick={pageFirst}>&lt;&lt;</div>
-                ) : null}
-                <div className="left" onClick={pageBack}>&lt;</div>
-                <div className="page">{pageNum} of {totalPages}</div>
-                <div className="right" onClick={pageForward}>&gt;</div>
-                <div className="total">{totalCount} deals</div>
-                <div className="per-page">
-                    <select value={dealsPerPage} onChange={onDealsPerPageChange}>
-                        <option value={10}>10 pp</option>
-                        <option value={25}>25 pp</option>
-                        <option value={50}>50 pp</option>
-                        <option value={100}>100 pp</option>
-                    </select>
-                </div>
-            </div>
-        </div>
+        <Pagination {...paginationParams} />
     </div>
 }
 
@@ -171,4 +181,8 @@ export function LegacyStorageDealsCount(props) {
             </div>
         </Link>
     )
+}
+
+function scrollTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" })
 }

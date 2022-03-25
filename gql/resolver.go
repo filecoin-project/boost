@@ -266,11 +266,10 @@ func (r *resolver) dealList(ctx context.Context, first *graphql.ID, offset int, 
 		return nil, 0, false, err
 	}
 	more := len(deals) > limit
-	if !more {
-		limit = len(deals)
+	if more {
+		// Truncate deal list to limit
+		deals = deals[:limit]
 	}
-	// Truncate deal list to limit
-	deals = deals[:limit]
 
 	// Get the total deal count
 	count, err := r.dealsDB.Count(ctx)

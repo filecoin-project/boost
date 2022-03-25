@@ -89,8 +89,8 @@ const DealsListQuery = gql`
 `;
 
 const LegacyDealsListQuery = gql`
-    query AppLegacyDealsListQuery($first: ID, $limit: Int) {
-        legacyDeals(first: $first, limit: $limit) {
+    query AppLegacyDealsListQuery($first: ID, $offset: Int, $limit: Int) {
+        legacyDeals(first: $first, offset: $offset, limit: $limit) {
             deals {
                 ID
                 CreatedAt
@@ -108,7 +108,7 @@ const LegacyDealsListQuery = gql`
                 SectorNumber
             }
             totalCount
-            next
+            more
         }
     }
 `;
