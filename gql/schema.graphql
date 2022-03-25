@@ -43,14 +43,23 @@ type Deal {
   CreatedAt: Time!
   PieceCid: String!
   PieceSize: Uint64!
+  IsVerified: Boolean!
+  ProposalLabel: String!
   ProviderCollateral: Uint64!
+  ClientCollateral: Uint64!
+  StoragePricePerEpoch: Uint64!
   StartEpoch: Uint64!
   EndEpoch: Uint64!
   ClientPeerID: String!
   DealDataRoot: String!
+  InboundFilePath: String!
+  ChainDealID: Uint64!
   PublishCid: String!
+  IsOffline: Boolean!
   Transfer: TransferParams!
   Stage: String!
+  Err: String!
+  Transferred: Uint64!
   Sector: Sector!
   Message: String!
   Logs: [DealLog]!
@@ -103,8 +112,13 @@ type DealBasic {
 
 type DealList {
   totalCount: Int!
-  next: ID
   deals: [Deal]!
+  more: Boolean!
+}
+
+type DealNew {
+  totalCount: Int!
+  deal: Deal!
 }
 
 type LegacyDealList {
@@ -260,7 +274,7 @@ type RootQuery {
   legacyDeal(id: ID!): LegacyDeal
 
   """Get all Deals"""
-  deals(first: ID, limit: Int): DealList!
+  deals(first: ID, offset: Int, limit: Int): DealList!
 
   """Get all Deals made with legacy markets endpoint"""
   legacyDeals(first: ID, limit: Int): LegacyDealList!
@@ -320,5 +334,5 @@ type RootSubscription {
   """Subscribe to Deal updates by ID"""
   dealUpdate(id: ID!): Deal
   """Subscribe to new Deals"""
-  dealNew: Deal
+  dealNew: DealNew
 }

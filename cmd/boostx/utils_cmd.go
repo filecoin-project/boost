@@ -176,8 +176,14 @@ var commpCmd = &cli.Command{
 
 		encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
 
+		stat, err := os.Stat(inPath)
+		if err != nil {
+			return err
+		}
+
 		fmt.Println("CommP CID: ", encoder.Encode(commp.PieceCID))
 		fmt.Println("Piece size: ", types.NewInt(uint64(commp.PieceSize.Unpadded().Padded())))
+		fmt.Println("Car file size: ", stat.Size())
 		return nil
 	},
 }

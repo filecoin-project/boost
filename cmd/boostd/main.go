@@ -43,6 +43,7 @@ func main() {
 			indexProvCmd,
 			offlineDealCmd,
 			logCmd,
+			dagstoreCmd,
 		},
 	}
 	app.Setup()
@@ -61,6 +62,11 @@ func before(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("gql", "DEBUG")
 		_ = logging.SetLogLevel("boost-provider", "DEBUG")
 		_ = logging.SetLogLevel("storagemanager", "DEBUG")
+		_ = logging.SetLogLevel("index-provider-wrapper", "DEBUG")
+		_ = logging.SetLogLevel("boost-migrator", "DEBUG")
+		_ = logging.SetLogLevel("dagstore", "DEBUG")
+		_ = logging.SetLogLevel("storagemarket_impl", "DEBUG")
+		_ = logging.SetLogLevel("migrator", "DEBUG")
 	}
 
 	return nil

@@ -24,7 +24,7 @@ export function humanFileSize(size, unitIndex = 0) {
 
     if (isBigInt) {
         size = size / 1024n
-        if (size <= Math.MAX_SAFE_INTEGER) {
+        if (size <= Number.MAX_SAFE_INTEGER) {
             size = Number(size)
         }
     } else {
@@ -59,11 +59,14 @@ export function humanFIL(atto) {
         return toFixed(nanoFil, 1) + ' nano' // 123.4 nano
     }
 
-    return atto + ' atto' // 123 atto
+    return addCommas(atto) + ' atto' // 123 atto
 }
 
 export function toFixed(num, fractionDigits) {
-    return num.toFixed(fractionDigits).replace(/\.?0+$/, '')
+    const fixed = num.toFixed(fractionDigits).replace(/\.?0+$/, '')
+    var [whole, fractional] = fixed.split('.')
+    whole = addCommas(whole)
+    return whole + (fractional ? '.' + fractional : '')
 }
 
 export function shortDealID(dealID) {

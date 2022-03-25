@@ -16,6 +16,7 @@ require (
 	github.com/docker/go-units v0.4.0
 	github.com/dustin/go-humanize v1.0.0
 	github.com/etclabscore/go-openrpc-reflect v0.0.36
+	github.com/fatih/color v1.13.0
 	github.com/filecoin-project/dagstore v0.5.2
 	github.com/filecoin-project/go-address v0.0.6
 	github.com/filecoin-project/go-bitfield v0.2.4

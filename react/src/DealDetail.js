@@ -10,6 +10,7 @@ import {humanFIL, addCommas, humanFileSize} from "./util";
 import {useParams} from "react-router-dom";
 import './DealDetail.css'
 import closeImg from './bootstrap-icons/icons/x-circle.svg'
+import {Info} from "./Info";
 
 export function DealDetail(props) {
     const params = useParams()
@@ -127,6 +128,10 @@ export function DealDetail(props) {
                     <td>{deal.DealDataRoot}</td>
                 </tr>
                 <tr>
+                    <th>Verified</th>
+                    <td>{deal.IsVerified ? 'Yes' : 'No'}</td>
+                </tr>
+                <tr>
                     <th>Piece CID</th>
                     <td>{deal.PieceCid}</td>
                 </tr>
@@ -139,8 +144,16 @@ export function DealDetail(props) {
                     </td>
                 </tr>
                 <tr>
+                    <th>Client Collateral</th>
+                    <td>{humanFIL(deal.ClientCollateral)}</td>
+                </tr>
+                <tr>
                     <th>Provider Collateral</th>
                     <td>{humanFIL(deal.ProviderCollateral)}</td>
+                </tr>
+                <tr>
+                    <th>Storage Price Per Epoch</th>
+                    <td>{humanFIL(deal.StoragePricePerEpoch)}</td>
                 </tr>
                 <tr>
                     <th>Current Epoch</th>
@@ -165,6 +178,29 @@ export function DealDetail(props) {
                     </td>
                 </tr>
                 <tr>
+                    <th>Duration</th>
+                    <td>
+                        {addCommas(deal.EndEpoch-deal.StartEpoch)}
+                        <span className="aux">
+                            {startEpochTime && endEpochTime ? ' (' + moment(endEpochTime).diff(startEpochTime, 'days') + ' days)' : null}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Storage Fee</th>
+                    <td>
+                        {humanFIL(deal.StoragePricePerEpoch * BigInt(deal.EndEpoch-deal.StartEpoch))}
+                        &nbsp;
+                        <span className="aux">
+                            (Price per epoch x Duration)
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Transfer Mode</th>
+                    <td>{deal.IsOffline ? 'Offline' : 'Online'}</td>
+                </tr>
+                <tr>
                     <th>Transfer Type</th>
                     <td>{deal.Transfer.Type}</td>
                 </tr>
@@ -175,6 +211,18 @@ export function DealDetail(props) {
                         &nbsp;
                         <span className="aux">({addCommas(deal.Transfer.Size)} bytes)</span>
                     </td>
+                </tr>
+                <tr>
+                    <th>Transferred</th>
+                    <td>
+                        {humanFileSize(deal.Transferred)}
+                        &nbsp;
+                        <span className="aux">({addCommas(deal.Transferred)} bytes)</span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Inbound File Path</th>
+                    <td>{deal.InboundFilePath}</td>
                 </tr>
                 {deal.Sector.ID > 0 ? (
                     <>
@@ -201,8 +249,15 @@ export function DealDetail(props) {
                     </td>
                 </tr>
                 <tr>
+                    <th>Chain Deal ID</th>
+                    <td>{deal.ChainDealID ? addCommas(deal.ChainDealID) : null}</td>
+                </tr>
+                <tr>
                     <th>Status</th>
-                    <td>{deal.Message}</td>
+                    <td>
+                        {deal.Message}
+                        <DealStatusInfo />
+                    </td>
                 </tr>
                 </tbody>
             </table>
@@ -349,4 +404,74 @@ function addClassFor(el, className, duration) {
     return setTimeout(function() {
         el.classList.remove(className)
     }, duration)
+}
+
+function DealStatusInfo(props) {
+    return <span className="deal-status-info">
+        <Info>
+            The deal can be in one of the following states:
+            <p>
+                <i>Transfer queued</i><br/>
+                <p>
+                    The storage deal proposal has been accepted, and Boost is
+                    about to start the data transfer.
+                </p>
+            </p>
+            <p>
+                <i>Transferring</i>
+                <p>
+                    The data for the deal is transferring.
+                </p>
+            </p>
+            <p>
+                <i>Transfer Complete</i>
+                <p>
+                    The data transfer is complete and Boost is verifying the data matches commp.
+                </p>
+            </p>
+            <p>
+                <i>Ready to Publish</i>
+                <p>
+                    The deal is in the batch publish queue, ready to be published.
+                </p>
+            </p>
+            <p>
+                <i>Awaiting Publish Confirmation</i>
+                <p>
+                    Boost sent a publish deal message for the deal and is waiting for on-chain confirmation.
+                </p>
+            </p>
+            <p>
+                <i>Adding to Sector</i>
+                <p>
+                    Boost is handing the deal off to the lotus-miner sealing subsystem
+                    to be added to a sector.
+                </p>
+            </p>
+            <p>
+                <i>Announcing</i>
+                <p>
+                    Boost is announcing the deal to the network so that clients know where to retrieve it.
+                </p>
+            </p>
+            <p>
+                <i>Sealing</i>
+                <p>
+                    The deal has been added to a sector and is now sealing.
+                </p>
+            </p>
+            <p>
+                <i>Complete</i>
+                <p>
+                    The deal has reached its duration and expired.
+                </p>
+            </p>
+            <p>
+                <i>Cancelled</i>
+                <p>
+                    The deal was cancelled.
+                </p>
+            </p>
+        </Info>
+    </span>
 }

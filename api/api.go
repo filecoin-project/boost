@@ -32,10 +32,12 @@ type Boost interface {
 	Net
 
 	// MethodGroup: Boost
-	BoostIndexerAnnounceAllDeals(ctx context.Context) error                                           //perm:admin
-	BoostOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*ProviderDealRejectionInfo, error) //perm:admin
-	BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)            //perm:admin
-	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)           //perm:admin
+	BoostIndexerAnnounceAllDeals(ctx context.Context) error                                                                        //perm:admin
+	BoostOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*ProviderDealRejectionInfo, error)                              //perm:admin
+	BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                                         //perm:admin
+	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                        //perm:admin
+	BoostDagstoreInitializeShard(ctx context.Context, key string) error                                                            //perm:admin
+	BoostDagstoreInitializeAll(ctx context.Context, params DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) //perm:admin
 
 	// MethodGroup: LegacyMarket
 	MarketListRetrievalDeals(ctx context.Context) ([]retrievalmarket.ProviderDealState, error)                                                                                           //perm:read

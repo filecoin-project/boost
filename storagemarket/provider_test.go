@@ -1170,6 +1170,6 @@ func (n *NoOpIndexProvider) AnnounceBoostDeal(ctx context.Context, pds *types.Pr
 	return testutil.GenerateCid(), nil
 }
 
-func (n *NoOpIndexProvider) Start() {
+func (n *NoOpIndexProvider) Start(_ context.Context) {
 
 }

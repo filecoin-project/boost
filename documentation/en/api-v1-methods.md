@@ -5,6 +5,8 @@
   * [AuthNew](#AuthNew)
   * [AuthVerify](#AuthVerify)
 * [Boost](#Boost)
+  * [BoostDagstoreInitializeAll](#BoostDagstoreInitializeAll)
+  * [BoostDagstoreInitializeShard](#BoostDagstoreInitializeShard)
   * [BoostDeal](#BoostDeal)
   * [BoostDummyDeal](#BoostDummyDeal)
   * [BoostIndexerAnnounceAllDeals](#BoostIndexerAnnounceAllDeals)
@@ -112,6 +114,47 @@ Response:
 
 ## Boost
 
+
+### BoostDagstoreInitializeAll
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "MaxConcurrency": 123,
+    "IncludeSealed": true
+  }
+]
+```
+
+Response:
+```json
+{
+  "Key": "string value",
+  "Event": "string value",
+  "Success": true,
+  "Error": "string value",
+  "Total": 123,
+  "Current": 123
+}
+```
+
+### BoostDagstoreInitializeShard
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  "string value"
+]
+```
+
+Response: `{}`
 
 ### BoostDeal
 

@@ -33,6 +33,10 @@ type BoostStruct struct {
 	Internal struct {
 		ActorSectorSize func(p0 context.Context, p1 address.Address) (abi.SectorSize, error) `perm:"read"`
 
+		BoostDagstoreInitializeAll func(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) `perm:"admin"`
+
+		BoostDagstoreInitializeShard func(p0 context.Context, p1 string) error `perm:"admin"`
+
 		BoostDeal func(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) `perm:"admin"`
 
 		BoostDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
@@ -184,6 +188,28 @@ func (s *BoostStruct) ActorSectorSize(p0 context.Context, p1 address.Address) (a
 
 func (s *BoostStub) ActorSectorSize(p0 context.Context, p1 address.Address) (abi.SectorSize, error) {
 	return *new(abi.SectorSize), ErrNotSupported
+}
+
+func (s *BoostStruct) BoostDagstoreInitializeAll(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) {
+	if s.Internal.BoostDagstoreInitializeAll == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.BoostDagstoreInitializeAll(p0, p1)
+}
+
+func (s *BoostStub) BoostDagstoreInitializeAll(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *BoostStruct) BoostDagstoreInitializeShard(p0 context.Context, p1 string) error {
+	if s.Internal.BoostDagstoreInitializeShard == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.BoostDagstoreInitializeShard(p0, p1)
+}
+
+func (s *BoostStub) BoostDagstoreInitializeShard(p0 context.Context, p1 string) error {
+	return ErrNotSupported
 }
 
 func (s *BoostStruct) BoostDeal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {

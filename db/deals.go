@@ -206,20 +206,20 @@ func (d *DealsDB) Count(ctx context.Context) (int, error) {
 }
 
 func (d *DealsDB) ListActive(ctx context.Context) ([]*types.ProviderDealState, error) {
-	return d.list(ctx, 0, "Checkpoint != ?", dealcheckpoints.Complete.String())
+	return d.list(ctx, 0, 0, "Checkpoint != ?", dealcheckpoints.Complete.String())
 }
 
-func (d *DealsDB) List(ctx context.Context, first *graphql.ID, limit int) ([]*types.ProviderDealState, error) {
+func (d *DealsDB) List(ctx context.Context, first *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
 	where := ""
 	whereArgs := []interface{}{}
 	if first != nil {
 		where += "CreatedAt <= (SELECT CreatedAt FROM Deals WHERE ID = ?)"
 		whereArgs = append(whereArgs, *first)
 	}
-	return d.list(ctx, limit, where, whereArgs...)
+	return d.list(ctx, offset, limit, where, whereArgs...)
 }
 
-func (d *DealsDB) list(ctx context.Context, limit int, whereClause string, whereArgs ...interface{}) ([]*types.ProviderDealState, error) {
+func (d *DealsDB) list(ctx context.Context, offset int, limit int, whereClause string, whereArgs ...interface{}) ([]*types.ProviderDealState, error) {
 	args := whereArgs
 	qry := "SELECT " + dealFieldsStr + " FROM Deals"
 	if whereClause != "" {
@@ -229,6 +229,11 @@ func (d *DealsDB) list(ctx context.Context, limit int, whereClause string, where
 	if limit > 0 {
 		qry += " LIMIT ?"
 		args = append(args, limit)
+
+		if offset > 0 {
+			qry += " OFFSET ?"
+			args = append(args, offset)
+		}
 	}
 
 	rows, err := d.db.QueryContext(ctx, qry, args...)
