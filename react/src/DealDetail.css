@@ -76,6 +76,10 @@
     text-align: left;
 }
 
+.deal-detail table.deal-fields .param {
+    color: #777777;
+}
+
 .deal-detail td, .deal-detail th {
     padding: 0.5em 1em;
 }

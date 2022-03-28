@@ -28,6 +28,7 @@ type TransferParams {
   Type: String!
   Size: Uint64!
   Params: String!
+  ClientID: String!
 }
 
 type Sector {

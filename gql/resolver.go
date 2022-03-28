@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boost/transport"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
@@ -369,16 +370,23 @@ func (dr *dealResolver) Sector() *sectorResolver {
 }
 
 type dealTransfer struct {
-	Type   string
-	Size   gqltypes.Uint64
-	Params string
+	Type     string
+	Size     gqltypes.Uint64
+	Params   string
+	ClientID string
 }
 
 func (dr *dealResolver) Transfer() dealTransfer {
+	transfer := dr.ProviderDealState.Transfer
+	params, err := transport.TransferParamsAsJson(transfer)
+	if err != nil {
+		params = fmt.Sprintf(`{"url": "could not extract url from params: %s"}`, err)
+	}
 	return dealTransfer{
-		Type:   dr.ProviderDealState.Transfer.Type,
-		Size:   gqltypes.Uint64(dr.ProviderDealState.Transfer.Size),
-		Params: "TODO",
+		Type:     transfer.Type,
+		Size:     gqltypes.Uint64(transfer.Size),
+		Params:   params,
+		ClientID: transfer.ClientID,
 	}
 }
 

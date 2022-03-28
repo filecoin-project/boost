@@ -80,6 +80,16 @@ export function DealDetail(props) {
         endEpochTime = new Date(new Date().getTime() + endEpochDelta*secondsPerEpoch*1000)
     }
 
+    var transferParams = deal.Transfer.Params
+    try {
+        const fields = JSON.parse(transferParams)
+        transferParams = Object.keys(fields).map(k => (
+            <div className="param">{k}: {fields[k]}</div>
+        ))
+    } catch (e) {
+        console.error("parsing transfer params: "+e.message)
+    }
+
     var logRowData = []
     var logs = (deal.Logs || []).sort((a, b) => a.CreatedAt.getTime() - b.CreatedAt.getTime())
     for (var i = 0; i < logs.length; i++) {
@@ -211,6 +221,14 @@ export function DealDetail(props) {
                         &nbsp;
                         <span className="aux">({addCommas(deal.Transfer.Size)} bytes)</span>
                     </td>
+                </tr>
+                <tr>
+                    <th>Transfer Params</th>
+                    <td>{transferParams}</td>
+                </tr>
+                <tr>
+                    <th>Transfer Client ID</th>
+                    <td>{deal.Transfer.ClientID}</td>
                 </tr>
                 <tr>
                     <th>Transferred</th>
