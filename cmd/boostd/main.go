@@ -49,7 +49,7 @@ func main() {
 	app.Setup()
 
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+		os.Stderr.WriteString("Error: " + err.Error() + "\n")
 	}
 }
 

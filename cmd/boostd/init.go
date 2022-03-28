@@ -81,7 +81,7 @@ var initCmd = &cli.Command{
 			return err
 		}
 
-		log.Debug("Creating boost config")
+		fmt.Println("Creating boost config")
 		var cerr error
 		err = lr.SetConfig(func(raw interface{}) {
 			rcfg, ok := raw.(*config.Boost)
@@ -95,7 +95,7 @@ var initCmd = &cli.Command{
 				cerr = xerrors.Errorf("checking sector index API: %w", err)
 				return
 			}
-			log.Debugf("Sector index api info: %s", asi)
+			fmt.Printf("Sector index api info: %s\n", asi)
 			rcfg.SectorIndexApiInfo = asi
 
 			ai, err := checkApiInfo(ctx, cctx.String("api-sealer"))
@@ -103,7 +103,7 @@ var initCmd = &cli.Command{
 				cerr = xerrors.Errorf("checking sealer API: %w", err)
 				return
 			}
-			log.Debugf("Sealer api info: %s", ai)
+			fmt.Printf("Sealer api info: %s\n", ai)
 			rcfg.SealerApiInfo = ai
 
 			setCommonConfig(cctx, rcfg, bp)
@@ -116,22 +116,20 @@ var initCmd = &cli.Command{
 		}
 
 		// Add the miner address to the metadata datastore
-		log.Debugf("Adding miner address %s to datastore", bp.minerActor)
+		fmt.Printf("Adding miner address %s to datastore\n", bp.minerActor)
 		err = addMinerAddressToDatastore(ds, bp.minerActor)
 		if err != nil {
 			return err
 		}
 
 		// Create an empty storage.json file
-		// TODO: This is needed by markets, although it's not clear why as
-		// it seems like this should be the responsibility of the sealer
-		log.Debug("Creating empty storage.json file")
+		fmt.Println("Creating empty storage.json file")
 		err = os.WriteFile(path.Join(lr.Path(), "storage.json"), []byte("{}"), 0666)
 		if err != nil {
 			return fmt.Errorf("creating storage.json file: %w", err)
 		}
 
-		log.Info("Boost repo successfully created, you can now start boost with 'boostd run'")
+		fmt.Println("Boost repo successfully created, you can now start boost with 'boostd -vv run'")
 
 		return nil
 	},
@@ -168,7 +166,7 @@ var migrateCmd = &cli.Command{
 
 		// Open markets repo
 		mktsRepoPath := cctx.String("import-markets-repo")
-		log.Debugf("Getting markets repo '%s'", mktsRepoPath)
+		fmt.Printf("Getting markets repo '%s'\n", mktsRepoPath)
 		mktsRepo, err := getMarketsRepo(mktsRepoPath)
 		if err != nil {
 			return err
@@ -193,28 +191,28 @@ var migrateCmd = &cli.Command{
 		}
 
 		// Migrate datastore keys
-		log.Info("Migrating datastore keys")
+		fmt.Println("Migrating datastore keys")
 		err = migrateMarketsDatastore(ctx, ds, mktsRepo)
 		if err != nil {
 			return err
 		}
 
 		// Migrate keystore
-		log.Info("Migrating markets keystore")
+		fmt.Println("Migrating markets keystore")
 		err = migrateMarketsKeystore(mktsRepo, boostRepo)
 		if err != nil {
 			return err
 		}
 
 		// Migrate config
-		log.Info("Migrating markets config")
+		fmt.Println("Migrating markets config")
 		err = migrateMarketsConfig(cctx, mktsRepo, boostRepo, bp)
 		if err != nil {
 			return err
 		}
 
 		// Add the miner address to the metadata datastore
-		log.Infof("Adding miner address %s to datastore", bp.minerActor)
+		fmt.Printf("Adding miner address %s to datastore\n", bp.minerActor)
 		err = addMinerAddressToDatastore(ds, bp.minerActor)
 		if err != nil {
 			return err
@@ -232,7 +230,7 @@ var migrateCmd = &cli.Command{
 			return err
 		}
 
-		log.Info("Boost repo successfully created, you can now start boost with 'boostd run'")
+		fmt.Println("Boost repo successfully created, you can now start boost with 'boostd -vv run'")
 
 		return nil
 	},
@@ -251,10 +249,10 @@ func migrateStorageJson(mktsRepoPath string, boostRepoPath string) error {
 
 		// There is no storage.json in the markets repo, so create an empty one
 		// in the Boost repo
-		log.Debug("Creating storage.json file")
+		fmt.Println("Creating storage.json file")
 		bz = []byte("{}")
 	} else {
-		log.Debug("Migrating storage.json file")
+		fmt.Println("Migrating storage.json file")
 	}
 
 	// Write storage.json in the boost repo
@@ -279,7 +277,7 @@ func migrateDirectory(ctx context.Context, mktsRepoPath string, boostRepoPath st
 
 	// If it's a sym-link just copy the sym-link
 	if dirInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
-		log.Infof("copying sym-link %s to %s", mktsSubdirPath, boostSubdirPath)
+		fmt.Printf("copying sym-link %s to %s\n", mktsSubdirPath, boostSubdirPath)
 		cmd := exec.Command("cp", "-a", mktsSubdirPath, boostSubdirPath)
 		err = cmd.Run()
 		if err != nil {
@@ -298,11 +296,11 @@ func migrateDirectory(ctx context.Context, mktsRepoPath string, boostRepoPath st
 	}
 
 	humanSize := humanize.Bytes(uint64(dirSizeBytes))
-	log.Debugf("%s directory size: %s", subdir, humanSize)
+	fmt.Printf("%s directory size: %s\n", subdir, humanSize)
 
 	// If the directory is small enough, just copy it
 	if dirSizeBytes < 1024 {
-		log.Infof("Copying %s to %s", mktsSubdirPath, boostSubdirPath)
+		fmt.Printf("Copying %s to %s\n", mktsSubdirPath, boostSubdirPath)
 		cmd := exec.Command("cp", "-r", mktsSubdirPath, boostSubdirPath)
 		err = cmd.Run()
 		if err != nil {
@@ -331,7 +329,7 @@ func migrateDirectory(ctx context.Context, mktsRepoPath string, boostRepoPath st
 
 		switch string(line) {
 		case "c", "y":
-			log.Infof("Copying %s to %s", mktsSubdirPath, boostSubdirPath)
+			fmt.Printf("Copying %s to %s\n", mktsSubdirPath, boostSubdirPath)
 			cmd := exec.Command("cp", "-r", mktsSubdirPath, boostSubdirPath)
 			err = cmd.Run()
 			if err != nil {
@@ -339,7 +337,7 @@ func migrateDirectory(ctx context.Context, mktsRepoPath string, boostRepoPath st
 			}
 			return nil
 		case "m":
-			log.Infof("Moving %s to %s", mktsSubdirPath, boostSubdirPath)
+			fmt.Printf("Moving %s to %s\n", mktsSubdirPath, boostSubdirPath)
 			cmd := exec.Command("mv", mktsSubdirPath, boostSubdirPath)
 			err = cmd.Run()
 			if err != nil {
@@ -347,7 +345,7 @@ func migrateDirectory(ctx context.Context, mktsRepoPath string, boostRepoPath st
 			}
 			return nil
 		case "i":
-			log.Info("Not copying %s directory from markets to boost", subdir)
+			fmt.Printf("Not copying %s directory from markets to boost\n", subdir)
 			return nil
 		}
 	}
@@ -404,7 +402,7 @@ type boostParams struct {
 }
 
 func initBoost(ctx context.Context, cctx *cli.Context) (*boostParams, error) {
-	log.Info("Initializing boost repo")
+	fmt.Println("Initializing boost repo")
 
 	walletPSD, err := address.NewFromString(cctx.String("wallet-publish-storage-deals"))
 	if err != nil {
@@ -424,19 +422,25 @@ func initBoost(ctx context.Context, cctx *cli.Context) (*boostParams, error) {
 		return nil, xerrors.Errorf("max size for staging deals area must be > 0 bytes")
 	}
 
-	log.Debug("Trying to connect to full node RPC")
+	fmt.Println("Trying to connect to full node RPC")
 	if err := checkV1ApiSupport(ctx, cctx); err != nil {
 		return nil, err
 	}
 
 	api, closer, err := lcli.GetFullNodeAPIV1(cctx)
 	if err != nil {
+		if strings.Contains(err.Error(), "could not get API info") {
+			err = fmt.Errorf("%w\nDo you need to set the environment variable FULLNODE_API_INFO?", err)
+		}
 		return nil, err
 	}
 	defer closer()
 
 	smApi, smCloser, err := lcli.GetStorageMinerAPI(cctx)
 	if err != nil {
+		if strings.Contains(err.Error(), "could not get API info") {
+			err = fmt.Errorf("%w\nDo you need to set the environment variable MINER_API_INFO?", err)
+		}
 		return nil, err
 	}
 	defer smCloser()
@@ -446,14 +450,14 @@ func initBoost(ctx context.Context, cctx *cli.Context) (*boostParams, error) {
 		return nil, xerrors.Errorf("getting miner actor address: %w", err)
 	}
 
-	log.Debug("Checking full node sync status")
+	fmt.Println("Checking full node sync status")
 
 	if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false); err != nil {
 		return nil, xerrors.Errorf("sync wait: %w", err)
 	}
 
 	repoPath := cctx.String(FlagBoostRepo)
-	log.Debugw("Checking if repo exists", "path", repoPath)
+	fmt.Printf("Checking if repo exists at %s\n", repoPath)
 
 	r, err := lotus_repo.NewFS(repoPath)
 	if err != nil {
@@ -468,7 +472,7 @@ func initBoost(ctx context.Context, cctx *cli.Context) (*boostParams, error) {
 		return nil, xerrors.Errorf("repo at '%s' is already initialized", repoPath)
 	}
 
-	log.Debug("Checking full node version")
+	fmt.Println("Checking full node version")
 
 	v, err := api.Version(ctx)
 	if err != nil {
@@ -481,7 +485,7 @@ func initBoost(ctx context.Context, cctx *cli.Context) (*boostParams, error) {
 		return nil, xerrors.Errorf(msg + ". Boost and Lotus Daemon must have the same API version")
 	}
 
-	log.Debug("Creating boost repo")
+	fmt.Println("Creating boost repo")
 	if err := r.Init(node.Boost); err != nil {
 		return nil, err
 	}
@@ -583,7 +587,7 @@ func migrateMarketsDatastore(ctx context.Context, boostDS datastore.Batching, mk
 }
 
 func importPrefix(ctx context.Context, prefix string, mktsDS datastore.Batching, boostDS datastore.Batching) error {
-	log.Infof("Importing all legacy markets datastore keys under %s", prefix)
+	fmt.Printf("Importing all legacy markets datastore keys under %s\n", prefix)
 
 	q, err := mktsDS.Query(ctx, dsq.Query{
 		Prefix: prefix,
@@ -618,7 +622,7 @@ func importPrefix(ctx context.Context, prefix string, mktsDS datastore.Batching,
 			}
 		}
 
-		log.Debugf("Importing %d legacy markets datastore keys", count)
+		fmt.Printf("Importing %d legacy markets datastore keys\n", count)
 		err = batch.Commit(ctx)
 		if err != nil {
 			return xerrors.Errorf("saving %d datastore keys to Boost datastore: %w", count, err)
@@ -626,7 +630,7 @@ func importPrefix(ctx context.Context, prefix string, mktsDS datastore.Batching,
 
 		totalCount += count
 		if complete {
-			log.Infof("Imported %d legacy markets datastore keys under %s", totalCount, prefix)
+			fmt.Printf("Imported %d legacy markets datastore keys under %s\n", totalCount, prefix)
 			return nil
 		}
 	}
@@ -668,6 +672,9 @@ func checkV1ApiSupport(ctx context.Context, cctx *cli.Context) error {
 	// check v0 api version to make sure it supports v1 api
 	api0, closer, err := lcli.GetFullNodeAPI(cctx)
 	if err != nil {
+		if strings.Contains(err.Error(), "could not get API info") {
+			err = fmt.Errorf("%w\nDo you need to set the environment variable FULLNODE_API_INFO?", err)
+		}
 		return err
 	}
 
@@ -693,7 +700,7 @@ func checkApiInfo(ctx context.Context, ai string) (string, error) {
 		return "", xerrors.Errorf("could not get DialArgs: %w", err)
 	}
 
-	log.Infof("Checking miner api version of %s", addr)
+	fmt.Printf("Checking miner api version of %s\n", addr)
 
 	api, closer, err := client.NewStorageMinerRPCV0(ctx, addr, info.AuthHeader())
 	if err != nil {
