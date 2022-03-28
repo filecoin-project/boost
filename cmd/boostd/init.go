@@ -381,6 +381,7 @@ func migrateMarketsConfig(cctx *cli.Context, mktsRepo lotus_repo.LockedRepo, boo
 		rcfg.LotusDealmaking = mktsCfg.Dealmaking
 		rcfg.LotusFees = mktsCfg.Fees
 		rcfg.DAGStore = mktsCfg.DAGStore
+		rcfg.IndexProvider = mktsCfg.IndexProvider
 
 		setCommonConfig(cctx, rcfg, bp)
 	})
