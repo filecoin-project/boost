@@ -130,7 +130,6 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 }
 
 func (p *Provider) processOfflineDealRequest(deal *types.ProviderDealState) (bool, string, error) {
-	// tag funds and start executing deal
 	cleanup := func() {
 		collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {

@@ -378,9 +378,13 @@ type dealTransfer struct {
 
 func (dr *dealResolver) Transfer() dealTransfer {
 	transfer := dr.ProviderDealState.Transfer
-	params, err := transport.TransferParamsAsJson(transfer)
-	if err != nil {
-		params = fmt.Sprintf(`{"url": "could not extract url from params: %s"}`, err)
+	params := "{}"
+	if !dr.IsOffline {
+		var err error
+		params, err = transport.TransferParamsAsJson(transfer)
+		if err != nil {
+			params = fmt.Sprintf(`{"url": "could not extract url from params: %s"}`, err)
+		}
 	}
 	return dealTransfer{
 		Type:     transfer.Type,
@@ -421,9 +425,12 @@ func (dr *dealResolver) Stage() string {
 func (dr *dealResolver) Message() string {
 	switch dr.Checkpoint {
 	case dealcheckpoints.Accepted:
+		if dr.IsOffline {
+			return "Awaiting Offline Data Import"
+		}
 		switch dr.transferred {
 		case 0:
-			return "Transfer queued"
+			return "Transfer Queued"
 		case 100:
 			return "Transfer Complete"
 		default:

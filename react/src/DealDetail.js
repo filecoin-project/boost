@@ -210,10 +210,12 @@ export function DealDetail(props) {
                     <th>Transfer Mode</th>
                     <td>{deal.IsOffline ? 'Offline' : 'Online'}</td>
                 </tr>
-                <tr>
-                    <th>Transfer Type</th>
-                    <td>{deal.Transfer.Type}</td>
-                </tr>
+                {deal.IsOffline ? null : (
+                    <tr>
+                        <th>Transfer Type</th>
+                        <td>{deal.Transfer.Type}</td>
+                    </tr>
+                )}
                 <tr>
                     <th>Transfer Size</th>
                     <td>
@@ -222,14 +224,18 @@ export function DealDetail(props) {
                         <span className="aux">({addCommas(deal.Transfer.Size)} bytes)</span>
                     </td>
                 </tr>
-                <tr>
-                    <th>Transfer Params</th>
-                    <td>{transferParams}</td>
-                </tr>
-                <tr>
-                    <th>Transfer Client ID</th>
-                    <td>{deal.Transfer.ClientID}</td>
-                </tr>
+                {deal.IsOffline ? null : (
+                    <tr>
+                        <th>Transfer Params</th>
+                        <td>{transferParams}</td>
+                    </tr>
+                )}
+                {deal.Transfer.ClientID ? (
+                    <tr>
+                        <th>Transfer Client ID</th>
+                        <td>{deal.Transfer.ClientID}</td>
+                    </tr>
+                ) : null}
                 <tr>
                     <th>Transferred</th>
                     <td>
@@ -280,7 +286,7 @@ export function DealDetail(props) {
                 </tbody>
             </table>
 
-            {deal.Stage === 'Accepted' ? (
+            {deal.Stage === 'Accepted' && !deal.IsOffline ? (
                 <div className="buttons">
                     <div className="button cancel" onClick={cancelDeal}>Cancel Transfer</div>
                 </div>
@@ -429,10 +435,18 @@ function DealStatusInfo(props) {
         <Info>
             The deal can be in one of the following states:
             <p>
-                <i>Transfer queued</i><br/>
+                <i>Transfer Queued</i><br/>
                 <p>
                     The storage deal proposal has been accepted, and Boost is
                     about to start the data transfer.
+                </p>
+            </p>
+            <p>
+                <i>Awaiting Offline Data Import</i><br/>
+                <p>
+                    The client has made an offline deal proposal, and Boost is
+                    waiting for the Storage Provider operator to import the deal
+                    data.
                 </p>
             </p>
             <p>
