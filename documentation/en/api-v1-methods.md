@@ -5,8 +5,10 @@
   * [AuthNew](#authnew)
   * [AuthVerify](#authverify)
 * [Boost](#boost)
+  * [BoostDagstoreGC](#boostdagstoregc)
   * [BoostDagstoreInitializeAll](#boostdagstoreinitializeall)
   * [BoostDagstoreInitializeShard](#boostdagstoreinitializeshard)
+  * [BoostDagstoreListShards](#boostdagstorelistshards)
   * [BoostDeal](#boostdeal)
   * [BoostDummyDeal](#boostdummydeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
@@ -115,6 +117,24 @@ Response:
 ## Boost
 
 
+### BoostDagstoreGC
+
+
+Perms: admin
+
+Inputs: `null`
+
+Response:
+```json
+[
+  {
+    "Key": "baga6ea4seaqecmtz7iak33dsfshi627abz4i4665dfuzr3qfs4bmad6dx3iigdq",
+    "Success": false,
+    "Error": "\u003cerror\u003e"
+  }
+]
+```
+
 ### BoostDagstoreInitializeAll
 
 
@@ -155,6 +175,24 @@ Inputs:
 ```
 
 Response: `{}`
+
+### BoostDagstoreListShards
+
+
+Perms: read
+
+Inputs: `null`
+
+Response:
+```json
+[
+  {
+    "Key": "baga6ea4seaqecmtz7iak33dsfshi627abz4i4665dfuzr3qfs4bmad6dx3iigdq",
+    "State": "ShardStateAvailable",
+    "Error": "\u003cerror\u003e"
+  }
+]
+```
 
 ### BoostDeal
 

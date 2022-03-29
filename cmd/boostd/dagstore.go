@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
+
+	"github.com/filecoin-project/lotus/lib/tablewriter"
 
 	"github.com/fatih/color"
 	bapi "github.com/filecoin-project/boost/api"
@@ -13,11 +16,103 @@ import (
 
 var dagstoreCmd = &cli.Command{
 	Name:  "dagstore",
-	Usage: "Manage the dagstore on the markets subsystem",
+	Usage: "Manage the dagstore on the Boost subsystem",
 	Subcommands: []*cli.Command{
 		dagstoreInitializeShardCmd,
 		dagstoreInitializeAllCmd,
+		dagstoreListShardsCmd,
+		dagstoreGcCmd,
 	},
+}
+
+var dagstoreGcCmd = &cli.Command{
+	Name:  "gc",
+	Usage: "Garbage collect the dagstore",
+	Flags: []cli.Flag{},
+	Action: func(cctx *cli.Context) error {
+		ctx := lcli.ReqContext(cctx)
+		napi, closer, err := bcli.GetBoostAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		collected, err := napi.BoostDagstoreGC(ctx)
+		if err != nil {
+			return err
+		}
+
+		if len(collected) == 0 {
+			_, _ = fmt.Fprintln(os.Stdout, "no shards collected")
+			return nil
+		}
+
+		for _, e := range collected {
+			if e.Error == "" {
+				_, _ = fmt.Fprintln(os.Stdout, e.Key, color.New(color.FgGreen).Sprint("SUCCESS"))
+			} else {
+				_, _ = fmt.Fprintln(os.Stdout, e.Key, color.New(color.FgRed).Sprint("ERROR"), e.Error)
+			}
+		}
+
+		return nil
+	},
+}
+
+var dagstoreListShardsCmd = &cli.Command{
+	Name:  "list-shards",
+	Usage: "List all shards known to the dagstore, with their current status",
+	Flags: []cli.Flag{},
+	Action: func(cctx *cli.Context) error {
+		ctx := lcli.ReqContext(cctx)
+		napi, closer, err := bcli.GetBoostAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		shards, err := napi.BoostDagstoreListShards(ctx)
+		if err != nil {
+			return err
+		}
+
+		return printTableShards(shards)
+	},
+}
+
+func printTableShards(shards []bapi.DagstoreShardInfo) error {
+	if len(shards) == 0 {
+		return nil
+	}
+
+	tw := tablewriter.New(
+		tablewriter.Col("Key"),
+		tablewriter.Col("State"),
+		tablewriter.Col("Error"),
+	)
+
+	colors := map[string]color.Attribute{
+		"ShardStateAvailable": color.FgGreen,
+		"ShardStateServing":   color.FgBlue,
+		"ShardStateErrored":   color.FgRed,
+		"ShardStateNew":       color.FgYellow,
+	}
+
+	for _, s := range shards {
+		m := map[string]interface{}{
+			"Key": s.Key,
+			"State": func() string {
+				trimmedState := strings.TrimPrefix(s.State, "ShardState")
+				if c, ok := colors[s.State]; ok {
+					return color.New(c).Sprint(trimmedState)
+				}
+				return trimmedState
+			}(),
+			"Error": s.Error,
+		}
+		tw.Write(m)
+	}
+	return tw.Flush(os.Stdout)
 }
 
 var dagstoreInitializeShardCmd = &cli.Command{
@@ -26,20 +121,18 @@ var dagstoreInitializeShardCmd = &cli.Command{
 	Usage:     "Initialize the specified shard",
 	Flags:     []cli.Flag{},
 	Action: func(cctx *cli.Context) error {
-
 		if cctx.NArg() != 1 {
 			return fmt.Errorf("must provide a single shard key")
 		}
 
-		marketsApi, closer, err := lcli.GetMarketsAPI(cctx)
+		ctx := lcli.ReqContext(cctx)
+		napi, closer, err := bcli.GetBoostAPI(cctx)
 		if err != nil {
 			return err
 		}
 		defer closer()
 
-		ctx := lcli.ReqContext(cctx)
-
-		return marketsApi.DagstoreInitializeShard(ctx, cctx.Args().First())
+		return napi.BoostDagstoreInitializeShard(ctx, cctx.Args().First())
 	},
 }
 
@@ -63,7 +156,6 @@ var dagstoreInitializeAllCmd = &cli.Command{
 
 		ctx := lcli.ReqContext(cctx)
 
-		// announce markets and boost deals
 		napi, closer, err := bcli.GetBoostAPI(cctx)
 		if err != nil {
 			return err
