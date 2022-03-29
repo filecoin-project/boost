@@ -39,9 +39,11 @@ var dealCmd = &cli.Command{
 			Value: "~/.boost-client",
 		},
 		&cli.StringFlag{
-			Name:     "http-url",
-			Usage:    "http url to CAR file",
-			Required: true,
+			Name:  "http-url",
+			Usage: "http url to CAR file",
+		},
+		&cli.BoolFlag{
+			Name: "offline",
 		},
 		&cli.StringSliceFlag{
 			Name:  "http-headers",
@@ -99,6 +101,11 @@ var dealCmd = &cli.Command{
 	Before: before,
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
+
+		isOnline := !cctx.Bool("offline")
+		if isOnline && !cctx.IsSet("http-url") {
+			return fmt.Errorf("must supply either --http-url or --offline flag")
+		}
 
 		sdir, err := homedir.Expand(cctx.String("repo"))
 		if err != nil {
@@ -196,25 +203,32 @@ var dealCmd = &cli.Command{
 		}
 		defer s.Close()
 
-		// Store the path to the CAR file as a transfer parameter
-		transferParams := &types2.HttpRequest{URL: cctx.String("http-url")}
-
-		if cctx.IsSet("http-headers") {
-			transferParams.Headers = make(map[string]string)
-
-			for _, header := range cctx.StringSlice("http-headers") {
-				sp := strings.Split(header, "=")
-				if len(sp) != 2 {
-					return fmt.Errorf("malformed http header: %s", header)
-				}
-
-				transferParams.Headers[sp[0]] = sp[1]
-			}
+		transfer := types.Transfer{
+			Size: carFileSize,
 		}
+		if isOnline {
+			// Store the path to the CAR file as a transfer parameter
+			transferParams := &types2.HttpRequest{URL: cctx.String("http-url")}
 
-		paramsBytes, err := json.Marshal(transferParams)
-		if err != nil {
-			return fmt.Errorf("marshalling request parameters: %w", err)
+			if cctx.IsSet("http-headers") {
+				transferParams.Headers = make(map[string]string)
+
+				for _, header := range cctx.StringSlice("http-headers") {
+					sp := strings.Split(header, "=")
+					if len(sp) != 2 {
+						return fmt.Errorf("malformed http header: %s", header)
+					}
+
+					transferParams.Headers[sp[0]] = sp[1]
+				}
+			}
+
+			paramsBytes, err := json.Marshal(transferParams)
+			if err != nil {
+				return fmt.Errorf("marshalling request parameters: %w", err)
+			}
+			transfer.Type = "http"
+			transfer.Params = paramsBytes
 		}
 
 		var providerCollateral abi.TokenAmount
@@ -255,11 +269,8 @@ var dealCmd = &cli.Command{
 			DealUUID:           dealUuid,
 			ClientDealProposal: *dealProposal,
 			DealDataRoot:       rootCid,
-			Transfer: types.Transfer{
-				Type:   "http",
-				Params: paramsBytes,
-				Size:   carFileSize,
-			},
+			IsOffline:          !isOnline,
+			Transfer:           transfer,
 		}
 
 		log.Debugw("about to submit deal proposal", "uuid", dealUuid.String())
@@ -273,12 +284,18 @@ var dealCmd = &cli.Command{
 			return fmt.Errorf("deal proposal rejected: %s", resp.Message)
 		}
 
-		msg := "sent deal proposal\n"
+		msg := "sent deal proposal"
+		if !isOnline {
+			msg += " for offline deal"
+		}
+		msg += "\n"
 		msg += fmt.Sprintf("  deal uuid: %s\n", dealUuid)
 		msg += fmt.Sprintf("  storage provider: %s\n", maddr)
 		msg += fmt.Sprintf("  client wallet: %s\n", walletAddr)
 		msg += fmt.Sprintf("  payload cid: %s\n", rootCid)
-		msg += fmt.Sprintf("  url: %s\n", transferParams.URL)
+		if isOnline {
+			msg += fmt.Sprintf("  url: %s\n", cctx.String("http-url"))
+		}
 		msg += fmt.Sprintf("  commp: %s\n", dealProposal.Proposal.PieceCID)
 		msg += fmt.Sprintf("  start epoch: %d\n", dealProposal.Proposal.StartEpoch)
 		msg += fmt.Sprintf("  end epoch: %d\n", dealProposal.Proposal.EndEpoch)

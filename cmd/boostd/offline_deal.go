@@ -35,16 +35,16 @@ var offlineDealCmd = &cli.Command{
 
 		dealUuid, err := uuid.Parse(id)
 		if err != nil {
-			return fmt.Errorf("failed to parse deal uuid")
+			return fmt.Errorf("failed to parse deal uuid '%s'", id)
 		}
-		rej, err := napi.BoostOfflineDealWithData(dealUuid, filePath)
+		rej, err := napi.BoostOfflineDealWithData(cctx.Context, dealUuid, filePath)
 		if err != nil {
 			return fmt.Errorf("failed to execute offline deal: %w", err)
 		}
 		if rej != nil && rej.Reason != "" {
 			return fmt.Errorf("offline deal %s rejected: %s", dealUuid, rej.Reason)
 		}
-		fmt.Println("\n offline deal is being executed")
+		fmt.Println("Offline deal accepted and scheduled for execution")
 		return nil
 	},
 }

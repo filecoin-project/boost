@@ -1,6 +1,7 @@
 package itests
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -69,7 +70,7 @@ func TestDummydeal(t *testing.T) {
 	res, err = f.makeDummyDeal(offlineDealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), true)
 	require.NoError(t, err)
 	require.True(t, res.Accepted)
-	res, err = f.boost.BoostOfflineDealWithData(offlineDealUuid, carFilepath)
+	res, err = f.boost.BoostOfflineDealWithData(context.Background(), offlineDealUuid, carFilepath)
 	require.NoError(t, err)
 	require.True(t, res.Accepted)
 	err = f.waitForDealAddedToSector(offlineDealUuid)
