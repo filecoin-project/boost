@@ -65,7 +65,6 @@ func before(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("index-provider-wrapper", "DEBUG")
 		_ = logging.SetLogLevel("boost-migrator", "DEBUG")
 		_ = logging.SetLogLevel("dagstore", "DEBUG")
-		_ = logging.SetLogLevel("storagemarket_impl", "DEBUG")
 		_ = logging.SetLogLevel("migrator", "DEBUG")
 	}
 
