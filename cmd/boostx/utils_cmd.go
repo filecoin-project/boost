@@ -120,7 +120,7 @@ var marketCmd = &cli.Command{
 
 		newGasFeeCap := big.Mul(big.Int(basefee), big.NewInt(2)) // use 2*basefee, so that this message confirms quickly
 
-		if big.Cmp(msg.GasFeeCap, newGasFeeCap) > 0 {
+		if big.Cmp(msg.GasFeeCap, newGasFeeCap) < 0 {
 			msg.GasFeeCap = newGasFeeCap
 		}
 
