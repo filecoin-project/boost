@@ -29,8 +29,6 @@ func (r *resolver) Storage(ctx context.Context) (*storageResolver, error) {
 	sealing := uint64(0)
 
 	for _, deal := range activeDeals {
-		log.Debugw("deal", "uuid", deal.DealUuid, "checkpoint", deal.Checkpoint)
-
 		if deal.Checkpoint < dealcheckpoints.Transferred {
 			transferred += r.provider.NBytesReceived(deal.DealUuid)
 		} else if deal.Checkpoint < dealcheckpoints.AddedPiece {
