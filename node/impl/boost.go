@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 
 	"github.com/filecoin-project/dagstore/shard"
 
@@ -124,6 +125,59 @@ func (sm *BoostAPI) BoostIndexerAnnounceAllDeals(ctx context.Context) error {
 func (sm *BoostAPI) BoostOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
 	res, _, err := sm.StorageProvider.MakeOfflineDealWithData(dealUuid, filePath)
 	return res, err
+}
+
+func (sm *BoostAPI) BoostDagstoreGC(ctx context.Context) ([]api.DagstoreShardResult, error) {
+	if sm.DAGStore == nil {
+		return nil, fmt.Errorf("dagstore not available on this node")
+	}
+
+	res, err := sm.DAGStore.GC(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to gc: %w", err)
+	}
+
+	ret := make([]api.DagstoreShardResult, 0, len(res.Shards))
+	for k, err := range res.Shards {
+		r := api.DagstoreShardResult{Key: k.String()}
+		if err == nil {
+			r.Success = true
+		} else {
+			r.Success = false
+			r.Error = err.Error()
+		}
+		ret = append(ret, r)
+	}
+
+	return ret, nil
+}
+
+func (sm *BoostAPI) BoostDagstoreListShards(ctx context.Context) ([]api.DagstoreShardInfo, error) {
+	if sm.DAGStore == nil {
+		return nil, fmt.Errorf("dagstore not available on this node")
+	}
+
+	info := sm.DAGStore.AllShardsInfo()
+	ret := make([]api.DagstoreShardInfo, 0, len(info))
+	for k, i := range info {
+		ret = append(ret, api.DagstoreShardInfo{
+			Key:   k.String(),
+			State: i.ShardState.String(),
+			Error: func() string {
+				if i.Error == nil {
+					return ""
+				}
+				return i.Error.Error()
+			}(),
+		})
+	}
+
+	// order by key.
+	sort.SliceStable(ret, func(i, j int) bool {
+		return ret[i].Key < ret[j].Key
+	})
+
+	return ret, nil
 }
 
 func (sm *BoostAPI) BoostDagstoreInitializeAll(ctx context.Context, params api.DagstoreInitializeAllParams) (<-chan api.DagstoreInitializeAllEvent, error) {

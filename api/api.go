@@ -38,6 +38,9 @@ type Boost interface {
 	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                        //perm:admin
 	BoostDagstoreInitializeShard(ctx context.Context, key string) error                                                            //perm:admin
 	BoostDagstoreInitializeAll(ctx context.Context, params DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) //perm:admin
+	BoostDagstoreGC(ctx context.Context) ([]DagstoreShardResult, error)                                                            //perm:admin
+
+	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error) //perm:read
 
 	// MethodGroup: LegacyMarket
 	MarketListRetrievalDeals(ctx context.Context) ([]retrievalmarket.ProviderDealState, error)                                                                                           //perm:read
