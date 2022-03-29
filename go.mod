@@ -25,12 +25,12 @@ require (
 	github.com/filecoin-project/go-data-transfer v1.15.0
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
-	github.com/filecoin-project/go-fil-markets v1.20.2-0.20220325122707-b18483a0834b
+	github.com/filecoin-project/go-fil-markets v1.20.2-0.20220329125642-06a55dfff6a8
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-state-types v0.1.3
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/index-provider v0.5.0
+	github.com/filecoin-project/index-provider v0.6.1
 	github.com/filecoin-project/lotus v1.15.1-0.20220321111228-3c1edca90295
 	github.com/filecoin-project/specs-actors v0.9.14
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
