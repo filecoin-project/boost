@@ -15,6 +15,7 @@ import (
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/client"
 	chain_types "github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
@@ -110,9 +111,15 @@ var dealCmd = &cli.Command{
 			return err
 		}
 
-		api, closer, err := lcli.GetGatewayAPI(cctx)
+		addr := cctx.String("gateway-url")
+		api, closer, err := client.NewGatewayRPCV1(ctx, addr, nil)
 		if err != nil {
-			return fmt.Errorf("cant setup gateway connection: %w", err)
+			log.Warnw("couldnt connect to gateway", "addr", addr)
+
+			api, closer, err = lcli.GetGatewayAPI(cctx)
+			if err != nil {
+				return fmt.Errorf("cant setup gateway connection: %w", err)
+			}
 		}
 		defer closer()
 

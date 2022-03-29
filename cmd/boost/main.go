@@ -26,6 +26,11 @@ func main() {
 		EnableBashCompletion: true,
 		Version:              build.UserVersion(),
 		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "gateway-url",
+				Usage: "Filecoin gateway url",
+				Value: "https://api.node.glif.io",
+			},
 			cliutil.FlagVeryVerbose,
 		},
 		Commands: []*cli.Command{

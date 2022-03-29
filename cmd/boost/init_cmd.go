@@ -8,6 +8,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 
 	"github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	cli "github.com/urfave/cli/v2"
@@ -39,9 +40,15 @@ var initCmd = &cli.Command{
 			return err
 		}
 
-		api, closer, err := lcli.GetGatewayAPI(cctx)
+		addr := cctx.String("gateway-url")
+		api, closer, err := client.NewGatewayRPCV1(ctx, addr, nil)
 		if err != nil {
-			return fmt.Errorf("cant setup gateway connection: %w", err)
+			log.Warnw("couldnt connect to gateway", "addr", addr)
+
+			api, closer, err = lcli.GetGatewayAPI(cctx)
+			if err != nil {
+				return fmt.Errorf("cant setup gateway connection: %w", err)
+			}
 		}
 		defer closer()
 
