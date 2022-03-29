@@ -118,7 +118,11 @@ var marketCmd = &cli.Command{
 			return xerrors.Errorf("GasEstimateMessageGas error: %w", err)
 		}
 
-		msg.GasFeeCap = big.Mul(big.Int(basefee), big.NewInt(2)) // use 2*basefee, so that this message confirms quickly
+		newGasFeeCap := big.Mul(big.Int(basefee), big.NewInt(2)) // use 2*basefee, so that this message confirms quickly
+
+		if big.Cmp(msg.GasFeeCap, newGasFeeCap) < 0 {
+			msg.GasFeeCap = newGasFeeCap
+		}
 
 		smsg, err := messagesigner.SignMessage(ctx, msg, func(*types.SignedMessage) error { return nil })
 		if err != nil {
