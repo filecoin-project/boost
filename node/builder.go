@@ -480,7 +480,7 @@ func ConfigBoost(c interface{}) Option {
 		// Lotus Markets (storage)
 		Override(new(lotus_dtypes.ProviderTransferNetwork), lotus_modules.NewProviderTransferNetwork),
 		Override(new(lotus_dtypes.ProviderTransport), lotus_modules.NewProviderTransport),
-		Override(new(lotus_dtypes.ProviderDataTransfer), lotus_modules.NewProviderDataTransfer),
+		Override(new(lotus_dtypes.ProviderDataTransfer), modules.NewProviderDataTransfer),
 		Override(new(*storedask.StoredAsk), lotus_modules.NewStorageAsk),
 
 		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&cfg.LotusFees, &cfg.LotusDealmaking)),
