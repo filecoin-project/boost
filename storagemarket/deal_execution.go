@@ -62,7 +62,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	}
 
 	// build in-memory state
-	// if the deal has already been handed to the sealer, the inbound file could already have been removed and in that case.
+	// if the deal has already been handed to the sealer, the inbound file could already have been removed and in that case,
 	// the number of bytes recieved should be the same as deal size as we've already verified the transfer.
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
 		fi, err := os.Stat(deal.InboundFilePath)
