@@ -141,22 +141,11 @@ func (w *Wrapper) Start(ctx context.Context) {
 }
 
 func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDealState) (cid.Cid, error) {
-	var mt metadata.Metadata
-
-	// anly onnounce verified deals as available for Bitswap retrieval
-	if pds.ClientDealProposal.Proposal.VerifiedDeal {
-		mt = metadata.New(metadata.Bitswap{}, &metadata.GraphsyncFilecoinV1{
-			PieceCID:      pds.ClientDealProposal.Proposal.PieceCID,
-			FastRetrieval: true,
-			VerifiedDeal:  pds.ClientDealProposal.Proposal.VerifiedDeal,
-		})
-	} else {
-		mt = metadata.New(&metadata.GraphsyncFilecoinV1{
-			PieceCID:      pds.ClientDealProposal.Proposal.PieceCID,
-			FastRetrieval: true,
-			VerifiedDeal:  pds.ClientDealProposal.Proposal.VerifiedDeal,
-		})
-	}
+	mt := metadata.New(metadata.Bitswap{}, &metadata.GraphsyncFilecoinV1{
+		PieceCID:      pds.ClientDealProposal.Proposal.PieceCID,
+		FastRetrieval: true,
+		VerifiedDeal:  pds.ClientDealProposal.Proposal.VerifiedDeal,
+	})
 
 	// ensure we have a connection with the full node host so that the index provider gossip sub announcements make their
 	// way to the filecoin bootstrapper network
