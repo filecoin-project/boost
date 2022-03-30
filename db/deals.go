@@ -209,6 +209,10 @@ func (d *DealsDB) ListActive(ctx context.Context) ([]*types.ProviderDealState, e
 	return d.list(ctx, 0, 0, "Checkpoint != ?", dealcheckpoints.Complete.String())
 }
 
+func (d *DealsDB) ListCompleted(ctx context.Context) ([]*types.ProviderDealState, error) {
+	return d.list(ctx, 0, 0, "Checkpoint = ?", dealcheckpoints.Complete.String())
+}
+
 func (d *DealsDB) List(ctx context.Context, first *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
 	where := ""
 	whereArgs := []interface{}{}

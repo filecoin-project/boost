@@ -382,6 +382,16 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 	}
 	log.Infow("db initialized")
 
+	// cleanup all completed deals in case Boost resumed before they were cleanedup
+	finished, err := p.dealsDB.ListCompleted(p.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list completed deals: %w", err)
+	}
+	for _, ds := range finished {
+		p.cleanupDeal(ds)
+	}
+	log.Info("finished cleaning up completed deals")
+
 	// restart all active deals
 	pds, err := p.dealsDB.ListActive(p.ctx)
 	if err != nil {
@@ -395,6 +405,7 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 		dh := p.mkAndInsertDealHandler(d.DealUuid)
 		p.wg.Add(1)
 		dhs = append(dhs, dh)
+
 		go func() {
 			defer func() {
 				p.wg.Done()
