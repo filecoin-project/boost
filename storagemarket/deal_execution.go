@@ -62,14 +62,20 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	}
 
 	// build in-memory state
-	fi, err := os.Stat(deal.InboundFilePath)
-	if err != nil {
-		err := fmt.Errorf("failed to stat output file: %w", err)
-		p.failDeal(pub, deal, err)
-		p.cleanupDealLogged(deal)
-		return
+	// if the deal has already been handed to the sealer, the inbound file could already have been removed and in that case.
+	// the number of bytes recieved should be the same as deal size as we've already verified the transfer.
+	if deal.Checkpoint < dealcheckpoints.AddedPiece {
+		fi, err := os.Stat(deal.InboundFilePath)
+		if err != nil {
+			err := fmt.Errorf("failed to stat output file: %w", err)
+			p.failDeal(pub, deal, err)
+			p.cleanupDealLogged(deal)
+			return
+		}
+		deal.NBytesReceived = fi.Size()
+	} else {
+		deal.NBytesReceived = int64(deal.Transfer.Size)
 	}
-	deal.NBytesReceived = fi.Size()
 
 	// Execute the deal synchronously
 	if derr := p.execDealUptoAddPiece(dh.providerCtx, pub, deal, dh); derr != nil {
