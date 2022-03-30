@@ -33,6 +33,7 @@ import (
 
 var log = logging.Logger("index-provider-wrapper")
 var shardRegMarker = ".boost-shard-registration-complete"
+var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
 	cfg         lotus_config.DAGStoreConfig
@@ -46,9 +47,14 @@ type Wrapper struct {
 func NewWrapper(cfg lotus_config.DAGStoreConfig) func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
 	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
 	meshCreator idxprov.MeshCreator) *Wrapper {
+
 	return func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
 		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
 		meshCreator idxprov.MeshCreator) *Wrapper {
+		if cfg.RootDir == "" {
+			cfg.RootDir = filepath.Join(r.Path(), defaultDagStoreDir)
+		}
+
 		return &Wrapper{
 			dealsDB:     dealsDB,
 			legacyProv:  legacyProv,
