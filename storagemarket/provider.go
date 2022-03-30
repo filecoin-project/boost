@@ -410,8 +410,8 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 
 	// resume all in-progress deals
 	var dhs []*dealHandler
-	for _, ds := range pds {
-		d := ds
+	for _, d := range pds {
+		d := d
 		if d.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
 			continue
 		}
