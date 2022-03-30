@@ -87,6 +87,8 @@ type BoostStruct struct {
 
 		MarketListDataTransfers func(p0 context.Context) ([]lapi.DataTransferChannel, error) `perm:"write"`
 
+		MarketListIncompleteDeals func(p0 context.Context) ([]storagemarket.MinerDeal, error) `perm:"read"`
+
 		MarketListRetrievalDeals func(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) `perm:"read"`
 
 		MarketRestartDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error `perm:"write"`
@@ -94,6 +96,8 @@ type BoostStruct struct {
 		MarketSetAsk func(p0 context.Context, p1 types.BigInt, p2 types.BigInt, p3 abi.ChainEpoch, p4 abi.PaddedPieceSize, p5 abi.PaddedPieceSize) error `perm:"admin"`
 
 		MarketSetRetrievalAsk func(p0 context.Context, p1 *retrievalmarket.Ask) error `perm:"admin"`
+
+		RuntimeSubsystems func(p0 context.Context) (lapi.MinerSubsystems, error) `perm:"read"`
 	}
 }
 
@@ -491,6 +495,17 @@ func (s *BoostStub) MarketListDataTransfers(p0 context.Context) ([]lapi.DataTran
 	return *new([]lapi.DataTransferChannel), ErrNotSupported
 }
 
+func (s *BoostStruct) MarketListIncompleteDeals(p0 context.Context) ([]storagemarket.MinerDeal, error) {
+	if s.Internal.MarketListIncompleteDeals == nil {
+		return *new([]storagemarket.MinerDeal), ErrNotSupported
+	}
+	return s.Internal.MarketListIncompleteDeals(p0)
+}
+
+func (s *BoostStub) MarketListIncompleteDeals(p0 context.Context) ([]storagemarket.MinerDeal, error) {
+	return *new([]storagemarket.MinerDeal), ErrNotSupported
+}
+
 func (s *BoostStruct) MarketListRetrievalDeals(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) {
 	if s.Internal.MarketListRetrievalDeals == nil {
 		return *new([]retrievalmarket.ProviderDealState), ErrNotSupported
@@ -533,6 +548,17 @@ func (s *BoostStruct) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmar
 
 func (s *BoostStub) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmarket.Ask) error {
 	return ErrNotSupported
+}
+
+func (s *BoostStruct) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystems, error) {
+	if s.Internal.RuntimeSubsystems == nil {
+		return *new(lapi.MinerSubsystems), ErrNotSupported
+	}
+	return s.Internal.RuntimeSubsystems(p0)
+}
+
+func (s *BoostStub) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystems, error) {
+	return *new(lapi.MinerSubsystems), ErrNotSupported
 }
 
 func (s *ChainIOStruct) ChainHasObj(p0 context.Context, p1 cid.Cid) (bool, error) {

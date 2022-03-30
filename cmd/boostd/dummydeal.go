@@ -10,7 +10,7 @@ import (
 	"os"
 	"path"
 
-	lcli "github.com/filecoin-project/boost/cli"
+	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/policy"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -52,14 +52,14 @@ var dummydealCmd = &cli.Command{
 	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
-		boostApi, ncloser, err := lcli.GetBoostAPI(cctx)
+		boostApi, ncloser, err := bcli.GetBoostAPI(cctx)
 		if err != nil {
 			return fmt.Errorf("getting boost api: %w", err)
 		}
 		defer ncloser()
 
-		ctx := lcli.ReqContext(cctx)
-		fullNodeApi, fncloser, err := lcli.GetFullNodeAPI(cctx)
+		ctx := bcli.ReqContext(cctx)
+		fullNodeApi, fncloser, err := bcli.GetFullNodeAPI(cctx)
 		if err != nil {
 			return fmt.Errorf("getting full node api: %w", err)
 		}

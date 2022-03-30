@@ -7,13 +7,12 @@ import (
 	"golang.org/x/xerrors"
 
 	bcli "github.com/filecoin-project/boost/cli"
-	"github.com/filecoin-project/go-jsonrpc/auth"
-
 	boostcliutil "github.com/filecoin-project/boost/cli/util"
+
+	"github.com/filecoin-project/boost/node"
+	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/lotus/api"
-	lcli "github.com/filecoin-project/lotus/cli"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
-	"github.com/filecoin-project/lotus/node/repo"
 )
 
 var authCmd = &cli.Command{
@@ -42,7 +41,7 @@ var AuthCreateAdminToken = &cli.Command{
 		}
 		defer closer()
 
-		ctx := lcli.ReqContext(cctx)
+		ctx := bcli.ReqContext(cctx)
 
 		if !cctx.IsSet("perm") {
 			return xerrors.New("--perm flag not set")
@@ -90,7 +89,7 @@ var AuthApiInfoToken = &cli.Command{
 		}
 		defer closer()
 
-		ctx := lcli.ReqContext(cctx)
+		ctx := bcli.ReqContext(cctx)
 
 		if !cctx.IsSet("perm") {
 			return xerrors.New("--perm flag not set, use with one of: read, write, sign, admin")
@@ -114,24 +113,12 @@ var AuthApiInfoToken = &cli.Command{
 			return err
 		}
 
-		ti, ok := cctx.App.Metadata["repoType"]
-		if !ok {
-			log.Errorf("unknown repo type, are you sure you want to use GetCommonAPI?")
-			ti = repo.FullNode
-		}
-		t, ok := ti.(repo.RepoType)
-		if !ok {
-			log.Errorf("repoType type does not match the type of repo.RepoType")
-		}
-
-		ainfo, err := cliutil.GetAPIInfo(cctx, t)
+		ainfo, err := cliutil.GetAPIInfo(cctx, node.Boost)
 		if err != nil {
-			return xerrors.Errorf("could not get API info for %s: %w", t, err)
+			return xerrors.Errorf("could not get API info for %s: %w", node.Boost, err)
 		}
 
-		// TODO: Log in audit log when it is implemented
-
-		currentEnv, _, _ := boostcliutil.EnvsForAPIInfos(t)
+		currentEnv, _, _ := boostcliutil.EnvsForAPIInfos(node.Boost)
 		fmt.Printf("%s=%s:%s\n", currentEnv, string(token), ainfo.Addr)
 		return nil
 	},
