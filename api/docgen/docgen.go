@@ -36,6 +36,7 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	lapi "github.com/filecoin-project/lotus/api"
 	apitypes "github.com/filecoin-project/lotus/api/types"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -295,6 +296,7 @@ func init() {
 			NumFD:              5,
 		}})
 	addExample(dealcheckpoints.Transferred)
+	addExample(lapi.SubsystemMarkets)
 }
 
 func GetAPIType(name, pkg string) (i interface{}, t reflect.Type, permStruct []reflect.Type) {

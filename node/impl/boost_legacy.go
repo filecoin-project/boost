@@ -166,6 +166,10 @@ func (sm *BoostAPI) MarketSetAsk(ctx context.Context, price types.BigInt, verifi
 	return sm.LegacyStorageProvider.SetAsk(price, verifiedPrice, duration, options...)
 }
 
+func (sm *BoostAPI) MarketListIncompleteDeals(ctx context.Context) ([]storagemarket.MinerDeal, error) {
+	return sm.LegacyStorageProvider.ListLocalDeals()
+}
+
 func (sm *BoostAPI) MarketGetAsk(ctx context.Context) (*storagemarket.SignedStorageAsk, error) {
 	return sm.LegacyStorageProvider.GetAsk(), nil
 }
@@ -176,4 +180,8 @@ func (sm *BoostAPI) ActorSectorSize(ctx context.Context, addr address.Address) (
 		return 0, err
 	}
 	return mi.SectorSize, nil
+}
+
+func (sm *BoostAPI) RuntimeSubsystems(context.Context) (res lapi.MinerSubsystems, err error) {
+	return []lapi.MinerSubsystem{lapi.SubsystemMarkets}, nil
 }

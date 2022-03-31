@@ -42,6 +42,10 @@ type Boost interface {
 
 	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error) //perm:read
 
+	// RuntimeSubsystems returns the subsystems that are enabled
+	// in this instance.
+	RuntimeSubsystems(ctx context.Context) (lapi.MinerSubsystems, error) //perm:read
+
 	// MethodGroup: LegacyMarket
 	MarketListRetrievalDeals(ctx context.Context) ([]retrievalmarket.ProviderDealState, error)                                                                                           //perm:read
 	MarketSetRetrievalAsk(ctx context.Context, rask *retrievalmarket.Ask) error                                                                                                          //perm:admin
@@ -52,6 +56,7 @@ type Boost interface {
 	MarketDataTransferUpdates(ctx context.Context) (<-chan lapi.DataTransferChannel, error)                                                                                              //perm:write
 	MarketRestartDataTransfer(ctx context.Context, transferID datatransfer.TransferID, otherPeer peer.ID, isInitiator bool) error                                                        //perm:write
 	MarketImportDealData(ctx context.Context, propcid cid.Cid, path string) error                                                                                                        //perm:write
+	MarketListIncompleteDeals(ctx context.Context) ([]storagemarket.MinerDeal, error)                                                                                                    //perm:read
 
 	// MethodGroup: Actor
 	ActorSectorSize(context.Context, address.Address) (abi.SectorSize, error) //perm:read

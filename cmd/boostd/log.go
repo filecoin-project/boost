@@ -5,8 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	boostcli "github.com/filecoin-project/boost/cli"
-	lcli "github.com/filecoin-project/lotus/cli"
+	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/urfave/cli/v2"
 )
 
@@ -23,9 +22,9 @@ var logListCmd = &cli.Command{
 	Name:  "list",
 	Usage: "List all available log subsystems",
 	Action: func(cctx *cli.Context) error {
-		ctx := lcli.ReqContext(cctx)
+		ctx := bcli.ReqContext(cctx)
 
-		boostApi, ncloser, err := boostcli.GetBoostAPI(cctx)
+		boostApi, ncloser, err := bcli.GetBoostAPI(cctx)
 		if err != nil {
 			return fmt.Errorf("getting boost api: %w", err)
 		}
@@ -68,9 +67,9 @@ $ boost log set-level *=info provider=warn gql=debug`,
 			return fmt.Errorf("must specify level or subsystem=level, eg boost log set-level boost=debug")
 		}
 
-		ctx := lcli.ReqContext(cctx)
+		ctx := bcli.ReqContext(cctx)
 
-		boostApi, ncloser, err := boostcli.GetBoostAPI(cctx)
+		boostApi, ncloser, err := bcli.GetBoostAPI(cctx)
 		if err != nil {
 			return fmt.Errorf("getting boost api: %w", err)
 		}
