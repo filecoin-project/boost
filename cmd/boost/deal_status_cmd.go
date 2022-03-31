@@ -124,6 +124,14 @@ var dealStatusCmd = &cli.Command{
 
 		msg := "got deal status response"
 		msg += "\n"
+
+		if resp.Error != "" {
+			msg += fmt.Sprintf("  error: %s\n", resp.Error)
+			fmt.Println(msg)
+
+			return nil
+		}
+
 		msg += fmt.Sprintf("  deal uuid: %s\n", resp.DealUUID)
 		msg += fmt.Sprintf("  deal status: %s\n", statusMessage(resp))
 		msg += fmt.Sprintf("  deal label: %s\n", resp.DealStatus.Proposal.Label)
@@ -164,13 +172,7 @@ func statusMessage(resp *types.DealStatusResponse) string {
 	case dealcheckpoints.IndexedAndAnnounced.String():
 		return "Sealing"
 	case dealcheckpoints.Complete.String():
-		switch resp.Error {
-		case "":
-			return "Complete"
-		case "Cancelled":
-			return "Cancelled"
-		}
-		return "Error: " + resp.Error
+		return "Complete"
 	}
 	return resp.DealStatus.Status
 }
