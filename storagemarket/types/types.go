@@ -44,8 +44,10 @@ type DealStatusResponse struct {
 	DealUUID uuid.UUID
 	// Error is non-empty if there is an error getting the deal status
 	// (eg invalid request signature)
-	Error      string
-	DealStatus *DealStatus
+	Error          string
+	DealStatus     *DealStatus
+	Transfer       Transfer // Transfer params will be the zero value if this is an offline deal
+	NBytesReceived int64
 }
 
 type DealStatus struct {

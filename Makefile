@@ -129,6 +129,9 @@ cfgdoc-gen:
 print-%:
 	@echo $*=$($*)
 
+cbor-gen:
+	pushd ./storagemarket/types && rm -rf storagemarket/types/types_cbor_gen.go && $(GOCC) generate types.go && popd
+
 docsgen: docsgen-md docsgen-openrpc
 
 docsgen-md-bin: api-gen

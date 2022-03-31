@@ -6,21 +6,20 @@ import (
 	"fmt"
 	"strings"
 
+	bcli "github.com/filecoin-project/boost/cli"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/mitchellh/go-homedir"
-
 	types2 "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/api"
 	chain_types "github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/mitchellh/go-homedir"
 	"github.com/multiformats/go-multiaddr"
 	cli "github.com/urfave/cli/v2"
 
@@ -116,7 +115,7 @@ var offlineDealCmd = &cli.Command{
 }
 
 func dealCmdAction(cctx *cli.Context, isOnline bool) error {
-	ctx := lcli.ReqContext(cctx)
+	ctx := bcli.ReqContext(cctx)
 
 	sdir, err := homedir.Expand(cctx.String("repo"))
 	if err != nil {
@@ -341,7 +340,7 @@ func dealProposal(ctx context.Context, n *clinode.Node, rootCid cid.Cid, pieceSi
 		return nil, err
 	}
 
-	sig, err := n.Wallet.WalletSign(ctx, clientAddr, buf, api.MsgMeta{Type: api.MTDealProposal})
+	sig, err := n.Wallet.WalletSign(ctx, clientAddr, buf)
 	if err != nil {
 		return nil, fmt.Errorf("wallet sign failed: %w", err)
 	}
