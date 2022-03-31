@@ -77,4 +77,16 @@ func TestDealsDB(t *testing.T) {
 	storedDeal.CreatedAt = time.Time{}
 	req.Equal(deal, *storedDeal)
 	req.True(deal.IsOffline)
+
+	finished, err := GenerateDeals()
+	require.NoError(t, err)
+	for _, deal := range finished {
+		deal.Checkpoint = dealcheckpoints.Complete
+		err = db.Insert(ctx, &deal)
+		req.NoError(err)
+	}
+
+	fds, err := db.ListCompleted(ctx)
+	req.NoError(err)
+	req.Len(fds, len(finished))
 }

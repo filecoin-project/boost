@@ -382,33 +382,48 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 	}
 	log.Infow("db initialized")
 
+	// cleanup all completed deals in case Boost resumed before they were cleanedup
+	finished, err := p.dealsDB.ListCompleted(p.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list completed deals: %w", err)
+	}
+	for i := range finished {
+		p.cleanupDealOnRestart(finished[i])
+	}
+	log.Info("finished cleaning up completed deals")
+
 	// restart all active deals
 	pds, err := p.dealsDB.ListActive(p.ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list active deals: %w", err)
 	}
 
-	var dhs []*dealHandler
+	// cleanup all deals that have finished successfully
+	for i := range pds {
+		deal := pds[i]
+		// TODO Update this once we start listening for expired/slashed deals etc
+		if deal.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
+			// cleanup if cleanup didn't finish before we restarted
+			p.cleanupDealOnRestart(deal)
+		}
+	}
 
-	for _, ds := range pds {
-		d := ds
+	// resume all in-progress deals
+	var dhs []*dealHandler
+	for _, d := range pds {
+		d := d
+		if d.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
+			continue
+		}
 		dh := p.mkAndInsertDealHandler(d.DealUuid)
 		p.wg.Add(1)
 		dhs = append(dhs, dh)
+
 		go func() {
 			defer func() {
 				p.wg.Done()
 				log.Infow("finished running deal", "id", d.DealUuid)
 			}()
-
-			// Check if deal is already complete
-			// TODO Update this once we start listening for expired/slashed deals etc
-			if d.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
-				// cleanup if cleanup didn't finish before we restarted
-				p.cleanupDeal(d)
-				return
-			}
-
 			p.dealLogger.Infow(d.DealUuid, "resuming deal on boost restart", "checkpoint on resumption", d.Checkpoint.String())
 			p.doDeal(d, dh)
 		}()
@@ -420,6 +435,26 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 
 	log.Infow("storage provider: started")
 	return dhs, nil
+}
+
+func (p *Provider) cleanupDealOnRestart(deal *types.ProviderDealState) {
+	// remove the temp file created for inbound deal data if it is not an offline deal
+	if !deal.IsOffline {
+		_ = os.Remove(deal.InboundFilePath)
+	}
+
+	// untag storage space
+	errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
+	if errs == nil {
+		p.dealLogger.Infow(deal.DealUuid, "untagged storage space")
+	}
+
+	// untag funds
+	collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+	if errf == nil {
+		p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal as deal finished", "untagged publish", pub, "untagged collateral", collat,
+			"err", errf)
+	}
 }
 
 func (p *Provider) Stop() {
