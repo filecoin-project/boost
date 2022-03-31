@@ -325,6 +325,7 @@ Perms: admin
 Inputs:
 ```json
 [
+  "07070707-0707-0707-0707-070707070707",
   "string value"
 ]
 ```

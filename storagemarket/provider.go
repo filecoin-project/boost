@@ -204,40 +204,55 @@ func (p *Provider) GetAsk() *storagemarket.StorageAsk {
 	}
 }
 
+// MakeOfflineDealWithData is called when the Storage Provider imports data for
+// an offline deal (the deal must already have been proposed by the client)
 func (p *Provider) MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) (pi *api.ProviderDealRejectionInfo, handler *dealHandler, err error) {
-	p.dealLogger.Infow(dealUuid, "execute offline deal called", "filepath", filePath)
+	p.dealLogger.Infow(dealUuid, "import data for offline deal", "filepath", filePath)
 
 	// db should already have a deal with this uuid as the deal proposal should have been agreed before hand
 	ds, err := p.dealsDB.ByID(p.ctx, dealUuid)
 	if err != nil {
-		return nil, nil, fmt.Errorf("no pre-existing deal proposal for offline deal: %w", err)
+		if xerrors.Is(err, sql.ErrNoRows) {
+			return nil, nil, fmt.Errorf("no pre-existing deal proposal for offline deal %s: %w", dealUuid, err)
+		}
+		return nil, nil, fmt.Errorf("getting offline deal %s: %w", dealUuid, err)
 	}
 	if !ds.IsOffline {
-		return nil, nil, errors.New("deal for the given id is not an offline deal")
+		return nil, nil, fmt.Errorf("deal %s is not an offline deal", dealUuid)
 	}
+	if ds.Checkpoint > dealcheckpoints.Accepted {
+		return nil, nil, fmt.Errorf("deal %s has already been imported and reached checkpoint %s", dealUuid, ds.Checkpoint)
+	}
+
 	ds.InboundFilePath = filePath
 
-	// setup clean-up code
-	var dh *dealHandler
-	cleanup := func() {
-		if dh != nil {
-			dh.close()
-			p.delDealHandler(dealUuid)
-		}
+	// get the deal handler for the deal
+	dh := p.getDealHandler(dealUuid)
+	if dh == nil {
+		// deal handlers are created for each active deal on startup, so if
+		// there is no deal handler then the deal is not active
+		return nil, nil, fmt.Errorf("deal %s is no longer active (deal is at checkpoint %s)", dealUuid, ds.Checkpoint)
 	}
 
-	dh = p.mkAndInsertDealHandler(dealUuid)
+	// setup clean-up code
+	cleanup := func() {
+		dh.close()
+		p.delDealHandler(dealUuid)
+	}
+
 	resp, err := p.checkForDealAcceptance(ds, dh)
 	if err != nil {
 		cleanup()
 		p.dealLogger.LogError(dealUuid, "failed to send deal for acceptance", err)
 		return nil, nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
 	}
+
 	// if there was an error, we return no rejection reason as well.
 	if resp.err != nil {
 		cleanup()
 		return nil, nil, fmt.Errorf("failed to accept deal: %w", resp.err)
 	}
+
 	// return rejection reason as provider has rejected the deal.
 	if !resp.ri.Accepted {
 		cleanup()
@@ -249,8 +264,10 @@ func (p *Provider) MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) 
 	return resp.ri, dh, nil
 }
 
-func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *api.ProviderDealRejectionInfo, handler *dealHandler, err error) {
-	p.dealLogger.Infow(dp.DealUUID, "execute deal called")
+// ExecuteDeal is called when the Storage Provider receives a deal proposal
+// from the network
+func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (*api.ProviderDealRejectionInfo, *dealHandler, error) {
+	p.dealLogger.Infow(dp.DealUUID, "executing deal proposal received from network", "peer", clientPeer)
 
 	ds := types.ProviderDealState{
 		DealUuid:           dp.DealUUID,
@@ -271,65 +288,92 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (pi *ap
 		}
 	}
 
-	// if it is an offline deal  just persist it in the DB here and return
 	if dp.IsOffline {
-		ds.CreatedAt = time.Now()
-		ds.Checkpoint = dealcheckpoints.Accepted
-		if err := p.dealsDB.Insert(p.ctx, &ds); err != nil {
-			return nil, nil, fmt.Errorf("failed to insert deal in db: %w", err)
-		}
-		return &api.ProviderDealRejectionInfo{Accepted: true}, nil, nil
+		return p.processOfflineDealProposal(ds)
 	}
 
-	// setup clean-up code
-	var tmpFile filestore.File
-	var dh *dealHandler
-	cleanup := func() {
+	return p.executeOnlineDeal(ds)
+}
+
+// processOfflineDealProposal saves the deal to the database and then stops execution.
+// Execution resumes when MakeOfflineDealWithData is called.
+func (p *Provider) processOfflineDealProposal(ds smtypes.ProviderDealState) (*api.ProviderDealRejectionInfo, *dealHandler, error) {
+	// Save deal to DB
+	ds.CreatedAt = time.Now()
+	ds.Checkpoint = dealcheckpoints.Accepted
+	if err := p.dealsDB.Insert(p.ctx, &ds); err != nil {
+		return nil, nil, fmt.Errorf("failed to insert deal in db: %w", err)
+	}
+
+	// Set up pubsub for deal updates
+	dh := p.mkAndInsertDealHandler(ds.DealUuid)
+	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
+	if err != nil {
+		err = fmt.Errorf("failed to create event emitter: %w", err)
+		p.failDeal(pub, &ds, err)
+		p.cleanupDealLogged(&ds)
+		return nil, nil, err
+	}
+
+	// publish "new deal" event
+	p.fireEventDealNew(&ds)
+	// publish an event with the current state of the deal
+	p.fireEventDealUpdate(pub, &ds)
+
+	p.dealLogger.Infow(ds.DealUuid, "offline deal accepted, waiting for data import")
+
+	return &api.ProviderDealRejectionInfo{Accepted: true}, nil, nil
+}
+
+// executeOnlineDeal sets up a download location for the deal, then sends the
+// deal to the main provider loop for execution
+func (p *Provider) executeOnlineDeal(ds smtypes.ProviderDealState) (*api.ProviderDealRejectionInfo, *dealHandler, error) {
+	dh := p.mkAndInsertDealHandler(ds.DealUuid)
+	tmpFile, err := p.fs.CreateTemp()
+	ri, err := func() (*api.ProviderDealRejectionInfo, error) {
+		// create a temp file where we will hold the deal data.
+		if err != nil {
+			p.dealLogger.LogError(ds.DealUuid, "failed to create temp file for inbound data transfer", err)
+			return nil, fmt.Errorf("failed to create temp file: %w", err)
+		}
+		if err := tmpFile.Close(); err != nil {
+			p.dealLogger.LogError(ds.DealUuid, "failed to close temp file created for inbound data transfer", err)
+			return nil, fmt.Errorf("failed to close temp file: %w", err)
+		}
+
+		// send the deal to the main provider loop for execution
+		ds.InboundFilePath = string(tmpFile.OsPath())
+		resp, err := p.checkForDealAcceptance(&ds, dh)
+		if err != nil {
+			p.dealLogger.LogError(ds.DealUuid, "failed to send deal for acceptance", err)
+			return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
+		}
+
+		// if there was an error, we don't return a rejection reason, just the error.
+		if resp.err != nil {
+			return nil, fmt.Errorf("failed to accept deal: %w", resp.err)
+		}
+
+		// log rejection reason as provider has rejected the deal.
+		if !resp.ri.Accepted {
+			p.dealLogger.Infow(ds.DealUuid, "deal rejected by provider", "reason", resp.ri.Reason)
+		}
+
+		return resp.ri, nil
+	}()
+	if err != nil || ri == nil || !ri.Accepted {
+		// if there was an error processing the deal, or the deal was rejected,
+		// clean up the tmp file and deal handler
 		if tmpFile != nil {
 			_ = os.Remove(string(tmpFile.OsPath()))
 		}
-		if dh != nil {
-			dh.close()
-			p.delDealHandler(dp.DealUUID)
-		}
+		dh.close()
+		p.delDealHandler(ds.DealUuid)
+		return ri, nil, err
 	}
 
-	// create a temp file where we will hold the deal data.
-	tmpFile, err = p.fs.CreateTemp()
-	if err != nil {
-		cleanup()
-		p.dealLogger.LogError(dp.DealUUID, "failed to create temp file for inbound data transfer", err)
-		return nil, nil, fmt.Errorf("failed to create temp file: %w", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		cleanup()
-		p.dealLogger.LogError(dp.DealUUID, "failed to close temp file created for inbound data transfer", err)
-		return nil, nil, fmt.Errorf("failed to close temp file: %w", err)
-	}
-
-	ds.InboundFilePath = string(tmpFile.OsPath())
-	dh = p.mkAndInsertDealHandler(dp.DealUUID)
-	resp, err := p.checkForDealAcceptance(&ds, dh)
-	if err != nil {
-		cleanup()
-		p.dealLogger.LogError(dp.DealUUID, "failed to send deal for acceptance", err)
-		return nil, nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
-	}
-
-	// if there was an error, we return no rejection reason as well.
-	if resp.err != nil {
-		cleanup()
-		return nil, nil, fmt.Errorf("failed to accept deal: %w", resp.err)
-	}
-	// return rejection reason as provider has rejected the deal.
-	if !resp.ri.Accepted {
-		cleanup()
-		p.dealLogger.Infow(dp.DealUUID, "deal rejected by provider", "reason", resp.ri.Reason)
-		return resp.ri, nil, nil
-	}
-
-	p.dealLogger.Infow(dp.DealUUID, "deal accepted and scheduled for execution")
-	return resp.ri, dh, nil
+	p.dealLogger.Infow(ds.DealUuid, "deal accepted and scheduled for execution")
+	return ri, dh, nil
 }
 
 func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealHandler) (acceptDealResp, error) {
@@ -353,6 +397,7 @@ func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealH
 }
 
 func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) *dealHandler {
+	// Create a deal handler
 	bus := eventbus.NewBus()
 
 	transferCtx, cancel := context.WithCancel(p.ctx)
@@ -424,6 +469,14 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 				p.wg.Done()
 				log.Infow("finished running deal", "id", d.DealUuid)
 			}()
+
+			// If it's an offline deal, and the deal data hasn't yet been
+			// imported, just wait for the SP operator to import the data
+			if d.IsOffline && d.InboundFilePath == "" {
+				p.dealLogger.Infow(d.DealUuid, "restarted deal: waiting for offline deal data import")
+				return
+			}
+
 			p.dealLogger.Infow(d.DealUuid, "resuming deal on boost restart", "checkpoint on resumption", d.Checkpoint.String())
 			p.doDeal(d, dh)
 		}()
