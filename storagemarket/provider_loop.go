@@ -130,7 +130,6 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 }
 
 func (p *Provider) processOfflineDealRequest(deal *types.ProviderDealState) (bool, string, error) {
-	// tag funds and start executing deal
 	cleanup := func() {
 		collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
@@ -218,7 +217,7 @@ func (p *Provider) loop() {
 			collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 			if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag funds", errf)
-			} else {
+			} else if errf == nil {
 				p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal as deal finished", "untagged publish", pub, "untagged collateral", collat,
 					"err", errf)
 			}
@@ -226,6 +225,8 @@ func (p *Provider) loop() {
 			errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
 			if errs != nil && !xerrors.Is(errs, db.ErrNotFound) {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag storage", errs)
+			} else if errs == nil {
+				p.dealLogger.Infow(deal.DealUuid, "untagged storage space for deal")
 			}
 			finishedDeal.done <- struct{}{}
 

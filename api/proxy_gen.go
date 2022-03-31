@@ -47,7 +47,7 @@ type BoostStruct struct {
 
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
 
-		BoostOfflineDealWithData func(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
+		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
 		DealsConsiderOfflineRetrievalDeals func(p0 context.Context) (bool, error) `perm:"admin"`
 
@@ -275,14 +275,14 @@ func (s *BoostStub) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 	return ErrNotSupported
 }
 
-func (s *BoostStruct) BoostOfflineDealWithData(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) {
+func (s *BoostStruct) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) {
 	if s.Internal.BoostOfflineDealWithData == nil {
 		return nil, ErrNotSupported
 	}
-	return s.Internal.BoostOfflineDealWithData(p0, p1)
+	return s.Internal.BoostOfflineDealWithData(p0, p1, p2)
 }
 
-func (s *BoostStub) BoostOfflineDealWithData(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) {
+func (s *BoostStub) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) {
 	return nil, ErrNotSupported
 }
 

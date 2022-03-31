@@ -61,19 +61,28 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 		return
 	}
 
-	// build in-memory state
-	// if the deal has already been handed to the sealer, the inbound file could already have been removed and in that case,
-	// the number of bytes recieved should be the same as deal size as we've already verified the transfer.
+	// If the deal has not yet been handed off to the sealer
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
+		transferType := "downloaded file"
+		if deal.IsOffline {
+			transferType = "imported offline deal file"
+		}
+
+		// Read the bytes received from the downloaded / imported file
 		fi, err := os.Stat(deal.InboundFilePath)
 		if err != nil {
-			err := fmt.Errorf("failed to stat output file: %w", err)
+			err := fmt.Errorf("failed to get size of %s '%s': %w", transferType, deal.InboundFilePath, err)
 			p.failDeal(pub, deal, err)
 			p.cleanupDealLogged(deal)
 			return
 		}
 		deal.NBytesReceived = fi.Size()
+		p.dealLogger.Infow(deal.DealUuid, "size of "+transferType, "filepath", deal.InboundFilePath, "size", fi.Size())
 	} else {
+		// if the deal has already been handed to the sealer, the inbound file
+		// could already have been removed and in that case, the number of
+		// bytes received should be the same as deal size as we've already
+		// verified the transfer.
 		deal.NBytesReceived = int64(deal.Transfer.Size)
 	}
 
@@ -148,6 +157,13 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 			return &dealMakingError{err: fmt.Errorf("error when matching commP for imported data for offline deal: %w", err)}
 		}
 		p.dealLogger.Infow(deal.DealUuid, "commp matched successfully for imported data for offline deal")
+
+		// update checkpoint
+		if err := p.updateCheckpoint(pub, deal, dealcheckpoints.Transferred); err != nil {
+			return &dealMakingError{
+				err: fmt.Errorf("failed to update checkpoint: %w", err),
+			}
+		}
 	}
 
 	// Publish
@@ -307,6 +323,7 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 }
 
 func (p *Provider) verifyCommP(deal *types.ProviderDealState) error {
+	p.dealLogger.Infow(deal.DealUuid, "checking commP")
 	pieceCid, err := GeneratePieceCommitment(deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize)
 	if err != nil {
 		return fmt.Errorf("failed to generate CommP: %w", err)
