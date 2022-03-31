@@ -457,18 +457,12 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 	var dhs []*dealHandler
 	for _, d := range pds {
 		d := d
-		if d.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
-			continue
-		}
 		dh := p.mkAndInsertDealHandler(d.DealUuid)
 		p.wg.Add(1)
 		dhs = append(dhs, dh)
 
 		go func() {
-			defer func() {
-				p.wg.Done()
-				log.Infow("finished running deal", "id", d.DealUuid)
-			}()
+			defer p.wg.Done()
 
 			// If it's an offline deal, and the deal data hasn't yet been
 			// imported, just wait for the SP operator to import the data
@@ -477,8 +471,17 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 				return
 			}
 
+			// Check if deal is already proving
+			if d.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
+				si, err := p.sps.SectorsStatus(p.ctx, d.SectorID, false)
+				if err != nil || isFinalSealingState(si.State) {
+					return
+				}
+			}
+
 			p.dealLogger.Infow(d.DealUuid, "resuming deal on boost restart", "checkpoint on resumption", d.Checkpoint.String())
 			p.doDeal(d, dh)
+			log.Infow("finished running deal", "id", d.DealUuid)
 		}()
 	}
 
@@ -536,7 +539,7 @@ func (p *Provider) SubscribeNewDeals() (event.Subscription, error) {
 	return p.newDealPS.subscribe()
 }
 
-// SubscribeNewDeals subscribes to updates to a deal
+// SubscribeDealUpdates subscribes to updates to a deal
 func (p *Provider) SubscribeDealUpdates(dealUuid uuid.UUID) (event.Subscription, error) {
 	dh := p.getDealHandler(dealUuid)
 	if dh == nil {
