@@ -397,19 +397,7 @@ func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealH
 }
 
 func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) *dealHandler {
-	// Create a deal handler
-	bus := eventbus.NewBus()
-
-	transferCtx, cancel := context.WithCancel(p.ctx)
-	dh := &dealHandler{
-		providerCtx: p.ctx,
-		dealUuid:    dealUuid,
-		bus:         bus,
-
-		transferCtx:    transferCtx,
-		transferCancel: cancel,
-		transferDone:   make(chan error, 1),
-	}
+	dh := newDealHandler(p.ctx, dealUuid)
 
 	p.dhsMu.Lock()
 	defer p.dhsMu.Unlock()

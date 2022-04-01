@@ -31,14 +31,74 @@ type dealHandler struct {
 	transferMu       sync.Mutex
 	transferFinished bool
 	transferErr      error
+
+	updateSubsLk sync.RWMutex
+	updateSubs   map[*updatesSubscription]struct{}
 }
 
+func newDealHandler(ctx context.Context, dealUuid uuid.UUID) *dealHandler {
+	// Create a deal handler
+	bus := eventbus.NewBus()
+
+	transferCtx, cancel := context.WithCancel(ctx)
+	return &dealHandler{
+		providerCtx: ctx,
+		dealUuid:    dealUuid,
+		bus:         bus,
+
+		transferCtx:    transferCtx,
+		transferCancel: cancel,
+		transferDone:   make(chan error, 1),
+
+		updateSubs: make(map[*updatesSubscription]struct{}),
+	}
+}
+
+// updatesSubscription wraps event.Subscription so that we can add an onClose
+// callback
+type updatesSubscription struct {
+	event.Subscription
+	onClose func(*updatesSubscription)
+}
+
+func (s *updatesSubscription) Close() error {
+	s.onClose(s)
+	return s.Subscription.Close()
+}
+
+// subscribeUpdates subscribes to deal status updates
 func (d *dealHandler) subscribeUpdates() (event.Subscription, error) {
 	sub, err := d.bus.Subscribe(new(types.ProviderDealState), eventbus.BufSize(256))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create deal update subscriber to %s: %w", d.dealUuid, err)
 	}
-	return sub, nil
+
+	// create an updatesSubscription that will delete itself from the map of
+	// all update subscriptions when it is closed
+	updatesSub := &updatesSubscription{
+		Subscription: sub,
+		onClose: func(s *updatesSubscription) {
+			d.updateSubsLk.Lock()
+			defer d.updateSubsLk.Unlock()
+			delete(d.updateSubs, s)
+		},
+	}
+
+	// Add the updatesSubscription to the map of all update subscriptions
+	d.updateSubsLk.Lock()
+	defer d.updateSubsLk.Unlock()
+	d.updateSubs[updatesSub] = struct{}{}
+
+	return updatesSub, nil
+}
+
+// hasUpdateSubscribers indicates if anyone is subscribed to updates.
+// This is useful if we want to check if anyone is listening before doing an
+// expensive operation to publish an event.
+func (d *dealHandler) hasUpdateSubscribers() bool {
+	d.updateSubsLk.RLock()
+	defer d.updateSubsLk.RUnlock()
+	return len(d.updateSubs) > 0
 }
 
 // TransferCancelledByUser returns true if the user explicitly cancelled the transfer by calling `dealhandler.cancelTransfer()`
