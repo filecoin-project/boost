@@ -54,7 +54,7 @@ func (p *Provider) logFunds(id uuid.UUID, trsp *fundmanager.TagFundsResp) {
 
 func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, string, error) {
 	// get current sealing pipeline status
-	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
+	status, err := sealingpipeline.GetStatus(p.ctx, p.sps)
 	if err != nil {
 		return false, "server error", fmt.Errorf("failed to fetch sealing pipleine status: %w", err)
 	}

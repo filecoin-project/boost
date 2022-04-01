@@ -10,7 +10,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-fil-markets/shared"
-	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/lib/sigs"
 	"github.com/google/uuid"
@@ -45,7 +45,7 @@ func RetryParameters(minDuration time.Duration, maxDuration time.Duration, attem
 type DealClient struct {
 	addr        address.Address
 	retryStream *shared.RetryStream
-	fullNode    v1api.FullNode
+	fullNode    v0api.FullNode
 }
 
 // SendDealProposal sends a deal proposal over a libp2p stream to the peer
@@ -130,7 +130,7 @@ func (c *DealClient) SendDealStatusRequest(ctx context.Context, id peer.ID, deal
 	return &resp, nil
 }
 
-func NewDealClient(h host.Host, addr address.Address, fullNodeApi v1api.FullNode, options ...DealClientOption) *DealClient {
+func NewDealClient(h host.Host, addr address.Address, fullNodeApi v0api.FullNode, options ...DealClientOption) *DealClient {
 	c := &DealClient{
 		addr:        addr,
 		retryStream: shared.NewRetryStream(h),
@@ -147,10 +147,10 @@ type DealProvider struct {
 	ctx      context.Context
 	host     host.Host
 	prov     *storagemarket.Provider
-	fullNode v1api.FullNode
+	fullNode v0api.FullNode
 }
 
-func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode) *DealProvider {
+func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v0api.FullNode) *DealProvider {
 	p := &DealProvider{
 		host:     h,
 		prov:     prov,

@@ -4,31 +4,29 @@ import (
 	"bytes"
 	"context"
 
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/go-state-types/exitcode"
+	"github.com/filecoin-project/lotus/api/v0api"
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
-
-	"github.com/filecoin-project/go-fil-markets/storagemarket"
-	"github.com/filecoin-project/go-state-types/exitcode"
-	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/build"
 	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
 )
 
 type ChainDealManager struct {
-	fullnodeApi v1api.FullNode
+	fullnodeApi v0api.FullNode
 }
 
-func NewChainDealManager(a v1api.FullNode) *ChainDealManager {
+func NewChainDealManager(a v0api.FullNode) *ChainDealManager {
 	return &ChainDealManager{a}
 }
 
 func (c *ChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
 	// Wait for deal to be published (plus additional time for confidence)
-	receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, 2*build.MessageConfidence, api.LookbackNoLimit, true)
+	receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, 2*build.MessageConfidence)
 	if err != nil {
 		return nil, xerrors.Errorf("WaitForPublishDeals errored: %w", err)
 	}
@@ -83,7 +81,7 @@ func (c *ChainDealManager) dealIDFromPublishDealsMsg(ctx context.Context, tok ct
 	dealID := abi.DealID(0)
 
 	// Get the return value of the publish deals message
-	wmsg, err := c.fullnodeApi.StateSearchMsg(ctx, ctypes.EmptyTSK, publishCid, api.LookbackNoLimit, true)
+	wmsg, err := c.fullnodeApi.StateSearchMsg(ctx, publishCid)
 	if err != nil {
 		return dealID, ctypes.EmptyTSK, xerrors.Errorf("getting publish deals message return value: %w", err)
 	}

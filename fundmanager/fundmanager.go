@@ -11,7 +11,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
@@ -46,8 +46,8 @@ type FundManager struct {
 	cfg Config
 }
 
-func New(cfg Config) func(api v1api.FullNode, sqldb *sql.DB) *FundManager {
-	return func(api api.FullNode, sqldb *sql.DB) *FundManager {
+func New(cfg Config) func(api v0api.FullNode, sqldb *sql.DB) *FundManager {
+	return func(api v0api.FullNode, sqldb *sql.DB) *FundManager {
 		return &FundManager{
 			api: api,
 			db:  db.NewFundsDB(sqldb),

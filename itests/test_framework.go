@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/lotus/api/v0api"
+
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 
@@ -32,7 +34,6 @@ import (
 	"github.com/filecoin-project/go-state-types/exitcode"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
-	"github.com/filecoin-project/lotus/api/v1api"
 	lbuild "github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
 
@@ -63,7 +64,7 @@ type testFramework struct {
 
 	client        *boostclient.StorageClient
 	boost         api.Boost
-	fullNode      lapi.FullNode
+	fullNode      v0api.FullNode
 	clientAddr    address.Address
 	minerAddr     address.Address
 	defaultWallet address.Address
@@ -87,7 +88,7 @@ func (f *testFramework) start() error {
 
 	apiinfo := cliutil.ParseApiInfo(fullnodeApiString)
 
-	fullnodeApi, closerFullnode, err := client.NewFullNodeRPCV1(f.ctx, addr, apiinfo.AuthHeader())
+	fullnodeApi, closerFullnode, err := client.NewFullNodeRPCV0(f.ctx, addr, apiinfo.AuthHeader())
 	if err != nil {
 		return err
 	}
@@ -246,7 +247,7 @@ func (f *testFramework) start() error {
 		node.Override(new(dtypes.ShutdownChan), shutdownChan),
 		node.Base(),
 		node.Repo(r),
-		node.Override(new(v1api.FullNode), fullnodeApi),
+		node.Override(new(v0api.FullNode), fullnodeApi),
 
 		node.Override(new(*storage.AddressSelector), modules.AddressSelector(&lotus_config.MinerAddressConfig{
 			DealPublishControl: []string{
@@ -325,7 +326,7 @@ func (f *testFramework) start() error {
 	}
 
 	log.Debugw("wait for state msg")
-	mw, err := fullnodeApi.StateWaitMsg(f.ctx, signed.Cid(), 2, api.LookbackNoLimit, true)
+	mw, err := fullnodeApi.StateWaitMsg(f.ctx, signed.Cid(), 2)
 	if err != nil {
 		return err
 	}
@@ -518,7 +519,7 @@ func (f *testFramework) DefaultMarketsV1DealParams() lapi.StartDealParams {
 	}
 }
 
-func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Address, amount abi.TokenAmount) error {
+func sendFunds(ctx context.Context, sender v0api.FullNode, recipient address.Address, amount abi.TokenAmount) error {
 	senderAddr, err := sender.WalletDefaultAddress(ctx)
 	if err != nil {
 		return err
@@ -535,7 +536,7 @@ func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Addr
 		return err
 	}
 
-	_, err = sender.StateWaitMsg(ctx, sm.Cid(), 1, 1e10, true)
+	_, err = sender.StateWaitMsg(ctx, sm.Cid(), 1)
 	return err
 }
 
@@ -574,7 +575,7 @@ func (f *testFramework) setControlAddress(psdAddr address.Address) error {
 }
 
 func (f *testFramework) WaitMsg(mcid cid.Cid) error {
-	_, err := f.fullNode.StateWaitMsg(f.ctx, mcid, 1, 1e10, true)
+	_, err := f.fullNode.StateWaitMsg(f.ctx, mcid, 1)
 	return err
 }
 

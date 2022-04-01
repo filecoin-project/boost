@@ -9,7 +9,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -24,7 +24,7 @@ type StorageClient struct {
 	dealClient *lp2pimpl.DealClient
 }
 
-func NewStorageClient(addr address.Address, fullNodeApi v1api.FullNode) (*StorageClient, error) {
+func NewStorageClient(addr address.Address, fullNodeApi v0api.FullNode) (*StorageClient, error) {
 	pstore, err := pstoremem.NewPeerstore()
 	if err != nil {
 		return nil, fmt.Errorf("creating peer store: %w", err)

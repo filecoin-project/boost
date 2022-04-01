@@ -9,7 +9,6 @@ import (
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
-	"github.com/filecoin-project/lotus/api/v1api"
 	lcli "github.com/filecoin-project/lotus/cli"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 
@@ -93,7 +92,7 @@ var runCmd = &cli.Command{
 			node.Override(new(dtypes.ShutdownChan), shutdownChan),
 			node.Base(),
 			node.Repo(r),
-			node.Override(new(v1api.FullNode), fullnodeApi),
+			node.Override(new(v0api.FullNode), fullnodeApi),
 		)
 		if err != nil {
 			return xerrors.Errorf("creating node: %w", err)

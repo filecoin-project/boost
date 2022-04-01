@@ -6,7 +6,7 @@ import (
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/graph-gophers/graphql-go"
 )
@@ -132,7 +132,7 @@ type sealingPipelineState struct {
 	Workers      []*worker
 }
 
-func getSectorSize(ctx context.Context, fullNode v1api.FullNode, maddr address.Address) (uint64, error) {
+func getSectorSize(ctx context.Context, fullNode v0api.FullNode, maddr address.Address) (uint64, error) {
 	mi, err := fullNode.StateMinerInfo(ctx, maddr, types.EmptyTSK)
 	if err != nil {
 		return 0, err

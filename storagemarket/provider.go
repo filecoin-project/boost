@@ -33,7 +33,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	"github.com/filecoin-project/lotus/lib/sigs"
@@ -108,7 +108,7 @@ type Provider struct {
 	maxDealCollateralMultiplier uint64
 	chainDealManager            types.ChainDealManager
 
-	fullnodeApi v1api.FullNode
+	fullnodeApi v0api.FullNode
 
 	dhsMu sync.RWMutex
 	dhs   map[uuid.UUID]*dealHandler
@@ -121,7 +121,7 @@ type Provider struct {
 	ip types.IndexProvider
 }
 
-func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
+func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v0api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, httpOpts ...httptransport.Option) (*Provider, error) {
 	fspath := path.Join(repoRoot, storagemanager.StagingAreaDirName)
