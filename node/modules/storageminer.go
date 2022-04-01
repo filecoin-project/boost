@@ -499,14 +499,14 @@ func HandleIndexProvider(lc fx.Lifecycle, prov *indexprovider.Wrapper) {
 func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode,
 	sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
 	dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
-	dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper) (*storagemarket.Provider, error) {
+	dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, legacyProv lotus_storagemarket.StorageProvider) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
-		dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper) (*storagemarket.Provider, error) {
+		dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, legacyProv lotus_storagemarket.StorageProvider) (*storagemarket.Provider, error) {
 
 		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
-			sps, storagemarket.NewChainDealManager(a), df, logsSqlDB.db, logsDB, dagst, ps, ip)
+			sps, storagemarket.NewChainDealManager(a), df, logsSqlDB.db, logsDB, dagst, ps, ip, legacyProv)
 		if err != nil {
 			return nil, err
 		}
