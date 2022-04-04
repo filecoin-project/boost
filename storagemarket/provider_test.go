@@ -91,6 +91,10 @@ func TestSimpleDealHappy(t *testing.T) {
 	td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
 	harness.EventuallyAssertNoTagged(t, ctx)
 
+	// expect Proving event to be fired
+	err := td.waitForSealingState(api.SectorState(sealing.Proving))
+	require.NoError(t, err)
+
 	// assert logs
 	lgs, err := harness.Provider.logsDB.Logs(ctx, td.params.DealUUID)
 	require.NoError(t, err)
@@ -1086,6 +1090,28 @@ LOOP:
 	}
 
 	return nil
+}
+
+func (td *testDeal) waitForSealingState(secState api.SectorState) error {
+	if td.sub == nil {
+		return errors.New("no subcription for deal")
+	}
+
+	for i := range td.sub.Out() {
+		st := i.(types.ProviderDealState)
+		if len(st.Err) != 0 {
+			return errors.New(st.Err)
+		}
+		si, err := td.ph.MockSealingPipelineAPI.SectorsStatus(context.Background(), st.SectorID, false)
+		if err != nil {
+			return err
+		}
+		if si.State == secState {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("did not reach sealing state %s", secState)
 }
 
 func (td *testDeal) updateWithRestartedProvider(ph *ProviderHarness) *testDealBuilder {
