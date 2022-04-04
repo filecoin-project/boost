@@ -32,8 +32,8 @@ type dealHandler struct {
 	transferFinished bool
 	transferErr      error
 
-	updateSubsLk sync.RWMutex
-	updateSubs   map[*updatesSubscription]struct{}
+	activeSubsLk sync.RWMutex
+	activeSubs   map[*updatesSubscription]struct{}
 }
 
 func newDealHandler(ctx context.Context, dealUuid uuid.UUID) *dealHandler {
@@ -50,7 +50,7 @@ func newDealHandler(ctx context.Context, dealUuid uuid.UUID) *dealHandler {
 		transferCancel: cancel,
 		transferDone:   make(chan error, 1),
 
-		updateSubs: make(map[*updatesSubscription]struct{}),
+		activeSubs: make(map[*updatesSubscription]struct{}),
 	}
 }
 
@@ -78,27 +78,27 @@ func (d *dealHandler) subscribeUpdates() (event.Subscription, error) {
 	updatesSub := &updatesSubscription{
 		Subscription: sub,
 		onClose: func(s *updatesSubscription) {
-			d.updateSubsLk.Lock()
-			defer d.updateSubsLk.Unlock()
-			delete(d.updateSubs, s)
+			d.activeSubsLk.Lock()
+			defer d.activeSubsLk.Unlock()
+			delete(d.activeSubs, s)
 		},
 	}
 
 	// Add the updatesSubscription to the map of all update subscriptions
-	d.updateSubsLk.Lock()
-	defer d.updateSubsLk.Unlock()
-	d.updateSubs[updatesSub] = struct{}{}
+	d.activeSubsLk.Lock()
+	defer d.activeSubsLk.Unlock()
+	d.activeSubs[updatesSub] = struct{}{}
 
 	return updatesSub, nil
 }
 
-// hasUpdateSubscribers indicates if anyone is subscribed to updates.
+// hasActiveSubscribers indicates if anyone is subscribed to updates.
 // This is useful if we want to check if anyone is listening before doing an
 // expensive operation to publish an event.
-func (d *dealHandler) hasUpdateSubscribers() bool {
-	d.updateSubsLk.RLock()
-	defer d.updateSubsLk.RUnlock()
-	return len(d.updateSubs) > 0
+func (d *dealHandler) hasActiveSubscribers() bool {
+	d.activeSubsLk.RLock()
+	defer d.activeSubsLk.RUnlock()
+	return len(d.activeSubs) > 0
 }
 
 // TransferCancelledByUser returns true if the user explicitly cancelled the transfer by calling `dealhandler.cancelTransfer()`

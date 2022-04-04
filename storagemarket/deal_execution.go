@@ -603,7 +603,7 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, pub event.Emitter, d
 	checkStatus := func(force bool) lapi.SectorState {
 		// To avoid overloading the sealing service, only get the sector status
 		// if there's at least one subscriber to the event that will be published
-		if !force && !dh.hasUpdateSubscribers() {
+		if !force && !dh.hasActiveSubscribers() {
 			return ""
 		}
 
