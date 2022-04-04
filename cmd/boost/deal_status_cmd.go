@@ -107,7 +107,7 @@ var dealStatusCmd = &cli.Command{
 		}
 
 		dc := lp2pimpl.NewDealClient(n.Host, walletAddr, node.DealProposalSigner{LocalWallet: n.Wallet})
-		resp, err := dc.SendDealStatusRequest(ctx, *minfo.PeerId, dealUUID)
+		resp, err := dc.SendDealStatusRequest(ctx, addrInfo.ID, dealUUID)
 		if err != nil {
 			return fmt.Errorf("send deal status request failed: %w", err)
 		}

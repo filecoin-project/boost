@@ -170,7 +170,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		Addrs: maddrs,
 	}
 
-	log.Debugw("found storage provider", "id", *minfo.PeerId, "multiaddr", maddrs, "addr", maddr)
+	log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddr", maddrs, "addr", maddr)
 
 	if err := n.Host.Connect(ctx, *addrInfo); err != nil {
 		return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
