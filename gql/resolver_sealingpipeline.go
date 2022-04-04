@@ -75,25 +75,18 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		}
 	}
 
-	log.Debugw("sealing pipeline", "waitdeals", summary["WaitDeals"], "taken", taken, "deals", deals, "pc1", summary["PreCommit1"], "pc2", summary["PreCommit2"], "precommitwait", summary["PreCommitWait"], "waitseed", summary["WaitSeed"], "committing", summary["Committing"], "commitwait", summary["CommitWait"], "proving", summary["Proving"])
+	sectorStates := map[string]int{}
+	for k, v := range summary {
+		sectorStates[string(k)] = v
+	}
 
 	return &sealingPipelineState{
 		WaitDeals: waitDeals{
 			SectorSize: gqltypes.Uint64(ssize),
 			Deals:      deals,
 		},
-		SectorStates: sectorStates{
-			AddPiece:       int32(summary["AddPiece"]),
-			Packing:        int32(summary["Packing"]),
-			PreCommit1:     int32(summary["PreCommit1"]),
-			PreCommit2:     int32(summary["PreCommit2"]),
-			PreCommitWait:  int32(summary["PreCommitWait"]),
-			WaitSeed:       int32(summary["WaitSeed"]),
-			Committing:     int32(summary["Committing"]),
-			CommittingWait: int32(summary["CommitWait"]),
-			FinalizeSector: int32(summary["FinalizeSector"]),
-		},
-		Workers: workers,
+		SectorStates: sectorStates,
+		Workers:      workers,
 	}, nil
 }
 
@@ -110,6 +103,7 @@ type waitDeals struct {
 type sectorStates struct {
 	AddPiece       int32
 	Packing        int32
+	UpdateReplica  int32
 	PreCommit1     int32
 	PreCommit2     int32
 	WaitSeed       int32
@@ -128,7 +122,7 @@ type worker struct {
 
 type sealingPipelineState struct {
 	WaitDeals    waitDeals
-	SectorStates sectorStates
+	SectorStates map[string]int
 	Workers      []*worker
 }
 

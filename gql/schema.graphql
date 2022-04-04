@@ -164,6 +164,7 @@ type WaitDeals {
 type SectorStates {
   AddPiece: Int!
   Packing: Int!
+  UpdateReplica: Int!
   PreCommit1: Int!
   PreCommit2: Int!
   PreCommitWait: Int!
