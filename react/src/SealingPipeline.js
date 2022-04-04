@@ -93,6 +93,9 @@ const sectorStates = function(props) {
         Name: 'Packing',
         Count: props.Packing,
     }, {
+        Name: 'Update Replica',
+        Count: props.UpdateReplica,
+    }, {
         Name: 'Pre-commit 1',
         Count: props.PreCommit1,
     }, {
@@ -212,6 +215,7 @@ const mockData = {
         SectorStates: {
             AddPiece: 1,
             Packing: 1,
+            UpdateReplica: 0,
             PreCommit1: 0,
             PreCommit2: 2,
             PreCommitWait: 0,
