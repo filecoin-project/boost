@@ -140,7 +140,7 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 }
 
 func (p *Provider) validateAsk(deal types.ProviderDealState) error {
-	ask := p.GetAsk()
+	ask := p.GetAsk().Ask
 	askPrice := ask.Price
 	if deal.ClientDealProposal.Proposal.VerifiedDeal {
 		askPrice = ask.VerifiedPrice

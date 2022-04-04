@@ -29,6 +29,7 @@ import (
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
+	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/crypto"
@@ -118,12 +119,13 @@ type Provider struct {
 	dagst stores.DAGStoreWrapper
 	ps    piecestore.PieceStore
 
-	ip types.IndexProvider
+	ip         types.IndexProvider
+	legacyProv lotus_storagemarket.StorageProvider
 }
 
 func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
-	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, httpOpts ...httptransport.Option) (*Provider, error) {
+	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, legacyProv lotus_storagemarket.StorageProvider, httpOpts ...httptransport.Option) (*Provider, error) {
 	fspath := path.Join(repoRoot, storagemanager.StagingAreaDirName)
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -178,7 +180,8 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		dagst: dagst,
 		ps:    ps,
 
-		ip: ip,
+		ip:         ip,
+		legacyProv: legacyProv,
 	}, nil
 }
 
@@ -194,14 +197,8 @@ func (p *Provider) NBytesReceived(dealUuid uuid.UUID) uint64 {
 	return p.transfers.getBytes(dealUuid)
 }
 
-func (p *Provider) GetAsk() *storagemarket.StorageAsk {
-	return &storagemarket.StorageAsk{
-		Price:         abi.NewTokenAmount(0),
-		VerifiedPrice: abi.NewTokenAmount(0),
-		MinPieceSize:  0,
-		MaxPieceSize:  64 * 1024 * 1024 * 1024,
-		Miner:         p.Address,
-	}
+func (p *Provider) GetAsk() *storagemarket.SignedStorageAsk {
+	return p.legacyProv.GetAsk()
 }
 
 // MakeOfflineDealWithData is called when the Storage Provider imports data for
