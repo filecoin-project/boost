@@ -77,6 +77,8 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 
 	log.Debugw("sealing pipeline", "waitdeals", summary["WaitDeals"], "taken", taken, "deals", deals, "pc1", summary["PreCommit1"], "pc2", summary["PreCommit2"], "precommitwait", summary["PreCommitWait"], "waitseed", summary["WaitSeed"], "committing", summary["Committing"], "commitwait", summary["CommitWait"], "proving", summary["Proving"])
 
+	//SnapDealsWaitDeals
+
 	return &sealingPipelineState{
 		WaitDeals: waitDeals{
 			SectorSize: gqltypes.Uint64(ssize),
@@ -85,6 +87,7 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		SectorStates: sectorStates{
 			AddPiece:       int32(summary["AddPiece"]),
 			Packing:        int32(summary["Packing"]),
+			UpdateReplica:  int32(summary["UpdateReplica"]),
 			PreCommit1:     int32(summary["PreCommit1"]),
 			PreCommit2:     int32(summary["PreCommit2"]),
 			PreCommitWait:  int32(summary["PreCommitWait"]),
@@ -110,6 +113,7 @@ type waitDeals struct {
 type sectorStates struct {
 	AddPiece       int32
 	Packing        int32
+	UpdateReplica  int32
 	PreCommit1     int32
 	PreCommit2     int32
 	WaitSeed       int32
