@@ -46,6 +46,7 @@ type DealStatusResponse struct {
 	// (eg invalid request signature)
 	Error          string
 	DealStatus     *DealStatus
+	IsOffline      bool
 	TransferSize   uint64
 	NBytesReceived uint64
 }

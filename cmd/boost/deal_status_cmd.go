@@ -115,11 +115,9 @@ var dealStatusCmd = &cli.Command{
 func statusMessage(resp *types.DealStatusResponse) string {
 	switch resp.DealStatus.Status {
 	case dealcheckpoints.Accepted.String():
-		//TODO: handle offline deals
-
-		//if dr.IsOffline {
-		//return "Awaiting Offline Data Import"
-		//}
+		if resp.IsOffline {
+			return "Awaiting Offline Data Import"
+		}
 		switch resp.NBytesReceived {
 		case 0:
 			return "Transfer Queued"
