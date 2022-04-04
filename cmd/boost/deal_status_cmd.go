@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/cli/node"
@@ -115,9 +114,8 @@ var dealStatusCmd = &cli.Command{
 
 		log.Debugw("storage provider on-chain address", "addr", minerAddr)
 
-		retryOpts := lp2pimpl.RetryParameters(time.Second, 1*time.Minute, 5, 5)
-		w := node.FullnodeWalletIface{n.Wallet}
-		dc := lp2pimpl.NewDealClient(n.Host, walletAddr, w, retryOpts)
+		w := node.DealProposalSigner{n.Wallet}
+		dc := lp2pimpl.NewDealClient(n.Host, walletAddr, w)
 
 		resp, err := dc.SendDealStatusRequest(ctx, *minfo.PeerId, dealUUID)
 		if err != nil {
