@@ -130,7 +130,7 @@ func (s *Libp2pCarServer) handler(w http.ResponseWriter, r *http.Request) {
 	// Check authentication
 	authToken, authVal, herr := s.checkAuth(r)
 	if herr != nil {
-		log.Infow("data transfer request failed", "code", herr.code, "err", herr.error)
+		log.Infow("data transfer request failed", "code", herr.code, "err", herr.error, "peer", r.RemoteAddr)
 		w.WriteHeader(herr.code)
 		return
 	}
