@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	clinode "github.com/filecoin-project/boost/cli/node"
-	"github.com/filecoin-project/boost/lib/messagesigner"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-commp-utils/writer"
@@ -18,6 +17,7 @@ import (
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/actors"
 	marketactor "github.com/filecoin-project/lotus/chain/actors/builtin/market"
+	"github.com/filecoin-project/lotus/chain/messagesigner"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/backupds"

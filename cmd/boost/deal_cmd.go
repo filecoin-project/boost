@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/api"
 	chain_types "github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
@@ -340,7 +341,7 @@ func dealProposal(ctx context.Context, n *clinode.Node, rootCid cid.Cid, pieceSi
 		return nil, err
 	}
 
-	sig, err := n.Wallet.WalletSign(ctx, clientAddr, buf)
+	sig, err := n.Wallet.WalletSign(ctx, clientAddr, buf, api.MsgMeta{Type: api.MTDealProposal})
 	if err != nil {
 		return nil, fmt.Errorf("wallet sign failed: %w", err)
 	}
