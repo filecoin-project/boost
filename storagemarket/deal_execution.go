@@ -110,7 +110,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	p.dealLogger.Infow(deal.DealUuid, "finished deal cleanup after successful execution")
 
 	// Watch the sealing status of the deal and fire events for each change
-	p.fireSealingUpdateEvents(pub, deal.DealUuid, deal.SectorID)
+	p.fireSealingUpdateEvents(dh, pub, deal.DealUuid, deal.SectorID)
 	p.cleanupDealHandler(deal.DealUuid)
 
 	// TODO
@@ -598,9 +598,16 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 
 // fireSealingUpdateEvents periodically checks the sealing status of the deal
 // and fires events for each change
-func (p *Provider) fireSealingUpdateEvents(pub event.Emitter, dealUuid uuid.UUID, sectorNum abi.SectorNumber) {
+func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, pub event.Emitter, dealUuid uuid.UUID, sectorNum abi.SectorNumber) {
 	var lastSealingState lapi.SectorState
-	checkStatus := func() lapi.SectorState {
+	checkStatus := func(force bool) lapi.SectorState {
+		// To avoid overloading the sealing service, only get the sector status
+		// if there's at least one subscriber to the event that will be published
+		if !force && !dh.hasActiveSubscribers() {
+			return ""
+		}
+
+		// Get the sector status
 		si, err := p.sps.SectorsStatus(p.ctx, sectorNum, false)
 		if err == nil && si.State != lastSealingState {
 			lastSealingState = si.State
@@ -618,7 +625,7 @@ func (p *Provider) fireSealingUpdateEvents(pub event.Emitter, dealUuid uuid.UUID
 	}
 
 	// Check status immediately
-	state := checkStatus()
+	state := checkStatus(true)
 	if isFinalSealingState(state) {
 		return
 	}
@@ -626,12 +633,22 @@ func (p *Provider) fireSealingUpdateEvents(pub event.Emitter, dealUuid uuid.UUID
 	// Check status every second
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	count := 0
+	forceCount := 60
 	for {
 		select {
 		case <-p.ctx.Done():
 			return
 		case <-ticker.C:
-			state := checkStatus()
+			count++
+			// Force a status check every forceCount seconds, even if there
+			// are no subscribers (so that we can stop checking altogether
+			// if the sector reaches a final sealing state)
+			state := checkStatus(count >= forceCount)
+			if count >= forceCount {
+				count = 0
+			}
+
 			if isFinalSealingState(state) {
 				return
 			}
