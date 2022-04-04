@@ -130,7 +130,7 @@ print-%:
 	@echo $*=$($*)
 
 cbor-gen:
-	pushd ./storagemarket/types && rm -rf storagemarket/types/types_cbor_gen.go && $(GOCC) generate types.go && popd
+	pushd ./storagemarket/types && rm -rf types_cbor_gen.go && $(GOCC) generate types.go && popd
 
 docsgen: docsgen-md docsgen-openrpc
 

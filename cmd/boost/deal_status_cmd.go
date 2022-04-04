@@ -114,9 +114,7 @@ var dealStatusCmd = &cli.Command{
 
 		log.Debugw("storage provider on-chain address", "addr", minerAddr)
 
-		w := node.DealProposalSigner{n.Wallet}
-		dc := lp2pimpl.NewDealClient(n.Host, walletAddr, w)
-
+		dc := lp2pimpl.NewDealClient(n.Host, walletAddr, node.DealProposalSigner{LocalWallet: n.Wallet})
 		resp, err := dc.SendDealStatusRequest(ctx, *minfo.PeerId, dealUUID)
 		if err != nil {
 			return fmt.Errorf("send deal status request failed: %w", err)
@@ -158,7 +156,7 @@ func statusMessage(resp *types.DealStatusResponse) string {
 		case 100:
 			return "Transfer Complete"
 		default:
-			pct := (100 * float64(resp.NBytesReceived)) / float64(resp.Transfer.Size)
+			pct := (100 * float64(resp.NBytesReceived)) / float64(resp.TransferSize)
 			return fmt.Sprintf("Transferring %.2f%%", pct)
 		}
 	case dealcheckpoints.Transferred.String():

@@ -291,7 +291,7 @@ func (p *DealProvider) getDealStatus(req types.DealStatusRequest) types.DealStat
 			PublishCid:        pds.PublishCID,
 			ChainDealID:       pds.ChainDealID,
 		},
-		Transfer:       pds.Transfer,
-		NBytesReceived: int64(bts),
+		TransferSize:   pds.Transfer.Size,
+		NBytesReceived: bts,
 	}
 }

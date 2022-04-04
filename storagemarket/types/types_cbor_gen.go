@@ -959,23 +959,23 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	// t.Transfer (types.Transfer) (struct)
-	if len("Transfer") > cbg.MaxLength {
-		return xerrors.Errorf("Value in field \"Transfer\" was too long")
+	// t.TransferSize (uint64) (uint64)
+	if len("TransferSize") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"TransferSize\" was too long")
 	}
 
-	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("Transfer"))); err != nil {
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("TransferSize"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Transfer")); err != nil {
-		return err
-	}
-
-	if err := t.Transfer.MarshalCBOR(w); err != nil {
+	if _, err := io.WriteString(w, string("TransferSize")); err != nil {
 		return err
 	}
 
-	// t.NBytesReceived (int64) (int64)
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajUnsignedInt, uint64(t.TransferSize)); err != nil {
+		return err
+	}
+
+	// t.NBytesReceived (uint64) (uint64)
 	if len("NBytesReceived") > cbg.MaxLength {
 		return xerrors.Errorf("Value in field \"NBytesReceived\" was too long")
 	}
@@ -987,15 +987,10 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	if t.NBytesReceived >= 0 {
-		if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajUnsignedInt, uint64(t.NBytesReceived)); err != nil {
-			return err
-		}
-	} else {
-		if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajNegativeInt, uint64(-t.NBytesReceived-1)); err != nil {
-			return err
-		}
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajUnsignedInt, uint64(t.NBytesReceived)); err != nil {
+		return err
 	}
+
 	return nil
 }
 
@@ -1087,41 +1082,35 @@ func (t *DealStatusResponse) UnmarshalCBOR(r io.Reader) error {
 				}
 
 			}
-			// t.Transfer (types.Transfer) (struct)
-		case "Transfer":
+			// t.TransferSize (uint64) (uint64)
+		case "TransferSize":
 
 			{
 
-				if err := t.Transfer.UnmarshalCBOR(br); err != nil {
-					return xerrors.Errorf("unmarshaling t.Transfer: %w", err)
-				}
-
-			}
-			// t.NBytesReceived (int64) (int64)
-		case "NBytesReceived":
-			{
-				maj, extra, err := cbg.CborReadHeaderBuf(br, scratch)
-				var extraI int64
+				maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
 				if err != nil {
 					return err
 				}
-				switch maj {
-				case cbg.MajUnsignedInt:
-					extraI = int64(extra)
-					if extraI < 0 {
-						return fmt.Errorf("int64 positive overflow")
-					}
-				case cbg.MajNegativeInt:
-					extraI = int64(extra)
-					if extraI < 0 {
-						return fmt.Errorf("int64 negative oveflow")
-					}
-					extraI = -1 - extraI
-				default:
-					return fmt.Errorf("wrong type for int64 field: %d", maj)
+				if maj != cbg.MajUnsignedInt {
+					return fmt.Errorf("wrong type for uint64 field")
 				}
+				t.TransferSize = uint64(extra)
 
-				t.NBytesReceived = int64(extraI)
+			}
+			// t.NBytesReceived (uint64) (uint64)
+		case "NBytesReceived":
+
+			{
+
+				maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
+				if err != nil {
+					return err
+				}
+				if maj != cbg.MajUnsignedInt {
+					return fmt.Errorf("wrong type for uint64 field")
+				}
+				t.NBytesReceived = uint64(extra)
+
 			}
 
 		default:

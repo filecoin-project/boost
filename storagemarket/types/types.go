@@ -46,8 +46,8 @@ type DealStatusResponse struct {
 	// (eg invalid request signature)
 	Error          string
 	DealStatus     *DealStatus
-	Transfer       Transfer // Transfer params will be the zero value if this is an offline deal
-	NBytesReceived int64
+	TransferSize   uint64
+	NBytesReceived uint64
 }
 
 type DealStatus struct {
