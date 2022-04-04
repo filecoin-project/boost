@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost/bitswap"
+
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 
@@ -148,6 +150,9 @@ const (
 
 	// index-provider should be started after Boost
 	HandleIndexProviderKey
+
+	// Bitswap server should be started in the end
+	HandleBitswapServerKey
 
 	// daemon
 	ExtractApiKey
@@ -489,6 +494,10 @@ func ConfigBoost(c interface{}) Option {
 
 		Override(HandleBoostDealsKey, modules.HandleBoostDeals),
 		Override(HandleIndexProviderKey, modules.HandleIndexProvider),
+
+		// Bitswap Server
+		Override(new(*bitswap.RetrievalServer), bitswap.NewRetrievalServer),
+		Override(HandleBitswapServerKey, modules.HandleBitswapServer),
 
 		// Boost storage deal filter
 		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),

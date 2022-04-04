@@ -17,7 +17,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/etclabscore/go-openrpc-reflect v0.0.36
 	github.com/fatih/color v1.13.0
-	github.com/filecoin-project/dagstore v0.5.2
+	github.com/filecoin-project/dagstore v0.5.3-0.20220330091151-51396854de25
 	github.com/filecoin-project/go-address v0.0.6
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-cbor-util v0.0.1
@@ -25,13 +25,13 @@ require (
 	github.com/filecoin-project/go-data-transfer v1.15.0
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
-	github.com/filecoin-project/go-fil-markets v1.20.2-0.20220325122707-b18483a0834b
+	github.com/filecoin-project/go-fil-markets v1.20.2-0.20220329144844-e8c1a839f897
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-state-types v0.1.3
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/index-provider v0.5.0
-	github.com/filecoin-project/lotus v1.15.1-0.20220321111228-3c1edca90295
+	github.com/filecoin-project/index-provider v0.6.1
+	github.com/filecoin-project/lotus v1.15.1-0.20220330062321-65dbddcfe8c2
 	github.com/filecoin-project/specs-actors v0.9.14
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v5 v5.0.4
@@ -43,6 +43,7 @@ require (
 	github.com/graph-gophers/graphql-go v1.2.0
 	github.com/graph-gophers/graphql-transport-ws v0.0.1
 	github.com/hashicorp/go-multierror v1.1.1
+	github.com/ipfs/go-bitswap v0.5.1
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-blockservice v0.2.1
 	github.com/ipfs/go-cid v0.1.0
@@ -56,6 +57,7 @@ require (
 	github.com/ipfs/go-ipfs-exchange-interface v0.1.0
 	github.com/ipfs/go-ipfs-exchange-offline v0.1.1
 	github.com/ipfs/go-ipfs-files v0.0.9
+	github.com/ipfs/go-ipfs-routing v0.2.1
 	github.com/ipfs/go-ipld-format v0.2.0
 	github.com/ipfs/go-log/v2 v2.5.0
 	github.com/ipfs/go-merkledag v0.5.1

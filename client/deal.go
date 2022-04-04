@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/host"
+
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -22,6 +24,7 @@ import (
 type StorageClient struct {
 	PeerStore  peerstore.Peerstore
 	dealClient *lp2pimpl.DealClient
+	Host       host.Host
 }
 
 func NewStorageClient(addr address.Address, fullNodeApi v1api.FullNode) (*StorageClient, error) {
@@ -43,6 +46,7 @@ func NewStorageClient(addr address.Address, fullNodeApi v1api.FullNode) (*Storag
 
 	retryOpts := lp2pimpl.RetryParameters(time.Millisecond, time.Millisecond, 1, 1)
 	return &StorageClient{
+		Host:       h,
 		dealClient: lp2pimpl.NewDealClient(h, addr, fullNodeApi, retryOpts),
 		PeerStore:  pstore,
 	}, nil

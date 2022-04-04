@@ -55,6 +55,8 @@ func main() {
 
 func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("boostd", "INFO")
+	_ = logging.SetLogLevel("boost-bitswap", "INFO")
+	_ = logging.SetLogLevel("dagstore-all-readblockstore", "DEBUG")
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostd", "DEBUG")

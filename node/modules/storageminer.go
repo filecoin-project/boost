@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/filecoin-project/boost/bitswap"
+
 	"github.com/filecoin-project/boost/indexprovider"
 
 	"github.com/filecoin-project/boost/db"
@@ -480,6 +482,17 @@ func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider
 			lp2pnet.Stop()
 			prov.Stop()
 			return nil
+		},
+	})
+}
+
+func HandleBitswapServer(lc fx.Lifecycle, bs *bitswap.RetrievalServer) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return bs.Start(ctx)
+		},
+		OnStop: func(ctx context.Context) error {
+			return bs.Stop(ctx)
 		},
 	})
 }

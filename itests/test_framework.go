@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
+
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 
@@ -63,6 +65,7 @@ type testFramework struct {
 
 	client        *boostclient.StorageClient
 	boost         api.Boost
+	boostAddrs    peer.AddrInfo
 	fullNode      lapi.FullNode
 	clientAddr    address.Address
 	minerAddr     address.Address
@@ -300,6 +303,7 @@ func (f *testFramework) start() error {
 	if err != nil {
 		return err
 	}
+	f.boostAddrs = boostAddrs
 	f.client.PeerStore.AddAddrs(boostAddrs.ID, boostAddrs.Addrs, time.Hour)
 
 	// Add boost libp2p to chain
