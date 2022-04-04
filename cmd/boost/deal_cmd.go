@@ -170,15 +170,11 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		Addrs: maddrs,
 	}
 
-	log.Debugw("found storage provider", "id", *minfo.PeerId, "multiaddr", maddrs)
+	log.Debugw("found storage provider", "id", *minfo.PeerId, "multiaddr", maddrs, "addr", maddr)
 
-	providerStr := cctx.String("provider")
-	minerAddr, err := address.NewFromString(providerStr)
-	if err != nil {
-		return fmt.Errorf("invalid storage provider address '%s': %w", providerStr, err)
+	if err := n.Host.Connect(ctx, *addrInfo); err != nil {
+		return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
 	}
-
-	log.Debugw("storage provider on-chain address", "addr", minerAddr)
 
 	dealUuid := uuid.New()
 
@@ -203,16 +199,6 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	if carFileSize == 0 {
 		return fmt.Errorf("size of car file cannot be 0")
 	}
-
-	if err := n.Host.Connect(ctx, *addrInfo); err != nil {
-		return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
-	}
-
-	s, err := n.Host.NewStream(ctx, addrInfo.ID, DealProtocolv120)
-	if err != nil {
-		return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
-	}
-	defer s.Close()
 
 	transfer := types.Transfer{
 		Size: carFileSize,
@@ -271,7 +257,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	}
 
 	// Create a deal proposal to storage provider using deal protocol v1.2.0 format
-	dealProposal, err := dealProposal(ctx, n, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, minerAddr, startEpoch, cctx.Int("duration"), cctx.Bool("verified"), providerCollateral, abi.NewTokenAmount(cctx.Int64("storage-price-per-epoch")))
+	dealProposal, err := dealProposal(ctx, n, walletAddr, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, maddr, startEpoch, cctx.Int("duration"), cctx.Bool("verified"), providerCollateral, abi.NewTokenAmount(cctx.Int64("storage-price-per-epoch")))
 	if err != nil {
 		return fmt.Errorf("failed to create a deal proposal: %w", err)
 	}
@@ -285,6 +271,12 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	}
 
 	log.Debugw("about to submit deal proposal", "uuid", dealUuid.String())
+
+	s, err := n.Host.NewStream(ctx, addrInfo.ID, DealProtocolv120)
+	if err != nil {
+		return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
+	}
+	defer s.Close()
 
 	var resp types.DealResponse
 	if err := doRpc(ctx, s, &dealParams, &resp); err != nil {
@@ -316,12 +308,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	return nil
 }
 
-func dealProposal(ctx context.Context, n *clinode.Node, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, startEpoch abi.ChainEpoch, duration int, verified bool, providerCollateral abi.TokenAmount, storagePricePerEpoch abi.TokenAmount) (*market.ClientDealProposal, error) {
-	clientAddr, err := n.Wallet.GetDefault()
-	if err != nil {
-		return nil, err
-	}
-
+func dealProposal(ctx context.Context, n *clinode.Node, clientAddr address.Address, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, startEpoch abi.ChainEpoch, duration int, verified bool, providerCollateral abi.TokenAmount, storagePricePerEpoch abi.TokenAmount) (*market.ClientDealProposal, error) {
 	endEpoch := startEpoch + abi.ChainEpoch(duration)
 	proposal := market.DealProposal{
 		PieceCID:             pieceCid,

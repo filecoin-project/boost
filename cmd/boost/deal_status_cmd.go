@@ -95,13 +95,7 @@ var dealStatusCmd = &cli.Command{
 			return fmt.Errorf("storage provider %s has no multiaddrs set on-chain", maddr)
 		}
 
-		log.Debugw("found storage provider", "id", *minfo.PeerId, "multiaddr", maddrs)
-
-		providerStr := cctx.String("provider")
-		minerAddr, err := address.NewFromString(providerStr)
-		if err != nil {
-			return fmt.Errorf("invalid storage provider address '%s': %w", providerStr, err)
-		}
+		log.Debugw("found storage provider", "id", *minfo.PeerId, "multiaddr", maddrs, "addr", maddr)
 
 		addrInfo := &peer.AddrInfo{
 			ID:    *minfo.PeerId,
@@ -111,8 +105,6 @@ var dealStatusCmd = &cli.Command{
 		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
 			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
 		}
-
-		log.Debugw("storage provider on-chain address", "addr", minerAddr)
 
 		dc := lp2pimpl.NewDealClient(n.Host, walletAddr, node.DealProposalSigner{LocalWallet: n.Wallet})
 		resp, err := dc.SendDealStatusRequest(ctx, *minfo.PeerId, dealUUID)
