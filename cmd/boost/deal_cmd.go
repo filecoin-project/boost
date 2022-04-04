@@ -145,32 +145,13 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	if err != nil {
 		return err
 	}
-	minfo, err := api.StateMinerInfo(ctx, maddr, chain_types.EmptyTSK)
+
+	addrInfo, err := getAddrInfo(cctx, ctx, api, maddr)
 	if err != nil {
 		return err
 	}
-	if minfo.PeerId == nil {
-		return fmt.Errorf("storage provider %s has no peer ID set on-chain", maddr)
-	}
 
-	var maddrs []multiaddr.Multiaddr
-	for _, mma := range minfo.Multiaddrs {
-		ma, err := multiaddr.NewMultiaddrBytes(mma)
-		if err != nil {
-			return fmt.Errorf("storage provider %s had invalid multiaddrs in their info: %w", maddr, err)
-		}
-		maddrs = append(maddrs, ma)
-	}
-	if len(maddrs) == 0 {
-		return fmt.Errorf("storage provider %s has no multiaddrs set on-chain", maddr)
-	}
-
-	addrInfo := &peer.AddrInfo{
-		ID:    *minfo.PeerId,
-		Addrs: maddrs,
-	}
-
-	log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddr", maddrs, "addr", maddr)
+	log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
 
 	if err := n.Host.Connect(ctx, *addrInfo); err != nil {
 		return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
@@ -361,4 +342,31 @@ func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func getAddrInfo(cctx *cli.Context, ctx context.Context, api api.Gateway, maddr address.Address) (*peer.AddrInfo, error) {
+	minfo, err := api.StateMinerInfo(ctx, maddr, chain_types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	if minfo.PeerId == nil {
+		return nil, fmt.Errorf("storage provider %s has no peer ID set on-chain", maddr)
+	}
+
+	var maddrs []multiaddr.Multiaddr
+	for _, mma := range minfo.Multiaddrs {
+		ma, err := multiaddr.NewMultiaddrBytes(mma)
+		if err != nil {
+			return nil, fmt.Errorf("storage provider %s had invalid multiaddrs in their info: %w", maddr, err)
+		}
+		maddrs = append(maddrs, ma)
+	}
+	if len(maddrs) == 0 {
+		return nil, fmt.Errorf("storage provider %s has no multiaddrs set on-chain", maddr)
+	}
+
+	return &peer.AddrInfo{
+		ID:    *minfo.PeerId,
+		Addrs: maddrs,
+	}, nil
 }

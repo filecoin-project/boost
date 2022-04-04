@@ -10,12 +10,9 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
-	chain_types "github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/google/uuid"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/mitchellh/go-homedir"
-	"github.com/multiformats/go-multiaddr"
 	cli "github.com/urfave/cli/v2"
 )
 
@@ -75,32 +72,13 @@ var dealStatusCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		minfo, err := api.StateMinerInfo(ctx, maddr, chain_types.EmptyTSK)
+
+		addrInfo, err := getAddrInfo(cctx, ctx, api, maddr)
 		if err != nil {
 			return err
 		}
-		if minfo.PeerId == nil {
-			return fmt.Errorf("storage provider %s has no peer ID set on-chain", maddr)
-		}
 
-		var maddrs []multiaddr.Multiaddr
-		for _, mma := range minfo.Multiaddrs {
-			ma, err := multiaddr.NewMultiaddrBytes(mma)
-			if err != nil {
-				return fmt.Errorf("storage provider %s had invalid multiaddrs in their info: %w", maddr, err)
-			}
-			maddrs = append(maddrs, ma)
-		}
-		if len(maddrs) == 0 {
-			return fmt.Errorf("storage provider %s has no multiaddrs set on-chain", maddr)
-		}
-
-		log.Debugw("found storage provider", "id", *minfo.PeerId, "multiaddr", maddrs, "addr", maddr)
-
-		addrInfo := &peer.AddrInfo{
-			ID:    *minfo.PeerId,
-			Addrs: maddrs,
-		}
+		log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
 
 		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
 			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
