@@ -1,0 +1,48 @@
+.pagination {
+    text-align: center;
+}
+
+.pagination .controls {
+    margin-top: 1em;
+    display: inline-block;
+}
+
+.pagination .controls > div {
+    display: inline-block;
+    padding: 0 0.5em;
+}
+
+.pagination a {
+    color: #465298;
+    cursor: pointer;
+}
+
+.pagination .controls > span {
+    cursor: pointer;
+}
+
+.pagination .first {
+    padding-right: 0.5em;
+}
+
+.pagination span.first {
+    color: transparent;
+}
+
+.pagination .total {
+    color: #999;
+}
+
+.deals .pagination .per-page select {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    outline: none;
+    color: #999;
+}

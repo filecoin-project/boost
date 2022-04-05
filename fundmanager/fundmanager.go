@@ -2,7 +2,6 @@ package fundmanager
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/filecoin-project/boost/db"
@@ -46,11 +45,11 @@ type FundManager struct {
 	cfg Config
 }
 
-func New(cfg Config) func(api v1api.FullNode, sqldb *sql.DB) *FundManager {
-	return func(api api.FullNode, sqldb *sql.DB) *FundManager {
+func New(cfg Config) func(api v1api.FullNode, fundsDB *db.FundsDB) *FundManager {
+	return func(api api.FullNode, fundsDB *db.FundsDB) *FundManager {
 		return &FundManager{
 			api: api,
-			db:  db.NewFundsDB(sqldb),
+			db:  fundsDB,
 			cfg: cfg,
 		}
 	}
@@ -228,10 +227,6 @@ func (m *FundManager) BalancePublishMsg(ctx context.Context) (abi.TokenAmount, e
 
 func (m *FundManager) AddressPublishMsg() address.Address {
 	return m.cfg.PubMsgWallet
-}
-
-func (m *FundManager) Logs(ctx context.Context) ([]db.FundsLog, error) {
-	return m.db.Logs(ctx)
 }
 
 func toSharedBalance(bal api.MarketBalance) storagemarket.Balance {

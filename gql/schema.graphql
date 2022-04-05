@@ -207,7 +207,7 @@ type Funds {
 type FundsLogList {
   totalCount: Int!
   logs: [FundsLog]!
-  next: Time
+  more: Boolean!
 }
 
 type FundsLog {
@@ -299,7 +299,7 @@ type RootQuery {
   funds: Funds!
 
   """Get log of fund transactions"""
-  fundsLogs: FundsLogList!
+  fundsLogs(first: BigInt, offset: Int, limit: Int): FundsLogList!
 
   """Get information about deals that are pending being published"""
   dealPublish: DealPublish!
