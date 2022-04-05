@@ -7,12 +7,29 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/filecoin-project/boost/itests/framework"
 	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDummydeal(t *testing.T) {
+	ctx := context.Background()
+	log := framework.Log
+
+	kit.QuietMiningLogs()
+	framework.SetLogLevel()
+	framework.SetPreCommitChallengeDelay(t, 5)
+	f := framework.NewTestFramework(ctx, t)
+	err := f.Start()
+	require.NoError(t, err)
+	defer f.Stop()
+
+	err = f.AddClientProviderBalance(abi.NewTokenAmount(1e15))
+	require.NoError(t, err)
+
 	// Create a CAR file
 	tempdir := t.TempDir()
 	log.Debugw("using tempdir", "dir", tempdir)
@@ -37,42 +54,35 @@ func TestDummydeal(t *testing.T) {
 	// Create a new dummy deal
 	dealUuid := uuid.New()
 
-	res, err := f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false)
+	// Make a deal
+	res, err := f.MakeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false)
 	require.NoError(t, err)
 	require.True(t, res.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
 	time.Sleep(2 * time.Second)
 
+	// Make a second deal - it should fail because the first deal took up all
+	// available space
 	failingDealUuid := uuid.New()
-	res2, err2 := f.makeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
+	res2, err2 := f.MakeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
 	require.NoError(t, err2)
 	require.Equal(t, "cannot accept piece of size 2254421, on top of already allocated 2254421 bytes, because it would exceed max staging area size 4000000", res2.Reason)
 	log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
 
-	// Wait for the deal to be added to a sector and be cleanedup so space is made
-	err = f.waitForDealAddedToSector(dealUuid)
+	// Wait for the first deal to be added to a sector and cleaned up so space is made
+	err = f.WaitForDealAddedToSector(dealUuid)
 	require.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
 
+	// Make a third deal - it should succeed because the first deal has been cleaned up
 	passingDealUuid := uuid.New()
-	res2, err2 = f.makeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
+	res2, err2 = f.MakeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
 	require.NoError(t, err2)
 	require.True(t, res2.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
 
 	// Wait for the deal to be added to a sector
-	err = f.waitForDealAddedToSector(passingDealUuid)
-	require.NoError(t, err)
-
-	// make an offline deal
-	offlineDealUuid := uuid.New()
-	res, err = f.makeDummyDeal(offlineDealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), true)
-	require.NoError(t, err)
-	require.True(t, res.Accepted)
-	res, err = f.boost.BoostOfflineDealWithData(context.Background(), offlineDealUuid, carFilepath)
-	require.NoError(t, err)
-	require.True(t, res.Accepted)
-	err = f.waitForDealAddedToSector(offlineDealUuid)
+	err = f.WaitForDealAddedToSector(passingDealUuid)
 	require.NoError(t, err)
 }

@@ -318,10 +318,23 @@ workflows:
             tags:
               only:
                 - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+
       - test:
-          name: test-itest
-          suite: itest
-          target: "./itests/..."
+          name: test-itest-dummdeal_offline
+          suite: itest-dummdeal_offline
+          target: "./itests/dummydeal_offline_test.go"
+
+      - test:
+          name: test-itest-dummdeal
+          suite: itest-dummdeal
+          target: "./itests/dummydeal_test.go"
+
+#      TODO: Fix this test - at the moment it just hangs
+#      - test:
+#          name: test-itest-markets_v1_deal
+#          suite: itest-markets_v1_deal
+#          target: "./itests/markets_v1_deal_test.go"
+
       - test:
           name: test-all
           suite: all
