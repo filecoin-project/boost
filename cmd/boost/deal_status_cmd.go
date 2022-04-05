@@ -138,6 +138,9 @@ func statusMessage(resp *types.DealStatusResponse) string {
 	case dealcheckpoints.IndexedAndAnnounced.String():
 		return "Sealing"
 	case dealcheckpoints.Complete.String():
+		if resp.DealStatus.Error != "" {
+			return "Error: " + resp.DealStatus.Error
+		}
 		return "Complete"
 	}
 	return resp.DealStatus.Status
