@@ -87,35 +87,41 @@ function WaitDealsSizes(props) {
 
 const sectorStates = function(props) {
     return [{
+        Name: 'Available',
+        Count: props["Available"],
+    }, {
         Name: 'Add Piece',
-        Count: props.AddPiece,
+        Count: props["AddPiece"],
     }, {
         Name: 'Packing',
-        Count: props.Packing,
+        Count: props["Packing"],
     }, {
         Name: 'Update Replica',
-        Count: props.UpdateReplica,
+        Count: props["UpdateReplica"],
+    }, {
+        Name: 'Prove Update Replica',
+        Count: props["ProveUpdateReplica"],
     }, {
         Name: 'Pre-commit 1',
-        Count: props.PreCommit1,
+        Count: props["PreCommit1"],
     }, {
         Name: 'Pre-commit 2',
-        Count: props.PreCommit2,
+        Count: props["PreCommit2"],
     }, {
         Name: 'Pre-commit Wait',
-        Count: props.PreCommitWait,
+        Count: props["PreCommitWait"],
     }, {
         Name: 'Wait Seed',
-        Count: props.WaitSeed,
+        Count: props["WaitSeed"],
     }, {
         Name: 'Committing',
-        Count: props.Committing,
+        Count: props["Committing"],
     }, {
         Name: 'Committing Wait',
-        Count: props.CommittingWait,
+        Count: props["CommittingWait"],
     }, {
         Name: 'Finalize Sector',
-        Count: props.FinalizeSector,
+        Count: props["FinalizeSector"],
     }]
 }
 
