@@ -384,7 +384,7 @@ func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 	}
 }
 
-func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool, spe abi.TokenAmount) (*api.ProviderDealRejectionInfo, error) {
+func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool) (*api.ProviderDealRejectionInfo, error) {
 	cidAndSize, err := storagemarket.GenerateCommP(carFilepath)
 	if err != nil {
 		return nil, err
@@ -399,7 +399,7 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		Label:                rootCid.String(),
 		StartEpoch:           10000 + abi.ChainEpoch(rand.Intn(30000)),
 		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
-		StoragePricePerEpoch: spe,
+		StoragePricePerEpoch: abi.NewTokenAmount(2000000),
 		ProviderCollateral:   abi.NewTokenAmount(0),
 		ClientCollateral:     abi.NewTokenAmount(0),
 	}

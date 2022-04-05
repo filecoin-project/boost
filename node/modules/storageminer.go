@@ -11,6 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/filecoin-project/go-fil-markets/shared"
+	"github.com/filecoin-project/go-state-types/crypto"
+	ctypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/lib/sigs"
+
 	"github.com/filecoin-project/boost/indexprovider"
 
 	"github.com/filecoin-project/boost/db"
@@ -496,6 +501,20 @@ func HandleIndexProvider(lc fx.Lifecycle, prov *indexprovider.Wrapper) {
 	})
 }
 
+type signatureVerifier struct {
+	fn v1api.FullNode
+}
+
+func (s *signatureVerifier) VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error) {
+	addr, err := s.fn.StateAccountKey(ctx, addr, ctypes.EmptyTSK)
+	if err != nil {
+		return false, err
+	}
+
+	err = sigs.Verify(&sig, addr, input)
+	return err == nil, err
+}
+
 func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode,
 	sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
 	dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
@@ -506,7 +525,7 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 		dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider) (*storagemarket.Provider, error) {
 
 		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
-			sps, storagemarket.NewChainDealManager(a), df, logsSqlDB.db, logsDB, dagst, ps, ip, lp)
+			sps, storagemarket.NewChainDealManager(a), df, logsSqlDB.db, logsDB, dagst, ps, ip, lp, &signatureVerifier{a})
 		if err != nil {
 			return nil, err
 		}

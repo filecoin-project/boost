@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 
+	"github.com/filecoin-project/go-fil-markets/shared"
+
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
@@ -115,4 +117,12 @@ type ChainDealManager interface {
 type IndexProvider interface {
 	AnnounceBoostDeal(ctx context.Context, pds *ProviderDealState) (cid.Cid, error)
 	Start(ctx context.Context)
+}
+
+type AskGetter interface {
+	GetAsk() *storagemarket.SignedStorageAsk
+}
+
+type SignatureVerifier interface {
+	VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error)
 }
