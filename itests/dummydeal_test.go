@@ -77,18 +77,4 @@ func TestDummydeal(t *testing.T) {
 	require.True(t, res.Accepted)
 	err = f.waitForDealAddedToSector(offlineDealUuid)
 	require.NoError(t, err)
-
-	// Deal fails because client price less than min ask
-	res, err = f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false, abi.NewTokenAmount(1000))
-	require.NoError(t, err)
-	require.False(t, res.Accepted)
-	require.Contains(t, res.Reason, "storage price per epoch less than asking price")
-	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
-
-	// deal fails because signature is invalid
-	res, err = f.makeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false, abi.NewTokenAmount(2000000), withInvalidSignature())
-	require.NoError(t, err)
-	require.False(t, res.Accepted)
-	require.Contains(t, res.Reason, "error verifying signature")
-	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 }
