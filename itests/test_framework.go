@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	acrypto "github.com/filecoin-project/go-state-types/crypto"
+
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 
@@ -384,7 +386,26 @@ func (f *testFramework) waitForDealAddedToSector(dealUuid uuid.UUID) error {
 	}
 }
 
-func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool, spe abi.TokenAmount) (*api.ProviderDealRejectionInfo, error) {
+type dummyDealConfig struct {
+	validSignature bool
+}
+
+type makeDummyDealOpts func(*dummyDealConfig)
+
+func withInvalidSignature() makeDummyDealOpts {
+	return func(dc *dummyDealConfig) {
+		dc.validSignature = false
+	}
+}
+
+func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool, spe abi.TokenAmount, opts ...makeDummyDealOpts) (*api.ProviderDealRejectionInfo, error) {
+	dc := &dummyDealConfig{
+		validSignature: true,
+	}
+	for _, opt := range opts {
+		opt(dc)
+	}
+
 	cidAndSize, err := storagemarket.GenerateCommP(carFilepath)
 	if err != nil {
 		return nil, err
@@ -407,6 +428,13 @@ func (f *testFramework) makeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 	signedProposal, err := f.signProposal(f.clientAddr, &proposal)
 	if err != nil {
 		return nil, err
+	}
+
+	if !dc.validSignature {
+		signedProposal.ClientSignature = acrypto.Signature{
+			Type: signedProposal.ClientSignature.Type,
+			Data: signedProposal.ClientSignature.Data[1:],
+		}
 	}
 
 	log.Debugf("Client balance requirement for deal: %d attoFil", proposal.ClientBalanceRequirement())

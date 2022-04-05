@@ -29,15 +29,12 @@ import (
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
-	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
-	"github.com/filecoin-project/lotus/lib/sigs"
 	"github.com/filecoin-project/lotus/markets/utils"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
@@ -65,8 +62,6 @@ type Config struct {
 var log = logging.Logger("boost-provider")
 
 type Provider struct {
-	testMode bool
-
 	config Config
 	// Address of the provider on chain.
 	Address address.Address
@@ -119,13 +114,15 @@ type Provider struct {
 	dagst stores.DAGStoreWrapper
 	ps    piecestore.PieceStore
 
-	ip         types.IndexProvider
-	legacyProv lotus_storagemarket.StorageProvider
+	ip          types.IndexProvider
+	askGetter   types.AskGetter
+	sigVerifier types.SignatureVerifier
 }
 
 func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
-	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, legacyProv lotus_storagemarket.StorageProvider, httpOpts ...httptransport.Option) (*Provider, error) {
+	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, askGetter types.AskGetter,
+	sigVerifier types.SignatureVerifier, httpOpts ...httptransport.Option) (*Provider, error) {
 	fspath := path.Join(repoRoot, storagemanager.StagingAreaDirName)
 	err := os.MkdirAll(fspath, os.ModePerm)
 	if err != nil {
@@ -180,8 +177,9 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		dagst: dagst,
 		ps:    ps,
 
-		ip:         ip,
-		legacyProv: legacyProv,
+		ip:          ip,
+		askGetter:   askGetter,
+		sigVerifier: sigVerifier,
 	}, nil
 }
 
@@ -198,7 +196,7 @@ func (p *Provider) NBytesReceived(dealUuid uuid.UUID) uint64 {
 }
 
 func (p *Provider) GetAsk() *storagemarket.SignedStorageAsk {
-	return p.legacyProv.GetAsk()
+	return p.askGetter.GetAsk()
 }
 
 // MakeOfflineDealWithData is called when the Storage Provider imports data for
@@ -275,14 +273,12 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (*api.P
 		IsOffline:          dp.IsOffline,
 	}
 	// validate the deal proposal
-	if !p.testMode {
-		if err := p.validateDealProposal(ds); err != nil {
-			p.dealLogger.Infow(dp.DealUUID, "deal proposal failed validation", "err", err.Error())
+	if err := p.validateDealProposal(ds); err != nil {
+		p.dealLogger.Infow(dp.DealUUID, "deal proposal failed validation", "err", err.Error())
 
-			return &api.ProviderDealRejectionInfo{
-				Reason: fmt.Sprintf("failed validation: %s", err),
-			}, nil, nil
-		}
+		return &api.ProviderDealRejectionInfo{
+			Reason: fmt.Sprintf("failed validation: %s", err),
+		}, nil, nil
 	}
 
 	if dp.IsOffline {
@@ -631,16 +627,6 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 		Offset:       offset,
 		Size:         pieceSize.Padded(),
 	}, nil
-}
-
-func (p *Provider) VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error) {
-	addr, err := p.fullnodeApi.StateAccountKey(ctx, addr, ctypes.EmptyTSK)
-	if err != nil {
-		return false, err
-	}
-
-	err = sigs.Verify(&sig, addr, input)
-	return err == nil, err
 }
 
 func (p *Provider) GetBalance(ctx context.Context, addr address.Address, encodedTs shared.TipSetToken) (storagemarket.Balance, error) {

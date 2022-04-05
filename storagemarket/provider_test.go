@@ -16,6 +16,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/filecoin-project/go-fil-markets/shared"
+
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
+
 	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
 	"github.com/filecoin-project/go-fil-markets/shared_testutil"
 	ds "github.com/ipfs/go-datastore"
@@ -36,6 +40,7 @@ import (
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	types2 "github.com/filecoin-project/boost/transport/types"
+	ctypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
 
 	mock_sealingpipeline "github.com/filecoin-project/boost/sealingpipeline/mock"
@@ -335,6 +340,192 @@ func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
 	harness.EventuallyAssertNoTagged(t, ctx)
 }
 
+func TestDealAskValidation(t *testing.T) {
+	ctx := context.Background()
+
+	tcs := map[string]struct {
+		ask         *storagemarket.StorageAsk
+		dbuilder    func(h *ProviderHarness) *testDeal
+		expectedErr string
+	}{
+		"fails if price below minimum for unverified deal": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(100000000000),
+			},
+			dbuilder: func(h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1).withNoOpMinerStub().build()
+
+			},
+			expectedErr: "storage price per epoch less than asking price",
+		},
+		"fails if price below minimum for verified deal": {
+			ask: &storagemarket.StorageAsk{
+				Price:         abi.NewTokenAmount(0),
+				VerifiedPrice: abi.NewTokenAmount(100000000000),
+			},
+			dbuilder: func(h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1, withVerifiedDeal()).withNoOpMinerStub().build()
+
+			},
+			expectedErr: "storage price per epoch less than asking price",
+		},
+		"fails if piece size below minimum": {
+			ask: &storagemarket.StorageAsk{
+				Price:        abi.NewTokenAmount(0),
+				MinPieceSize: abi.PaddedPieceSize(1000000000),
+			},
+			dbuilder: func(h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1, withNormalFileSize(100)).withNoOpMinerStub().build()
+
+			},
+			expectedErr: "piece size less than minimum required size",
+		},
+		"fails if piece size above maximum": {
+			ask: &storagemarket.StorageAsk{
+				Price:        abi.NewTokenAmount(0),
+				MaxPieceSize: abi.PaddedPieceSize(1),
+			},
+			dbuilder: func(h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1, withNormalFileSize(100)).withNoOpMinerStub().build()
+
+			},
+			expectedErr: "piece size more than maximum allowed size",
+		},
+	}
+
+	for name, tc := range tcs {
+		t.Run(name, func(t *testing.T) {
+			// setup the provider test harness
+			harness := NewHarness(t, ctx, withStoredAsk(tc.ask.Price, tc.ask.VerifiedPrice, tc.ask.MinPieceSize, tc.ask.MaxPieceSize))
+			// start the provider test harness
+			harness.Start(t, ctx)
+			defer harness.Stop()
+
+			// build the deal proposal with the blocking http test server and a completely blocking miner stub
+			td := tc.dbuilder(harness)
+
+			// execute deal
+			err := td.executeAndSubscribe()
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
+}
+
+func TestDealVerification(t *testing.T) {
+	ctx := context.Background()
+
+	tcs := map[string]struct {
+		ask         *storagemarket.StorageAsk
+		dbuilder    func(h *ProviderHarness) *testDeal
+		expectedErr string
+		expect      func(h *ProviderHarness)
+		opts        []harnessOpt
+	}{
+		"fails if client does not have enough datacap for verified deal": {
+			ask: &storagemarket.StorageAsk{
+				VerifiedPrice: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1, withVerifiedDeal()).withNoOpMinerStub().build()
+			},
+			expect: func(h *ProviderHarness) {
+				sp := abi.NewStoragePower(1)
+				h.MockFullNode.EXPECT().StateVerifiedClientStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(&sp,
+					nil)
+			},
+			expectedErr: "verified deal DataCap too small",
+		},
+		"fails if can't fetch datacap for verified deal": {
+			ask: &storagemarket.StorageAsk{
+				VerifiedPrice: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1, withVerifiedDeal()).withNoOpMinerStub().build()
+			},
+			expect: func(h *ProviderHarness) {
+				h.MockFullNode.EXPECT().StateVerifiedClientStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil,
+					errors.New("some error"))
+			},
+			expectedErr: "error fetching verified data cap",
+		},
+		"fails if client does NOT have enough balance for deal": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1).withNoOpMinerStub().build()
+			},
+			opts:        []harnessOpt{withStateMarketBalance(abi.NewTokenAmount(10), abi.NewTokenAmount(10))},
+			expectedErr: "clientMarketBalance.Available too small",
+		},
+		"fails if client signature is not valid": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1).withNoOpMinerStub().build()
+			},
+			expect: func(h *ProviderHarness) {
+				h.Provider.sigVerifier = &mockSignatureVerifier{false, nil}
+			},
+			expectedErr: "validateSignature failed",
+		},
+		"fails if client signature verification fails": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1).withNoOpMinerStub().build()
+			},
+			expect: func(h *ProviderHarness) {
+				h.Provider.sigVerifier = &mockSignatureVerifier{true, errors.New("some error")}
+			},
+			expectedErr: "validateSignature failed",
+		},
+		"fails if proposed provider collateral below minimum": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1, withProviderCollateral(abi.NewTokenAmount(0))).withNoOpMinerStub().build()
+			},
+			expectedErr: "proposed provider collateral below minimum",
+		},
+		"fails if proposed provider collateral above maximum": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1, withProviderCollateral(abi.NewTokenAmount(100))).withNoOpMinerStub().build()
+			},
+			expectedErr: "proposed provider collateral above maximum",
+		},
+	}
+
+	for name, tc := range tcs {
+		t.Run(name, func(t *testing.T) {
+			// setup the provider test harness
+			harness := NewHarness(t, ctx, tc.opts...)
+			// start the provider test harness
+			harness.Start(t, ctx)
+			defer harness.Stop()
+
+			// build the deal proposal with the blocking http test server and a completely blocking miner stub
+			td := tc.dbuilder(harness)
+
+			if tc.expect != nil {
+				tc.expect(harness)
+			}
+
+			// execute deal
+			err := td.executeAndSubscribe()
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
+}
+
 func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals int,
 	buildDeal func(i int) *testDeal, waitF func(i int, td *testDeal) error) []*testDeal {
 	tds := make([]*testDeal, 0, nDeals)
@@ -525,6 +716,11 @@ type providerConfig struct {
 	lockedFunds      big.Int
 	escrowFunds      big.Int
 	publishWalletBal int64
+
+	price         abi.TokenAmount
+	verifiedPrice abi.TokenAmount
+	minPieceSize  abi.PaddedPieceSize
+	maxPieceSize  abi.PaddedPieceSize
 }
 
 type harnessOpt func(pc *providerConfig)
@@ -556,14 +752,35 @@ func withPublishWalletBal(bal int64) harnessOpt {
 	}
 }
 
+func withStoredAsk(price, verifiedPrice abi.TokenAmount, minPieceSize, maxPieceSize abi.PaddedPieceSize) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.price = price
+		pc.verifiedPrice = verifiedPrice
+		pc.minPieceSize = minPieceSize
+		pc.maxPieceSize = maxPieceSize
+	}
+}
+
+func withStateMarketBalance(locked, escrow abi.TokenAmount) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.lockedFunds = locked
+		pc.escrowFunds = escrow
+	}
+}
+
 func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *ProviderHarness {
 	pc := &providerConfig{
 		minPublishFees:       abi.NewTokenAmount(100),
 		maxStagingDealBytes:  10000000000,
 		disconnectAfterEvery: 1048600,
-		lockedFunds:          big.NewInt(300),
-		escrowFunds:          big.NewInt(500),
+		lockedFunds:          big.NewInt(3000000),
+		escrowFunds:          big.NewInt(5000000),
 		publishWalletBal:     1000,
+
+		price:         abi.NewTokenAmount(0),
+		verifiedPrice: abi.NewTokenAmount(0),
+		minPieceSize:  abi.PaddedPieceSize(0),
+		maxPieceSize:  abi.PaddedPieceSize(10737418240), //10Gib default
 	}
 
 	sealingpipelineStatus := map[api.SectorState]int{
@@ -631,7 +848,6 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		DisconnectingServer: disconnServer,
 		FailingServer:       failingServer,
 
-		MockFullNode:           fn,
 		MockSealingPipelineAPI: sps,
 		DealsDB:                dealsDB,
 		FundsDB:                db.NewFundsDB(sqldb),
@@ -669,24 +885,33 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	require.NoError(t, err)
 	dagStore := shared_testutil.NewMockDagStoreWrapper(ps, nil)
 
-	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, minerStub, address.Undef, minerStub, sps, minerStub, df, sqldb,
-		db.NewLogsDB(sqldb), dagStore, ps, &NoOpIndexProvider{}, nil, pc.httpOpts...)
+	askStore := &mockAskStore{}
+	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
+
+	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, sps, minerStub, df, sqldb,
+		db.NewLogsDB(sqldb), dagStore, ps, &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, pc.httpOpts...)
 	require.NoError(t, err)
-	prov.testMode = true
 	ph.Provider = prov
 
-	ph.MockFullNode.EXPECT().StateMarketBalance(gomock.Any(), gomock.Any(), gomock.Any()).Return(api.MarketBalance{
+	fn.EXPECT().ChainHead(gomock.Any()).Return(&ctypes.TipSet{}, nil).AnyTimes()
+	fn.EXPECT().StateDealProviderCollateralBounds(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(api.DealCollateralBounds{
+		Min: abi.NewTokenAmount(1),
+		Max: abi.NewTokenAmount(1),
+	}, nil).AnyTimes()
+
+	fn.EXPECT().StateMarketBalance(gomock.Any(), gomock.Any(), gomock.Any()).Return(api.MarketBalance{
 		Locked: pc.lockedFunds,
 		Escrow: pc.escrowFunds,
 	}, nil).AnyTimes()
 
-	ph.MockFullNode.EXPECT().WalletBalance(gomock.Any(), ph.PublishWallet).Return(abi.NewTokenAmount(pc.publishWalletBal), nil).AnyTimes()
+	fn.EXPECT().WalletBalance(gomock.Any(), ph.PublishWallet).Return(abi.NewTokenAmount(pc.publishWalletBal), nil).AnyTimes()
 
 	ph.MockSealingPipelineAPI.EXPECT().WorkerJobs(gomock.Any()).Return(map[uuid.UUID][]storiface.WorkerJob{}, nil).AnyTimes()
 
 	ph.MockSealingPipelineAPI.EXPECT().SectorsSummary(gomock.Any()).Return(sealingpipelineStatus, nil).AnyTimes()
 
 	ph.DAGStore = dagStore
+	ph.MockFullNode = fn
 
 	return ph
 }
@@ -713,8 +938,8 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, ctx context
 
 	// construct a new provider with pre-existing state
 	prov, err := NewProvider("", h.Host, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
-		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, address.Undef, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
-		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.dagst, h.Provider.ps, &NoOpIndexProvider{}, nil, pc.httpOpts...)
+		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
+		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.dagst, h.Provider.ps, &NoOpIndexProvider{}, h.Provider.askGetter, h.Provider.sigVerifier, pc.httpOpts...)
 
 	require.NoError(t, err)
 	h.Provider = prov
@@ -748,8 +973,10 @@ func (h *ProviderHarness) Stop() {
 }
 
 type dealProposalConfig struct {
-	normalFileSize int
-	offlineDeal    bool
+	normalFileSize     int
+	offlineDeal        bool
+	verifiedDeal       bool
+	providerCollateral abi.TokenAmount
 }
 
 // dealProposalOpt allows configuration of the deal proposal
@@ -769,11 +996,25 @@ func withOfflineDeal() dealProposalOpt {
 	}
 }
 
+func withVerifiedDeal() dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.verifiedDeal = true
+	}
+}
+
+func withProviderCollateral(amt abi.TokenAmount) dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.providerCollateral = amt
+	}
+}
+
 func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealProposalOpt) *testDealBuilder {
 	tbuilder := &testDealBuilder{t: t, ph: ph}
 
 	dc := &dealProposalConfig{
-		normalFileSize: 2000000,
+		normalFileSize:     2000000,
+		verifiedDeal:       false,
+		providerCollateral: abi.NewTokenAmount(1),
 	}
 	for _, opt := range opts {
 		opt(dc)
@@ -793,14 +1034,14 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	proposal := market.DealProposal{
 		PieceCID:             cidAndSize.PieceCID,
 		PieceSize:            cidAndSize.PieceSize,
-		VerifiedDeal:         false,
+		VerifiedDeal:         dc.verifiedDeal,
 		Client:               tbuilder.ph.ClientAddr,
 		Provider:             tbuilder.ph.MinerAddr,
 		Label:                rootCid.String(),
 		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
 		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
-		ProviderCollateral:   abi.NewTokenAmount(1),
+		ProviderCollateral:   dc.providerCollateral,
 		ClientCollateral:     abi.NewTokenAmount(1),
 	}
 
@@ -1040,7 +1281,7 @@ func (td *testDeal) executeAndSubscribe() error {
 		return err
 	}
 	if !pi.Accepted {
-		return errors.New("deal not accepted")
+		return fmt.Errorf("deal not accepted: %s", pi.Reason)
 	}
 	sub, err := dh.subscribeUpdates()
 	if err != nil {
@@ -1172,4 +1413,33 @@ func (n *NoOpIndexProvider) AnnounceBoostDeal(ctx context.Context, pds *types.Pr
 
 func (n *NoOpIndexProvider) Start(_ context.Context) {
 
+}
+
+type mockAskStore struct {
+	ask *storagemarket.StorageAsk
+}
+
+func (m *mockAskStore) SetAsk(price, verifiedPrice abi.TokenAmount, minPieceSize, maxPieceSize abi.PaddedPieceSize) {
+	m.ask = &storagemarket.StorageAsk{
+		Price:         price,
+		VerifiedPrice: verifiedPrice,
+		MinPieceSize:  minPieceSize,
+		MaxPieceSize:  maxPieceSize,
+	}
+
+}
+
+func (m *mockAskStore) GetAsk() *storagemarket.SignedStorageAsk {
+	return &storagemarket.SignedStorageAsk{
+		Ask: m.ask,
+	}
+}
+
+type mockSignatureVerifier struct {
+	valid bool
+	err   error
+}
+
+func (m *mockSignatureVerifier) VerifySignature(ctx context.Context, sig acrypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error) {
+	return m.valid, m.err
 }
