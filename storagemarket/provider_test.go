@@ -31,8 +31,10 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
+	mock_sealingpipeline "github.com/filecoin-project/boost/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/smtestutil"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -40,26 +42,37 @@ import (
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	types2 "github.com/filecoin-project/boost/transport/types"
+
 	ctypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
 
 	mock_sealingpipeline "github.com/filecoin-project/boost/sealingpipeline/mock"
+
 	"github.com/filecoin-project/go-address"
+	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
+	"github.com/filecoin-project/go-fil-markets/shared_testutil"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
+	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
+	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
+	ds "github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	logging "github.com/ipfs/go-log/v2"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-libp2p-core/event"
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestSimpleDealHappy(t *testing.T) {
@@ -99,6 +112,10 @@ func TestSimpleDealHappy(t *testing.T) {
 	td.unblockAddPiece()
 	td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
 	harness.EventuallyAssertNoTagged(t, ctx)
+
+	// expect Proving event to be fired
+	err := td.waitForSealingState(api.SectorState(sealing.Proving))
+	require.NoError(t, err)
 
 	// assert logs
 	lgs, err := harness.Provider.logsDB.Logs(ctx, td.params.DealUUID)
@@ -910,6 +927,9 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 
 	ph.MockSealingPipelineAPI.EXPECT().SectorsSummary(gomock.Any()).Return(sealingpipelineStatus, nil).AnyTimes()
 
+	secInfo := api.SectorInfo{State: api.SectorState(sealing.Proving)}
+	ph.MockSealingPipelineAPI.EXPECT().SectorsStatus(gomock.Any(), gomock.Any(), false).Return(secInfo, nil).AnyTimes()
+
 	ph.DAGStore = dagStore
 	ph.MockFullNode = fn
 
@@ -1328,6 +1348,28 @@ LOOP:
 	}
 
 	return nil
+}
+
+func (td *testDeal) waitForSealingState(secState api.SectorState) error {
+	if td.sub == nil {
+		return errors.New("no subcription for deal")
+	}
+
+	for i := range td.sub.Out() {
+		st := i.(types.ProviderDealState)
+		if len(st.Err) != 0 {
+			return errors.New(st.Err)
+		}
+		si, err := td.ph.MockSealingPipelineAPI.SectorsStatus(context.Background(), st.SectorID, false)
+		if err != nil {
+			return err
+		}
+		if si.State == secState {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("did not reach sealing state %s", secState)
 }
 
 func (td *testDeal) updateWithRestartedProvider(ph *ProviderHarness) *testDealBuilder {

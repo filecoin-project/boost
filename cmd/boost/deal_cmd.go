@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	bcli "github.com/filecoin-project/boost/cli"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/mitchellh/go-homedir"
-
 	types2 "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
@@ -21,6 +20,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/mitchellh/go-homedir"
 	"github.com/multiformats/go-multiaddr"
 	cli "github.com/urfave/cli/v2"
 
@@ -116,7 +116,7 @@ var offlineDealCmd = &cli.Command{
 }
 
 func dealCmdAction(cctx *cli.Context, isOnline bool) error {
-	ctx := lcli.ReqContext(cctx)
+	ctx := bcli.ReqContext(cctx)
 
 	sdir, err := homedir.Expand(cctx.String("repo"))
 	if err != nil {
@@ -145,40 +145,17 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	if err != nil {
 		return err
 	}
-	minfo, err := api.StateMinerInfo(ctx, maddr, chain_types.EmptyTSK)
+
+	addrInfo, err := getAddrInfo(cctx, ctx, api, maddr)
 	if err != nil {
 		return err
 	}
-	if minfo.PeerId == nil {
-		return fmt.Errorf("storage provider %s has no peer ID set on-chain", maddr)
-	}
 
-	var maddrs []multiaddr.Multiaddr
-	for _, mma := range minfo.Multiaddrs {
-		ma, err := multiaddr.NewMultiaddrBytes(mma)
-		if err != nil {
-			return fmt.Errorf("storage provider %s had invalid multiaddrs in their info: %w", maddr, err)
-		}
-		maddrs = append(maddrs, ma)
-	}
-	if len(maddrs) == 0 {
-		return fmt.Errorf("storage provider %s has no multiaddrs set on-chain", maddr)
-	}
+	log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
 
-	addrInfo := &peer.AddrInfo{
-		ID:    *minfo.PeerId,
-		Addrs: maddrs,
+	if err := n.Host.Connect(ctx, *addrInfo); err != nil {
+		return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
 	}
-
-	log.Debugw("found storage provider", "id", *minfo.PeerId, "multiaddr", maddrs)
-
-	providerStr := cctx.String("provider")
-	minerAddr, err := address.NewFromString(providerStr)
-	if err != nil {
-		return fmt.Errorf("invalid storage provider address '%s': %w", providerStr, err)
-	}
-
-	log.Debugw("storage provider on-chain address", "addr", minerAddr)
 
 	dealUuid := uuid.New()
 
@@ -203,16 +180,6 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	if carFileSize == 0 {
 		return fmt.Errorf("size of car file cannot be 0")
 	}
-
-	if err := n.Host.Connect(ctx, *addrInfo); err != nil {
-		return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
-	}
-
-	s, err := n.Host.NewStream(ctx, addrInfo.ID, DealProtocolv120)
-	if err != nil {
-		return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
-	}
-	defer s.Close()
 
 	transfer := types.Transfer{
 		Size: carFileSize,
@@ -271,7 +238,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	}
 
 	// Create a deal proposal to storage provider using deal protocol v1.2.0 format
-	dealProposal, err := dealProposal(ctx, n, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, minerAddr, startEpoch, cctx.Int("duration"), cctx.Bool("verified"), providerCollateral, abi.NewTokenAmount(cctx.Int64("storage-price-per-epoch")))
+	dealProposal, err := dealProposal(ctx, n, walletAddr, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, maddr, startEpoch, cctx.Int("duration"), cctx.Bool("verified"), providerCollateral, abi.NewTokenAmount(cctx.Int64("storage-price-per-epoch")))
 	if err != nil {
 		return fmt.Errorf("failed to create a deal proposal: %w", err)
 	}
@@ -285,6 +252,12 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	}
 
 	log.Debugw("about to submit deal proposal", "uuid", dealUuid.String())
+
+	s, err := n.Host.NewStream(ctx, addrInfo.ID, DealProtocolv120)
+	if err != nil {
+		return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
+	}
+	defer s.Close()
 
 	var resp types.DealResponse
 	if err := doRpc(ctx, s, &dealParams, &resp); err != nil {
@@ -316,12 +289,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	return nil
 }
 
-func dealProposal(ctx context.Context, n *clinode.Node, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, startEpoch abi.ChainEpoch, duration int, verified bool, providerCollateral abi.TokenAmount, storagePricePerEpoch abi.TokenAmount) (*market.ClientDealProposal, error) {
-	clientAddr, err := n.Wallet.GetDefault()
-	if err != nil {
-		return nil, err
-	}
-
+func dealProposal(ctx context.Context, n *clinode.Node, clientAddr address.Address, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, startEpoch abi.ChainEpoch, duration int, verified bool, providerCollateral abi.TokenAmount, storagePricePerEpoch abi.TokenAmount) (*market.ClientDealProposal, error) {
 	endEpoch := startEpoch + abi.ChainEpoch(duration)
 	proposal := market.DealProposal{
 		PieceCID:             pieceCid,
@@ -374,4 +342,31 @@ func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func getAddrInfo(cctx *cli.Context, ctx context.Context, api api.Gateway, maddr address.Address) (*peer.AddrInfo, error) {
+	minfo, err := api.StateMinerInfo(ctx, maddr, chain_types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	if minfo.PeerId == nil {
+		return nil, fmt.Errorf("storage provider %s has no peer ID set on-chain", maddr)
+	}
+
+	var maddrs []multiaddr.Multiaddr
+	for _, mma := range minfo.Multiaddrs {
+		ma, err := multiaddr.NewMultiaddrBytes(mma)
+		if err != nil {
+			return nil, fmt.Errorf("storage provider %s had invalid multiaddrs in their info: %w", maddr, err)
+		}
+		maddrs = append(maddrs, ma)
+	}
+	if len(maddrs) == 0 {
+		return nil, fmt.Errorf("storage provider %s has no multiaddrs set on-chain", maddr)
+	}
+
+	return &peer.AddrInfo{
+		ID:    *minfo.PeerId,
+		Addrs: maddrs,
+	}, nil
 }
