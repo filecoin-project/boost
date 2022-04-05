@@ -16,6 +16,10 @@ import (
 	"testing"
 	"time"
 
+	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
+
+	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
+
 	"github.com/filecoin-project/go-fil-markets/shared"
 
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
@@ -425,7 +429,7 @@ func TestDealVerification(t *testing.T) {
 
 	tcs := map[string]struct {
 		ask         *storagemarket.StorageAsk
-		dbuilder    func(h *ProviderHarness) *testDeal
+		dbuilder    func(t *testing.T, h *ProviderHarness) *testDeal
 		expectedErr string
 		expect      func(h *ProviderHarness)
 		opts        []harnessOpt
@@ -434,7 +438,7 @@ func TestDealVerification(t *testing.T) {
 			ask: &storagemarket.StorageAsk{
 				VerifiedPrice: abi.NewTokenAmount(0),
 			},
-			dbuilder: func(h *ProviderHarness) *testDeal {
+			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
 				return h.newDealBuilder(t, 1, withVerifiedDeal()).withNoOpMinerStub().build()
 			},
 			expect: func(h *ProviderHarness) {
@@ -448,7 +452,7 @@ func TestDealVerification(t *testing.T) {
 			ask: &storagemarket.StorageAsk{
 				VerifiedPrice: abi.NewTokenAmount(0),
 			},
-			dbuilder: func(h *ProviderHarness) *testDeal {
+			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
 				return h.newDealBuilder(t, 1, withVerifiedDeal()).withNoOpMinerStub().build()
 			},
 			expect: func(h *ProviderHarness) {
@@ -461,7 +465,7 @@ func TestDealVerification(t *testing.T) {
 			ask: &storagemarket.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
-			dbuilder: func(h *ProviderHarness) *testDeal {
+			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
 				return h.newDealBuilder(t, 1).withNoOpMinerStub().build()
 			},
 			opts:        []harnessOpt{withStateMarketBalance(abi.NewTokenAmount(10), abi.NewTokenAmount(10))},
@@ -471,7 +475,7 @@ func TestDealVerification(t *testing.T) {
 			ask: &storagemarket.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
-			dbuilder: func(h *ProviderHarness) *testDeal {
+			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
 				return h.newDealBuilder(t, 1).withNoOpMinerStub().build()
 			},
 			expect: func(h *ProviderHarness) {
@@ -483,7 +487,7 @@ func TestDealVerification(t *testing.T) {
 			ask: &storagemarket.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
-			dbuilder: func(h *ProviderHarness) *testDeal {
+			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
 				return h.newDealBuilder(t, 1).withNoOpMinerStub().build()
 			},
 			expect: func(h *ProviderHarness) {
@@ -495,7 +499,7 @@ func TestDealVerification(t *testing.T) {
 			ask: &storagemarket.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
-			dbuilder: func(h *ProviderHarness) *testDeal {
+			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
 				return h.newDealBuilder(t, 1, withProviderCollateral(abi.NewTokenAmount(0))).withNoOpMinerStub().build()
 			},
 			expectedErr: "proposed provider collateral below minimum",
@@ -504,10 +508,110 @@ func TestDealVerification(t *testing.T) {
 			ask: &storagemarket.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
-			dbuilder: func(h *ProviderHarness) *testDeal {
+			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
 				return h.newDealBuilder(t, 1, withProviderCollateral(abi.NewTokenAmount(100))).withNoOpMinerStub().build()
 			},
 			expectedErr: "proposed provider collateral above maximum",
+		},
+
+		"fails if provider address does not match": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
+				addr, err := address.NewIDAddress(1)
+				require.NoError(t, err)
+				return h.newDealBuilder(t, 1, withMinerAddr(addr)).withNoOpMinerStub().build()
+			},
+			expectedErr: "incorrect provider for deal",
+		},
+		"proposal piece cid has wrong prefix": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
+
+				return h.newDealBuilder(t, 1, withPieceCid(testutil.GenerateCid())).withNoOpMinerStub().build()
+			},
+			expectedErr: "proposal PieceCID had wrong prefix",
+		},
+		"proposal piece cid undefined": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
+
+				return h.newDealBuilder(t, 1, withUndefinedPieceCid()).withNoOpMinerStub().build()
+			},
+			expectedErr: "undefined cid",
+		},
+		"proposal end before proposal start": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1, withEpochs(abi.ChainEpoch(10), abi.ChainEpoch(9))).withNoOpMinerStub().build()
+			},
+			expectedErr: "proposal end before proposal start",
+		},
+		"deal start epoch has already elapsed": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1, withEpochs(abi.ChainEpoch(-1), abi.ChainEpoch(9))).withNoOpMinerStub().build()
+			},
+			expectedErr: "deal start epoch has already elapsed",
+		},
+		"deal label greater than max size": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
+				label := strings.Repeat("a", 1000)
+				return h.newDealBuilder(t, 1, withLabel(label)).withNoOpMinerStub().build()
+			},
+			expectedErr: "deal label can be at most 256 bytes",
+		},
+		"deal piece size invalid": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1, withPieceSize(abi.PaddedPieceSize(1000))).withNoOpMinerStub().build()
+			},
+			expectedErr: "proposal piece size is invalid",
+		},
+		"deal end epoch too far out": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
+				start := miner.MaxSectorExpirationExtension - market2.DealMinDuration - 1
+				maxEndEpoch := miner.MaxSectorExpirationExtension + 100
+				return h.newDealBuilder(t, 1, withEpochs(abi.ChainEpoch(start), abi.ChainEpoch(maxEndEpoch))).withNoOpMinerStub().build()
+			},
+			expectedErr: "invalid deal end epoch",
+		},
+		"deal duration greater than max duration": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
+
+				return h.newDealBuilder(t, 1, withEpochs(0, abi.ChainEpoch(market2.DealMaxDuration+1))).withNoOpMinerStub().build()
+			},
+			expectedErr: "deal duration out of bounds",
+		},
+		"deal duration less than min duration": {
+			ask: &storagemarket.StorageAsk{
+				Price: abi.NewTokenAmount(0),
+			},
+			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
+
+				return h.newDealBuilder(t, 1, withEpochs(1, 2)).withNoOpMinerStub().build()
+			},
+			expectedErr: "deal duration out of bounds",
 		},
 	}
 
@@ -520,8 +624,7 @@ func TestDealVerification(t *testing.T) {
 			defer harness.Stop()
 
 			// build the deal proposal with the blocking http test server and a completely blocking miner stub
-			td := tc.dbuilder(harness)
-
+			td := tc.dbuilder(t, harness)
 			if tc.expect != nil {
 				tc.expect(harness)
 			}
@@ -988,6 +1091,13 @@ type dealProposalConfig struct {
 	offlineDeal        bool
 	verifiedDeal       bool
 	providerCollateral abi.TokenAmount
+	minerAddr          address.Address
+	pieceCid           cid.Cid
+	pieceSize          abi.PaddedPieceSize
+	undefinedPieceCid  bool
+	startEpoch         abi.ChainEpoch
+	endEpoch           abi.ChainEpoch
+	label              string
 }
 
 // dealProposalOpt allows configuration of the deal proposal
@@ -1019,6 +1129,43 @@ func withProviderCollateral(amt abi.TokenAmount) dealProposalOpt {
 	}
 }
 
+func withMinerAddr(addr address.Address) dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.minerAddr = addr
+	}
+}
+
+func withPieceCid(c cid.Cid) dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.pieceCid = c
+	}
+}
+
+func withPieceSize(size abi.PaddedPieceSize) dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.pieceSize = size
+	}
+}
+
+func withUndefinedPieceCid() dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.undefinedPieceCid = true
+	}
+}
+
+func withEpochs(start, end abi.ChainEpoch) dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.startEpoch = start
+		dc.endEpoch = end
+	}
+}
+
+func withLabel(label string) dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.label = label
+	}
+}
+
 func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealProposalOpt) *testDealBuilder {
 	tbuilder := &testDealBuilder{t: t, ph: ph}
 
@@ -1026,6 +1173,11 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 		normalFileSize:     2000000,
 		verifiedDeal:       false,
 		providerCollateral: abi.NewTokenAmount(1),
+		minerAddr:          tbuilder.ph.MinerAddr,
+		pieceCid:           cid.Undef,
+		undefinedPieceCid:  false,
+		startEpoch:         abi.ChainEpoch(rand.Intn(100000)),
+		endEpoch:           800000 + abi.ChainEpoch(rand.Intn(10000)),
 	}
 	for _, opt := range opts {
 		opt(dc)
@@ -1041,16 +1193,28 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	cidAndSize, err := GenerateCommP(carV2FilePath)
 	require.NoError(tbuilder.t, err)
 
+	var pieceCid = cidAndSize.PieceCID
+	if dc.pieceCid != cid.Undef {
+		pieceCid = dc.pieceCid
+	}
+	if dc.undefinedPieceCid {
+		pieceCid = cid.Undef
+	}
+	var pieceSize = cidAndSize.PieceSize
+	if dc.pieceSize != abi.PaddedPieceSize(0) {
+		pieceSize = dc.pieceSize
+	}
+
 	// build the deal proposal
 	proposal := market.DealProposal{
-		PieceCID:             cidAndSize.PieceCID,
-		PieceSize:            cidAndSize.PieceSize,
+		PieceCID:             pieceCid,
+		PieceSize:            pieceSize,
 		VerifiedDeal:         dc.verifiedDeal,
 		Client:               tbuilder.ph.ClientAddr,
-		Provider:             tbuilder.ph.MinerAddr,
-		Label:                rootCid.String(),
-		StartEpoch:           abi.ChainEpoch(rand.Intn(100000)),
-		EndEpoch:             800000 + abi.ChainEpoch(rand.Intn(10000)),
+		Provider:             dc.minerAddr,
+		Label:                dc.label,
+		StartEpoch:           dc.startEpoch,
+		EndEpoch:             dc.endEpoch,
 		StoragePricePerEpoch: abi.NewTokenAmount(1),
 		ProviderCollateral:   dc.providerCollateral,
 		ClientCollateral:     abi.NewTokenAmount(1),
