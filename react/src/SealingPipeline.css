@@ -21,6 +21,10 @@
     background-color: rgb(210, 221, 236);
 }
 
+table.sealing td.sealing-type {
+    vertical-align: top;
+    padding: 0;
+}
 
 .sealing-pipeline table {
     font-size: 1em;
@@ -82,7 +86,7 @@
     padding: 0 0 2em 1.25em;
 }
 
-.sealing-pipeline .Add_Piece {
+.sealing-pipeline .AddPiece {
     background-color: #2c7be5;
 }
 
@@ -90,19 +94,35 @@
     background-color: #6b5eae
 }
 
-.sealing-pipeline .Pre-commit_1 {
+.sealing-pipeline .GetTicket {
+    background-color: #6b5eae
+}
+
+.sealing-pipeline .PreCommit1 {
     background-color: #e63757;
 }
 
-.sealing-pipeline .Pre-commit_2 {
+.sealing-pipeline .PreCommit2 {
     background-color: #fd7e14;
 }
 
-.sealing-pipeline .Pre-commit_Wait {
+.sealing-pipeline .PreCommitting {
     background-color: #f6c343;
 }
 
-.sealing-pipeline .Wait_Seed {
+.sealing-pipeline .PreCommitWait {
+    background-color: #f6c343;
+}
+
+.sealing-pipeline .SubmitPreCommitBatch {
+    background-color: rgb(210, 221, 236);
+}
+
+.sealing-pipeline .PreCommitBatchWait {
+    background-color: rgb(210, 221, 236);
+}
+
+.sealing-pipeline .WaitSeed {
     background-color: rgb(210, 221, 236);
 }
 
@@ -110,10 +130,112 @@
     background-color: #00d97e;
 }
 
-.sealing-pipeline .Committing_Wait {
+.sealing-pipeline .CommitFinalize {
+    background-color: rgb(210, 221, 236);
+}
+
+.sealing-pipeline .CommitFinalizeFailed {
+    background-color: rgb(210, 221, 236);
+}
+
+.sealing-pipeline .SubmitCommit {
+    background-color: rgb(210, 221, 236);
+}
+
+.sealing-pipeline .CommitWait {
     background-color: #02a8b5;
 }
 
-.sealing-pipeline .Finalize_Sector {
+.sealing-pipeline .SubmitCommitAggregate {
+    background-color: rgb(210, 221, 236);
+}
+
+.sealing-pipeline .CommitAggregateWait {
+    background-color: rgb(210, 221, 236);
+}
+
+.sealing-pipeline .FinalizeSector {
     background-color: #39afd1;
+}
+
+.sealing-pipeline .Proving {
+    background-color: #2c7be5;
+}
+
+.sealing-pipeline .TerminateWait {
+    background-color: #fd7e14;
+}
+
+.sealing-pipeline .TerminateFailed,
+.sealing-pipeline .FailedUnrecoverable,
+.sealing-pipeline .AddPieceFailed,
+.sealing-pipeline .SealPreCommit1Failed,
+.sealing-pipeline .SealPreCommit2Failed,
+.sealing-pipeline .PreCommitFailed,
+.sealing-pipeline .ComputeProofFailed,
+.sealing-pipeline .CommitFailed,
+.sealing-pipeline .PackingFailed,
+.sealing-pipeline .FinalizeFailed,
+.sealing-pipeline .DealsExpired,
+.sealing-pipeline .RecoverDealIDs,
+.sealing-pipeline .Faulty,
+.sealing-pipeline .FaultReported,
+.sealing-pipeline .FaultedFinal,
+.sealing-pipeline .Terminating,
+.sealing-pipeline .TerminateWait,
+.sealing-pipeline .TerminateFinality,
+.sealing-pipeline .TerminateFailed,
+.sealing-pipeline .Removing,
+.sealing-pipeline .RemoveFailed {
+    background-color: #e63757;
+}
+
+.sealing-pipeline .Removed {
+    background-color: #444;
+}
+
+/* Snap Deals */
+
+.sealing-pipeline .Available {
+    background-color: rgb(210, 221, 236);
+}
+.sealing-pipeline .SnapDealsWaitDeals {
+    background-color: #2c7be5;
+}
+.sealing-pipeline .SnapDealsAddPiece {
+    background-color: #6b5eae
+}
+.sealing-pipeline .SnapDealsPacking {
+    background-color: #6b5eae
+}
+.sealing-pipeline .UpdateReplica {
+    background-color: #e63757;
+}
+.sealing-pipeline .ProveReplicaUpdate {
+    background-color: #fd7e14;
+}
+.sealing-pipeline .SubmitReplicaUpdate {
+    background-color: #f6c343;
+}
+.sealing-pipeline .ReplicaUpdateWait {
+    background-color: #00d97e;
+}
+.sealing-pipeline .FinalizeReplicaUpdate {
+    background-color: #02a8b5;
+}
+.sealing-pipeline .UpdateActivating {
+    background-color: #029895;
+}
+.sealing-pipeline .ReleaseSectorKey {
+    background-color: #016855;
+}
+
+.sealing-pipeline .SnapDealsAddPieceFailed,
+.sealing-pipeline .SnapDealsDealsExpired,
+.sealing-pipeline .SnapDealsRecoverDealIDs,
+.sealing-pipeline .AbortUpgrade,
+.sealing-pipeline .ReplicaUpdateFailed,
+.sealing-pipeline .ReleaseSectorKeyFailed,
+.sealing-pipeline .FinalizeReplicaUpdateFailed {
+    background-color: #e63757;
 }

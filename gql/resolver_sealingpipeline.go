@@ -75,26 +75,67 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		}
 	}
 
-	log.Debugw("sealing pipeline", "waitdeals", summary["WaitDeals"], "taken", taken, "deals", deals, "pc1", summary["PreCommit1"], "pc2", summary["PreCommit2"], "precommitwait", summary["PreCommitWait"], "waitseed", summary["WaitSeed"], "committing", summary["Committing"], "commitwait", summary["CommitWait"], "proving", summary["Proving"])
+	var ss sectorStates
+	for order, state := range allSectorStates {
+		count, ok := summary[api.SectorState(state)]
+		if !ok {
+			continue
+		}
+		if count == 0 {
+			continue
+		}
+
+		if _, ok := normalSectors[state]; ok {
+			ss.Regular = append(ss.Regular, &sectorState{
+				Key:   state,
+				Value: int32(count),
+				Order: int32(order),
+			})
+			continue
+		}
+
+		if _, ok := normalErredSectors[state]; ok {
+			ss.RegularError = append(ss.RegularError, &sectorState{
+				Key:   state,
+				Value: int32(count),
+				Order: int32(order),
+			})
+			continue
+		}
+
+		if _, ok := snapdealsSectors[state]; ok {
+			ss.SnapDeals = append(ss.SnapDeals, &sectorState{
+				Key:   state,
+				Value: int32(count),
+				Order: int32(order),
+			})
+			continue
+		}
+
+		if _, ok := snapdealsSectors[state]; ok {
+			ss.SnapDealsError = append(ss.SnapDealsError, &sectorState{
+				Key:   state,
+				Value: int32(count),
+				Order: int32(order),
+			})
+			continue
+		}
+	}
 
 	return &sealingPipelineState{
 		WaitDeals: waitDeals{
 			SectorSize: gqltypes.Uint64(ssize),
 			Deals:      deals,
 		},
-		SectorStates: sectorStates{
-			AddPiece:       int32(summary["AddPiece"]),
-			Packing:        int32(summary["Packing"]),
-			PreCommit1:     int32(summary["PreCommit1"]),
-			PreCommit2:     int32(summary["PreCommit2"]),
-			PreCommitWait:  int32(summary["PreCommitWait"]),
-			WaitSeed:       int32(summary["WaitSeed"]),
-			Committing:     int32(summary["Committing"]),
-			CommittingWait: int32(summary["CommitWait"]),
-			FinalizeSector: int32(summary["FinalizeSector"]),
-		},
-		Workers: workers,
+		SectorStates: ss,
+		Workers:      workers,
 	}, nil
+}
+
+type sectorState struct {
+	Key   string
+	Value int32
+	Order int32
 }
 
 type waitDeal struct {
@@ -108,15 +149,10 @@ type waitDeals struct {
 }
 
 type sectorStates struct {
-	AddPiece       int32
-	Packing        int32
-	PreCommit1     int32
-	PreCommit2     int32
-	WaitSeed       int32
-	PreCommitWait  int32
-	Committing     int32
-	CommittingWait int32
-	FinalizeSector int32
+	Regular        []*sectorState
+	SnapDeals      []*sectorState
+	RegularError   []*sectorState
+	SnapDealsError []*sectorState
 }
 
 type worker struct {

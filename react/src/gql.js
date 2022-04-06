@@ -275,15 +275,26 @@ const SealingPipelineQuery = gql`
                 }
             }
             SectorStates {
-                AddPiece
-                Packing
-                PreCommit1
-                PreCommit2
-                PreCommitWait
-                WaitSeed
-                Committing
-                CommittingWait
-                FinalizeSector
+                Regular {
+                    Key
+                    Value
+                    Order
+                }
+                RegularError {
+                    Key
+                    Value
+                    Order
+                }
+                SnapDeals {
+                    Key
+                    Value
+                    Order
+                }
+                SnapDealsError {
+                    Key
+                    Value
+                    Order
+                }
             }
             Workers {
                 ID

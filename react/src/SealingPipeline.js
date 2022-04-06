@@ -31,7 +31,7 @@ function SealingPipelineContent(props) {
 
     return <div className="sealing-pipeline">
         <WaitDeals {...sealingPipeline.WaitDeals} />
-        <Sealing {...sealingPipeline.SectorStates} />
+        <Sealing states={sealingPipeline.SectorStates} />
         <Workers workers={sealingPipeline.Workers} />
     </div>
 }
@@ -85,63 +85,48 @@ function WaitDealsSizes(props) {
     </table>
 }
 
-const sectorStates = function(props) {
-    return [{
-        Name: 'Add Piece',
-        Count: props.AddPiece,
-    }, {
-        Name: 'Packing',
-        Count: props.Packing,
-    }, {
-        Name: 'Pre-commit 1',
-        Count: props.PreCommit1,
-    }, {
-        Name: 'Pre-commit 2',
-        Count: props.PreCommit2,
-    }, {
-        Name: 'Pre-commit Wait',
-        Count: props.PreCommitWait,
-    }, {
-        Name: 'Wait Seed',
-        Count: props.WaitSeed,
-    }, {
-        Name: 'Committing',
-        Count: props.Committing,
-    }, {
-        Name: 'Committing Wait',
-        Count: props.CommittingWait,
-    }, {
-        Name: 'Finalize Sector',
-        Count: props.FinalizeSector,
-    }]
+function Sealing(props) {
+    return (
+        <table className="sealing">
+            <tbody>
+            <tr>
+                <td className="sealing-type">
+                    <SealingType states={props.states} sectorType="Regular" />
+                </td>
+                <td className="sealing-type">
+                    <SealingType states={props.states} sectorType="Snap Deals" />
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    )
 }
 
-function Sealing(props) {
-    var total = 0
-    const states = sectorStates(props)
-    var bars = []
-    for (let i = 0; i < states.length; i++) {
-        let sec = states[i]
-        total += sec.Count
-        sec.className = sec.Name.replace(/ /g, '_')
-        bars.push({
-            className: sec.className,
-            amount: sec.Count,
-        })
+function SealingType(props) {
+    var states = []
+    var errStates = []
+    if (props.sectorType === 'Regular') {
+        states = props.states.Regular
+        errStates = props.states.RegularError
+    } else {
+        states = props.states.SnapDeals
+        errStates = props.states.SnapDealsError
     }
+    states = states.map(s => s).sort((a, b) => a.Order - b.Order)
+    states = states.concat(errStates.map(s => s).sort((a, b) => a.Order - b.Order))
 
-    return <div className="sealing">
-        <div className="title">Sealing</div>
-
-        {total > 0 ? <CumulativeBarChart bars={bars} /> : null}
+    const title = props.sectorType === 'Snap Deals' ? 'Snap Deals Sectors' : 'Regular Sectors'
+    const className = props.sectorType.toLowerCase().replace(/ /g, '_')
+    return <div className={"sealing-type-content " + className}>
+        <div className="title">{title}</div>
 
         <table className="sector-states">
             <tbody>
             {states.map(sec => (
-                <tr key={sec.Name}>
-                    <td className="color"><div className={sec.className} /></td>
-                    <td className="state">{sec.Name}</td>
-                    <td className={"count " + (sec.Count ? '' : 'zero')}>{sec.Count}</td>
+                <tr key={sec.Key}>
+                    <td className="color"><div className={sec.Key.replace(/ /g, '_')} /></td>
+                    <td className="state">{sec.Key}</td>
+                    <td className={"count " + (sec.Value ? '' : 'zero')}>{sec.Value}</td>
                 </tr>
             ))}
             </tbody>
@@ -183,8 +168,17 @@ export function SealingPipelineMenuItem(props) {
 
     var total = 0
     if (data) {
-        for (let sec of sectorStates(data.sealingpipeline.SectorStates)) {
-            total += sec.Count
+        for (let sec of data.sealingpipeline.SectorStates.Regular) {
+            total += Number(sec.Value)
+        }
+        for (let sec of data.sealingpipeline.SectorStates.RegularError) {
+            total += Number(sec.Value)
+        }
+        for (let sec of data.sealingpipeline.SectorStates.SnapDeals) {
+            total += Number(sec.Value)
+        }
+        for (let sec of data.sealingpipeline.SectorStates.SnapDealsError) {
+            total += Number(sec.Value)
         }
     }
 
@@ -195,31 +189,4 @@ export function SealingPipelineMenuItem(props) {
             <b>{total}</b> sector{total === 1 ? '' : 's'}
         </div>
     </Link>
-}
-
-const mockData = {
-    sealingpipeline: {
-        WaitDeals: {
-            Deals: [{
-                ID: '1312-asdfd-234234-sadfsdfs',
-                Size: BigInt(2*1024*1024*1024),
-            }, {
-                ID: '4234-hfdsh-253524-kassdsss',
-                Size: BigInt(11*1024*1024*1024),
-            }],
-            SectorSize: BigInt(32*1024*1024*1024),
-        },
-        SectorStates: {
-            AddPiece: 1,
-            Packing: 1,
-            PreCommit1: 0,
-            PreCommit2: 2,
-            PreCommitWait: 0,
-            WaitSeed: 0,
-            Committing: 4,
-            CommittingWait: 0,
-            FinalizeSector: 1,
-        },
-        Workers: [],
-    }
 }
