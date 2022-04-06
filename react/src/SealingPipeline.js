@@ -31,7 +31,7 @@ function SealingPipelineContent(props) {
 
     return <div className="sealing-pipeline">
         <WaitDeals {...sealingPipeline.WaitDeals} />
-        <Sealing {...sealingPipeline.SectorStates} />
+        <Sealing states={sealingPipeline.SectorStates} />
         <Workers workers={sealingPipeline.Workers} />
     </div>
 }
@@ -93,14 +93,13 @@ const sectorStates = function(props) {
             Value: props[i].Value,
         })
     }
-    console.log(states);
 
     return states
 }
 
 function Sealing(props) {
     var total = 0
-    const states = sectorStates(props)
+    const states = sectorStates(props.states)
     var bars = []
     for (let i = 0; i < states.length; i++) {
         let sec = states[i]
@@ -112,7 +111,6 @@ function Sealing(props) {
         })
     }
 
-    //console.log(states)
     return <div className="sealing">
         <div className="title">Sealing</div>
 
@@ -124,7 +122,7 @@ function Sealing(props) {
                 <tr key={sec.Key}>
                     <td className="color"><div className={sec.className} /></td>
                     <td className="state">{sec.Key}</td>
-                    <td className={"count " + (Number(sec.Value) ? '' : 'zero')}>{sec.Value}</td>
+                    <td className={"count " + (Number(sec.Value) ? '' : 'zero')}>{sec.Value+''}</td>
                 </tr>
             ))}
             </tbody>
