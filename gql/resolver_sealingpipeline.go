@@ -75,36 +75,55 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		}
 	}
 
-	// TODO: put states in order
-	var order int32
 	sectorStates := []*sectorState{}
-	for k, v := range summary {
-		if v == 0 {
+	for order, state := range allSectorStates {
+		count, ok := summary[api.SectorState(state)]
+		if !ok {
 			continue
 		}
-		order++
+		if count == 0 {
+			continue
+		}
 
-		if _, ok := normalSectors[string(k)]; ok {
+		if _, ok := normalSectors[state]; ok {
 			sectorStates = append(sectorStates, &sectorState{
-				Key:   string(k),
-				Value: int32(v),
+				Key:   state,
+				Value: int32(count),
 				Type:  "Regular",
-				Order: order,
+				Order: int32(order),
 			})
 			continue
 		}
 
-		if _, ok := snapdealsSectors[string(k)]; ok {
+		if _, ok := normalErredSectors[state]; ok {
 			sectorStates = append(sectorStates, &sectorState{
-				Key:   string(k),
-				Value: int32(v),
-				Type:  "Snap Deals",
-				Order: order,
+				Key:   state,
+				Value: int32(count),
+				Type:  "Regular / Erred",
+				Order: int32(order),
 			})
 			continue
 		}
 
-		log.Errorw("unknown sector in resolver", "name", string(k), "count", v)
+		if _, ok := snapdealsSectors[state]; ok {
+			sectorStates = append(sectorStates, &sectorState{
+				Key:   state,
+				Value: int32(count),
+				Type:  "Snap Deals",
+				Order: int32(order),
+			})
+			continue
+		}
+
+		if _, ok := snapdealsErredSectors[state]; ok {
+			sectorStates = append(sectorStates, &sectorState{
+				Key:   state,
+				Value: int32(count),
+				Type:  "Snap Deals / Erred",
+				Order: int32(order),
+			})
+			continue
+		}
 	}
 
 	return &sealingPipelineState{

@@ -1,9 +1,14 @@
 package gql
 
 var (
-	normalSectors    map[string]struct{}
-	snapdealsSectors map[string]struct{}
+	normalSectors         map[string]struct{}
+	normalErredSectors    map[string]struct{}
+	snapdealsSectors      map[string]struct{}
+	snapdealsErredSectors map[string]struct{}
 
+	allSectorStates []string
+
+	// ordered
 	normalSectorsList = []string{
 		"WaitDeals",
 		"AddPiece",
@@ -25,8 +30,9 @@ var (
 		"CommitAggregateWait",
 		"FinalizeSector",
 		"Proving",
+	}
 
-		// error modes
+	normalErredSectorsList = []string{
 		"FailedUnrecoverable",
 		"AddPieceFailed",
 		"SealPreCommit1Failed",
@@ -63,7 +69,9 @@ var (
 		"FinalizeReplicaUpdate",
 		"UpdateActivating",
 		"ReleaseSectorKey",
+	}
 
+	snapdealsErredSectorsList = []string{
 		// snap deals error modes
 		"SnapDealsAddPieceFailed",
 		"SnapDealsDealsExpired",
@@ -76,13 +84,26 @@ var (
 )
 
 func init() {
+	allSectorStates = append(allSectorStates, normalSectorsList...)
+	allSectorStates = append(allSectorStates, normalErredSectorsList...)
+	allSectorStates = append(allSectorStates, snapdealsSectorsList...)
+	allSectorStates = append(allSectorStates, snapdealsErredSectorsList...)
+
 	normalSectors = make(map[string]struct{})
+	normalErredSectors = make(map[string]struct{})
 	snapdealsSectors = make(map[string]struct{})
+	snapdealsErredSectors = make(map[string]struct{})
 
 	for _, s := range normalSectorsList {
 		normalSectors[s] = struct{}{}
 	}
+	for _, s := range normalErredSectorsList {
+		normalErredSectors[s] = struct{}{}
+	}
 	for _, s := range snapdealsSectorsList {
 		snapdealsSectors[s] = struct{}{}
+	}
+	for _, s := range snapdealsErredSectorsList {
+		snapdealsErredSectors[s] = struct{}{}
 	}
 }
