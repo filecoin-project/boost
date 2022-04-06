@@ -2,7 +2,6 @@ package gql
 
 import (
 	"context"
-	"sort"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
@@ -76,17 +75,21 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		}
 	}
 
+	// TODO: put states in order
+	var order int32
 	sectorStates := []*sectorState{}
 	for k, v := range summary {
 		if v == 0 {
 			continue
 		}
+		order++
 
 		if _, ok := normalSectors[string(k)]; ok {
 			sectorStates = append(sectorStates, &sectorState{
 				Key:   string(k),
 				Value: int32(v),
 				Type:  "Regular",
+				Order: order,
 			})
 			continue
 		}
@@ -96,16 +99,13 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 				Key:   string(k),
 				Value: int32(v),
 				Type:  "Snap Deals",
+				Order: order,
 			})
 			continue
 		}
 
 		log.Errorw("unknown sector in resolver", "name", string(k), "count", v)
 	}
-
-	sort.Slice(sectorStates, func(i, j int) bool {
-		return sectorStates[i].Key < sectorStates[j].Key
-	})
 
 	return &sealingPipelineState{
 		WaitDeals: waitDeals{
@@ -121,6 +121,7 @@ type sectorState struct {
 	Key   string
 	Value int32
 	Type  string
+	Order int32
 }
 
 type waitDeal struct {

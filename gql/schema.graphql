@@ -161,9 +161,11 @@ type WaitDeals {
   Deals: [WaitDeal]!
 }
 
-type sectorState {
+type SectorState {
+  Type: String!
   Key: String!
   Value: Int!
+  Order: Int!
 }
 
 type Worker {
@@ -175,7 +177,7 @@ type Worker {
 
 type SealingPipeline {
   WaitDeals: WaitDeals!
-  SectorStates: [sectorState]!
+  SectorStates: [SectorState]!
   Workers: [Worker]!
 }
 
