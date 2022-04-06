@@ -163,7 +163,7 @@ type WaitDeals {
 
 type sectorState {
   Key: String!
-  Value: Uint64!
+  Value: Int!
 }
 
 type Worker {

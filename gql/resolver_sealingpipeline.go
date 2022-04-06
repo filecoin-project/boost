@@ -77,10 +77,29 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 
 	sectorStates := []*sectorState{}
 	for k, v := range summary {
-		sectorStates = append(sectorStates, &sectorState{
-			Key:   string(k),
-			Value: gqltypes.Uint64(v),
-		})
+		if v == 0 {
+			continue
+		}
+
+		if _, ok := normalSectors[string(k)]; ok {
+			sectorStates = append(sectorStates, &sectorState{
+				Key:   string(k),
+				Value: int32(v),
+				Type:  "Regular",
+			})
+			continue
+		}
+
+		if _, ok := snapdealsSectors[string(k)]; ok {
+			sectorStates = append(sectorStates, &sectorState{
+				Key:   string(k),
+				Value: int32(v),
+				Type:  "Snap Deals",
+			})
+			continue
+		}
+
+		log.Errorw("unknown sector in resolver", "name", string(k), "count", v)
 	}
 
 	return &sealingPipelineState{
@@ -95,7 +114,8 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 
 type sectorState struct {
 	Key   string
-	Value gqltypes.Uint64
+	Value int32
+	Type  string
 }
 
 type waitDeal struct {
