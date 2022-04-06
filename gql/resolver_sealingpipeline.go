@@ -2,6 +2,7 @@ package gql
 
 import (
 	"context"
+	"sort"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
@@ -101,6 +102,10 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 
 		log.Errorw("unknown sector in resolver", "name", string(k), "count", v)
 	}
+
+	sort.Slice(sectorStates, func(i, j int) bool {
+		return sectorStates[i].Key < sectorStates[j].Key
+	})
 
 	return &sealingPipelineState{
 		WaitDeals: waitDeals{

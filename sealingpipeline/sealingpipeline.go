@@ -45,18 +45,7 @@ func GetStatus(ctx context.Context, fullnodeApi api.FullNode, api API) (*Status,
 
 	st := &Status{
 		SectorStates: summary,
-		//SectorStates: sectorStates{
-		//AddPiece:       int32(summary["AddPiece"]),
-		//Packing:        int32(summary["Packing"]),
-		//PreCommit1:     int32(summary["PreCommit1"]),
-		//PreCommit2:     int32(summary["PreCommit2"]),
-		//PreCommitWait:  int32(summary["PreCommitWait"]),
-		//WaitSeed:       int32(summary["WaitSeed"]),
-		//Committing:     int32(summary["Committing"]),
-		//CommittingWait: int32(summary["CommitWait"]),
-		//FinalizeSector: int32(summary["FinalizeSector"]),
-		//},
-		Workers: workers,
+		Workers:      workers,
 	}
 
 	return st, nil
