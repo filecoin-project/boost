@@ -275,10 +275,26 @@ const SealingPipelineQuery = gql`
                 }
             }
             SectorStates {
-                Type
-                Key
-                Value
-                Order
+                Regular {
+                    Key
+                    Value
+                    Order
+                }
+                RegularError {
+                    Key
+                    Value
+                    Order
+                }
+                SnapDeals {
+                    Key
+                    Value
+                    Order
+                }
+                SnapDealsError {
+                    Key
+                    Value
+                    Order
+                }
             }
             Workers {
                 ID

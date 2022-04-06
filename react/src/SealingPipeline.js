@@ -18,8 +18,7 @@ export function SealingPipelinePage(props) {
 }
 
 function SealingPipelineContent(props) {
-    // const {loading, error, data} = useQuery(SealingPipelineQuery, { pollInterval: 2000 })
-    const {loading, error, data} = useQuery(SealingPipelineQuery)
+    const {loading, error, data} = useQuery(SealingPipelineQuery, { pollInterval: 2000 })
 
     if (loading) {
         return <div>Loading...</div>
@@ -86,26 +85,16 @@ function WaitDealsSizes(props) {
     </table>
 }
 
-const sectorStates = function(allStates, sectorType) {
-    return allStates.filter(s => !sectorType || s.Type === sectorType).
-        map(s => ({
-            Key: s.Key,
-            Value: s.Value,
-        }))
-}
-
 function Sealing(props) {
-    const states = props.states.map(s => s).sort((a, b) => a.Order - b.Order)
-
     return (
         <table className="sealing">
             <tbody>
             <tr>
                 <td className="sealing-type">
-                    <SealingType states={states} sectorType="Regular" />
+                    <SealingType states={props.states} sectorType="Regular" />
                 </td>
                 <td className="sealing-type">
-                    <SealingType states={states} sectorType="Snap Deals" />
+                    <SealingType states={props.states} sectorType="Snap Deals" />
                 </td>
             </tr>
             </tbody>
@@ -115,15 +104,25 @@ function Sealing(props) {
 
 function SealingType(props) {
     var total = 0
-    const states = sectorStates(props.states, props.sectorType)
+    var states = []
+    var errStates = []
+    if (props.sectorType == 'Regular') {
+        states = props.states.Regular
+        errStates = props.states.RegularError
+    } else {
+        states = props.states.SnapDeals
+        errStates = props.states.SnapDealsError
+    }
+    states = states.map(s => s).sort((a, b) => a.Order - b.Order)
+    states = states.concat(errStates.map(s => s).sort((a, b) => a.Order - b.Order))
+
     var bars = []
-    for (let i = 0; i < states.length; i++) {
-        let sec = states[i]
+    for (let sec of states) {
         total += sec.Value
-        sec.className = sec.Key.replace(/ /g, '_')
+        const className = sec.Key.replace(/ /g, '_')
         bars.push({
-            className: sec.className,
             amount: sec.Value,
+            className,
         })
     }
 
@@ -138,7 +137,7 @@ function SealingType(props) {
             <tbody>
             {states.map(sec => (
                 <tr key={sec.Key}>
-                    <td className="color"><div className={sec.className} /></td>
+                    <td className="color"><div className={sec.Key.replace(/ /g, '_')} /></td>
                     <td className="state">{sec.Key}</td>
                     <td className={"count " + (sec.Value ? '' : 'zero')}>{sec.Value}</td>
                 </tr>
@@ -176,13 +175,22 @@ function Workers(props) {
 
 export function SealingPipelineMenuItem(props) {
     const {data} = useQuery(SealingPipelineQuery, {
-        // pollInterval: 5000,
+        pollInterval: 5000,
         fetchPolicy: "network-only",
     })
 
     var total = 0
     if (data) {
-        for (let sec of sectorStates(data.sealingpipeline.SectorStates)) {
+        for (let sec of data.sealingpipeline.SectorStates.Regular) {
+            total += Number(sec.Value)
+        }
+        for (let sec of data.sealingpipeline.SectorStates.RegularError) {
+            total += Number(sec.Value)
+        }
+        for (let sec of data.sealingpipeline.SectorStates.SnapDeals) {
+            total += Number(sec.Value)
+        }
+        for (let sec of data.sealingpipeline.SectorStates.SnapDealsError) {
             total += Number(sec.Value)
         }
     }
