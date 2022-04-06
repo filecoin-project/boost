@@ -93,46 +93,9 @@ const sectorStates = function(props) {
             Value: props[i].Value,
         })
     }
+    console.log(states);
 
     return states
-
-    //return [{
-        //Key: 'Available',
-        //Value: props["Available"],
-    //}, {
-        //Key: 'Add Piece',
-        //Value: props["AddPiece"],
-    //}, {
-        //Key: 'Packing',
-        //Value: props["Packing"],
-    //}, {
-        //Key: 'Update Replica',
-        //Value: props["UpdateReplica"],
-    //}, {
-        //Key: 'Prove Update Replica',
-        //Value: props["ProveUpdateReplica"],
-    //}, {
-        //Key: 'Pre-commit 1',
-        //Value: props["PreCommit1"],
-    //}, {
-        //Key: 'Pre-commit 2',
-        //Value: props["PreCommit2"],
-    //}, {
-        //Key: 'Pre-commit Wait',
-        //Value: props["PreCommitWait"],
-    //}, {
-        //Key: 'Wait Seed',
-        //Value: props["WaitSeed"],
-    //}, {
-        //Key: 'Committing',
-        //Value: props["Committing"],
-    //}, {
-        //Key: 'Committing Wait',
-        //Value: props["CommittingWait"],
-    //}, {
-        //Key: 'Finalize Sector',
-        //Value: props["FinalizeSector"],
-    //}]
 }
 
 function Sealing(props) {
@@ -141,14 +104,15 @@ function Sealing(props) {
     var bars = []
     for (let i = 0; i < states.length; i++) {
         let sec = states[i]
-        total += sec.Value
+        total += Number(sec.Value)
         sec.className = sec.Key.replace(/ /g, '_')
         bars.push({
             className: sec.className,
-            amount: sec.Value,
+            amount: Number(sec.Value),
         })
     }
 
+    //console.log(states)
     return <div className="sealing">
         <div className="title">Sealing</div>
 
@@ -157,10 +121,10 @@ function Sealing(props) {
         <table className="sector-states">
             <tbody>
             {states.map(sec => (
-                <tr key={sec.Name}>
+                <tr key={sec.Key}>
                     <td className="color"><div className={sec.className} /></td>
                     <td className="state">{sec.Key}</td>
-                    <td className={"count " + (sec.Count ? '' : 'zero')}>{sec.Value}</td>
+                    <td className={"count " + (Number(sec.Value) ? '' : 'zero')}>{sec.Value}</td>
                 </tr>
             ))}
             </tbody>
@@ -203,7 +167,7 @@ export function SealingPipelineMenuItem(props) {
     var total = 0
     if (data) {
         for (let sec of sectorStates(data.sealingpipeline.SectorStates)) {
-            total += sec.Value
+            total += Number(sec.Value)
         }
     }
 

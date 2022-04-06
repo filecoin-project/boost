@@ -275,15 +275,8 @@ const SealingPipelineQuery = gql`
                 }
             }
             SectorStates {
-                AddPiece
-                Packing
-                PreCommit1
-                PreCommit2
-                PreCommitWait
-                WaitSeed
-                Committing
-                CommittingWait
-                FinalizeSector
+                Key
+                Value
             }
             Workers {
                 ID
