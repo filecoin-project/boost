@@ -161,17 +161,9 @@ type WaitDeals {
   Deals: [WaitDeal]!
 }
 
-type SectorStates {
-  AddPiece: Int!
-  Packing: Int!
-  UpdateReplica: Int!
-  PreCommit1: Int!
-  PreCommit2: Int!
-  PreCommitWait: Int!
-  WaitSeed: Int!
-  Committing: Int!
-  CommittingWait: Int!
-  FinalizeSector: Int!
+type sectorState {
+  Key: String!
+  Value: Int!
 }
 
 type Worker {
@@ -183,7 +175,7 @@ type Worker {
 
 type SealingPipeline {
   WaitDeals: WaitDeals!
-  SectorStates: SectorStates!
+  SectorStates: [sectorState]!
   Workers: [Worker]!
 }
 

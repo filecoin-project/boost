@@ -75,9 +75,12 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		}
 	}
 
-	sectorStates := map[string]int{}
+	sectorStates := []sectorState{}
 	for k, v := range summary {
-		sectorStates[string(k)] = v
+		sectorStates = append(sectorStates, sectorState{
+			Key:   string(k),
+			Value: gqltypes.Uint64(v),
+		})
 	}
 
 	return &sealingPipelineState{
@@ -90,6 +93,11 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 	}, nil
 }
 
+type sectorState struct {
+	Key   string
+	Value gqltypes.Uint64
+}
+
 type waitDeal struct {
 	ID   graphql.ID
 	Size gqltypes.Uint64
@@ -98,19 +106,6 @@ type waitDeal struct {
 type waitDeals struct {
 	SectorSize gqltypes.Uint64
 	Deals      []*waitDeal
-}
-
-type sectorStates struct {
-	AddPiece       int32
-	Packing        int32
-	UpdateReplica  int32
-	PreCommit1     int32
-	PreCommit2     int32
-	WaitSeed       int32
-	PreCommitWait  int32
-	Committing     int32
-	CommittingWait int32
-	FinalizeSector int32
 }
 
 type worker struct {
@@ -122,7 +117,7 @@ type worker struct {
 
 type sealingPipelineState struct {
 	WaitDeals    waitDeals
-	SectorStates map[string]int
+	SectorStates []sectorState
 	Workers      []*worker
 }
 

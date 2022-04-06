@@ -86,43 +86,53 @@ function WaitDealsSizes(props) {
 }
 
 const sectorStates = function(props) {
-    return [{
-        Name: 'Available',
-        Count: props["Available"],
-    }, {
-        Name: 'Add Piece',
-        Count: props["AddPiece"],
-    }, {
-        Name: 'Packing',
-        Count: props["Packing"],
-    }, {
-        Name: 'Update Replica',
-        Count: props["UpdateReplica"],
-    }, {
-        Name: 'Prove Update Replica',
-        Count: props["ProveUpdateReplica"],
-    }, {
-        Name: 'Pre-commit 1',
-        Count: props["PreCommit1"],
-    }, {
-        Name: 'Pre-commit 2',
-        Count: props["PreCommit2"],
-    }, {
-        Name: 'Pre-commit Wait',
-        Count: props["PreCommitWait"],
-    }, {
-        Name: 'Wait Seed',
-        Count: props["WaitSeed"],
-    }, {
-        Name: 'Committing',
-        Count: props["Committing"],
-    }, {
-        Name: 'Committing Wait',
-        Count: props["CommittingWait"],
-    }, {
-        Name: 'Finalize Sector',
-        Count: props["FinalizeSector"],
-    }]
+    var states = []
+    for (let i = 0; i < props.length; i++) {
+        states.push({
+            Key: props[i].Key,
+            Value: props[i].Value,
+        })
+    }
+
+    return states
+
+    //return [{
+        //Key: 'Available',
+        //Value: props["Available"],
+    //}, {
+        //Key: 'Add Piece',
+        //Value: props["AddPiece"],
+    //}, {
+        //Key: 'Packing',
+        //Value: props["Packing"],
+    //}, {
+        //Key: 'Update Replica',
+        //Value: props["UpdateReplica"],
+    //}, {
+        //Key: 'Prove Update Replica',
+        //Value: props["ProveUpdateReplica"],
+    //}, {
+        //Key: 'Pre-commit 1',
+        //Value: props["PreCommit1"],
+    //}, {
+        //Key: 'Pre-commit 2',
+        //Value: props["PreCommit2"],
+    //}, {
+        //Key: 'Pre-commit Wait',
+        //Value: props["PreCommitWait"],
+    //}, {
+        //Key: 'Wait Seed',
+        //Value: props["WaitSeed"],
+    //}, {
+        //Key: 'Committing',
+        //Value: props["Committing"],
+    //}, {
+        //Key: 'Committing Wait',
+        //Value: props["CommittingWait"],
+    //}, {
+        //Key: 'Finalize Sector',
+        //Value: props["FinalizeSector"],
+    //}]
 }
 
 function Sealing(props) {
@@ -131,11 +141,11 @@ function Sealing(props) {
     var bars = []
     for (let i = 0; i < states.length; i++) {
         let sec = states[i]
-        total += sec.Count
-        sec.className = sec.Name.replace(/ /g, '_')
+        total += sec.Value
+        sec.className = sec.Key.replace(/ /g, '_')
         bars.push({
             className: sec.className,
-            amount: sec.Count,
+            amount: sec.Value,
         })
     }
 
@@ -149,8 +159,8 @@ function Sealing(props) {
             {states.map(sec => (
                 <tr key={sec.Name}>
                     <td className="color"><div className={sec.className} /></td>
-                    <td className="state">{sec.Name}</td>
-                    <td className={"count " + (sec.Count ? '' : 'zero')}>{sec.Count}</td>
+                    <td className="state">{sec.Key}</td>
+                    <td className={"count " + (sec.Count ? '' : 'zero')}>{sec.Value}</td>
                 </tr>
             ))}
             </tbody>
@@ -193,7 +203,7 @@ export function SealingPipelineMenuItem(props) {
     var total = 0
     if (data) {
         for (let sec of sectorStates(data.sealingpipeline.SectorStates)) {
-            total += sec.Count
+            total += sec.Value
         }
     }
 
