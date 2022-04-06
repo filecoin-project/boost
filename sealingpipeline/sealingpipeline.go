@@ -51,18 +51,6 @@ func GetStatus(ctx context.Context, fullnodeApi api.FullNode, api API) (*Status,
 	return st, nil
 }
 
-//type sectorStates struct {
-//AddPiece       int32
-//Packing        int32
-//PreCommit1     int32
-//PreCommit2     int32
-//WaitSeed       int32
-//PreCommitWait  int32
-//Committing     int32
-//CommittingWait int32
-//FinalizeSector int32
-//}
-
 type worker struct {
 	ID     string
 	Start  time.Time
