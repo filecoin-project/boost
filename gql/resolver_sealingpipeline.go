@@ -75,9 +75,9 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		}
 	}
 
-	sectorStates := []sectorState{}
+	sectorStates := []*sectorState{}
 	for k, v := range summary {
-		sectorStates = append(sectorStates, sectorState{
+		sectorStates = append(sectorStates, &sectorState{
 			Key:   string(k),
 			Value: gqltypes.Uint64(v),
 		})
@@ -117,7 +117,7 @@ type worker struct {
 
 type sealingPipelineState struct {
 	WaitDeals    waitDeals
-	SectorStates []sectorState
+	SectorStates []*sectorState
 	Workers      []*worker
 }
 
