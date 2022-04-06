@@ -75,7 +75,7 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		}
 	}
 
-	sectorStates := []*sectorState{}
+	var ss sectorStates
 	for order, state := range allSectorStates {
 		count, ok := summary[api.SectorState(state)]
 		if !ok {
@@ -86,40 +86,36 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		}
 
 		if _, ok := normalSectors[state]; ok {
-			sectorStates = append(sectorStates, &sectorState{
+			ss.Regular = append(ss.Regular, &sectorState{
 				Key:   state,
 				Value: int32(count),
-				Type:  "Regular",
 				Order: int32(order),
 			})
 			continue
 		}
 
 		if _, ok := normalErredSectors[state]; ok {
-			sectorStates = append(sectorStates, &sectorState{
+			ss.RegularError = append(ss.RegularError, &sectorState{
 				Key:   state,
 				Value: int32(count),
-				Type:  "Regular / Erred",
 				Order: int32(order),
 			})
 			continue
 		}
 
 		if _, ok := snapdealsSectors[state]; ok {
-			sectorStates = append(sectorStates, &sectorState{
+			ss.SnapDeals = append(ss.SnapDeals, &sectorState{
 				Key:   state,
 				Value: int32(count),
-				Type:  "Snap Deals",
 				Order: int32(order),
 			})
 			continue
 		}
 
-		if _, ok := snapdealsErredSectors[state]; ok {
-			sectorStates = append(sectorStates, &sectorState{
+		if _, ok := snapdealsSectors[state]; ok {
+			ss.SnapDealsError = append(ss.SnapDealsError, &sectorState{
 				Key:   state,
 				Value: int32(count),
-				Type:  "Snap Deals / Erred",
 				Order: int32(order),
 			})
 			continue
@@ -131,7 +127,7 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 			SectorSize: gqltypes.Uint64(ssize),
 			Deals:      deals,
 		},
-		SectorStates: sectorStates,
+		SectorStates: ss,
 		Workers:      workers,
 	}, nil
 }
@@ -139,7 +135,6 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 type sectorState struct {
 	Key   string
 	Value int32
-	Type  string
 	Order int32
 }
 
@@ -153,6 +148,13 @@ type waitDeals struct {
 	Deals      []*waitDeal
 }
 
+type sectorStates struct {
+	Regular        []*sectorState
+	SnapDeals      []*sectorState
+	RegularError   []*sectorState
+	SnapDealsError []*sectorState
+}
+
 type worker struct {
 	ID     string
 	Start  graphql.Time
@@ -162,7 +164,7 @@ type worker struct {
 
 type sealingPipelineState struct {
 	WaitDeals    waitDeals
-	SectorStates []*sectorState
+	SectorStates sectorStates
 	Workers      []*worker
 }
 
