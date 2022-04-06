@@ -18,7 +18,8 @@ export function SealingPipelinePage(props) {
 }
 
 function SealingPipelineContent(props) {
-    const {loading, error, data} = useQuery(SealingPipelineQuery, { pollInterval: 2000 })
+    // const {loading, error, data} = useQuery(SealingPipelineQuery, { pollInterval: 2000 })
+    const {loading, error, data} = useQuery(SealingPipelineQuery)
 
     if (loading) {
         return <div>Loading...</div>
@@ -85,34 +86,51 @@ function WaitDealsSizes(props) {
     </table>
 }
 
-const sectorStates = function(props) {
-    var states = []
-    for (let i = 0; i < props.length; i++) {
-        states.push({
-            Key: props[i].Key,
-            Value: props[i].Value,
-        })
-    }
-
-    return states
+const sectorStates = function(allStates, sectorType) {
+    return allStates.filter(s => !sectorType || s.Type === sectorType).
+        map(s => ({
+            Key: s.Key,
+            Value: s.Value,
+        }))
 }
 
 function Sealing(props) {
+    const states = props.states.map(s => s).sort((a, b) => a.Order - b.Order)
+
+    return (
+        <table className="sealing">
+            <tbody>
+            <tr>
+                <td className="sealing-type">
+                    <SealingType states={states} sectorType="Regular" />
+                </td>
+                <td className="sealing-type">
+                    <SealingType states={states} sectorType="Snap Deals" />
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    )
+}
+
+function SealingType(props) {
     var total = 0
-    const states = sectorStates(props.states)
+    const states = sectorStates(props.states, props.sectorType)
     var bars = []
     for (let i = 0; i < states.length; i++) {
         let sec = states[i]
-        total += Number(sec.Value)
+        total += sec.Value
         sec.className = sec.Key.replace(/ /g, '_')
         bars.push({
             className: sec.className,
-            amount: Number(sec.Value),
+            amount: sec.Value,
         })
     }
 
-    return <div className="sealing">
-        <div className="title">Sealing</div>
+    const title = props.sectorType == 'Snap Deals' ? 'Snap Deals' : 'Regular Deals'
+    const className = props.sectorType.toLowerCase().replace(/ /g, '_')
+    return <div className={"sealing-type-content " + className}>
+        <div className="title">{title}</div>
 
         {total > 0 ? <CumulativeBarChart bars={bars} /> : null}
 
@@ -122,7 +140,7 @@ function Sealing(props) {
                 <tr key={sec.Key}>
                     <td className="color"><div className={sec.className} /></td>
                     <td className="state">{sec.Key}</td>
-                    <td className={"count " + (Number(sec.Value) ? '' : 'zero')}>{sec.Value+''}</td>
+                    <td className={"count " + (sec.Value ? '' : 'zero')}>{sec.Value}</td>
                 </tr>
             ))}
             </tbody>
@@ -158,7 +176,7 @@ function Workers(props) {
 
 export function SealingPipelineMenuItem(props) {
     const {data} = useQuery(SealingPipelineQuery, {
-        pollInterval: 5000,
+        // pollInterval: 5000,
         fetchPolicy: "network-only",
     })
 

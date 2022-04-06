@@ -275,8 +275,10 @@ const SealingPipelineQuery = gql`
                 }
             }
             SectorStates {
+                Type
                 Key
                 Value
+                Order
             }
             Workers {
                 ID

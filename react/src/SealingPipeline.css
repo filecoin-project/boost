@@ -21,6 +21,10 @@
     background-color: rgb(210, 221, 236);
 }
 
+table.sealing td.sealing-type {
+    vertical-align: top;
+    padding: 0;
+}
 
 .sealing-pipeline table {
     font-size: 1em;
@@ -117,3 +121,28 @@
 .sealing-pipeline .Finalize_Sector {
     background-color: #39afd1;
 }
+
+.sealing-pipeline .Proving {
+    background-color: #2c7be5;
+}
+
+.sealing-pipeline .TerminateWait {
+    background-color: #fd7e14;
+}
+
+.sealing-pipeline .TerminateFailed {
+    background-color: #e63757;
+}
+
+.sealing-pipeline .Removed {
+    background-color: #444;
+}
+
+.sealing-pipeline .Available {
+    background-color: #999;
+}
+
+.sealing-pipeline .UpdateActivating {
+    background-color: #2c7be5;
+}
+
