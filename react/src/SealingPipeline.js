@@ -103,10 +103,9 @@ function Sealing(props) {
 }
 
 function SealingType(props) {
-    var total = 0
     var states = []
     var errStates = []
-    if (props.sectorType == 'Regular') {
+    if (props.sectorType === 'Regular') {
         states = props.states.Regular
         errStates = props.states.RegularError
     } else {
@@ -116,22 +115,10 @@ function SealingType(props) {
     states = states.map(s => s).sort((a, b) => a.Order - b.Order)
     states = states.concat(errStates.map(s => s).sort((a, b) => a.Order - b.Order))
 
-    var bars = []
-    for (let sec of states) {
-        total += sec.Value
-        const className = sec.Key.replace(/ /g, '_')
-        bars.push({
-            amount: sec.Value,
-            className,
-        })
-    }
-
-    const title = props.sectorType == 'Snap Deals' ? 'Snap Deals' : 'Regular Deals'
+    const title = props.sectorType === 'Snap Deals' ? 'Snap Deals Sectors' : 'Regular Sectors'
     const className = props.sectorType.toLowerCase().replace(/ /g, '_')
     return <div className={"sealing-type-content " + className}>
         <div className="title">{title}</div>
-
-        {total > 0 ? <CumulativeBarChart bars={bars} /> : null}
 
         <table className="sector-states">
             <tbody>
@@ -202,32 +189,4 @@ export function SealingPipelineMenuItem(props) {
             <b>{total}</b> sector{total === 1 ? '' : 's'}
         </div>
     </Link>
-}
-
-const mockData = {
-    sealingpipeline: {
-        WaitDeals: {
-            Deals: [{
-                ID: '1312-asdfd-234234-sadfsdfs',
-                Size: BigInt(2*1024*1024*1024),
-            }, {
-                ID: '4234-hfdsh-253524-kassdsss',
-                Size: BigInt(11*1024*1024*1024),
-            }],
-            SectorSize: BigInt(32*1024*1024*1024),
-        },
-        SectorStates: {
-            AddPiece: 1,
-            Packing: 1,
-            UpdateReplica: 0,
-            PreCommit1: 0,
-            PreCommit2: 2,
-            PreCommitWait: 0,
-            WaitSeed: 0,
-            Committing: 4,
-            CommittingWait: 0,
-            FinalizeSector: 1,
-        },
-        Workers: [],
-    }
 }
