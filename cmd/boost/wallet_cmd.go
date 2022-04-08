@@ -20,17 +20,16 @@ import (
 	"golang.org/x/xerrors"
 )
 
-var walletFlags = []cli.Flag{
-	&cli.StringFlag{
-		Name:  "repo",
-		Usage: "repo directory for Boost client",
-		Value: "~/.boost-client",
-	},
-}
-
 var walletCmd = &cli.Command{
 	Name:  "wallet",
 	Usage: "Manage wallets with Boost",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "repo",
+			Usage: "repo directory for Boost client",
+			Value: "~/.boost-client",
+		},
+	},
 	Subcommands: []*cli.Command{
 		walletNew,
 		walletList,
@@ -388,8 +387,9 @@ var walletImport = &cli.Command{
 }
 
 var walletGetDefault = &cli.Command{
-	Name:  "default",
-	Usage: "Get default wallet address",
+	Name:    "default",
+	Usage:   "Get default wallet address",
+	Aliases: []string{"get-default"},
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
