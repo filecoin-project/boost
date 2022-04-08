@@ -26,10 +26,6 @@ func (e *PrintHelpErr) Is(o error) bool {
 	return ok
 }
 
-func ShowHelp(cctx *ufcli.Context, err error) error {
-	return &PrintHelpErr{Err: err, Ctx: cctx}
-}
-
 type AppFmt struct {
 	app   *ufcli.App
 	Stdin io.Reader
