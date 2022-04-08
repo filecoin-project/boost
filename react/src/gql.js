@@ -5,7 +5,13 @@ import { WebSocketLink } from "@apollo/client/link/ws";
 import Observable from 'zen-observable';
 import { transformResponse } from "./transform";
 
-const graphqlEndpoint = "localhost:8080"
+var graphqlEndpoint = window.location.host
+var graphqlHttpEndpoint = window.location.href.replace(/\/+$/, '')
+
+if (process.env.NODE_ENV === 'development') {
+    graphqlEndpoint = 'localhost:8080'
+    graphqlHttpEndpoint = 'http://' + graphqlEndpoint
+}
 
 // Transform response data (eg convert date string to Date object)
 const transformResponseLink = new ApolloLink((operation, forward) => {
@@ -18,7 +24,7 @@ const transformResponseLink = new ApolloLink((operation, forward) => {
 
 // HTTP Link
 const httpLink = new HttpLink({
-    uri: `http://${graphqlEndpoint}/graphql/query`,
+    uri: `${graphqlHttpEndpoint}/graphql/query`,
 });
 
 // WebSocket Link
