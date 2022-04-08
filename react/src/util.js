@@ -33,7 +33,7 @@ export function humanFileSize(size, unitIndex = 0) {
     return humanFileSize(size, unitIndex+1)
 }
 
-var oneNanoFil = 1e9
+export const oneNanoFil = 1e9
 export const oneFil = BigInt(oneNanoFil)*BigInt(oneNanoFil)
 export function humanFIL(atto) {
     atto = BigInt(atto)
@@ -54,8 +54,8 @@ export function humanFIL(atto) {
     }
 
     // 10^9
-    if (atto > oneNanoFil / 1000) {
-        const nanoFil = (Number(atto) / oneNanoFil)
+    if (atto > oneNanoFil) {
+        const nanoFil = (Number(1000n * atto) / oneNanoFil) / 1000
         return toFixed(nanoFil, 1) + ' nano' // 123.4 nano
     }
 

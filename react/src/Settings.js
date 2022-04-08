@@ -8,7 +8,7 @@ import {Link} from "react-router-dom";
 import moment from "moment"
 import settingsImg from './bootstrap-icons/icons/gear.svg'
 import './Settings.css'
-import {addCommas, humanFileSize} from "./util";
+import {addCommas, humanFIL, humanFileSize, oneNanoFil} from "./util";
 
 export function SettingsPage(props) {
     return <PageContainer pageType="settings" title="Settings">
@@ -118,14 +118,9 @@ function StorageAsk(props) {
     )
 }
 
-function toNano(num) {
-    const tmp = (BigInt(1e6)*BigInt(num))/BigInt(1e9)
-    return Number(tmp)/1e6
-}
-
 export function EditableField(props) {
     const isCurrency = props.type === 'fil'
-    const initialValue = isCurrency ? toNano(props.value)+'' : props.value+''
+    const initialValue = isCurrency ? props.value+'' : props.value+''
     const [editing, setEditing] = useState(false)
     const [currentVal, setCurrentVal] = useState(initialValue)
     const [storageAskUpdate] = useMutation(StorageAskUpdate, {
@@ -138,7 +133,8 @@ export function EditableField(props) {
         const update = {}
         var rawVal = currentVal || 0
         if (isCurrency) {
-            rawVal = BigInt(currentVal * 1e9)
+            rawVal = BigInt(currentVal)
+            setCurrentVal(rawVal+'')
         }
         update[props.fieldName] = rawVal
         storageAskUpdate({
@@ -149,7 +145,7 @@ export function EditableField(props) {
 
     var displayVal
     if (isCurrency) {
-        displayVal = currentVal + ' nano'
+        displayVal = addCommas(currentVal) + ' atto'
     } else {
         displayVal = humanFileSize(BigInt(currentVal)) + ''
     }
@@ -168,14 +164,20 @@ export function EditableField(props) {
                         type="number"
                         value={currentVal}
                         onChange={handleValChange}
-                    /> {isCurrency ? 'nano' : 'bytes'}
+                    /> {isCurrency ? 'atto' : 'bytes'}
                     <div className="button" onClick={save}>Save</div>
                     <div className="button cancel" onClick={cancel}>Cancel</div>
+                    { BigInt(currentVal) > oneNanoFil ? (
+                        <span className="human">({humanFIL(BigInt(currentVal))})</span>
+                    ) : null }
                 </td>
             ) : (
                 <td className="val" onClick={() => setEditing(true)}>
                     {displayVal}
                     <span className="edit" />
+                    { BigInt(currentVal) > oneNanoFil ? (
+                        <span className="human">({humanFIL(BigInt(currentVal))})</span>
+                    ) : null }
                 </td>
             )}
         </tr>
