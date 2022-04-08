@@ -16,6 +16,7 @@ import {TimestampFormat} from "./timestamp";
 import {DealsPerPage} from "./deals-per-page";
 import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import './Deals.css'
+import {Pagination} from "./Pagination";
 
 export function StorageDealsPage(props) {
     return <PageContainer pageType="storage-deals" title="Storage Deals">
@@ -91,7 +92,11 @@ function StorageDealsContent(props) {
 
     const paginationParams = {
         basePath: '/storage-deals',
-        cursor, pageNum, moreDeals, totalCount, dealsPerPage, onDealsPerPageChange
+        cursor, pageNum, totalCount,
+        rowsPerPage: dealsPerPage,
+        moreRows: moreDeals,
+        onRowsPerPageChange: onDealsPerPageChange,
+        onLinkClick: scrollTop,
     }
 
     return <div className="deals">
@@ -118,45 +123,6 @@ function StorageDealsContent(props) {
 
         <Pagination {...paginationParams} />
     </div>
-}
-
-export function Pagination({basePath, cursor, pageNum, moreDeals, totalCount, dealsPerPage, onDealsPerPageChange}) {
-    var totalPages = Math.ceil(totalCount / dealsPerPage)
-
-    var pageLinks = {}
-    if (cursor) {
-        if (pageNum === 2) {
-            pageLinks.prev = basePath
-        } else if (pageNum > 2) {
-            pageLinks.prev = basePath + '/from/' + cursor + '/page/' + (pageNum - 1)
-        }
-
-        if (moreDeals) {
-            pageLinks.next = basePath + '/from/' + cursor + '/page/' + (pageNum + 1)
-        }
-    }
-
-    return (
-        <div className="pagination">
-            <div className="controls">
-                {pageNum > 1 ? (
-                    <Link className="first" to={basePath} onClick={scrollTop}>&lt;&lt;</Link>
-                ) : <span className="first">&lt;&lt;</span>}
-                {pageLinks.prev ? <Link to={pageLinks.prev} onClick={scrollTop}>&lt;</Link> : <span>&lt;</span>}
-                <div className="page">{pageNum} of {totalPages}</div>
-                {pageLinks.next ? <Link to={pageLinks.next} onClick={scrollTop}>&gt;</Link> : <span>&gt;</span>}
-                <div className="total">{totalCount} deals</div>
-                <div className="per-page">
-                    <select value={dealsPerPage} onChange={onDealsPerPageChange}>
-                        <option value={10}>10 pp</option>
-                        <option value={25}>25 pp</option>
-                        <option value={50}>50 pp</option>
-                        <option value={100}>100 pp</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-    )
 }
 
 function DealRow(props) {

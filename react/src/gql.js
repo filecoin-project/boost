@@ -343,10 +343,10 @@ const TransfersQuery = gql`
 `;
 
 const FundsLogsQuery = gql`
-    query AppFundsLogsQuery {
-        fundsLogs {
+    query AppFundsLogsQuery($first: BigInt, $offset: Int, $limit: Int) {
+        fundsLogs(first: $first, offset: $offset, limit: $limit) {
             totalCount
-            next
+            more
             logs {
                 CreatedAt
                 DealUUID

@@ -942,6 +942,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	sqldb, err := db.SqlDB(f.Name())
 	require.NoError(t, err)
 	dealsDB := db.NewDealsDB(sqldb)
+	fundsDB := db.NewFundsDB(sqldb)
 
 	// publish wallet
 	pw, err := address.NewIDAddress(uint64(rand.Intn(100)))
@@ -975,7 +976,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		PubMsgBalMin: ph.MinPublishFees,
 		PubMsgWallet: pw,
 	})
-	fm := fminitF(fn, sqldb)
+	fm := fminitF(fn, fundsDB)
 
 	// storage manager
 	fsRepo, err := repo.NewFS(dir)
