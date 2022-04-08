@@ -15,7 +15,6 @@ import (
 	boostclient "github.com/filecoin-project/boost/client"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -34,10 +33,12 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/policy"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/extern/storage-sealing/sealiface"
 	"github.com/filecoin-project/lotus/itests/kit"
 	lnode "github.com/filecoin-project/lotus/node"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/modules"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage"
@@ -105,6 +106,23 @@ func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
 		kit.DisableLibp2p(),
 		kit.ThroughRPC(),
 		secSizeOpt,
+		kit.ConstructorOpts(lnode.Options(
+			lnode.Override(new(dtypes.GetSealingConfigFunc), func() (dtypes.GetSealingConfigFunc, error) {
+				return func() (sealiface.Config, error) {
+					cfg := lotus_config.DefaultStorageMiner()
+					sc := modules.ToSealingConfig(cfg.Dealmaking, cfg.Sealing)
+					sc.MaxWaitDealsSectors = 2
+					sc.MaxSealingSectors = 1
+					sc.MaxSealingSectorsForDeals = 3
+					sc.AlwaysKeepUnsealedCopy = true
+					sc.WaitDealsDelay = time.Hour
+					sc.BatchPreCommits = false
+					sc.AggregateCommits = false
+
+					return sc, nil
+				}, nil
+			}),
+		)),
 	}
 	fnOpts := []kit.NodeOpt{
 		kit.ConstructorOpts(
