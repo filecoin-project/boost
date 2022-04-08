@@ -35,6 +35,10 @@ var dealStatusCmd = &cli.Command{
 			Usage:    "",
 			Required: true,
 		},
+		&cli.StringFlag{
+			Name:  "wallet",
+			Usage: "the wallet address that was used to sign the deal proposal",
+		},
 	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
@@ -61,7 +65,7 @@ var dealStatusCmd = &cli.Command{
 		}
 		defer closer()
 
-		walletAddr, err := n.Wallet.GetDefault()
+		walletAddr, err := n.GetProvidedOrDefaultWallet(ctx, cctx.String("wallet"))
 		if err != nil {
 			return err
 		}

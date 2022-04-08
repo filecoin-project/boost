@@ -49,6 +49,10 @@ var marketCmd = &cli.Command{
 			Usage: "repo directory for Boost client",
 			Value: "~/.boost-client",
 		},
+		&cli.StringFlag{
+			Name:  "wallet",
+			Usage: "move balance from this wallet address to its market actor",
+		},
 	},
 	ArgsUsage: "<amount>",
 	Before:    before,
@@ -81,7 +85,7 @@ var marketCmd = &cli.Command{
 		}
 		defer closer()
 
-		walletAddr, err := n.Wallet.GetDefault()
+		walletAddr, err := n.GetProvidedOrDefaultWallet(ctx, cctx.String("wallet"))
 		if err != nil {
 			return err
 		}

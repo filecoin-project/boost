@@ -33,6 +33,7 @@ func main() {
 			dealCmd,
 			dealStatusCmd,
 			offlineDealCmd,
+			walletCmd,
 		},
 	}
 	app.Setup()
