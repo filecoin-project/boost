@@ -22,6 +22,7 @@ import (
 	types2 "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -49,9 +50,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	files "github.com/ipfs/go-ipfs-files"
+	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
+	dag "github.com/ipfs/go-merkledag"
+	dstest "github.com/ipfs/go-merkledag/test"
+	unixfile "github.com/ipfs/go-unixfs/file"
+	"github.com/ipld/go-car"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 )
@@ -641,6 +649,99 @@ func (f *TestFramework) WaitDealSealed(ctx context.Context, deal *cid.Cid) error
 
 		time.Sleep(2 * time.Second)
 	}
+}
+
+func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, deal *cid.Cid, root cid.Cid, carExport bool) (path string) {
+	// perform retrieval.
+	info, err := f.FullNode.ClientGetDealInfo(ctx, *deal)
+	require.NoError(t, err)
+
+	offers, err := f.FullNode.ClientFindData(ctx, root, &info.PieceCID)
+	require.NoError(t, err)
+	require.NotEmpty(t, offers, "no offers")
+
+	carFile, err := ioutil.TempFile(f.HomeDir, "ret-car")
+	require.NoError(t, err)
+
+	defer carFile.Close() //nolint:errcheck
+
+	caddr, err := f.FullNode.WalletDefaultAddress(ctx)
+	require.NoError(t, err)
+
+	updatesCtx, cancel := context.WithCancel(ctx)
+	updates, err := f.FullNode.ClientGetRetrievalUpdates(updatesCtx)
+	require.NoError(t, err)
+
+	retrievalRes, err := f.FullNode.ClientRetrieve(ctx, offers[0].Order(caddr))
+	require.NoError(t, err)
+consumeEvents:
+	for {
+		var evt lapi.RetrievalInfo
+		select {
+		case <-updatesCtx.Done():
+			t.Fatal("Retrieval Timed Out")
+		case evt = <-updates:
+			if evt.ID != retrievalRes.DealID {
+				continue
+			}
+		}
+		switch evt.Status {
+		case retrievalmarket.DealStatusCompleted:
+			break consumeEvents
+		case retrievalmarket.DealStatusRejected:
+			t.Fatalf("Retrieval Proposal Rejected: %s", evt.Message)
+		case
+			retrievalmarket.DealStatusDealNotFound,
+			retrievalmarket.DealStatusErrored:
+			t.Fatalf("Retrieval Error: %s", evt.Message)
+		}
+	}
+	cancel()
+
+	require.NoError(t, f.FullNode.ClientExport(ctx,
+		lapi.ExportRef{
+			Root:   root,
+			DealID: retrievalRes.DealID,
+		},
+		lapi.FileRef{
+			Path:  carFile.Name(),
+			IsCAR: carExport,
+		}))
+
+	ret := carFile.Name()
+	if carExport {
+		actualFile := f.ExtractFileFromCAR(ctx, t, carFile)
+		ret = actualFile.Name()
+		_ = actualFile.Close() //nolint:errcheck
+	}
+
+	return ret
+}
+
+func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, file *os.File) (out *os.File) {
+	bserv := dstest.Bserv()
+	ch, err := car.LoadCar(ctx, bserv.Blockstore(), file)
+	require.NoError(t, err)
+
+	b, err := bserv.GetBlock(ctx, ch.Roots[0])
+	require.NoError(t, err)
+
+	nd, err := ipld.Decode(b)
+	require.NoError(t, err)
+
+	dserv := dag.NewDAGService(bserv)
+	fil, err := unixfile.NewUnixfsFile(ctx, dserv, nd)
+	require.NoError(t, err)
+
+	tmpfile, err := ioutil.TempFile(f.HomeDir, "file-in-car")
+	require.NoError(t, err)
+
+	defer tmpfile.Close() //nolint:errcheck
+
+	err = files.WriteTo(fil, tmpfile.Name())
+	require.NoError(t, err)
+
+	return tmpfile
 }
 
 func SetPreCommitChallengeDelay(t *testing.T, delay abi.ChainEpoch) {
