@@ -1,25 +1,27 @@
 package storagemarket
 
 import (
+	"database/sql"
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/fundmanager"
-	"github.com/google/uuid"
-
-	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/sealingpipeline"
-	"golang.org/x/xerrors"
-
 	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/fundmanager"
+	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/google/uuid"
+	"github.com/libp2p/go-eventbus"
+	"golang.org/x/xerrors"
 )
 
 type acceptDealReq struct {
-	rsp  chan acceptDealResp
-	deal *types.ProviderDealState
-	dh   *dealHandler
+	rsp      chan acceptDealResp
+	deal     *types.ProviderDealState
+	dh       *dealHandler
+	isImport bool
 }
 
 type acceptDealResp struct {
@@ -52,11 +54,16 @@ func (p *Provider) logFunds(id uuid.UUID, trsp *fundmanager.TagFundsResp) {
 		"total available for collateral", trsp.AvailableCollateral)
 }
 
-func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, string, error) {
+func (p *Provider) processDealProposal(deal *types.ProviderDealState) (bool, string, error) {
+	// Check that the deal proposal is unique
+	if ok, reason, err := p.checkDealPropUnique(deal); !ok {
+		return ok, reason, err
+	}
+
 	// get current sealing pipeline status
 	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
 	if err != nil {
-		return false, "server error", fmt.Errorf("failed to fetch sealing pipleine status: %w", err)
+		return false, "server error: get sealing status", fmt.Errorf("failed to fetch sealing pipleine status: %w", err)
 	}
 
 	// run custom decision logic
@@ -102,7 +109,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	if err != nil {
 		cleanup()
 
-		return false, "server error", fmt.Errorf("failed to tag funds for deal: %w", err)
+		return false, "server error: tag funds", fmt.Errorf("failed to tag funds for deal: %w", err)
 	}
 	p.logFunds(deal.DealUuid, trsp)
 
@@ -121,7 +128,7 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	if err != nil {
 		cleanup()
 
-		return false, "server error", fmt.Errorf("failed to insert deal in db: %w", err)
+		return false, "server error: save to db", fmt.Errorf("failed to insert deal in db: %w", err)
 	}
 
 	p.dealLogger.Infow(deal.DealUuid, "inserted deal into deals DB")
@@ -129,7 +136,40 @@ func (p *Provider) processDealRequest(deal *types.ProviderDealState) (bool, stri
 	return true, "", nil
 }
 
-func (p *Provider) processOfflineDealRequest(deal *types.ProviderDealState) (bool, string, error) {
+// processOfflineDealProposal just saves the deal to the database.
+// Execution resumes when processImportOfflineDealData is called.
+func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState) (bool, string, error) {
+	// Check that the deal proposal is unique
+	if ok, reason, err := p.checkDealPropUnique(ds); !ok {
+		return ok, reason, err
+	}
+
+	// Save deal to DB
+	ds.CreatedAt = time.Now()
+	ds.Checkpoint = dealcheckpoints.Accepted
+	if err := p.dealsDB.Insert(p.ctx, ds); err != nil {
+		return false, "server error: save to db", fmt.Errorf("failed to insert deal in db: %w", err)
+	}
+
+	// Set up pubsub for deal updates
+	dh := p.mkAndInsertDealHandler(ds.DealUuid)
+	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
+	if err != nil {
+		err = fmt.Errorf("failed to create event emitter: %w", err)
+		p.failDeal(pub, ds, err)
+		p.cleanupDealLogged(ds)
+		return false, "server error: setup pubsub", err
+	}
+
+	// publish "new deal" event
+	p.fireEventDealNew(ds)
+	// publish an event with the current state of the deal
+	p.fireEventDealUpdate(pub, ds)
+
+	return true, "", nil
+}
+
+func (p *Provider) processImportOfflineDealData(deal *types.ProviderDealState) (bool, string, error) {
 	cleanup := func() {
 		collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
@@ -144,10 +184,34 @@ func (p *Provider) processOfflineDealRequest(deal *types.ProviderDealState) (boo
 	trsp, err := p.fundManager.TagFunds(p.ctx, deal.DealUuid, deal.ClientDealProposal.Proposal)
 	if err != nil {
 		cleanup()
-		return false, "server error", fmt.Errorf("failed to tag funds for deal: %w", err)
+		return false, "server error: tag funds", fmt.Errorf("failed to tag funds for deal: %w", err)
 	}
 	p.logFunds(deal.DealUuid, trsp)
 	return true, "", nil
+}
+
+func (p *Provider) checkDealPropUnique(deal *smtypes.ProviderDealState) (bool, string, error) {
+	signedPropCid, err := deal.SignedProposalCid()
+	if err != nil {
+		return false, "server error: signed proposal cid", fmt.Errorf("getting signed deal proposal cid: %w", err)
+	}
+
+	dl, err := p.dealsDB.BySignedProposalCID(p.ctx, signedPropCid)
+	if err != nil {
+		if xerrors.Is(err, sql.ErrNoRows) {
+			// If there was no deal in the DB with this signed proposal cid,
+			// then it's unique
+			return true, "", nil
+		}
+		return false, "server error: lookup by proposal cid", fmt.Errorf("looking up deal by signed deal proposal cid: %w", err)
+	}
+
+	// The database lookup did not return a "not found" error, meaning we found
+	// a deal with a matching deal proposal cid. Therefore the deal proposal
+	// is not unique.
+	reason := fmt.Sprintf("deal proposal is identical to deal %s (proposed at %s)",
+		dl.DealUuid, dl.CreatedAt)
+	return false, reason, nil
 }
 
 func (p *Provider) loop() {
@@ -166,9 +230,25 @@ func (p *Provider) loop() {
 			var reason string
 			var err error
 			if deal.IsOffline {
-				ok, reason, err = p.processOfflineDealRequest(dealReq.deal)
+				if dealReq.isImport {
+					// The Storage Provider is importing the deal data, so tag
+					// funds for the deal and execute it
+					ok, reason, err = p.processImportOfflineDealData(dealReq.deal)
+				} else {
+					// When the client proposes an offline deal, save the deal
+					// to the database but don't execute the deal. The deal
+					// will be executed when the Storage Provider imports the
+					// deal data.
+					ok, reason, err = p.processOfflineDealProposal(dealReq.deal)
+					if ok {
+						// don't execute the deal, just send an accept response
+						dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: true}}
+						continue
+					}
+				}
 			} else {
-				ok, reason, err = p.processDealRequest(dealReq.deal)
+				// Process a regular deal proposal
+				ok, reason, err = p.processDealProposal(dealReq.deal)
 			}
 			if !ok {
 				if err != nil {

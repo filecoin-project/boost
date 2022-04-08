@@ -38,7 +38,6 @@ import (
 	"github.com/filecoin-project/lotus/markets/utils"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/libp2p/go-eventbus"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -199,9 +198,9 @@ func (p *Provider) GetAsk() *storagemarket.SignedStorageAsk {
 	return p.askGetter.GetAsk()
 }
 
-// MakeOfflineDealWithData is called when the Storage Provider imports data for
+// ImportOfflineDealData is called when the Storage Provider imports data for
 // an offline deal (the deal must already have been proposed by the client)
-func (p *Provider) MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) (pi *api.ProviderDealRejectionInfo, handler *dealHandler, err error) {
+func (p *Provider) ImportOfflineDealData(dealUuid uuid.UUID, filePath string) (pi *api.ProviderDealRejectionInfo, handler *dealHandler, err error) {
 	p.dealLogger.Infow(dealUuid, "import data for offline deal", "filepath", filePath)
 
 	// db should already have a deal with this uuid as the deal proposal should have been agreed before hand
@@ -235,7 +234,7 @@ func (p *Provider) MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) 
 		p.delDealHandler(dealUuid)
 	}
 
-	resp, err := p.checkForDealAcceptance(ds, dh)
+	resp, err := p.checkForDealAcceptance(ds, dh, true)
 	if err != nil {
 		cleanup()
 		p.dealLogger.LogError(dealUuid, "failed to send deal for acceptance", err)
@@ -255,7 +254,7 @@ func (p *Provider) MakeOfflineDealWithData(dealUuid uuid.UUID, filePath string) 
 		return resp.ri, nil, nil
 	}
 
-	p.dealLogger.Infow(dealUuid, "deal accepted and scheduled for execution")
+	p.dealLogger.Infow(dealUuid, "offline deal data imported and deal scheduled for execution")
 	return resp.ri, dh, nil
 }
 
@@ -281,62 +280,32 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (*api.P
 		}, nil, nil
 	}
 
-	if dp.IsOffline {
-		return p.processOfflineDealProposal(ds)
-	}
-
-	return p.executeOnlineDeal(ds)
-}
-
-// processOfflineDealProposal saves the deal to the database and then stops execution.
-// Execution resumes when MakeOfflineDealWithData is called.
-func (p *Provider) processOfflineDealProposal(ds smtypes.ProviderDealState) (*api.ProviderDealRejectionInfo, *dealHandler, error) {
-	// Save deal to DB
-	ds.CreatedAt = time.Now()
-	ds.Checkpoint = dealcheckpoints.Accepted
-	if err := p.dealsDB.Insert(p.ctx, &ds); err != nil {
-		return nil, nil, fmt.Errorf("failed to insert deal in db: %w", err)
-	}
-
-	// Set up pubsub for deal updates
-	dh := p.mkAndInsertDealHandler(ds.DealUuid)
-	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
-	if err != nil {
-		err = fmt.Errorf("failed to create event emitter: %w", err)
-		p.failDeal(pub, &ds, err)
-		p.cleanupDealLogged(&ds)
-		return nil, nil, err
-	}
-
-	// publish "new deal" event
-	p.fireEventDealNew(&ds)
-	// publish an event with the current state of the deal
-	p.fireEventDealUpdate(pub, &ds)
-
-	p.dealLogger.Infow(ds.DealUuid, "offline deal accepted, waiting for data import")
-
-	return &api.ProviderDealRejectionInfo{Accepted: true}, nil, nil
+	return p.executeDeal(ds)
 }
 
 // executeOnlineDeal sets up a download location for the deal, then sends the
 // deal to the main provider loop for execution
-func (p *Provider) executeOnlineDeal(ds smtypes.ProviderDealState) (*api.ProviderDealRejectionInfo, *dealHandler, error) {
+func (p *Provider) executeDeal(ds smtypes.ProviderDealState) (*api.ProviderDealRejectionInfo, *dealHandler, error) {
+	var tmpFile filestore.File
 	dh := p.mkAndInsertDealHandler(ds.DealUuid)
-	tmpFile, err := p.fs.CreateTemp()
 	ri, err := func() (*api.ProviderDealRejectionInfo, error) {
-		// create a temp file where we will hold the deal data.
-		if err != nil {
-			p.dealLogger.LogError(ds.DealUuid, "failed to create temp file for inbound data transfer", err)
-			return nil, fmt.Errorf("failed to create temp file: %w", err)
-		}
-		if err := tmpFile.Close(); err != nil {
-			p.dealLogger.LogError(ds.DealUuid, "failed to close temp file created for inbound data transfer", err)
-			return nil, fmt.Errorf("failed to close temp file: %w", err)
+		if !ds.IsOffline {
+			// for online deals, create a temp file to which we will download the deal data.
+			tmpFile, err := p.fs.CreateTemp()
+			if err != nil {
+				p.dealLogger.LogError(ds.DealUuid, "failed to create temp file for inbound data transfer", err)
+				return nil, fmt.Errorf("failed to create temp file: %w", err)
+			}
+			if err := tmpFile.Close(); err != nil {
+				p.dealLogger.LogError(ds.DealUuid, "failed to close temp file created for inbound data transfer", err)
+				return nil, fmt.Errorf("failed to close temp file: %w", err)
+			}
+
+			ds.InboundFilePath = string(tmpFile.OsPath())
 		}
 
 		// send the deal to the main provider loop for execution
-		ds.InboundFilePath = string(tmpFile.OsPath())
-		resp, err := p.checkForDealAcceptance(&ds, dh)
+		resp, err := p.checkForDealAcceptance(&ds, dh, false)
 		if err != nil {
 			p.dealLogger.LogError(ds.DealUuid, "failed to send deal for acceptance", err)
 			return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
@@ -365,16 +334,21 @@ func (p *Provider) executeOnlineDeal(ds smtypes.ProviderDealState) (*api.Provide
 		return ri, nil, err
 	}
 
-	p.dealLogger.Infow(ds.DealUuid, "deal accepted and scheduled for execution")
+	if ds.IsOffline {
+		p.dealLogger.Infow(ds.DealUuid, "offline deal accepted, waiting for data import")
+	} else {
+		p.dealLogger.Infow(ds.DealUuid, "deal accepted and scheduled for execution")
+	}
+
 	return ri, dh, nil
 }
 
-func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealHandler) (acceptDealResp, error) {
+func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealHandler, isImport bool) (acceptDealResp, error) {
 	// send message to event loop to run the deal through the acceptance filter and reserve the required resources
 	// then wait for a response and return the response to the client.
 	respChan := make(chan acceptDealResp, 1)
 	select {
-	case p.acceptDealChan <- acceptDealReq{rsp: respChan, deal: ds, dh: dh}:
+	case p.acceptDealChan <- acceptDealReq{rsp: respChan, deal: ds, dh: dh, isImport: isImport}:
 	case <-p.ctx.Done():
 		return acceptDealResp{}, p.ctx.Err()
 	}
