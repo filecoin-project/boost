@@ -80,9 +80,9 @@ type TestFramework struct {
 	DefaultWallet address.Address
 }
 
-func NewTestFramework(ctx context.Context, t *testing.T, mockProofs bool) *TestFramework {
+func NewTestFramework(ctx context.Context, t *testing.T) *TestFramework {
 	tempHome, _ := ioutil.TempDir("", "boost-tests-")
-	fullNode, miner := FullNodeAndMiner(t, mockProofs)
+	fullNode, miner := FullNodeAndMiner(t)
 
 	return &TestFramework{
 		ctx:        ctx,
@@ -92,7 +92,7 @@ func NewTestFramework(ctx context.Context, t *testing.T, mockProofs bool) *TestF
 	}
 }
 
-func FullNodeAndMiner(t *testing.T, mockProofs bool) (*kit.TestFullNode, *kit.TestMiner) {
+func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
 	// enable 8MiB proofs so we can conduct larger transfers.
 	policy.SetSupportedProofTypes(
 		abi.RegisteredSealProof_StackedDrg2KiBV1,
@@ -143,12 +143,11 @@ func FullNodeAndMiner(t *testing.T, mockProofs bool) (*kit.TestFullNode, *kit.Te
 		secSizeOpt,
 	}
 
-	eOpts := []kit.EnsembleOpt{}
+	eOpts := []kit.EnsembleOpt{
+		//TODO: at the moment we are not mocking proofs
+		//maybe enable this in the future to speed up tests further
 
-	if mockProofs {
-		eOpts = append(eOpts,
-			kit.MockProofs(),
-		)
+		//kit.MockProofs(),
 	}
 
 	blockTime := 100 * time.Millisecond

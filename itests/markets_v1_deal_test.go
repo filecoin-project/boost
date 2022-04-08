@@ -18,7 +18,7 @@ func TestMarketsV1Deal(t *testing.T) {
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
 	framework.SetPreCommitChallengeDelay(t, 5)
-	f := framework.NewTestFramework(ctx, t, false)
+	f := framework.NewTestFramework(ctx, t)
 	err := f.Start()
 	require.NoError(t, err)
 	defer f.Stop()
