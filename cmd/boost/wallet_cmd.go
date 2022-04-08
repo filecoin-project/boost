@@ -89,11 +89,6 @@ var walletList = &cli.Command{
 			Usage:   "Output ID addresses",
 			Aliases: []string{"i"},
 		},
-		&cli.BoolFlag{
-			Name:    "market",
-			Usage:   "Output market balances",
-			Aliases: []string{"m"},
-		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
@@ -171,12 +166,10 @@ var walletList = &cli.Command{
 					}
 				}
 
-				if cctx.Bool("market") {
-					mbal, err := api.StateMarketBalance(ctx, addr, types.EmptyTSK)
-					if err == nil {
-						row["Market(Avail)"] = types.FIL(types.BigSub(mbal.Escrow, mbal.Locked))
-						row["Market(Locked)"] = types.FIL(mbal.Locked)
-					}
+				mbal, err := api.StateMarketBalance(ctx, addr, types.EmptyTSK)
+				if err == nil {
+					row["Market(Avail)"] = types.FIL(types.BigSub(mbal.Escrow, mbal.Locked))
+					row["Market(Locked)"] = types.FIL(mbal.Locked)
 				}
 
 				tw.Write(row)
