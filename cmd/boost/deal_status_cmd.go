@@ -37,7 +37,7 @@ var dealStatusCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "wallet",
-			Usage: "wallet address used to sign the deal proposal",
+			Usage: "the wallet address that was used to sign the deal proposal",
 		},
 	},
 	Before: before,
