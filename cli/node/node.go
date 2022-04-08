@@ -115,7 +115,7 @@ func walletPath(baseDir string) string {
 	return filepath.Join(baseDir, "wallet")
 }
 
-func (n *Node) GetProviderOrDefaultWallet(ctx context.Context, provided string) (address.Address, error) {
+func (n *Node) GetProvidedOrDefaultWallet(ctx context.Context, provided string) (address.Address, error) {
 	var walletAddr address.Address
 	if provided == "" {
 		var err error

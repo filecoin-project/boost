@@ -138,7 +138,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	}
 	defer closer()
 
-	walletAddr, err := n.GetProviderOrDefaultWallet(ctx, cctx.String("wallet"))
+	walletAddr, err := n.GetProvidedOrDefaultWallet(ctx, cctx.String("wallet"))
 	if err != nil {
 		return err
 	}
