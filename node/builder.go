@@ -438,6 +438,8 @@ func ConfigBoost(c interface{}) Option {
 
 		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg.DAGStore)),
 
+		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
+
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner)),
 
 		// GraphQL server

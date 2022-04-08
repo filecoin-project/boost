@@ -557,7 +557,6 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece)
 }
 
-// TODO Index Provider integration to announce deals to the network Indexer
 func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
 	pc := deal.ClientDealProposal.Proposal.PieceCID
 
