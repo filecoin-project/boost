@@ -15,6 +15,7 @@ import (
 	boostclient "github.com/filecoin-project/boost/client"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -38,7 +39,7 @@ import (
 	lnode "github.com/filecoin-project/lotus/node"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/modules"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage"
@@ -71,9 +72,9 @@ type TestFramework struct {
 	DefaultWallet address.Address
 }
 
-func NewTestFramework(ctx context.Context, t *testing.T) *TestFramework {
+func NewTestFramework(ctx context.Context, t *testing.T, mockProofs bool) *TestFramework {
 	tempHome, _ := ioutil.TempDir("", "boost-tests-")
-	fullNode, miner := FullNodeAndMiner(t)
+	fullNode, miner := FullNodeAndMiner(t, mockProofs)
 
 	return &TestFramework{
 		ctx:        ctx,
@@ -83,7 +84,7 @@ func NewTestFramework(ctx context.Context, t *testing.T) *TestFramework {
 	}
 }
 
-func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
+func FullNodeAndMiner(t *testing.T, mockProofs bool) (*kit.TestFullNode, *kit.TestMiner) {
 	// enable 8MiB proofs so we can conduct larger transfers.
 	policy.SetSupportedProofTypes(
 		abi.RegisteredSealProof_StackedDrg2KiBV1,
@@ -107,7 +108,7 @@ func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
 		kit.ThroughRPC(),
 		secSizeOpt,
 		kit.ConstructorOpts(lnode.Options(
-			lnode.Override(new(dtypes.GetSealingConfigFunc), func() (dtypes.GetSealingConfigFunc, error) {
+			lnode.Override(new(lotus_dtypes.GetSealingConfigFunc), func() (lotus_dtypes.GetSealingConfigFunc, error) {
 				return func() (sealiface.Config, error) {
 					cfg := lotus_config.DefaultStorageMiner()
 					sc := modules.ToSealingConfig(cfg.Dealmaking, cfg.Sealing)
@@ -134,11 +135,12 @@ func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
 		secSizeOpt,
 	}
 
-	eOpts := []kit.EnsembleOpt{
-		// TODO: When mock proofs are enabled, the markets v1 deal test fails.
-		// Need to understand exactly why, but it seems that it can't find the
-		// sector when trying to register the shard after adding piece to sector.
-		//kit.MockProofs(),
+	eOpts := []kit.EnsembleOpt{}
+
+	if mockProofs {
+		eOpts = append(eOpts,
+			kit.MockProofs(),
+		)
 	}
 
 	blockTime := 100 * time.Millisecond

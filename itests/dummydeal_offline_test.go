@@ -18,7 +18,7 @@ func TestDummydealOffline(t *testing.T) {
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
 	framework.SetPreCommitChallengeDelay(t, 5)
-	f := framework.NewTestFramework(ctx, t)
+	f := framework.NewTestFramework(ctx, t, true)
 	err := f.Start()
 	require.NoError(t, err)
 	defer f.Stop()
