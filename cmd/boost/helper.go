@@ -8,24 +8,6 @@ import (
 	ufcli "github.com/urfave/cli/v2"
 )
 
-type PrintHelpErr struct {
-	Err error
-	Ctx *ufcli.Context
-}
-
-func (e *PrintHelpErr) Error() string {
-	return e.Err.Error()
-}
-
-func (e *PrintHelpErr) Unwrap() error {
-	return e.Err
-}
-
-func (e *PrintHelpErr) Is(o error) bool {
-	_, ok := o.(*PrintHelpErr)
-	return ok
-}
-
 type AppFmt struct {
 	app   *ufcli.App
 	Stdin io.Reader
