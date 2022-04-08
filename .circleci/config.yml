@@ -295,11 +295,15 @@ workflows:
           suite: itest-dummdeal
           target: "./itests/dummydeal_test.go"
 
-#      TODO: Fix this test - at the moment it just hangs
-#      - test:
-#          name: test-itest-markets_v1_deal
-#          suite: itest-markets_v1_deal
-#          target: "./itests/markets_v1_deal_test.go"
+      - test:
+          name: test-itest-markets_v1_deal
+          suite: itest-markets_v1_deal
+          target: "./itests/markets_v1_deal_test.go"
+
+      - test:
+          name: test-itest-markets_v1_offline_deal
+          suite: itest-markets_v1_offline_deal
+          target: "./itests/markets_v1_offline_deal_test.go"
 
       - test:
           name: test-all
