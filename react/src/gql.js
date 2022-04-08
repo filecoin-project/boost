@@ -69,8 +69,8 @@ const EpochQuery = gql`
 `;
 
 const DealsListQuery = gql`
-    query AppDealsListQuery($first: ID, $offset: Int, $limit: Int) {
-        deals(first: $first, offset: $offset, limit: $limit) {
+    query AppDealsListQuery($cursor: ID, $offset: Int, $limit: Int) {
+        deals(cursor: $cursor, offset: $offset, limit: $limit) {
             deals {
                 ID
                 CreatedAt
@@ -95,8 +95,8 @@ const DealsListQuery = gql`
 `;
 
 const LegacyDealsListQuery = gql`
-    query AppLegacyDealsListQuery($first: ID, $offset: Int, $limit: Int) {
-        legacyDeals(first: $first, offset: $offset, limit: $limit) {
+    query AppLegacyDealsListQuery($cursor: ID, $offset: Int, $limit: Int) {
+        legacyDeals(cursor: $cursor, offset: $offset, limit: $limit) {
             deals {
                 ID
                 CreatedAt
@@ -343,8 +343,8 @@ const TransfersQuery = gql`
 `;
 
 const FundsLogsQuery = gql`
-    query AppFundsLogsQuery($first: BigInt, $offset: Int, $limit: Int) {
-        fundsLogs(first: $first, offset: $offset, limit: $limit) {
+    query AppFundsLogsQuery($cursor: BigInt, $offset: Int, $limit: Int) {
+        fundsLogs(cursor: $cursor, offset: $offset, limit: $limit) {
             totalCount
             more
             logs {

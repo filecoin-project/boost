@@ -80,12 +80,12 @@ func (f *FundsDB) InsertLog(ctx context.Context, logs ...*FundsLog) error {
 	return nil
 }
 
-func (f *FundsDB) Logs(ctx context.Context, first *time.Time, offset int, limit int) ([]FundsLog, error) {
+func (f *FundsDB) Logs(ctx context.Context, cursor *time.Time, offset int, limit int) ([]FundsLog, error) {
 	qry := "SELECT DealUUID, CreatedAt, Amount, LogText FROM FundsLogs"
 	args := []interface{}{}
-	if first != nil {
+	if cursor != nil {
 		qry += " WHERE CreatedAt <= ?"
-		args = append(args, first.Format(sqlite3.SQLiteTimestampFormats[0]))
+		args = append(args, cursor.Format(sqlite3.SQLiteTimestampFormats[0]))
 	}
 
 	qry += " ORDER BY CreatedAt DESC, RowID"

@@ -95,12 +95,12 @@ func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dea
 }
 
 type dealsArgs struct {
-	First  *graphql.ID
+	Cursor *graphql.ID
 	Offset graphql.NullInt
 	Limit  graphql.NullInt
 }
 
-// query: deals(first, offset, limit) DealList
+// query: deals(cursor, offset, limit) DealList
 func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver, error) {
 	offset := 0
 	if args.Offset.Set && args.Offset.Value != nil && *args.Offset.Value > 0 {
@@ -112,7 +112,7 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 		limit = int(*args.Limit.Value)
 	}
 
-	deals, count, more, err := r.dealList(ctx, args.First, offset, limit)
+	deals, count, more, err := r.dealList(ctx, args.Cursor, offset, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -264,10 +264,10 @@ func (r *resolver) dealByPublishCID(ctx context.Context, publishCid *cid.Cid) (*
 	return deal, nil
 }
 
-func (r *resolver) dealList(ctx context.Context, first *graphql.ID, offset int, limit int) ([]types.ProviderDealState, int, bool, error) {
+func (r *resolver) dealList(ctx context.Context, cursor *graphql.ID, offset int, limit int) ([]types.ProviderDealState, int, bool, error) {
 	// Fetch one extra deal so that we can check if there are more deals
 	// beyond the limit
-	deals, err := r.dealsDB.List(ctx, first, offset, limit+1)
+	deals, err := r.dealsDB.List(ctx, cursor, offset, limit+1)
 	if err != nil {
 		return nil, 0, false, err
 	}

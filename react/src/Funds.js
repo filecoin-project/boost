@@ -249,7 +249,7 @@ function FundsLogs(props) {
     const {loading, error, data} = useQuery(FundsLogsQuery, {
         pollInterval: pageNum === 1 ? 5000 : undefined,
         variables: {
-            first: queryCursor,
+            cursor: queryCursor,
             limit: rowsPerPage,
             offset: dealListOffset,
         }

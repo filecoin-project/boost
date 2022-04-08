@@ -1,4 +1,3 @@
-/* global BigInt */
 import {useQuery} from "@apollo/react-hooks";
 import {SealingPipelineQuery} from "./gql";
 import React from "react";
