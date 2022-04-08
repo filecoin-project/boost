@@ -46,6 +46,12 @@
     opacity: 1;
 }
 
+#settings td .human {
+    display: inline-block;
+    margin-left: 1em;
+    color: #999;
+}
+
 #settings td.editor {
     line-height: 2em;
 }
