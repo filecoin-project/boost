@@ -213,12 +213,12 @@ func (d *DealsDB) ListCompleted(ctx context.Context) ([]*types.ProviderDealState
 	return d.list(ctx, 0, 0, "Checkpoint = ?", dealcheckpoints.Complete.String())
 }
 
-func (d *DealsDB) List(ctx context.Context, first *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
+func (d *DealsDB) List(ctx context.Context, cursor *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
 	where := ""
 	whereArgs := []interface{}{}
-	if first != nil {
+	if cursor != nil {
 		where += "CreatedAt <= (SELECT CreatedAt FROM Deals WHERE ID = ?)"
-		whereArgs = append(whereArgs, *first)
+		whereArgs = append(whereArgs, *cursor)
 	}
 	return d.list(ctx, offset, limit, where, whereArgs...)
 }

@@ -50,7 +50,7 @@ function StorageDealsContent(props) {
     const queryCursor = (pageNum === 1) ? null : params.cursor
     const {loading, error, data} = useQuery(DealsListQuery, {
         variables: {
-            first: queryCursor,
+            cursor: queryCursor,
             offset: dealListOffset,
             limit: dealsPerPage,
         },
