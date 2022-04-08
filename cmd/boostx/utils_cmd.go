@@ -22,8 +22,12 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/backupds"
 
+	"github.com/docker/go-units"
+	paramfetch "github.com/filecoin-project/go-paramfetch"
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/lib/unixfs"
 	"github.com/filecoin-project/lotus/node/modules"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/node/repo/imports"
 	"github.com/ipfs/go-cidutil/cidenc"
 	"github.com/ipfs/go-datastore"
@@ -35,8 +39,6 @@ import (
 	"github.com/multiformats/go-multibase"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
-
-	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 
 var marketCmd = &cli.Command{
@@ -284,6 +286,31 @@ var generatecarCmd = &cli.Command{
 		encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
 
 		fmt.Println("Payload CID: ", encoder.Encode(root))
+
+		return nil
+	},
+}
+
+var fetchParamCmd = &cli.Command{
+	Name:      "fetch-params",
+	Usage:     "Fetch proving parameters",
+	ArgsUsage: "[sectorSize]",
+	Action: func(cctx *cli.Context) error {
+		ctx := lcli.ReqContext(cctx)
+
+		if !cctx.Args().Present() {
+			return xerrors.Errorf("must pass sector size to fetch params for (specify as \"32GiB\", for instance)")
+		}
+		sectorSizeInt, err := units.RAMInBytes(cctx.Args().First())
+		if err != nil {
+			return xerrors.Errorf("error parsing sector size (specify as \"32GiB\", for instance): %w", err)
+		}
+		sectorSize := uint64(sectorSizeInt)
+
+		err = paramfetch.GetParams(ctx, build.ParametersJSON(), build.SrsJSON(), sectorSize)
+		if err != nil {
+			return xerrors.Errorf("fetching proof parameters: %w", err)
+		}
 
 		return nil
 	},

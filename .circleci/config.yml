@@ -45,7 +45,7 @@ commands:
             - 'v25-8mb-lotus-params'
           paths:
             - /var/tmp/filecoin-proof-parameters/
-      - run:  lotus fetch-params 8388608
+      - run:  ./boostx fetch-params 8388608
       - save_cache:
           name: Save parameters cache
           key: 'v25-8mb-lotus-params'
