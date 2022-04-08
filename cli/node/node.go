@@ -1,8 +1,10 @@
 package node
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -10,6 +12,7 @@ import (
 	crand "crypto/rand"
 
 	"github.com/filecoin-project/boost/lib/keystore"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
 	"github.com/libp2p/go-libp2p"
@@ -110,4 +113,39 @@ func keyPath(baseDir string) string {
 
 func walletPath(baseDir string) string {
 	return filepath.Join(baseDir, "wallet")
+}
+
+func (n *Node) GetProviderOrDefaultWallet(ctx context.Context, provided string) (address.Address, error) {
+	var walletAddr address.Address
+	if provided == "" {
+		var err error
+		walletAddr, err = n.Wallet.GetDefault()
+		if err != nil {
+			return address.Address{}, err
+		}
+	} else {
+		w, err := address.NewFromString(provided)
+		if err != nil {
+			return address.Address{}, err
+		}
+
+		addrs, err := n.Wallet.WalletList(ctx)
+		if err != nil {
+			return address.Address{}, err
+		}
+
+		found := false
+		for _, a := range addrs {
+			if bytes.Equal(a.Bytes(), w.Bytes()) {
+				walletAddr = w
+				found = true
+			}
+		}
+
+		if !found {
+			return address.Address{}, fmt.Errorf("couldn't find wallet %s locally", provided)
+		}
+	}
+
+	return walletAddr, nil
 }

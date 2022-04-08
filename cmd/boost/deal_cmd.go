@@ -83,6 +83,10 @@ var dealFlags = []cli.Flag{
 		Usage: "whether the deal funds should come from verified client data-cap",
 		Value: true,
 	},
+	&cli.StringFlag{
+		Name:  "wallet",
+		Usage: "wallet address to be used to initiate the deal",
+	},
 }
 
 var dealCmd = &cli.Command{
@@ -134,7 +138,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	}
 	defer closer()
 
-	walletAddr, err := n.Wallet.GetDefault()
+	walletAddr, err := n.GetProviderOrDefaultWallet(ctx, cctx.String("wallet"))
 	if err != nil {
 		return err
 	}

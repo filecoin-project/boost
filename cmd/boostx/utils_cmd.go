@@ -81,7 +81,7 @@ var marketCmd = &cli.Command{
 		}
 		defer closer()
 
-		walletAddr, err := n.Wallet.GetDefault()
+		walletAddr, err := n.GetProviderOrDefaultWallet(ctx, cctx.String("wallet"))
 		if err != nil {
 			return err
 		}
