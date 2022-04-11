@@ -52,7 +52,7 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 		}
 
 		// Look up the deal by signed proposal CID in the Boost database
-		signedPropCid := signedProp.Cid().String()
+		signedPropCid := signedProp.Cid()
 		deal, err := r.dealsDB.BySignedProposalCID(ctx, signedPropCid)
 		if err == nil {
 			prop := deal.ClientDealProposal.Proposal

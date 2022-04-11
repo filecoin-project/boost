@@ -30,7 +30,7 @@ func TestSimpleOfflineDealHappy(t *testing.T) {
 	require.True(t, pi.Accepted)
 
 	// execute deal
-	require.NoError(t, td.executeAndSubscribeOfflineDeal())
+	require.NoError(t, td.executeAndSubscribeImportOfflineDeal())
 
 	// wait for Accepted checkpoint
 	td.waitForAndAssert(t, ctx, dealcheckpoints.Accepted)

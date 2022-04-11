@@ -287,6 +287,34 @@ func TestDealsRejectedForFunds(t *testing.T) {
 
 }
 
+func TestOnlineDealRejectedForDuplicateProposal(t *testing.T) {
+	ctx := context.Background()
+	harness := NewHarness(t, ctx)
+	// start the provider test harness
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	t.Run("online", func(t *testing.T) {
+		td := harness.newDealBuilder(t, 1).withNoOpMinerStub().withBlockingHttpServer().build()
+		err := td.executeAndSubscribe()
+		require.NoError(t, err)
+
+		pi, _, err := td.ph.Provider.ExecuteDeal(td.params, "")
+		require.NoError(t, err)
+		require.False(t, pi.Accepted)
+	})
+
+	t.Run("offline", func(t *testing.T) {
+		td := harness.newDealBuilder(t, 1, withOfflineDeal()).withNoOpMinerStub().build()
+		_, _, err := td.ph.Provider.ExecuteDeal(td.params, "")
+		require.NoError(t, err)
+
+		pi, _, err := td.ph.Provider.ExecuteDeal(td.params, "")
+		require.NoError(t, err)
+		require.False(t, pi.Accepted)
+	})
+}
+
 func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
 	require.NoError(t, logging.SetLogLevel("*", "INFO"))
 
@@ -1434,8 +1462,8 @@ type testDeal struct {
 	tBuilder *testDealBuilder
 }
 
-func (td *testDeal) executeAndSubscribeOfflineDeal() error {
-	pi, dh, err := td.ph.Provider.MakeOfflineDealWithData(td.params.DealUUID, td.carv2FilePath)
+func (td *testDeal) executeAndSubscribeImportOfflineDeal() error {
+	pi, dh, err := td.ph.Provider.ImportOfflineDealData(td.params.DealUUID, td.carv2FilePath)
 	if err != nil {
 		return err
 	}

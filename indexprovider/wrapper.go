@@ -130,7 +130,7 @@ func (w *Wrapper) Start(ctx context.Context) {
 
 		// go from proposal cid -> piece cid by looking up deal in boost and if we can't find it there -> then markets
 		// check Boost deals DB
-		pds, boostErr := w.dealsDB.BySignedProposalCID(ctx, proposalCid.String())
+		pds, boostErr := w.dealsDB.BySignedProposalCID(ctx, proposalCid)
 		if boostErr == nil {
 			pieceCid := pds.ClientDealProposal.Proposal.PieceCID
 			return provideF(pieceCid)
