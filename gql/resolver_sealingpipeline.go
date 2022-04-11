@@ -77,6 +77,7 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		}
 
 		sectors = append(sectors, &waitDealSector{
+			SectorID:   gqltypes.Uint64(s),
 			Deals:      deals,
 			Taken:      gqltypes.Uint64(taken),
 			SectorSize: gqltypes.Uint64(ssize),
@@ -149,6 +150,7 @@ type waitDeal struct {
 }
 
 type waitDealSector struct {
+	SectorID   gqltypes.Uint64
 	Deals      []*waitDeal
 	Taken      gqltypes.Uint64
 	SectorSize gqltypes.Uint64
