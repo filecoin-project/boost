@@ -50,9 +50,11 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		return nil, err
 	}
 
-	taken := uint64(0)
-	deals := []*waitDeal{}
+	sectors := []*waitDealSector{}
 	for _, s := range wdSectors {
+		taken := uint64(0)
+		deals := []*waitDeal{}
+
 		wdSectorStatus, err := r.spApi.SectorsStatus(ctx, s, false)
 		if err != nil {
 			return nil, err
@@ -73,6 +75,12 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 			})
 			taken += uint64(p.Piece.Size)
 		}
+
+		sectors = append(sectors, &waitDealSector{
+			Deals:      deals,
+			Taken:      gqltypes.Uint64(taken),
+			SectorSize: gqltypes.Uint64(ssize),
+		})
 	}
 
 	var ss sectorStates
@@ -123,10 +131,7 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 	}
 
 	return &sealingPipelineState{
-		WaitDeals: waitDeals{
-			SectorSize: gqltypes.Uint64(ssize),
-			Deals:      deals,
-		},
+		Sectors:      sectors,
 		SectorStates: ss,
 		Workers:      workers,
 	}, nil
@@ -143,9 +148,10 @@ type waitDeal struct {
 	Size gqltypes.Uint64
 }
 
-type waitDeals struct {
-	SectorSize gqltypes.Uint64
+type waitDealSector struct {
 	Deals      []*waitDeal
+	Taken      gqltypes.Uint64
+	SectorSize gqltypes.Uint64
 }
 
 type sectorStates struct {
@@ -163,7 +169,7 @@ type worker struct {
 }
 
 type sealingPipelineState struct {
-	WaitDeals    waitDeals
+	Sectors      []*waitDealSector
 	SectorStates sectorStates
 	Workers      []*worker
 }
