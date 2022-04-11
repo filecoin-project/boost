@@ -5,6 +5,7 @@ import (
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -50,38 +51,18 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		return nil, err
 	}
 
-	sectors := []*waitDealSector{}
-	for _, s := range wdSectors {
-		taken := uint64(0)
-		deals := []*waitDeal{}
+	sdwdSectors, err := r.spApi.SectorsListInStates(ctx, []api.SectorState{"SnapDealsWaitDeals"})
+	if err != nil {
+		return nil, err
+	}
 
-		wdSectorStatus, err := r.spApi.SectorsStatus(ctx, s, false)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, p := range wdSectorStatus.Pieces {
-			if p.DealInfo == nil {
-				continue
-			}
-			//TODO: any other way to map deal from sector with deal from db?
-			d, err := r.dealByPublishCID(ctx, p.DealInfo.PublishCid)
-			if err != nil {
-				return nil, err
-			}
-			deals = append(deals, &waitDeal{
-				ID:   graphql.ID(d.DealUuid.String()),
-				Size: gqltypes.Uint64(p.Piece.Size),
-			})
-			taken += uint64(p.Piece.Size)
-		}
-
-		sectors = append(sectors, &waitDealSector{
-			SectorID:   gqltypes.Uint64(s),
-			Deals:      deals,
-			Taken:      gqltypes.Uint64(taken),
-			SectorSize: gqltypes.Uint64(ssize),
-		})
+	waitDealsSectors, err := r.populateWaitDealsSectors(ctx, wdSectors, ssize)
+	if err != nil {
+		return nil, err
+	}
+	snapDealsWaitDealsSectors, err := r.populateWaitDealsSectors(ctx, sdwdSectors, ssize)
+	if err != nil {
+		return nil, err
 	}
 
 	var ss sectorStates
@@ -132,9 +113,10 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 	}
 
 	return &sealingPipelineState{
-		Sectors:      sectors,
-		SectorStates: ss,
-		Workers:      workers,
+		WaitDealsSectors:          waitDealsSectors,
+		SnapDealsWaitDealsSectors: snapDealsWaitDealsSectors,
+		SectorStates:              ss,
+		Workers:                   workers,
 	}, nil
 }
 
@@ -171,9 +153,10 @@ type worker struct {
 }
 
 type sealingPipelineState struct {
-	Sectors      []*waitDealSector
-	SectorStates sectorStates
-	Workers      []*worker
+	WaitDealsSectors          []*waitDealSector
+	SnapDealsWaitDealsSectors []*waitDealSector
+	SectorStates              sectorStates
+	Workers                   []*worker
 }
 
 func getSectorSize(ctx context.Context, fullNode v1api.FullNode, maddr address.Address) (uint64, error) {
@@ -183,4 +166,42 @@ func getSectorSize(ctx context.Context, fullNode v1api.FullNode, maddr address.A
 	}
 
 	return uint64(mi.SectorSize), nil
+}
+
+func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers []abi.SectorNumber, ssize uint64) ([]*waitDealSector, error) {
+	waitDealsSectors := []*waitDealSector{}
+	for _, s := range sectorNumbers {
+		taken := uint64(0)
+		deals := []*waitDeal{}
+
+		wdSectorStatus, err := r.spApi.SectorsStatus(ctx, s, false)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, p := range wdSectorStatus.Pieces {
+			if p.DealInfo == nil {
+				continue
+			}
+			//TODO: any other way to map deal from sector with deal from db?
+			d, err := r.dealByPublishCID(ctx, p.DealInfo.PublishCid)
+			if err != nil {
+				return nil, err
+			}
+			deals = append(deals, &waitDeal{
+				ID:   graphql.ID(d.DealUuid.String()),
+				Size: gqltypes.Uint64(p.Piece.Size),
+			})
+			taken += uint64(p.Piece.Size)
+		}
+
+		waitDealsSectors = append(waitDealsSectors, &waitDealSector{
+			SectorID:   gqltypes.Uint64(s),
+			Deals:      deals,
+			Taken:      gqltypes.Uint64(taken),
+			SectorSize: gqltypes.Uint64(ssize),
+		})
+	}
+
+	return waitDealsSectors, nil
 }
