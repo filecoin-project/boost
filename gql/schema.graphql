@@ -156,9 +156,11 @@ type WaitDeal {
   Size: Uint64!
 }
 
-type WaitDeals {
-  SectorSize: Uint64!
+type WaitDealsSector {
+  SectorID: Uint64!
   Deals: [WaitDeal]!
+  Used: Uint64!
+  SectorSize: Uint64!
 }
 
 type SectorState {
@@ -182,7 +184,8 @@ type SectorStates {
 }
 
 type SealingPipeline {
-  WaitDeals: WaitDeals!
+  WaitDealsSectors: [WaitDealsSector]!
+  SnapDealsWaitDealsSectors: [WaitDealsSector]!
   SectorStates: SectorStates!
   Workers: [Worker]!
 }

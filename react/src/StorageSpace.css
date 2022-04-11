@@ -2,19 +2,19 @@
     padding: 1em;
 }
 
-.staged {
+.storage-chart .staged {
     background-color: #6b5eae;
 }
 
-.transferred, .used {
+.storage-chart .transferred, .used {
     background-color: rgb(44, 123, 229);
 }
 
-.pending {
+.storage-chart .pending {
     background-color: rgb(166, 197, 247);
 }
 
-.free {
+.storage-chart .free {
     background-color: rgb(210, 221, 236);
 }
 

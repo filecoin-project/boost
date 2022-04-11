@@ -273,7 +273,18 @@ const LegacyStorageQuery = gql`
 const SealingPipelineQuery = gql`
     query AppSealingPipelineQuery {
         sealingpipeline {
-            WaitDeals {
+            WaitDealsSectors {
+                SectorID
+                Used
+                SectorSize
+                Deals {
+                    ID
+                    Size
+                }
+            }
+            SnapDealsWaitDealsSectors {
+                SectorID
+                Used
                 SectorSize
                 Deals {
                     ID

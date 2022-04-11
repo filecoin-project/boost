@@ -5,23 +5,47 @@
     color: #a61e4d;
 }
 
+.sealing-pipeline .wait-deals-sector {
+    margin-bottom: 1em;
+}
+
+.sealing-pipeline .wait-deals-sector .sector-id {
+    padding: 0 1em 1em 1em;
+    color: #3b506c;
+}
+
 .sealing-pipeline .wait-deals .no-deals {
     padding: 1em;
+}
+
+table.wait-deals td.wait-deals-type {
+    width: 50%;
+    vertical-align: top;
+    padding: 0;
 }
 
 .sealing-pipeline .cumulative-bar-chart {
     padding-left: 1em;
 }
 
-.filled {
+.sealing-pipeline .cumulative-bar-chart .filled {
     background-color: rgb(44, 123, 229);
 }
 
-.free {
+.sealing-pipeline .cumulative-bar-chart .free {
     background-color: rgb(210, 221, 236);
 }
 
+#content table.wait-deals-sizes {
+    font-size: 0.9em;
+}
+
+.wait-deals-sizes .free {
+    color: #777
+}
+
 table.sealing td.sealing-type {
+    width: 50%;
     vertical-align: top;
     padding: 0;
 }
@@ -84,6 +108,10 @@ table.sealing td.sealing-type {
 
 .no-workers {
     padding: 0 0 2em 1.25em;
+}
+
+.sealing-pipeline .WaitDeals {
+    background-color: rgb(210, 221, 236);
 }
 
 .sealing-pipeline .AddPiece {

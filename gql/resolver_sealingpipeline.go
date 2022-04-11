@@ -134,7 +134,7 @@ type waitDeal struct {
 type waitDealSector struct {
 	SectorID   gqltypes.Uint64
 	Deals      []*waitDeal
-	Taken      gqltypes.Uint64
+	Used       gqltypes.Uint64
 	SectorSize gqltypes.Uint64
 }
 
@@ -171,7 +171,7 @@ func getSectorSize(ctx context.Context, fullNode v1api.FullNode, maddr address.A
 func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers []abi.SectorNumber, ssize uint64) ([]*waitDealSector, error) {
 	waitDealsSectors := []*waitDealSector{}
 	for _, s := range sectorNumbers {
-		taken := uint64(0)
+		used := uint64(0)
 		deals := []*waitDeal{}
 
 		wdSectorStatus, err := r.spApi.SectorsStatus(ctx, s, false)
@@ -192,13 +192,13 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 				ID:   graphql.ID(d.DealUuid.String()),
 				Size: gqltypes.Uint64(p.Piece.Size),
 			})
-			taken += uint64(p.Piece.Size)
+			used += uint64(p.Piece.Size)
 		}
 
 		waitDealsSectors = append(waitDealsSectors, &waitDealSector{
 			SectorID:   gqltypes.Uint64(s),
 			Deals:      deals,
-			Taken:      gqltypes.Uint64(taken),
+			Used:       gqltypes.Uint64(used),
 			SectorSize: gqltypes.Uint64(ssize),
 		})
 	}
