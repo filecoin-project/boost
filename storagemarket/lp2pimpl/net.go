@@ -194,8 +194,7 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 	// wait for deal execution to complete.
 	res, _, err := p.prov.ExecuteDeal(&proposal, s.Conn().RemotePeer())
 	if err != nil {
-		log.Warnw("executing deal proposal", "id", proposal.DealUUID, "err", err)
-		return
+		log.Warnw("deal proposal failed", "id", proposal.DealUUID, "err", err, "reason", res.Reason)
 	}
 
 	// Set a deadline on writing to the stream so it doesn't hang
