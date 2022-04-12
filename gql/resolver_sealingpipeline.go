@@ -184,6 +184,8 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 			if p.DealInfo == nil {
 				continue
 			}
+
+			log.Debugw("dealsByPublishCID", "publishcid", p.DealInfo.PublishCid)
 			ds, err := r.dealsByPublishCID(ctx, p.DealInfo.PublishCid)
 			if err != nil {
 				return nil, err
@@ -200,6 +202,8 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 					if err != nil {
 						return nil, err
 					}
+
+					log.Debugw("ds[i].Proposal.Cid", "i", i, "cid", cid, "dcid", dcid)
 
 					if cid.Equals(dcid) {
 						break
