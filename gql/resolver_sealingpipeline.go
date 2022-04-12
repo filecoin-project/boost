@@ -128,8 +128,9 @@ type sectorState struct {
 }
 
 type waitDeal struct {
-	ID   graphql.ID
-	Size gqltypes.Uint64
+	ID       graphql.ID
+	Size     gqltypes.Uint64
+	IsLegacy bool
 }
 
 type waitDealSector struct {
@@ -225,8 +226,9 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 				}
 
 				deals = append(deals, &waitDeal{
-					ID:   graphql.ID(lds[j].ProposalCid.String()),
-					Size: gqltypes.Uint64(p.Piece.Size),
+					ID:       graphql.ID(lds[j].ProposalCid.String()),
+					Size:     gqltypes.Uint64(p.Piece.Size),
+					IsLegacy: true,
 				})
 				used += uint64(p.Piece.Size)
 				continue
@@ -250,8 +252,9 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 			}
 
 			deals = append(deals, &waitDeal{
-				ID:   graphql.ID(ds[i].DealUuid.String()),
-				Size: gqltypes.Uint64(p.Piece.Size),
+				ID:       graphql.ID(ds[i].DealUuid.String()),
+				Size:     gqltypes.Uint64(p.Piece.Size),
+				IsLegacy: false,
 			})
 			used += uint64(p.Piece.Size)
 		}
