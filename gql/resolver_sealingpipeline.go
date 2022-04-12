@@ -206,7 +206,7 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 				for ; j < len(lds); j++ {
 					l := lds[j]
 
-					if p.DealInfo.PublishCid == nil {
+					if p.DealInfo.PublishCid == nil || l.PublishCid == nil {
 						continue
 					}
 
