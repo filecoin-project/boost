@@ -2,7 +2,6 @@ package gql
 
 import (
 	"context"
-	"errors"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
@@ -186,51 +185,19 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 				continue
 			}
 
+			publishCid := p.DealInfo.PublishCid
+			if publishCid == nil {
+				continue
+			}
+
 			dcid, err := p.DealInfo.DealProposal.Cid()
 			if err != nil {
 				return nil, err
 			}
 
-			ds, err := r.dealsByPublishCID(ctx, p.DealInfo.PublishCid)
+			ds, err := r.dealsByPublishCID(ctx, publishCid)
 			if err != nil {
 				return nil, err
-			}
-
-			if len(ds) == 0 { // legacy deal
-				lds, err := r.legacyProv.ListLocalDeals()
-				if err != nil {
-					return nil, err
-				}
-
-				var j int
-				for ; j < len(lds); j++ {
-					l := lds[j]
-
-					if p.DealInfo.PublishCid == nil || l.PublishCid == nil {
-						continue
-					}
-
-					lpcid, err := l.ClientDealProposal.Proposal.Cid()
-					if err != nil {
-						return nil, err
-					}
-
-					if l.PublishCid.Equals(*p.DealInfo.PublishCid) && lpcid.Equals(dcid) {
-						break
-					}
-				}
-
-				if j == len(lds) {
-					return nil, errors.New("couldnt match legacy markets deal based on publish cid and proposal cid")
-				}
-
-				deals = append(deals, &waitDeal{
-					ID:       graphql.ID(lds[j].ProposalCid.String()),
-					Size:     gqltypes.Uint64(p.Piece.Size),
-					IsLegacy: true,
-				})
-				used += uint64(p.Piece.Size)
-				continue
 			}
 
 			var i int
@@ -241,21 +208,57 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 						return nil, err
 					}
 
-					log.Debugw("ds[i]", "publishCid", p.DealInfo.PublishCid, "i", i, "cid", cid, "dcid", dcid, "len(ds)", len(ds))
 					if cid.Equals(dcid) {
 						break
 					}
 				}
 			}
 
-			if i == len(ds) {
-				return nil, errors.New("couldnt match boost deal based on publish cid and proposal cid")
+			// we matched the deal from piece with a deal from the boost db
+			// single deal in publish message; i == 0; len(ds) == 1;
+			// multiple deals in publish message; i == smth; len(ds) > 1;
+			if i < len(ds) {
+				deals = append(deals, &waitDeal{
+					ID:       graphql.ID(ds[i].DealUuid.String()),
+					Size:     gqltypes.Uint64(p.Piece.Size),
+					IsLegacy: false,
+				})
+				used += uint64(p.Piece.Size)
+				continue
+			}
+
+			// match not found in boost db - fallback to legacy deals list
+			lds, err := r.legacyProv.ListLocalDeals()
+			if err != nil {
+				return nil, err
+			}
+
+			var j int
+			for ; j < len(lds); j++ {
+				l := lds[j]
+				if l.PublishCid == nil {
+					continue
+				}
+
+				lpcid, err := l.ClientDealProposal.Proposal.Cid()
+				if err != nil {
+					return nil, err
+				}
+
+				if l.PublishCid.Equals(*publishCid) && lpcid.Equals(dcid) {
+					break
+				}
+			}
+
+			if j == len(lds) {
+				log.Errorw("couldnt match deal to boost or legacy market deal based on publish cid and proposal cid", "publishCid", publishCid, "dealProposalCid", dcid)
+				continue
 			}
 
 			deals = append(deals, &waitDeal{
-				ID:       graphql.ID(ds[i].DealUuid.String()),
+				ID:       graphql.ID(lds[j].ProposalCid.String()),
 				Size:     gqltypes.Uint64(p.Piece.Size),
-				IsLegacy: false,
+				IsLegacy: true,
 			})
 			used += uint64(p.Piece.Size)
 		}
