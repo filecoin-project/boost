@@ -195,7 +195,6 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 			if err != nil {
 				return nil, err
 			}
-			var i int
 
 			if len(ds) == 0 { // legacy deal
 				lds, err := r.legacyProv.ListLocalDeals()
@@ -234,6 +233,7 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 				continue
 			}
 
+			var i int
 			if len(ds) > 1 { // compare by deal proposal cid
 				for ; i < len(ds); i++ {
 					cid, err := ds[i].ClientDealProposal.Proposal.Cid()
@@ -241,6 +241,7 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 						return nil, err
 					}
 
+					log.Debugw("ds[i]", "publishCid", p.DealInfo.PublishCid, "i", i, "cid", cid, "dcid", dcid, "len(ds)", len(ds))
 					if cid.Equals(dcid) {
 						break
 					}
