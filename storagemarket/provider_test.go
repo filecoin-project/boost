@@ -291,6 +291,7 @@ func TestDealRejectedForDuplicateProposal(t *testing.T) {
 		pi, _, err := td.ph.Provider.ExecuteDeal(td.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
+		require.Contains(t, pi.Reason, "deal proposal is identical")
 	})
 
 	t.Run("offline", func(t *testing.T) {
@@ -301,6 +302,41 @@ func TestDealRejectedForDuplicateProposal(t *testing.T) {
 		pi, _, err := td.ph.Provider.ExecuteDeal(td.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
+		require.Contains(t, pi.Reason, "deal proposal is identical")
+	})
+}
+
+func TestDealRejectedForDuplicateUuid(t *testing.T) {
+	ctx := context.Background()
+	harness := NewHarness(t, ctx)
+	// start the provider test harness
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	t.Run("online", func(t *testing.T) {
+		td := harness.newDealBuilder(t, 1).withNoOpMinerStub().withBlockingHttpServer().build()
+		err := td.executeAndSubscribe()
+		require.NoError(t, err)
+
+		td2 := harness.newDealBuilder(t, 2).withNoOpMinerStub().withBlockingHttpServer().build()
+		td2.params.DealUUID = td.params.DealUUID
+		pi, _, err := td.ph.Provider.ExecuteDeal(td2.params, "")
+		require.NoError(t, err)
+		require.False(t, pi.Accepted)
+		require.Contains(t, pi.Reason, "deal has the same uuid")
+	})
+
+	t.Run("offline", func(t *testing.T) {
+		td := harness.newDealBuilder(t, 1, withOfflineDeal()).withNoOpMinerStub().build()
+		_, _, err := td.ph.Provider.ExecuteDeal(td.params, "")
+		require.NoError(t, err)
+
+		td2 := harness.newDealBuilder(t, 2, withOfflineDeal()).withNoOpMinerStub().build()
+		td2.params.DealUUID = td.params.DealUUID
+		pi, _, err := td.ph.Provider.ExecuteDeal(td2.params, "")
+		require.NoError(t, err)
+		require.False(t, pi.Accepted)
+		require.Contains(t, pi.Reason, "deal has the same uuid")
 	})
 }
 
@@ -1039,7 +1075,8 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	smInitF := storagemanager.New(storagemanager.Config{
 		MaxStagingDealsBytes: ph.MaxStagingDealBytes,
 	})
-	sm := smInitF(lr, sqldb)
+	sm, err := smInitF(lr, sqldb)
+	require.NoError(t, err)
 
 	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
 	df := func(ctx context.Context, deal types.DealFilterParams) (bool, string, error) {
@@ -1053,7 +1090,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	askStore := &mockAskStore{}
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
-	prov, err := NewProvider("", h, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, sps, minerStub, df, sqldb,
+	prov, err := NewProvider(h, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, sps, minerStub, df, sqldb,
 		db.NewLogsDB(sqldb), dagStore, ps, &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, pc.httpOpts...)
 	require.NoError(t, err)
 	ph.Provider = prov
@@ -1105,7 +1142,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, ctx context
 	}
 
 	// construct a new provider with pre-existing state
-	prov, err := NewProvider("", h.Host, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
+	prov, err := NewProvider(h.Host, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
 		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.dagst, h.Provider.ps, &NoOpIndexProvider{}, h.Provider.askGetter, h.Provider.sigVerifier, pc.httpOpts...)
 

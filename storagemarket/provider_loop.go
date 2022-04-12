@@ -3,6 +3,7 @@ package storagemarket
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/filecoin-project/boost/api"
@@ -71,6 +72,11 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 		return aerr
 	}
 
+	// Check that the deal uuid is unique
+	if aerr := p.checkDealUuidUnique(deal); aerr != nil {
+		return aerr
+	}
+
 	// get current sealing pipeline status
 	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
 	if err != nil {
@@ -124,6 +130,10 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 		} else if errs == nil {
 			p.dealLogger.Infow(deal.DealUuid, "untagged storage for deal cleanup", deal.Transfer.Size)
 		}
+
+		if deal.InboundFilePath != "" {
+			_ = os.Remove(deal.InboundFilePath)
+		}
 	}
 
 	// tag the funds required for escrow and sending the publish deal message
@@ -164,12 +174,27 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 		return aerr
 	}
 
+	// create a file in the staging area to which we will download the deal data
+	downloadFilePath, err := p.storageManager.DownloadFilePath(deal.DealUuid)
+	if err != nil {
+		cleanup()
+
+		return &acceptError{
+			error:         fmt.Errorf("failed to create download staging file for deal: %w", err),
+			reason:        "server error: creating download staging file",
+			isSevereError: true,
+		}
+	}
+	deal.InboundFilePath = downloadFilePath
+	p.dealLogger.Infow(deal.DealUuid, "created deal download staging file", "path", deal.InboundFilePath)
+
 	// write deal state to the database
 	deal.CreatedAt = time.Now()
 	deal.Checkpoint = dealcheckpoints.Accepted
 	err = p.dealsDB.Insert(p.ctx, deal)
 	if err != nil {
 		cleanup()
+
 		return &acceptError{
 			error:         fmt.Errorf("failed to insert deal in db: %w", err),
 			reason:        "server error: save to db",
@@ -187,6 +212,11 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState) *acceptError {
 	// Check that the deal proposal is unique
 	if aerr := p.checkDealPropUnique(ds); aerr != nil {
+		return aerr
+	}
+
+	// Check that the deal uuid is unique
+	if aerr := p.checkDealUuidUnique(ds); aerr != nil {
 		return aerr
 	}
 
@@ -283,6 +313,30 @@ func (p *Provider) checkDealPropUnique(deal *smtypes.ProviderDealState) *acceptE
 	// a deal with a matching deal proposal cid. Therefore the deal proposal
 	// is not unique.
 	err = fmt.Errorf("deal proposal is identical to deal %s (proposed at %s)", dl.DealUuid, dl.CreatedAt)
+	return &acceptError{
+		error:         err,
+		reason:        err.Error(),
+		isSevereError: false,
+	}
+}
+
+func (p *Provider) checkDealUuidUnique(deal *smtypes.ProviderDealState) *acceptError {
+	dl, err := p.dealsDB.ByID(p.ctx, deal.DealUuid)
+	if err != nil {
+		if xerrors.Is(err, sql.ErrNoRows) {
+			// If there was no deal in the DB with this uuid, then it's unique
+			return nil
+		}
+		return &acceptError{
+			error:         fmt.Errorf("looking up deal by uuid: %w", err),
+			reason:        "server error: unique check: lookup by deal uuid",
+			isSevereError: true,
+		}
+	}
+
+	// The database lookup did not return a "not found" error, meaning we found
+	// a deal with a matching deal uuid. Therefore the deal proposal is not unique.
+	err = fmt.Errorf("deal has the same uuid as deal %s (proposed at %s)", dl.DealUuid, dl.CreatedAt)
 	return &acceptError{
 		error:         err,
 		reason:        err.Error(),

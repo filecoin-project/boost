@@ -7,14 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"sync"
 	"time"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/filestore"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/sealingpipeline"
@@ -72,9 +70,6 @@ type Provider struct {
 
 	newDealPS *newDealPS
 
-	// filestore for manipulating files on disk.
-	fs filestore.FileStore
-
 	// event loop
 	acceptDealChan    chan acceptDealReq
 	finishedDealChan  chan finishedDealReq
@@ -118,19 +113,10 @@ type Provider struct {
 	sigVerifier types.SignatureVerifier
 }
 
-func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
+func NewProvider(h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, httpOpts ...httptransport.Option) (*Provider, error) {
-	fspath := path.Join(repoRoot, storagemanager.StagingAreaDirName)
-	err := os.MkdirAll(fspath, os.ModePerm)
-	if err != nil {
-		return nil, err
-	}
-	fs, err := filestore.NewLocalFileStore(filestore.OsPath(fspath))
-	if err != nil {
-		return nil, err
-	}
 
 	newDealPS, err := newDealPubsub()
 	if err != nil {
@@ -146,7 +132,6 @@ func NewProvider(repoRoot string, h host.Host, sqldb *sql.DB, dealsDB *db.DealsD
 		config:    Config{MaxTransferDuration: 24 * 3600 * time.Second},
 		Address:   addr,
 		newDealPS: newDealPS,
-		fs:        fs,
 		db:        sqldb,
 		dealsDB:   dealsDB,
 		logsSqlDB: logsSqlDB,
@@ -290,24 +275,8 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (*api.P
 // executeOnlineDeal sets up a download location for the deal, then sends the
 // deal to the main provider loop for execution
 func (p *Provider) executeDeal(ds smtypes.ProviderDealState) (*api.ProviderDealRejectionInfo, *dealHandler, error) {
-	var tmpFile filestore.File
 	dh := p.mkAndInsertDealHandler(ds.DealUuid)
 	ri, err := func() (*api.ProviderDealRejectionInfo, error) {
-		if !ds.IsOffline {
-			// for online deals, create a temp file to which we will download the deal data.
-			tmpFile, err := p.fs.CreateTemp()
-			if err != nil {
-				p.dealLogger.LogError(ds.DealUuid, "failed to create temp file for inbound data transfer", err)
-				return nil, fmt.Errorf("failed to create temp file: %w", err)
-			}
-			if err := tmpFile.Close(); err != nil {
-				p.dealLogger.LogError(ds.DealUuid, "failed to close temp file created for inbound data transfer", err)
-				return nil, fmt.Errorf("failed to close temp file: %w", err)
-			}
-
-			ds.InboundFilePath = string(tmpFile.OsPath())
-		}
-
 		// send the deal to the main provider loop for execution
 		resp, err := p.checkForDealAcceptance(&ds, dh, false)
 		if err != nil {
@@ -329,10 +298,7 @@ func (p *Provider) executeDeal(ds smtypes.ProviderDealState) (*api.ProviderDealR
 	}()
 	if err != nil || ri == nil || !ri.Accepted {
 		// if there was an error processing the deal, or the deal was rejected,
-		// clean up the tmp file and deal handler
-		if tmpFile != nil {
-			_ = os.Remove(string(tmpFile.OsPath()))
-		}
+		// clean up the deal handler
 		dh.close()
 		p.delDealHandler(ds.DealUuid)
 		return ri, nil, err
