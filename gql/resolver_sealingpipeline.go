@@ -210,7 +210,12 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 						continue
 					}
 
-					if l.PublishCid.Equals(*p.DealInfo.PublishCid) && l.ProposalCid.Equals(dcid) {
+					lpcid, err := l.ClientDealProposal.Proposal.Cid()
+					if err != nil {
+						return nil, err
+					}
+
+					if l.PublishCid.Equals(*p.DealInfo.PublishCid) && lpcid.Equals(dcid) {
 						break
 					}
 				}
