@@ -197,22 +197,22 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 			var i int
 
 			if len(ds) == 0 { // legacy deal
-				lds, err := r.legacyProv.ListLocalDeals()
-				if err != nil {
-					return nil, err
-				}
+				//lds, err := r.legacyProv.ListLocalDeals()
+				//if err != nil {
+				//return nil, err
+				//}
 
-				var j int
-				for ; j < len(lds); j++ {
-					l := lds[j]
-					if l.PublishCid.Equals(*p.DealInfo.PublishCid) && l.ProposalCid.Equals(dcid) {
-						break
-					}
-				}
+				//var j int
+				//for ; j < len(lds); j++ {
+				//l := lds[j]
+				//if l.PublishCid.Equals(*p.DealInfo.PublishCid) && l.ProposalCid.Equals(dcid) {
+				//break
+				//}
+				//}
 
-				if j == len(lds) {
-					return nil, errors.New("couldnt match legacy markets deal based on publish cid and proposal cid")
-				}
+				//if j == len(lds) {
+				//return nil, errors.New("couldnt match legacy markets deal based on publish cid and proposal cid")
+				//}
 
 				deals = append(deals, &waitDeal{
 					ID:   graphql.ID(dcid.String()),
