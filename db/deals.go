@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
+	"github.com/ipfs/go-cid"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -209,9 +210,9 @@ func (d *DealsDB) ByPublishCID(ctx context.Context, publishCid string) ([]*types
 	return deals, nil
 }
 
-func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid string) (*types.ProviderDealState, error) {
+func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid cid.Cid) (*types.ProviderDealState, error) {
 	qry := "SELECT " + dealFieldsStr + " FROM Deals WHERE SignedProposalCID=?"
-	row := d.db.QueryRowContext(ctx, qry, proposalCid)
+	row := d.db.QueryRowContext(ctx, qry, proposalCid.String())
 	return d.scanRow(row)
 }
 

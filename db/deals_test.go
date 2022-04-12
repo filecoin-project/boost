@@ -39,7 +39,7 @@ func TestDealsDB(t *testing.T) {
 
 	propnd, err := cborutil.AsIpld(&deal.ClientDealProposal)
 	req.NoError(err)
-	storedDealBySignedPropCid, err := db.BySignedProposalCID(ctx, propnd.Cid().String())
+	storedDealBySignedPropCid, err := db.BySignedProposalCID(ctx, propnd.Cid())
 	req.NoError(err)
 	req.Equal(deal.DealUuid, storedDealBySignedPropCid.DealUuid)
 
