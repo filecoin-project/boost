@@ -185,6 +185,11 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 				continue
 			}
 
+			dcid, err := p.DealInfo.DealProposal.Cid()
+			if err != nil {
+				return nil, err
+			}
+
 			ds, err := r.dealsByPublishCID(ctx, p.DealInfo.PublishCid)
 			if err != nil {
 				return nil, err
@@ -192,8 +197,25 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 			var i int
 
 			if len(ds) == 0 { // legacy deal
+				lds, err := r.legacyProv.ListLocalDeals()
+				if err != nil {
+					return nil, err
+				}
+
+				var j int
+				for ; j < len(lds); j++ {
+					l := lds[j]
+					if l.PublishCid.Equals(*p.DealInfo.PublishCid) && l.ProposalCid.Equals(dcid) {
+						break
+					}
+				}
+
+				if j == len(lds) {
+					return nil, errors.New("couldnt match legacy markets deal based on publish cid and proposal cid")
+				}
+
 				deals = append(deals, &waitDeal{
-					ID:   graphql.ID(p.DealInfo.DealID),
+					ID:   graphql.ID(dcid.String()),
 					Size: gqltypes.Uint64(p.Piece.Size),
 				})
 				used += uint64(p.Piece.Size)
@@ -207,11 +229,6 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 						return nil, err
 					}
 
-					dcid, err := p.DealInfo.DealProposal.Cid()
-					if err != nil {
-						return nil, err
-					}
-
 					if cid.Equals(dcid) {
 						break
 					}
@@ -219,7 +236,7 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 			}
 
 			if i == len(ds) {
-				return nil, errors.New("couldnt match deal based on proposal cid")
+				return nil, errors.New("couldnt match boost deal based on publish cid and proposal cid")
 			}
 
 			deals = append(deals, &waitDeal{
