@@ -94,7 +94,13 @@ function WaitDealsSizes(props) {
             {props.deals.map(deal => (
                 <tr key={deal.ID}>
                     <td className="deal-id">
-                        <ShortDealLink id={deal.ID} />
+                        {deal.IsLegacy ? (
+                            <Link to={"/legacy-deals/" + deal.ID}>
+                                <div className="short-deal-id">{deal.ID.substring(0, 12) + '…'}</div>
+                            </Link>
+                        ) : (
+                            <ShortDealLink id={deal.ID} />
+                        )}
                     </td>
                     <td className="deal-size">{humanFileSize(deal.Size)}</td>
                 </tr>

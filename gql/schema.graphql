@@ -154,6 +154,7 @@ type LegacyStorage {
 type WaitDeal {
   ID: ID!
   Size: Uint64!
+  IsLegacy: Boolean!
 }
 
 type WaitDealsSector {
