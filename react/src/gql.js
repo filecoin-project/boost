@@ -280,6 +280,7 @@ const SealingPipelineQuery = gql`
                 Deals {
                     ID
                     Size
+                    IsLegacy
                 }
             }
             SnapDealsWaitDealsSectors {
@@ -289,6 +290,7 @@ const SealingPipelineQuery = gql`
                 Deals {
                     ID
                     Size
+                    IsLegacy
                 }
             }
             SectorStates {
