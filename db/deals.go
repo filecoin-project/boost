@@ -186,10 +186,27 @@ func (d *DealsDB) ByID(ctx context.Context, id uuid.UUID) (*types.ProviderDealSt
 	return d.scanRow(row)
 }
 
-func (d *DealsDB) ByPublishCID(ctx context.Context, publishCid string) (*types.ProviderDealState, error) {
+func (d *DealsDB) ByPublishCID(ctx context.Context, publishCid string) ([]*types.ProviderDealState, error) {
 	qry := "SELECT " + dealFieldsStr + " FROM Deals WHERE PublishCID=?"
-	row := d.db.QueryRowContext(ctx, qry, publishCid)
-	return d.scanRow(row)
+	rows, err := d.db.QueryContext(ctx, qry, publishCid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var deals []*types.ProviderDealState
+	for rows.Next() {
+		deal, err := d.scanRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		deals = append(deals, deal)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return deals, nil
 }
 
 func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid string) (*types.ProviderDealState, error) {

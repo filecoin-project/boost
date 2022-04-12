@@ -2,6 +2,7 @@ package gql
 
 import (
 	"context"
+	"errors"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
@@ -183,13 +184,35 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 			if p.DealInfo == nil {
 				continue
 			}
-			//TODO: any other way to map deal from sector with deal from db?
-			d, err := r.dealByPublishCID(ctx, p.DealInfo.PublishCid)
+			ds, err := r.dealsByPublishCID(ctx, p.DealInfo.PublishCid)
 			if err != nil {
 				return nil, err
 			}
+			var i int
+			if len(ds) > 1 { // compare by deal proposal cid
+				for ; i < len(ds); i++ {
+					cid, err := ds[i].ClientDealProposal.Proposal.Cid()
+					if err != nil {
+						return nil, err
+					}
+
+					dcid, err := p.DealInfo.DealProposal.Cid()
+					if err != nil {
+						return nil, err
+					}
+
+					if cid.Equals(dcid) {
+						break
+					}
+				}
+			}
+
+			if i == len(ds) {
+				return nil, errors.New("couldnt match deal based on proposal cid")
+			}
+
 			deals = append(deals, &waitDeal{
-				ID:   graphql.ID(d.DealUuid.String()),
+				ID:   graphql.ID(ds[i].DealUuid.String()),
 				Size: gqltypes.Uint64(p.Piece.Size),
 			})
 			used += uint64(p.Piece.Size)
