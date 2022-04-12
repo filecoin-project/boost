@@ -185,11 +185,13 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 				continue
 			}
 
+			log.Debugw("=====", "=======", "======")
 			log.Debugw("dealsByPublishCID", "publishcid", p.DealInfo.PublishCid)
 			ds, err := r.dealsByPublishCID(ctx, p.DealInfo.PublishCid)
 			if err != nil {
 				return nil, err
 			}
+			log.Debugw("len(ds)", "len", len(ds))
 			var i int
 			if len(ds) > 1 { // compare by deal proposal cid
 				for ; i < len(ds); i++ {
@@ -212,6 +214,7 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 			}
 
 			if i == len(ds) {
+				log.Warnw("i == len(ds)", "error", "error")
 				return nil, errors.New("couldnt match deal based on proposal cid")
 			}
 
