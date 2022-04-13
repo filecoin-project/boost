@@ -17,6 +17,7 @@ import {DealsPerPage} from "./deals-per-page";
 import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import './Deals.css'
 import {Pagination} from "./Pagination";
+import {Warn} from "./Info";
 
 export function StorageDealsPage(props) {
     return <PageContainer pageType="storage-deals" title="Storage Deals">
@@ -131,13 +132,11 @@ function DealRow(props) {
     })
 
     if (error) {
-        return <tr>
-            <td colSpan={5}>Error: {error.message}</td>
-        </tr>
+        console.error('Error subscribing to deal ' + props.deal.ID, error)
     }
 
     var deal = props.deal
-    if (!loading) {
+    if (!loading && !error) {
         deal = data.dealUpdate
     }
 
@@ -150,7 +149,7 @@ function DealRow(props) {
     }
 
     return (
-        <tr>
+        <tr className={error ? "error" : ""}>
             <td className="start" onClick={props.toggleTimestampFormat}>
                 {start}
             </td>
@@ -161,7 +160,12 @@ function DealRow(props) {
             <td className="client">
                 <ShortClientAddress address={deal.ClientAddress} />
             </td>
-            <td className="message">{deal.Message}</td>
+            <td className="message">
+                {deal.Message}
+                {error ? (
+                    <Warn>{"Web UI Subscription Error: " + error.message}</Warn>
+                ) : null}
+            </td>
         </tr>
     )
 }

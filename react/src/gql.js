@@ -32,6 +32,7 @@ const wsLink = new WebSocketLink({
     uri: `ws://${graphqlEndpoint}/graphql/subscription`,
     options: {
         reconnect: true,
+        minTimeout: 5000,
         lazy: true,
     },
 });

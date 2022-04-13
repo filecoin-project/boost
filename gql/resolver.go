@@ -145,19 +145,14 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 		return nil, err
 	}
 
-	net := make(chan *dealResolver, 1)
-
 	// Send an update to the client with the initial state
 	deal, err := r.dealByID(ctx, dealUuid)
 	if err != nil {
 		return nil, err
 	}
 
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case net <- newDealResolver(deal, r.dealsDB, r.logsDB, r.spApi):
-	}
+	net := make(chan *dealResolver, 1)
+	net <- newDealResolver(deal, r.dealsDB, r.logsDB, r.spApi)
 
 	// Updates to deal state are broadcast on pubsub. Pipe these updates to the
 	// client
@@ -469,6 +464,7 @@ func (dr *dealResolver) Message(ctx context.Context) string {
 func (dr *dealResolver) sealingState(ctx context.Context) string {
 	si, err := dr.spApi.SectorsStatus(ctx, dr.SectorID, false)
 	if err != nil {
+		log.Warnw("error getting sealing status for sector", "sector", dr.SectorID, "error", err)
 		return "Sealer: Sealing"
 	}
 

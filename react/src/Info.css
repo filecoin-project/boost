@@ -5,16 +5,17 @@
 
 .info .target {
     display: inline-block;
-    border: 1px solid #465298;
-    color: #465298;
     cursor: pointer;
-    font-size: 0.6em;
-    width: 0.25em;
-    height: 1.2em;
-    border-radius: 2em;
-    padding: 0.2em 0.5em 0 0.55em;
+    font-size: 1em;
+    width: 1em;
+    height: 1em;
     vertical-align: top;
     margin-left: 0.5em;
+    background: url("./bootstrap-icons/icons/info-circle.svg");
+}
+
+.info.warning .target {
+    background: url("./bootstrap-icons/icons/exclamation-circle.svg");
 }
 
 .info .content {
