@@ -2,6 +2,7 @@ package fundmanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/filecoin-project/boost/db"
@@ -66,10 +67,12 @@ type TagFundsResp struct {
 	AvailablePublishMessage abi.TokenAmount
 }
 
+var ErrInsufficientFunds = errors.New("insufficient funds")
+
 // TagFunds tags funds for deal collateral and for the publish storage
 // deals message, so those funds cannot be used for other deals.
-// It fails if there are not enough funds available in the respective
-// wallets to cover either of these operations.
+// It returns ErrInsufficientFunds if there are not enough funds available
+// in the respective wallets to cover either of these operations.
 func (m *FundManager) TagFunds(ctx context.Context, dealUuid uuid.UUID, proposal market.DealProposal) (*TagFundsResp, error) {
 	marketBal, err := m.BalanceMarket(ctx)
 	if err != nil {
@@ -91,17 +94,19 @@ func (m *FundManager) TagFunds(ctx context.Context, dealUuid uuid.UUID, proposal
 	dealCollateral := proposal.ProviderBalanceRequirement()
 	availForDealCollat := big.Sub(marketBal.Available, tagged.Collateral)
 	if availForDealCollat.LessThan(dealCollateral) {
-		return nil, fmt.Errorf("available funds %d is less than collateral needed for deal %d: "+
+		err := fmt.Errorf("%w: available funds %d is less than collateral needed for deal %d: "+
 			"available = funds in escrow %d - amount reserved for other deals %d",
-			availForDealCollat, dealCollateral, marketBal.Available, tagged.Collateral)
+			ErrInsufficientFunds, availForDealCollat, dealCollateral, marketBal.Available, tagged.Collateral)
+		return nil, err
 	}
 
 	// Check that the provider has enough funds to send a PublishStorageDeals message
 	availForPubMsg := big.Sub(pubMsgBal, tagged.PubMsg)
 	if availForPubMsg.LessThan(m.cfg.PubMsgBalMin) {
-		return nil, fmt.Errorf("available funds %d is less than needed for publish deals message %d: "+
+		err := fmt.Errorf("%w: available funds %d is less than needed for publish deals message %d: "+
 			"available = funds in publish deals wallet %d - amount reserved for other deals %d",
-			availForPubMsg, m.cfg.PubMsgBalMin, pubMsgBal, tagged.PubMsg)
+			ErrInsufficientFunds, availForPubMsg, m.cfg.PubMsgBalMin, pubMsgBal, tagged.PubMsg)
+		return nil, err
 	}
 
 	// Provider has enough funds to make deal, so persist tagged funds

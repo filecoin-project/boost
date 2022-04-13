@@ -18,25 +18,9 @@ import (
 
 	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 
-	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
-
-	"github.com/filecoin-project/go-fil-markets/shared"
-
-	"github.com/filecoin-project/go-fil-markets/storagemarket"
-
-	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
-	"github.com/filecoin-project/go-fil-markets/shared_testutil"
-	ds "github.com/ipfs/go-datastore"
-	dssync "github.com/ipfs/go-datastore/sync"
-
-	logging "github.com/ipfs/go-log/v2"
-
-	"github.com/libp2p/go-libp2p-core/host"
-
-	"golang.org/x/sync/errgroup"
-
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
+	mock_sealingpipeline "github.com/filecoin-project/boost/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/smtestutil"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -44,30 +28,35 @@ import (
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	types2 "github.com/filecoin-project/boost/transport/types"
-
-	ctypes "github.com/filecoin-project/lotus/chain/types"
-
-	mock_sealingpipeline "github.com/filecoin-project/boost/sealingpipeline/mock"
-
 	"github.com/filecoin-project/go-address"
+	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
+	"github.com/filecoin-project/go-fil-markets/shared"
+	"github.com/filecoin-project/go-fil-markets/shared_testutil"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
-	"github.com/filecoin-project/lotus/api"
+	lapi "github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
+	ctypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
+	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-
+	ds "github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	logging "github.com/ipfs/go-log/v2"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-libp2p-core/event"
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestSimpleDealHappy(t *testing.T) {
@@ -109,7 +98,7 @@ func TestSimpleDealHappy(t *testing.T) {
 	harness.EventuallyAssertNoTagged(t, ctx)
 
 	// expect Proving event to be fired
-	err := td.waitForSealingState(api.SectorState(sealing.Proving))
+	err := td.waitForSealingState(lapi.SectorState(sealing.Proving))
 	require.NoError(t, err)
 
 	// assert logs
@@ -257,7 +246,7 @@ func TestDealsRejectedForFunds(t *testing.T) {
 		errg.Go(func() error {
 			if err := td.executeAndSubscribe(); err != nil {
 				// deal should be rejected only for lack of funds
-				if !strings.Contains(err.Error(), "available funds") {
+				if !strings.Contains(err.Error(), "insufficient funds") {
 					return errors.New("did not get expected error")
 				}
 
@@ -287,7 +276,7 @@ func TestDealsRejectedForFunds(t *testing.T) {
 
 }
 
-func TestOnlineDealRejectedForDuplicateProposal(t *testing.T) {
+func TestDealRejectedForDuplicateProposal(t *testing.T) {
 	ctx := context.Background()
 	harness := NewHarness(t, ctx)
 	// start the provider test harness
@@ -313,6 +302,38 @@ func TestOnlineDealRejectedForDuplicateProposal(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 	})
+}
+
+func TestDealRejectedForInsufficientProviderFunds(t *testing.T) {
+	ctx := context.Background()
+	// setup the provider test harness with configured publish fee per deal
+	// that is more than the total wallet balance.
+	harness := NewHarness(t, ctx, withMinPublishFees(abi.NewTokenAmount(100)), withPublishWalletBal(50))
+	// start the provider test harness
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	td := harness.newDealBuilder(t, 1).withNoOpMinerStub().withBlockingHttpServer().build()
+	pi, _, err := td.ph.Provider.ExecuteDeal(td.params, peer.ID(""))
+	require.NoError(t, err)
+	require.False(t, pi.Accepted)
+	require.Contains(t, pi.Reason, "insufficient funds")
+}
+
+func TestDealRejectedForInsufficientProviderStorageSpace(t *testing.T) {
+	ctx := context.Background()
+	// setup the provider test harness with only 1 byte of storage
+	// space for incoming deals.
+	harness := NewHarness(t, ctx, withMaxStagingDealsBytes(1))
+	// start the provider test harness
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	td := harness.newDealBuilder(t, 1).withNoOpMinerStub().withBlockingHttpServer().build()
+	pi, _, err := td.ph.Provider.ExecuteDeal(td.params, peer.ID(""))
+	require.NoError(t, err)
+	require.False(t, pi.Accepted)
+	require.Contains(t, pi.Reason, "no space left")
 }
 
 func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
@@ -474,7 +495,7 @@ func TestDealVerification(t *testing.T) {
 				h.MockFullNode.EXPECT().StateVerifiedClientStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(&sp,
 					nil)
 			},
-			expectedErr: "verified deal DataCap too small",
+			expectedErr: "verified deal DataCap 1 too small",
 		},
 		"fails if can't fetch datacap for verified deal": {
 			ask: &storagemarket.StorageAsk{
@@ -487,7 +508,7 @@ func TestDealVerification(t *testing.T) {
 				h.MockFullNode.EXPECT().StateVerifiedClientStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil,
 					errors.New("some error"))
 			},
-			expectedErr: "error fetching verified data cap",
+			expectedErr: "getting verified datacap",
 		},
 		"fails if client does NOT have enough balance for deal": {
 			ask: &storagemarket.StorageAsk{
@@ -497,7 +518,7 @@ func TestDealVerification(t *testing.T) {
 				return h.newDealBuilder(t, 1).withNoOpMinerStub().build()
 			},
 			opts:        []harnessOpt{withStateMarketBalance(abi.NewTokenAmount(10), abi.NewTokenAmount(10))},
-			expectedErr: "clientMarketBalance.Available too small",
+			expectedErr: "funds in escrow 0 not enough",
 		},
 		"fails if client signature is not valid": {
 			ask: &storagemarket.StorageAsk{
@@ -509,7 +530,7 @@ func TestDealVerification(t *testing.T) {
 			expect: func(h *ProviderHarness) {
 				h.Provider.sigVerifier = &mockSignatureVerifier{false, nil}
 			},
-			expectedErr: "validateSignature failed",
+			expectedErr: "invalid signature",
 		},
 		"fails if client signature verification fails": {
 			ask: &storagemarket.StorageAsk{
@@ -521,7 +542,7 @@ func TestDealVerification(t *testing.T) {
 			expect: func(h *ProviderHarness) {
 				h.Provider.sigVerifier = &mockSignatureVerifier{true, errors.New("some error")}
 			},
-			expectedErr: "validateSignature failed",
+			expectedErr: "validating signature",
 		},
 		"fails if proposed provider collateral below minimum": {
 			ask: &storagemarket.StorageAsk{
@@ -530,7 +551,7 @@ func TestDealVerification(t *testing.T) {
 			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
 				return h.newDealBuilder(t, 1, withProviderCollateral(abi.NewTokenAmount(0))).withNoOpMinerStub().build()
 			},
-			expectedErr: "proposed provider collateral below minimum",
+			expectedErr: "proposed provider collateral 0 below minimum",
 		},
 		"fails if proposed provider collateral above maximum": {
 			ask: &storagemarket.StorageAsk{
@@ -539,7 +560,7 @@ func TestDealVerification(t *testing.T) {
 			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
 				return h.newDealBuilder(t, 1, withProviderCollateral(abi.NewTokenAmount(100))).withNoOpMinerStub().build()
 			},
-			expectedErr: "proposed provider collateral above maximum",
+			expectedErr: "proposed provider collateral 100 above maximum",
 		},
 
 		"fails if provider address does not match": {
@@ -558,7 +579,6 @@ func TestDealVerification(t *testing.T) {
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
-
 				return h.newDealBuilder(t, 1, withPieceCid(testutil.GenerateCid())).withNoOpMinerStub().build()
 			},
 			expectedErr: "proposal PieceCID had wrong prefix",
@@ -568,19 +588,18 @@ func TestDealVerification(t *testing.T) {
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
-
 				return h.newDealBuilder(t, 1, withUndefinedPieceCid()).withNoOpMinerStub().build()
 			},
-			expectedErr: "undefined cid",
+			expectedErr: "proposal PieceCID undefined",
 		},
-		"proposal end before proposal start": {
+		"proposal end 9 before proposal start 10": {
 			ask: &storagemarket.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
 				return h.newDealBuilder(t, 1, withEpochs(abi.ChainEpoch(10), abi.ChainEpoch(9))).withNoOpMinerStub().build()
 			},
-			expectedErr: "proposal end before proposal start",
+			expectedErr: "proposal end 9 before proposal start 10",
 		},
 		"deal start epoch has already elapsed": {
 			ask: &storagemarket.StorageAsk{
@@ -589,7 +608,7 @@ func TestDealVerification(t *testing.T) {
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
 				return h.newDealBuilder(t, 1, withEpochs(abi.ChainEpoch(-1), abi.ChainEpoch(9))).withNoOpMinerStub().build()
 			},
-			expectedErr: "deal start epoch has already elapsed",
+			expectedErr: "deal start epoch -1 has already elapsed",
 		},
 		"deal label greater than max size": {
 			ask: &storagemarket.StorageAsk{
@@ -891,6 +910,12 @@ func withPublishWalletBal(bal int64) harnessOpt {
 	}
 }
 
+func withMaxStagingDealsBytes(max uint64) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.maxStagingDealBytes = max
+	}
+}
+
 func withStoredAsk(price, verifiedPrice abi.TokenAmount, minPieceSize, maxPieceSize abi.PaddedPieceSize) harnessOpt {
 	return func(pc *providerConfig) {
 		pc.price = price
@@ -922,7 +947,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		maxPieceSize:  abi.PaddedPieceSize(10737418240), //10Gib default
 	}
 
-	sealingpipelineStatus := map[api.SectorState]int{
+	sealingpipelineStatus := map[lapi.SectorState]int{
 		"AddPiece":       0,
 		"Packing":        0,
 		"PreCommit1":     1,
@@ -1034,12 +1059,12 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	ph.Provider = prov
 
 	fn.EXPECT().ChainHead(gomock.Any()).Return(&ctypes.TipSet{}, nil).AnyTimes()
-	fn.EXPECT().StateDealProviderCollateralBounds(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(api.DealCollateralBounds{
+	fn.EXPECT().StateDealProviderCollateralBounds(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(lapi.DealCollateralBounds{
 		Min: abi.NewTokenAmount(1),
 		Max: abi.NewTokenAmount(1),
 	}, nil).AnyTimes()
 
-	fn.EXPECT().StateMarketBalance(gomock.Any(), gomock.Any(), gomock.Any()).Return(api.MarketBalance{
+	fn.EXPECT().StateMarketBalance(gomock.Any(), gomock.Any(), gomock.Any()).Return(lapi.MarketBalance{
 		Locked: pc.lockedFunds,
 		Escrow: pc.escrowFunds,
 	}, nil).AnyTimes()
@@ -1050,7 +1075,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 
 	ph.MockSealingPipelineAPI.EXPECT().SectorsSummary(gomock.Any()).Return(sealingpipelineStatus, nil).AnyTimes()
 
-	secInfo := api.SectorInfo{State: api.SectorState(sealing.Proving)}
+	secInfo := lapi.SectorInfo{State: lapi.SectorState(sealing.Proving)}
 	ph.MockSealingPipelineAPI.EXPECT().SectorsStatus(gomock.Any(), gomock.Any(), false).Return(secInfo, nil).AnyTimes()
 
 	ph.DAGStore = dagStore
@@ -1534,7 +1559,7 @@ LOOP:
 	return nil
 }
 
-func (td *testDeal) waitForSealingState(secState api.SectorState) error {
+func (td *testDeal) waitForSealingState(secState lapi.SectorState) error {
 	if td.sub == nil {
 		return errors.New("no subcription for deal")
 	}

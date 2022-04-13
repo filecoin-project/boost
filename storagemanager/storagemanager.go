@@ -3,6 +3,7 @@ package storagemanager
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -51,7 +52,11 @@ func (m *StorageManager) Free(ctx context.Context) (uint64, error) {
 	return m.cfg.MaxStagingDealsBytes - tagged, nil
 }
 
-// Tag
+// ErrNoSpaceLeft indicates that there is insufficient storage to accept a deal
+var ErrNoSpaceLeft = errors.New("no space left")
+
+// Tags storage space for the deal.
+// If there is not enough space left, returns ErrNoSpaceLeft.
 func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, size uint64) error {
 	// Get the total tagged storage, so that we know how much is available.
 	log.Debugw("tagging", "id", dealUuid, "size", size, "maxbytes", m.cfg.MaxStagingDealsBytes)
@@ -62,12 +67,14 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, size uint6
 	}
 
 	if m.cfg.MaxStagingDealsBytes != 0 {
-		if tagged+uint64(size) >= m.cfg.MaxStagingDealsBytes {
-			return fmt.Errorf("cannot accept piece of size %d, on top of already allocated %d bytes, because it would exceed max staging area size %d", uint64(size), uint64(tagged), m.cfg.MaxStagingDealsBytes)
+		if tagged+size >= m.cfg.MaxStagingDealsBytes {
+			err := fmt.Errorf("%w: cannot accept piece of size %d, on top of already allocated %d bytes, because it would exceed max staging area size %d",
+				ErrNoSpaceLeft, size, tagged, m.cfg.MaxStagingDealsBytes)
+			return err
 		}
 	}
 
-	err = m.persistTagged(ctx, dealUuid, uint64(size))
+	err = m.persistTagged(ctx, dealUuid, size)
 	if err != nil {
 		return fmt.Errorf("saving total tagged storage: %w", err)
 	}
