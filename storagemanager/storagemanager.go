@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/filecoin-project/boost/db"
@@ -30,14 +32,20 @@ type StorageManager struct {
 	StagingAreaDirPath string
 }
 
-func New(cfg Config) func(lr lotus_repo.LockedRepo, sqldb *sql.DB) *StorageManager {
-	return func(lr lotus_repo.LockedRepo, sqldb *sql.DB) *StorageManager {
+func New(cfg Config) func(lr lotus_repo.LockedRepo, sqldb *sql.DB) (*StorageManager, error) {
+	return func(lr lotus_repo.LockedRepo, sqldb *sql.DB) (*StorageManager, error) {
+		stagingPath := filepath.Join(lr.Path(), StagingAreaDirName)
+		err := os.MkdirAll(stagingPath, os.ModePerm)
+		if err != nil {
+			return nil, err
+		}
+
 		return &StorageManager{
 			db:                 db.NewStorageDB(sqldb),
 			cfg:                cfg,
 			lr:                 lr,
-			StagingAreaDirPath: filepath.Join(lr.Path(), StagingAreaDirName),
-		}
+			StagingAreaDirPath: stagingPath,
+		}, nil
 	}
 }
 
@@ -129,4 +137,17 @@ func (m *StorageManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, 
 
 	log.Infow("tag storage", "id", dealUuid, "size", size)
 	return nil
+}
+
+// DownloadFilePath creates a file in the download staging area for the deal
+// with the given uuid
+func (m *StorageManager) DownloadFilePath(dealUuid uuid.UUID) (string, error) {
+	path := path.Join(m.StagingAreaDirPath, dealUuid.String()+".download")
+	file, err := os.Create(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to create download file %s", path)
+	}
+	defer file.Close()
+
+	return file.Name(), nil
 }
