@@ -5,7 +5,6 @@ go 1.16
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
 // replace github.com/filecoin-project/lotus => ../lotus
-replace github.com/graph-gophers/graphql-transport-ws => github.com/dirkmc/graphql-transport-ws v0.0.2-0.20220413103002-bd2222a7a5d5
 
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
@@ -43,7 +42,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.7.4
 	github.com/graph-gophers/graphql-go v1.2.0
-	github.com/graph-gophers/graphql-transport-ws v0.0.1
+	github.com/graph-gophers/graphql-transport-ws v0.0.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-blockservice v0.2.1
