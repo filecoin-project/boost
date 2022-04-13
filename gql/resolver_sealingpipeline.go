@@ -5,6 +5,7 @@ import (
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -50,29 +51,18 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		return nil, err
 	}
 
-	taken := uint64(0)
-	deals := []*waitDeal{}
-	for _, s := range wdSectors {
-		wdSectorStatus, err := r.spApi.SectorsStatus(ctx, s, false)
-		if err != nil {
-			return nil, err
-		}
+	sdwdSectors, err := r.spApi.SectorsListInStates(ctx, []api.SectorState{"SnapDealsWaitDeals"})
+	if err != nil {
+		return nil, err
+	}
 
-		for _, p := range wdSectorStatus.Pieces {
-			if p.DealInfo == nil {
-				continue
-			}
-			//TODO: any other way to map deal from sector with deal from db?
-			d, err := r.dealByPublishCID(ctx, p.DealInfo.PublishCid)
-			if err != nil {
-				return nil, err
-			}
-			deals = append(deals, &waitDeal{
-				ID:   graphql.ID(d.DealUuid.String()),
-				Size: gqltypes.Uint64(p.Piece.Size),
-			})
-			taken += uint64(p.Piece.Size)
-		}
+	waitDealsSectors, err := r.populateWaitDealsSectors(ctx, wdSectors, ssize)
+	if err != nil {
+		return nil, err
+	}
+	snapDealsWaitDealsSectors, err := r.populateWaitDealsSectors(ctx, sdwdSectors, ssize)
+	if err != nil {
+		return nil, err
 	}
 
 	var ss sectorStates
@@ -123,12 +113,10 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 	}
 
 	return &sealingPipelineState{
-		WaitDeals: waitDeals{
-			SectorSize: gqltypes.Uint64(ssize),
-			Deals:      deals,
-		},
-		SectorStates: ss,
-		Workers:      workers,
+		WaitDealsSectors:          waitDealsSectors,
+		SnapDealsWaitDealsSectors: snapDealsWaitDealsSectors,
+		SectorStates:              ss,
+		Workers:                   workers,
 	}, nil
 }
 
@@ -139,13 +127,16 @@ type sectorState struct {
 }
 
 type waitDeal struct {
-	ID   graphql.ID
-	Size gqltypes.Uint64
+	ID       graphql.ID
+	Size     gqltypes.Uint64
+	IsLegacy bool
 }
 
-type waitDeals struct {
-	SectorSize gqltypes.Uint64
+type waitDealSector struct {
+	SectorID   gqltypes.Uint64
 	Deals      []*waitDeal
+	Used       gqltypes.Uint64
+	SectorSize gqltypes.Uint64
 }
 
 type sectorStates struct {
@@ -163,9 +154,10 @@ type worker struct {
 }
 
 type sealingPipelineState struct {
-	WaitDeals    waitDeals
-	SectorStates sectorStates
-	Workers      []*worker
+	WaitDealsSectors          []*waitDealSector
+	SnapDealsWaitDealsSectors []*waitDealSector
+	SectorStates              sectorStates
+	Workers                   []*worker
 }
 
 func getSectorSize(ctx context.Context, fullNode v1api.FullNode, maddr address.Address) (uint64, error) {
@@ -175,4 +167,109 @@ func getSectorSize(ctx context.Context, fullNode v1api.FullNode, maddr address.A
 	}
 
 	return uint64(mi.SectorSize), nil
+}
+
+func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers []abi.SectorNumber, ssize uint64) ([]*waitDealSector, error) {
+	waitDealsSectors := []*waitDealSector{}
+	for _, s := range sectorNumbers {
+		used := uint64(0)
+		deals := []*waitDeal{}
+
+		wdSectorStatus, err := r.spApi.SectorsStatus(ctx, s, false)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, p := range wdSectorStatus.Pieces {
+			if p.DealInfo == nil {
+				continue
+			}
+
+			publishCid := p.DealInfo.PublishCid
+			if publishCid == nil {
+				continue
+			}
+
+			dcid, err := p.DealInfo.DealProposal.Cid()
+			if err != nil {
+				return nil, err
+			}
+
+			ds, err := r.dealsByPublishCID(ctx, *publishCid)
+			if err != nil {
+				return nil, err
+			}
+
+			var i int
+			if len(ds) > 1 { // compare by deal proposal cid
+				for ; i < len(ds); i++ {
+					cid, err := ds[i].ClientDealProposal.Proposal.Cid()
+					if err != nil {
+						return nil, err
+					}
+
+					if cid.Equals(dcid) {
+						break
+					}
+				}
+			}
+
+			// we matched the deal from piece with a deal from the boost db
+			// single deal in publish message; i == 0; len(ds) == 1;
+			// multiple deals in publish message; i == smth; len(ds) > 1;
+			if i < len(ds) {
+				deals = append(deals, &waitDeal{
+					ID:       graphql.ID(ds[i].DealUuid.String()),
+					Size:     gqltypes.Uint64(p.Piece.Size),
+					IsLegacy: false,
+				})
+				used += uint64(p.Piece.Size)
+				continue
+			}
+
+			// match not found in boost db - fallback to legacy deals list
+			lds, err := r.legacyProv.ListLocalDeals()
+			if err != nil {
+				return nil, err
+			}
+
+			var j int
+			for ; j < len(lds); j++ {
+				l := lds[j]
+				if l.PublishCid == nil {
+					continue
+				}
+
+				lpcid, err := l.ClientDealProposal.Proposal.Cid()
+				if err != nil {
+					return nil, err
+				}
+
+				if l.PublishCid.Equals(*publishCid) && lpcid.Equals(dcid) {
+					break
+				}
+			}
+
+			if j == len(lds) {
+				log.Errorw("couldnt match deal to boost or legacy market deal based on publish cid and proposal cid", "publishCid", publishCid, "dealProposalCid", dcid)
+				continue
+			}
+
+			deals = append(deals, &waitDeal{
+				ID:       graphql.ID(lds[j].ProposalCid.String()),
+				Size:     gqltypes.Uint64(p.Piece.Size),
+				IsLegacy: true,
+			})
+			used += uint64(p.Piece.Size)
+		}
+
+		waitDealsSectors = append(waitDealsSectors, &waitDealSector{
+			SectorID:   gqltypes.Uint64(s),
+			Deals:      deals,
+			Used:       gqltypes.Uint64(used),
+			SectorSize: gqltypes.Uint64(ssize),
+		})
+	}
+
+	return waitDealsSectors, nil
 }

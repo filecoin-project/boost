@@ -253,15 +253,17 @@ func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.Pro
 	return deal, nil
 }
 
-func (r *resolver) dealByPublishCID(ctx context.Context, publishCid *cid.Cid) (*types.ProviderDealState, error) {
-	deal, err := r.dealsDB.ByPublishCID(ctx, publishCid.String())
+func (r *resolver) dealsByPublishCID(ctx context.Context, publishCid cid.Cid) ([]*types.ProviderDealState, error) {
+	deals, err := r.dealsDB.ByPublishCID(ctx, publishCid.String())
 	if err != nil {
 		return nil, err
 	}
 
-	deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
+	for _, d := range deals {
+		d.NBytesReceived = int64(r.provider.NBytesReceived(d.DealUuid))
+	}
 
-	return deal, nil
+	return deals, nil
 }
 
 func (r *resolver) dealList(ctx context.Context, cursor *graphql.ID, offset int, limit int) ([]types.ProviderDealState, int, bool, error) {

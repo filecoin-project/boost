@@ -27,21 +27,45 @@ function SealingPipelineContent(props) {
     }
 
     const sealingPipeline = data.sealingpipeline
+    console.log(sealingPipeline)
 
     return <div className="sealing-pipeline">
-        <WaitDeals {...sealingPipeline.WaitDeals} />
+        <WaitDeals wdSectors={sealingPipeline.WaitDealsSectors} sdwdSectors={sealingPipeline.SnapDealsWaitDealsSectors} />
         <Sealing states={sealingPipeline.SectorStates} />
         <Workers workers={sealingPipeline.Workers} />
     </div>
 }
 
 function WaitDeals(props) {
-    var totalSize = 0n
-    for (let deal of props.Deals) {
-        totalSize += deal.Size
-    }
-    const free = props.SectorSize - totalSize
-    const haveDeals = props.Deals.length > 0
+    return <table className="wait-deals">
+        <tbody>
+        <tr>
+            <td className="wait-deals-type">
+                <WaitDealsType sectors={props.wdSectors} name="Regular"/>
+            </td>
+            <td className="wait-deals-type">
+                <WaitDealsType sectors={props.sdwdSectors} name="Snap Deals"/>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+}
+
+function WaitDealsType(props) {
+    return <div>
+        <div className="title">{props.name} Wait Deals</div>
+        { props.sectors.length ? (
+            props.sectors.map(s => <WaitDealsSector sector={s}/>)
+        ) : (
+            <div className="no-deals">There are no sectors in the WaitDeals state</div>
+        ) }
+    </div>
+}
+
+function WaitDealsSector(props) {
+    const sector = props.sector
+    const free = sector.SectorSize - sector.Used
+    const haveDeals = sector.Deals.length > 0
 
     var bars = [{
         className: 'free',
@@ -50,33 +74,38 @@ function WaitDeals(props) {
     if (haveDeals) {
         bars = [{
             className: 'filled',
-            amount: totalSize,
+            amount: sector.Used,
         }].concat(bars)
     }
 
-    return <div className="wait-deals">
-        <div className="title">Wait Deals</div>
-
+    return <div className="wait-deals-sector">
+        <div className="sector-id">Sector {sector.SectorID+''}</div>
         <CumulativeBarChart bars={bars} unit="byte" />
 
-        { haveDeals ? <WaitDealsSizes free={free} deals={props.Deals} /> : (
-            <div className="no-deals">There are no deals in the Wait Deals state</div>
+        { haveDeals ? <WaitDealsSizes free={free} deals={sector.Deals} /> : (
+            <div className="no-deals">There are no deals in this sector</div>
         )}
     </div>
 }
 
 function WaitDealsSizes(props) {
-    return <table>
+    return <table className="wait-deals-sizes">
         <tbody>
             {props.deals.map(deal => (
                 <tr key={deal.ID}>
                     <td className="deal-id">
-                        <ShortDealLink id={deal.ID} />
+                        {deal.IsLegacy ? (
+                            <Link to={"/legacy-deals/" + deal.ID}>
+                                <div className="short-deal-id">{deal.ID.substring(0, 12) + '…'}</div>
+                            </Link>
+                        ) : (
+                            <ShortDealLink id={deal.ID} />
+                        )}
                     </td>
                     <td className="deal-size">{humanFileSize(deal.Size)}</td>
                 </tr>
             ))}
-            <tr key="free">
+            <tr key="free" className="free">
                 <td className="deal-id">Free</td>
                 <td className="deal-size">{humanFileSize(props.free)}</td>
             </tr>

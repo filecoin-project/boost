@@ -8,6 +8,31 @@ Boost exposes `libp2p` interfaces for making storage and retrieval deals, a web 
 
 ## Building
 
+### Prerequisites
+
+Currently, Boost installation is supported on macOS and Linux platforms.
+
+You need to have Go and Rust installed on your machine in order to build Boost, as well as some additional system dependencies, usually provided by your distribution: 
+
+Ubuntu/Debian:
+```
+sudo apt install mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang build-essential hwloc libhwloc-dev wget -y && sudo apt upgrade -y
+```
+
+Arch:
+```
+sudo pacman -Syu opencl-icd-loader gcc git bzr jq pkg-config opencl-icd-loader opencl-headers opencl-nvidia hwloc
+```
+
+macOS:
+```
+brew install go bzr jq pkg-config rustup hwloc coreutils
+```
+
+Boost also requires that Xcode Command Line Tools be installed before building the Boost binaries.
+
+### Compiling from source
+
 ```
 git clone https://github.com/filecoin-project/boost
 cd boost
