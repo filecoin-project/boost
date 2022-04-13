@@ -195,7 +195,7 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 				return nil, err
 			}
 
-			ds, err := r.dealsByPublishCID(ctx, publishCid)
+			ds, err := r.dealsByPublishCID(ctx, *publishCid)
 			if err != nil {
 				return nil, err
 			}

@@ -253,7 +253,7 @@ func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.Pro
 	return deal, nil
 }
 
-func (r *resolver) dealsByPublishCID(ctx context.Context, publishCid *cid.Cid) ([]*types.ProviderDealState, error) {
+func (r *resolver) dealsByPublishCID(ctx context.Context, publishCid cid.Cid) ([]*types.ProviderDealState, error) {
 	deals, err := r.dealsDB.ByPublishCID(ctx, publishCid.String())
 	if err != nil {
 		return nil, err
