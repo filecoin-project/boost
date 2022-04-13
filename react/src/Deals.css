@@ -37,3 +37,7 @@
 .deals td.message {
     width: 100%;
 }
+
+.deals tr.error {
+    opacity: 0.8;
+}

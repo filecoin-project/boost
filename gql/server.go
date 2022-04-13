@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/xerrors"
 
@@ -78,7 +79,13 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// GraphQL handler
 	queryHandler := &relay.Handler{Schema: schema}
-	wsHandler := graphqlws.NewHandlerFunc(schema, queryHandler)
+	wsOpts := []graphqlws.Option{
+		// Add a 5 second timeout for writing responses to the web socket.
+		// A lot of people will expose Boost over an ssh tunnel so the
+		// connection may be quite laggy.
+		graphqlws.WithWriteTimeout(5 * time.Second),
+	}
+	wsHandler := graphqlws.NewHandlerFunc(schema, queryHandler, wsOpts...)
 
 	listenAddr := fmt.Sprintf(":%d", httpPort)
 	s.srv = &http.Server{Addr: listenAddr, Handler: mux}
