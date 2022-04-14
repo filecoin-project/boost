@@ -107,7 +107,7 @@ jobs:
       - install-deps
       - prepare
       - run:
-          command: make debug
+          command: make boostx
           no_output_timeout: 30m
       - download-params
       - run:
