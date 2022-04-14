@@ -75,7 +75,7 @@ commands:
             - 'gopkg-e334ea4'
           paths:
             - /go/pkg
-      - run:  make debug
+      - run:  go mod tidy
       - save_cache:
           name: Save go pkg cache
           key: 'gopkg-e334ea4'
