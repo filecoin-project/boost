@@ -18,15 +18,15 @@ var providerCmd = &cli.Command{
 	Usage: "Info about Storage Providers",
 	Flags: []cli.Flag{cmd.FlagRepo},
 	Subcommands: []*cli.Command{
-		protocolsCmd,
+		libp2pInfoCmd,
 	},
 }
 
-var protocolsCmd = &cli.Command{
-	Name:        "protocols",
+var libp2pInfoCmd = &cli.Command{
+	Name:        "libp2p-info",
 	Usage:       "",
 	ArgsUsage:   "<provider address>",
-	Description: "Lists the libp2p protocols supported by the Storage Provider",
+	Description: "Lists the libp2p address and protocols supported by the Storage Provider",
 	Before:      before,
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
@@ -54,7 +54,7 @@ var protocolsCmd = &cli.Command{
 
 		addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
 		if err != nil {
-			return fmt.Errorf("getting provider address: %w", err)
+			return fmt.Errorf("getting provider multi-address: %w", err)
 		}
 
 		log.Debugw("connecting to storage provider",
@@ -72,10 +72,21 @@ var protocolsCmd = &cli.Command{
 		sort.Strings(protos)
 
 		if cctx.Bool("json") {
-			return cmd.PrintJson(map[string]interface{}{"provider": addrStr, "protocols": protos})
+			return cmd.PrintJson(map[string]interface{}{
+				"provider":   addrStr,
+				"id":         addrInfo.ID.String(),
+				"multiaddrs": addrInfo.Addrs,
+				"protocols":  protos,
+			})
 		}
 
-		fmt.Println(strings.Join(protos, "\n"))
+		fmt.Println("Provider: " + addrStr)
+		fmt.Println("Peer ID: " + addrInfo.ID.String())
+		fmt.Println("Peer Addresses:")
+		for _, addr := range addrInfo.Addrs {
+			fmt.Println("  " + addr.String())
+		}
+		fmt.Println("Protocols:\n" + "  " + strings.Join(protos, "\n  "))
 		return nil
 	},
 }
