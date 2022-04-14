@@ -67,6 +67,12 @@ debug: build-go
 deps: $(BUILD_DEPS)
 .PHONY: deps
 
+boostx: $(BUILD_DEPS)
+	rm -f boostx
+	$(GOCC) build $(GOFLAGS) -o boostx ./cmd/boostx
+.PHONY: boostx
+BINS+=boostx
+
 boost: $(BUILD_DEPS)
 	rm -f boost boostd boostx
 	$(GOCC) build $(GOFLAGS) -o boost ./cmd/boost
