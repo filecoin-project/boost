@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/mitchellh/go-homedir"
 )
 
 type Node struct {
@@ -25,8 +26,13 @@ type Node struct {
 	Wallet *wallet.LocalWallet
 }
 
-func Setup(ctx context.Context, cfgdir string) (*Node, error) {
-	_, err := os.Stat(cfgdir)
+func Setup(cfgdir string) (*Node, error) {
+	cfgdir, err := homedir.Expand(cfgdir)
+	if err != nil {
+		return nil, fmt.Errorf("getting homedir: %w", err)
+	}
+
+	_, err = os.Stat(cfgdir)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		return nil, errors.New("repo dir doesn't exist. run `boost init` first.")
 	}

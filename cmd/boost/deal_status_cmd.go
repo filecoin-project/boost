@@ -6,25 +6,21 @@ import (
 	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/cli/node"
 	clinode "github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/google/uuid"
-	"github.com/mitchellh/go-homedir"
-	cli "github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2"
 )
 
 var dealStatusCmd = &cli.Command{
 	Name:  "deal-status",
 	Usage: "",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "repo",
-			Usage: "repo directory for Boost client",
-			Value: "~/.boost-client",
-		},
+		cmd.FlagRepo,
 		&cli.StringFlag{
 			Name:     "provider",
 			Usage:    "storage provider on-chain address",
@@ -49,12 +45,7 @@ var dealStatusCmd = &cli.Command{
 			return err
 		}
 
-		sdir, err := homedir.Expand(cctx.String("repo"))
-		if err != nil {
-			return err
-		}
-
-		n, err := clinode.Setup(ctx, sdir)
+		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}
@@ -77,7 +68,7 @@ var dealStatusCmd = &cli.Command{
 			return err
 		}
 
-		addrInfo, err := getAddrInfo(cctx, ctx, api, maddr)
+		addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
 		if err != nil {
 			return err
 		}

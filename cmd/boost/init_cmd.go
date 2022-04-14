@@ -5,36 +5,30 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mitchellh/go-homedir"
-
 	"github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/mitchellh/go-homedir"
 	cli "github.com/urfave/cli/v2"
 )
 
 var initCmd = &cli.Command{
-	Name:  "init",
-	Usage: "Initialise Boost client repo",
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "repo",
-			Usage: "repo directory for Boost client",
-			Value: "~/.boost-client",
-		},
-	},
+	Name:   "init",
+	Usage:  "Initialise Boost client repo",
+	Flags:  []cli.Flag{cmd.FlagRepo},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
-		sdir, err := homedir.Expand(cctx.String("repo"))
+		sdir, err := homedir.Expand(cmd.FlagRepo.Name)
 		if err != nil {
 			return err
 		}
 
 		os.Mkdir(sdir, 0755) //nolint:errcheck
 
-		n, err := node.Setup(ctx, sdir)
+		n, err := node.Setup(cmd.FlagRepo.Name)
 		if err != nil {
 			return err
 		}

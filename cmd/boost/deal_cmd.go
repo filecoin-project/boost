@@ -8,6 +8,7 @@ import (
 
 	bcli "github.com/filecoin-project/boost/cli"
 	clinode "github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	types2 "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
@@ -19,22 +20,14 @@ import (
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/mitchellh/go-homedir"
-	"github.com/multiformats/go-multiaddr"
-	cli "github.com/urfave/cli/v2"
-
 	inet "github.com/libp2p/go-libp2p-core/network"
+	"github.com/urfave/cli/v2"
 )
 
 const DealProtocolv120 = "/fil/storage/mk/1.2.0"
 
 var dealFlags = []cli.Flag{
-	&cli.StringFlag{
-		Name:  "repo",
-		Usage: "repo directory for Boost client",
-		Value: "~/.boost-client",
-	},
+	cmd.FlagRepo,
 	&cli.StringFlag{
 		Name:     "provider",
 		Usage:    "storage provider on-chain address",
@@ -122,12 +115,7 @@ var offlineDealCmd = &cli.Command{
 func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	ctx := bcli.ReqContext(cctx)
 
-	sdir, err := homedir.Expand(cctx.String("repo"))
-	if err != nil {
-		return err
-	}
-
-	n, err := clinode.Setup(ctx, sdir)
+	n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
 	if err != nil {
 		return err
 	}
@@ -150,7 +138,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		return err
 	}
 
-	addrInfo, err := getAddrInfo(cctx, ctx, api, maddr)
+	addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
 	if err != nil {
 		return err
 	}
@@ -346,31 +334,4 @@ func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-}
-
-func getAddrInfo(cctx *cli.Context, ctx context.Context, api api.Gateway, maddr address.Address) (*peer.AddrInfo, error) {
-	minfo, err := api.StateMinerInfo(ctx, maddr, chain_types.EmptyTSK)
-	if err != nil {
-		return nil, err
-	}
-	if minfo.PeerId == nil {
-		return nil, fmt.Errorf("storage provider %s has no peer ID set on-chain", maddr)
-	}
-
-	var maddrs []multiaddr.Multiaddr
-	for _, mma := range minfo.Multiaddrs {
-		ma, err := multiaddr.NewMultiaddrBytes(mma)
-		if err != nil {
-			return nil, fmt.Errorf("storage provider %s had invalid multiaddrs in their info: %w", maddr, err)
-		}
-		maddrs = append(maddrs, ma)
-	}
-	if len(maddrs) == 0 {
-		return nil, fmt.Errorf("storage provider %s has no multiaddrs set on-chain", maddr)
-	}
-
-	return &peer.AddrInfo{
-		ID:    *minfo.PeerId,
-		Addrs: maddrs,
-	}, nil
 }
