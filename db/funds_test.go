@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"testing"
+	"time"
 
 	"golang.org/x/xerrors"
 
@@ -52,10 +53,57 @@ func TestFundsDB(t *testing.T) {
 	err = db.InsertLog(ctx, fl)
 	req.NoError(err)
 
-	logs, err := db.Logs(ctx)
+	time.Sleep(time.Millisecond)
+
+	fl2 := &FundsLog{
+		DealUUID: uuid.New(),
+		Amount:   abi.NewTokenAmount(4567),
+		Text:     "Goodbye",
+	}
+	err = db.InsertLog(ctx, fl2)
+	req.NoError(err)
+
+	count, err := db.LogsCount(ctx)
+	req.NoError(err)
+	req.Equal(count, 2)
+
+	logs, err := db.Logs(ctx, nil, 0, 0)
+	req.NoError(err)
+	req.Len(logs, 2)
+
+	// Expect most recently created log first
+	req.Equal(fl2.DealUUID, logs[0].DealUUID)
+	req.Equal(fl2.Amount, logs[0].Amount)
+	req.Equal(fl2.Text, logs[0].Text)
+
+	// Then expect older log
+	req.Equal(fl.DealUUID, logs[1].DealUUID)
+	req.Equal(fl.Amount, logs[1].Amount)
+	req.Equal(fl.Text, logs[1].Text)
+
+	newest := logs[0]
+	oldest := logs[1]
+
+	// Get all logs from newest to oldest
+	logs, err = db.Logs(ctx, &newest.CreatedAt, 0, 0)
+	req.NoError(err)
+	req.Len(logs, 2)
+
+	// Get all logs starting at oldest
+	logs, err = db.Logs(ctx, &oldest.CreatedAt, 0, 0)
 	req.NoError(err)
 	req.Len(logs, 1)
-	req.Equal(fl.DealUUID, logs[0].DealUUID)
-	req.Equal(fl.Amount, logs[0].Amount)
-	req.Equal(fl.Text, logs[0].Text)
+	req.Equal(oldest.DealUUID, logs[0].DealUUID)
+
+	// Get all logs from newest with limit 1
+	logs, err = db.Logs(ctx, &newest.CreatedAt, 0, 1)
+	req.NoError(err)
+	req.Len(logs, 1)
+	req.Equal(newest.DealUUID, logs[0].DealUUID)
+
+	// Get all logs from newest with offset 1, limit 1
+	logs, err = db.Logs(ctx, &newest.CreatedAt, 1, 1)
+	req.NoError(err)
+	req.Len(logs, 1)
+	req.Equal(oldest.DealUUID, logs[0].DealUUID)
 }

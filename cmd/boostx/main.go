@@ -32,6 +32,7 @@ func main() {
 			commpCmd,
 			generatecarCmd,
 			marketCmd,
+			fetchParamCmd,
 		},
 	}
 	app.Setup()

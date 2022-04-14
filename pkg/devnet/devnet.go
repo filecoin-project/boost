@@ -43,7 +43,7 @@ func Run(ctx context.Context, tempHome string, done chan struct{}) {
 		cancel()
 	}
 
-	wg.Add(3)
+	wg.Add(2)
 	go func() {
 		runLotusDaemon(ctx, tempHome)
 		log.Debugw("shut down lotus daemon")
@@ -53,11 +53,6 @@ func Run(ctx context.Context, tempHome string, done chan struct{}) {
 	go func() {
 		runLotusMiner(ctx, tempHome)
 		log.Debugw("shut down lotus miner")
-		wg.Done()
-	}()
-
-	go func() {
-		publishDealsPeriodicallyCmd(ctx, tempHome)
 		wg.Done()
 	}()
 
@@ -96,7 +91,7 @@ func runCmdsWithLog(ctx context.Context, name string, commands [][]string, homeD
 func runLotusDaemon(ctx context.Context, home string) {
 	cmds := [][]string{
 		{"lotus-seed", "genesis", "new", "localnet.json"},
-		{"lotus-seed", "pre-seal", "--sector-size=8388608", "--num-sectors=2"},
+		{"lotus-seed", "pre-seal", "--sector-size=8388608", "--num-sectors=1"},
 		{"lotus-seed", "genesis", "add-miner", "localnet.json",
 			filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.json")},
 		{"lotus", "daemon", "--lotus-make-genesis=dev.gen",
@@ -135,21 +130,6 @@ func runLotusMiner(ctx context.Context, home string) {
 	}
 
 	runCmdsWithLog(ctx, "lotus-miner", cmds, home)
-}
-
-func publishDealsPeriodicallyCmd(ctx context.Context, homeDir string) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(5 * time.Second):
-		}
-
-		cmd := exec.CommandContext(ctx, "lotus-miner",
-			"storage-deals", "pending-publish", "--publish-now")
-		cmd.Env = []string{fmt.Sprintf("HOME=%s", homeDir)}
-		_ = cmd.Run() // we ignore errors
-	}
 }
 
 //func setDefaultWalletCmd(ctx context.Context, _ string) {

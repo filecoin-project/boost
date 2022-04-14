@@ -890,7 +890,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 		_, err := w.Write(cbg.CborNull)
 		return err
 	}
-	if _, err := w.Write([]byte{163}); err != nil {
+	if _, err := w.Write([]byte{166}); err != nil {
 		return err
 	}
 
@@ -958,6 +958,55 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := t.DealStatus.MarshalCBOR(w); err != nil {
 		return err
 	}
+
+	// t.IsOffline (bool) (bool)
+	if len("IsOffline") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"IsOffline\" was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("IsOffline"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("IsOffline")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteBool(w, t.IsOffline); err != nil {
+		return err
+	}
+
+	// t.TransferSize (uint64) (uint64)
+	if len("TransferSize") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"TransferSize\" was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("TransferSize"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("TransferSize")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajUnsignedInt, uint64(t.TransferSize)); err != nil {
+		return err
+	}
+
+	// t.NBytesReceived (uint64) (uint64)
+	if len("NBytesReceived") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"NBytesReceived\" was too long")
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len("NBytesReceived"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("NBytesReceived")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajUnsignedInt, uint64(t.NBytesReceived)); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1047,6 +1096,54 @@ func (t *DealStatusResponse) UnmarshalCBOR(r io.Reader) error {
 						return xerrors.Errorf("unmarshaling t.DealStatus pointer: %w", err)
 					}
 				}
+
+			}
+			// t.IsOffline (bool) (bool)
+		case "IsOffline":
+
+			maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
+			if err != nil {
+				return err
+			}
+			if maj != cbg.MajOther {
+				return fmt.Errorf("booleans must be major type 7")
+			}
+			switch extra {
+			case 20:
+				t.IsOffline = false
+			case 21:
+				t.IsOffline = true
+			default:
+				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
+			}
+			// t.TransferSize (uint64) (uint64)
+		case "TransferSize":
+
+			{
+
+				maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
+				if err != nil {
+					return err
+				}
+				if maj != cbg.MajUnsignedInt {
+					return fmt.Errorf("wrong type for uint64 field")
+				}
+				t.TransferSize = uint64(extra)
+
+			}
+			// t.NBytesReceived (uint64) (uint64)
+		case "NBytesReceived":
+
+			{
+
+				maj, extra, err = cbg.CborReadHeaderBuf(br, scratch)
+				if err != nil {
+					return err
+				}
+				if maj != cbg.MajUnsignedInt {
+					return fmt.Errorf("wrong type for uint64 field")
+				}
+				t.NBytesReceived = uint64(extra)
 
 			}
 

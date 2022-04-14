@@ -28,10 +28,11 @@ require (
 	github.com/filecoin-project/go-fil-markets v1.20.2-0.20220325122707-b18483a0834b
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-padreader v0.0.1
+	github.com/filecoin-project/go-paramfetch v0.0.4
 	github.com/filecoin-project/go-state-types v0.1.3
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/index-provider v0.5.0
-	github.com/filecoin-project/lotus v1.15.1-0.20220321111228-3c1edca90295
+	github.com/filecoin-project/lotus v1.15.1-0.20220407132257-de8258c7a1bd
 	github.com/filecoin-project/specs-actors v0.9.14
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v5 v5.0.4
@@ -41,7 +42,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.7.4
 	github.com/graph-gophers/graphql-go v1.2.0
-	github.com/graph-gophers/graphql-transport-ws v0.0.1
+	github.com/graph-gophers/graphql-transport-ws v0.0.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-blockservice v0.2.1
@@ -79,7 +80,6 @@ require (
 	github.com/libp2p/go-libp2p-record v0.1.3
 	github.com/libp2p/go-libp2p-swarm v0.10.2
 	github.com/mattn/go-sqlite3 v1.14.9
-	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/multiformats/go-multiaddr v0.5.0
 	github.com/multiformats/go-multibase v0.0.3

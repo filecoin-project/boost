@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
@@ -45,7 +46,7 @@ func RetryParameters(minDuration time.Duration, maxDuration time.Duration, attem
 type DealClient struct {
 	addr        address.Address
 	retryStream *shared.RetryStream
-	fullNode    v1api.FullNode
+	walletApi   api.Wallet
 }
 
 // SendDealProposal sends a deal proposal over a libp2p stream to the peer
@@ -85,14 +86,14 @@ func (c *DealClient) SendDealProposal(ctx context.Context, id peer.ID, params ty
 }
 
 func (c *DealClient) SendDealStatusRequest(ctx context.Context, id peer.ID, dealUUID uuid.UUID) (*types.DealStatusResponse, error) {
-	log.Debugw("send deal status req", "id", dealUUID)
+	log.Debugw("send deal status req", "deal-uuid", dealUUID, "id", id)
 
 	uuidBytes, err := dealUUID.MarshalBinary()
 	if err != nil {
 		return nil, fmt.Errorf("getting uuid bytes: %w", err)
 	}
 
-	sig, err := c.fullNode.WalletSign(ctx, c.addr, uuidBytes)
+	sig, err := c.walletApi.WalletSign(ctx, c.addr, uuidBytes)
 	if err != nil {
 		return nil, fmt.Errorf("signing uuid bytes: %w", err)
 	}
@@ -130,11 +131,11 @@ func (c *DealClient) SendDealStatusRequest(ctx context.Context, id peer.ID, deal
 	return &resp, nil
 }
 
-func NewDealClient(h host.Host, addr address.Address, fullNodeApi v1api.FullNode, options ...DealClientOption) *DealClient {
+func NewDealClient(h host.Host, addr address.Address, walletApi api.Wallet, options ...DealClientOption) *DealClient {
 	c := &DealClient{
 		addr:        addr,
 		retryStream: shared.NewRetryStream(h),
-		fullNode:    fullNodeApi,
+		walletApi:   walletApi,
 	}
 	for _, option := range options {
 		option(c)
@@ -193,8 +194,7 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 	// wait for deal execution to complete.
 	res, _, err := p.prov.ExecuteDeal(&proposal, s.Conn().RemotePeer())
 	if err != nil {
-		log.Warnw("executing deal proposal", "id", proposal.DealUUID, "err", err)
-		return
+		log.Warnw("deal proposal failed", "id", proposal.DealUUID, "err", err, "reason", res.Reason)
 	}
 
 	// Set a deadline on writing to the stream so it doesn't hang
@@ -278,6 +278,8 @@ func (p *DealProvider) getDealStatus(req types.DealStatusRequest) types.DealStat
 		return errResp("getting signed proposal cid")
 	}
 
+	bts := p.prov.NBytesReceived(req.DealUUID)
+
 	return types.DealStatusResponse{
 		DealUUID: req.DealUUID,
 		DealStatus: &types.DealStatus{
@@ -288,5 +290,8 @@ func (p *DealProvider) getDealStatus(req types.DealStatusRequest) types.DealStat
 			PublishCid:        pds.PublishCID,
 			ChainDealID:       pds.ChainDealID,
 		},
+		IsOffline:      pds.IsOffline,
+		TransferSize:   pds.Transfer.Size,
+		NBytesReceived: bts,
 	}
 }

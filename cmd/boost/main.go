@@ -36,6 +36,9 @@ func main() {
 		Commands: []*cli.Command{
 			initCmd,
 			dealCmd,
+			dealStatusCmd,
+			offlineDealCmd,
+			walletCmd,
 		},
 	}
 	app.Setup()
@@ -50,6 +53,7 @@ func before(cctx *cli.Context) error {
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boost", "DEBUG")
+		_ = logging.SetLogLevel("boost-net", "DEBUG")
 	}
 
 	return nil

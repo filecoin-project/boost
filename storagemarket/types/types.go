@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 
+	"github.com/filecoin-project/go-fil-markets/shared"
+
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
@@ -44,8 +46,11 @@ type DealStatusResponse struct {
 	DealUUID uuid.UUID
 	// Error is non-empty if there is an error getting the deal status
 	// (eg invalid request signature)
-	Error      string
-	DealStatus *DealStatus
+	Error          string
+	DealStatus     *DealStatus
+	IsOffline      bool
+	TransferSize   uint64
+	NBytesReceived uint64
 }
 
 type DealStatus struct {
@@ -112,4 +117,12 @@ type ChainDealManager interface {
 type IndexProvider interface {
 	AnnounceBoostDeal(ctx context.Context, pds *ProviderDealState) (cid.Cid, error)
 	Start(ctx context.Context)
+}
+
+type AskGetter interface {
+	GetAsk() *storagemarket.SignedStorageAsk
+}
+
+type SignatureVerifier interface {
+	VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error)
 }

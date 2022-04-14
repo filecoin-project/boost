@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/go-state-types/big"
-
 	"github.com/filecoin-project/go-state-types/abi"
-
+	"github.com/filecoin-project/go-state-types/big"
 	"github.com/google/uuid"
+	"github.com/mattn/go-sqlite3"
 )
 
 type FundsLog struct {
@@ -81,9 +80,27 @@ func (f *FundsDB) InsertLog(ctx context.Context, logs ...*FundsLog) error {
 	return nil
 }
 
-func (f *FundsDB) Logs(ctx context.Context) ([]FundsLog, error) {
+func (f *FundsDB) Logs(ctx context.Context, cursor *time.Time, offset int, limit int) ([]FundsLog, error) {
 	qry := "SELECT DealUUID, CreatedAt, Amount, LogText FROM FundsLogs"
-	rows, err := f.db.QueryContext(ctx, qry)
+	args := []interface{}{}
+	if cursor != nil {
+		qry += " WHERE CreatedAt <= ?"
+		args = append(args, cursor.Format(sqlite3.SQLiteTimestampFormats[0]))
+	}
+
+	qry += " ORDER BY CreatedAt DESC, RowID"
+
+	if limit > 0 {
+		qry += " LIMIT ?"
+		args = append(args, limit)
+
+		if offset > 0 {
+			qry += " OFFSET ?"
+			args = append(args, offset)
+		}
+	}
+
+	rows, err := f.db.QueryContext(ctx, qry, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +131,13 @@ func (f *FundsDB) Logs(ctx context.Context) ([]FundsLog, error) {
 	}
 
 	return fundsLogs, nil
+}
+
+func (f *FundsDB) LogsCount(ctx context.Context) (int, error) {
+	var count int
+	row := f.db.QueryRowContext(ctx, "SELECT count(*) FROM FundsLogs")
+	err := row.Scan(&count)
+	return count, err
 }
 
 type TotalTagged struct {

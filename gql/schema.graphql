@@ -154,23 +154,20 @@ type LegacyStorage {
 type WaitDeal {
   ID: ID!
   Size: Uint64!
+  IsLegacy: Boolean!
 }
 
-type WaitDeals {
-  SectorSize: Uint64!
+type WaitDealsSector {
+  SectorID: Uint64!
   Deals: [WaitDeal]!
+  Used: Uint64!
+  SectorSize: Uint64!
 }
 
-type SectorStates {
-  AddPiece: Int!
-  Packing: Int!
-  PreCommit1: Int!
-  PreCommit2: Int!
-  PreCommitWait: Int!
-  WaitSeed: Int!
-  Committing: Int!
-  CommittingWait: Int!
-  FinalizeSector: Int!
+type SectorState {
+  Key: String!
+  Value: Int!
+  Order: Int!
 }
 
 type Worker {
@@ -180,8 +177,16 @@ type Worker {
   Sector: Int!
 }
 
+type SectorStates {
+  Regular: [SectorState]!
+  RegularError: [SectorState]!
+  SnapDeals: [SectorState]!
+  SnapDealsError: [SectorState]!
+}
+
 type SealingPipeline {
-  WaitDeals: WaitDeals!
+  WaitDealsSectors: [WaitDealsSector]!
+  SnapDealsWaitDealsSectors: [WaitDealsSector]!
   SectorStates: SectorStates!
   Workers: [Worker]!
 }
@@ -207,7 +212,7 @@ type Funds {
 type FundsLogList {
   totalCount: Int!
   logs: [FundsLog]!
-  next: Time
+  more: Boolean!
 }
 
 type FundsLog {
@@ -275,10 +280,10 @@ type RootQuery {
   legacyDeal(id: ID!): LegacyDeal
 
   """Get all Deals"""
-  deals(first: ID, offset: Int, limit: Int): DealList!
+  deals(cursor: ID, offset: Int, limit: Int): DealList!
 
   """Get all Deals made with legacy markets endpoint"""
-  legacyDeals(first: ID, offset: Int, limit: Int): LegacyDealList!
+  legacyDeals(cursor: ID, offset: Int, limit: Int): LegacyDealList!
 
   """Get the total number of deals"""
   dealsCount: Int!
@@ -299,7 +304,7 @@ type RootQuery {
   funds: Funds!
 
   """Get log of fund transactions"""
-  fundsLogs: FundsLogList!
+  fundsLogs(cursor: BigInt, offset: Int, limit: Int): FundsLogList!
 
   """Get information about deals that are pending being published"""
   dealPublish: DealPublish!

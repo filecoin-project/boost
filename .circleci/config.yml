@@ -45,38 +45,12 @@ commands:
             - 'v25-8mb-lotus-params'
           paths:
             - /var/tmp/filecoin-proof-parameters/
-      - run:  lotus fetch-params 8388608
+      - run:  ./boostx fetch-params 8388608
       - save_cache:
           name: Save parameters cache
           key: 'v25-8mb-lotus-params'
           paths:
             - /var/tmp/filecoin-proof-parameters/
-  lotus-artefacts:
-    steps:
-      - restore_cache:
-          name: Restore lotus artefacts cache
-          keys:
-            - 'lotus-d118ef92'
-          paths:
-            - /tmp/lotus-artefacts
-      - setup_remote_docker:
-          version: 19.03.13
-      - run:
-          name: copy latest stable lotus binaries
-          command: |
-            docker pull public.ecr.aws/p5f3y3g5/lotus-test:d118ef92
-            id=$(docker create public.ecr.aws/p5f3y3g5/lotus-test:d118ef92)
-            mkdir -p /tmp/lotus-artefacts
-            docker cp $id:/usr/local/bin/lotus-seed /tmp/lotus-artefacts/lotus-seed
-            docker cp $id:/usr/local/bin/lotus-miner /tmp/lotus-artefacts/lotus-miner
-            docker cp $id:/usr/local/bin/lotus /tmp/lotus-artefacts/lotus
-            docker cp $id:/lib/libhwloc.so.5 /tmp/lotus-artefacts/libhwloc.so.5
-            docker rm -v $id
-      - save_cache:
-          name: Save lotus artefacts cache
-          key: 'lotus-d118ef92'
-          paths:
-            - /tmp/lotus-artefacts
   git_fetch_all_tags:
     steps:
       - run:
@@ -135,14 +109,6 @@ jobs:
       - run:
           command: make debug
           no_output_timeout: 30m
-      - lotus-artefacts
-      - run:
-          name: copy library and add lotus binaries to PATH
-          command: |
-            sudo cp /tmp/lotus-artefacts/libhwloc.so.5 /lib/x86_64-linux-gnu/
-            sudo cp /tmp/lotus-artefacts/lotus /usr/local/bin/
-            sudo cp /tmp/lotus-artefacts/lotus-miner /usr/local/bin/
-            sudo cp /tmp/lotus-artefacts/lotus-seed /usr/local/bin/
       - download-params
       - run:
           name: go test
@@ -214,6 +180,17 @@ jobs:
       - prepare
       - run:
           command: "! go fmt ./... 2>&1 | read"
+
+  cbor-check:
+    executor: golang
+    steps:
+      - install-deps
+      - prepare
+      - run: go install golang.org/x/tools/cmd/goimports
+      - run: go install github.com/hannahhoward/cbor-gen-for
+      - run: make cbor-gen
+      - run: git --no-pager diff
+      - run: git --no-pager diff --quiet
 
   gen-check:
     executor: golang
@@ -291,6 +268,7 @@ workflows:
           concurrency: "16"   # expend all docker 2xlarge CPUs.
       - mod-tidy-check
       - gofmt
+      - cbor-check
       - gen-check
       - docs-check
       - build-all:
@@ -306,10 +284,27 @@ workflows:
             tags:
               only:
                 - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+
       - test:
-          name: test-itest
-          suite: itest
-          target: "./itests/..."
+          name: test-itest-dummdeal_offline
+          suite: itest-dummdeal_offline
+          target: "./itests/dummydeal_offline_test.go"
+
+      - test:
+          name: test-itest-dummdeal
+          suite: itest-dummdeal
+          target: "./itests/dummydeal_test.go"
+
+      - test:
+          name: test-itest-markets_v1_deal
+          suite: itest-markets_v1_deal
+          target: "./itests/markets_v1_deal_test.go"
+
+      - test:
+          name: test-itest-markets_v1_offline_deal
+          suite: itest-markets_v1_offline_deal
+          target: "./itests/markets_v1_offline_deal_test.go"
+
       - test:
           name: test-all
           suite: all

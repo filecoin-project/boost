@@ -10,7 +10,7 @@ import './LegacyDeals.css'
 import {dateFormat} from "./util-date";
 import {TimestampFormat} from "./timestamp";
 import {DealsPerPage} from "./deals-per-page";
-import {Pagination} from "./Deals";
+import {Pagination} from "./Pagination";
 
 export function LegacyStorageDealsPage(props) {
     return <PageContainer pageType="legacy-storage-deals" title="Legacy Storage Deals">
@@ -22,8 +22,6 @@ function LegacyStorageDealsContent(props) {
     const navigate = useNavigate()
     const params = useParams()
     const pageNum = params.pageNum ? parseInt(params.pageNum) : 1
-    const [first, setFirst] = useState(null)
-    const [previous, setPrevious] = useState([])
     const [timestampFormat, setTimestampFormat] = useState(TimestampFormat.load)
     const saveTimestampFormat = (val) => {
         TimestampFormat.save(val)
@@ -42,16 +40,10 @@ function LegacyStorageDealsContent(props) {
 
     const dealListOffset = (pageNum-1) * dealsPerPage
     const queryCursor = pageNum === 1 ? null : params.cursor
-    console.log('params', params)
-    console.log({
-            first: queryCursor,
-            limit: dealsPerPage,
-            offset: dealListOffset,
-    })
     const {loading, error, data} = useQuery(LegacyDealsListQuery, {
-        pollInterval: 5000,
+        pollInterval: pageNum === 1 ? 5000 : undefined,
         variables: {
-            first: queryCursor,
+            cursor: queryCursor,
             limit: dealsPerPage,
             offset: dealListOffset,
         }
@@ -61,37 +53,6 @@ function LegacyStorageDealsContent(props) {
 
     const deals = data.legacyDeals.deals
     const totalCount = data.legacyDeals.totalCount
-    var totalPages = Math.ceil(totalCount / dealsPerPage)
-
-    function pageForward() {
-        if (!data.legacyDeals.next) {
-            return
-        }
-        window.scrollTo({ top: 0, behavior: "smooth" })
-        setPrevious(previous.concat([first]))
-        setFirst(data.legacyDeals.next)
-        // setPageNum(pageNum+1)
-    }
-
-    function pageBack() {
-        if (previous.length === 0) {
-            return
-        }
-        window.scrollTo({ top: 0, behavior: "smooth" })
-        setFirst(previous[previous.length-1])
-        setPrevious(previous.slice(0, previous.length-1))
-        // setPageNum(pageNum-1)
-    }
-
-    function pageFirst() {
-        if (previous.length === 0) {
-            return
-        }
-        window.scrollTo({ top: 0, behavior: "smooth" })
-        setFirst(null)
-        setPrevious([])
-        // setPageNum(1)
-    }
 
     var cursor = params.cursor
     if (pageNum === 1 && deals.length) {
@@ -100,8 +61,11 @@ function LegacyStorageDealsContent(props) {
 
     const paginationParams = {
         basePath: '/legacy-storage-deals',
-        moreDeals: data.legacyDeals.more,
-        cursor, pageNum, totalCount, dealsPerPage, onDealsPerPageChange
+        cursor, pageNum, totalCount,
+        moreRows: data.legacyDeals.more,
+        rowsPerPage: dealsPerPage,
+        onRowsPerPageChange: onDealsPerPageChange,
+        onLinkClick: scrollTop,
     }
 
     return <div className="deals">

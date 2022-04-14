@@ -12,23 +12,27 @@ import (
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/build"
 	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
 )
 
-type ChainDealManager struct {
-	fullnodeApi v1api.FullNode
+type ChainDealManagerCfg struct {
+	PublishDealsConfidence uint64
 }
 
-func NewChainDealManager(a v1api.FullNode) *ChainDealManager {
-	return &ChainDealManager{a}
+type ChainDealManager struct {
+	fullnodeApi            v1api.FullNode
+	cfg ChainDealManagerCfg
+}
+
+func NewChainDealManager(a v1api.FullNode, cfg ChainDealManagerCfg) *ChainDealManager {
+	return &ChainDealManager{fullnodeApi: a, cfg: cfg}
 }
 
 func (c *ChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
 	// Wait for deal to be published (plus additional time for confidence)
-	receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, 2*build.MessageConfidence, api.LookbackNoLimit, true)
+	receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, c.cfg.PublishDealsConfidence, api.LookbackNoLimit, true)
 	if err != nil {
 		return nil, xerrors.Errorf("WaitForPublishDeals errored: %w", err)
 	}

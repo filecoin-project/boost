@@ -6,11 +6,12 @@ import moment from "moment";
 import {humanFIL, max, parseFil} from "./util"
 import {Info} from "./Info"
 import {PageContainer, ShortDealLink} from "./Components";
-import {Link} from "react-router-dom";
+import {Link, useParams} from "react-router-dom";
 import coinImg from './bootstrap-icons/icons/coin.svg'
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import './Funds.css'
 import {ShowBanner} from "./Banner";
+import {Pagination} from "./Pagination";
 
 export function FundsPage(props) {
     return (
@@ -53,7 +54,7 @@ function FundsChart(props) {
 }
 
 function CollateralSource(props) {
-    const barPct = toPercentage(props.collateral.Balance, props.amtMax)
+    const barPct = props.amtMax ? toPercentage(props.collateral.Balance, props.amtMax) : 0
 
     const bars = [{
         className: 'balance',
@@ -102,7 +103,7 @@ function FundsEscrow(props) {
     for (const bar of bars) {
         total += bar.amount
     }
-    const barPct = toPercentage(total, props.amtMax)
+    const barPct = props.amtMax ? toPercentage(total, props.amtMax) : 0
 
     return <div className="escrow">
         <div className="title">
@@ -141,7 +142,7 @@ function PubMsgWallet(props) {
         className: 'available',
         amount: pubMsg.Balance - pubMsg.Tagged,
     }]
-    const barPct = toPercentage(pubMsg.Balance, props.amtMax)
+    const barPct = props.amtMax ? toPercentage(pubMsg.Balance, props.amtMax) : 0
 
     return <div className="pubmsg-wallet">
         <div className="title">
@@ -234,7 +235,25 @@ function TopupCollateral(props) {
 }
 
 function FundsLogs(props) {
-    const {loading, error, data} = useQuery(FundsLogsQuery)
+    const params = useParams()
+    const pageNum = params.pageNum ? parseInt(params.pageNum) : 1
+    const rowsPerPage = 10
+    const dealListOffset = (pageNum-1) * rowsPerPage
+
+    var queryCursor = null
+    if (pageNum > 1 && params.cursor) {
+        try {
+            queryCursor = BigInt(params.cursor)
+        } catch {}
+    }
+    const {loading, error, data} = useQuery(FundsLogsQuery, {
+        pollInterval: pageNum === 1 ? 5000 : undefined,
+        variables: {
+            cursor: queryCursor,
+            limit: rowsPerPage,
+            offset: dealListOffset,
+        }
+    })
 
     if (loading) {
         return <div>Loading...</div>
@@ -248,17 +267,35 @@ function FundsLogs(props) {
         return null
     }
 
-    return <table className="funds-logs">
-        <tbody>
-            <tr>
-                <th></th>
-                <th>Deal ID</th>
-                <th>Amount</th>
-                <th>Description</th>
-            </tr>
-            {logs.map((l, i) => <FundsLog key={i} log={l} />)}
-        </tbody>
-    </table>
+    const totalCount = data.fundsLogs.totalCount
+
+    var cursor = params.cursor ? parseInt(params.cursor) : undefined
+    if (pageNum === 1 && logs.length) {
+        cursor = logs[0].CreatedAt.getTime()
+    }
+
+    const paginationParams = {
+        basePath: '/funds',
+        moreRows: data.fundsLogs.more,
+        cursor, pageNum, totalCount, rowsPerPage
+    }
+
+    return <div className="funds-logs-section">
+        <h3>Funds logs</h3>
+        <table className="funds-logs">
+            <tbody>
+                <tr>
+                    <th></th>
+                    <th>Deal ID</th>
+                    <th>Amount</th>
+                    <th>Description</th>
+                </tr>
+                {logs.map((l, i) => <FundsLog key={i} log={l} />)}
+            </tbody>
+        </table>
+
+        <Pagination {...paginationParams} />
+    </div>
 }
 
 function FundsLog(props) {

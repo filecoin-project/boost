@@ -1,15 +1,19 @@
 package modules
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"net/http"
 	"path"
-	"strings"
 	"time"
+
+	"github.com/filecoin-project/boost/build"
+
+	"github.com/filecoin-project/go-fil-markets/shared"
+	"github.com/filecoin-project/go-state-types/crypto"
+	ctypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/lib/sigs"
 
 	"github.com/filecoin-project/boost/indexprovider"
 
@@ -24,33 +28,16 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
-	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
-	"github.com/filecoin-project/go-jsonrpc/auth"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-statestore"
-	lapi "github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/api/v1api"
-	"github.com/filecoin-project/lotus/blockstore"
-	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
-	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
-	"github.com/filecoin-project/lotus/journal"
-	"github.com/filecoin-project/lotus/markets"
 	"github.com/filecoin-project/lotus/markets/dagstore"
-	marketevents "github.com/filecoin-project/lotus/markets/loggers"
-	"github.com/filecoin-project/lotus/markets/pricing"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
-	lotus_config "github.com/filecoin-project/lotus/node/config"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/filecoin-project/lotus/node/repo"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/namespace"
 	"github.com/libp2p/go-libp2p-core/host"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
@@ -60,75 +47,6 @@ import (
 var (
 	StorageCounterDSPrefix = "/storage/nextid"
 )
-
-func HandleRetrieval(host host.Host, lc fx.Lifecycle, m retrievalmarket.RetrievalProvider, j journal.Journal) {
-	m.OnReady(marketevents.ReadyLogger("retrieval provider"))
-	lc.Append(fx.Hook{
-
-		OnStart: func(ctx context.Context) error {
-			m.SubscribeToEvents(marketevents.RetrievalProviderLogger)
-
-			evtType := j.RegisterEventType("markets/retrieval/provider", "state_change")
-			m.SubscribeToEvents(markets.RetrievalProviderJournaler(j, evtType))
-
-			return m.Start(ctx)
-		},
-		OnStop: func(context.Context) error {
-			return m.Stop()
-		},
-	})
-}
-
-func HandleMigrateProviderFunds(lc fx.Lifecycle, ds lotus_dtypes.MetadataDS, node lapi.FullNode, minerAddress lotus_dtypes.MinerAddress) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			b, err := ds.Get(ctx, datastore.NewKey("/marketfunds/provider"))
-			if err != nil {
-				if xerrors.Is(err, datastore.ErrNotFound) {
-					return nil
-				}
-				return err
-			}
-
-			var value abi.TokenAmount
-			if err = value.UnmarshalCBOR(bytes.NewReader(b)); err != nil {
-				return err
-			}
-			ts, err := node.ChainHead(ctx)
-			if err != nil {
-				log.Errorf("provider funds migration - getting chain head: %v", err)
-				return nil
-			}
-
-			mi, err := node.StateMinerInfo(ctx, address.Address(minerAddress), ts.Key())
-			if err != nil {
-				log.Errorf("provider funds migration - getting miner info %s: %v", minerAddress, err)
-				return nil
-			}
-
-			_, err = node.MarketReserveFunds(ctx, mi.Worker, address.Address(minerAddress), value)
-			if err != nil {
-				log.Errorf("provider funds migration - reserving funds (wallet %s, addr %s, funds %d): %v",
-					mi.Worker, minerAddress, value, err)
-				return nil
-			}
-
-			return ds.Delete(ctx, datastore.NewKey("/marketfunds/provider"))
-		},
-	})
-}
-
-// StagingBlockstore creates a blockstore for staging blocks for a miner
-// in a storage deal, prior to sealing
-func StagingBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, r lotus_repo.LockedRepo) (lotus_dtypes.StagingBlockstore, error) {
-	ctx := helpers.LifecycleCtx(mctx, lc)
-	stagingds, err := r.Datastore(ctx, "/staging")
-	if err != nil {
-		return nil, err
-	}
-
-	return blockstore.FromDatastore(stagingds), nil
-}
 
 func RetrievalDealFilter(userFilter dtypes.RetrievalDealFilter) func(onlineOk dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
 	offlineOk dtypes.ConsiderOfflineRetrievalDealsConfigFunc) dtypes.RetrievalDealFilter {
@@ -160,79 +78,6 @@ func RetrievalDealFilter(userFilter dtypes.RetrievalDealFilter) func(onlineOk dt
 
 			return true, "", nil
 		}
-	}
-}
-
-func RetrievalNetwork(h host.Host) rmnet.RetrievalMarketNetwork {
-	return rmnet.NewFromLibp2pHost(h)
-}
-
-var WorkerCallsPrefix = datastore.NewKey("/worker/calls")
-var ManagerWorkPrefix = datastore.NewKey("/stmgr/calls")
-
-func LocalStorage(mctx helpers.MetricsCtx, lc fx.Lifecycle, ls stores.LocalStorage, si stores.SectorIndex, urls stores.URLs) (*stores.Local, error) {
-	ctx := helpers.LifecycleCtx(mctx, lc)
-	return stores.NewLocal(ctx, ls, si, urls)
-}
-
-func RemoteStorage(lstor *stores.Local, si stores.SectorIndex, sa sectorstorage.StorageAuth, sc sectorstorage.SealerConfig) *stores.Remote {
-	return stores.NewRemote(lstor, si, http.Header(sa), sc.ParallelFetchLimit, &stores.DefaultPartialFileHandler{})
-}
-
-func SectorStorage(mctx helpers.MetricsCtx, lc fx.Lifecycle, lstor *stores.Local, stor *stores.Remote, ls stores.LocalStorage, si stores.SectorIndex, sc sectorstorage.SealerConfig, ds lotus_dtypes.MetadataDS) (*sectorstorage.Manager, error) {
-	ctx := helpers.LifecycleCtx(mctx, lc)
-
-	wsts := statestore.New(namespace.Wrap(ds, WorkerCallsPrefix))
-	smsts := statestore.New(namespace.Wrap(ds, ManagerWorkPrefix))
-
-	sst, err := sectorstorage.New(ctx, lstor, stor, ls, si, sc, wsts, smsts)
-	if err != nil {
-		return nil, err
-	}
-
-	lc.Append(fx.Hook{
-		OnStop: sst.Close,
-	})
-
-	return sst, nil
-}
-
-// LotusRetrievalPricingFunc configures the pricing function to use for retrieval deals. // TODO(anteva): Fix me
-func LotusRetrievalPricingFunc() func(_ lotus_dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
-	_ lotus_dtypes.ConsiderOfflineRetrievalDealsConfigFunc) lotus_dtypes.RetrievalPricingFunc {
-
-	cfg := lotus_config.DealmakingConfig{}
-
-	return func(_ lotus_dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
-		_ lotus_dtypes.ConsiderOfflineRetrievalDealsConfigFunc) lotus_dtypes.RetrievalPricingFunc {
-		if cfg.RetrievalPricing.Strategy == lotus_config.RetrievalPricingExternalMode {
-			return pricing.ExternalRetrievalPricingFunc(cfg.RetrievalPricing.External.Path)
-		}
-
-		return retrievalimpl.DefaultPricingFunc(cfg.RetrievalPricing.Default.VerifiedDealsFreeTransfer)
-	}
-}
-
-func StorageAuth(ctx helpers.MetricsCtx, ca v0api.Common) (sectorstorage.StorageAuth, error) {
-	token, err := ca.AuthNew(ctx, []auth.Permission{"admin"})
-	if err != nil {
-		return nil, xerrors.Errorf("creating storage auth header: %w", err)
-	}
-
-	headers := http.Header{}
-	headers.Add("Authorization", "Bearer "+string(token))
-	return sectorstorage.StorageAuth(headers), nil
-}
-
-func StorageAuthWithURL(apiInfo string) func(ctx helpers.MetricsCtx, ca v0api.Common) (sectorstorage.StorageAuth, error) {
-	return func(ctx helpers.MetricsCtx, ca v0api.Common) (sectorstorage.StorageAuth, error) {
-		s := strings.Split(apiInfo, ":")
-		if len(s) != 2 {
-			return nil, errors.New("unexpected format of `apiInfo`")
-		}
-		headers := http.Header{}
-		headers.Add("Authorization", "Bearer "+s[0])
-		return sectorstorage.StorageAuth(headers), nil
 	}
 }
 
@@ -464,6 +309,10 @@ func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
 	return db.NewLogsDB(logsSqlDB.db)
 }
 
+func NewFundsDB(sqldb *sql.DB) *db.FundsDB {
+	return db.NewFundsDB(sqldb)
+}
+
 func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode) {
 	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a)
 
@@ -496,17 +345,38 @@ func HandleIndexProvider(lc fx.Lifecycle, prov *indexprovider.Wrapper) {
 	})
 }
 
-func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode,
+type signatureVerifier struct {
+	fn v1api.FullNode
+}
+
+func (s *signatureVerifier) VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error) {
+	addr, err := s.fn.StateAccountKey(ctx, addr, ctypes.EmptyTSK)
+	if err != nil {
+		return false, err
+	}
+
+	err = sigs.Verify(&sig, addr, input)
+	return err == nil, err
+}
+
+func NewChainDealManager(a v1api.FullNode) *storagemarket.ChainDealManager {
+	cdmCfg := storagemarket.ChainDealManagerCfg{PublishDealsConfidence: 2 * build.MessageConfidence}
+	return storagemarket.NewChainDealManager(a, cdmCfg)
+}
+
+func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode,
 	sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
 	dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
-	dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper) (*storagemarket.Provider, error) {
-	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
+	dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider,
+	cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
+	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
-		dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper) (*storagemarket.Provider, error) {
+		dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper,
+		lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 
-		prov, err := storagemarket.NewProvider(r.Path(), h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
-			sps, storagemarket.NewChainDealManager(a), df, logsSqlDB.db, logsDB, dagst, ps, ip)
+		prov, err := storagemarket.NewProvider(h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
+			sps, cdm, df, logsSqlDB.db, logsDB, dagst, ps, ip, lp, &signatureVerifier{a})
 		if err != nil {
 			return nil, err
 		}
@@ -515,12 +385,12 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, r 
 	}
 }
 
-func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, fullNode v1api.FullNode) *gql.Server {
-	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager,
+func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, fullNode v1api.FullNode) *gql.Server {
+	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
 		storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API,
 		legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, fullNode v1api.FullNode) *gql.Server {
 
-		resolver := gql.NewResolver(cfg, r, h, dealsDB, logsDB, fundMgr, storageMgr, spApi, prov, legacyProv, legacyDT, publisher, fullNode)
+		resolver := gql.NewResolver(cfg, r, h, dealsDB, logsDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyProv, legacyDT, publisher, fullNode)
 		server := gql.NewServer(resolver)
 
 		lc.Append(fx.Hook{

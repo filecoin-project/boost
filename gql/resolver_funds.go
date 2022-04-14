@@ -3,6 +3,7 @@ package gql
 import (
 	"context"
 	"fmt"
+	"time"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/graph-gophers/graphql-go"
@@ -68,8 +69,8 @@ func (r *resolver) Funds(ctx context.Context) (*funds, error) {
 
 type fundsLogList struct {
 	TotalCount int32
-	Next       *graphql.Time
 	Logs       []*fundsLogResolver
+	More       bool
 }
 
 type fundsLogResolver struct {
@@ -79,11 +80,48 @@ type fundsLogResolver struct {
 	Text      string
 }
 
+type fundsLogsArgs struct {
+	Cursor *gqltypes.BigInt // CreatedAt in milli-seconds
+	Offset graphql.NullInt
+	Limit  graphql.NullInt
+}
+
 // query: fundsLogs: FundsLogList
-func (r *resolver) FundsLogs(ctx context.Context) (*fundsLogList, error) {
-	logs, err := r.fundMgr.Logs(ctx)
+func (r *resolver) FundsLogs(ctx context.Context, args fundsLogsArgs) (*fundsLogList, error) {
+	offset := 0
+	if args.Offset.Set && args.Offset.Value != nil && *args.Offset.Value > 0 {
+		offset = int(*args.Offset.Value)
+	}
+
+	limit := 10
+	if args.Limit.Set && args.Limit.Value != nil && *args.Limit.Value > 0 {
+		limit = int(*args.Limit.Value)
+	}
+
+	var cursor *time.Time
+	if args.Cursor != nil {
+		val := (*args.Cursor).Int64()
+		asTime := time.Unix(val/1000, (val%1000)*1e6)
+		cursor = &asTime
+	}
+
+	// Fetch one extra log so that we can check if there are more logs
+	// beyond the limit
+	logs, err := r.fundsDB.Logs(ctx, cursor, offset, limit+1)
 	if err != nil {
 		return nil, fmt.Errorf("getting funds logs: %w", err)
+	}
+
+	more := len(logs) > limit
+	if more {
+		// Truncate log list to limit
+		logs = logs[:limit]
+	}
+
+	// Get the total log count
+	count, err := r.fundsDB.LogsCount(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	fundsLogs := make([]*fundsLogResolver, 0, len(logs))
@@ -98,8 +136,8 @@ func (r *resolver) FundsLogs(ctx context.Context) (*fundsLogList, error) {
 
 	return &fundsLogList{
 		Logs:       fundsLogs,
-		TotalCount: int32(len(logs)),
-		Next:       nil,
+		TotalCount: int32(count),
+		More:       more,
 	}, nil
 }
 

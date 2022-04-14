@@ -1,4 +1,3 @@
-/* global BigInt */
 import {useQuery} from "@apollo/react-hooks";
 import {SealingPipelineQuery} from "./gql";
 import React from "react";
@@ -28,21 +27,45 @@ function SealingPipelineContent(props) {
     }
 
     const sealingPipeline = data.sealingpipeline
+    console.log(sealingPipeline)
 
     return <div className="sealing-pipeline">
-        <WaitDeals {...sealingPipeline.WaitDeals} />
-        <Sealing {...sealingPipeline.SectorStates} />
+        <WaitDeals wdSectors={sealingPipeline.WaitDealsSectors} sdwdSectors={sealingPipeline.SnapDealsWaitDealsSectors} />
+        <Sealing states={sealingPipeline.SectorStates} />
         <Workers workers={sealingPipeline.Workers} />
     </div>
 }
 
 function WaitDeals(props) {
-    var totalSize = 0n
-    for (let deal of props.Deals) {
-        totalSize += deal.Size
-    }
-    const free = props.SectorSize - totalSize
-    const haveDeals = props.Deals.length > 0
+    return <table className="wait-deals">
+        <tbody>
+        <tr>
+            <td className="wait-deals-type">
+                <WaitDealsType sectors={props.wdSectors} name="Regular"/>
+            </td>
+            <td className="wait-deals-type">
+                <WaitDealsType sectors={props.sdwdSectors} name="Snap Deals"/>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+}
+
+function WaitDealsType(props) {
+    return <div>
+        <div className="title">{props.name} Wait Deals</div>
+        { props.sectors.length ? (
+            props.sectors.map(s => <WaitDealsSector sector={s}/>)
+        ) : (
+            <div className="no-deals">There are no sectors in the WaitDeals state</div>
+        ) }
+    </div>
+}
+
+function WaitDealsSector(props) {
+    const sector = props.sector
+    const free = sector.SectorSize - sector.Used
+    const haveDeals = sector.Deals.length > 0
 
     var bars = [{
         className: 'free',
@@ -51,33 +74,38 @@ function WaitDeals(props) {
     if (haveDeals) {
         bars = [{
             className: 'filled',
-            amount: totalSize,
+            amount: sector.Used,
         }].concat(bars)
     }
 
-    return <div className="wait-deals">
-        <div className="title">Wait Deals</div>
-
+    return <div className="wait-deals-sector">
+        <div className="sector-id">Sector {sector.SectorID+''}</div>
         <CumulativeBarChart bars={bars} unit="byte" />
 
-        { haveDeals ? <WaitDealsSizes free={free} deals={props.Deals} /> : (
-            <div className="no-deals">There are no deals in the Wait Deals state</div>
+        { haveDeals ? <WaitDealsSizes free={free} deals={sector.Deals} /> : (
+            <div className="no-deals">There are no deals in this sector</div>
         )}
     </div>
 }
 
 function WaitDealsSizes(props) {
-    return <table>
+    return <table className="wait-deals-sizes">
         <tbody>
             {props.deals.map(deal => (
                 <tr key={deal.ID}>
                     <td className="deal-id">
-                        <ShortDealLink id={deal.ID} />
+                        {deal.IsLegacy ? (
+                            <Link to={"/legacy-deals/" + deal.ID}>
+                                <div className="short-deal-id">{deal.ID.substring(0, 12) + '…'}</div>
+                            </Link>
+                        ) : (
+                            <ShortDealLink id={deal.ID} />
+                        )}
                     </td>
                     <td className="deal-size">{humanFileSize(deal.Size)}</td>
                 </tr>
             ))}
-            <tr key="free">
+            <tr key="free" className="free">
                 <td className="deal-id">Free</td>
                 <td className="deal-size">{humanFileSize(props.free)}</td>
             </tr>
@@ -85,63 +113,48 @@ function WaitDealsSizes(props) {
     </table>
 }
 
-const sectorStates = function(props) {
-    return [{
-        Name: 'Add Piece',
-        Count: props.AddPiece,
-    }, {
-        Name: 'Packing',
-        Count: props.Packing,
-    }, {
-        Name: 'Pre-commit 1',
-        Count: props.PreCommit1,
-    }, {
-        Name: 'Pre-commit 2',
-        Count: props.PreCommit2,
-    }, {
-        Name: 'Pre-commit Wait',
-        Count: props.PreCommitWait,
-    }, {
-        Name: 'Wait Seed',
-        Count: props.WaitSeed,
-    }, {
-        Name: 'Committing',
-        Count: props.Committing,
-    }, {
-        Name: 'Committing Wait',
-        Count: props.CommittingWait,
-    }, {
-        Name: 'Finalize Sector',
-        Count: props.FinalizeSector,
-    }]
+function Sealing(props) {
+    return (
+        <table className="sealing">
+            <tbody>
+            <tr>
+                <td className="sealing-type">
+                    <SealingType states={props.states} sectorType="Regular" />
+                </td>
+                <td className="sealing-type">
+                    <SealingType states={props.states} sectorType="Snap Deals" />
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    )
 }
 
-function Sealing(props) {
-    var total = 0
-    const states = sectorStates(props)
-    var bars = []
-    for (let i = 0; i < states.length; i++) {
-        let sec = states[i]
-        total += sec.Count
-        sec.className = sec.Name.replace(/ /g, '_')
-        bars.push({
-            className: sec.className,
-            amount: sec.Count,
-        })
+function SealingType(props) {
+    var states = []
+    var errStates = []
+    if (props.sectorType === 'Regular') {
+        states = props.states.Regular
+        errStates = props.states.RegularError
+    } else {
+        states = props.states.SnapDeals
+        errStates = props.states.SnapDealsError
     }
+    states = states.map(s => s).sort((a, b) => a.Order - b.Order)
+    states = states.concat(errStates.map(s => s).sort((a, b) => a.Order - b.Order))
 
-    return <div className="sealing">
-        <div className="title">Sealing</div>
-
-        {total > 0 ? <CumulativeBarChart bars={bars} /> : null}
+    const title = props.sectorType === 'Snap Deals' ? 'Snap Deals Sectors' : 'Regular Sectors'
+    const className = props.sectorType.toLowerCase().replace(/ /g, '_')
+    return <div className={"sealing-type-content " + className}>
+        <div className="title">{title}</div>
 
         <table className="sector-states">
             <tbody>
             {states.map(sec => (
-                <tr key={sec.Name}>
-                    <td className="color"><div className={sec.className} /></td>
-                    <td className="state">{sec.Name}</td>
-                    <td className={"count " + (sec.Count ? '' : 'zero')}>{sec.Count}</td>
+                <tr key={sec.Key}>
+                    <td className="color"><div className={sec.Key.replace(/ /g, '_')} /></td>
+                    <td className="state">{sec.Key}</td>
+                    <td className={"count " + (sec.Value ? '' : 'zero')}>{sec.Value}</td>
                 </tr>
             ))}
             </tbody>
@@ -183,8 +196,17 @@ export function SealingPipelineMenuItem(props) {
 
     var total = 0
     if (data) {
-        for (let sec of sectorStates(data.sealingpipeline.SectorStates)) {
-            total += sec.Count
+        for (let sec of data.sealingpipeline.SectorStates.Regular) {
+            total += Number(sec.Value)
+        }
+        for (let sec of data.sealingpipeline.SectorStates.RegularError) {
+            total += Number(sec.Value)
+        }
+        for (let sec of data.sealingpipeline.SectorStates.SnapDeals) {
+            total += Number(sec.Value)
+        }
+        for (let sec of data.sealingpipeline.SectorStates.SnapDealsError) {
+            total += Number(sec.Value)
         }
     }
 
@@ -195,31 +217,4 @@ export function SealingPipelineMenuItem(props) {
             <b>{total}</b> sector{total === 1 ? '' : 's'}
         </div>
     </Link>
-}
-
-const mockData = {
-    sealingpipeline: {
-        WaitDeals: {
-            Deals: [{
-                ID: '1312-asdfd-234234-sadfsdfs',
-                Size: BigInt(2*1024*1024*1024),
-            }, {
-                ID: '4234-hfdsh-253524-kassdsss',
-                Size: BigInt(11*1024*1024*1024),
-            }],
-            SectorSize: BigInt(32*1024*1024*1024),
-        },
-        SectorStates: {
-            AddPiece: 1,
-            Packing: 1,
-            PreCommit1: 0,
-            PreCommit2: 2,
-            PreCommitWait: 0,
-            WaitSeed: 0,
-            Committing: 4,
-            CommittingWait: 0,
-            FinalizeSector: 1,
-        },
-        Workers: [],
-    }
 }

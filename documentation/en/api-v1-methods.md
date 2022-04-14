@@ -39,6 +39,7 @@
   * [MarketGetRetrievalAsk](#marketgetretrievalask)
   * [MarketImportDealData](#marketimportdealdata)
   * [MarketListDataTransfers](#marketlistdatatransfers)
+  * [MarketListIncompleteDeals](#marketlistincompletedeals)
   * [MarketListRetrievalDeals](#marketlistretrievaldeals)
   * [MarketRestartDataTransfer](#marketrestartdatatransfer)
   * [MarketSetAsk](#marketsetask)
@@ -59,6 +60,8 @@
   * [NetFindPeer](#netfindpeer)
   * [NetPeerInfo](#netpeerinfo)
   * [NetPeers](#netpeers)
+* [Runtime](#runtime)
+  * [RuntimeSubsystems](#runtimesubsystems)
 ## Actor
 
 
@@ -325,6 +328,7 @@ Perms: admin
 Inputs:
 ```json
 [
+  "07070707-0707-0707-0707-070707070707",
   "string value"
 ]
 ```
@@ -698,6 +702,73 @@ Response:
         }
       ]
     }
+  }
+]
+```
+
+### MarketListIncompleteDeals
+
+
+Perms: read
+
+Inputs: `null`
+
+Response:
+```json
+[
+  {
+    "Proposal": {
+      "PieceCID": {
+        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+      },
+      "PieceSize": 1032,
+      "VerifiedDeal": true,
+      "Client": "f01234",
+      "Provider": "f01234",
+      "Label": "string value",
+      "StartEpoch": 10101,
+      "EndEpoch": 10101,
+      "StoragePricePerEpoch": "0",
+      "ProviderCollateral": "0",
+      "ClientCollateral": "0"
+    },
+    "ClientSignature": {
+      "Type": 2,
+      "Data": "Ynl0ZSBhcnJheQ=="
+    },
+    "ProposalCid": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "AddFundsCid": null,
+    "PublishCid": null,
+    "Miner": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+    "Client": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+    "State": 42,
+    "PiecePath": ".lotusminer/fstmp123",
+    "MetadataPath": ".lotusminer/fstmp123",
+    "SlashEpoch": 10101,
+    "FastRetrieval": true,
+    "Message": "string value",
+    "FundsReserved": "0",
+    "Ref": {
+      "TransferType": "string value",
+      "Root": {
+        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+      },
+      "PieceCid": null,
+      "PieceSize": 1024,
+      "RawBlockSize": 42
+    },
+    "AvailableForRetrieval": true,
+    "DealID": 5432,
+    "CreationTime": "0001-01-01T00:00:00Z",
+    "TransferChannelId": {
+      "Initiator": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+      "Responder": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+      "ID": 3
+    },
+    "SectorNumber": 9,
+    "InboundCAR": "string value"
   }
 ]
 ```
@@ -1103,6 +1174,25 @@ Response:
       "/ip4/52.36.61.156/tcp/1347/p2p/12D3KooWFETiESTf1v4PGUvtnxMAcEFMzLZbJGg4tjWfGEimYior"
     ]
   }
+]
+```
+
+## Runtime
+
+
+### RuntimeSubsystems
+RuntimeSubsystems returns the subsystems that are enabled
+in this instance.
+
+
+Perms: read
+
+Inputs: `null`
+
+Response:
+```json
+[
+  "Markets"
 ]
 ```
 

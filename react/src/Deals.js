@@ -16,6 +16,8 @@ import {TimestampFormat} from "./timestamp";
 import {DealsPerPage} from "./deals-per-page";
 import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import './Deals.css'
+import {Pagination} from "./Pagination";
+import {Warn} from "./Info";
 
 export function StorageDealsPage(props) {
     return <PageContainer pageType="storage-deals" title="Storage Deals">
@@ -49,7 +51,7 @@ function StorageDealsContent(props) {
     const queryCursor = (pageNum === 1) ? null : params.cursor
     const {loading, error, data} = useQuery(DealsListQuery, {
         variables: {
-            first: queryCursor,
+            cursor: queryCursor,
             offset: dealListOffset,
             limit: dealsPerPage,
         },
@@ -91,7 +93,11 @@ function StorageDealsContent(props) {
 
     const paginationParams = {
         basePath: '/storage-deals',
-        cursor, pageNum, moreDeals, totalCount, dealsPerPage, onDealsPerPageChange
+        cursor, pageNum, totalCount,
+        rowsPerPage: dealsPerPage,
+        moreRows: moreDeals,
+        onRowsPerPageChange: onDealsPerPageChange,
+        onLinkClick: scrollTop,
     }
 
     return <div className="deals">
@@ -120,58 +126,17 @@ function StorageDealsContent(props) {
     </div>
 }
 
-export function Pagination({basePath, cursor, pageNum, moreDeals, totalCount, dealsPerPage, onDealsPerPageChange}) {
-    var totalPages = Math.ceil(totalCount / dealsPerPage)
-
-    var pageLinks = {}
-    if (cursor) {
-        if (pageNum === 2) {
-            pageLinks.prev = basePath
-        } else if (pageNum > 2) {
-            pageLinks.prev = basePath + '/from/' + cursor + '/page/' + (pageNum - 1)
-        }
-
-        if (moreDeals) {
-            pageLinks.next = basePath + '/from/' + cursor + '/page/' + (pageNum + 1)
-        }
-    }
-
-    return (
-        <div className="pagination">
-            <div className="controls">
-                {pageNum > 1 ? (
-                    <Link className="first" to={basePath} onClick={scrollTop}>&lt;&lt;</Link>
-                ) : <span className="first">&lt;&lt;</span>}
-                {pageLinks.prev ? <Link to={pageLinks.prev} onClick={scrollTop}>&lt;</Link> : <span>&lt;</span>}
-                <div className="page">{pageNum} of {totalPages}</div>
-                {pageLinks.next ? <Link to={pageLinks.next} onClick={scrollTop}>&gt;</Link> : <span>&gt;</span>}
-                <div className="total">{totalCount} deals</div>
-                <div className="per-page">
-                    <select value={dealsPerPage} onChange={onDealsPerPageChange}>
-                        <option value={10}>10 pp</option>
-                        <option value={25}>25 pp</option>
-                        <option value={50}>50 pp</option>
-                        <option value={100}>100 pp</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-    )
-}
-
 function DealRow(props) {
     const {loading, error, data} = useSubscription(DealSubscription, {
         variables: {id: props.deal.ID},
     })
 
     if (error) {
-        return <tr>
-            <td colSpan={5}>Error: {error.message}</td>
-        </tr>
+        console.error('Error subscribing to deal ' + props.deal.ID, error)
     }
 
     var deal = props.deal
-    if (!loading) {
+    if (!loading && !error) {
         deal = data.dealUpdate
     }
 
@@ -184,7 +149,7 @@ function DealRow(props) {
     }
 
     return (
-        <tr>
+        <tr className={error ? "error" : ""}>
             <td className="start" onClick={props.toggleTimestampFormat}>
                 {start}
             </td>
@@ -195,7 +160,12 @@ function DealRow(props) {
             <td className="client">
                 <ShortClientAddress address={deal.ClientAddress} />
             </td>
-            <td className="message">{deal.Message}</td>
+            <td className="message">
+                {deal.Message}
+                {error ? (
+                    <Warn>{"Web UI Subscription Error: " + error.message}</Warn>
+                ) : null}
+            </td>
         </tr>
     )
 }

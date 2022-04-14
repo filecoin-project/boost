@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
+	"github.com/ipfs/go-cid"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -186,15 +187,32 @@ func (d *DealsDB) ByID(ctx context.Context, id uuid.UUID) (*types.ProviderDealSt
 	return d.scanRow(row)
 }
 
-func (d *DealsDB) ByPublishCID(ctx context.Context, publishCid string) (*types.ProviderDealState, error) {
+func (d *DealsDB) ByPublishCID(ctx context.Context, publishCid string) ([]*types.ProviderDealState, error) {
 	qry := "SELECT " + dealFieldsStr + " FROM Deals WHERE PublishCID=?"
-	row := d.db.QueryRowContext(ctx, qry, publishCid)
-	return d.scanRow(row)
+	rows, err := d.db.QueryContext(ctx, qry, publishCid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var deals []*types.ProviderDealState
+	for rows.Next() {
+		deal, err := d.scanRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		deals = append(deals, deal)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return deals, nil
 }
 
-func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid string) (*types.ProviderDealState, error) {
+func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid cid.Cid) (*types.ProviderDealState, error) {
 	qry := "SELECT " + dealFieldsStr + " FROM Deals WHERE SignedProposalCID=?"
-	row := d.db.QueryRowContext(ctx, qry, proposalCid)
+	row := d.db.QueryRowContext(ctx, qry, proposalCid.String())
 	return d.scanRow(row)
 }
 
@@ -209,12 +227,16 @@ func (d *DealsDB) ListActive(ctx context.Context) ([]*types.ProviderDealState, e
 	return d.list(ctx, 0, 0, "Checkpoint != ?", dealcheckpoints.Complete.String())
 }
 
-func (d *DealsDB) List(ctx context.Context, first *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
+func (d *DealsDB) ListCompleted(ctx context.Context) ([]*types.ProviderDealState, error) {
+	return d.list(ctx, 0, 0, "Checkpoint = ?", dealcheckpoints.Complete.String())
+}
+
+func (d *DealsDB) List(ctx context.Context, cursor *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
 	where := ""
 	whereArgs := []interface{}{}
-	if first != nil {
+	if cursor != nil {
 		where += "CreatedAt <= (SELECT CreatedAt FROM Deals WHERE ID = ?)"
-		whereArgs = append(whereArgs, *first)
+		whereArgs = append(whereArgs, *cursor)
 	}
 	return d.list(ctx, offset, limit, where, whereArgs...)
 }

@@ -5,7 +5,13 @@ import { WebSocketLink } from "@apollo/client/link/ws";
 import Observable from 'zen-observable';
 import { transformResponse } from "./transform";
 
-const graphqlEndpoint = "localhost:8080"
+var graphqlEndpoint = window.location.host
+var graphqlHttpEndpoint = window.location.href.replace(/\/+$/, '')
+
+if (process.env.NODE_ENV === 'development') {
+    graphqlEndpoint = 'localhost:8080'
+    graphqlHttpEndpoint = 'http://' + graphqlEndpoint
+}
 
 // Transform response data (eg convert date string to Date object)
 const transformResponseLink = new ApolloLink((operation, forward) => {
@@ -18,7 +24,7 @@ const transformResponseLink = new ApolloLink((operation, forward) => {
 
 // HTTP Link
 const httpLink = new HttpLink({
-    uri: `http://${graphqlEndpoint}/graphql/query`,
+    uri: `${graphqlHttpEndpoint}/graphql/query`,
 });
 
 // WebSocket Link
@@ -26,6 +32,7 @@ const wsLink = new WebSocketLink({
     uri: `ws://${graphqlEndpoint}/graphql/subscription`,
     options: {
         reconnect: true,
+        minTimeout: 5000,
         lazy: true,
     },
 });
@@ -63,8 +70,8 @@ const EpochQuery = gql`
 `;
 
 const DealsListQuery = gql`
-    query AppDealsListQuery($first: ID, $offset: Int, $limit: Int) {
-        deals(first: $first, offset: $offset, limit: $limit) {
+    query AppDealsListQuery($cursor: ID, $offset: Int, $limit: Int) {
+        deals(cursor: $cursor, offset: $offset, limit: $limit) {
             deals {
                 ID
                 CreatedAt
@@ -89,8 +96,8 @@ const DealsListQuery = gql`
 `;
 
 const LegacyDealsListQuery = gql`
-    query AppLegacyDealsListQuery($first: ID, $offset: Int, $limit: Int) {
-        legacyDeals(first: $first, offset: $offset, limit: $limit) {
+    query AppLegacyDealsListQuery($cursor: ID, $offset: Int, $limit: Int) {
+        legacyDeals(cursor: $cursor, offset: $offset, limit: $limit) {
             deals {
                 ID
                 CreatedAt
@@ -267,23 +274,47 @@ const LegacyStorageQuery = gql`
 const SealingPipelineQuery = gql`
     query AppSealingPipelineQuery {
         sealingpipeline {
-            WaitDeals {
+            WaitDealsSectors {
+                SectorID
+                Used
                 SectorSize
                 Deals {
                     ID
                     Size
+                    IsLegacy
+                }
+            }
+            SnapDealsWaitDealsSectors {
+                SectorID
+                Used
+                SectorSize
+                Deals {
+                    ID
+                    Size
+                    IsLegacy
                 }
             }
             SectorStates {
-                AddPiece
-                Packing
-                PreCommit1
-                PreCommit2
-                PreCommitWait
-                WaitSeed
-                Committing
-                CommittingWait
-                FinalizeSector
+                Regular {
+                    Key
+                    Value
+                    Order
+                }
+                RegularError {
+                    Key
+                    Value
+                    Order
+                }
+                SnapDeals {
+                    Key
+                    Value
+                    Order
+                }
+                SnapDealsError {
+                    Key
+                    Value
+                    Order
+                }
             }
             Workers {
                 ID
@@ -326,10 +357,10 @@ const TransfersQuery = gql`
 `;
 
 const FundsLogsQuery = gql`
-    query AppFundsLogsQuery {
-        fundsLogs {
+    query AppFundsLogsQuery($cursor: BigInt, $offset: Int, $limit: Int) {
+        fundsLogs(cursor: $cursor, offset: $offset, limit: $limit) {
             totalCount
-            next
+            more
             logs {
                 CreatedAt
                 DealUUID

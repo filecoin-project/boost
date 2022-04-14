@@ -49,7 +49,7 @@ func (r *resolver) withTransferState(ctx context.Context, dl storagemarket.Miner
 	return dr
 }
 
-// query: legacyDeals(first, limit) DealList
+// query: legacyDeals(cursor, offset, limit) DealList
 func (r *resolver) LegacyDeals(ctx context.Context, args dealsArgs) (*legacyDealListResolver, error) {
 	offset := 0
 	if args.Offset.Set && args.Offset.Value != nil && *args.Offset.Value > 0 {
@@ -62,10 +62,10 @@ func (r *resolver) LegacyDeals(ctx context.Context, args dealsArgs) (*legacyDeal
 	}
 
 	var startPropCid *cid.Cid
-	if args.First != nil {
-		signedPropCid, err := cid.Parse(string(*args.First))
+	if args.Cursor != nil {
+		signedPropCid, err := cid.Parse(string(*args.Cursor))
 		if err != nil {
-			return nil, fmt.Errorf("parsing offset signed proposal cid %s: %w", *args.First, err)
+			return nil, fmt.Errorf("parsing offset signed proposal cid %s: %w", *args.Cursor, err)
 		}
 		startPropCid = &signedPropCid
 	}

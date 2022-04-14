@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/google/uuid"
@@ -47,7 +48,7 @@ type BoostStruct struct {
 
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
 
-		BoostOfflineDealWithData func(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
+		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
 		DealsConsiderOfflineRetrievalDeals func(p0 context.Context) (bool, error) `perm:"admin"`
 
@@ -87,6 +88,8 @@ type BoostStruct struct {
 
 		MarketListDataTransfers func(p0 context.Context) ([]lapi.DataTransferChannel, error) `perm:"write"`
 
+		MarketListIncompleteDeals func(p0 context.Context) ([]storagemarket.MinerDeal, error) `perm:"read"`
+
 		MarketListRetrievalDeals func(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) `perm:"read"`
 
 		MarketRestartDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error `perm:"write"`
@@ -94,6 +97,8 @@ type BoostStruct struct {
 		MarketSetAsk func(p0 context.Context, p1 types.BigInt, p2 types.BigInt, p3 abi.ChainEpoch, p4 abi.PaddedPieceSize, p5 abi.PaddedPieceSize) error `perm:"admin"`
 
 		MarketSetRetrievalAsk func(p0 context.Context, p1 *retrievalmarket.Ask) error `perm:"admin"`
+
+		RuntimeSubsystems func(p0 context.Context) (lapi.MinerSubsystems, error) `perm:"read"`
 	}
 }
 
@@ -181,6 +186,27 @@ type NetStruct struct {
 }
 
 type NetStub struct {
+}
+
+type WalletStruct struct {
+	Internal struct {
+		WalletDelete func(p0 context.Context, p1 address.Address) error `perm:"admin"`
+
+		WalletExport func(p0 context.Context, p1 address.Address) (*types.KeyInfo, error) `perm:"admin"`
+
+		WalletHas func(p0 context.Context, p1 address.Address) (bool, error) `perm:"admin"`
+
+		WalletImport func(p0 context.Context, p1 *types.KeyInfo) (address.Address, error) `perm:"admin"`
+
+		WalletList func(p0 context.Context) ([]address.Address, error) `perm:"admin"`
+
+		WalletNew func(p0 context.Context, p1 types.KeyType) (address.Address, error) `perm:"admin"`
+
+		WalletSign func(p0 context.Context, p1 address.Address, p2 []byte) (*crypto.Signature, error) `perm:"admin"`
+	}
+}
+
+type WalletStub struct {
 }
 
 func (s *BoostStruct) ActorSectorSize(p0 context.Context, p1 address.Address) (abi.SectorSize, error) {
@@ -271,14 +297,14 @@ func (s *BoostStub) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 	return ErrNotSupported
 }
 
-func (s *BoostStruct) BoostOfflineDealWithData(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) {
+func (s *BoostStruct) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) {
 	if s.Internal.BoostOfflineDealWithData == nil {
 		return nil, ErrNotSupported
 	}
-	return s.Internal.BoostOfflineDealWithData(p0, p1)
+	return s.Internal.BoostOfflineDealWithData(p0, p1, p2)
 }
 
-func (s *BoostStub) BoostOfflineDealWithData(p0 uuid.UUID, p1 string) (*ProviderDealRejectionInfo, error) {
+func (s *BoostStub) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) {
 	return nil, ErrNotSupported
 }
 
@@ -491,6 +517,17 @@ func (s *BoostStub) MarketListDataTransfers(p0 context.Context) ([]lapi.DataTran
 	return *new([]lapi.DataTransferChannel), ErrNotSupported
 }
 
+func (s *BoostStruct) MarketListIncompleteDeals(p0 context.Context) ([]storagemarket.MinerDeal, error) {
+	if s.Internal.MarketListIncompleteDeals == nil {
+		return *new([]storagemarket.MinerDeal), ErrNotSupported
+	}
+	return s.Internal.MarketListIncompleteDeals(p0)
+}
+
+func (s *BoostStub) MarketListIncompleteDeals(p0 context.Context) ([]storagemarket.MinerDeal, error) {
+	return *new([]storagemarket.MinerDeal), ErrNotSupported
+}
+
 func (s *BoostStruct) MarketListRetrievalDeals(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) {
 	if s.Internal.MarketListRetrievalDeals == nil {
 		return *new([]retrievalmarket.ProviderDealState), ErrNotSupported
@@ -533,6 +570,17 @@ func (s *BoostStruct) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmar
 
 func (s *BoostStub) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmarket.Ask) error {
 	return ErrNotSupported
+}
+
+func (s *BoostStruct) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystems, error) {
+	if s.Internal.RuntimeSubsystems == nil {
+		return *new(lapi.MinerSubsystems), ErrNotSupported
+	}
+	return s.Internal.RuntimeSubsystems(p0)
+}
+
+func (s *BoostStub) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystems, error) {
+	return *new(lapi.MinerSubsystems), ErrNotSupported
 }
 
 func (s *ChainIOStruct) ChainHasObj(p0 context.Context, p1 cid.Cid) (bool, error) {
@@ -777,8 +825,86 @@ func (s *NetStub) NetPeers(p0 context.Context) ([]peer.AddrInfo, error) {
 	return *new([]peer.AddrInfo), ErrNotSupported
 }
 
+func (s *WalletStruct) WalletDelete(p0 context.Context, p1 address.Address) error {
+	if s.Internal.WalletDelete == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.WalletDelete(p0, p1)
+}
+
+func (s *WalletStub) WalletDelete(p0 context.Context, p1 address.Address) error {
+	return ErrNotSupported
+}
+
+func (s *WalletStruct) WalletExport(p0 context.Context, p1 address.Address) (*types.KeyInfo, error) {
+	if s.Internal.WalletExport == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.WalletExport(p0, p1)
+}
+
+func (s *WalletStub) WalletExport(p0 context.Context, p1 address.Address) (*types.KeyInfo, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *WalletStruct) WalletHas(p0 context.Context, p1 address.Address) (bool, error) {
+	if s.Internal.WalletHas == nil {
+		return false, ErrNotSupported
+	}
+	return s.Internal.WalletHas(p0, p1)
+}
+
+func (s *WalletStub) WalletHas(p0 context.Context, p1 address.Address) (bool, error) {
+	return false, ErrNotSupported
+}
+
+func (s *WalletStruct) WalletImport(p0 context.Context, p1 *types.KeyInfo) (address.Address, error) {
+	if s.Internal.WalletImport == nil {
+		return *new(address.Address), ErrNotSupported
+	}
+	return s.Internal.WalletImport(p0, p1)
+}
+
+func (s *WalletStub) WalletImport(p0 context.Context, p1 *types.KeyInfo) (address.Address, error) {
+	return *new(address.Address), ErrNotSupported
+}
+
+func (s *WalletStruct) WalletList(p0 context.Context) ([]address.Address, error) {
+	if s.Internal.WalletList == nil {
+		return *new([]address.Address), ErrNotSupported
+	}
+	return s.Internal.WalletList(p0)
+}
+
+func (s *WalletStub) WalletList(p0 context.Context) ([]address.Address, error) {
+	return *new([]address.Address), ErrNotSupported
+}
+
+func (s *WalletStruct) WalletNew(p0 context.Context, p1 types.KeyType) (address.Address, error) {
+	if s.Internal.WalletNew == nil {
+		return *new(address.Address), ErrNotSupported
+	}
+	return s.Internal.WalletNew(p0, p1)
+}
+
+func (s *WalletStub) WalletNew(p0 context.Context, p1 types.KeyType) (address.Address, error) {
+	return *new(address.Address), ErrNotSupported
+}
+
+func (s *WalletStruct) WalletSign(p0 context.Context, p1 address.Address, p2 []byte) (*crypto.Signature, error) {
+	if s.Internal.WalletSign == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.WalletSign(p0, p1, p2)
+}
+
+func (s *WalletStub) WalletSign(p0 context.Context, p1 address.Address, p2 []byte) (*crypto.Signature, error) {
+	return nil, ErrNotSupported
+}
+
 var _ Boost = new(BoostStruct)
 var _ ChainIO = new(ChainIOStruct)
 var _ Common = new(CommonStruct)
 var _ CommonNet = new(CommonNetStruct)
 var _ Net = new(NetStruct)
+var _ Wallet = new(WalletStruct)

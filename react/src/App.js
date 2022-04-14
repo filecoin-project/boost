@@ -38,6 +38,7 @@ function App(props) {
                                         <Route path="/storage-space" element={<StorageSpacePage />} />
                                         <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
                                         <Route path="/funds" element={<FundsPage />} />
+                                        <Route path="/funds/from/:cursor/page/:pageNum" element={<FundsPage />} />
                                         <Route path="/deal-publish" element={<DealPublishPage />} />
                                         <Route path="/deal-transfers" element={<DealTransfersPage />} />
                                         <Route path="/mpool" element={<MpoolPage />} />

@@ -33,7 +33,7 @@ type Boost interface {
 
 	// MethodGroup: Boost
 	BoostIndexerAnnounceAllDeals(ctx context.Context) error                                                                        //perm:admin
-	BoostOfflineDealWithData(dealUuid uuid.UUID, filePath string) (*ProviderDealRejectionInfo, error)                              //perm:admin
+	BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string) (*ProviderDealRejectionInfo, error)         //perm:admin
 	BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                                         //perm:admin
 	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                        //perm:admin
 	BoostDagstoreInitializeShard(ctx context.Context, key string) error                                                            //perm:admin
@@ -41,6 +41,10 @@ type Boost interface {
 	BoostDagstoreGC(ctx context.Context) ([]DagstoreShardResult, error)                                                            //perm:admin
 
 	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error) //perm:read
+
+	// RuntimeSubsystems returns the subsystems that are enabled
+	// in this instance.
+	RuntimeSubsystems(ctx context.Context) (lapi.MinerSubsystems, error) //perm:read
 
 	// MethodGroup: LegacyMarket
 	MarketListRetrievalDeals(ctx context.Context) ([]retrievalmarket.ProviderDealState, error)                                                                                           //perm:read
@@ -52,6 +56,7 @@ type Boost interface {
 	MarketDataTransferUpdates(ctx context.Context) (<-chan lapi.DataTransferChannel, error)                                                                                              //perm:write
 	MarketRestartDataTransfer(ctx context.Context, transferID datatransfer.TransferID, otherPeer peer.ID, isInitiator bool) error                                                        //perm:write
 	MarketImportDealData(ctx context.Context, propcid cid.Cid, path string) error                                                                                                        //perm:write
+	MarketListIncompleteDeals(ctx context.Context) ([]storagemarket.MinerDeal, error)                                                                                                    //perm:read
 
 	// MethodGroup: Actor
 	ActorSectorSize(context.Context, address.Address) (abi.SectorSize, error) //perm:read

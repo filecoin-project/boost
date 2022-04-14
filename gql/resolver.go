@@ -41,6 +41,7 @@ type resolver struct {
 	h          host.Host
 	dealsDB    *db.DealsDB
 	logsDB     *db.LogsDB
+	fundsDB    *db.FundsDB
 	fundMgr    *fundmanager.FundManager
 	storageMgr *storagemanager.StorageManager
 	provider   *storagemarket.Provider
@@ -51,13 +52,14 @@ type resolver struct {
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		cfg:        cfg,
 		repo:       r,
 		h:          h,
 		dealsDB:    dealsDB,
 		logsDB:     logsDB,
+		fundsDB:    fundsDB,
 		fundMgr:    fundMgr,
 		storageMgr: storageMgr,
 		provider:   provider,
@@ -89,16 +91,16 @@ func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dea
 		return nil, err
 	}
 
-	return newDealResolver(deal, r.dealsDB, r.logsDB), nil
+	return newDealResolver(deal, r.dealsDB, r.logsDB, r.spApi), nil
 }
 
 type dealsArgs struct {
-	First  *graphql.ID
+	Cursor *graphql.ID
 	Offset graphql.NullInt
 	Limit  graphql.NullInt
 }
 
-// query: deals(first, offset, limit) DealList
+// query: deals(cursor, offset, limit) DealList
 func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver, error) {
 	offset := 0
 	if args.Offset.Set && args.Offset.Value != nil && *args.Offset.Value > 0 {
@@ -110,14 +112,14 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 		limit = int(*args.Limit.Value)
 	}
 
-	deals, count, more, err := r.dealList(ctx, args.First, offset, limit)
+	deals, count, more, err := r.dealList(ctx, args.Cursor, offset, limit)
 	if err != nil {
 		return nil, err
 	}
 
 	resolvers := make([]*dealResolver, 0, len(deals))
 	for _, deal := range deals {
-		resolvers = append(resolvers, newDealResolver(&deal, r.dealsDB, r.logsDB))
+		resolvers = append(resolvers, newDealResolver(&deal, r.dealsDB, r.logsDB, r.spApi))
 	}
 
 	return &dealListResolver{
@@ -143,19 +145,14 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 		return nil, err
 	}
 
-	net := make(chan *dealResolver, 1)
-
 	// Send an update to the client with the initial state
 	deal, err := r.dealByID(ctx, dealUuid)
 	if err != nil {
 		return nil, err
 	}
 
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case net <- newDealResolver(deal, r.dealsDB, r.logsDB):
-	}
+	net := make(chan *dealResolver, 1)
+	net <- newDealResolver(deal, r.dealsDB, r.logsDB, r.spApi)
 
 	// Updates to deal state are broadcast on pubsub. Pipe these updates to the
 	// client
@@ -167,8 +164,11 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 		}
 		return nil, xerrors.Errorf("%s: subscribing to deal updates: %w", args.ID, err)
 	}
-	sub := &subLastUpdate{sub: dealUpdatesSub, dealsDB: r.dealsDB, logsDB: r.logsDB}
-	go sub.Pipe(ctx, net)
+	sub := &subLastUpdate{sub: dealUpdatesSub, dealsDB: r.dealsDB, logsDB: r.logsDB, spApi: r.spApi}
+	go func() {
+		sub.Pipe(ctx, net) // blocks until connection is closed
+		close(net)
+	}()
 
 	return net, nil
 }
@@ -203,7 +203,7 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 			case evti := <-sub.Out():
 				// Pipe the deal to the new deal channel
 				di := evti.(types.ProviderDealState)
-				rsv := newDealResolver(&di, r.dealsDB, r.logsDB)
+				rsv := newDealResolver(&di, r.dealsDB, r.logsDB, r.spApi)
 				totalCount, err := r.dealsDB.Count(ctx)
 				if err != nil {
 					log.Errorf("getting total deal count: %w", err)
@@ -248,21 +248,23 @@ func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.Pro
 	return deal, nil
 }
 
-func (r *resolver) dealByPublishCID(ctx context.Context, publishCid *cid.Cid) (*types.ProviderDealState, error) {
-	deal, err := r.dealsDB.ByPublishCID(ctx, publishCid.String())
+func (r *resolver) dealsByPublishCID(ctx context.Context, publishCid cid.Cid) ([]*types.ProviderDealState, error) {
+	deals, err := r.dealsDB.ByPublishCID(ctx, publishCid.String())
 	if err != nil {
 		return nil, err
 	}
 
-	deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
+	for _, d := range deals {
+		d.NBytesReceived = int64(r.provider.NBytesReceived(d.DealUuid))
+	}
 
-	return deal, nil
+	return deals, nil
 }
 
-func (r *resolver) dealList(ctx context.Context, first *graphql.ID, offset int, limit int) ([]types.ProviderDealState, int, bool, error) {
+func (r *resolver) dealList(ctx context.Context, cursor *graphql.ID, offset int, limit int) ([]types.ProviderDealState, int, bool, error) {
 	// Fetch one extra deal so that we can check if there are more deals
 	// beyond the limit
-	deals, err := r.dealsDB.List(ctx, first, offset, limit+1)
+	deals, err := r.dealsDB.List(ctx, cursor, offset, limit+1)
 	if err != nil {
 		return nil, 0, false, err
 	}
@@ -293,14 +295,16 @@ type dealResolver struct {
 	transferred uint64
 	dealsDB     *db.DealsDB
 	logsDB      *db.LogsDB
+	spApi       sealingpipeline.API
 }
 
-func newDealResolver(deal *types.ProviderDealState, dealsDB *db.DealsDB, logsDB *db.LogsDB) *dealResolver {
+func newDealResolver(deal *types.ProviderDealState, dealsDB *db.DealsDB, logsDB *db.LogsDB, spApi sealingpipeline.API) *dealResolver {
 	return &dealResolver{
 		ProviderDealState: *deal,
 		transferred:       uint64(deal.NBytesReceived),
 		dealsDB:           dealsDB,
 		logsDB:            logsDB,
+		spApi:             spApi,
 	}
 }
 
@@ -378,9 +382,13 @@ type dealTransfer struct {
 
 func (dr *dealResolver) Transfer() dealTransfer {
 	transfer := dr.ProviderDealState.Transfer
-	params, err := transport.TransferParamsAsJson(transfer)
-	if err != nil {
-		params = fmt.Sprintf(`{"url": "could not extract url from params: %s"}`, err)
+	params := "{}"
+	if !dr.IsOffline {
+		var err error
+		params, err = transport.TransferParamsAsJson(transfer)
+		if err != nil {
+			params = fmt.Sprintf(`{"url": "could not extract url from params: %s"}`, err)
+		}
 	}
 	return dealTransfer{
 		Type:     transfer.Type,
@@ -418,12 +426,15 @@ func (dr *dealResolver) Stage() string {
 	return dr.ProviderDealState.Checkpoint.String()
 }
 
-func (dr *dealResolver) Message() string {
+func (dr *dealResolver) Message(ctx context.Context) string {
 	switch dr.Checkpoint {
 	case dealcheckpoints.Accepted:
+		if dr.IsOffline {
+			return "Awaiting Offline Data Import"
+		}
 		switch dr.transferred {
 		case 0:
-			return "Transfer queued"
+			return "Transfer Queued"
 		case 100:
 			return "Transfer Complete"
 		default:
@@ -439,7 +450,7 @@ func (dr *dealResolver) Message() string {
 	case dealcheckpoints.AddedPiece:
 		return "Announcing"
 	case dealcheckpoints.IndexedAndAnnounced:
-		return "Sealing"
+		return dr.sealingState(ctx)
 	case dealcheckpoints.Complete:
 		switch dr.Err {
 		case "":
@@ -450,6 +461,16 @@ func (dr *dealResolver) Message() string {
 		return "Error: " + dr.Err
 	}
 	return dr.ProviderDealState.Checkpoint.String()
+}
+
+func (dr *dealResolver) sealingState(ctx context.Context) string {
+	si, err := dr.spApi.SectorsStatus(ctx, dr.SectorID, false)
+	if err != nil {
+		log.Warnw("error getting sealing status for sector", "sector", dr.SectorID, "error", err)
+		return "Sealer: Sealing"
+	}
+
+	return "Sealer: " + string(si.State)
 }
 
 func (dr *dealResolver) Logs(ctx context.Context) ([]*logsResolver, error) {
@@ -506,10 +527,11 @@ type subLastUpdate struct {
 	sub     event.Subscription
 	dealsDB *db.DealsDB
 	logsDB  *db.LogsDB
+	spApi   sealingpipeline.API
 }
 
 func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
-	// When the connection ends, unsubscribe
+	// When the connection ends, unsubscribe from deal update events
 	defer s.sub.Close()
 
 	var lastUpdate interface{}
@@ -518,7 +540,11 @@ func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
 		select {
 		case <-ctx.Done():
 			return
-		case update := <-s.sub.Out():
+		case update, ok := <-s.sub.Out():
+			if !ok {
+				// Stop listening for updates when the subscription is closed
+				return
+			}
 			lastUpdate = update
 		}
 
@@ -526,26 +552,33 @@ func (s *subLastUpdate) Pipe(ctx context.Context, net chan *dealResolver) {
 		// updates that are queued up behind the first one, and only save
 		// the very last
 		select {
-		case update := <-s.sub.Out():
-			lastUpdate = update
+		case update, ok := <-s.sub.Out():
+			if ok {
+				lastUpdate = update
+			}
 		default:
 		}
 
 		// Attempt to send the update to the network. If the network is
 		// blocked, and another update arrives on the subscription,
 		// override the latest update.
+		updates := s.sub.Out()
 	loop:
 		for {
 			di := lastUpdate.(types.ProviderDealState)
-			rsv := newDealResolver(&di, s.dealsDB, s.logsDB)
+			rsv := newDealResolver(&di, s.dealsDB, s.logsDB, s.spApi)
 
 			select {
 			case <-ctx.Done():
 				return
 			case net <- rsv:
 				break loop
-			case update := <-s.sub.Out():
-				lastUpdate = update
+			case update, ok := <-updates:
+				if ok {
+					lastUpdate = update
+				} else {
+					updates = nil
+				}
 			}
 		}
 	}

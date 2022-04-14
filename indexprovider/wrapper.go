@@ -33,6 +33,7 @@ import (
 
 var log = logging.Logger("index-provider-wrapper")
 var shardRegMarker = ".boost-shard-registration-complete"
+var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
 	cfg         lotus_config.DAGStoreConfig
@@ -46,9 +47,14 @@ type Wrapper struct {
 func NewWrapper(cfg lotus_config.DAGStoreConfig) func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
 	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
 	meshCreator idxprov.MeshCreator) *Wrapper {
+
 	return func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
 		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
 		meshCreator idxprov.MeshCreator) *Wrapper {
+		if cfg.RootDir == "" {
+			cfg.RootDir = filepath.Join(r.Path(), defaultDagStoreDir)
+		}
+
 		return &Wrapper{
 			dealsDB:     dealsDB,
 			legacyProv:  legacyProv,
@@ -124,7 +130,7 @@ func (w *Wrapper) Start(ctx context.Context) {
 
 		// go from proposal cid -> piece cid by looking up deal in boost and if we can't find it there -> then markets
 		// check Boost deals DB
-		pds, boostErr := w.dealsDB.BySignedProposalCID(ctx, proposalCid.String())
+		pds, boostErr := w.dealsDB.BySignedProposalCID(ctx, proposalCid)
 		if boostErr == nil {
 			pieceCid := pds.ClientDealProposal.Proposal.PieceCID
 			return provideF(pieceCid)

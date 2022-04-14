@@ -374,6 +374,7 @@ var BoostNode = Options(
 	Override(new(*modules.LogSqlDB), modules.NewLogsSqlDB),
 	Override(new(*db.DealsDB), modules.NewDealsDB),
 	Override(new(*db.LogsDB), modules.NewLogsDB),
+	Override(new(*db.FundsDB), modules.NewFundsDB),
 )
 
 func ConfigBoost(c interface{}) Option {
@@ -437,6 +438,8 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(sealingpipeline.API), From(new(lotus_modules.MinerStorageService))),
 
 		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg.DAGStore)),
+
+		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
 
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner)),
 

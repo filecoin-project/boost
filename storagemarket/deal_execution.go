@@ -8,31 +8,28 @@ import (
 	"os"
 	"time"
 
-	"github.com/filecoin-project/dagstore"
-
-	"github.com/filecoin-project/go-fil-markets/piecestore"
-
-	"github.com/filecoin-project/go-fil-markets/stores"
-
-	acrypto "github.com/filecoin-project/go-state-types/crypto"
-
-	"github.com/filecoin-project/boost/transport"
-	"github.com/filecoin-project/go-state-types/abi"
-
-	"golang.org/x/xerrors"
+	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
-	transporttypes "github.com/filecoin-project/boost/transport/types"
-
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boost/transport"
+	transporttypes "github.com/filecoin-project/boost/transport/types"
+	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	commcid "github.com/filecoin-project/go-fil-commcid"
 	commp "github.com/filecoin-project/go-fil-commp-hashhash"
+	"github.com/filecoin-project/go-fil-markets/piecestore"
+	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-padreader"
+	"github.com/filecoin-project/go-state-types/abi"
+	acrypto "github.com/filecoin-project/go-state-types/crypto"
+	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-eventbus"
 	"github.com/libp2p/go-libp2p-core/event"
+	"golang.org/x/xerrors"
 )
 
 const (
@@ -61,15 +58,30 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 		return
 	}
 
-	// build in-memory state
-	fi, err := os.Stat(deal.InboundFilePath)
-	if err != nil {
-		err := fmt.Errorf("failed to stat output file: %w", err)
-		p.failDeal(pub, deal, err)
-		p.cleanupDealLogged(deal)
-		return
+	// If the deal has not yet been handed off to the sealer
+	if deal.Checkpoint < dealcheckpoints.AddedPiece {
+		transferType := "downloaded file"
+		if deal.IsOffline {
+			transferType = "imported offline deal file"
+		}
+
+		// Read the bytes received from the downloaded / imported file
+		fi, err := os.Stat(deal.InboundFilePath)
+		if err != nil {
+			err := fmt.Errorf("failed to get size of %s '%s': %w", transferType, deal.InboundFilePath, err)
+			p.failDeal(pub, deal, err)
+			p.cleanupDealLogged(deal)
+			return
+		}
+		deal.NBytesReceived = fi.Size()
+		p.dealLogger.Infow(deal.DealUuid, "size of "+transferType, "filepath", deal.InboundFilePath, "size", fi.Size())
+	} else {
+		// if the deal has already been handed to the sealer, the inbound file
+		// could already have been removed and in that case, the number of
+		// bytes received should be the same as deal size as we've already
+		// verified the transfer.
+		deal.NBytesReceived = int64(deal.Transfer.Size)
 	}
-	deal.NBytesReceived = fi.Size()
 
 	// Execute the deal synchronously
 	if derr := p.execDealUptoAddPiece(dh.providerCtx, pub, deal, dh); derr != nil {
@@ -96,10 +108,13 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	// to wait for deal completion/slashing and update the state in DB accordingly.
 	p.cleanupDealLogged(deal)
 	p.dealLogger.Infow(deal.DealUuid, "finished deal cleanup after successful execution")
+
+	// Watch the sealing status of the deal and fire events for each change
+	p.fireSealingUpdateEvents(dh, pub, deal.DealUuid, deal.SectorID)
+	p.cleanupDealHandler(deal.DealUuid)
+
 	// TODO
 	// Watch deal on chain and change state in DB and emit notifications.
-	// Given that cleanup deal above also gets rid of the deal handler, subscriptions to deal updates from here on
-	// will fail, we can look into it when we implement deal completion.
 }
 
 func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState, dh *dealHandler) *dealMakingError {
@@ -142,6 +157,13 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 			return &dealMakingError{err: fmt.Errorf("error when matching commP for imported data for offline deal: %w", err)}
 		}
 		p.dealLogger.Infow(deal.DealUuid, "commp matched successfully for imported data for offline deal")
+
+		// update checkpoint
+		if err := p.updateCheckpoint(pub, deal, dealcheckpoints.Transferred); err != nil {
+			return &dealMakingError{
+				err: fmt.Errorf("failed to update checkpoint: %w", err),
+			}
+		}
 	}
 
 	// Publish
@@ -301,6 +323,7 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 }
 
 func (p *Provider) verifyCommP(deal *types.ProviderDealState) error {
+	p.dealLogger.Infow(deal.DealUuid, "checking commP")
 	pieceCid, err := GeneratePieceCommitment(deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize)
 	if err != nil {
 		return fmt.Errorf("failed to generate CommP: %w", err)
@@ -534,7 +557,6 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece)
 }
 
-// TODO Index Provider integration to announce deals to the network Indexer
 func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
 	pc := deal.ClientDealProposal.Proposal.PieceCID
 
@@ -573,6 +595,84 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced)
 }
 
+// fireSealingUpdateEvents periodically checks the sealing status of the deal
+// and fires events for each change
+func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, pub event.Emitter, dealUuid uuid.UUID, sectorNum abi.SectorNumber) {
+	var lastSealingState lapi.SectorState
+	checkStatus := func(force bool) lapi.SectorState {
+		// To avoid overloading the sealing service, only get the sector status
+		// if there's at least one subscriber to the event that will be published
+		if !force && !dh.hasActiveSubscribers() {
+			return ""
+		}
+
+		// Get the sector status
+		si, err := p.sps.SectorsStatus(p.ctx, sectorNum, false)
+		if err == nil && si.State != lastSealingState {
+			lastSealingState = si.State
+
+			// Sector status has changed, fire an update event
+			deal, err := p.dealsDB.ByID(p.ctx, dealUuid)
+			if err != nil {
+				log.Errorf("getting deal %s with sealing update: %w", dealUuid, err)
+				return si.State
+			}
+
+			p.fireEventDealUpdate(pub, deal)
+		}
+		return si.State
+	}
+
+	// Check status immediately
+	state := checkStatus(true)
+	if isFinalSealingState(state) {
+		return
+	}
+
+	// Check status every second
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	count := 0
+	forceCount := 60
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+		case <-ticker.C:
+			count++
+			// Force a status check every forceCount seconds, even if there
+			// are no subscribers (so that we can stop checking altogether
+			// if the sector reaches a final sealing state)
+			state := checkStatus(count >= forceCount)
+			if count >= forceCount {
+				count = 0
+			}
+
+			if isFinalSealingState(state) {
+				return
+			}
+		}
+	}
+}
+
+func isFinalSealingState(state lapi.SectorState) bool {
+	switch sealing.SectorState(state) {
+	case
+		sealing.Proving,
+		sealing.Available,
+		sealing.UpdateActivating,
+		sealing.ReleaseSectorKey,
+		sealing.Removed,
+		sealing.Removing,
+		sealing.Terminating,
+		sealing.TerminateWait,
+		sealing.TerminateFinality,
+		sealing.TerminateFailed:
+		return true
+	}
+	return false
+}
+
 func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, err error) {
 	// Update state in DB with error
 	deal.Checkpoint = dealcheckpoints.Complete
@@ -608,12 +708,8 @@ func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 		_ = os.Remove(deal.InboundFilePath)
 	}
 
-	// close and clean up the deal handler
-	dh := p.getDealHandler(deal.DealUuid)
-	if dh != nil {
-		dh.transferCancelled(errors.New("deal cleaned up"))
-		dh.close()
-		p.delDealHandler(deal.DealUuid)
+	if deal.Checkpoint == dealcheckpoints.Complete {
+		p.cleanupDealHandler(deal.DealUuid)
 	}
 
 	done := make(chan struct{}, 1)
@@ -630,6 +726,18 @@ func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
 	case <-done:
 	case <-p.ctx.Done():
 	}
+}
+
+// cleanupDealHandler closes and cleans up the deal handler
+func (p *Provider) cleanupDealHandler(dealUuid uuid.UUID) {
+	dh := p.getDealHandler(dealUuid)
+	if dh == nil {
+		return
+	}
+
+	dh.transferCancelled(errors.New("deal cleaned up"))
+	dh.close()
+	p.delDealHandler(dealUuid)
 }
 
 func (p *Provider) fireEventDealNew(deal *types.ProviderDealState) {

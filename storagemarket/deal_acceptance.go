@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	cborutil "github.com/filecoin-project/go-cbor-util"
+
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
@@ -18,67 +20,100 @@ import (
 
 const DealMaxLabelSize = 256
 
-// ValidateDealProposal validates a proposed deal against the provider criteria
-func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
-	// TODO Audit based on current Markets code
+type validationError struct {
+	error
+	// The reason sent to the client for why validation failed
+	reason string
+}
+
+// ValidateDealProposal validates a proposed deal against the provider criteria.
+// It returns a validationError. If a nicer error message should be sent to the
+// client, the reason string will be set to that nicer error message.
+func (p *Provider) validateDealProposal(deal types.ProviderDealState) *validationError {
 	head, err := p.fullnodeApi.ChainHead(p.ctx)
 	if err != nil {
-		return fmt.Errorf("node error getting most recent state id: %w", err)
+		return &validationError{
+			reason: "server error: getting chain head",
+			error:  fmt.Errorf("node error getting most recent state id: %w", err),
+		}
 	}
 
 	tok := head.Key().Bytes()
 	curEpoch := head.Height()
 
-	if err := p.validateSignature(tok, deal); err != nil {
-		return fmt.Errorf("validateSignature failed: %w", err)
+	// Check that the proposal piece cid is defined before attempting signature
+	// validation - if it's not defined, it won't be possible to marshall the
+	// deal proposal to check the signature
+	proposal := deal.ClientDealProposal.Proposal
+	if !proposal.PieceCID.Defined() {
+		return &validationError{error: fmt.Errorf("proposal PieceCID undefined")}
+	}
+
+	if ok, err := p.validateSignature(tok, deal); err != nil || !ok {
+		if err != nil {
+			return &validationError{
+				reason: "server error: validating signature",
+				error:  fmt.Errorf("validateSignature failed: %w", err),
+			}
+		}
+		return &validationError{
+			reason: "invalid signature",
+			error:  fmt.Errorf("invalid signature"),
+		}
 	}
 
 	// validate deal proposal
-	proposal := deal.ClientDealProposal.Proposal
 	if proposal.Provider != p.Address {
-		return fmt.Errorf("incorrect provider for deal; proposal.Provider: %s; provider.Address: %s", proposal.Provider, p.Address)
+		err := fmt.Errorf("incorrect provider for deal; proposal.Provider: %s; provider.Address: %s", proposal.Provider, p.Address)
+		return &validationError{error: err}
 	}
 
 	if len(proposal.Label) > DealMaxLabelSize {
-		return fmt.Errorf("deal label can be at most %d bytes, is %d", DealMaxLabelSize, len(proposal.Label))
+		err := fmt.Errorf("deal label can be at most %d bytes, is %d", DealMaxLabelSize, len(proposal.Label))
+		return &validationError{error: err}
 	}
 
 	if err := proposal.PieceSize.Validate(); err != nil {
-		return fmt.Errorf("proposal piece size is invalid: %w", err)
-	}
-
-	if !proposal.PieceCID.Defined() {
-		return fmt.Errorf("proposal PieceCID undefined")
+		err := fmt.Errorf("proposal piece size is invalid: %w", err)
+		return &validationError{error: err}
 	}
 
 	if proposal.PieceCID.Prefix() != market.PieceCIDPrefix {
-		return fmt.Errorf("proposal PieceCID had wrong prefix")
+		err := fmt.Errorf("proposal PieceCID had wrong prefix")
+		return &validationError{error: err}
 	}
 
 	if proposal.EndEpoch <= proposal.StartEpoch {
-		return fmt.Errorf("proposal end before proposal start")
+		err := fmt.Errorf("proposal end %d before proposal start %d", proposal.EndEpoch, proposal.StartEpoch)
+		return &validationError{error: err}
 	}
 
 	if curEpoch > proposal.StartEpoch {
-		return fmt.Errorf("deal start epoch has already elapsed")
+		err := fmt.Errorf("deal start epoch %d has already elapsed (current epoch: %d)", proposal.StartEpoch, curEpoch)
+		return &validationError{error: err}
 	}
 
 	// Check that the delta between the start and end epochs (the deal
 	// duration) is within acceptable bounds
 	minDuration, maxDuration := market2.DealDurationBounds(proposal.PieceSize)
 	if proposal.Duration() < minDuration || proposal.Duration() > maxDuration {
-		return fmt.Errorf("deal duration out of bounds (min, max, provided): %d, %d, %d", minDuration, maxDuration, proposal.Duration())
+		err := fmt.Errorf("deal duration out of bounds (min, max, provided): %d, %d, %d", minDuration, maxDuration, proposal.Duration())
+		return &validationError{error: err}
 	}
 
 	// Check that the proposed end epoch isn't too far beyond the current epoch
 	maxEndEpoch := curEpoch + miner.MaxSectorExpirationExtension
 	if proposal.EndEpoch > maxEndEpoch {
-		return fmt.Errorf("invalid deal end epoch %d: cannot be more than %d past current epoch %d", proposal.EndEpoch, miner.MaxSectorExpirationExtension, curEpoch)
+		err := fmt.Errorf("invalid deal end epoch %d: cannot be more than %d past current epoch %d", proposal.EndEpoch, miner.MaxSectorExpirationExtension, curEpoch)
+		return &validationError{error: err}
 	}
 
 	bounds, err := p.fullnodeApi.StateDealProviderCollateralBounds(p.ctx, proposal.PieceSize, proposal.VerifiedDeal, ctypes.EmptyTSK)
 	if err != nil {
-		return fmt.Errorf("node error getting collateral bounds: %w", err)
+		return &validationError{
+			reason: "server error: getting collateral bounds",
+			error:  fmt.Errorf("node error getting collateral bounds: %w", err),
+		}
 	}
 
 	// The maximum amount of collateral that the provider will put into escrow
@@ -89,25 +124,33 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 	pcMax := max
 
 	if proposal.ProviderCollateral.LessThan(pcMin) {
-		return fmt.Errorf("proposed provider collateral below minimum: %s < %s", proposal.ProviderCollateral, pcMin)
+		err := fmt.Errorf("proposed provider collateral %s below minimum %s", proposal.ProviderCollateral, pcMin)
+		return &validationError{error: err}
 	}
 
 	if proposal.ProviderCollateral.GreaterThan(pcMax) {
-		return fmt.Errorf("proposed provider collateral above maximum: %s > %s", proposal.ProviderCollateral, pcMax)
+		err := fmt.Errorf("proposed provider collateral %s above maximum %s", proposal.ProviderCollateral, pcMax)
+		return &validationError{error: err}
 	}
 
 	if err := p.validateAsk(deal); err != nil {
-		return fmt.Errorf("validateAsk failed: %w", err)
+		return &validationError{error: err}
 	}
 
 	tsk, err := ctypes.TipSetKeyFromBytes(tok)
 	if err != nil {
-		return err
+		return &validationError{
+			reason: "server error: tip set key from bytes",
+			error:  err,
+		}
 	}
 
 	bal, err := p.fullnodeApi.StateMarketBalance(p.ctx, proposal.Client, tsk)
 	if err != nil {
-		return fmt.Errorf("node error getting client market balance failed: %w", err)
+		return &validationError{
+			reason: "server error: getting market balance",
+			error:  fmt.Errorf("node error getting client market balance failed: %w", err),
+		}
 	}
 
 	clientMarketBalance := utils.ToSharedBalance(bal)
@@ -115,7 +158,8 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 	// This doesn't guarantee that the client won't withdraw / lock those funds
 	// but it's a decent first filter
 	if clientMarketBalance.Available.LessThan(proposal.ClientBalanceRequirement()) {
-		return fmt.Errorf("clientMarketBalance.Available too small: %d < %d", clientMarketBalance.Available, proposal.ClientBalanceRequirement())
+		err := fmt.Errorf("client available funds in escrow %d not enough to meet storage cost for deal %d", clientMarketBalance.Available, proposal.ClientBalanceRequirement())
+		return &validationError{error: err}
 	}
 
 	// Verified deal checks
@@ -123,16 +167,23 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 		// Get data cap
 		dataCap, err := p.fullnodeApi.StateVerifiedClientStatus(p.ctx, proposal.Client, tsk)
 		if err != nil {
-			return fmt.Errorf("node error fetching verified data cap: %w", err)
+			return &validationError{
+				reason: "server error: getting verified datacap",
+				error:  fmt.Errorf("node error fetching verified data cap: %w", err),
+			}
 		}
 
 		if dataCap == nil {
-			return errors.New("node error fetching verified data cap: data cap missing -- client not verified")
+			return &validationError{
+				reason: "client is not a verified client",
+				error:  errors.New("node error fetching verified data cap: data cap missing -- client not verified"),
+			}
 		}
 
 		pieceSize := big.NewIntUnsigned(uint64(proposal.PieceSize))
 		if dataCap.LessThan(pieceSize) {
-			return errors.New("verified deal DataCap too small for proposed piece size")
+			err := fmt.Errorf("verified deal DataCap %d too small for proposed piece size %d", dataCap, pieceSize)
+			return &validationError{error: err}
 		}
 	}
 
@@ -140,7 +191,7 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) error {
 }
 
 func (p *Provider) validateAsk(deal types.ProviderDealState) error {
-	ask := p.GetAsk()
+	ask := p.GetAsk().Ask
 	askPrice := ask.Price
 	if deal.ClientDealProposal.Proposal.VerifiedDeal {
 		askPrice = ask.VerifiedPrice
@@ -163,22 +214,15 @@ func (p *Provider) validateAsk(deal types.ProviderDealState) error {
 	return nil
 }
 
-func (p *Provider) validateSignature(tok shared.TipSetToken, deal types.ProviderDealState) error {
-	// TODO: do proper signature validation once the client side of deal making is set up
-	return nil
+func (p *Provider) validateSignature(tok shared.TipSetToken, deal types.ProviderDealState) (bool, error) {
+	b, err := cborutil.Dump(&deal.ClientDealProposal.Proposal)
+	if err != nil {
+		return false, fmt.Errorf("failed to serialize client deal proposal: %w", err)
+	}
 
-	//b, err := cborutil.Dump(&deal.ClientDealProposal.Proposal)
-	//if err != nil {
-	//return fmt.Errorf("failed to serialize client deal proposal: %w", err)
-	//}
-
-	//verified, err := p.VerifySignature(p.ctx, deal.ClientDealProposal.ClientSignature, deal.ClientDealProposal.Proposal.Client, b, tok)
-	//if err != nil {
-	//return fmt.Errorf("error verifying signature: %w", err)
-	//}
-	//if !verified {
-	//return errors.New("could not verify signature")
-	//}
-
-	//return nil
+	verified, err := p.sigVerifier.VerifySignature(p.ctx, deal.ClientDealProposal.ClientSignature, deal.ClientDealProposal.Proposal.Client, b, tok)
+	if err != nil {
+		return false, fmt.Errorf("error verifying signature: %w", err)
+	}
+	return verified, nil
 }
