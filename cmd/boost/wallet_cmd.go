@@ -9,13 +9,14 @@ import (
 	"os"
 	"strings"
 
+	"github.com/filecoin-project/boost/cmd"
+
 	"github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/tablewriter"
-	"github.com/mitchellh/go-homedir"
 	cli "github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 )
@@ -23,13 +24,7 @@ import (
 var walletCmd = &cli.Command{
 	Name:  "wallet",
 	Usage: "Manage wallets with Boost",
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "repo",
-			Usage: "repo directory for Boost client",
-			Value: "~/.boost-client",
-		},
-	},
+	Flags: []cli.Flag{cmd.FlagRepo},
 	Subcommands: []*cli.Command{
 		walletNew,
 		walletList,
@@ -49,12 +44,7 @@ var walletNew = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
-		sdir, err := homedir.Expand(cctx.String("repo"))
-		if err != nil {
-			return err
-		}
-
-		n, err := node.Setup(ctx, sdir)
+		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}
@@ -93,12 +83,7 @@ var walletList = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
-		sdir, err := homedir.Expand(cctx.String("repo"))
-		if err != nil {
-			return err
-		}
-
-		n, err := node.Setup(ctx, sdir)
+		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}
@@ -191,12 +176,7 @@ var walletBalance = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
-		sdir, err := homedir.Expand(cctx.String("repo"))
-		if err != nil {
-			return err
-		}
-
-		n, err := node.Setup(ctx, sdir)
+		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}
@@ -241,12 +221,7 @@ var walletExport = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
-		sdir, err := homedir.Expand(cctx.String("repo"))
-		if err != nil {
-			return err
-		}
-
-		n, err := node.Setup(ctx, sdir)
+		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}
@@ -295,12 +270,7 @@ var walletImport = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
-		sdir, err := homedir.Expand(cctx.String("repo"))
-		if err != nil {
-			return err
-		}
-
-		n, err := node.Setup(ctx, sdir)
+		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}
@@ -384,14 +354,7 @@ var walletGetDefault = &cli.Command{
 	Usage:   "Get default wallet address",
 	Aliases: []string{"get-default"},
 	Action: func(cctx *cli.Context) error {
-		ctx := lcli.ReqContext(cctx)
-
-		sdir, err := homedir.Expand(cctx.String("repo"))
-		if err != nil {
-			return err
-		}
-
-		n, err := node.Setup(ctx, sdir)
+		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}
@@ -413,14 +376,7 @@ var walletSetDefault = &cli.Command{
 	Usage:     "Set default wallet address",
 	ArgsUsage: "[address]",
 	Action: func(cctx *cli.Context) error {
-		ctx := lcli.ReqContext(cctx)
-
-		sdir, err := homedir.Expand(cctx.String("repo"))
-		if err != nil {
-			return err
-		}
-
-		n, err := node.Setup(ctx, sdir)
+		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}
@@ -445,12 +401,7 @@ var walletDelete = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
-		sdir, err := homedir.Expand(cctx.String("repo"))
-		if err != nil {
-			return err
-		}
-
-		n, err := node.Setup(ctx, sdir)
+		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}

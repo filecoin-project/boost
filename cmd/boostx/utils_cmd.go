@@ -7,24 +7,24 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/docker/go-units"
 	clinode "github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/filecoin-project/go-fil-markets/stores"
+	"github.com/filecoin-project/go-paramfetch"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
 	marketactor "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/filecoin-project/lotus/chain/messagesigner"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/backupds"
-
-	"github.com/docker/go-units"
-	paramfetch "github.com/filecoin-project/go-paramfetch"
-	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/lib/unixfs"
 	"github.com/filecoin-project/lotus/node/modules"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
@@ -35,7 +35,6 @@ import (
 	ds_sync "github.com/ipfs/go-datastore/sync"
 	"github.com/ipld/go-car"
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
-	"github.com/mitchellh/go-homedir"
 	"github.com/multiformats/go-multibase"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
@@ -46,11 +45,7 @@ var marketCmd = &cli.Command{
 	Usage:       "Add funds to the Storage Market actor",
 	Description: "Send signed message to add funds for the default wallet to the Storage Market actor. Uses 2x current BaseFee and a maximum fee of 1 nFIL. This is an experimental utility, do not use in production.",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "repo",
-			Usage: "repo directory for Boost client",
-			Value: "~/.boost-client",
-		},
+		cmd.FlagRepo,
 		&cli.StringFlag{
 			Name:  "wallet",
 			Usage: "move balance from this wallet address to its market actor",
@@ -71,12 +66,7 @@ var marketCmd = &cli.Command{
 
 		ctx := lcli.ReqContext(cctx)
 
-		sdir, err := homedir.Expand(cctx.String("repo"))
-		if err != nil {
-			return err
-		}
-
-		n, err := clinode.Setup(ctx, sdir)
+		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}
