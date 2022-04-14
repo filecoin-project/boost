@@ -22,8 +22,8 @@ type ChainDealManagerCfg struct {
 }
 
 type ChainDealManager struct {
-	fullnodeApi            v1api.FullNode
-	cfg ChainDealManagerCfg
+	fullnodeApi v1api.FullNode
+	cfg         ChainDealManagerCfg
 }
 
 func NewChainDealManager(a v1api.FullNode, cfg ChainDealManagerCfg) *ChainDealManager {
