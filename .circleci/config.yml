@@ -37,6 +37,8 @@ commands:
             - run: sudo apt-get install ocl-icd-opencl-dev libhwloc-dev
       - run: git submodule sync
       - run: git submodule update --init
+      - deps-filcrypto
+      - deps-gopkg
   download-params:
     steps:
       - restore_cache:
@@ -51,6 +53,35 @@ commands:
           key: 'v25-8mb-lotus-params'
           paths:
             - /var/tmp/filecoin-proof-parameters/
+  deps-filcrypto:
+    steps:
+      - restore_cache:
+          name: Restore filcrypto
+          keys:
+            - 'filcrypto-c2668aa'
+          paths:
+            - /home/circleci/project/extern/filecoin-ffi
+      - run:  make deps
+      - save_cache:
+          name: Save filcrypto
+          key: 'filcrypto-c2668aa'
+          paths:
+            - /home/circleci/project/extern/filecoin-ffi
+  deps-gopkg:
+    steps:
+      - restore_cache:
+          name: Restore go pkg cache
+          keys:
+            - 'gopkg-e334ea4'
+          paths:
+            - /go/pkg
+      - run:  make debug
+      - save_cache:
+          name: Save go pkg cache
+          key: 'gopkg-e334ea4'
+          paths:
+            - /go/pkg
+
   git_fetch_all_tags:
     steps:
       - run:
