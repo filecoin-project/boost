@@ -6,7 +6,7 @@ import Observable from 'zen-observable';
 import { transformResponse } from "./transform";
 
 var graphqlEndpoint = window.location.host
-var graphqlHttpEndpoint = window.location.href.replace(/\/+$/, '')
+var graphqlHttpEndpoint = window.location.origin
 
 if (process.env.NODE_ENV === 'development') {
     graphqlEndpoint = 'localhost:8080'
