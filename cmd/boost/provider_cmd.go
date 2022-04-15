@@ -42,7 +42,7 @@ var libp2pInfoCmd = &cli.Command{
 
 		api, closer, err := lcli.GetGatewayAPI(cctx)
 		if err != nil {
-			return fmt.Errorf("settings up gateway connection: %w", err)
+			return fmt.Errorf("setting up gateway connection: %w", err)
 		}
 		defer closer()
 
@@ -68,12 +68,18 @@ var libp2pInfoCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("getting protocols for peer %s: %w", addrInfo.ID, err)
 		}
-
 		sort.Strings(protos)
+
+		agentVersionI, err := n.Host.Peerstore().Get(addrInfo.ID, "AgentVersion")
+		if err != nil {
+			return fmt.Errorf("getting agent version for peer %s: %w", addrInfo.ID, err)
+		}
+		agentVersion, _ := agentVersionI.(string)
 
 		if cctx.Bool("json") {
 			return cmd.PrintJson(map[string]interface{}{
 				"provider":   addrStr,
+				"agent":      agentVersion,
 				"id":         addrInfo.ID.String(),
 				"multiaddrs": addrInfo.Addrs,
 				"protocols":  protos,
@@ -81,6 +87,7 @@ var libp2pInfoCmd = &cli.Command{
 		}
 
 		fmt.Println("Provider: " + addrStr)
+		fmt.Println("Agent: " + agentVersion)
 		fmt.Println("Peer ID: " + addrInfo.ID.String())
 		fmt.Println("Peer Addresses:")
 		for _, addr := range addrInfo.Addrs {
