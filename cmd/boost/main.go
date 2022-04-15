@@ -44,7 +44,7 @@ func main() {
 	app.Setup()
 
 	if err := app.Run(os.Args); err != nil {
-		if app.Metadata["json"].(bool) {
+		if isJson, ok := app.Metadata["json"].(bool); isJson && ok {
 			resJson, err := json.Marshal(map[string]string{"error": err.Error()})
 			if err != nil {
 				fmt.Fprintln(os.Stderr, fmt.Errorf("marshalling json: %w", err))
