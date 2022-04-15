@@ -87,6 +87,11 @@ devnet: $(BUILD_DEPS)
 .PHONY: devnet
 BINS+=devnet
 
+boostci: $(BUILD_DEPS)
+	rm -f boostci
+	$(GOCC) build $(GOFLAGS) -o boostci ./cmd/boostci
+.PHONY: boostci
+
 react:
 	npm install --prefix react
 	npm run --prefix react build

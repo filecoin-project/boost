@@ -45,7 +45,7 @@ commands:
             - 'v25-8mb-lotus-params'
           paths:
             - /var/tmp/filecoin-proof-parameters/
-      - run:  ./boostx fetch-params 8388608
+      - run:  ./boostci fetch-params 8388608
       - save_cache:
           name: Save parameters cache
           key: 'v25-8mb-lotus-params'
@@ -107,7 +107,7 @@ jobs:
       - install-deps
       - prepare
       - run:
-          command: make boostx
+          command: make boostci
           no_output_timeout: 30m
       - download-params
       - run:
@@ -286,13 +286,13 @@ workflows:
                 - /^v\d+\.\d+\.\d+(-rc\d+)?$/
 
       - test:
-          name: test-itest-dummdeal_offline
-          suite: itest-dummdeal_offline
+          name: test-itest-dummydeal_offline
+          suite: itest-dummydeal_offline
           target: "./itests/dummydeal_offline_test.go"
 
       - test:
-          name: test-itest-dummdeal
-          suite: itest-dummdeal
+          name: test-itest-dummydeal
+          suite: itest-dummydeal
           target: "./itests/dummydeal_test.go"
 
       - test:
