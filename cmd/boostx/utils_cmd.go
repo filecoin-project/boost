@@ -7,19 +7,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/docker/go-units"
-	"github.com/filecoin-project/boost/cli/ctxutil"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/filecoin-project/go-fil-markets/stores"
-	"github.com/filecoin-project/go-paramfetch"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	lapi "github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
 	marketactor "github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/filecoin-project/lotus/chain/messagesigner"
@@ -281,31 +277,6 @@ var generatecarCmd = &cli.Command{
 		encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
 
 		fmt.Println("Payload CID: ", encoder.Encode(root))
-
-		return nil
-	},
-}
-
-var fetchParamCmd = &cli.Command{
-	Name:      "fetch-params",
-	Usage:     "Fetch proving parameters",
-	ArgsUsage: "[sectorSize]",
-	Action: func(cctx *cli.Context) error {
-		ctx := ctxutil.ReqContext(cctx)
-
-		if !cctx.Args().Present() {
-			return xerrors.Errorf("must pass sector size to fetch params for (specify as \"32GiB\", for instance)")
-		}
-		sectorSizeInt, err := units.RAMInBytes(cctx.Args().First())
-		if err != nil {
-			return xerrors.Errorf("error parsing sector size (specify as \"32GiB\", for instance): %w", err)
-		}
-		sectorSize := uint64(sectorSizeInt)
-
-		err = paramfetch.GetParams(ctx, build.ParametersJSON(), build.SrsJSON(), sectorSize)
-		if err != nil {
-			return xerrors.Errorf("fetching proof parameters: %w", err)
-		}
 
 		return nil
 	},
