@@ -1,15 +1,12 @@
 package cliutil
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
@@ -24,10 +21,6 @@ import (
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/lotus/node/repo"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-)
-
-const (
-	metadataTraceContext = "traceContext"
 )
 
 var log = logging.Logger("cli")
@@ -224,29 +217,4 @@ func GetRawAPI(ctx *cli.Context, t repo.RepoType, version string) (string, http.
 	}
 
 	return addr, ainfo.AuthHeader(), nil
-}
-
-func DaemonContext(cctx *cli.Context) context.Context {
-	if mtCtx, ok := cctx.App.Metadata[metadataTraceContext]; ok {
-		return mtCtx.(context.Context)
-	}
-
-	return context.Background()
-}
-
-// ReqContext returns context for cli execution. Calling it for the first time
-// installs SIGTERM handler that will close returned context.
-// Not safe for concurrent execution.
-func ReqContext(cctx *cli.Context) context.Context {
-	tCtx := DaemonContext(cctx)
-
-	ctx, done := context.WithCancel(tCtx)
-	sigChan := make(chan os.Signal, 2)
-	go func() {
-		<-sigChan
-		done()
-	}()
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
-
-	return ctx
 }

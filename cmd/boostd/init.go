@@ -12,6 +12,7 @@ import (
 
 	"github.com/chzyer/readline"
 	"github.com/dustin/go-humanize"
+	"github.com/filecoin-project/boost/cli/ctxutil"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
@@ -63,7 +64,7 @@ var initCmd = &cli.Command{
 	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
-		ctx := cliutil.ReqContext(cctx)
+		ctx := ctxutil.ReqContext(cctx)
 
 		bp, err := initBoost(ctx, cctx)
 		if err != nil {
@@ -162,7 +163,7 @@ var migrateCmd = &cli.Command{
 	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
-		ctx := cliutil.ReqContext(cctx)
+		ctx := ctxutil.ReqContext(cctx)
 
 		// Open markets repo
 		mktsRepoPath := cctx.String("import-markets-repo")

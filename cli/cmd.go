@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"github.com/filecoin-project/boost/cli/ctxutil"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	lcliutil "github.com/filecoin-project/lotus/cli/util"
 )
@@ -8,5 +9,5 @@ import (
 var GetBoostAPI = cliutil.GetBoostAPI
 var GetFullNodeAPI = lcliutil.GetFullNodeAPI
 
-var ReqContext = cliutil.ReqContext
-var DaemonContext = cliutil.DaemonContext
+var ReqContext = ctxutil.ReqContext
+var DaemonContext = ctxutil.DaemonContext
