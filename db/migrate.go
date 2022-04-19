@@ -4,8 +4,11 @@ import (
 	"database/sql"
 	"embed"
 
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/pressly/goose/v3"
 )
+
+var log = logging.Logger("db")
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
@@ -17,13 +20,22 @@ func Migrate(db *sql.DB) error {
 		return err
 	}
 
-	err := goose.Version(db, "migrations")
+	beforeVer, err := goose.GetDBVersion(db)
 	if err != nil {
 		return err
 	}
 
 	if err := goose.Up(db, "migrations"); err != nil {
 		return err
+	}
+
+	afterVer, err := goose.GetDBVersion(db)
+	if err != nil {
+		return err
+	}
+
+	if beforeVer != afterVer {
+		log.Warnw("boost sqlite3 migrated", "previous", beforeVer, "current", afterVer)
 	}
 
 	return nil

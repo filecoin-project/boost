@@ -55,6 +55,7 @@ func main() {
 
 func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("boostd", "INFO")
+	_ = logging.SetLogLevel("db", "INFO")
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostd", "DEBUG")
