@@ -350,6 +350,12 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to init db: %w", err)
 	}
+
+	err = db.Migrate(p.db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to migrate db: %w", err)
+	}
+
 	log.Infow("db initialized")
 
 	// cleanup all completed deals in case Boost resumed before they were cleanedup
