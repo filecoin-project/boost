@@ -121,6 +121,12 @@ func serveReactApp(mux *http.ServeMux) error {
 		return nil
 	}
 
+	if len(reactFiles) == 1 && reactFiles[0].Name() == "README.md" {
+		log.Warnw("not serving react app: no files found in embedded react build directory - " +
+			"you may need to build the boost react app")
+		return nil
+	}
+
 	// Serves files in the react build dir
 	reactFS := &fsPrefix{
 		FS:     react.BuildDir,
