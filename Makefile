@@ -100,7 +100,7 @@ react:
 build-go: boost devnet
 .PHONY: build-go
 
-build: build-go react
+build: react build-go
 .PHONY: build
 
 install: install-boost install-devnet
