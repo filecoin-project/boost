@@ -18,6 +18,8 @@ func TestDealsDB(t *testing.T) {
 	sqldb := CreateTestTmpDB(t)
 	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
 
+	require.NoError(t, Migrate(sqldb))
+
 	db := NewDealsDB(sqldb)
 	deals, err := GenerateDeals()
 	req.NoError(err)
