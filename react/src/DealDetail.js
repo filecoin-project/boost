@@ -283,10 +283,23 @@ export function DealDetail(props) {
                         <DealStatusInfo />
                     </td>
                 </tr>
+                <tr>
+                    <th>Checkpoint</th>
+                    <td>
+                        {deal.Checkpoint}
+                        {deal.CheckpointAt+'' !== (new Date(0))+'' ? (
+                          <span>
+                            &nbsp;
+                            <span className="aux">({moment(deal.CheckpointAt).fromNow()} ago)</span>
+                          </span>
+                        ) : null}
+                    </td>
+                </tr>
+
                 </tbody>
             </table>
 
-            {deal.Stage === 'Accepted' && !deal.IsOffline ? (
+            {deal.Checkpoint === 'Accepted' && !deal.IsOffline ? (
                 <div className="buttons">
                     <div className="button cancel" onClick={cancelDeal}>Cancel Transfer</div>
                 </div>

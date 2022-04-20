@@ -49,6 +49,9 @@ type ProviderDealState struct {
 
 	// deal checkpoint in DB.
 	Checkpoint dealcheckpoints.Checkpoint
+	// CheckpointAt is the time at which the deal entered in the last state
+	CheckpointAt time.Time
+
 	// set if there's an error
 	Err string
 

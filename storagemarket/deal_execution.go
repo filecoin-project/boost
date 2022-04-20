@@ -755,6 +755,7 @@ func (p *Provider) fireEventDealUpdate(pub event.Emitter, deal *types.ProviderDe
 func (p *Provider) updateCheckpoint(pub event.Emitter, deal *types.ProviderDealState, ckpt dealcheckpoints.Checkpoint) error {
 	prev := deal.Checkpoint
 	deal.Checkpoint = ckpt
+	deal.CheckpointAt = time.Now()
 	// we don't want a graceful shutdown to mess with db updates so pass a background context
 	if err := p.dealsDB.Update(context.Background(), deal); err != nil {
 		return fmt.Errorf("failed to persist deal state: %w", err)

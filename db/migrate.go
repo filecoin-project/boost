@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"embed"
 
+	_ "github.com/filecoin-project/boost/db/migrations"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/pressly/goose/v3"
 )
