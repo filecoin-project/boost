@@ -92,7 +92,6 @@ function LegacyStorageSpaceContent(props) {
     }
 
     var storage = data.legacyStorage
-    console.log(storage)
     if (storage.Capacity === 0n) {
         return null
     }

@@ -27,7 +27,6 @@ function SealingPipelineContent(props) {
     }
 
     const sealingPipeline = data.sealingpipeline
-    console.log(sealingPipeline)
 
     return <div className="sealing-pipeline">
         <WaitDeals wdSectors={sealingPipeline.WaitDealsSectors} sdwdSectors={sealingPipeline.SnapDealsWaitDealsSectors} />
