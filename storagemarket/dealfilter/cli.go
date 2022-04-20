@@ -12,14 +12,18 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 )
 
+const jsonVersion = "2.0.0"
+
 func CliStorageDealFilter(cmd string) dtypes.StorageDealFilter {
 	return func(ctx context.Context, deal types.DealFilterParams) (bool, string, error) {
 		d := struct {
 			types.DealParams
 			DealType string
+			Version  string
 		}{
 			DealParams: *deal.DealParams,
 			DealType:   "storage",
+			Version:    jsonVersion,
 		}
 		return runDealFilter(ctx, cmd, d)
 	}
@@ -30,9 +34,11 @@ func CliRetrievalDealFilter(cmd string) dtypes.RetrievalDealFilter {
 		d := struct {
 			retrievalmarket.ProviderDealState
 			DealType string
+			Version  string
 		}{
 			ProviderDealState: deal,
 			DealType:          "retrieval",
+			Version:           jsonVersion,
 		}
 		return runDealFilter(ctx, cmd, d)
 	}
