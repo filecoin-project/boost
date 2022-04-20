@@ -30,6 +30,7 @@ import (
 
 var dummydealCmd = &cli.Command{
 	Name:      "dummydeal",
+	Hidden:    true,
 	Usage:     "Trigger a sample deal",
 	ArgsUsage: "<client addr> <miner addr>",
 	Flags: []cli.Flag{
