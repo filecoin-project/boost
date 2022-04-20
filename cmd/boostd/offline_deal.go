@@ -10,7 +10,7 @@ import (
 
 var offlineDealCmd = &cli.Command{
 	Name:  "offline-deal",
-	Usage: "Make offline deal on Boost",
+	Usage: "Import data for offline deal made with Boost",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "deal-uuid",
