@@ -53,3 +53,7 @@
     font-weight: normal;
     color: #12263f;
 }
+
+.cumulative-bar-chart .bar.free {
+    background-color: rgb(210, 221, 236);
+}
