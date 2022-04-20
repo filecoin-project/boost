@@ -21,14 +21,14 @@ var initCmd = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
-		sdir, err := homedir.Expand(cmd.FlagRepo.Name)
+		sdir, err := homedir.Expand(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}
 
 		os.Mkdir(sdir, 0755) //nolint:errcheck
 
-		n, err := node.Setup(cmd.FlagRepo.Name)
+		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
 		}
