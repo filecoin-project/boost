@@ -191,6 +191,7 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 	// write deal state to the database
 	deal.CreatedAt = time.Now()
 	deal.Checkpoint = dealcheckpoints.Accepted
+	deal.CheckpointAt = time.Now()
 	err = p.dealsDB.Insert(p.ctx, deal)
 	if err != nil {
 		cleanup()
@@ -223,6 +224,7 @@ func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState) *ac
 	// Save deal to DB
 	ds.CreatedAt = time.Now()
 	ds.Checkpoint = dealcheckpoints.Accepted
+	ds.CheckpointAt = time.Now()
 	if err := p.dealsDB.Insert(p.ctx, ds); err != nil {
 		return &acceptError{
 			error:         fmt.Errorf("failed to insert deal in db: %w", err),

@@ -58,7 +58,8 @@ type Deal {
   PublishCid: String!
   IsOffline: Boolean!
   Transfer: TransferParams!
-  Stage: String!
+  Checkpoint: String!
+  CheckpointAt: Time!
   Err: String!
   Transferred: Uint64!
   Sector: Sector!

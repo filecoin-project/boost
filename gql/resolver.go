@@ -422,12 +422,16 @@ func (dr *dealResolver) PieceCid() string {
 	return dr.ProviderDealState.ClientDealProposal.Proposal.PieceCID.String()
 }
 
-func (dr *dealResolver) Stage() string {
+func (dr *dealResolver) Checkpoint() string {
 	return dr.ProviderDealState.Checkpoint.String()
 }
 
+func (dr *dealResolver) CheckpointAt() graphql.Time {
+	return graphql.Time{Time: dr.ProviderDealState.CheckpointAt}
+}
+
 func (dr *dealResolver) Message(ctx context.Context) string {
-	switch dr.Checkpoint {
+	switch dr.ProviderDealState.Checkpoint {
 	case dealcheckpoints.Accepted:
 		if dr.IsOffline {
 			return "Awaiting Offline Data Import"

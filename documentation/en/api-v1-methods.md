@@ -253,6 +253,7 @@ Response:
   "Offset": 1032,
   "Length": 1032,
   "Checkpoint": 1,
+  "CheckpointAt": "0001-01-01T00:00:00Z",
   "Err": "string value",
   "NBytesReceived": 9
 }

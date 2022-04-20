@@ -76,7 +76,8 @@ const DealsListQuery = gql`
                 ID
                 CreatedAt
                 ClientAddress
-                Stage
+                Checkpoint
+                CheckpointAt
                 Message
                 Transfer {
                     Type
@@ -153,7 +154,8 @@ const DealSubscription = gql`
             ChainDealID
             PublishCid
             IsOffline
-            Stage
+            Checkpoint
+            CheckpointAt
             Message
             Transferred
             Transfer {
@@ -197,7 +199,8 @@ const NewDealsSubscription = gql`
                 ClientPeerID
                 DealDataRoot
                 PublishCid
-                Stage
+                Checkpoint
+                CheckpointAt
                 Message
                 Transfer {
                     Type
