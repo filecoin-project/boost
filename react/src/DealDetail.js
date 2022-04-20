@@ -290,8 +290,6 @@ export function DealDetail(props) {
                         {deal.CheckpointAt+'' !== (new Date(0))+'' ? (
                           <span>
                             &nbsp;
-                            {moment(deal.CheckpointAt).format(dateFormat)}
-                            &nbsp;
                             <span className="aux">({moment(deal.CheckpointAt).fromNow()} ago)</span>
                           </span>
                         ) : null}
