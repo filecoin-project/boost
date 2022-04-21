@@ -37,7 +37,7 @@ import (
 	"golang.org/x/xerrors"
 )
 
-var marketCmd = &cli.Command{
+var marketAddCmd = &cli.Command{
 	Name:        "market-add",
 	Usage:       "Add funds to the Storage Market actor",
 	Description: "Send signed message to add funds for the default wallet to the Storage Market actor. Uses 2x current BaseFee and a maximum fee of 1 nFIL. This is an experimental utility, do not use in production.",
@@ -127,6 +127,104 @@ var marketCmd = &cli.Command{
 			return xerrors.Errorf("mpool push: failed to push message: %w", err)
 		}
 		log.Infow("submitted market-add message", "cid", cid.String())
+
+		return nil
+	},
+}
+
+var marketWithdrawCmd = &cli.Command{
+	Name:        "market-withdraw",
+	Usage:       "Withdraw funds from the Storage Market actor",
+	Description: "",
+	Flags: []cli.Flag{
+		cmd.FlagRepo,
+		&cli.StringFlag{
+			Name:  "wallet",
+			Usage: "move balance to this wallet address from its market actor",
+		},
+	},
+	ArgsUsage: "<amount>",
+	Before:    before,
+	Action: func(cctx *cli.Context) error {
+		if !cctx.Args().Present() {
+			return fmt.Errorf("must pass amount to add")
+		}
+		f, err := types.ParseFIL(cctx.Args().First())
+		if err != nil {
+			return xerrors.Errorf("parsing 'amount' argument: %w", err)
+		}
+
+		amt := abi.TokenAmount(f)
+
+		ctx := lcli.ReqContext(cctx)
+
+		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
+		if err != nil {
+			return err
+		}
+
+		api, closer, err := lcli.GetGatewayAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("cant setup gateway connection: %w", err)
+		}
+		defer closer()
+
+		walletAddr, err := n.GetProvidedOrDefaultWallet(ctx, cctx.String("wallet"))
+		if err != nil {
+			return err
+		}
+
+		log.Infow("selected wallet", "wallet", walletAddr)
+
+		ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
+		messagesigner := messagesigner.NewMessageSigner(n.Wallet, &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}, ds)
+
+		params, err := actors.SerializeParams(&marketactor.WithdrawBalanceParams{
+			ProviderOrClientAddress: walletAddr,
+			Amount:                  amt,
+		})
+		if err != nil {
+			return err
+		}
+
+		msg := &types.Message{
+			To:     marketactor.Address,
+			From:   walletAddr,
+			Value:  types.NewInt(0),
+			Method: marketactor.Methods.WithdrawBalance,
+			Params: params,
+		}
+
+		head, err := api.ChainHead(ctx)
+		if err != nil {
+			return err
+		}
+		basefee := head.Blocks()[0].ParentBaseFee
+
+		spec := &lapi.MessageSendSpec{
+			MaxFee: abi.NewTokenAmount(1000000000), // 1 nFIL
+		}
+		msg, err = api.GasEstimateMessageGas(ctx, msg, spec, types.EmptyTSK)
+		if err != nil {
+			return xerrors.Errorf("GasEstimateMessageGas error: %w", err)
+		}
+
+		newGasFeeCap := big.Mul(big.Int(basefee), big.NewInt(2)) // use 2*basefee, so that this message confirms quickly
+
+		if big.Cmp(msg.GasFeeCap, newGasFeeCap) < 0 {
+			msg.GasFeeCap = newGasFeeCap
+		}
+
+		smsg, err := messagesigner.SignMessage(ctx, msg, func(*types.SignedMessage) error { return nil })
+		if err != nil {
+			return err
+		}
+
+		cid, err := api.MpoolPush(ctx, smsg)
+		if err != nil {
+			return xerrors.Errorf("mpool push: failed to push message: %w", err)
+		}
+		log.Infow("submitted market-withdraw message", "cid", cid.String())
 
 		return nil
 	},

@@ -31,7 +31,8 @@ func main() {
 		Commands: []*cli.Command{
 			commpCmd,
 			generatecarCmd,
-			marketCmd,
+			marketAddCmd,
+			marketWithdrawCmd,
 		},
 	}
 	app.Setup()
