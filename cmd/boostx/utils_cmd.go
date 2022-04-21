@@ -111,7 +111,9 @@ var marketAddCmd = &cli.Command{
 			return xerrors.Errorf("GasEstimateMessageGas error: %w", err)
 		}
 
-		newGasFeeCap := big.Mul(big.Int(basefee), big.NewInt(2)) // use 2*basefee, so that this message confirms quickly
+		// use basefee + 20%
+		newGasFeeCap := big.Mul(big.Int(basefee), big.NewInt(6))
+		newGasFeeCap = big.Div(newGasFeeCap, big.NewInt(5))
 
 		if big.Cmp(msg.GasFeeCap, newGasFeeCap) < 0 {
 			msg.GasFeeCap = newGasFeeCap
@@ -123,6 +125,8 @@ var marketAddCmd = &cli.Command{
 		}
 
 		fmt.Println("about to send message with the following gas costs")
+		maxFee := big.Mul(smsg.Message.GasFeeCap, big.NewInt(smsg.Message.GasLimit))
+		fmt.Println("max fee:     ", types.FIL(maxFee), "(absolute maximum amount you are willing to pay to get your transaction confirmed)")
 		fmt.Println("gas fee cap: ", types.FIL(smsg.Message.GasFeeCap))
 		fmt.Println("gas limit:   ", smsg.Message.GasLimit)
 		fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
@@ -223,7 +227,9 @@ var marketWithdrawCmd = &cli.Command{
 			return xerrors.Errorf("GasEstimateMessageGas error: %w", err)
 		}
 
-		newGasFeeCap := big.Mul(big.Int(basefee), big.NewInt(2)) // use 2*basefee, so that this message confirms quickly
+		// use basefee + 20%
+		newGasFeeCap := big.Mul(big.Int(basefee), big.NewInt(6))
+		newGasFeeCap = big.Div(newGasFeeCap, big.NewInt(5))
 
 		if big.Cmp(msg.GasFeeCap, newGasFeeCap) < 0 {
 			msg.GasFeeCap = newGasFeeCap
@@ -235,6 +241,8 @@ var marketWithdrawCmd = &cli.Command{
 		}
 
 		fmt.Println("about to send message with the following gas costs")
+		maxFee := big.Mul(smsg.Message.GasFeeCap, big.NewInt(smsg.Message.GasLimit))
+		fmt.Println("max fee:     ", types.FIL(maxFee), "(absolute maximum amount you are willing to pay to get your transaction confirmed)")
 		fmt.Println("gas fee cap: ", types.FIL(smsg.Message.GasFeeCap))
 		fmt.Println("gas limit:   ", smsg.Message.GasLimit)
 		fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
