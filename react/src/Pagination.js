@@ -26,7 +26,7 @@ export function Pagination({basePath, cursor, pageNum, moreRows, totalCount, row
                 {pageLinks.prev ? <Link to={pageLinks.prev} onClick={onLinkClick}>&lt;</Link> : <span>&lt;</span>}
                 <div className="page">{pageNum} of {totalPages}</div>
                 {pageLinks.next ? <Link to={pageLinks.next} onClick={onLinkClick}>&gt;</Link> : <span>&gt;</span>}
-                <div className="total">{totalCount} deals</div>
+                <div className="total">{totalCount} total</div>
                 {onRowsPerPageChange ? (
                     <div className="per-page">
                         <select value={rowsPerPage} onChange={onRowsPerPageChange}>
