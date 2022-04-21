@@ -406,6 +406,7 @@ github.com/filecoin-project/go-storedcounter v0.1.0/go.mod h1:4ceukaXi4vFURIoxYM
 github.com/filecoin-project/index-provider v0.5.0/go.mod h1:KHVrP2vU3YuScb+fawObwTFoR882up9U07kk0ZrfP0c=
 github.com/filecoin-project/index-provider v0.6.1 h1:yVpmtm1ASl2JZMNDC6H2Fe0neYo5akYgaJJB2wlcsMU=
 github.com/filecoin-project/index-provider v0.6.1/go.mod h1:iAbSQ6sUpKC4GqfUSheGnYwj9d9B+X8pPi4BV1PgwZA=
+github.com/filecoin-project/index-provider v0.7.0/go.mod h1:80z6gimZmntp9Z3OAiv7SkjjfgXAB2IiHM/B2eRU3nY=
 github.com/filecoin-project/lotus v1.15.1-0.20220407132257-de8258c7a1bd h1:JA8Vb0ytFYBHnTVOt8+UBCv0wnd6olN/Xk5CnUq0Mz4=
 github.com/filecoin-project/lotus v1.15.1-0.20220407132257-de8258c7a1bd/go.mod h1:lWTkxHRmO6ir+uyMvvupnBcC0YMJXXQ+5cOdXuCyoFU=
 github.com/filecoin-project/specs-actors v0.9.13/go.mod h1:TS1AW/7LbG+615j4NsjMK1qlpAwaFsG9w0V2tg2gSao=
