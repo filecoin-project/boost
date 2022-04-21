@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/api"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/actors"
 	marketactor "github.com/filecoin-project/lotus/chain/actors/builtin/market"
@@ -26,6 +28,7 @@ import (
 	"github.com/filecoin-project/lotus/node/modules"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/node/repo/imports"
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-cidutil/cidenc"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
@@ -81,9 +84,6 @@ var marketAddCmd = &cli.Command{
 
 		log.Infow("selected wallet", "wallet", walletAddr)
 
-		ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
-		messagesigner := messagesigner.NewMessageSigner(n.Wallet, &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}, ds)
-
 		params, err := actors.SerializeParams(&walletAddr)
 		if err != nil {
 			return err
@@ -97,53 +97,14 @@ var marketAddCmd = &cli.Command{
 			Params: params,
 		}
 
-		head, err := api.ChainHead(ctx)
+		cid, sent, err := signAndPushToMpool(ctx, api, n, msg)
 		if err != nil {
 			return err
 		}
-		basefee := head.Blocks()[0].ParentBaseFee
-
-		spec := &lapi.MessageSendSpec{
-			MaxFee: abi.NewTokenAmount(1000000000), // 1 nFIL
-		}
-		msg, err = api.GasEstimateMessageGas(ctx, msg, spec, types.EmptyTSK)
-		if err != nil {
-			return xerrors.Errorf("GasEstimateMessageGas error: %w", err)
-		}
-
-		// use basefee + 20%
-		newGasFeeCap := big.Mul(big.Int(basefee), big.NewInt(6))
-		newGasFeeCap = big.Div(newGasFeeCap, big.NewInt(5))
-
-		if big.Cmp(msg.GasFeeCap, newGasFeeCap) < 0 {
-			msg.GasFeeCap = newGasFeeCap
-		}
-
-		smsg, err := messagesigner.SignMessage(ctx, msg, func(*types.SignedMessage) error { return nil })
-		if err != nil {
-			return err
-		}
-
-		fmt.Println("about to send message with the following gas costs")
-		maxFee := big.Mul(smsg.Message.GasFeeCap, big.NewInt(smsg.Message.GasLimit))
-		fmt.Println("max fee:     ", types.FIL(maxFee), "(absolute maximum amount you are willing to pay to get your transaction confirmed)")
-		fmt.Println("gas fee cap: ", types.FIL(smsg.Message.GasFeeCap))
-		fmt.Println("gas limit:   ", smsg.Message.GasLimit)
-		fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
-		fmt.Println("basefee:     ", types.FIL(basefee))
-		fmt.Println()
-		process, err := confirm(ctx)
-		if err != nil {
-			return err
-		}
-		if !process {
+		if !sent {
 			return nil
 		}
 
-		cid, err := api.MpoolPush(ctx, smsg)
-		if err != nil {
-			return xerrors.Errorf("mpool push: failed to push message: %w", err)
-		}
 		log.Infow("submitted market-add message", "cid", cid.String())
 
 		return nil
@@ -194,9 +155,6 @@ var marketWithdrawCmd = &cli.Command{
 
 		log.Infow("selected wallet", "wallet", walletAddr)
 
-		ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
-		messagesigner := messagesigner.NewMessageSigner(n.Wallet, &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}, ds)
-
 		params, err := actors.SerializeParams(&marketactor.WithdrawBalanceParams{
 			ProviderOrClientAddress: walletAddr,
 			Amount:                  amt,
@@ -213,53 +171,14 @@ var marketWithdrawCmd = &cli.Command{
 			Params: params,
 		}
 
-		head, err := api.ChainHead(ctx)
+		cid, sent, err := signAndPushToMpool(ctx, api, n, msg)
 		if err != nil {
 			return err
 		}
-		basefee := head.Blocks()[0].ParentBaseFee
-
-		spec := &lapi.MessageSendSpec{
-			MaxFee: abi.NewTokenAmount(1000000000), // 1 nFIL
-		}
-		msg, err = api.GasEstimateMessageGas(ctx, msg, spec, types.EmptyTSK)
-		if err != nil {
-			return xerrors.Errorf("GasEstimateMessageGas error: %w", err)
-		}
-
-		// use basefee + 20%
-		newGasFeeCap := big.Mul(big.Int(basefee), big.NewInt(6))
-		newGasFeeCap = big.Div(newGasFeeCap, big.NewInt(5))
-
-		if big.Cmp(msg.GasFeeCap, newGasFeeCap) < 0 {
-			msg.GasFeeCap = newGasFeeCap
-		}
-
-		smsg, err := messagesigner.SignMessage(ctx, msg, func(*types.SignedMessage) error { return nil })
-		if err != nil {
-			return err
-		}
-
-		fmt.Println("about to send message with the following gas costs")
-		maxFee := big.Mul(smsg.Message.GasFeeCap, big.NewInt(smsg.Message.GasLimit))
-		fmt.Println("max fee:     ", types.FIL(maxFee), "(absolute maximum amount you are willing to pay to get your transaction confirmed)")
-		fmt.Println("gas fee cap: ", types.FIL(smsg.Message.GasFeeCap))
-		fmt.Println("gas limit:   ", smsg.Message.GasLimit)
-		fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
-		fmt.Println("basefee:     ", types.FIL(basefee))
-		fmt.Println()
-		process, err := confirm(ctx)
-		if err != nil {
-			return err
-		}
-		if !process {
+		if !sent {
 			return nil
 		}
 
-		cid, err := api.MpoolPush(ctx, smsg)
-		if err != nil {
-			return xerrors.Errorf("mpool push: failed to push message: %w", err)
-		}
 		log.Infow("submitted market-withdraw message", "cid", cid.String())
 
 		return nil
@@ -414,4 +333,62 @@ var generatecarCmd = &cli.Command{
 
 		return nil
 	},
+}
+
+func signAndPushToMpool(ctx context.Context, api api.Gateway, n *clinode.Node, msg *types.Message) (cid cid.Cid, sent bool, err error) {
+	ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
+	messagesigner := messagesigner.NewMessageSigner(n.Wallet, &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}, ds)
+
+	head, err := api.ChainHead(ctx)
+	if err != nil {
+		return
+	}
+	basefee := head.Blocks()[0].ParentBaseFee
+
+	spec := &lapi.MessageSendSpec{
+		MaxFee: abi.NewTokenAmount(1000000000), // 1 nFIL
+	}
+	msg, err = api.GasEstimateMessageGas(ctx, msg, spec, types.EmptyTSK)
+	if err != nil {
+		err = xerrors.Errorf("GasEstimateMessageGas error: %w", err)
+		return
+	}
+
+	// use basefee + 20%
+	newGasFeeCap := big.Mul(big.Int(basefee), big.NewInt(6))
+	newGasFeeCap = big.Div(newGasFeeCap, big.NewInt(5))
+
+	if big.Cmp(msg.GasFeeCap, newGasFeeCap) < 0 {
+		msg.GasFeeCap = newGasFeeCap
+	}
+
+	smsg, err := messagesigner.SignMessage(ctx, msg, func(*types.SignedMessage) error { return nil })
+	if err != nil {
+		return
+	}
+
+	fmt.Println("about to send message with the following gas costs")
+	maxFee := big.Mul(smsg.Message.GasFeeCap, big.NewInt(smsg.Message.GasLimit))
+	fmt.Println("max fee:     ", types.FIL(maxFee), "(absolute maximum amount you are willing to pay to get your transaction confirmed)")
+	fmt.Println("gas fee cap: ", types.FIL(smsg.Message.GasFeeCap))
+	fmt.Println("gas limit:   ", smsg.Message.GasLimit)
+	fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
+	fmt.Println("basefee:     ", types.FIL(basefee))
+	fmt.Println()
+	process, err := confirm(ctx)
+	if err != nil {
+		return
+	}
+	if !process {
+		return
+	}
+
+	cid, err = api.MpoolPush(ctx, smsg)
+	if err != nil {
+		err = xerrors.Errorf("mpool push: failed to push message: %w", err)
+		return
+	}
+
+	sent = true
+	return
 }
