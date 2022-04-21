@@ -122,6 +122,20 @@ var marketAddCmd = &cli.Command{
 			return err
 		}
 
+		fmt.Println("about to send message with the following gas costs")
+		fmt.Println("gas fee cap: ", types.FIL(smsg.Message.GasFeeCap))
+		fmt.Println("gas limit:   ", smsg.Message.GasLimit)
+		fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
+		fmt.Println("basefee:     ", types.FIL(basefee))
+		fmt.Println()
+		process, err := confirm(ctx)
+		if err != nil {
+			return err
+		}
+		if !process {
+			return nil
+		}
+
 		cid, err := api.MpoolPush(ctx, smsg)
 		if err != nil {
 			return xerrors.Errorf("mpool push: failed to push message: %w", err)
@@ -218,6 +232,20 @@ var marketWithdrawCmd = &cli.Command{
 		smsg, err := messagesigner.SignMessage(ctx, msg, func(*types.SignedMessage) error { return nil })
 		if err != nil {
 			return err
+		}
+
+		fmt.Println("about to send message with the following gas costs")
+		fmt.Println("gas fee cap: ", types.FIL(smsg.Message.GasFeeCap))
+		fmt.Println("gas limit:   ", smsg.Message.GasLimit)
+		fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
+		fmt.Println("basefee:     ", types.FIL(basefee))
+		fmt.Println()
+		process, err := confirm(ctx)
+		if err != nil {
+			return err
+		}
+		if !process {
+			return nil
 		}
 
 		cid, err := api.MpoolPush(ctx, smsg)
