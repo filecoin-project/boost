@@ -40,12 +40,21 @@ import (
 	"golang.org/x/xerrors"
 )
 
+var (
+	flagAssumeYes = &cli.BoolFlag{
+		Name:    "assume-yes",
+		Usage:   "automatic yes to prompts; assume 'yes' as answer to all prompts and run non-interactively",
+		Aliases: []string{"y", "yes"},
+	}
+)
+
 var marketAddCmd = &cli.Command{
 	Name:        "market-add",
 	Usage:       "Add funds to the Storage Market actor",
 	Description: "Send signed message to add funds for the default wallet to the Storage Market actor. Uses 2x current BaseFee and a maximum fee of 1 nFIL. This is an experimental utility, do not use in production.",
 	Flags: []cli.Flag{
 		cmd.FlagRepo,
+		flagAssumeYes,
 		&cli.StringFlag{
 			Name:  "wallet",
 			Usage: "move balance from this wallet address to its market actor",
@@ -97,7 +106,7 @@ var marketAddCmd = &cli.Command{
 			Params: params,
 		}
 
-		cid, sent, err := signAndPushToMpool(ctx, api, n, msg)
+		cid, sent, err := signAndPushToMpool(cctx, ctx, api, n, msg)
 		if err != nil {
 			return err
 		}
@@ -117,6 +126,7 @@ var marketWithdrawCmd = &cli.Command{
 	Description: "",
 	Flags: []cli.Flag{
 		cmd.FlagRepo,
+		flagAssumeYes,
 		&cli.StringFlag{
 			Name:  "wallet",
 			Usage: "move balance to this wallet address from its market actor",
@@ -171,7 +181,7 @@ var marketWithdrawCmd = &cli.Command{
 			Params: params,
 		}
 
-		cid, sent, err := signAndPushToMpool(ctx, api, n, msg)
+		cid, sent, err := signAndPushToMpool(cctx, ctx, api, n, msg)
 		if err != nil {
 			return err
 		}
@@ -335,7 +345,7 @@ var generatecarCmd = &cli.Command{
 	},
 }
 
-func signAndPushToMpool(ctx context.Context, api api.Gateway, n *clinode.Node, msg *types.Message) (cid cid.Cid, sent bool, err error) {
+func signAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway, n *clinode.Node, msg *types.Message) (cid cid.Cid, sent bool, err error) {
 	ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
 	messagesigner := messagesigner.NewMessageSigner(n.Wallet, &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}, ds)
 
@@ -375,12 +385,15 @@ func signAndPushToMpool(ctx context.Context, api api.Gateway, n *clinode.Node, m
 	fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
 	fmt.Println("basefee:     ", types.FIL(basefee))
 	fmt.Println()
-	process, err := confirm(ctx)
-	if err != nil {
-		return
-	}
-	if !process {
-		return
+	if !cctx.Bool("assume-yes") {
+		var yes bool
+		yes, err = confirm(ctx)
+		if err != nil {
+			return
+		}
+		if !yes {
+			return
+		}
 	}
 
 	cid, err = api.MpoolPush(ctx, smsg)
