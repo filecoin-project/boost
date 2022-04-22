@@ -351,20 +351,40 @@ export function FundsMenuItem(props) {
         amount: pubMsg.free,
     }]
 
-    return <Link key="funds" className="funds menu-item" to="/funds">
-        <img className="icon" alt="" src={coinImg} />
-        <h3>Funds</h3>
-
-        <div className="menu-desc">
-            <div className="title">Escrow</div>
-            <CumulativeBarChart bars={escrow.bars} unit="byte" compact={true} />
-            <b>{humanFIL(escrow.used)}</b> of <b>{humanFIL(escrow.total)}</b> used
-        </div>
-
-        <div className="menu-desc">
-            <div className="title">Publish Message</div>
-            <CumulativeBarChart bars={pubMsg.bars} unit="byte" compact={true} />
-            <b>{humanFIL(pubMsg.used)}</b> of <b>{humanFIL(pubMsg.total)}</b> used
+    return <Link key="funds" className="sidebar-item sidebar-item-funds active" to="/funds">
+        <span className="sidebar-icon">
+            <svg width="25" height="24" viewBox="0 0 25 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 15.13h-4.865a3.236 3.236 0 0 1-3.235-3.235 3.236 3.236 0 0 1 3.235-3.234H24M19.685 11.821h-.374" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path clip-rule="evenodd" d="M7.306 1.435h10.388A6.306 6.306 0 0 1 24 7.74v8.625a6.306 6.306 0 0 1-6.306 6.306H7.306A6.306 6.306 0 0 1 1 16.366V7.741a6.306 6.306 0 0 1 6.306-6.306z" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.45 6.889h6.489" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span className="sidebar-title">Funds</span>
+        <div className="sidebar-item-excerpt">
+            <div className="row">
+                <div className="col-sm-6">
+                    <span className="sub-label">Publish Message</span>
+                    <div className="progress">
+                        <span className="bar" style={{width:"0%"}}></span>
+                        {/*<CumulativeBarChart bars={pubMsg.bars} unit="byte" compact={true} />*/}
+                    </div>
+                    <div className="explanation">
+                        <span className="numerator">{humanFIL(pubMsg.used)}</span>
+                        <span> of </span>
+                        <span className="denominator">{humanFIL(pubMsg.total)}</span>
+                        <span> used</span>
+                    </div>
+                </div>
+                <div className="col-sm-6">
+                    <span className="sub-label sub-label-escrow">Escrow</span>
+                    <div className="progress">
+                        <span className="bar" style={{width:"5%"}}></span>
+                        {/*<CumulativeBarChart bars={escrow.bars} unit="byte" compact={true} />*/}
+                    </div>
+                    <div className="explanation">
+                        <span className="numerator">{humanFIL(escrow.used)}</span>
+                        <span> of </span>
+                        <span className="denominator">{humanFIL(escrow.total)}</span>
+                        <span> used</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </Link>
 }

@@ -121,13 +121,18 @@ export function DealPublishMenuItem(props) {
     })
 
     return (
-        <Link key="deal-publish" className="menu-item" to="/deal-publish">
-            <img className="icon" alt="" src={sendImg} />
-            <h3>Publish Deals</h3>
+        <Link key="deal-publish" className="sidebar-item sidebar-item-deals" to="/deal-publish">
+            <span className="sidebar-icon">
+                <svg width="24" height="26" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="7" rx="2" stroke-width="2"/><rect x="23" y="25" width="9" height="7" rx="2" transform="rotate(-180 23 25)" stroke-width="2"/><rect x="1" y="12" width="9" height="13" rx="2" stroke-width="2"/><rect x="23" y="14" width="9" height="13" rx="2" transform="rotate(-180 23 14)" stroke-width="2"/></svg>
+            </span>
+            <span className="sidebar-title">
+                Publish Deals
+            </span>
 
             {data && data.dealPublish.Deals ? (
-                <div className="menu-desc">
-                    <b>{data.dealPublish.Deals.length}</b> ready to publish
+                <div className="sidebar-item-excerpt">
+                    <span className="figure">{data.dealPublish.Deals.length}</span>
+                    <span className="label"> ready to publish</span>
                 </div>
             ) : null}
         </Link>

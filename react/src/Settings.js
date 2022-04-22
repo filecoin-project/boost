@@ -9,6 +9,7 @@ import moment from "moment"
 import settingsImg from './bootstrap-icons/icons/gear.svg'
 import './Settings.css'
 import {addCommas, humanFIL, humanFileSize, oneNanoFil} from "./util";
+import gridImg from "./bootstrap-icons/icons/grid-3x3-gap.svg";
 
 export function SettingsPage(props) {
     return <PageContainer pageType="settings" title="Settings">
@@ -186,9 +187,9 @@ export function EditableField(props) {
 
 export function SettingsMenuItem(props) {
     return (
-        <Link key="settings" className="menu-item" to="/settings">
+        <Link key="settings" className="sidebar-item sidebar-item-deal-transfers active" to="/settings">
             <img className="icon" alt="" src={settingsImg} />
-            <h3>Settings</h3>
+            <span className="sidebar-title">Settings</span>
         </Link>
     )
 }

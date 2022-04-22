@@ -209,11 +209,14 @@ export function SealingPipelineMenuItem(props) {
         }
     }
 
-    return <Link key="sealing-pipeline" className="menu-item" to="/sealing-pipeline">
-        <img className="icon" alt="" src={layerBackwardImg} />
-        <h3>Sealing Pipeline</h3>
-        <div className="menu-desc">
-            <b>{total}</b> sector{total === 1 ? '' : 's'}
+    return <Link key="sealing-pipeline" className="sidebar-item sidebar-item-deals" to="/sealing-pipeline">
+        <span class="sidebar-icon">
+            <svg width="26" height="22" viewBox="0 0 26 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="24" height="6" rx="2" stroke-width="2"/><path d="M14 1a1 1 0 1 0-2 0h2zm-1.707 20.707a1 1 0 0 0 1.414 0l6.364-6.364a1 1 0 0 0-1.414-1.414L13 19.586l-5.657-5.657a1 1 0 0 0-1.414 1.414l6.364 6.364zM12 1v20h2V1h-2z" class="both" /></svg>
+        </span>
+        <span class="sidebar-title">Sealing Pipeline</span>
+        <div class="sidebar-item-excerpt">
+          <span class="figure">{total}</span>
+          <span class="label">Sector{total === 1 ? '' : 's'}</span>
         </div>
     </Link>
 }

@@ -163,12 +163,26 @@ export function StorageSpaceMenuItem(props) {
     }]
 
     return (
-        <Link key="storage-space" className="menu-item storage-space" to="/storage-space">
-            <img className="icon" alt="" src={archiveImg} />
-            <h3>Storage Space</h3>
-            <div className="menu-desc">
-                <CumulativeBarChart bars={bars} unit="byte" compact={true} />
-                <b>{humanFileSize(used)}</b> of <b>{humanFileSize(totalSize)}</b> used
+        <Link key="storage-space" className="sidebar-item sidebar-item-deals" to="/storage-space">
+            <span className="sidebar-icon">
+              <svg width="26" height="25" viewBox="0 0 26 25" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7h20v15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="#415364" stroke-width="2"/><rect x="1" y="1" width="24" height="6" rx="2" stroke="#415364" stroke-width="2"/><path fill="#415364" d="M8 11h10v2H8z"/></svg>
+            </span>
+            <span className="sidebar-title">Storage Space</span>
+            <div className="sidebar-item-excerpt">
+                <div className="row">
+                    <div className="col-sm-8 col-xxl-6">
+                        <div className="progress">
+                            <span className="bar" style={{width:"0%"}}></span>
+                        </div>
+                        {/*<CumulativeBarChart bars={bars} unit="byte" compact={true} />*/}
+                        <div className="explanation">
+                            <span className="numerator">{humanFileSize(used)}</span>
+                            <span> of </span>
+                            <span className="denominator">{humanFileSize(totalSize)}</span>
+                            <span> used</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </Link>
     )
