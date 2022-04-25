@@ -1,0 +1,20 @@
+.page-header {
+	display: flex;
+	align-items: center;
+	margin-bottom:40px;
+
+	@include media-breakpoint-up(md) {
+		margin-bottom:60px;
+	}
+
+	h1 {
+		margin:0;
+	}
+}
+.page-header-icon {
+	margin-right:15px;
+
+	svg {
+		stroke: $secondary;
+	}
+}

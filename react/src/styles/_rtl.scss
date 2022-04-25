@@ -1,0 +1,50 @@
+.rtl {
+  direction:rtl;
+  unicode-bidi: embed;
+  text-align:right;
+
+  header {
+    .navbar-toggle {
+      margin-left:0;
+      margin-right:20px;
+    }
+    .country-switcher {
+      ul {
+        right:auto;
+        left:0;
+      }
+    }
+  }
+  footer {
+    .country-switcher {
+      ul {
+        right:0;
+        left:auto;
+      }
+    }
+  }
+  .select-field {
+    background-position: left .7em top 50%, 0 0;
+  }
+  label.label-checkbox {
+    padding-right:31px;
+    padding-left:0;
+  }
+  .checkmark {
+    left:auto;
+    right:0;
+  }
+  label.label-checkbox .checkmark:after {
+    // transform:scaleX(-1);
+   // border-width: 0px 3px 3px 0px;
+    transform: rotate(135deg) scaleY(-1);
+  }
+}
+@include media-breakpoint-up(sm) {
+  .rtl {
+    label.label-checkbox {
+      padding-right:40px;
+      padding-left:0;
+    }
+  }
+}

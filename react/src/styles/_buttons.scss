@@ -1,0 +1,23 @@
+.btn {
+  display: inline-block;
+  border:0;
+  background: none;
+  text-decoration: none;
+  padding:3px 15px;
+  border-radius: 10px;
+  font-weight: 300;
+}
+.btn-primary {
+  background: $blue;
+  color:$white;
+  font-size: 18px;
+
+  @include media-breakpoint-up(lg) {
+    font-size: 20px;
+  }
+
+  &:hover, &:focus-visible, &:active {
+    background:$secondary;
+    color:$white;
+  }
+}

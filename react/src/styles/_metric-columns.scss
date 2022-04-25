@@ -1,0 +1,31 @@
+/* used on storage-space page */
+.metric-columns {
+	margin:60px 0;
+}
+.metric-column {
+	margin-bottom:30px;
+
+	@include media-breakpoint-up(md) {
+		margin-bottom:50px;
+	}
+
+	h2 {
+		font-size: 20px;
+		font-weight: 400;
+		margin-bottom: 0.5em;
+		color:$secondary;
+
+			@include media-breakpoint-up(md) {
+				font-size: 24px;
+			}
+	}
+	.figure {
+		display: block;
+		font-size:16px;
+		font-weight: 500;
+	}
+	.sub-figure {
+		font-size: 14px;
+		font-weight: 400;
+	}
+}

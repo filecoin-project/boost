@@ -1,0 +1,72 @@
+// FONT: enqueue via functions.php
+$font-family-sans-serif: 'Poppins', sans-serif;
+//$font-family-serif: 'Example', sans-serif;
+//$headings-font-family: 'Ostrich', sans serif;
+
+// Colors
+$white: #fff;
+$black: #000;
+$ltgrey: #F9F9F9;
+$ltestgrey: #E8E8E8;
+$grey: #ccc;
+
+$bluegrey: #415364;
+$cerise: #B92454;
+$yelloworange: #FFC844;
+$blue: #2f9feb;
+$green: #62D586;
+$purple: #6853A1;
+$orange: #F89B57;
+$yellow: #FBD476;
+$aquamarine: #4AA6B3;
+$progressgrey: #E3E6EC;
+
+$primary: $bluegrey;
+$secondary: $cerise;
+$tertiary: $yelloworange;
+$quaternary: $green;
+$body-color: $primary;
+$body-bg: $ltgrey;
+$headings-color: $secondary;
+$tablegray: rgba(232, 232, 232, 0.5);
+$link-color:$blue;
+
+// Variables
+$headings-font-weight: 600;
+$mobileheaderHeight: 82px;
+$headerHeight: 80px;
+$fullheaderHeight: 80px;
+$sidebarWidth: 350px;
+$fullsidebarWidth: 488px;
+
+
+// bootstrap
+@import 'bootstrap/bootstrap';
+
+// theme
+@import '_overall';
+@import '_useful';
+@import '_typography';
+// @import '_animations';
+
+// right to left option
+// @import '_rtl';
+
+// elements
+@import '_header';
+@import '_header-navbar-toggle';
+@import '_sidebar';
+@import '_main';
+
+@import '_page-header';
+@import '_tables';
+@import '_progress-bar';
+@import '_big-progress';
+@import '_pagination';
+@import '_indicator';
+@import '_metric-columns';
+@import '_buttons';
+@import '_deals';
+@import '_chart';
+
+// @import '_footer';

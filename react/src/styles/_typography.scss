@@ -1,0 +1,12 @@
+h1 {
+	font-size: 24px;
+}
+h2 {
+	font-size: 20px;
+	color:$primary;
+	margin-bottom: 1em;
+
+	&.no-margin {
+		margin-bottom:0;
+	}
+}

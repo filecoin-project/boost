@@ -1,0 +1,106 @@
+.indicators {
+	margin:0;
+	padding: 0;
+
+	&.horizontal {
+		display: flex;
+		flex-wrap: wrap;
+	}
+	&.round {
+		li {
+			&:before {
+				border-radius: 10px;
+			}
+		}
+	}
+	&.align-top {
+		li {
+			align-items: baseline;
+
+			&:before {
+				position: relative;
+				top:5px;
+			}
+		}
+	}
+
+	li {
+		font-size: 16px;
+		display: flex;
+		align-items: center;
+		margin: 0 23px 15px 0;
+		//flex-wrap: wrap;
+
+		.label-large {
+			display: block;
+
+			strong {
+				font-size:18px;
+				font-weight: 400;
+				display: block;
+
+				@include media-breakpoint-up(md) {
+					font-size:20px;
+				}
+			}
+		}
+
+		&:before {
+			content:"";
+			display: block;
+			width:20px;
+			height:20px;
+			margin-right:12px;
+		}
+		&.blue {
+			&:before {
+				background-color: $primary;
+			}
+		}
+		&.red {
+			&:before {
+				background-color: $secondary;
+			}
+		}
+		&.yellow {
+			&:before {
+				background-color: $tertiary;
+			}
+		}
+		&.purple {
+			&:before {
+				background-color: $purple;
+			}
+		}
+		&.orange {
+			&:before {
+				background-color: $orange;
+			}
+		}
+		&.yellow {
+			&:before {
+				background-color: $yellow;
+			}
+		}
+		&.grey {
+			&:before {
+				background-color: $ltestgrey;
+			}
+		}
+		&.green {
+			&:before {
+				background-color: $green;
+			}
+		}
+		&.aquamarine {
+			&:before {
+				background-color: $aquamarine;
+			}
+		}
+		&.light-blue {
+			&:before {
+				background-color: $blue;
+			}
+		}
+	}
+}

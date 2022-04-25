@@ -1,0 +1,27 @@
+body {
+  overflow-x: hidden;
+}
+.section {
+  margin-bottom:40px;
+
+  @include media-breakpoint-up(md) {
+    margin-bottom:50px;
+  }
+}
+.apart {
+  margin-bottom:15px;
+
+  @include media-breakpoint-up(md) {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .btn {
+    align-self: flex-start;
+    margin-top:10px;
+
+    @include media-breakpoint-up(md) {
+      margin-top:0;
+    }
+  }
+}

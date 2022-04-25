@@ -1,0 +1,49 @@
+header {
+	padding:10px 15px;
+	position:fixed;
+	top:0;
+	left:0;
+	width:100%;
+	height:$mobileheaderHeight;
+	z-index:10;
+	background: $primary;
+	color:$white;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+
+	@include media-breakpoint-up(md) {
+		height:$headerHeight;
+	}
+	@include media-breakpoint-up(lg) {
+		padding:10px 20px;
+	}
+	@include media-breakpoint-up(xl) {
+		padding:10px 15px;
+	}
+	@include media-breakpoint-up(xxl) {
+		padding:10px 20px;
+	}
+	@media (min-height: 1000px) {
+		height:$fullheaderHeight;
+	}
+
+	.logo {
+		display:block;
+		width:120px;
+
+		@include media-breakpoint-up(md) {
+			width:190px;
+		}
+
+		@media (min-height: 1000px) {
+			width:222px;
+		}
+
+		img, svg {
+			display:block;
+			max-width:100%;
+			height:auto;
+		}
+	}
+}
