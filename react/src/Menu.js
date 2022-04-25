@@ -1,4 +1,4 @@
-import {BrowserRouter, Link} from "react-router-dom";
+import {BrowserRouter, NavLink} from "react-router-dom";
 import {StorageDealsMenuItem} from "./Deals";
 import {StorageSpaceMenuItem} from "./StorageSpace";
 import {DealPublishMenuItem} from "./DealPublish";
@@ -20,10 +20,12 @@ export function Menu() {
                     <FundsMenuItem />
                     <DealPublishMenuItem />
                     <DealTransfersMenuItem />
-                    <Link key="mpool" className="sidebar-item sidebar-item-deal-transfers active" to="/mpool">
-                        <img className="icon" alt="" src={gridImg} />
+                    <NavLink key="mpool" className="sidebar-item sidebar-item-deal-transfers" to="/mpool">
+                        <span className="sidebar-icon">
+                            <img className="icon" alt="Message Pool Icon" src={gridImg} />
+                        </span>
                         <span className="sidebar-title">Message Pool</span>
-                    </Link>
+                    </NavLink>
                     <SettingsMenuItem />
                 </div>
             </div>

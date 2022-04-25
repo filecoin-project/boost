@@ -4,7 +4,7 @@ import {useQuery} from "@apollo/react-hooks";
 import {TransfersQuery} from "./gql";
 import moment from "moment"
 import {PageContainer} from "./Components";
-import {Link} from "react-router-dom";
+import {NavLink} from "react-router-dom";
 import {toFixed} from "./util";
 import arrowLeftRightImg from './bootstrap-icons/icons/arrow-left-right.svg'
 
@@ -91,7 +91,7 @@ export function DealTransfersMenuItem(props) {
         dataRate = total / 10
     }
 
-    return <Link key="deal-transfers" className="sidebar-item sidebar-item-deal-transfers active" to="/deal-transfers">
+    return <NavLink key="deal-transfers" className="sidebar-item sidebar-item-deal-transfers" to="/deal-transfers">
         <span className="sidebar-icon">
             <svg class="alternative" width="22" height="30" viewBox="0 0 22 30" xmlns="http://www.w3.org/2000/svg"><path d="M1 21a1 1 0 1 0 0 2v-2zm20.707 1.707a1 1 0 0 0 0-1.414l-6.364-6.364a1 1 0 0 0-1.414 1.414L19.586 22l-5.657 5.657a1 1 0 0 0 1.414 1.414l6.364-6.364zM1 23h20v-2H1v2zM21 9a1 1 0 1 0 0-2v2zM.293 7.293a1 1 0 0 0 0 1.414l6.364 6.364a1 1 0 0 0 1.414-1.414L2.414 8l5.657-5.657A1 1 0 0 0 6.657.93L.293 7.293zM21 7H1v2h20V7z" /></svg>
         </span>
@@ -100,5 +100,5 @@ export function DealTransfersMenuItem(props) {
             <span className="figure">{toFixed(dataRate, 1)}</span>
             <span className="label">Mbps</span>
         </div>
-    </Link>
+    </NavLink>
 }

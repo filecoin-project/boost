@@ -5,7 +5,7 @@ import {addCommas, humanFileSize} from "./util";
 import './StorageSpace.css'
 import archiveImg from './bootstrap-icons/icons/archive.svg'
 import {PageContainer} from "./Components";
-import {Link} from "react-router-dom";
+import {NavLink} from "react-router-dom";
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import {Info} from "./Info"
 
@@ -163,7 +163,7 @@ export function StorageSpaceMenuItem(props) {
     }]
 
     return (
-        <Link key="storage-space" className="sidebar-item sidebar-item-deals" to="/storage-space">
+        <NavLink key="storage-space" className="sidebar-item sidebar-item-deals" to="/storage-space">
             <span className="sidebar-icon">
               <svg width="26" height="25" viewBox="0 0 26 25" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7h20v15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="#415364" stroke-width="2"/><rect x="1" y="1" width="24" height="6" rx="2" stroke="#415364" stroke-width="2"/><path fill="#415364" d="M8 11h10v2H8z"/></svg>
             </span>
@@ -184,6 +184,6 @@ export function StorageSpaceMenuItem(props) {
                     </div>
                 </div>
             </div>
-        </Link>
+        </NavLink>
     )
 }

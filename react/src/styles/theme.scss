@@ -39,6 +39,14 @@ $fullheaderHeight: 80px;
 $sidebarWidth: 350px;
 $fullsidebarWidth: 488px;
 
+// filters
+.filter-white {
+  filter: invert(100%) sepia(0%) saturate(7479%) hue-rotate(320deg) brightness(108%) contrast(109%);
+}
+.filter-primary {
+  filter: invert(32%) sepia(6%) saturate(2167%) hue-rotate(168deg) brightness(88%) contrast(87%);
+}
+
 
 // bootstrap
 @import 'bootstrap/bootstrap';
@@ -68,5 +76,8 @@ $fullsidebarWidth: 488px;
 @import '_buttons';
 @import '_deals';
 @import '_chart';
+
+@import '../Info.scss';
+@import '../Epoch.scss';
 
 // @import '_footer';

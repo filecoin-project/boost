@@ -9,7 +9,7 @@ import moment from "moment";
 import {humanFileSize} from "./util";
 import React, {useState} from "react";
 import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
-import {Link, useNavigate, useParams} from "react-router-dom";
+import {NavLink, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import {LegacyStorageDealsCount} from "./LegacyDeals";
 import {TimestampFormat} from "./timestamp";
@@ -103,6 +103,7 @@ function StorageDealsContent(props) {
 
     return (
         <div className="section">
+            <NavLink key="legacy-storage-deals" to="/legacy-storage-deals">Legacy Deals</NavLink>
             <div className="table-wrapper">
                 <table className="table table-striped">
                     <thead>
@@ -208,7 +209,7 @@ export function StorageDealsMenuItem(props) {
     data = data || { dealsCount: '...' }
 
     return (
-        <Link key="storage-deals" to="/storage-deals" className="sidebar-item sidebar-item-deals">
+        <NavLink key="storage-deals" to="/storage-deals" className="sidebar-item sidebar-item-deals">
             <span className="sidebar-icon">
                 <svg width="24" height="26" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect x="1" y="1" width="9" height="7" rx="2" stroke-width="2"/>
@@ -219,25 +220,32 @@ export function StorageDealsMenuItem(props) {
             </span>
             <span className="sidebar-title">Storage Deals</span>
             <div className="sidebar-item-excerpt">
-                <span className="figure">{data.dealsCount}</span>
-                <span className="label">Deal{data.dealsCount === 1 ? '' : 's'}</span>
+                <div className="row">
+                    <div className="col-sm-6">
+                        <span className="figure">{data.dealsCount}</span>
+                        <span className="label">Deal{data.dealsCount === 1 ? '' : 's'}</span>
+                    </div>
+                    <div className="col-sm-6">
+                        <LegacyStorageDealsCount />
+                    </div>
+                </div>
             </div>
-        </Link>
+        </NavLink>
     //
     //
     // <div className="menu-item" >
     //         <img className="icon" alt="" src={columnsGapImg} />
-    //         <Link key="storage-deals" to="/storage-deals">
+    //         <NavLink key="storage-deals" to="/storage-deals">
     //                 <h3>Storage Deals</h3>
-    //         </Link>
+    //         </NavLink>
     //         {data ? (
-    //             <Link key="legacy-storage-deals" to="/storage-deals">
+    //             <NavLink key="legacy-storage-deals" to="/storage-deals">
     //                 <div className="menu-desc">
     //                     <b>{data.dealsCount}</b> deal{data.dealsCount === 1 ? '' : 's'}
     //                 </div>
-    //             </Link>
+    //             </NavLink>
     //         ) : null}
-    //
+
     //         <LegacyStorageDealsCount />
     //     </div>
     )

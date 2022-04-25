@@ -6,7 +6,7 @@ import moment from "moment";
 import {humanFIL, max, parseFil} from "./util"
 import {Info} from "./Info"
 import {PageContainer, ShortDealLink} from "./Components";
-import {Link, useParams} from "react-router-dom";
+import {NavLink, useParams} from "react-router-dom";
 import coinImg from './bootstrap-icons/icons/coin.svg'
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import './Funds.css'
@@ -351,7 +351,7 @@ export function FundsMenuItem(props) {
         amount: pubMsg.free,
     }]
 
-    return <Link key="funds" className="sidebar-item sidebar-item-funds active" to="/funds">
+    return <NavLink key="funds" className="sidebar-item sidebar-item-funds" to="/funds">
         <span className="sidebar-icon">
             <svg width="25" height="24" viewBox="0 0 25 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 15.13h-4.865a3.236 3.236 0 0 1-3.235-3.235 3.236 3.236 0 0 1 3.235-3.234H24M19.685 11.821h-.374" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path clip-rule="evenodd" d="M7.306 1.435h10.388A6.306 6.306 0 0 1 24 7.74v8.625a6.306 6.306 0 0 1-6.306 6.306H7.306A6.306 6.306 0 0 1 1 16.366V7.741a6.306 6.306 0 0 1 6.306-6.306z" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.45 6.889h6.489" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>
@@ -386,5 +386,5 @@ export function FundsMenuItem(props) {
                 </div>
             </div>
         </div>
-    </Link>
+    </NavLink>
 }

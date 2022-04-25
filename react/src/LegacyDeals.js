@@ -4,7 +4,7 @@ import moment from "moment";
 import {humanFileSize} from "./util";
 import React, {useState} from "react";
 import {PageContainer, ShortClientAddress} from "./Components";
-import {Link, useNavigate, useParams} from "react-router-dom";
+import {NavLink, useNavigate, useParams} from "react-router-dom";
 import './Deals.css'
 import './LegacyDeals.css'
 import {dateFormat} from "./util-date";
@@ -13,9 +13,7 @@ import {DealsPerPage} from "./deals-per-page";
 import {Pagination} from "./Pagination";
 
 export function LegacyStorageDealsPage(props) {
-    return <PageContainer pageType="legacy-storage-deals" title="Legacy Storage Deals">
-        <LegacyStorageDealsContent />
-    </PageContainer>
+    return <LegacyStorageDealsContent />
 }
 
 function LegacyStorageDealsContent(props) {
@@ -68,28 +66,29 @@ function LegacyStorageDealsContent(props) {
         onLinkClick: scrollTop,
     }
 
-    return <div className="deals">
-        <table>
+    return <div className="section">
+        <NavLink key="storage-deals" to="/storage-deals">v1.2 Deals</NavLink>
+        <table className="table table-striped">
+            <thead>
+                <tr>
+                    <th onClick={toggleTimestampFormat} className="start">Start</th>
+                    <th>Deal ID</th>
+                    <th>Piece Size</th>
+                    <th>Client</th>
+                    <th>State</th>
+                </tr>
+            </thead>
             <tbody>
-            <tr>
-                <th className="start" onClick={toggleTimestampFormat}>Start</th>
-                <th>Deal ID</th>
-                <th>Piece Size</th>
-                <th>Client</th>
-                <th>State</th>
-            </tr>
-
-            {deals.map(deal => (
-                <DealRow
-                    key={deal.ID}
-                    deal={deal}
-                    timestampFormat={timestampFormat}
-                    toggleTimestampFormat={toggleTimestampFormat}
-                />
-            ))}
+                {deals.map(deal => (
+                    <DealRow
+                        key={deal.ID}
+                        deal={deal}
+                        timestampFormat={timestampFormat}
+                        toggleTimestampFormat={toggleTimestampFormat}
+                    />
+                ))}
             </tbody>
         </table>
-
         <Pagination {...paginationParams} />
     </div>
 }
@@ -114,9 +113,9 @@ function DealRow(props) {
         <tr>
             <td className="start" onClick={props.toggleTimestampFormat}>{start}</td>
             <td className="deal-id">
-                <Link to={"/legacy-deals/" + deal.ID}>
+                <NavLink to={"/legacy-deals/" + deal.ID}>
                     <div className="short-deal-id">{deal.ID.substring(0, 12) + '…'}</div>
-                </Link>
+                </NavLink>
             </td>
             <td className="piece-size">{humanFileSize(deal.PieceSize)}</td>
             <td className="client">
@@ -138,11 +137,14 @@ export function LegacyStorageDealsCount(props) {
     }
 
     return (
-        <Link key="legacy-storage-deals" to="/legacy-storage-deals">
-            <div className="menu-desc">
-                <b>{data.legacyDealsCount}</b> legacy deal{data.legacyDealsCount === 1 ? '' : 's'}
-            </div>
-        </Link>
+        // <NavLink key="legacy-storage-deals" to="/legacy-storage-deals">
+        //     <span className="figure">{data.legacyDealsCount}</span>
+        //     <span className="label">Legacy Deal{data.legacyDealsCount === 1 ? '' : 's'}</span>
+        // </NavLink>
+        <div>
+            <span className="figure">{data.legacyDealsCount}</span>
+            <span className="label">Legacy Deal{data.legacyDealsCount === 1 ? '' : 's'}</span>
+        </div>
     )
 }
 

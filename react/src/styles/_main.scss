@@ -29,12 +29,12 @@ main {
 	}
 }
 .main-wrapper {
-	padding:40px 20px;
+	padding:10px 20px;
 
 	@include media-breakpoint-up(md) {
-		padding:50px;
+		padding:20px;
 	}
 	@include media-breakpoint-up(lg) {
-		padding:60px;
+		padding:40px;
 	}
 }

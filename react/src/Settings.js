@@ -4,7 +4,7 @@ import {useMutation, useQuery} from "@apollo/react-hooks";
 import {Libp2pAddrInfoQuery, StorageAskQuery, StorageAskUpdate} from "./gql";
 import React, {useState} from "react";
 import {PageContainer} from "./Components";
-import {Link} from "react-router-dom";
+import {NavLink} from "react-router-dom";
 import moment from "moment"
 import settingsImg from './bootstrap-icons/icons/gear.svg'
 import './Settings.css'
@@ -187,9 +187,11 @@ export function EditableField(props) {
 
 export function SettingsMenuItem(props) {
     return (
-        <Link key="settings" className="sidebar-item sidebar-item-deal-transfers active" to="/settings">
-            <img className="icon" alt="" src={settingsImg} />
+        <NavLink key="settings" className="sidebar-item sidebar-item-deal-transfers" to="/settings">
+            <span className="sidebar-icon">
+                <img className="icon" alt="Settings Icon" src={settingsImg} />
+            </span>
             <span className="sidebar-title">Settings</span>
-        </Link>
+        </NavLink>
     )
 }

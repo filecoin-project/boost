@@ -11,6 +11,7 @@
     height: 1em;
     vertical-align: top;
     margin-left: 0.5em;
+    margin-top: 0.2em;
     background: url("./bootstrap-icons/icons/info-circle.svg");
 }
 
@@ -26,9 +27,9 @@
     left: 2em;
     width: 20em;
     background: #fff;
-    border: 1px solid #465298;
+    border: 1px solid $bluegrey;
     box-shadow: 0 .75rem 1.5rem rgba(18,38,63,.1);
-    color: #465298;
+    color: $bluegrey;
     border-radius: 0.2em;
     padding: 0.75em;
 }

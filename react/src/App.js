@@ -31,12 +31,12 @@ function App() {
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
               </button>
-              { <Epoch /> }
   			</header>
 
             <Menu />
 
             <main>
+                { <Epoch /> }
                 <div className="main-wrapper">
 
                     <div className="page-header">

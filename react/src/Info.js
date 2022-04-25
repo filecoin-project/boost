@@ -1,5 +1,5 @@
 import {React, useEffect, useState} from "react";
-import "./Info.css"
+import InfoIcon from "bootstrap-icons/icons/info-circle.svg"
 
 export function Info(props) {
     return <InfoBox {...props} />
@@ -21,7 +21,8 @@ function InfoBox(props) {
 
     return (
         <div className={"info " + props.className || ""}>
-            <div className="target" onClick={() => setShow(!show)}></div>
+            <img className={"target filter-" + props.color || "primary"} src={InfoIcon} alt="Click for more Info" onClick={() => setShow(!show)} />
+            {/* <div className="target" onClick={() => setShow(!show)}></div> */}
             { show ? <div className="content">{props.children}</div> : null }
         </div>
     )
