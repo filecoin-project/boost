@@ -15,6 +15,7 @@ type Common struct {
 	API    lotus_config.API
 	Backup lotus_config.Backup
 	Libp2p lotus_config.Libp2p
+	Pubsub lotus_config.Pubsub
 }
 
 type Backup struct {
