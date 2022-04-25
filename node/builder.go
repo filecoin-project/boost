@@ -525,7 +525,7 @@ func ConfigBoost(c interface{}) Option {
 
 		Override(new(sectorstorage.Unsealer), From(new(lotus_modules.MinerStorageService))),
 		Override(new(stores.SectorIndex), From(new(lotus_modules.MinerSealingService))),
-		Override(new(sectorstorage.SealerConfig), cfg.Storage),
+		Override(new(lotus_config.SealerConfig), cfg.Storage),
 
 		Override(new(lotus_modules.MinerStorageService), lotus_modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
 		Override(new(lotus_modules.MinerSealingService), lotus_modules.ConnectSealingService(cfg.SealerApiInfo)),
