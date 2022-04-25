@@ -34,7 +34,7 @@ require (
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/index-provider v0.7.0
 	// lotus boost/main branch
-	github.com/filecoin-project/lotus v1.15.2-0.20220422133258-2be9452ced11
+	github.com/filecoin-project/lotus v1.15.2-rc1
 	github.com/filecoin-project/specs-actors v0.9.14
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v5 v5.0.4

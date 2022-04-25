@@ -150,7 +150,7 @@ func (c *ChainDealManager) dealIDFromPublishDealsMsg(ctx context.Context, tok ct
 			dealIdx, len(dealIDs), publishCid)
 	}
 
-	valid, _, err := retval.IsDealValid(uint64(dealIdx))
+	valid, err := retval.IsDealValid(uint64(dealIdx))
 	if err != nil {
 		return dealID, ctypes.EmptyTSK, xerrors.Errorf("determining deal validity: %w", err)
 	}
