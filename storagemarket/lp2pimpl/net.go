@@ -2,6 +2,7 @@ package lp2pimpl
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -242,7 +243,7 @@ func (p *DealProvider) getDealStatus(req types.DealStatusRequest) types.DealStat
 	}
 
 	pds, err := p.prov.Deal(p.ctx, req.DealUUID)
-	if err != nil && xerrors.Is(err, storagemarket.ErrDealNotFound) {
+	if err != nil && errors.Is(err, storagemarket.ErrDealNotFound) {
 		return errResp(fmt.Sprintf("no storage deal found with deal UUID %s", req.DealUUID))
 	}
 

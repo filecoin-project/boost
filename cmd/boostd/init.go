@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -244,7 +245,7 @@ func migrateStorageJson(mktsRepoPath string, boostRepoPath string) error {
 	// Read storage.json in the markets repo
 	bz, err := os.ReadFile(mktsFilePath)
 	if err != nil {
-		if !xerrors.Is(err, os.ErrNotExist) {
+		if !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("reading %s: %w", mktsFilePath, err)
 		}
 

@@ -3,6 +3,7 @@ package modules
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"time"
@@ -50,7 +51,7 @@ func HandleMigrateClientFunds(lc fx.Lifecycle, ds lotus_dtypes.MetadataDS, walle
 			}
 			b, err := ds.Get(ctx, datastore.NewKey("/marketfunds/client"))
 			if err != nil {
-				if xerrors.Is(err, datastore.ErrNotFound) {
+				if errors.Is(err, datastore.ErrNotFound) {
 					return nil
 				}
 				log.Errorf("client funds migration - getting datastore value: %v", err)

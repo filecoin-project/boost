@@ -108,7 +108,7 @@ func ReaderParamEncoder(addr string) jsonrpc.Option {
 		reqID := uuid.New()
 		u, err := url.Parse(addr)
 		if err != nil {
-			return reflect.Value{}, xerrors.Errorf("parsing push address: %w", err)
+			return reflect.Value{}, fmt.Errorf("parsing push address: %w", err)
 		}
 		u.Path = path.Join(u.Path, reqID.String())
 
