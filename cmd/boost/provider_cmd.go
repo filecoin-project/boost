@@ -9,8 +9,12 @@ import (
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/ipfs/go-cid"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/xerrors"
 )
 
 var providerCmd = &cli.Command{
@@ -19,6 +23,8 @@ var providerCmd = &cli.Command{
 	Flags: []cli.Flag{cmd.FlagRepo},
 	Subcommands: []*cli.Command{
 		libp2pInfoCmd,
+		queryAskCmd,
+		queryRetrievalAskCmd,
 	},
 }
 
@@ -94,6 +100,153 @@ var libp2pInfoCmd = &cli.Command{
 			fmt.Println("  " + addr.String())
 		}
 		fmt.Println("Protocols:\n" + "  " + strings.Join(protos, "\n  "))
+		return nil
+	},
+}
+
+var queryAskCmd = &cli.Command{
+	Name:      "query-ask",
+	Usage:     "Find a miners ask",
+	ArgsUsage: "[minerAddress]",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "peerid",
+			Usage: "specify peer ID of node to make query against",
+		},
+		&cli.Int64Flag{
+			Name:  "size",
+			Usage: "data size in bytes",
+		},
+		&cli.Int64Flag{
+			Name:  "duration",
+			Usage: "deal duration",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		afmt := NewAppFmt(cctx.App)
+		if cctx.NArg() != 1 {
+			afmt.Println("Usage: query-ask [minerAddress]")
+			return nil
+		}
+
+		maddr, err := address.NewFromString(cctx.Args().First())
+		if err != nil {
+			return err
+		}
+
+		api, closer, err := lcli.GetFullNodeAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("setting up fullnode connection: %w", err)
+		}
+		defer closer()
+
+		ctx := ctxutil.ReqContext(cctx)
+
+		var pid peer.ID
+		if pidstr := cctx.String("peerid"); pidstr != "" {
+			p, err := peer.Decode(pidstr)
+			if err != nil {
+				return err
+			}
+			pid = p
+		} else {
+			mi, err := api.StateMinerInfo(ctx, maddr, types.EmptyTSK)
+			if err != nil {
+				return xerrors.Errorf("failed to get peerID for miner: %w", err)
+			}
+
+			if mi.PeerId == nil || *mi.PeerId == peer.ID("SETME") {
+				return fmt.Errorf("the miner hasn't initialized yet")
+			}
+
+			pid = *mi.PeerId
+		}
+
+		ask, err := api.ClientQueryAsk(ctx, pid, maddr)
+		if err != nil {
+			return err
+		}
+
+		afmt.Printf("Ask: %s\n", maddr)
+		afmt.Printf("Price per GiB: %s\n", types.FIL(ask.Price))
+		afmt.Printf("Verified Price per GiB: %s\n", types.FIL(ask.VerifiedPrice))
+		afmt.Printf("Max Piece size: %s\n", types.SizeStr(types.NewInt(uint64(ask.MaxPieceSize))))
+		afmt.Printf("Min Piece size: %s\n", types.SizeStr(types.NewInt(uint64(ask.MinPieceSize))))
+
+		size := cctx.Int64("size")
+		if size == 0 {
+			return nil
+		}
+		perEpoch := types.BigDiv(types.BigMul(ask.Price, types.NewInt(uint64(size))), types.NewInt(1<<30))
+		afmt.Printf("Price per Block: %s\n", types.FIL(perEpoch))
+
+		duration := cctx.Int64("duration")
+		if duration == 0 {
+			return nil
+		}
+		afmt.Printf("Total Price: %s\n", types.FIL(types.BigMul(perEpoch, types.NewInt(uint64(duration)))))
+
+		return nil
+	},
+}
+
+var queryRetrievalAskCmd = &cli.Command{
+	Name:      "retrieval-ask",
+	Usage:     "Get a miner's retrieval ask",
+	ArgsUsage: "[minerAddress] [data CID]",
+	Flags: []cli.Flag{
+		&cli.Int64Flag{
+			Name:  "size",
+			Usage: "data size in bytes",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		afmt := NewAppFmt(cctx.App)
+		if cctx.NArg() != 2 {
+			afmt.Println("Usage: retrieval-ask [minerAddress] [data CID]")
+			return nil
+		}
+
+		maddr, err := address.NewFromString(cctx.Args().First())
+		if err != nil {
+			return err
+		}
+
+		dataCid, err := cid.Parse(cctx.Args().Get(1))
+		if err != nil {
+			return fmt.Errorf("parsing data cid: %w", err)
+		}
+
+		api, closer, err := lcli.GetFullNodeAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("setting up fullnode connection: %w", err)
+		}
+		defer closer()
+		ctx := ctxutil.ReqContext(cctx)
+
+		ask, err := api.ClientMinerQueryOffer(ctx, maddr, dataCid, nil)
+		if err != nil {
+			return err
+		}
+
+		afmt.Printf("Ask: %s\n", maddr)
+		afmt.Printf("Unseal price: %s\n", types.FIL(ask.UnsealPrice))
+		afmt.Printf("Price per byte: %s\n", types.FIL(ask.PricePerByte))
+		afmt.Printf("Payment interval: %s\n", types.SizeStr(types.NewInt(ask.PaymentInterval)))
+		afmt.Printf("Payment interval increase: %s\n", types.SizeStr(types.NewInt(ask.PaymentIntervalIncrease)))
+
+		size := cctx.Uint64("size")
+		if size == 0 {
+			if ask.Size == 0 {
+				return nil
+			}
+			size = ask.Size
+			afmt.Printf("Size: %s\n", types.SizeStr(types.NewInt(ask.Size)))
+		}
+		transferPrice := types.BigMul(ask.PricePerByte, types.NewInt(size))
+		totalPrice := types.BigAdd(ask.UnsealPrice, transferPrice)
+		afmt.Printf("Total price for %d bytes: %s\n", size, types.FIL(totalPrice))
+
 		return nil
 	},
 }
