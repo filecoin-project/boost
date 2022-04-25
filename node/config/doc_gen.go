@@ -21,7 +21,7 @@ your node if metadata log is disabled`,
 	"Boost": []DocField{
 		{
 			Name: "Storage",
-			Type: "sectorstorage.SealerConfig",
+			Type: "lotus_config.SealerConfig",
 
 			Comment: ``,
 		},
