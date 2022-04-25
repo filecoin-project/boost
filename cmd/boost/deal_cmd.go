@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/api"
 	chain_types "github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
@@ -210,7 +211,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 			return fmt.Errorf("node error getting collateral bounds: %w", err)
 		}
 
-		providerCollateral = bounds.Min
+		providerCollateral = big.Div(big.Mul(bounds.Min, big.NewInt(6)), big.NewInt(5)) // add 20%
 	}
 
 	var startEpoch abi.ChainEpoch
