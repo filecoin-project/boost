@@ -5,17 +5,19 @@ import (
 	"sort"
 	"strings"
 
+	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/cli/ctxutil"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-fil-markets/storagemarket/network"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
 )
+
+const AskProtocolID = "/fil/storage/ask/1.1.0"
 
 var providerCmd = &cli.Command{
 	Name:  "provider",
@@ -123,49 +125,58 @@ var queryAskCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
+		ctx := bcli.ReqContext(cctx)
+
 		afmt := NewAppFmt(cctx.App)
 		if cctx.NArg() != 1 {
 			afmt.Println("Usage: query-ask [minerAddress]")
 			return nil
 		}
 
+		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
+		if err != nil {
+			return err
+		}
+
+		api, closer, err := lcli.GetGatewayAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("cant setup gateway connection: %w", err)
+		}
+		defer closer()
+
 		maddr, err := address.NewFromString(cctx.Args().First())
 		if err != nil {
 			return err
 		}
 
-		api, closer, err := lcli.GetFullNodeAPI(cctx)
-		if err != nil {
-			return fmt.Errorf("setting up fullnode connection: %w", err)
-		}
-		defer closer()
-
-		ctx := ctxutil.ReqContext(cctx)
-
-		var pid peer.ID
-		if pidstr := cctx.String("peerid"); pidstr != "" {
-			p, err := peer.Decode(pidstr)
-			if err != nil {
-				return err
-			}
-			pid = p
-		} else {
-			mi, err := api.StateMinerInfo(ctx, maddr, types.EmptyTSK)
-			if err != nil {
-				return xerrors.Errorf("failed to get peerID for miner: %w", err)
-			}
-
-			if mi.PeerId == nil || *mi.PeerId == peer.ID("SETME") {
-				return fmt.Errorf("the miner hasn't initialized yet")
-			}
-
-			pid = *mi.PeerId
-		}
-
-		ask, err := api.ClientQueryAsk(ctx, pid, maddr)
+		addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
 		if err != nil {
 			return err
 		}
+
+		log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
+
+		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
+			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+		}
+
+		s, err := n.Host.NewStream(ctx, addrInfo.ID, AskProtocolID)
+		if err != nil {
+			return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
+		}
+		defer s.Close()
+
+		var resp network.AskResponse
+
+		askRequest := network.AskRequest{
+			Miner: maddr,
+		}
+
+		if err := doRpc(ctx, s, &askRequest, &resp); err != nil {
+			return fmt.Errorf("send ask request rpc: %w", err)
+		}
+
+		ask := resp.Ask.Ask
 
 		afmt.Printf("Ask: %s\n", maddr)
 		afmt.Printf("Price per GiB: %s\n", types.FIL(ask.Price))
