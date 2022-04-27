@@ -266,16 +266,13 @@ var queryRetrievalAskCmd = &cli.Command{
 			QueryParams: retrievalmarket.QueryParams{},
 		}
 
-		var resp retrievalmarket.QueryResponse
+		var ask retrievalmarket.QueryResponse
 
-		if err := doRpc(ctx, s, &req, &resp); err != nil {
+		if err := doRpc(ctx, s, &req, &ask); err != nil {
 			return fmt.Errorf("send retrieval-ask request rpc: %w", err)
 		}
 
-		ask := resp
-
 		afmt.Printf("Status: %d\n", ask.Status)
-
 		if ask.Status != 0 {
 			return nil
 		}
