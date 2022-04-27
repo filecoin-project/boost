@@ -10,14 +10,17 @@ import (
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/network"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-cid"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/urfave/cli/v2"
 )
 
 const AskProtocolID = "/fil/storage/ask/1.1.0"
+const QueryProtocolID = protocol.ID("/fil/retrieval/qry/1.0.0")
 
 var providerCmd = &cli.Command{
 	Name:  "provider",
@@ -212,11 +215,24 @@ var queryRetrievalAskCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
+		ctx := bcli.ReqContext(cctx)
+
 		afmt := NewAppFmt(cctx.App)
 		if cctx.NArg() != 2 {
 			afmt.Println("Usage: retrieval-ask [minerAddress] [data CID]")
 			return nil
 		}
+
+		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
+		if err != nil {
+			return err
+		}
+
+		api, closer, err := lcli.GetGatewayAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("cant setup gateway connection: %w", err)
+		}
+		defer closer()
 
 		maddr, err := address.NewFromString(cctx.Args().First())
 		if err != nil {
@@ -228,23 +244,42 @@ var queryRetrievalAskCmd = &cli.Command{
 			return fmt.Errorf("parsing data cid: %w", err)
 		}
 
-		api, closer, err := lcli.GetFullNodeAPI(cctx)
-		if err != nil {
-			return fmt.Errorf("setting up fullnode connection: %w", err)
-		}
-		defer closer()
-		ctx := ctxutil.ReqContext(cctx)
-
-		ask, err := api.ClientMinerQueryOffer(ctx, maddr, dataCid, nil)
+		addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
 		if err != nil {
 			return err
 		}
 
+		log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
+
+		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
+			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+		}
+
+		s, err := n.Host.NewStream(ctx, addrInfo.ID, QueryProtocolID)
+		if err != nil {
+			return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
+		}
+		defer s.Close()
+
+		req := retrievalmarket.Query{
+			PayloadCID:  dataCid,
+			QueryParams: retrievalmarket.QueryParams{},
+		}
+
+		var resp retrievalmarket.QueryResponse
+
+		if err := doRpc(ctx, s, &req, &resp); err != nil {
+			return fmt.Errorf("send retrieval-ask request rpc: %w", err)
+		}
+
+		ask := resp
+
+		afmt.Printf("Status: %d\n", ask.Status)
 		afmt.Printf("Ask: %s\n", maddr)
 		afmt.Printf("Unseal price: %s\n", types.FIL(ask.UnsealPrice))
-		afmt.Printf("Price per byte: %s\n", types.FIL(ask.PricePerByte))
-		afmt.Printf("Payment interval: %s\n", types.SizeStr(types.NewInt(ask.PaymentInterval)))
-		afmt.Printf("Payment interval increase: %s\n", types.SizeStr(types.NewInt(ask.PaymentIntervalIncrease)))
+		afmt.Printf("Price per byte: %s\n", types.FIL(ask.MinPricePerByte))
+		afmt.Printf("Payment interval: %s\n", types.SizeStr(types.NewInt(ask.MaxPaymentInterval)))
+		afmt.Printf("Payment interval increase: %s\n", types.SizeStr(types.NewInt(ask.MaxPaymentIntervalIncrease)))
 
 		size := cctx.Uint64("size")
 		if size == 0 {
@@ -254,7 +289,7 @@ var queryRetrievalAskCmd = &cli.Command{
 			size = ask.Size
 			afmt.Printf("Size: %s\n", types.SizeStr(types.NewInt(ask.Size)))
 		}
-		transferPrice := types.BigMul(ask.PricePerByte, types.NewInt(size))
+		transferPrice := types.BigMul(ask.MinPricePerByte, types.NewInt(size))
 		totalPrice := types.BigAdd(ask.UnsealPrice, transferPrice)
 		afmt.Printf("Total price for %d bytes: %s\n", size, types.FIL(totalPrice))
 
