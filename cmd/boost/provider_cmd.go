@@ -15,12 +15,13 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/urfave/cli/v2"
 )
 
-const AskProtocolID = "/fil/storage/ask/1.1.0"
-const QueryProtocolID = protocol.ID("/fil/retrieval/qry/1.0.0")
+const (
+	AskProtocolID   = "/fil/storage/ask/1.1.0"
+	QueryProtocolID = "/fil/retrieval/qry/1.0.0"
+)
 
 var providerCmd = &cli.Command{
 	Name:  "provider",
