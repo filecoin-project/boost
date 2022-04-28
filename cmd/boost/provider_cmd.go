@@ -29,8 +29,8 @@ var providerCmd = &cli.Command{
 	Flags: []cli.Flag{cmd.FlagRepo},
 	Subcommands: []*cli.Command{
 		libp2pInfoCmd,
-		queryAskCmd,
-		queryRetrievalAskCmd,
+		storageAskCmd,
+		retrievalAskCmd,
 	},
 }
 
@@ -110,14 +110,14 @@ var libp2pInfoCmd = &cli.Command{
 	},
 }
 
-var queryAskCmd = &cli.Command{
-	Name:      "query-ask",
-	Usage:     "Query a storage provider's storage ask",
-	ArgsUsage: "[minerAddress]",
+var storageAskCmd = &cli.Command{
+	Name:  "storage-ask",
+	Usage: "Query a storage provider's storage ask",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "peerid",
-			Usage: "specify peer ID of node to make query against",
+			Name:     "provider",
+			Usage:    "storage provider on-chain address",
+			Required: true,
 		},
 		&cli.Int64Flag{
 			Name:  "size",
@@ -132,10 +132,6 @@ var queryAskCmd = &cli.Command{
 		ctx := bcli.ReqContext(cctx)
 
 		afmt := NewAppFmt(cctx.App)
-		if cctx.NArg() != 1 {
-			afmt.Println("Usage: query-ask [minerAddress]")
-			return nil
-		}
 
 		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
@@ -148,7 +144,7 @@ var queryAskCmd = &cli.Command{
 		}
 		defer closer()
 
-		maddr, err := address.NewFromString(cctx.Args().First())
+		maddr, err := address.NewFromString(cctx.String("provider"))
 		if err != nil {
 			return err
 		}
@@ -205,11 +201,16 @@ var queryAskCmd = &cli.Command{
 	},
 }
 
-var queryRetrievalAskCmd = &cli.Command{
+var retrievalAskCmd = &cli.Command{
 	Name:      "retrieval-ask",
 	Usage:     "Query a storage provider's retrieval ask",
-	ArgsUsage: "[minerAddress] [data CID]",
+	ArgsUsage: "[data CID]",
 	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "provider",
+			Usage:    "storage provider on-chain address",
+			Required: true,
+		},
 		&cli.Int64Flag{
 			Name:  "size",
 			Usage: "data size in bytes",
@@ -219,8 +220,8 @@ var queryRetrievalAskCmd = &cli.Command{
 		ctx := bcli.ReqContext(cctx)
 
 		afmt := NewAppFmt(cctx.App)
-		if cctx.NArg() != 2 {
-			afmt.Println("Usage: retrieval-ask [minerAddress] [data CID]")
+		if cctx.NArg() != 1 {
+			afmt.Println("Usage: retrieval-ask [data CID]")
 			return nil
 		}
 
@@ -235,12 +236,12 @@ var queryRetrievalAskCmd = &cli.Command{
 		}
 		defer closer()
 
-		maddr, err := address.NewFromString(cctx.Args().First())
+		maddr, err := address.NewFromString(cctx.String("provider"))
 		if err != nil {
 			return err
 		}
 
-		dataCid, err := cid.Parse(cctx.Args().Get(1))
+		dataCid, err := cid.Parse(cctx.Args().First())
 		if err != nil {
 			return fmt.Errorf("parsing data cid: %w", err)
 		}
