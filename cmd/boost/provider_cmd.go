@@ -205,13 +205,8 @@ var storageAskCmd = &cli.Command{
 var retrievalAskCmd = &cli.Command{
 	Name:      "retrieval-ask",
 	Usage:     "Query a storage provider's retrieval ask",
-	ArgsUsage: "[data CID]",
+	ArgsUsage: "[provider] [data CID]",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:     "provider",
-			Usage:    "storage provider on-chain address",
-			Required: true,
-		},
 		&cli.Int64Flag{
 			Name:  "size",
 			Usage: "data size in bytes",
@@ -221,8 +216,8 @@ var retrievalAskCmd = &cli.Command{
 		ctx := bcli.ReqContext(cctx)
 
 		afmt := NewAppFmt(cctx.App)
-		if cctx.NArg() != 1 {
-			afmt.Println("Usage: retrieval-ask [data CID]")
+		if cctx.NArg() != 2 {
+			afmt.Println("Usage: retrieval-ask [provider] [data CID]")
 			return nil
 		}
 
@@ -237,12 +232,12 @@ var retrievalAskCmd = &cli.Command{
 		}
 		defer closer()
 
-		maddr, err := address.NewFromString(cctx.String("provider"))
+		maddr, err := address.NewFromString(cctx.Args().First())
 		if err != nil {
 			return err
 		}
 
-		dataCid, err := cid.Parse(cctx.Args().First())
+		dataCid, err := cid.Parse(cctx.Args().Get(1))
 		if err != nil {
 			return fmt.Errorf("parsing data cid: %w", err)
 		}
