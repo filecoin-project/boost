@@ -112,7 +112,7 @@ var libp2pInfoCmd = &cli.Command{
 
 var queryAskCmd = &cli.Command{
 	Name:      "query-ask",
-	Usage:     "Find a miners ask",
+	Usage:     "Query a storage provider's storage ask",
 	ArgsUsage: "[minerAddress]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
