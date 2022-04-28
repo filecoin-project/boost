@@ -164,7 +164,7 @@ function SealingType(props) {
 function Workers(props) {
     return <div className="workers">
         <div className="title">Workers</div>
-        {props.workers.length === 0 ? <div className="no-workers">No active workers</div> : (
+        {props.workers.length === 0 ? <div className="no-workers">No active jobs</div> : (
             <table>
                 <tbody>
                 <tr>
