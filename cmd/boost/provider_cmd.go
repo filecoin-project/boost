@@ -5,12 +5,22 @@ import (
 	"sort"
 	"strings"
 
+	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/cli/ctxutil"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/go-fil-markets/storagemarket/network"
+	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
+)
+
+const (
+	AskProtocolID   = "/fil/storage/ask/1.1.0"
+	QueryProtocolID = "/fil/retrieval/qry/1.0.0"
 )
 
 var providerCmd = &cli.Command{
@@ -19,6 +29,8 @@ var providerCmd = &cli.Command{
 	Flags: []cli.Flag{cmd.FlagRepo},
 	Subcommands: []*cli.Command{
 		libp2pInfoCmd,
+		storageAskCmd,
+		retrievalAskCmd,
 	},
 }
 
@@ -94,6 +106,192 @@ var libp2pInfoCmd = &cli.Command{
 			fmt.Println("  " + addr.String())
 		}
 		fmt.Println("Protocols:\n" + "  " + strings.Join(protos, "\n  "))
+		return nil
+	},
+}
+
+var storageAskCmd = &cli.Command{
+	Name:      "storage-ask",
+	Usage:     "Query a storage provider's storage ask",
+	ArgsUsage: "[provider]",
+	Flags: []cli.Flag{
+		&cli.Int64Flag{
+			Name:  "size",
+			Usage: "data size in bytes",
+		},
+		&cli.Int64Flag{
+			Name:  "duration",
+			Usage: "deal duration in epochs",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		ctx := bcli.ReqContext(cctx)
+
+		afmt := NewAppFmt(cctx.App)
+
+		if cctx.NArg() != 1 {
+			afmt.Println("Usage: storage-ask [provider]")
+			return nil
+		}
+
+		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
+		if err != nil {
+			return err
+		}
+
+		api, closer, err := lcli.GetGatewayAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("cant setup gateway connection: %w", err)
+		}
+		defer closer()
+
+		maddr, err := address.NewFromString(cctx.Args().First())
+		if err != nil {
+			return err
+		}
+
+		addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
+		if err != nil {
+			return err
+		}
+
+		log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
+
+		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
+			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+		}
+
+		s, err := n.Host.NewStream(ctx, addrInfo.ID, AskProtocolID)
+		if err != nil {
+			return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
+		}
+		defer s.Close()
+
+		var resp network.AskResponse
+
+		askRequest := network.AskRequest{
+			Miner: maddr,
+		}
+
+		if err := doRpc(ctx, s, &askRequest, &resp); err != nil {
+			return fmt.Errorf("send ask request rpc: %w", err)
+		}
+
+		ask := resp.Ask.Ask
+
+		afmt.Printf("Ask: %s\n", maddr)
+		afmt.Printf("Price per GiB: %s\n", types.FIL(ask.Price))
+		afmt.Printf("Verified Price per GiB: %s\n", types.FIL(ask.VerifiedPrice))
+		afmt.Printf("Max Piece size: %s\n", types.SizeStr(types.NewInt(uint64(ask.MaxPieceSize))))
+		afmt.Printf("Min Piece size: %s\n", types.SizeStr(types.NewInt(uint64(ask.MinPieceSize))))
+
+		size := cctx.Int64("size")
+		if size == 0 {
+			return nil
+		}
+		perEpoch := types.BigDiv(types.BigMul(ask.Price, types.NewInt(uint64(size))), types.NewInt(1<<30))
+		afmt.Printf("Price per Block: %s\n", types.FIL(perEpoch))
+
+		duration := cctx.Int64("duration")
+		if duration == 0 {
+			return nil
+		}
+		afmt.Printf("Total Price: %s\n", types.FIL(types.BigMul(perEpoch, types.NewInt(uint64(duration)))))
+
+		return nil
+	},
+}
+
+var retrievalAskCmd = &cli.Command{
+	Name:      "retrieval-ask",
+	Usage:     "Query a storage provider's retrieval ask",
+	ArgsUsage: "[provider] [data CID]",
+	Flags: []cli.Flag{
+		&cli.Int64Flag{
+			Name:  "size",
+			Usage: "data size in bytes",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		ctx := bcli.ReqContext(cctx)
+
+		afmt := NewAppFmt(cctx.App)
+		if cctx.NArg() != 2 {
+			afmt.Println("Usage: retrieval-ask [provider] [data CID]")
+			return nil
+		}
+
+		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
+		if err != nil {
+			return err
+		}
+
+		api, closer, err := lcli.GetGatewayAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("cant setup gateway connection: %w", err)
+		}
+		defer closer()
+
+		maddr, err := address.NewFromString(cctx.Args().First())
+		if err != nil {
+			return err
+		}
+
+		dataCid, err := cid.Parse(cctx.Args().Get(1))
+		if err != nil {
+			return fmt.Errorf("parsing data cid: %w", err)
+		}
+
+		addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
+		if err != nil {
+			return err
+		}
+
+		log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
+
+		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
+			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+		}
+
+		s, err := n.Host.NewStream(ctx, addrInfo.ID, QueryProtocolID)
+		if err != nil {
+			return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
+		}
+		defer s.Close()
+
+		req := retrievalmarket.Query{
+			PayloadCID:  dataCid,
+			QueryParams: retrievalmarket.QueryParams{},
+		}
+
+		var ask retrievalmarket.QueryResponse
+
+		if err := doRpc(ctx, s, &req, &ask); err != nil {
+			return fmt.Errorf("send retrieval-ask request rpc: %w", err)
+		}
+
+		afmt.Printf("Status: %d\n", ask.Status)
+		if ask.Status != 0 {
+			return nil
+		}
+		afmt.Printf("Ask: %s\n", maddr)
+		afmt.Printf("Unseal price: %s\n", types.FIL(ask.UnsealPrice))
+		afmt.Printf("Price per byte: %s\n", types.FIL(ask.MinPricePerByte))
+		afmt.Printf("Payment interval: %s\n", types.SizeStr(types.NewInt(ask.MaxPaymentInterval)))
+		afmt.Printf("Payment interval increase: %s\n", types.SizeStr(types.NewInt(ask.MaxPaymentIntervalIncrease)))
+
+		size := cctx.Uint64("size")
+		if size == 0 {
+			if ask.Size == 0 {
+				return nil
+			}
+			size = ask.Size
+			afmt.Printf("Size: %s\n", types.SizeStr(types.NewInt(ask.Size)))
+		}
+		transferPrice := types.BigMul(ask.MinPricePerByte, types.NewInt(size))
+		totalPrice := types.BigAdd(ask.UnsealPrice, transferPrice)
+		afmt.Printf("Total price for %d bytes: %s\n", size, types.FIL(totalPrice))
+
 		return nil
 	},
 }
