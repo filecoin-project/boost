@@ -111,14 +111,10 @@ var libp2pInfoCmd = &cli.Command{
 }
 
 var storageAskCmd = &cli.Command{
-	Name:  "storage-ask",
-	Usage: "Query a storage provider's storage ask",
+	Name:      "storage-ask",
+	Usage:     "Query a storage provider's storage ask",
+	ArgsUsage: "[provider]",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:     "provider",
-			Usage:    "storage provider on-chain address",
-			Required: true,
-		},
 		&cli.Int64Flag{
 			Name:  "size",
 			Usage: "data size in bytes",
@@ -133,6 +129,11 @@ var storageAskCmd = &cli.Command{
 
 		afmt := NewAppFmt(cctx.App)
 
+		if cctx.NArg() != 1 {
+			afmt.Println("Usage: storage-ask [provider]")
+			return nil
+		}
+
 		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
@@ -144,7 +145,7 @@ var storageAskCmd = &cli.Command{
 		}
 		defer closer()
 
-		maddr, err := address.NewFromString(cctx.String("provider"))
+		maddr, err := address.NewFromString(cctx.Args().First())
 		if err != nil {
 			return err
 		}
