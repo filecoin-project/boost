@@ -207,7 +207,7 @@ var queryAskCmd = &cli.Command{
 
 var queryRetrievalAskCmd = &cli.Command{
 	Name:      "retrieval-ask",
-	Usage:     "Get a miner's retrieval ask",
+	Usage:     "Query a storage provider's retrieval ask",
 	ArgsUsage: "[minerAddress] [data CID]",
 	Flags: []cli.Flag{
 		&cli.Int64Flag{
