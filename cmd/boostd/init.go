@@ -226,7 +226,7 @@ var migrateCmd = &cli.Command{
 		}
 
 		// Migrate DAG store
-		err = migrateDirectory(ctx, mktsRepo.Path(), boostRepo.Path(), "dagstore")
+		err = migrateDirectory(ctx, mktsRepo, boostRepo, "dagstore")
 		if err != nil {
 			return err
 		}
@@ -265,9 +265,27 @@ func migrateStorageJson(mktsRepoPath string, boostRepoPath string) error {
 	return nil
 }
 
-func migrateDirectory(ctx context.Context, mktsRepoPath string, boostRepoPath string, subdir string) error {
-	mktsSubdirPath := path.Join(mktsRepoPath, subdir)
-	boostSubdirPath := path.Join(boostRepoPath, subdir)
+func migrateDirectory(ctx context.Context, mktsRepo lotus_repo.LockedRepo, boostRepo lotus_repo.LockedRepo, subdir string) error {
+	mktsSubdirPath := path.Join(mktsRepo.Path(), subdir)
+	boostSubdirPath := path.Join(boostRepo.Path(), subdir)
+
+	var cerr error
+
+	rawMktsCfg, err := mktsRepo.Config()
+	if err != nil {
+		cerr = fmt.Errorf("getting markets repo config: %w", err)
+		return cerr
+	}
+	mktsCfg, ok := rawMktsCfg.(*lotus_config.StorageMiner)
+	if !ok {
+		cerr = fmt.Errorf("expected legacy markets config, got %T", rawMktsCfg)
+		return cerr
+	}
+
+	if len(mktsCfg.DAGStore.RootDir) > 0 {
+		mktsSubdirPath = mktsCfg.DAGStore.RootDir
+	}
+
 	dirInfo, err := os.Lstat(mktsSubdirPath)
 	if err != nil {
 		if xerrors.Is(err, os.ErrNotExist) {
@@ -382,6 +400,7 @@ func migrateMarketsConfig(cctx *cli.Context, mktsRepo lotus_repo.LockedRepo, boo
 		rcfg.LotusDealmaking = mktsCfg.Dealmaking
 		rcfg.LotusFees = mktsCfg.Fees
 		rcfg.DAGStore = mktsCfg.DAGStore
+		rcfg.DAGStore.RootDir = ""
 		rcfg.IndexProvider = mktsCfg.IndexProvider
 		rcfg.IndexProvider.Enable = true // Enable index provider in Boost by default
 
