@@ -125,7 +125,7 @@ var queryAskCmd = &cli.Command{
 		},
 		&cli.Int64Flag{
 			Name:  "duration",
-			Usage: "deal duration",
+			Usage: "deal duration in epochs",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
