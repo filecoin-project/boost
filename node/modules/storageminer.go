@@ -9,27 +9,25 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/build"
-
-	"github.com/filecoin-project/go-fil-markets/shared"
-	"github.com/filecoin-project/go-state-types/crypto"
-	ctypes "github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/lib/sigs"
-
-	"github.com/filecoin-project/boost/indexprovider"
-
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
+	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/retrieval"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/go-fil-markets/shared"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
+	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api/v1api"
+	ctypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/lib/sigs"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -400,4 +398,17 @@ func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo
 
 		return server
 	}
+}
+
+func NewHttpRetrievalServer(lc fx.Lifecycle, sa dagstore.SectorAccessor, ps lotus_dtypes.ProviderPieceStore, dagst *dagstore.Wrapper) *retrieval.HttpServer {
+	server := retrieval.NewHttpServer("/retrieve", sa, ps, dagst)
+
+	lc.Append(fx.Hook{
+		OnStart: server.Start,
+		OnStop: func(ctx context.Context) error {
+			return server.Stop()
+		},
+	})
+
+	return server
 }

@@ -7,29 +7,25 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/filecoin-project/dagstore/shard"
-
-	"github.com/ipfs/go-cid"
-	logging "github.com/ipfs/go-log/v2"
-
-	"github.com/filecoin-project/boost/indexprovider"
-
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
+	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/retrieval"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/dagstore"
+	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
-
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
-
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"go.uber.org/fx"
 )
@@ -70,6 +66,7 @@ type BoostAPI struct {
 	// TODO: Figure out how to start graphql server without it needing
 	// to be a dependency of another fx object
 	GraphqlServer *gql.Server
+	HttpServer    *retrieval.HttpServer
 
 	DS lotus_dtypes.MetadataDS
 

@@ -7,27 +7,30 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/indexprovider"
-	"github.com/filecoin-project/boost/storagemarket/dealfilter"
-
-	provider "github.com/filecoin-project/index-provider"
-	"github.com/filecoin-project/lotus/markets/idxprov"
-
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
+	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/impl"
 	"github.com/filecoin-project/boost/node/impl/common"
 	"github.com/filecoin-project/boost/node/impl/net"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/retrieval"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
-
+	"github.com/filecoin-project/boost/storagemarket/dealfilter"
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
+	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
+	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
+	"github.com/filecoin-project/go-state-types/abi"
+	provider "github.com/filecoin-project/index-provider"
 	lotus_api "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	lotus_sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
@@ -39,6 +42,7 @@ import (
 	_ "github.com/filecoin-project/lotus/lib/sigs/secp"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	lotus_dealfilter "github.com/filecoin-project/lotus/markets/dealfilter"
+	"github.com/filecoin-project/lotus/markets/idxprov"
 	"github.com/filecoin-project/lotus/markets/retrievaladapter"
 	"github.com/filecoin-project/lotus/markets/sectoraccessor"
 	lotus_storageadapter "github.com/filecoin-project/lotus/markets/storageadapter"
@@ -53,15 +57,8 @@ import (
 	"github.com/filecoin-project/lotus/storage"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/filecoin-project/lotus/system"
-
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
-	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
-	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
-
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipfs/go-metrics-interface"
 	ci "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -71,9 +68,6 @@ import (
 	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 	record "github.com/libp2p/go-libp2p-record"
 	"github.com/libp2p/go-libp2p/p2p/net/conngater"
-
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipfs/go-metrics-interface"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
@@ -445,6 +439,7 @@ func ConfigBoost(c interface{}) Option {
 
 		// GraphQL server
 		Override(new(*gql.Server), modules.NewGraphqlServer(cfg)),
+		Override(new(*retrieval.HttpServer), modules.NewHttpRetrievalServer),
 
 		// Address selector
 		Override(new(*storage.AddressSelector), lotus_modules.AddressSelector(&lotus_config.MinerAddressConfig{
