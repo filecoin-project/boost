@@ -78,6 +78,8 @@ type BoostStruct struct {
 
 		DealsSetPieceCidBlocklist func(p0 context.Context, p1 []cid.Cid) error `perm:"admin"`
 
+		MarketCancelDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error `perm:"write"`
+
 		MarketDataTransferUpdates func(p0 context.Context) (<-chan lapi.DataTransferChannel, error) `perm:"write"`
 
 		MarketGetAsk func(p0 context.Context) (*storagemarket.SignedStorageAsk, error) `perm:"read"`
@@ -459,6 +461,17 @@ func (s *BoostStruct) DealsSetPieceCidBlocklist(p0 context.Context, p1 []cid.Cid
 }
 
 func (s *BoostStub) DealsSetPieceCidBlocklist(p0 context.Context, p1 []cid.Cid) error {
+	return ErrNotSupported
+}
+
+func (s *BoostStruct) MarketCancelDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
+	if s.Internal.MarketCancelDataTransfer == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.MarketCancelDataTransfer(p0, p1, p2, p3)
+}
+
+func (s *BoostStub) MarketCancelDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
 	return ErrNotSupported
 }
 
