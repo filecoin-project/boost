@@ -19,6 +19,7 @@ var dagstoreCmd = &cli.Command{
 	Usage: "Manage the dagstore on the Boost subsystem",
 	Subcommands: []*cli.Command{
 		dagstoreInitializeShardCmd,
+		dagstoreRecoverShardCmd,
 		dagstoreInitializeAllCmd,
 		dagstoreListShardsCmd,
 		dagstoreGcCmd,
@@ -194,5 +195,37 @@ var dagstoreInitializeAllCmd = &cli.Command{
 				return fmt.Errorf("aborted")
 			}
 		}
+	},
+}
+
+var dagstoreRecoverShardCmd = &cli.Command{
+	Name:      "recover-shard",
+	ArgsUsage: "[key]",
+	Usage:     "Attempt to recover a shard in errored state",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:        "color",
+			Usage:       "use color in display output",
+			DefaultText: "depends on output being a TTY",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		if cctx.IsSet("color") {
+			color.NoColor = !cctx.Bool("color")
+		}
+
+		if cctx.NArg() != 1 {
+			return fmt.Errorf("must provide a single shard key")
+		}
+
+		napi, closer, err := bcli.GetBoostAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		ctx := lcli.ReqContext(cctx)
+
+		return napi.BoostDagstoreRecoverShard(ctx, cctx.Args().First())
 	},
 }
