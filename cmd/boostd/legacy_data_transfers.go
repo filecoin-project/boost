@@ -112,7 +112,7 @@ var marketCancelTransfer = &cli.Command{
 		if !cctx.Args().Present() {
 			return cli.ShowCommandHelp(cctx, cctx.Command.Name)
 		}
-		nodeApi, closer, err := lcli.GetMarketsAPI(cctx)
+		nodeApi, closer, err := bcli.GetBoostAPI(cctx)
 		if err != nil {
 			return err
 		}
