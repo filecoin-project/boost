@@ -34,6 +34,7 @@
   * [LogList](#loglist)
   * [LogSetLevel](#logsetlevel)
 * [Market](#market)
+  * [MarketCancelDataTransfer](#marketcanceldatatransfer)
   * [MarketDataTransferUpdates](#marketdatatransferupdates)
   * [MarketGetAsk](#marketgetask)
   * [MarketGetRetrievalAsk](#marketgetretrievalask)
@@ -563,6 +564,22 @@ Response: `{}`
 
 ## Market
 
+
+### MarketCancelDataTransfer
+
+
+Perms: write
+
+Inputs:
+```json
+[
+  3,
+  "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+  true
+]
+```
+
+Response: `{}`
 
 ### MarketDataTransferUpdates
 
