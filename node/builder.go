@@ -408,6 +408,9 @@ func ConfigBoost(c interface{}) Option {
 	if err != nil {
 		return Error(fmt.Errorf("failed to parse cfg.Wallets.Miner: %s; err: %w", cfg.Wallets.Miner, err))
 	}
+	if len(cfg.DAGStore.RootDir) > 0 {
+		return Error(fmt.Errorf("A custom dagstore path is not supported. Please ensure that dagstore is present under BOOST REPO."))
+	}
 
 	return Options(
 		ConfigCommon(&cfg.Common),
