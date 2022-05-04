@@ -10,7 +10,7 @@ import {humanFileSize} from "./util";
 import {ShowBanner} from "./Banner";
 
 export function DealPublishPage(props) {
-    return <PageContainer pageType="deal-publish" title="Publish Deals">
+    return <PageContainer icon={<DealPublishIcon />} title="Publish Deals">
         <DealPublishContent />
     </PageContainer>
 }
@@ -40,21 +40,21 @@ function DealPublishContent() {
     var publishTime = moment(data.dealPublish.Start).add(period)
 
     var deals = data.dealPublish.Deals
-    return <div>
+    return <div className="publish-actions">
         {deals.length ? (
             <>
             <p>
-                {deals.length} deal{deals.length === 1 ? '' : 's'} will be published
+                <b>{deals.length}</b> deal{deals.length === 1 ? '' : 's'} will be published
                 at <b>{publishTime.format('HH:mm:ss')}</b> (in {publishTime.toNow()})
             </p>
 
             <div className="buttons">
-                <div className="button" onClick={doPublish}>Publish Now</div>
+                <div className="button btn btn-primary" onClick={doPublish}>Publish Now</div>
             </div>
             </>
         ) : null}
 
-        <h3>Deal Publish Config</h3>
+        <h5>Deal Publish Config</h5>
 
         <table className="deal-publish">
             <tbody>
@@ -77,40 +77,38 @@ function DealPublishContent() {
 
 function DealsTable(props) {
     return (
-        <>
-            <h3>Deals</h3>
-
-            <table className="deals">
-                <tbody>
-                    <tr>
-                        <th>Created</th>
-                        <th>Deal ID</th>
-                        <th>Size</th>
-                        <th>Piece Size</th>
-                        <th>Client</th>
+        <table className="table deal-publish-deals">
+            <thead>
+                <tr>
+                    <th>Created</th>
+                    <th>Deal ID</th>
+                    <th>Size</th>
+                    <th>Piece Size</th>
+                    <th>Client</th>
+                </tr>
+            </thead>
+            <tbody>
+                {props.deals.map(deal => (
+                    <tr key={deal.ID}>
+                        <td>{moment(deal.CreatedAt).fromNow()}</td>
+                        <td className="deal-id">
+                            {deal.IsLegacy ? (
+                                <NavLink to={"/legacy-deals/" + deal.ID}>
+                                    <ShortDealID id={deal.ID} />
+                                </NavLink>
+                            ) : (
+                                <ShortDealLink id={deal.ID} />
+                            )}
+                        </td>
+                        <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
+                        <td className="piece-size">{humanFileSize(deal.PieceSize)}</td>
+                        <td className="client">
+                            <ShortClientAddress address={deal.ClientAddress} />
+                        </td>
                     </tr>
-                    {props.deals.map(deal => (
-                        <tr key={deal.ID}>
-                            <td>{moment(deal.CreatedAt).fromNow()}</td>
-                            <td className="deal-id">
-                                {deal.IsLegacy ? (
-                                    <NavLink to={"/legacy-deals/" + deal.ID}>
-                                        <ShortDealID id={deal.ID} />
-                                    </NavLink>
-                                ) : (
-                                    <ShortDealLink id={deal.ID} />
-                                )}
-                            </td>
-                            <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
-                            <td className="piece-size">{humanFileSize(deal.PieceSize)}</td>
-                            <td className="client">
-                                <ShortClientAddress address={deal.ClientAddress} />
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </>
+                ))}
+            </tbody>
+        </table>
     )
 }
 
@@ -123,7 +121,7 @@ export function DealPublishMenuItem(props) {
     return (
         <NavLink key="deal-publish" className="sidebar-item sidebar-item-deals" to="/deal-publish">
             <span className="sidebar-icon">
-                <svg width="24" height="26" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="7" rx="2" stroke-width="2"/><rect x="23" y="25" width="9" height="7" rx="2" transform="rotate(-180 23 25)" stroke-width="2"/><rect x="1" y="12" width="9" height="13" rx="2" stroke-width="2"/><rect x="23" y="14" width="9" height="13" rx="2" transform="rotate(-180 23 14)" stroke-width="2"/></svg>
+                <DealPublishIcon />
             </span>
             <span className="sidebar-title">
                 Publish Deals
@@ -137,4 +135,10 @@ export function DealPublishMenuItem(props) {
             ) : null}
         </NavLink>
     )
+}
+
+function DealPublishIcon(props) {
+    return <svg width="25" height="26" viewBox="0 0 25 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M1 11.046L24 1l-9.31 24-5.476-8.93L1 11.046zM9 16L24 1" stroke-width="2" stroke-linejoin="round" />
+    </svg>
 }

@@ -1,4 +1,4 @@
-import {BrowserRouter, NavLink} from "react-router-dom";
+import {NavLink} from "react-router-dom";
 import {StorageDealsMenuItem} from "./Deals";
 import {StorageSpaceMenuItem} from "./StorageSpace";
 import {DealPublishMenuItem} from "./DealPublish";
@@ -6,7 +6,6 @@ import {DealTransfersMenuItem} from "./DealTransfers";
 import {SealingPipelineMenuItem} from "./SealingPipeline";
 import {FundsMenuItem} from "./Funds";
 import gridImg from './bootstrap-icons/icons/grid-3x3-gap.svg'
-// import './Menu.css'
 import {SettingsMenuItem} from "./Settings";
 
 export function Menu() {
@@ -30,9 +29,6 @@ export function Menu() {
                 </div>
             </div>
         </div>
-        //
-        // <td onClick={scrollToTop} className="menu">
-        // </td>
     )
 }
 

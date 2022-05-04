@@ -7,11 +7,10 @@ import './SealingPipeline.css'
 import {dateFormat} from "./util-date";
 import moment from 'moment';
 import {NavLink} from "react-router-dom";
-import layerBackwardImg from './bootstrap-icons/icons/layer-backward.svg'
 import {CumulativeBarChart} from "./CumulativeBarChart";
 
 export function SealingPipelinePage(props) {
-    return <PageContainer pageType="sealing-pipeline" title="Sealing Pipeline">
+    return <PageContainer icon={<SealingPipelineIcon />} title="Sealing Pipeline">
         <SealingPipelineContent />
     </PageContainer>
 }
@@ -36,23 +35,19 @@ function SealingPipelineContent(props) {
 }
 
 function WaitDeals(props) {
-    return <table className="wait-deals">
-        <tbody>
-        <tr>
-            <td className="wait-deals-type">
-                <WaitDealsType sectors={props.wdSectors} name="Regular"/>
-            </td>
-            <td className="wait-deals-type">
-                <WaitDealsType sectors={props.sdwdSectors} name="Snap Deals"/>
-            </td>
-        </tr>
-        </tbody>
-    </table>
+    return <div className="wait-deals split-pane">
+        <div className="wait-deals-type split-pane-half">
+            <WaitDealsType sectors={props.wdSectors} name="Regular"/>
+        </div>
+        <div className="wait-deals-type split-pane-half">
+            <WaitDealsType sectors={props.sdwdSectors} name="Snap Deals"/>
+        </div>
+    </div>
 }
 
 function WaitDealsType(props) {
     return <div>
-        <div className="title">{props.name} Wait Deals</div>
+        <h5>{props.name} Wait Deals</h5>
         { props.sectors.length ? (
             props.sectors.map(s => <WaitDealsSector sector={s}/>)
         ) : (
@@ -114,18 +109,14 @@ function WaitDealsSizes(props) {
 
 function Sealing(props) {
     return (
-        <table className="sealing">
-            <tbody>
-            <tr>
-                <td className="sealing-type">
-                    <SealingType states={props.states} sectorType="Regular" />
-                </td>
-                <td className="sealing-type">
-                    <SealingType states={props.states} sectorType="Snap Deals" />
-                </td>
-            </tr>
-            </tbody>
-        </table>
+        <div className="sealing split-pane section">
+            <div className="sealing-type split-pane-half">
+                <SealingType states={props.states} sectorType="Regular" />
+            </div>
+            <div className="sealing-type split-pane-half">
+                <SealingType states={props.states} sectorType="Snap Deals" />
+            </div>
+        </div>
     )
 }
 
@@ -145,7 +136,7 @@ function SealingType(props) {
     const title = props.sectorType === 'Snap Deals' ? 'Snap Deals Sectors' : 'Regular Sectors'
     const className = props.sectorType.toLowerCase().replace(/ /g, '_')
     return <div className={"sealing-type-content " + className}>
-        <div className="title">{title}</div>
+        <h5>{title}</h5>
 
         <table className="sector-states">
             <tbody>
@@ -163,7 +154,7 @@ function SealingType(props) {
 
 function Workers(props) {
     return <div className="workers">
-        <div className="title">Workers</div>
+        <h5>Workers</h5>
         {props.workers.length === 0 ? <div className="no-workers">No active jobs</div> : (
             <table>
                 <tbody>
@@ -211,7 +202,7 @@ export function SealingPipelineMenuItem(props) {
 
     return <NavLink key="sealing-pipeline" className="sidebar-item sidebar-item-deals" to="/sealing-pipeline">
         <span class="sidebar-icon">
-            <svg width="26" height="22" viewBox="0 0 26 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="24" height="6" rx="2" stroke-width="2"/><path d="M14 1a1 1 0 1 0-2 0h2zm-1.707 20.707a1 1 0 0 0 1.414 0l6.364-6.364a1 1 0 0 0-1.414-1.414L13 19.586l-5.657-5.657a1 1 0 0 0-1.414 1.414l6.364 6.364zM12 1v20h2V1h-2z" class="both" /></svg>
+            <SealingPipelineIcon />
         </span>
         <span class="sidebar-title">Sealing Pipeline</span>
         <div class="sidebar-item-excerpt">
@@ -219,4 +210,14 @@ export function SealingPipelineMenuItem(props) {
           <span class="label">Sector{total === 1 ? '' : 's'}</span>
         </div>
     </NavLink>
+}
+
+export function SealingPipelineIcon(props) {
+    return <svg width="26" height="22" viewBox="0 0 26 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="24" height="6" rx="2" stroke-width="2"/>
+        <path
+            d="M14 1a1 1 0 1 0-2 0h2zm-1.707 20.707a1 1 0 0 0 1.414 0l6.364-6.364a1 1 0 0 0-1.414-1.414L13 19.586l-5.657-5.657a1 1 0 0 0-1.414 1.414l6.364 6.364zM12 1v20h2V1h-2z"
+            fill="currentColor"
+            className="both"/>
+    </svg>
 }

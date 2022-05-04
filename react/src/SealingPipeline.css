@@ -1,8 +1,16 @@
-.sealing-pipeline .title {
-    font-size: 1.2em;
+.sealing-pipeline h5 {
     padding: 1em;
-    margin-top: 1em;
-    color: #a61e4d;
+}
+
+.sealing-pipeline .section {
+    margin-bottom: 2em;
+}
+
+.sealing-pipeline .split-pane-half:first-child {
+    margin-right: 0.5em;
+}
+.sealing-pipeline .split-pane-half:last-child {
+    margin-left: 0.5em;
 }
 
 .sealing-pipeline .wait-deals-sector {
@@ -16,12 +24,6 @@
 
 .sealing-pipeline .wait-deals .no-deals {
     padding: 1em;
-}
-
-table.wait-deals td.wait-deals-type {
-    width: 50%;
-    vertical-align: top;
-    padding: 0;
 }
 
 .sealing-pipeline .cumulative-bar-chart {
@@ -42,12 +44,6 @@ table.wait-deals td.wait-deals-type {
 
 .wait-deals-sizes .free {
     color: #777
-}
-
-table.sealing td.sealing-type {
-    width: 50%;
-    vertical-align: top;
-    padding: 0;
 }
 
 .sealing-pipeline table {
@@ -82,7 +78,7 @@ table.sealing td.sealing-type {
 }
 
 .sealing-pipeline td.state {
-    padding-left: 0.25em;
+    padding-left: 0.75em;
     width: 8em;
 }
 

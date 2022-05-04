@@ -1,0 +1,53 @@
+.bar-limit {
+    min-width: 6em;
+}
+
+.chart .amounts .section {
+    margin-bottom: 2em;
+}
+
+.chart .wallet-address {
+    padding: 0 0 1em 0;
+    font-size: 0.8em;
+}
+
+.chart .pubmsg-wallet .bar-content {
+    height: 4em;
+}
+
+.top-up .button {
+    display: inline-block;
+}
+
+.top-up-form input {
+    margin: 0 1em 1em 0;
+}
+
+.top-up-form .button.cancel {
+    background-color: #999;
+    margin-left: 1em;
+}
+
+.funds-logs-section {
+    margin-top: 2em;
+}
+
+.funds-logs-section h5 {
+    margin: 1em;
+}
+
+.funds-logs td, .funds-logs th {
+    padding: 0.5em 1em;
+}
+
+.tagged {
+    background-color: $blue;
+}
+
+.available, .balance {
+    background-color: $grey;
+}
+
+.locked {
+    background-color: $bluegrey;
+}

@@ -25,3 +25,10 @@ body {
     }
   }
 }
+.split-pane {
+   display: flex;
+}
+.split-pane-half {
+  vertical-align: top;
+  flex: 1;
+}

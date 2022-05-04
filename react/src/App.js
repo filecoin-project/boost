@@ -16,7 +16,6 @@ import {DealDetail} from "./DealDetail";
 import {Epoch} from "./Epoch";
 import {LegacyDealDetail} from "./LegacyDealDetail"
 import {SettingsPage} from "./Settings";
-import {Banner} from "./Banner";
 
 function App() {
     return (
@@ -31,44 +30,29 @@ function App() {
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
               </button>
+              <Epoch />
   			</header>
 
-            <Menu />
-
             <main>
-                { <Epoch /> }
+                <Menu />
                 <div className="main-wrapper">
-
-                    <div className="page-header">
-                        <span className="page-header-icon">
-                            <svg width="24" height="26" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="7" rx="2" stroke-width="2"/><rect x="23" y="25" width="9" height="7" rx="2" transform="rotate(-180 23 25)" stroke-width="2"/><rect x="1" y="12" width="9" height="13" rx="2" stroke-width="2"/><rect x="23" y="14" width="9" height="13" rx="2" transform="rotate(-180 23 14)" stroke-width="2"/></svg>
-                        </span>
-                        <h1>
-                            Storage Deals
-                            (<span className="storage-deals-figure" id="storage-deals-page-header-figure">6</span>)
-                        </h1>
-                    </div>
-
-                    <div className="page-content">
-                        <Banner />
-                        <Routes>
-                            <Route path="/storage-deals" element={<StorageDealsPage />} />
-                            <Route path="/storage-deals/from/:cursor/page/:pageNum" element={<StorageDealsPage />} />
-                            <Route path="/legacy-storage-deals" element={<LegacyStorageDealsPage />} />
-                            <Route path="/legacy-storage-deals/from/:cursor/page/:pageNum" element={<LegacyStorageDealsPage />} />
-                            <Route path="/storage-space" element={<StorageSpacePage />} />
-                            <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
-                            <Route path="/funds" element={<FundsPage />} />
-                            <Route path="/funds/from/:cursor/page/:pageNum" element={<FundsPage />} />
-                            <Route path="/deal-publish" element={<DealPublishPage />} />
-                            <Route path="/deal-transfers" element={<DealTransfersPage />} />
-                            <Route path="/mpool" element={<MpoolPage />} />
-                            <Route path="/settings" element={<SettingsPage />} />
-                            <Route path="/deals/:dealID" element={<DealDetail />} />
-                            <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
-                            <Route path="/" element={<StorageDealsPage />} />
-                        </Routes>
-                    </div>
+                    <Routes>
+                        <Route path="/storage-deals" element={<StorageDealsPage />} />
+                        <Route path="/storage-deals/from/:cursor/page/:pageNum" element={<StorageDealsPage />} />
+                        <Route path="/legacy-storage-deals" element={<LegacyStorageDealsPage />} />
+                        <Route path="/legacy-storage-deals/from/:cursor/page/:pageNum" element={<LegacyStorageDealsPage />} />
+                        <Route path="/storage-space" element={<StorageSpacePage />} />
+                        <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
+                        <Route path="/funds" element={<FundsPage />} />
+                        <Route path="/funds/from/:cursor/page/:pageNum" element={<FundsPage />} />
+                        <Route path="/deal-publish" element={<DealPublishPage />} />
+                        <Route path="/deal-transfers" element={<DealTransfersPage />} />
+                        <Route path="/mpool" element={<MpoolPage />} />
+                        <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/deals/:dealID" element={<DealDetail />} />
+                        <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
+                        <Route path="/" element={<StorageDealsPage />} />
+                    </Routes>
                 </div>
             </main>
         </BrowserRouter>

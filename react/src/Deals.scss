@@ -1,0 +1,10 @@
+table.storage-deals {
+  td {
+    white-space: nowrap;
+    padding: 10px 20px;
+  }
+  td.message {
+    white-space: normal;
+    word-break: break-all;
+  }
+}

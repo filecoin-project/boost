@@ -2,15 +2,13 @@ import {useQuery} from "@apollo/react-hooks";
 import {LegacyStorageQuery, StorageQuery} from "./gql";
 import React from "react";
 import {addCommas, humanFileSize} from "./util";
-import './StorageSpace.css'
-import archiveImg from './bootstrap-icons/icons/archive.svg'
 import {PageContainer} from "./Components";
 import {NavLink} from "react-router-dom";
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import {Info} from "./Info"
 
 export function StorageSpacePage(props) {
-    return <PageContainer pageType="storage-space" title="Storage Space">
+    return <PageContainer icon={<StorageSpaceIcon />} title="Storage Space">
         <StorageSpaceContent />
         <LegacyStorageSpaceContent />
     </PageContainer>
@@ -51,7 +49,7 @@ function StorageSpaceContent(props) {
     }]
 
     return <>
-        <h3>Deal transfers</h3>
+        <h5>Deal transfers</h5>
 
         <div className="storage-chart">
             <CumulativeBarChart bars={bars} unit="byte" />
@@ -96,6 +94,10 @@ function LegacyStorageSpaceContent(props) {
         return null
     }
 
+    var free = storage.Capacity - storage.Used
+    if (free < 0) {
+        free = 0
+    }
     const bars = [{
         name: 'Used',
         className: 'used',
@@ -103,11 +105,11 @@ function LegacyStorageSpaceContent(props) {
     }, {
         name: 'Free',
         className: 'free',
-        amount: storage.Capacity - storage.Used,
+        amount: free,
     }]
 
     return <div className="legacy-deal-transfers">
-        <h3>Legacy Deal transfers</h3>
+        <h5>Legacy Deal transfers</h5>
 
         <div className="storage-chart">
             <CumulativeBarChart bars={bars} unit="byte" />
@@ -165,7 +167,7 @@ export function StorageSpaceMenuItem(props) {
     return (
         <NavLink key="storage-space" className="sidebar-item sidebar-item-deals" to="/storage-space">
             <span className="sidebar-icon">
-              <svg width="26" height="25" viewBox="0 0 26 25" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7h20v15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="#415364" stroke-width="2"/><rect x="1" y="1" width="24" height="6" rx="2" stroke="#415364" stroke-width="2"/><path fill="#415364" d="M8 11h10v2H8z"/></svg>
+                <StorageSpaceIcon />
             </span>
             <span className="sidebar-title">Storage Space</span>
             <div className="sidebar-item-excerpt">
@@ -177,13 +179,20 @@ export function StorageSpaceMenuItem(props) {
                         {/*<CumulativeBarChart bars={bars} unit="byte" compact={true} />*/}
                         <div className="explanation">
                             <span className="numerator">{humanFileSize(used)}</span>
-                            <span> of </span>
+                            <span> / </span>
                             <span className="denominator">{humanFileSize(totalSize)}</span>
-                            <span> used</span>
                         </div>
                     </div>
                 </div>
             </div>
         </NavLink>
     )
+}
+
+function StorageSpaceIcon(props) {
+    return <svg width="26" height="25" viewBox="0 0 26 25" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 7h20v15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke-width="2"/>
+        <rect x="1" y="1" width="24" height="6" rx="2" stroke-width="2"/>
+        <path d="M8 11h10v2H8z"/>
+    </svg>
 }

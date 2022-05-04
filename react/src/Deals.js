@@ -14,19 +14,16 @@ import {dateFormat} from "./util-date";
 import {LegacyStorageDealsCount} from "./LegacyDeals";
 import {TimestampFormat} from "./timestamp";
 import {DealsPerPage} from "./deals-per-page";
-import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
-// import './Deals.css'
 import {Pagination} from "./Pagination";
 import {Warn} from "./Info";
 
 export function StorageDealsPage(props) {
-    // return <PageContainer pageType="storage-deals" title="Storage Deals">
-    //     <StorageDealsContent />
-    // </PageContainer>
-    return <StorageDealsContent />
+    return <PageContainer icon={<StorageDealsIcon />} title="Storage Deals">
+        <StorageDealsContent />
+    </PageContainer>
 }
 
-function StorageDealsContent(props) {
+export function StorageDealsContent(props) {
     const navigate = useNavigate()
     const params = useParams()
     const [subDeals, setSubDeals] = useState([])
@@ -103,9 +100,8 @@ function StorageDealsContent(props) {
 
     return (
         <div className="section">
-            <NavLink key="legacy-storage-deals" to="/legacy-storage-deals">Legacy Deals</NavLink>
             <div className="table-wrapper">
-                <table className="table table-striped">
+                <table className="table table-striped storage-deals">
                     <thead>
                         <tr>
                             <th onClick={toggleTimestampFormat} className="start">Start</th>
@@ -131,26 +127,6 @@ function StorageDealsContent(props) {
             </div>
         </div>
     )
-        // <table>
-        //     <tbody>
-        //     <tr>
-        //         <th onClick={toggleTimestampFormat} className="start">Start</th>
-        //         <th>Deal ID</th>
-        //         <th>Size</th>
-        //         <th>Client</th>
-        //         <th>State</th>
-        //     </tr>
-        //
-        //     {deals.map(deal => (
-        //         <DealRow
-        //             key={deal.ID}
-        //             deal={deal}
-        //             timestampFormat={timestampFormat}
-        //             toggleTimestampFormat={toggleTimestampFormat}
-        //         />
-        //     ))}
-        //     </tbody>
-        // </table>
 }
 
 function DealRow(props) {
@@ -168,7 +144,7 @@ function DealRow(props) {
     }
 
     var start = moment(deal.CreatedAt).format(dateFormat)
-    if (props.timestampFormat !== TimestampFormat.DateTime) {
+    if (!props.timestampFormat !== TimestampFormat.DateTime) {
         start = '1m'
         if (new Date().getTime() - deal.CreatedAt.getTime() > 60 * 1000) {
             start = moment(deal.CreatedAt).fromNow()
@@ -209,48 +185,39 @@ export function StorageDealsMenuItem(props) {
     data = data || { dealsCount: '...' }
 
     return (
-        <NavLink key="storage-deals" to="/storage-deals" className="sidebar-item sidebar-item-deals">
+        <div key="storage-deals" to="/storage-deals" className="sidebar-item sidebar-item-deals">
             <span className="sidebar-icon">
-                <svg width="24" height="26" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="1" y="1" width="9" height="7" rx="2" stroke-width="2"/>
-                    <rect x="23" y="25" width="9" height="7" rx="2" transform="rotate(-180 23 25)" stroke-width="2"/>
-                    <rect x="1" y="12" width="9" height="13" rx="2" stroke-width="2"/>
-                    <rect x="23" y="14" width="9" height="13" rx="2" transform="rotate(-180 23 14)" stroke-width="2"/>
-                </svg>
+                <StorageDealsIcon />
             </span>
-            <span className="sidebar-title">Storage Deals</span>
+            <span className="sidebar-title">
+                <NavLink to="/storage-deals">Storage Deals</NavLink>
+            </span>
             <div className="sidebar-item-excerpt">
-                <div className="row">
-                    <div className="col-sm-6">
+                <NavLink to="/storage-deals" className="row">
+                    <div className="col-sm-12">
                         <span className="figure">{data.dealsCount}</span>
                         <span className="label">Deal{data.dealsCount === 1 ? '' : 's'}</span>
                     </div>
-                    <div className="col-sm-6">
+                </NavLink>
+                <NavLink to="/legacy-storage-deals" className="row">
+                    <div className="col-sm-12">
                         <LegacyStorageDealsCount />
                     </div>
-                </div>
+                </NavLink>
             </div>
-        </NavLink>
-    //
-    //
-    // <div className="menu-item" >
-    //         <img className="icon" alt="" src={columnsGapImg} />
-    //         <NavLink key="storage-deals" to="/storage-deals">
-    //                 <h3>Storage Deals</h3>
-    //         </NavLink>
-    //         {data ? (
-    //             <NavLink key="legacy-storage-deals" to="/storage-deals">
-    //                 <div className="menu-desc">
-    //                     <b>{data.dealsCount}</b> deal{data.dealsCount === 1 ? '' : 's'}
-    //                 </div>
-    //             </NavLink>
-    //         ) : null}
-
-    //         <LegacyStorageDealsCount />
-    //     </div>
+        </div>
     )
 }
 
 function scrollTop() {
     window.scrollTo({ top: 0, behavior: "smooth" })
+}
+
+export function StorageDealsIcon(props) {
+    return <svg width="24" height="26" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="9" height="7" rx="2" stroke-width="2"/>
+        <rect x="23" y="25" width="9" height="7" rx="2" transform="rotate(-180 23 25)" stroke-width="2"/>
+        <rect x="1" y="12" width="9" height="13" rx="2" stroke-width="2"/>
+        <rect x="23" y="14" width="9" height="13" rx="2" transform="rotate(-180 23 14)" stroke-width="2"/>
+    </svg>
 }

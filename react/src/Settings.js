@@ -9,10 +9,9 @@ import moment from "moment"
 import settingsImg from './bootstrap-icons/icons/gear.svg'
 import './Settings.css'
 import {addCommas, humanFIL, humanFileSize, oneNanoFil} from "./util";
-import gridImg from "./bootstrap-icons/icons/grid-3x3-gap.svg";
 
 export function SettingsPage(props) {
-    return <PageContainer pageType="settings" title="Settings">
+    return <PageContainer icon={<SettingsIcon />} title="Settings">
         <SettingsContent />
     </PageContainer>
 }
@@ -38,16 +37,16 @@ function Libp2pInfo(props) {
 
     return (
         <div className="libp2p">
-            <h3>Libp2p</h3>
-            <table>
+            <h5>Libp2p</h5>
+            <table className="horizontal-table fixed-width">
                 <tbody>
                     <tr>
                         <th>Peer ID</th>
-                        <td>{data.libp2pAddrInfo.PeerID}</td>
+                        <td className="fixed-width">{data.libp2pAddrInfo.PeerID}</td>
                     </tr>
                     <tr>
                         <th>Addresses</th>
-                        <td>
+                        <td className="fixed-width">
                             {data.libp2pAddrInfo.Addresses.map(addr => {
                                 return <div key={addr}>{addr}</div>
                             })}
@@ -55,7 +54,7 @@ function Libp2pInfo(props) {
                     </tr>
                     <tr>
                         <th>Protocols</th>
-                        <td>
+                        <td className="fixed-width">
                             {data.libp2pAddrInfo.Protocols.map(proto => {
                                 return <div key={proto}>{proto}</div>
                             })}
@@ -79,8 +78,8 @@ function StorageAsk(props) {
 
     return (
         <div className="storage-ask">
-            <h3>Storage Ask</h3>
-            <table>
+            <h5>Storage Ask</h5>
+            <table className="horizontal-table">
                 <tbody>
                     <EditableField
                         name="Price"
@@ -109,7 +108,7 @@ function StorageAsk(props) {
                         <td>
                             {addCommas(data.storageAsk.ExpiryEpoch)}
                             <span className="expiry-time">
-                                {(moment(data.storageAsk.ExpiryTime).fromNow())}
+                                ({(moment(data.storageAsk.ExpiryTime).fromNow())})
                             </span>
                         </td>
                     </tr>
@@ -130,11 +129,16 @@ export function EditableField(props) {
     const handleValChange = (event) => {
         setCurrentVal(event.target.value)
     }
+
+    var sanitizedVal = currentVal
+    if (sanitizedVal.indexOf('.') >= 0) {
+        sanitizedVal = sanitizedVal.replace(/\..*/, '')
+    }
     const save = () => {
         const update = {}
-        var rawVal = currentVal || 0
+        var rawVal = sanitizedVal || 0
         if (isCurrency) {
-            rawVal = BigInt(currentVal)
+            rawVal = BigInt(sanitizedVal)
             setCurrentVal(rawVal+'')
         }
         update[props.fieldName] = rawVal
@@ -146,9 +150,9 @@ export function EditableField(props) {
 
     var displayVal
     if (isCurrency) {
-        displayVal = addCommas(currentVal) + ' atto'
+        displayVal = addCommas(sanitizedVal) + ' atto'
     } else {
-        displayVal = humanFileSize(BigInt(currentVal)) + ''
+        displayVal = humanFileSize(BigInt(sanitizedVal)) + ''
     }
 
     const cancel = () => {
@@ -166,18 +170,18 @@ export function EditableField(props) {
                         value={currentVal}
                         onChange={handleValChange}
                     /> {isCurrency ? 'atto' : 'bytes'}
-                    <div className="button" onClick={save}>Save</div>
-                    <div className="button cancel" onClick={cancel}>Cancel</div>
-                    { BigInt(currentVal) > oneNanoFil ? (
-                        <span className="human">({humanFIL(BigInt(currentVal))})</span>
+                    <div className="button btn btn-primary" onClick={save}>Save</div>
+                    <div className="button cancel btn btn-primary" onClick={cancel}>Cancel</div>
+                    { BigInt(sanitizedVal) > oneNanoFil ? (
+                        <span className="human">({humanFIL(BigInt(sanitizedVal))})</span>
                     ) : null }
                 </td>
             ) : (
                 <td className="val" onClick={() => setEditing(true)}>
                     {displayVal}
                     <span className="edit" />
-                    { BigInt(currentVal) > oneNanoFil ? (
-                        <span className="human">({humanFIL(BigInt(currentVal))})</span>
+                    { BigInt(sanitizedVal) > oneNanoFil ? (
+                        <span className="human">({humanFIL(BigInt(sanitizedVal))})</span>
                     ) : null }
                 </td>
             )}
@@ -189,9 +193,19 @@ export function SettingsMenuItem(props) {
     return (
         <NavLink key="settings" className="sidebar-item sidebar-item-deal-transfers" to="/settings">
             <span className="sidebar-icon">
-                <img className="icon" alt="Settings Icon" src={settingsImg} />
+                <SettingsIcon />
             </span>
             <span className="sidebar-title">Settings</span>
         </NavLink>
     )
+}
+
+function SettingsIcon(props) {
+    return <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-gear"
+                viewBox="0 0 16 16">
+        <path
+            d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
+        <path
+            d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
+    </svg>
 }

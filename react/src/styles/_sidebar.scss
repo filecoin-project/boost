@@ -1,37 +1,19 @@
 .sidebar {
-	position:fixed;
-	top:0;
-	left:-100%;
-	width:100%;
-	height:100vh;
-	padding-top:$mobileheaderHeight;
+	display: inline-block;
 	transition: 0.25s ease;
-	z-index: 9;
 	background: $body-bg;
 
 	@include media-breakpoint-up(md) {
-		padding-top:$headerHeight;
-		left:-$sidebarWidth;
-		width:$sidebarWidth;
+		flex: 0 0 $sidebarWidth;
 	}
 	@include media-breakpoint-up(lg) {
-		left:-$fullsidebarWidth;
-		width:$fullsidebarWidth;
+		flex: 0 0 $fullsidebarWidth;
 	}
 	@include media-breakpoint-up(xl) {
-		width:$sidebarWidth;
-		left:0;
+		flex: 0 0 $sidebarWidth;
 	}
 	@include media-breakpoint-up(xxl) {
-		width:$fullsidebarWidth;
-	}
-	@media (min-height: 1000px) {
-		padding-top:$fullheaderHeight;
-	}
-}
-.menu-open {
-	.sidebar {
-		left:0;
+		flex: 0 0 $fullsidebarWidth;
 	}
 }
 .sidebar-wrapper {
@@ -39,7 +21,6 @@
 	overflow-y:auto;
 }
 .sidebar-item {
-	display: block;
 	padding:15px 25px;
 	text-decoration: none;
 	display: flex;
@@ -53,6 +34,10 @@
 		padding:15px 40px;
 	}
 
+	a {
+		color: inherit;
+		text-decoration: inherit;
+	}
 	&:hover {
 		background: $tertiary;
 		color:$primary;
@@ -77,6 +62,13 @@
 			}
 		}
 
+		width: 25px;
+		height: 24px;
+	}
+
+	.icon {
+		width: 24px;
+		height: 26px;
 	}
 }
 .sidebar-title {

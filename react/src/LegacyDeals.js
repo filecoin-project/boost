@@ -11,9 +11,12 @@ import {dateFormat} from "./util-date";
 import {TimestampFormat} from "./timestamp";
 import {DealsPerPage} from "./deals-per-page";
 import {Pagination} from "./Pagination";
+import {StorageDealsContent, StorageDealsIcon} from "./Deals";
 
 export function LegacyStorageDealsPage(props) {
-    return <LegacyStorageDealsContent />
+    return <PageContainer icon={<StorageDealsIcon />} title="Legacy Storage Deals">
+        <LegacyStorageDealsContent />
+    </PageContainer>
 }
 
 function LegacyStorageDealsContent(props) {
@@ -67,7 +70,6 @@ function LegacyStorageDealsContent(props) {
     }
 
     return <div className="section">
-        <NavLink key="storage-deals" to="/storage-deals">v1.2 Deals</NavLink>
         <table className="table table-striped">
             <thead>
                 <tr>

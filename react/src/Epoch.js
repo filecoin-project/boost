@@ -16,7 +16,7 @@ export function Epoch(props) {
     return (
         <div className="epoch">
             {addCommas(data.epoch.Epoch)}
-            <Info>Chain Height</Info>
+            <Info invertColor={true}>Chain Height</Info>
         </div>
     )
 }

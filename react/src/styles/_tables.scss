@@ -28,3 +28,20 @@ tbody {
 .table-wrapper {
 	overflow-x: scroll;
 }
+.horizontal-table {
+	th {
+		color: $ltestgrey;
+		vertical-align: top;
+		padding: 1em;
+		color: inherit;
+		font-weight: normal;
+		font-size: inherit;
+	}
+	td {
+		padding: 1em;
+	}
+}
+.fixed-width {
+	font-size: 0.9em;
+	font-family: "Monaco";
+}
