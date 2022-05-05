@@ -174,7 +174,7 @@ function Workers(props) {
                     <th className="sector">Sector</th>
                 </tr>
                 {props.workers.map(worker => (
-                    <tr key={worker.ID}>
+                    <tr key={worker.ID+worker.Sector}>
                         <td className="start">{moment(worker.Start).format(dateFormat)}</td>
                         <td className="worker-id">{worker.ID}</td>
                         <td className="stage">{worker.Stage}</td>
