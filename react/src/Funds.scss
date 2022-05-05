@@ -33,7 +33,7 @@
 }
 
 .funds-logs-section h5 {
-    margin: 1em;
+    margin: 2em 0 1em 0;
 }
 
 .funds-logs td, .funds-logs th {
@@ -45,7 +45,7 @@
 }
 
 .available, .balance {
-    background-color: $grey;
+    background-color: $progressgrey;
 }
 
 .locked {

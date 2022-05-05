@@ -55,7 +55,7 @@ export function LegacyDealDetail(props) {
                 <img className="icon" alt="" src={closeImg} />
             </div>
             <div className="title">Deal {deal.ID}</div>
-            <table className="deal-fields">
+            <table className="deal-fields horizontal-table">
                 <tbody>
                 <tr>
                     <th>CreatedAt</th>

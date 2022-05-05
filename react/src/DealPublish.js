@@ -4,7 +4,6 @@ import React from "react";
 import moment from "moment";
 import {PageContainer, ShortClientAddress, ShortDealID, ShortDealLink} from "./Components";
 import {NavLink} from "react-router-dom";
-import sendImg from './bootstrap-icons/icons/send.svg'
 import './DealPublish.css'
 import {humanFileSize} from "./util";
 import {ShowBanner} from "./Banner";
@@ -70,7 +69,7 @@ function DealPublishContent() {
         </table>
 
         { deals.length ? <DealsTable deals={deals} /> : (
-            <p>There are no deals in the batch publish queue</p>
+            <p className="no-deals">There are no deals in the batch publish queue</p>
         ) }
     </div>
 }
@@ -139,6 +138,6 @@ export function DealPublishMenuItem(props) {
 
 function DealPublishIcon(props) {
     return <svg width="25" height="26" viewBox="0 0 25 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M1 11.046L24 1l-9.31 24-5.476-8.93L1 11.046zM9 16L24 1" stroke-width="2" stroke-linejoin="round" />
+        <path d="M1 11.046L24 1l-9.31 24-5.476-8.93L1 11.046zM9 16L24 1" strokeWidth="2" strokeLinejoin="round" />
     </svg>
 }

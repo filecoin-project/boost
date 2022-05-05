@@ -1,5 +1,5 @@
 .cumulative-bar-chart {
-    padding-right: 5em;
+    padding-right: 6.5em;
     position: relative;
 }
 
@@ -8,7 +8,6 @@
 }
 
 .cumulative-bar-chart .total {
-    font-size: 0.8em;
     width: 5em;
     display: inline-block;
     position: absolute;
@@ -21,32 +20,21 @@
 }
 
 .cumulative-bar-chart .bars {
-    border-radius: 0.5em;
     margin-bottom: 0.5em;
 }
 
 .cumulative-bar-chart.compact .bars {
     line-height: 0.3em;
-    margin-bottom: 0.5em;
 }
 
 .cumulative-bar-chart .bars .bar {
     display: inline-block;
-    height: 1em;
+    height: 1.5em;
+    min-width: 0.1em;
 }
 
 .cumulative-bar-chart.compact .bars .bar {
     height: 0.25em;
-}
-
-.cumulative-bar-chart .bars .bar:first-child {
-    border-top-left-radius: 0.5em;
-    border-bottom-left-radius: 0.5em;
-}
-
-.cumulative-bar-chart .bars .bar:last-child {
-    border-top-right-radius: 0.5em;
-    border-bottom-right-radius: 0.5em;
 }
 
 .cumulative-bar-chart .bars .bar .bar-inner {
@@ -60,13 +48,11 @@
 .cumulative-bar-labels .label {
     display: inline-block;
     padding: 0.5em 1em;
-    font-size: 0.8em;
 }
 
 .cumulative-bar-labels .bar-color {
     width: 0.8em;
     height: 0.8em;
-    border-radius: 0.8em;
     display: inline-block;
 }
 
@@ -76,6 +62,7 @@
 }
 
 .cumulative-bar-labels .amount {
-    padding: 0.25em 0 0 1.4em;
+    padding: 0.25em 0 0 1.7em;
+    font-size: 0.8em;
 }
 

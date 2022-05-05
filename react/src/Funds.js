@@ -60,7 +60,7 @@ function CollateralSource(props) {
     }]
 
     return <div className="collateral-source section">
-        <h6>
+        <h5>
             Deal Collateral Source Wallet
             <Info>
                 The Storage Provider must have sufficient collateral in escrow for each
@@ -72,7 +72,7 @@ function CollateralSource(props) {
                 The Collateral Source Wallet is the wallet from which funds
                 are moved to escrow.
             </Info>
-        </h6>
+        </h5>
         <WalletAddress address={props.collateral.Address} />
         <div className="bar-limit" style={{width: barPct + '%'}}>
             <CumulativeBarChart bars={bars} unit="attoFIL" />
@@ -104,7 +104,7 @@ function FundsEscrow(props) {
     const barPct = props.amtMax ? toPercentage(total, props.amtMax) : 0
 
     return <div className="escrow section">
-        <h6>
+        <h5>
             Deal Collateral in Escrow
             <Info>
                 The Storage Provider must have sufficient collateral in escrow for each
@@ -117,7 +117,7 @@ function FundsEscrow(props) {
                 the collateral for the deal. On publish, the tagged funds are moved on
                 chain from "Available" to "Locked" until the deal is complete.<br/>
             </Info>
-        </h6>
+        </h5>
 
         <div className="bar-content">
             <div className="bar-limit" style={{width: barPct + '%'}}>
@@ -143,13 +143,13 @@ function PubMsgWallet(props) {
     const barPct = props.amtMax ? toPercentage(pubMsg.Balance, props.amtMax) : 0
 
     return <div className="pubmsg-wallet section">
-        <h6>
+        <h5>
             Publish Storage Deals Wallet
             <Info>
                 The Publish Storage Deals Wallet is used to pay the gas cost
                 for sending the Publish Storage Deals message on chain.
             </Info>
-        </h6>
+        </h5>
         <WalletAddress address={props.address} />
         <div className="bar-content">
             <div className="bar-limit" style={{width: barPct + '%'}}>
@@ -315,6 +315,7 @@ export function FundsMenuItem(props) {
         used: 0n,
         free: 0n,
         total: 0n,
+        usedPct: 0,
     }
     const pubMsg = {
         used: 0n,
@@ -327,27 +328,16 @@ export function FundsMenuItem(props) {
         escrow.free = funds.Escrow.Available
         escrow.used = funds.Escrow.Tagged + funds.Escrow.Locked
         escrow.total = escrow.used + escrow.free
+        if (escrow.total > 0) {
+            escrow.usedPct = Number((BigInt(1000) * escrow.used) / escrow.total) / 10
+        }
 
         pubMsg.total = funds.PubMsg.Balance
         pubMsg.used = funds.PubMsg.Tagged
-        escrow.free = escrow.total - escrow.used
+        if (pubMsg.total > 0) {
+            pubMsg.usedPct = Number((BigInt(1000) * pubMsg.used) / pubMsg.total) / 10
+        }
     }
-
-    escrow.bars = [{
-        className: 'used',
-        amount: escrow.used,
-    }, {
-        className: 'free',
-        amount: escrow.free,
-    }]
-
-    pubMsg.bars = [{
-        className: 'used',
-        amount: pubMsg.used,
-    }, {
-        className: 'free',
-        amount: pubMsg.free,
-    }]
 
     return <NavLink key="funds" className="sidebar-item sidebar-item-funds" to="/funds">
         <span className="sidebar-icon">
@@ -359,8 +349,7 @@ export function FundsMenuItem(props) {
                 <div className="col-sm-6">
                     <span className="sub-label">Publish Message</span>
                     <div className="progress">
-                        <span className="bar" style={{width:"0%"}}></span>
-                        {/*<CumulativeBarChart bars={pubMsg.bars} unit="byte" compact={true} />*/}
+                        <span className="bar" style={{width: pubMsg.usedPct+"%"}}></span>
                     </div>
                     <div className="explanation">
                         <span className="numerator">{humanFIL(pubMsg.used)}</span>
@@ -371,8 +360,7 @@ export function FundsMenuItem(props) {
                 <div className="col-sm-6">
                     <span className="sub-label sub-label-escrow">Escrow</span>
                     <div className="progress">
-                        <span className="bar" style={{width:"5%"}}></span>
-                        {/*<CumulativeBarChart bars={escrow.bars} unit="byte" compact={true} />*/}
+                        <span className="bar" style={{width: escrow.usedPct+"%"}}></span>
                     </div>
                     <div className="explanation">
                         <span className="numerator">{humanFIL(escrow.used)}</span>
@@ -387,8 +375,8 @@ export function FundsMenuItem(props) {
 
 function FundsIcon(props) {
     return <svg width="25" height="24" viewBox="0 0 25 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M24 15.13h-4.865a3.236 3.236 0 0 1-3.235-3.235 3.236 3.236 0 0 1 3.235-3.234H24M19.685 11.821h-.374" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <path clip-rule="evenodd" d="M7.306 1.435h10.388A6.306 6.306 0 0 1 24 7.74v8.625a6.306 6.306 0 0 1-6.306 6.306H7.306A6.306 6.306 0 0 1 1 16.366V7.741a6.306 6.306 0 0 1 6.306-6.306z" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M6.45 6.889h6.489" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M24 15.13h-4.865a3.236 3.236 0 0 1-3.235-3.235 3.236 3.236 0 0 1 3.235-3.234H24M19.685 11.821h-.374" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <path clipRule="evenodd" d="M7.306 1.435h10.388A6.306 6.306 0 0 1 24 7.74v8.625a6.306 6.306 0 0 1-6.306 6.306H7.306A6.306 6.306 0 0 1 1 16.366V7.741a6.306 6.306 0 0 1 6.306-6.306z" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M6.45 6.889h6.489" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
 }

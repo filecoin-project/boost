@@ -1,7 +1,3 @@
-h5 {
-    margin: 2em 1em 1em 1em;
-}
-
 .publish-actions p {
     display: inline-block;
     padding-left: 1em
@@ -30,4 +26,8 @@ h5 {
 
 .deal-publish-deals {
     margin-top: 2em;
+}
+
+.no-deals {
+    margin-top: 2em
 }

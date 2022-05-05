@@ -199,7 +199,7 @@ export function StorageDealsMenuItem(props) {
                         <span className="label">Deal{data.dealsCount === 1 ? '' : 's'}</span>
                     </div>
                 </NavLink>
-                <NavLink to="/legacy-storage-deals" className="row">
+                <NavLink to="/legacy-storage-deals" className="row legacy-storage-deals">
                     <div className="col-sm-12">
                         <LegacyStorageDealsCount />
                     </div>
@@ -215,9 +215,9 @@ function scrollTop() {
 
 export function StorageDealsIcon(props) {
     return <svg width="24" height="26" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="1" y="1" width="9" height="7" rx="2" stroke-width="2"/>
-        <rect x="23" y="25" width="9" height="7" rx="2" transform="rotate(-180 23 25)" stroke-width="2"/>
-        <rect x="1" y="12" width="9" height="13" rx="2" stroke-width="2"/>
-        <rect x="23" y="14" width="9" height="13" rx="2" transform="rotate(-180 23 14)" stroke-width="2"/>
+        <rect x="1" y="1" width="9" height="7" rx="2" strokeWidth="2"/>
+        <rect x="23" y="25" width="9" height="7" rx="2" transform="rotate(-180 23 25)" strokeWidth="2"/>
+        <rect x="1" y="12" width="9" height="13" rx="2" strokeWidth="2"/>
+        <rect x="23" y="14" width="9" height="13" rx="2" transform="rotate(-180 23 14)" strokeWidth="2"/>
     </svg>
 }

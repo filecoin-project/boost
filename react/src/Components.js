@@ -1,17 +1,6 @@
 import React from "react";
-import {Link, Route, Routes} from "react-router-dom";
+import {Link} from "react-router-dom";
 import {Banner} from "./Banner";
-import {StorageDealsHeader, StorageDealsPage} from "./Deals";
-import {LegacyStorageDealsPage} from "./LegacyDeals";
-import {StorageSpacePage} from "./StorageSpace";
-import {SealingPipelinePage} from "./SealingPipeline";
-import {FundsPage} from "./Funds";
-import {DealPublishPage} from "./DealPublish";
-import {DealTransfersPage} from "./DealTransfers";
-import {MpoolPage} from "./Mpool";
-import {SettingsPage} from "./Settings";
-import {DealDetail} from "./DealDetail";
-import {LegacyDealDetail} from "./LegacyDealDetail";
 
 export function PageContainer(props) {
     return (<>

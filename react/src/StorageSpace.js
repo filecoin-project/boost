@@ -56,7 +56,7 @@ function StorageSpaceContent(props) {
             <CumulativeBarLabels bars={bars} unit="byte" />
         </div>
 
-        <table className="storage-fields">
+        <table className="storage-fields horizontal-table">
             <tbody>
                 {bars.map(bar => (
                     <tr key={bar.name}>
@@ -116,7 +116,7 @@ function LegacyStorageSpaceContent(props) {
             <CumulativeBarLabels bars={bars} unit="byte" />
         </div>
 
-        <table className="storage-fields">
+        <table className="storage-fields horizontal-table">
             <tbody>
             {bars.map(bar => (
                 <tr key={bar.name}>
@@ -156,14 +156,6 @@ export function StorageSpaceMenuItem(props) {
         used = totalSize - storage.Free
     }
 
-    const bars = [{
-        className: 'used',
-        amount: used,
-    }, {
-        className: 'free',
-        amount: totalSize - used,
-    }]
-
     return (
         <NavLink key="storage-space" className="sidebar-item sidebar-item-deals" to="/storage-space">
             <span className="sidebar-icon">
@@ -176,7 +168,6 @@ export function StorageSpaceMenuItem(props) {
                         <div className="progress">
                             <span className="bar" style={{width:"0%"}}></span>
                         </div>
-                        {/*<CumulativeBarChart bars={bars} unit="byte" compact={true} />*/}
                         <div className="explanation">
                             <span className="numerator">{humanFileSize(used)}</span>
                             <span> / </span>
@@ -191,8 +182,8 @@ export function StorageSpaceMenuItem(props) {
 
 function StorageSpaceIcon(props) {
     return <svg width="26" height="25" viewBox="0 0 26 25" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M3 7h20v15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke-width="2"/>
-        <rect x="1" y="1" width="24" height="6" rx="2" stroke-width="2"/>
+        <path d="M3 7h20v15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" strokeWidth="2"/>
+        <rect x="1" y="1" width="24" height="6" rx="2" strokeWidth="2"/>
         <path d="M8 11h10v2H8z"/>
     </svg>
 }

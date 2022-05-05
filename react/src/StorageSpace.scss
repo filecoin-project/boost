@@ -15,12 +15,11 @@
 }
 
 .storage-chart .free {
-    background-color: rgb(210, 221, 236);
+    background-color: $progressgrey;
 }
 
-.storage-fields td {
-    padding: 0.5em 1em;
-    font-weight: normal;
+.storage-fields {
+    margin-top: 1em;
 }
 
 .legacy-deal-transfers {

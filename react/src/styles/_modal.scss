@@ -1,0 +1,32 @@
+body.modal-open {
+  overflow: hidden;
+}
+
+.modal {
+  position: fixed;
+  background-color: $ltgrey;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  overflow: auto;
+  cursor: auto;
+}
+
+.modal .content {
+  position: relative;
+  width: 800px;
+  margin: 2em auto;
+}
+
+.modal .close {
+  position: absolute;
+  top: -0.25em;
+  right: -2em;
+  font-size: 2em;
+  cursor: pointer;
+}
+
+.modal .close .icon {
+  width: 0.8em;
+}

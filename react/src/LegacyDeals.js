@@ -11,7 +11,7 @@ import {dateFormat} from "./util-date";
 import {TimestampFormat} from "./timestamp";
 import {DealsPerPage} from "./deals-per-page";
 import {Pagination} from "./Pagination";
-import {StorageDealsContent, StorageDealsIcon} from "./Deals";
+import {StorageDealsIcon} from "./Deals";
 
 export function LegacyStorageDealsPage(props) {
     return <PageContainer icon={<StorageDealsIcon />} title="Legacy Storage Deals">
