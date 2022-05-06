@@ -2,6 +2,7 @@ package gql
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/filecoin-project/boost/db"
@@ -24,7 +25,6 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
-	"golang.org/x/xerrors"
 )
 
 type dealListResolver struct {
@@ -158,11 +158,11 @@ func (r *resolver) DealUpdate(ctx context.Context, args struct{ ID graphql.ID })
 	// client
 	dealUpdatesSub, err := r.provider.SubscribeDealUpdates(dealUuid)
 	if err != nil {
-		if xerrors.Is(err, storagemarket.ErrDealHandlerNotFound) {
+		if errors.Is(err, storagemarket.ErrDealHandlerNotFound) {
 			close(net)
 			return net, nil
 		}
-		return nil, xerrors.Errorf("%s: subscribing to deal updates: %w", args.ID, err)
+		return nil, fmt.Errorf("%s: subscribing to deal updates: %w", args.ID, err)
 	}
 	sub := &subLastUpdate{sub: dealUpdatesSub, dealsDB: r.dealsDB, logsDB: r.logsDB, spApi: r.spApi}
 	go func() {
@@ -184,7 +184,7 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 
 	sub, err := r.provider.SubscribeNewDeals()
 	if err != nil {
-		return nil, xerrors.Errorf("subscribing to new deal events: %w", err)
+		return nil, fmt.Errorf("subscribing to new deal events: %w", err)
 	}
 
 	// New deals are broadcast on pubsub. Pipe these deals to the
@@ -522,7 +522,7 @@ func toUuid(id graphql.ID) (uuid.UUID, error) {
 	var dealUuid uuid.UUID
 	err := dealUuid.UnmarshalText([]byte(id))
 	if err != nil {
-		return uuid.UUID{}, xerrors.Errorf("parsing graphql ID '%s' as UUID: %w", id, err)
+		return uuid.UUID{}, fmt.Errorf("parsing graphql ID '%s' as UUID: %w", id, err)
 	}
 	return dealUuid, nil
 }

@@ -1,6 +1,6 @@
 package dealcheckpoints
 
-import "golang.org/x/xerrors"
+import "fmt"
 
 type Checkpoint int
 
@@ -40,7 +40,7 @@ func (c Checkpoint) String() string {
 func FromString(str string) (Checkpoint, error) {
 	cp, ok := strToCP[str]
 	if !ok {
-		return Accepted, xerrors.Errorf("unrecognized checkpoint %s", str)
+		return Accepted, fmt.Errorf("unrecognized checkpoint %s", str)
 	}
 	return cp, nil
 }

@@ -2,6 +2,7 @@ package storagemarket
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -16,7 +17,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-eventbus"
-	"golang.org/x/xerrors"
 )
 
 type acceptDealReq struct {
@@ -117,7 +117,7 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 
 	cleanup := func() {
 		collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
-		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
+		if errf != nil && !errors.Is(errf, db.ErrNotFound) {
 			p.dealLogger.LogError(deal.DealUuid, "failed to untag funds during deal cleanup", errf)
 		} else if errf == nil {
 			p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal cleanup", "untagged publish", pub, "untagged collateral", collat,
@@ -125,7 +125,7 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 		}
 
 		errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
-		if errs != nil && !xerrors.Is(errs, db.ErrNotFound) {
+		if errs != nil && !errors.Is(errs, db.ErrNotFound) {
 			p.dealLogger.LogError(deal.DealUuid, "failed to untag storage during deal cleanup", errs)
 		} else if errs == nil {
 			p.dealLogger.Infow(deal.DealUuid, "untagged storage for deal cleanup", deal.Transfer.Size)
@@ -148,7 +148,7 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 			reason:        "server error: tag funds",
 			isSevereError: true,
 		}
-		if xerrors.Is(err, fundmanager.ErrInsufficientFunds) {
+		if errors.Is(err, fundmanager.ErrInsufficientFunds) {
 			aerr.reason = "server error: provider has insufficient funds to accept deal"
 			aerr.isSevereError = false
 		}
@@ -167,7 +167,7 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 			reason:        "server error: tag storage",
 			isSevereError: true,
 		}
-		if xerrors.Is(err, storagemanager.ErrNoSpaceLeft) {
+		if errors.Is(err, storagemanager.ErrNoSpaceLeft) {
 			aerr.reason = "server error: provider has no space left for storage deals"
 			aerr.isSevereError = false
 		}
@@ -258,7 +258,7 @@ func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState) *ac
 func (p *Provider) processImportOfflineDealData(deal *types.ProviderDealState) *acceptError {
 	cleanup := func() {
 		collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
-		if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
+		if errf != nil && !errors.Is(errf, db.ErrNotFound) {
 			p.dealLogger.LogError(deal.DealUuid, "failed to untag funds during deal cleanup", errf)
 		} else if errf == nil {
 			p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal cleanup", "untagged publish", pub, "untagged collateral", collat)
@@ -277,7 +277,7 @@ func (p *Provider) processImportOfflineDealData(deal *types.ProviderDealState) *
 			reason:        "server error: tag funds",
 			isSevereError: true,
 		}
-		if xerrors.Is(err, fundmanager.ErrInsufficientFunds) {
+		if errors.Is(err, fundmanager.ErrInsufficientFunds) {
 			aerr.reason = "server error: provider has insufficient funds to accept deal"
 			aerr.isSevereError = false
 		}
@@ -299,7 +299,7 @@ func (p *Provider) checkDealPropUnique(deal *smtypes.ProviderDealState) *acceptE
 
 	dl, err := p.dealsDB.BySignedProposalCID(p.ctx, signedPropCid)
 	if err != nil {
-		if xerrors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			// If there was no deal in the DB with this signed proposal cid,
 			// then it's unique
 			return nil
@@ -325,7 +325,7 @@ func (p *Provider) checkDealPropUnique(deal *smtypes.ProviderDealState) *acceptE
 func (p *Provider) checkDealUuidUnique(deal *smtypes.ProviderDealState) *acceptError {
 	dl, err := p.dealsDB.ByID(p.ctx, deal.DealUuid)
 	if err != nil {
-		if xerrors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			// If there was no deal in the DB with this uuid, then it's unique
 			return nil
 		}
@@ -420,7 +420,7 @@ func (p *Provider) loop() {
 
 		case storageSpaceDealReq := <-p.storageSpaceChan:
 			deal := storageSpaceDealReq.deal
-			if err := p.storageManager.Untag(p.ctx, deal.DealUuid); err != nil && !xerrors.Is(err, db.ErrNotFound) {
+			if err := p.storageManager.Untag(p.ctx, deal.DealUuid); err != nil && !errors.Is(err, db.ErrNotFound) {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag storage space", err)
 			} else {
 				p.dealLogger.Infow(deal.DealUuid, "untagged storage space")
@@ -441,7 +441,7 @@ func (p *Provider) loop() {
 			deal := finishedDeal.deal
 			p.dealLogger.Infow(deal.DealUuid, "deal finished")
 			collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
-			if errf != nil && !xerrors.Is(errf, db.ErrNotFound) {
+			if errf != nil && !errors.Is(errf, db.ErrNotFound) {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag funds", errf)
 			} else if errf == nil {
 				p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal as deal finished", "untagged publish", pub, "untagged collateral", collat,
@@ -449,7 +449,7 @@ func (p *Provider) loop() {
 			}
 
 			errs := p.storageManager.Untag(p.ctx, deal.DealUuid)
-			if errs != nil && !xerrors.Is(errs, db.ErrNotFound) {
+			if errs != nil && !errors.Is(errs, db.ErrNotFound) {
 				p.dealLogger.LogError(deal.DealUuid, "failed to untag storage", errs)
 			} else if errs == nil {
 				p.dealLogger.Infow(deal.DealUuid, "untagged storage space for deal")

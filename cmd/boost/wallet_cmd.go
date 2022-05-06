@@ -18,7 +18,6 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/tablewriter"
 	cli "github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
 )
 
 var walletCmd = &cli.Command{
@@ -316,7 +315,7 @@ var walletImport = &cli.Command{
 				}
 			}
 			if err := json.Unmarshal(inpdata, &f); err != nil {
-				return xerrors.Errorf("failed to parse go-filecoin key: %s", err)
+				return fmt.Errorf("failed to parse go-filecoin key: %s", err)
 			}
 
 			gk := f.KeyInfo[0]

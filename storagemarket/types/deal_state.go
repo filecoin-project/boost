@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"golang.org/x/xerrors"
 )
 
 // ProviderDealState is the local state tracked for a deal by the StorageProvider.
@@ -66,7 +65,7 @@ func (d *ProviderDealState) String() string {
 func (d *ProviderDealState) SignedProposalCid() (cid.Cid, error) {
 	propnd, err := cborutil.AsIpld(&d.ClientDealProposal)
 	if err != nil {
-		return cid.Undef, xerrors.Errorf("failed to compute signed deal proposal ipld node: %w", err)
+		return cid.Undef, fmt.Errorf("failed to compute signed deal proposal ipld node: %w", err)
 	}
 
 	return propnd.Cid(), nil

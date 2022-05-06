@@ -3,11 +3,10 @@ package car
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"math/rand"
 	"testing"
-
-	"golang.org/x/xerrors"
 
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-datastore"
@@ -190,7 +189,7 @@ func TestCarReaderSeeker(t *testing.T) {
 
 		_, err = crs.Read(buff)
 		require.Error(t, err)
-		require.True(t, xerrors.Is(err, context.Canceled))
+		require.True(t, errors.Is(err, context.Canceled))
 	})
 
 	t.Run("cancel with no ongoing write", func(t *testing.T) {
@@ -203,6 +202,6 @@ func TestCarReaderSeeker(t *testing.T) {
 		buff := make([]byte, 1024)
 		_, err = crs.Read(buff)
 		require.Error(t, err)
-		require.True(t, xerrors.Is(err, context.Canceled))
+		require.True(t, errors.Is(err, context.Canceled))
 	})
 }

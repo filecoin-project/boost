@@ -11,8 +11,6 @@ import (
 	"strings"
 	"text/template"
 	"unicode"
-
-	"golang.org/x/xerrors"
 )
 
 type methodMeta struct {
@@ -101,12 +99,12 @@ func typeName(e ast.Expr, pkg string) (string, error) {
 		return "map[" + k + "]" + v, nil
 	case *ast.StructType:
 		if len(t.Fields.List) != 0 {
-			return "", xerrors.Errorf("can't struct")
+			return "", fmt.Errorf("can't struct")
 		}
 		return "struct{}", nil
 	case *ast.InterfaceType:
 		if len(t.Methods.List) != 0 {
-			return "", xerrors.Errorf("can't interface")
+			return "", fmt.Errorf("can't interface")
 		}
 		return "interface{}", nil
 	case *ast.ChanType:
@@ -121,7 +119,7 @@ func typeName(e ast.Expr, pkg string) (string, error) {
 		}
 		return subt, nil
 	default:
-		return "", xerrors.Errorf("unknown type")
+		return "", fmt.Errorf("unknown type")
 	}
 }
 
@@ -301,7 +299,7 @@ import (
 
 	err = doTemplate(w, m, `
 
-var ErrNotSupported = xerrors.New("method not supported")
+var ErrNotSupported = errors.New("method not supported")
 
 {{range .Infos}}
 type {{.Name}}Struct struct {

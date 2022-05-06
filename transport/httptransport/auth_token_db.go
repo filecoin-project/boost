@@ -13,7 +13,6 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipfs/go-datastore/query"
-	"golang.org/x/xerrors"
 )
 
 // ErrTokenNotFound is returned when an auth token is not found in the database
@@ -67,7 +66,7 @@ func (db *AuthTokenDB) Put(ctx context.Context, authToken string, val AuthValue)
 func (db *AuthTokenDB) Get(ctx context.Context, authToken string) (*AuthValue, error) {
 	data, err := db.ds.Get(ctx, datastore.NewKey(authToken))
 	if err != nil {
-		if xerrors.Is(err, datastore.ErrNotFound) {
+		if errors.Is(err, datastore.ErrNotFound) {
 			return nil, ErrTokenNotFound
 		}
 		return nil, fmt.Errorf("getting auth token from datastore: %w", err)
@@ -91,7 +90,7 @@ func (db *AuthTokenDB) DeleteExpired(ctx context.Context, before time.Time) ([]A
 	// Query all items in the datastore
 	qres, err := db.ds.Query(ctx, query.Query{})
 	if err != nil {
-		return nil, xerrors.Errorf("query error: %w", err)
+		return nil, fmt.Errorf("query error: %w", err)
 	}
 	defer qres.Close() //nolint:errcheck
 

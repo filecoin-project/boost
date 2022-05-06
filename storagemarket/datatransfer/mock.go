@@ -2,12 +2,11 @@ package datatransfer
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"sync"
 	"time"
-
-	"golang.org/x/xerrors"
 
 	"github.com/google/uuid"
 )
@@ -88,17 +87,17 @@ type ExecuteParams struct {
 func (t *MockTransport) Execute(ctx context.Context, params ExecuteParams) (chan uint64, error) {
 	transferParams, err := TransferLocal.UnmarshallParams(params.TransferParams)
 	if err != nil {
-		return nil, xerrors.Errorf("unmarshalling data transfer params: %w", err)
+		return nil, fmt.Errorf("unmarshalling data transfer params: %w", err)
 	}
 
 	bz, err := ioutil.ReadFile(transferParams.Path)
 	if err != nil {
-		return nil, xerrors.Errorf("reading file %s: %w", transferParams.Path, err)
+		return nil, fmt.Errorf("reading file %s: %w", transferParams.Path, err)
 	}
 
 	err = ioutil.WriteFile(params.FilePath, bz, 0644)
 	if err != nil {
-		return nil, xerrors.Errorf("writing file %s: %w", params.FilePath, err)
+		return nil, fmt.Errorf("writing file %s: %w", params.FilePath, err)
 	}
 
 	return t.SimulateTransfer(ctx, params.DealUuid, params.Size)

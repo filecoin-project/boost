@@ -2,10 +2,9 @@ package db
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
-
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
@@ -28,7 +27,7 @@ func TestFundsDB(t *testing.T) {
 
 	dealUUID := uuid.New()
 	collat, pub, err := db.Untag(ctx, dealUUID)
-	req.True(xerrors.Is(err, ErrNotFound))
+	req.True(errors.Is(err, ErrNotFound))
 	req.Equal(int64(0), collat.Int64())
 	req.True(pub.IsZero())
 

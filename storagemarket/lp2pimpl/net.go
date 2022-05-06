@@ -2,6 +2,7 @@ package lp2pimpl
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -20,7 +21,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	"golang.org/x/xerrors"
 )
 
 var log = logging.Logger("boost-net")
@@ -67,7 +67,7 @@ func (c *DealClient) SendDealProposal(ctx context.Context, id peer.ID, params ty
 
 	// Write the deal proposal to the stream
 	if err = cborutil.WriteCborRPC(s, &params); err != nil {
-		return nil, xerrors.Errorf("sending deal proposal: %w", err)
+		return nil, fmt.Errorf("sending deal proposal: %w", err)
 	}
 
 	// Set a deadline on reading from the stream so it doesn't hang
@@ -77,7 +77,7 @@ func (c *DealClient) SendDealProposal(ctx context.Context, id peer.ID, params ty
 	// Read the response from the stream
 	var resp types.DealResponse
 	if err := resp.UnmarshalCBOR(s); err != nil {
-		return nil, xerrors.Errorf("reading proposal response: %w", err)
+		return nil, fmt.Errorf("reading proposal response: %w", err)
 	}
 
 	log.Debugw("received deal proposal response", "id", params.DealUUID, "accepted", resp.Accepted, "reason", resp.Message)
@@ -113,7 +113,7 @@ func (c *DealClient) SendDealStatusRequest(ctx context.Context, id peer.ID, deal
 	// Write the deal status request to the stream
 	req := types.DealStatusRequest{DealUUID: dealUUID, Signature: *sig}
 	if err = cborutil.WriteCborRPC(s, &req); err != nil {
-		return nil, xerrors.Errorf("sending deal status req: %w", err)
+		return nil, fmt.Errorf("sending deal status req: %w", err)
 	}
 
 	// Set a deadline on reading from the stream so it doesn't hang
@@ -123,7 +123,7 @@ func (c *DealClient) SendDealStatusRequest(ctx context.Context, id peer.ID, deal
 	// Read the response from the stream
 	var resp types.DealStatusResponse
 	if err := resp.UnmarshalCBOR(s); err != nil {
-		return nil, xerrors.Errorf("reading deal status response: %w", err)
+		return nil, fmt.Errorf("reading deal status response: %w", err)
 	}
 
 	log.Debugw("received deal status response", "id", resp.DealUUID, "status", resp.DealStatus)
@@ -242,7 +242,7 @@ func (p *DealProvider) getDealStatus(req types.DealStatusRequest) types.DealStat
 	}
 
 	pds, err := p.prov.Deal(p.ctx, req.DealUUID)
-	if err != nil && xerrors.Is(err, storagemarket.ErrDealNotFound) {
+	if err != nil && errors.Is(err, storagemarket.ErrDealNotFound) {
 		return errResp(fmt.Sprintf("no storage deal found with deal UUID %s", req.DealUUID))
 	}
 

@@ -16,8 +16,6 @@ import (
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/markets/idxprov"
 
-	"golang.org/x/xerrors"
-
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/hashicorp/go-multierror"
 	logging "github.com/ipfs/go-log/v2"
@@ -184,7 +182,7 @@ func (w *Wrapper) DagstoreReinitBoostDeals(ctx context.Context) (bool, error) {
 	// Check if all deals have already been registered as shards
 	isComplete, err := w.boostRegistrationComplete()
 	if err != nil {
-		return false, xerrors.Errorf("failed to get boost dagstore migration status: %w", err)
+		return false, fmt.Errorf("failed to get boost dagstore migration status: %w", err)
 	}
 	if isComplete {
 		// All deals have been registered as shards, bail out

@@ -3,11 +3,11 @@ package storagemarket
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"sync"
 
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	"github.com/ipfs/go-cid"
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
@@ -122,14 +122,14 @@ func (mgr *SectorCommittedManager) OnDealSectorPreCommitted(ctx context.Context,
 	called := func(msg *types.Message, rec *types.MessageReceipt, ts *types.TipSet, curH abi.ChainEpoch) (more bool, err error) {
 		defer func() {
 			if err != nil {
-				cb(0, false, xerrors.Errorf("handling applied event: %w", err))
+				cb(0, false, fmt.Errorf("handling applied event: %w", err))
 			}
 		}()
 
 		// If the deal hasn't been activated by the proposed start epoch, the
 		// deal will timeout (when msg == nil it means the timeout epoch was reached)
 		if msg == nil {
-			err = xerrors.Errorf("deal with piece CID %s was not activated by proposed deal start epoch %d", proposal.PieceCID, proposal.StartEpoch)
+			err = fmt.Errorf("deal with piece CID %s was not activated by proposed deal start epoch %d", proposal.PieceCID, proposal.StartEpoch)
 			return false, err
 		}
 
@@ -166,7 +166,7 @@ func (mgr *SectorCommittedManager) OnDealSectorPreCommitted(ctx context.Context,
 	}
 
 	if err := mgr.ev.Called(ctx, checkFunc, called, revert, int(build.MessageConfidence+1), timeoutEpoch, matchEvent); err != nil {
-		return xerrors.Errorf("failed to set up called handler: %w", err)
+		return fmt.Errorf("failed to set up called handler: %w", err)
 	}
 
 	return nil
@@ -217,14 +217,14 @@ func (mgr *SectorCommittedManager) OnDealSectorCommitted(ctx context.Context, pr
 	called := func(msg *types.Message, rec *types.MessageReceipt, ts *types.TipSet, curH abi.ChainEpoch) (more bool, err error) {
 		defer func() {
 			if err != nil {
-				cb(xerrors.Errorf("handling applied event: %w", err))
+				cb(fmt.Errorf("handling applied event: %w", err))
 			}
 		}()
 
 		// If the deal hasn't been activated by the proposed start epoch, the
 		// deal will timeout (when msg == nil it means the timeout epoch was reached)
 		if msg == nil {
-			err := xerrors.Errorf("deal with piece CID %s was not activated by proposed deal start epoch %d", proposal.PieceCID, proposal.StartEpoch)
+			err := fmt.Errorf("deal with piece CID %s was not activated by proposed deal start epoch %d", proposal.PieceCID, proposal.StartEpoch)
 			return false, err
 		}
 
@@ -236,12 +236,12 @@ func (mgr *SectorCommittedManager) OnDealSectorCommitted(ctx context.Context, pr
 		// Get the deal info
 		res, err := mgr.dealInfo.GetCurrentDealInfo(ctx, ts.Key().Bytes(), &proposal, publishCid)
 		if err != nil {
-			return false, xerrors.Errorf("failed to look up deal on chain: %w", err)
+			return false, fmt.Errorf("failed to look up deal on chain: %w", err)
 		}
 
 		// Make sure the deal is active
 		if res.MarketDeal.State.SectorStartEpoch < 1 {
-			return false, xerrors.Errorf("deal wasn't active: deal=%d, parentState=%s, h=%d", res.DealID, ts.ParentState(), ts.Height())
+			return false, fmt.Errorf("deal wasn't active: deal=%d, parentState=%s, h=%d", res.DealID, ts.ParentState(), ts.Height())
 		}
 
 		log.Infof("Storage deal %d activated at epoch %d", res.DealID, res.MarketDeal.State.SectorStartEpoch)
@@ -258,7 +258,7 @@ func (mgr *SectorCommittedManager) OnDealSectorCommitted(ctx context.Context, pr
 	}
 
 	if err := mgr.ev.Called(ctx, checkFunc, called, revert, int(build.MessageConfidence+1), timeoutEpoch, matchEvent); err != nil {
-		return xerrors.Errorf("failed to set up called handler: %w", err)
+		return fmt.Errorf("failed to set up called handler: %w", err)
 	}
 
 	return nil
@@ -270,7 +270,7 @@ func dealSectorInPreCommitMsg(msg *types.Message, res sealing.CurrentDealInfo) (
 	case miner.Methods.PreCommitSector:
 		var params miner.SectorPreCommitInfo
 		if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
-			return nil, xerrors.Errorf("unmarshal pre commit: %w", err)
+			return nil, fmt.Errorf("unmarshal pre commit: %w", err)
 		}
 
 		// Check through the deal IDs associated with this message
@@ -283,7 +283,7 @@ func dealSectorInPreCommitMsg(msg *types.Message, res sealing.CurrentDealInfo) (
 	case miner.Methods.PreCommitSectorBatch:
 		var params miner5.PreCommitSectorBatchParams
 		if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
-			return nil, xerrors.Errorf("unmarshal pre commit: %w", err)
+			return nil, fmt.Errorf("unmarshal pre commit: %w", err)
 		}
 
 		for _, precommit := range params.Sectors {
@@ -296,7 +296,7 @@ func dealSectorInPreCommitMsg(msg *types.Message, res sealing.CurrentDealInfo) (
 			}
 		}
 	default:
-		return nil, xerrors.Errorf("unexpected method %d", msg.Method)
+		return nil, fmt.Errorf("unexpected method %d", msg.Method)
 	}
 
 	return nil, nil
@@ -308,7 +308,7 @@ func sectorInCommitMsg(msg *types.Message, sectorNumber abi.SectorNumber) (bool,
 	case miner.Methods.ProveCommitSector:
 		var params miner.ProveCommitSectorParams
 		if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
-			return false, xerrors.Errorf("failed to unmarshal prove commit sector params: %w", err)
+			return false, fmt.Errorf("failed to unmarshal prove commit sector params: %w", err)
 		}
 
 		return params.SectorNumber == sectorNumber, nil
@@ -316,12 +316,12 @@ func sectorInCommitMsg(msg *types.Message, sectorNumber abi.SectorNumber) (bool,
 	case miner.Methods.ProveCommitAggregate:
 		var params miner5.ProveCommitAggregateParams
 		if err := params.UnmarshalCBOR(bytes.NewReader(msg.Params)); err != nil {
-			return false, xerrors.Errorf("failed to unmarshal prove commit sector params: %w", err)
+			return false, fmt.Errorf("failed to unmarshal prove commit sector params: %w", err)
 		}
 
 		set, err := params.SectorNumbers.IsSet(uint64(sectorNumber))
 		if err != nil {
-			return false, xerrors.Errorf("checking if sectorNumber is set in commit aggregate message: %w", err)
+			return false, fmt.Errorf("checking if sectorNumber is set in commit aggregate message: %w", err)
 		}
 
 		return set, nil
@@ -335,12 +335,12 @@ func (mgr *SectorCommittedManager) checkIfDealAlreadyActive(ctx context.Context,
 	res, err := mgr.dealInfo.GetCurrentDealInfo(ctx, ts.Key().Bytes(), proposal, publishCid)
 	if err != nil {
 		// TODO: This may be fine for some errors
-		return res, false, xerrors.Errorf("failed to look up deal on chain: %w", err)
+		return res, false, fmt.Errorf("failed to look up deal on chain: %w", err)
 	}
 
 	// Sector was slashed
 	if res.MarketDeal.State.SlashEpoch > 0 {
-		return res, false, xerrors.Errorf("deal %d was slashed at epoch %d", res.DealID, res.MarketDeal.State.SlashEpoch)
+		return res, false, fmt.Errorf("deal %d was slashed at epoch %d", res.DealID, res.MarketDeal.State.SlashEpoch)
 	}
 
 	// Sector with deal is already active

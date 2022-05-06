@@ -17,7 +17,6 @@ import (
 
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -108,7 +107,7 @@ func ReaderParamEncoder(addr string) jsonrpc.Option {
 		reqID := uuid.New()
 		u, err := url.Parse(addr)
 		if err != nil {
-			return reflect.Value{}, xerrors.Errorf("parsing push address: %w", err)
+			return reflect.Value{}, fmt.Errorf("parsing push address: %w", err)
 		}
 		u.Path = path.Join(u.Path, reqID.String())
 
@@ -271,7 +270,7 @@ func (w *RpcReader) Read(p []byte) (int, error) {
 	}
 
 	if w.postBody == nil {
-		return 0, xerrors.Errorf("reader already closed or redirected")
+		return 0, fmt.Errorf("reader already closed or redirected")
 	}
 
 	n, err := w.postBody.Read(p)
@@ -401,13 +400,13 @@ func ReaderParamDecoder() (http.HandlerFunc, jsonrpc.ServerOption) {
 	dec := jsonrpc.WithParamDecoder(new(io.Reader), func(ctx context.Context, b []byte) (reflect.Value, error) {
 		var rs ReaderStream
 		if err := json.Unmarshal(b, &rs); err != nil {
-			return reflect.Value{}, xerrors.Errorf("unmarshaling reader id: %w", err)
+			return reflect.Value{}, fmt.Errorf("unmarshaling reader id: %w", err)
 		}
 
 		if rs.Type == Null {
 			n, err := strconv.ParseInt(rs.Info, 10, 64)
 			if err != nil {
-				return reflect.Value{}, xerrors.Errorf("parsing null byte count: %w", err)
+				return reflect.Value{}, fmt.Errorf("parsing null byte count: %w", err)
 			}
 
 			return reflect.ValueOf(sealing.NewNullReader(abi.UnpaddedPieceSize(n))), nil
@@ -415,7 +414,7 @@ func ReaderParamDecoder() (http.HandlerFunc, jsonrpc.ServerOption) {
 
 		u, err := uuid.Parse(rs.Info)
 		if err != nil {
-			return reflect.Value{}, xerrors.Errorf("parsing reader UUDD: %w", err)
+			return reflect.Value{}, fmt.Errorf("parsing reader UUDD: %w", err)
 		}
 
 		readersLk.Lock()
@@ -432,7 +431,7 @@ func ReaderParamDecoder() (http.HandlerFunc, jsonrpc.ServerOption) {
 		select {
 		case wr, ok := <-ch:
 			if !ok {
-				return reflect.Value{}, xerrors.Errorf("handler timed out")
+				return reflect.Value{}, fmt.Errorf("handler timed out")
 			}
 
 			return reflect.ValueOf(wr), nil

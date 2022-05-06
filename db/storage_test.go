@@ -2,9 +2,8 @@ package db
 
 import (
 	"context"
+	"errors"
 	"testing"
-
-	"golang.org/x/xerrors"
 
 	"github.com/google/uuid"
 
@@ -26,7 +25,7 @@ func TestStorageDB(t *testing.T) {
 
 	dealUUID := uuid.New()
 	amt, err := db.Untag(ctx, dealUUID)
-	req.True(xerrors.Is(err, ErrNotFound))
+	req.True(errors.Is(err, ErrNotFound))
 	req.Equal(uint64(0), amt)
 
 	err = db.Tag(ctx, dealUUID, 1111)

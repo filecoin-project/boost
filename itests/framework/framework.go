@@ -61,7 +61,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 )
 
 var Log = logging.Logger("boosttest")
@@ -448,7 +447,7 @@ func (f *TestFramework) WaitForDealAddedToSector(dealUuid uuid.UUID) error {
 
 	for {
 		resp, err := f.Client.DealStatus(f.ctx, peerID, dealUuid)
-		if err != nil && !xerrors.Is(err, storagemarket.ErrDealNotFound) {
+		if err != nil && !errors.Is(err, storagemarket.ErrDealNotFound) {
 			return fmt.Errorf("error getting status: %s", err.Error())
 		}
 

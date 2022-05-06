@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-
-	"golang.org/x/xerrors"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
@@ -41,7 +40,7 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 	if args.Local {
 		addrs, err := r.fullNode.WalletList(ctx)
 		if err != nil {
-			return nil, xerrors.Errorf("getting local addresses: %w", err)
+			return nil, fmt.Errorf("getting local addresses: %w", err)
 		}
 
 		filter = make(map[address.Address]struct{})
@@ -52,7 +51,7 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 
 	ts, err := r.fullNode.ChainHead(ctx)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get chain head: %w", err)
+		return nil, fmt.Errorf("failed to get chain head: %w", err)
 	}
 	baseFee := ts.Blocks()[0].ParentBaseFee
 
@@ -151,7 +150,7 @@ func messageFromBytes(msgb []byte) (types.ChainMsg, error) {
 		}
 	}
 
-	return nil, xerrors.New("probably not a cbor-serialized message")
+	return nil, errors.New("probably not a cbor-serialized message")
 }
 
 func messageFromJson(msgb []byte) (types.ChainMsg, error) {
@@ -175,7 +174,7 @@ func messageFromJson(msgb []byte) (types.ChainMsg, error) {
 		}
 	}
 
-	return nil, xerrors.New("probably not a json-serialized message")
+	return nil, errors.New("probably not a json-serialized message")
 }
 
 func mockMessages() []*types.SignedMessage {

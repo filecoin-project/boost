@@ -4,6 +4,7 @@ package api
 
 import (
 	"context"
+	"errors"
 
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
@@ -21,10 +22,9 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	"golang.org/x/xerrors"
 )
 
-var ErrNotSupported = xerrors.New("method not supported")
+var ErrNotSupported = errors.New("method not supported")
 
 type BoostStruct struct {
 	CommonStruct

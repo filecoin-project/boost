@@ -29,7 +29,6 @@ import (
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-eventbus"
 	"github.com/libp2p/go-libp2p-core/event"
-	"golang.org/x/xerrors"
 )
 
 const (
@@ -132,7 +131,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 				dh.transferCancelled(nil)
 				// if the transfer failed because of context cancellation and the context was not
 				// cancelled because of the user explicitly cancelling the transfer, this is a recoverable error.
-				if xerrors.Is(err, context.Canceled) && !dh.TransferCancelledByUser() {
+				if errors.Is(err, context.Canceled) && !dh.TransferCancelledByUser() {
 					return &dealMakingError{
 						recoverable: true,
 						err:         fmt.Errorf("data transfer failed with a recoverable error after %d bytes with error: %w", deal.NBytesReceived, err),
@@ -169,7 +168,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	// Publish
 	if deal.Checkpoint <= dealcheckpoints.Published {
 		if err := p.publishDeal(ctx, pub, deal); err != nil {
-			if xerrors.Is(err, context.Canceled) {
+			if errors.Is(err, context.Canceled) {
 				return &dealMakingError{
 					recoverable: true,
 					err:         fmt.Errorf("deal publish failed with a recoverable error: %w", err),
@@ -190,7 +189,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	// tagged as being for this deal (the publish message moves collateral
 	// from the storage market actor escrow balance to the locked balance)
 	if err := p.untagFundsAfterPublish(ctx, deal); err != nil {
-		if xerrors.Is(err, context.Canceled) {
+		if errors.Is(err, context.Canceled) {
 			return &dealMakingError{recoverable: true,
 				err:   fmt.Errorf("deal failed with recoverbale error while untagging funds after publish: %w", err),
 				uiMsg: "the deal was paused in the Publishing state because Boost was shut down"}
@@ -205,7 +204,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	// AddPiece
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
 		if err := p.addPiece(ctx, pub, deal); err != nil {
-			if xerrors.Is(err, context.Canceled) {
+			if errors.Is(err, context.Canceled) {
 				return &dealMakingError{
 					recoverable: true,
 					err:         fmt.Errorf("add piece failed with a recoverable error: %w", err),
@@ -228,7 +227,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 		p.dealLogger.Infow(deal.DealUuid, "removed inbound file as deal handed to sealer", "path", deal.InboundFilePath)
 	}
 	if err := p.untagStorageSpaceAfterSealing(ctx, deal); err != nil {
-		if xerrors.Is(err, context.Canceled) {
+		if errors.Is(err, context.Canceled) {
 			return &dealMakingError{recoverable: true,
 				err:   fmt.Errorf("deal failed with recoverable error while untagging storage space after handing to sealer: %w", err),
 				uiMsg: "the deal was paused in the Sealing state because Boost was shut down"}
@@ -575,7 +574,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	err := stores.RegisterShardSync(ctx, p.dagst, pc, "", true)
 
 	if err != nil {
-		if !xerrors.Is(err, dagstore.ErrShardExists) {
+		if !errors.Is(err, dagstore.ErrShardExists) {
 			return fmt.Errorf("failed to register deal with dagstore: %w", err)
 		}
 		p.dealLogger.Infow(deal.DealUuid, "deal has previously been registered in dagstore")
@@ -676,7 +675,7 @@ func isFinalSealingState(state lapi.SectorState) bool {
 func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, err error) {
 	// Update state in DB with error
 	deal.Checkpoint = dealcheckpoints.Complete
-	if xerrors.Is(err, context.Canceled) {
+	if errors.Is(err, context.Canceled) {
 		deal.Err = DealCancelled
 		p.dealLogger.Infow(deal.DealUuid, "deal cancelled")
 	} else {

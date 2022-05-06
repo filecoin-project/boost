@@ -2,11 +2,10 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
-
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
 )
@@ -16,7 +15,7 @@ func StorageFromFile(path string, def *stores.StorageConfig) (*stores.StorageCon
 	switch {
 	case os.IsNotExist(err):
 		if def == nil {
-			return nil, xerrors.Errorf("couldn't load storage config: %w", err)
+			return nil, fmt.Errorf("couldn't load storage config: %w", err)
 		}
 		return def, nil
 	case err != nil:
@@ -40,11 +39,11 @@ func StorageFromReader(reader io.Reader) (*stores.StorageConfig, error) {
 func WriteStorageFile(path string, config stores.StorageConfig) error {
 	b, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
-		return xerrors.Errorf("marshaling storage config: %w", err)
+		return fmt.Errorf("marshaling storage config: %w", err)
 	}
 
 	if err := ioutil.WriteFile(path, b, 0644); err != nil {
-		return xerrors.Errorf("persisting storage config (%s): %w", path, err)
+		return fmt.Errorf("persisting storage config (%s): %w", path, err)
 	}
 
 	return nil

@@ -10,7 +10,6 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-jsonrpc"
 
@@ -110,17 +109,17 @@ func GetAPIInfo(ctx *cli.Context, t lotus_repo.RepoType) (APIInfo, error) {
 
 		p, err := homedir.Expand(path)
 		if err != nil {
-			return APIInfo{}, xerrors.Errorf("could not expand home dir (%s): %w", f, err)
+			return APIInfo{}, fmt.Errorf("could not expand home dir (%s): %w", f, err)
 		}
 
 		r, err := lotus_repo.NewFS(p)
 		if err != nil {
-			return APIInfo{}, xerrors.Errorf("could not open repo at path: %s; %w", p, err)
+			return APIInfo{}, fmt.Errorf("could not open repo at path: %s; %w", p, err)
 		}
 
 		exists, err := r.Exists()
 		if err != nil {
-			return APIInfo{}, xerrors.Errorf("repo.Exists returned an error: %w", err)
+			return APIInfo{}, fmt.Errorf("repo.Exists returned an error: %w", err)
 		}
 
 		if !exists {
@@ -129,7 +128,7 @@ func GetAPIInfo(ctx *cli.Context, t lotus_repo.RepoType) (APIInfo, error) {
 
 		ma, err := r.APIEndpoint()
 		if err != nil {
-			return APIInfo{}, xerrors.Errorf("could not get api endpoint: %w", err)
+			return APIInfo{}, fmt.Errorf("could not get api endpoint: %w", err)
 		}
 
 		token, err := r.APIToken()
@@ -181,7 +180,7 @@ func GetBoostAPI(ctx *cli.Context, opts ...GetBoostOption) (api.Boost, jsonrpc.C
 	if options.PreferHttp {
 		u, err := url.Parse(addr)
 		if err != nil {
-			return nil, nil, xerrors.Errorf("parsing miner api URL: %w", err)
+			return nil, nil, fmt.Errorf("parsing miner api URL: %w", err)
 		}
 
 		switch u.Scheme {
@@ -204,12 +203,12 @@ func GetBoostAPI(ctx *cli.Context, opts ...GetBoostOption) (api.Boost, jsonrpc.C
 func GetRawAPI(ctx *cli.Context, t repo.RepoType, version string) (string, http.Header, error) {
 	ainfo, err := GetAPIInfo(ctx, t)
 	if err != nil {
-		return "", nil, xerrors.Errorf("could not get API info for %s: %w", t.Type(), err)
+		return "", nil, fmt.Errorf("could not get API info for %s: %w", t.Type(), err)
 	}
 
 	addr, err := ainfo.DialArgs(version)
 	if err != nil {
-		return "", nil, xerrors.Errorf("could not get DialArgs: %w", err)
+		return "", nil, fmt.Errorf("could not get DialArgs: %w", err)
 	}
 
 	if IsVeryVerbose {

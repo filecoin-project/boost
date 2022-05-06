@@ -39,7 +39,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"golang.org/x/xerrors"
 )
 
 var (
@@ -169,7 +168,7 @@ func NewProvider(h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundm
 
 func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
 	deal, err := p.dealsDB.ByID(ctx, dealUuid)
-	if xerrors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("getting deal %s: %w", dealUuid, ErrDealNotFound)
 	}
 	return deal, nil
@@ -191,7 +190,7 @@ func (p *Provider) ImportOfflineDealData(dealUuid uuid.UUID, filePath string) (p
 	// db should already have a deal with this uuid as the deal proposal should have been agreed before hand
 	ds, err := p.dealsDB.ByID(p.ctx, dealUuid)
 	if err != nil {
-		if xerrors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil, fmt.Errorf("no pre-existing deal proposal for offline deal %s: %w", dealUuid, err)
 		}
 		return nil, nil, fmt.Errorf("getting offline deal %s: %w", dealUuid, err)
@@ -521,7 +520,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 	// Sanity check - we must have published the deal before handing it off
 	// to the sealing subsystem
 	if deal.PublishCID == nil {
-		return nil, xerrors.Errorf("deal.PublishCid can't be nil")
+		return nil, fmt.Errorf("deal.PublishCid can't be nil")
 	}
 
 	sdInfo := lapi.PieceDealInfo{
@@ -544,7 +543,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 	curTime := build.Clock.Now()
 
 	for build.Clock.Since(curTime) < addPieceRetryTimeout {
-		if !xerrors.Is(err, sealing.ErrTooManySectorsSealing) {
+		if !errors.Is(err, sealing.ErrTooManySectorsSealing) {
 			if err != nil {
 				p.dealLogger.Warnw(deal.DealUuid, "failed to addPiece for deal, will-retry", "err", err.Error())
 			}

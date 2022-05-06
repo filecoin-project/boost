@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -16,7 +17,6 @@ import (
 	record "github.com/libp2p/go-libp2p-record"
 	"github.com/raulk/go-watchdog"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-jsonrpc/auth"
 
@@ -155,7 +155,7 @@ func APISecret(keystore types.KeyStore, lr lotus_repo.LockedRepo) (*dtypes.APIAl
 		}
 
 		if err := keystore.Put(JWTSecretName, key); err != nil {
-			return nil, xerrors.Errorf("writing API secret: %w", err)
+			return nil, fmt.Errorf("writing API secret: %w", err)
 		}
 
 		// TODO: make this configurable
@@ -172,7 +172,7 @@ func APISecret(keystore types.KeyStore, lr lotus_repo.LockedRepo) (*dtypes.APIAl
 			return nil, err
 		}
 	} else if err != nil {
-		return nil, xerrors.Errorf("could not get JWT Token: %w", err)
+		return nil, fmt.Errorf("could not get JWT Token: %w", err)
 	}
 
 	return (*dtypes.APIAlg)(jwt.NewHS256(key.PrivateKey)), nil

@@ -76,7 +76,6 @@ import (
 	"github.com/ipfs/go-metrics-interface"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 )
 
 //nolint:deadcode,varcheck
@@ -328,7 +327,7 @@ func New(ctx context.Context, opts ...Option) (StopFunc, error) {
 
 	// apply module options in the right order
 	if err := Options(Options(defaults()...), Options(opts...))(&settings); err != nil {
-		return nil, xerrors.Errorf("applying node options failed: %w", err)
+		return nil, fmt.Errorf("applying node options failed: %w", err)
 	}
 
 	// gather constructors for fx.Options
@@ -356,7 +355,7 @@ func New(ctx context.Context, opts ...Option) (StopFunc, error) {
 	//  correctly
 	if err := app.Start(ctx); err != nil {
 		// comment fx.NopLogger few lines above for easier debugging
-		return nil, xerrors.Errorf("starting node: %w", err)
+		return nil, fmt.Errorf("starting node: %w", err)
 	}
 
 	return app.Stop, nil
@@ -380,20 +379,20 @@ var BoostNode = Options(
 func ConfigBoost(c interface{}) Option {
 	cfg, ok := c.(*config.Boost)
 	if !ok {
-		return Error(xerrors.Errorf("invalid config from repo, got: %T", c))
+		return Error(fmt.Errorf("invalid config from repo, got: %T", c))
 	}
 
 	pricingConfig := cfg.Dealmaking.RetrievalPricing
 	if pricingConfig.Strategy == config.RetrievalPricingExternalMode {
 		if pricingConfig.External == nil {
-			return Error(xerrors.New("retrieval pricing policy has been to set to external but external policy config is nil"))
+			return Error(errors.New("retrieval pricing policy has been to set to external but external policy config is nil"))
 		}
 
 		if pricingConfig.External.Path == "" {
-			return Error(xerrors.New("retrieval pricing policy has been to set to external but external script path is empty"))
+			return Error(errors.New("retrieval pricing policy has been to set to external but external script path is empty"))
 		}
 	} else if pricingConfig.Strategy != config.RetrievalPricingDefaultMode {
-		return Error(xerrors.New("retrieval pricing policy must be either default or external"))
+		return Error(errors.New("retrieval pricing policy must be either default or external"))
 	}
 
 	walletPledgeCollat, err := address.NewFromString(cfg.Wallets.PledgeCollateral)

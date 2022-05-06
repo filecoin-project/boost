@@ -2,11 +2,11 @@ package modules
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/sealingpipeline"
@@ -30,7 +30,7 @@ func connectMinerService(apiInfo string) func(mctx helpers.MetricsCtx, lc fx.Lif
 		info := cliutil.ParseApiInfo(apiInfo)
 		addr, err := info.DialArgs("v0")
 		if err != nil {
-			return nil, xerrors.Errorf("could not get DialArgs: %w", err)
+			return nil, fmt.Errorf("could not get DialArgs: %w", err)
 		}
 
 		log.Infof("Checking (svc) api version of %s", addr)
@@ -43,11 +43,11 @@ func connectMinerService(apiInfo string) func(mctx helpers.MetricsCtx, lc fx.Lif
 			OnStart: func(ctx context.Context) error {
 				v, err := mapi.Version(ctx)
 				if err != nil {
-					return xerrors.Errorf("checking version: %w", err)
+					return fmt.Errorf("checking version: %w", err)
 				}
 
 				if !v.APIVersion.EqMajorMinor(lapi.Version(api.MinerAPIVersion0)) {
-					return xerrors.Errorf("remote service API version didn't match (expected %s, remote %s)", api.MinerAPIVersion0, v.APIVersion)
+					return fmt.Errorf("remote service API version didn't match (expected %s, remote %s)", api.MinerAPIVersion0, v.APIVersion)
 				}
 
 				return nil
