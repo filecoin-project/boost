@@ -349,23 +349,19 @@ func migrateDirectory(ctx context.Context, mktsRepo lotus_repo.LockedRepo, boost
 	mktsSubdirPath := path.Join(mktsRepo.Path(), subdir)
 	boostSubdirPath := path.Join(boostRepo.Path(), subdir)
 
-	var cerr error
 
 	rawMktsCfg, err := mktsRepo.Config()
 	if err != nil {
-		cerr = fmt.Errorf("getting markets repo config: %w", err)
-		return cerr
+		return fmt.Errorf("getting markets repo config: %w", err)
 	}
 	mktsCfg, ok := rawMktsCfg.(*lotus_config.StorageMiner)
 	if !ok {
-		cerr = fmt.Errorf("expected legacy markets config, got %T", rawMktsCfg)
-		return cerr
+		return fmt.Errorf("expected legacy markets config, got %T", rawMktsCfg)
 	}
 
 	if len(mktsCfg.DAGStore.RootDir) > 0 {
-		fmt.Printf("Not migrating the dagstore as custom path is set. Please move the dagstore manually to BOOST_REPO/dagstore from the customer path.")
+		fmt.Println("Not migrating the dagstore as a custom dagstore path is set. Please manually move or copy the dagstore to $BOOST_PATH/dagstore")
 		return nil
-	} else {
 
 		dirInfo, err := os.Lstat(mktsSubdirPath)
 		if err != nil {
@@ -487,6 +483,8 @@ func migrateMarketsConfig(cctx *cli.Context, mktsRepo lotus_repo.LockedRepo, boo
 		rcfg.LotusDealmaking = mktsCfg.Dealmaking
 		rcfg.LotusFees = mktsCfg.Fees
 		rcfg.DAGStore = mktsCfg.DAGStore
+		// Clear the DAG store root dir config, because the DAG store is no longer configurable in Boost
+		// (it is always at <repo path>/dagstore
 		rcfg.DAGStore.RootDir = ""
 		rcfg.IndexProvider = mktsCfg.IndexProvider
 		rcfg.IndexProvider.Enable = true // Enable index provider in Boost by default
