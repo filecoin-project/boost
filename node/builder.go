@@ -409,7 +409,7 @@ func ConfigBoost(c interface{}) Option {
 		return Error(fmt.Errorf("failed to parse cfg.Wallets.Miner: %s; err: %w", cfg.Wallets.Miner, err))
 	}
 	if len(cfg.DAGStore.RootDir) > 0 {
-		return Error(fmt.Errorf("Detected custom DAG store path %s. The DAG store must be at $BOOST_PATH/dagstore", cfg.DAGStrore.RootDir))
+		return Error(fmt.Errorf("Detected custom DAG store path %s. The DAG store must be at $BOOST_PATH/dagstore", cfg.DAGStore.RootDir))
 	}
 
 	return Options(

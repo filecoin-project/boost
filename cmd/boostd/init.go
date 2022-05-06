@@ -252,7 +252,7 @@ func migrate(cctx *cli.Context, fromMonolith bool, mktsRepoPath string) error {
 	}
 
 	// Migrate DAG store
-	err = migrateDirectory(ctx, mktsRepo, boostRepo, "dagstore")
+	err = migrateDAGStore(ctx, mktsRepo, boostRepo)
 	if err != nil {
 		return err
 	}
@@ -345,10 +345,12 @@ func createAuthToken(boostRepo *lotus_repo.FsRepo, boostRepoLocked lotus_repo.Lo
 	return nil
 }
 
-func migrateDirectory(ctx context.Context, mktsRepo lotus_repo.LockedRepo, boostRepo lotus_repo.LockedRepo, subdir string) error {
+func migrateDAGStore(ctx context.Context, mktsRepo lotus_repo.LockedRepo, boostRepo lotus_repo.LockedRepo) error {
+
+	subdir := "dagstore"
+
 	mktsSubdirPath := path.Join(mktsRepo.Path(), subdir)
 	boostSubdirPath := path.Join(boostRepo.Path(), subdir)
-
 
 	rawMktsCfg, err := mktsRepo.Config()
 	if err != nil {
@@ -362,40 +364,70 @@ func migrateDirectory(ctx context.Context, mktsRepo lotus_repo.LockedRepo, boost
 	if len(mktsCfg.DAGStore.RootDir) > 0 {
 		fmt.Println("Not migrating the dagstore as a custom dagstore path is set. Please manually move or copy the dagstore to $BOOST_PATH/dagstore")
 		return nil
+	}
 
-		dirInfo, err := os.Lstat(mktsSubdirPath)
-		if err != nil {
-			if xerrors.Is(err, os.ErrNotExist) {
-				return nil
-			}
-			return fmt.Errorf("reading %s path %s", subdir, mktsSubdirPath)
-		}
-
-		// If it's a sym-link just copy the sym-link
-		if dirInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
-			fmt.Printf("copying sym-link %s to %s\n", mktsSubdirPath, boostSubdirPath)
-			cmd := exec.Command("cp", "-a", mktsSubdirPath, boostSubdirPath)
-			err = cmd.Run()
-			if err != nil {
-				return fmt.Errorf("Copying sym-link %s %s to %s: %w", subdir, mktsSubdirPath, boostSubdirPath, err)
-			}
+	dirInfo, err := os.Lstat(mktsSubdirPath)
+	if err != nil {
+		if xerrors.Is(err, os.ErrNotExist) {
 			return nil
 		}
+		return fmt.Errorf("reading %s path %s", subdir, mktsSubdirPath)
+	}
 
-		if !dirInfo.IsDir() {
-			return fmt.Errorf("expected %s to be a directory but it's not", mktsSubdirPath)
-		}
-
-		dirSizeBytes, err := util.DirSize(mktsSubdirPath)
+	// If it's a sym-link just copy the sym-link
+	if dirInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
+		fmt.Printf("copying sym-link %s to %s\n", mktsSubdirPath, boostSubdirPath)
+		cmd := exec.Command("cp", "-a", mktsSubdirPath, boostSubdirPath)
+		err = cmd.Run()
 		if err != nil {
-			return fmt.Errorf("getting size of %s: %w", mktsSubdirPath, err)
+			return fmt.Errorf("Copying sym-link %s %s to %s: %w", subdir, mktsSubdirPath, boostSubdirPath, err)
+		}
+		return nil
+	}
+
+	if !dirInfo.IsDir() {
+		return fmt.Errorf("expected %s to be a directory but it's not", mktsSubdirPath)
+	}
+
+	dirSizeBytes, err := util.DirSize(mktsSubdirPath)
+	if err != nil {
+		return fmt.Errorf("getting size of %s: %w", mktsSubdirPath, err)
+	}
+
+	humanSize := humanize.Bytes(uint64(dirSizeBytes))
+	fmt.Printf("%s directory size: %s\n", subdir, humanSize)
+
+	// If the directory is small enough, just copy it
+	if dirSizeBytes < 1024 {
+		fmt.Printf("Copying %s to %s\n", mktsSubdirPath, boostSubdirPath)
+		cmd := exec.Command("cp", "-r", mktsSubdirPath, boostSubdirPath)
+		err = cmd.Run()
+		if err != nil {
+			return fmt.Errorf("Copying %s directory %s to %s: %w", subdir, mktsSubdirPath, boostSubdirPath, err)
+		}
+		return nil
+	}
+
+	cs := readline.NewCancelableStdin(os.Stdin)
+	go func() {
+		<-ctx.Done()
+		cs.Close() // nolint:errcheck
+	}()
+	rl := bufio.NewReader(cs)
+	for {
+		fmt.Printf("%s directory size is %s. Copy [c] / Move [m] / Ignore [i]:\n", subdir, humanSize)
+
+		line, _, err := rl.ReadLine()
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				return fmt.Errorf("boost initialize canceled: %w", err)
+			}
+
+			return fmt.Errorf("reading input: %w", err)
 		}
 
-		humanSize := humanize.Bytes(uint64(dirSizeBytes))
-		fmt.Printf("%s directory size: %s\n", subdir, humanSize)
-
-		// If the directory is small enough, just copy it
-		if dirSizeBytes < 1024 {
+		switch string(line) {
+		case "c", "y":
 			fmt.Printf("Copying %s to %s\n", mktsSubdirPath, boostSubdirPath)
 			cmd := exec.Command("cp", "-r", mktsSubdirPath, boostSubdirPath)
 			err = cmd.Run()
@@ -403,47 +435,17 @@ func migrateDirectory(ctx context.Context, mktsRepo lotus_repo.LockedRepo, boost
 				return fmt.Errorf("Copying %s directory %s to %s: %w", subdir, mktsSubdirPath, boostSubdirPath, err)
 			}
 			return nil
-		}
-
-		cs := readline.NewCancelableStdin(os.Stdin)
-		go func() {
-			<-ctx.Done()
-			cs.Close() // nolint:errcheck
-		}()
-		rl := bufio.NewReader(cs)
-		for {
-			fmt.Printf("%s directory size is %s. Copy [c] / Move [m] / Ignore [i]:\n", subdir, humanSize)
-
-			line, _, err := rl.ReadLine()
+		case "m":
+			fmt.Printf("Moving %s to %s\n", mktsSubdirPath, boostSubdirPath)
+			cmd := exec.Command("mv", mktsSubdirPath, boostSubdirPath)
+			err = cmd.Run()
 			if err != nil {
-				if xerrors.Is(err, io.EOF) {
-					return fmt.Errorf("boost initialize canceled: %w", err)
-				}
-
-				return fmt.Errorf("reading input: %w", err)
+				return fmt.Errorf("Moving %s directory %s to %s: %w", subdir, mktsSubdirPath, boostSubdirPath, err)
 			}
-
-			switch string(line) {
-			case "c", "y":
-				fmt.Printf("Copying %s to %s\n", mktsSubdirPath, boostSubdirPath)
-				cmd := exec.Command("cp", "-r", mktsSubdirPath, boostSubdirPath)
-				err = cmd.Run()
-				if err != nil {
-					return fmt.Errorf("Copying %s directory %s to %s: %w", subdir, mktsSubdirPath, boostSubdirPath, err)
-				}
-				return nil
-			case "m":
-				fmt.Printf("Moving %s to %s\n", mktsSubdirPath, boostSubdirPath)
-				cmd := exec.Command("mv", mktsSubdirPath, boostSubdirPath)
-				err = cmd.Run()
-				if err != nil {
-					return fmt.Errorf("Moving %s directory %s to %s: %w", subdir, mktsSubdirPath, boostSubdirPath, err)
-				}
-				return nil
-			case "i":
-				fmt.Printf("Not copying %s directory from markets to boost\n", subdir)
-				return nil
-			}
+			return nil
+		case "i":
+			fmt.Printf("Not copying %s directory from markets to boost\n", subdir)
+			return nil
 		}
 	}
 }
