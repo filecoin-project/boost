@@ -7,6 +7,14 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 )
 
+type storageResolver struct {
+	Staged      gqltypes.Uint64
+	Transferred gqltypes.Uint64
+	Pending     gqltypes.Uint64
+	Free        gqltypes.Uint64
+	MountPoint  string
+}
+
 // query: storage: [Storage]
 func (r *resolver) Storage(ctx context.Context) (*storageResolver, error) {
 	tagged, err := r.storageMgr.TotalTagged(ctx)

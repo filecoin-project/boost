@@ -28,7 +28,7 @@ type Config struct {
 type StorageManager struct {
 	lr                 lotus_repo.LockedRepo
 	db                 *db.StorageDB
-	cfg                Config
+	Cfg                Config
 	StagingAreaDirPath string
 }
 
@@ -42,7 +42,7 @@ func New(cfg Config) func(lr lotus_repo.LockedRepo, sqldb *sql.DB) (*StorageMana
 
 		return &StorageManager{
 			db:                 db.NewStorageDB(sqldb),
-			cfg:                cfg,
+			Cfg:                cfg,
 			lr:                 lr,
 			StagingAreaDirPath: stagingPath,
 		}, nil
@@ -57,7 +57,7 @@ func (m *StorageManager) Free(ctx context.Context) (uint64, error) {
 		return 0, fmt.Errorf("getting total tagged: %w", err)
 	}
 
-	return m.cfg.MaxStagingDealsBytes - tagged, nil
+	return m.Cfg.MaxStagingDealsBytes - tagged, nil
 }
 
 // ErrNoSpaceLeft indicates that there is insufficient storage to accept a deal
@@ -67,17 +67,17 @@ var ErrNoSpaceLeft = errors.New("no space left")
 // If there is not enough space left, returns ErrNoSpaceLeft.
 func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, size uint64) error {
 	// Get the total tagged storage, so that we know how much is available.
-	log.Debugw("tagging", "id", dealUuid, "size", size, "maxbytes", m.cfg.MaxStagingDealsBytes)
+	log.Debugw("tagging", "id", dealUuid, "size", size, "maxbytes", m.Cfg.MaxStagingDealsBytes)
 
 	tagged, err := m.TotalTagged(ctx)
 	if err != nil {
 		return fmt.Errorf("getting total tagged: %w", err)
 	}
 
-	if m.cfg.MaxStagingDealsBytes != 0 {
-		if tagged+size >= m.cfg.MaxStagingDealsBytes {
+	if m.Cfg.MaxStagingDealsBytes != 0 {
+		if tagged+size >= m.Cfg.MaxStagingDealsBytes {
 			err := fmt.Errorf("%w: cannot accept piece of size %d, on top of already allocated %d bytes, because it would exceed max staging area size %d",
-				ErrNoSpaceLeft, size, tagged, m.cfg.MaxStagingDealsBytes)
+				ErrNoSpaceLeft, size, tagged, m.Cfg.MaxStagingDealsBytes)
 			return err
 		}
 	}

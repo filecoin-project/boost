@@ -16,12 +16,11 @@ import (
 	"testing"
 	"time"
 
-	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
-
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
-	mock_sealingpipeline "github.com/filecoin-project/boost/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemanager"
+	"github.com/filecoin-project/boost/storagemarket/dealfilter"
+	mock_sealingpipeline "github.com/filecoin-project/boost/storagemarket/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemarket/smtestutil"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -44,6 +43,7 @@ import (
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
+	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -885,6 +885,7 @@ type ProviderHarness struct {
 	FundsDB                *db.FundsDB
 	StorageDB              *db.StorageDB
 	PublishWallet          address.Address
+	PledgeCollatWallet     address.Address
 	MinPublishFees         abi.TokenAmount
 	MaxStagingDealBytes    uint64
 	MockSealingPipelineAPI *mock_sealingpipeline.MockAPI
@@ -910,6 +911,7 @@ type providerConfig struct {
 	lockedFunds      big.Int
 	escrowFunds      big.Int
 	publishWalletBal int64
+	collatWalletBal  int64
 
 	price         abi.TokenAmount
 	verifiedPrice abi.TokenAmount
@@ -976,6 +978,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		lockedFunds:          big.NewInt(3000000),
 		escrowFunds:          big.NewInt(5000000),
 		publishWalletBal:     1000,
+		collatWalletBal:      1000,
 
 		price:         abi.NewTokenAmount(0),
 		verifiedPrice: abi.NewTokenAmount(0),
@@ -1034,7 +1037,10 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	fundsDB := db.NewFundsDB(sqldb)
 
 	// publish wallet
-	pw, err := address.NewIDAddress(uint64(rand.Intn(100)))
+	pw, err := address.NewIDAddress(1)
+	require.NoError(t, err)
+
+	pcw, err := address.NewIDAddress(2)
 	require.NoError(t, err)
 
 	// create the harness with default values
@@ -1054,6 +1060,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		FundsDB:                db.NewFundsDB(sqldb),
 		StorageDB:              db.NewStorageDB(sqldb),
 		PublishWallet:          pw,
+		PledgeCollatWallet:     pcw,
 		MinerStub:              minerStub,
 		MinPublishFees:         pc.minPublishFees,
 		MaxStagingDealBytes:    pc.maxStagingDealBytes,
@@ -1064,6 +1071,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	fminitF := fundmanager.New(fundmanager.Config{
 		PubMsgBalMin: ph.MinPublishFees,
 		PubMsgWallet: pw,
+		CollatWallet: pcw,
 	})
 	fm := fminitF(fn, fundsDB)
 
@@ -1079,7 +1087,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	require.NoError(t, err)
 
 	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
-	df := func(ctx context.Context, deal types.DealFilterParams) (bool, string, error) {
+	df := func(ctx context.Context, deal dealfilter.DealFilterParams) (bool, string, error) {
 		return true, "", nil
 	}
 
@@ -1106,6 +1114,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		Escrow: pc.escrowFunds,
 	}, nil).AnyTimes()
 
+	fn.EXPECT().WalletBalance(gomock.Any(), ph.PledgeCollatWallet).Return(abi.NewTokenAmount(pc.publishWalletBal), nil).AnyTimes()
 	fn.EXPECT().WalletBalance(gomock.Any(), ph.PublishWallet).Return(abi.NewTokenAmount(pc.publishWalletBal), nil).AnyTimes()
 
 	ph.MockSealingPipelineAPI.EXPECT().WorkerJobs(gomock.Any()).Return(map[uuid.UUID][]storiface.WorkerJob{}, nil).AnyTimes()
@@ -1129,6 +1138,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, ctx context
 		lockedFunds:          big.NewInt(300),
 		escrowFunds:          big.NewInt(500),
 		publishWalletBal:     1000,
+		collatWalletBal:      1000,
 	}
 	for _, opt := range opts {
 		opt(pc)
@@ -1137,7 +1147,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, ctx context
 	h.Provider.Stop()
 	h.MinerStub = smtestutil.NewMinerStub(h.GoMockCtrl)
 	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
-	df := func(ctx context.Context, deal types.DealFilterParams) (bool, string, error) {
+	df := func(ctx context.Context, deal dealfilter.DealFilterParams) (bool, string, error) {
 		return true, "", nil
 	}
 

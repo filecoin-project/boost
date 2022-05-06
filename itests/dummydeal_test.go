@@ -34,10 +34,11 @@ func TestDummydeal(t *testing.T) {
 	tempdir := t.TempDir()
 	log.Debugw("using tempdir", "dir", tempdir)
 
-	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
+	fileSize := 2000000
+	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, fileSize)
 	require.NoError(t, err)
 
-	failingFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
+	failingFilepath, err := testutil.CreateRandomFile(tempdir, 6, fileSize)
 	require.NoError(t, err)
 
 	rootCid, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
@@ -47,11 +48,13 @@ func TestDummydeal(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start a web server to serve the car files
+	log.Debug("starting webserver")
 	server, err := testutil.HttpTestFileServer(t, tempdir)
 	require.NoError(t, err)
 	defer server.Close()
 
 	// Create a new dummy deal
+	log.Debug("creating dummy deal")
 	dealUuid := uuid.New()
 
 	// Make a deal

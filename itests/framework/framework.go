@@ -191,9 +191,11 @@ func (f *TestFramework) Start() error {
 		wg.Done()
 	}()
 
-	// Create a wallet for publish storage deals with some funds
-	wg.Add(1)
+	// Create wallets for publish storage deals and pledge collateral with
+	// some funds
+	wg.Add(2)
 	var psdWalletAddr address.Address
+	var pledgeCollatAddr address.Address
 	go func() {
 		Log.Info("Creating publish storage deals wallet")
 		psdWalletAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
@@ -201,6 +203,15 @@ func (f *TestFramework) Start() error {
 		amt := abi.NewTokenAmount(1e18)
 		_ = sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
 		Log.Infof("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
+		wg.Done()
+	}()
+	go func() {
+		Log.Info("Creating publish storage deals wallet")
+		pledgeCollatAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
+
+		amt := abi.NewTokenAmount(1e18)
+		_ = sendFunds(f.ctx, fullnodeApi, pledgeCollatAddr, amt)
+		Log.Infof("Created pledge collateral wallet %s with %d attoFil", pledgeCollatAddr, amt)
 		wg.Done()
 	}()
 	wg.Wait()
@@ -268,6 +279,7 @@ func (f *TestFramework) Start() error {
 	cfg.SealerApiInfo = apiInfo
 	cfg.Wallets.Miner = minerAddr.String()
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
+	cfg.Wallets.PledgeCollateral = pledgeCollatAddr.String()
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
 	cfg.Dealmaking.PublishMsgPeriod = config.Duration(0)
 	cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB

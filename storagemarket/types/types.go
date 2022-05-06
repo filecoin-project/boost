@@ -4,10 +4,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/filecoin-project/go-fil-markets/shared"
-
-	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/crypto"
@@ -75,11 +73,6 @@ type DealParams struct {
 	ClientDealProposal market.ClientDealProposal
 	DealDataRoot       cid.Cid
 	Transfer           Transfer // Transfer params will be the zero value if this is an offline deal
-}
-
-type DealFilterParams struct {
-	DealParams           *DealParams
-	SealingPipelineState *sealingpipeline.Status
 }
 
 // Transfer has the parameters for a data transfer

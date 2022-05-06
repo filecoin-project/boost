@@ -10,7 +10,6 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
-	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
@@ -77,28 +76,12 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 		return aerr
 	}
 
-	// get current sealing pipeline status
-	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
-	if err != nil {
-		return &acceptError{
-			error:         fmt.Errorf("failed to fetch sealing pipleine status: %w", err),
-			reason:        "server error: get sealing status",
-			isSevereError: true,
-		}
+	// run custom storage deal filter decision logic
+	dealFilterParams, aerr := p.getDealFilterParams(deal)
+	if aerr != nil {
+		return aerr
 	}
-
-	// run custom decision logic
-	params := types.DealParams{
-		DealUUID:           deal.DealUuid,
-		ClientDealProposal: deal.ClientDealProposal,
-		DealDataRoot:       deal.DealDataRoot,
-		Transfer:           deal.Transfer,
-	}
-
-	accept, reason, err := p.df(p.ctx, types.DealFilterParams{
-		DealParams:           &params,
-		SealingPipelineState: status})
-
+	accept, reason, err := p.df(p.ctx, *dealFilterParams)
 	if err != nil {
 		return &acceptError{
 			error:         fmt.Errorf("failed to invoke deal filter: %w", err),
