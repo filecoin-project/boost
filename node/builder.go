@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 
@@ -48,6 +50,7 @@ import (
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_helpers "github.com/filecoin-project/lotus/node/modules/helpers"
+	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_lp2p "github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage"
@@ -231,6 +234,15 @@ var LibP2P = Options(
 	Override(BandwidthReporterKey, lotus_lp2p.BandwidthCounter),
 	Override(AutoNATSvcKey, lotus_lp2p.AutoNATService),
 
+	// Services (pubsub)
+	Override(new(*lotus_dtypes.ScoreKeeper), lotus_lp2p.ScoreKeeper),
+	Override(new(*pubsub.PubSub), lotus_lp2p.GossipSub),
+	Override(new(*lotus_config.Pubsub), func(bs lotus_dtypes.Bootstrapper) *lotus_config.Pubsub {
+		return &lotus_config.Pubsub{
+			Bootstrapper: bool(bs),
+		}
+	}),
+
 	// Services (connection management)
 	Override(ConnectionManagerKey, lotus_lp2p.ConnectionManager(50, 200, 20*time.Second, nil)),
 	Override(new(*conngater.BasicConnectionGater), lotus_lp2p.ConnGater),
@@ -279,6 +291,14 @@ func ConfigCommon(cfg *config.Common) Option {
 			cfg.Libp2p.ConnMgrHigh,
 			time.Duration(cfg.Libp2p.ConnMgrGrace),
 			cfg.Libp2p.ProtectedPeers)),
+		ApplyIf(func(s *Settings) bool { return len(cfg.Libp2p.BootstrapPeers) > 0 },
+			Override(new(lotus_dtypes.BootstrapPeers), modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)),
+		),
+
+		//Override(new(network.ResourceManager), lp2p.ResourceManager(cfg.Libp2p.ConnMgrHigh)),
+		Override(new(*pubsub.PubSub), lp2p.GossipSub),
+		Override(new(*lotus_config.Pubsub), &cfg.Pubsub),
+
 		ApplyIf(func(s *Settings) bool { return len(cfg.Libp2p.BootstrapPeers) > 0 },
 			Override(new(lotus_dtypes.BootstrapPeers), modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)),
 		),
@@ -416,8 +436,13 @@ func ConfigBoost(c interface{}) Option {
 
 		Override(CheckFDLimit, lotus_modules.CheckFdLimit(build.BoostFDLimit)), // recommend at least 100k FD limit to miners
 
+		Override(new(lotus_dtypes.DrandSchedule), lotus_modules.BuiltinDrandConfig),
+		Override(new(lotus_dtypes.BootstrapPeers), lotus_modules.BuiltinBootstrap),
+		Override(new(lotus_dtypes.DrandBootstrap), lotus_modules.DrandBootstrap),
+
 		Override(new(stores.LocalStorage), From(new(lotus_repo.LockedRepo))),
 		Override(new(*stores.Local), lotus_modules.LocalStorage),
+		Override(new(sectorstorage.Config), cfg.StorageManager()),
 		Override(new(*stores.Remote), lotus_modules.RemoteStorage),
 
 		Override(new(*fundmanager.FundManager), fundmanager.New(fundmanager.Config{
@@ -527,7 +552,7 @@ func ConfigBoost(c interface{}) Option {
 
 		Override(new(sectorstorage.Unsealer), From(new(lotus_modules.MinerStorageService))),
 		Override(new(stores.SectorIndex), From(new(lotus_modules.MinerSealingService))),
-		Override(new(sectorstorage.SealerConfig), cfg.Storage),
+		Override(new(lotus_config.SealerConfig), cfg.Storage),
 
 		Override(new(lotus_modules.MinerStorageService), lotus_modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
 		Override(new(lotus_modules.MinerSealingService), lotus_modules.ConnectSealingService(cfg.SealerApiInfo)),

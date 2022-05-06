@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
-
 	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/lotus/chain/types"
@@ -61,7 +59,7 @@ func DefaultBoost() *Boost {
 	cfg := &Boost{
 		Common: defCommon(),
 
-		Storage: sectorstorage.SealerConfig{
+		Storage: lotus_config.SealerConfig{
 			ParallelFetchLimit: 10,
 		},
 
@@ -105,7 +103,6 @@ func DefaultBoost() *Boost {
 			ConsiderVerifiedStorageDeals:   true,
 			ConsiderUnverifiedStorageDeals: true,
 			PieceCidBlocklist:              []cid.Cid{},
-			MakeNewSectorForDeals:          true,
 			// TODO: It'd be nice to set this based on sector size
 			MaxDealStartDelay:               lotus_config.Duration(time.Hour * 24 * 14),
 			ExpectedSealDuration:            lotus_config.Duration(time.Hour * 24),
@@ -158,8 +155,10 @@ func DefaultBoost() *Boost {
 			Enable:               true,
 			EntriesCacheCapacity: 1024,
 			EntriesChunkSize:     16384,
-			TopicName:            "/indexer/ingest/mainnet",
-			PurgeCacheOnStart:    false,
+			// The default empty TopicName means it is inferred from network name, in the following
+			// format: "/indexer/ingest/<network-name>"
+			TopicName:         "",
+			PurgeCacheOnStart: false,
 		},
 	}
 	return cfg

@@ -2,7 +2,6 @@ package config
 
 import (
 	"github.com/filecoin-project/lotus/chain/types"
-	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
 	"github.com/ipfs/go-cid"
 )
@@ -16,6 +15,7 @@ type Common struct {
 	API    lotus_config.API
 	Backup lotus_config.Backup
 	Libp2p lotus_config.Libp2p
+	Pubsub lotus_config.Pubsub
 }
 
 type Backup struct {
@@ -31,7 +31,7 @@ type Backup struct {
 type Boost struct {
 	Common
 
-	Storage            sectorstorage.SealerConfig
+	Storage            lotus_config.SealerConfig
 	SealerApiInfo      string
 	SectorIndexApiInfo string
 	Dealmaking         DealmakingConfig
