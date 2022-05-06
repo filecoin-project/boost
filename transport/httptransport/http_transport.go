@@ -3,6 +3,7 @@ package httptransport
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,7 +19,6 @@ import (
 	"github.com/jpillora/backoff"
 	"github.com/libp2p/go-libp2p-core/host"
 	p2phttp "github.com/libp2p/go-libp2p-http"
-	"golang.org/x/xerrors"
 )
 
 const (
@@ -94,7 +94,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	}
 
 	if len(tInfo.URL) == 0 {
-		return nil, xerrors.New("deal url is empty")
+		return nil, errors.New("deal url is empty")
 	}
 
 	// parse request URL
@@ -287,7 +287,7 @@ func (t *transfer) execute(ctx context.Context) error {
 
 		// do not resume transfer if context has been cancelled or if the context deadline has exceeded
 		err = reqErr.error
-		if xerrors.Is(err, context.Canceled) || xerrors.Is(err, context.DeadlineExceeded) {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			t.dl.LogError(duuid, "terminating http transfer: context cancelled or deadline exceeded", err)
 			return fmt.Errorf("transfer context canceled err: %w", err)
 		}

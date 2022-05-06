@@ -25,7 +25,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
 )
 
 var dummydealCmd = &cli.Command{
@@ -201,7 +200,7 @@ var dummydealCmd = &cli.Command{
 
 		rej, err := boostApi.BoostDummyDeal(ctx, dealParams)
 		if err != nil {
-			return xerrors.Errorf("creating dummy deal: %w", err)
+			return fmt.Errorf("creating dummy deal: %w", err)
 		}
 
 		if rej != nil && rej.Reason != "" {

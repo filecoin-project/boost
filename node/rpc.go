@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -11,7 +12,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"go.opencensus.io/tag"
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-jsonrpc/auth"
@@ -36,7 +36,7 @@ func ServeRPC(h http.Handler, id string, addr multiaddr.Multiaddr) (StopFunc, er
 	// Start listening to the addr; if invalid or occupied, we will fail early.
 	lst, err := manet.Listen(addr)
 	if err != nil {
-		return nil, xerrors.Errorf("could not listen: %w", err)
+		return nil, fmt.Errorf("could not listen: %w", err)
 	}
 
 	// Instantiate the server and start listening.

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipfs/go-datastore/query"
 	dshelp "github.com/ipfs/go-ipfs-ds-help"
-	"golang.org/x/xerrors"
 
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -77,13 +77,13 @@ func (st *SectorBlocks) writeRef(ctx context.Context, dealID abi.DealID, sectorI
 		err = nil
 	}
 	if err != nil {
-		return xerrors.Errorf("getting existing refs: %w", err)
+		return fmt.Errorf("getting existing refs: %w", err)
 	}
 
 	var refs api.SealedRefs
 	if len(v) > 0 {
 		if err := cborutil.ReadCborRPC(bytes.NewReader(v), &refs); err != nil {
-			return xerrors.Errorf("decoding existing refs: %w", err)
+			return fmt.Errorf("decoding existing refs: %w", err)
 		}
 	}
 
@@ -95,7 +95,7 @@ func (st *SectorBlocks) writeRef(ctx context.Context, dealID abi.DealID, sectorI
 
 	newRef, err := cborutil.Dump(&refs)
 	if err != nil {
-		return xerrors.Errorf("serializing refs: %w", err)
+		return fmt.Errorf("serializing refs: %w", err)
 	}
 	return st.keys.Put(ctx, DealIDToDsKey(dealID), newRef) // TODO: batch somehow
 }
@@ -109,7 +109,7 @@ func (st *SectorBlocks) AddPiece(ctx context.Context, size abi.UnpaddedPieceSize
 	// TODO: DealID has very low finality here
 	err = st.writeRef(ctx, d.DealID, so.Sector, so.Offset, size)
 	if err != nil {
-		return 0, 0, xerrors.Errorf("writeRef: %w", err)
+		return 0, 0, fmt.Errorf("writeRef: %w", err)
 	}
 
 	return so.Sector, so.Offset, nil

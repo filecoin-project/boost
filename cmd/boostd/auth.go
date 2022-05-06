@@ -1,10 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
 
 	bcli "github.com/filecoin-project/boost/cli"
 	boostcliutil "github.com/filecoin-project/boost/cli/util"
@@ -44,7 +44,7 @@ var AuthCreateAdminToken = &cli.Command{
 		ctx := bcli.ReqContext(cctx)
 
 		if !cctx.IsSet("perm") {
-			return xerrors.New("--perm flag not set")
+			return errors.New("--perm flag not set")
 		}
 
 		perm := cctx.String("perm")
@@ -92,7 +92,7 @@ var AuthApiInfoToken = &cli.Command{
 		ctx := bcli.ReqContext(cctx)
 
 		if !cctx.IsSet("perm") {
-			return xerrors.New("--perm flag not set, use with one of: read, write, sign, admin")
+			return errors.New("--perm flag not set, use with one of: read, write, sign, admin")
 		}
 
 		perm := cctx.String("perm")
@@ -115,7 +115,7 @@ var AuthApiInfoToken = &cli.Command{
 
 		ainfo, err := cliutil.GetAPIInfo(cctx, node.Boost)
 		if err != nil {
-			return xerrors.Errorf("could not get API info for %s: %w", node.Boost, err)
+			return fmt.Errorf("could not get API info for %s: %w", node.Boost, err)
 		}
 
 		currentEnv, _, _ := boostcliutil.EnvsForAPIInfos(node.Boost)

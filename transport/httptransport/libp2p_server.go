@@ -21,7 +21,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	gostream "github.com/libp2p/go-libp2p-gostream"
 	"github.com/multiformats/go-multiaddr"
-	"golang.org/x/xerrors"
 )
 
 var log = logging.Logger("libp2p-server")
@@ -169,7 +168,7 @@ func (s *Libp2pCarServer) checkAuth(r *http.Request) (string, *AuthValue, *httpE
 
 	// Get auth value from auth datastore
 	val, err := s.auth.Get(ctx, authToken)
-	if xerrors.Is(err, ErrTokenNotFound) {
+	if errors.Is(err, ErrTokenNotFound) {
 		return "", nil, &httpError{
 			error: errors.New("rejected unrecognized auth token"),
 			code:  http.StatusUnauthorized,

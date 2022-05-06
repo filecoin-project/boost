@@ -3,12 +3,13 @@ package modules
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-datastore"
@@ -50,7 +51,7 @@ func HandleMigrateClientFunds(lc fx.Lifecycle, ds lotus_dtypes.MetadataDS, walle
 			}
 			b, err := ds.Get(ctx, datastore.NewKey("/marketfunds/client"))
 			if err != nil {
-				if xerrors.Is(err, datastore.ErrNotFound) {
+				if errors.Is(err, datastore.ErrNotFound) {
 					return nil
 				}
 				log.Errorf("client funds migration - getting datastore value: %v", err)
@@ -78,7 +79,7 @@ func ClientImportMgr(ds lotus_dtypes.MetadataDS, r repo.LockedRepo) (lotus_dtype
 	// store the imports under the repo's `imports` subdirectory.
 	dir := filepath.Join(r.Path(), "imports")
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, xerrors.Errorf("failed to create directory %s: %w", dir, err)
+		return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
 	ns := namespace.Wrap(ds, datastore.NewKey("/client"))
@@ -116,7 +117,7 @@ func StorageBlockstoreAccessor(importmgr dtypes.ClientImportMgr) storagemarket.B
 func RetrievalBlockstoreAccessor(r repo.LockedRepo) (retrievalmarket.BlockstoreAccessor, error) {
 	dir := filepath.Join(r.Path(), "retrievals")
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, xerrors.Errorf("failed to create directory %s: %w", dir, err)
+		return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 	return retrievaladapter.NewCARBlockstoreAccessor(dir), nil
 }

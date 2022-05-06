@@ -3,9 +3,8 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
-
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -95,7 +94,7 @@ func (d *dealAccessor) scan(row Scannable) error {
 	// Scan the row into each pointer
 	err := row.Scan(dest...)
 	if err != nil {
-		return xerrors.Errorf("scanning deal row: %w", err)
+		return fmt.Errorf("scanning deal row: %w", err)
 	}
 
 	// For each field
@@ -103,7 +102,7 @@ func (d *dealAccessor) scan(row Scannable) error {
 		// Unmarshall the scanned value into deal object
 		err := fieldDef.unmarshall()
 		if err != nil {
-			return xerrors.Errorf("unmarshalling db field %s: %s", name, err)
+			return fmt.Errorf("unmarshalling db field %s: %s", name, err)
 		}
 	}
 	return nil

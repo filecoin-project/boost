@@ -3,6 +3,7 @@ package gql
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -16,7 +17,6 @@ import (
 	"github.com/graph-gophers/graphql-go/relay"
 	"github.com/graph-gophers/graphql-transport-ws/graphqlws"
 	logging "github.com/ipfs/go-log/v2"
-	"golang.org/x/xerrors"
 )
 
 var log = logging.Logger("gql")
@@ -112,7 +112,7 @@ func serveReactApp(mux *http.ServeMux) error {
 
 	reactFiles, err := react.BuildDir.ReadDir("build")
 	if err != nil {
-		if !xerrors.Is(err, os.ErrNotExist) {
+		if !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("reading files in embedded react build dir: %w", err)
 		}
 

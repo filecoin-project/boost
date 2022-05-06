@@ -17,7 +17,6 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
 )
 
 var runCmd = &cli.Command{
@@ -42,7 +41,7 @@ var runCmd = &cli.Command{
 
 		fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx)
 		if err != nil {
-			return xerrors.Errorf("getting full node api: %w", err)
+			return fmt.Errorf("getting full node api: %w", err)
 		}
 		defer ncloser()
 
@@ -58,14 +57,14 @@ var runCmd = &cli.Command{
 		log.Debugw("Remote full node version", "version", v)
 
 		if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
-			return xerrors.Errorf("Remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion1, v.APIVersion)
+			return fmt.Errorf("Remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion1, v.APIVersion)
 		}
 
 		log.Debug("Checking full node sync status")
 
 		if !cctx.Bool("nosync") {
 			if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: fullnodeApi}, false); err != nil {
-				return xerrors.Errorf("sync wait: %w", err)
+				return fmt.Errorf("sync wait: %w", err)
 			}
 		}
 
@@ -80,7 +79,7 @@ var runCmd = &cli.Command{
 			return err
 		}
 		if !ok {
-			return xerrors.Errorf("repo at '%s' is not initialized", cctx.String(FlagBoostRepo))
+			return fmt.Errorf("repo at '%s' is not initialized", cctx.String(FlagBoostRepo))
 		}
 
 		shutdownChan := make(chan struct{})
@@ -96,20 +95,20 @@ var runCmd = &cli.Command{
 			node.Override(new(v1api.FullNode), fullnodeApi),
 		)
 		if err != nil {
-			return xerrors.Errorf("creating node: %w", err)
+			return fmt.Errorf("creating node: %w", err)
 		}
 
 		log.Debug("Getting API endpoint of boost node")
 
 		endpoint, err := r.APIEndpoint()
 		if err != nil {
-			return xerrors.Errorf("getting API endpoint: %w", err)
+			return fmt.Errorf("getting API endpoint: %w", err)
 		}
 
 		// Get maddr for boost node
 		maddr, err := boostApi.NetAddrsListen(ctx)
 		if err != nil {
-			return xerrors.Errorf("getting boost libp2p address: %w", err)
+			return fmt.Errorf("getting boost libp2p address: %w", err)
 		}
 
 		log.Infow("Boost libp2p node listening", "maddr", maddr)
@@ -117,19 +116,19 @@ var runCmd = &cli.Command{
 		// Bootstrap with full node
 		remoteAddrs, err := fullnodeApi.NetAddrsListen(ctx)
 		if err != nil {
-			return xerrors.Errorf("getting full node libp2p address: %w", err)
+			return fmt.Errorf("getting full node libp2p address: %w", err)
 		}
 
 		log.Debugw("Bootstrapping boost libp2p network with full node", "maadr", remoteAddrs)
 
 		if err := boostApi.NetConnect(ctx, remoteAddrs); err != nil {
-			return xerrors.Errorf("connecting to full node (libp2p): %w", err)
+			return fmt.Errorf("connecting to full node (libp2p): %w", err)
 		}
 
 		// Instantiate the boost service JSON RPC handler.
 		handler, err := node.BoostHandler(boostApi, true)
 		if err != nil {
-			return xerrors.Errorf("failed to instantiate rpc handler: %w", err)
+			return fmt.Errorf("failed to instantiate rpc handler: %w", err)
 		}
 
 		log.Infow("Boost JSON RPC server is listening", "endpoint", endpoint)

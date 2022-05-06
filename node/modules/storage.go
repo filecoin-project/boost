@@ -2,10 +2,10 @@ package modules
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/lib/backupds"
@@ -45,7 +45,7 @@ func Datastore(disableLog bool) func(lc fx.Lifecycle, mctx helpers.MetricsCtx, r
 
 		bds, err := backupds.Wrap(mds, logdir)
 		if err != nil {
-			return nil, xerrors.Errorf("opening backupds: %w", err)
+			return nil, fmt.Errorf("opening backupds: %w", err)
 		}
 
 		lc.Append(fx.Hook{

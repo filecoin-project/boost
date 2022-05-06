@@ -2,14 +2,13 @@ package common
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/gbrlsnchs/jwt/v3"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
-
-	"github.com/filecoin-project/go-jsonrpc/auth"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
@@ -35,7 +34,7 @@ type jwtPayload struct {
 func (a *CommonAPI) AuthVerify(ctx context.Context, token string) ([]auth.Permission, error) {
 	var payload jwtPayload
 	if _, err := jwt.Verify([]byte(token), (*jwt.HMACSHA)(a.APISecret), &payload); err != nil {
-		return nil, xerrors.Errorf("JWT Verification failed: %w", err)
+		return nil, fmt.Errorf("JWT Verification failed: %w", err)
 	}
 
 	return payload.Allow, nil

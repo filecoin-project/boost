@@ -37,7 +37,6 @@ import (
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
 	"github.com/multiformats/go-multibase"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
 )
 
 var (
@@ -68,7 +67,7 @@ var marketAddCmd = &cli.Command{
 		}
 		f, err := types.ParseFIL(cctx.Args().First())
 		if err != nil {
-			return xerrors.Errorf("parsing 'amount' argument: %w", err)
+			return fmt.Errorf("parsing 'amount' argument: %w", err)
 		}
 
 		amt := abi.TokenAmount(f)
@@ -140,7 +139,7 @@ var marketWithdrawCmd = &cli.Command{
 		}
 		f, err := types.ParseFIL(cctx.Args().First())
 		if err != nil {
-			return xerrors.Errorf("parsing 'amount' argument: %w", err)
+			return fmt.Errorf("parsing 'amount' argument: %w", err)
 		}
 
 		amt := abi.TokenAmount(f)
@@ -216,22 +215,22 @@ var commpCmd = &cli.Command{
 		// check that the data is a car file; if it's not, retrieval won't work
 		_, err = car.ReadHeader(bufio.NewReader(rdr))
 		if err != nil {
-			return xerrors.Errorf("not a car file: %w", err)
+			return fmt.Errorf("not a car file: %w", err)
 		}
 
 		if _, err := rdr.Seek(0, io.SeekStart); err != nil {
-			return xerrors.Errorf("seek to start: %w", err)
+			return fmt.Errorf("seek to start: %w", err)
 		}
 
 		w := &writer.Writer{}
 		_, err = io.CopyBuffer(w, rdr, make([]byte, writer.CommPBuf))
 		if err != nil {
-			return xerrors.Errorf("copy into commp writer: %w", err)
+			return fmt.Errorf("copy into commp writer: %w", err)
 		}
 
 		commp, err := w.Sum()
 		if err != nil {
-			return xerrors.Errorf("computing commP failed: %w", err)
+			return fmt.Errorf("computing commP failed: %w", err)
 		}
 
 		encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
@@ -274,13 +273,13 @@ var generatecarCmd = &cli.Command{
 		}
 		ds, err := backupds.Wrap(mds, "")
 		if err != nil {
-			return xerrors.Errorf("opening backupds: %w", err)
+			return fmt.Errorf("opening backupds: %w", err)
 		}
 
 		// import manager - store the imports under the repo's `imports` subdirectory.
 		dir := filepath.Join(lr.Path(), "imports")
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return xerrors.Errorf("failed to create directory %s: %w", dir, err)
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 
 		ns := namespace.Wrap(ds, datastore.NewKey("/client"))
@@ -289,26 +288,26 @@ var generatecarCmd = &cli.Command{
 		// create a temporary import to represent this job and obtain a staging CAR.
 		id, err := importMgr.CreateImport()
 		if err != nil {
-			return xerrors.Errorf("failed to create temporary import: %w", err)
+			return fmt.Errorf("failed to create temporary import: %w", err)
 		}
 		defer importMgr.Remove(id) //nolint:errcheck
 
 		tmp, err := importMgr.AllocateCAR(id)
 		if err != nil {
-			return xerrors.Errorf("failed to allocate temporary CAR: %w", err)
+			return fmt.Errorf("failed to allocate temporary CAR: %w", err)
 		}
 		defer os.Remove(tmp) //nolint:errcheck
 
 		// generate and import the UnixFS DAG into a filestore (positional reference) CAR.
 		root, err := unixfs.CreateFilestore(ctx, inPath, tmp)
 		if err != nil {
-			return xerrors.Errorf("failed to import file using unixfs: %w", err)
+			return fmt.Errorf("failed to import file using unixfs: %w", err)
 		}
 
 		// open the positional reference CAR as a filestore.
 		fs, err := stores.ReadOnlyFilestore(tmp)
 		if err != nil {
-			return xerrors.Errorf("failed to open filestore from carv2 in path %s: %w", tmp, err)
+			return fmt.Errorf("failed to open filestore from carv2 in path %s: %w", tmp, err)
 		}
 		defer fs.Close() //nolint:errcheck
 
@@ -329,7 +328,7 @@ var generatecarCmd = &cli.Command{
 		).Write(
 			f,
 		); err != nil {
-			return xerrors.Errorf("failed to write CAR to output file: %w", err)
+			return fmt.Errorf("failed to write CAR to output file: %w", err)
 		}
 
 		err = f.Close()
@@ -360,7 +359,7 @@ func signAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway,
 	}
 	msg, err = api.GasEstimateMessageGas(ctx, msg, spec, types.EmptyTSK)
 	if err != nil {
-		err = xerrors.Errorf("GasEstimateMessageGas error: %w", err)
+		err = fmt.Errorf("GasEstimateMessageGas error: %w", err)
 		return
 	}
 
@@ -398,7 +397,7 @@ func signAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway,
 
 	cid, err = api.MpoolPush(ctx, smsg)
 	if err != nil {
-		err = xerrors.Errorf("mpool push: failed to push message: %w", err)
+		err = fmt.Errorf("mpool push: failed to push message: %w", err)
 		return
 	}
 

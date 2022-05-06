@@ -2,9 +2,8 @@ package net
 
 import (
 	"context"
+	"fmt"
 	"net"
-
-	"golang.org/x/xerrors"
 
 	logging "github.com/ipfs/go-log/v2"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -18,7 +17,7 @@ func (a *NetAPI) NetBlockAdd(ctx context.Context, acl api.NetBlockList) error {
 	for _, p := range acl.Peers {
 		err := a.ConnGater.BlockPeer(p)
 		if err != nil {
-			return xerrors.Errorf("error blocking peer %s: %w", p, err)
+			return fmt.Errorf("error blocking peer %s: %w", p, err)
 		}
 
 		for _, c := range a.Host.Network().ConnsToPeer(p) {
@@ -33,12 +32,12 @@ func (a *NetAPI) NetBlockAdd(ctx context.Context, acl api.NetBlockList) error {
 	for _, addr := range acl.IPAddrs {
 		ip := net.ParseIP(addr)
 		if ip == nil {
-			return xerrors.Errorf("error parsing IP address %s", addr)
+			return fmt.Errorf("error parsing IP address %s", addr)
 		}
 
 		err := a.ConnGater.BlockAddr(ip)
 		if err != nil {
-			return xerrors.Errorf("error blocking IP address %s: %w", addr, err)
+			return fmt.Errorf("error blocking IP address %s: %w", addr, err)
 		}
 
 		for _, c := range a.Host.Network().Conns() {
@@ -61,12 +60,12 @@ func (a *NetAPI) NetBlockAdd(ctx context.Context, acl api.NetBlockList) error {
 	for _, subnet := range acl.IPSubnets {
 		_, cidr, err := net.ParseCIDR(subnet)
 		if err != nil {
-			return xerrors.Errorf("error parsing subnet %s: %w", subnet, err)
+			return fmt.Errorf("error parsing subnet %s: %w", subnet, err)
 		}
 
 		err = a.ConnGater.BlockSubnet(cidr)
 		if err != nil {
-			return xerrors.Errorf("error blocking subunet %s: %w", subnet, err)
+			return fmt.Errorf("error blocking subunet %s: %w", subnet, err)
 		}
 
 		for _, c := range a.Host.Network().Conns() {
@@ -93,31 +92,31 @@ func (a *NetAPI) NetBlockRemove(ctx context.Context, acl api.NetBlockList) error
 	for _, p := range acl.Peers {
 		err := a.ConnGater.UnblockPeer(p)
 		if err != nil {
-			return xerrors.Errorf("error unblocking peer %s: %w", p, err)
+			return fmt.Errorf("error unblocking peer %s: %w", p, err)
 		}
 	}
 
 	for _, addr := range acl.IPAddrs {
 		ip := net.ParseIP(addr)
 		if ip == nil {
-			return xerrors.Errorf("error parsing IP address %s", addr)
+			return fmt.Errorf("error parsing IP address %s", addr)
 		}
 
 		err := a.ConnGater.UnblockAddr(ip)
 		if err != nil {
-			return xerrors.Errorf("error unblocking IP address %s: %w", addr, err)
+			return fmt.Errorf("error unblocking IP address %s: %w", addr, err)
 		}
 	}
 
 	for _, subnet := range acl.IPSubnets {
 		_, cidr, err := net.ParseCIDR(subnet)
 		if err != nil {
-			return xerrors.Errorf("error parsing subnet %s: %w", subnet, err)
+			return fmt.Errorf("error parsing subnet %s: %w", subnet, err)
 		}
 
 		err = a.ConnGater.UnblockSubnet(cidr)
 		if err != nil {
-			return xerrors.Errorf("error unblocking subunet %s: %w", subnet, err)
+			return fmt.Errorf("error unblocking subunet %s: %w", subnet, err)
 		}
 	}
 

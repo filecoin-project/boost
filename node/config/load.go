@@ -12,7 +12,6 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/kelseyhightower/envconfig"
-	"golang.org/x/xerrors"
 )
 
 // FromFile loads config from a specified file overriding defaults specified in
@@ -52,7 +51,7 @@ func ConfigUpdate(cfgCur, cfgDef interface{}, comment bool) ([]byte, error) {
 		buf := new(bytes.Buffer)
 		e := toml.NewEncoder(buf)
 		if err := e.Encode(cfgDef); err != nil {
-			return nil, xerrors.Errorf("encoding default config: %w", err)
+			return nil, fmt.Errorf("encoding default config: %w", err)
 		}
 
 		defStr = buf.String()
@@ -62,7 +61,7 @@ func ConfigUpdate(cfgCur, cfgDef interface{}, comment bool) ([]byte, error) {
 		buf := new(bytes.Buffer)
 		e := toml.NewEncoder(buf)
 		if err := e.Encode(cfgCur); err != nil {
-			return nil, xerrors.Errorf("encoding node config: %w", err)
+			return nil, fmt.Errorf("encoding node config: %w", err)
 		}
 
 		nodeStr = buf.String()
@@ -96,7 +95,7 @@ func ConfigUpdate(cfgCur, cfgDef interface{}, comment bool) ([]byte, error) {
 				if trimmed[0] == '[' {
 					m := sectionRx.FindSubmatch([]byte(trimmed))
 					if len(m) != 2 {
-						return nil, xerrors.Errorf("section didn't match (line %d)", i)
+						return nil, fmt.Errorf("section didn't match (line %d)", i)
 					}
 					section = string(m[1])
 
@@ -147,11 +146,11 @@ func ConfigUpdate(cfgCur, cfgDef interface{}, comment bool) ([]byte, error) {
 	if cfgDef != nil {
 		cfgUpdated, err := FromReader(strings.NewReader(nodeStr), cfgDef)
 		if err != nil {
-			return nil, xerrors.Errorf("parsing updated config: %w", err)
+			return nil, fmt.Errorf("parsing updated config: %w", err)
 		}
 
 		if !reflect.DeepEqual(cfgCur, cfgUpdated) {
-			return nil, xerrors.Errorf("updated config didn't match current config")
+			return nil, fmt.Errorf("updated config didn't match current config")
 		}
 	}
 

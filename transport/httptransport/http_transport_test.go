@@ -45,7 +45,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 )
 
 type serverTest struct {
@@ -278,7 +277,7 @@ func TestTransferCancellation(t *testing.T) {
 
 			evts := waitForTransferComplete(th)
 			require.Len(t, evts, 1)
-			require.True(t, xerrors.Is(evts[0].Error, context.Canceled))
+			require.True(t, errors.Is(evts[0].Error, context.Canceled))
 			closing <- struct{}{}
 		})
 	}

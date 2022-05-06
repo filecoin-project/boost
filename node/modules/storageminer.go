@@ -41,7 +41,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
-	"golang.org/x/xerrors"
 )
 
 var (
@@ -251,7 +250,7 @@ func readCfg(r lotus_repo.LockedRepo, accessor func(*config.Boost)) error {
 
 	cfg, ok := raw.(*config.Boost)
 	if !ok {
-		return xerrors.New("expected address of config.Boost")
+		return errors.New("expected address of config.Boost")
 	}
 
 	accessor(cfg)

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -30,7 +31,6 @@ import (
 	"github.com/ipfs/go-datastore"
 	dsq "github.com/ipfs/go-datastore/query"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
 )
 
 const metadataNamespace = "/metadata"
@@ -93,7 +93,7 @@ var initCmd = &cli.Command{
 		err = lr.SetConfig(func(raw interface{}) {
 			rcfg, ok := raw.(*config.Boost)
 			if !ok {
-				cerr = xerrors.New("expected boost config")
+				cerr = errors.New("expected boost config")
 				return
 			}
 
@@ -107,7 +107,7 @@ var initCmd = &cli.Command{
 			return cerr
 		}
 		if err != nil {
-			return xerrors.Errorf("setting config: %w", err)
+			return fmt.Errorf("setting config: %w", err)
 		}
 
 		// Add the miner address to the metadata datastore
@@ -270,7 +270,7 @@ func migrateStorageJson(mktsRepoPath string, boostRepoPath string) error {
 	// Read storage.json in the markets repo
 	bz, err := os.ReadFile(mktsFilePath)
 	if err != nil {
-		if !xerrors.Is(err, os.ErrNotExist) {
+		if !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("reading %s: %w", mktsFilePath, err)
 		}
 
@@ -312,7 +312,7 @@ func createAuthToken(boostRepo *lotus_repo.FsRepo, boostRepoLocked lotus_repo.Lo
 
 	// Check if the error was because the token has not been created (expected)
 	// or for some other reason
-	if !xerrors.Is(err, lotus_repo.ErrNoAPIEndpoint) {
+	if !errors.Is(err, lotus_repo.ErrNoAPIEndpoint) {
 		return fmt.Errorf("getting API token for newly created boost repo: %w", err)
 	}
 
@@ -368,7 +368,7 @@ func migrateDAGStore(ctx context.Context, mktsRepo lotus_repo.LockedRepo, boostR
 
 	dirInfo, err := os.Lstat(mktsSubdirPath)
 	if err != nil {
-		if xerrors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
 		return fmt.Errorf("reading %s path %s", subdir, mktsSubdirPath)
@@ -419,7 +419,7 @@ func migrateDAGStore(ctx context.Context, mktsRepo lotus_repo.LockedRepo, boostR
 
 		line, _, err := rl.ReadLine()
 		if err != nil {
-			if xerrors.Is(err, io.EOF) {
+			if errors.Is(err, io.EOF) {
 				return fmt.Errorf("boost initialize canceled: %w", err)
 			}
 
@@ -455,7 +455,7 @@ func migrateMarketsConfig(cctx *cli.Context, mktsRepo lotus_repo.LockedRepo, boo
 	err := boostRepo.SetConfig(func(raw interface{}) {
 		rcfg, ok := raw.(*config.Boost)
 		if !ok {
-			cerr = xerrors.New("expected boost config")
+			cerr = errors.New("expected boost config")
 			return
 		}
 
@@ -510,7 +510,7 @@ func migrateMarketsConfig(cctx *cli.Context, mktsRepo lotus_repo.LockedRepo, boo
 		return cerr
 	}
 	if err != nil {
-		return xerrors.Errorf("setting config: %w", err)
+		return fmt.Errorf("setting config: %w", err)
 	}
 
 	return nil
@@ -537,11 +537,11 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 	}
 
 	if walletPSD.String() == walletCP.String() {
-		return nil, xerrors.Errorf("wallets for PublishStorageDeals and pledging collateral must be different")
+		return nil, fmt.Errorf("wallets for PublishStorageDeals and pledging collateral must be different")
 	}
 
 	if cctx.Int64("max-staging-deals-bytes") <= 0 {
-		return nil, xerrors.Errorf("max size for staging deals area must be > 0 bytes")
+		return nil, fmt.Errorf("max size for staging deals area must be > 0 bytes")
 	}
 
 	fmt.Println("Trying to connect to full node RPC")
@@ -573,25 +573,25 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 
 		minerActor, err = smApi.ActorAddress(ctx)
 		if err != nil {
-			return nil, xerrors.Errorf("getting miner actor address: %w", err)
+			return nil, fmt.Errorf("getting miner actor address: %w", err)
 		}
 	} else {
 		// This is a migration from an existing repo, so get the miner address
 		// from the repo datastore
 		ds, err := marketsRepo.Datastore(context.Background(), metadataNamespace)
 		if err != nil {
-			return nil, xerrors.Errorf("getting legacy repo datastore: %w", err)
+			return nil, fmt.Errorf("getting legacy repo datastore: %w", err)
 		}
 		minerActor, err = getMinerAddressFromDatastore(ds)
 		if err != nil {
-			return nil, xerrors.Errorf("getting miner actor address: %w", err)
+			return nil, fmt.Errorf("getting miner actor address: %w", err)
 		}
 	}
 
 	fmt.Println("Checking full node sync status")
 
 	if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false); err != nil {
-		return nil, xerrors.Errorf("sync wait: %w", err)
+		return nil, fmt.Errorf("sync wait: %w", err)
 	}
 
 	repoPath := cctx.String(FlagBoostRepo)
@@ -607,7 +607,7 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 		return nil, err
 	}
 	if ok {
-		return nil, xerrors.Errorf("repo at '%s' is already initialized", repoPath)
+		return nil, fmt.Errorf("repo at '%s' is already initialized", repoPath)
 	}
 
 	fmt.Println("Checking full node version")
@@ -620,7 +620,7 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 	if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
 		msg := fmt.Sprintf("Remote API version didn't match (expected %s, remote %s)",
 			lapi.FullAPIVersion1, v.APIVersion)
-		return nil, xerrors.Errorf(msg + ". Boost and Lotus Daemon must have the same API version")
+		return nil, fmt.Errorf(msg + ". Boost and Lotus Daemon must have the same API version")
 	}
 
 	fmt.Println("Creating boost repo")
@@ -640,14 +640,14 @@ func setMinerApiConfig(cctx *cli.Context, rcfg *config.Boost, dialCheck bool) er
 	ctx := cctx.Context
 	asi, err := checkApiInfo(ctx, cctx.String("api-sector-index"), dialCheck)
 	if err != nil {
-		return xerrors.Errorf("checking sector index API: %w", err)
+		return fmt.Errorf("checking sector index API: %w", err)
 	}
 	fmt.Printf("Sector index api info: %s\n", asi)
 	rcfg.SectorIndexApiInfo = asi
 
 	ai, err := checkApiInfo(ctx, cctx.String("api-sealer"), dialCheck)
 	if err != nil {
-		return xerrors.Errorf("checking sealer API: %w", err)
+		return fmt.Errorf("checking sealer API: %w", err)
 	}
 
 	fmt.Printf("Sealer api info: %s\n", ai)
@@ -719,16 +719,16 @@ func getMarketsRepo(repoPath string) (lotus_repo.LockedRepo, error) {
 	// Make sure the repo exists
 	exists, err := mktsRepo.Exists()
 	if err != nil {
-		return nil, xerrors.Errorf("checking legacy markets repo %s exists: %w", repoPath, err)
+		return nil, fmt.Errorf("checking legacy markets repo %s exists: %w", repoPath, err)
 	}
 	if !exists {
-		return nil, xerrors.Errorf("legacy markets repo %s does not exist", repoPath)
+		return nil, fmt.Errorf("legacy markets repo %s does not exist", repoPath)
 	}
 
 	// Lock the repo
 	lr, err := mktsRepo.LockRO(lotus_repo.StorageMiner)
 	if err != nil {
-		return nil, xerrors.Errorf("locking legacy markets repo %s: %w", repoPath, err)
+		return nil, fmt.Errorf("locking legacy markets repo %s: %w", repoPath, err)
 	}
 	return lr, nil
 }
@@ -737,7 +737,7 @@ func migrateMarketsDatastore(ctx context.Context, boostDS datastore.Batching, mk
 	// Open the metadata datastore on the repo
 	mktsDS, err := mktsRepo.Datastore(ctx, metadataNamespace)
 	if err != nil {
-		return xerrors.Errorf("opening datastore %s on legacy markets repo %s: %w",
+		return fmt.Errorf("opening datastore %s on legacy markets repo %s: %w",
 			metadataNamespace, mktsRepo.Path(), err)
 	}
 
@@ -767,7 +767,7 @@ func importPrefix(ctx context.Context, prefix string, mktsDS datastore.Batching,
 		Prefix: prefix,
 	})
 	if err != nil {
-		return xerrors.Errorf("legacy markets datastore query: %w", err)
+		return fmt.Errorf("legacy markets datastore query: %w", err)
 	}
 	defer q.Close() //nolint:errcheck
 
@@ -778,7 +778,7 @@ func importPrefix(ctx context.Context, prefix string, mktsDS datastore.Batching,
 	for {
 		batch, err := boostDS.Batch(ctx)
 		if err != nil {
-			return xerrors.Errorf("creating boost datastore batch: %w", err)
+			return fmt.Errorf("creating boost datastore batch: %w", err)
 		}
 
 		complete := false
@@ -792,14 +792,14 @@ func importPrefix(ctx context.Context, prefix string, mktsDS datastore.Batching,
 
 			err := batch.Put(ctx, datastore.NewKey(res.Key), res.Value)
 			if err != nil {
-				return xerrors.Errorf("putting %s to Boost datastore: %w", res.Key, err)
+				return fmt.Errorf("putting %s to Boost datastore: %w", res.Key, err)
 			}
 		}
 
 		fmt.Printf("Importing %d legacy markets datastore keys\n", count)
 		err = batch.Commit(ctx)
 		if err != nil {
-			return xerrors.Errorf("saving %d datastore keys to Boost datastore: %w", count, err)
+			return fmt.Errorf("saving %d datastore keys to Boost datastore: %w", count, err)
 		}
 
 		totalCount += count
@@ -860,7 +860,7 @@ func checkV1ApiSupport(ctx context.Context, cctx *cli.Context) error {
 	}
 
 	if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion0) {
-		return xerrors.Errorf("Remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion0, v.APIVersion)
+		return fmt.Errorf("Remote API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion0, v.APIVersion)
 	}
 
 	return nil
@@ -871,7 +871,7 @@ func checkApiInfo(ctx context.Context, ai string, dialCheck bool) (string, error
 	info := cliutil.ParseApiInfo(ai)
 	addr, err := info.DialArgs("v0")
 	if err != nil {
-		return "", xerrors.Errorf("could not get DialArgs: %w", err)
+		return "", fmt.Errorf("could not get DialArgs: %w", err)
 	}
 
 	if !dialCheck {
@@ -887,11 +887,11 @@ func checkApiInfo(ctx context.Context, ai string, dialCheck bool) (string, error
 
 	v, err := api.Version(ctx)
 	if err != nil {
-		return "", xerrors.Errorf("checking version: %w", err)
+		return "", fmt.Errorf("checking version: %w", err)
 	}
 
 	if !v.APIVersion.EqMajorMinor(lapi.MinerAPIVersion0) {
-		return "", xerrors.Errorf("remote service API version didn't match (expected %s, remote %s)", lapi.MinerAPIVersion0, v.APIVersion)
+		return "", fmt.Errorf("remote service API version didn't match (expected %s, remote %s)", lapi.MinerAPIVersion0, v.APIVersion)
 	}
 
 	return ai, nil

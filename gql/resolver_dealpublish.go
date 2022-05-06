@@ -3,12 +3,12 @@ package gql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/filecoin-project/boost/gql/types"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/graph-gophers/graphql-go"
-	"golang.org/x/xerrors"
 )
 
 // basicDealResolver just has simple types (as opposed to dealResolver which
@@ -48,7 +48,7 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 	for _, dp := range pending.Deals {
 		signedProp, err := cborutil.AsIpld(&dp)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to compute signed deal proposal ipld node: %w", err)
+			return nil, fmt.Errorf("failed to compute signed deal proposal ipld node: %w", err)
 		}
 
 		// Look up the deal by signed proposal CID in the Boost database
@@ -85,15 +85,15 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 			continue
 		}
 
-		if !xerrors.Is(err, sql.ErrNoRows) {
-			return nil, xerrors.Errorf("getting deal from DB by signed proposal cid: %w", err)
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("getting deal from DB by signed proposal cid: %w", err)
 		}
 
 		// The deal is not in the Boost database so look it up in the legacy
 		// database
 		propCid, err := dp.Proposal.Cid()
 		if err != nil {
-			return nil, xerrors.Errorf("getting proposal cid: %w", err)
+			return nil, fmt.Errorf("getting proposal cid: %w", err)
 		}
 		legacyDealIDs[propCid.String()+string(dp.ClientSignature.Data)] = struct{}{}
 	}
@@ -110,14 +110,14 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 		for _, ld := range legacyDeals {
 			propCid, err := ld.Proposal.Cid()
 			if err != nil {
-				return nil, xerrors.Errorf("getting proposal cid: %w", err)
+				return nil, fmt.Errorf("getting proposal cid: %w", err)
 			}
 
 			// Match
 			if _, ok := legacyDealIDs[propCid.String()+string(ld.ClientSignature.Data)]; ok {
 				signedProp, err := cborutil.AsIpld(&ld.ClientDealProposal)
 				if err != nil {
-					return nil, xerrors.Errorf("failed to compute signed deal proposal ipld node: %w", err)
+					return nil, fmt.Errorf("failed to compute signed deal proposal ipld node: %w", err)
 				}
 
 				prop := ld.Proposal

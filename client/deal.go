@@ -15,7 +15,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
-	"golang.org/x/xerrors"
 )
 
 // StorageClient starts storage deals with Boost over libp2p
@@ -52,7 +51,7 @@ func (c *StorageClient) StorageDeal(ctx context.Context, params types.DealParams
 	// Send the deal proposal to the provider
 	resp, err := c.dealClient.SendDealProposal(ctx, providerID, params)
 	if err != nil {
-		return nil, xerrors.Errorf("sending deal proposal: %w", err)
+		return nil, fmt.Errorf("sending deal proposal: %w", err)
 	}
 
 	return &api.ProviderDealRejectionInfo{

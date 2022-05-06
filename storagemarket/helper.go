@@ -3,18 +3,19 @@ package storagemarket
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/lotus/api"
 	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
-	"github.com/ipfs/go-cid"
-	"golang.org/x/xerrors"
 )
 
 type ChainDealManagerCfg struct {
@@ -34,22 +35,22 @@ func (c *ChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid c
 	// Wait for deal to be published (plus additional time for confidence)
 	receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, c.cfg.PublishDealsConfidence, api.LookbackNoLimit, true)
 	if err != nil {
-		return nil, xerrors.Errorf("WaitForPublishDeals errored: %w", err)
+		return nil, fmt.Errorf("WaitForPublishDeals errored: %w", err)
 	}
 	if receipt.Receipt.ExitCode != exitcode.Ok {
-		return nil, xerrors.Errorf("WaitForPublishDeals exit code: %s", receipt.Receipt.ExitCode)
+		return nil, fmt.Errorf("WaitForPublishDeals exit code: %s", receipt.Receipt.ExitCode)
 	}
 
 	// The deal ID may have changed since publish if there was a reorg, so
 	// get the current deal ID
 	head, err := c.fullnodeApi.ChainHead(ctx)
 	if err != nil {
-		return nil, xerrors.Errorf("WaitForPublishDeals failed to get chain head: %w", err)
+		return nil, fmt.Errorf("WaitForPublishDeals failed to get chain head: %w", err)
 	}
 
 	res, err := c.GetCurrentDealInfo(ctx, head.Key(), (*market.DealProposal)(&proposal), publishCid)
 	if err != nil {
-		return nil, xerrors.Errorf("WaitForPublishDeals getting deal info errored: %w", err)
+		return nil, fmt.Errorf("WaitForPublishDeals getting deal info errored: %w", err)
 	}
 
 	return &storagemarket.PublishDealsWaitResult{DealID: res.DealID, FinalCid: receipt.Message}, nil
@@ -75,7 +76,7 @@ func (c *ChainDealManager) GetCurrentDealInfo(ctx context.Context, tok ctypes.Ti
 			return CurrentDealInfo{}, err
 		}
 		if !equal {
-			return CurrentDealInfo{}, xerrors.Errorf("Deal proposals for publish message %s did not match", publishCid)
+			return CurrentDealInfo{}, fmt.Errorf("Deal proposals for publish message %s did not match", publishCid)
 		}
 	}
 	return CurrentDealInfo{DealID: dealID, MarketDeal: marketDeal, PublishMsgTipSet: pubMsgTok}, err
@@ -89,41 +90,41 @@ func (c *ChainDealManager) dealIDFromPublishDealsMsg(ctx context.Context, tok ct
 	// Get the return value of the publish deals message
 	wmsg, err := c.fullnodeApi.StateSearchMsg(ctx, ctypes.EmptyTSK, publishCid, api.LookbackNoLimit, true)
 	if err != nil {
-		return dealID, ctypes.EmptyTSK, xerrors.Errorf("getting publish deals message return value: %w", err)
+		return dealID, ctypes.EmptyTSK, fmt.Errorf("getting publish deals message return value: %w", err)
 	}
 
 	if wmsg == nil {
-		return dealID, ctypes.EmptyTSK, xerrors.Errorf("looking for publish deal message %s: not found", publishCid)
+		return dealID, ctypes.EmptyTSK, fmt.Errorf("looking for publish deal message %s: not found", publishCid)
 	}
 
 	if wmsg.Receipt.ExitCode != exitcode.Ok {
-		return dealID, ctypes.EmptyTSK, xerrors.Errorf("looking for publish deal message %s: non-ok exit code: %s", publishCid, wmsg.Receipt.ExitCode)
+		return dealID, ctypes.EmptyTSK, fmt.Errorf("looking for publish deal message %s: non-ok exit code: %s", publishCid, wmsg.Receipt.ExitCode)
 	}
 
 	nv, err := c.fullnodeApi.StateNetworkVersion(ctx, wmsg.TipSet)
 	if err != nil {
-		return dealID, ctypes.EmptyTSK, xerrors.Errorf("getting network version: %w", err)
+		return dealID, ctypes.EmptyTSK, fmt.Errorf("getting network version: %w", err)
 	}
 
 	retval, err := market.DecodePublishStorageDealsReturn(wmsg.Receipt.Return, nv)
 	if err != nil {
-		return dealID, ctypes.EmptyTSK, xerrors.Errorf("looking for publish deal message %s: decoding message return: %w", publishCid, err)
+		return dealID, ctypes.EmptyTSK, fmt.Errorf("looking for publish deal message %s: decoding message return: %w", publishCid, err)
 	}
 
 	dealIDs, err := retval.DealIDs()
 	if err != nil {
-		return dealID, ctypes.EmptyTSK, xerrors.Errorf("looking for publish deal message %s: getting dealIDs: %w", publishCid, err)
+		return dealID, ctypes.EmptyTSK, fmt.Errorf("looking for publish deal message %s: getting dealIDs: %w", publishCid, err)
 	}
 
 	// Get the parameters to the publish deals message
 	pubmsg, err := c.fullnodeApi.ChainGetMessage(ctx, publishCid)
 	if err != nil {
-		return dealID, ctypes.EmptyTSK, xerrors.Errorf("getting publish deal message %s: %w", publishCid, err)
+		return dealID, ctypes.EmptyTSK, fmt.Errorf("getting publish deal message %s: %w", publishCid, err)
 	}
 
 	var pubDealsParams market2.PublishStorageDealsParams
 	if err := pubDealsParams.UnmarshalCBOR(bytes.NewReader(pubmsg.Params)); err != nil {
-		return dealID, ctypes.EmptyTSK, xerrors.Errorf("unmarshalling publish deal message params for message %s: %w", publishCid, err)
+		return dealID, ctypes.EmptyTSK, fmt.Errorf("unmarshalling publish deal message params for message %s: %w", publishCid, err)
 	}
 
 	// Scan through the deal proposals in the message parameters to find the
@@ -132,7 +133,7 @@ func (c *ChainDealManager) dealIDFromPublishDealsMsg(ctx context.Context, tok ct
 	for i, paramDeal := range pubDealsParams.Deals {
 		eq, err := c.CheckDealEquality(ctx, tok, *proposal, market.DealProposal(paramDeal.Proposal))
 		if err != nil {
-			return dealID, ctypes.EmptyTSK, xerrors.Errorf("comparing publish deal message %s proposal to deal proposal: %w", publishCid, err)
+			return dealID, ctypes.EmptyTSK, fmt.Errorf("comparing publish deal message %s proposal to deal proposal: %w", publishCid, err)
 		}
 		if eq {
 			dealIdx = i
@@ -141,22 +142,22 @@ func (c *ChainDealManager) dealIDFromPublishDealsMsg(ctx context.Context, tok ct
 	}
 
 	if dealIdx == -1 {
-		return dealID, ctypes.EmptyTSK, xerrors.Errorf("could not find deal in publish deals message %s", publishCid)
+		return dealID, ctypes.EmptyTSK, fmt.Errorf("could not find deal in publish deals message %s", publishCid)
 	}
 
 	if dealIdx >= len(dealIDs) {
-		return dealID, ctypes.EmptyTSK, xerrors.Errorf(
+		return dealID, ctypes.EmptyTSK, fmt.Errorf(
 			"deal index %d out of bounds of deals (len %d) in publish deals message %s",
 			dealIdx, len(dealIDs), publishCid)
 	}
 
 	valid, err := retval.IsDealValid(uint64(dealIdx))
 	if err != nil {
-		return dealID, ctypes.EmptyTSK, xerrors.Errorf("determining deal validity: %w", err)
+		return dealID, ctypes.EmptyTSK, fmt.Errorf("determining deal validity: %w", err)
 	}
 
 	if !valid {
-		return dealID, ctypes.EmptyTSK, xerrors.New("deal was invalid at publication")
+		return dealID, ctypes.EmptyTSK, errors.New("deal was invalid at publication")
 	}
 
 	return dealIDs[dealIdx], wmsg.TipSet, nil

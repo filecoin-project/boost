@@ -3,12 +3,12 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/chzyer/readline"
-	"golang.org/x/xerrors"
 )
 
 func confirm(ctx context.Context) (bool, error) {
@@ -23,7 +23,7 @@ func confirm(ctx context.Context) (bool, error) {
 
 		line, _, err := rl.ReadLine()
 		if err != nil {
-			if xerrors.Is(err, io.EOF) {
+			if errors.Is(err, io.EOF) {
 				return false, fmt.Errorf("request canceled: %w", err)
 			}
 
