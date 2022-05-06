@@ -236,7 +236,7 @@ func (f *TestFramework) Start() error {
 		return err
 	}
 
-	// The in-memory repo implementation assumes that its being set up to test
+	// The in-memory repo implementation assumes that its being used to test
 	// a miner, which has storage configuration.
 	// Boost doesn't have storage configuration so clear the storage config.
 	if err := lr.SetStorage(func(sc *stores.StorageConfig) {

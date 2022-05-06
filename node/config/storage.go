@@ -8,7 +8,6 @@ import (
 	"os"
 
 	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
-
 	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
 )
 
@@ -51,6 +50,7 @@ func WriteStorageFile(path string, config stores.StorageConfig) error {
 	return nil
 }
 
+// Convert boost config to sectorstorage.Config
 func (c *Boost) StorageManager() sectorstorage.Config {
 	return sectorstorage.Config{
 		ParallelFetchLimit:       c.Storage.ParallelFetchLimit,
@@ -64,6 +64,7 @@ func (c *Boost) StorageManager() sectorstorage.Config {
 		AllowRegenSectorKey:      c.Storage.AllowRegenSectorKey,
 		ResourceFiltering:        c.Storage.ResourceFiltering,
 
+		// Ignore ParallelCheckLimit because the Boost node doesn't do any proving
 		//ParallelCheckLimit: c.Proving.ParallelCheckLimit,
 	}
 }

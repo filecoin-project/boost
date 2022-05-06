@@ -21,7 +21,7 @@ your node if metadata log is disabled`,
 	"Boost": []DocField{
 		{
 			Name: "Storage",
-			Type: "sectorstorage.SealerConfig",
+			Type: "lotus_config.SealerConfig",
 
 			Comment: ``,
 		},
@@ -90,6 +90,12 @@ your node if metadata log is disabled`,
 		{
 			Name: "Libp2p",
 			Type: "lotus_config.Libp2p",
+
+			Comment: ``,
+		},
+		{
+			Name: "Pubsub",
+			Type: "lotus_config.Pubsub",
 
 			Comment: ``,
 		},
