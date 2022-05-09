@@ -140,11 +140,8 @@ const (
 	HandleRetrievalKey
 	RunSectorServiceKey
 
-	// boost -> should be started after markets
+	// boost should be started after legacy markets (HandleDealsKey)
 	HandleBoostDealsKey
-
-	// index-provider should be started after Boost
-	HandleIndexProviderKey
 
 	// daemon
 	ExtractApiKey
@@ -511,10 +508,8 @@ func ConfigBoost(c interface{}) Option {
 
 		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&cfg.LotusFees, &cfg.LotusDealmaking)),
 		Override(new(lotus_storagemarket.StorageProvider), lotus_modules.StorageProvider),
-		Override(HandleDealsKey, lotus_modules.HandleDeals),
-
+		Override(HandleDealsKey, modules.HandleLegacyDeals),
 		Override(HandleBoostDealsKey, modules.HandleBoostDeals),
-		Override(HandleIndexProviderKey, modules.HandleIndexProvider),
 
 		// Boost storage deal filter
 		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),
