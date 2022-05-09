@@ -35,6 +35,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/policy"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
 	"github.com/filecoin-project/lotus/extern/storage-sealing/sealiface"
 	"github.com/filecoin-project/lotus/itests/kit"
 	lnode "github.com/filecoin-project/lotus/node"
@@ -233,6 +234,15 @@ func (f *TestFramework) Start() error {
 	lr, err := r.Lock(node.Boost)
 	if err != nil {
 		return err
+	}
+
+	// The in-memory repo implementation assumes that its being used to test
+	// a miner, which has storage configuration.
+	// Boost doesn't have storage configuration so clear the storage config.
+	if err := lr.SetStorage(func(sc *stores.StorageConfig) {
+		sc.StoragePaths = nil
+	}); err != nil {
+		return fmt.Errorf("set storage config: %w", err)
 	}
 
 	// Set up the datastore
