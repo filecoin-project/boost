@@ -26,7 +26,7 @@ require (
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
 	// go-fil-markets boost/main branch
-	github.com/filecoin-project/go-fil-markets v1.20.2-0.20220415100246-742e1400623d
+	github.com/filecoin-project/go-fil-markets v1.20.2-0.20220509100709-5b96975b1577
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4

@@ -9,17 +9,10 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/build"
-
-	"github.com/filecoin-project/go-fil-markets/shared"
-	"github.com/filecoin-project/go-state-types/crypto"
-	ctypes "github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/lib/sigs"
-
-	"github.com/filecoin-project/boost/indexprovider"
-
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
+	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/sealingpipeline"
@@ -28,10 +21,16 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/go-fil-markets/shared"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
+	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api/v1api"
+	ctypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/journal"
+	"github.com/filecoin-project/lotus/lib/sigs"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
+	"github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/filecoin-project/lotus/node/repo"
@@ -312,33 +311,52 @@ func NewFundsDB(sqldb *sql.DB) *db.FundsDB {
 	return db.NewFundsDB(sqldb)
 }
 
-func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode) {
+func HandleLegacyDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, host host.Host, lsp lotus_storagemarket.StorageProvider, j journal.Journal) error {
+	log.Info("starting legacy storage provider")
+	modules.HandleDeals(mctx, lc, host, lsp, j)
+	return nil
+}
+
+func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper) {
 	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a)
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			_, err := prov.Start()
+			// Wait for the legacy SP to fire the "ready" event before starting
+			// the boost SP.
+			// Boost overrides some listeners so it must start after the legacy SP.
+			errch := make(chan error, 1)
+			log.Info("waiting for legacy storage provider 'ready' event")
+			legacySP.OnReady(func(err error) {
+				errch <- err
+			})
+			err := <-errch
+			if err != nil {
+				log.Errorf("failed to start legacy storage provider: %w", err)
+				return err
+			}
+			log.Info("legacy storage provider started successfully")
+
+			// Start the Boost SP
+			log.Info("starting boost storage provider")
+			_, err = prov.Start()
 			if err != nil {
 				return fmt.Errorf("starting storage provider: %w", err)
 			}
 			lp2pnet.Start(ctx)
+			log.Info("boost storage provider started successfully")
+
+			// Start the Boost Index Provider.
+			// It overrides the multihash lister registered by the legacy
+			// index provider so it must start after the legacy SP.
+			log.Info("starting boost index provider")
+			idxProv.Start(ctx)
+			log.Info("boost index provider started successfully")
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
 			lp2pnet.Stop()
 			prov.Stop()
-			return nil
-		},
-	})
-}
-
-func HandleIndexProvider(lc fx.Lifecycle, prov *indexprovider.Wrapper) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			prov.Start(ctx)
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
 			return nil
 		},
 	})

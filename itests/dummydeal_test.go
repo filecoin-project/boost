@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDummydeal(t *testing.T) {
+func TestDummydealOnline(t *testing.T) {
 	ctx := context.Background()
 	log := framework.Log
 
