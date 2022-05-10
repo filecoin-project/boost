@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/network"
-
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
@@ -63,6 +61,7 @@ import (
 	"github.com/ipfs/go-metrics-interface"
 	ci "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/routing"
@@ -442,7 +441,7 @@ func ConfigBoost(c interface{}) Option {
 			StorageMiner: walletMiner,
 			CollatWallet: walletPledgeCollat,
 			PubMsgWallet: walletPSD,
-			PubMsgBalMin: abi.NewTokenAmount(1000), // TODO: add to node config
+			PubMsgBalMin: abi.TokenAmount(cfg.Dealmaking.PublishMsgMaxFee),
 		})),
 
 		Override(new(*storagemanager.StorageManager), storagemanager.New(storagemanager.Config{
