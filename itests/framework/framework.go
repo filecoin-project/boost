@@ -280,6 +280,7 @@ func (f *TestFramework) Start() error {
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
 	cfg.Dealmaking.PublishMsgPeriod = config.Duration(0)
+	cfg.Dealmaking.PublishMsgMaxFee = ltypes.FIL(big.NewInt(1000))
 	cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
 	cfg.Storage.ParallelFetchLimit = 10
 
