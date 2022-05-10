@@ -37,6 +37,7 @@ type Boost interface {
 	BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string) (*ProviderDealRejectionInfo, error)         //perm:admin
 	BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                                         //perm:admin
 	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                        //perm:admin
+	BoostDagstoreRegisterShard(ctx context.Context, key string) error                                                              //perm:admin
 	BoostDagstoreInitializeShard(ctx context.Context, key string) error                                                            //perm:admin
 	BoostDagstoreInitializeAll(ctx context.Context, params DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) //perm:admin
 	BoostDagstoreRecoverShard(ctx context.Context, key string) error                                                               //perm:admin

@@ -45,6 +45,8 @@ type BoostStruct struct {
 
 		BoostDagstoreRecoverShard func(p0 context.Context, p1 string) error `perm:"admin"`
 
+		BoostDagstoreRegisterShard func(p0 context.Context, p1 string) error `perm:"admin"`
+
 		BoostDeal func(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) `perm:"admin"`
 
 		BoostDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
@@ -285,6 +287,17 @@ func (s *BoostStruct) BoostDagstoreRecoverShard(p0 context.Context, p1 string) e
 }
 
 func (s *BoostStub) BoostDagstoreRecoverShard(p0 context.Context, p1 string) error {
+	return ErrNotSupported
+}
+
+func (s *BoostStruct) BoostDagstoreRegisterShard(p0 context.Context, p1 string) error {
+	if s.Internal.BoostDagstoreRegisterShard == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.BoostDagstoreRegisterShard(p0, p1)
+}
+
+func (s *BoostStub) BoostDagstoreRegisterShard(p0 context.Context, p1 string) error {
 	return ErrNotSupported
 }
 

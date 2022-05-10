@@ -10,6 +10,7 @@
   * [BoostDagstoreInitializeShard](#boostdagstoreinitializeshard)
   * [BoostDagstoreListShards](#boostdagstorelistshards)
   * [BoostDagstoreRecoverShard](#boostdagstorerecovershard)
+  * [BoostDagstoreRegisterShard](#boostdagstoreregistershard)
   * [BoostDeal](#boostdeal)
   * [BoostDummyDeal](#boostdummydeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
@@ -205,6 +206,20 @@ Response:
 ```
 
 ### BoostDagstoreRecoverShard
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  "string value"
+]
+```
+
+Response: `{}`
+
+### BoostDagstoreRegisterShard
 
 
 Perms: admin
