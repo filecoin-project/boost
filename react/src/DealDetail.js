@@ -80,6 +80,14 @@ export function DealDetail(props) {
         endEpochTime = new Date(new Date().getTime() + endEpochDelta*secondsPerEpoch*1000)
     }
 
+    const pieceSizePerGiB = Number(deal.PieceSize) / (1<<30)
+    var storagePricePerEpochPerGiB
+    if (pieceSizePerGiB < 1) {
+        storagePricePerEpochPerGiB = deal.StoragePricePerEpoch * BigInt(1/pieceSizePerGiB)
+    } else {
+        storagePricePerEpochPerGiB = deal.StoragePricePerEpoch / BigInt(pieceSizePerGiB)
+    }
+
     var transferParams = deal.Transfer.Params
     try {
         const fields = JSON.parse(transferParams)
@@ -162,8 +170,8 @@ export function DealDetail(props) {
                     <td>{humanFIL(deal.ProviderCollateral)}</td>
                 </tr>
                 <tr>
-                    <th>Storage Price Per Epoch</th>
-                    <td>{humanFIL(deal.StoragePricePerEpoch)}</td>
+                    <th>Storage Price / epoch / GiB</th>
+                    <td>{humanFIL(storagePricePerEpochPerGiB )}</td>
                 </tr>
                 <tr>
                     <th>Current Epoch</th>
@@ -202,7 +210,7 @@ export function DealDetail(props) {
                         {humanFIL(deal.StoragePricePerEpoch * BigInt(deal.EndEpoch-deal.StartEpoch))}
                         &nbsp;
                         <span className="aux">
-                            (Price per epoch x Duration)
+                            (Price per epoch per GiB x Piece Size x Duration)
                         </span>
                     </td>
                 </tr>
