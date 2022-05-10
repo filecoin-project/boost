@@ -68,8 +68,8 @@ var dealFlags = []cli.Flag{
 		Usage: "deal collateral that storage miner must put in escrow; if empty, the min collateral for the given piece size will be used",
 	},
 	&cli.Int64Flag{
-		Name:  "storage-price-per-epoch",
-		Usage: "",
+		Name:  "storage-price",
+		Usage: "storage price in attoFIL per epoch per GiB",
 		Value: 1,
 	},
 	&cli.BoolFlag{
@@ -231,7 +231,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	}
 
 	// Create a deal proposal to storage provider using deal protocol v1.2.0 format
-	dealProposal, err := dealProposal(ctx, n, walletAddr, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, maddr, startEpoch, cctx.Int("duration"), cctx.Bool("verified"), providerCollateral, abi.NewTokenAmount(cctx.Int64("storage-price-per-epoch")))
+	dealProposal, err := dealProposal(ctx, n, walletAddr, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, maddr, startEpoch, cctx.Int("duration"), cctx.Bool("verified"), providerCollateral, abi.NewTokenAmount(cctx.Int64("storage-price")))
 	if err != nil {
 		return fmt.Errorf("failed to create a deal proposal: %w", err)
 	}
@@ -282,8 +282,11 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	return nil
 }
 
-func dealProposal(ctx context.Context, n *clinode.Node, clientAddr address.Address, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, startEpoch abi.ChainEpoch, duration int, verified bool, providerCollateral abi.TokenAmount, storagePricePerEpoch abi.TokenAmount) (*market.ClientDealProposal, error) {
+func dealProposal(ctx context.Context, n *clinode.Node, clientAddr address.Address, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, startEpoch abi.ChainEpoch, duration int, verified bool, providerCollateral abi.TokenAmount, storagePrice abi.TokenAmount) (*market.ClientDealProposal, error) {
 	endEpoch := startEpoch + abi.ChainEpoch(duration)
+	// deal proposal expects total storage price for deal per epoch, therefore we
+	// multiply pieceSize * storagePrice (which is set per epoch per GiB) and divide by 2^30
+	storagePricePerEpochForDeal := big.Div(big.Mul(big.NewInt(int64(pieceSize)), storagePrice), big.NewInt(int64(1<<30)))
 	proposal := market.DealProposal{
 		PieceCID:             pieceCid,
 		PieceSize:            pieceSize,
@@ -293,7 +296,7 @@ func dealProposal(ctx context.Context, n *clinode.Node, clientAddr address.Addre
 		Label:                rootCid.String(),
 		StartEpoch:           startEpoch,
 		EndEpoch:             endEpoch,
-		StoragePricePerEpoch: storagePricePerEpoch,
+		StoragePricePerEpoch: storagePricePerEpochForDeal,
 		ProviderCollateral:   providerCollateral,
 	}
 
