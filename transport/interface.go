@@ -19,7 +19,7 @@ type Handler interface {
 }
 
 func TransferParamsAsJson(transfer smtypes.Transfer) (string, error) {
-	if transfer.Type != "http" {
+	if transfer.Type != "http" && transfer.Type != "libp2p" {
 		return "", fmt.Errorf("cannot parse params for unrecognized transfer type '%s'", transfer.Type)
 	}
 
