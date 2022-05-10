@@ -82,13 +82,13 @@ function StorageAsk(props) {
             <table>
                 <tbody>
                     <EditableField
-                        name="Price"
+                        name="Price / epoch / Gib"
                         fieldName="Price"
                         type="fil"
                         value={data.storageAsk.Price}
                     />
                     <EditableField
-                        name="Verified Price"
+                        name="Verified Price / epoch / Gib"
                         fieldName="VerifiedPrice"
                         type="fil"
                         value={data.storageAsk.VerifiedPrice}
