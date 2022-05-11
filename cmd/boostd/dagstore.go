@@ -18,6 +18,7 @@ var dagstoreCmd = &cli.Command{
 	Name:  "dagstore",
 	Usage: "Manage the dagstore on the Boost subsystem",
 	Subcommands: []*cli.Command{
+		dagstoreRegisterShardCmd,
 		dagstoreInitializeShardCmd,
 		dagstoreRecoverShardCmd,
 		dagstoreInitializeAllCmd,
@@ -114,6 +115,45 @@ func printTableShards(shards []bapi.DagstoreShardInfo) error {
 		tw.Write(m)
 	}
 	return tw.Flush(os.Stdout)
+}
+
+var dagstoreRegisterShardCmd = &cli.Command{
+	Name:      "register-shard",
+	ArgsUsage: "[key]",
+	Usage:     "Register a shard",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:        "color",
+			Usage:       "use color in display output",
+			DefaultText: "depends on output being a TTY",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		if cctx.IsSet("color") {
+			color.NoColor = !cctx.Bool("color")
+		}
+
+		if cctx.NArg() != 1 {
+			return fmt.Errorf("must provide a single shard key")
+		}
+
+		napi, closer, err := bcli.GetBoostAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		ctx := lcli.ReqContext(cctx)
+
+		shardKey := cctx.Args().First()
+		err = napi.BoostDagstoreRegisterShard(ctx, shardKey)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("Registered shard " + shardKey)
+		return nil
+	},
 }
 
 var dagstoreInitializeShardCmd = &cli.Command{

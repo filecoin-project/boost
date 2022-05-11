@@ -3,33 +3,32 @@ package impl
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
 
-	"github.com/filecoin-project/dagstore/shard"
-
-	"github.com/ipfs/go-cid"
-	logging "github.com/ipfs/go-log/v2"
-
-	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/go-fil-markets/stores"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
+	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/dagstore"
+	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
-
 	lapi "github.com/filecoin-project/lotus/api"
+	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
-
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"go.uber.org/fx"
 )
@@ -46,8 +45,10 @@ type BoostAPI struct {
 	//LocalStore  *stores.Local
 	//RemoteStore *stores.Remote
 
-	Host     host.Host
-	DAGStore *dagstore.DAGStore
+	Host host.Host
+
+	DAGStore        *dagstore.DAGStore
+	DagStoreWrapper *mktsdagstore.Wrapper
 
 	// Boost
 	StorageProvider *storagemarket.Provider
@@ -357,6 +358,34 @@ func (sm *BoostAPI) BoostDagstoreInitializeShard(ctx context.Context, key string
 		if err != nil {
 			log.Warnw("failed to close shard accessor; continuing", "shard_key", k, "error", err)
 		}
+	}
+
+	return nil
+}
+
+func (sm *BoostAPI) BoostDagstoreRegisterShard(ctx context.Context, key string) error {
+	if sm.DAGStore == nil {
+		return fmt.Errorf("dagstore not available on this node")
+	}
+
+	// First check if the shard has already been registered
+	k := shard.KeyFromString(key)
+	_, err := sm.DAGStore.GetShardInfo(k)
+	if err == nil {
+		// Shard already registered, nothing further to do
+		return nil
+	}
+	// If the shard is not registered we would expect ErrShardUnknown
+	if !errors.Is(err, dagstore.ErrShardUnknown) {
+		return fmt.Errorf("getting shard info from DAG store: %w", err)
+	}
+
+	pieceCid, err := cid.Parse(key)
+	if err != nil {
+		return fmt.Errorf("parsing shard key as piece cid: %w", err)
+	}
+	if err = stores.RegisterShardSync(ctx, sm.DagStoreWrapper, pieceCid, "", true); err != nil {
+		return fmt.Errorf("failed to register shard: %w", err)
 	}
 
 	return nil
