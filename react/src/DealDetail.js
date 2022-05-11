@@ -210,7 +210,7 @@ export function DealDetail(props) {
                         {humanFIL(deal.StoragePricePerEpoch * BigInt(deal.EndEpoch-deal.StartEpoch))}
                         &nbsp;
                         <span className="aux">
-                            (Price per epoch per GiB x Piece Size x Duration)
+                            (Price per epoch x Piece Size x Duration)
                         </span>
                     </td>
                 </tr>
