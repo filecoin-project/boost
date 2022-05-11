@@ -6,6 +6,7 @@ import (
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
+	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -59,6 +60,11 @@ type Boost interface {
 	MarketCancelDataTransfer(ctx context.Context, transferID datatransfer.TransferID, otherPeer peer.ID, isInitiator bool) error                                                         //perm:write
 	MarketImportDealData(ctx context.Context, propcid cid.Cid, path string) error                                                                                                        //perm:write
 	MarketListIncompleteDeals(ctx context.Context) ([]storagemarket.MinerDeal, error)                                                                                                    //perm:read
+
+	PiecesListPieces(ctx context.Context) ([]cid.Cid, error)                                 //perm:read
+	PiecesListCidInfos(ctx context.Context) ([]cid.Cid, error)                               //perm:read
+	PiecesGetPieceInfo(ctx context.Context, pieceCid cid.Cid) (*piecestore.PieceInfo, error) //perm:read
+	PiecesGetCIDInfo(ctx context.Context, payloadCid cid.Cid) (*piecestore.CIDInfo, error)   //perm:read
 
 	// MethodGroup: Actor
 	ActorSectorSize(context.Context, address.Address) (abi.SectorSize, error) //perm:read
