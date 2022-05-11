@@ -45,6 +45,7 @@ func main() {
 			offlineDealCmd,
 			logCmd,
 			dagstoreCmd,
+			piecesCmd,
 		},
 	}
 	app.Setup()

@@ -9,6 +9,7 @@ import (
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
+	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
@@ -101,6 +102,14 @@ type BoostStruct struct {
 		MarketSetAsk func(p0 context.Context, p1 types.BigInt, p2 types.BigInt, p3 abi.ChainEpoch, p4 abi.PaddedPieceSize, p5 abi.PaddedPieceSize) error `perm:"admin"`
 
 		MarketSetRetrievalAsk func(p0 context.Context, p1 *retrievalmarket.Ask) error `perm:"admin"`
+
+		PiecesGetCIDInfo func(p0 context.Context, p1 cid.Cid) (*piecestore.CIDInfo, error) `perm:"read"`
+
+		PiecesGetPieceInfo func(p0 context.Context, p1 cid.Cid) (*piecestore.PieceInfo, error) `perm:"read"`
+
+		PiecesListCidInfos func(p0 context.Context) ([]cid.Cid, error) `perm:"read"`
+
+		PiecesListPieces func(p0 context.Context) ([]cid.Cid, error) `perm:"read"`
 
 		RuntimeSubsystems func(p0 context.Context) (lapi.MinerSubsystems, error) `perm:"read"`
 	}
@@ -596,6 +605,50 @@ func (s *BoostStruct) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmar
 
 func (s *BoostStub) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmarket.Ask) error {
 	return ErrNotSupported
+}
+
+func (s *BoostStruct) PiecesGetCIDInfo(p0 context.Context, p1 cid.Cid) (*piecestore.CIDInfo, error) {
+	if s.Internal.PiecesGetCIDInfo == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.PiecesGetCIDInfo(p0, p1)
+}
+
+func (s *BoostStub) PiecesGetCIDInfo(p0 context.Context, p1 cid.Cid) (*piecestore.CIDInfo, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *BoostStruct) PiecesGetPieceInfo(p0 context.Context, p1 cid.Cid) (*piecestore.PieceInfo, error) {
+	if s.Internal.PiecesGetPieceInfo == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.PiecesGetPieceInfo(p0, p1)
+}
+
+func (s *BoostStub) PiecesGetPieceInfo(p0 context.Context, p1 cid.Cid) (*piecestore.PieceInfo, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *BoostStruct) PiecesListCidInfos(p0 context.Context) ([]cid.Cid, error) {
+	if s.Internal.PiecesListCidInfos == nil {
+		return *new([]cid.Cid), ErrNotSupported
+	}
+	return s.Internal.PiecesListCidInfos(p0)
+}
+
+func (s *BoostStub) PiecesListCidInfos(p0 context.Context) ([]cid.Cid, error) {
+	return *new([]cid.Cid), ErrNotSupported
+}
+
+func (s *BoostStruct) PiecesListPieces(p0 context.Context) ([]cid.Cid, error) {
+	if s.Internal.PiecesListPieces == nil {
+		return *new([]cid.Cid), ErrNotSupported
+	}
+	return s.Internal.PiecesListPieces(p0)
+}
+
+func (s *BoostStub) PiecesListPieces(p0 context.Context) ([]cid.Cid, error) {
+	return *new([]cid.Cid), ErrNotSupported
 }
 
 func (s *BoostStruct) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystems, error) {
