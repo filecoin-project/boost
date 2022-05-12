@@ -53,6 +53,7 @@ type Deal {
   EndEpoch: Uint64!
   ClientPeerID: String!
   DealDataRoot: String!
+  SignedProposalCid: String!
   InboundFilePath: String!
   ChainDealID: Uint64!
   PublishCid: String!

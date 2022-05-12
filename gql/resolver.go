@@ -340,6 +340,14 @@ func (dr *dealResolver) DealDataRoot() string {
 	return dr.ProviderDealState.DealDataRoot.String()
 }
 
+func (dr *dealResolver) SignedProposalCid() (string, error) {
+	cid, err := dr.ProviderDealState.SignedProposalCid()
+	if err != nil {
+		return "", err
+	}
+	return cid.String(), err
+}
+
 func (dr *dealResolver) PublishCid() string {
 	if dr.ProviderDealState.PublishCID == nil {
 		return ""

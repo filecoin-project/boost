@@ -142,6 +142,10 @@ export function DealDetail(props) {
                     <td>{deal.ClientPeerID}</td>
                 </tr>
                 <tr>
+                    <th>Signed Proposal CID</th>
+                    <td>{deal.SignedProposalCid}</td>
+                </tr>
+                <tr>
                     <th>Deal Data Root CID</th>
                     <td>{deal.DealDataRoot}</td>
                 </tr>

@@ -150,6 +150,7 @@ const DealSubscription = gql`
             StoragePricePerEpoch
             ClientPeerID
             DealDataRoot
+            SignedProposalCid
             InboundFilePath
             ChainDealID
             PublishCid
@@ -198,6 +199,7 @@ const NewDealsSubscription = gql`
                 ProviderCollateral
                 ClientPeerID
                 DealDataRoot
+                SignedProposalCid
                 PublishCid
                 Checkpoint
                 CheckpointAt
