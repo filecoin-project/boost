@@ -53,6 +53,8 @@ type ProviderDealState struct {
 
 	// set if there's an error
 	Err string
+	// if there was an error, indicates whether and how to retry (auto / manual)
+	Retry DealRetryType
 
 	// NBytesReceived is the number of bytes Received for this deal
 	NBytesReceived int64
@@ -70,3 +72,16 @@ func (d *ProviderDealState) SignedProposalCid() (cid.Cid, error) {
 
 	return propnd.Cid(), nil
 }
+
+type DealRetryType string
+
+const (
+	// DealRetryAuto means that when boost restarts, it will automatically
+	// retry the deal
+	DealRetryAuto DealRetryType = "auto"
+	// DealRetryManual means that boost will not automatically retry the
+	// deal, it must be manually retried by the user
+	DealRetryManual DealRetryType = "manual"
+	// DealRetryFatal means that the deal will fail immediately and permanently
+	DealRetryFatal DealRetryType = "fatal"
+)

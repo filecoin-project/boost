@@ -11,6 +11,7 @@ import (
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	transporttypes "github.com/filecoin-project/boost/transport/types"
@@ -37,24 +38,59 @@ const (
 )
 
 type dealMakingError struct {
-	recoverable bool
-	err         error
-	uiMsg       string
+	error
+	retry types.DealRetryType
 }
 
-func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
+func (p *Provider) runDeal(deal *types.ProviderDealState, dh *dealHandler) {
+	// Log out the deal state at the start of execution (to help with debugging)
 	dcpy := *deal
 	dcpy.Transfer.Params = nil
 	dcpy.ClientDealProposal.ClientSignature = acrypto.Signature{}
 	p.dealLogger.Infow(deal.DealUuid, "deal execution initiated", "deal state", dcpy)
 
+	// Clear any error from a previous run
+	deal.Err = ""
+
+	// Execute the deal
+	pub, err := p.execDeal(deal, dh)
+	if err == nil {
+		// Deal completed successfully
+		return
+	}
+
+	// If the error is fatal, fail the deal and cleanup resources (delete
+	// downloaded data, untag funds etc)
+	if err.retry == types.DealRetryFatal {
+		cancelled := dh.TransferCancelledByUser()
+		p.failDeal(pub, deal, err, cancelled)
+		return
+	}
+
+	// The error is recoverable, so just add a line to the deal log and
+	// wait for the deal to be executed again (either manually by the user
+	// or automatically when boost restarts)
+	if errors.Is(err.error, context.Canceled) {
+		p.dealLogger.Infow(deal.DealUuid, "deal paused because boost was shut down",
+			"checkpoint", deal.Checkpoint.String())
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "deal paused because of recoverable error", "err", err.error.Error(),
+			"checkpoint", deal.Checkpoint.String(), "retry", err.retry)
+	}
+
+	deal.Retry = err.retry
+	deal.Err = err.Error()
+	p.saveDealToDB(pub, deal)
+}
+
+func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (event.Emitter, *dealMakingError) {
 	// Set up pubsub for deal updates
 	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
 	if err != nil {
-		err = fmt.Errorf("failed to create event emitter: %w", err)
-		p.failDeal(pub, deal, err)
-		p.cleanupDealLogged(deal)
-		return
+		return nil, &dealMakingError{
+			error: fmt.Errorf("failed to create event emitter: %w", err),
+			retry: smtypes.DealRetryFatal,
+		}
 	}
 
 	// If the deal has not yet been handed off to the sealer
@@ -67,10 +103,10 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 		// Read the bytes received from the downloaded / imported file
 		fi, err := os.Stat(deal.InboundFilePath)
 		if err != nil {
-			err := fmt.Errorf("failed to get size of %s '%s': %w", transferType, deal.InboundFilePath, err)
-			p.failDeal(pub, deal, err)
-			p.cleanupDealLogged(deal)
-			return
+			return pub, &dealMakingError{
+				error: fmt.Errorf("failed to get size of %s '%s': %w", transferType, deal.InboundFilePath, err),
+				retry: smtypes.DealRetryFatal,
+			}
 		}
 		deal.NBytesReceived = fi.Size()
 		p.dealLogger.Infow(deal.DealUuid, "size of "+transferType, "filepath", deal.InboundFilePath, "size", fi.Size())
@@ -84,28 +120,13 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 
 	// Execute the deal synchronously
 	if derr := p.execDealUptoAddPiece(dh.providerCtx, pub, deal, dh); derr != nil {
-		// If the error is NOT recoverable, fail the deal and cleanup state.
-		if !derr.recoverable {
-			p.failDeal(pub, deal, derr.err)
-			p.cleanupDealLogged(deal)
-			p.dealLogger.Infow(deal.DealUuid, "deal cleanup complete")
-		} else {
-			// TODO For now, we will get recoverable errors only when the process is gracefully shutdown and
-			// the provider context gets cancelled.
-			// However, down the road, other stages of deal making will start returning
-			// recoverable errors as well and we will have to build the DB/UX/resumption support for it.
-
-			// if the error is recoverable, persist that fact to the deal log and return
-			p.dealLogger.Infow(deal.DealUuid, "deal paused because of recoverable error", "err", derr.err.Error(),
-				"current deal state", deal.Checkpoint.String())
-		}
-		return
+		return pub, derr
 	}
 
 	p.dealLogger.Infow(deal.DealUuid, "deal execution completed successfully")
 	// deal has been sent for sealing -> we can cleanup the deal state now and simply watch the deal on chain
 	// to wait for deal completion/slashing and update the state in DB accordingly.
-	p.cleanupDealLogged(deal)
+	p.cleanupDeal(deal)
 	p.dealLogger.Infow(deal.DealUuid, "finished deal cleanup after successful execution")
 
 	// Watch the sealing status of the deal and fire events for each change
@@ -114,6 +135,7 @@ func (p *Provider) doDeal(deal *types.ProviderDealState, dh *dealHandler) {
 
 	// TODO
 	// Watch deal on chain and change state in DB and emit notifications.
+	return pub, nil
 }
 
 func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState, dh *dealHandler) *dealMakingError {
@@ -127,20 +149,41 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	// Transfer Data step will be executed only if it's NOT an offline deal
 	if !deal.IsOffline {
 		if deal.Checkpoint < dealcheckpoints.Transferred {
+			// Check that the deal's start epoch hasn't already elapsed
+			if err := p.checkDealProposalStartEpoch(deal); err != nil {
+				return err
+			}
+
 			if err := p.transferAndVerify(dh.transferCtx, pub, deal); err != nil {
-				dh.transferCancelled(nil)
-				// if the transfer failed because of context cancellation and the context was not
-				// cancelled because of the user explicitly cancelling the transfer, this is a recoverable error.
-				if errors.Is(err, context.Canceled) && !dh.TransferCancelledByUser() {
+				// The transfer has failed. If the user tries to cancel the
+				// transfer after this point it's a no-op.
+				dh.setCancelTransferResponse(nil)
+
+				// Pass through fatal errors
+				if err.retry == smtypes.DealRetryFatal {
+					return err
+				}
+
+				// If the transfer failed because the user cancelled the
+				// transfer, it's non-recoverable
+				if dh.TransferCancelledByUser() {
 					return &dealMakingError{
-						recoverable: true,
-						err:         fmt.Errorf("data transfer failed with a recoverable error after %d bytes with error: %w", deal.NBytesReceived, err),
-						uiMsg:       fmt.Sprintf("data transfer paused after transferring %d bytes because Boost is shutting down", deal.NBytesReceived),
+						retry: types.DealRetryFatal,
+						error: fmt.Errorf("data transfer cancelled after %d bytes: %w", deal.NBytesReceived, err),
 					}
 				}
-				return &dealMakingError{
-					err: fmt.Errorf("execDeal failed data transfer: %w", err),
+
+				// If the transfer failed because boost was shut down, it's
+				// automatically recoverable
+				if errors.Is(err.error, context.Canceled) {
+					return &dealMakingError{
+						retry: types.DealRetryAuto,
+						error: fmt.Errorf("data transfer paused by boost shutdown after %d bytes: %w", deal.NBytesReceived, err),
+					}
 				}
+
+				// Pass through any other transfer failure
+				return err
 			}
 
 			p.dealLogger.Infow(deal.DealUuid, "deal data transfer finished successfully")
@@ -148,37 +191,28 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 			p.dealLogger.Infow(deal.DealUuid, "deal data transfer has already been completed")
 		}
 		// transfer can no longer be cancelled
-		dh.transferCancelled(errors.New("transfer already complete"))
+		dh.setCancelTransferResponse(errors.New("transfer already complete"))
 		p.dealLogger.Infow(deal.DealUuid, "deal data-transfer can no longer be cancelled")
 	} else {
 		// verify CommP matches for an offline deal
 		if err := p.verifyCommP(deal); err != nil {
-			return &dealMakingError{err: fmt.Errorf("error when matching commP for imported data for offline deal: %w", err)}
+			return &dealMakingError{
+				retry: types.DealRetryFatal,
+				error: fmt.Errorf("error when matching commP for imported data for offline deal: %w", err),
+			}
 		}
 		p.dealLogger.Infow(deal.DealUuid, "commp matched successfully for imported data for offline deal")
 
 		// update checkpoint
 		if err := p.updateCheckpoint(pub, deal, dealcheckpoints.Transferred); err != nil {
-			return &dealMakingError{
-				err: fmt.Errorf("failed to update checkpoint: %w", err),
-			}
+			return err
 		}
 	}
 
 	// Publish
 	if deal.Checkpoint <= dealcheckpoints.Published {
 		if err := p.publishDeal(ctx, pub, deal); err != nil {
-			if errors.Is(err, context.Canceled) {
-				return &dealMakingError{
-					recoverable: true,
-					err:         fmt.Errorf("deal publish failed with a recoverable error: %w", err),
-					uiMsg:       "deal was paused in the publish state because Boost was shut down",
-				}
-			}
-
-			return &dealMakingError{
-				err: fmt.Errorf("failed to publish deal: %w", err),
-			}
+			return err
 		}
 		p.dealLogger.Infow(deal.DealUuid, "deal successfully published and confirmed-publish")
 	} else {
@@ -189,32 +223,18 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	// tagged as being for this deal (the publish message moves collateral
 	// from the storage market actor escrow balance to the locked balance)
 	if err := p.untagFundsAfterPublish(ctx, deal); err != nil {
-		if errors.Is(err, context.Canceled) {
-			return &dealMakingError{recoverable: true,
-				err:   fmt.Errorf("deal failed with recoverbale error while untagging funds after publish: %w", err),
-				uiMsg: "the deal was paused in the Publishing state because Boost was shut down"}
-		}
-
-		return &dealMakingError{
-			err: fmt.Errorf("failed to untag funds after sending publish message: %w", err),
-		}
+		// If there's an error untagging funds we should still try to continue,
+		// so just log the error
+		p.dealLogger.Warnw(deal.DealUuid, "failed to untag funds after sending publish message", "err", err)
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "funds successfully untagged for deal after publish")
 	}
-	p.dealLogger.Infow(deal.DealUuid, "funds successfully untagged for deal after publish")
 
 	// AddPiece
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
 		if err := p.addPiece(ctx, pub, deal); err != nil {
-			if errors.Is(err, context.Canceled) {
-				return &dealMakingError{
-					recoverable: true,
-					err:         fmt.Errorf("add piece failed with a recoverable error: %w", err),
-					uiMsg:       "deal was paused while being sent to the sealing subsystem because Boost was shut down",
-				}
-			}
-
-			return &dealMakingError{
-				err: fmt.Errorf("failed to add piece: %w", err),
-			}
+			err.error = fmt.Errorf("failed to add piece: %w", err.error)
+			return err
 		}
 		p.dealLogger.Infow(deal.DealUuid, "deal successfully handed over to the sealing subsystem")
 	} else {
@@ -227,27 +247,18 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 		p.dealLogger.Infow(deal.DealUuid, "removed inbound file as deal handed to sealer", "path", deal.InboundFilePath)
 	}
 	if err := p.untagStorageSpaceAfterSealing(ctx, deal); err != nil {
-		if errors.Is(err, context.Canceled) {
-			return &dealMakingError{recoverable: true,
-				err:   fmt.Errorf("deal failed with recoverable error while untagging storage space after handing to sealer: %w", err),
-				uiMsg: "the deal was paused in the Sealing state because Boost was shut down"}
-		}
-
-		return &dealMakingError{
-			err: fmt.Errorf("failed to untag storage space after handing deal to sealer: %w", err),
-		}
+		// If there's an error untagging storage space we should still try to continue,
+		// so just log the error
+		p.dealLogger.Warnw(deal.DealUuid, "failed to untag storage space after handing deal to sealer", "err", err)
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "storage space successfully untagged for deal after it was handed to sealer")
 	}
-	p.dealLogger.Infow(deal.DealUuid, "storage space successfully untagged for deal after it was handed to sealer")
 
 	// Index deal in DAGStore and Announce deal
 	if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
 		if err := p.indexAndAnnounce(ctx, pub, deal); err != nil {
-			// any error here is always a recoverable error as this step is completely idempotent
-			return &dealMakingError{
-				recoverable: true,
-				err:         fmt.Errorf("failed to add deal to dagstore/piecestore with recoverable error: %w", err),
-				uiMsg:       "deal was paused while indexing because Boost was shut down",
-			}
+			err.error = fmt.Errorf("failed to add index and announce deal: %w", err.error)
+			return err
 		}
 		p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed and announced")
 	} else {
@@ -289,7 +300,7 @@ func (p *Provider) untagFundsAfterPublish(ctx context.Context, deal *types.Provi
 	return nil
 }
 
-func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
+func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
 	p.dealLogger.Infow(deal.DealUuid, "transferring deal data", "transfer client id", deal.Transfer.ClientID)
 
 	tctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.config.MaxTransferDuration))
@@ -302,19 +313,32 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 		DealSize:   int64(deal.Transfer.Size),
 	})
 	if err != nil {
-		return fmt.Errorf("transferAndVerify failed data transfer: %w", err)
+		return &dealMakingError{
+			retry: smtypes.DealRetryFatal,
+			error: fmt.Errorf("transferAndVerify failed to start data transfer: %w", err),
+		}
 	}
 
 	// wait for data-transfer to finish
 	if err := p.waitForTransferFinish(tctx, handler, pub, deal); err != nil {
-		return fmt.Errorf("data-transfer failed: %w", err)
+		// Note that the data transfer has automatic retries built in, so if
+		// it fails, it means it's already retried several times and we should
+		// surface the problem to the user so they can decide manually whether
+		// to keep retrying
+		return &dealMakingError{
+			retry: smtypes.DealRetryManual,
+			error: fmt.Errorf("data-transfer failed: %w", err),
+		}
 	}
 	p.dealLogger.Infow(deal.DealUuid, "deal data-transfer completed successfully", "bytes received", deal.NBytesReceived, "time taken",
 		time.Since(st).String())
 
 	// Verify CommP matches
 	if err := p.verifyCommP(deal); err != nil {
-		return fmt.Errorf("failed to verify CommP: %w", err)
+		return &dealMakingError{
+			retry: smtypes.DealRetryFatal,
+			error: fmt.Errorf("failed to verify CommP: %w", err),
+		}
 	}
 
 	p.dealLogger.Infow(deal.DealUuid, "commP matched successfully: deal-data verified")
@@ -445,7 +469,12 @@ func GeneratePieceCommitment(filepath string, dealSize abi.PaddedPieceSize) (c c
 	return cidAndSize.PieceCID, err
 }
 
-func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
+func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
+	// Check that the deal's start epoch hasn't already elapsed
+	if err := p.checkDealProposalStartEpoch(deal); err != nil {
+		return err
+	}
+
 	// Publish the deal on chain. At this point collateral and payment for the
 	// deal are locked and can no longer be withdrawn. Payment is transferred
 	// to the provider's wallet at each epoch.
@@ -453,13 +482,29 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 		p.dealLogger.Infow(deal.DealUuid, "sending deal to deal publisher")
 
 		mcid, err := p.dealPublisher.Publish(p.ctx, deal.ClientDealProposal)
-		if err != nil && ctx.Err() != nil {
-			p.dealLogger.Warnw(deal.DealUuid, "context timed out while waiting for publish")
-			return fmt.Errorf("publish did not complete: %w", ctx.Err())
-		}
-
 		if err != nil {
-			return fmt.Errorf("failed to publish deal %s: %w", deal.DealUuid, err)
+			// Check if the deal start epoch has expired
+			if err := p.checkDealProposalStartEpoch(deal); err != nil {
+				return err
+			}
+
+			// If boost was shutdown while waiting for the deal to be
+			// published, automatically retry on restart.
+			// Note that deals are published in batches, and the batch is
+			// kept in memory.
+			if errors.Is(err, context.Canceled) {
+				return &dealMakingError{
+					retry: types.DealRetryAuto,
+					error: fmt.Errorf("boost shutdown while waiting to publish deal %s: %w", deal.DealUuid, err),
+				}
+			}
+
+			// For any other publish error the user must manually retry: we don't
+			// want to automatically retry because deal publishing costs money
+			return &dealMakingError{
+				retry: types.DealRetryManual,
+				error: fmt.Errorf("failed to publish deal %s: %w", deal.DealUuid, err),
+			}
 		}
 
 		deal.PublishCID = &mcid
@@ -483,14 +528,20 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	// The below check is a work around for that.
 	if err != nil && ctx.Err() != nil {
 		p.dealLogger.Warnw(deal.DealUuid, "context timed out while waiting for publish confirmation")
-		return fmt.Errorf("wait for publish confirmation did not complete: %w", ctx.Err())
-	}
-	if err != nil {
-		p.dealLogger.LogError(deal.DealUuid, "error while waiting for publish confirm", err)
-		return fmt.Errorf("wait for publish message %s failed: %w", deal.PublishCID, err)
+		return &dealMakingError{
+			retry: types.DealRetryAuto,
+			error: fmt.Errorf("wait for publish confirmation did not complete: %w", ctx.Err()),
+		}
 	}
 
-	p.dealLogger.Infow(deal.DealUuid, "successfully finished deal publish confirmation")
+	if err != nil {
+		p.dealLogger.LogError(deal.DealUuid, "error while waiting for publish confirm", err)
+		return &dealMakingError{
+			retry: types.DealRetryAuto,
+			error: fmt.Errorf("wait for confirmation of publish message %s failed: %w", deal.PublishCID, err),
+		}
+	}
+	p.dealLogger.Infow(deal.DealUuid, "deal publish confirmed")
 
 	// If there's a re-org, the publish deal CID may change, so use the
 	// final CID.
@@ -504,13 +555,21 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 }
 
 // addPiece hands off a published deal for sealing and commitment in a sector
-func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
+func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
+	// Check that the deal's start epoch hasn't already elapsed
+	if err := p.checkDealProposalStartEpoch(deal); err != nil {
+		return err
+	}
+
 	p.dealLogger.Infow(deal.DealUuid, "add piece called")
 
 	// Open a reader against the CAR file with the deal data
 	v2r, err := carv2.OpenReader(deal.InboundFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to open CARv2 file: %w", err)
+		return &dealMakingError{
+			retry: types.DealRetryFatal,
+			error: fmt.Errorf("failed to open CARv2 file: %w", err),
+		}
 	}
 	defer func() {
 		if err := v2r.Close(); err != nil {
@@ -523,7 +582,10 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	case 1:
 		st, err := os.Stat(deal.InboundFilePath)
 		if err != nil {
-			return fmt.Errorf("failed to stat CARv1 file: %w", err)
+			return &dealMakingError{
+				retry: types.DealRetryFatal,
+				error: fmt.Errorf("failed to stat CARv1 file: %w", err),
+			}
 		}
 		size = uint64(st.Size())
 	case 2:
@@ -534,17 +596,23 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	proposal := deal.ClientDealProposal.Proposal
 	paddedReader, err := padreader.NewInflator(v2r.DataReader(), size, proposal.PieceSize.Unpadded())
 	if err != nil {
-		return fmt.Errorf("failed to create inflator: %w", err)
+		return &dealMakingError{
+			retry: types.DealRetryFatal,
+			error: fmt.Errorf("failed to create inflator: %w", err),
+		}
 	}
 
 	// Add the piece to a sector
 	packingInfo, packingErr := p.AddPieceToSector(ctx, *deal, paddedReader)
-	if packingErr != nil && ctx.Err() != nil {
-		p.dealLogger.Warnw(deal.DealUuid, "context timed out while trying to add piece")
-		return fmt.Errorf("add piece did not complete: %w", ctx.Err())
-	}
 	if packingErr != nil {
-		return fmt.Errorf("packing piece %s: %w", proposal.PieceCID, packingErr)
+		if ctx.Err() != nil {
+			p.dealLogger.Warnw(deal.DealUuid, "context timed out while trying to add piece")
+		}
+
+		return &dealMakingError{
+			retry: types.DealRetryAuto,
+			error: fmt.Errorf("packing piece %s: %w", proposal.PieceCID, packingErr),
+		}
 	}
 
 	deal.SectorID = packingInfo.SectorNumber
@@ -553,10 +621,14 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully handed to the sealing subsystem",
 		"sectorNum", deal.SectorID.String(), "offset", deal.Offset, "length", deal.Length)
 
-	return p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece)
+	if err := p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) error {
+func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
 	pc := deal.ClientDealProposal.Proposal.PieceCID
 
 	// add deal to piecestore
@@ -566,7 +638,10 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 		Offset:   deal.Offset,
 		Length:   deal.Length,
 	}); err != nil {
-		return fmt.Errorf("failed to add deal to piecestore: %w", err)
+		return &dealMakingError{
+			retry: types.DealRetryAuto,
+			error: fmt.Errorf("failed to add deal to piecestore: %w", err),
+		}
 	}
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piecestore")
 
@@ -575,7 +650,10 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 
 	if err != nil {
 		if !errors.Is(err, dagstore.ErrShardExists) {
-			return fmt.Errorf("failed to register deal with dagstore: %w", err)
+			return &dealMakingError{
+				retry: types.DealRetryAuto,
+				error: fmt.Errorf("failed to register deal with dagstore: %w", err),
+			}
 		}
 		p.dealLogger.Infow(deal.DealUuid, "deal has previously been registered in dagstore")
 	} else {
@@ -585,13 +663,18 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	// announce to the network indexer but do not fail the deal if the announcement fails
 	annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
 	if err != nil {
-		p.dealLogger.LogError(deal.DealUuid, "failed to announce deal to network indexer "+
-			"but not failing deal as it's already been handed for sealing", err)
-	} else {
-		p.dealLogger.Infow(deal.DealUuid, "announced deal to network indexer", "announcement-cid", annCid)
+		return &dealMakingError{
+			retry: types.DealRetryAuto,
+			error: fmt.Errorf("failed to announce deal to network indexer: %w", err),
+		}
+	}
+	p.dealLogger.Infow(deal.DealUuid, "announced deal to network indexer", "announcement-cid", annCid)
+
+	if err := p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced); err != nil {
+		return err
 	}
 
-	return p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced)
+	return nil
 }
 
 // fireSealingUpdateEvents periodically checks the sealing status of the deal
@@ -672,21 +755,32 @@ func isFinalSealingState(state lapi.SectorState) bool {
 	return false
 }
 
-func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, err error) {
+func (p *Provider) failDeal(pub event.Emitter, deal *smtypes.ProviderDealState, err error, cancelled bool) {
 	// Update state in DB with error
 	deal.Checkpoint = dealcheckpoints.Complete
-	if errors.Is(err, context.Canceled) {
+	deal.Retry = smtypes.DealRetryFatal
+	if cancelled {
 		deal.Err = DealCancelled
-		p.dealLogger.Infow(deal.DealUuid, "deal cancelled")
+		p.dealLogger.Infow(deal.DealUuid, "deal cancelled by user")
 	} else {
 		deal.Err = err.Error()
 		p.dealLogger.LogError(deal.DealUuid, "deal failed", err)
 	}
 
-	// we don't want a graceful shutdown to mess up our db update, so pass a background context
-	dberr := p.dealsDB.Update(context.Background(), deal)
+	p.saveDealToDB(pub, deal)
+	p.cleanupDeal(deal)
+}
+
+func (p *Provider) saveDealToDB(pub event.Emitter, deal *smtypes.ProviderDealState) {
+	// In the case that the provider has been shutdown, the provider's context
+	// will be cancelled, so use a background context when saving state to the
+	// DB to avoid this edge case.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	dberr := p.dealsDB.Update(ctx, deal)
 	if dberr != nil {
-		p.dealLogger.LogError(deal.DealUuid, "failed to update deal failure error in DB", dberr)
+		p.dealLogger.LogError(deal.DealUuid, "failed to update deal state in DB", dberr)
 	}
 
 	// Fire deal update event
@@ -695,13 +789,10 @@ func (p *Provider) failDeal(pub event.Emitter, deal *types.ProviderDealState, er
 	}
 }
 
-func (p *Provider) cleanupDealLogged(deal *types.ProviderDealState) {
-	p.dealLogger.Infow(deal.DealUuid, "cleaning up deal")
-	p.cleanupDeal(deal)
-	p.dealLogger.Infow(deal.DealUuid, "finished cleaning up deal")
-}
-
 func (p *Provider) cleanupDeal(deal *types.ProviderDealState) {
+	p.dealLogger.Infow(deal.DealUuid, "cleaning up deal")
+	defer p.dealLogger.Infow(deal.DealUuid, "finished cleaning up deal")
+
 	// remove the temp file created for inbound deal data if it is not an offline deal
 	if !deal.IsOffline {
 		_ = os.Remove(deal.InboundFilePath)
@@ -734,7 +825,7 @@ func (p *Provider) cleanupDealHandler(dealUuid uuid.UUID) {
 		return
 	}
 
-	dh.transferCancelled(errors.New("deal cleaned up"))
+	dh.setCancelTransferResponse(errors.New("deal cleaned up"))
 	dh.close()
 	p.delDealHandler(dealUuid)
 }
@@ -751,16 +842,41 @@ func (p *Provider) fireEventDealUpdate(pub event.Emitter, deal *types.ProviderDe
 	}
 }
 
-func (p *Provider) updateCheckpoint(pub event.Emitter, deal *types.ProviderDealState, ckpt dealcheckpoints.Checkpoint) error {
+func (p *Provider) updateCheckpoint(pub event.Emitter, deal *types.ProviderDealState, ckpt dealcheckpoints.Checkpoint) *dealMakingError {
 	prev := deal.Checkpoint
 	deal.Checkpoint = ckpt
 	deal.CheckpointAt = time.Now()
 	// we don't want a graceful shutdown to mess with db updates so pass a background context
 	if err := p.dealsDB.Update(context.Background(), deal); err != nil {
-		return fmt.Errorf("failed to persist deal state: %w", err)
+		return &dealMakingError{
+			retry: smtypes.DealRetryFatal,
+			error: fmt.Errorf("failed to persist deal state: %w", err),
+		}
 	}
 	p.dealLogger.Infow(deal.DealUuid, "updated deal checkpoint in DB", "old checkpoint", prev.String(), "new checkpoint", ckpt.String())
 	p.fireEventDealUpdate(pub, deal)
+
+	return nil
+}
+
+func (p *Provider) checkDealProposalStartEpoch(deal *smtypes.ProviderDealState) *dealMakingError {
+	chainHead, err := p.fullnodeApi.ChainHead(p.ctx)
+	if err != nil {
+		log.Warnw("failed to check deal proposal start epoch", "err", err)
+		return nil
+	}
+
+	// A storage deal must appear in a sealed (proven) sector no later than
+	// StartEpoch, otherwise it is invalid
+	height := chainHead.Height()
+	if height > deal.ClientDealProposal.Proposal.StartEpoch {
+		return &dealMakingError{
+			retry: smtypes.DealRetryFatal,
+			error: fmt.Errorf("deal proposal must be proven on chain by deal proposal "+
+				"start epoch %d, but it has expired: current chain height: %d",
+				deal.ClientDealProposal.Proposal.StartEpoch, height),
+		}
+	}
 
 	return nil
 }

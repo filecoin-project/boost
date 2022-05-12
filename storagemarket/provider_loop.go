@@ -45,6 +45,11 @@ type storageSpaceDealReq struct {
 	done chan struct{}
 }
 
+type retryDealReq struct {
+	dealUuid uuid.UUID
+	done     chan error
+}
+
 func (p *Provider) logFunds(id uuid.UUID, trsp *fundmanager.TagFundsResp) {
 	p.dealLogger.Infow(id, "tagged funds for deal",
 		"tagged for deal publish", trsp.PublishMessage,
@@ -236,8 +241,7 @@ func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState, dh 
 	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
 	if err != nil {
 		err = fmt.Errorf("failed to create event emitter: %w", err)
-		p.failDeal(pub, ds, err)
-		p.cleanupDealLogged(ds)
+		p.failDeal(nil, ds, err, false)
 		return &acceptError{
 			error:         err,
 			reason:        "server error: setup pubsub",
@@ -442,6 +446,23 @@ func (p *Provider) run() {
 			}
 			publishedDeal.done <- struct{}{}
 
+		case retryDealReq := <-p.retryDealChan:
+			// Get deal by uuid from the database
+			deal, err := p.dealsDB.ByID(p.ctx, retryDealReq.dealUuid)
+			if err != nil {
+				retryDealReq.done <- err
+				return
+			}
+
+			// start executing the deal
+			if p.startDealThread(deal) {
+				// if the deal wasn't already running, log a message saying
+				// that it was restarted
+				p.dealLogger.Infow(deal.DealUuid, "user initiated deal retry", "checkpoint", deal.Checkpoint)
+			}
+
+			retryDealReq.done <- nil
+
 		case finishedDeal := <-p.finishedDealChan:
 			deal := finishedDeal.deal
 			p.dealLogger.Infow(deal.DealUuid, "deal finished")
@@ -469,16 +490,32 @@ func (p *Provider) run() {
 
 // startDealThread sets up a deal handler and wait group monitoring for a deal, then
 // executes the deal in a new go routine
-func (p *Provider) startDealThread(deal *types.ProviderDealState) {
+func (p *Provider) startDealThread(deal *types.ProviderDealState) bool {
+	// Check if the deal is already running
+	p.dealThreadsLk.Lock()
+	_, alreadyRunning := p.dealThreads[deal.DealUuid]
+	p.dealThreads[deal.DealUuid] = struct{}{}
+	p.dealThreadsLk.Unlock()
+	if alreadyRunning {
+		return false
+	}
+
 	// Set up deal handler so that clients can subscribe to deal update events
 	dh := p.mkAndInsertDealHandler(deal.DealUuid)
 
 	p.runWG.Add(1)
 	go func() {
 		defer p.runWG.Done()
+		defer func() {
+			p.dealThreadsLk.Lock()
+			delete(p.dealThreads, deal.DealUuid)
+			p.dealThreadsLk.Unlock()
+		}()
 
 		// Run deal
-		p.doDeal(deal, dh)
+		p.runDeal(deal, dh)
 		p.dealLogger.Infow(deal.DealUuid, "deal go-routine finished execution")
 	}()
+
+	return true
 }

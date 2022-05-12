@@ -22,13 +22,11 @@ import (
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
-	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-fil-markets/stores"
-	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
@@ -37,7 +35,6 @@ import (
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
@@ -73,6 +70,7 @@ type Provider struct {
 	acceptDealChan    chan acceptDealReq
 	finishedDealChan  chan finishedDealReq
 	publishedDealChan chan publishDealReq
+	retryDealChan     chan retryDealReq
 	storageSpaceChan  chan storageSpaceDealReq
 
 	// Sealing Pipeline API
@@ -99,8 +97,13 @@ type Provider struct {
 
 	fullnodeApi v1api.FullNode
 
+	// Map of deal handlers indexed by deal uuid.
 	dhsMu sync.RWMutex
 	dhs   map[uuid.UUID]*dealHandler
+
+	// Set of deals that are currently running in a go-routine.
+	dealThreadsLk sync.Mutex
+	dealThreads   map[uuid.UUID]struct{}
 
 	dealLogger *logs.DealLogger
 
@@ -112,17 +115,16 @@ type Provider struct {
 	sigVerifier types.SignatureVerifier
 }
 
-func NewProvider(h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
+func NewProvider(sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, askGetter types.AskGetter,
-	sigVerifier types.SignatureVerifier, httpOpts ...httptransport.Option) (*Provider, error) {
+	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
 
 	newDealPS, err := newDealPubsub()
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	dl := logs.NewDealLogger(logsDB)
 
 	return &Provider{
 		ctx:    ctx,
@@ -140,9 +142,10 @@ func NewProvider(h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundm
 		acceptDealChan:    make(chan acceptDealReq),
 		finishedDealChan:  make(chan finishedDealReq),
 		publishedDealChan: make(chan publishDealReq),
+		retryDealChan:     make(chan retryDealReq),
 		storageSpaceChan:  make(chan storageSpaceDealReq),
 
-		Transport:      httptransport.New(h, dl, httpOpts...),
+		Transport:      tspt,
 		fundManager:    fundMgr,
 		storageManager: storageMgr,
 
@@ -153,9 +156,10 @@ func NewProvider(h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundm
 		maxDealCollateralMultiplier: 2,
 		transfers:                   newDealTransfers(),
 
-		dhs:        make(map[uuid.UUID]*dealHandler),
-		dealLogger: dl,
-		logsDB:     logsDB,
+		dhs:         make(map[uuid.UUID]*dealHandler),
+		dealThreads: make(map[uuid.UUID]struct{}),
+		dealLogger:  dl,
+		logsDB:      logsDB,
 
 		dagst: dagst,
 		ps:    ps,
@@ -237,6 +241,7 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (*api.P
 		DealDataRoot:       dp.DealDataRoot,
 		Transfer:           dp.Transfer,
 		IsOffline:          dp.IsOffline,
+		Retry:              smtypes.DealRetryAuto,
 	}
 	// validate the deal proposal
 	if err := p.validateDealProposal(ds); err != nil {
@@ -327,27 +332,34 @@ func (p *Provider) Start() error {
 	log.Infow("storage provider: starting")
 
 	// initialize the database
+	log.Infow("db: creating tables")
 	err := db.CreateAllBoostTables(p.ctx, p.db, p.logsSqlDB)
 	if err != nil {
 		return fmt.Errorf("failed to init db: %w", err)
 	}
 
+	log.Infow("db: performing migrations")
 	err = db.Migrate(p.db)
 	if err != nil {
 		return fmt.Errorf("failed to migrate db: %w", err)
 	}
 
-	log.Infow("db initialized")
+	log.Infow("db: initialized")
 
 	// cleanup all completed deals in case Boost resumed before they were cleanedup
 	finished, err := p.dealsDB.ListCompleted(p.ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list completed deals: %w", err)
 	}
+	if len(finished) > 0 {
+		log.Infof("cleaning up %d completed deals", len(finished))
+	}
 	for i := range finished {
 		p.cleanupDealOnRestart(finished[i])
 	}
-	log.Info("finished cleaning up completed deals")
+	if len(finished) > 0 {
+		log.Infof("finished cleaning up %d completed deals", len(finished))
+	}
 
 	// restart all active deals
 	activeDeals, err := p.dealsDB.ListActive(p.ctx)
@@ -355,6 +367,7 @@ func (p *Provider) Start() error {
 		return fmt.Errorf("failed to list active deals: %w", err)
 	}
 
+	// cleanup all deals that have finished successfully
 	for _, deal := range activeDeals {
 		// Make sure that deals that have reached the index and announce stage
 		// have their resources untagged
@@ -365,8 +378,16 @@ func (p *Provider) Start() error {
 		}
 	}
 
-	// Filter out offline and proving deals
+	// Restart active deals
 	for _, deal := range activeDeals {
+		// Check if deal is already proving
+		if deal.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
+			si, err := p.sps.SectorsStatus(p.ctx, deal.SectorID, false)
+			if err != nil || isFinalSealingState(si.State) {
+				continue
+			}
+		}
+
 		// If it's an offline deal, and the deal data hasn't yet been
 		// imported, just wait for the SP operator to import the data
 		if deal.IsOffline && deal.InboundFilePath == "" {
@@ -377,12 +398,12 @@ func (p *Provider) Start() error {
 			continue
 		}
 
-		// Check if deal is already proving
-		if deal.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
-			si, err := p.sps.SectorsStatus(p.ctx, deal.SectorID, false)
-			if err != nil || isFinalSealingState(si.State) {
-				continue
-			}
+		// Check if the deal can be restarted automatically.
+		// Note that if the retry type is "fatal" then the deal should already
+		// have been marked as complete (and therefore not returned by ListActive).
+		if deal.Retry != smtypes.DealRetryAuto {
+			p.dealLogger.Infow(deal.DealUuid, "deal must be manually restarted: waiting for manual restart")
+			continue
 		}
 
 		// Restart deal
@@ -415,8 +436,7 @@ func (p *Provider) cleanupDealOnRestart(deal *types.ProviderDealState) {
 	// untag funds
 	collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 	if errf == nil {
-		p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal as deal finished", "untagged publish", pub, "untagged collateral", collat,
-			"err", errf)
+		p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal as deal has finished", "untagged publish", pub, "untagged collateral", collat)
 	}
 }
 
@@ -454,6 +474,22 @@ func (p *Provider) SubscribeDealUpdates(dealUuid uuid.UUID) (event.Subscription,
 	}
 
 	return dh.subscribeUpdates()
+}
+
+// RetryDeal starts execution of a deal from the point at which it stopped
+func (p *Provider) RetryDeal(dealUuid uuid.UUID) error {
+	resp := make(chan error, 1)
+	select {
+	case p.retryDealChan <- retryDealReq{dealUuid: dealUuid, done: resp}:
+	case <-p.ctx.Done():
+		return p.ctx.Err()
+	}
+	select {
+	case err := <-resp:
+		return err
+	case <-p.ctx.Done():
+		return p.ctx.Err()
+	}
 }
 
 func (p *Provider) CancelDealDataTransfer(dealUuid uuid.UUID) error {
@@ -558,10 +594,4 @@ func (p *Provider) GetBalance(ctx context.Context, addr address.Address, encoded
 	}
 
 	return utils.ToSharedBalance(bal), nil
-}
-
-type CurrentDealInfo struct {
-	DealID           abi.DealID
-	MarketDeal       *lapi.MarketDeal
-	PublishMsgTipSet ctypes.TipSetKey
 }

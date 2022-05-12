@@ -18,7 +18,9 @@ import (
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
+	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
+	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/shared"
@@ -392,8 +394,10 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, h 
 		dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper,
 		lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 
-		prov, err := storagemarket.NewProvider(h, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
-			sps, cdm, df, logsSqlDB.db, logsDB, dagst, ps, ip, lp, &signatureVerifier{a})
+		dl := logs.NewDealLogger(logsDB)
+		tspt := httptransport.New(h, dl)
+		prov, err := storagemarket.NewProvider(sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
+			sps, cdm, df, logsSqlDB.db, logsDB, dagst, ps, ip, lp, &signatureVerifier{a}, dl, tspt)
 		if err != nil {
 			return nil, err
 		}

@@ -129,8 +129,8 @@ func (dh *dealHandler) cancelTransfer() error {
 	}
 }
 
-// transferCancelled idempotently marks the transfer as cancelled with the given error.
-func (dh *dealHandler) transferCancelled(err error) {
+// setCancelTransferResponse idempotently sets the return value of calls to cancelTransfer
+func (dh *dealHandler) setCancelTransferResponse(err error) {
 	dh.tdOnce.Do(func() {
 		dh.transferDone <- err
 		close(dh.transferDone)
@@ -139,5 +139,5 @@ func (dh *dealHandler) transferCancelled(err error) {
 
 func (dh *dealHandler) close() {
 	dh.transferCancel()
-	dh.transferCancelled(errors.New("deal handler closed"))
+	dh.setCancelTransferResponse(errors.New("deal handler closed"))
 }

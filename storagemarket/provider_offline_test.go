@@ -15,7 +15,7 @@ func TestSimpleOfflineDealHappy(t *testing.T) {
 	ctx := context.Background()
 
 	// setup the provider test harness
-	harness := NewHarness(t, ctx)
+	harness := NewHarness(t)
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -61,7 +61,7 @@ func TestOfflineDealInsufficientProviderFunds(t *testing.T) {
 
 	// setup the provider test harness with configured publish fee per deal
 	// that is more than the total wallet balance.
-	harness := NewHarness(t, ctx, withMinPublishFees(abi.NewTokenAmount(100)), withPublishWalletBal(50))
+	harness := NewHarness(t, withMinPublishFees(abi.NewTokenAmount(100)), withPublishWalletBal(50))
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
