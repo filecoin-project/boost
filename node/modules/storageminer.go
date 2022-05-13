@@ -339,7 +339,7 @@ func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider
 
 			// Start the Boost SP
 			log.Info("starting boost storage provider")
-			_, err = prov.Start()
+			err = prov.Start()
 			if err != nil {
 				return fmt.Errorf("starting storage provider: %w", err)
 			}

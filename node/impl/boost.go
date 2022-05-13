@@ -111,8 +111,7 @@ func (sm *BoostAPI) ServeRemote(perm bool) func(w http.ResponseWriter, r *http.R
 }
 
 func (sm *BoostAPI) BoostDummyDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
-	info, _, err := sm.StorageProvider.ExecuteDeal(&params, "dummy")
-	return info, err
+	return sm.StorageProvider.ExecuteDeal(&params, "dummy")
 }
 
 func (sm *BoostAPI) BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
@@ -124,7 +123,7 @@ func (sm *BoostAPI) BoostIndexerAnnounceAllDeals(ctx context.Context) error {
 }
 
 func (sm *BoostAPI) BoostOfflineDealWithData(_ context.Context, dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
-	res, _, err := sm.StorageProvider.ImportOfflineDealData(dealUuid, filePath)
+	res, err := sm.StorageProvider.ImportOfflineDealData(dealUuid, filePath)
 	return res, err
 }
 

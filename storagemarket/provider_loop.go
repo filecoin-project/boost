@@ -22,7 +22,6 @@ import (
 type acceptDealReq struct {
 	rsp      chan acceptDealResp
 	deal     *types.ProviderDealState
-	dh       *dealHandler
 	isImport bool
 }
 
@@ -210,7 +209,7 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 
 // processOfflineDealProposal just saves the deal to the database.
 // Execution resumes when processImportOfflineDealData is called.
-func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState) *acceptError {
+func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState, dh *dealHandler) *acceptError {
 	// Check that the deal proposal is unique
 	if aerr := p.checkDealPropUnique(ds); aerr != nil {
 		return aerr
@@ -234,7 +233,6 @@ func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState) *ac
 	}
 
 	// Set up pubsub for deal updates
-	dh := p.mkAndInsertDealHandler(ds.DealUuid)
 	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
 	if err != nil {
 		err = fmt.Errorf("failed to create event emitter: %w", err)
@@ -346,13 +344,15 @@ func (p *Provider) checkDealUuidUnique(deal *smtypes.ProviderDealState) *acceptE
 	}
 }
 
-// The provider loop effectively implements a lock over resources used by
+// The provider run loop effectively implements a lock over resources used by
 // the provider, like funds and storage space, so that only one deal at a
 // time can change the value of these resources.
-func (p *Provider) loop() {
+func (p *Provider) run() {
+	log.Info("provider run loop: start")
+	p.runWG.Add(1)
 	defer func() {
-		p.wg.Done()
-		log.Info("provider event loop complete")
+		p.runWG.Done()
+		log.Info("provider run loop: complete")
 	}()
 
 	for {
@@ -366,31 +366,7 @@ func (p *Provider) loop() {
 			deal := dealReq.deal
 			p.dealLogger.Infow(deal.DealUuid, "processing deal acceptance request")
 
-			var aerr *acceptError
-			if deal.IsOffline {
-				// It's an offline deal
-				if dealReq.isImport {
-					// The Storage Provider is importing the deal data, so tag
-					// funds for the deal and execute it
-					aerr = p.processImportOfflineDealData(dealReq.deal)
-				} else {
-					// When the client proposes an offline deal, save the deal
-					// to the database but don't execute the deal. The deal
-					// will be executed when the Storage Provider imports the
-					// deal data.
-					aerr = p.processOfflineDealProposal(dealReq.deal)
-					if aerr == nil {
-						// The deal proposal was successful. Send an Accept response to the client.
-						dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: true}}
-						// Don't execute the deal now, wait for data import.
-						continue
-					}
-				}
-			} else {
-				// Process a regular deal proposal
-				aerr = p.processDealProposal(dealReq.deal)
-			}
-			if aerr != nil {
+			sendErrorResp := func(aerr *acceptError) {
 				// If the error is a severe error (eg can't connect to database)
 				if aerr.isSevereError {
 					// Send a rejection message to the client with a reason for rejection
@@ -398,24 +374,53 @@ func (p *Provider) loop() {
 					// Log an error with more details for the provider
 					p.dealLogger.LogError(deal.DealUuid, "error while processing deal acceptance request", aerr)
 					dealReq.rsp <- resp
-					continue
+					return
 				}
 
 				// The error is not a severe error, so don't log an error, just
 				// send a message to the client with a rejection reason
 				p.dealLogger.Infow(deal.DealUuid, "deal acceptance request rejected", "reason", aerr.reason)
 				dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: aerr.reason}, err: nil}
+			}
+
+			if deal.IsOffline && !dealReq.isImport {
+				// When the client proposes an offline deal, save the deal
+				// to the database but don't execute the deal. The deal
+				// will be executed when the Storage Provider imports the
+				// deal data.
+				dh := p.mkAndInsertDealHandler(deal.DealUuid)
+				aerr := p.processOfflineDealProposal(dealReq.deal, dh)
+				if aerr != nil {
+					dh.close()
+					p.delDealHandler(deal.DealUuid)
+					sendErrorResp(aerr)
+					continue
+				}
+
+				// The deal proposal was successful. Send an Accept response to the client.
+				dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: true}}
+				// Don't execute the deal now, wait for data import.
+				continue
+			}
+
+			var aerr *acceptError
+			if deal.IsOffline {
+				// The Storage Provider is importing offline deal data, so tag
+				// funds for the deal and execute it
+				aerr = p.processImportOfflineDealData(dealReq.deal)
+			} else {
+				// Process a regular deal proposal
+				aerr = p.processDealProposal(dealReq.deal)
+			}
+			if aerr != nil {
+				sendErrorResp(aerr)
 				continue
 			}
 
 			// start executing the deal
-			p.wg.Add(1)
-			go func() {
-				defer p.wg.Done()
-				p.doDeal(deal, dealReq.dh)
-				p.dealLogger.Infow(deal.DealUuid, "deal go-routine finished execution")
-			}()
+			p.startDealThread(deal)
 
+			// send an accept response
 			dealReq.rsp <- acceptDealResp{&api.ProviderDealRejectionInfo{Accepted: true}, nil}
 
 		case storageSpaceDealReq := <-p.storageSpaceChan:
@@ -460,4 +465,20 @@ func (p *Provider) loop() {
 			return
 		}
 	}
+}
+
+// startDealThread sets up a deal handler and wait group monitoring for a deal, then
+// executes the deal in a new go routine
+func (p *Provider) startDealThread(deal *types.ProviderDealState) {
+	// Set up deal handler so that clients can subscribe to deal update events
+	dh := p.mkAndInsertDealHandler(deal.DealUuid)
+
+	p.runWG.Add(1)
+	go func() {
+		defer p.runWG.Done()
+
+		// Run deal
+		p.doDeal(deal, dh)
+		p.dealLogger.Infow(deal.DealUuid, "deal go-routine finished execution")
+	}()
 }

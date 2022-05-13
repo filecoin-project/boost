@@ -95,10 +95,10 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 			td = tc.stubAfterResumeF(tbuilder)
 
 			// start the provider -> this will restart the deal
-			dhs, err := harness.Provider.Start()
+			err := harness.Provider.Start()
 			require.NoError(t, err)
-			require.Len(t, dhs, 1)
-			dh := dhs[0]
+			dh := harness.Provider.getDealHandler(td.params.DealUUID)
+			require.NotNil(t, dh)
 			sub, err := dh.subscribeUpdates()
 			require.NoError(t, err)
 			td.sub = sub
