@@ -97,9 +97,8 @@ type Provider struct {
 
 	fullnodeApi v1api.FullNode
 
-	dhsMu       sync.RWMutex
-	dhs         map[uuid.UUID]*dealHandler // Map of deal handlers indexed by deal uuid.
-	dealThreads map[uuid.UUID]struct{}     // Set of deals that are currently running in a go-routine.
+	dhsMu sync.RWMutex
+	dhs   map[uuid.UUID]*dealHandler // Map of deal handlers indexed by deal uuid.
 
 	dealLogger *logs.DealLogger
 
@@ -152,10 +151,9 @@ func NewProvider(sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundMa
 		maxDealCollateralMultiplier: 2,
 		transfers:                   newDealTransfers(),
 
-		dhs:         make(map[uuid.UUID]*dealHandler),
-		dealThreads: make(map[uuid.UUID]struct{}),
-		dealLogger:  dl,
-		logsDB:      logsDB,
+		dhs:        make(map[uuid.UUID]*dealHandler),
+		dealLogger: dl,
+		logsDB:     logsDB,
 
 		dagst: dagst,
 		ps:    ps,
@@ -373,7 +371,7 @@ func (p *Provider) Start() error {
 
 		// Set up a deal handler so that clients can subscribe to update
 		// events about the deal
-		_, err := p.mkAndInsertDealHandler(deal.DealUuid)
+		dh, err := p.mkAndInsertDealHandler(deal.DealUuid)
 		if err != nil {
 			p.dealLogger.LogError(deal.DealUuid, "failed to restart deal", err)
 			continue
@@ -396,7 +394,7 @@ func (p *Provider) Start() error {
 
 		// Restart deal
 		p.dealLogger.Infow(deal.DealUuid, "resuming deal on boost restart", "checkpoint", deal.Checkpoint.String())
-		_, err = p.startDealThread(deal)
+		_, err = p.startDealThread(dh, deal)
 		if err != nil {
 			p.dealLogger.LogError(deal.DealUuid, "failed to restart deal", err)
 		}
