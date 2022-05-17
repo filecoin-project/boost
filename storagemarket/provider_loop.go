@@ -16,7 +16,6 @@ import (
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/google/uuid"
-	"github.com/libp2p/go-eventbus"
 )
 
 type acceptDealReq struct {
@@ -45,8 +44,9 @@ type storageSpaceDealReq struct {
 	done chan struct{}
 }
 
-type retryDealReq struct {
+type updateRetryStateReq struct {
 	dealUuid uuid.UUID
+	retry    bool // whether to retry or to terminate the deal
 	done     chan error
 }
 
@@ -237,22 +237,10 @@ func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState, dh 
 		}
 	}
 
-	// Set up pubsub for deal updates
-	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
-	if err != nil {
-		err = fmt.Errorf("failed to create event emitter: %w", err)
-		p.failDeal(nil, ds, err, false)
-		return &acceptError{
-			error:         err,
-			reason:        "server error: setup pubsub",
-			isSevereError: true,
-		}
-	}
-
 	// publish "new deal" event
 	p.fireEventDealNew(ds)
 	// publish an event with the current state of the deal
-	p.fireEventDealUpdate(pub, ds)
+	p.fireEventDealUpdate(dh.Publisher, ds)
 
 	return nil
 }
@@ -392,7 +380,12 @@ func (p *Provider) run() {
 				// to the database but don't execute the deal. The deal
 				// will be executed when the Storage Provider imports the
 				// deal data.
-				dh := p.mkAndInsertDealHandler(deal.DealUuid)
+				dh, err := p.mkAndInsertDealHandler(deal.DealUuid)
+				if err != nil {
+					sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: creating deal handler"})
+					continue
+				}
+
 				aerr := p.processOfflineDealProposal(dealReq.deal, dh)
 				if aerr != nil {
 					dh.close()
@@ -421,8 +414,19 @@ func (p *Provider) run() {
 				continue
 			}
 
+			// set up deal handler so that clients can subscribe to deal update events
+			dh, err := p.mkAndInsertDealHandler(deal.DealUuid)
+			if err != nil {
+				sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: starting deal thread"})
+				continue
+			}
+
 			// start executing the deal
-			p.startDealThread(deal)
+			_, err = p.startDealThread(dh, deal)
+			if err != nil {
+				sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: starting deal thread"})
+				continue
+			}
 
 			// send an accept response
 			dealReq.rsp <- acceptDealResp{&api.ProviderDealRejectionInfo{Accepted: true}, nil}
@@ -446,25 +450,47 @@ func (p *Provider) run() {
 			}
 			publishedDeal.done <- struct{}{}
 
-		case retryDealReq := <-p.retryDealChan:
-			// Get deal by uuid from the database
-			deal, err := p.dealsDB.ByID(p.ctx, retryDealReq.dealUuid)
-			if err != nil {
-				retryDealReq.done <- err
-				return
-			}
+		case retryDealReq := <-p.updateRetryStateChan:
+			err := func() error {
+				// Get deal by uuid from the database
+				deal, err := p.dealsDB.ByID(p.ctx, retryDealReq.dealUuid)
+				if err != nil {
+					return fmt.Errorf("getting deal from db by id: %w", err)
+				}
 
-			// start executing the deal
-			if p.startDealThread(deal) {
-				// if the deal wasn't already running, log a message saying
-				// that it was restarted
-				p.dealLogger.Infow(deal.DealUuid, "user initiated deal retry", "checkpoint", deal.Checkpoint)
-			} else {
-				// the deal was already running - log a message saying so
-				p.dealLogger.Infow(deal.DealUuid, "user initiated deal retry but deal is already running", "checkpoint", deal.Checkpoint)
-			}
+				if deal.Checkpoint == dealcheckpoints.Complete {
+					return errors.New("deal is already complete")
+				}
 
-			retryDealReq.done <- nil
+				// Set up deal handler so that clients can subscribe to deal update events
+				dh, err := p.mkAndInsertDealHandler(deal.DealUuid)
+				if err != nil {
+					return err
+				}
+
+				// If the user wants to retry the deal
+				if retryDealReq.retry {
+					// Start executing the deal
+					started, err := p.startDealThread(dh, deal)
+					if err != nil {
+						return fmt.Errorf("starting deal thread: %w", err)
+					}
+					if started {
+						// If the deal wasn't already running, log a message saying
+						// that it was restarted
+						p.dealLogger.Infow(deal.DealUuid, "user initiated deal retry", "checkpoint", deal.Checkpoint)
+					} else {
+						// the deal was already running - log a message saying so
+						p.dealLogger.Infow(deal.DealUuid, "user initiated deal retry but deal is already running", "checkpoint", deal.Checkpoint)
+					}
+
+					return nil
+				}
+
+				// The user wants to fail the deal
+				return p.failPausedDeal(dh, deal)
+			}()
+			retryDealReq.done <- err
 
 		case finishedDeal := <-p.finishedDealChan:
 			deal := finishedDeal.deal
@@ -493,26 +519,17 @@ func (p *Provider) run() {
 
 // startDealThread sets up a deal handler and wait group monitoring for a deal, then
 // executes the deal in a new go routine
-func (p *Provider) startDealThread(deal *types.ProviderDealState) bool {
+func (p *Provider) startDealThread(dh *dealHandler, deal *types.ProviderDealState) (bool, error) {
 	// Check if the deal is already running
-	p.dealThreadsLk.Lock()
-	_, alreadyRunning := p.dealThreads[deal.DealUuid]
-	p.dealThreads[deal.DealUuid] = struct{}{}
-	p.dealThreadsLk.Unlock()
-	if alreadyRunning {
-		return false
+	if ok := dh.setRunning(true); !ok {
+		return false, nil
 	}
-
-	// Set up deal handler so that clients can subscribe to deal update events
-	dh := p.mkAndInsertDealHandler(deal.DealUuid)
 
 	p.runWG.Add(1)
 	go func() {
 		defer p.runWG.Done()
 		defer func() {
-			p.dealThreadsLk.Lock()
-			delete(p.dealThreads, deal.DealUuid)
-			p.dealThreadsLk.Unlock()
+			dh.setRunning(false)
 		}()
 
 		// Run deal
@@ -520,5 +537,34 @@ func (p *Provider) startDealThread(deal *types.ProviderDealState) bool {
 		p.dealLogger.Infow(deal.DealUuid, "deal go-routine finished execution")
 	}()
 
-	return true
+	return true, nil
+}
+
+// failPausedDeal moves a deal from the paused to the failed state and cleans
+// up the deal
+func (p *Provider) failPausedDeal(dh *dealHandler, deal *smtypes.ProviderDealState) error {
+	// Check if the deal is running
+	if dh.isRunning() {
+		return fmt.Errorf("the deal %s is running; cannot fail running deal", deal.DealUuid)
+	}
+
+	// Update state in DB with error
+	deal.Checkpoint = dealcheckpoints.Complete
+	deal.Retry = smtypes.DealRetryFatal
+	var err error
+	if deal.Err == "" {
+		err = errors.New("user manually terminated the deal")
+	} else {
+		err = errors.New(deal.Err)
+	}
+	deal.Err = "user manually terminated the deal"
+	p.dealLogger.LogError(deal.DealUuid, deal.Err, err)
+	p.saveDealToDB(dh.Publisher, deal)
+
+	// Call cleanupDeal in a go-routine because it sends a message to the provider
+	// run loop (and failPausedDeal is called from the same run loop so otherwise
+	// it will deadlock)
+	go p.cleanupDeal(deal)
+
+	return nil
 }

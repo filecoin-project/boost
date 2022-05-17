@@ -67,11 +67,11 @@ type Provider struct {
 	newDealPS *newDealPS
 
 	// channels used to pass messages to run loop
-	acceptDealChan    chan acceptDealReq
-	finishedDealChan  chan finishedDealReq
-	publishedDealChan chan publishDealReq
-	retryDealChan     chan retryDealReq
-	storageSpaceChan  chan storageSpaceDealReq
+	acceptDealChan       chan acceptDealReq
+	finishedDealChan     chan finishedDealReq
+	publishedDealChan    chan publishDealReq
+	updateRetryStateChan chan updateRetryStateReq
+	storageSpaceChan     chan storageSpaceDealReq
 
 	// Sealing Pipeline API
 	sps sealingpipeline.API
@@ -97,13 +97,8 @@ type Provider struct {
 
 	fullnodeApi v1api.FullNode
 
-	// Map of deal handlers indexed by deal uuid.
 	dhsMu sync.RWMutex
-	dhs   map[uuid.UUID]*dealHandler
-
-	// Set of deals that are currently running in a go-routine.
-	dealThreadsLk sync.Mutex
-	dealThreads   map[uuid.UUID]struct{}
+	dhs   map[uuid.UUID]*dealHandler // Map of deal handlers indexed by deal uuid.
 
 	dealLogger *logs.DealLogger
 
@@ -139,11 +134,11 @@ func NewProvider(sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundMa
 		sps:       sps,
 		df:        df,
 
-		acceptDealChan:    make(chan acceptDealReq),
-		finishedDealChan:  make(chan finishedDealReq),
-		publishedDealChan: make(chan publishDealReq),
-		retryDealChan:     make(chan retryDealReq),
-		storageSpaceChan:  make(chan storageSpaceDealReq),
+		acceptDealChan:       make(chan acceptDealReq),
+		finishedDealChan:     make(chan finishedDealReq),
+		publishedDealChan:    make(chan publishDealReq),
+		updateRetryStateChan: make(chan updateRetryStateReq),
+		storageSpaceChan:     make(chan storageSpaceDealReq),
 
 		Transport:      tspt,
 		fundManager:    fundMgr,
@@ -156,10 +151,9 @@ func NewProvider(sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundMa
 		maxDealCollateralMultiplier: 2,
 		transfers:                   newDealTransfers(),
 
-		dhs:         make(map[uuid.UUID]*dealHandler),
-		dealThreads: make(map[uuid.UUID]struct{}),
-		dealLogger:  dl,
-		logsDB:      logsDB,
+		dhs:        make(map[uuid.UUID]*dealHandler),
+		dealLogger: dl,
+		logsDB:     logsDB,
 
 		dagst: dagst,
 		ps:    ps,
@@ -315,19 +309,6 @@ func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, isImport 
 	return resp, nil
 }
 
-func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) *dealHandler {
-	p.dhsMu.Lock()
-	defer p.dhsMu.Unlock()
-	dh, ok := p.dhs[dealUuid]
-	if ok {
-		return dh
-	}
-
-	dh = newDealHandler(p.ctx, dealUuid)
-	p.dhs[dealUuid] = dh
-	return dh
-}
-
 func (p *Provider) Start() error {
 	log.Infow("storage provider: starting")
 
@@ -388,12 +369,17 @@ func (p *Provider) Start() error {
 			}
 		}
 
+		// Set up a deal handler so that clients can subscribe to update
+		// events about the deal
+		dh, err := p.mkAndInsertDealHandler(deal.DealUuid)
+		if err != nil {
+			p.dealLogger.LogError(deal.DealUuid, "failed to restart deal", err)
+			continue
+		}
+
 		// If it's an offline deal, and the deal data hasn't yet been
 		// imported, just wait for the SP operator to import the data
 		if deal.IsOffline && deal.InboundFilePath == "" {
-			// Set up a deal handler so that clients can subscribe to update
-			// events about the deal
-			p.mkAndInsertDealHandler(deal.DealUuid)
 			p.dealLogger.Infow(deal.DealUuid, "restarted deal: waiting for offline deal data import")
 			continue
 		}
@@ -408,7 +394,10 @@ func (p *Provider) Start() error {
 
 		// Restart deal
 		p.dealLogger.Infow(deal.DealUuid, "resuming deal on boost restart", "checkpoint", deal.Checkpoint.String())
-		p.startDealThread(deal)
+		_, err = p.startDealThread(dh, deal)
+		if err != nil {
+			p.dealLogger.LogError(deal.DealUuid, "failed to restart deal", err)
+		}
 	}
 
 	// Start provider run loop
@@ -476,11 +465,22 @@ func (p *Provider) SubscribeDealUpdates(dealUuid uuid.UUID) (event.Subscription,
 	return dh.subscribeUpdates()
 }
 
-// RetryDeal starts execution of a deal from the point at which it stopped
-func (p *Provider) RetryDeal(dealUuid uuid.UUID) error {
+// RetryPausedDeal starts execution of a deal from the point at which it stopped
+func (p *Provider) RetryPausedDeal(dealUuid uuid.UUID) error {
+	return p.updateRetryState(dealUuid, true)
+}
+
+// FailPausedDeal moves a deal from the paused state to the failed state
+func (p *Provider) FailPausedDeal(dealUuid uuid.UUID) error {
+	return p.updateRetryState(dealUuid, false)
+}
+
+// updateRetryState either retries the deal or terminates the deal
+// (depending on the value of retry)
+func (p *Provider) updateRetryState(dealUuid uuid.UUID, retry bool) error {
 	resp := make(chan error, 1)
 	select {
-	case p.retryDealChan <- retryDealReq{dealUuid: dealUuid, done: resp}:
+	case p.updateRetryStateChan <- updateRetryStateReq{dealUuid: dealUuid, retry: retry, done: resp}:
 	case <-p.ctx.Done():
 		return p.ctx.Err()
 	}
@@ -514,19 +514,6 @@ func (p *Provider) CancelDealDataTransfer(dealUuid uuid.UUID) error {
 		p.dealLogger.Warnw(dealUuid, "error when user tried to cancel deal data transfer", "err", err)
 	}
 	return err
-}
-
-func (p *Provider) getDealHandler(id uuid.UUID) *dealHandler {
-	p.dhsMu.RLock()
-	defer p.dhsMu.RUnlock()
-
-	return p.dhs[id]
-}
-
-func (p *Provider) delDealHandler(dealUuid uuid.UUID) {
-	p.dhsMu.Lock()
-	delete(p.dhs, dealUuid)
-	p.dhsMu.Unlock()
 }
 
 func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDealState, pieceData io.Reader) (*storagemarket.PackingResult, error) {

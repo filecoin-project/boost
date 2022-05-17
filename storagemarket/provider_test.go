@@ -520,8 +520,8 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 			sub, err := dh.subscribeUpdates()
 			require.NoError(t, err)
 			td.sub = sub
-
 			td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
+
 			// assert funds and storage are no longer tagged
 			harness.EventuallyAssertNoTagged(t, ctx)
 		})
@@ -529,7 +529,7 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 }
 
 // Tests scenarios where a deal is paused with an error that the user must
-// resolve by retrying manually
+// resolve by retrying manually, and the user retries the deal
 func TestDealRestartAfterManualRecoverableErrors(t *testing.T) {
 	ctx := context.Background()
 
@@ -595,25 +595,63 @@ func TestDealRestartAfterManualRecoverableErrors(t *testing.T) {
 
 			// expect the deal not to have been automatically restarted
 			// (because it was paused with retry set to "manual")
-			dh := harness.Provider.getDealHandler(td.params.DealUUID)
-			require.Nil(t, dh)
+			require.False(t, harness.Provider.isRunning(td.params.DealUUID))
 
 			// manually retry the deal
-			err = harness.Provider.RetryDeal(td.params.DealUUID)
+			err = harness.Provider.RetryPausedDeal(td.params.DealUUID)
 			require.NoError(t, err)
 
 			// expect the deal to complete successfully
-			dh = harness.Provider.getDealHandler(td.params.DealUUID)
+			dh := harness.Provider.getDealHandler(td.params.DealUUID)
 			require.NotNil(t, dh)
 			sub, err := dh.subscribeUpdates()
 			require.NoError(t, err)
 			td.sub = sub
-
 			td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
+
 			// assert funds and storage are no longer tagged
 			harness.EventuallyAssertNoTagged(t, ctx)
 		})
 	}
+}
+
+// Tests scenarios where a deal is paused with an error that the user must
+// resolve by retrying manually, and the user fails the deal
+func TestDealFailAfterManualRecoverableErrors(t *testing.T) {
+	ctx := context.Background()
+
+	// setup the provider test harness
+	harness := NewHarness(t)
+	// start the provider test harness
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	// Simulate publish deal failure
+	td := harness.newDealBuilder(t, 1).withPublishFailing(errors.New("puberr")).withNormalHttpServer().build()
+
+	// execute deal
+	err := td.executeAndSubscribe()
+	require.NoError(t, err)
+
+	// expect recoverable error with retry type Manual
+	err = td.waitForError("puberr", types.DealRetryManual)
+	require.NoError(t, err)
+
+	// wait for the deal execution thread to complete
+	require.Eventually(t, func() bool {
+		return !harness.Provider.isRunning(td.params.DealUUID)
+	}, time.Second, 10*time.Millisecond)
+
+	// manually fail the deal
+	err = harness.Provider.FailPausedDeal(td.params.DealUUID)
+	require.NoError(t, err)
+
+	// assert cleanup of deal and db state
+	td.assertEventuallyDealCleanedup(t, ctx)
+	td.assertDealFailedNonRecoverable(t, ctx, "user manually terminated the deal")
+
+	// assert storage and funds are untagged
+	harness.EventuallyAssertNoTagged(t, ctx)
 }
 
 func TestDealAskValidation(t *testing.T) {

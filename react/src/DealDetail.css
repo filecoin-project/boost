@@ -93,6 +93,10 @@
     float: right;
 }
 
+.deal-detail .buttons .button {
+    display: inline-block;
+}
+
 .deal-detail h3 {
     margin-top: 2em;
 }
