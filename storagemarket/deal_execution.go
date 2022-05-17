@@ -150,8 +150,8 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 	if !deal.IsOffline {
 		if deal.Checkpoint < dealcheckpoints.Transferred {
 			// Check that the deal's start epoch hasn't already elapsed
-			if err := p.checkDealProposalStartEpoch(deal); err != nil {
-				return err
+			if derr := p.checkDealProposalStartEpoch(deal); derr != nil {
+				return derr
 			}
 
 			if err := p.transferAndVerify(dh.transferCtx, pub, deal); err != nil {
@@ -204,8 +204,8 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, 
 		p.dealLogger.Infow(deal.DealUuid, "commp matched successfully for imported data for offline deal")
 
 		// update checkpoint
-		if err := p.updateCheckpoint(pub, deal, dealcheckpoints.Transferred); err != nil {
-			return err
+		if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.Transferred); derr != nil {
+			return derr
 		}
 	}
 
@@ -471,8 +471,8 @@ func GeneratePieceCommitment(filepath string, dealSize abi.PaddedPieceSize) (c c
 
 func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
 	// Check that the deal's start epoch hasn't already elapsed
-	if err := p.checkDealProposalStartEpoch(deal); err != nil {
-		return err
+	if derr := p.checkDealProposalStartEpoch(deal); derr != nil {
+		return derr
 	}
 
 	// Publish the deal on chain. At this point collateral and payment for the
@@ -484,8 +484,8 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 		mcid, err := p.dealPublisher.Publish(p.ctx, deal.ClientDealProposal)
 		if err != nil {
 			// Check if the deal start epoch has expired
-			if err := p.checkDealProposalStartEpoch(deal); err != nil {
-				return err
+			if derr := p.checkDealProposalStartEpoch(deal); derr != nil {
+				return derr
 			}
 
 			// If boost was shutdown while waiting for the deal to be
@@ -508,8 +508,8 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 		}
 
 		deal.PublishCID = &mcid
-		if err := p.updateCheckpoint(pub, deal, dealcheckpoints.Published); err != nil {
-			return err
+		if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.Published); derr != nil {
+			return derr
 		}
 		p.dealLogger.Infow(deal.DealUuid, "deal published successfully, will await deal publish confirmation")
 	} else {
@@ -547,8 +547,8 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 	// final CID.
 	deal.PublishCID = &res.FinalCid
 	deal.ChainDealID = res.DealID
-	if err := p.updateCheckpoint(pub, deal, dealcheckpoints.PublishConfirmed); err != nil {
-		return err
+	if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.PublishConfirmed); derr != nil {
+		return derr
 	}
 
 	return nil
@@ -557,8 +557,8 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 // addPiece hands off a published deal for sealing and commitment in a sector
 func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
 	// Check that the deal's start epoch hasn't already elapsed
-	if err := p.checkDealProposalStartEpoch(deal); err != nil {
-		return err
+	if derr := p.checkDealProposalStartEpoch(deal); derr != nil {
+		return derr
 	}
 
 	p.dealLogger.Infow(deal.DealUuid, "add piece called")
@@ -621,8 +621,8 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully handed to the sealing subsystem",
 		"sectorNum", deal.SectorID.String(), "offset", deal.Offset, "length", deal.Length)
 
-	if err := p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece); err != nil {
-		return err
+	if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece); derr != nil {
+		return derr
 	}
 
 	return nil
@@ -670,8 +670,8 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	}
 	p.dealLogger.Infow(deal.DealUuid, "announced deal to network indexer", "announcement-cid", annCid)
 
-	if err := p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced); err != nil {
-		return err
+	if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced); derr != nil {
+		return derr
 	}
 
 	return nil
