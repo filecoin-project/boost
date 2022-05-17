@@ -188,7 +188,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 		// transfer can no longer be cancelled
 		dh.setCancelTransferResponse(errors.New("transfer already complete"))
 		p.dealLogger.Infow(deal.DealUuid, "deal data-transfer can no longer be cancelled")
-	} else {
+	} else if deal.Checkpoint < dealcheckpoints.Transferred {
 		// verify CommP matches for an offline deal
 		if err := p.verifyCommP(deal); err != nil {
 			return &dealMakingError{
