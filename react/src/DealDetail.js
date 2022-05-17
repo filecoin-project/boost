@@ -106,7 +106,7 @@ export function DealDetail(props) {
         console.error("parsing transfer params: "+e.message)
     }
 
-    const showRetryFailButtons = deal.Retry === 'manual' && deal.Error != ''
+    const showRetryFailButtons = deal.Retry !== 'fatal' && deal.Err !== ''
     const showCancelButton = !showRetryFailButtons && deal.Checkpoint === 'Accepted' && !deal.IsOffline
 
     var logRowData = []

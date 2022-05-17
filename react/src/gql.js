@@ -158,6 +158,7 @@ const DealSubscription = gql`
             Checkpoint
             CheckpointAt
             Retry
+            Err
             Message
             Transferred
             Transfer {
@@ -217,6 +218,7 @@ const NewDealsSubscription = gql`
                 Checkpoint
                 CheckpointAt
                 Retry
+                Err
                 Message
                 Transfer {
                     Type

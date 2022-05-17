@@ -466,7 +466,7 @@ func (dr *dealResolver) Retry() string {
 
 func (dr *dealResolver) Message(ctx context.Context) string {
 	msg := dr.message(ctx, dr.ProviderDealState.Checkpoint)
-	if dr.ProviderDealState.Retry == types.DealRetryManual {
+	if dr.ProviderDealState.Retry != types.DealRetryFatal && dr.ProviderDealState.Err != "" {
 		msg = "Paused at '" + msg + "': " + dr.ProviderDealState.Err
 	}
 	return msg
