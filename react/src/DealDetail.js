@@ -2,7 +2,7 @@
 
 import React, {useEffect, useState} from "react";
 import {useMutation, useQuery, useSubscription} from "@apollo/react-hooks";
-import {DealCancelMutation, DealSubscription, EpochQuery} from "./gql";
+import {DealCancelMutation, DealFailPausedMutation, DealRetryPausedMutation, DealSubscription, EpochQuery} from "./gql";
 import {useNavigate} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";
@@ -56,6 +56,14 @@ export function DealDetail(props) {
         variables: {id: params.dealID}
     })
 
+    const [retryPausedDeal] = useMutation(DealRetryPausedMutation, {
+        variables: {id: params.dealID}
+    })
+
+    const [failPausedDeal] = useMutation(DealFailPausedMutation, {
+        variables: {id: params.dealID}
+    })
+
     const {loading, error, data} = useSubscription(DealSubscription, {
         variables: {id: params.dealID},
     })
@@ -97,6 +105,9 @@ export function DealDetail(props) {
     } catch (e) {
         console.error("parsing transfer params: "+e.message)
     }
+
+    const showRetryFailButtons = deal.Retry === 'manual' && deal.Error != ''
+    const showCancelButton = !showRetryFailButtons && deal.Checkpoint === 'Accepted' && !deal.IsOffline
 
     var logRowData = []
     var logs = (deal.Logs || []).sort((a, b) => a.CreatedAt.getTime() - b.CreatedAt.getTime())
@@ -289,31 +300,39 @@ export function DealDetail(props) {
                     <td>{deal.ChainDealID ? addCommas(deal.ChainDealID) : null}</td>
                 </tr>
                 <tr>
+                    <th>Checkpoint</th>
+                    <td>
+                        {deal.Checkpoint}
+                        {deal.CheckpointAt+'' !== (new Date(0))+'' ? (
+                            <span>
+                            &nbsp;
+                                <span className="aux">({moment(deal.CheckpointAt).fromNow()} ago)</span>
+                          </span>
+                        ) : null}
+                    </td>
+                </tr>
+                <tr>
                     <th>Status</th>
                     <td>
                         {deal.Message}
                         <DealStatusInfo />
                     </td>
                 </tr>
-                <tr>
-                    <th>Checkpoint</th>
-                    <td>
-                        {deal.Checkpoint}
-                        {deal.CheckpointAt+'' !== (new Date(0))+'' ? (
-                          <span>
-                            &nbsp;
-                            <span className="aux">({moment(deal.CheckpointAt).fromNow()} ago)</span>
-                          </span>
-                        ) : null}
-                    </td>
-                </tr>
 
                 </tbody>
             </table>
 
-            {deal.Checkpoint === 'Accepted' && !deal.IsOffline ? (
+            {showCancelButton || showRetryFailButtons ? (
                 <div className="buttons">
-                    <div className="button cancel" onClick={cancelDeal}>Cancel Transfer</div>
+                    {showCancelButton ? (
+                        <div className="button cancel" onClick={cancelDeal}>Cancel Transfer</div>
+                    ) : null}
+                    {showRetryFailButtons ? (
+                        <>
+                            <div className="button retry" onClick={retryPausedDeal}>Retry Deal</div>
+                            <div className="button fail" onClick={failPausedDeal}>Terminate Deal</div>
+                        </>
+                    ) : null}
                 </div>
             ) : null}
 

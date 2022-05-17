@@ -237,6 +237,28 @@ func (r *resolver) DealCancel(_ context.Context, args struct{ ID graphql.ID }) (
 	return args.ID, err
 }
 
+// mutation: dealRetryPaused(id): ID
+func (r *resolver) DealRetryPaused(_ context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
+	dealUuid, err := toUuid(args.ID)
+	if err != nil {
+		return args.ID, err
+	}
+
+	err = r.provider.RetryPausedDeal(dealUuid)
+	return args.ID, err
+}
+
+// mutation: dealFailPaused(id): ID
+func (r *resolver) DealFailPaused(_ context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
+	dealUuid, err := toUuid(args.ID)
+	if err != nil {
+		return args.ID, err
+	}
+
+	err = r.provider.FailPausedDeal(dealUuid)
+	return args.ID, err
+}
+
 func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
 	deal, err := r.dealsDB.ByID(ctx, dealUuid)
 	if err != nil {
@@ -438,8 +460,20 @@ func (dr *dealResolver) CheckpointAt() graphql.Time {
 	return graphql.Time{Time: dr.ProviderDealState.CheckpointAt}
 }
 
+func (dr *dealResolver) Retry() string {
+	return string(dr.ProviderDealState.Retry)
+}
+
 func (dr *dealResolver) Message(ctx context.Context) string {
-	switch dr.ProviderDealState.Checkpoint {
+	msg := dr.message(ctx, dr.ProviderDealState.Checkpoint)
+	if dr.ProviderDealState.Retry == types.DealRetryManual {
+		msg = "Paused at '" + msg + "': " + dr.ProviderDealState.Err
+	}
+	return msg
+}
+
+func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.Checkpoint) string {
+	switch checkpoint {
 	case dealcheckpoints.Accepted:
 		if dr.IsOffline {
 			return "Awaiting Offline Data Import"
@@ -472,7 +506,7 @@ func (dr *dealResolver) Message(ctx context.Context) string {
 		}
 		return "Error: " + dr.Err
 	}
-	return dr.ProviderDealState.Checkpoint.String()
+	return checkpoint.String()
 }
 
 func (dr *dealResolver) sealingState(ctx context.Context) string {

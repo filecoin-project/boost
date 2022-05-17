@@ -157,6 +157,7 @@ const DealSubscription = gql`
             IsOffline
             Checkpoint
             CheckpointAt
+            Retry
             Message
             Transferred
             Transfer {
@@ -185,6 +186,18 @@ const DealCancelMutation = gql`
     }
 `;
 
+const DealRetryPausedMutation = gql`
+    mutation AppDealRetryMutation($id: ID!) {
+        dealRetryPaused(id: $id)
+    }
+`;
+
+const DealFailPausedMutation = gql`
+    mutation AppDealRetryMutation($id: ID!) {
+        dealFailPaused(id: $id)
+    }
+`;
+
 const NewDealsSubscription = gql`
     subscription AppNewDealsSubscription {
         dealNew {
@@ -203,6 +216,7 @@ const NewDealsSubscription = gql`
                 PublishCid
                 Checkpoint
                 CheckpointAt
+                Retry
                 Message
                 Transfer {
                     Type
@@ -464,6 +478,8 @@ export {
     LegacyDealQuery,
     DealSubscription,
     DealCancelMutation,
+    DealRetryPausedMutation,
+    DealFailPausedMutation,
     NewDealsSubscription,
     StorageQuery,
     LegacyStorageQuery,

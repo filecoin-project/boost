@@ -6,20 +6,137 @@ import (
 	"fmt"
 	"sync"
 
-	"go.uber.org/atomic"
-
 	"github.com/filecoin-project/boost/storagemarket/types"
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/google/uuid"
 	"github.com/libp2p/go-eventbus"
 	"github.com/libp2p/go-libp2p-core/event"
-
-	"github.com/google/uuid"
+	"go.uber.org/atomic"
 )
+
+func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) (*dealHandler, error) {
+	p.dhsMu.Lock()
+	defer p.dhsMu.Unlock()
+	return p.unlkMkAndInsertDealHandler(dealUuid)
+}
+
+func (p *Provider) unlkMkAndInsertDealHandler(dealUuid uuid.UUID) (*dealHandler, error) {
+	dh, ok := p.dhs[dealUuid]
+	if ok {
+		return dh, nil
+	}
+
+	dh, err := newDealHandler(p.ctx, dealUuid)
+	if err != nil {
+		return nil, fmt.Errorf("creating deal handler: %w", err)
+	}
+
+	p.dhs[dealUuid] = dh
+	return dh, nil
+}
+
+func (p *Provider) getDealHandler(id uuid.UUID) *dealHandler {
+	p.dhsMu.RLock()
+	defer p.dhsMu.RUnlock()
+
+	return p.dhs[id]
+}
+
+func (p *Provider) delDealHandler(dealUuid uuid.UUID) {
+	p.dhsMu.Lock()
+	delete(p.dhs, dealUuid)
+	p.dhsMu.Unlock()
+}
+
+// startDealThread sets up a deal handler and wait group monitoring for a deal, then
+// executes the deal in a new go routine
+func (p *Provider) startDealThread(deal *types.ProviderDealState) (bool, error) {
+	p.dhsMu.Lock()
+	defer p.dhsMu.Unlock()
+
+	// Check if the deal is already running
+	_, alreadyRunning := p.dealThreads[deal.DealUuid]
+	if alreadyRunning {
+		return false, nil
+	}
+	p.dealThreads[deal.DealUuid] = struct{}{}
+
+	// Set up deal handler so that clients can subscribe to deal update events
+	dh, err := p.unlkMkAndInsertDealHandler(deal.DealUuid)
+	if err != nil {
+		return false, fmt.Errorf("creating deal handler: %w", err)
+	}
+
+	p.runWG.Add(1)
+	go func() {
+		defer p.runWG.Done()
+		defer func() {
+			p.dhsMu.Lock()
+			delete(p.dealThreads, deal.DealUuid)
+			p.dhsMu.Unlock()
+		}()
+
+		// Run deal
+		p.runDeal(deal, dh)
+		p.dealLogger.Infow(deal.DealUuid, "deal go-routine finished execution")
+	}()
+
+	return true, nil
+}
+
+func (p *Provider) failPausedDeal(deal *smtypes.ProviderDealState) error {
+	p.dhsMu.RLock()
+	defer p.dhsMu.RUnlock()
+
+	// Check if the deal is running
+	_, alreadyRunning := p.dealThreads[deal.DealUuid]
+	if alreadyRunning {
+		return fmt.Errorf("the deal %s is running; cannot fail running deal", deal.DealUuid)
+	}
+
+	dh, ok := p.dhs[deal.DealUuid]
+	if !ok {
+		// This should never happen, but check just in case
+		return fmt.Errorf("the deal %s does not have a deal handler; cannot fail deal", deal.DealUuid)
+	}
+
+	// Update state in DB with error
+	deal.Checkpoint = dealcheckpoints.Complete
+	deal.Retry = smtypes.DealRetryFatal
+	errMsg := "user manually terminated the deal"
+	err := errors.New(errMsg)
+	if deal.Err != "" {
+		err = errors.New(deal.Err)
+	}
+	deal.Err = errMsg
+	p.dealLogger.LogError(deal.DealUuid, errMsg, err)
+	p.saveDealToDB(dh.Publisher, deal)
+
+	// Call cleanupDeal in a go-routine because it sends a message to the provider
+	// run loop (and failPausedDeal is called from the same run loop so otherwise
+	// it will deadlock)
+	go p.cleanupDeal(deal)
+
+	return nil
+}
+
+// used by the tests
+func (p *Provider) isRunning(dealUuid uuid.UUID) bool {
+	p.dhsMu.RLock()
+	defer p.dhsMu.RUnlock()
+
+	// Check if the deal is running
+	_, ok := p.dealThreads[dealUuid]
+	return ok
+}
 
 // dealHandler keeps track of the deal while it's executing
 type dealHandler struct {
 	providerCtx context.Context
 	dealUuid    uuid.UUID
 	bus         event.Bus
+	Publisher   event.Emitter
 
 	// Transfer cancellation state
 	transferCtx             context.Context
@@ -36,22 +153,27 @@ type dealHandler struct {
 	activeSubs   map[*updatesSubscription]struct{}
 }
 
-func newDealHandler(ctx context.Context, dealUuid uuid.UUID) *dealHandler {
+func newDealHandler(ctx context.Context, dealUuid uuid.UUID) (*dealHandler, error) {
 	// Create a deal handler
 	bus := eventbus.NewBus()
+	pub, err := bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
+	if err != nil {
+		return nil, fmt.Errorf("creating event emitter for deal handler: %w", err)
+	}
 
 	transferCtx, cancel := context.WithCancel(ctx)
 	return &dealHandler{
 		providerCtx: ctx,
 		dealUuid:    dealUuid,
 		bus:         bus,
+		Publisher:   pub,
 
 		transferCtx:    transferCtx,
 		transferCancel: cancel,
 		transferDone:   make(chan error, 1),
 
 		activeSubs: make(map[*updatesSubscription]struct{}),
-	}
+	}, nil
 }
 
 // updatesSubscription wraps event.Subscription so that we can add an onClose

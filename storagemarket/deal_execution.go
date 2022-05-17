@@ -28,7 +28,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
-	"github.com/libp2p/go-eventbus"
 	"github.com/libp2p/go-libp2p-core/event"
 )
 
@@ -50,10 +49,14 @@ func (p *Provider) runDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	p.dealLogger.Infow(deal.DealUuid, "deal execution initiated", "deal state", dcpy)
 
 	// Clear any error from a previous run
-	deal.Err = ""
+	if deal.Err != "" || deal.Retry == smtypes.DealRetryAuto {
+		deal.Err = ""
+		deal.Retry = smtypes.DealRetryAuto
+		p.saveDealToDB(dh.Publisher, deal)
+	}
 
 	// Execute the deal
-	pub, err := p.execDeal(deal, dh)
+	err := p.execDeal(deal, dh)
 	if err == nil {
 		// Deal completed successfully
 		return
@@ -63,7 +66,7 @@ func (p *Provider) runDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	// downloaded data, untag funds etc)
 	if err.retry == types.DealRetryFatal {
 		cancelled := dh.TransferCancelledByUser()
-		p.failDeal(pub, deal, err, cancelled)
+		p.failDeal(dh.Publisher, deal, err, cancelled)
 		return
 	}
 
@@ -80,19 +83,10 @@ func (p *Provider) runDeal(deal *types.ProviderDealState, dh *dealHandler) {
 
 	deal.Retry = err.retry
 	deal.Err = err.Error()
-	p.saveDealToDB(pub, deal)
+	p.saveDealToDB(dh.Publisher, deal)
 }
 
-func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (event.Emitter, *dealMakingError) {
-	// Set up pubsub for deal updates
-	pub, err := dh.bus.Emitter(&types.ProviderDealState{}, eventbus.Stateful)
-	if err != nil {
-		return nil, &dealMakingError{
-			error: fmt.Errorf("failed to create event emitter: %w", err),
-			retry: smtypes.DealRetryFatal,
-		}
-	}
-
+func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) *dealMakingError {
 	// If the deal has not yet been handed off to the sealer
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
 		transferType := "downloaded file"
@@ -103,7 +97,7 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (e
 		// Read the bytes received from the downloaded / imported file
 		fi, err := os.Stat(deal.InboundFilePath)
 		if err != nil {
-			return pub, &dealMakingError{
+			return &dealMakingError{
 				error: fmt.Errorf("failed to get size of %s '%s': %w", transferType, deal.InboundFilePath, err),
 				retry: smtypes.DealRetryFatal,
 			}
@@ -119,8 +113,8 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (e
 	}
 
 	// Execute the deal synchronously
-	if derr := p.execDealUptoAddPiece(dh.providerCtx, pub, deal, dh); derr != nil {
-		return pub, derr
+	if derr := p.execDealUptoAddPiece(dh.providerCtx, deal, dh); derr != nil {
+		return derr
 	}
 
 	p.dealLogger.Infow(deal.DealUuid, "deal execution completed successfully")
@@ -130,15 +124,16 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (e
 	p.dealLogger.Infow(deal.DealUuid, "finished deal cleanup after successful execution")
 
 	// Watch the sealing status of the deal and fire events for each change
-	p.fireSealingUpdateEvents(dh, pub, deal.DealUuid, deal.SectorID)
+	p.fireSealingUpdateEvents(dh, deal.DealUuid, deal.SectorID)
 	p.cleanupDealHandler(deal.DealUuid)
 
 	// TODO
 	// Watch deal on chain and change state in DB and emit notifications.
-	return pub, nil
+	return nil
 }
 
-func (p *Provider) execDealUptoAddPiece(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState, dh *dealHandler) *dealMakingError {
+func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.ProviderDealState, dh *dealHandler) *dealMakingError {
+	pub := dh.Publisher
 	// publish "new deal" event
 	p.fireEventDealNew(deal)
 	// publish an event with the current state of the deal
@@ -679,7 +674,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 
 // fireSealingUpdateEvents periodically checks the sealing status of the deal
 // and fires events for each change
-func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, pub event.Emitter, dealUuid uuid.UUID, sectorNum abi.SectorNumber) {
+func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, sectorNum abi.SectorNumber) {
 	var lastSealingState lapi.SectorState
 	checkStatus := func(force bool) lapi.SectorState {
 		// To avoid overloading the sealing service, only get the sector status
@@ -700,7 +695,7 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, pub event.Emitter, d
 				return si.State
 			}
 
-			p.fireEventDealUpdate(pub, deal)
+			p.fireEventDealUpdate(dh.Publisher, deal)
 		}
 		return si.State
 	}
