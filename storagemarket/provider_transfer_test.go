@@ -23,8 +23,7 @@ func TestSingleDealResumptionDisconnect(t *testing.T) {
 	fileSize := testFileSize
 
 	// setup the provider test harness with a disconnecting server that disconnects after sending the given number of bytes
-	harness := NewHarness(t, ctx, withHttpDisconnectServerAfter(int64(fileSize/101)),
-		withHttpTransportOpts([]httptransport.Option{httptransport.BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000)}))
+	harness := NewHarness(t, withHttpDisconnectServerAfter(int64(fileSize/101)), withHttpTransportOpts([]httptransport.Option{httptransport.BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000)}))
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -50,7 +49,7 @@ func TestRetryShutdownRecoverable(t *testing.T) {
 	fileSize := testFileSize
 
 	// setup the provider test harness with a disconnecting server that disconnects after sending the given number of bytes
-	harness := NewHarness(t, ctx, withHttpDisconnectServerAfter(int64(fileSize/101)))
+	harness := NewHarness(t, withHttpDisconnectServerAfter(int64(fileSize/101)))
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -84,8 +83,7 @@ func TestMultipleDealsConcurrentResumptionDisconnect(t *testing.T) {
 	fileSize := testFileSize
 
 	// setup the provider test harness with a disconnecting server that disconnects after sending the given number of bytes
-	harness := NewHarness(t, ctx, withHttpDisconnectServerAfter(int64(fileSize/101)),
-		withHttpTransportOpts([]httptransport.Option{httptransport.BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000)}))
+	harness := NewHarness(t, withHttpDisconnectServerAfter(int64(fileSize/101)), withHttpTransportOpts([]httptransport.Option{httptransport.BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000)}))
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -106,7 +104,7 @@ func TestTransferCancelledByUser(t *testing.T) {
 	ctx := context.Background()
 
 	// setup the provider test harness
-	harness := NewHarness(t, ctx)
+	harness := NewHarness(t)
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -125,7 +123,7 @@ func TestTransferCancelledByUser(t *testing.T) {
 	// cancel transfer for the deal
 	require.NoError(t, harness.Provider.CancelDealDataTransfer(td.params.DealUUID))
 
-	require.NoError(t, td.waitForError(DealCancelled))
+	require.NoError(t, td.waitForError(DealCancelled, types.DealRetryFatal))
 
 	// assert cleanup of deal
 	td.assertEventuallyDealCleanedup(t, ctx)
@@ -142,7 +140,7 @@ func TestCancelTransferForTransferredDealFails(t *testing.T) {
 	ctx := context.Background()
 
 	// setup the provider test harness
-	harness := NewHarness(t, ctx)
+	harness := NewHarness(t)
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()

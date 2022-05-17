@@ -16,18 +16,19 @@ import (
 	"testing"
 	"time"
 
-	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
-
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	mock_sealingpipeline "github.com/filecoin-project/boost/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemanager"
+	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/smtestutil"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/boost/transport/httptransport"
-	types2 "github.com/filecoin-project/boost/transport/types"
+	"github.com/filecoin-project/boost/transport/mocks"
+	tspttypes "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
 	"github.com/filecoin-project/go-fil-markets/shared"
@@ -38,18 +39,18 @@ import (
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
-	ctypes "github.com/filecoin-project/lotus/chain/types"
+	test "github.com/filecoin-project/lotus/chain/events/state/mock"
 	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
+	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	logging "github.com/ipfs/go-log/v2"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -63,7 +64,7 @@ func TestSimpleDealHappy(t *testing.T) {
 	ctx := context.Background()
 
 	// setup the provider test harness
-	harness := NewHarness(t, ctx)
+	harness := NewHarness(t)
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -112,7 +113,7 @@ func TestMultipleDealsConcurrent(t *testing.T) {
 	ctx := context.Background()
 
 	// setup the provider test harness
-	harness := NewHarness(t, ctx)
+	harness := NewHarness(t)
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -136,7 +137,7 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 	ctx := context.Background()
 
 	// setup the provider test harness
-	harness := NewHarness(t, ctx)
+	harness := NewHarness(t)
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -228,7 +229,7 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 func TestDealsRejectedForFunds(t *testing.T) {
 	ctx := context.Background()
 	// setup the provider test harness with configured publish fee per deal and a total wallet balance.
-	harness := NewHarness(t, ctx, withMinPublishFees(abi.NewTokenAmount(100)), withPublishWalletBal(1000))
+	harness := NewHarness(t, withMinPublishFees(abi.NewTokenAmount(100)), withPublishWalletBal(1000))
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -278,7 +279,7 @@ func TestDealsRejectedForFunds(t *testing.T) {
 
 func TestDealRejectedForDuplicateProposal(t *testing.T) {
 	ctx := context.Background()
-	harness := NewHarness(t, ctx)
+	harness := NewHarness(t)
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -308,7 +309,7 @@ func TestDealRejectedForDuplicateProposal(t *testing.T) {
 
 func TestDealRejectedForDuplicateUuid(t *testing.T) {
 	ctx := context.Background()
-	harness := NewHarness(t, ctx)
+	harness := NewHarness(t)
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -344,7 +345,7 @@ func TestDealRejectedForInsufficientProviderFunds(t *testing.T) {
 	ctx := context.Background()
 	// setup the provider test harness with configured publish fee per deal
 	// that is more than the total wallet balance.
-	harness := NewHarness(t, ctx, withMinPublishFees(abi.NewTokenAmount(100)), withPublishWalletBal(50))
+	harness := NewHarness(t, withMinPublishFees(abi.NewTokenAmount(100)), withPublishWalletBal(50))
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -360,7 +361,7 @@ func TestDealRejectedForInsufficientProviderStorageSpace(t *testing.T) {
 	ctx := context.Background()
 	// setup the provider test harness with only 1 byte of storage
 	// space for incoming deals.
-	harness := NewHarness(t, ctx, withMaxStagingDealsBytes(1))
+	harness := NewHarness(t, withMaxStagingDealsBytes(1))
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -372,68 +373,284 @@ func TestDealRejectedForInsufficientProviderStorageSpace(t *testing.T) {
 	require.Contains(t, pi.Reason, "no space left")
 }
 
+// Tests scenarios where a deal fails with a fatal error
 func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
-	require.NoError(t, logging.SetLogLevel("*", "INFO"))
-
 	ctx := context.Background()
-	// setup the provider test harness with a disconnecting server that disconnects after sending the given number of bytes
-	harness := NewHarness(t, ctx, withHttpDisconnectServerAfter(1),
-		withHttpTransportOpts([]httptransport.Option{httptransport.BackOffRetryOpt(1*time.Millisecond, 1*time.Millisecond, 2, 1)}))
+
+	tcs := []struct {
+		name        string
+		expectedErr string
+		opts        []harnessOpt
+	}{{
+		name:        "non-recoverable error when transport.Execute returns an error",
+		expectedErr: "failed to start data transfer",
+		opts: []harnessOpt{
+			// Inject a Transport that immediately returns an error from Execute
+			withTransportBuilder(func(ctrl *gomock.Controller) transport.Transport {
+				tspt := mocks.NewMockTransport(ctrl)
+				tspt.EXPECT().Execute(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("somerr"))
+				return tspt
+			}),
+		},
+	}, {
+		name:        "non-recoverable error when commp fails",
+		expectedErr: "failed to verify CommP",
+		opts: []harnessOpt{
+			// Inject a Transport that returns success but doesn't download
+			// anything. Running commp over the (empty) file will produce a
+			// cid that does not match the deal proposal commp
+			withTransportBuilder(func(ctrl *gomock.Controller) transport.Transport {
+				th := mocks.NewMockHandler(ctrl)
+				evts := make(chan tspttypes.TransportEvent)
+				close(evts)
+				th.EXPECT().Sub().Return(evts)
+				th.EXPECT().Close()
+				tspt := mocks.NewMockTransport(ctrl)
+				tspt.EXPECT().Execute(gomock.Any(), gomock.Any(), gomock.Any()).Return(th, nil)
+				return tspt
+			}),
+		},
+	}}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup the provider test harness
+			harness := NewHarness(t, tc.opts...)
+			// start the provider test harness
+			harness.Start(t, ctx)
+			defer harness.Stop()
+
+			// build the deal proposal
+			td := harness.newDealBuilder(t, 1).build()
+
+			// execute deal
+			err := td.executeAndSubscribe()
+			require.NoError(t, err)
+
+			// assert cleanup of deal and db state
+			td.assertEventuallyDealCleanedup(t, ctx)
+			td.assertDealFailedNonRecoverable(t, ctx, tc.expectedErr)
+
+			// assert storage and funds are untagged
+			harness.EventuallyAssertNoTagged(t, ctx)
+
+			// shutdown the existing provider and create a new provider
+			harness.shutdownAndCreateNewProvider(t)
+
+			// update the test deal state with the new provider
+			td.updateWithRestartedProvider(harness)
+
+			// start the provider
+			err = harness.Provider.Start()
+			require.NoError(t, err)
+
+			// expect the deal not to have been restarted (because it failed
+			// with a fatal error)
+			dh := harness.Provider.getDealHandler(td.params.DealUUID)
+			require.Nil(t, dh)
+		})
+	}
+}
+
+// Tests scenarios where there is an error that is resolved when the provider
+// restarts
+func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
+	ctx := context.Background()
+
+	tcs := []struct {
+		name        string
+		dbuilder    func(h *ProviderHarness) *testDeal
+		expectedErr string
+		onResume    func(b *testDealBuilder) *testDeal
+	}{{
+		name: "publish confirm fails",
+		dbuilder: func(h *ProviderHarness) *testDeal {
+			// Simulate publish confirm failure
+			return h.newDealBuilder(t, 1).withPublishNonBlocking().withPublishConfirmFailing(errors.New("pubconferr")).withNormalHttpServer().build()
+		},
+		expectedErr: "pubconferr",
+		onResume: func(builder *testDealBuilder) *testDeal {
+			// Simulate publish confirm success (and then success for all other calls to miner)
+			return builder.withPublishConfirmNonBlocking().withAddPieceNonBlocking().build()
+		},
+	}, {
+		name: "add piece fails",
+		dbuilder: func(h *ProviderHarness) *testDeal {
+			// Simulate add piece failure
+			return h.newDealBuilder(t, 1).withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceFailing(errors.New("addpieceerr")).withNormalHttpServer().build()
+		},
+		expectedErr: "addpieceerr",
+		onResume: func(builder *testDealBuilder) *testDeal {
+			// Simulate add piece success
+			return builder.withAddPieceNonBlocking().build()
+		},
+	}}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup the provider test harness
+			harness := NewHarness(t)
+			// start the provider test harness
+			harness.Start(t, ctx)
+			defer harness.Stop()
+
+			// build the deal proposal
+			td := tc.dbuilder(harness)
+
+			// execute deal
+			err := td.executeAndSubscribe()
+			require.NoError(t, err)
+
+			// expect recoverable error
+			err = td.waitForError(tc.expectedErr, types.DealRetryAuto)
+			require.NoError(t, err)
+
+			// shutdown the existing provider and create a new provider
+			harness.shutdownAndCreateNewProvider(t)
+
+			// update the test deal state with the new provider
+			tbuilder := td.updateWithRestartedProvider(harness)
+			td = tc.onResume(tbuilder)
+
+			// start the provider -> this will restart the deal
+			err = harness.Provider.Start()
+			require.NoError(t, err)
+			dh := harness.Provider.getDealHandler(td.params.DealUUID)
+			require.NotNil(t, dh)
+			sub, err := dh.subscribeUpdates()
+			require.NoError(t, err)
+			td.sub = sub
+			td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
+
+			// assert funds and storage are no longer tagged
+			harness.EventuallyAssertNoTagged(t, ctx)
+		})
+	}
+}
+
+// Tests scenarios where a deal is paused with an error that the user must
+// resolve by retrying manually, and the user retries the deal
+func TestDealRestartAfterManualRecoverableErrors(t *testing.T) {
+	ctx := context.Background()
+
+	tcs := []struct {
+		name        string
+		dbuilder    func(h *ProviderHarness) *testDeal
+		expectedErr string
+		onResume    func(builder *testDealBuilder) *testDeal
+	}{{
+		name: "transfer fails",
+		dbuilder: func(h *ProviderHarness) *testDeal {
+			// Simulate data transfer failure
+			return h.newDealBuilder(t, 1).withFailingHttpServer().build()
+		},
+		expectedErr: "data-transfer failed",
+		onResume: func(builder *testDealBuilder) *testDeal {
+			td := builder.withAllMinerCallsNonBlocking().build()
+			td.setTransferWorking(true)
+			return td
+		},
+	}, {
+		name: "publish fails",
+		dbuilder: func(h *ProviderHarness) *testDeal {
+			// Simulate publish deal failure
+			return h.newDealBuilder(t, 1).withPublishFailing(errors.New("puberr")).withNormalHttpServer().build()
+		},
+		expectedErr: "puberr",
+		onResume: func(builder *testDealBuilder) *testDeal {
+			// Simulate add piece success
+			return builder.withAllMinerCallsNonBlocking().build()
+		},
+	}}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup the provider test harness
+			harness := NewHarness(t)
+			// start the provider test harness
+			harness.Start(t, ctx)
+			defer harness.Stop()
+
+			// build the deal proposal
+			td := tc.dbuilder(harness)
+
+			// execute deal
+			err := td.executeAndSubscribe()
+			require.NoError(t, err)
+
+			// expect recoverable error with retry type Manual
+			err = td.waitForError(tc.expectedErr, types.DealRetryManual)
+			require.NoError(t, err)
+
+			// shutdown the existing provider and create a new provider
+			harness.shutdownAndCreateNewProvider(t)
+
+			// update the test deal state with the new provider
+			tbuilder := td.updateWithRestartedProvider(harness)
+			td = tc.onResume(tbuilder)
+
+			// start the provider
+			err = harness.Provider.Start()
+			require.NoError(t, err)
+
+			// expect the deal not to have been automatically restarted
+			// (because it was paused with retry set to "manual")
+			require.False(t, harness.Provider.isRunning(td.params.DealUUID))
+
+			// manually retry the deal
+			err = harness.Provider.RetryPausedDeal(td.params.DealUUID)
+			require.NoError(t, err)
+
+			// expect the deal to complete successfully
+			dh := harness.Provider.getDealHandler(td.params.DealUUID)
+			require.NotNil(t, dh)
+			sub, err := dh.subscribeUpdates()
+			require.NoError(t, err)
+			td.sub = sub
+			td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
+
+			// assert funds and storage are no longer tagged
+			harness.EventuallyAssertNoTagged(t, ctx)
+		})
+	}
+}
+
+// Tests scenarios where a deal is paused with an error that the user must
+// resolve by retrying manually, and the user fails the deal
+func TestDealFailAfterManualRecoverableErrors(t *testing.T) {
+	ctx := context.Background()
+
+	// setup the provider test harness
+	harness := NewHarness(t)
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
 
-	// spin up four deals
-	// deal 1 -> fails transfer, deal 2 -> fails publish, deal 3 -> fails publish confirm, deal 4 -> fails add piece
-	publishErr := errors.New("publish failed")
-	publishConfirmErr := errors.New("publish confirm error")
-	addPieceErr := errors.New("add piece error")
-	deals := []struct {
-		dealBuilder func() *testDeal
-		errContains string
-	}{
-		{
-			dealBuilder: func() *testDeal {
-				return harness.newDealBuilder(t, 1).withFailingHttpServer().build()
-			},
-			errContains: "failed data transfer",
-		},
-		{
-			dealBuilder: func() *testDeal {
-				return harness.newDealBuilder(t, 1).withPublishFailing(publishErr).withNormalHttpServer().build()
-			},
-			errContains: publishErr.Error(),
-		},
-		{
-			dealBuilder: func() *testDeal {
-				return harness.newDealBuilder(t, 1).withPublishNonBlocking().withPublishConfirmFailing(publishConfirmErr).withNormalHttpServer().build()
-			},
-			errContains: publishConfirmErr.Error(),
-		},
-		{
-			dealBuilder: func() *testDeal {
-				return harness.newDealBuilder(t, 1).withPublishNonBlocking().
-					withPublishConfirmNonBlocking().withAddPieceFailing(addPieceErr).withNormalHttpServer().build()
-			},
-			errContains: addPieceErr.Error(),
-		},
-	}
+	// Simulate publish deal failure
+	td := harness.newDealBuilder(t, 1).withPublishFailing(errors.New("puberr")).withNormalHttpServer().build()
 
-	tds := harness.executeNDealsConcurrentAndWaitFor(t, len(deals), func(i int) *testDeal {
-		return deals[i].dealBuilder()
-	}, func(i int, td *testDeal) error {
-		return td.waitForError(deals[i].errContains)
-	})
+	// execute deal
+	err := td.executeAndSubscribe()
+	require.NoError(t, err)
+
+	// expect recoverable error with retry type Manual
+	err = td.waitForError("puberr", types.DealRetryManual)
+	require.NoError(t, err)
+
+	// wait for the deal execution thread to complete
+	require.Eventually(t, func() bool {
+		return !harness.Provider.isRunning(td.params.DealUUID)
+	}, time.Second, 10*time.Millisecond)
+
+	// manually fail the deal
+	err = harness.Provider.FailPausedDeal(td.params.DealUUID)
+	require.NoError(t, err)
 
 	// assert cleanup of deal and db state
-	for i := range tds {
-		td := tds[i]
-		derr := deals[i].errContains
-		td.assertEventuallyDealCleanedup(t, ctx)
-		td.assertDealFailedNonRecoverable(t, ctx, derr)
-	}
+	td.assertEventuallyDealCleanedup(t, ctx)
+	td.assertDealFailedNonRecoverable(t, ctx, "user manually terminated the deal")
 
-	// assert storage manager and funds
+	// assert storage and funds are untagged
 	harness.EventuallyAssertNoTagged(t, ctx)
 }
 
@@ -493,7 +710,7 @@ func TestDealAskValidation(t *testing.T) {
 	for name, tc := range tcs {
 		t.Run(name, func(t *testing.T) {
 			// setup the provider test harness
-			harness := NewHarness(t, ctx, withStoredAsk(tc.ask.Price, tc.ask.VerifiedPrice, tc.ask.MinPieceSize, tc.ask.MaxPieceSize))
+			harness := NewHarness(t, withStoredAsk(tc.ask.Price, tc.ask.VerifiedPrice, tc.ask.MinPieceSize, tc.ask.MaxPieceSize))
 			// start the provider test harness
 			harness.Start(t, ctx)
 			defer harness.Stop()
@@ -682,7 +899,7 @@ func TestDealVerification(t *testing.T) {
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
 
-				return h.newDealBuilder(t, 1, withEpochs(0, abi.ChainEpoch(market2.DealMaxDuration+1))).withNoOpMinerStub().build()
+				return h.newDealBuilder(t, 1, withEpochs(10, market2.DealMaxDuration+11)).withNoOpMinerStub().build()
 			},
 			expectedErr: "deal duration out of bounds",
 		},
@@ -692,7 +909,7 @@ func TestDealVerification(t *testing.T) {
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
 
-				return h.newDealBuilder(t, 1, withEpochs(1, 2)).withNoOpMinerStub().build()
+				return h.newDealBuilder(t, 1, withEpochs(10, 11)).withNoOpMinerStub().build()
 			},
 			expectedErr: "deal duration out of bounds",
 		},
@@ -701,7 +918,7 @@ func TestDealVerification(t *testing.T) {
 	for name, tc := range tcs {
 		t.Run(name, func(t *testing.T) {
 			// setup the provider test harness
-			harness := NewHarness(t, ctx, tc.opts...)
+			harness := NewHarness(t, tc.opts...)
 			// start the provider test harness
 			harness.Start(t, ctx)
 			defer harness.Stop()
@@ -892,20 +1109,24 @@ type ProviderHarness struct {
 	Provider *Provider
 
 	// http test servers
-	NormalServer        *httptest.Server
+	NormalServer        *testutil.HttpTestServer
 	BlockingServer      *testutil.BlockingHttpTestServer
 	DisconnectingServer *httptest.Server
-	FailingServer       *httptest.Server
+
+	Transport transport.Transport
 
 	SqlDB    *sql.DB
 	DAGStore *shared_testutil.MockDagStoreWrapper
 }
 
 type providerConfig struct {
+	mockCtrl *gomock.Controller
+
 	maxStagingDealBytes  uint64
 	minPublishFees       abi.TokenAmount
 	disconnectAfterEvery int64
 	httpOpts             []httptransport.Option
+	transport            transport.Transport
 
 	lockedFunds      big.Int
 	escrowFunds      big.Int
@@ -952,6 +1173,12 @@ func withMaxStagingDealsBytes(max uint64) harnessOpt {
 	}
 }
 
+func withTransportBuilder(bldr func(controller *gomock.Controller) transport.Transport) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.transport = bldr(pc.mockCtrl)
+	}
+}
+
 func withStoredAsk(price, verifiedPrice abi.TokenAmount, minPieceSize, maxPieceSize abi.PaddedPieceSize) harnessOpt {
 	return func(pc *providerConfig) {
 		pc.price = price
@@ -968,8 +1195,11 @@ func withStateMarketBalance(locked, escrow abi.TokenAmount) harnessOpt {
 	}
 }
 
-func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *ProviderHarness {
+func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
+	ctrl := gomock.NewController(t)
 	pc := &providerConfig{
+		mockCtrl: ctrl,
+
 		minPublishFees:       abi.NewTokenAmount(100),
 		maxStagingDealBytes:  10000000000,
 		disconnectAfterEvery: 1048600,
@@ -1002,7 +1232,6 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	dir := t.TempDir()
 
 	// setup mocks
-	ctrl := gomock.NewController(t)
 	fn := lotusmocks.NewMockFullNode(ctrl)
 	minerStub := smtestutil.NewMinerStub(ctrl)
 	sps := mock_sealingpipeline.NewMockAPI(ctrl)
@@ -1017,7 +1246,6 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	normalServer := testutil.HttpTestUnstartedFileServer(t, dir)
 	blockingServer := testutil.NewBlockingHttpTestServer(t, dir)
 	disconnServer := testutil.HttpTestDisconnectingServer(t, dir, pc.disconnectAfterEvery)
-	failingServer := testutil.HttpTestUnstartedFailingServer(t)
 
 	// create a provider libp2p peer
 	mn := mocknet.New()
@@ -1032,6 +1260,14 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	require.NoError(t, err)
 	dealsDB := db.NewDealsDB(sqldb)
 	fundsDB := db.NewFundsDB(sqldb)
+	logsDB := db.NewLogsDB(sqldb)
+	dl := logs.NewDealLogger(logsDB)
+
+	// Create http transport
+	tspt := pc.transport
+	if tspt == nil {
+		tspt = httptransport.New(h, dl, pc.httpOpts...)
+	}
 
 	// publish wallet
 	pw, err := address.NewIDAddress(uint64(rand.Intn(100)))
@@ -1047,7 +1283,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 		NormalServer:        normalServer,
 		BlockingServer:      blockingServer,
 		DisconnectingServer: disconnServer,
-		FailingServer:       failingServer,
+		Transport:           tspt,
 
 		MockSealingPipelineAPI: sps,
 		DealsDB:                dealsDB,
@@ -1090,12 +1326,15 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	askStore := &mockAskStore{}
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
-	prov, err := NewProvider(h, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, sps, minerStub, df, sqldb,
-		db.NewLogsDB(sqldb), dagStore, ps, &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, pc.httpOpts...)
+	prov, err := NewProvider(sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, sps, minerStub, df, sqldb,
+		logsDB, dagStore, ps, &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
 	require.NoError(t, err)
 	ph.Provider = prov
 
-	fn.EXPECT().ChainHead(gomock.Any()).Return(&ctypes.TipSet{}, nil).AnyTimes()
+	// Creates chain tipset with height 5
+	chainHead, err := test.MockTipset(minerAddr, 1)
+	require.NoError(t, err)
+	fn.EXPECT().ChainHead(gomock.Any()).Return(chainHead, nil).AnyTimes()
 	fn.EXPECT().StateDealProviderCollateralBounds(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(lapi.DealCollateralBounds{
 		Min: abi.NewTokenAmount(1),
 		Max: abi.NewTokenAmount(1),
@@ -1121,7 +1360,7 @@ func NewHarness(t *testing.T, ctx context.Context, opts ...harnessOpt) *Provider
 	return ph
 }
 
-func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, ctx context.Context, opts ...harnessOpt) {
+func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...harnessOpt) {
 	pc := &providerConfig{
 		minPublishFees:       abi.NewTokenAmount(100),
 		maxStagingDealBytes:  10000000000,
@@ -1142,9 +1381,10 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, ctx context
 	}
 
 	// construct a new provider with pre-existing state
-	prov, err := NewProvider(h.Host, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
+	prov, err := NewProvider(h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
-		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.dagst, h.Provider.ps, &NoOpIndexProvider{}, h.Provider.askGetter, h.Provider.sigVerifier, pc.httpOpts...)
+		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.dagst, h.Provider.ps, &NoOpIndexProvider{}, h.Provider.askGetter,
+		h.Provider.sigVerifier, h.Provider.dealLogger, h.Provider.Transport)
 
 	require.NoError(t, err)
 	h.Provider = prov
@@ -1162,14 +1402,12 @@ func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
 	h.NormalServer.Start()
 	h.BlockingServer.Start()
 	h.DisconnectingServer.Start()
-	h.FailingServer.Start()
 	err := h.Provider.Start()
 	require.NoError(t, err)
 }
 
 func (h *ProviderHarness) Stop() {
 	_ = h.SqlDB.Close()
-	h.FailingServer.Close()
 	h.NormalServer.Close()
 	h.BlockingServer.Close()
 	h.DisconnectingServer.Close()
@@ -1267,8 +1505,8 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 		minerAddr:          tbuilder.ph.MinerAddr,
 		pieceCid:           cid.Undef,
 		undefinedPieceCid:  false,
-		startEpoch:         abi.ChainEpoch(rand.Intn(100000)),
-		endEpoch:           800000 + abi.ChainEpoch(rand.Intn(10000)),
+		startEpoch:         50000,
+		endEpoch:           800000,
 	}
 	for _, opt := range opts {
 		opt(dc)
@@ -1429,7 +1667,8 @@ func (tbuilder *testDealBuilder) withAllMinerCallsBlocking() *testDealBuilder {
 }
 
 func (tbuilder *testDealBuilder) withFailingHttpServer() *testDealBuilder {
-	tbuilder.setTransferParams(tbuilder.td.ph.FailingServer.URL)
+	tbuilder.setTransferParams(tbuilder.ph.NormalServer.URL)
+	tbuilder.ph.NormalServer.SetWorking(false)
 	return tbuilder
 }
 
@@ -1455,7 +1694,7 @@ func (tbuilder *testDealBuilder) withNormalHttpServer() *testDealBuilder {
 }
 
 func (tbuilder *testDealBuilder) setTransferParams(serverURL string) {
-	transferParams := &types2.HttpRequest{URL: serverURL + "/" + filepath.Base(tbuilder.td.carv2FilePath)}
+	transferParams := &tspttypes.HttpRequest{URL: serverURL + "/" + filepath.Base(tbuilder.td.carv2FilePath)}
 	transferParamsJSON, err := json.Marshal(transferParams)
 	if err != nil {
 		panic(err)
@@ -1543,7 +1782,7 @@ func (td *testDeal) executeAndSubscribeImportOfflineDeal() error {
 }
 
 func (td *testDeal) executeAndSubscribe() error {
-	pi, err := td.ph.Provider.ExecuteDeal(td.params, peer.ID(""))
+	pi, err := td.ph.Provider.ExecuteDeal(td.params, "")
 	if err != nil {
 		return err
 	}
@@ -1560,7 +1799,7 @@ func (td *testDeal) executeAndSubscribe() error {
 	return nil
 }
 
-func (td *testDeal) waitForError(errContains string) error {
+func (td *testDeal) waitForError(errContains string, retryType types.DealRetryType) error {
 	if td.sub == nil {
 		return errors.New("no subcription for deal")
 	}
@@ -1570,6 +1809,9 @@ func (td *testDeal) waitForError(errContains string) error {
 		if len(st.Err) != 0 {
 			if !strings.Contains(st.Err, errContains) {
 				return fmt.Errorf("actual error does not contain expected error, expected: %s, actual:%s", errContains, st.Err)
+			}
+			if st.Retry != retryType {
+				return fmt.Errorf("retry type does not match expected type, expected: %s, actual:%s", retryType, st.Retry)
 			}
 
 			return nil
@@ -1658,6 +1900,10 @@ func (td *testDeal) unblockTransfer() {
 	td.ph.BlockingServer.UnblockFile(td.carv2FileName)
 }
 
+func (td *testDeal) setTransferWorking(working bool) {
+	td.ph.NormalServer.SetWorking(working)
+}
+
 func (td *testDeal) unblockPublish() {
 	td.ph.MinerStub.UnblockPublish(td.params.DealUUID)
 }
@@ -1693,6 +1939,7 @@ func (td *testDeal) assertDealFailedNonRecoverable(t *testing.T, ctx context.Con
 	require.NotEmpty(t, dbState.Err)
 	require.Contains(t, dbState.Err, errContains)
 	require.EqualValues(t, dealcheckpoints.Complete, dbState.Checkpoint)
+	require.EqualValues(t, types.DealRetryFatal, dbState.Retry)
 }
 
 type NoOpIndexProvider struct{}
