@@ -7,8 +7,6 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
-	smtypes "github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-eventbus"
 	"github.com/libp2p/go-libp2p-core/event"
@@ -49,87 +47,17 @@ func (p *Provider) delDealHandler(dealUuid uuid.UUID) {
 	p.dhsMu.Unlock()
 }
 
-// startDealThread sets up a deal handler and wait group monitoring for a deal, then
-// executes the deal in a new go routine
-func (p *Provider) startDealThread(deal *types.ProviderDealState) (bool, error) {
-	p.dhsMu.Lock()
-	defer p.dhsMu.Unlock()
-
-	// Check if the deal is already running
-	_, alreadyRunning := p.dealThreads[deal.DealUuid]
-	if alreadyRunning {
-		return false, nil
-	}
-	p.dealThreads[deal.DealUuid] = struct{}{}
-
-	// Set up deal handler so that clients can subscribe to deal update events
-	dh, err := p.unlkMkAndInsertDealHandler(deal.DealUuid)
-	if err != nil {
-		return false, fmt.Errorf("creating deal handler: %w", err)
-	}
-
-	p.runWG.Add(1)
-	go func() {
-		defer p.runWG.Done()
-		defer func() {
-			p.dhsMu.Lock()
-			delete(p.dealThreads, deal.DealUuid)
-			p.dhsMu.Unlock()
-		}()
-
-		// Run deal
-		p.runDeal(deal, dh)
-		p.dealLogger.Infow(deal.DealUuid, "deal go-routine finished execution")
-	}()
-
-	return true, nil
-}
-
-func (p *Provider) failPausedDeal(deal *smtypes.ProviderDealState) error {
-	p.dhsMu.RLock()
-	defer p.dhsMu.RUnlock()
-
-	// Check if the deal is running
-	_, alreadyRunning := p.dealThreads[deal.DealUuid]
-	if alreadyRunning {
-		return fmt.Errorf("the deal %s is running; cannot fail running deal", deal.DealUuid)
-	}
-
-	dh, ok := p.dhs[deal.DealUuid]
-	if !ok {
-		// This should never happen, but check just in case
-		return fmt.Errorf("the deal %s does not have a deal handler; cannot fail deal", deal.DealUuid)
-	}
-
-	// Update state in DB with error
-	deal.Checkpoint = dealcheckpoints.Complete
-	deal.Retry = smtypes.DealRetryFatal
-	var err error
-	if deal.Err == "" {
-		err = errors.New("user manually terminated the deal")
-	} else {
-		err = errors.New(deal.Err)
-	}
-	deal.Err = "user manually terminated the deal"
-	p.dealLogger.LogError(deal.DealUuid, deal.Err, err)
-	p.saveDealToDB(dh.Publisher, deal)
-
-	// Call cleanupDeal in a go-routine because it sends a message to the provider
-	// run loop (and failPausedDeal is called from the same run loop so otherwise
-	// it will deadlock)
-	go p.cleanupDeal(deal)
-
-	return nil
-}
-
 // used by the tests
 func (p *Provider) isRunning(dealUuid uuid.UUID) bool {
 	p.dhsMu.RLock()
 	defer p.dhsMu.RUnlock()
 
 	// Check if the deal is running
-	_, ok := p.dealThreads[dealUuid]
-	return ok
+	dh, ok := p.dhs[dealUuid]
+	if !ok {
+		return false
+	}
+	return dh.isRunning()
 }
 
 // dealHandler keeps track of the deal while it's executing
@@ -152,6 +80,9 @@ type dealHandler struct {
 
 	activeSubsLk sync.RWMutex
 	activeSubs   map[*updatesSubscription]struct{}
+
+	runningLk sync.RWMutex
+	running   bool
 }
 
 func newDealHandler(ctx context.Context, dealUuid uuid.UUID) (*dealHandler, error) {
@@ -263,4 +194,21 @@ func (dh *dealHandler) setCancelTransferResponse(err error) {
 func (dh *dealHandler) close() {
 	dh.transferCancel()
 	dh.setCancelTransferResponse(errors.New("deal handler closed"))
+}
+
+func (d *dealHandler) setRunning(running bool) bool {
+	d.runningLk.Lock()
+	defer d.runningLk.Unlock()
+
+	if d.running == running {
+		return false
+	}
+	d.running = running
+	return true
+}
+
+func (d *dealHandler) isRunning() bool {
+	d.runningLk.RLock()
+	defer d.runningLk.RUnlock()
+	return d.running
 }
