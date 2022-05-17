@@ -9,6 +9,8 @@ import (
 	"github.com/filecoin-project/boost/transport/types"
 )
 
+//go:generate go run github.com/golang/mock/mockgen -destination=mocks/mock_transport.go -package=mocks . Transport,Handler
+
 type Transport interface {
 	Execute(ctx context.Context, transportInfo []byte, dealInfo *types.TransportDealInfo) (th Handler, err error)
 }

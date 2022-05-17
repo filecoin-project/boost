@@ -31,6 +31,12 @@ func NewChainDealManager(a v1api.FullNode, cfg ChainDealManagerCfg) *ChainDealMa
 	return &ChainDealManager{fullnodeApi: a, cfg: cfg}
 }
 
+type CurrentDealInfo struct {
+	DealID           abi.DealID
+	MarketDeal       *api.MarketDeal
+	PublishMsgTipSet ctypes.TipSetKey
+}
+
 func (c *ChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
 	// Wait for deal to be published (plus additional time for confidence)
 	receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, c.cfg.PublishDealsConfidence, api.LookbackNoLimit, true)

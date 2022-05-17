@@ -22,13 +22,11 @@ import (
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
-	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-fil-markets/stores"
-	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
@@ -37,7 +35,6 @@ import (
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
@@ -65,15 +62,16 @@ type Provider struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	closeSync sync.Once
-	wg        sync.WaitGroup
+	runWG     sync.WaitGroup
 
 	newDealPS *newDealPS
 
-	// event loop
-	acceptDealChan    chan acceptDealReq
-	finishedDealChan  chan finishedDealReq
-	publishedDealChan chan publishDealReq
-	storageSpaceChan  chan storageSpaceDealReq
+	// channels used to pass messages to run loop
+	acceptDealChan       chan acceptDealReq
+	finishedDealChan     chan finishedDealReq
+	publishedDealChan    chan publishDealReq
+	updateRetryStateChan chan updateRetryStateReq
+	storageSpaceChan     chan storageSpaceDealReq
 
 	// Sealing Pipeline API
 	sps sealingpipeline.API
@@ -100,7 +98,7 @@ type Provider struct {
 	fullnodeApi v1api.FullNode
 
 	dhsMu sync.RWMutex
-	dhs   map[uuid.UUID]*dealHandler
+	dhs   map[uuid.UUID]*dealHandler // Map of deal handlers indexed by deal uuid.
 
 	dealLogger *logs.DealLogger
 
@@ -112,17 +110,16 @@ type Provider struct {
 	sigVerifier types.SignatureVerifier
 }
 
-func NewProvider(h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
+func NewProvider(sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, askGetter types.AskGetter,
-	sigVerifier types.SignatureVerifier, httpOpts ...httptransport.Option) (*Provider, error) {
+	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
 
 	newDealPS, err := newDealPubsub()
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	dl := logs.NewDealLogger(logsDB)
 
 	return &Provider{
 		ctx:    ctx,
@@ -137,12 +134,13 @@ func NewProvider(h host.Host, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundm
 		sps:       sps,
 		df:        df,
 
-		acceptDealChan:    make(chan acceptDealReq),
-		finishedDealChan:  make(chan finishedDealReq),
-		publishedDealChan: make(chan publishDealReq),
-		storageSpaceChan:  make(chan storageSpaceDealReq),
+		acceptDealChan:       make(chan acceptDealReq),
+		finishedDealChan:     make(chan finishedDealReq),
+		publishedDealChan:    make(chan publishDealReq),
+		updateRetryStateChan: make(chan updateRetryStateReq),
+		storageSpaceChan:     make(chan storageSpaceDealReq),
 
-		Transport:      httptransport.New(h, dl, httpOpts...),
+		Transport:      tspt,
 		fundManager:    fundMgr,
 		storageManager: storageMgr,
 
@@ -184,67 +182,50 @@ func (p *Provider) GetAsk() *storagemarket.SignedStorageAsk {
 
 // ImportOfflineDealData is called when the Storage Provider imports data for
 // an offline deal (the deal must already have been proposed by the client)
-func (p *Provider) ImportOfflineDealData(dealUuid uuid.UUID, filePath string) (pi *api.ProviderDealRejectionInfo, handler *dealHandler, err error) {
+func (p *Provider) ImportOfflineDealData(dealUuid uuid.UUID, filePath string) (pi *api.ProviderDealRejectionInfo, err error) {
 	p.dealLogger.Infow(dealUuid, "import data for offline deal", "filepath", filePath)
 
 	// db should already have a deal with this uuid as the deal proposal should have been agreed before hand
 	ds, err := p.dealsDB.ByID(p.ctx, dealUuid)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil, fmt.Errorf("no pre-existing deal proposal for offline deal %s: %w", dealUuid, err)
+			return nil, fmt.Errorf("no pre-existing deal proposal for offline deal %s: %w", dealUuid, err)
 		}
-		return nil, nil, fmt.Errorf("getting offline deal %s: %w", dealUuid, err)
+		return nil, fmt.Errorf("getting offline deal %s: %w", dealUuid, err)
 	}
 	if !ds.IsOffline {
-		return nil, nil, fmt.Errorf("deal %s is not an offline deal", dealUuid)
+		return nil, fmt.Errorf("deal %s is not an offline deal", dealUuid)
 	}
 	if ds.Checkpoint > dealcheckpoints.Accepted {
-		return nil, nil, fmt.Errorf("deal %s has already been imported and reached checkpoint %s", dealUuid, ds.Checkpoint)
+		return nil, fmt.Errorf("deal %s has already been imported and reached checkpoint %s", dealUuid, ds.Checkpoint)
 	}
 
 	ds.InboundFilePath = filePath
 
-	// get the deal handler for the deal
-	dh := p.getDealHandler(dealUuid)
-	if dh == nil {
-		// deal handlers are created for each active deal on startup, so if
-		// there is no deal handler then the deal is not active
-		return nil, nil, fmt.Errorf("deal %s is no longer active (deal is at checkpoint %s)", dealUuid, ds.Checkpoint)
-	}
-
-	// setup clean-up code
-	cleanup := func() {
-		dh.close()
-		p.delDealHandler(dealUuid)
-	}
-
-	resp, err := p.checkForDealAcceptance(ds, dh, true)
+	resp, err := p.checkForDealAcceptance(ds, true)
 	if err != nil {
-		cleanup()
 		p.dealLogger.LogError(dealUuid, "failed to send deal for acceptance", err)
-		return nil, nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
+		return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
 	}
 
-	// if there was an error, we return no rejection reason as well.
+	// if there was an error, we don't return a rejection reason
 	if resp.err != nil {
-		cleanup()
-		return nil, nil, fmt.Errorf("failed to accept deal: %w", resp.err)
+		return nil, fmt.Errorf("failed to accept deal: %w", resp.err)
 	}
 
 	// return rejection reason as provider has rejected the deal.
 	if !resp.ri.Accepted {
-		cleanup()
 		p.dealLogger.Infow(dealUuid, "deal execution rejected by provider", "reason", resp.ri.Reason)
-		return resp.ri, nil, nil
+		return resp.ri, nil
 	}
 
 	p.dealLogger.Infow(dealUuid, "offline deal data imported and deal scheduled for execution")
-	return resp.ri, dh, nil
+	return resp.ri, nil
 }
 
 // ExecuteDeal is called when the Storage Provider receives a deal proposal
 // from the network
-func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (*api.ProviderDealRejectionInfo, *dealHandler, error) {
+func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (*api.ProviderDealRejectionInfo, error) {
 	p.dealLogger.Infow(dp.DealUUID, "executing deal proposal received from network", "peer", clientPeer)
 
 	ds := types.ProviderDealState{
@@ -254,6 +235,7 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (*api.P
 		DealDataRoot:       dp.DealDataRoot,
 		Transfer:           dp.Transfer,
 		IsOffline:          dp.IsOffline,
+		Retry:              smtypes.DealRetryAuto,
 	}
 	// validate the deal proposal
 	if err := p.validateDealProposal(ds); err != nil {
@@ -265,19 +247,17 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (*api.P
 
 		return &api.ProviderDealRejectionInfo{
 			Reason: fmt.Sprintf("failed validation: %s", reason),
-		}, nil, nil
+		}, nil
 	}
 
 	return p.executeDeal(ds)
 }
 
-// executeOnlineDeal sets up a download location for the deal, then sends the
-// deal to the main provider loop for execution
-func (p *Provider) executeDeal(ds smtypes.ProviderDealState) (*api.ProviderDealRejectionInfo, *dealHandler, error) {
-	dh := p.mkAndInsertDealHandler(ds.DealUuid)
+// executeDeal sends the deal to the main provider run loop for execution
+func (p *Provider) executeDeal(ds smtypes.ProviderDealState) (*api.ProviderDealRejectionInfo, error) {
 	ri, err := func() (*api.ProviderDealRejectionInfo, error) {
 		// send the deal to the main provider loop for execution
-		resp, err := p.checkForDealAcceptance(&ds, dh, false)
+		resp, err := p.checkForDealAcceptance(&ds, false)
 		if err != nil {
 			p.dealLogger.LogError(ds.DealUuid, "failed to send deal for acceptance", err)
 			return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
@@ -296,11 +276,8 @@ func (p *Provider) executeDeal(ds smtypes.ProviderDealState) (*api.ProviderDealR
 		return resp.ri, nil
 	}()
 	if err != nil || ri == nil || !ri.Accepted {
-		// if there was an error processing the deal, or the deal was rejected,
-		// clean up the deal handler
-		dh.close()
-		p.delDealHandler(ds.DealUuid)
-		return ri, nil, err
+		// if there was an error processing the deal, or the deal was rejected, return
+		return ri, err
 	}
 
 	if ds.IsOffline {
@@ -309,15 +286,15 @@ func (p *Provider) executeDeal(ds smtypes.ProviderDealState) (*api.ProviderDealR
 		p.dealLogger.Infow(ds.DealUuid, "deal accepted and scheduled for execution")
 	}
 
-	return ri, dh, nil
+	return ri, nil
 }
 
-func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealHandler, isImport bool) (acceptDealResp, error) {
-	// send message to event loop to run the deal through the acceptance filter and reserve the required resources
+func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, isImport bool) (acceptDealResp, error) {
+	// send message to run loop to run the deal through the acceptance filter and reserve the required resources
 	// then wait for a response and return the response to the client.
 	respChan := make(chan acceptDealResp, 1)
 	select {
-	case p.acceptDealChan <- acceptDealReq{rsp: respChan, deal: ds, dh: dh, isImport: isImport}:
+	case p.acceptDealChan <- acceptDealReq{rsp: respChan, deal: ds, isImport: isImport}:
 	case <-p.ctx.Done():
 		return acceptDealResp{}, p.ctx.Err()
 	}
@@ -332,50 +309,49 @@ func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, dh *dealH
 	return resp, nil
 }
 
-func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) *dealHandler {
-	dh := newDealHandler(p.ctx, dealUuid)
-
-	p.dhsMu.Lock()
-	defer p.dhsMu.Unlock()
-	p.dhs[dealUuid] = dh
-	return dh
-}
-
-func (p *Provider) Start() ([]*dealHandler, error) {
+func (p *Provider) Start() error {
 	log.Infow("storage provider: starting")
 
 	// initialize the database
+	log.Infow("db: creating tables")
 	err := db.CreateAllBoostTables(p.ctx, p.db, p.logsSqlDB)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init db: %w", err)
+		return fmt.Errorf("failed to init db: %w", err)
 	}
 
+	log.Infow("db: performing migrations")
 	err = db.Migrate(p.db)
 	if err != nil {
-		return nil, fmt.Errorf("failed to migrate db: %w", err)
+		return fmt.Errorf("failed to migrate db: %w", err)
 	}
 
-	log.Infow("db initialized")
+	log.Infow("db: initialized")
 
 	// cleanup all completed deals in case Boost resumed before they were cleanedup
 	finished, err := p.dealsDB.ListCompleted(p.ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list completed deals: %w", err)
+		return fmt.Errorf("failed to list completed deals: %w", err)
+	}
+	if len(finished) > 0 {
+		log.Infof("cleaning up %d completed deals", len(finished))
 	}
 	for i := range finished {
 		p.cleanupDealOnRestart(finished[i])
 	}
-	log.Info("finished cleaning up completed deals")
+	if len(finished) > 0 {
+		log.Infof("finished cleaning up %d completed deals", len(finished))
+	}
 
 	// restart all active deals
-	pds, err := p.dealsDB.ListActive(p.ctx)
+	activeDeals, err := p.dealsDB.ListActive(p.ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list active deals: %w", err)
+		return fmt.Errorf("failed to list active deals: %w", err)
 	}
 
 	// cleanup all deals that have finished successfully
-	for i := range pds {
-		deal := pds[i]
+	for _, deal := range activeDeals {
+		// Make sure that deals that have reached the index and announce stage
+		// have their resources untagged
 		// TODO Update this once we start listening for expired/slashed deals etc
 		if deal.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
 			// cleanup if cleanup didn't finish before we restarted
@@ -383,44 +359,55 @@ func (p *Provider) Start() ([]*dealHandler, error) {
 		}
 	}
 
-	// resume all in-progress deals
-	var dhs []*dealHandler
-	for _, d := range pds {
-		d := d
-		dh := p.mkAndInsertDealHandler(d.DealUuid)
-		p.wg.Add(1)
-		dhs = append(dhs, dh)
-
-		go func() {
-			defer p.wg.Done()
-
-			// If it's an offline deal, and the deal data hasn't yet been
-			// imported, just wait for the SP operator to import the data
-			if d.IsOffline && d.InboundFilePath == "" {
-				p.dealLogger.Infow(d.DealUuid, "restarted deal: waiting for offline deal data import")
-				return
+	// Restart active deals
+	for _, deal := range activeDeals {
+		// Check if deal is already proving
+		if deal.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
+			si, err := p.sps.SectorsStatus(p.ctx, deal.SectorID, false)
+			if err != nil || isFinalSealingState(si.State) {
+				continue
 			}
+		}
 
-			// Check if deal is already proving
-			if d.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
-				si, err := p.sps.SectorsStatus(p.ctx, d.SectorID, false)
-				if err != nil || isFinalSealingState(si.State) {
-					return
-				}
-			}
+		// Set up a deal handler so that clients can subscribe to update
+		// events about the deal
+		dh, err := p.mkAndInsertDealHandler(deal.DealUuid)
+		if err != nil {
+			p.dealLogger.LogError(deal.DealUuid, "failed to restart deal", err)
+			continue
+		}
 
-			p.dealLogger.Infow(d.DealUuid, "resuming deal on boost restart", "checkpoint on resumption", d.Checkpoint.String())
-			p.doDeal(d, dh)
-			log.Infow("finished running deal", "id", d.DealUuid)
-		}()
+		// If it's an offline deal, and the deal data hasn't yet been
+		// imported, just wait for the SP operator to import the data
+		if deal.IsOffline && deal.InboundFilePath == "" {
+			p.dealLogger.Infow(deal.DealUuid, "restarted deal: waiting for offline deal data import")
+			continue
+		}
+
+		// Check if the deal can be restarted automatically.
+		// Note that if the retry type is "fatal" then the deal should already
+		// have been marked as complete (and therefore not returned by ListActive).
+		if deal.Retry != smtypes.DealRetryAuto {
+			p.dealLogger.Infow(deal.DealUuid, "deal must be manually restarted: waiting for manual restart")
+			continue
+		}
+
+		// Restart deal
+		p.dealLogger.Infow(deal.DealUuid, "resuming deal on boost restart", "checkpoint", deal.Checkpoint.String())
+		_, err = p.startDealThread(dh, deal)
+		if err != nil {
+			p.dealLogger.LogError(deal.DealUuid, "failed to restart deal", err)
+		}
 	}
 
-	p.wg.Add(1)
-	go p.loop()
+	// Start provider run loop
+	go p.run()
+
+	// Start sampling transfer data rate
 	go p.transfers.start(p.ctx)
 
 	log.Infow("storage provider: started")
-	return dhs, nil
+	return nil
 }
 
 func (p *Provider) cleanupDealOnRestart(deal *types.ProviderDealState) {
@@ -438,14 +425,13 @@ func (p *Provider) cleanupDealOnRestart(deal *types.ProviderDealState) {
 	// untag funds
 	collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
 	if errf == nil {
-		p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal as deal finished", "untagged publish", pub, "untagged collateral", collat,
-			"err", errf)
+		p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal as deal has finished", "untagged publish", pub, "untagged collateral", collat)
 	}
 }
 
 func (p *Provider) Stop() {
 	p.closeSync.Do(func() {
-		log.Infow("storage provider: stopping")
+		log.Infow("storage provider: shutdown")
 
 		deals, err := p.dealsDB.ListActive(p.ctx)
 		if err == nil {
@@ -457,10 +443,10 @@ func (p *Provider) Stop() {
 			}
 		}
 
+		log.Infow("storage provider: stop run loop")
 		p.cancel()
-		log.Infow("stopping provider event loop")
-		p.wg.Wait()
-		log.Info("provider shutdown complete")
+		p.runWG.Wait()
+		log.Info("storage provider: shutdown complete")
 	})
 }
 
@@ -477,6 +463,33 @@ func (p *Provider) SubscribeDealUpdates(dealUuid uuid.UUID) (event.Subscription,
 	}
 
 	return dh.subscribeUpdates()
+}
+
+// RetryPausedDeal starts execution of a deal from the point at which it stopped
+func (p *Provider) RetryPausedDeal(dealUuid uuid.UUID) error {
+	return p.updateRetryState(dealUuid, true)
+}
+
+// FailPausedDeal moves a deal from the paused state to the failed state
+func (p *Provider) FailPausedDeal(dealUuid uuid.UUID) error {
+	return p.updateRetryState(dealUuid, false)
+}
+
+// updateRetryState either retries the deal or terminates the deal
+// (depending on the value of retry)
+func (p *Provider) updateRetryState(dealUuid uuid.UUID, retry bool) error {
+	resp := make(chan error, 1)
+	select {
+	case p.updateRetryStateChan <- updateRetryStateReq{dealUuid: dealUuid, retry: retry, done: resp}:
+	case <-p.ctx.Done():
+		return p.ctx.Err()
+	}
+	select {
+	case err := <-resp:
+		return err
+	case <-p.ctx.Done():
+		return p.ctx.Err()
+	}
 }
 
 func (p *Provider) CancelDealDataTransfer(dealUuid uuid.UUID) error {
@@ -501,19 +514,6 @@ func (p *Provider) CancelDealDataTransfer(dealUuid uuid.UUID) error {
 		p.dealLogger.Warnw(dealUuid, "error when user tried to cancel deal data transfer", "err", err)
 	}
 	return err
-}
-
-func (p *Provider) getDealHandler(id uuid.UUID) *dealHandler {
-	p.dhsMu.RLock()
-	defer p.dhsMu.RUnlock()
-
-	return p.dhs[id]
-}
-
-func (p *Provider) delDealHandler(dealUuid uuid.UUID) {
-	p.dhsMu.Lock()
-	delete(p.dhs, dealUuid)
-	p.dhsMu.Unlock()
 }
 
 func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDealState, pieceData io.Reader) (*storagemarket.PackingResult, error) {
@@ -581,10 +581,4 @@ func (p *Provider) GetBalance(ctx context.Context, addr address.Address, encoded
 	}
 
 	return utils.ToSharedBalance(bal), nil
-}
-
-type CurrentDealInfo struct {
-	DealID           abi.DealID
-	MarketDeal       *lapi.MarketDeal
-	PublishMsgTipSet ctypes.TipSetKey
 }

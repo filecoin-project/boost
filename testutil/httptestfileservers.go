@@ -23,18 +23,34 @@ func HttpTestFileServer(t *testing.T, dir string) (*httptest.Server, error) {
 	return svr, nil
 }
 
-func HttpTestUnstartedFailingServer(t *testing.T) *httptest.Server {
-	svr := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(401)
-	}))
-	return svr
+type HttpTestServer struct {
+	*httptest.Server
+	lk      sync.Mutex
+	working bool
+}
+
+func (s *HttpTestServer) SetWorking(working bool) {
+	s.lk.Lock()
+	defer s.lk.Unlock()
+	s.working = working
 }
 
 // HttpTestUnstartedFileServer returns a http server that serves files from the given directory
-func HttpTestUnstartedFileServer(t *testing.T, dir string) *httptest.Server {
+func HttpTestUnstartedFileServer(t *testing.T, dir string) *HttpTestServer {
+	var tsrv *HttpTestServer
 	handler := http.FileServer(http.Dir(dir))
-	svr := httptest.NewUnstartedServer(handler)
-	return svr
+	svr := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tsrv.lk.Lock()
+		working := tsrv.working
+		tsrv.lk.Unlock()
+		if !working {
+			w.WriteHeader(401)
+		} else {
+			handler.ServeHTTP(w, r)
+		}
+	}))
+	tsrv = &HttpTestServer{Server: svr, working: true}
+	return tsrv
 }
 
 type unblockInfo struct {

@@ -62,6 +62,7 @@ type Deal {
   Checkpoint: String!
   CheckpointAt: Time!
   Err: String!
+  Retry: String!
   Transferred: Uint64!
   Sector: Sector!
   Message: String!
@@ -327,6 +328,12 @@ type RootQuery {
 type RootMutation {
   """Cancel a Deal"""
   dealCancel(id: ID!): ID!
+
+  """Retry a Deal that was paused because of an error"""
+  dealRetryPaused(id: ID!): ID!
+
+  """Fail a Deal that was paused because of an error"""
+  dealFailPaused(id: ID!): ID!
 
   """Publish all pending deals now"""
   dealPublishNow: Boolean!

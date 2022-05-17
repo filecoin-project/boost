@@ -15,7 +15,7 @@ func TestSimpleOfflineDealHappy(t *testing.T) {
 	ctx := context.Background()
 
 	// setup the provider test harness
-	harness := NewHarness(t, ctx)
+	harness := NewHarness(t)
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -25,7 +25,7 @@ func TestSimpleOfflineDealHappy(t *testing.T) {
 	td := harness.newDealBuilder(t, 1, withOfflineDeal()).withAllMinerCallsBlocking().build()
 
 	// create a deal proposal for the offline deal
-	pi, _, err := harness.Provider.ExecuteDeal(td.params, peer.ID(""))
+	pi, err := harness.Provider.ExecuteDeal(td.params, peer.ID(""))
 	require.NoError(t, err)
 	require.True(t, pi.Accepted)
 
@@ -61,7 +61,7 @@ func TestOfflineDealInsufficientProviderFunds(t *testing.T) {
 
 	// setup the provider test harness with configured publish fee per deal
 	// that is more than the total wallet balance.
-	harness := NewHarness(t, ctx, withMinPublishFees(abi.NewTokenAmount(100)), withPublishWalletBal(50))
+	harness := NewHarness(t, withMinPublishFees(abi.NewTokenAmount(100)), withPublishWalletBal(50))
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
@@ -71,13 +71,13 @@ func TestOfflineDealInsufficientProviderFunds(t *testing.T) {
 	td := harness.newDealBuilder(t, 1, withOfflineDeal()).withNoOpMinerStub().build()
 
 	// create a deal proposal for the offline deal
-	pi, _, err := harness.Provider.ExecuteDeal(td.params, peer.ID(""))
+	pi, err := harness.Provider.ExecuteDeal(td.params, peer.ID(""))
 	require.NoError(t, err)
 	require.True(t, pi.Accepted)
 
 	// expect that when the deal data is imported, the import will fail because
 	// there are not enough funds for the deal
-	pi, _, err = td.ph.Provider.ImportOfflineDealData(td.params.DealUUID, td.carv2FilePath)
+	pi, err = td.ph.Provider.ImportOfflineDealData(td.params.DealUUID, td.carv2FilePath)
 	require.NoError(t, err)
 	require.False(t, pi.Accepted)
 	require.Contains(t, pi.Reason, "insufficient funds")

@@ -75,7 +75,7 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 	for name, tc := range tcs {
 		t.Run(name, func(t *testing.T) {
 			// setup the provider test harness
-			harness := NewHarness(t, ctx)
+			harness := NewHarness(t)
 			// start the provider test harness
 			harness.Start(t, ctx)
 			defer harness.Stop()
@@ -88,17 +88,17 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 			tc.waitForAndAssertBeforeResumeF(t, harness, td)
 
 			// shutdown the existing provider and create a new provider
-			harness.shutdownAndCreateNewProvider(t, ctx)
+			harness.shutdownAndCreateNewProvider(t)
 
-			// update the test deal stat with the new provider
+			// update the test deal state with the new provider
 			tbuilder := td.updateWithRestartedProvider(harness)
 			td = tc.stubAfterResumeF(tbuilder)
 
 			// start the provider -> this will restart the deal
-			dhs, err := harness.Provider.Start()
+			err := harness.Provider.Start()
 			require.NoError(t, err)
-			require.Len(t, dhs, 1)
-			dh := dhs[0]
+			dh := harness.Provider.getDealHandler(td.params.DealUUID)
+			require.NotNil(t, dh)
 			sub, err := dh.subscribeUpdates()
 			require.NoError(t, err)
 			td.sub = sub

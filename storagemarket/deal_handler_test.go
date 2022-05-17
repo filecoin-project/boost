@@ -21,7 +21,7 @@ func TestCancellationSimple(t *testing.T) {
 	}
 
 	require.False(t, dh.TransferCancelledByUser())
-	dh.transferCancelled(nil)
+	dh.setCancelTransferResponse(nil)
 	require.NoError(t, dh.cancelTransfer())
 	require.True(t, dh.TransferCancelledByUser())
 }
@@ -44,7 +44,7 @@ func TestCancellationByCancel(t *testing.T) {
 		go func() {
 
 			<-transferCtx.Done()
-			dh.transferCancelled(smErr)
+			dh.setCancelTransferResponse(smErr)
 
 		}()
 	}
