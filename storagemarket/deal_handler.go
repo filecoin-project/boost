@@ -16,10 +16,7 @@ import (
 func (p *Provider) mkAndInsertDealHandler(dealUuid uuid.UUID) (*dealHandler, error) {
 	p.dhsMu.Lock()
 	defer p.dhsMu.Unlock()
-	return p.unlkMkAndInsertDealHandler(dealUuid)
-}
 
-func (p *Provider) unlkMkAndInsertDealHandler(dealUuid uuid.UUID) (*dealHandler, error) {
 	dh, ok := p.dhs[dealUuid]
 	if ok {
 		return dh, nil
