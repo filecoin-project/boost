@@ -104,13 +104,14 @@ func (p *Provider) failPausedDeal(deal *smtypes.ProviderDealState) error {
 	// Update state in DB with error
 	deal.Checkpoint = dealcheckpoints.Complete
 	deal.Retry = smtypes.DealRetryFatal
-	errMsg := "user manually terminated the deal"
-	err := errors.New(errMsg)
-	if deal.Err != "" {
+	var err error
+	if deal.Err == "" {
+		err = errors.New("user manually terminated the deal")
+	} else {
 		err = errors.New(deal.Err)
 	}
-	deal.Err = errMsg
-	p.dealLogger.LogError(deal.DealUuid, errMsg, err)
+	deal.Err = "user manually terminated the deal"
+	p.dealLogger.LogError(deal.DealUuid, deal.Err, err)
 	p.saveDealToDB(dh.Publisher, deal)
 
 	// Call cleanupDeal in a go-routine because it sends a message to the provider
