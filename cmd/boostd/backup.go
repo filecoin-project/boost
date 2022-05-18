@@ -1,9 +1,7 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"io/fs"
 	"io/ioutil"
 	"os"
 	"path"
@@ -14,26 +12,27 @@ import (
 	"gopkg.in/cheggaaa/pb.v1"
 
 	"github.com/filecoin-project/boost/node"
-	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/lib/backupds"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	dstore "github.com/ipfs/go-datastore"
 )
 
-var fm = map[string]fs.FileMode{"api": 0644, "boost.db": 0644, "boost.logs.db": 0644, "config.toml": 0664, "storage.json": 0644, "token": 0600}
+const metadaFileName = "metadata"
+
+var fm = []string{"api",
+	"boost.db",
+	"boost.logs.db",
+	"config.toml",
+	"storage.json",
+	"token"}
 
 var backupCmd = &cli.Command{
-	Name:  "backup",
-	Usage: "Perorms offline backup of the Boost subsystem",
-	Flags: []cli.Flag{
-		&cli.PathFlag{
-			Name:     "path",
-			Usage:    "Specify a directory to create backup. Must be inside home directory.",
-			Required: false,
-		},
-	},
+	Name:   "backup",
+	Usage:  "Performs offline backup of Boost",
 	Before: before,
 	Action: func(cctx *cli.Context) error {
+		if cctx.Args().Len() > 1 {
+			return fmt.Errorf("backup only takes one argument (custom location inside home directory)")
+		}
 
 		boostRepoPath := cctx.String(FlagBoostRepo)
 
@@ -51,11 +50,11 @@ var backupCmd = &cli.Command{
 
 		lr, err := r.LockRO(node.Boost)
 		if err != nil {
-			return fmt.Errorf("locking repo: %w", err)
+			return fmt.Errorf("locking repo: %w. Please stop the boostd process to take backup", err)
 		}
 		defer lr.Close()
 
-		mds, err := lr.Datastore(context.TODO(), "/metadata")
+		mds, err := lr.Datastore(cctx.Context, metadataNamespace)
 		if err != nil {
 			return fmt.Errorf("getting metadata datastore: %w", err)
 		}
@@ -65,28 +64,39 @@ var backupCmd = &cli.Command{
 			return err
 		}
 
-		bpath, err := homedir.Expand(cctx.Path("path"))
+		bpath, err := homedir.Expand(cctx.Args().First())
 		if err != nil {
 			return fmt.Errorf("expanding backup directory path: %w", err)
 		}
 
-		bkp_dir := path.Join(bpath, "boost_backup_"+time.Now().Format("20060102150405"))
+		fmt.Println("Creating backup directory")
 
-		if err := os.Mkdir(bkp_dir, 0755); err != nil {
-			return fmt.Errorf("Error creating backup directory %s: %w", bkp_dir, err)
+		bkpDir := path.Join(bpath, "boost_backup_"+time.Now().Format("20060102150405"))
+
+		if err := os.Mkdir(bkpDir, 0755); err != nil {
+			return fmt.Errorf("Error creating backup directory %s: %w", bkpDir, err)
 		}
 
-		fpath_name := path.Join(bkp_dir, "metadata")
+		fpathName := path.Join(bkpDir, metadaFileName)
 
-		fpath, err := homedir.Expand(fpath_name)
+		fpath, err := homedir.Expand(fpathName)
 		if err != nil {
 			return fmt.Errorf("expanding metadata file path: %w", err)
 		}
+
+		fmt.Println("creating metadata backup")
 
 		out, err := os.OpenFile(fpath, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return fmt.Errorf("opening backup file %s: %w", fpath, err)
 		}
+
+		defer func(*os.File) error {
+			if err := out.Close(); err != nil {
+				return fmt.Errorf("closing backup file: %w", err)
+			}
+			return nil
+		}(out)
 
 		if err := bds.Backup(cctx.Context, out); err != nil {
 			if cerr := out.Close(); cerr != nil {
@@ -95,47 +105,44 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("backup error: %w", err)
 		}
 
-		if err := out.Close(); err != nil {
-			return fmt.Errorf("closing backup file: %w", err)
+		fmt.Println("Copying the files to backup directory")
+
+		for _, name := range fm {
+			srcName := path.Join(lr.Path(), name)
+
+			srcPath, err := homedir.Expand(srcName)
+			if err != nil {
+				return fmt.Errorf("expanding source file path %s: %w", srcName, err)
+			}
+
+			destName := path.Join(bkpDir, name)
+
+			destPath, err := homedir.Expand(destName)
+			if err != nil {
+				return fmt.Errorf("expanding destination file path %s: %w", destName, err)
+			}
+
+			if err := copy_files(srcPath, destPath); err != nil {
+				return fmt.Errorf("Error copying file %s: %w", srcName, err)
+			}
+
 		}
 
-		for name, perm := range fm {
-			src_name := path.Join(lr.Path(), name)
-
-			src_path, err := homedir.Expand(src_name)
-			if err != nil {
-				return fmt.Errorf("expanding source file path %s: %w", src_name, err)
-			}
-
-			dest_name := path.Join(bkp_dir, name)
-
-			dest_path, err := homedir.Expand(dest_name)
-			if err != nil {
-				return fmt.Errorf("expanding destination file path %s: %w", dest_name, err)
-			}
-
-			if err := copy_files(src_path, dest_path, perm); err != nil {
-				return fmt.Errorf("Error copying file %s: %w", src_name, err)
-			}
-
-		}
+		fmt.Println("Boost repo successfully backed up at " + bkpDir)
+		fmt.Println("You can now start boost with 'boostd -vv run'")
 
 		return nil
 	},
 }
 
 var restoreCmd = &cli.Command{
-	Name:  "restore",
-	Usage: "Restores a boost repository from backup",
-	Flags: []cli.Flag{
-		&cli.PathFlag{
-			Name:     "restore-path",
-			Usage:    "Specify the path to backup directory",
-			Required: true,
-		},
-	},
+	Name:   "restore",
+	Usage:  "Restores a boost repository from backup",
 	Before: before,
 	Action: func(cctx *cli.Context) error {
+		if cctx.Args().Len() != 1 {
+			return fmt.Errorf("restore only takes one argument (backup directory path)")
+		}
 
 		repoPath := cctx.String(FlagBoostRepo)
 		fmt.Printf("Checking if repo exists at %s\n", repoPath)
@@ -164,19 +171,19 @@ var restoreCmd = &cli.Command{
 		}
 		defer lr.Close()
 
-		mds, err := lr.Datastore(context.Background(), metadataNamespace)
+		mds, err := lr.Datastore(cctx.Context, metadataNamespace)
 		if err != nil {
 			return err
 		}
 
-		bpath, err := homedir.Expand(cctx.Path("restore-path"))
+		bpath, err := homedir.Expand(cctx.Args().First())
 		if err != nil {
 			return fmt.Errorf("expanding backup directory path: %w", err)
 		}
 
-		fpath_name := path.Join(bpath, "metadata")
+		fpathName := path.Join(bpath, metadaFileName)
 
-		fpath, err := homedir.Expand(fpath_name)
+		fpath, err := homedir.Expand(fpathName)
 		if err != nil {
 			return fmt.Errorf("expanding metadata file path: %w", err)
 		}
@@ -190,7 +197,7 @@ var restoreCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("opening backup file: %w", err)
 		}
-		defer f.Close() // nolint:errcheck
+		defer f.Close()
 
 		fmt.Println("Restoring metadata backup")
 
@@ -209,16 +216,6 @@ var restoreCmd = &cli.Command{
 			return fmt.Errorf("restoring metadata: %w", err)
 		}
 
-		fmt.Println("Resetting chainstore metadata")
-
-		chainHead := dstore.NewKey("head")
-		if err := mds.Delete(cctx.Context, chainHead); err != nil {
-			return fmt.Errorf("clearing chain head: %w", err)
-		}
-		if err := store.FlushValidationCache(cctx.Context, mds); err != nil {
-			return fmt.Errorf("clearing chain validation cache: %w", err)
-		}
-
 		fmt.Println("Restoring files")
 
 		rpath, err := homedir.Expand(lr.Path())
@@ -226,23 +223,23 @@ var restoreCmd = &cli.Command{
 			return fmt.Errorf("expanding boost repo path: %w", err)
 		}
 
-		for name, perm := range fm {
-			src_name := path.Join(bpath, name)
+		for _, name := range fm {
+			srcName := path.Join(bpath, name)
 
-			src_path, err := homedir.Expand(src_name)
+			srcPath, err := homedir.Expand(srcName)
 			if err != nil {
-				return fmt.Errorf("expanding source file path %s: %w", src_name, err)
+				return fmt.Errorf("expanding source file path %s: %w", srcName, err)
 			}
 
-			dest_name := path.Join(rpath, name)
+			destName := path.Join(rpath, name)
 
-			dest_path, err := homedir.Expand(dest_name)
+			destPath, err := homedir.Expand(destName)
 			if err != nil {
-				return fmt.Errorf("expanding destination file path %s: %w", dest_name, err)
+				return fmt.Errorf("expanding destination file path %s: %w", destName, err)
 			}
 
-			if err := copy_files(src_path, dest_path, perm); err != nil {
-				return fmt.Errorf("Error copying file %s: %w", src_name, err)
+			if err := copy_files(srcPath, destPath); err != nil {
+				return fmt.Errorf("Error copying file %s: %w", srcName, err)
 			}
 
 		}
@@ -254,21 +251,27 @@ var restoreCmd = &cli.Command{
 	},
 }
 
-func copy_files(src, dest string, perm fs.FileMode) error {
-	_, err := os.Stat(src)
+func copy_files(src, dest string) error {
+	f, err := os.Stat(src)
 
-	if !os.IsNotExist(err) {
-		input, err := ioutil.ReadFile(src)
-		if err != nil {
-			return err
-		}
-
-		err = ioutil.WriteFile(dest, input, perm)
-		if err != nil {
-			return err
-		}
-	} else {
+	if os.IsNotExist(err) {
 		fmt.Printf("Not copying %s as file does not exists\n", src)
+		return nil
 	}
+
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	input, err := ioutil.ReadFile(src)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(dest, input, f.Mode())
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
