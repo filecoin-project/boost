@@ -36,7 +36,7 @@ type finishedDealReq struct {
 
 type publishDealReq struct {
 	deal *types.ProviderDealState
-	done chan struct{}
+	done chan error
 }
 
 type storageSpaceDealReq struct {
@@ -442,13 +442,12 @@ func (p *Provider) run() {
 
 		case publishedDeal := <-p.publishedDealChan:
 			deal := publishedDeal.deal
-			collat, pub, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
-			if errf != nil {
-				p.dealLogger.LogError(deal.DealUuid, "failed to untag funds", errf)
+			_, _, errf := p.fundManager.UntagFunds(p.ctx, deal.DealUuid)
+			if errf != nil && !errors.Is(errf, db.ErrNotFound) {
+				publishedDeal.done <- errf
 			} else {
-				p.dealLogger.Infow(deal.DealUuid, "untagged funds for deal after publish", "untagged publish", pub, "untagged collateral", collat)
+				publishedDeal.done <- nil
 			}
-			publishedDeal.done <- struct{}{}
 
 		case retryDealReq := <-p.updateRetryStateChan:
 			err := func() error {

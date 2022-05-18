@@ -280,19 +280,18 @@ func (p *Provider) untagStorageSpaceAfterSealing(ctx context.Context, deal *type
 }
 
 func (p *Provider) untagFundsAfterPublish(ctx context.Context, deal *types.ProviderDealState) error {
-	presp := make(chan struct{}, 1)
+	presp := make(chan error, 1)
 	select {
 	case p.publishedDealChan <- publishDealReq{deal: deal, done: presp}:
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 	select {
-	case <-presp:
+	case err := <-presp:
+		return err
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-
-	return nil
 }
 
 func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
