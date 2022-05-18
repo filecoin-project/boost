@@ -466,6 +466,8 @@ github.com/filecoin-project/index-provider v0.7.0 h1:Y7ms/paXuheVWadXLv0Phl4PmXE
 github.com/filecoin-project/index-provider v0.7.0/go.mod h1:80z6gimZmntp9Z3OAiv7SkjjfgXAB2IiHM/B2eRU3nY=
 github.com/filecoin-project/lotus v1.15.2 h1:M5/MIvmodUpZTkBjSb/C2GR0SaKDS4q1s8uXsDtqzdg=
 github.com/filecoin-project/lotus v1.15.2/go.mod h1:ofqUV+bsesKyD7cK7ue6ngxutkDCOqkpOl2GkU84cco=
+github.com/filecoin-project/lotus v1.15.3-0.20220518102910-5f31ddd96a42 h1:ujyQrY8biJIYXN17Vi8IXm7BpT/ip8TruIPexMyyZOY=
+github.com/filecoin-project/lotus v1.15.3-0.20220518102910-5f31ddd96a42/go.mod h1:ksTif38AzsM/7wJFBLExcAW3VwkKz4uBlPsp0F5isYE=
 github.com/filecoin-project/specs-actors v0.9.13/go.mod h1:TS1AW/7LbG+615j4NsjMK1qlpAwaFsG9w0V2tg2gSao=
 github.com/filecoin-project/specs-actors v0.9.14 h1:68PVstg2UB3ZsMLF+DKFTAs/YKsqhKWynkr0IqmVRQY=
 github.com/filecoin-project/specs-actors v0.9.14/go.mod h1:TS1AW/7LbG+615j4NsjMK1qlpAwaFsG9w0V2tg2gSao=
@@ -1854,6 +1856,8 @@ github.com/nikkolasg/hexjson v0.0.0-20181101101858-78e39397e00c h1:5bFTChQxSKNwy
 github.com/nikkolasg/hexjson v0.0.0-20181101101858-78e39397e00c/go.mod h1:7qN3Y0BvzRUf4LofcoJplQL10lsFDb4PYlePTVwrP28=
 github.com/nkovacs/streamquote v1.0.0 h1:PmVIV08Zlx2lZK5fFZlMZ04eHcDTIFJCv/5/0twVUow=
 github.com/nkovacs/streamquote v1.0.0/go.mod h1:BN+NaZ2CmdKqUuTUXUEm9j95B2TRbpOWpxbJYzzgUsc=
+github.com/nonsense/go-ds-rpcclient v0.0.0-20220517111155-cc06cd650a0a h1:7zfhleo1ID9xCKrNtbk0qiccbQKikTt1Gr1YOVImzqM=
+github.com/nonsense/go-ds-rpcclient v0.0.0-20220517111155-cc06cd650a0a/go.mod h1:cURQMhf8t2lwI2ioQhdiW+lRAoW2kE64w61wP9D2w6o=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/nxadm/tail v1.4.8/go.mod h1:+ncqLTQzXmGhMZNUePPaPqPvBxHAIsmXswZKocGu+AU=

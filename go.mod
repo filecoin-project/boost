@@ -4,9 +4,9 @@ go 1.16
 
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
-replace github.com/filecoin-project/lotus => ../lotus
+//replace github.com/filecoin-project/lotus => ../lotus
 
-replace github.com/nonsense/go-ds-rpcclient => ../../ipfs/go-ds-rpcclient
+//replace github.com/nonsense/go-ds-rpcclient => ../../ipfs/go-ds-rpcclient
 
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
@@ -36,7 +36,7 @@ require (
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/index-provider v0.7.0
 	// lotus boost/main branch
-	github.com/filecoin-project/lotus v1.15.2
+	github.com/filecoin-project/lotus v1.15.3-0.20220518102910-5f31ddd96a42
 	github.com/filecoin-project/specs-actors v0.9.14
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
 	github.com/filecoin-project/specs-actors/v5 v5.0.4
@@ -88,6 +88,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.5.0
 	github.com/multiformats/go-multibase v0.0.3
 	github.com/multiformats/go-multihash v0.1.0
+	github.com/nonsense/go-ds-rpcclient v0.0.0-20220517111155-cc06cd650a0a // indirect
 	github.com/open-rpc/meta-schema v0.0.0-20201029221707-1b72ef2ea333
 	github.com/pressly/goose/v3 v3.5.3
 	github.com/prometheus/client_golang v1.12.1
