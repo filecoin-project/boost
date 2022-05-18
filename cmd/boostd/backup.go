@@ -11,7 +11,6 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
 	"gopkg.in/cheggaaa/pb.v1"
 
 	"github.com/filecoin-project/boost/node"
@@ -52,13 +51,13 @@ var backupCmd = &cli.Command{
 
 		lr, err := r.LockRO(node.Boost)
 		if err != nil {
-			return xerrors.Errorf("locking repo: %w", err)
+			return fmt.Errorf("locking repo: %w", err)
 		}
 		defer lr.Close()
 
 		mds, err := lr.Datastore(context.TODO(), "/metadata")
 		if err != nil {
-			return xerrors.Errorf("getting metadata datastore: %w", err)
+			return fmt.Errorf("getting metadata datastore: %w", err)
 		}
 
 		bds, err := backupds.Wrap(mds, backupds.NoLogdir)
@@ -68,36 +67,36 @@ var backupCmd = &cli.Command{
 
 		bpath, err := homedir.Expand(cctx.Path("path"))
 		if err != nil {
-			return xerrors.Errorf("expanding backup directory path: %w", err)
+			return fmt.Errorf("expanding backup directory path: %w", err)
 		}
 
 		bkp_dir := path.Join(bpath, "boost_backup_"+time.Now().Format("20060102150405"))
 
 		if err := os.Mkdir(bkp_dir, 0755); err != nil {
-			return xerrors.Errorf("Error creating backup directory %s: %w", bkp_dir, err)
+			return fmt.Errorf("Error creating backup directory %s: %w", bkp_dir, err)
 		}
 
 		fpath_name := path.Join(bkp_dir, "metadata")
 
 		fpath, err := homedir.Expand(fpath_name)
 		if err != nil {
-			return xerrors.Errorf("expanding metadata file path: %w", err)
+			return fmt.Errorf("expanding metadata file path: %w", err)
 		}
 
 		out, err := os.OpenFile(fpath, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return xerrors.Errorf("opening backup file %s: %w", fpath, err)
+			return fmt.Errorf("opening backup file %s: %w", fpath, err)
 		}
 
 		if err := bds.Backup(cctx.Context, out); err != nil {
 			if cerr := out.Close(); cerr != nil {
 				log.Errorw("error closing backup file while handling backup error", "closeErr", cerr, "backupErr", err)
 			}
-			return xerrors.Errorf("backup error: %w", err)
+			return fmt.Errorf("backup error: %w", err)
 		}
 
 		if err := out.Close(); err != nil {
-			return xerrors.Errorf("closing backup file: %w", err)
+			return fmt.Errorf("closing backup file: %w", err)
 		}
 
 		for name, perm := range fm {
@@ -105,18 +104,18 @@ var backupCmd = &cli.Command{
 
 			src_path, err := homedir.Expand(src_name)
 			if err != nil {
-				return xerrors.Errorf("expanding source file path %s: %w", src_name, err)
+				return fmt.Errorf("expanding source file path %s: %w", src_name, err)
 			}
 
 			dest_name := path.Join(bkp_dir, name)
 
 			dest_path, err := homedir.Expand(src_name)
 			if err != nil {
-				return xerrors.Errorf("expanding destination file path %s: %w", dest_name, err)
+				return fmt.Errorf("expanding destination file path %s: %w", dest_name, err)
 			}
 
 			if err := copy_files(src_path, dest_path, perm); err != nil {
-				return xerrors.Errorf("Error copying file %s: %w", dest_name, err)
+				return fmt.Errorf("Error copying file %s: %w", dest_name, err)
 			}
 
 		}
@@ -164,7 +163,7 @@ var restoreCmd = &cli.Command{
 			return err
 		}
 		if ok {
-			return xerrors.Errorf("repo at '%s' is already initialized, cannot restore.", repoPath)
+			return fmt.Errorf("repo at '%s' is already initialized, cannot restore.", repoPath)
 		}
 
 		fmt.Println("Creating boost repo")
@@ -185,24 +184,24 @@ var restoreCmd = &cli.Command{
 
 		bpath, err := homedir.Expand(cctx.Path("restore"))
 		if err != nil {
-			return xerrors.Errorf("expanding backup directory path: %w", err)
+			return fmt.Errorf("expanding backup directory path: %w", err)
 		}
 
 		fpath_name := path.Join(bpath, "metadata")
 
 		fpath, err := homedir.Expand(fpath_name)
 		if err != nil {
-			return xerrors.Errorf("expanding metadata file path: %w", err)
+			return fmt.Errorf("expanding metadata file path: %w", err)
 		}
 
 		st, err := os.Stat(fpath)
 		if err != nil {
-			return xerrors.Errorf("stat backup file (%s): %w", fpath, err)
+			return fmt.Errorf("stat backup file (%s): %w", fpath, err)
 		}
 
 		f, err := os.Open(fpath)
 		if err != nil {
-			return xerrors.Errorf("opening backup file: %w", err)
+			return fmt.Errorf("opening backup file: %w", err)
 		}
 		defer f.Close() // nolint:errcheck
 
@@ -220,24 +219,24 @@ var restoreCmd = &cli.Command{
 		bar.Finish()
 
 		if err != nil {
-			return xerrors.Errorf("restoring metadata: %w", err)
+			return fmt.Errorf("restoring metadata: %w", err)
 		}
 
 		fmt.Println("Resetting chainstore metadata")
 
 		chainHead := dstore.NewKey("head")
 		if err := mds.Delete(cctx.Context, chainHead); err != nil {
-			return xerrors.Errorf("clearing chain head: %w", err)
+			return fmt.Errorf("clearing chain head: %w", err)
 		}
 		if err := store.FlushValidationCache(cctx.Context, mds); err != nil {
-			return xerrors.Errorf("clearing chain validation cache: %w", err)
+			return fmt.Errorf("clearing chain validation cache: %w", err)
 		}
 
 		fmt.Println("Restoring files")
 
 		rpath, err := homedir.Expand(lr.Path())
 		if err != nil {
-			return xerrors.Errorf("expanding boost repo path: %w", err)
+			return fmt.Errorf("expanding boost repo path: %w", err)
 		}
 
 		for name, perm := range fm {
@@ -245,18 +244,18 @@ var restoreCmd = &cli.Command{
 
 			src_path, err := homedir.Expand(src_name)
 			if err != nil {
-				return xerrors.Errorf("expanding source file path %s: %w", src_name, err)
+				return fmt.Errorf("expanding source file path %s: %w", src_name, err)
 			}
 
 			dest_name := path.Join(rpath, name)
 
 			dest_path, err := homedir.Expand(src_name)
 			if err != nil {
-				return xerrors.Errorf("expanding destination file path %s: %w", dest_name, err)
+				return fmt.Errorf("expanding destination file path %s: %w", dest_name, err)
 			}
 
 			if err := copy_files(src_path, dest_path, perm); err != nil {
-				return xerrors.Errorf("Error copying file %s: %w", dest_name, err)
+				return fmt.Errorf("Error copying file %s: %w", dest_name, err)
 			}
 
 		}

@@ -37,6 +37,8 @@ func main() {
 			initCmd,
 			migrateMonolithCmd,
 			migrateMarketsCmd,
+			backupCmd,
+			restoreCmd,
 			dummydealCmd,
 			storageDealsCmd,
 			dataTransfersCmd,
