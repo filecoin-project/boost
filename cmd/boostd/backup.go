@@ -100,7 +100,7 @@ var backupCmd = &cli.Command{
 		}
 
 		for name, perm := range fm {
-			src_name := path.Join(bkp_dir, name)
+			src_name := path.Join(lr.Path(), name)
 
 			src_path, err := homedir.Expand(src_name)
 			if err != nil {
@@ -109,32 +109,19 @@ var backupCmd = &cli.Command{
 
 			dest_name := path.Join(bkp_dir, name)
 
-			dest_path, err := homedir.Expand(src_name)
+			dest_path, err := homedir.Expand(dest_name)
 			if err != nil {
 				return fmt.Errorf("expanding destination file path %s: %w", dest_name, err)
 			}
 
 			if err := copy_files(src_path, dest_path, perm); err != nil {
-				return fmt.Errorf("Error copying file %s: %w", dest_name, err)
+				return fmt.Errorf("Error copying file %s: %w", src_name, err)
 			}
 
 		}
 
 		return nil
 	},
-}
-
-func copy_files(src, dest string, perm fs.FileMode) error {
-	input, err := ioutil.ReadFile(src)
-	if err != nil {
-		return err
-	}
-
-	err = ioutil.WriteFile(dest, input, perm)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 var restoreCmd = &cli.Command{
@@ -182,7 +169,7 @@ var restoreCmd = &cli.Command{
 			return err
 		}
 
-		bpath, err := homedir.Expand(cctx.Path("restore"))
+		bpath, err := homedir.Expand(cctx.Path("restore-path"))
 		if err != nil {
 			return fmt.Errorf("expanding backup directory path: %w", err)
 		}
@@ -249,13 +236,13 @@ var restoreCmd = &cli.Command{
 
 			dest_name := path.Join(rpath, name)
 
-			dest_path, err := homedir.Expand(src_name)
+			dest_path, err := homedir.Expand(dest_name)
 			if err != nil {
 				return fmt.Errorf("expanding destination file path %s: %w", dest_name, err)
 			}
 
 			if err := copy_files(src_path, dest_path, perm); err != nil {
-				return fmt.Errorf("Error copying file %s: %w", dest_name, err)
+				return fmt.Errorf("Error copying file %s: %w", src_name, err)
 			}
 
 		}
@@ -265,4 +252,23 @@ var restoreCmd = &cli.Command{
 
 		return nil
 	},
+}
+
+func copy_files(src, dest string, perm fs.FileMode) error {
+	_, err := os.Stat(src)
+
+	if !os.IsNotExist(err) {
+		input, err := ioutil.ReadFile(src)
+		if err != nil {
+			return err
+		}
+
+		err = ioutil.WriteFile(dest, input, perm)
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("Not copying %s as file does not exists\n", src)
+	}
+	return nil
 }
