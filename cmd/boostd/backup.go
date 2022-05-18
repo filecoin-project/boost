@@ -74,7 +74,7 @@ var backupCmd = &cli.Command{
 		bkpDir := path.Join(bpath, "boost_backup_"+time.Now().Format("20060102150405"))
 
 		if err := os.Mkdir(bkpDir, 0755); err != nil {
-			return fmt.Errorf("Error creating backup directory %s: %w", bkpDir, err)
+			return fmt.Errorf("error creating backup directory %s: %w", bkpDir, err)
 		}
 
 		fpathName := path.Join(bkpDir, metadaFileName)
@@ -91,11 +91,10 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("opening backup file %s: %w", fpath, err)
 		}
 
-		defer func(*os.File) error {
+		defer func(*os.File) {
 			if err := out.Close(); err != nil {
-				return fmt.Errorf("closing backup file: %w", err)
+				log.Errorw("closing backup file: %w", err)
 			}
-			return nil
 		}(out)
 
 		if err := bds.Backup(cctx.Context, out); err != nil {
@@ -123,7 +122,7 @@ var backupCmd = &cli.Command{
 			}
 
 			if err := copy_files(srcPath, destPath); err != nil {
-				return fmt.Errorf("Error copying file %s: %w", srcName, err)
+				return fmt.Errorf("error copying file %s: %w", srcName, err)
 			}
 
 		}
@@ -157,7 +156,7 @@ var restoreCmd = &cli.Command{
 			return err
 		}
 		if ok {
-			return fmt.Errorf("repo at '%s' is already initialized, cannot restore.", repoPath)
+			return fmt.Errorf("repo at '%s' is already initialized, cannot restore", repoPath)
 		}
 
 		fmt.Println("Creating boost repo")
@@ -239,7 +238,7 @@ var restoreCmd = &cli.Command{
 			}
 
 			if err := copy_files(srcPath, destPath); err != nil {
-				return fmt.Errorf("Error copying file %s: %w", srcName, err)
+				return fmt.Errorf("error copying file %s: %w", srcName, err)
 			}
 
 		}
