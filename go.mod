@@ -37,7 +37,6 @@ require (
 	github.com/filecoin-project/lotus v1.15.2
 	github.com/filecoin-project/specs-actors v0.9.14
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
-	github.com/filecoin-project/specs-actors/v5 v5.0.4
 	github.com/filecoin-project/specs-storage v0.2.2
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
 	github.com/golang/mock v1.6.0
