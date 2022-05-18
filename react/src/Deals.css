@@ -73,3 +73,9 @@
 .deals tr.show-actions td.message .buttons .button.retry {
     background-image: url("./icons/play-white.svg");
 }
+
+.deals .search {
+    position: absolute;
+    right: 8em;
+    top: 2em;
+}

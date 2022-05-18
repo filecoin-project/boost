@@ -1,11 +1,13 @@
-import {useQuery, useSubscription} from "@apollo/react-hooks";
+import {useQuery} from "@apollo/react-hooks";
 import {
     DealsCountQuery,
     DealsListQuery,
 } from "./gql";
 import moment from "moment";
+import debounce from 'lodash.debounce';
+import {DebounceInput} from 'react-debounce-input';
 import {humanFileSize} from "./util";
-import React, {useState} from "react";
+import React, {useMemo, useState} from "react";
 import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
@@ -15,7 +17,6 @@ import {DealsPerPage} from "./deals-per-page";
 import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import './Deals.css'
 import {Pagination} from "./Pagination";
-import {Warn} from "./Info";
 import {DealActions, IsPaused, IsTransferring} from "./DealDetail";
 
 export function StorageDealsPage(props) {
@@ -44,6 +45,11 @@ function StorageDealsContent(props) {
         scrollTop()
     }
 
+    const [searchQuery, setSearchQuery] = useState('')
+    const handleSearchQueryChange = (event) => {
+        setSearchQuery(event.target.value)
+    }
+
     // Fetch deals on this page
     const pageNum = (params.pageNum && parseInt(params.pageNum)) || 1
     const dealListOffset = (pageNum-1) * dealsPerPage
@@ -51,6 +57,7 @@ function StorageDealsContent(props) {
     const {loading, error, data} = useQuery(DealsListQuery, {
         pollInterval: 1000,
         variables: {
+            query: searchQuery,
             cursor: queryCursor,
             offset: dealListOffset,
             limit: dealsPerPage,
@@ -61,7 +68,9 @@ function StorageDealsContent(props) {
     if (error) return <div>Error: {error.message + " - check connection to Boost server"}</div>
     if (loading) return <div>Loading...</div>
 
-    var deals = data.deals.deals
+    // var deals = data.deals.deals
+    var res = data.dealsSearch
+    var deals = res.deals
     if (pageNum === 1) {
         deals.sort((a, b) => b.CreatedAt.getTime() - a.CreatedAt.getTime())
         deals = deals.slice(0, dealsPerPage)
@@ -86,6 +95,7 @@ function StorageDealsContent(props) {
     }
 
     return <div className="deals">
+        <SearchBox value={searchQuery} onChange={handleSearchQueryChange} />
         <table>
             <tbody>
             <tr>
@@ -108,6 +118,16 @@ function StorageDealsContent(props) {
         </table>
 
         <Pagination {...paginationParams} />
+    </div>
+}
+
+function SearchBox(props) {
+    return <div className="search">
+        <DebounceInput
+            minLength={2}
+            debounceTimeout={300}
+            value={props.value}
+            onChange={props.onChange} />
     </div>
 }
 

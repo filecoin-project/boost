@@ -102,6 +102,20 @@ type dealsArgs struct {
 
 // query: deals(cursor, offset, limit) DealList
 func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver, error) {
+	return r.dealsSearch(ctx, dealsSearchArgs{dealsArgs: args})
+}
+
+type dealsSearchArgs struct {
+	Query string
+	dealsArgs
+}
+
+// query: dealsSearch(query, cursor, offset, limit) DealList
+func (r *resolver) DealsSearch(ctx context.Context, args dealsSearchArgs) (*dealListResolver, error) {
+	return r.dealsSearch(ctx, args)
+}
+
+func (r *resolver) dealsSearch(ctx context.Context, args dealsSearchArgs) (*dealListResolver, error) {
 	offset := 0
 	if args.Offset.Set && args.Offset.Value != nil && *args.Offset.Value > 0 {
 		offset = int(*args.Offset.Value)
@@ -112,7 +126,7 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 		limit = int(*args.Limit.Value)
 	}
 
-	deals, count, more, err := r.dealList(ctx, args.Cursor, offset, limit)
+	deals, count, more, err := r.dealList(ctx, args.Query, args.Cursor, offset, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -283,10 +297,16 @@ func (r *resolver) dealsByPublishCID(ctx context.Context, publishCid cid.Cid) ([
 	return deals, nil
 }
 
-func (r *resolver) dealList(ctx context.Context, cursor *graphql.ID, offset int, limit int) ([]types.ProviderDealState, int, bool, error) {
+func (r *resolver) dealList(ctx context.Context, query string, cursor *graphql.ID, offset int, limit int) ([]types.ProviderDealState, int, bool, error) {
 	// Fetch one extra deal so that we can check if there are more deals
 	// beyond the limit
-	deals, err := r.dealsDB.List(ctx, cursor, offset, limit+1)
+	var deals []*types.ProviderDealState
+	var err error
+	if query != "" {
+		deals, err = r.dealsDB.Search(ctx, query, cursor, offset, limit+1)
+	} else {
+		deals, err = r.dealsDB.List(ctx, cursor, offset, limit+1)
+	}
 	if err != nil {
 		return nil, 0, false, err
 	}

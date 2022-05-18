@@ -259,6 +259,12 @@ func (d *DealsDB) list(ctx context.Context, offset int, limit int, whereClause s
 		}
 	}
 
+	out := qry
+	for _, arg := range args {
+		out = strings.Replace(out, "?", fmt.Sprint(arg), 1)
+	}
+	fmt.Println(out)
+
 	rows, err := d.db.QueryContext(ctx, qry, args...)
 	if err != nil {
 		return nil, err
@@ -278,6 +284,39 @@ func (d *DealsDB) list(ctx context.Context, offset int, limit int, whereClause s
 	}
 
 	return deals, nil
+}
+
+func (d *DealsDB) Search(ctx context.Context, query string, cursor *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
+	where := ""
+	whereArgs := []interface{}{}
+	if cursor != nil {
+		where += "CreatedAt <= (SELECT CreatedAt FROM Deals WHERE ID = ?) AND "
+		whereArgs = append(whereArgs, *cursor)
+	}
+
+	where += "("
+	where += "ID = ? OR "
+	whereArgs = append(whereArgs, query)
+	where += "DealProposalSignature = ? OR "
+	whereArgs = append(whereArgs, query)
+	where += "PieceCID = ? OR "
+	whereArgs = append(whereArgs, query)
+	where += "ClientAddress = ? OR "
+	whereArgs = append(whereArgs, query)
+	where += "ProviderAddress = ? OR "
+	whereArgs = append(whereArgs, query)
+	where += "ClientPeerID = ? OR "
+	whereArgs = append(whereArgs, query)
+	where += "DealDataRoot = ? OR "
+	whereArgs = append(whereArgs, query)
+	where += "PublishCID = ? OR "
+	whereArgs = append(whereArgs, query)
+	where += "SignedProposalCID = ?"
+	whereArgs = append(whereArgs, query)
+	// TODO: search error field
+	where += ")"
+
+	return d.list(ctx, offset, limit, where, whereArgs...)
 }
 
 func (d *DealsDB) scanRow(row Scannable) (*types.ProviderDealState, error) {

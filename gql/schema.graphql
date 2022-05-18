@@ -283,7 +283,7 @@ type RootQuery {
   legacyDeal(id: ID!): LegacyDeal
 
   """Get all Deals"""
-  deals(cursor: ID, offset: Int, limit: Int): DealList!
+  deals(query: String, cursor: ID, offset: Int, limit: Int): DealList!
 
   """Get all Deals made with legacy markets endpoint"""
   legacyDeals(cursor: ID, offset: Int, limit: Int): LegacyDealList!

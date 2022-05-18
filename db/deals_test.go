@@ -17,7 +17,6 @@ func TestDealsDB(t *testing.T) {
 
 	sqldb := CreateTestTmpDB(t)
 	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
-
 	require.NoError(t, Migrate(sqldb))
 
 	db := NewDealsDB(sqldb)
@@ -91,4 +90,38 @@ func TestDealsDB(t *testing.T) {
 	fds, err := db.ListCompleted(ctx)
 	req.NoError(err)
 	req.Len(fds, len(finished))
+}
+
+func TestDealsDBSearch(t *testing.T) {
+	req := require.New(t)
+	ctx := context.Background()
+
+	sqldb := CreateTestTmpDB(t)
+	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
+	require.NoError(t, Migrate(sqldb))
+
+	db := NewDealsDB(sqldb)
+	deals, err := GenerateDeals()
+	req.NoError(err)
+
+	for _, deal := range deals {
+		err = db.Insert(ctx, &deal)
+		req.NoError(err)
+	}
+
+	tcs := []struct {
+		name  string
+		value string
+	}{{
+		name:  "PieceCID",
+		value: deals[0].ClientDealProposal.Proposal.PieceCID.String(),
+	}}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			searchRes, err := db.Search(ctx, tc.value, nil, 0, 0)
+			req.NoError(err)
+			require.Len(t, searchRes, 1)
+			require.Equal(t, searchRes[0].DealUuid, deals[0].DealUuid)
+		})
+	}
 }

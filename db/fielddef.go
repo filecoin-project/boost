@@ -126,7 +126,7 @@ func (fd *bigIntFieldDef) unmarshall() error {
 }
 
 type addrFieldDef struct {
-	marshalled []byte
+	marshalled string
 	f          *address.Address
 }
 

@@ -70,8 +70,8 @@ const EpochQuery = gql`
 `;
 
 const DealsListQuery = gql`
-    query AppDealsListQuery($cursor: ID, $offset: Int, $limit: Int) {
-        deals(cursor: $cursor, offset: $offset, limit: $limit) {
+    query AppDealsListQuery($query: String, $cursor: ID, $offset: Int, $limit: Int) {
+        deals(query: $query, cursor: $cursor, offset: $offset, limit: $limit) {
             deals {
                 ID
                 CreatedAt
