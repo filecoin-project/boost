@@ -126,7 +126,7 @@ func (fd *bigIntFieldDef) unmarshall() error {
 }
 
 type addrFieldDef struct {
-	marshalled []byte
+	marshalled string
 	f          *address.Address
 }
 
@@ -135,11 +135,11 @@ func (fd *addrFieldDef) fieldPtr() interface{} {
 }
 
 func (fd *addrFieldDef) marshall() (interface{}, error) {
-	return fd.f.Bytes(), nil
+	return fd.f.String(), nil
 }
 
 func (fd *addrFieldDef) unmarshall() error {
-	addr, err := address.NewFromBytes(fd.marshalled)
+	addr, err := address.NewFromString(fd.marshalled)
 	if err != nil {
 		return fmt.Errorf("parsing address: %w", err)
 	}
