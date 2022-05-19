@@ -52,18 +52,6 @@ export function DealDetail(props) {
 
     const currentEpochData = useQuery(EpochQuery)
 
-    const [cancelDeal] = useMutation(DealCancelMutation, {
-        variables: {id: params.dealID}
-    })
-
-    const [retryPausedDeal] = useMutation(DealRetryPausedMutation, {
-        variables: {id: params.dealID}
-    })
-
-    const [failPausedDeal] = useMutation(DealFailPausedMutation, {
-        variables: {id: params.dealID}
-    })
-
     const {loading, error, data} = useSubscription(DealSubscription, {
         variables: {id: params.dealID},
     })
@@ -105,9 +93,6 @@ export function DealDetail(props) {
     } catch (e) {
         console.error("parsing transfer params: "+e.message)
     }
-
-    const showRetryFailButtons = deal.Retry !== 'fatal' && deal.Err !== ''
-    const showCancelButton = !showRetryFailButtons && deal.Checkpoint === 'Accepted' && !deal.IsOffline
 
     var logRowData = []
     var logs = (deal.Logs || []).sort((a, b) => a.CreatedAt.getTime() - b.CreatedAt.getTime())
@@ -322,19 +307,7 @@ export function DealDetail(props) {
                 </tbody>
             </table>
 
-            {showCancelButton || showRetryFailButtons ? (
-                <div className="buttons">
-                    {showCancelButton ? (
-                        <div className="button cancel" onClick={cancelDeal}>Cancel Transfer</div>
-                    ) : null}
-                    {showRetryFailButtons ? (
-                        <>
-                            <div className="button retry" onClick={retryPausedDeal}>Retry Deal</div>
-                            <div className="button fail" onClick={failPausedDeal}>Terminate Deal</div>
-                        </>
-                    ) : null}
-                </div>
-            ) : null}
+            <DealActions deal={deal} />
 
             <h3>Deal Logs</h3>
 
@@ -345,6 +318,63 @@ export function DealDetail(props) {
             </table>
         </div>
     </div>
+}
+
+export function DealActions(props) {
+    const deal = props.deal
+    const compact = props.compact
+
+    // Cancel deal that is transferring
+    const [cancelDeal] = useMutation(DealCancelMutation, {
+        refetchQueries: props.refetchQueries,
+        variables: {id: deal.ID}
+    })
+
+    // Retry deal that failed with a recoverable error
+    const [retryPausedDeal] = useMutation(DealRetryPausedMutation, {
+        refetchQueries: props.refetchQueries,
+        variables: {id: deal.ID}
+    })
+
+    // Terminate deal that failed with a recoverable error
+    const [failPausedDeal] = useMutation(DealFailPausedMutation, {
+        refetchQueries: props.refetchQueries,
+        variables: {id: deal.ID}
+    })
+
+    const showRetryFailButtons = IsPaused(deal)
+    const showCancelButton = !showRetryFailButtons && IsTransferring(deal)
+    if (!showCancelButton && !showRetryFailButtons) {
+        return null
+    }
+
+    return (
+        <div className="buttons">
+            {showCancelButton ? (
+                <div className="button cancel" title="Cancel Transfer" onClick={cancelDeal}>
+                    {compact ? '' : 'Cancel Transfer'}
+                </div>
+            ) : null}
+            {showRetryFailButtons ? (
+                <>
+                    <div className="button retry" title="Retry Deal" onClick={retryPausedDeal}>
+                        {compact ? '' : 'Retry Deal'}
+                    </div>
+                    <div className="button fail" title="Terminate Deal" onClick={failPausedDeal}>
+                        {compact ? '' : 'Terminate Deal'}
+                    </div>
+                </>
+            ) : null}
+        </div>
+    )
+}
+
+export function IsPaused(deal) {
+    return deal.Retry !== 'fatal' && deal.Err !== ''
+}
+
+export function IsTransferring(deal) {
+    return deal.Checkpoint === 'Accepted' && !deal.IsOffline
 }
 
 function DealLog(props) {

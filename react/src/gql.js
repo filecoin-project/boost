@@ -78,6 +78,9 @@ const DealsListQuery = gql`
                 ClientAddress
                 Checkpoint
                 CheckpointAt
+                IsOffline
+                Err
+                Retry
                 Message
                 Transfer {
                     Type

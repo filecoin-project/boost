@@ -2,8 +2,6 @@ import {useQuery, useSubscription} from "@apollo/react-hooks";
 import {
     DealsCountQuery,
     DealsListQuery,
-    DealSubscription,
-    NewDealsSubscription,
 } from "./gql";
 import moment from "moment";
 import {humanFileSize} from "./util";
@@ -18,6 +16,7 @@ import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import './Deals.css'
 import {Pagination} from "./Pagination";
 import {Warn} from "./Info";
+import {DealActions, IsPaused, IsTransferring} from "./DealDetail";
 
 export function StorageDealsPage(props) {
     return <PageContainer pageType="storage-deals" title="Storage Deals">
@@ -50,6 +49,7 @@ function StorageDealsContent(props) {
     const dealListOffset = (pageNum-1) * dealsPerPage
     const queryCursor = (pageNum === 1) ? null : params.cursor
     const {loading, error, data} = useQuery(DealsListQuery, {
+        pollInterval: 1000,
         variables: {
             cursor: queryCursor,
             offset: dealListOffset,
@@ -58,30 +58,15 @@ function StorageDealsContent(props) {
         fetchPolicy: 'network-only',
     })
 
-    // Watch for new deals
-    const sub = useSubscription(NewDealsSubscription)
-    const subNewDeal = ((sub || {}).data || {}).dealNew
-    if (subNewDeal) {
-        // Check if the new deal is already in the list of deals
-        const deals = (((data || {}).deals || {}).deals || [])
-        const inDeals = deals.find(el => el.ID === subNewDeal.deal.ID)
-        const inSubDeals = subDeals.find(el => el.ID === subNewDeal.deal.ID)
-        if (!inDeals && !inSubDeals) {
-            // New deal is not in the list of deals so add it to the subDeals array
-            setSubDeals([subNewDeal.deal, ...subDeals].slice(0, dealsPerPage))
-        }
-    }
-
     if (error) return <div>Error: {error.message + " - check connection to Boost server"}</div>
     if (loading) return <div>Loading...</div>
 
     var deals = data.deals.deals
     if (pageNum === 1) {
-        deals = uniqDeals([...data.deals.deals, ...subDeals])
         deals.sort((a, b) => b.CreatedAt.getTime() - a.CreatedAt.getTime())
         deals = deals.slice(0, dealsPerPage)
     }
-    const totalCount = subNewDeal ? subNewDeal.totalCount : data.deals.totalCount
+    const totalCount = data.deals.totalCount
     const moreDeals = data.deals.more
 
     var cursor = params.cursor
@@ -127,19 +112,7 @@ function StorageDealsContent(props) {
 }
 
 function DealRow(props) {
-    const {loading, error, data} = useSubscription(DealSubscription, {
-        variables: {id: props.deal.ID},
-    })
-
-    if (error) {
-        console.error('Error subscribing to deal ' + props.deal.ID, error)
-    }
-
     var deal = props.deal
-    if (!loading && !error) {
-        deal = data.dealUpdate
-    }
-
     var start = moment(deal.CreatedAt).format(dateFormat)
     if (props.timestampFormat !== TimestampFormat.DateTime) {
         start = '1m'
@@ -148,8 +121,14 @@ function DealRow(props) {
         }
     }
 
+    const showActions = (IsPaused(deal) || IsTransferring(deal))
+    var rowClassName = ''
+    if (showActions) {
+        rowClassName = 'show-actions'
+    }
+
     return (
-        <tr className={error ? "error" : ""}>
+        <tr className={rowClassName}>
             <td className="start" onClick={props.toggleTimestampFormat}>
                 {start}
             </td>
@@ -161,10 +140,12 @@ function DealRow(props) {
                 <ShortClientAddress address={deal.ClientAddress} />
             </td>
             <td className="message">
-                {deal.Message}
-                {error ? (
-                    <Warn>{"Web UI Subscription Error: " + error.message}</Warn>
-                ) : null}
+                <div className="message-content">
+                    <span className="message-text">
+                        {deal.Message}
+                    </span>
+                    {showActions ? <DealActions deal={props.deal} refetchQueries={[DealsListQuery]} compact={true} /> : null}
+                </div>
             </td>
         </tr>
     )

@@ -41,3 +41,35 @@
 .deals tr.error {
     opacity: 0.8;
 }
+
+.deals tr.show-actions td.message .message-content {
+    display: flex;
+    align-items: center;
+}
+
+.deals tr.show-actions td.message .message-content .message-text {
+    flex-grow: 1;
+}
+
+.deals tr.show-actions td.message .buttons {
+    display: inline-block;
+    min-width: 6em;
+    text-align: right;
+}
+
+.deals tr.show-actions td.message .buttons .button {
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+    background-size: cover;
+}
+
+.deals tr.show-actions td.message .buttons .button.cancel {
+    background-image: url("./bootstrap-icons/icons/x-white.svg");
+}
+.deals tr.show-actions td.message .buttons .button.fail {
+    background-image: url("./bootstrap-icons/icons/x-white.svg");
+}
+.deals tr.show-actions td.message .buttons .button.retry {
+    background-image: url("./bootstrap-icons/icons/play-white.svg");
+}
