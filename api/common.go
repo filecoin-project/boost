@@ -42,7 +42,7 @@ type Common interface {
 	//Discover(ctx context.Context) (apitypes.OpenRPCDocument, error) //perm:read
 
 	//// trigger graceful shutdown
-	//Shutdown(context.Context) error //perm:admin
+	Shutdown(context.Context) error //perm:admin
 
 	//// Session returns a random UUID of api provider session
 	//Session(context.Context) (uuid.UUID, error) //perm:read

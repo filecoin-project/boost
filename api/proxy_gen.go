@@ -143,6 +143,8 @@ type CommonStruct struct {
 		LogList func(p0 context.Context) ([]string, error) `perm:"write"`
 
 		LogSetLevel func(p0 context.Context, p1 string, p2 string) error `perm:"write"`
+
+		Shutdown func(p0 context.Context) error `perm:"admin"`
 	}
 }
 
@@ -738,6 +740,17 @@ func (s *CommonStruct) LogSetLevel(p0 context.Context, p1 string, p2 string) err
 }
 
 func (s *CommonStub) LogSetLevel(p0 context.Context, p1 string, p2 string) error {
+	return ErrNotSupported
+}
+
+func (s *CommonStruct) Shutdown(p0 context.Context) error {
+	if s.Internal.Shutdown == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.Shutdown(p0)
+}
+
+func (s *CommonStub) Shutdown(p0 context.Context) error {
 	return ErrNotSupported
 }
 
