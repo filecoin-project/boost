@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/journal/alerting"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 )
@@ -24,7 +25,7 @@ type CommonAPI struct {
 
 	Alerting     *alerting.Alerting
 	APISecret    *lotus_dtypes.APIAlg
-	ShutdownChan lotus_dtypes.ShutdownChan
+	ShutdownChan dtypes.ShutdownChan
 }
 
 type jwtPayload struct {
