@@ -27,7 +27,7 @@ var fm = []string{"api",
 
 var backupCmd = &cli.Command{
 	Name:   "backup",
-	Usage: "boostd backup <backup directory>"
+	Usage: "boostd backup <backup directory>",
 	Description:  "Performs offline backup of Boost",
 	Before: before,
 	Action: func(cctx *cli.Context) error {
