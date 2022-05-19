@@ -8,8 +8,8 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var offlineDealCmd = &cli.Command{
-	Name:  "offline-deal",
+var importDataCmd = &cli.Command{
+	Name:  "import-data",
 	Usage: "Import data for offline deal made with Boost",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
