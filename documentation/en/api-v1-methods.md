@@ -1,4 +1,6 @@
 # Groups
+* [](#)
+  * [Shutdown](#shutdown)
 * [Actor](#actor)
   * [ActorSectorSize](#actorsectorsize)
 * [Auth](#auth)
@@ -70,6 +72,18 @@
   * [PiecesListPieces](#pieceslistpieces)
 * [Runtime](#runtime)
   * [RuntimeSubsystems](#runtimesubsystems)
+## 
+
+
+### Shutdown
+
+
+Perms: admin
+
+Inputs: `null`
+
+Response: `{}`
+
 ## Actor
 
 
