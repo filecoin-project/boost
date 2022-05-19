@@ -42,7 +42,7 @@ func main() {
 			dataTransfersCmd,
 			retrievalDealsCmd,
 			indexProvCmd,
-			offlineDealCmd,
+			importDataCmd,
 			logCmd,
 			dagstoreCmd,
 			piecesCmd,
