@@ -27,11 +27,12 @@ var fm = []string{"api",
 
 var backupCmd = &cli.Command{
 	Name:   "backup",
-	Usage:  "Performs offline backup of Boost",
+	Usage: "boostd backup <backup directory>"
+	Description:  "Performs offline backup of Boost",
 	Before: before,
 	Action: func(cctx *cli.Context) error {
-		if cctx.Args().Len() > 1 {
-			return fmt.Errorf("backup only takes one argument (custom location inside home directory)")
+		if cctx.Args().Len() != 1 {
+			return fmt.Errorf("usage: boostd backup <backup directory>")
 		}
 
 		boostRepoPath := cctx.String(FlagBoostRepo)
@@ -91,16 +92,13 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("opening backup file %s: %w", fpath, err)
 		}
 
-		defer func(*os.File) {
+		defer func() {
 			if err := out.Close(); err != nil {
 				log.Errorw("closing backup file: %w", err)
 			}
-		}(out)
+		}()
 
 		if err := bds.Backup(cctx.Context, out); err != nil {
-			if cerr := out.Close(); cerr != nil {
-				log.Errorw("error closing backup file while handling backup error", "closeErr", cerr, "backupErr", err)
-			}
 			return fmt.Errorf("backup error: %w", err)
 		}
 
@@ -128,7 +126,6 @@ var backupCmd = &cli.Command{
 		}
 
 		fmt.Println("Boost repo successfully backed up at " + bkpDir)
-		fmt.Println("You can now start boost with 'boostd -vv run'")
 
 		return nil
 	},
@@ -136,7 +133,8 @@ var backupCmd = &cli.Command{
 
 var restoreCmd = &cli.Command{
 	Name:   "restore",
-	Usage:  "Restores a boost repository from backup",
+	Usage:  "boostd restore <backup dir>",
+	Description:  "Restores a boost repository from backup",
 	Before: before,
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() != 1 {
@@ -244,7 +242,6 @@ var restoreCmd = &cli.Command{
 		}
 
 		fmt.Println("Boost repo successfully restored at " + lr.Path())
-		fmt.Println("You can now start boost with 'boostd -vv run'")
 
 		return nil
 	},
