@@ -65,11 +65,11 @@
 }
 
 .deals tr.show-actions td.message .buttons .button.cancel {
-    background-image: url("./bootstrap-icons/icons/x-white.svg");
+    background-image: url("./icons/x-white.svg");
 }
 .deals tr.show-actions td.message .buttons .button.fail {
-    background-image: url("./bootstrap-icons/icons/x-white.svg");
+    background-image: url("./icons/x-white.svg");
 }
 .deals tr.show-actions td.message .buttons .button.retry {
-    background-image: url("./bootstrap-icons/icons/play-white.svg");
+    background-image: url("./icons/play-white.svg");
 }
