@@ -115,7 +115,7 @@ export function DealDetail(props) {
                 <span className="copy" onClick={dealIDToClipboard} title="Copy deal uuid to clipboard"></span>
                 <span className="copy-all" onClick={allToClipboard} title="Copy all deal info to clipboard"></span>
             </div>
-            <table className="deal-fields">
+            <table className="deal-fields horizontal-table">
                 <tbody>
                 <tr>
                     <th>CreatedAt</th>
@@ -309,7 +309,7 @@ export function DealDetail(props) {
 
             <DealActions deal={deal} />
 
-            <h3>Deal Logs</h3>
+            <h5>Deal Logs</h5>
 
             <table className="deal-logs">
                 <tbody>

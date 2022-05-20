@@ -1,0 +1,47 @@
+.table {
+	width:100%;
+
+	th, td {
+		padding:10px 20px;
+
+			@include media-breakpoint-up(md) {
+				padding:10px 30px;
+			}
+	}
+	a {
+		font-weight: 600;
+	}
+}
+
+th {
+	color:$secondary;
+	font-size: 18px;
+	font-weight: 600;
+}
+tbody {
+	tr {
+		&:nth-child(odd) {
+			background:$tablegray;
+		}
+	}
+}
+.table-wrapper {
+	overflow-x: scroll;
+}
+.horizontal-table {
+	th {
+		color: $ltestgrey;
+		vertical-align: top;
+		padding: 1em;
+		color: inherit;
+		font-weight: normal;
+		font-size: inherit;
+	}
+	td {
+		padding: 1em;
+	}
+}
+.fixed-width {
+	font-size: 0.9em;
+	font-family: "Monaco";
+}

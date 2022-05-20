@@ -1,4 +1,3 @@
-import './Epoch.css';
 import {useQuery} from "@apollo/react-hooks";
 import {EpochQuery} from "./gql";
 import {addCommas} from "./util";
@@ -17,7 +16,7 @@ export function Epoch(props) {
     return (
         <div className="epoch">
             {addCommas(data.epoch.Epoch)}
-            <Info>Chain Height</Info>
+            <Info invertColor={true}>Chain Height</Info>
         </div>
     )
 }

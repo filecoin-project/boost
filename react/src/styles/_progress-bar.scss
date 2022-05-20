@@ -1,0 +1,36 @@
+.progress {
+	position:relative;
+	background: $progressgrey;
+	height: 18px;
+	margin:5px 0 20px;
+	display: flex;
+
+	.bar {
+		background: $primary;
+		height:100%;
+
+		&.blue {
+			background: $primary;
+		}
+		&.red {
+			background: $secondary;
+		}
+		&.yellow {
+			background: $tertiary;
+		}
+		&.green {
+			background: $green;
+		}
+	}
+}
+.sidebar {
+	.progress {
+		height: 8px;
+		border-radius: 4px;
+		margin:5px 0;
+
+		.bar {
+				border-radius: 4px;
+		}
+	}
+}

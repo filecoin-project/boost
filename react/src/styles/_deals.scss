@@ -1,0 +1,26 @@
+.deal-status {
+	//margin-bottom:40px;
+	font-size: 18px;
+
+	@include media-breakpoint-up(md) {
+    display: flex;
+    justify-content: space-between;
+		align-items: center;
+		font-size: 20px;
+  }
+	.btn {
+		margin-top:10px;
+
+		@include media-breakpoint-up(md) {
+			margin-top:0;
+		}
+	}
+}
+.deal-config {
+	//margin-bottom: 40px;
+	font-size: 18px;
+
+	@include media-breakpoint-up(md) {
+		font-size: 20px;
+	}
+}

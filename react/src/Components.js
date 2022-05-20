@@ -1,13 +1,18 @@
 import React from "react";
 import {Link} from "react-router-dom";
+import {Banner} from "./Banner";
 
 export function PageContainer(props) {
-    return (
-        <div id={props.pageType}>
-            <div className="page-title">{props.title}</div>
+    return (<>
+        <div className="page-header">
+            <span className="page-header-icon">{props.icon}</span>
+            <h1>{props.title}</h1>
+        </div>
+        <div className="page-content">
+            <Banner />
             {props.children}
         </div>
-    )
+    </>)
 }
 
 export function ShortDealLink(props) {

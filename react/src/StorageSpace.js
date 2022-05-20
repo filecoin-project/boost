@@ -2,15 +2,13 @@ import {useQuery} from "@apollo/react-hooks";
 import {LegacyStorageQuery, StorageQuery} from "./gql";
 import React from "react";
 import {addCommas, humanFileSize} from "./util";
-import './StorageSpace.css'
-import archiveImg from './bootstrap-icons/icons/archive.svg'
 import {PageContainer} from "./Components";
-import {Link} from "react-router-dom";
+import {NavLink} from "react-router-dom";
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import {Info} from "./Info"
 
 export function StorageSpacePage(props) {
-    return <PageContainer pageType="storage-space" title="Storage Space">
+    return <PageContainer icon={<StorageSpaceIcon />} title="Storage Space">
         <StorageSpaceContent />
         <LegacyStorageSpaceContent />
     </PageContainer>
@@ -51,14 +49,14 @@ function StorageSpaceContent(props) {
     }]
 
     return <>
-        <h3>Deal transfers</h3>
+        <h5>Deal transfers</h5>
 
         <div className="storage-chart">
             <CumulativeBarChart bars={bars} unit="byte" />
             <CumulativeBarLabels bars={bars} unit="byte" />
         </div>
 
-        <table className="storage-fields">
+        <table className="storage-fields horizontal-table">
             <tbody>
                 {bars.map(bar => (
                     <tr key={bar.name}>
@@ -96,6 +94,10 @@ function LegacyStorageSpaceContent(props) {
         return null
     }
 
+    var free = storage.Capacity - storage.Used
+    if (free < 0) {
+        free = 0
+    }
     const bars = [{
         name: 'Used',
         className: 'used',
@@ -103,18 +105,18 @@ function LegacyStorageSpaceContent(props) {
     }, {
         name: 'Free',
         className: 'free',
-        amount: storage.Capacity - storage.Used,
+        amount: free,
     }]
 
     return <div className="legacy-deal-transfers">
-        <h3>Legacy Deal transfers</h3>
+        <h5>Legacy Deal transfers</h5>
 
         <div className="storage-chart">
             <CumulativeBarChart bars={bars} unit="byte" />
             <CumulativeBarLabels bars={bars} unit="byte" />
         </div>
 
-        <table className="storage-fields">
+        <table className="storage-fields horizontal-table">
             <tbody>
             {bars.map(bar => (
                 <tr key={bar.name}>
@@ -154,22 +156,34 @@ export function StorageSpaceMenuItem(props) {
         used = totalSize - storage.Free
     }
 
-    const bars = [{
-        className: 'used',
-        amount: used,
-    }, {
-        className: 'free',
-        amount: totalSize - used,
-    }]
-
     return (
-        <Link key="storage-space" className="menu-item storage-space" to="/storage-space">
-            <img className="icon" alt="" src={archiveImg} />
-            <h3>Storage Space</h3>
-            <div className="menu-desc">
-                <CumulativeBarChart bars={bars} unit="byte" compact={true} />
-                <b>{humanFileSize(used)}</b> of <b>{humanFileSize(totalSize)}</b> used
+        <NavLink key="storage-space" className="sidebar-item sidebar-item-deals" to="/storage-space">
+            <span className="sidebar-icon">
+                <StorageSpaceIcon />
+            </span>
+            <span className="sidebar-title">Storage Space</span>
+            <div className="sidebar-item-excerpt">
+                <div className="row">
+                    <div className="col-sm-8 col-xxl-6">
+                        <div className="progress">
+                            <span className="bar" style={{width:"0%"}}></span>
+                        </div>
+                        <div className="explanation">
+                            <span className="numerator">{humanFileSize(used)}</span>
+                            <span> / </span>
+                            <span className="denominator">{humanFileSize(totalSize)}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </Link>
+        </NavLink>
     )
+}
+
+function StorageSpaceIcon(props) {
+    return <svg width="26" height="25" viewBox="0 0 26 25" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 7h20v15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" strokeWidth="2"/>
+        <rect x="1" y="1" width="24" height="6" rx="2" strokeWidth="2"/>
+        <path d="M8 11h10v2H8z"/>
+    </svg>
 }

@@ -1,0 +1,60 @@
+.navbar-toggle {
+  margin: 0 -9px 1px 0;
+  padding: 10px;
+  font-size: 14px;
+  border: none;
+  // border-radius:5px;
+  background: none;
+  position: relative;
+  outline: none;
+  cursor: pointer;
+
+  @include media-breakpoint-up(xl) {
+		display: none;
+	}
+
+  .icon-bar {
+    display: block;
+    width: 32px;
+    height: 3px;
+    border-radius: 3px;
+    color: $white;
+    background-color: $white;
+    margin: 0 auto;
+    position: relative;
+    transition: all 250ms ease-in-out;
+    cursor: pointer;
+  }
+  .icon-bar + .icon-bar {
+    margin-top: 6px;
+  }
+  .icon-bar:nth-of-type(2) {
+    z-index: 2;
+  }
+  .icon-bar:nth-of-type(3) {
+    top: 1px;
+  }
+  .icon-bar:nth-of-type(4) {
+    top: 2px;
+  }
+  &.active {
+    .icon-bar {
+      background-color: $white;
+    }
+    .icon-bar:nth-of-type(2) {
+      top: 9px;
+      transform: rotate(45deg);
+      color: $white;
+      background-color: $white;
+    }
+    .icon-bar:nth-of-type(3) {
+      background-color: transparent;
+    }
+    .icon-bar:nth-of-type(4) {
+      top: -9px;
+      transform: rotate(-45deg);
+      color: $white;
+      background-color: $white;
+    }
+  }
+}

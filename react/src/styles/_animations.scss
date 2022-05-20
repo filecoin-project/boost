@@ -1,0 +1,31 @@
+/*
+Not using yet...
+
+.transition-quarter {
+  transition: all 0.25s ease;
+}
+.transition-half {
+  transition: all 0.5s ease;
+}
+.grow-in {
+    transform: scale(0);
+}
+.grow-in.activated {
+    transform: scale(1);
+}
+.dock-in-up {
+  transform:translate3d(0, 5%, 0);
+}
+.dock-in-up.activated {
+  transform:translate3d(0, 0, 0);
+}
+.slide-in-up {
+  transform:translate3d(0, 200%, 0);
+}
+.slide-in-up.activated {
+  transform:translate3d(0, 0, 0);
+}
+.slide-in-down.activated {
+  animation: slideInDown 0.25s linear;
+}
+*/

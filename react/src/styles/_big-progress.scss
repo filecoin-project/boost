@@ -1,0 +1,15 @@
+.big-progress {
+	position:relative;
+	background: $progressgrey;
+	height: 107px;
+	margin:40px 0;
+
+	@include media-breakpoint-up(md) {
+		margin:50px 0;
+	}
+
+	.bar {
+		background: $primary;
+		height:100%;
+	}
+}

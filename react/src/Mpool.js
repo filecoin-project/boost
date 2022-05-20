@@ -4,9 +4,10 @@ import {React, useState} from "react";
 import {humanFIL} from "./util";
 import './Mpool.css'
 import {PageContainer} from "./Components";
+import {NavLink} from "react-router-dom";
 
 export function MpoolPage(props) {
-    return <PageContainer pageType="mpool" title="Message Pool">
+    return <PageContainer icon={<MpoolIcon />} title="Message Pool">
         <MpoolContent />
     </PageContainer>
 }
@@ -27,7 +28,7 @@ function MpoolContent(props) {
     return <div className="mpool">
         <div className="header">
             Showing {msgs.length} {local ? 'local' : ''} messages in message pool.
-            <div className="button" onClick={() => setLocal(!local)}>
+            <div className="button btn btn-primary" onClick={() => setLocal(!local)}>
                 Show {local ? 'All' : 'Local'} messages
             </div>
         </div>
@@ -128,4 +129,20 @@ function FeeGraph(props) {
             <div className="tick-top" />
         </div>
     </div>
+}
+
+export function MpoolMenuItem(props) {
+    return <NavLink key="mpool" className="sidebar-item sidebar-item-deal-transfers" to="/mpool">
+        <span className="sidebar-icon">
+            <MpoolIcon />
+        </span>
+        <span className="sidebar-title">Message Pool</span>
+    </NavLink>
+}
+
+function MpoolIcon(props) {
+    return <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+        <path strokeWidth="0.1"
+            d="M4 2v2H2V2h2zm1 12v-2a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1zm0-5V7a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1zm0-5V2a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1zm5 10v-2a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1zm0-5V7a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1zm0-5V2a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1zM9 2v2H7V2h2zm5 0v2h-2V2h2zM4 7v2H2V7h2zm5 0v2H7V7h2zm5 0h-2v2h2V7zM4 12v2H2v-2h2zm5 0v2H7v-2h2zm5 0v2h-2v-2h2zM12 1a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1h-2zm-1 6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V7zm1 4a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-2z"/>
+    </svg>
 }

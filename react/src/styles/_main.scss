@@ -1,0 +1,27 @@
+main {
+	transition: 0.25s ease;
+	position:relative;
+	display: flex;
+}
+.menu-open {
+	main {
+		@include media-breakpoint-up(md) {
+			left:$sidebarWidth;
+		}
+		@include media-breakpoint-up(lg) {
+			left:$fullsidebarWidth;
+		}
+	}
+}
+.main-wrapper {
+	display: inline-block;
+	flex-grow: 1;
+	padding:10px 20px;
+
+	@include media-breakpoint-up(md) {
+		padding:20px;
+	}
+	@include media-breakpoint-up(lg) {
+		padding:40px;
+	}
+}

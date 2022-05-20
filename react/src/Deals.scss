@@ -1,0 +1,14 @@
+table.storage-deals {
+  td {
+    white-space: nowrap;
+    padding: 10px 20px;
+  }
+  td.message {
+    white-space: normal;
+    word-break: break-all;
+  }
+}
+
+.sidebar-item-deals .legacy-storage-deals {
+  margin-top: 0.5em;
+}

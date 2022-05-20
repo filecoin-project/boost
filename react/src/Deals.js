@@ -7,24 +7,22 @@ import moment from "moment";
 import {humanFileSize} from "./util";
 import React, {useState} from "react";
 import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
-import {Link, useNavigate, useParams} from "react-router-dom";
+import {NavLink, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import {LegacyStorageDealsCount} from "./LegacyDeals";
 import {TimestampFormat} from "./timestamp";
 import {DealsPerPage} from "./deals-per-page";
-import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
-import './Deals.css'
 import {Pagination} from "./Pagination";
 import {Warn} from "./Info";
 import {DealActions, IsPaused, IsTransferring} from "./DealDetail";
 
 export function StorageDealsPage(props) {
-    return <PageContainer pageType="storage-deals" title="Storage Deals">
+    return <PageContainer icon={<StorageDealsIcon />} title="Storage Deals">
         <StorageDealsContent />
     </PageContainer>
 }
 
-function StorageDealsContent(props) {
+export function StorageDealsContent(props) {
     const navigate = useNavigate()
     const params = useParams()
     const [subDeals, setSubDeals] = useState([])
@@ -85,36 +83,41 @@ function StorageDealsContent(props) {
         onLinkClick: scrollTop,
     }
 
-    return <div className="deals">
-        <table>
-            <tbody>
-            <tr>
-                <th onClick={toggleTimestampFormat} className="start">Start</th>
-                <th>Deal ID</th>
-                <th>Size</th>
-                <th>Client</th>
-                <th>State</th>
-            </tr>
+    return (
+        <div className="section">
+            <div className="table-wrapper">
+                <table className="table table-striped storage-deals">
+                    <thead>
+                        <tr>
+                            <th onClick={toggleTimestampFormat} className="start">Start</th>
+                            <th>Deal ID</th>
+                            <th>Size</th>
+                            <th>Client</th>
+                            <th>State</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {deals.map(deal => (
+                            <DealRow
+                                key={deal.ID}
+                                deal={deal}
+                                timestampFormat={timestampFormat}
+                                toggleTimestampFormat={toggleTimestampFormat}
+                            />
+                        ))}
+                    </tbody>
+                </table>
 
-            {deals.map(deal => (
-                <DealRow
-                    key={deal.ID}
-                    deal={deal}
-                    timestampFormat={timestampFormat}
-                    toggleTimestampFormat={toggleTimestampFormat}
-                />
-            ))}
-            </tbody>
-        </table>
-
-        <Pagination {...paginationParams} />
-    </div>
+                <Pagination {...paginationParams} />
+            </div>
+        </div>
+    )
 }
 
 function DealRow(props) {
     var deal = props.deal
     var start = moment(deal.CreatedAt).format(dateFormat)
-    if (props.timestampFormat !== TimestampFormat.DateTime) {
+    if (!props.timestampFormat !== TimestampFormat.DateTime) {
         start = '1m'
         if (new Date().getTime() - deal.CreatedAt.getTime() > 60 * 1000) {
             start = moment(deal.CreatedAt).fromNow()
@@ -156,30 +159,46 @@ function uniqDeals(deals) {
 }
 
 export function StorageDealsMenuItem(props) {
-    const {data} = useQuery(DealsCountQuery, {
+    var {data} = useQuery(DealsCountQuery, {
         pollInterval: 5000,
         fetchPolicy: 'network-only',
     })
+    data = data || { dealsCount: '...' }
 
     return (
-        <div className="menu-item" >
-            <img className="icon" alt="" src={columnsGapImg} />
-            <Link key="storage-deals" to="/storage-deals">
-                    <h3>Storage Deals</h3>
-            </Link>
-            {data ? (
-                <Link key="legacy-storage-deals" to="/storage-deals">
-                    <div className="menu-desc">
-                        <b>{data.dealsCount}</b> deal{data.dealsCount === 1 ? '' : 's'}
+        <div key="storage-deals" to="/storage-deals" className="sidebar-item sidebar-item-deals">
+            <span className="sidebar-icon">
+                <StorageDealsIcon />
+            </span>
+            <span className="sidebar-title">
+                <NavLink to="/storage-deals">Storage Deals</NavLink>
+            </span>
+            <div className="sidebar-item-excerpt">
+                <NavLink to="/storage-deals" className="row">
+                    <div className="col-sm-12">
+                        <span className="figure">{data.dealsCount}</span>
+                        <span className="label">Deal{data.dealsCount === 1 ? '' : 's'}</span>
                     </div>
-                </Link>
-            ) : null}
-
-            <LegacyStorageDealsCount />
+                </NavLink>
+                <NavLink to="/legacy-storage-deals" className="row legacy-storage-deals">
+                    <div className="col-sm-12">
+                        <LegacyStorageDealsCount />
+                    </div>
+                </NavLink>
+            </div>
         </div>
     )
 }
 
 function scrollTop() {
     window.scrollTo({ top: 0, behavior: "smooth" })
+}
+
+export function StorageDealsIcon(props) {
+    return <svg width="24" height="26" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="9" height="7" rx="2" strokeWidth="2"/>
+        <rect x="23" y="25" width="9" height="7" rx="2" transform="rotate(-180 23 25)" strokeWidth="2"/>
+        <rect x="1" y="12" width="9" height="13" rx="2" strokeWidth="2"/>
+        <rect x="23" y="14" width="9" height="13" rx="2" transform="rotate(-180 23 14)" strokeWidth="2"/>
+    </svg>
 }
