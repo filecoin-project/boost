@@ -95,6 +95,7 @@ func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dea
 }
 
 type dealsArgs struct {
+	Query  graphql.NullString
 	Cursor *graphql.ID
 	Offset graphql.NullInt
 	Limit  graphql.NullInt
@@ -102,20 +103,6 @@ type dealsArgs struct {
 
 // query: deals(cursor, offset, limit) DealList
 func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver, error) {
-	return r.dealsSearch(ctx, dealsSearchArgs{dealsArgs: args})
-}
-
-type dealsSearchArgs struct {
-	Query string
-	dealsArgs
-}
-
-// query: dealsSearch(query, cursor, offset, limit) DealList
-func (r *resolver) DealsSearch(ctx context.Context, args dealsSearchArgs) (*dealListResolver, error) {
-	return r.dealsSearch(ctx, args)
-}
-
-func (r *resolver) dealsSearch(ctx context.Context, args dealsSearchArgs) (*dealListResolver, error) {
 	offset := 0
 	if args.Offset.Set && args.Offset.Value != nil && *args.Offset.Value > 0 {
 		offset = int(*args.Offset.Value)
@@ -126,7 +113,11 @@ func (r *resolver) dealsSearch(ctx context.Context, args dealsSearchArgs) (*deal
 		limit = int(*args.Limit.Value)
 	}
 
-	deals, count, more, err := r.dealList(ctx, args.Query, args.Cursor, offset, limit)
+	query := ""
+	if args.Query.Set && args.Query.Value != nil {
+		query = *args.Query.Value
+	}
+	deals, count, more, err := r.dealList(ctx, query, args.Cursor, offset, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +135,7 @@ func (r *resolver) dealsSearch(ctx context.Context, args dealsSearchArgs) (*deal
 }
 
 func (r *resolver) DealsCount(ctx context.Context) (int32, error) {
-	count, err := r.dealsDB.Count(ctx)
+	count, err := r.dealsDB.Count(ctx, "")
 	if err != nil {
 		return 0, err
 	}
@@ -218,7 +209,7 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 				// Pipe the deal to the new deal channel
 				di := evti.(types.ProviderDealState)
 				rsv := newDealResolver(&di, r.dealsDB, r.logsDB, r.spApi)
-				totalCount, err := r.dealsDB.Count(ctx)
+				totalCount, err := r.dealsDB.Count(ctx, "")
 				if err != nil {
 					log.Errorf("getting total deal count: %w", err)
 				}
@@ -300,13 +291,7 @@ func (r *resolver) dealsByPublishCID(ctx context.Context, publishCid cid.Cid) ([
 func (r *resolver) dealList(ctx context.Context, query string, cursor *graphql.ID, offset int, limit int) ([]types.ProviderDealState, int, bool, error) {
 	// Fetch one extra deal so that we can check if there are more deals
 	// beyond the limit
-	var deals []*types.ProviderDealState
-	var err error
-	if query != "" {
-		deals, err = r.dealsDB.Search(ctx, query, cursor, offset, limit+1)
-	} else {
-		deals, err = r.dealsDB.List(ctx, cursor, offset, limit+1)
-	}
+	deals, err := r.dealsDB.List(ctx, query, cursor, offset, limit+1)
 	if err != nil {
 		return nil, 0, false, err
 	}
@@ -317,7 +302,7 @@ func (r *resolver) dealList(ctx context.Context, query string, cursor *graphql.I
 	}
 
 	// Get the total deal count
-	count, err := r.dealsDB.Count(ctx)
+	count, err := r.dealsDB.Count(ctx, query)
 	if err != nil {
 		return nil, 0, false, err
 	}

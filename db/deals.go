@@ -62,7 +62,7 @@ func newDealAccessor(db *sql.DB, deal *types.ProviderDealState) *dealAccessor {
 			"StoragePricePerEpoch":  &bigIntFieldDef{f: &deal.ClientDealProposal.Proposal.StoragePricePerEpoch},
 			"ProviderCollateral":    &bigIntFieldDef{f: &deal.ClientDealProposal.Proposal.ProviderCollateral},
 			"ClientCollateral":      &bigIntFieldDef{f: &deal.ClientDealProposal.Proposal.ClientCollateral},
-			"ClientPeerID":          &fieldDef{f: &deal.ClientPeerID},
+			"ClientPeerID":          &peerIDFieldDef{f: &deal.ClientPeerID},
 			"DealDataRoot":          &cidFieldDef{f: &deal.DealDataRoot},
 			"InboundFilePath":       &fieldDef{f: &deal.InboundFilePath},
 			"TransferType":          &fieldDef{f: &deal.Transfer.Type},
@@ -217,9 +217,17 @@ func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid cid.Cid) 
 	return d.scanRow(row)
 }
 
-func (d *DealsDB) Count(ctx context.Context) (int, error) {
+func (d *DealsDB) Count(ctx context.Context, query string) (int, error) {
+	whereArgs := []interface{}{}
+	where := "SELECT count(*) FROM Deals"
+	if query != "" {
+		searchWhere, searchArgs := withSearchQuery(query)
+		where += " WHERE " + searchWhere
+		whereArgs = append(whereArgs, searchArgs...)
+	}
+	row := d.db.QueryRowContext(ctx, where, whereArgs...)
+
 	var count int
-	row := d.db.QueryRowContext(ctx, "SELECT count(*) FROM Deals")
 	err := row.Scan(&count)
 	return count, err
 }
@@ -232,14 +240,44 @@ func (d *DealsDB) ListCompleted(ctx context.Context) ([]*types.ProviderDealState
 	return d.list(ctx, 0, 0, "Checkpoint = ?", dealcheckpoints.Complete.String())
 }
 
-func (d *DealsDB) List(ctx context.Context, cursor *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
+func (d *DealsDB) List(ctx context.Context, query string, cursor *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
 	where := ""
 	whereArgs := []interface{}{}
+
+	// Add pagination parameters
 	if cursor != nil {
 		where += "CreatedAt <= (SELECT CreatedAt FROM Deals WHERE ID = ?)"
 		whereArgs = append(whereArgs, *cursor)
 	}
+
+	// Add search query parameters
+	if query != "" {
+		if where != "" {
+			where += " AND "
+		}
+		searchWhere, searchArgs := withSearchQuery(query)
+		where += searchWhere
+		whereArgs = append(whereArgs, searchArgs...)
+	}
+
 	return d.list(ctx, offset, limit, where, whereArgs...)
+}
+
+var searchFields = []string{"ID", "PieceCID", "ClientAddress", "ProviderAddress", "ClientPeerID", "DealDataRoot", "PublishCID", "SignedProposalCID", "Label"}
+
+func withSearchQuery(query string) (string, []interface{}) {
+	query = strings.Trim(query, " \t\n")
+	whereArgs := []interface{}{}
+	where := "("
+	for _, searchField := range searchFields {
+		where += searchField + " = ? OR "
+		whereArgs = append(whereArgs, query)
+	}
+	where += " instr(Error, ?) > 0"
+	whereArgs = append(whereArgs, query)
+	where += ")"
+
+	return where, whereArgs
 }
 
 func (d *DealsDB) list(ctx context.Context, offset int, limit int, whereClause string, whereArgs ...interface{}) ([]*types.ProviderDealState, error) {
@@ -258,12 +296,6 @@ func (d *DealsDB) list(ctx context.Context, offset int, limit int, whereClause s
 			args = append(args, offset)
 		}
 	}
-
-	out := qry
-	for _, arg := range args {
-		out = strings.Replace(out, "?", fmt.Sprint(arg), 1)
-	}
-	fmt.Println(out)
 
 	rows, err := d.db.QueryContext(ctx, qry, args...)
 	if err != nil {
@@ -284,39 +316,6 @@ func (d *DealsDB) list(ctx context.Context, offset int, limit int, whereClause s
 	}
 
 	return deals, nil
-}
-
-func (d *DealsDB) Search(ctx context.Context, query string, cursor *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
-	where := ""
-	whereArgs := []interface{}{}
-	if cursor != nil {
-		where += "CreatedAt <= (SELECT CreatedAt FROM Deals WHERE ID = ?) AND "
-		whereArgs = append(whereArgs, *cursor)
-	}
-
-	where += "("
-	where += "ID = ? OR "
-	whereArgs = append(whereArgs, query)
-	where += "DealProposalSignature = ? OR "
-	whereArgs = append(whereArgs, query)
-	where += "PieceCID = ? OR "
-	whereArgs = append(whereArgs, query)
-	where += "ClientAddress = ? OR "
-	whereArgs = append(whereArgs, query)
-	where += "ProviderAddress = ? OR "
-	whereArgs = append(whereArgs, query)
-	where += "ClientPeerID = ? OR "
-	whereArgs = append(whereArgs, query)
-	where += "DealDataRoot = ? OR "
-	whereArgs = append(whereArgs, query)
-	where += "PublishCID = ? OR "
-	whereArgs = append(whereArgs, query)
-	where += "SignedProposalCID = ?"
-	whereArgs = append(whereArgs, query)
-	// TODO: search error field
-	where += ")"
-
-	return d.list(ctx, offset, limit, where, whereArgs...)
 }
 
 func (d *DealsDB) scanRow(row Scannable) (*types.ProviderDealState, error) {

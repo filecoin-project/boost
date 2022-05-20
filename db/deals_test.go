@@ -44,16 +44,16 @@ func TestDealsDB(t *testing.T) {
 	req.NoError(err)
 	req.Equal(deal.DealUuid, storedDealBySignedPropCid.DealUuid)
 
-	dealList, err := db.List(ctx, nil, 0, 0)
+	dealList, err := db.List(ctx, "", nil, 0, 0)
 	req.NoError(err)
 	req.Len(dealList, len(deals))
 
-	limitedDealList, err := db.List(ctx, nil, 1, 1)
+	limitedDealList, err := db.List(ctx, "", nil, 1, 1)
 	req.NoError(err)
 	req.Len(limitedDealList, 1)
 	req.Equal(dealList[1].DealUuid, limitedDealList[0].DealUuid)
 
-	count, err := db.Count(ctx)
+	count, err := db.Count(ctx, "")
 	req.NoError(err)
 	req.Equal(len(deals), count)
 
@@ -97,31 +97,89 @@ func TestDealsDBSearch(t *testing.T) {
 	ctx := context.Background()
 
 	sqldb := CreateTestTmpDB(t)
-	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
-	require.NoError(t, Migrate(sqldb))
+	req.NoError(CreateAllBoostTables(ctx, sqldb, sqldb))
+	req.NoError(Migrate(sqldb))
 
+	start := time.Now()
 	db := NewDealsDB(sqldb)
-	deals, err := GenerateDeals()
+	deals, err := generateDeals(5)
 	req.NoError(err)
+	t.Logf("generated %d deals in %s", len(deals), time.Since(start))
 
+	insertStart := time.Now()
 	for _, deal := range deals {
-		err = db.Insert(ctx, &deal)
+		err := db.Insert(ctx, &deal)
 		req.NoError(err)
 	}
+	t.Logf("inserted deals in %s", time.Since(insertStart))
+
+	signedPropCid, err := deals[0].SignedProposalCid()
+	req.NoError(err)
 
 	tcs := []struct {
 		name  string
 		value string
+		count int
 	}{{
-		name:  "PieceCID",
+		name:  "search error",
+		value: "data-transfer failed",
+		count: 1,
+	}, {
+		name:  "search error with padding",
+		value: "  data-transfer failed\n\t ",
+		count: 1,
+	}, {
+		name:  "Deal UUID",
+		value: deals[0].DealUuid.String(),
+		count: 1,
+	}, {
+		name:  "piece CID",
 		value: deals[0].ClientDealProposal.Proposal.PieceCID.String(),
+		count: 1,
+	}, {
+		name:  "client address",
+		value: deals[0].ClientDealProposal.Proposal.Client.String(),
+		count: 1,
+	}, {
+		name:  "provider address",
+		value: deals[0].ClientDealProposal.Proposal.Provider.String(),
+		count: len(deals),
+	}, {
+		name:  "client peer ID",
+		value: deals[0].ClientPeerID.String(),
+		count: 1,
+	}, {
+		name:  "deal data root",
+		value: deals[0].DealDataRoot.String(),
+		count: 1,
+	}, {
+		name:  "publish CID",
+		value: deals[0].PublishCID.String(),
+		count: 1,
+	}, {
+		name:  "signed proposal CID",
+		value: signedPropCid.String(),
+		count: 1,
+	}, {
+		name:  "label",
+		value: deals[0].ClientDealProposal.Proposal.Label,
+		count: 1,
 	}}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			searchRes, err := db.Search(ctx, tc.value, nil, 0, 0)
+			count, err := db.Count(ctx, tc.value)
 			req.NoError(err)
-			require.Len(t, searchRes, 1)
-			require.Equal(t, searchRes[0].DealUuid, deals[0].DealUuid)
+			req.Equal(tc.count, count)
+
+			searchStart := time.Now()
+			searchRes, err := db.List(ctx, tc.value, nil, 0, 0)
+			searchElapsed := time.Since(searchStart)
+			req.NoError(err)
+			req.Len(searchRes, tc.count)
+			t.Logf("searched in %s", searchElapsed)
+			if tc.count == 1 {
+				req.Equal(searchRes[0].DealUuid, deals[0].DealUuid)
+			}
 		})
 	}
 }

@@ -4,10 +4,9 @@ import {
     DealsListQuery,
 } from "./gql";
 import moment from "moment";
-import debounce from 'lodash.debounce';
 import {DebounceInput} from 'react-debounce-input';
 import {humanFileSize} from "./util";
-import React, {useMemo, useState} from "react";
+import React, {useState} from "react";
 import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
@@ -15,9 +14,12 @@ import {LegacyStorageDealsCount} from "./LegacyDeals";
 import {TimestampFormat} from "./timestamp";
 import {DealsPerPage} from "./deals-per-page";
 import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
+import xImg from './bootstrap-icons/icons/x-lg.svg'
 import './Deals.css'
 import {Pagination} from "./Pagination";
 import {DealActions, IsPaused, IsTransferring} from "./DealDetail";
+
+const dealsBasePath = '/storage-deals'
 
 export function StorageDealsPage(props) {
     return <PageContainer pageType="storage-deals" title="Storage Deals">
@@ -28,7 +30,7 @@ export function StorageDealsPage(props) {
 function StorageDealsContent(props) {
     const navigate = useNavigate()
     const params = useParams()
-    const [subDeals, setSubDeals] = useState([])
+    const pageNum = (params.pageNum && parseInt(params.pageNum)) || 1
 
     const [timestampFormat, setTimestampFormat] = useState(TimestampFormat.load)
     const saveTimestampFormat = (val) => {
@@ -41,21 +43,29 @@ function StorageDealsContent(props) {
         const val = parseInt(e.target.value)
         DealsPerPage.save(val)
         setDealsPerPage(val)
-        navigate('/storage-deals')
+        navigate(dealsBasePath)
         scrollTop()
     }
 
     const [searchQuery, setSearchQuery] = useState('')
     const handleSearchQueryChange = (event) => {
+        if (pageNum !== 1) {
+            navigate(dealsBasePath)
+        }
         setSearchQuery(event.target.value)
+    }
+    const clearSearchBox = () => {
+        if (pageNum !== 1) {
+            navigate(dealsBasePath)
+        }
+        setSearchQuery('')
     }
 
     // Fetch deals on this page
-    const pageNum = (params.pageNum && parseInt(params.pageNum)) || 1
     const dealListOffset = (pageNum-1) * dealsPerPage
     const queryCursor = (pageNum === 1) ? null : params.cursor
     const {loading, error, data} = useQuery(DealsListQuery, {
-        pollInterval: 1000,
+        pollInterval: searchQuery ? undefined : 1000,
         variables: {
             query: searchQuery,
             cursor: queryCursor,
@@ -68,8 +78,7 @@ function StorageDealsContent(props) {
     if (error) return <div>Error: {error.message + " - check connection to Boost server"}</div>
     if (loading) return <div>Loading...</div>
 
-    // var deals = data.deals.deals
-    var res = data.dealsSearch
+    var res = data.deals
     var deals = res.deals
     if (pageNum === 1) {
         deals.sort((a, b) => b.CreatedAt.getTime() - a.CreatedAt.getTime())
@@ -86,7 +95,7 @@ function StorageDealsContent(props) {
     var toggleTimestampFormat = () => saveTimestampFormat(!timestampFormat)
 
     const paginationParams = {
-        basePath: '/storage-deals',
+        basePath: dealsBasePath,
         cursor, pageNum, totalCount,
         rowsPerPage: dealsPerPage,
         moreRows: moreDeals,
@@ -95,7 +104,7 @@ function StorageDealsContent(props) {
     }
 
     return <div className="deals">
-        <SearchBox value={searchQuery} onChange={handleSearchQueryChange} />
+        <SearchBox value={searchQuery} clearSearchBox={clearSearchBox} onChange={handleSearchQueryChange} />
         <table>
             <tbody>
             <tr>
@@ -124,10 +133,12 @@ function StorageDealsContent(props) {
 function SearchBox(props) {
     return <div className="search">
         <DebounceInput
-            minLength={2}
+            autoFocus={!!props.value}
+            minLength={4}
             debounceTimeout={300}
             value={props.value}
             onChange={props.onChange} />
+        { props.value ? <img class="clear-text" onClick={props.clearSearchBox} src={xImg} /> : null }
     </div>
 }
 
@@ -169,10 +180,6 @@ function DealRow(props) {
             </td>
         </tr>
     )
-}
-
-function uniqDeals(deals) {
-    return new Array(...new Map(deals.map(el => [el.ID, el])).values())
 }
 
 export function StorageDealsMenuItem(props) {
