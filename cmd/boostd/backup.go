@@ -317,7 +317,7 @@ func copyKeys(src, dest string) error {
 		return err
 	}
 
-	km, err := os.ReadDir(srcDirStat.Name())
+	km, err := os.ReadDir(srcDir)
 
 	if err != nil {
 		return err
