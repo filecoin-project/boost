@@ -138,7 +138,7 @@ function SearchBox(props) {
             debounceTimeout={300}
             value={props.value}
             onChange={props.onChange} />
-        { props.value ? <img class="clear-text" onClick={props.clearSearchBox} src={xImg} /> : null }
+        { props.value ? <img alt="clear" class="clear-text" onClick={props.clearSearchBox} src={xImg} /> : null }
     </div>
 }
 
