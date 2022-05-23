@@ -73,3 +73,24 @@
 .deals tr.show-actions td.message .buttons .button.retry {
     background-image: url("./icons/play-white.svg");
 }
+
+.deals .search {
+    position: absolute;
+    right: 8em;
+    top: 2em;
+}
+
+.deals .search input {
+    background-image: url("./bootstrap-icons/icons/search.svg");
+    background-repeat: no-repeat;
+    background-position: left 0.5em center;
+    padding-left: 2em;
+    padding-right: 2em;
+}
+
+.deals .search .clear-text {
+    position: absolute;
+    right: 1em;
+    top: 1.1em;
+    cursor: pointer;
+}

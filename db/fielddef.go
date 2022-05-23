@@ -11,6 +11,7 @@ import (
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/ipfs/go-cid"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 type fieldDefinition interface {
@@ -97,6 +98,49 @@ func (fd *cidPtrFieldDef) unmarshall() error {
 	return nil
 }
 
+type peerIDFieldDef struct {
+	marshalled sql.NullString
+	f          *peer.ID
+}
+
+func (fd *peerIDFieldDef) fieldPtr() interface{} {
+	return &fd.marshalled
+}
+
+func (fd *peerIDFieldDef) marshall() (interface{}, error) {
+	if fd.f == nil {
+		return nil, nil
+	}
+	return fd.f.String(), nil
+}
+
+func (fd *peerIDFieldDef) unmarshall() error {
+	if !fd.marshalled.Valid {
+		return nil
+	}
+
+	if fd.marshalled.String == "" {
+		*fd.f = ""
+		return nil
+	}
+
+	// The dummydeal command creates deals with a peer ID of "dummy"
+	if fd.marshalled.String == "dummy" {
+		*fd.f = peer.ID(fd.marshalled.String)
+		return nil
+	}
+
+	var pid peer.ID
+	bz := []byte(fd.marshalled.String)
+	err := pid.UnmarshalText(bz)
+	if err != nil {
+		return fmt.Errorf("parsing peer ID from string '%s': %w", fd.marshalled.String, err)
+	}
+
+	*fd.f = pid
+	return nil
+}
+
 type bigIntFieldDef struct {
 	marshalled sql.NullString
 	f          *big.Int
@@ -126,7 +170,7 @@ func (fd *bigIntFieldDef) unmarshall() error {
 }
 
 type addrFieldDef struct {
-	marshalled []byte
+	marshalled string
 	f          *address.Address
 }
 
@@ -135,11 +179,11 @@ func (fd *addrFieldDef) fieldPtr() interface{} {
 }
 
 func (fd *addrFieldDef) marshall() (interface{}, error) {
-	return fd.f.Bytes(), nil
+	return fd.f.String(), nil
 }
 
 func (fd *addrFieldDef) unmarshall() error {
-	addr, err := address.NewFromBytes(fd.marshalled)
+	addr, err := address.NewFromString(fd.marshalled)
 	if err != nil {
 		return fmt.Errorf("parsing address: %w", err)
 	}
