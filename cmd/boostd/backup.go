@@ -150,13 +150,15 @@ var restoreCmd = &cli.Command{
 			return fmt.Errorf("expanding backup directory path: %w", err)
 		}
 
-		fmt.Println("Verifying backup")
+		fmt.Printf("Checking backup directory %s\n", bpath)
 
 		flist := []string{"metadata", "boost.db", "boost.logs.db"}
 		for _, fileName := range flist {
 			_, err = os.Stat(path.Join(bpath, fileName))
 			if os.IsNotExist(err) {
-				return fmt.Errorf("could not locate suitable backup files: %w", err)
+				return fmt.Errorf("did not find required repo file %s: %w", fileName, err)
+			} else if (err != nil) {
+				return fmt.Errorf("getting status of %s: %w", fileName, err)
 			}
 		}
 
