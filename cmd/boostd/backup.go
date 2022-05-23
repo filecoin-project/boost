@@ -26,10 +26,10 @@ var fm = []string{"api",
 	"token"}
 
 var backupCmd = &cli.Command{
-	Name:   "backup",
-	Usage: "boostd backup <backup directory>",
-	Description:  "Performs offline backup of Boost",
-	Before: before,
+	Name:        "backup",
+	Usage:       "boostd backup <backup directory>",
+	Description: "Performs offline backup of Boost",
+	Before:      before,
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() != 1 {
 			return fmt.Errorf("usage: boostd backup <backup directory>")
@@ -119,10 +119,14 @@ var backupCmd = &cli.Command{
 				return fmt.Errorf("expanding destination file path %s: %w", destName, err)
 			}
 
-			if err := copy_files(srcPath, destPath); err != nil {
+			if err := copyFiles(srcPath, destPath); err != nil {
 				return fmt.Errorf("error copying file %s: %w", srcName, err)
 			}
 
+		}
+
+		if err := copyKeys(lr.Path(), bkpDir); err != nil {
+			return fmt.Errorf("error copying keys: %w", err)
 		}
 
 		fmt.Println("Boost repo successfully backed up at " + bkpDir)
@@ -132,13 +136,28 @@ var backupCmd = &cli.Command{
 }
 
 var restoreCmd = &cli.Command{
-	Name:   "restore",
-	Usage:  "boostd restore <backup dir>",
-	Description:  "Restores a boost repository from backup",
-	Before: before,
+	Name:        "restore",
+	Usage:       "boostd restore <backup dir>",
+	Description: "Restores a boost repository from backup",
+	Before:      before,
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() != 1 {
 			return fmt.Errorf("restore only takes one argument (backup directory path)")
+		}
+
+		bpath, err := homedir.Expand(cctx.Args().First())
+		if err != nil {
+			return fmt.Errorf("expanding backup directory path: %w", err)
+		}
+
+		fmt.Println("Verifying backup")
+
+		flist := []string{"metadata", "boost.db", "boost.logs.db"}
+		for _, fileName := range flist {
+			_, err = os.Stat(path.Join(bpath, fileName))
+			if os.IsNotExist(err) {
+				return fmt.Errorf("could not locate suitable backup files: %w", err)
+			}
 		}
 
 		repoPath := cctx.String(FlagBoostRepo)
@@ -171,11 +190,6 @@ var restoreCmd = &cli.Command{
 		mds, err := lr.Datastore(cctx.Context, metadataNamespace)
 		if err != nil {
 			return err
-		}
-
-		bpath, err := homedir.Expand(cctx.Args().First())
-		if err != nil {
-			return fmt.Errorf("expanding backup directory path: %w", err)
 		}
 
 		fpathName := path.Join(bpath, metadaFileName)
@@ -235,10 +249,14 @@ var restoreCmd = &cli.Command{
 				return fmt.Errorf("expanding destination file path %s: %w", destName, err)
 			}
 
-			if err := copy_files(srcPath, destPath); err != nil {
+			if err := copyFiles(srcPath, destPath); err != nil {
 				return fmt.Errorf("error copying file %s: %w", srcName, err)
 			}
 
+		}
+
+		if err := copyKeys(bpath, rpath); err != nil {
+			return fmt.Errorf("error copying keys: %w", err)
 		}
 
 		fmt.Println("Boost repo successfully restored at " + lr.Path())
@@ -247,7 +265,7 @@ var restoreCmd = &cli.Command{
 	},
 }
 
-func copy_files(src, dest string) error {
+func copyFiles(src, dest string) error {
 	f, err := os.Stat(src)
 
 	if os.IsNotExist(err) {
@@ -267,6 +285,52 @@ func copy_files(src, dest string) error {
 	err = ioutil.WriteFile(dest, input, f.Mode())
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func copyKeys(src, dest string) error {
+	srcDir := path.Join(src, "keystore")
+	srcDirStat, err := os.Stat(srcDir)
+
+	if os.IsNotExist(err) {
+		fmt.Printf("Keystore directory not found. Keys will not be copied\n")
+		return nil
+	}
+
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	destDir := path.Join(dest, "keystore")
+
+	_, err = os.Stat(destDir)
+
+	if os.IsNotExist(err) {
+		if err := os.Mkdir(destDir, srcDirStat.Mode()); err != nil {
+			return err
+		}
+	}
+
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	km, err := os.ReadDir(srcDirStat.Name())
+
+	if err != nil {
+		return err
+	}
+
+	for _, kname := range km {
+		if !kname.IsDir() {
+			if err := copyFiles(path.Join(srcDir, kname.Name()), path.Join(destDir, kname.Name())); err != nil {
+				fmt.Printf("error copying file %s", path.Join(srcDir, kname.Name()))
+				return err
+			}
+
+		}
 	}
 
 	return nil
