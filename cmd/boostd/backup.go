@@ -91,6 +91,10 @@ var backupCmd = &cli.Command{
 
 		fmt.Println("Copying keystore")
 
+		if err := os.Mkdir(path.Join(bkpDir, "keystore"), 0700); err != nil {
+			return fmt.Errorf("error creating keystore directory %s: %w", path.Join(bkpDir, "keystore"), err)
+		}
+
 		if err := migrateMarketsKeystore(lr, lb); err != nil {
 			return fmt.Errorf("error copying keys: %w", err)
 		}
