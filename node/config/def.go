@@ -6,10 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ipfs/go-cid"
-
 	"github.com/filecoin-project/lotus/chain/types"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
+	"github.com/ipfs/go-cid"
 )
 
 const (
@@ -101,6 +100,7 @@ func DefaultBoost() *Boost {
 			},
 
 			MaxTransferDuration: Duration(24 * 3600 * time.Second),
+			RemoteCommp:         false,
 		},
 
 		LotusDealmaking: lotus_config.DealmakingConfig{

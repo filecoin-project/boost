@@ -60,51 +60,75 @@ import (
 )
 
 func TestSimpleDealHappy(t *testing.T) {
-	ctx := context.Background()
+	runTest := func(t *testing.T, localCommp bool) {
+		ctx := context.Background()
 
-	// setup the provider test harness
-	harness := NewHarness(t)
-	// start the provider test harness
-	harness.Start(t, ctx)
-	defer harness.Stop()
+		// setup the provider test harness
+		opts := []harnessOpt{}
+		if localCommp {
+			opts = append(opts, withLocalCommp())
+		}
+		harness := NewHarness(t, opts...)
+		// start the provider test harness
+		harness.Start(t, ctx)
+		defer harness.Stop()
 
-	// build the deal proposal with the blocking http test server and a completely blocking miner stub
-	td := harness.newDealBuilder(t, 1).withAllMinerCallsBlocking().withBlockingHttpServer().build()
+		// build the deal proposal with the blocking http test server and a completely blocking miner stub
+		tdBuilder := harness.newDealBuilder(t, 1).withBlockingHttpServer()
+		if localCommp {
+			// if commp is calculated locally, don't expect a remote call to commp
+			// (expect calls to all other miner APIs)
+			tdBuilder.withPublishBlocking().withPublishConfirmBlocking().withAddPieceBlocking()
+		} else {
+			tdBuilder.withAllMinerCallsBlocking()
+		}
+		td := tdBuilder.build()
 
-	// execute deal
-	require.NoError(t, td.executeAndSubscribe())
+		// execute deal
+		require.NoError(t, td.executeAndSubscribe())
 
-	// wait for Accepted checkpoint
-	td.waitForAndAssert(t, ctx, dealcheckpoints.Accepted)
+		// wait for Accepted checkpoint
+		td.waitForAndAssert(t, ctx, dealcheckpoints.Accepted)
 
-	// unblock transfer -> wait for Transferred checkpoint and assert deals db and storage and fund manager
-	td.unblockTransfer()
-	td.waitForAndAssert(t, ctx, dealcheckpoints.Transferred)
-	harness.AssertStorageAndFundManagerState(t, ctx, td.params.Transfer.Size, harness.MinPublishFees, td.params.ClientDealProposal.Proposal.ProviderCollateral)
+		// unblock transfer & commp -> wait for Transferred checkpoint and assert deals db and storage and fund manager
+		td.unblockTransfer()
+		if !localCommp {
+			td.unblockCommp()
+		}
+		td.waitForAndAssert(t, ctx, dealcheckpoints.Transferred)
+		harness.AssertStorageAndFundManagerState(t, ctx, td.params.Transfer.Size, harness.MinPublishFees, td.params.ClientDealProposal.Proposal.ProviderCollateral)
 
-	// unblock publish -> wait for published checkpoint and assert
-	td.unblockPublish()
-	td.waitForAndAssert(t, ctx, dealcheckpoints.Published)
-	harness.AssertStorageAndFundManagerState(t, ctx, td.params.Transfer.Size, harness.MinPublishFees, td.params.ClientDealProposal.Proposal.ProviderCollateral)
+		// unblock publish -> wait for published checkpoint and assert
+		td.unblockPublish()
+		td.waitForAndAssert(t, ctx, dealcheckpoints.Published)
+		harness.AssertStorageAndFundManagerState(t, ctx, td.params.Transfer.Size, harness.MinPublishFees, td.params.ClientDealProposal.Proposal.ProviderCollateral)
 
-	// unblock publish confirmation -> wait for publish confirmed and assert
-	td.unblockWaitForPublish()
-	td.waitForAndAssert(t, ctx, dealcheckpoints.PublishConfirmed)
-	harness.EventuallyAssertStorageFundState(t, ctx, td.params.Transfer.Size, abi.NewTokenAmount(0), abi.NewTokenAmount(0))
+		// unblock publish confirmation -> wait for publish confirmed and assert
+		td.unblockWaitForPublish()
+		td.waitForAndAssert(t, ctx, dealcheckpoints.PublishConfirmed)
+		harness.EventuallyAssertStorageFundState(t, ctx, td.params.Transfer.Size, abi.NewTokenAmount(0), abi.NewTokenAmount(0))
 
-	// unblock adding piece -> wait for piece to be added and assert
-	td.unblockAddPiece()
-	td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
-	harness.EventuallyAssertNoTagged(t, ctx)
+		// unblock adding piece -> wait for piece to be added and assert
+		td.unblockAddPiece()
+		td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
+		harness.EventuallyAssertNoTagged(t, ctx)
 
-	// expect Proving event to be fired
-	err := td.waitForSealingState(lapi.SectorState(sealing.Proving))
-	require.NoError(t, err)
+		// expect Proving event to be fired
+		err := td.waitForSealingState(lapi.SectorState(sealing.Proving))
+		require.NoError(t, err)
 
-	// assert logs
-	lgs, err := harness.Provider.logsDB.Logs(ctx, td.params.DealUUID)
-	require.NoError(t, err)
-	require.NotEmpty(t, lgs)
+		// assert logs
+		lgs, err := harness.Provider.logsDB.Logs(ctx, td.params.DealUUID)
+		require.NoError(t, err)
+		require.NotEmpty(t, lgs)
+	}
+
+	t.Run("with remote commp", func(t *testing.T) {
+		runTest(t, false)
+	})
+	t.Run("with local commp", func(t *testing.T) {
+		runTest(t, true)
+	})
 }
 
 func TestMultipleDealsConcurrent(t *testing.T) {
@@ -157,7 +181,7 @@ func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
 		} else {
 			// for odd numbered deals, we will block on the publish-confirm step
 			// setup mock publish & add-piece expectations with blocking wait-for-publish behaviours -> the associated tagged funds and storage will not be released
-			td = harness.newDealBuilder(t, i).withPublishNonBlocking().withPublishConfirmBlocking().withAddPieceBlocking().withNormalHttpServer().build()
+			td = harness.newDealBuilder(t, i).withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmBlocking().withAddPieceBlocking().withNormalHttpServer().build()
 			totalStorage = totalStorage + td.params.Transfer.Size
 			totalCollat = abi.NewTokenAmount(totalCollat.Add(totalCollat.Int, td.params.ClientDealProposal.Proposal.ProviderCollateral.Int).Int64())
 			totalPublish = abi.NewTokenAmount(totalPublish.Add(totalPublish.Int, harness.MinPublishFees.Int).Int64())
@@ -465,7 +489,7 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 		name: "publish confirm fails",
 		dbuilder: func(h *ProviderHarness) *testDeal {
 			// Simulate publish confirm failure
-			return h.newDealBuilder(t, 1).withPublishNonBlocking().withPublishConfirmFailing(errors.New("pubconferr")).withNormalHttpServer().build()
+			return h.newDealBuilder(t, 1).withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmFailing(errors.New("pubconferr")).withNormalHttpServer().build()
 		},
 		expectedErr: "pubconferr",
 		onResume: func(builder *testDealBuilder) *testDeal {
@@ -476,7 +500,7 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 		name: "add piece fails",
 		dbuilder: func(h *ProviderHarness) *testDeal {
 			// Simulate add piece failure
-			return h.newDealBuilder(t, 1).withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceFailing(errors.New("addpieceerr")).withNormalHttpServer().build()
+			return h.newDealBuilder(t, 1).withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceFailing(errors.New("addpieceerr")).withNormalHttpServer().build()
 		},
 		expectedErr: "addpieceerr",
 		onResume: func(builder *testDealBuilder) *testDeal {
@@ -553,12 +577,11 @@ func TestDealRestartAfterManualRecoverableErrors(t *testing.T) {
 		name: "publish fails",
 		dbuilder: func(h *ProviderHarness) *testDeal {
 			// Simulate publish deal failure
-			return h.newDealBuilder(t, 1).withPublishFailing(errors.New("puberr")).withNormalHttpServer().build()
+			return h.newDealBuilder(t, 1).withCommpNonBlocking().withPublishFailing(errors.New("puberr")).withNormalHttpServer().build()
 		},
 		expectedErr: "puberr",
 		onResume: func(builder *testDealBuilder) *testDeal {
-			// Simulate add piece success
-			return builder.withAllMinerCallsNonBlocking().build()
+			return builder.withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().build()
 		},
 	}}
 
@@ -626,7 +649,7 @@ func TestDealFailAfterManualRecoverableErrors(t *testing.T) {
 	defer harness.Stop()
 
 	// Simulate publish deal failure
-	td := harness.newDealBuilder(t, 1).withPublishFailing(errors.New("puberr")).withNormalHttpServer().build()
+	td := harness.newDealBuilder(t, 1).withCommpNonBlocking().withPublishFailing(errors.New("puberr")).withNormalHttpServer().build()
 
 	// execute deal
 	err := td.executeAndSubscribe()
@@ -1127,6 +1150,8 @@ type providerConfig struct {
 	verifiedPrice abi.TokenAmount
 	minPieceSize  abi.PaddedPieceSize
 	maxPieceSize  abi.PaddedPieceSize
+
+	localCommp bool
 }
 
 type harnessOpt func(pc *providerConfig)
@@ -1167,6 +1192,12 @@ func withMaxStagingDealsBytes(max uint64) harnessOpt {
 func withTransportBuilder(bldr func(controller *gomock.Controller) transport.Transport) harnessOpt {
 	return func(pc *providerConfig) {
 		pc.transport = bldr(pc.mockCtrl)
+	}
+}
+
+func withLocalCommp() harnessOpt {
+	return func(pc *providerConfig) {
+		pc.localCommp = true
 	}
 }
 
@@ -1317,8 +1348,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	askStore := &mockAskStore{}
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
-	prvCfg := Config{MaxTransferDuration: time.Hour}
-	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, sps, minerStub, df, sqldb,
+	prvCfg := Config{MaxTransferDuration: time.Hour, RemoteCommp: !pc.localCommp}
+	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, minerStub, sps, minerStub, df, sqldb,
 		logsDB, dagStore, ps, &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
 	require.NoError(t, err)
 	ph.Provider = prov
@@ -1374,7 +1405,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 
 	// construct a new provider with pre-existing state
 	prov, err := NewProvider(h.Provider.config, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
-		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
+		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
 		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.dagst, h.Provider.ps, &NoOpIndexProvider{}, h.Provider.askGetter,
 		h.Provider.sigVerifier, h.Provider.dealLogger, h.Provider.Transport)
 
@@ -1515,7 +1546,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	if dc.undefinedPieceCid {
 		pieceCid = cid.Undef
 	}
-	var pieceSize = cidAndSize.PieceSize
+	var pieceSize = cidAndSize.Size
 	if dc.pieceSize != abi.PaddedPieceSize(0) {
 		pieceSize = dc.pieceSize
 	}
@@ -1587,6 +1618,7 @@ type testDealBuilder struct {
 
 	ms               *smtestutil.MinerStubBuilder
 	msNoOp           bool
+	msCommp          *minerStubCall
 	msPublish        *minerStubCall
 	msPublishConfirm *minerStubCall
 	msAddPiece       *minerStubCall
@@ -1604,6 +1636,16 @@ func (tbuilder *testDealBuilder) withPublishConfirmFailing(err error) *testDealB
 
 func (tbuilder *testDealBuilder) withAddPieceFailing(err error) *testDealBuilder {
 	tbuilder.msAddPiece = &minerStubCall{err: err}
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withCommpBlocking() *testDealBuilder {
+	tbuilder.msCommp = &minerStubCall{blocking: true}
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withCommpNonBlocking() *testDealBuilder {
+	tbuilder.msCommp = &minerStubCall{blocking: false}
 	return tbuilder
 }
 
@@ -1638,6 +1680,7 @@ func (tbuilder *testDealBuilder) withAddPieceNonBlocking() *testDealBuilder {
 }
 
 func (tbuilder *testDealBuilder) withAllMinerCallsNonBlocking() *testDealBuilder {
+	tbuilder.msCommp = &minerStubCall{blocking: false}
 	tbuilder.msPublish = &minerStubCall{blocking: false}
 	tbuilder.msPublishConfirm = &minerStubCall{blocking: false}
 	tbuilder.msAddPiece = &minerStubCall{blocking: false}
@@ -1645,6 +1688,7 @@ func (tbuilder *testDealBuilder) withAllMinerCallsNonBlocking() *testDealBuilder
 }
 
 func (tbuilder *testDealBuilder) withAllMinerCallsBlocking() *testDealBuilder {
+	tbuilder.msCommp = &minerStubCall{blocking: true}
 	tbuilder.msPublish = &minerStubCall{blocking: true}
 	tbuilder.msPublishConfirm = &minerStubCall{blocking: true}
 	tbuilder.msAddPiece = &minerStubCall{blocking: true}
@@ -1693,7 +1737,7 @@ func (tbuilder *testDealBuilder) build() *testDeal {
 	if tbuilder.msNoOp {
 		tbuilder.ms.SetupNoOp()
 	} else {
-		tbuilder.buildPublish().buildPublishConfirm().buildAddPiece()
+		tbuilder.buildCommp().buildPublish().buildPublishConfirm().buildAddPiece()
 	}
 
 	testDeal := tbuilder.td
@@ -1701,6 +1745,18 @@ func (tbuilder *testDealBuilder) build() *testDeal {
 	testDeal.stubOutput = tbuilder.ms.Output()
 	testDeal.tBuilder = tbuilder
 	return testDeal
+}
+
+func (tbuilder *testDealBuilder) buildCommp() *testDealBuilder {
+	if tbuilder.msCommp != nil {
+		if err := tbuilder.msCommp.err; err != nil {
+			tbuilder.ms.SetupCommpFailure(err)
+		} else {
+			tbuilder.ms.SetupCommp(tbuilder.msCommp.blocking)
+		}
+	}
+
+	return tbuilder
 }
 
 func (tbuilder *testDealBuilder) buildPublish() *testDealBuilder {
@@ -1852,6 +1908,7 @@ func (td *testDeal) updateWithRestartedProvider(ph *ProviderHarness) *testDealBu
 	old := td.stubOutput
 
 	td.ph = ph
+	td.tBuilder.msCommp = nil
 	td.tBuilder.msPublish = nil
 	td.tBuilder.msAddPiece = nil
 	td.tBuilder.msPublishConfirm = nil
@@ -1884,6 +1941,10 @@ func (td *testDeal) waitForAndAssert(t *testing.T, ctx context.Context, cp dealc
 
 func (td *testDeal) unblockTransfer() {
 	td.ph.BlockingServer.UnblockFile(td.carv2FileName)
+}
+
+func (td *testDeal) unblockCommp() {
+	td.ph.MinerStub.UnblockCommp(td.params.DealUUID)
 }
 
 func (td *testDeal) setTransferWorking(working bool) {

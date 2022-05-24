@@ -12,12 +12,13 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/specs-storage/storage"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 )
 
 //go:generate cbor-gen-for --map-encoding StorageAsk DealParams Transfer DealResponse DealStatusRequest DealStatusResponse DealStatus
-//go:generate go run github.com/golang/mock/mockgen -destination=mock_types/mocks.go -package=mock_types . PieceAdder,DealPublisher,ChainDealManager
+//go:generate go run github.com/golang/mock/mockgen -destination=mock_types/mocks.go -package=mock_types . PieceAdder,CommpCalculator,DealPublisher,ChainDealManager
 
 // StorageAsk defines the parameters by which a miner will choose to accept or
 // reject a deal. Note: making a storage deal proposal which matches the miner's
@@ -103,6 +104,10 @@ type DealResponse struct {
 
 type PieceAdder interface {
 	AddPiece(ctx context.Context, size abi.UnpaddedPieceSize, r io.Reader, d api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error)
+}
+
+type CommpCalculator interface {
+	ComputeDataCid(ctx context.Context, pieceSize abi.UnpaddedPieceSize, pieceData storage.Data) (abi.PieceInfo, error)
 }
 
 type DealPublisher interface {

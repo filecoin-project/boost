@@ -112,7 +112,7 @@ var dummydealCmd = &cli.Command{
 				return fmt.Errorf("generating commp for %s: %w", carFilepath, err)
 			}
 			pieceCid = cidAndSize.PieceCID
-			pieceSize = cidAndSize.PieceSize
+			pieceSize = cidAndSize.Size
 
 			if pieceCid.Prefix() != market.PieceCIDPrefix {
 				return fmt.Errorf("piece cid has wrong prefix: %s", pieceCid)

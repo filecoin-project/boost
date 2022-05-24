@@ -175,6 +175,8 @@ type DealmakingConfig struct {
 
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration Duration
+	// Whether to do commp on the Boost node (local) or on the Sealer (remote)
+	RemoteCommp bool
 }
 
 type FeeConfig struct {
