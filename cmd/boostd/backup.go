@@ -78,6 +78,23 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("error creating backup directory %s: %w", bkpDir, err)
 		}
 
+		b, err := lotus_repo.NewFS(bkpDir)
+		if err != nil {
+			return err
+		}
+
+		lb, err := b.Lock(node.Boost)
+		if err != nil {
+			return err
+		}
+		defer lb.Close()
+
+		fmt.Println("Copying keystore")
+
+		if err := migrateMarketsKeystore(lr, lb); err != nil {
+			return fmt.Errorf("error copying keys: %w", err)
+		}
+
 		fpathName := path.Join(bkpDir, metadaFileName)
 
 		fpath, err := homedir.Expand(fpathName)
@@ -125,10 +142,6 @@ var backupCmd = &cli.Command{
 
 		}
 
-		if err := copyKeys(lr.Path(), bkpDir); err != nil {
-			return fmt.Errorf("error copying keys: %w", err)
-		}
-
 		fmt.Println("Boost repo successfully backed up at " + bkpDir)
 
 		return nil
@@ -157,7 +170,7 @@ var restoreCmd = &cli.Command{
 			_, err = os.Stat(path.Join(bpath, fileName))
 			if os.IsNotExist(err) {
 				return fmt.Errorf("did not find required repo file %s: %w", fileName, err)
-			} else if (err != nil) {
+			} else if err != nil {
 				return fmt.Errorf("getting status of %s: %w", fileName, err)
 			}
 		}
@@ -188,6 +201,23 @@ var restoreCmd = &cli.Command{
 			return err
 		}
 		defer lr.Close()
+
+		b, err := lotus_repo.NewFS(bpath)
+		if err != nil {
+			return err
+		}
+
+		lb, err := b.Lock(node.Boost)
+		if err != nil {
+			return err
+		}
+		defer lb.Close()
+
+		fmt.Println("Copying keystore")
+
+		if err := migrateMarketsKeystore(lb, lr); err != nil {
+			return fmt.Errorf("error copying keys: %w", err)
+		}
 
 		mds, err := lr.Datastore(cctx.Context, metadataNamespace)
 		if err != nil {
@@ -257,10 +287,6 @@ var restoreCmd = &cli.Command{
 
 		}
 
-		if err := copyKeys(bpath, rpath); err != nil {
-			return fmt.Errorf("error copying keys: %w", err)
-		}
-
 		fmt.Println("Boost repo successfully restored at " + lr.Path())
 
 		return nil
@@ -287,52 +313,6 @@ func copyFiles(src, dest string) error {
 	err = ioutil.WriteFile(dest, input, f.Mode())
 	if err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func copyKeys(src, dest string) error {
-	srcDir := path.Join(src, "keystore")
-	srcDirStat, err := os.Stat(srcDir)
-
-	if os.IsNotExist(err) {
-		fmt.Printf("Keystore directory not found. Keys will not be copied\n")
-		return nil
-	}
-
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	destDir := path.Join(dest, "keystore")
-
-	_, err = os.Stat(destDir)
-
-	if os.IsNotExist(err) {
-		if err := os.Mkdir(destDir, srcDirStat.Mode()); err != nil {
-			return err
-		}
-	}
-
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	km, err := os.ReadDir(srcDir)
-
-	if err != nil {
-		return err
-	}
-
-	for _, kname := range km {
-		if !kname.IsDir() {
-			if err := copyFiles(path.Join(srcDir, kname.Name()), path.Join(destDir, kname.Name())); err != nil {
-				fmt.Printf("error copying file %s", path.Join(srcDir, kname.Name()))
-				return err
-			}
-
-		}
 	}
 
 	return nil
