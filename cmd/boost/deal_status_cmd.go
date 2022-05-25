@@ -85,6 +85,32 @@ var dealStatusCmd = &cli.Command{
 			return fmt.Errorf("send deal status request failed: %w", err)
 		}
 
+		if cctx.Bool("json") {
+			out := map[string]interface{}{}
+			if resp.Error != "" {
+				out["error"] = resp.Error
+			} else {
+				out = map[string]interface{}{
+					"dealUuid":      resp.DealUUID.String(),
+					"provider":      maddr.String(),
+					"clientWallet":  walletAddr.String(),
+					"statusMessage": statusMessage(resp),
+				}
+				// resp.DealStatus should always be present if there's no error,
+				// but check just in case
+				if resp.DealStatus != nil {
+					out["label"] = resp.DealStatus.Proposal.Label
+					out["chainDealId"] = resp.DealStatus.ChainDealID
+					out["status"] = resp.DealStatus.Status
+					out["publishCid"] = nil
+					if resp.DealStatus.PublishCid != nil {
+						out["publishCid"] = resp.DealStatus.PublishCid.String()
+					}
+				}
+			}
+			return cmd.PrintJson(out)
+		}
+
 		msg := "got deal status response"
 		msg += "\n"
 
