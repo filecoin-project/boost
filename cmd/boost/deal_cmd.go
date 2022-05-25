@@ -261,6 +261,23 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		return fmt.Errorf("deal proposal rejected: %s", resp.Message)
 	}
 
+	if cctx.Bool("json") {
+		out := map[string]interface{}{
+			"dealUuid":           dealUuid.String(),
+			"provider":           maddr.String(),
+			"clientWallet":       walletAddr.String(),
+			"payloadCid":         rootCid.String(),
+			"commp":              dealProposal.Proposal.PieceCID.String(),
+			"startEpoch":         dealProposal.Proposal.StartEpoch.String(),
+			"endEpoch":           dealProposal.Proposal.EndEpoch.String(),
+			"providerCollateral": dealProposal.Proposal.ProviderCollateral.String(),
+		}
+		if isOnline {
+			out["url"] = cctx.String("http-url")
+		}
+		return cmd.PrintJson(out)
+	}
+
 	msg := "sent deal proposal"
 	if !isOnline {
 		msg += " for offline deal"
