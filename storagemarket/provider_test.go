@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -60,7 +62,7 @@ import (
 )
 
 func TestSimpleDealHappy(t *testing.T) {
-	runTest := func(t *testing.T, localCommp bool) {
+	runTest := func(t *testing.T, localCommp bool, carVersion CarVersion) {
 		ctx := context.Background()
 
 		// setup the provider test harness
@@ -74,7 +76,7 @@ func TestSimpleDealHappy(t *testing.T) {
 		defer harness.Stop()
 
 		// build the deal proposal with the blocking http test server and a completely blocking miner stub
-		tdBuilder := harness.newDealBuilder(t, 1).withBlockingHttpServer()
+		tdBuilder := harness.newDealBuilder(t, 1, withCarVersion(carVersion)).withBlockingHttpServer()
 		if localCommp {
 			// if commp is calculated locally, don't expect a remote call to commp
 			// (expect calls to all other miner APIs)
@@ -123,11 +125,17 @@ func TestSimpleDealHappy(t *testing.T) {
 		require.NotEmpty(t, lgs)
 	}
 
-	t.Run("with remote commp", func(t *testing.T) {
-		runTest(t, false)
+	t.Run("with remote commp / car v1", func(t *testing.T) {
+		runTest(t, false, CarVersion1)
 	})
-	t.Run("with local commp", func(t *testing.T) {
-		runTest(t, true)
+	t.Run("with remote commp / car v2", func(t *testing.T) {
+		runTest(t, false, CarVersion2)
+	})
+	t.Run("with local commp / car v1", func(t *testing.T) {
+		runTest(t, true, CarVersion1)
+	})
+	t.Run("with local commp / car v2", func(t *testing.T) {
+		runTest(t, true, CarVersion2)
 	})
 }
 
@@ -1450,6 +1458,7 @@ type dealProposalConfig struct {
 	startEpoch         abi.ChainEpoch
 	endEpoch           abi.ChainEpoch
 	label              market.DealLabel
+	carVersion         CarVersion
 }
 
 // dealProposalOpt allows configuration of the deal proposal
@@ -1460,6 +1469,18 @@ type dealProposalOpt func(dc *dealProposalConfig)
 func withNormalFileSize(normalFileSize int) dealProposalOpt {
 	return func(dc *dealProposalConfig) {
 		dc.normalFileSize = normalFileSize
+	}
+}
+
+type CarVersion int
+
+const CarVersion1 = CarVersion(1)
+const CarVersion2 = CarVersion(2)
+
+// withCarVersion sets the CAR file version to be either v1 or v2
+func withCarVersion(v CarVersion) dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.carVersion = v
 	}
 }
 
@@ -1524,6 +1545,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 		undefinedPieceCid:  false,
 		startEpoch:         50000,
 		endEpoch:           800000,
+		carVersion:         CarVersion2,
 	}
 	for _, opt := range opts {
 		opt(dc)
@@ -1532,11 +1554,30 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	// generate a CARv2 file using a random seed in the tempDir
 	randomFilepath, err := testutil.CreateRandomFile(tbuilder.ph.TempDir, seed, dc.normalFileSize)
 	require.NoError(tbuilder.t, err)
-	rootCid, carV2FilePath, err := testutil.CreateDenseCARv2(tbuilder.ph.TempDir, randomFilepath)
+	rootCid, carFilePath, err := testutil.CreateDenseCARv2(tbuilder.ph.TempDir, randomFilepath)
 	require.NoError(tbuilder.t, err)
 
+	// if the file should be a version 1 car file
+	if dc.carVersion == CarVersion1 {
+		// Just get the data out of the car file and write it to disk
+		// (a car v1 is just the data portion of the car v2)
+		cv2r, err := carv2.OpenReader(carFilePath)
+		require.NoError(tbuilder.t, err)
+		r, err := cv2r.DataReader()
+		require.NoError(tbuilder.t, err)
+		carData, err := io.ReadAll(r)
+		require.NoError(tbuilder.t, err)
+		carv1Path := path.Join(tbuilder.ph.TempDir, "v1.car")
+		err = os.WriteFile(carv1Path, carData, 0644)
+		require.NoError(tbuilder.t, err)
+		rd, err := carv2.OpenReader(carv1Path)
+		require.NoError(tbuilder.t, err)
+		defer rd.Close()
+		carFilePath = carv1Path
+	}
+
 	// generate CommP of the CARv2 file
-	cidAndSize, err := GenerateCommP(carV2FilePath)
+	cidAndSize, err := GenerateCommP(carFilePath)
 	require.NoError(tbuilder.t, err)
 
 	var pieceCid = cidAndSize.PieceCID
@@ -1566,7 +1607,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 		ClientCollateral:     abi.NewTokenAmount(1),
 	}
 
-	carv2Fileinfo, err := os.Stat(carV2FilePath)
+	carv2Fileinfo, err := os.Stat(carFilePath)
 	require.NoError(tbuilder.t, err)
 	name := carv2Fileinfo.Name()
 
@@ -1591,7 +1632,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	td := &testDeal{
 		ph:            tbuilder.ph,
 		params:        dealParams,
-		carv2FilePath: carV2FilePath,
+		carv2FilePath: carFilePath,
 		carv2FileName: name,
 	}
 
