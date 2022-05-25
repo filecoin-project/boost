@@ -13,6 +13,14 @@ $(warning Your Golang version is go$(shell expr $(GOVERSION) / 1000000).$(shell 
 $(error Update Golang to version to at least 1.16.0)
 endif
 
+LTS_NODE_VER=16
+NODE_VER=$(shell node -v)
+ifeq ($(patsubst v$(LTS_NODE_VER).%,matched,$(NODE_VER)), matched)
+	NODE_LTS=true
+else
+	NODE_LTS=false
+endif
+
 # git modules that need to be loaded
 MODULES:=
 
@@ -92,10 +100,15 @@ boostci: $(BUILD_DEPS)
 	$(GOCC) build $(GOFLAGS) -o boostci ./cmd/boostci
 .PHONY: boostci
 
-react:
+react: check-node-lts
 	npm install --prefix react
 	npm run --prefix react build
 .PHONY: react
+
+.PHONY: check-node-lts
+check-node-lts:
+	@$(NODE_LTS) || echo Build requires Node v$(LTS_NODE_VER) \(detected Node $(NODE_VER)\)
+	@$(NODE_LTS) && echo Building using Node v$(LTS_NODE_VER)
 
 build-go: boost devnet
 .PHONY: build-go
