@@ -96,6 +96,21 @@ func (p *Provider) remoteCommP(filepath string) (*abi.PieceInfo, *dealMakingErro
 		}
 	}()
 
+	var size uint64
+	switch rd.Version {
+	case 2:
+		size = uint64(rd.Header.DataSize)
+	case 1:
+		st, err := os.Stat(filepath)
+		if err != nil {
+			return nil, &dealMakingError{
+				retry: types.DealRetryFatal,
+				error: fmt.Errorf("failed to get file size: %w", err),
+			}
+		}
+		size = uint64(st.Size())
+	}
+
 	// Get the data portion of the CAR file
 	dataReader, err := rd.DataReader()
 	if err != nil {
@@ -107,7 +122,8 @@ func (p *Provider) remoteCommP(filepath string) (*abi.PieceInfo, *dealMakingErro
 
 	// The commp calculation requires the data to be of length
 	// pieceSize.Unpadded(), so add zeros until it reaches that size
-	pr, numBytes := padreader.New(dataReader, rd.Header.DataSize)
+	pr, numBytes := padreader.New(dataReader, size)
+	log.Debugw("computing remote commp", "size", size, "padded-size", numBytes)
 	pi, err := p.commpCalc.ComputeDataCid(p.ctx, numBytes, pr)
 	if err != nil {
 		if p.ctx.Err() != nil {
