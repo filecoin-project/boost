@@ -199,6 +199,10 @@ npm start
 http://localhost:3000
 ```
 
+### Running a devnet
+
+Follow the instructions in the [devnet guide](./documentation/devnet.md)
+
 ## License
 
 Dual-licensed under [MIT](https://github.com/filecoin-project/boost/blob/main/LICENSE-MIT) + [Apache 2.0](https://github.com/filecoin-project/boost/blob/main/LICENSE-APACHE)
