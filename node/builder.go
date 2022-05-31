@@ -141,6 +141,7 @@ const (
 
 	// boost should be started after legacy markets (HandleDealsKey)
 	HandleBoostDealsKey
+	HandleProposalLogCleanerKey
 
 	// daemon
 	ExtractApiKey
@@ -385,6 +386,7 @@ var BoostNode = Options(
 	Override(new(*modules.LogSqlDB), modules.NewLogsSqlDB),
 	Override(new(*db.DealsDB), modules.NewDealsDB),
 	Override(new(*db.LogsDB), modules.NewLogsDB),
+	Override(new(*db.ProposalLogsDB), modules.NewProposalLogsDB),
 	Override(new(*db.FundsDB), modules.NewFundsDB),
 )
 
@@ -509,6 +511,7 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(lotus_storagemarket.StorageProvider), lotus_modules.StorageProvider),
 		Override(HandleDealsKey, modules.HandleLegacyDeals),
 		Override(HandleBoostDealsKey, modules.HandleBoostDeals),
+		Override(HandleProposalLogCleanerKey, modules.HandleProposalLogCleaner(time.Duration(cfg.Dealmaking.DealProposalLogDuration))),
 
 		// Boost storage deal filter
 		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),

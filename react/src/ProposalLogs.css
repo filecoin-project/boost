@@ -1,0 +1,98 @@
+.logs {
+    position: relative;
+}
+
+.logs table {
+    font-size: 1em;
+    width: 100%;
+}
+
+.logs td, .logs th {
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
+
+.logs th {
+    white-space: nowrap;
+    text-align: left;
+    opacity: 0.6;
+}
+
+.logs td.start, .logs th.start {
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.logs td.size {
+    width: 5em;
+    white-space: nowrap;
+}
+
+.logs td.deal-id {
+    min-width: 7em;
+}
+
+.logs td.deal-id.accepted {
+    cursor: pointer;
+    color: #465298;
+}
+
+.logs td.client {
+    min-width: 6em;
+}
+
+.logs td.reason {
+    width: 100%;
+}
+
+.logs tr.rejected {
+    background-color: #ffeeee;
+}
+
+.logs .popup {
+    display: none;
+    position: absolute;
+    font-size: 1em;
+    top: -4em;
+    text-align: center;
+    width: 100%;
+}
+.logs .popup.showing {
+    display: inline-block;
+}
+
+.logs .popup .message {
+    display: inline-block;
+    color: #777777;
+    background-color: #fff;
+    border: 1px solid #aaa;
+    border-radius: 0.2em;
+    padding: 0.5em;
+    font-size: 0.8em;
+    margin-top: 0.8em;
+}
+
+.logs .deal-id > *, .logs .client > * {
+    display: inline-block;
+}
+
+.logs .copy {
+    display: inline-block;
+    vertical-align: text-top;
+    width: 0.8em;
+    height: 0.8em;
+    margin-right: 0.5em;
+    margin-top: 0.1em;
+    cursor: pointer;
+    background: url("./bootstrap-icons/icons/clipboard.svg");
+    background-size: cover;
+}
+
+.logs .copy.copied {
+    animation: rotate 0.5s infinite;
+}
+
+@keyframes rotate {
+    from{ transform: rotate(0deg); }
+    to{ transform: rotate(360deg); }
+}

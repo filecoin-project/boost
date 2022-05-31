@@ -210,6 +210,12 @@ passed to the sealing node by the markets service. 0 is unlimited.`,
 			Comment: `Minimum start epoch buffer to give time for sealing of sector with deal.`,
 		},
 		{
+			Name: "DealProposalLogDuration",
+			Type: "Duration",
+
+			Comment: `The amount of time to keep deal proposal logs for before cleaning them up.`,
+		},
+		{
 			Name: "Filter",
 			Type: "string",
 

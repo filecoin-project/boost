@@ -60,11 +60,12 @@ func main() {
 func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("boostd", "INFO")
 	_ = logging.SetLogLevel("db", "INFO")
-	_ = logging.SetLogLevel("boost-net", "INFO")
+	_ = logging.SetLogLevel("boost-prop", "INFO")
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostd", "DEBUG")
 		_ = logging.SetLogLevel("provider", "DEBUG")
+		_ = logging.SetLogLevel("boost-net", "DEBUG")
 		_ = logging.SetLogLevel("gql", "DEBUG")
 		_ = logging.SetLogLevel("boost-provider", "DEBUG")
 		_ = logging.SetLogLevel("storagemanager", "DEBUG")

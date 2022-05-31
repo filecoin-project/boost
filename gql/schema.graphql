@@ -140,6 +140,27 @@ type DealLog {
   Subsystem: String!
 }
 
+type ProposalLog {
+  DealUUID: ID!
+  Accepted: Boolean!
+  Reason: String!
+  CreatedAt: Time!
+  ClientAddress: String!
+  PieceSize: Uint64!
+}
+
+type ProposalLogsList {
+  totalCount: Int!
+  logs: [ProposalLog]!
+  more: Boolean!
+}
+
+type ProposalLogsCount {
+  Accepted: Int!
+  Rejected: Int!
+  Period: Uint64!
+}
+
 type Storage {
   Staged: Uint64!
   Transferred: Uint64!
@@ -293,6 +314,12 @@ type RootQuery {
 
   """Get the total number of deals made with legacy markets endpoint"""
   legacyDealsCount: Int!
+
+  """Get deal proposal logs"""
+  proposalLogs(accepted: Boolean, cursor: BigInt, offset: Int, limit: Int): ProposalLogsList!
+
+  """Get the number of accepted and rejected deal proposal logs"""
+  proposalLogsCount: ProposalLogsCount!
 
   """Get storage space usage"""
   storage: Storage!

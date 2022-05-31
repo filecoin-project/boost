@@ -184,6 +184,33 @@ const DealSubscription = gql`
     }
 `;
 
+const ProposalLogsListQuery = gql`
+    query AppProposalLogsListQuery($accepted: Boolean, $cursor: BigInt, $offset: Int, $limit: Int) {
+        proposalLogs(accepted: $accepted, cursor: $cursor, offset: $offset, limit: $limit) {
+            logs {
+                DealUUID
+                Accepted
+                Reason
+                CreatedAt
+                ClientAddress
+                PieceSize
+            }
+            totalCount
+            more
+        }
+    }
+`;
+
+const ProposalLogsCountQuery = gql`
+    query AppProposalLogsCountQuery {
+        proposalLogsCount {
+            Accepted
+            Rejected
+            Period
+        }
+    }
+`;
+
 const DealCancelMutation = gql`
     mutation AppDealCancelMutation($id: ID!) {
         dealCancel(id: $id)
@@ -486,6 +513,8 @@ export {
     DealRetryPausedMutation,
     DealFailPausedMutation,
     NewDealsSubscription,
+    ProposalLogsListQuery,
+    ProposalLogsCountQuery,
     StorageQuery,
     LegacyStorageQuery,
     FundsQuery,

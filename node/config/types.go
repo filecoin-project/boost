@@ -148,6 +148,8 @@ type DealmakingConfig struct {
 	SimultaneousTransfersForRetrieval uint64
 	// Minimum start epoch buffer to give time for sealing of sector with deal.
 	StartEpochSealingBuffer uint64
+	// The amount of time to keep deal proposal logs for before cleaning them up.
+	DealProposalLogDuration Duration
 
 	// A command used for fine-grained evaluation of storage deals
 	// see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-fine-grained-storage-and-retrieval-deal-acceptance for more details

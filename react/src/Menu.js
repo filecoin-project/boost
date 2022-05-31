@@ -8,6 +8,7 @@ import {FundsMenuItem} from "./Funds";
 import gridImg from './bootstrap-icons/icons/grid-3x3-gap.svg'
 import './Menu.css'
 import {SettingsMenuItem} from "./Settings";
+import {ProposalLogsMenuItem} from "./ProposalLogs";
 
 export function Menu(props) {
     function scrollToTop() {
@@ -17,6 +18,7 @@ export function Menu(props) {
     return (
         <td onClick={scrollToTop} className="menu">
             <StorageDealsMenuItem />
+            <ProposalLogsMenuItem />
             <StorageSpaceMenuItem />
             <SealingPipelineMenuItem />
             <FundsMenuItem />
