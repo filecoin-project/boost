@@ -26,6 +26,15 @@ install -C ./lotus-seed /usr/local/bin/lotus-seed
 ```
 
 4. Build boost in debug mode
+
+Double check if environment variables are set:
+```
+export LIBRARY_PATH=/opt/homebrew/lib
+export FFI_BUILD_FROM_SOURCE=1
+export PATH="$(brew --prefix coreutils)/libexec/gnubin:/usr/local/bin:$PATH"
+```
+
+Build & Install
 ```
 cd boost
 make debug
