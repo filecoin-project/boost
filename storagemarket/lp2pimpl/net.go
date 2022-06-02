@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
@@ -24,6 +25,7 @@ import (
 )
 
 var log = logging.Logger("boost-net")
+var propLog = logging.Logger("boost-prop")
 
 const DealProtocolID = "/fil/storage/mk/1.2.0"
 const DealStatusV12ProtocolID = "/fil/storage/status/1.2.0"
@@ -149,13 +151,15 @@ type DealProvider struct {
 	host     host.Host
 	prov     *storagemarket.Provider
 	fullNode v1api.FullNode
+	plDB     *db.ProposalLogsDB
 }
 
-func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode) *DealProvider {
+func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode, plDB *db.ProposalLogsDB) *DealProvider {
 	p := &DealProvider{
 		host:     h,
 		prov:     prov,
 		fullNode: fullNodeApi,
+		plDB:     plDB,
 	}
 	return p
 }
@@ -201,8 +205,25 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 	_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
 	defer s.SetWriteDeadline(time.Time{}) // nolint
 
+	// Log the response
+	propLog.Infow("send deal proposal response",
+		"id", proposal.DealUUID,
+		"accepted", res.Accepted,
+		"msg", res.Reason,
+		"peer id", s.Conn().RemotePeer(),
+		"client address", proposal.ClientDealProposal.Proposal.Client,
+		"provider address", proposal.ClientDealProposal.Proposal.Provider,
+		"piece cid", proposal.ClientDealProposal.Proposal.PieceCID.String(),
+		"piece size", proposal.ClientDealProposal.Proposal.PieceSize,
+		"verified", proposal.ClientDealProposal.Proposal.VerifiedDeal,
+		"label", proposal.ClientDealProposal.Proposal.Label,
+		"start epoch", proposal.ClientDealProposal.Proposal.StartEpoch,
+		"end epoch", proposal.ClientDealProposal.Proposal.EndEpoch,
+		"price per epoch", proposal.ClientDealProposal.Proposal.StoragePricePerEpoch,
+	)
+	_ = p.plDB.InsertLog(p.ctx, proposal, res.Accepted, res.Reason) //nolint:errcheck
+
 	// Write the response to the client
-	log.Infow("send deal proposal response", "id", proposal.DealUUID, "accepted", res.Accepted, "msg", res.Reason)
 	err = cborutil.WriteCborRPC(s, &types.DealResponse{Accepted: res.Accepted, Message: res.Reason})
 	if err != nil {
 		log.Warnw("writing deal response", "id", proposal.DealUUID, "err", err)

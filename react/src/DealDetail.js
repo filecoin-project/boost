@@ -3,14 +3,14 @@
 import React, {useEffect, useState} from "react";
 import {useMutation, useQuery, useSubscription} from "@apollo/react-hooks";
 import {DealCancelMutation, DealFailPausedMutation, DealRetryPausedMutation, DealSubscription, EpochQuery} from "./gql";
-import {useNavigate} from "react-router-dom";
+import {useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";
-import {humanFIL, addCommas, humanFileSize} from "./util";
-import {useParams} from "react-router-dom";
+import {addCommas, humanFIL, humanFileSize} from "./util";
 import './DealDetail.css'
 import closeImg from './bootstrap-icons/icons/x-circle.svg'
 import {Info} from "./Info";
+import {addClassFor} from "./util-ui";
 
 export function DealDetail(props) {
     const params = useParams()
@@ -495,13 +495,6 @@ function getAllDataAsText(detailTableEl, dealID, logs) {
     }
 
     return lines.join('\n')+'\n'
-}
-
-function addClassFor(el, className, duration) {
-    el.classList.add(className)
-    return setTimeout(function() {
-        el.classList.remove(className)
-    }, duration)
 }
 
 function DealStatusInfo(props) {
