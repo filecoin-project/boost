@@ -20,7 +20,7 @@ func HandleProposalLogCleaner(duration time.Duration) func(lc fx.Lifecycle, plDB
 
 		run := func() {
 			frequency := time.Minute
-			dplcLog.Infof("Starting deal proposal log cleaner to clean up logs older than %s every %s", duration, frequency)
+			dplcLog.Debugf("Starting deal proposal log cleaner to clean up logs older than %s every %s", duration, frequency)
 			timer := time.NewTicker(frequency)
 			defer timer.Stop()
 			for {
