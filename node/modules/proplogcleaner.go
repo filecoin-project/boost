@@ -30,7 +30,7 @@ func HandleProposalLogCleaner(duration time.Duration) func(lc fx.Lifecycle, plDB
 				case <-timer.C:
 					count, err := plDB.DeleteOlderThan(cleanerCtx, time.Now().Add(-duration))
 					if err == nil {
-						dplcLog.Infof("Deleted %d deal proposal logs older than %s", count, duration)
+						dplcLog.Debugf("Deleted %d deal proposal logs older than %s", count, duration)
 					} else {
 						dplcLog.Warnf("Failed to delete old deal proposal logs: %s", err)
 					}
