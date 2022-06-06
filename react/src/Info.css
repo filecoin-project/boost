@@ -23,7 +23,7 @@
     font-size: 0.8em;
     position: absolute;
     top: 0;
-    left: 2em;
+    left: 2.5em;
     width: 20em;
     background: #fff;
     border: 1px solid #465298;
@@ -31,4 +31,8 @@
     color: #465298;
     border-radius: 0.2em;
     padding: 0.75em;
+}
+
+.info .content a {
+    text-decoration: underline;
 }
