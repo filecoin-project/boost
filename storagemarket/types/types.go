@@ -115,6 +115,7 @@ type ChainDealManager interface {
 }
 
 type IndexProvider interface {
+	Enabled() bool
 	AnnounceBoostDeal(ctx context.Context, pds *ProviderDealState) (cid.Cid, error)
 	Start(ctx context.Context)
 }
