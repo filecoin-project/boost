@@ -142,7 +142,7 @@ boostd --vv init \
        --api-sealer=`lotus-miner auth api-info --perm=admin` \
        --api-sector-index=`lotus-miner auth api-info --perm=admin` \
        --wallet-publish-storage-deals=`lotus wallet new bls` \
-       --wallet-collateral-pledge=`lotus wallet new bls` \
+       --wallet-deal-collateral=`lotus wallet new bls` \
        --max-staging-deals-bytes=50000000000
 ```
 

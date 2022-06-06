@@ -409,9 +409,13 @@ func ConfigBoost(c interface{}) Option {
 		return Error(errors.New("retrieval pricing policy must be either default or external"))
 	}
 
-	walletPledgeCollat, err := address.NewFromString(cfg.Wallets.PledgeCollateral)
+	collatWalletStr := cfg.Wallets.DealCollateral
+	if collatWalletStr == "" && cfg.Wallets.PledgeCollateral != "" { // nolint:staticcheck
+		collatWalletStr = cfg.Wallets.PledgeCollateral // nolint:staticcheck
+	}
+	walletDealCollat, err := address.NewFromString(collatWalletStr)
 	if err != nil {
-		return Error(fmt.Errorf("failed to parse cfg.Wallets.PledgeCollateral: %s; err: %w", cfg.Wallets.PledgeCollateral, err))
+		return Error(fmt.Errorf("failed to parse deal collateral wallet: '%s'; err: %w", collatWalletStr, err))
 	}
 	walletPSD, err := address.NewFromString(cfg.Wallets.PublishStorageDeals)
 	if err != nil {
@@ -441,7 +445,7 @@ func ConfigBoost(c interface{}) Option {
 
 		Override(new(*fundmanager.FundManager), fundmanager.New(fundmanager.Config{
 			StorageMiner: walletMiner,
-			CollatWallet: walletPledgeCollat,
+			CollatWallet: walletDealCollat,
 			PubMsgWallet: walletPSD,
 			PubMsgBalMin: abi.TokenAmount(cfg.Dealmaking.PublishMsgMaxFee),
 		})),

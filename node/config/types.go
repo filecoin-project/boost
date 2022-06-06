@@ -58,7 +58,9 @@ type WalletsConfig struct {
 	// The wallet used to send PublishStorageDeals messages.
 	// Must be a control or worker address of the miner.
 	PublishStorageDeals string
-	// The wallet used as the source for pledge collateral
+	// The wallet used as the source for storage deal collateral
+	DealCollateral string
+	// Deprecated: Renamed to DealCollateral
 	PledgeCollateral string
 }
 
