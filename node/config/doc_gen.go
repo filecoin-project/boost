@@ -350,10 +350,16 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 Must be a control or worker address of the miner.`,
 		},
 		{
+			Name: "DealCollateral",
+			Type: "string",
+
+			Comment: `The wallet used as the source for storage deal collateral`,
+		},
+		{
 			Name: "PledgeCollateral",
 			Type: "string",
 
-			Comment: `The wallet used as the source for pledge collateral`,
+			Comment: `Deprecated: Renamed to DealCollateral`,
 		},
 	},
 }

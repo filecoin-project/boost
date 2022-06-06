@@ -365,7 +365,7 @@ type RootMutation {
   """Publish all pending deals now"""
   dealPublishNow: Boolean!
 
-  """Top-up the available pledge collateral in escrow for deal publishing"""
+  """Top-up the available deal collateral in escrow for deal publishing"""
   fundsMoveToEscrow(amount: BigInt!): Boolean!
 
   """Update the Storage Ask (price of doing a storage deal)"""

@@ -112,7 +112,7 @@ boostd -vv init \
   --api-sealer=$MINER_API_INFO \
   --api-sector-index=$MINER_API_INFO \
   --wallet-publish-storage-deals=$PUBMSG_WALLET \
-  --wallet-collateral-pledge=$COLLAT_WALLET \
+  --wallet-deal-collateral=$COLLAT_WALLET \
   --max-staging-deals-bytes=2000000000
 ```
 
