@@ -12,7 +12,7 @@ import (
 
 func IndexProvider(cfg config.IndexProviderConfig) func(params lotus_modules.IdxProv, marketHost host.Host, dt dtypes.ProviderDataTransfer, maddr dtypes.MinerAddress, ps *pubsub.PubSub, nn dtypes.NetworkName) (provider.Interface, error) {
 	if !cfg.Enable {
-		log.Warnf("Starting Boost with index provider disabled - all index announcements will fail")
+		log.Warnf("Starting Boost with index provider disabled - no announcements will be made to the index provider")
 		return func(params lotus_modules.IdxProv, marketHost host.Host, dt dtypes.ProviderDataTransfer, maddr dtypes.MinerAddress, ps *pubsub.PubSub, nn dtypes.NetworkName) (provider.Interface, error) {
 			return indexprovider.NewDisabledIndexProvider(), nil
 		}

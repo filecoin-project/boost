@@ -355,9 +355,9 @@ func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider
 			// Start the Boost Index Provider.
 			// It overrides the multihash lister registered by the legacy
 			// index provider so it must start after the legacy SP.
-			log.Info("starting boost index provider")
+			log.Info("starting boost index provider wrapper")
 			idxProv.Start(ctx)
-			log.Info("boost index provider started successfully")
+			log.Info("boost index provider wrapper started successfully")
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {

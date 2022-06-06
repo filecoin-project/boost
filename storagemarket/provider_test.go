@@ -1944,6 +1944,10 @@ func (td *testDeal) assertDealFailedNonRecoverable(t *testing.T, ctx context.Con
 
 type NoOpIndexProvider struct{}
 
+func (n *NoOpIndexProvider) Enabled() bool {
+	return true
+}
+
 func (n *NoOpIndexProvider) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDealState) (cid.Cid, error) {
 	return testutil.GenerateCid(), nil
 }
