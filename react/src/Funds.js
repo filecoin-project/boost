@@ -65,14 +65,14 @@ function CollateralSource(props) {
         <div className="title">
             Deal Collateral Source Wallet
             <Info>
-                The Storage Provider must have sufficient collateral in escrow for each
-                storage deal.<br/>
+                The Storage Provider must have sufficient collateral for each
+                storage deal in escrow with the Storage Market Actor on chain.<br/>
                 <br/>
-                When the deal is published, the network checks whether there is enough
-                collateral in escrow.<br/>
+                When a deal is published, the network checks whether there is enough
+                collateral in escrow for the deal.<br/>
                 <br/>
                 The Collateral Source Wallet is the wallet from which funds
-                are moved to escrow.
+                are moved into escrow with the Storage Market Actor.
             </Info>
         </div>
         <WalletAddress address={props.collateral.Address} />
@@ -86,15 +86,15 @@ function CollateralSource(props) {
 function FundsEscrow(props) {
     const escrow = props.escrow
     const bars = [{
-        name: 'Tagged',
+        name: 'Tagged by Boost',
         className: 'tagged',
         amount: escrow.Tagged,
     }, {
-        name: 'Available',
+        name: 'Available in Escrow',
         className: 'available',
         amount: escrow.Available,
     }, {
-        name: 'Locked',
+        name: 'Locked in Escrow',
         className: 'locked',
         amount: escrow.Locked,
     }]
@@ -109,15 +109,34 @@ function FundsEscrow(props) {
         <div className="title">
             Deal Collateral in Escrow
             <Info>
-                The Storage Provider must have sufficient collateral in escrow for each
-                storage deal.<br/>
+                The Storage Provider must have sufficient collateral for each
+                storage deal in escrow with the Storage Market Actor on chain.<br/>
                 <br/>
-                When a deal is accepted, the collateral for the deal is "tagged". Those
-                funds cannot be used as collateral for another deal.<br/>
+                When the Client proposes a storage deal to the Storage Provider,
+                the Client specifies the amount of collateral that the Storage
+                Provider must put into escrow for the deal.<br/>
+                <br/>
+                When the Storage Provider accepts the deal proposal, Boost "tags"
+                the collateral amount for the deal.
+                These "tagged" funds cannot be used as collateral for another deal.
+                Boost keeps track of how much funds are "tagged" for each deal in the
+                Boost database.<br/>
                 <br/>
                 When a deal is published, there must be enough funds in escrow to cover
-                the collateral for the deal. On publish, the tagged funds are moved on
-                chain from "Available" to "Locked" until the deal is complete.<br/>
+                the collateral for the deal. On publish, the Storage Market Actor moves
+                the funds in escrow on chain from "Available" to "Locked".
+                Boost "untags" the funds in the Boost database (because they are now "Locked"
+                on chain).<br/>
+                <br/>
+                When the deal expires, the Storage Market Actor moves funds on chain from
+                "Locked" back to "Available".<br/>
+                <br/>
+                See the&nbsp;
+                <a href="https://spec.filecoin.io/systems/filecoin_markets/onchain_storage_market/storage_market_actor">
+                    Filecoin Spec
+                </a>
+                &nbsp;
+                for more information.
             </Info>
         </div>
 
@@ -134,7 +153,7 @@ function PubMsgWallet(props) {
     const pubMsg = props.pubMsg
 
     const bars = [{
-        name: 'Tagged',
+        name: 'Tagged by Boost',
         className: 'tagged',
         amount: pubMsg.Tagged,
     }, {
@@ -149,7 +168,14 @@ function PubMsgWallet(props) {
             Publish Storage Deals Wallet
             <Info>
                 The Publish Storage Deals Wallet is used to pay the gas cost
-                for sending the Publish Storage Deals message on chain.
+                for sending the Publish Storage Deals message on chain.<br/>
+                <br/>
+                When the Storage Provider accepts a deal proposal, Boost "tags"
+                the funds required to send the Publish Storage Deals message in
+                the Boost database. These "tagged" funds cannot be used for another
+                deal.<br/>
+                <br/>
+                When the deal is published, Boost "untags" the funds for the deal.
             </Info>
         </div>
         <WalletAddress address={props.address} />
