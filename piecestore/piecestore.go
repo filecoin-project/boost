@@ -28,7 +28,7 @@ type Sealer interface {
 	GetReader(id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error)
 }
 
-// CarIndexes keeps indexes that map from multihash => offset
+// CarIndexes manages indexes of CAR files that map from multihash => offset
 type CarIndexes interface {
 	Add(pieceCid cid.Cid, itidx carindex.IterableIndex) error
 	IsIndexed(pieceCid cid.Cid) bool
@@ -37,7 +37,8 @@ type CarIndexes interface {
 	Delete(pieceCid cid.Cid) error
 }
 
-// MHToPieceIndex maps from multihash => piece cids
+// MHToPieceIndex is used to get the pieces that contain a multihash.
+// It has an index that maps from multihash => piece cids
 type MHToPieceIndex interface {
 	Add(pieceCid cid.Cid, itidx carindex.IterableIndex) error
 	IsIndexed(pieceCid cid.Cid) bool
@@ -67,11 +68,11 @@ type PieceStore struct {
 // CAR            ......[      ]............
 type DealInfo struct {
 	DealUuid    uuid.UUID
-	PublishCid  cid.Cid
 	SectorID    abi.SectorNumber
 	PieceOffset abi.PaddedPieceSize
 	PieceLength abi.PaddedPieceSize
-	// The size of the CAR file without zero-padding
+	// The size of the CAR file without zero-padding.
+	// This value may be zero if the size is unknown.
 	CarLength uint64
 }
 
@@ -218,7 +219,7 @@ func (ps *PieceStore) GetIterableIndex(pieceCid cid.Cid) (carindex.IterableIndex
 
 // Get a block (used by Bitswap retrieval)
 func (ps *PieceStore) GetBlock(c cid.Cid) ([]byte, error) {
-	// TODO: use caching to make this efficient
+	// TODO: use caching to make this efficient for repeated Gets against the same piece
 
 	// Get the pieces that contain the cid
 	pieces, err := ps.PiecesContainingMultihash(c.Hash())
@@ -254,7 +255,7 @@ func (ps *PieceStore) GetBlock(c cid.Cid) ([]byte, error) {
 			// Read the block data
 			_, data, err := util.ReadNode(bufio.NewReader(reader))
 			if err != nil {
-				return nil, fmt.Errorf("reading data for from piece reader: %w", err)
+				return nil, fmt.Errorf("reading data for block %s from reader for piece %s: %w", c, pieceCid, err)
 			}
 			return data, nil
 		}()
