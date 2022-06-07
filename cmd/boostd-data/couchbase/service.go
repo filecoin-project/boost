@@ -1,56 +1,51 @@
-package main
+package couchbase
 
 import (
 	"fmt"
-	"io/ioutil"
 	"time"
 
+	"github.com/couchbase/gocb/v2"
+	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	levelds "github.com/ipfs/go-ds-leveldb"
 	logging "github.com/ipfs/go-log/v2"
 	carindex "github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
-	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 )
 
-var log = logging.Logger("boostd-data")
+var log = logging.Logger("boostd-data-cb")
 
 type PieceMetaService struct {
-	db datastore.Batching
+	col *gocb.Collection
 }
 
-func NewPieceMetaService(repopath string) *PieceMetaService {
-	if repopath == "" {
-		var err error
-		repopath, err = ioutil.TempDir("", "ds-leveldb")
-		if err != nil {
-			panic(err)
-		}
-	}
+func NewPieceMetaService() *PieceMetaService {
+	bucketName := "piecestore"
+	username := "Administrator"
+	password := "boostdemo"
 
-	db, err := levelDs(repopath, false)
+	cluster, err := gocb.Connect("couchbase://127.0.0.1", gocb.ClusterOptions{
+		Authenticator: gocb.PasswordAuthenticator{
+			Username: username,
+			Password: password,
+		},
+	})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	log.Debugw("datastore.service", "repo path", repopath)
+	bucket := cluster.Bucket(bucketName)
+
+	err = bucket.WaitUntilReady(5*time.Second, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	return &PieceMetaService{
-		db: db,
+		col: bucket.DefaultCollection(),
 	}
 }
 
-func levelDs(path string, readonly bool) (datastore.Batching, error) {
-	return levelds.NewDatastore(path, &levelds.Options{
-		Compression: ldbopts.NoCompression,
-		NoSync:      false,
-		Strict:      ldbopts.StrictAll,
-		ReadOnly:    readonly,
-	})
-}
-
-func (s *PieceMetaService) AddDealForPiece(pieceCid cid.Cid, dealInfo DealInfo) error {
+func (s *PieceMetaService) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	log.Debugw("handle.add-deal-for-piece", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
@@ -81,7 +76,7 @@ func (s *PieceMetaService) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint6
 	return 0, nil
 }
 
-func (s *PieceMetaService) GetPieceDeals(pieceCid cid.Cid) ([]DealInfo, error) {
+func (s *PieceMetaService) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
 	log.Debugw("handle.get-piece-deals", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {

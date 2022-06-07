@@ -1,9 +1,10 @@
 module github.com/filecoin-project/boost/cmd/boostd-data
 
 require (
+	github.com/couchbase/gocb/v2 v2.5.0
 	github.com/ethereum/go-ethereum v1.10.17
 	github.com/filecoin-project/go-state-types v0.1.7
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/ipfs/go-cid v0.2.0
 	github.com/ipfs/go-datastore v0.5.1
@@ -16,6 +17,7 @@ require (
 
 require (
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
+	github.com/couchbase/gocbcore/v10 v10.1.2 // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/filecoin-project/go-address v0.0.5 // indirect
 	github.com/go-ole/go-ole v1.2.1 // indirect
