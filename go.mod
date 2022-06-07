@@ -32,7 +32,7 @@ require (
 	github.com/filecoin-project/go-paramfetch v0.0.4
 	github.com/filecoin-project/go-state-types v0.1.3
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/index-provider v0.7.0
+	github.com/filecoin-project/index-provider v0.8.0
 	// lotus boost/main branch
 	github.com/filecoin-project/lotus v1.15.2
 	github.com/filecoin-project/specs-actors v0.9.14
