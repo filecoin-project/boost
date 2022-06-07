@@ -9,7 +9,7 @@ import (
 	mh "github.com/multiformats/go-multihash"
 )
 
-var log = logger.Logger("rpcclient")
+var log = logger.Logger("boostd-data-client")
 
 type PieceMeta struct {
 	client *rpc.Client
