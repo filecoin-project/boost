@@ -78,6 +78,9 @@ func GetAPIInfo(ctx *cli.Context, t lotus_repo.RepoType) (APIInfo, error) {
 		strma := ctx.String(f)
 		strma = strings.TrimSpace(strma)
 
+		if IsVeryVerbose {
+			_, _ = fmt.Fprintf(ctx.App.Writer, "extracted API endpoint %s from API flag %s\n", strma, f)
+		}
 		return APIInfo{Addr: strma}, nil
 	}
 
@@ -88,14 +91,22 @@ func GetAPIInfo(ctx *cli.Context, t lotus_repo.RepoType) (APIInfo, error) {
 	primaryEnv, fallbacksEnvs, deprecatedEnvs := EnvsForAPIInfos(t)
 	env, ok := os.LookupEnv(primaryEnv)
 	if ok {
+		if IsVeryVerbose {
+			_, _ = fmt.Fprintf(ctx.App.Writer,
+				"extracted API endpoint %s from primary environment variable %s\n", env, primaryEnv)
+		}
 		return ParseApiInfo(env), nil
 	}
 
 	for _, env := range deprecatedEnvs {
-		env, ok := os.LookupEnv(env)
+		envVal, ok := os.LookupEnv(env)
 		if ok {
 			log.Warnf("Using deprecated env(%s) value, please use env(%s) instead.", env, primaryEnv)
-			return ParseApiInfo(env), nil
+			if IsVeryVerbose {
+				_, _ = fmt.Fprintf(ctx.App.Writer,
+					"extracted API endpoint %s from deprecated environment variable %s\n", envVal, env)
+			}
+			return ParseApiInfo(envVal), nil
 		}
 	}
 
@@ -136,6 +147,10 @@ func GetAPIInfo(ctx *cli.Context, t lotus_repo.RepoType) (APIInfo, error) {
 			log.Warnf("Couldn't load CLI token, capabilities may be limited: %v", err)
 		}
 
+		if IsVeryVerbose {
+			_, _ = fmt.Fprintf(ctx.App.Writer, "extracted API endpoint %s from repo flag %s\n", ma, f)
+		}
+
 		return APIInfo{
 			Addr:  ma.String(),
 			Token: token,
@@ -143,9 +158,13 @@ func GetAPIInfo(ctx *cli.Context, t lotus_repo.RepoType) (APIInfo, error) {
 	}
 
 	for _, env := range fallbacksEnvs {
-		env, ok := os.LookupEnv(env)
+		envVal, ok := os.LookupEnv(env)
 		if ok {
-			return ParseApiInfo(env), nil
+			if IsVeryVerbose {
+				_, _ = fmt.Fprintf(ctx.App.Writer,
+					"extracted API endpoint %s from fallback environment variable %s\n", envVal, env)
+			}
+			return ParseApiInfo(envVal), nil
 		}
 	}
 
@@ -180,7 +199,7 @@ func GetBoostAPI(ctx *cli.Context, opts ...GetBoostOption) (api.Boost, jsonrpc.C
 	if options.PreferHttp {
 		u, err := url.Parse(addr)
 		if err != nil {
-			return nil, nil, fmt.Errorf("parsing miner api URL: %w", err)
+			return nil, nil, fmt.Errorf("parsing Boost API URL: %w", err)
 		}
 
 		switch u.Scheme {
@@ -194,7 +213,7 @@ func GetBoostAPI(ctx *cli.Context, opts ...GetBoostOption) (api.Boost, jsonrpc.C
 	}
 
 	if IsVeryVerbose {
-		_, _ = fmt.Fprintln(ctx.App.Writer, "using miner API v0 endpoint:", addr)
+		_, _ = fmt.Fprintln(ctx.App.Writer, "using Boost API endpoint:", addr)
 	}
 
 	return client.NewBoostRPCV0(ctx.Context, addr, headers)
