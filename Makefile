@@ -101,7 +101,7 @@ boostci: $(BUILD_DEPS)
 .PHONY: boostci
 
 react: check-node-lts
-	npm install --prefix react
+	npm install --no-audit --prefix react
 	npm run --prefix react build
 .PHONY: react
 
