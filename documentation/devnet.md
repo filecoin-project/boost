@@ -30,7 +30,6 @@ install -C ./lotus-seed /usr/local/bin/lotus-seed
 Double check if environment variables are set:
 ```
 export LIBRARY_PATH=/opt/homebrew/lib
-export FFI_BUILD_FROM_SOURCE=1
 export PATH="$(brew --prefix coreutils)/libexec/gnubin:/usr/local/bin:$PATH"
 ```
 
@@ -121,9 +120,16 @@ boostd -vv init \
 boostd -vv run
 ```
 
-#### Next steps
+12. Build the Web UI
+```
+make react
+```
+
+13. Open the Web UI
 
 Open http://localhost:8080 to see the Boost UI
+
+#### Next steps
 
 To make a deal with boost, follow the guide at https://boost.filecoin.io/tutorials/how-to-store-files-with-boost-on-filecoin
 
