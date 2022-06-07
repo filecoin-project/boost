@@ -3,6 +3,8 @@ package piecestore
 import (
 	"bufio"
 	"fmt"
+	"io"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
@@ -14,7 +16,6 @@ import (
 	"github.com/ipld/go-car/v2/blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
-	"io"
 )
 
 type SectionReader interface {
@@ -74,6 +75,8 @@ type DealInfo struct {
 	// The size of the CAR file without zero-padding.
 	// This value may be zero if the size is unknown.
 	CarLength uint64
+
+	// If we don't have CarLength, we have to iterate over all offsets, get the largest offset and sum it with length.
 }
 
 // Get the list of deals (and the sector the data is in) for a particular piece
@@ -84,6 +87,10 @@ func (ps *PieceStore) GetPieceDeals(pieceCid cid.Cid) ([]DealInfo, error) {
 	}
 
 	return deals, nil
+}
+
+func (ps *PieceStore) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
+
 }
 
 func (ps *PieceStore) AddDealForPiece(pieceCid cid.Cid, dealInfo DealInfo) error {
@@ -178,7 +185,7 @@ func (ps *PieceStore) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
 }
 
 // Used internally, and also by HTTP retrieval
-func (ps *PieceStore) GetPieceReader(pieceCid cid.Cid) (SectionReader, error) {
+func (ps *PieceStore) _GetPieceReader(pieceCid cid.Cid) (SectionReader, error) {
 	// Get all deals containing this piece
 	deals, err := ps.GetPieceDeals(pieceCid)
 	if err != nil {
@@ -218,7 +225,7 @@ func (ps *PieceStore) GetIterableIndex(pieceCid cid.Cid) (carindex.IterableIndex
 }
 
 // Get a block (used by Bitswap retrieval)
-func (ps *PieceStore) GetBlock(c cid.Cid) ([]byte, error) {
+func (ps *PieceStore) _GetBlock(c cid.Cid) ([]byte, error) {
 	// TODO: use caching to make this efficient for repeated Gets against the same piece
 
 	// Get the pieces that contain the cid
@@ -241,7 +248,7 @@ func (ps *PieceStore) GetBlock(c cid.Cid) ([]byte, error) {
 			}
 
 			// Get the offset of the block within the piece (CAR file)
-			offset, err := ps.carIndex.GetOffset(pieceCid, c.Hash())
+			offset, err := ps.GetOffset(pieceCid, c.Hash())
 			if err != nil {
 				return nil, fmt.Errorf("getting offset for cid %s in piece %s: %w", c, pieceCid, err)
 			}
@@ -272,7 +279,7 @@ func (ps *PieceStore) GetBlock(c cid.Cid) ([]byte, error) {
 }
 
 // Get a blockstore over a piece (used by Graphsync retrieval)
-func (ps *PieceStore) GetBlockstore(pieceCid cid.Cid) (bstore.Blockstore, error) {
+func (ps *PieceStore) _GetBlockstore(pieceCid cid.Cid) (bstore.Blockstore, error) {
 	// Get a reader over the piece
 	reader, err := ps.GetPieceReader(pieceCid)
 	if err != nil {
