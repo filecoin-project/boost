@@ -89,6 +89,12 @@ boost: $(BUILD_DEPS)
 .PHONY: boost
 BINS+=boost boostx boostd
 
+booster-http: $(BUILD_DEPS)
+	rm -f booster-http
+	$(GOCC) build $(GOFLAGS) -o booster-http ./cmd/booster-http
+.PHONY: booster-http
+BINS+=booster-http
+
 devnet: $(BUILD_DEPS)
 	rm -f devnet
 	$(GOCC) build $(GOFLAGS) -o devnet ./cmd/devnet

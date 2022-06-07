@@ -109,6 +109,8 @@ type BoostStruct struct {
 
 		PiecesGetCIDInfo func(p0 context.Context, p1 cid.Cid) (*piecestore.CIDInfo, error) `perm:"read"`
 
+		PiecesGetMaxOffset func(p0 context.Context, p1 cid.Cid) (uint64, error) `perm:"read"`
+
 		PiecesGetPieceInfo func(p0 context.Context, p1 cid.Cid) (*piecestore.PieceInfo, error) `perm:"read"`
 
 		PiecesListCidInfos func(p0 context.Context) ([]cid.Cid, error) `perm:"read"`
@@ -642,6 +644,17 @@ func (s *BoostStruct) PiecesGetCIDInfo(p0 context.Context, p1 cid.Cid) (*piecest
 
 func (s *BoostStub) PiecesGetCIDInfo(p0 context.Context, p1 cid.Cid) (*piecestore.CIDInfo, error) {
 	return nil, ErrNotSupported
+}
+
+func (s *BoostStruct) PiecesGetMaxOffset(p0 context.Context, p1 cid.Cid) (uint64, error) {
+	if s.Internal.PiecesGetMaxOffset == nil {
+		return 0, ErrNotSupported
+	}
+	return s.Internal.PiecesGetMaxOffset(p0, p1)
+}
+
+func (s *BoostStub) PiecesGetMaxOffset(p0 context.Context, p1 cid.Cid) (uint64, error) {
+	return 0, ErrNotSupported
 }
 
 func (s *BoostStruct) PiecesGetPieceInfo(p0 context.Context, p1 cid.Cid) (*piecestore.PieceInfo, error) {
