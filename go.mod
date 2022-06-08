@@ -34,7 +34,6 @@ require (
 	github.com/filecoin-project/index-provider v0.8.1
 	github.com/filecoin-project/lotus v1.17.0-rc1.0.20220706101903-9bcefce07b7c
 	github.com/filecoin-project/specs-actors v0.9.15
-	github.com/filecoin-project/specs-actors/v8 v8.0.1
 	github.com/filecoin-project/specs-storage v0.4.1
 	github.com/filecoin-project/storetheindex v0.4.17
 	github.com/gbrlsnchs/jwt/v3 v3.0.1

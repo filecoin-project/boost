@@ -34,6 +34,10 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	lbuild "github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
+<<<<<<< HEAD
+=======
+	"github.com/filecoin-project/lotus/chain/actors/policy"
+>>>>>>> feat: lotus v16
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/itests/kit"
@@ -43,9 +47,13 @@ import (
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
+<<<<<<< HEAD
 	"github.com/filecoin-project/lotus/storage/ctladdr"
 	"github.com/filecoin-project/lotus/storage/paths"
 	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
+=======
+	"github.com/filecoin-project/lotus/storage"
+>>>>>>> feat: lotus v16
 	"github.com/filecoin-project/specs-actors/v8/actors/builtin"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
