@@ -116,6 +116,8 @@ func TestDealsDBSearch(t *testing.T) {
 	signedPropCid, err := deals[0].SignedProposalCid()
 	req.NoError(err)
 
+	label, err := deals[0].ClientDealProposal.Proposal.Label.ToString()
+	req.NoError(err)
 	tcs := []struct {
 		name  string
 		value string
@@ -162,7 +164,7 @@ func TestDealsDBSearch(t *testing.T) {
 		count: 1,
 	}, {
 		name:  "label",
-		value: deals[0].ClientDealProposal.Proposal.Label,
+		value: label,
 		count: 1,
 	}}
 	for _, tc := range tcs {

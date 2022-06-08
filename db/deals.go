@@ -8,7 +8,7 @@ import (
 
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
+	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
@@ -56,7 +56,7 @@ func newDealAccessor(db *sql.DB, deal *types.ProviderDealState) *dealAccessor {
 			"IsOffline":             &fieldDef{f: &deal.IsOffline},
 			"ClientAddress":         &addrFieldDef{f: &deal.ClientDealProposal.Proposal.Client},
 			"ProviderAddress":       &addrFieldDef{f: &deal.ClientDealProposal.Proposal.Provider},
-			"Label":                 &fieldDef{f: &deal.ClientDealProposal.Proposal.Label},
+			"Label":                 &labelFieldDef{f: &deal.ClientDealProposal.Proposal.Label},
 			"StartEpoch":            &fieldDef{f: &deal.ClientDealProposal.Proposal.StartEpoch},
 			"EndEpoch":              &fieldDef{f: &deal.ClientDealProposal.Proposal.EndEpoch},
 			"StoragePricePerEpoch":  &bigIntFieldDef{f: &deal.ClientDealProposal.Proposal.StoragePricePerEpoch},
@@ -263,16 +263,24 @@ func (d *DealsDB) List(ctx context.Context, query string, cursor *graphql.ID, of
 	return d.list(ctx, offset, limit, where, whereArgs...)
 }
 
-var searchFields = []string{"ID", "PieceCID", "ClientAddress", "ProviderAddress", "ClientPeerID", "DealDataRoot", "PublishCID", "SignedProposalCID", "Label"}
+var searchFields = []string{"ID", "PieceCID", "ClientAddress", "ProviderAddress", "ClientPeerID", "DealDataRoot", "PublishCID", "SignedProposalCID"}
 
 func withSearchQuery(query string) (string, []interface{}) {
 	query = strings.Trim(query, " \t\n")
+
 	whereArgs := []interface{}{}
 	where := "("
 	for _, searchField := range searchFields {
 		where += searchField + " = ? OR "
 		whereArgs = append(whereArgs, query)
 	}
+	// The label field is prefixed by the ' character
+	// Note: In sqlite the concat operator is ||
+	// Note: To escape a ' character it is prefixed by another '.
+	// So when you put a ' in quotes, you have to write ''''
+	where += "Label = ('''' || ?) OR "
+	whereArgs = append(whereArgs, query)
+
 	where += " instr(Error, ?) > 0"
 	whereArgs = append(whereArgs, query)
 	where += ")"

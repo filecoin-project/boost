@@ -15,10 +15,10 @@ import (
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/filecoin-project/lotus/api"
 	chain_types "github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	inet "github.com/libp2p/go-libp2p-core/network"
@@ -304,13 +304,17 @@ func dealProposal(ctx context.Context, n *clinode.Node, clientAddr address.Addre
 	// deal proposal expects total storage price for deal per epoch, therefore we
 	// multiply pieceSize * storagePrice (which is set per epoch per GiB) and divide by 2^30
 	storagePricePerEpochForDeal := big.Div(big.Mul(big.NewInt(int64(pieceSize)), storagePrice), big.NewInt(int64(1<<30)))
+	l, err := market.NewLabelFromString(rootCid.String())
+	if err != nil {
+		return nil, err
+	}
 	proposal := market.DealProposal{
 		PieceCID:             pieceCid,
 		PieceSize:            pieceSize,
 		VerifiedDeal:         verified,
 		Client:               clientAddr,
 		Provider:             minerAddr,
-		Label:                rootCid.String(),
+		Label:                l,
 		StartEpoch:           startEpoch,
 		EndEpoch:             endEpoch,
 		StoragePricePerEpoch: storagePricePerEpochForDeal,

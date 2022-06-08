@@ -1,8 +1,6 @@
 package db
 
 import (
-	"context"
-	"database/sql"
 	"fmt"
 	"math/rand"
 	"time"
@@ -12,44 +10,12 @@ import (
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/filecoin-project/go-state-types/crypto"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/peer"
 	mh "github.com/multiformats/go-multihash"
 )
-
-func LoadFixtures(ctx context.Context, db *sql.DB) ([]types.ProviderDealState, error) {
-	err := CreateAllBoostTables(ctx, db, db)
-	if err != nil {
-		return nil, err
-	}
-
-	dealsDB := NewDealsDB(db)
-	logsDB := NewLogsDB(db)
-
-	deals, err := GenerateDeals()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, deal := range deals {
-		err = dealsDB.Insert(ctx, &deal)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	logs := generateDealLogs(deals)
-	for _, l := range logs {
-		err = logsDB.InsertLog(ctx, &l)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return deals, err
-}
 
 var clientAddrs = []uint64{01312, 42134, 01322, 43242, 04212}
 
@@ -83,6 +49,10 @@ func generateDeals(count int) ([]types.ProviderDealState, error) {
 			if err != nil {
 				return nil, err
 			}
+			l, err := market.NewLabelFromString(testutil.GenerateCid().String())
+			if err != nil {
+				return nil, err
+			}
 			deal := types.ProviderDealState{
 				DealUuid:  uuid.New(),
 				CreatedAt: time.Now(),
@@ -94,7 +64,7 @@ func generateDeals(count int) ([]types.ProviderDealState, error) {
 						VerifiedDeal:         false,
 						Client:               clientAddr,
 						Provider:             provAddr,
-						Label:                testutil.GenerateCid().String(),
+						Label:                l,
 						StartEpoch:           startEpoch,
 						EndEpoch:             endEpoch,
 						StoragePricePerEpoch: abi.NewTokenAmount(rand.Int63()),
