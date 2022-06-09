@@ -56,7 +56,7 @@ func (s *PieceMetaService) AddDealForPiece(pieceCid cid.Cid, dealInfo model.Deal
 }
 
 // TODO: maybe implement over rpc subscription
-func (s *PieceMetaService) GetIterableIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
+func (s *PieceMetaService) GetRecords(pieceCid cid.Cid) ([]carindex.Record, error) {
 	log.Debugw("handle.get-iterable-index", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {

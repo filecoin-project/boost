@@ -16,3 +16,8 @@ type DealInfo struct {
 
 	// If we don't have CarLength, we have to iterate over all offsets, get the largest offset and sum it with length.
 }
+
+type Metadata struct {
+	Cursor    uint64 `json:"cursor"`
+	IsIndexed bool   `json:"is_indexed"`
+}

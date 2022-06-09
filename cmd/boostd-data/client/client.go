@@ -15,8 +15,8 @@ type PieceMeta struct {
 	client *rpc.Client
 }
 
-func NewPieceMeta() (*PieceMeta, error) {
-	client, err := rpc.Dial("http://localhost:8089")
+func NewPieceMeta(addr string) (*PieceMeta, error) {
+	client, err := rpc.Dial(addr)
 	if err != nil {
 		return nil, err
 	}
@@ -58,6 +58,27 @@ func (s *PieceMeta) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error)
 
 func (s *PieceMeta) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	return s.client.Call(nil, "boostddata_addDealForPiece", pieceCid, dealInfo)
+}
+
+// Add mh => piece index to store  ;;; multihash -> []cid.Cid ; given multihash, which pieces is it in ; already in dagstore as a datastore impl
+
+// Add mh => offset index to store ;;; piececid, multihash, offset ->  adding the offset
+func (s *PieceMeta) AddIndex(pieceCid cid.Cid, records []carindex.Record) error {
+
+	// first: see inverted index in dagstore today
+
+	// second:
+	// alloacte index for pieceCid
+	// foreach record -> add cid -> offset (for the given pieceCid)
+
+	// TODO: mark that indexing is complete ; metadata value for each piece
+	// pieceCid -> {cursor ; isIndexed ; []dealInfo }
+	return nil
+}
+
+func (s *PieceMeta) IsIndexed(pieceCid cid.Cid) (bool, error) {
+	return false, nil
+
 }
 
 func (s *PieceMeta) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {

@@ -56,7 +56,7 @@ func NewPieceMetaService(repopath string) *PieceMetaService {
 		panic(err)
 	}
 
-	log.Debugw("datastore.service", "repo path", repopath)
+	log.Debugw("new piece meta service", "repo path", repopath)
 
 	return &PieceMetaService{
 		db: db,
@@ -70,14 +70,14 @@ func (s *PieceMetaService) AddDealForPiece(pieceCid cid.Cid, dealInfo model.Deal
 		log.Debugw("handled.add-deal-for-piece", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	panic("not implemented")
+	//panic("not implemented")
 
 	return nil
 }
 
 // TODO: maybe implement over rpc subscription
 // TODO: maybe pass ctx in func signature
-func (s *PieceMetaService) GetIterableIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
+func (s *PieceMetaService) GetRecords(pieceCid cid.Cid) ([]carindex.Record, error) {
 	log.Debugw("handle.get-iterable-index", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
@@ -86,7 +86,7 @@ func (s *PieceMetaService) GetIterableIndex(pieceCid cid.Cid) ([]carindex.Record
 
 	ctx := context.Background()
 
-	cursor, err := s.db.GetPieceCidToCursor(ctx, pieceCid)
+	cursor, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
 		return nil, err
 	}
@@ -108,12 +108,12 @@ func (s *PieceMetaService) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint6
 
 	ctx := context.Background()
 
-	cursor, err := s.db.GetPieceCidToCursor(ctx, pieceCid)
+	cursor, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
 		return 0, err
 	}
 
-	return s.db.GetOffset(ctx, string(cursor)+"/", hash)
+	return s.db.GetOffset(ctx, fmt.Sprintf("%d", cursor)+"/", hash)
 }
 
 func (s *PieceMetaService) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {

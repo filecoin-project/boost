@@ -2,6 +2,8 @@ module github.com/filecoin-project/boost/cmd/boostd-data
 
 require (
 	github.com/couchbase/gocb/v2 v2.5.0
+	github.com/docker/docker v1.4.2-0.20180625184442-8e610b2b55bf
+	github.com/docker/go-connections v0.4.0
 	github.com/ethereum/go-ethereum v1.10.17
 	github.com/filecoin-project/go-state-types v0.1.7
 	github.com/google/uuid v1.3.0
@@ -13,15 +15,22 @@ require (
 	github.com/ipld/go-car/v2 v2.1.1
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
+	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
 )
 
 require (
+	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
+	github.com/Microsoft/go-winio v0.5.2 // indirect
+	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
 	github.com/couchbase/gocbcore/v10 v10.1.2 // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
+	github.com/docker/distribution v2.8.1+incompatible // indirect
+	github.com/docker/go-units v0.4.0 // indirect
 	github.com/filecoin-project/go-address v0.0.5 // indirect
 	github.com/go-ole/go-ole v1.2.1 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/ipfs/go-block-format v0.0.3 // indirect
@@ -39,6 +48,9 @@ require (
 	github.com/multiformats/go-multibase v0.0.3 // indirect
 	github.com/multiformats/go-multicodec v0.3.1-0.20210902112759-1539a079fd61 // indirect
 	github.com/multiformats/go-varint v0.0.6 // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.0.2 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/polydawn/refmt v0.0.0-20201211092308-30ac6d18308e // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect

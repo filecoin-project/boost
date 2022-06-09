@@ -1,14 +1,16 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"fmt"
+	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/filecoin-project/boost/cmd/boostd-data/couchbase"
-	"github.com/filecoin-project/boost/cmd/boostd-data/ldb"
-	"github.com/gorilla/mux"
+	"github.com/filecoin-project/boost/cmd/boostd-data/svc"
 	logging "github.com/ipfs/go-log/v2"
 )
 
@@ -29,22 +31,42 @@ func init() {
 func main() {
 	flag.Parse()
 
-	server := rpc.NewServer()
+	done := make(chan struct{})
 
-	switch db {
-	case "couchbase":
-		ds := couchbase.NewPieceMetaService()
-		server.RegisterName("boostddata", ds)
-	case "ldb":
-		ds := ldb.NewPieceMetaService(repopath)
-		server.RegisterName("boostddata", ds)
-	default:
-		panic(fmt.Sprintf("unknown db: %s", db))
+	srv := svc.New(db, repopath)
+	addr := "localhost:8089"
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	router := mux.NewRouter()
-	router.Handle("/", server)
+	log.Infow("server is listening", "addr", "localhost:8089")
 
-	log.Infow("http.listen", "boostd-data is listening", "localhost:8089")
-	http.ListenAndServe("localhost:8089", router)
+	go func() {
+		err = srv.Serve(ln)
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+
+		done <- struct{}{}
+	}()
+
+	// setup a signal handler to cancel the context
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, syscall.SIGTERM, syscall.SIGINT)
+	select {
+	case <-interrupt:
+		log.Debugw("got os signal interrupt")
+	}
+
+	log.Debug("shutting down server")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		panic(err) // failure/timeout shutting down the server gracefully
+	}
+
+	<-done
 }

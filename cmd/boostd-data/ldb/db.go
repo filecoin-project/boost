@@ -55,7 +55,7 @@ func (db *DB) SetNextCursor(ctx context.Context, cursor uint64) error {
 }
 
 // SetPieceCidToCursor
-func (db *DB) SetPieceCidToCursor(ctx context.Context, pieceCid cid.Cid, cursor uint64) error {
+func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, cursor uint64) error {
 	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
 
 	value := make([]byte, size)
@@ -65,7 +65,7 @@ func (db *DB) SetPieceCidToCursor(ctx context.Context, pieceCid cid.Cid, cursor 
 }
 
 // GetPieceCidToCursor
-func (db *DB) GetPieceCidToCursor(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
+func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
 	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
 
 	b, err := db.Get(ctx, key)
