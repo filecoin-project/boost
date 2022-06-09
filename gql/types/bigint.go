@@ -26,8 +26,11 @@ func (BigInt) ImplementsGraphQLType(name string) bool {
 // BigInt scalar as an input
 func (n *BigInt) UnmarshalGraphQL(input interface{}) error {
 	switch input := input.(type) {
+	case uint32:
+		n.Int = stbig.NewIntUnsigned(uint64(input))
+		return nil
 	case uint64:
-		n.Int.SetUint64(input)
+		n.Int = stbig.NewIntUnsigned(input)
 		return nil
 	case string:
 		var err error
@@ -38,10 +41,16 @@ func (n *BigInt) UnmarshalGraphQL(input interface{}) error {
 		n.Int, err = stbig.FromBytes(input)
 		return err
 	case int32:
-		n.Int.SetInt64(int64(input))
+		n.Int = stbig.NewInt(int64(input))
 		return nil
 	case int64:
-		n.Int.SetInt64(input)
+		n.Int = stbig.NewInt(input)
+		return nil
+	case float32:
+		f32 := new(big.Float).SetFloat64(float64(input))
+		bi := new(big.Int)
+		f32.Int(bi)
+		n.Int = stbig.Int{Int: bi}
 		return nil
 	case float64:
 		f64 := new(big.Float).SetFloat64(input)
