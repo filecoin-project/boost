@@ -97,8 +97,9 @@ var dealStatusCmd = &cli.Command{
 			lbz, err := label.ToBytes()
 			if err != nil {
 				lstr = "could not marshall deal label"
+			} else {
+				lstr = "bytes: " + hex.EncodeToString(lbz)
 			}
-			lstr = "bytes: " + hex.EncodeToString(lbz)
 		}
 
 		if cctx.Bool("json") {
