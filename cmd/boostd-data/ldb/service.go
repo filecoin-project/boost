@@ -136,3 +136,68 @@ func (s *PieceMetaService) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid,
 
 	return nil, nil
 }
+
+func (s *PieceMetaService) AddIndex(pieceCid cid.Cid, records []carindex.Record) error {
+	log.Debugw("handle.add-index", "records", len(records))
+
+	defer func(now time.Time) {
+		log.Debugw("handled.add-index", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+	// TODO first: see inverted index in dagstore today
+
+	// --- second ---:
+	// foreach record -> add cid -> offset (for the given pieceCid)
+
+	ctx := context.Background()
+
+	// get and set next cursor (handle synchronization, maybe with CAS)
+	cursor, keyCursorPrefix, err := s.db.NextCursor(ctx)
+	if err != nil {
+		return err
+	}
+
+	// alloacte metadata for pieceCid
+	err = s.db.SetNextCursor(ctx, cursor+1)
+	if err != nil {
+		return err
+	}
+
+	// put pieceCid in pieceCid->cursor table
+	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, cursor)
+	if err != nil {
+		return err
+	}
+
+	// process index and store entries
+	//switch idx := subject.(type) {
+	//case carindex.IterableIndex:
+	//i := 0
+	//err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
+	//i++
+	//gi++
+
+	//err := db.AddOffset(ctx, keyCursorPrefix, m, offset)
+	//if err != nil {
+	//return err
+	//}
+
+	//return nil
+	//})
+	//if err != nil {
+	//return err
+	//}
+
+	//log.Debugf(fmt.Sprintf("processed %d index entries for piece cid %s", i, pieceCid.String()))
+	//default:
+	//panic(fmt.Sprintf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec()))
+	//}
+
+	err = s.db.Sync(ctx, datastore.NewKey(keyCursorPrefix))
+	if err != nil {
+		return err
+	}
+
+	// TODO: mark that indexing is complete ; metadata value for each piece
+	// pieceCid -> {cursor ; isIndexed ; []dealInfo }
+	return nil
+}

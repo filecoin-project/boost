@@ -90,7 +90,7 @@ func (ps *PieceStore) GetPieceDeals(pieceCid cid.Cid) ([]DealInfo, error) {
 }
 
 func (ps *PieceStore) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
-
+	return 0, nil
 }
 
 func (ps *PieceStore) AddDealForPiece(pieceCid cid.Cid, dealInfo DealInfo) error {
@@ -116,7 +116,7 @@ func (ps *PieceStore) addIndexForPiece(pieceCid cid.Cid) error {
 	}
 
 	// Get a reader over the piece data
-	reader, err := ps.GetPieceReader(pieceCid)
+	reader, err := ps.getPieceReader(pieceCid)
 	if err != nil {
 		return fmt.Errorf("getting piece reader for piece %s: %w", pieceCid, err)
 	}
@@ -185,7 +185,7 @@ func (ps *PieceStore) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
 }
 
 // Used internally, and also by HTTP retrieval
-func (ps *PieceStore) _GetPieceReader(pieceCid cid.Cid) (SectionReader, error) {
+func (ps *PieceStore) getPieceReader(pieceCid cid.Cid) (SectionReader, error) {
 	// Get all deals containing this piece
 	deals, err := ps.GetPieceDeals(pieceCid)
 	if err != nil {
@@ -242,7 +242,7 @@ func (ps *PieceStore) _GetBlock(c cid.Cid) ([]byte, error) {
 	for i, pieceCid := range pieces {
 		data, err := func() ([]byte, error) {
 			// Get a reader over the piece data
-			reader, err := ps.GetPieceReader(pieceCid)
+			reader, err := ps.getPieceReader(pieceCid)
 			if err != nil {
 				return nil, fmt.Errorf("getting piece reader: %w", err)
 			}
@@ -281,7 +281,7 @@ func (ps *PieceStore) _GetBlock(c cid.Cid) ([]byte, error) {
 // Get a blockstore over a piece (used by Graphsync retrieval)
 func (ps *PieceStore) _GetBlockstore(pieceCid cid.Cid) (bstore.Blockstore, error) {
 	// Get a reader over the piece
-	reader, err := ps.GetPieceReader(pieceCid)
+	reader, err := ps.getPieceReader(pieceCid)
 	if err != nil {
 		return nil, fmt.Errorf("getting piece reader for piece %s: %w", pieceCid, err)
 	}
