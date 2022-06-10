@@ -115,22 +115,53 @@ boostd -vv init \
   --max-staging-deals-bytes=2000000000
 ```
 
-11. Run boost
-```
-boostd -vv run
-```
-
-12. Build the Web UI
+11. Build the Web UI
 ```
 make react
 ```
 
-13. Open the Web UI
+12. Edit config to set a fixed listen address
+
+Open `~/.boost/config.toml`
+
+Set the port in the `ListenAddresses` key to `50000` 
+```
+[Libp2p]
+  ListenAddresses = ["/ip4/0.0.0.0/tcp/50000", "/ip6/::/tcp/0"]
+```
+
+13. Run boost
+```
+boostd -vv run
+```
+
+Note down the peer ID of the boost instance
+
+14. Set the peer ID of the miner on chain
+```
+lotus-miner actor set-peer-id <peer id>
+```
+
+15. Open the Web UI
 
 Open http://localhost:8080 to see the Boost UI
 
-#### Next steps
+## Make a deal with Boost
 
-To make a deal with boost, follow the guide at https://boost.filecoin.io/tutorials/how-to-store-files-with-boost-on-filecoin
+2. Initialize the boost client
+```
+boost init
+```
+
+This will output the address of the wallet (it's safe to run the init command repeatedly).
+
+2. Send funds to the client wallet
+```
+lotus send --from=$DEFAULT_WALLET <client wallet> 10
+```
+
+3. Follow the guide at https://boost.filecoin.io/tutorials/how-to-store-files-with-boost-on-filecoin
 
 Note that above you already ran a command to export FULLNODE_API (and point it to your local devnet lotus daemon).
+
+Note also that the provider address is `t01000`
