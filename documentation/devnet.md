@@ -169,4 +169,4 @@ lotus send --from=$DEFAULT_WALLET <client wallet> 10
 
 Note that above you already ran a command to export FULLNODE_API (and point it to your local devnet lotus daemon).
 
-Note also that the provider address is `t01000`
+Note also that the provider address is `t01000` and you will need to supply an appropriate `--storage-price` when using `boost deal` since the devnet has a minimum price. Alternatively, using "Settings" in the Boost web UI to set the deal price to zero. 
