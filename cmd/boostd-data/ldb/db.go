@@ -43,7 +43,7 @@ func (db *DB) NextCursor(ctx context.Context) (uint64, string, error) {
 	}
 
 	cursor, _ := binary.Uvarint(b)
-	return cursor, string(b) + "/", nil // adding "/" because query for datastore
+	return cursor, fmt.Sprintf("%d", cursor) + "/", nil // adding "/" because query for datastore
 }
 
 // SetNextCursor
@@ -54,7 +54,7 @@ func (db *DB) SetNextCursor(ctx context.Context, cursor uint64) error {
 	return db.Put(ctx, dskeyNextCursor, buf)
 }
 
-// SetPieceCidToCursor
+// SetPieceCidToMetadata
 func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, cursor uint64) error {
 	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
 
@@ -64,7 +64,7 @@ func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, curso
 	return db.Put(ctx, key, value)
 }
 
-// GetPieceCidToCursor
+// GetPieceCidToMetadata
 func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
 	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
 

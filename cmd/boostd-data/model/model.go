@@ -3,6 +3,7 @@ package model
 import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 )
 
 type DealInfo struct {
@@ -20,4 +21,9 @@ type DealInfo struct {
 type Metadata struct {
 	Cursor    uint64 `json:"cursor"`
 	IsIndexed bool   `json:"is_indexed"`
+}
+
+type Record struct {
+	Cid    cid.Cid
+	Offset uint64
 }
