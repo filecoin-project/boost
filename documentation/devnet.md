@@ -141,9 +141,10 @@ Note down the peer ID of the boost instance:
 ```
 In this example: `12D3KooWQNNWNiJ1mieEk9EHjDVF2qBc1FSjJGEzwjnMJzteApaW`
 
-14. Set the peer ID of the miner on chain
+14. Set the peer ID and multi-address of the miner on chain
 ```
 lotus-miner actor set-peer-id <peer id>
+lotus-miner actor set-addrs /ip4/127.0.0.1/tcp/50000
 ```
 
 15. Open the Web UI
