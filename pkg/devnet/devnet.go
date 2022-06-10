@@ -29,8 +29,8 @@ func Run(ctx context.Context, tempHome string, done chan struct{}) {
 	// fetch-params will exit in about a second if all files are up to date.
 	// The command is also pretty verbose, so reduce its verbosity.
 	{
-		// Ten minutes should be enough for practically any machine.
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+		// One hour should be enough for practically any machine.
+		ctx, cancel := context.WithTimeout(ctx, time.Hour)
 
 		log.Debugw("lotus fetch-params 8388608")
 		cmd := exec.CommandContext(ctx, "lotus", "fetch-params", "8388608")
