@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/filecoin-project/boost/piecemeta"
 	"path"
 	"time"
 
@@ -30,7 +31,6 @@ import (
 	ctypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/lib/sigs"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
 	"github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -386,18 +386,18 @@ func NewChainDealManager(a v1api.FullNode) *storagemarket.ChainDealManager {
 func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode,
 	sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
 	dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
-	dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider,
+	pieceMeta *piecemeta.PieceMeta, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider,
 	cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
-		dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper,
+		pieceMeta *piecemeta.PieceMeta, ip *indexprovider.Wrapper,
 		lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl)
 		prov, err := storagemarket.NewProvider(sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
-			sps, cdm, df, logsSqlDB.db, logsDB, dagst, ps, ip, lp, &signatureVerifier{a}, dl, tspt)
+			sps, cdm, df, logsSqlDB.db, logsDB, pieceMeta, ip, lp, &signatureVerifier{a}, dl, tspt)
 		if err != nil {
 			return nil, err
 		}

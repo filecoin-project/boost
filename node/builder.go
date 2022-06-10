@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/filecoin-project/dagstore"
 	"time"
 
 	"github.com/filecoin-project/boost/api"
@@ -19,6 +20,7 @@ import (
 	"github.com/filecoin-project/boost/node/impl/net"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/piecemeta"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -39,7 +41,7 @@ import (
 	"github.com/filecoin-project/lotus/journal/alerting"
 	_ "github.com/filecoin-project/lotus/lib/sigs/bls"
 	_ "github.com/filecoin-project/lotus/lib/sigs/secp"
-	"github.com/filecoin-project/lotus/markets/dagstore"
+	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	lotus_dealfilter "github.com/filecoin-project/lotus/markets/dealfilter"
 	"github.com/filecoin-project/lotus/markets/idxprov"
 	"github.com/filecoin-project/lotus/markets/retrievaladapter"
@@ -456,7 +458,7 @@ func ConfigBoost(c interface{}) Option {
 		// Sealing Pipeline State API
 		Override(new(sealingpipeline.API), From(new(lotus_modules.MinerStorageService))),
 
-		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg.DAGStore)),
+		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper()),
 
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
 
@@ -486,15 +488,22 @@ func ConfigBoost(c interface{}) Option {
 		})),
 
 		// DAG Store
-		Override(new(dagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
-		Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
+		//Override(new(dagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
+
+		// TODO: Not sure how to completely get rid of these yet:
+		// Error: creating node: starting node: missing dependencies for function "reflect".makeFuncStub (/usr/local/go/src/reflect/asm_amd64.s:30): missing types: *dagstore.DAGStore; *dagstore.Wrapper (did you mean stores.DAGStoreWrapper?)
+		Override(new(*dagstore.DAGStore), func() *dagstore.DAGStore { return nil }),
+		Override(new(*mktsdagstore.Wrapper), func() *mktsdagstore.Wrapper { return nil }),
+
+		Override(new(*piecemeta.PieceMeta), modules.NewPieceMeta),
+		Override(DAGStoreKey, modules.NewDAGStoreWrapper),
 
 		// Lotus Markets (retrieval)
-		Override(new(dagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
-		Override(new(retrievalmarket.SectorAccessor), From(new(dagstore.SectorAccessor))),
+		Override(new(mktsdagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
+		Override(new(retrievalmarket.SectorAccessor), From(new(mktsdagstore.SectorAccessor))),
 		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
-		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
+		Override(new(retrievalmarket.RetrievalProvider), modules.RetrievalProvider),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
 		Override(new(idxprov.MeshCreator), idxprov.NewMeshCreator),
 		Override(new(provider.Interface), lotus_modules.IndexProvider(cfg.IndexProvider)),
@@ -506,7 +515,7 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(*storedask.StoredAsk), lotus_modules.NewStorageAsk),
 
 		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&cfg.LotusFees, &cfg.LotusDealmaking)),
-		Override(new(lotus_storagemarket.StorageProvider), lotus_modules.StorageProvider),
+		Override(new(lotus_storagemarket.StorageProvider), modules.StorageProvider),
 		Override(HandleDealsKey, modules.HandleLegacyDeals),
 		Override(HandleBoostDealsKey, modules.HandleBoostDeals),
 
