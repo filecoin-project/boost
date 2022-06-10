@@ -135,7 +135,11 @@ Set the port in the `ListenAddresses` key to `50000`
 boostd -vv run
 ```
 
-Note down the peer ID of the boost instance
+Note down the peer ID of the boost instance:
+```
+2022-06-10T09:32:28.819Z        INFO    boostd  boostd/run.go:114       Boost libp2p node listening     {"maddr": "{12D3KooWQNNWNiJ1mieEk9EHjDVF2qBc1FSjJGEzwjnMJzteApaW: [/ip4/172.17.0.2/tcp/50000 /ip4/127.0.0.1/tcp/50000]}"}
+```
+In this example: `12D3KooWQNNWNiJ1mieEk9EHjDVF2qBc1FSjJGEzwjnMJzteApaW`
 
 14. Set the peer ID of the miner on chain
 ```
