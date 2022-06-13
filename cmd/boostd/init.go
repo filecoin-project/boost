@@ -97,6 +97,7 @@ var initCmd = &cli.Command{
 				return
 			}
 
+			rcfg.ConfigVersion = config.CurrentVersion
 			cerr = setMinerApiConfig(cctx, rcfg, true)
 			if cerr != nil {
 				return
@@ -480,10 +481,13 @@ func migrateMarketsConfig(cctx *cli.Context, mktsRepo lotus_repo.LockedRepo, boo
 		}
 		rcfg.Common.Backup = mktsCfg.Common.Backup
 		rcfg.Common.Libp2p = mktsCfg.Common.Libp2p
-		rcfg.Storage = mktsCfg.Storage
+		rcfg.Storage = config.StorageConfig{ParallelFetchLimit: mktsCfg.Storage.ParallelFetchLimit}
 		rcfg.Dealmaking = boostDealMakingCfg(mktsCfg)
 		rcfg.LotusDealmaking = mktsCfg.Dealmaking
-		rcfg.LotusFees = mktsCfg.Fees
+		rcfg.LotusFees = config.FeeConfig{
+			MaxPublishDealsFee:     mktsCfg.Fees.MaxPublishDealsFee,
+			MaxMarketBalanceAddFee: mktsCfg.Fees.MaxMarketBalanceAddFee,
+		}
 		rcfg.DAGStore = mktsCfg.DAGStore
 		// Clear the DAG store root dir config, because the DAG store is no longer configurable in Boost
 		// (it is always at <repo path>/dagstore

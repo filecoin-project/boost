@@ -309,10 +309,23 @@ func Repo(r lotus_repo.Repo) Option {
 		if err != nil {
 			return err
 		}
+		// If it's not a mem-repo
+		if _, ok := r.(*lotus_repo.MemRepo); !ok {
+			// Migrate config file
+			err = config.ConfigMigrate(lr.Path())
+			if err != nil {
+				return fmt.Errorf("migrating config: %w", err)
+			}
+		}
 		c, err := lr.Config()
 		if err != nil {
 			return err
 		}
+		cfg, ok := c.(*config.Boost)
+		if !ok {
+			return fmt.Errorf("invalid config type from repo, expected *config.Boost but got %T", c)
+		}
+
 		return Options(
 			Override(new(lotus_repo.LockedRepo), lotus_modules.LockedRepo(lr)), // module handles closing
 
@@ -324,7 +337,7 @@ func Repo(r lotus_repo.Repo) Option {
 
 			Override(new(*lotus_dtypes.APIAlg), lotus_modules.APISecret),
 
-			ConfigBoost(c),
+			ConfigBoost(cfg),
 		)(settings)
 	}
 }
@@ -390,12 +403,7 @@ var BoostNode = Options(
 	Override(new(*db.FundsDB), modules.NewFundsDB),
 )
 
-func ConfigBoost(c interface{}) Option {
-	cfg, ok := c.(*config.Boost)
-	if !ok {
-		return Error(fmt.Errorf("invalid config from repo, got: %T", c))
-	}
-
+func ConfigBoost(cfg *config.Boost) Option {
 	pricingConfig := cfg.Dealmaking.RetrievalPricing
 	if pricingConfig.Strategy == config.RetrievalPricingExternalMode {
 		if pricingConfig.External == nil {
@@ -428,6 +436,8 @@ func ConfigBoost(c interface{}) Option {
 	if len(cfg.DAGStore.RootDir) > 0 {
 		return Error(fmt.Errorf("Detected custom DAG store path %s. The DAG store must be at $BOOST_PATH/dagstore", cfg.DAGStore.RootDir))
 	}
+
+	legacyFees := cfg.LotusFees.Legacy()
 
 	return Options(
 		ConfigCommon(&cfg.Common),
@@ -511,7 +521,7 @@ func ConfigBoost(c interface{}) Option {
 		Override(new(lotus_dtypes.ProviderDataTransfer), modules.NewProviderDataTransfer),
 		Override(new(*storedask.StoredAsk), lotus_modules.NewStorageAsk),
 
-		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&cfg.LotusFees, &cfg.LotusDealmaking)),
+		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&legacyFees, &cfg.LotusDealmaking)),
 		Override(new(lotus_storagemarket.StorageProvider), lotus_modules.StorageProvider),
 		Override(HandleDealsKey, modules.HandleLegacyDeals),
 		Override(HandleBoostDealsKey, modules.HandleBoostDeals),
@@ -541,7 +551,7 @@ func ConfigBoost(c interface{}) Option {
 			Override(new(lotus_dtypes.RetrievalDealFilter), lotus_modules.RetrievalDealFilter(lotus_dealfilter.CliRetrievalDealFilter(cfg.LotusDealmaking.RetrievalFilter))),
 		),
 
-		Override(new(*lotus_storageadapter.DealPublisher), lotus_storageadapter.NewDealPublisher(&cfg.LotusFees, lotus_storageadapter.PublishMsgConfig{
+		Override(new(*lotus_storageadapter.DealPublisher), lotus_storageadapter.NewDealPublisher(&legacyFees, lotus_storageadapter.PublishMsgConfig{
 			Period:                  time.Duration(cfg.Dealmaking.PublishMsgPeriod),
 			MaxDealsPerMsg:          cfg.LotusDealmaking.MaxDealsPerPublishMsg,
 			StartEpochSealingBuffer: cfg.LotusDealmaking.StartEpochSealingBuffer,
@@ -549,7 +559,6 @@ func ConfigBoost(c interface{}) Option {
 
 		Override(new(sectorstorage.Unsealer), From(new(lotus_modules.MinerStorageService))),
 		Override(new(stores.SectorIndex), From(new(lotus_modules.MinerSealingService))),
-		Override(new(lotus_config.SealerConfig), cfg.Storage),
 
 		Override(new(lotus_modules.MinerStorageService), lotus_modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
 		Override(new(lotus_modules.MinerSealingService), lotus_modules.ConnectSealingService(cfg.SealerApiInfo)),
