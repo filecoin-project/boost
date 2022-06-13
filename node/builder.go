@@ -466,7 +466,7 @@ func ConfigBoost(c interface{}) Option {
 
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
 
-		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner)),
+		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner, cfg)),
 
 		// GraphQL server
 		Override(new(*gql.Server), modules.NewGraphqlServer(cfg)),

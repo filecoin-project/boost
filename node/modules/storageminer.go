@@ -387,7 +387,7 @@ func NewChainDealManager(a v1api.FullNode) *storagemarket.ChainDealManager {
 	return storagemarket.NewChainDealManager(a, cdmCfg)
 }
 
-func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode,
+func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode,
 	sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
 	dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
 	dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider,
@@ -398,9 +398,12 @@ func NewStorageMarketProvider(provAddr address.Address) func(lc fx.Lifecycle, h 
 		dagst *dagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper,
 		lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 
+		prvCfg := storagemarket.Config{
+			MaxTransferDuration: time.Duration(cfg.Dealmaking.MaxTransferDuration),
+		}
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl)
-		prov, err := storagemarket.NewProvider(sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
+		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb,
 			sps, cdm, df, logsSqlDB.db, logsDB, dagst, ps, ip, lp, &signatureVerifier{a}, dl, tspt)
 		if err != nil {
 			return nil, err

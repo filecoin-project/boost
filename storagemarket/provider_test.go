@@ -1326,7 +1326,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	askStore := &mockAskStore{}
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
-	prov, err := NewProvider(sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, sps, minerStub, df, sqldb,
+	prvCfg := Config{MaxTransferDuration: time.Hour}
+	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, sps, minerStub, df, sqldb,
 		logsDB, dagStore, ps, &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
 	require.NoError(t, err)
 	ph.Provider = prov
@@ -1381,7 +1382,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	}
 
 	// construct a new provider with pre-existing state
-	prov, err := NewProvider(h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
+	prov, err := NewProvider(h.Provider.config, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
 		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.dagst, h.Provider.ps, &NoOpIndexProvider{}, h.Provider.askGetter,
 		h.Provider.sigVerifier, h.Provider.dealLogger, h.Provider.Transport)

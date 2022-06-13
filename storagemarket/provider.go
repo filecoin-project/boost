@@ -49,6 +49,7 @@ var (
 )
 
 type Config struct {
+	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration time.Duration
 }
 
@@ -110,7 +111,7 @@ type Provider struct {
 	sigVerifier types.SignatureVerifier
 }
 
-func NewProvider(sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
+func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
@@ -122,10 +123,9 @@ func NewProvider(sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundMa
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Provider{
-		ctx:    ctx,
-		cancel: cancel,
-		// TODO Make this configurable
-		config:    Config{MaxTransferDuration: 24 * 3600 * time.Second},
+		ctx:       ctx,
+		cancel:    cancel,
+		config:    cfg,
 		Address:   addr,
 		newDealPS: newDealPS,
 		db:        sqldb,
