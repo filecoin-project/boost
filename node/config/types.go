@@ -161,4 +161,7 @@ type DealmakingConfig struct {
 	RetrievalFilter string
 
 	RetrievalPricing *lotus_config.RetrievalPricing
+
+	// The maximum amount of time a transfer can take before it fails
+	MaxTransferDuration Duration
 }

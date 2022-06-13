@@ -235,6 +235,12 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 
 			Comment: ``,
 		},
+		{
+			Name: "MaxTransferDuration",
+			Type: "Duration",
+
+			Comment: `The maximum amount of time a transfer can take before it fails`,
+		},
 	},
 	"LotusDealmakingConfig": []DocField{
 		{

@@ -95,6 +95,8 @@ func DefaultBoost() *Boost {
 					Path: "",
 				},
 			},
+
+			MaxTransferDuration: Duration(24 * 3600 * time.Second),
 		},
 
 		LotusDealmaking: lotus_config.DealmakingConfig{
