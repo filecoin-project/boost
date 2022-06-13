@@ -3,8 +3,10 @@ package ldb
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 
+	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
@@ -43,7 +45,7 @@ func (db *DB) NextCursor(ctx context.Context) (uint64, string, error) {
 	}
 
 	cursor, _ := binary.Uvarint(b)
-	return cursor, fmt.Sprintf("%d", cursor) + "/", nil // adding "/" because query for datastore
+	return cursor, fmt.Sprintf("%d", cursor) + "/", nil // adding "/" because of Query method in go-datastore
 }
 
 // SetNextCursor
@@ -55,26 +57,34 @@ func (db *DB) SetNextCursor(ctx context.Context, cursor uint64) error {
 }
 
 // SetPieceCidToMetadata
-func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, cursor uint64) error {
+func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md model.Metadata) error {
+	b, err := json.Marshal(md)
+	if err != nil {
+		return err
+	}
+
 	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
 
-	value := make([]byte, size)
-	binary.PutUvarint(value, cursor)
-
-	return db.Put(ctx, key, value)
+	return db.Put(ctx, key, b)
 }
 
 // GetPieceCidToMetadata
-func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
+func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+	var metadata model.Metadata
+
 	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
 
 	b, err := db.Get(ctx, key)
 	if err != nil {
-		return 0, err
+		return metadata, err
 	}
 
-	cursor, _ := binary.Uvarint(b)
-	return cursor, nil
+	err = json.Unmarshal(b, &metadata)
+	if err != nil {
+		return metadata, err
+	}
+
+	return metadata, nil
 }
 
 // AllRecords

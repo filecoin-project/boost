@@ -83,6 +83,20 @@ func (s *PieceMetaService) AddDealForPiece(pieceCid cid.Cid, dealInfo model.Deal
 		log.Debugw("handled.add-deal-for-piece", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
+	ctx := context.Background()
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return err
+	}
+
+	md.Deals = append(md.Deals, dealInfo)
+
+	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -95,12 +109,12 @@ func (s *PieceMetaService) GetRecords(pieceCid cid.Cid) ([]carindex.Record, erro
 
 	ctx := context.Background()
 
-	cursor, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
 		return nil, err
 	}
 
-	records, err := s.db.AllRecords(ctx, cursor)
+	records, err := s.db.AllRecords(ctx, md.Cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -117,12 +131,12 @@ func (s *PieceMetaService) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint6
 
 	ctx := context.Background()
 
-	cursor, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
 		return 0, err
 	}
 
-	return s.db.GetOffset(ctx, fmt.Sprintf("%d", cursor)+"/", hash)
+	return s.db.GetOffset(ctx, fmt.Sprintf("%d", md.Cursor)+"/", hash)
 }
 
 func (s *PieceMetaService) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
@@ -142,6 +156,8 @@ func (s *PieceMetaService) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid,
 	defer func(now time.Time) {
 		log.Debugw("handled.pieces-containing-mh", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
+
+	// TODO: inverted index
 
 	return nil, nil
 }
@@ -205,11 +221,13 @@ func (s *PieceMetaService) AddIndex(pieceCid cid.Cid, records []model.Record) er
 		return errors.New(fmt.Sprintf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec()))
 	}
 
-	// TODO: mark that indexing is complete ; metadata value for each piece
-	// pieceCid -> {cursor ; isIndexed ; []dealInfo }
-	// put pieceCid in pieceCid->cursor table
-	// right now we store just cursor
-	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, cursor)
+	// mark that indexing is complete
+	md := model.Metadata{
+		Cursor:    cursor,
+		IsIndexed: true,
+	}
+
+	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
 	if err != nil {
 		return err
 	}
