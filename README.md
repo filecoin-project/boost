@@ -31,7 +31,14 @@ brew install go bzr jq pkg-config rustup hwloc coreutils
 
 Boost also requires that Xcode Command Line Tools be installed before building the Boost binaries.
 
-### Compiling from source
+### Compiling Boost from source
+
+Depending on your architecture, you will want to export additional environment variables:
+
+```
+export RUSTFLAGS="-C target-cpu=native -g"
+export FFI_BUILD_FROM_SOURCE=1
+```
 
 ```
 git clone https://github.com/filecoin-project/boost
