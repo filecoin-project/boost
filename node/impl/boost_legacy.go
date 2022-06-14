@@ -204,7 +204,7 @@ func (sm *BoostAPI) PiecesListCidInfos(ctx context.Context) ([]cid.Cid, error) {
 func (sm *BoostAPI) PiecesGetPieceInfo(ctx context.Context, pieceCid cid.Cid) (*piecestore.PieceInfo, error) {
 	pi, err := sm.PieceStore.GetPieceInfo(pieceCid)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting piece from piece store: %w", err)
 	}
 	return &pi, nil
 }
@@ -223,7 +223,7 @@ func (sm *BoostAPI) PiecesGetMaxOffset(ctx context.Context, pieceCid cid.Cid) (u
 
 	it, err := sm.DAGStore.GetIterableIndex(shard.KeyFromCID(pieceCid))
 	if err != nil {
-		return maxOffset, fmt.Errorf("getting iterable index for piece %s: %w", pieceCid, err)
+		return maxOffset, fmt.Errorf("getting iterable index for piece %s from DAG store: %w", pieceCid, err)
 	}
 
 	err = it.ForEach(func(mh multihash.Multihash, offset uint64) error {

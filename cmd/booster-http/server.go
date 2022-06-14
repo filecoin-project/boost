@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-datastore"
 	"io"
 	"net"
@@ -19,6 +21,8 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-varint"
 )
+
+var ErrNotFound = errors.New("not found")
 
 type HttpServer struct {
 	path string
@@ -99,12 +103,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	content, err := s.getPieceContent(ctx, pieceCid)
 	if err != nil {
-		if errors.Is(err, ErrPieceSealed) {
-			msg := fmt.Sprintf("no unsealed CAR file found for piece CID %s", pieceCidStr)
-			writeError(w, r, http.StatusNotFound, msg)
-			return
-		}
-		if errors.Is(err, datastore.ErrNotFound) || isNotFoundError(err) {
+		if isNotFoundError(err) {
 			writeError(w, r, http.StatusNotFound, err.Error())
 			return
 		}
@@ -129,21 +128,35 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	}}
 
 	// Send the content
-	alog("%s\tGET %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
+	start := time.Now()
+	alogAt(start, "%s\tGET %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
 	http.ServeContent(writeErrWatcher, r, "", time.Time{}, content)
 
 	// Check if there was an error during the transfer
-	if err != nil {
-		alog("%s\tGET %s\nSending data to client: %s",
-			color.New(color.FgRed).Sprint("FAIL"), r.URL, err)
-		return
+	end := time.Now()
+	completeMsg := fmt.Sprintf("GET %s\n%s - %s: %s / %s bytes transferred",
+		r.URL, end.Format(timeFmt), start.Format(timeFmt), time.Since(start), addCommas(writeErrWatcher.count))
+	if err == nil {
+		alogAt(end, "%s\t%s", color.New(color.FgGreen).Sprint("DONE"), completeMsg)
+	} else {
+		alogAt(end, "%s\t%s\n%s",
+			color.New(color.FgRed).Sprint("FAIL"), completeMsg, err)
 	}
 }
 
-// isNotFoundError just checks the string for "not found".
-// Unfortunately we can't use errors.Is() because the error might have crossed
-// an RPC boundary.
+// isNotFoundError falls back to checking the error string for "not found".
+// Unfortunately we can't always use errors.Is() because the error might
+// have crossed an RPC boundary.
 func isNotFoundError(err error) bool {
+	if errors.Is(err, ErrNotFound) {
+		return true
+	}
+	if errors.Is(err, datastore.ErrNotFound) {
+		return true
+	}
+	if errors.Is(err, retrievalmarket.ErrNotFound) {
+		return true
+	}
 	return strings.Contains(strings.ToLower(err.Error()), "not found")
 }
 
@@ -158,19 +171,19 @@ func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.
 	// Get the deals for the piece
 	pieceInfo, err := s.api.GetPieceInfo(pieceCid)
 	if err != nil {
-		return nil, fmt.Errorf("getting sector location of piece %s: %w", pieceCid, err)
+		return nil, fmt.Errorf("getting sector info for piece %s: %w", pieceCid, err)
 	}
 
 	// Get the first unsealed deal
 	di, err := s.unsealedDeal(ctx, *pieceInfo)
 	if err != nil {
-		return nil, fmt.Errorf("getting CAR for piece %s: %w", pieceCid.String(), err)
+		return nil, fmt.Errorf("getting unsealed CAR file: %w", err)
 	}
 
 	// Get the raw piece data from the sector
 	pieceReader, err := s.api.UnsealSectorAt(ctx, di.SectorID, di.Offset.Unpadded(), di.Length.Unpadded())
 	if err != nil {
-		return nil, fmt.Errorf("getting raw data from sector %d: %w", err)
+		return nil, fmt.Errorf("getting raw data from sector %d: %w", di.SectorID, err)
 	}
 
 	maxOffset, err := s.api.GetMaxPieceOffset(pieceCid)
@@ -180,7 +193,7 @@ func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.
 
 	_, err = pieceReader.Seek(int64(maxOffset), io.SeekStart)
 	if err != nil {
-		return nil, fmt.Errorf("seeking to offset %d in CAR: %w", maxOffset, err)
+		return nil, fmt.Errorf("seeking to offset %d in piece data: %w", maxOffset, err)
 	}
 
 	// A section consists of
@@ -236,26 +249,56 @@ func (l *limitSeekReader) Seek(offset int64, whence int) (int64, error) {
 	return l.readSeeker.Seek(offset, whence)
 }
 
-var ErrPieceSealed = errors.New("piece is in a sealed sector")
-
 func (s *HttpServer) unsealedDeal(ctx context.Context, pieceInfo piecestore.PieceInfo) (*piecestore.DealInfo, error) {
-	// Find the first unsealed deal
+	// There should always been deals in the PieceInfo, but check just in case
+	if len(pieceInfo.Deals) == 0 {
+		return nil, fmt.Errorf("there are no deals containing piece %s: %w", pieceInfo.PieceCID, ErrNotFound)
+	}
+
+	// The same piece can be in many deals. Find the first unsealed deal.
+	sealedCount := 0
+	var allErr error
 	for _, di := range pieceInfo.Deals {
 		isUnsealed, err := s.api.IsUnsealed(ctx, di.SectorID, di.Offset.Unpadded(), di.Length.Unpadded())
 		if err != nil {
-			return nil, err
+			allErr = multierror.Append(allErr, err)
+			continue
 		}
 		if isUnsealed {
 			return &di, nil
 		}
+		sealedCount++
 	}
 
-	return nil, ErrPieceSealed
+	// Try to return an error message with as much useful information as possible
+	if allErr == nil {
+		deals := make([]string, 0, len(pieceInfo.Deals))
+		for _, di := range pieceInfo.Deals {
+			deals = append(deals, fmt.Sprintf("Deal %d: Sector %d", di.DealID, di.SectorID))
+		}
+		noDealsErr := fmt.Errorf("%s: %w", strings.Join(deals, ", "), ErrNotFound)
+		return nil, fmt.Errorf("checked unsealed status of %d deals containing piece %s: none are unsealed: %w",
+			len(pieceInfo.Deals), pieceInfo.PieceCID, noDealsErr)
+	}
+
+	if len(pieceInfo.Deals) == 1 {
+		return nil, fmt.Errorf("checking unsealed status of deal %d containing piece %s: %w",
+			pieceInfo.Deals[0].DealID, pieceInfo.PieceCID, allErr)
+	}
+
+	if sealedCount == 0 {
+		return nil, fmt.Errorf("checking unsealed status of %d deals containing piece %s: %w",
+			len(pieceInfo.Deals), pieceInfo.PieceCID, allErr)
+	}
+
+	return nil, fmt.Errorf("checking unsealed status of %d deals containing piece %s - %d are sealed, %d had errors: %w",
+		len(pieceInfo.Deals), pieceInfo.PieceCID, sealedCount, len(pieceInfo.Deals)-sealedCount, allErr)
 }
 
 // writeErrorWatcher calls onError if there is an error writing to the writer
 type writeErrorWatcher struct {
 	http.ResponseWriter
+	count   uint64
 	onError func(err error)
 }
 
@@ -264,6 +307,7 @@ func (w *writeErrorWatcher) Write(bz []byte) (int, error) {
 	if err != nil {
 		w.onError(err)
 	}
+	w.count += uint64(count)
 	return count, err
 }
 
@@ -284,5 +328,9 @@ func (c *countReader) ReadByte() (byte, error) {
 const timeFmt = "2006-01-02T15:04:05.000Z0700"
 
 func alog(l string, args ...interface{}) {
-	fmt.Printf(time.Now().Format(timeFmt)+"\t"+l+"\n", args...)
+	alogAt(time.Now(), l, args...)
+}
+
+func alogAt(at time.Time, l string, args ...interface{}) {
+	fmt.Printf(at.Format(timeFmt)+"\t"+l+"\n", args...)
 }

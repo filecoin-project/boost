@@ -66,6 +66,7 @@
   * [NetPeers](#netpeers)
 * [Pieces](#pieces)
   * [PiecesGetCIDInfo](#piecesgetcidinfo)
+  * [PiecesGetMaxOffset](#piecesgetmaxoffset)
   * [PiecesGetPieceInfo](#piecesgetpieceinfo)
   * [PiecesListCidInfos](#pieceslistcidinfos)
   * [PiecesListPieces](#pieceslistpieces)
@@ -1331,6 +1332,22 @@ Response:
   ]
 }
 ```
+
+### PiecesGetMaxOffset
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
+Response: `42`
 
 ### PiecesGetPieceInfo
 
