@@ -17,7 +17,10 @@ export function DealTransfersPage(props) {
 }
 
 function DealTransfersContent(props) {
-    const {loading, error, data} = useQuery(TransfersQuery, { pollInterval: 1000 })
+    const {loading, error, data} = useQuery(TransfersQuery, {
+        pollInterval: 1000,
+        fetchPolicy: 'network-only',
+    })
 
     if (loading) {
         return <div>Loading...</div>
@@ -95,7 +98,7 @@ export function DealTransfersMenuItem(props) {
         <img className="icon" alt="" src={arrowLeftRightImg} />
         <h3>Deal Transfers</h3>
         <div className="menu-desc">
-            <b>{toFixed(dataRate, 1)}</b> Mbps
+            <b>{toFixed(dataRate, 1)}</b> Mbps (10s avg)
         </div>
     </Link>
 }
