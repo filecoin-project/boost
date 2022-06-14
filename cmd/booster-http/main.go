@@ -11,10 +11,6 @@ import (
 
 var log = logging.Logger("booster")
 
-const (
-	FlagBoostRepo = "boost-repo"
-)
-
 func main() {
 	app := &cli.App{
 		Name:                 "booster-http",
@@ -22,12 +18,6 @@ func main() {
 		EnableBashCompletion: true,
 		Version:              build.UserVersion(),
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    FlagBoostRepo,
-				EnvVars: []string{"BOOST_PATH"},
-				Usage:   "boost repo path",
-				Value:   "~/.boost",
-			},
 			cliutil.FlagVeryVerbose,
 		},
 		Commands: []*cli.Command{
