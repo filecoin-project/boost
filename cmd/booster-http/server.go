@@ -5,9 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	"github.com/hashicorp/go-multierror"
-	"github.com/ipfs/go-datastore"
 	"io"
 	"net"
 	"net/http"
@@ -17,8 +14,11 @@ import (
 	"github.com/fatih/color"
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
 	"github.com/multiformats/go-varint"
 )
 
@@ -49,7 +49,7 @@ func (s *HttpServer) pieceBasePath() string {
 	return s.path + "/piece/"
 }
 
-func (s *HttpServer) Start(ctx context.Context) error {
+func (s *HttpServer) Start(ctx context.Context) {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
 	listenAddr := fmt.Sprintf(":%d", s.port)
@@ -70,8 +70,6 @@ func (s *HttpServer) Start(ctx context.Context) error {
 			log.Fatalf("http.ListenAndServe(): %v", err)
 		}
 	}()
-
-	return nil
 }
 
 func (s *HttpServer) Stop() error {

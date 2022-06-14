@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
+	"strings"
+
 	"github.com/filecoin-project/boost/api"
 	bclient "github.com/filecoin-project/boost/api/client"
 	cliutil "github.com/filecoin-project/boost/cli/util"
@@ -25,9 +29,6 @@ import (
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
-	"net/http"
-	_ "net/http/pprof"
-	"strings"
 )
 
 var runCmd = &cli.Command{
@@ -87,6 +88,9 @@ var runCmd = &cli.Command{
 		// Connect to the full node API
 		fnApiInfo := cctx.String("api-fullnode")
 		fullnodeApi, ncloser, err := getFullNodeApi(ctx, fnApiInfo)
+		if err != nil {
+			return fmt.Errorf("getting full node API: %w", err)
+		}
 		defer ncloser()
 
 		// Connect to the sealing API
@@ -96,9 +100,15 @@ var runCmd = &cli.Command{
 			return fmt.Errorf("parsing sealing API endpoint: %w", err)
 		}
 		sealingService, sealerCloser, err := getMinerApi(ctx, sealingApiInfo)
+		if err != nil {
+			return fmt.Errorf("getting miner API: %w", err)
+		}
 		defer sealerCloser()
 
 		maddr, err := sealingService.ActorAddress(ctx)
+		if err != nil {
+			return fmt.Errorf("getting miner actor address: %w", err)
+		}
 		log.Infof("Miner address: %s", maddr)
 
 		// Use an in-memory repo because we don't need any functions
