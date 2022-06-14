@@ -94,7 +94,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 
 	// Set the Content-Type header explicitly so that http.ServeContent doesn't
 	// try to do it implicitly
-	w.Header().Set("Content-Type", "application/car")
+	w.Header().Set("Content-Type", "application/vnd.ipld.car")
 
 	ctx := r.Context()
 	content, err := s.getPieceContent(ctx, pieceCid)
