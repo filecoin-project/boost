@@ -118,6 +118,10 @@ func (sm *BoostAPI) BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*types.P
 	return sm.StorageProvider.Deal(ctx, dealUuid)
 }
 
+func (sm *BoostAPI) BoostDealBySignedProposalCid(ctx context.Context, proposalCid cid.Cid) (*types.ProviderDealState, error) {
+	return sm.StorageProvider.DealBySignedProposalCid(ctx, proposalCid)
+}
+
 func (sm *BoostAPI) BoostIndexerAnnounceAllDeals(ctx context.Context) error {
 	return sm.IndexProvider.IndexerAnnounceAllDeals(ctx)
 }
