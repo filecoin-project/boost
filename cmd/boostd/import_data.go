@@ -54,7 +54,7 @@ var importDataCmd = &cli.Command{
 				// markets datastore (v1.1.0 deal)
 				err := napi.MarketImportDealData(cctx.Context, *proposalCid, filePath)
 				if err != nil {
-					return err
+					return fmt.Errorf("couldnt import v1.1.0 deal, or find boost deal: %w", err)
 				}
 				fmt.Printf("Offline deal import for v1.1.0 deal %s scheduled for execution\n", proposalCid.String())
 				return nil
