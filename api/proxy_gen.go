@@ -23,6 +23,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/multiformats/go-multihash"
 )
 
 var ErrNotSupported = errors.New("method not supported")
@@ -42,6 +43,8 @@ type BoostStruct struct {
 		BoostDagstoreInitializeShard func(p0 context.Context, p1 string) error `perm:"admin"`
 
 		BoostDagstoreListShards func(p0 context.Context) ([]DagstoreShardInfo, error) `perm:"read"`
+
+		BoostDagstorePiecesContainingMultihash func(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) `perm:"read"`
 
 		BoostDagstoreRecoverShard func(p0 context.Context, p1 string) error `perm:"admin"`
 
@@ -281,6 +284,17 @@ func (s *BoostStruct) BoostDagstoreListShards(p0 context.Context) ([]DagstoreSha
 
 func (s *BoostStub) BoostDagstoreListShards(p0 context.Context) ([]DagstoreShardInfo, error) {
 	return *new([]DagstoreShardInfo), ErrNotSupported
+}
+
+func (s *BoostStruct) BoostDagstorePiecesContainingMultihash(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) {
+	if s.Internal.BoostDagstorePiecesContainingMultihash == nil {
+		return *new([]cid.Cid), ErrNotSupported
+	}
+	return s.Internal.BoostDagstorePiecesContainingMultihash(p0, p1)
+}
+
+func (s *BoostStub) BoostDagstorePiecesContainingMultihash(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) {
+	return *new([]cid.Cid), ErrNotSupported
 }
 
 func (s *BoostStruct) BoostDagstoreRecoverShard(p0 context.Context, p1 string) error {

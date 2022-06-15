@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multihash"
 )
 
 //                       MODIFYING THE API INTERFACE
@@ -43,8 +44,8 @@ type Boost interface {
 	BoostDagstoreInitializeAll(ctx context.Context, params DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) //perm:admin
 	BoostDagstoreRecoverShard(ctx context.Context, key string) error                                                               //perm:admin
 	BoostDagstoreGC(ctx context.Context) ([]DagstoreShardResult, error)                                                            //perm:admin
-
-	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error) //perm:read
+	BoostDagstorePiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error)                         //perm:read
+	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error)                                                      //perm:read
 
 	// RuntimeSubsystems returns the subsystems that are enabled
 	// in this instance.

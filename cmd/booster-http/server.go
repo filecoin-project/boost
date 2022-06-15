@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/multiformats/go-multihash"
 	"github.com/multiformats/go-varint"
 )
 
@@ -35,6 +36,7 @@ type HttpServer struct {
 }
 
 type HttpServerApi interface {
+	PiecesContainingMultihash(mh multihash.Multihash) ([]cid.Cid, error)
 	GetMaxPieceOffset(pieceCid cid.Cid) (uint64, error)
 	GetPieceInfo(pieceCID cid.Cid) (*piecestore.PieceInfo, error)
 	IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error)
@@ -43,6 +45,10 @@ type HttpServerApi interface {
 
 func NewHttpServer(path string, port int, api HttpServerApi) *HttpServer {
 	return &HttpServer{path: path, port: port, api: api}
+}
+
+func (s *HttpServer) payloadBasePath() string {
+	return s.path + "/payload/"
 }
 
 func (s *HttpServer) pieceBasePath() string {
@@ -54,6 +60,7 @@ func (s *HttpServer) Start(ctx context.Context) {
 
 	listenAddr := fmt.Sprintf(":%d", s.port)
 	handler := http.NewServeMux()
+	handler.HandleFunc(s.payloadBasePath(), s.handleByPayloadCid)
 	handler.HandleFunc(s.pieceBasePath(), s.handleByPieceCid)
 	s.server = &http.Server{
 		Addr:    listenAddr,
@@ -77,6 +84,55 @@ func (s *HttpServer) Stop() error {
 	return s.server.Close()
 }
 
+func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) {
+	prefixLen := len(s.payloadBasePath())
+	if len(r.URL.Path) <= prefixLen {
+		msg := fmt.Sprintf("path '%s' is missing piece CID", r.URL.Path)
+		writeError(w, r, http.StatusBadRequest, msg)
+		return
+	}
+
+	payloadCidStr := r.URL.Path[prefixLen:]
+	payloadCid, err := cid.Parse(payloadCidStr)
+	if err != nil {
+		msg := fmt.Sprintf("parsing payload CID '%s': %s", payloadCidStr, err.Error())
+		writeError(w, r, http.StatusBadRequest, msg)
+		return
+	}
+
+	pieces, err := s.api.PiecesContainingMultihash(payloadCid.Hash())
+	if err != nil {
+		if isNotFoundError(err) {
+			msg := fmt.Sprintf("getting piece that contains payload CID '%s': %s", payloadCid, err.Error())
+			writeError(w, r, http.StatusNotFound, msg)
+			return
+		}
+		log.Errorf("getting piece that contains payload CID '%s': %s", payloadCid, err)
+		msg := fmt.Sprintf("server error getting piece that contains payload CID '%s'", payloadCidStr)
+		writeError(w, r, http.StatusInternalServerError, msg)
+		return
+	}
+
+	// Just get the content of the first piece returned (if the client wants a
+	// different piece they can just call the /piece endpoint)
+	pieceCid := pieces[0]
+	ctx := r.Context()
+	content, err := s.getPieceContent(ctx, pieceCid)
+	if err != nil {
+		if isNotFoundError(err) {
+			msg := fmt.Sprintf("getting content for payload CID %s in piece %s: %s", payloadCidStr, pieceCid, err)
+			writeError(w, r, http.StatusNotFound, msg)
+			return
+		}
+		log.Errorf("getting content for payload CID %s in piece %s: %s", payloadCid, pieceCid, err)
+		msg := fmt.Sprintf("server error getting content for payload CID %s in piece %s", payloadCidStr, pieceCid)
+		writeError(w, r, http.StatusInternalServerError, msg)
+		return
+	}
+
+	serveCAR(w, r, content)
+}
+
 func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	prefixLen := len(s.pieceBasePath())
 	if len(r.URL.Path) <= prefixLen {
@@ -89,14 +145,10 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	pieceCidStr := strings.Replace(fileName, ".car", "", 1)
 	pieceCid, err := cid.Parse(pieceCidStr)
 	if err != nil {
-		msg := fmt.Sprintf("parsing piece CID %s: %s", pieceCidStr, err.Error())
+		msg := fmt.Sprintf("parsing piece CID '%s': %s", pieceCidStr, err.Error())
 		writeError(w, r, http.StatusBadRequest, msg)
 		return
 	}
-
-	// Set the Content-Type header explicitly so that http.ServeContent doesn't
-	// try to do it implicitly
-	w.Header().Set("Content-Type", "application/vnd.ipld.car")
 
 	ctx := r.Context()
 	content, err := s.getPieceContent(ctx, pieceCid)
@@ -111,6 +163,14 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	serveCAR(w, r, content)
+}
+
+func serveCAR(w http.ResponseWriter, r *http.Request, content io.ReadSeeker) {
+	// Set the Content-Type header explicitly so that http.ServeContent doesn't
+	// try to do it implicitly
+	w.Header().Set("Content-Type", "application/vnd.ipld.car")
+
 	if r.Method == "HEAD" {
 		// For an HTTP HEAD request we don't send any data (just headers)
 		http.ServeContent(w, r, "", time.Time{}, content)
@@ -121,6 +181,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	// Send the CAR file
 	// http.ServeContent ignores errors when writing to the stream, so we
 	// replace the writer with a class that watches for errors
+	var err error
 	writeErrWatcher := &writeErrorWatcher{ResponseWriter: w, onError: func(e error) {
 		err = e
 	}}
@@ -269,28 +330,29 @@ func (s *HttpServer) unsealedDeal(ctx context.Context, pieceInfo piecestore.Piec
 	}
 
 	// Try to return an error message with as much useful information as possible
+	dealSectors := make([]string, 0, len(pieceInfo.Deals))
+	for _, di := range pieceInfo.Deals {
+		dealSectors = append(dealSectors, fmt.Sprintf("Deal %d: Sector %d", di.DealID, di.SectorID))
+	}
+
 	if allErr == nil {
-		deals := make([]string, 0, len(pieceInfo.Deals))
-		for _, di := range pieceInfo.Deals {
-			deals = append(deals, fmt.Sprintf("Deal %d: Sector %d", di.DealID, di.SectorID))
-		}
-		noDealsErr := fmt.Errorf("%s: %w", strings.Join(deals, ", "), ErrNotFound)
+		dealSectorsErr := fmt.Errorf("%s: %w", strings.Join(dealSectors, ", "), ErrNotFound)
 		return nil, fmt.Errorf("checked unsealed status of %d deals containing piece %s: none are unsealed: %w",
-			len(pieceInfo.Deals), pieceInfo.PieceCID, noDealsErr)
+			len(pieceInfo.Deals), pieceInfo.PieceCID, dealSectorsErr)
 	}
 
 	if len(pieceInfo.Deals) == 1 {
-		return nil, fmt.Errorf("checking unsealed status of deal %d containing piece %s: %w",
-			pieceInfo.Deals[0].DealID, pieceInfo.PieceCID, allErr)
+		return nil, fmt.Errorf("checking unsealed status of deal %d (sector %d) containing piece %s: %w",
+			pieceInfo.Deals[0].DealID, pieceInfo.Deals[0].SectorID, pieceInfo.PieceCID, allErr)
 	}
 
 	if sealedCount == 0 {
-		return nil, fmt.Errorf("checking unsealed status of %d deals containing piece %s: %w",
-			len(pieceInfo.Deals), pieceInfo.PieceCID, allErr)
+		return nil, fmt.Errorf("checking unsealed status of %d deals containing piece %s: %s: %w",
+			len(pieceInfo.Deals), pieceInfo.PieceCID, dealSectors, allErr)
 	}
 
-	return nil, fmt.Errorf("checking unsealed status of %d deals containing piece %s - %d are sealed, %d had errors: %w",
-		len(pieceInfo.Deals), pieceInfo.PieceCID, sealedCount, len(pieceInfo.Deals)-sealedCount, allErr)
+	return nil, fmt.Errorf("checking unsealed status of %d deals containing piece %s - %d are sealed, %d had errors: %s: %w",
+		len(pieceInfo.Deals), pieceInfo.PieceCID, sealedCount, len(pieceInfo.Deals)-sealedCount, dealSectors, allErr)
 }
 
 // writeErrorWatcher calls onError if there is an error writing to the writer
