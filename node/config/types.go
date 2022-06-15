@@ -29,17 +29,22 @@ type Backup struct {
 
 // Boost is a boost service config
 type Boost struct {
+	// The version of the config file (used for migrations)
+	ConfigVersion int
+
 	Common
 
-	Storage            lotus_config.SealerConfig
-	SealerApiInfo      string
+	Storage StorageConfig
+	// The connect string for the sealing RPC API (lotus miner)
+	SealerApiInfo string
+	// The connect string for the sector index RPC API (lotus miner)
 	SectorIndexApiInfo string
 	Dealmaking         DealmakingConfig
 	Wallets            WalletsConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
-	LotusFees       lotus_config.MinerFeeConfig
+	LotusFees       FeeConfig
 	DAGStore        lotus_config.DAGStoreConfig
 	IndexProvider   lotus_config.IndexProviderConfig
 }
@@ -164,4 +169,23 @@ type DealmakingConfig struct {
 
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration Duration
+}
+
+type FeeConfig struct {
+	// The maximum fee to pay when sending the PublishStorageDeals message
+	MaxPublishDealsFee types.FIL
+	// The maximum fee to pay when sending the AddBalance message (used by legacy markets)
+	MaxMarketBalanceAddFee types.FIL
+}
+
+func (c *FeeConfig) Legacy() lotus_config.MinerFeeConfig {
+	return lotus_config.MinerFeeConfig{
+		MaxPublishDealsFee:     c.MaxPublishDealsFee,
+		MaxMarketBalanceAddFee: c.MaxMarketBalanceAddFee,
+	}
+}
+
+type StorageConfig struct {
+	// The maximum number of concurrent fetch operations to the storage subsystem
+	ParallelFetchLimit int
 }

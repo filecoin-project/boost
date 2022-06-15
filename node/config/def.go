@@ -59,7 +59,7 @@ func DefaultBoost() *Boost {
 	cfg := &Boost{
 		Common: defCommon(),
 
-		Storage: lotus_config.SealerConfig{
+		Storage: StorageConfig{
 			ParallelFetchLimit: 10,
 		},
 
@@ -131,21 +131,7 @@ func DefaultBoost() *Boost {
 			},
 		},
 
-		LotusFees: lotus_config.MinerFeeConfig{
-			MaxPreCommitGasFee: types.MustParseFIL("0.025"),
-			MaxCommitGasFee:    types.MustParseFIL("0.05"),
-
-			MaxPreCommitBatchGasFee: lotus_config.BatchFeeConfig{
-				Base:      types.MustParseFIL("0"),
-				PerSector: types.MustParseFIL("0.02"),
-			},
-			MaxCommitBatchGasFee: lotus_config.BatchFeeConfig{
-				Base:      types.MustParseFIL("0"),
-				PerSector: types.MustParseFIL("0.03"), // enough for 6 agg and 1nFIL base fee
-			},
-
-			MaxTerminateGasFee:     types.MustParseFIL("0.5"),
-			MaxWindowPoStGasFee:    types.MustParseFIL("5"),
+		LotusFees: FeeConfig{
 			MaxPublishDealsFee:     types.MustParseFIL("0.05"),
 			MaxMarketBalanceAddFee: types.MustParseFIL("0.007"),
 		},
