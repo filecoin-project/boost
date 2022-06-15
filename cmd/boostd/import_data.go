@@ -13,7 +13,7 @@ import (
 var importDataCmd = &cli.Command{
 	Name:      "import-data",
 	Usage:     "Import data for offline deal made with Boost",
-	ArgsUsage: "<proposal CID>/<deal UUID> <file>",
+	ArgsUsage: "<proposal CID> <file> or <deal UUID> <file>",
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() < 2 {
 			return fmt.Errorf("must specify proposal CID / deal UUID and file path")
