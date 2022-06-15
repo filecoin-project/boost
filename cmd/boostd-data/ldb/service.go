@@ -146,7 +146,14 @@ func (s *PieceMetaService) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, er
 		log.Debugw("handled.get-piece-deals", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	return nil, nil
+	ctx := context.Background()
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return nil, err
+	}
+
+	return md.Deals, nil
 }
 
 // Get all pieces that contain a multihash (used when retrieving by payload CID)

@@ -13,6 +13,8 @@ import (
 
 	"github.com/filecoin-project/boost/cmd/boostd-data/client"
 	"github.com/filecoin-project/boost/cmd/boostd-data/model"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car/v2/index"
@@ -49,7 +51,22 @@ func TestLdbService(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	randomuuid := uuid.New()
+
 	err = cl.AddIndex(pieceCid, records)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	di := model.DealInfo{
+		DealUuid:    randomuuid,
+		SectorID:    abi.SectorNumber(1),
+		PieceOffset: 1,
+		PieceLength: 2,
+		CarLength:   3,
+	}
+
+	err = cl.AddDealForPiece(pieceCid, di)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +98,16 @@ func TestLdbService(t *testing.T) {
 
 	if !pcids[0].Equals(pieceCid) {
 		t.Fatal("expected for pieceCids to match")
+	}
+
+	dis, err := cl.GetPieceDeals(pieceCid)
+
+	if len(dis) != 1 {
+		t.Fatalf("expected len of 1 for dis, got: %d", len(dis))
+	}
+
+	if dis[0] != di {
+		t.Fatal("expected for dealInfos to match")
 	}
 
 	//dealInfo := model.DealInfo{}
