@@ -40,7 +40,6 @@ func main() {
 			backupCmd,
 			restoreCmd,
 			dummydealCmd,
-			storageDealsCmd,
 			dataTransfersCmd,
 			retrievalDealsCmd,
 			indexProvCmd,

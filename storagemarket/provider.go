@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/ipfs/go-cid"
 	"io"
 	"os"
 	"sync"
@@ -168,6 +169,14 @@ func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.Provide
 	deal, err := p.dealsDB.ByID(ctx, dealUuid)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("getting deal %s: %w", dealUuid, ErrDealNotFound)
+	}
+	return deal, nil
+}
+
+func (p *Provider) DealBySignedProposalCid(ctx context.Context, propCid cid.Cid) (*types.ProviderDealState, error) {
+	deal, err := p.dealsDB.BySignedProposalCID(ctx, propCid)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("getting deal %s: %w", propCid, ErrDealNotFound)
 	}
 	return deal, nil
 }
