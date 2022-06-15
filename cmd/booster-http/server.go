@@ -62,6 +62,8 @@ func (s *HttpServer) Start(ctx context.Context) {
 	handler := http.NewServeMux()
 	handler.HandleFunc(s.payloadBasePath(), s.handleByPayloadCid)
 	handler.HandleFunc(s.pieceBasePath(), s.handleByPieceCid)
+	handler.HandleFunc("/", s.handleIndex)
+	handler.HandleFunc("/index.html", s.handleIndex)
 	s.server = &http.Server{
 		Addr:    listenAddr,
 		Handler: handler,
@@ -84,6 +86,40 @@ func (s *HttpServer) Stop() error {
 	return s.server.Close()
 }
 
+const idxPage = `
+<html>
+  <body>
+    <h4>Booster HTTP Server</h4>
+    Endpoints:
+    <table>
+      <tbody>
+      <tr>
+        <td>
+          Download a CAR file by payload CID
+        </td>
+        <td>
+          <a href="/payload/payloadcid">/payload/<payload cid></a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Download a CAR file by piece CID
+        </td>
+        <td>
+          <a href="/piece/piececid">/piece/<piece cid></a>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </body>
+</html>
+`
+
+func (s *HttpServer) handleIndex(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(idxPage)) //nolint:errcheck
+}
+
 func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) {
 	prefixLen := len(s.payloadBasePath())
 	if len(r.URL.Path) <= prefixLen {
@@ -92,7 +128,8 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	payloadCidStr := r.URL.Path[prefixLen:]
+	fileName := r.URL.Path[prefixLen:]
+	payloadCidStr := strings.Replace(fileName, ".car", "", 1)
 	payloadCid, err := cid.Parse(payloadCidStr)
 	if err != nil {
 		msg := fmt.Sprintf("parsing payload CID '%s': %s", payloadCidStr, err.Error())
