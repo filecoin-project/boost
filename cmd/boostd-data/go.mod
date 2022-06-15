@@ -2,7 +2,6 @@ module github.com/filecoin-project/boost/cmd/boostd-data
 
 require (
 	github.com/couchbase/gocb/v2 v2.5.0
-	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/docker v1.4.2-0.20180625184442-8e610b2b55bf
 	github.com/docker/go-connections v0.4.0
 	github.com/ethereum/go-ethereum v1.10.17

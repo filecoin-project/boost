@@ -177,7 +177,11 @@ func (s *PieceMetaService) AddIndex(pieceCid cid.Cid, records []model.Record) er
 			Offset: r.Offset,
 		})
 
-		s.db.SetMultihashToPieceCid(ctx, r.Cid.Hash(), pieceCid)
+	}
+
+	err := s.db.SetMultihashesToPieceCid(ctx, recs, pieceCid)
+	if err != nil {
+		return fmt.Errorf("failed to add entry from mh to pieceCid: %w", err)
 	}
 
 	// get and set next cursor (handle synchronization, maybe with CAS)

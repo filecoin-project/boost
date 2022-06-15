@@ -73,6 +73,16 @@ func TestLdbService(t *testing.T) {
 		t.Fatal("got wrong offset")
 	}
 
+	pcids, err := cl.PiecesContainingMultihash(mhash)
+
+	if len(pcids) != 1 {
+		t.Fatalf("expected len of 1 for pieceCids, got: %d", len(pcids))
+	}
+
+	if !pcids[0].Equals(pieceCid) {
+		t.Fatal("expected for pieceCids to match")
+	}
+
 	//dealInfo := model.DealInfo{}
 	//err = cl.AddDealForPiece(pieceCid, dealInfo)
 	//if err != nil {
@@ -146,8 +156,6 @@ func getRecords(subject index.Index) ([]model.Record, error) {
 	switch idx := subject.(type) {
 	case index.IterableIndex:
 		err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
-
-			//fmt.Println("reading offset for: ", m.String(), offset)
 
 			cid := cid.NewCidV1(cid.Raw, m)
 

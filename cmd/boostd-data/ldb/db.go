@@ -12,6 +12,7 @@ import (
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
 	"github.com/ipld/go-car/v2/index"
+	carindex "github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
 )
 
@@ -85,58 +86,73 @@ func (db *DB) GetPieceCidsByMultihash(ctx context.Context, mh multihash.Multihas
 }
 
 // SetMultihashToPieceCid
-func (db *DB) SetMultihashToPieceCid(ctx context.Context, mh multihash.Multihash, pieceCid cid.Cid) error {
+func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Record, pieceCid cid.Cid) error {
 	batch, err := db.Batch(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create ds batch: %w", err)
 	}
 
-	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixMhtoPieceCids, mh.String()))
+	for _, r := range recs {
+		mh := r.Cid.Hash()
 
-	// do we already have an entry for this multihash ?
-	val, err := db.Get(ctx, key)
-	if err != nil && err != ds.ErrNotFound {
-		return fmt.Errorf("failed to get value for multihash %s, err: %w", mh, err)
-	}
+		err := func() error {
+			key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixMhtoPieceCids, mh.String()))
 
-	// if we don't have an existing entry for this mh, create one
-	if err == ds.ErrNotFound {
-		v := []cid.Cid{pieceCid}
-		b, err := json.Marshal(v)
+			// do we already have an entry for this multihash ?
+			val, err := db.Get(ctx, key)
+			if err != nil && err != ds.ErrNotFound {
+				return fmt.Errorf("failed to get value for multihash %s, err: %w", mh, err)
+			}
+
+			// if we don't have an existing entry for this mh, create one
+			if err == ds.ErrNotFound {
+				v := []cid.Cid{pieceCid}
+				b, err := json.Marshal(v)
+				if err != nil {
+					return fmt.Errorf("failed to marshal pieceCids slice: %w", err)
+				}
+
+				if err := batch.Put(ctx, key, b); err != nil {
+					return fmt.Errorf("failed to batch put mh=%s, err=%w", mh, err)
+				}
+				return nil
+			}
+
+			// else, append the pieceCid to the existing list
+			var pcids []cid.Cid
+			if err := json.Unmarshal(val, &pcids); err != nil {
+				return fmt.Errorf("failed to unmarshal pieceCids slice: %w", err)
+			}
+
+			// if we already have the pieceCid indexed for the multihash, nothing to do here.
+			if has(pcids, pieceCid) {
+
+				fmt.Println("found -- not storing")
+				return nil
+			}
+
+			pcids = append(pcids, pieceCid)
+
+			b, err := json.Marshal(pcids)
+			if err != nil {
+				return fmt.Errorf("failed to marshal pieceCids slice: %w", err)
+			}
+			if err := batch.Put(ctx, key, b); err != nil {
+				return fmt.Errorf("failed to batch put mh=%s, err%w", mh, err)
+			}
+
+			return nil
+		}()
 		if err != nil {
-			return fmt.Errorf("failed to marshal pieceCids slice: %w", err)
+			return err
 		}
-		if err := batch.Put(ctx, key, b); err != nil {
-			return fmt.Errorf("failed to batch put mh=%s, err=%w", mh, err)
-		}
-		return nil
-	}
-
-	// else, append the pieceCid to the existing list
-	var pcids []cid.Cid
-	if err := json.Unmarshal(val, &pcids); err != nil {
-		return fmt.Errorf("failed to unmarshal pieceCids slice: %w", err)
-	}
-
-	// if we already have the pieceCid indexed for the multihash, nothing to do here.
-	if has(pcids, pieceCid) {
-		return nil
-	}
-
-	pcids = append(pcids, pieceCid)
-
-	b, err := json.Marshal(pcids)
-	if err != nil {
-		return fmt.Errorf("failed to marshal pieceCids slice: %w", err)
-	}
-	if err := batch.Put(ctx, key, b); err != nil {
-		return fmt.Errorf("failed to batch put mh=%s, err%w", mh, err)
 	}
 
 	if err := batch.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit batch: %w", err)
 	}
 
+	key := datastore.NewKey(sprefixMhtoPieceCids)
 	if err := db.Sync(ctx, key); err != nil {
 		return fmt.Errorf("failed to sync puts: %w", err)
 	}
