@@ -2,6 +2,7 @@ module github.com/filecoin-project/boost/cmd/boostd-data
 
 require (
 	github.com/couchbase/gocb/v2 v2.5.0
+	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/docker v1.4.2-0.20180625184442-8e610b2b55bf
 	github.com/docker/go-connections v0.4.0
 	github.com/ethereum/go-ethereum v1.10.17
@@ -13,6 +14,7 @@ require (
 	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/go-log/v2 v2.5.0
 	github.com/ipld/go-car/v2 v2.1.1
+	github.com/multiformats/go-multicodec v0.3.1-0.20210902112759-1539a079fd61
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
@@ -46,7 +48,6 @@ require (
 	github.com/multiformats/go-base32 v0.0.3 // indirect
 	github.com/multiformats/go-base36 v0.1.0 // indirect
 	github.com/multiformats/go-multibase v0.0.3 // indirect
-	github.com/multiformats/go-multicodec v0.3.1-0.20210902112759-1539a079fd61 // indirect
 	github.com/multiformats/go-varint v0.0.6 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.2 // indirect

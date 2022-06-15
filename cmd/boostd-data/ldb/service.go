@@ -157,9 +157,8 @@ func (s *PieceMetaService) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid,
 		log.Debugw("handled.pieces-containing-mh", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	// TODO: inverted index
-
-	return nil, nil
+	ctx := context.Background()
+	return s.db.GetPieceCidsByMultihash(ctx, m)
 }
 
 func (s *PieceMetaService) AddIndex(pieceCid cid.Cid, records []model.Record) error {
@@ -169,21 +168,17 @@ func (s *PieceMetaService) AddIndex(pieceCid cid.Cid, records []model.Record) er
 		log.Debugw("handled.add-index", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
+	ctx := context.Background()
+
 	var recs []carindex.Record
 	for _, r := range records {
 		recs = append(recs, carindex.Record{
 			Cid:    r.Cid,
 			Offset: r.Offset,
 		})
-		//fmt.Println("got r: ", r.Cid, r.Offset)
+
+		s.db.SetMultihashToPieceCid(ctx, r.Cid.Hash(), pieceCid)
 	}
-	// --- first  ---:
-
-	// TODO first: see inverted index in dagstore today
-
-	// --- second ---:
-
-	ctx := context.Background()
 
 	// get and set next cursor (handle synchronization, maybe with CAS)
 	cursor, keyCursorPrefix, err := s.db.NextCursor(ctx)

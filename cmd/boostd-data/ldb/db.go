@@ -9,6 +9,7 @@ import (
 	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
 	"github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
@@ -18,10 +19,16 @@ var (
 	// LevelDB key value for storing next free cursor.
 	keyNextCursor   uint64 = 0
 	dskeyNextCursor datastore.Key
+
 	// LevelDB key prefix for PieceCid to cursor table.
 	// LevelDB keys will be built by concatenating PieceCid to this prefix.
 	prefixPieceCidToCursor  uint64 = 1
 	sprefixPieceCidToCursor string
+
+	// LevelDB key prefix for Multihash to PieceCids table.
+	// LevelDB keys will be built by concatenating Multihash to this prefix.
+	prefixMhtoPieceCids  uint64 = 2
+	sprefixMhtoPieceCids string
 
 	size    = binary.MaxVarintLen64
 	cutsize = size + 2
@@ -35,6 +42,10 @@ func init() {
 	buf = make([]byte, size)
 	binary.PutUvarint(buf, prefixPieceCidToCursor)
 	sprefixPieceCidToCursor = string(buf)
+
+	buf = make([]byte, size)
+	binary.PutUvarint(buf, prefixMhtoPieceCids)
+	sprefixMhtoPieceCids = string(buf)
 }
 
 // NextCursor
@@ -54,6 +65,83 @@ func (db *DB) SetNextCursor(ctx context.Context, cursor uint64) error {
 	binary.PutUvarint(buf, cursor)
 
 	return db.Put(ctx, dskeyNextCursor, buf)
+}
+
+// GetPieceCidsByMultihash
+func (db *DB) GetPieceCidsByMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
+	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixMhtoPieceCids, mh.String()))
+
+	val, err := db.Get(ctx, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get value for multihash %s, err: %w", mh, err)
+	}
+
+	var pcids []cid.Cid
+	if err := json.Unmarshal(val, &pcids); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal pieceCids slice: %w", err)
+	}
+
+	return pcids, nil
+}
+
+// SetMultihashToPieceCid
+func (db *DB) SetMultihashToPieceCid(ctx context.Context, mh multihash.Multihash, pieceCid cid.Cid) error {
+	batch, err := db.Batch(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create ds batch: %w", err)
+	}
+
+	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixMhtoPieceCids, mh.String()))
+
+	// do we already have an entry for this multihash ?
+	val, err := db.Get(ctx, key)
+	if err != nil && err != ds.ErrNotFound {
+		return fmt.Errorf("failed to get value for multihash %s, err: %w", mh, err)
+	}
+
+	// if we don't have an existing entry for this mh, create one
+	if err == ds.ErrNotFound {
+		v := []cid.Cid{pieceCid}
+		b, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Errorf("failed to marshal pieceCids slice: %w", err)
+		}
+		if err := batch.Put(ctx, key, b); err != nil {
+			return fmt.Errorf("failed to batch put mh=%s, err=%w", mh, err)
+		}
+		return nil
+	}
+
+	// else, append the pieceCid to the existing list
+	var pcids []cid.Cid
+	if err := json.Unmarshal(val, &pcids); err != nil {
+		return fmt.Errorf("failed to unmarshal pieceCids slice: %w", err)
+	}
+
+	// if we already have the pieceCid indexed for the multihash, nothing to do here.
+	if has(pcids, pieceCid) {
+		return nil
+	}
+
+	pcids = append(pcids, pieceCid)
+
+	b, err := json.Marshal(pcids)
+	if err != nil {
+		return fmt.Errorf("failed to marshal pieceCids slice: %w", err)
+	}
+	if err := batch.Put(ctx, key, b); err != nil {
+		return fmt.Errorf("failed to batch put mh=%s, err%w", mh, err)
+	}
+
+	if err := batch.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit batch: %w", err)
+	}
+
+	if err := db.Sync(ctx, key); err != nil {
+		return fmt.Errorf("failed to sync puts: %w", err)
+	}
+
+	return nil
 }
 
 // SetPieceCidToMetadata
@@ -149,4 +237,13 @@ func (db *DB) GetOffset(ctx context.Context, cursorPrefix string, m multihash.Mu
 
 	offset, _ := binary.Uvarint(b)
 	return offset, nil
+}
+
+func has(list []cid.Cid, v cid.Cid) bool {
+	for _, l := range list {
+		if l.Equals(v) {
+			return true
+		}
+	}
+	return false
 }
