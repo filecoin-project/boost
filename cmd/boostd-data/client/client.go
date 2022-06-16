@@ -60,16 +60,17 @@ func (s *PieceMeta) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) e
 	return s.client.Call(nil, "boostddata_addDealForPiece", pieceCid, dealInfo)
 }
 
-// Add mh => piece index to store  ;;; multihash -> []cid.Cid ; given multihash, which pieces is it in ; already in dagstore as a datastore impl
-
-// Add mh => offset index to store ;;; piececid, multihash, offset ->  adding the offset
 func (s *PieceMeta) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 	return s.client.Call(nil, "boostddata_addIndex", pieceCid, records)
 }
 
 func (s *PieceMeta) IsIndexed(pieceCid cid.Cid) (bool, error) {
-	return false, nil
-
+	var resp bool
+	err := s.client.Call(&resp, "boostddata_isIndexed", pieceCid)
+	if err != nil {
+		return false, err
+	}
+	return resp, nil
 }
 
 func (s *PieceMeta) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {

@@ -95,6 +95,7 @@ func (s *PieceMetaService) AddDealForPiece(pieceCid cid.Cid, dealInfo model.Deal
 		return err
 	}
 
+	md.IsIndexed = true
 	md.Deals = append(md.Deals, dealInfo)
 
 	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
@@ -274,7 +275,7 @@ func (s *PieceMetaService) AddIndex(pieceCid cid.Cid, records []model.Record) er
 	// mark that indexing is complete
 	md := model.Metadata{
 		Cursor:    cursor,
-		IsIndexed: true,
+		IndexedAt: time.Now(),
 	}
 
 	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)

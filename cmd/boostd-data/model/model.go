@@ -1,6 +1,8 @@
 package model
 
 import (
+	"time"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -21,7 +23,7 @@ type DealInfo struct {
 // Metadata for PieceCid
 type Metadata struct {
 	Cursor    uint64     `json:"cursor"`
-	IsIndexed bool       `json:"is_indexed"`
+	IndexedAt time.Time  `json:"indexed_at"`
 	Deals     []DealInfo `json:"deals"`
 }
 
