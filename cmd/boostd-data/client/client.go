@@ -26,9 +26,9 @@ func NewPieceMeta(addr string) (*PieceMeta, error) {
 	}, nil
 }
 
-func (s *PieceMeta) GetIterableIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
+func (s *PieceMeta) GetIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
 	var resp []carindex.Record
-	err := s.client.Call(&resp, "boostddata_getIterableIndex", pieceCid)
+	err := s.client.Call(&resp, "boostddata_getIndex", pieceCid)
 	if err != nil {
 		return nil, err
 	}

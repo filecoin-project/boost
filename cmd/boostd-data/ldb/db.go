@@ -126,8 +126,6 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Reco
 
 			// if we already have the pieceCid indexed for the multihash, nothing to do here.
 			if has(pcids, pieceCid) {
-
-				fmt.Println("found -- not storing")
 				return nil
 			}
 

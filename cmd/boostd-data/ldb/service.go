@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"sync"
 	"time"
 
 	"github.com/filecoin-project/boost/cmd/boostd-data/model"
@@ -24,6 +25,7 @@ import (
 var log = logging.Logger("boostd-data-ldb")
 
 type PieceMetaService struct {
+	sync.Mutex
 	db *DB
 }
 
@@ -83,6 +85,9 @@ func (s *PieceMetaService) AddDealForPiece(pieceCid cid.Cid, dealInfo model.Deal
 		log.Debugw("handled.add-deal-for-piece", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
+	s.Lock()
+	defer s.Unlock()
+
 	ctx := context.Background()
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -107,6 +112,9 @@ func (s *PieceMetaService) GetRecords(pieceCid cid.Cid) ([]carindex.Record, erro
 		log.Debugw("handled.get-iterable-index", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
+	s.Lock()
+	defer s.Unlock()
+
 	ctx := context.Background()
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -129,6 +137,9 @@ func (s *PieceMetaService) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint6
 		log.Debugw("handled.get-offset", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
+	s.Lock()
+	defer s.Unlock()
+
 	ctx := context.Background()
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -145,6 +156,9 @@ func (s *PieceMetaService) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, er
 	defer func(now time.Time) {
 		log.Debugw("handled.get-piece-deals", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
 
 	ctx := context.Background()
 
@@ -164,8 +178,36 @@ func (s *PieceMetaService) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid,
 		log.Debugw("handled.pieces-containing-mh", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
+	s.Lock()
+	defer s.Unlock()
+
 	ctx := context.Background()
 	return s.db.GetPieceCidsByMultihash(ctx, m)
+}
+
+func (s *PieceMetaService) GetIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
+	log.Debugw("handle.get-index", "pieceCid", pieceCid)
+
+	defer func(now time.Time) {
+		log.Debugw("handled.get-index", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
+
+	ctx := context.Background()
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return nil, err
+	}
+
+	records, err := s.db.AllRecords(ctx, md.Cursor)
+	if err != nil {
+		return nil, err
+	}
+
+	return records, nil
 }
 
 func (s *PieceMetaService) AddIndex(pieceCid cid.Cid, records []model.Record) error {
@@ -175,6 +217,9 @@ func (s *PieceMetaService) AddIndex(pieceCid cid.Cid, records []model.Record) er
 		log.Debugw("handled.add-index", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
+	s.Lock()
+	defer s.Unlock()
+
 	ctx := context.Background()
 
 	var recs []carindex.Record
@@ -183,7 +228,6 @@ func (s *PieceMetaService) AddIndex(pieceCid cid.Cid, records []model.Record) er
 			Cid:    r.Cid,
 			Offset: r.Offset,
 		})
-
 	}
 
 	err := s.db.SetMultihashesToPieceCid(ctx, recs, pieceCid)

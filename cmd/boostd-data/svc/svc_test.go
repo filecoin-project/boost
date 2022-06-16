@@ -110,12 +110,6 @@ func TestLdbService(t *testing.T) {
 		t.Fatal("expected for dealInfos to match")
 	}
 
-	//dealInfo := model.DealInfo{}
-	//err = cl.AddDealForPiece(pieceCid, dealInfo)
-	//if err != nil {
-	//t.Fatal(err)
-	//}
-
 	log.Debug("sleeping for a while.. running tests..")
 
 	cleanup()
