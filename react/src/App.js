@@ -17,6 +17,7 @@ import {Epoch} from "./Epoch";
 import {LegacyDealDetail} from "./LegacyDealDetail"
 import {SettingsPage} from "./Settings";
 import {Banner} from "./Banner";
+import {PieceMetaDetail, PieceMetaPage} from "./PieceMeta";
 
 function App(props) {
     return (
@@ -43,6 +44,7 @@ function App(props) {
                                         <Route path="/deal-transfers" element={<DealTransfersPage />} />
                                         <Route path="/mpool" element={<MpoolPage />} />
                                         <Route path="/settings" element={<SettingsPage />} />
+                                        <Route path="/piece-meta" element={<PieceMetaPage />} />
                                         <Route path="/deals/:dealID" element={<DealDetail />} />
                                         <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
                                         <Route path="/" element={<StorageDealsPage />} />
