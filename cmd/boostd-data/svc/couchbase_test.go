@@ -22,7 +22,7 @@ func XTestCouchbaseService(t *testing.T) {
 
 	addr, cleanup := setupService(t, "couchbase")
 
-	cl, err := client.NewPieceMeta("http://" + addr)
+	cl, err := client.NewStore("http://" + addr)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,22 +11,22 @@ import (
 
 var log = logger.Logger("boostd-data-client")
 
-type PieceMeta struct {
+type Store struct {
 	client *rpc.Client
 }
 
-func NewPieceMeta(addr string) (*PieceMeta, error) {
+func NewStore(addr string) (*Store, error) {
 	client, err := rpc.Dial(addr)
 	if err != nil {
 		return nil, err
 	}
 
-	return &PieceMeta{
+	return &Store{
 		client: client,
 	}, nil
 }
 
-func (s *PieceMeta) GetIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
+func (s *Store) GetIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
 	var resp []carindex.Record
 	err := s.client.Call(&resp, "boostddata_getIndex", pieceCid)
 	if err != nil {
@@ -36,7 +36,7 @@ func (s *PieceMeta) GetIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
 	return resp, nil
 }
 
-func (s *PieceMeta) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
+func (s *Store) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
 	var resp []model.DealInfo
 	err := s.client.Call(&resp, "boostddata_getPieceDeals", pieceCid)
 	if err != nil {
@@ -46,7 +46,7 @@ func (s *PieceMeta) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
 	return resp, nil
 }
 
-func (s *PieceMeta) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
+func (s *Store) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
 	var resp []cid.Cid
 	err := s.client.Call(&resp, "boostddata_piecesContainingMultihash", m)
 	if err != nil {
@@ -56,15 +56,15 @@ func (s *PieceMeta) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error)
 	return resp, nil
 }
 
-func (s *PieceMeta) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (s *Store) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	return s.client.Call(nil, "boostddata_addDealForPiece", pieceCid, dealInfo)
 }
 
-func (s *PieceMeta) AddIndex(pieceCid cid.Cid, records []model.Record) error {
+func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 	return s.client.Call(nil, "boostddata_addIndex", pieceCid, records)
 }
 
-func (s *PieceMeta) IsIndexed(pieceCid cid.Cid) (bool, error) {
+func (s *Store) IsIndexed(pieceCid cid.Cid) (bool, error) {
 	var resp bool
 	err := s.client.Call(&resp, "boostddata_isIndexed", pieceCid)
 	if err != nil {
@@ -73,7 +73,7 @@ func (s *PieceMeta) IsIndexed(pieceCid cid.Cid) (bool, error) {
 	return resp, nil
 }
 
-func (s *PieceMeta) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
+func (s *Store) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
 	var resp uint64
 	err := s.client.Call(&resp, "boostddata_getOffset", pieceCid, hash)
 	if err != nil {

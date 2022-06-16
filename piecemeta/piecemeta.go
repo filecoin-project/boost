@@ -1,10 +1,12 @@
-package piecestore
+package piecemeta
 
 import (
 	"bufio"
 	"fmt"
 	"io"
 
+	"github.com/filecoin-project/boost/cmd/boostd-data/client"
+	"github.com/filecoin-project/boost/cmd/boostd-data/svc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
@@ -29,36 +31,22 @@ type Sealer interface {
 	GetReader(id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error)
 }
 
-// CarIndexes manages indexes of CAR files that map from multihash => offset
-type CarIndexes interface {
-	Add(pieceCid cid.Cid, itidx carindex.IterableIndex) error
+type Store interface {
+	AddDealForPiece(pieceCid cid.Cid, dealInfo DealInfo) error
+	AddIndex(pieceCid cid.Cid, itidx carindex.IterableIndex) error
 	IsIndexed(pieceCid cid.Cid) bool
-	Index(pieceCid cid.Cid) (carindex.IterableIndex, error)
+	GetIndex(pieceCid cid.Cid) (carindex.IterableIndex, error)
 	GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error)
-	Delete(pieceCid cid.Cid) error
-}
-
-// MHToPieceIndex is used to get the pieces that contain a multihash.
-// It has an index that maps from multihash => piece cids
-type MHToPieceIndex interface {
-	Add(pieceCid cid.Cid, itidx carindex.IterableIndex) error
-	IsIndexed(pieceCid cid.Cid) bool
+	GetPieceDeals(pieceCid cid.Cid) ([]DealInfo, error)
 	PiecesContaining(m mh.Multihash) ([]cid.Cid, error)
-	Delete(pieceCid cid.Cid) error
+
+	//Delete(pieceCid cid.Cid) error
+	//DeleteDealForPiece(pieceCid cid.Cid, dealUuid uuid.UUID) (bool, error)
 }
 
-// DealStore keeps track of deals for each piece
-type DealStore interface {
-	Add(pieceCid cid.Cid, dealInfo DealInfo) error
-	List(pieceCid cid.Cid) ([]DealInfo, error)
-	Delete(pieceCid cid.Cid, dealUuid uuid.UUID) (bool, error)
-}
-
-type PieceStore struct {
-	dealStore      DealStore
-	carIndex       CarIndexes
-	mhToPieceIndex MHToPieceIndex
-	sealer         Sealer
+type PieceMeta struct {
+	store  Store
+	sealer Sealer
 }
 
 // DealInfo is information about a single deal for a given piece
@@ -69,6 +57,7 @@ type PieceStore struct {
 // CAR            ......[      ]............
 type DealInfo struct {
 	DealUuid    uuid.UUID
+	ChainDealID abi.DealID
 	SectorID    abi.SectorNumber
 	PieceOffset abi.PaddedPieceSize
 	PieceLength abi.PaddedPieceSize
@@ -79,8 +68,22 @@ type DealInfo struct {
 	// If we don't have CarLength, we have to iterate over all offsets, get the largest offset and sum it with length.
 }
 
+func NewPieceMeta() *PieceMeta {
+	addr, cleanup, err := svc.Setup("ldb")
+	if err != nil {
+		panic(err)
+	}
+
+	cl, err := client.NewStore("http://" + addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return &PieceMeta{}
+}
+
 // Get the list of deals (and the sector the data is in) for a particular piece
-func (ps *PieceStore) GetPieceDeals(pieceCid cid.Cid) ([]DealInfo, error) {
+func (ps *PieceMeta) GetPieceDeals(pieceCid cid.Cid) ([]DealInfo, error) {
 	deals, err := ps.dealStore.List(pieceCid)
 	if err != nil {
 		return nil, fmt.Errorf("listing deals for piece %s: %w", pieceCid, err)
@@ -89,11 +92,11 @@ func (ps *PieceStore) GetPieceDeals(pieceCid cid.Cid) ([]DealInfo, error) {
 	return deals, nil
 }
 
-func (ps *PieceStore) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
-	return 0, nil
+func (ps *PieceMeta) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
+	return 0, fmt.Errorf("GetOffset not implemented")
 }
 
-func (ps *PieceStore) AddDealForPiece(pieceCid cid.Cid, dealInfo DealInfo) error {
+func (ps *PieceMeta) AddDealForPiece(pieceCid cid.Cid, dealInfo DealInfo) error {
 	// TODO: pass dealInfo to addIndexForPiece
 
 	// Perform indexing of piece
@@ -109,14 +112,14 @@ func (ps *PieceStore) AddDealForPiece(pieceCid cid.Cid, dealInfo DealInfo) error
 	return nil
 }
 
-func (ps *PieceStore) addIndexForPiece(pieceCid cid.Cid) error {
+func (ps *PieceMeta) addIndexForPiece(pieceCid cid.Cid) error {
 	// Check if the indexes have already been added
 	if ps.carIndex.IsIndexed(pieceCid) && ps.mhToPieceIndex.IsIndexed(pieceCid) {
 		return nil
 	}
 
 	// Get a reader over the piece data
-	reader, err := ps.getPieceReader(pieceCid)
+	reader, err := ps.GetPieceReader(pieceCid)
 	if err != nil {
 		return fmt.Errorf("getting piece reader for piece %s: %w", pieceCid, err)
 	}
@@ -149,7 +152,7 @@ func (ps *PieceStore) addIndexForPiece(pieceCid cid.Cid) error {
 	return nil
 }
 
-func (ps *PieceStore) DeleteDealForPiece(pieceCid cid.Cid, dealUuid uuid.UUID) error {
+func (ps *PieceMeta) DeleteDealForPiece(pieceCid cid.Cid, dealUuid uuid.UUID) error {
 	// Delete deal from list of deals for this piece
 	wasLast, err := ps.dealStore.Delete(pieceCid, dealUuid)
 	if err != nil {
@@ -168,7 +171,7 @@ func (ps *PieceStore) DeleteDealForPiece(pieceCid cid.Cid, dealUuid uuid.UUID) e
 	return nil
 }
 
-func (ps *PieceStore) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
+func (ps *PieceMeta) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
 	// TODO: Maybe mark for GC instead of deleting immediately
 
 	// Delete mh => offset index from store
@@ -185,7 +188,7 @@ func (ps *PieceStore) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
 }
 
 // Used internally, and also by HTTP retrieval
-func (ps *PieceStore) getPieceReader(pieceCid cid.Cid) (SectionReader, error) {
+func (ps *PieceMeta) GetPieceReader(pieceCid cid.Cid) (SectionReader, error) {
 	// Get all deals containing this piece
 	deals, err := ps.GetPieceDeals(pieceCid)
 	if err != nil {
@@ -216,16 +219,16 @@ func (ps *PieceStore) getPieceReader(pieceCid cid.Cid) (SectionReader, error) {
 }
 
 // Get all pieces that contain a multihash (used when retrieving by payload CID)
-func (ps *PieceStore) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
+func (ps *PieceMeta) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
 	return ps.mhToPieceIndex.PiecesContaining(m)
 }
 
-func (ps *PieceStore) GetIterableIndex(pieceCid cid.Cid) (carindex.IterableIndex, error) {
+func (ps *PieceMeta) GetIterableIndex(pieceCid cid.Cid) (carindex.IterableIndex, error) {
 	return ps.carIndex.Index(pieceCid)
 }
 
 // Get a block (used by Bitswap retrieval)
-func (ps *PieceStore) _GetBlock(c cid.Cid) ([]byte, error) {
+func (ps *PieceMeta) GetBlock(c cid.Cid) ([]byte, error) {
 	// TODO: use caching to make this efficient for repeated Gets against the same piece
 
 	// Get the pieces that contain the cid
@@ -242,7 +245,7 @@ func (ps *PieceStore) _GetBlock(c cid.Cid) ([]byte, error) {
 	for i, pieceCid := range pieces {
 		data, err := func() ([]byte, error) {
 			// Get a reader over the piece data
-			reader, err := ps.getPieceReader(pieceCid)
+			reader, err := ps.GetPieceReader(pieceCid)
 			if err != nil {
 				return nil, fmt.Errorf("getting piece reader: %w", err)
 			}
@@ -279,9 +282,9 @@ func (ps *PieceStore) _GetBlock(c cid.Cid) ([]byte, error) {
 }
 
 // Get a blockstore over a piece (used by Graphsync retrieval)
-func (ps *PieceStore) _GetBlockstore(pieceCid cid.Cid) (bstore.Blockstore, error) {
+func (ps *PieceMeta) GetBlockstore(pieceCid cid.Cid) (bstore.Blockstore, error) {
 	// Get a reader over the piece
-	reader, err := ps.getPieceReader(pieceCid)
+	reader, err := ps.GetPieceReader(pieceCid)
 	if err != nil {
 		return nil, fmt.Errorf("getting piece reader for piece %s: %w", pieceCid, err)
 	}

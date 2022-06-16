@@ -24,7 +24,7 @@ import (
 
 var log = logging.Logger("boostd-data-ldb")
 
-type PieceMetaService struct {
+type Store struct {
 	sync.Mutex
 	db *DB
 }
@@ -48,7 +48,7 @@ func newDB(path string, readonly bool) (*DB, error) {
 	return &DB{ldb}, nil
 }
 
-func NewPieceMetaService(_repopath string) *PieceMetaService {
+func NewStore(_repopath string) *Store {
 	// tests
 	repopath := _repopath
 	if _repopath == "" {
@@ -73,12 +73,12 @@ func NewPieceMetaService(_repopath string) *PieceMetaService {
 
 	log.Debugw("new piece meta service", "repo path", repopath)
 
-	return &PieceMetaService{
+	return &Store{
 		db: db,
 	}
 }
 
-func (s *PieceMetaService) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (s *Store) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	log.Debugw("handle.add-deal-for-piece", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
@@ -95,7 +95,6 @@ func (s *PieceMetaService) AddDealForPiece(pieceCid cid.Cid, dealInfo model.Deal
 		return err
 	}
 
-	md.IsIndexed = true
 	md.Deals = append(md.Deals, dealInfo)
 
 	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
@@ -106,7 +105,7 @@ func (s *PieceMetaService) AddDealForPiece(pieceCid cid.Cid, dealInfo model.Deal
 	return nil
 }
 
-func (s *PieceMetaService) GetRecords(pieceCid cid.Cid) ([]carindex.Record, error) {
+func (s *Store) GetRecords(pieceCid cid.Cid) ([]carindex.Record, error) {
 	log.Debugw("handle.get-iterable-index", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
@@ -131,7 +130,7 @@ func (s *PieceMetaService) GetRecords(pieceCid cid.Cid) ([]carindex.Record, erro
 	return records, nil
 }
 
-func (s *PieceMetaService) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
+func (s *Store) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
 	log.Debugw("handle.get-offset", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
@@ -151,7 +150,7 @@ func (s *PieceMetaService) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint6
 	return s.db.GetOffset(ctx, fmt.Sprintf("%d", md.Cursor)+"/", hash)
 }
 
-func (s *PieceMetaService) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
+func (s *Store) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
 	log.Debugw("handle.get-piece-deals", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
@@ -172,7 +171,7 @@ func (s *PieceMetaService) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, er
 }
 
 // Get all pieces that contain a multihash (used when retrieving by payload CID)
-func (s *PieceMetaService) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
+func (s *Store) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
 	log.Debugw("handle.pieces-containing-mh", "mh", m)
 
 	defer func(now time.Time) {
@@ -186,7 +185,7 @@ func (s *PieceMetaService) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid,
 	return s.db.GetPieceCidsByMultihash(ctx, m)
 }
 
-func (s *PieceMetaService) GetIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
+func (s *Store) GetIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
 	log.Debugw("handle.get-index", "pieceCid", pieceCid)
 
 	defer func(now time.Time) {
@@ -211,7 +210,7 @@ func (s *PieceMetaService) GetIndex(pieceCid cid.Cid) ([]carindex.Record, error)
 	return records, nil
 }
 
-func (s *PieceMetaService) AddIndex(pieceCid cid.Cid, records []model.Record) error {
+func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 	log.Debugw("handle.add-index", "records", len(records))
 
 	defer func(now time.Time) {

@@ -4,6 +4,8 @@ go 1.16
 
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
+replace github.com/filecoin-project/boost/cmd/boostd-data => ./cmd/boostd-data
+
 // replace github.com/filecoin-project/lotus => ../lotus
 
 require (

@@ -27,9 +27,12 @@ func init() {
 }
 
 func TestLdbService(t *testing.T) {
-	addr, cleanup := setupService(t, "ldb")
+	addr, cleanup, err := Setup("ldb")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	cl, err := client.NewPieceMeta("http://" + addr)
+	cl, err := client.NewStore("http://" + addr)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,6 +10,7 @@ import (
 
 type DealInfo struct {
 	DealUuid    uuid.UUID           `json:"deal_uuid"`
+	ChainDealID abi.DealID          `json:"chain_deal_id"`
 	SectorID    abi.SectorNumber    `json:"sector_id"`
 	PieceOffset abi.PaddedPieceSize `json:"piece_offset"`
 	PieceLength abi.PaddedPieceSize `json:"piece_length"`

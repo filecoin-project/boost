@@ -14,11 +14,11 @@ import (
 
 var log = logging.Logger("boostd-data-cb")
 
-type PieceMetaService struct {
+type Store struct {
 	col *gocb.Collection
 }
 
-func NewPieceMetaService() *PieceMetaService {
+func NewStore() *Store {
 	bucketName := "piecestore"
 	username := "Administrator"
 	password := "boostdemo"
@@ -40,12 +40,12 @@ func NewPieceMetaService() *PieceMetaService {
 		log.Fatal(err)
 	}
 
-	return &PieceMetaService{
+	return &Store{
 		col: bucket.DefaultCollection(),
 	}
 }
 
-func (s *PieceMetaService) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (s *Store) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	log.Debugw("handle.add-deal-for-piece", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
@@ -56,7 +56,7 @@ func (s *PieceMetaService) AddDealForPiece(pieceCid cid.Cid, dealInfo model.Deal
 }
 
 // TODO: maybe implement over rpc subscription
-func (s *PieceMetaService) GetRecords(pieceCid cid.Cid) ([]carindex.Record, error) {
+func (s *Store) GetRecords(pieceCid cid.Cid) ([]carindex.Record, error) {
 	log.Debugw("handle.get-iterable-index", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
@@ -66,7 +66,7 @@ func (s *PieceMetaService) GetRecords(pieceCid cid.Cid) ([]carindex.Record, erro
 	return nil, nil
 }
 
-func (s *PieceMetaService) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
+func (s *Store) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
 	log.Debugw("handle.get-offset", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
@@ -76,7 +76,7 @@ func (s *PieceMetaService) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint6
 	return 0, nil
 }
 
-func (s *PieceMetaService) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
+func (s *Store) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
 	log.Debugw("handle.get-piece-deals", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
@@ -87,7 +87,7 @@ func (s *PieceMetaService) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, er
 }
 
 // Get all pieces that contain a multihash (used when retrieving by payload CID)
-func (s *PieceMetaService) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
+func (s *Store) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
 	log.Debugw("handle.pieces-containing-mh", "mh", m)
 
 	defer func(now time.Time) {
