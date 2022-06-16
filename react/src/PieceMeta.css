@@ -1,0 +1,79 @@
+.piece-meta table {
+    font-size: 1em;
+    width: 100%;
+}
+
+.piece-meta td, .piece-meta th {
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
+
+.piece-meta th {
+    white-space: nowrap;
+    text-align: left;
+    opacity: 0.6;
+}
+
+.piece-meta .search {
+    position: absolute;
+    right: 8em;
+    top: 2em;
+}
+
+.piece-meta .search input {
+    background-image: url("./bootstrap-icons/icons/search.svg");
+    background-repeat: no-repeat;
+    background-position: left 0.5em center;
+    padding-left: 2em;
+    padding-right: 2em;
+}
+
+.piece-meta .search .clear-text {
+    position: absolute;
+    right: 1em;
+    top: 1.1em;
+    cursor: pointer;
+}
+
+.piece-meta h3 {
+    margin-top: 2em;
+}
+
+.piece-meta .title {
+    font-size: 1.25em;
+    color: #a61e4d;
+    margin: 2em 0.8em 1.5em 0.8em;
+}
+
+.piece-detail {
+    padding: 1em 0 5em 0;
+}
+
+.piece-detail .title {
+    color: inherit;
+    font-weight: normal;
+    margin:  0.8em;
+}
+
+.piece-detail table {
+    font-size: 1em;
+}
+
+.piece-detail table.deals tr td:first-child {
+    width: 8em;
+}
+.piece-detail table.deals tr td:last-child {
+    line-break: anywhere;
+}
+
+.piece-detail table th {
+    text-align: left;
+}
+
+.piece-detail table.deals .param {
+    color: #777777;
+}
+
+.piece-detail td, .piece-detail th {
+    padding: 0.5em 1em;
+}
