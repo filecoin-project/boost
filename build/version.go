@@ -2,7 +2,7 @@ package build
 
 var CurrentCommit string
 
-const BuildVersion = "0.0.1"
+const BuildVersion = "1.0.0"
 
 func UserVersion() string {
 	return BuildVersion + CurrentCommit
