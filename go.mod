@@ -29,12 +29,12 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.1.8
+	github.com/filecoin-project/go-state-types v0.1.9
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/index-provider v0.8.0
-	github.com/filecoin-project/lotus v1.16.0-pre-rc.0.20220607134000-0e5e5f49df29
-	github.com/filecoin-project/specs-actors v0.9.15-0.20220514164640-94e0d5e123bd
-	github.com/filecoin-project/specs-actors/v8 v8.0.0-20220422153930-0afe155bfffa
+	github.com/filecoin-project/lotus v1.16.0-rc1
+	github.com/filecoin-project/specs-actors v0.9.15
+	github.com/filecoin-project/specs-actors/v8 v8.0.0
 	github.com/filecoin-project/specs-storage v0.4.1
 	github.com/filecoin-project/storetheindex v0.4.14
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
