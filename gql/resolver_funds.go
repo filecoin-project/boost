@@ -44,9 +44,9 @@ func (r *resolver) Funds(ctx context.Context) (*funds, error) {
 		return nil, fmt.Errorf("getting publish message balance: %w", err)
 	}
 
-	balCollateral, err := r.fundMgr.BalancePledgeCollateral(ctx)
+	balCollateral, err := r.fundMgr.BalanceDealCollateral(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("getting pledge collateral balance: %w", err)
+		return nil, fmt.Errorf("getting deal collateral balance: %w", err)
 	}
 
 	return &funds{
@@ -56,7 +56,7 @@ func (r *resolver) Funds(ctx context.Context) (*funds, error) {
 			Locked:    gqltypes.BigInt{Int: balMkt.Locked},
 		},
 		Collateral: fundsWallet{
-			Address: r.fundMgr.AddressPledgeCollateral().String(),
+			Address: r.fundMgr.AddressDealCollateral().String(),
 			Balance: gqltypes.BigInt{Int: balCollateral},
 		},
 		PubMsg: fundsWallet{

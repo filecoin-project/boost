@@ -29,17 +29,22 @@ type Backup struct {
 
 // Boost is a boost service config
 type Boost struct {
+	// The version of the config file (used for migrations)
+	ConfigVersion int
+
 	Common
 
-	Storage            lotus_config.SealerConfig
-	SealerApiInfo      string
+	Storage StorageConfig
+	// The connect string for the sealing RPC API (lotus miner)
+	SealerApiInfo string
+	// The connect string for the sector index RPC API (lotus miner)
 	SectorIndexApiInfo string
 	Dealmaking         DealmakingConfig
 	Wallets            WalletsConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
-	LotusFees       lotus_config.MinerFeeConfig
+	LotusFees       FeeConfig
 	DAGStore        lotus_config.DAGStoreConfig
 	IndexProvider   lotus_config.IndexProviderConfig
 }
@@ -58,7 +63,9 @@ type WalletsConfig struct {
 	// The wallet used to send PublishStorageDeals messages.
 	// Must be a control or worker address of the miner.
 	PublishStorageDeals string
-	// The wallet used as the source for pledge collateral
+	// The wallet used as the source for storage deal collateral
+	DealCollateral string
+	// Deprecated: Renamed to DealCollateral
 	PledgeCollateral string
 }
 
@@ -148,6 +155,8 @@ type DealmakingConfig struct {
 	SimultaneousTransfersForRetrieval uint64
 	// Minimum start epoch buffer to give time for sealing of sector with deal.
 	StartEpochSealingBuffer uint64
+	// The amount of time to keep deal proposal logs for before cleaning them up.
+	DealProposalLogDuration Duration
 
 	// A command used for fine-grained evaluation of storage deals
 	// see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-fine-grained-storage-and-retrieval-deal-acceptance for more details
@@ -157,4 +166,26 @@ type DealmakingConfig struct {
 	RetrievalFilter string
 
 	RetrievalPricing *lotus_config.RetrievalPricing
+
+	// The maximum amount of time a transfer can take before it fails
+	MaxTransferDuration Duration
+}
+
+type FeeConfig struct {
+	// The maximum fee to pay when sending the PublishStorageDeals message
+	MaxPublishDealsFee types.FIL
+	// The maximum fee to pay when sending the AddBalance message (used by legacy markets)
+	MaxMarketBalanceAddFee types.FIL
+}
+
+func (c *FeeConfig) Legacy() lotus_config.MinerFeeConfig {
+	return lotus_config.MinerFeeConfig{
+		MaxPublishDealsFee:     c.MaxPublishDealsFee,
+		MaxMarketBalanceAddFee: c.MaxMarketBalanceAddFee,
+	}
+}
+
+type StorageConfig struct {
+	// The maximum number of concurrent fetch operations to the storage subsystem
+	ParallelFetchLimit int
 }

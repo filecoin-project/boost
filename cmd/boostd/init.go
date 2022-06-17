@@ -58,8 +58,8 @@ var initCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.StringFlag{
-			Name:     "wallet-collateral-pledge",
-			Usage:    "wallet to be used for pledging collateral",
+			Name:     "wallet-deal-collateral",
+			Usage:    "wallet to be used for deal collateral",
 			Required: true,
 		},
 		&cli.Int64Flag{
@@ -97,6 +97,7 @@ var initCmd = &cli.Command{
 				return
 			}
 
+			rcfg.ConfigVersion = config.CurrentVersion
 			cerr = setMinerApiConfig(cctx, rcfg, true)
 			if cerr != nil {
 				return
@@ -138,8 +139,8 @@ var migrateFlags = []cli.Flag{
 		Required: true,
 	},
 	&cli.StringFlag{
-		Name:     "wallet-collateral-pledge",
-		Usage:    "wallet to be used for pledging collateral",
+		Name:     "wallet-deal-collateral",
+		Usage:    "wallet to be used for deal collateral",
 		Required: true,
 	},
 	&cli.Int64Flag{
@@ -480,10 +481,13 @@ func migrateMarketsConfig(cctx *cli.Context, mktsRepo lotus_repo.LockedRepo, boo
 		}
 		rcfg.Common.Backup = mktsCfg.Common.Backup
 		rcfg.Common.Libp2p = mktsCfg.Common.Libp2p
-		rcfg.Storage = mktsCfg.Storage
+		rcfg.Storage = config.StorageConfig{ParallelFetchLimit: mktsCfg.Storage.ParallelFetchLimit}
 		rcfg.Dealmaking = boostDealMakingCfg(mktsCfg)
 		rcfg.LotusDealmaking = mktsCfg.Dealmaking
-		rcfg.LotusFees = mktsCfg.Fees
+		rcfg.LotusFees = config.FeeConfig{
+			MaxPublishDealsFee:     mktsCfg.Fees.MaxPublishDealsFee,
+			MaxMarketBalanceAddFee: mktsCfg.Fees.MaxMarketBalanceAddFee,
+		}
 		rcfg.DAGStore = mktsCfg.DAGStore
 		// Clear the DAG store root dir config, because the DAG store is no longer configurable in Boost
 		// (it is always at <repo path>/dagstore
@@ -531,13 +535,13 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 		return nil, fmt.Errorf("failed to parse wallet-publish-storage-deals: %s; err: %w", cctx.String("wallet-publish-storage-deals"), err)
 	}
 
-	walletCP, err := address.NewFromString(cctx.String("wallet-collateral-pledge"))
+	walletCP, err := address.NewFromString(cctx.String("wallet-deal-collateral"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse wallet-collateral-pledge: %s; err: %w", cctx.String("wallet-collateral-pledge"), err)
+		return nil, fmt.Errorf("failed to parse wallet-deal-collateral: %s; err: %w", cctx.String("wallet-deal-collateral"), err)
 	}
 
 	if walletPSD.String() == walletCP.String() {
-		return nil, fmt.Errorf("wallets for PublishStorageDeals and pledging collateral must be different")
+		return nil, fmt.Errorf("wallets for PublishStorageDeals and deal collateral must be different")
 	}
 
 	if cctx.Int64("max-staging-deals-bytes") <= 0 {
@@ -659,7 +663,7 @@ func setMinerApiConfig(cctx *cli.Context, rcfg *config.Boost, dialCheck bool) er
 func setCommonConfig(cctx *cli.Context, rcfg *config.Boost, bp *boostParams) {
 	rcfg.Dealmaking.MaxStagingDealsBytes = cctx.Int64("max-staging-deals-bytes")
 	rcfg.Wallets.Miner = bp.minerActor.String()
-	rcfg.Wallets.PledgeCollateral = bp.walletCP.String()
+	rcfg.Wallets.DealCollateral = bp.walletCP.String()
 	rcfg.Wallets.PublishStorageDeals = bp.walletPSD.String()
 }
 

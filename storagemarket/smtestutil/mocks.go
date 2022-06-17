@@ -6,15 +6,13 @@ import (
 	"io/ioutil"
 	"sync"
 
-	lapi "github.com/filecoin-project/lotus/api"
-
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/mock_types"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/filecoin-project/lotus/api"
-
-	mock_types "github.com/filecoin-project/boost/storagemarket/types/mock_types"
-	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
+	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -99,11 +97,11 @@ func (mb *MinerStubBuilder) SetupAllBlocking() *MinerStubBuilder {
 }
 
 func (mb *MinerStubBuilder) SetupNoOp() *MinerStubBuilder {
-	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(_ context.Context, _ market2.ClientDealProposal) (cid.Cid, error) {
+	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(_ context.Context, _ market.ClientDealProposal) (cid.Cid, error) {
 		return mb.publishCid, nil
 	}).AnyTimes()
 
-	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
 		return &storagemarket.PublishDealsWaitResult{
 			DealID:   mb.dealId,
 			FinalCid: mb.finalPublishCid,
@@ -124,7 +122,7 @@ func (mb *MinerStubBuilder) SetupPublish(blocking bool) *MinerStubBuilder {
 	}
 	mb.stub.lk.Unlock()
 
-	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(ctx context.Context, _ market2.ClientDealProposal) (cid.Cid, error) {
+	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(ctx context.Context, _ market.ClientDealProposal) (cid.Cid, error) {
 		mb.stub.lk.Lock()
 		ch := mb.stub.unblockPublish[mb.dp.DealUUID]
 		mb.stub.lk.Unlock()
@@ -147,7 +145,7 @@ func (mb *MinerStubBuilder) SetupPublish(blocking bool) *MinerStubBuilder {
 }
 
 func (mb *MinerStubBuilder) SetupPublishFailure(err error) *MinerStubBuilder {
-	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(_ context.Context, _ market2.ClientDealProposal) (cid.Cid, error) {
+	mb.stub.MockDealPublisher.EXPECT().Publish(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal)).DoAndReturn(func(_ context.Context, _ market.ClientDealProposal) (cid.Cid, error) {
 		return cid.Undef, err
 	})
 
@@ -161,7 +159,7 @@ func (mb *MinerStubBuilder) SetupPublishConfirm(blocking bool) *MinerStubBuilder
 	}
 	mb.stub.lk.Unlock()
 
-	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(ctx context.Context, _ cid.Cid, _ market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(ctx context.Context, _ cid.Cid, _ market.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
 		mb.stub.lk.Lock()
 		ch := mb.stub.unblockWaitForPublish[mb.dp.DealUUID]
 		mb.stub.lk.Unlock()
@@ -187,7 +185,7 @@ func (mb *MinerStubBuilder) SetupPublishConfirm(blocking bool) *MinerStubBuilder
 }
 
 func (mb *MinerStubBuilder) SetupPublishConfirmFailure(err error) *MinerStubBuilder {
-	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+	mb.stub.MockChainDealManager.EXPECT().WaitForPublishDeals(gomock.Any(), gomock.Eq(mb.publishCid), gomock.Eq(mb.dp.ClientDealProposal.Proposal)).DoAndReturn(func(_ context.Context, _ cid.Cid, _ market.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
 		return nil, err
 	})
 

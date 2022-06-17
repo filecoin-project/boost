@@ -2,6 +2,7 @@ package gql
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -41,6 +42,7 @@ type resolver struct {
 	h          host.Host
 	dealsDB    *db.DealsDB
 	logsDB     *db.LogsDB
+	plDB       *db.ProposalLogsDB
 	fundsDB    *db.FundsDB
 	fundMgr    *fundmanager.FundManager
 	storageMgr *storagemanager.StorageManager
@@ -52,13 +54,14 @@ type resolver struct {
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		cfg:        cfg,
 		repo:       r,
 		h:          h,
 		dealsDB:    dealsDB,
 		logsDB:     logsDB,
+		plDB:       plDB,
 		fundsDB:    fundsDB,
 		fundMgr:    fundMgr,
 		storageMgr: storageMgr,
@@ -355,8 +358,16 @@ func (dr *dealResolver) IsVerified() bool {
 	return dr.ProviderDealState.ClientDealProposal.Proposal.VerifiedDeal
 }
 
-func (dr *dealResolver) ProposalLabel() string {
-	return dr.ProviderDealState.ClientDealProposal.Proposal.Label
+func (dr *dealResolver) ProposalLabel() (string, error) {
+	l := dr.ProviderDealState.ClientDealProposal.Proposal.Label
+	if l.IsString() {
+		return l.ToString()
+	}
+	bz, err := l.ToBytes()
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bz), nil
 }
 
 func (dr *dealResolver) ClientPeerID() string {

@@ -89,6 +89,12 @@ boost: $(BUILD_DEPS)
 .PHONY: boost
 BINS+=boost boostx boostd
 
+booster-http: $(BUILD_DEPS)
+	rm -f booster-http
+	$(GOCC) build $(GOFLAGS) -o booster-http ./cmd/booster-http
+.PHONY: booster-http
+BINS+=booster-http
+
 devnet: $(BUILD_DEPS)
 	rm -f devnet
 	$(GOCC) build $(GOFLAGS) -o devnet ./cmd/devnet
@@ -101,7 +107,7 @@ boostci: $(BUILD_DEPS)
 .PHONY: boostci
 
 react: check-node-lts
-	npm install --prefix react
+	npm_config_legacy_peer_deps=yes npm install --no-audit --prefix react
 	npm run --prefix react build
 .PHONY: react
 

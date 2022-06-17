@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/filecoin-project/boost/piecemeta"
 	"io"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
@@ -48,6 +50,7 @@ var (
 )
 
 type Config struct {
+	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration time.Duration
 }
 
@@ -107,7 +110,7 @@ type Provider struct {
 	sigVerifier types.SignatureVerifier
 }
 
-func NewProvider(sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
+func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	pieceMeta *piecemeta.PieceMeta, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
@@ -119,10 +122,9 @@ func NewProvider(sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundMa
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Provider{
-		ctx:    ctx,
-		cancel: cancel,
-		// TODO Make this configurable
-		config:    Config{MaxTransferDuration: 24 * 3600 * time.Second},
+		ctx:       ctx,
+		cancel:    cancel,
+		config:    cfg,
 		Address:   addr,
 		newDealPS: newDealPS,
 		db:        sqldb,
@@ -163,6 +165,14 @@ func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.Provide
 	deal, err := p.dealsDB.ByID(ctx, dealUuid)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("getting deal %s: %w", dealUuid, ErrDealNotFound)
+	}
+	return deal, nil
+}
+
+func (p *Provider) DealBySignedProposalCid(ctx context.Context, propCid cid.Cid) (*types.ProviderDealState, error) {
+	deal, err := p.dealsDB.BySignedProposalCID(ctx, propCid)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("getting deal %s: %w", propCid, ErrDealNotFound)
 	}
 	return deal, nil
 }

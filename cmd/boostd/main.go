@@ -40,7 +40,6 @@ func main() {
 			backupCmd,
 			restoreCmd,
 			dummydealCmd,
-			storageDealsCmd,
 			dataTransfersCmd,
 			retrievalDealsCmd,
 			indexProvCmd,
@@ -60,11 +59,15 @@ func main() {
 func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("boostd", "INFO")
 	_ = logging.SetLogLevel("db", "INFO")
-	_ = logging.SetLogLevel("boost-net", "INFO")
+	_ = logging.SetLogLevel("boost-prop", "INFO")
+	_ = logging.SetLogLevel("modules", "INFO")
+	_ = logging.SetLogLevel("cfg", "INFO")
+	_ = logging.SetLogLevel("boost-storage-deal", "INFO")
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostd", "DEBUG")
 		_ = logging.SetLogLevel("provider", "DEBUG")
+		_ = logging.SetLogLevel("boost-net", "DEBUG")
 		_ = logging.SetLogLevel("gql", "DEBUG")
 		_ = logging.SetLogLevel("boost-provider", "DEBUG")
 		_ = logging.SetLogLevel("storagemanager", "DEBUG")

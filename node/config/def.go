@@ -59,7 +59,7 @@ func DefaultBoost() *Boost {
 	cfg := &Boost{
 		Common: defCommon(),
 
-		Storage: lotus_config.SealerConfig{
+		Storage: StorageConfig{
 			ParallelFetchLimit: 10,
 		},
 
@@ -84,6 +84,8 @@ func DefaultBoost() *Boost {
 
 			StartEpochSealingBuffer: 480, // 480 epochs buffer == 4 hours from adding deal to sector to sector being sealed
 
+			DealProposalLogDuration: Duration(time.Hour * 24),
+
 			RetrievalPricing: &lotus_config.RetrievalPricing{
 				Strategy: RetrievalPricingDefaultMode,
 				Default: &lotus_config.RetrievalPricingDefault{
@@ -93,6 +95,8 @@ func DefaultBoost() *Boost {
 					Path: "",
 				},
 			},
+
+			MaxTransferDuration: Duration(24 * 3600 * time.Second),
 		},
 
 		LotusDealmaking: lotus_config.DealmakingConfig{
@@ -127,21 +131,7 @@ func DefaultBoost() *Boost {
 			},
 		},
 
-		LotusFees: lotus_config.MinerFeeConfig{
-			MaxPreCommitGasFee: types.MustParseFIL("0.025"),
-			MaxCommitGasFee:    types.MustParseFIL("0.05"),
-
-			MaxPreCommitBatchGasFee: lotus_config.BatchFeeConfig{
-				Base:      types.MustParseFIL("0"),
-				PerSector: types.MustParseFIL("0.02"),
-			},
-			MaxCommitBatchGasFee: lotus_config.BatchFeeConfig{
-				Base:      types.MustParseFIL("0"),
-				PerSector: types.MustParseFIL("0.03"), // enough for 6 agg and 1nFIL base fee
-			},
-
-			MaxTerminateGasFee:     types.MustParseFIL("0.5"),
-			MaxWindowPoStGasFee:    types.MustParseFIL("5"),
+		LotusFees: FeeConfig{
 			MaxPublishDealsFee:     types.MustParseFIL("0.05"),
 			MaxMarketBalanceAddFee: types.MustParseFIL("0.007"),
 		},

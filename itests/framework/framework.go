@@ -26,13 +26,13 @@ import (
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/builtin/v8/market"
+	minertypes "github.com/filecoin-project/go-state-types/builtin/v8/miner"
 	"github.com/filecoin-project/go-state-types/exitcode"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	lbuild "github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
-	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
-	"github.com/filecoin-project/lotus/chain/actors/policy"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
@@ -45,9 +45,7 @@ import (
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
-	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
-	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
+	"github.com/filecoin-project/specs-actors/v8/actors/builtin"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -93,17 +91,6 @@ func NewTestFramework(ctx context.Context, t *testing.T) *TestFramework {
 }
 
 func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
-	// enable 8MiB proofs so we can conduct larger transfers.
-	policy.SetSupportedProofTypes(
-		abi.RegisteredSealProof_StackedDrg2KiBV1,
-		abi.RegisteredSealProof_StackedDrg8MiBV1,
-	)
-	t.Cleanup(func() { // reset when done.
-		policy.SetSupportedProofTypes(
-			abi.RegisteredSealProof_StackedDrg2KiBV1,
-		)
-	})
-
 	// Set up a full node and a miner (without markets)
 	var fullNode kit.TestFullNode
 	var miner kit.TestMiner
@@ -364,7 +351,7 @@ func (f *TestFramework) Start() error {
 
 	// Set boost libp2p address on chain
 	Log.Debugw("setting peer id on chain", "peer id", boostAddrs.ID)
-	params, err := actors.SerializeParams(&miner2.ChangePeerIDParams{NewID: abi.PeerID(boostAddrs.ID)})
+	params, err := actors.SerializeParams(&minertypes.ChangePeerIDParams{NewID: abi.PeerID(boostAddrs.ID)})
 	if err != nil {
 		return err
 	}
@@ -377,7 +364,7 @@ func (f *TestFramework) Start() error {
 	msg := &ltypes.Message{
 		To:     minerAddr,
 		From:   minerInfo.Owner,
-		Method: miner.Methods.ChangePeerID,
+		Method: builtin.MethodsMiner.ChangePeerID,
 		Params: params,
 		Value:  ltypes.NewInt(0),
 	}
@@ -494,15 +481,19 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		return nil, fmt.Errorf("getting chain head: %w", err)
 	}
 	startEpoch := head.Height() + abi.ChainEpoch(2000)
+	l, err := market.NewLabelFromString(rootCid.String())
+	if err != nil {
+		return nil, err
+	}
 	proposal := market.DealProposal{
 		PieceCID:             cidAndSize.PieceCID,
 		PieceSize:            cidAndSize.PieceSize,
 		VerifiedDeal:         false,
 		Client:               f.ClientAddr,
 		Provider:             f.MinerAddr,
-		Label:                rootCid.String(),
+		Label:                l,
 		StartEpoch:           startEpoch,
-		EndEpoch:             startEpoch + market2.DealMinDuration,
+		EndEpoch:             startEpoch + market.DealMinDuration,
 		StoragePricePerEpoch: abi.NewTokenAmount(2000000),
 		ProviderCollateral:   abi.NewTokenAmount(0),
 		ClientCollateral:     abi.NewTokenAmount(0),
@@ -604,7 +595,7 @@ func (f *TestFramework) setControlAddress(psdAddr address.Address) error {
 		return err
 	}
 
-	cwp := &miner2.ChangeWorkerAddressParams{
+	cwp := &minertypes.ChangeWorkerAddressParams{
 		NewWorker:       mi.Worker,
 		NewControlAddrs: []address.Address{psdAddr},
 	}
@@ -616,7 +607,7 @@ func (f *TestFramework) setControlAddress(psdAddr address.Address) error {
 	smsg, err := f.FullNode.MpoolPushMessage(f.ctx, &chaintypes.Message{
 		From:   mi.Owner,
 		To:     f.MinerAddr,
-		Method: miner.Methods.ChangeWorkerAddress,
+		Method: builtin.MethodsMiner.ChangeWorkerAddress,
 
 		Value:  big.Zero(),
 		Params: sp,
@@ -751,12 +742,4 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 	require.NoError(t, err)
 
 	return tmpfile
-}
-
-func SetPreCommitChallengeDelay(t *testing.T, delay abi.ChainEpoch) {
-	oldDelay := policy.GetPreCommitChallengeDelay()
-	policy.SetPreCommitChallengeDelay(delay)
-	t.Cleanup(func() {
-		policy.SetPreCommitChallengeDelay(oldDelay)
-	})
 }

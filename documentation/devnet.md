@@ -30,7 +30,6 @@ install -C ./lotus-seed /usr/local/bin/lotus-seed
 Double check if environment variables are set:
 ```
 export LIBRARY_PATH=/opt/homebrew/lib
-export FFI_BUILD_FROM_SOURCE=1
 export PATH="$(brew --prefix coreutils)/libexec/gnubin:/usr/local/bin:$PATH"
 ```
 
@@ -112,19 +111,62 @@ boostd -vv init \
   --api-sealer=$MINER_API_INFO \
   --api-sector-index=$MINER_API_INFO \
   --wallet-publish-storage-deals=$PUBMSG_WALLET \
-  --wallet-collateral-pledge=$COLLAT_WALLET \
+  --wallet-deal-collateral=$COLLAT_WALLET \
   --max-staging-deals-bytes=2000000000
 ```
 
-11. Run boost
+11. Build the Web UI
+```
+make react
+```
+
+12. Edit config to set a fixed listen address
+
+Open `~/.boost/config.toml`
+
+Set the port in the `ListenAddresses` key to `50000` 
+```
+[Libp2p]
+  ListenAddresses = ["/ip4/0.0.0.0/tcp/50000", "/ip6/::/tcp/0"]
+```
+
+13. Run boost
 ```
 boostd -vv run
 ```
 
-#### Next steps
+Note down the peer ID of the boost instance:
+```
+2022-06-10T09:32:28.819Z        INFO    boostd  boostd/run.go:114       Boost libp2p node listening     {"maddr": "{12D3KooWQNNWNiJ1mieEk9EHjDVF2qBc1FSjJGEzwjnMJzteApaW: [/ip4/172.17.0.2/tcp/50000 /ip4/127.0.0.1/tcp/50000]}"}
+```
+In this example: `12D3KooWQNNWNiJ1mieEk9EHjDVF2qBc1FSjJGEzwjnMJzteApaW`
+
+14. Set the peer ID and multi-address of the miner on chain
+```
+lotus-miner actor set-peer-id <peer id>
+lotus-miner actor set-addrs /ip4/127.0.0.1/tcp/50000
+```
+
+15. Open the Web UI
 
 Open http://localhost:8080 to see the Boost UI
 
-To make a deal with boost, follow the guide at https://boost.filecoin.io/tutorials/how-to-store-files-with-boost-on-filecoin
+## Make a deal with Boost
+
+2. Initialize the boost client
+```
+boost init
+```
+
+This will output the address of the wallet (it's safe to run the init command repeatedly).
+
+2. Send funds to the client wallet
+```
+lotus send --from=$DEFAULT_WALLET <client wallet> 10
+```
+
+3. Follow the guide at https://boost.filecoin.io/tutorials/how-to-store-files-with-boost-on-filecoin
 
 Note that above you already ran a command to export FULLNODE_API (and point it to your local devnet lotus daemon).
+
+Note also that the provider address is `t01000` and you will need to supply an appropriate `--storage-price` when using `boost deal` since the devnet has a minimum price. Alternatively, using "Settings" in the Boost web UI to set the deal price to zero. 

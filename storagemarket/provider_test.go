@@ -36,6 +36,7 @@ import (
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
@@ -43,9 +44,7 @@ import (
 	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	"github.com/filecoin-project/lotus/node/repo"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
-	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -863,16 +862,6 @@ func TestDealVerification(t *testing.T) {
 			},
 			expectedErr: "deal start epoch -1 has already elapsed",
 		},
-		"deal label greater than max size": {
-			ask: &storagemarket.StorageAsk{
-				Price: abi.NewTokenAmount(0),
-			},
-			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
-				label := strings.Repeat("a", 1000)
-				return h.newDealBuilder(t, 1, withLabel(label)).withNoOpMinerStub().build()
-			},
-			expectedErr: "deal label can be at most 256 bytes",
-		},
 		"deal piece size invalid": {
 			ask: &storagemarket.StorageAsk{
 				Price: abi.NewTokenAmount(0),
@@ -887,7 +876,7 @@ func TestDealVerification(t *testing.T) {
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
-				start := miner.MaxSectorExpirationExtension - market2.DealMinDuration - 1
+				start := miner.MaxSectorExpirationExtension - market.DealMinDuration - 1
 				maxEndEpoch := miner.MaxSectorExpirationExtension + 100
 				return h.newDealBuilder(t, 1, withEpochs(abi.ChainEpoch(start), abi.ChainEpoch(maxEndEpoch))).withNoOpMinerStub().build()
 			},
@@ -899,7 +888,7 @@ func TestDealVerification(t *testing.T) {
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
 
-				return h.newDealBuilder(t, 1, withEpochs(10, market2.DealMaxDuration+11)).withNoOpMinerStub().build()
+				return h.newDealBuilder(t, 1, withEpochs(10, market.DealMaxDuration+11)).withNoOpMinerStub().build()
 			},
 			expectedErr: "deal duration out of bounds",
 		},
@@ -1326,7 +1315,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	askStore := &mockAskStore{}
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
-	prov, err := NewProvider(sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, sps, minerStub, df, sqldb,
+	prvCfg := Config{MaxTransferDuration: time.Hour}
+	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, sps, minerStub, df, sqldb,
 		logsDB, dagStore, ps, &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
 	require.NoError(t, err)
 	ph.Provider = prov
@@ -1381,7 +1371,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	}
 
 	// construct a new provider with pre-existing state
-	prov, err := NewProvider(h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
+	prov, err := NewProvider(h.Provider.config, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
 		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.dagst, h.Provider.ps, &NoOpIndexProvider{}, h.Provider.askGetter,
 		h.Provider.sigVerifier, h.Provider.dealLogger, h.Provider.Transport)
@@ -1426,7 +1416,7 @@ type dealProposalConfig struct {
 	undefinedPieceCid  bool
 	startEpoch         abi.ChainEpoch
 	endEpoch           abi.ChainEpoch
-	label              string
+	label              market.DealLabel
 }
 
 // dealProposalOpt allows configuration of the deal proposal
@@ -1486,12 +1476,6 @@ func withEpochs(start, end abi.ChainEpoch) dealProposalOpt {
 	return func(dc *dealProposalConfig) {
 		dc.startEpoch = start
 		dc.endEpoch = end
-	}
-}
-
-func withLabel(label string) dealProposalOpt {
-	return func(dc *dealProposalConfig) {
-		dc.label = label
 	}
 }
 
@@ -1943,6 +1927,10 @@ func (td *testDeal) assertDealFailedNonRecoverable(t *testing.T, ctx context.Con
 }
 
 type NoOpIndexProvider struct{}
+
+func (n *NoOpIndexProvider) Enabled() bool {
+	return true
+}
 
 func (n *NoOpIndexProvider) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDealState) (cid.Cid, error) {
 	return testutil.GenerateCid(), nil

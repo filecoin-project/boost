@@ -5,7 +5,7 @@ orbs:
 executors:
   golang:
     docker:
-      - image: circleci/golang:1.17.2
+      - image: cimg/go:1.17.11
     resource_class: 2xlarge
   ubuntu:
     docker:
@@ -230,7 +230,7 @@ jobs:
         default: golang
       golangci-lint-version:
         type: string
-        default: 1.27.0
+        default: 1.46.2
       concurrency:
         type: string
         default: '2'

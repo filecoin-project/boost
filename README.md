@@ -31,7 +31,14 @@ brew install go bzr jq pkg-config rustup hwloc coreutils
 
 Boost also requires that Xcode Command Line Tools be installed before building the Boost binaries.
 
-### Compiling from source
+### Compiling Boost from source
+
+Depending on your architecture, you will want to export additional environment variables:
+
+```
+export RUSTFLAGS="-C target-cpu=native -g"
+export FFI_BUILD_FROM_SOURCE=1
+```
 
 ```
 git clone https://github.com/filecoin-project/boost
@@ -142,7 +149,7 @@ boostd --vv init \
        --api-sealer=`lotus-miner auth api-info --perm=admin` \
        --api-sector-index=`lotus-miner auth api-info --perm=admin` \
        --wallet-publish-storage-deals=`lotus wallet new bls` \
-       --wallet-collateral-pledge=`lotus wallet new bls` \
+       --wallet-deal-collateral=`lotus wallet new bls` \
        --max-staging-deals-bytes=50000000000
 ```
 

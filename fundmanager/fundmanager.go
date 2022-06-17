@@ -10,10 +10,11 @@ import (
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
+
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -31,7 +32,7 @@ type Config struct {
 	// The address of the storage miner, used as the target address when
 	// moving funds to escrow
 	StorageMiner address.Address
-	// Wallet used as source of pledge collateral when moving funds to
+	// Wallet used as source of deal collateral when moving funds to
 	// escrow
 	CollatWallet address.Address
 	// Wallet used to send the publish message (and pay gas fees)
@@ -192,7 +193,7 @@ func (m *FundManager) persistTagged(ctx context.Context, dealUuid uuid.UUID, dea
 	return nil
 }
 
-// MoveFundsToEscrow moves funds from the pledge collateral wallet into escrow with
+// MoveFundsToEscrow moves funds from the deal collateral wallet into escrow with
 // the storage market actor
 func (m *FundManager) MoveFundsToEscrow(ctx context.Context, amt abi.TokenAmount) (cid.Cid, error) {
 	msgCid, err := m.api.MarketAddBalance(ctx, m.cfg.CollatWallet, m.cfg.StorageMiner, amt)
@@ -214,13 +215,13 @@ func (m *FundManager) BalanceMarket(ctx context.Context) (storagemarket.Balance,
 	return toSharedBalance(bal), nil
 }
 
-// BalancePledgeCollateral returns the amount of funds in the wallet used for
-// pledging collateral for deal making
-func (m *FundManager) BalancePledgeCollateral(ctx context.Context) (abi.TokenAmount, error) {
+// BalanceDealCollateral returns the amount of funds in the wallet used for
+// collateral for deal making
+func (m *FundManager) BalanceDealCollateral(ctx context.Context) (abi.TokenAmount, error) {
 	return m.api.WalletBalance(ctx, m.cfg.CollatWallet)
 }
 
-func (m *FundManager) AddressPledgeCollateral() address.Address {
+func (m *FundManager) AddressDealCollateral() address.Address {
 	return m.cfg.CollatWallet
 }
 

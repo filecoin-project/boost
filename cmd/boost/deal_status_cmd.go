@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	bcli "github.com/filecoin-project/boost/cli"
@@ -85,6 +86,22 @@ var dealStatusCmd = &cli.Command{
 			return fmt.Errorf("send deal status request failed: %w", err)
 		}
 
+		label := resp.DealStatus.Proposal.Label
+		var lstr string
+		if label.IsString() {
+			lstr, err = label.ToString()
+			if err != nil {
+				lstr = "could not marshall deal label"
+			}
+		} else {
+			lbz, err := label.ToBytes()
+			if err != nil {
+				lstr = "could not marshall deal label"
+			} else {
+				lstr = "bytes: " + hex.EncodeToString(lbz)
+			}
+		}
+
 		if cctx.Bool("json") {
 			out := map[string]interface{}{}
 			if resp.Error != "" {
@@ -99,7 +116,7 @@ var dealStatusCmd = &cli.Command{
 				// resp.DealStatus should always be present if there's no error,
 				// but check just in case
 				if resp.DealStatus != nil {
-					out["label"] = resp.DealStatus.Proposal.Label
+					out["label"] = label
 					out["chainDealId"] = resp.DealStatus.ChainDealID
 					out["status"] = resp.DealStatus.Status
 					out["publishCid"] = nil
@@ -123,7 +140,7 @@ var dealStatusCmd = &cli.Command{
 
 		msg += fmt.Sprintf("  deal uuid: %s\n", resp.DealUUID)
 		msg += fmt.Sprintf("  deal status: %s\n", statusMessage(resp))
-		msg += fmt.Sprintf("  deal label: %s\n", resp.DealStatus.Proposal.Label)
+		msg += fmt.Sprintf("  deal label: %s\n", lstr)
 		msg += fmt.Sprintf("  publish cid: %s\n", resp.DealStatus.PublishCid)
 		msg += fmt.Sprintf("  chain deal id: %d\n", resp.DealStatus.ChainDealID)
 		fmt.Println(msg)

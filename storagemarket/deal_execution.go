@@ -641,15 +641,20 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	}
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piece metadata store")
 
-	// announce to the network indexer but do not fail the deal if the announcement fails
-	annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
-	if err != nil {
-		return &dealMakingError{
-			retry: types.DealRetryAuto,
-			error: fmt.Errorf("failed to announce deal to network indexer: %w", err),
+	// if the index provider is enabled
+	if p.ip.Enabled() {
+		// announce to the network indexer but do not fail the deal if the announcement fails
+		annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
+		if err != nil {
+			return &dealMakingError{
+				retry: types.DealRetryAuto,
+				error: fmt.Errorf("failed to announce deal to network indexer: %w", err),
+			}
 		}
+		p.dealLogger.Infow(deal.DealUuid, "announced deal to network indexer", "announcement-cid", annCid)
+	} else {
+		p.dealLogger.Infow(deal.DealUuid, "didn't announce deal because network indexer is disabled")
 	}
-	p.dealLogger.Infow(deal.DealUuid, "announced deal to network indexer", "announcement-cid", annCid)
 
 	if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced); derr != nil {
 		return derr

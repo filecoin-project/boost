@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multihash"
 )
 
 //                       MODIFYING THE API INTERFACE
@@ -36,14 +37,15 @@ type Boost interface {
 	BoostIndexerAnnounceAllDeals(ctx context.Context) error                                                                        //perm:admin
 	BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string) (*ProviderDealRejectionInfo, error)         //perm:admin
 	BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                                         //perm:admin
+	BoostDealBySignedProposalCid(ctx context.Context, proposalCid cid.Cid) (*smtypes.ProviderDealState, error)                     //perm:admin
 	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                        //perm:admin
 	BoostDagstoreRegisterShard(ctx context.Context, key string) error                                                              //perm:admin
 	BoostDagstoreInitializeShard(ctx context.Context, key string) error                                                            //perm:admin
 	BoostDagstoreInitializeAll(ctx context.Context, params DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) //perm:admin
 	BoostDagstoreRecoverShard(ctx context.Context, key string) error                                                               //perm:admin
 	BoostDagstoreGC(ctx context.Context) ([]DagstoreShardResult, error)                                                            //perm:admin
-
-	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error) //perm:read
+	BoostDagstorePiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error)                         //perm:read
+	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error)                                                      //perm:read
 
 	// RuntimeSubsystems returns the subsystems that are enabled
 	// in this instance.
@@ -66,6 +68,7 @@ type Boost interface {
 	PiecesListCidInfos(ctx context.Context) ([]cid.Cid, error)                               //perm:read
 	PiecesGetPieceInfo(ctx context.Context, pieceCid cid.Cid) (*piecestore.PieceInfo, error) //perm:read
 	PiecesGetCIDInfo(ctx context.Context, payloadCid cid.Cid) (*piecestore.CIDInfo, error)   //perm:read
+	PiecesGetMaxOffset(ctx context.Context, pieceCid cid.Cid) (uint64, error)                //perm:read
 
 	// MethodGroup: Actor
 	ActorSectorSize(context.Context, address.Address) (abi.SectorSize, error) //perm:read

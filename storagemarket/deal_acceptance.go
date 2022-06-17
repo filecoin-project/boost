@@ -13,9 +13,8 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
+	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
-	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 )
 
 const DealMaxLabelSize = 256
@@ -68,8 +67,8 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) *validatio
 		return &validationError{error: err}
 	}
 
-	if len(proposal.Label) > DealMaxLabelSize {
-		err := fmt.Errorf("deal label can be at most %d bytes, is %d", DealMaxLabelSize, len(proposal.Label))
+	if proposal.Label.Length() > DealMaxLabelSize {
+		err := fmt.Errorf("deal label can be at most %d bytes, is %d", DealMaxLabelSize, proposal.Label.Length())
 		return &validationError{error: err}
 	}
 
@@ -95,7 +94,7 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) *validatio
 
 	// Check that the delta between the start and end epochs (the deal
 	// duration) is within acceptable bounds
-	minDuration, maxDuration := market2.DealDurationBounds(proposal.PieceSize)
+	minDuration, maxDuration := market.DealDurationBounds(proposal.PieceSize)
 	if proposal.Duration() < minDuration || proposal.Duration() > maxDuration {
 		err := fmt.Errorf("deal duration out of bounds (min, max, provided): %d, %d, %d", minDuration, maxDuration, proposal.Duration())
 		return &validationError{error: err}

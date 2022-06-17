@@ -28,6 +28,10 @@ var runCmd = &cli.Command{
 			Name:  "pprof",
 			Usage: "run pprof web server on localhost:6060",
 		},
+		&cli.BoolFlag{
+			Name:  "nosync",
+			Usage: "dont wait for the full node to sync with the chain",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {

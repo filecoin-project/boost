@@ -10,7 +10,7 @@ replace github.com/filecoin-project/boost/cmd/boostd-data => ./cmd/boostd-data
 
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
-	github.com/BurntSushi/toml v0.4.1
+	github.com/BurntSushi/toml v1.1.0
 	github.com/alecthomas/jsonschema v0.0.0-20200530073317-71f438968921
 	github.com/buger/goterm v1.0.3
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
@@ -29,19 +29,18 @@ require (
 	github.com/filecoin-project/go-data-transfer v1.15.1
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
-	// go-fil-markets boost/main branch
-	github.com/filecoin-project/go-fil-markets v1.20.2-0.20220509100709-5b96975b1577
+	github.com/filecoin-project/go-fil-markets v1.21.0
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.1.7
+	github.com/filecoin-project/go-state-types v0.1.9
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/index-provider v0.7.0
-	// lotus boost/main branch
-	github.com/filecoin-project/lotus v1.15.2
-	github.com/filecoin-project/specs-actors v0.9.14
-	github.com/filecoin-project/specs-actors/v2 v2.3.6
-	github.com/filecoin-project/specs-storage v0.2.2
+	github.com/filecoin-project/index-provider v0.8.0
+	github.com/filecoin-project/lotus v1.16.0-rc1
+	github.com/filecoin-project/specs-actors v0.9.15
+	github.com/filecoin-project/specs-actors/v8 v8.0.0
+	github.com/filecoin-project/specs-storage v0.4.1
+	github.com/filecoin-project/storetheindex v0.4.14
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
@@ -75,7 +74,7 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/libp2p/go-eventbus v0.2.1
-	github.com/libp2p/go-libp2p v0.19.1
+	github.com/libp2p/go-libp2p v0.19.4
 	github.com/libp2p/go-libp2p-core v0.15.1
 	github.com/libp2p/go-libp2p-gostream v0.3.2-0.20220309102559-3d4abe2a19ac
 	github.com/libp2p/go-libp2p-http v0.2.1
@@ -89,20 +88,22 @@ require (
 	github.com/multiformats/go-multiaddr v0.5.0
 	github.com/multiformats/go-multibase v0.0.3
 	github.com/multiformats/go-multihash v0.1.0
+	github.com/multiformats/go-varint v0.0.6
 	github.com/open-rpc/meta-schema v0.0.0-20201029221707-1b72ef2ea333
 	github.com/pressly/goose/v3 v3.5.3
 	github.com/prometheus/client_golang v1.12.1
 	github.com/raulk/clock v1.1.0
 	github.com/raulk/go-watchdog v1.2.0
-	github.com/stretchr/testify v1.7.0
-	github.com/urfave/cli/v2 v2.3.0
+	github.com/stretchr/testify v1.7.1
+	github.com/urfave/cli/v2 v2.8.1
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
-	github.com/whyrusleeping/cbor-gen v0.0.0-20220302191723-37c43cae8e14
+	github.com/whyrusleeping/cbor-gen v0.0.0-20220323183124-98fa8256a799
 	go.opencensus.io v0.23.0
 	go.uber.org/atomic v1.9.0
 	go.uber.org/fx v1.15.0
 	go.uber.org/multierr v1.8.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/tools v0.1.11
 	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
 )

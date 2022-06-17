@@ -20,8 +20,8 @@ import (
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/filecoin-project/lotus/api/v0api"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
@@ -258,13 +258,17 @@ func serveCarFile(dealUuid uuid.UUID, fpath string) (string, error) {
 func dummydealProposal(ctx context.Context, fullNode v0api.FullNode, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, clientAddr address.Address, minerAddr address.Address, head abi.ChainEpoch) (*market.ClientDealProposal, error) {
 	startEpoch := head + abi.ChainEpoch(5760)
 	endEpoch := startEpoch + 521280 // startEpoch + 181 days
+	l, err := market.NewLabelFromString(rootCid.String())
+	if err != nil {
+		return nil, err
+	}
 	proposal := market.DealProposal{
 		PieceCID:             pieceCid,
 		PieceSize:            pieceSize,
 		VerifiedDeal:         false,
 		Client:               clientAddr,
 		Provider:             minerAddr,
-		Label:                rootCid.String(),
+		Label:                l,
 		StartEpoch:           startEpoch,
 		EndEpoch:             endEpoch,
 		StoragePricePerEpoch: abi.NewTokenAmount(1),

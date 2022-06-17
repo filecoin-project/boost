@@ -371,7 +371,7 @@ func (p *Provider) run() {
 
 				// The error is not a severe error, so don't log an error, just
 				// send a message to the client with a rejection reason
-				p.dealLogger.Infow(deal.DealUuid, "deal acceptance request rejected", "reason", aerr.reason)
+				p.dealLogger.Infow(deal.DealUuid, "deal acceptance request rejected", "reason", aerr.reason, "error", aerr.error)
 				dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: aerr.reason}, err: nil}
 			}
 

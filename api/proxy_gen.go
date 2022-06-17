@@ -23,6 +23,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/multiformats/go-multihash"
 )
 
 var ErrNotSupported = errors.New("method not supported")
@@ -43,11 +44,15 @@ type BoostStruct struct {
 
 		BoostDagstoreListShards func(p0 context.Context) ([]DagstoreShardInfo, error) `perm:"read"`
 
+		BoostDagstorePiecesContainingMultihash func(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) `perm:"read"`
+
 		BoostDagstoreRecoverShard func(p0 context.Context, p1 string) error `perm:"admin"`
 
 		BoostDagstoreRegisterShard func(p0 context.Context, p1 string) error `perm:"admin"`
 
 		BoostDeal func(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) `perm:"admin"`
+
+		BoostDealBySignedProposalCid func(p0 context.Context, p1 cid.Cid) (*smtypes.ProviderDealState, error) `perm:"admin"`
 
 		BoostDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
@@ -106,6 +111,8 @@ type BoostStruct struct {
 		MarketSetRetrievalAsk func(p0 context.Context, p1 *retrievalmarket.Ask) error `perm:"admin"`
 
 		PiecesGetCIDInfo func(p0 context.Context, p1 cid.Cid) (*piecestore.CIDInfo, error) `perm:"read"`
+
+		PiecesGetMaxOffset func(p0 context.Context, p1 cid.Cid) (uint64, error) `perm:"read"`
 
 		PiecesGetPieceInfo func(p0 context.Context, p1 cid.Cid) (*piecestore.PieceInfo, error) `perm:"read"`
 
@@ -279,6 +286,17 @@ func (s *BoostStub) BoostDagstoreListShards(p0 context.Context) ([]DagstoreShard
 	return *new([]DagstoreShardInfo), ErrNotSupported
 }
 
+func (s *BoostStruct) BoostDagstorePiecesContainingMultihash(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) {
+	if s.Internal.BoostDagstorePiecesContainingMultihash == nil {
+		return *new([]cid.Cid), ErrNotSupported
+	}
+	return s.Internal.BoostDagstorePiecesContainingMultihash(p0, p1)
+}
+
+func (s *BoostStub) BoostDagstorePiecesContainingMultihash(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) {
+	return *new([]cid.Cid), ErrNotSupported
+}
+
 func (s *BoostStruct) BoostDagstoreRecoverShard(p0 context.Context, p1 string) error {
 	if s.Internal.BoostDagstoreRecoverShard == nil {
 		return ErrNotSupported
@@ -309,6 +327,17 @@ func (s *BoostStruct) BoostDeal(p0 context.Context, p1 uuid.UUID) (*smtypes.Prov
 }
 
 func (s *BoostStub) BoostDeal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *BoostStruct) BoostDealBySignedProposalCid(p0 context.Context, p1 cid.Cid) (*smtypes.ProviderDealState, error) {
+	if s.Internal.BoostDealBySignedProposalCid == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.BoostDealBySignedProposalCid(p0, p1)
+}
+
+func (s *BoostStub) BoostDealBySignedProposalCid(p0 context.Context, p1 cid.Cid) (*smtypes.ProviderDealState, error) {
 	return nil, ErrNotSupported
 }
 
@@ -629,6 +658,17 @@ func (s *BoostStruct) PiecesGetCIDInfo(p0 context.Context, p1 cid.Cid) (*piecest
 
 func (s *BoostStub) PiecesGetCIDInfo(p0 context.Context, p1 cid.Cid) (*piecestore.CIDInfo, error) {
 	return nil, ErrNotSupported
+}
+
+func (s *BoostStruct) PiecesGetMaxOffset(p0 context.Context, p1 cid.Cid) (uint64, error) {
+	if s.Internal.PiecesGetMaxOffset == nil {
+		return 0, ErrNotSupported
+	}
+	return s.Internal.PiecesGetMaxOffset(p0, p1)
+}
+
+func (s *BoostStub) PiecesGetMaxOffset(p0 context.Context, p1 cid.Cid) (uint64, error) {
+	return 0, ErrNotSupported
 }
 
 func (s *BoostStruct) PiecesGetPieceInfo(p0 context.Context, p1 cid.Cid) (*piecestore.PieceInfo, error) {

@@ -192,7 +192,7 @@ func (s *Libp2pCarServer) serveContent(w http.ResponseWriter, r *http.Request, a
 
 	// Set the Content-Type header explicitly so that http.ServeContent doesn't
 	// try to do it implicitly
-	w.Header().Set("Content-Type", "application/car")
+	w.Header().Set("Content-Type", "application/vnd.ipld.car")
 
 	if r.Method == "HEAD" {
 		// For an HTTP HEAD request we don't send any data (just headers)

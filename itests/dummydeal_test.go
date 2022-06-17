@@ -21,7 +21,6 @@ func TestDummydealOnline(t *testing.T) {
 
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
-	framework.SetPreCommitChallengeDelay(t, 5)
 	f := framework.NewTestFramework(ctx, t)
 	err := f.Start()
 	require.NoError(t, err)

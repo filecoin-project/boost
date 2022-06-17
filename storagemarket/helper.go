@@ -5,17 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
+	market8 "github.com/filecoin-project/go-state-types/builtin/v8/market"
+	"github.com/filecoin-project/go-state-types/exitcode"
+	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
-
-	"github.com/filecoin-project/go-fil-markets/storagemarket"
-	"github.com/filecoin-project/go-state-types/exitcode"
-	"github.com/filecoin-project/lotus/api"
-	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 )
 
 type ChainDealManagerCfg struct {
@@ -37,7 +35,7 @@ type CurrentDealInfo struct {
 	PublishMsgTipSet ctypes.TipSetKey
 }
 
-func (c *ChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+func (c *ChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market8.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
 	// Wait for deal to be published (plus additional time for confidence)
 	receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, c.cfg.PublishDealsConfidence, api.LookbackNoLimit, true)
 	if err != nil {
@@ -128,7 +126,7 @@ func (c *ChainDealManager) dealIDFromPublishDealsMsg(ctx context.Context, tok ct
 		return dealID, ctypes.EmptyTSK, fmt.Errorf("getting publish deal message %s: %w", publishCid, err)
 	}
 
-	var pubDealsParams market2.PublishStorageDealsParams
+	var pubDealsParams market8.PublishStorageDealsParams
 	if err := pubDealsParams.UnmarshalCBOR(bytes.NewReader(pubmsg.Params)); err != nil {
 		return dealID, ctypes.EmptyTSK, fmt.Errorf("unmarshalling publish deal message params for message %s: %w", publishCid, err)
 	}
@@ -151,13 +149,13 @@ func (c *ChainDealManager) dealIDFromPublishDealsMsg(ctx context.Context, tok ct
 		return dealID, ctypes.EmptyTSK, fmt.Errorf("could not find deal in publish deals message %s", publishCid)
 	}
 
-	if dealIdx >= len(dealIDs) {
+	if dealIdx >= len(pubDealsParams.Deals) {
 		return dealID, ctypes.EmptyTSK, fmt.Errorf(
-			"deal index %d out of bounds of deals (len %d) in publish deals message %s",
-			dealIdx, len(dealIDs), publishCid)
+			"deal index %d out of bounds of deal proposals (len %d) in publish deals message %s",
+			dealIdx, len(pubDealsParams.Deals), publishCid)
 	}
 
-	valid, err := retval.IsDealValid(uint64(dealIdx))
+	valid, outIdx, err := retval.IsDealValid(uint64(dealIdx))
 	if err != nil {
 		return dealID, ctypes.EmptyTSK, fmt.Errorf("determining deal validity: %w", err)
 	}
@@ -166,6 +164,11 @@ func (c *ChainDealManager) dealIDFromPublishDealsMsg(ctx context.Context, tok ct
 		return dealID, ctypes.EmptyTSK, errors.New("deal was invalid at publication")
 	}
 
+	// final check against for invalid return value output
+	// should not be reachable from onchain output, only pathological test cases
+	if outIdx >= len(dealIDs) {
+		return dealID, ctypes.EmptyTSK, fmt.Errorf("invalid publish storage deals ret marking %d as valid while only returning %d valid deals in publish deal message %s", outIdx, len(dealIDs), publishCid)
+	}
 	return dealIDs[dealIdx], wmsg.TipSet, nil
 }
 func (c *ChainDealManager) CheckDealEquality(ctx context.Context, tok ctypes.TipSetKey, p1, p2 market.DealProposal) (bool, error) {
@@ -180,7 +183,7 @@ func (c *ChainDealManager) CheckDealEquality(ctx context.Context, tok ctypes.Tip
 	return p1.PieceCID.Equals(p2.PieceCID) &&
 		p1.PieceSize == p2.PieceSize &&
 		p1.VerifiedDeal == p2.VerifiedDeal &&
-		p1.Label == p2.Label &&
+		p1.Label.Equals(p2.Label) &&
 		p1.StartEpoch == p2.StartEpoch &&
 		p1.EndEpoch == p2.EndEpoch &&
 		p1.StoragePricePerEpoch.Equals(p2.StoragePricePerEpoch) &&

@@ -9,9 +9,11 @@
   * [BoostDagstoreInitializeAll](#boostdagstoreinitializeall)
   * [BoostDagstoreInitializeShard](#boostdagstoreinitializeshard)
   * [BoostDagstoreListShards](#boostdagstorelistshards)
+  * [BoostDagstorePiecesContainingMultihash](#boostdagstorepiecescontainingmultihash)
   * [BoostDagstoreRecoverShard](#boostdagstorerecovershard)
   * [BoostDagstoreRegisterShard](#boostdagstoreregistershard)
   * [BoostDeal](#boostdeal)
+  * [BoostDealBySignedProposalCid](#boostdealbysignedproposalcid)
   * [BoostDummyDeal](#boostdummydeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
   * [BoostOfflineDealWithData](#boostofflinedealwithdata)
@@ -65,6 +67,7 @@
   * [NetPeers](#netpeers)
 * [Pieces](#pieces)
   * [PiecesGetCIDInfo](#piecesgetcidinfo)
+  * [PiecesGetMaxOffset](#piecesgetmaxoffset)
   * [PiecesGetPieceInfo](#piecesgetpieceinfo)
   * [PiecesListCidInfos](#pieceslistcidinfos)
   * [PiecesListPieces](#pieceslistpieces)
@@ -205,6 +208,27 @@ Response:
 ]
 ```
 
+### BoostDagstorePiecesContainingMultihash
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "Bw=="
+]
+```
+
+Response:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
 ### BoostDagstoreRecoverShard
 
 
@@ -259,7 +283,72 @@ Response:
       "VerifiedDeal": true,
       "Client": "f01234",
       "Provider": "f01234",
-      "Label": "string value",
+      "Label": "",
+      "StartEpoch": 10101,
+      "EndEpoch": 10101,
+      "StoragePricePerEpoch": "0",
+      "ProviderCollateral": "0",
+      "ClientCollateral": "0"
+    },
+    "ClientSignature": {
+      "Type": 2,
+      "Data": "Ynl0ZSBhcnJheQ=="
+    }
+  },
+  "IsOffline": true,
+  "ClientPeerID": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+  "DealDataRoot": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "InboundFilePath": "string value",
+  "Transfer": {
+    "Type": "string value",
+    "ClientID": "string value",
+    "Params": "Ynl0ZSBhcnJheQ==",
+    "Size": 42
+  },
+  "ChainDealID": 5432,
+  "PublishCID": null,
+  "SectorID": 9,
+  "Offset": 1032,
+  "Length": 1032,
+  "Checkpoint": 1,
+  "CheckpointAt": "0001-01-01T00:00:00Z",
+  "Err": "string value",
+  "Retry": "auto",
+  "NBytesReceived": 9
+}
+```
+
+### BoostDealBySignedProposalCid
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
+Response:
+```json
+{
+  "DealUuid": "07070707-0707-0707-0707-070707070707",
+  "CreatedAt": "0001-01-01T00:00:00Z",
+  "ClientDealProposal": {
+    "Proposal": {
+      "PieceCID": {
+        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+      },
+      "PieceSize": 1032,
+      "VerifiedDeal": true,
+      "Client": "f01234",
+      "Provider": "f01234",
+      "Label": "",
       "StartEpoch": 10101,
       "EndEpoch": 10101,
       "StoragePricePerEpoch": "0",
@@ -316,7 +405,7 @@ Inputs:
         "VerifiedDeal": true,
         "Client": "f01234",
         "Provider": "f01234",
-        "Label": "string value",
+        "Label": "",
         "StartEpoch": 10101,
         "EndEpoch": 10101,
         "StoragePricePerEpoch": "0",
@@ -779,7 +868,7 @@ Response:
       "VerifiedDeal": true,
       "Client": "f01234",
       "Provider": "f01234",
-      "Label": "string value",
+      "Label": "",
       "StartEpoch": 10101,
       "EndEpoch": 10101,
       "StoragePricePerEpoch": "0",
@@ -1265,6 +1354,22 @@ Response:
   ]
 }
 ```
+
+### PiecesGetMaxOffset
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
+Response: `42`
 
 ### PiecesGetPieceInfo
 

@@ -2,6 +2,7 @@ package indexprovider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/filecoin-project/boost/piecemeta"
 	"github.com/filecoin-project/lotus/node/repo"
@@ -28,6 +29,11 @@ var log = logging.Logger("index-provider-wrapper")
 //var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
+<<<<<<< HEAD
+=======
+	cfg         lotus_config.DAGStoreConfig
+	enabled     bool
+>>>>>>> main
 	dealsDB     *db.DealsDB
 	legacyProv  lotus_storagemarket.StorageProvider
 	prov        provider.Interface
@@ -43,16 +49,30 @@ func NewWrapper() func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
 		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface,
 		meshCreator idxprov.MeshCreator) *Wrapper {
 
+		_, isDisabled := prov.(*DisabledIndexProvider)
 		return &Wrapper{
 			dealsDB:     dealsDB,
 			legacyProv:  legacyProv,
 			prov:        prov,
 			meshCreator: meshCreator,
+<<<<<<< HEAD
+=======
+			cfg:         cfg,
+			enabled:     !isDisabled,
+>>>>>>> main
 		}
 	}
 }
 
+func (w *Wrapper) Enabled() bool {
+	return w.enabled
+}
+
 func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
+	if !w.enabled {
+		return errors.New("cannot announce all deals: index provider is disabled")
+	}
+
 	log.Info("will announce all Markets deals to Indexer")
 	err := w.legacyProv.AnnounceAllDealsToIndexer(ctx)
 	if err != nil {
@@ -133,6 +153,10 @@ func (w *Wrapper) Start(ctx context.Context) {
 }
 
 func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDealState) (cid.Cid, error) {
+	if !w.enabled {
+		return cid.Undef, errors.New("cannot announce deal: index provider is disabled")
+	}
+
 	// Announce deal to network Indexer
 	fm := metadata.New(&metadata.GraphsyncFilecoinV1{
 		PieceCID:      pds.ClientDealProposal.Proposal.PieceCID,
