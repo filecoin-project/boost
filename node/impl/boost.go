@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/multiformats/go-multihash"
 	"net/http"
 	"sort"
 
@@ -182,6 +183,28 @@ func (sm *BoostAPI) BoostDagstoreListShards(ctx context.Context) ([]api.Dagstore
 	})
 
 	return ret, nil
+}
+
+func (sm *BoostAPI) BoostDagstorePiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
+	if sm.DAGStore == nil {
+		return nil, fmt.Errorf("dagstore not available on this node")
+	}
+
+	ks, err := sm.DAGStore.ShardsContainingMultihash(ctx, mh)
+	if err != nil {
+		return nil, fmt.Errorf("getting pieces containing multihash %s from DAG store: %w", mh, err)
+	}
+
+	pieceCids := make([]cid.Cid, 0, len(ks))
+	for _, k := range ks {
+		pieceCid, err := cid.Parse(k.String())
+		if err != nil {
+			return nil, fmt.Errorf("parsing DAG store shard key '%s' into cid: %w", k, err)
+		}
+		pieceCids = append(pieceCids, pieceCid)
+	}
+
+	return pieceCids, nil
 }
 
 func (sm *BoostAPI) BoostDagstoreInitializeAll(ctx context.Context, params api.DagstoreInitializeAllParams) (<-chan api.DagstoreInitializeAllEvent, error) {

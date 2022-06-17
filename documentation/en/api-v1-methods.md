@@ -9,6 +9,7 @@
   * [BoostDagstoreInitializeAll](#boostdagstoreinitializeall)
   * [BoostDagstoreInitializeShard](#boostdagstoreinitializeshard)
   * [BoostDagstoreListShards](#boostdagstorelistshards)
+  * [BoostDagstorePiecesContainingMultihash](#boostdagstorepiecescontainingmultihash)
   * [BoostDagstoreRecoverShard](#boostdagstorerecovershard)
   * [BoostDagstoreRegisterShard](#boostdagstoreregistershard)
   * [BoostDeal](#boostdeal)
@@ -66,6 +67,7 @@
   * [NetPeers](#netpeers)
 * [Pieces](#pieces)
   * [PiecesGetCIDInfo](#piecesgetcidinfo)
+  * [PiecesGetMaxOffset](#piecesgetmaxoffset)
   * [PiecesGetPieceInfo](#piecesgetpieceinfo)
   * [PiecesListCidInfos](#pieceslistcidinfos)
   * [PiecesListPieces](#pieceslistpieces)
@@ -202,6 +204,27 @@ Response:
     "Key": "baga6ea4seaqecmtz7iak33dsfshi627abz4i4665dfuzr3qfs4bmad6dx3iigdq",
     "State": "ShardStateAvailable",
     "Error": "\u003cerror\u003e"
+  }
+]
+```
+
+### BoostDagstorePiecesContainingMultihash
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "Bw=="
+]
+```
+
+Response:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   }
 ]
 ```
@@ -1331,6 +1354,22 @@ Response:
   ]
 }
 ```
+
+### PiecesGetMaxOffset
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
+Response: `42`
 
 ### PiecesGetPieceInfo
 
