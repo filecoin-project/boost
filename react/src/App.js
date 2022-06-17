@@ -17,11 +17,8 @@ import {Epoch} from "./Epoch";
 import {LegacyDealDetail} from "./LegacyDealDetail"
 import {SettingsPage} from "./Settings";
 import {Banner} from "./Banner";
-<<<<<<< HEAD
 import {PieceMetaDetail, PieceMetaPage} from "./PieceMeta";
-=======
 import {ProposalLogsPage} from "./ProposalLogs";
->>>>>>> main
 
 function App(props) {
     return (

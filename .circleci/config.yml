@@ -1,11 +1,11 @@
 version: 2.1
 orbs:
-  go: gotest/tools@0.0.13
+  go: gotest/tools@0.0.14
 
 executors:
   golang:
     docker:
-      - image: cimg/go:1.17.11
+      - image: cimg/go:1.18.3
     resource_class: 2xlarge
   ubuntu:
     docker:

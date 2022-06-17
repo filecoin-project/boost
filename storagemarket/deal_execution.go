@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/filecoin-project/boost/piecemeta"
 	"io"
 	"os"
 	"time"
 
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 
+	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -624,7 +624,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	pc := deal.ClientDealProposal.Proposal.PieceCID
 
 	// add deal to piece metadata store
-	if err := p.pieceMeta.AddDealForPiece(pc, piecemeta.DealInfo{
+	if err := p.pieceMeta.AddDealForPiece(pc, model.DealInfo{
 		DealUuid:    deal.DealUuid,
 		ChainDealID: deal.ChainDealID,
 		SectorID:    deal.SectorID,

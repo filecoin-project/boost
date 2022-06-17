@@ -3,6 +3,8 @@ package modules
 import (
 	"context"
 	"fmt"
+
+	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/filecoin-project/boost/piecemeta"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/shard"
@@ -39,7 +41,7 @@ func (pw *boostPieceStoreWrapper) OnReady(ready shared.ReadyFunc) {
 }
 
 func (pw *boostPieceStoreWrapper) AddDealForPiece(pieceCID cid.Cid, dealInfo piecestore.DealInfo) error {
-	di := piecemeta.DealInfo{
+	di := model.DealInfo{
 		DealUuid:    uuid.New(),
 		ChainDealID: dealInfo.DealID,
 		SectorID:    dealInfo.SectorID,

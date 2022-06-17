@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/filecoin-project/boost/piecemeta"
 	"github.com/filecoin-project/lotus/node/repo"
 	"go.uber.org/fx"
@@ -20,6 +21,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	provider "github.com/filecoin-project/index-provider"
+	lotus_config "github.com/filecoin-project/lotus/node/config"
 	"github.com/ipfs/go-cid"
 )
 
@@ -29,11 +31,8 @@ var log = logging.Logger("index-provider-wrapper")
 //var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
-<<<<<<< HEAD
-=======
 	cfg         lotus_config.DAGStoreConfig
 	enabled     bool
->>>>>>> main
 	dealsDB     *db.DealsDB
 	legacyProv  lotus_storagemarket.StorageProvider
 	prov        provider.Interface
@@ -55,11 +54,8 @@ func NewWrapper() func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
 			legacyProv:  legacyProv,
 			prov:        prov,
 			meshCreator: meshCreator,
-<<<<<<< HEAD
-=======
-			cfg:         cfg,
-			enabled:     !isDisabled,
->>>>>>> main
+			//cfg:         cfg,
+			enabled: !isDisabled,
 		}
 	}
 }
