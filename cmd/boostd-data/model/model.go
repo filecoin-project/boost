@@ -8,6 +8,12 @@ import (
 	"github.com/ipfs/go-cid"
 )
 
+// DealInfo is information about a single deal for a given piece
+//                      PieceOffset
+//                      v
+// Sector        [..........................]
+// Piece          ......[            ]......
+// CAR            ......[      ]............
 type DealInfo struct {
 	DealUuid    uuid.UUID           `json:"deal_uuid"`
 	ChainDealID abi.DealID          `json:"chain_deal_id"`

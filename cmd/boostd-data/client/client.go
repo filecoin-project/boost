@@ -46,7 +46,7 @@ func (s *Store) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
 	return resp, nil
 }
 
-func (s *Store) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
+func (s *Store) PiecesContaining(m mh.Multihash) ([]cid.Cid, error) {
 	var resp []cid.Cid
 	err := s.client.Call(&resp, "boostddata_piecesContainingMultihash", m)
 	if err != nil {

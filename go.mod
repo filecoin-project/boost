@@ -14,11 +14,13 @@ require (
 	github.com/alecthomas/jsonschema v0.0.0-20200530073317-71f438968921
 	github.com/buger/goterm v1.0.3
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
+	github.com/containerd/containerd v1.6.6 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/go-units v0.4.0
 	github.com/dustin/go-humanize v1.0.0
 	github.com/etclabscore/go-openrpc-reflect v0.0.36
 	github.com/fatih/color v1.13.0
+	github.com/filecoin-project/boost/cmd/boostd-data v0.0.0-00010101000000-000000000000
 	github.com/filecoin-project/dagstore v0.5.2
 	github.com/filecoin-project/go-address v0.0.6
 	github.com/filecoin-project/go-bitfield v0.2.4
@@ -32,7 +34,7 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.1.3
+	github.com/filecoin-project/go-state-types v0.1.7
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/index-provider v0.7.0
 	// lotus boost/main branch
@@ -43,14 +45,14 @@ require (
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
-	github.com/gorilla/mux v1.7.4
-	github.com/graph-gophers/graphql-go v1.2.0
+	github.com/gorilla/mux v1.8.0
+	github.com/graph-gophers/graphql-go v1.3.0
 	github.com/graph-gophers/graphql-transport-ws v0.0.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-blockservice v0.2.1
-	github.com/ipfs/go-cid v0.1.0
-	github.com/ipfs/go-cidutil v0.0.2
+	github.com/ipfs/go-cid v0.2.0
+	github.com/ipfs/go-cidutil v0.1.0
 	github.com/ipfs/go-datastore v0.5.1
 	github.com/ipfs/go-graphsync v0.13.1
 	github.com/ipfs/go-ipfs-blockstore v1.1.2

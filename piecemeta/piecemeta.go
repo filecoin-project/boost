@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/filecoin-project/boost/cmd/boostd-data/client"
+	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/filecoin-project/boost/cmd/boostd-data/svc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
@@ -16,6 +17,7 @@ import (
 	"github.com/ipld/go-car/v2"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
+	"github.com/ipld/go-car/v2/index"
 	carindex "github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
 )
@@ -32,12 +34,12 @@ type Sealer interface {
 }
 
 type Store interface {
-	AddDealForPiece(pieceCid cid.Cid, dealInfo DealInfo) error
-	AddIndex(pieceCid cid.Cid, itidx carindex.IterableIndex) error
-	IsIndexed(pieceCid cid.Cid) bool
-	GetIndex(pieceCid cid.Cid) (carindex.IterableIndex, error)
+	AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error
+	AddIndex(pieceCid cid.Cid, records []model.Record) error
+	IsIndexed(pieceCid cid.Cid) (bool, error)
+	GetIndex(pieceCid cid.Cid) ([]index.Record, error)
 	GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error)
-	GetPieceDeals(pieceCid cid.Cid) ([]DealInfo, error)
+	GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error)
 	PiecesContaining(m mh.Multihash) ([]cid.Cid, error)
 
 	//Delete(pieceCid cid.Cid) error
@@ -49,42 +51,23 @@ type PieceMeta struct {
 	sealer Sealer
 }
 
-// DealInfo is information about a single deal for a given piece
-//                      PieceOffset
-//                      v
-// Sector        [..........................]
-// Piece          ......[            ]......
-// CAR            ......[      ]............
-type DealInfo struct {
-	DealUuid    uuid.UUID
-	ChainDealID abi.DealID
-	SectorID    abi.SectorNumber
-	PieceOffset abi.PaddedPieceSize
-	PieceLength abi.PaddedPieceSize
-	// The size of the CAR file without zero-padding.
-	// This value may be zero if the size is unknown.
-	CarLength uint64
-
-	// If we don't have CarLength, we have to iterate over all offsets, get the largest offset and sum it with length.
-}
-
 func NewPieceMeta() *PieceMeta {
-	addr, cleanup, err := svc.Setup("ldb")
+	addr, _, err := svc.Setup("ldb")
 	if err != nil {
 		panic(err)
 	}
 
 	cl, err := client.NewStore("http://" + addr)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
-	return &PieceMeta{}
+	return &PieceMeta{store: cl}
 }
 
 // Get the list of deals (and the sector the data is in) for a particular piece
-func (ps *PieceMeta) GetPieceDeals(pieceCid cid.Cid) ([]DealInfo, error) {
-	deals, err := ps.dealStore.List(pieceCid)
+func (ps *PieceMeta) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
+	deals, err := ps.GetPieceDeals(pieceCid)
 	if err != nil {
 		return nil, fmt.Errorf("listing deals for piece %s: %w", pieceCid, err)
 	}
@@ -96,7 +79,7 @@ func (ps *PieceMeta) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, err
 	return 0, fmt.Errorf("GetOffset not implemented")
 }
 
-func (ps *PieceMeta) AddDealForPiece(pieceCid cid.Cid, dealInfo DealInfo) error {
+func (ps *PieceMeta) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	// TODO: pass dealInfo to addIndexForPiece
 
 	// Perform indexing of piece
@@ -105,7 +88,7 @@ func (ps *PieceMeta) AddDealForPiece(pieceCid cid.Cid, dealInfo DealInfo) error 
 	}
 
 	// Add deal to list of deals for this piece
-	if err := ps.dealStore.Add(pieceCid, dealInfo); err != nil {
+	if err := ps.store.AddDealForPiece(pieceCid, dealInfo); err != nil {
 		return fmt.Errorf("saving deal %s to store: %w", dealInfo.DealUuid, err)
 	}
 
@@ -114,7 +97,12 @@ func (ps *PieceMeta) AddDealForPiece(pieceCid cid.Cid, dealInfo DealInfo) error 
 
 func (ps *PieceMeta) addIndexForPiece(pieceCid cid.Cid) error {
 	// Check if the indexes have already been added
-	if ps.carIndex.IsIndexed(pieceCid) && ps.mhToPieceIndex.IsIndexed(pieceCid) {
+	isIndexed, err := ps.store.IsIndexed(pieceCid)
+	if err != nil {
+		return err
+	}
+
+	if isIndexed {
 		return nil
 	}
 
@@ -135,38 +123,45 @@ func (ps *PieceMeta) addIndexForPiece(pieceCid cid.Cid) error {
 		return fmt.Errorf("index is not iterable for piece %s", pieceCid)
 	}
 
-	if !ps.carIndex.IsIndexed(pieceCid) {
-		// Add mh => offset index to store
-		if err := ps.carIndex.Add(pieceCid, itidx); err != nil {
-			return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
-		}
-	}
+	_ = itidx
 
-	if !ps.mhToPieceIndex.IsIndexed(pieceCid) {
-		// Add mh => piece index to store
-		if err := ps.mhToPieceIndex.Add(pieceCid, itidx); err != nil {
-			return fmt.Errorf("adding cid index for piece %s: %w", pieceCid, err)
-		}
-	}
+	//isIndexed, err := ps.store.IsIndexed(pieceCid)
+	//if err != nil {
+	//return err
+	//}
+
+	//if !isIndexed {
+	//// Add mh => offset index to store
+	//if err := ps.carIndex.Add(pieceCid, itidx); err != nil {
+	//return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
+	//}
+	//}
+
+	//if !ps.mhToPieceIndex.IsIndexed(pieceCid) {
+	//// Add mh => piece index to store
+	//if err := ps.mhToPieceIndex.Add(pieceCid, itidx); err != nil {
+	//return fmt.Errorf("adding cid index for piece %s: %w", pieceCid, err)
+	//}
+	//}
 
 	return nil
 }
 
 func (ps *PieceMeta) DeleteDealForPiece(pieceCid cid.Cid, dealUuid uuid.UUID) error {
 	// Delete deal from list of deals for this piece
-	wasLast, err := ps.dealStore.Delete(pieceCid, dealUuid)
-	if err != nil {
-		return fmt.Errorf("deleting deal %s from store: %w", dealUuid, err)
-	}
+	//wasLast, err := ps.dealStore.Delete(pieceCid, dealUuid)
+	//if err != nil {
+	//return fmt.Errorf("deleting deal %s from store: %w", dealUuid, err)
+	//}
 
-	if !wasLast {
-		return nil
-	}
+	//if !wasLast {
+	//return nil
+	//}
 
-	// Remove piece indexes
-	if err := ps.deleteIndexForPiece(pieceCid); err != nil {
-		return fmt.Errorf("deleting index for piece %s: %w", pieceCid, err)
-	}
+	//// Remove piece indexes
+	//if err := ps.deleteIndexForPiece(pieceCid); err != nil {
+	//return fmt.Errorf("deleting index for piece %s: %w", pieceCid, err)
+	//}
 
 	return nil
 }
@@ -175,16 +170,17 @@ func (ps *PieceMeta) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
 	// TODO: Maybe mark for GC instead of deleting immediately
 
 	// Delete mh => offset index from store
-	err := ps.carIndex.Delete(pieceCid)
-	if err != nil {
-		err = fmt.Errorf("deleting CAR index for piece %s: %w", pieceCid, err)
-	}
+	//err := ps.carIndex.Delete(pieceCid)
+	//if err != nil {
+	//err = fmt.Errorf("deleting CAR index for piece %s: %w", pieceCid, err)
+	//}
 
-	// Delete mh => piece index from store
-	if mherr := ps.mhToPieceIndex.Delete(pieceCid); mherr != nil {
-		err = multierror.Append(fmt.Errorf("deleting cid index for piece %s: %w", pieceCid, mherr))
-	}
-	return err
+	//// Delete mh => piece index from store
+	//if mherr := ps.mhToPieceIndex.Delete(pieceCid); mherr != nil {
+	//err = multierror.Append(fmt.Errorf("deleting cid index for piece %s: %w", pieceCid, mherr))
+	//}
+	//return err
+	return nil
 }
 
 // Used internally, and also by HTTP retrieval
@@ -220,11 +216,12 @@ func (ps *PieceMeta) GetPieceReader(pieceCid cid.Cid) (SectionReader, error) {
 
 // Get all pieces that contain a multihash (used when retrieving by payload CID)
 func (ps *PieceMeta) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
-	return ps.mhToPieceIndex.PiecesContaining(m)
+	return ps.store.PiecesContaining(m)
 }
 
 func (ps *PieceMeta) GetIterableIndex(pieceCid cid.Cid) (carindex.IterableIndex, error) {
-	return ps.carIndex.Index(pieceCid)
+	return nil, nil
+	//return ps.carIndex.Index(pieceCid)
 }
 
 // Get a block (used by Bitswap retrieval)
