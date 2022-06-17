@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/filecoin-project/boost/db/fielddef"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-state-types/builtin/v8/market"
@@ -35,7 +36,7 @@ func init() {
 type dealAccessor struct {
 	db   *sql.DB
 	deal *types.ProviderDealState
-	def  map[string]fieldDefinition
+	def  map[string]fielddef.FieldDefinition
 }
 
 func (d *DealsDB) newDealDef(deal *types.ProviderDealState) *dealAccessor {
@@ -46,39 +47,39 @@ func newDealAccessor(db *sql.DB, deal *types.ProviderDealState) *dealAccessor {
 	return &dealAccessor{
 		db:   db,
 		deal: deal,
-		def: map[string]fieldDefinition{
-			"ID":                    &fieldDef{f: &deal.DealUuid},
-			"CreatedAt":             &fieldDef{f: &deal.CreatedAt},
-			"DealProposalSignature": &sigFieldDef{f: &deal.ClientDealProposal.ClientSignature},
-			"PieceCID":              &cidFieldDef{f: &deal.ClientDealProposal.Proposal.PieceCID},
-			"PieceSize":             &fieldDef{f: &deal.ClientDealProposal.Proposal.PieceSize},
-			"VerifiedDeal":          &fieldDef{f: &deal.ClientDealProposal.Proposal.VerifiedDeal},
-			"IsOffline":             &fieldDef{f: &deal.IsOffline},
-			"ClientAddress":         &addrFieldDef{f: &deal.ClientDealProposal.Proposal.Client},
-			"ProviderAddress":       &addrFieldDef{f: &deal.ClientDealProposal.Proposal.Provider},
-			"Label":                 &labelFieldDef{f: &deal.ClientDealProposal.Proposal.Label},
-			"StartEpoch":            &fieldDef{f: &deal.ClientDealProposal.Proposal.StartEpoch},
-			"EndEpoch":              &fieldDef{f: &deal.ClientDealProposal.Proposal.EndEpoch},
-			"StoragePricePerEpoch":  &bigIntFieldDef{f: &deal.ClientDealProposal.Proposal.StoragePricePerEpoch},
-			"ProviderCollateral":    &bigIntFieldDef{f: &deal.ClientDealProposal.Proposal.ProviderCollateral},
-			"ClientCollateral":      &bigIntFieldDef{f: &deal.ClientDealProposal.Proposal.ClientCollateral},
-			"ClientPeerID":          &peerIDFieldDef{f: &deal.ClientPeerID},
-			"DealDataRoot":          &cidFieldDef{f: &deal.DealDataRoot},
-			"InboundFilePath":       &fieldDef{f: &deal.InboundFilePath},
-			"TransferType":          &fieldDef{f: &deal.Transfer.Type},
-			"TransferParams":        &fieldDef{f: &deal.Transfer.Params},
-			"TransferSize":          &fieldDef{f: &deal.Transfer.Size},
-			"ChainDealID":           &fieldDef{f: &deal.ChainDealID},
-			"PublishCID":            &cidPtrFieldDef{f: &deal.PublishCID},
-			"SectorID":              &fieldDef{f: &deal.SectorID},
-			"Offset":                &fieldDef{f: &deal.Offset},
-			"Length":                &fieldDef{f: &deal.Length},
-			"Checkpoint":            &ckptFieldDef{f: &deal.Checkpoint},
-			"CheckpointAt":          &fieldDef{f: &deal.CheckpointAt},
-			"Error":                 &fieldDef{f: &deal.Err},
-			"Retry":                 &fieldDef{f: &deal.Retry},
+		def: map[string]fielddef.FieldDefinition{
+			"ID":                    &fielddef.FieldDef{F: &deal.DealUuid},
+			"CreatedAt":             &fielddef.FieldDef{F: &deal.CreatedAt},
+			"DealProposalSignature": &fielddef.SigFieldDef{F: &deal.ClientDealProposal.ClientSignature},
+			"PieceCID":              &fielddef.CidFieldDef{F: &deal.ClientDealProposal.Proposal.PieceCID},
+			"PieceSize":             &fielddef.FieldDef{F: &deal.ClientDealProposal.Proposal.PieceSize},
+			"VerifiedDeal":          &fielddef.FieldDef{F: &deal.ClientDealProposal.Proposal.VerifiedDeal},
+			"IsOffline":             &fielddef.FieldDef{F: &deal.IsOffline},
+			"ClientAddress":         &fielddef.AddrFieldDef{F: &deal.ClientDealProposal.Proposal.Client},
+			"ProviderAddress":       &fielddef.AddrFieldDef{F: &deal.ClientDealProposal.Proposal.Provider},
+			"Label":                 &fielddef.LabelFieldDef{F: &deal.ClientDealProposal.Proposal.Label},
+			"StartEpoch":            &fielddef.FieldDef{F: &deal.ClientDealProposal.Proposal.StartEpoch},
+			"EndEpoch":              &fielddef.FieldDef{F: &deal.ClientDealProposal.Proposal.EndEpoch},
+			"StoragePricePerEpoch":  &fielddef.BigIntFieldDef{F: &deal.ClientDealProposal.Proposal.StoragePricePerEpoch},
+			"ProviderCollateral":    &fielddef.BigIntFieldDef{F: &deal.ClientDealProposal.Proposal.ProviderCollateral},
+			"ClientCollateral":      &fielddef.BigIntFieldDef{F: &deal.ClientDealProposal.Proposal.ClientCollateral},
+			"ClientPeerID":          &fielddef.PeerIDFieldDef{F: &deal.ClientPeerID},
+			"DealDataRoot":          &fielddef.CidFieldDef{F: &deal.DealDataRoot},
+			"InboundFilePath":       &fielddef.FieldDef{F: &deal.InboundFilePath},
+			"TransferType":          &fielddef.FieldDef{F: &deal.Transfer.Type},
+			"TransferParams":        &fielddef.FieldDef{F: &deal.Transfer.Params},
+			"TransferSize":          &fielddef.FieldDef{F: &deal.Transfer.Size},
+			"ChainDealID":           &fielddef.FieldDef{F: &deal.ChainDealID},
+			"PublishCID":            &fielddef.CidPtrFieldDef{F: &deal.PublishCID},
+			"SectorID":              &fielddef.FieldDef{F: &deal.SectorID},
+			"Offset":                &fielddef.FieldDef{F: &deal.Offset},
+			"Length":                &fielddef.FieldDef{F: &deal.Length},
+			"Checkpoint":            &fielddef.CkptFieldDef{F: &deal.Checkpoint},
+			"CheckpointAt":          &fielddef.FieldDef{F: &deal.CheckpointAt},
+			"Error":                 &fielddef.FieldDef{F: &deal.Err},
+			"Retry":                 &fielddef.FieldDef{F: &deal.Retry},
 			// Needed so the deal can be looked up by signed proposal cid
-			"SignedProposalCID": &signedPropFieldDef{prop: deal.ClientDealProposal},
+			"SignedProposalCID": &fielddef.SignedPropFieldDef{Prop: deal.ClientDealProposal},
 		},
 	}
 }
@@ -89,7 +90,7 @@ func (d *dealAccessor) scan(row Scannable) error {
 	for _, name := range dealFields {
 		// Get a pointer to the field that will receive the scanned value
 		fieldDef := d.def[name]
-		dest = append(dest, fieldDef.fieldPtr())
+		dest = append(dest, fieldDef.FieldPtr())
 	}
 
 	// Scan the row into each pointer
@@ -101,7 +102,7 @@ func (d *dealAccessor) scan(row Scannable) error {
 	// For each field
 	for name, fieldDef := range d.def {
 		// Unmarshall the scanned value into deal object
-		err := fieldDef.unmarshall()
+		err := fieldDef.Unmarshall()
 		if err != nil {
 			return fmt.Errorf("unmarshalling db field %s: %s", name, err)
 		}
@@ -119,7 +120,7 @@ func (d *dealAccessor) insert(ctx context.Context) error {
 		placeholders = append(placeholders, "?")
 
 		// Marshall the field into a value that can be stored in the database
-		v, err := fieldDef.marshall()
+		v, err := fieldDef.Marshall()
 		if err != nil {
 			return err
 		}
@@ -148,7 +149,7 @@ func (d *dealAccessor) update(ctx context.Context) error {
 		setNames = append(setNames, name+" = ?")
 
 		// Marshall the field into a value that can be stored in the database
-		v, err := fieldDef.marshall()
+		v, err := fieldDef.Marshall()
 		if err != nil {
 			return err
 		}

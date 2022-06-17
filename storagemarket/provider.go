@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/ipfs/go-cid"
 	"io"
 	"os"
 	"sync"
@@ -14,6 +13,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/sealingpipeline"
@@ -34,6 +34,7 @@ import (
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	"github.com/filecoin-project/lotus/markets/utils"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -329,7 +330,7 @@ func (p *Provider) Start() error {
 	}
 
 	log.Infow("db: performing migrations")
-	err = db.Migrate(p.db)
+	err = migrations.Migrate(p.db)
 	if err != nil {
 		return fmt.Errorf("failed to migrate db: %w", err)
 	}

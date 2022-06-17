@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost/db/fielddef"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -89,23 +90,23 @@ func (p *ProposalLogsDB) List(ctx context.Context, accepted *bool, cursor *time.
 	propsLogs := make([]ProposalLog, 0, sz)
 	for rows.Next() {
 		var propsLog ProposalLog
-		addrFD := &addrFieldDef{f: &propsLog.ClientAddress}
+		addrFD := &fielddef.AddrFieldDef{F: &propsLog.ClientAddress}
 		err := rows.Scan(
 			&propsLog.DealUUID,
 			&propsLog.Accepted,
 			&propsLog.Reason,
 			&propsLog.CreatedAt,
-			addrFD.fieldPtr(),
+			addrFD.FieldPtr(),
 			&propsLog.PieceSize)
 		if err != nil {
 			return nil, fmt.Errorf("getting deal proposal log: %w", err)
 		}
 
-		err = addrFD.unmarshall()
+		err = addrFD.Unmarshall()
 		if err != nil {
-			return nil, fmt.Errorf("unmarshalling client address %s: %w", addrFD.marshalled, err)
+			return nil, fmt.Errorf("unmarshalling client address %s: %w", addrFD.Marshalled, err)
 		}
-		propsLog.ClientAddress = *addrFD.f
+		propsLog.ClientAddress = *addrFD.F
 
 		propsLogs = append(propsLogs, propsLog)
 	}
