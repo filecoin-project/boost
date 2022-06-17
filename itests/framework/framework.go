@@ -33,7 +33,6 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	lbuild "github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
-	"github.com/filecoin-project/lotus/chain/actors/policy"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
@@ -92,17 +91,6 @@ func NewTestFramework(ctx context.Context, t *testing.T) *TestFramework {
 }
 
 func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
-	// enable 8MiB proofs so we can conduct larger transfers.
-	policy.SetSupportedProofTypes(
-		abi.RegisteredSealProof_StackedDrg2KiBV1,
-		abi.RegisteredSealProof_StackedDrg8MiBV1,
-	)
-	t.Cleanup(func() { // reset when done.
-		policy.SetSupportedProofTypes(
-			abi.RegisteredSealProof_StackedDrg2KiBV1,
-		)
-	})
-
 	// Set up a full node and a miner (without markets)
 	var fullNode kit.TestFullNode
 	var miner kit.TestMiner
@@ -754,12 +742,4 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 	require.NoError(t, err)
 
 	return tmpfile
-}
-
-func SetPreCommitChallengeDelay(t *testing.T, delay abi.ChainEpoch) {
-	oldDelay := policy.GetPreCommitChallengeDelay()
-	policy.SetPreCommitChallengeDelay(delay)
-	t.Cleanup(func() {
-		policy.SetPreCommitChallengeDelay(oldDelay)
-	})
 }
