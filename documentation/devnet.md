@@ -42,13 +42,23 @@ make install
 
 3. Start the devnet
 
-This will use the lotus binaries that you built and installed above. So the lotus version must match the version in boost's go.mod 
+The following command will use the lotus binaries that you built and installed above, and especially it will run `lotus`, `lotus-miner` and `lotus-seed`. So the lotus version must match the version in boost's go.mod.
 ```
 cd boost
 ./devnet
 ```
 
-4. Wait for lotus-miner to come up
+The first time you run it, it will install a lot of metadata-related proofs. It will take at least 30 minutes depending on your connection speed. You may need to restart the command multiple times as your terminal will probably timeout before it finishes downloading everything.
+
+You can also use `./devnet &` instead of `./devnet` to run the process in the background - that would prevent you from having to manually restart the command when your terminal times out.
+
+NOTE: 
+The devnet isn't designed to be restartable unfortunately. After it has been successfully run once, you'll have to clear out the previous data before re-running `./devnet`: 
+```
+rm -rf ~/.lotusmarkets && rm -rf ~/.lotus && rm -rf ~/.lotusminer && rm -rf ~/.genesis_sectors
+```
+
+4. Wait for lotus-miner to come up (through the command above)
 
 Unset these variables as they interfere with the `lotus-miner` command.
 ```
@@ -59,7 +69,6 @@ Then repeatedly run this command until it succeeds:
 ```
 lotus-miner auth api-info --perm=admin
 ```
-It should take about a minute for the miner to come up.
 
 5. Get the auth tokens to connect to the lotus daemon and miner:
 ```
