@@ -6,7 +6,7 @@ import (
 
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
+	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

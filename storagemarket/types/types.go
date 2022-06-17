@@ -4,21 +4,20 @@ import (
 	"context"
 	"io"
 
-	"github.com/filecoin-project/go-fil-markets/shared"
-
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
-	market2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/market"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 )
 
 //go:generate cbor-gen-for --map-encoding StorageAsk DealParams Transfer DealResponse DealStatusRequest DealStatusResponse DealStatus
+//go:generate go run github.com/golang/mock/mockgen -destination=mock_types/mocks.go -package=mock_types . PieceAdder,DealPublisher,ChainDealManager
 
 // StorageAsk defines the parameters by which a miner will choose to accept or
 // reject a deal. Note: making a storage deal proposal which matches the miner's
@@ -107,11 +106,11 @@ type PieceAdder interface {
 }
 
 type DealPublisher interface {
-	Publish(ctx context.Context, deal market2.ClientDealProposal) (cid.Cid, error)
+	Publish(ctx context.Context, deal market.ClientDealProposal) (cid.Cid, error)
 }
 
 type ChainDealManager interface {
-	WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market2.DealProposal) (*storagemarket.PublishDealsWaitResult, error)
+	WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market.DealProposal) (*storagemarket.PublishDealsWaitResult, error)
 }
 
 type IndexProvider interface {

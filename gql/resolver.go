@@ -2,6 +2,7 @@ package gql
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -357,8 +358,16 @@ func (dr *dealResolver) IsVerified() bool {
 	return dr.ProviderDealState.ClientDealProposal.Proposal.VerifiedDeal
 }
 
-func (dr *dealResolver) ProposalLabel() string {
-	return dr.ProviderDealState.ClientDealProposal.Proposal.Label
+func (dr *dealResolver) ProposalLabel() (string, error) {
+	l := dr.ProviderDealState.ClientDealProposal.Proposal.Label
+	if l.IsString() {
+		return l.ToString()
+	}
+	bz, err := l.ToBytes()
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bz), nil
 }
 
 func (dr *dealResolver) ClientPeerID() string {

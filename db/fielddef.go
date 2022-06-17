@@ -2,14 +2,15 @@ package db
 
 import (
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/filecoin-project/go-state-types/crypto"
-	"github.com/filecoin-project/specs-actors/actors/builtin/market"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -138,6 +139,75 @@ func (fd *peerIDFieldDef) unmarshall() error {
 	}
 
 	*fd.f = pid
+	return nil
+}
+
+type labelFieldDef struct {
+	marshalled sql.NullString
+	f          *market.DealLabel
+}
+
+func (fd *labelFieldDef) fieldPtr() interface{} {
+	return &fd.marshalled
+}
+
+func (fd *labelFieldDef) marshall() (interface{}, error) {
+	if fd.f == nil {
+		return nil, nil
+	}
+
+	// If the deal label is a string, add a ' character at the beginning
+	if fd.f.IsString() {
+		s, err := fd.f.ToString()
+		if err != nil {
+			return nil, fmt.Errorf("marshalling deal label as string: %w", err)
+		}
+		return "'" + s, nil
+	}
+
+	// The deal label is a byte array, so hex-encode the data and add an 'x' at
+	// the beginning
+	bz, err := fd.f.ToBytes()
+	if err != nil {
+		return nil, fmt.Errorf("marshalling deal label as bytes: %w", err)
+	}
+	return "x" + hex.EncodeToString(bz), nil
+}
+
+func (fd *labelFieldDef) unmarshall() error {
+	if !fd.marshalled.Valid {
+		return nil
+	}
+
+	if fd.marshalled.String == "" || fd.marshalled.String == "'" {
+		*fd.f = market.EmptyDealLabel
+		return nil
+	}
+
+	// If the first character is 'x' it's a hex-encoded byte array
+	if fd.marshalled.String[0] == 'x' {
+		if len(fd.marshalled.String) == 1 {
+			return fmt.Errorf("cannot unmarshall empty string to hex")
+		}
+		bz, err := hex.DecodeString(fd.marshalled.String[1:])
+		if err != nil {
+			return fmt.Errorf("unmarshalling hex string %s into bytes: %w", fd.marshalled.String, err)
+		}
+		l, err := market.NewLabelFromBytes(bz)
+		if err != nil {
+			return fmt.Errorf("unmarshalling '%s' into label: %w", fd.marshalled.String, err)
+		}
+		*fd.f = l
+		return nil
+	}
+
+	// It's a string prefixed by the ' character
+	l, err := market.NewLabelFromString(fd.marshalled.String[1:])
+	if err != nil {
+		return fmt.Errorf("unmarshalling '%s' into label: %w", fd.marshalled.String, err)
+	}
+
+	*fd.f = l
 	return nil
 }
 
