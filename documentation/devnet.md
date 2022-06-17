@@ -42,7 +42,7 @@ make install
 
 3. Start the devnet
 
-The following command will use the lotus binaries that you built and installed above, and especially it will run `lotus-daemon` and `lotus-miner`. So the lotus version must match the version in boost's go.mod.
+The following command will use the lotus binaries that you built and installed above, and especially it will run `lotus`, `lotus-miner` and `lotus-seed`. So the lotus version must match the version in boost's go.mod.
 ```
 cd boost
 ./devnet
