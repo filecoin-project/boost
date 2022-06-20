@@ -72,6 +72,9 @@ CLEAN+=build/.update-modules
 debug: GOFLAGS+=-tags=debug
 debug: build-go
 
+calibnet: GOFLAGS+=-tags=calibnet
+calibnet: build-go
+
 deps: $(BUILD_DEPS)
 .PHONY: deps
 
@@ -107,6 +110,11 @@ boostci: $(BUILD_DEPS)
 .PHONY: boostci
 
 react: check-node-lts
+	npm_config_legacy_peer_deps=yes npm ci --no-audit --prefix react
+	npm run --prefix react build
+.PHONY: react
+
+update-react: check-node-lts
 	npm_config_legacy_peer_deps=yes npm install --no-audit --prefix react
 	npm run --prefix react build
 .PHONY: react
