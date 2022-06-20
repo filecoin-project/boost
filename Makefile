@@ -72,6 +72,9 @@ CLEAN+=build/.update-modules
 debug: GOFLAGS+=-tags=debug
 debug: build-go
 
+calibnet: GOFLAGS+=-tags=calibnet
+calibnet: build-go
+
 deps: $(BUILD_DEPS)
 .PHONY: deps
 
