@@ -81,7 +81,7 @@ func setupCouchbase(t *testing.T) func() {
 			nat.Port("11210"): {{HostIP: "127.0.0.1", HostPort: "11210"}},
 			nat.Port("11211"): {{HostIP: "127.0.0.1", HostPort: "11211"}},
 		},
-	}, nil, "")
+	}, nil, nil, "")
 
 	if err != nil {
 		t.Fatal(err)

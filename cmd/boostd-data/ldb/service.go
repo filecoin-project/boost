@@ -289,3 +289,23 @@ func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 
 	return nil
 }
+
+func (s *Store) IndexedAt(pieceCid cid.Cid) (time.Time, error) {
+	log.Debugw("handle.indexed-at", "pieceCid", pieceCid)
+
+	defer func(now time.Time) {
+		log.Debugw("handled.indexed-at", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
+
+	ctx := context.Background()
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return md.IndexedAt, nil
+}

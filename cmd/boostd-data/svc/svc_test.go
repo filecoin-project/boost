@@ -93,7 +93,7 @@ func TestLdbService(t *testing.T) {
 		t.Fatal("got wrong offset")
 	}
 
-	pcids, err := cl.PiecesContainingMultihash(mhash)
+	pcids, err := cl.PiecesContaining(mhash)
 
 	if len(pcids) != 1 {
 		t.Fatalf("expected len of 1 for pieceCids, got: %d", len(pcids))
@@ -111,6 +111,15 @@ func TestLdbService(t *testing.T) {
 
 	if dis[0] != di {
 		t.Fatal("expected for dealInfos to match")
+	}
+
+	indexed, err := cl.IsIndexed(pieceCid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !indexed {
+		t.Fatal("expected pieceCid to be indexed")
 	}
 
 	log.Debug("sleeping for a while.. running tests..")

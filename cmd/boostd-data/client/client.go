@@ -1,6 +1,8 @@
 package client
 
 import (
+	"time"
+
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/ipfs/go-cid"
@@ -65,12 +67,22 @@ func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 }
 
 func (s *Store) IsIndexed(pieceCid cid.Cid) (bool, error) {
-	var resp bool
-	err := s.client.Call(&resp, "boostddata_isIndexed", pieceCid)
+	var t time.Time
+
+	err := s.client.Call(&t, "boostddata_indexedAt", pieceCid)
 	if err != nil {
 		return false, err
 	}
-	return resp, nil
+	return !t.IsZero(), nil
+}
+
+func (s *Store) IndexedAt(pieceCid cid.Cid) (time.Time, error) {
+	var ts time.Time
+	err := s.client.Call(&ts, "boostddata_indexedAt", pieceCid)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts, nil
 }
 
 func (s *Store) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
