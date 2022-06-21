@@ -58,7 +58,14 @@ var walletNew = &cli.Command{
 			return err
 		}
 
-		fmt.Println(nk.String())
+		if cctx.Bool("json") {
+			out := map[string]interface{}{
+				"address": nk.String(),
+			}
+			cmd.PrintJson(out)
+		} else {
+			fmt.Println(nk.String())
+		}
 
 		return nil
 	},
@@ -103,15 +110,30 @@ var walletList = &cli.Command{
 		// Assume an error means no default key is set
 		def, _ := n.Wallet.GetDefault()
 
-		tw := tablewriter.New(
-			tablewriter.Col("Address"),
-			tablewriter.Col("ID"),
-			tablewriter.Col("Balance"),
-			tablewriter.Col("Market(Avail)"),
-			tablewriter.Col("Market(Locked)"),
-			tablewriter.Col("Nonce"),
-			tablewriter.Col("Default"),
-			tablewriter.NewLineCol("Error"))
+		// Map Keys. Corresponds to the standard tablewriter output
+		addressKey := "Address"
+		idKey := "ID"
+		balanceKey := "Balance"
+		marketKey := "market" // for json only
+		marketAvailKey := "Market(Avail)"
+		marketLockedKey := "Market(Locked)"
+		nonceKey := "Nonce"
+		defaultKey := "Default"
+		errorKey := "Error"
+
+		// One-to-one mapping between tablewriter keys and JSON keys
+		tableKeysToJsonKeys := map[string]string{
+			addressKey: strings.ToLower(addressKey),
+			idKey:      strings.ToLower(idKey),
+			balanceKey: strings.ToLower(balanceKey),
+			marketKey:  marketKey, // only in JSON
+			nonceKey:   strings.ToLower(nonceKey),
+			defaultKey: strings.ToLower(defaultKey),
+			errorKey:   strings.ToLower(errorKey),
+		}
+
+		// List of Maps whose keys are defined above. One row = one list element = one wallet
+		var wallets []map[string]interface{}
 
 		for _, addr := range addrs {
 			if cctx.Bool("addr-only") {
@@ -120,10 +142,11 @@ var walletList = &cli.Command{
 				a, err := api.StateGetActor(ctx, addr, types.EmptyTSK)
 				if err != nil {
 					if !strings.Contains(err.Error(), "actor not found") {
-						tw.Write(map[string]interface{}{
-							"Address": addr,
-							"Error":   err,
-						})
+						wallet := map[string]interface{}{
+							addressKey: addr,
+							errorKey:   err,
+						}
+						wallets = append(wallets, wallet)
 						continue
 					}
 
@@ -132,36 +155,88 @@ var walletList = &cli.Command{
 					}
 				}
 
-				row := map[string]interface{}{
-					"Address": addr,
-					"Balance": types.FIL(a.Balance),
-					"Nonce":   a.Nonce,
+				wallet := map[string]interface{}{
+					addressKey: addr,
+					balanceKey: types.FIL(a.Balance),
+					nonceKey:   a.Nonce,
 				}
-				if addr == def {
-					row["Default"] = "X"
+
+				if cctx.Bool("json") {
+					if addr == def {
+						wallet[defaultKey] = true
+					} else {
+						wallet[defaultKey] = false
+					}
+				} else {
+					if addr == def {
+						wallet[defaultKey] = "X"
+					}
 				}
 
 				if cctx.Bool("id") {
 					id, err := api.StateLookupID(ctx, addr, types.EmptyTSK)
 					if err != nil {
-						row["ID"] = "n/a"
+						wallet[idKey] = "n/a"
 					} else {
-						row["ID"] = id
+						wallet[idKey] = id
 					}
 				}
 
 				mbal, err := api.StateMarketBalance(ctx, addr, types.EmptyTSK)
 				if err == nil {
-					row["Market(Avail)"] = types.FIL(types.BigSub(mbal.Escrow, mbal.Locked))
-					row["Market(Locked)"] = types.FIL(mbal.Locked)
+					marketAvailValue := types.FIL(types.BigSub(mbal.Escrow, mbal.Locked))
+					marketLockedValue := types.FIL(mbal.Locked)
+					// structure is different for these particular keys so we have to distinguish the cases here
+					if cctx.Bool("json") {
+						wallet[marketKey] = map[string]interface{}{
+							"available": marketAvailValue,
+							"locked":    marketLockedValue,
+						}
+					} else {
+						wallet[marketAvailKey] = marketAvailValue
+						wallet[marketLockedKey] = marketLockedValue
+					}
 				}
-
-				tw.Write(row)
+				wallets = append(wallets, wallet)
 			}
 		}
 
 		if !cctx.Bool("addr-only") {
-			return tw.Flush(os.Stdout)
+
+			if cctx.Bool("json") {
+				// get a new list of wallets with json keys instead of tablewriter keys
+				var jsonWallets []map[string]interface{}
+				for _, wallet := range wallets {
+					jsonWallet := make(map[string]interface{})
+					for k, v := range wallet {
+						jsonWallet[tableKeysToJsonKeys[k]] = v
+					}
+					jsonWallets = append(jsonWallets, jsonWallet)
+				}
+				// then return this!
+				return cmd.PrintJson(jsonWallets)
+			} else {
+				// Init the tablewriter's columns
+				tw := tablewriter.New(
+					tablewriter.Col(addressKey),
+					tablewriter.Col(idKey),
+					tablewriter.Col(balanceKey),
+					tablewriter.Col(marketAvailKey),
+					tablewriter.Col(marketLockedKey),
+					tablewriter.Col(nonceKey),
+					tablewriter.Col(defaultKey),
+					tablewriter.NewLineCol(errorKey))
+				// populate it with content
+				for _, wallet := range wallets {
+					for k, v := range wallet {
+						tw.Write(map[string]interface{}{
+							k: v,
+						})
+					}
+				}
+				// return the corresponding string
+				return tw.Flush(os.Stdout)
+			}
 		}
 
 		return nil
@@ -204,9 +279,25 @@ var walletBalance = &cli.Command{
 		}
 
 		if balance.Equals(types.NewInt(0)) {
-			afmt.Printf("%s (warning: may display 0 if chain sync in progress)\n", types.FIL(balance))
+			warningMessage := "may display 0 if chain sync in progress"
+			if cctx.Bool("json") {
+				out := map[string]interface{}{
+					"balance": types.FIL(balance),
+					"warning": warningMessage,
+				}
+				return cmd.PrintJson(out)
+			} else {
+				afmt.Printf(fmt.Sprintf("%s (warning: %s)\n", types.FIL(balance), warningMessage))
+			}
 		} else {
-			afmt.Printf("%s\n", types.FIL(balance))
+			if cctx.Bool("json") {
+				out := map[string]interface{}{
+					"balance": types.FIL(balance),
+				}
+				return cmd.PrintJson(out)
+			} else {
+				afmt.Printf("%s\n", types.FIL(balance))
+			}
 		}
 
 		return nil
@@ -228,7 +319,8 @@ var walletExport = &cli.Command{
 		afmt := NewAppFmt(cctx.App)
 
 		if !cctx.Args().Present() {
-			return fmt.Errorf("must specify key to export")
+			err := fmt.Errorf("must specify key to export")
+			return err
 		}
 
 		addr, err := address.NewFromString(cctx.Args().First())
@@ -246,7 +338,14 @@ var walletExport = &cli.Command{
 			return err
 		}
 
-		afmt.Println(hex.EncodeToString(b))
+		if cctx.Bool("json") {
+			out := map[string]interface{}{
+				"key": hex.EncodeToString(b),
+			}
+			return cmd.PrintJson(out)
+		} else {
+			afmt.Println(hex.EncodeToString(b))
+		}
 		return nil
 	},
 }
@@ -343,7 +442,14 @@ var walletImport = &cli.Command{
 			}
 		}
 
-		fmt.Printf("imported key %s successfully!\n", addr)
+		if cctx.Bool("json") {
+			out := map[string]interface{}{
+				"address": addr,
+			}
+			return cmd.PrintJson(out)
+		} else {
+			fmt.Printf("imported key %s successfully!\n", addr)
+		}
 		return nil
 	},
 }
@@ -365,7 +471,14 @@ var walletGetDefault = &cli.Command{
 			return err
 		}
 
-		afmt.Printf("%s\n", addr.String())
+		if cctx.Bool("json") {
+			out := map[string]interface{}{
+				"address": addr.String(),
+			}
+			return cmd.PrintJson(out)
+		} else {
+			afmt.Printf("%s\n", addr.String())
+		}
 		return nil
 	},
 }
