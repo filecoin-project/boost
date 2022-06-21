@@ -37,7 +37,7 @@ func (pw *boostPieceStoreWrapper) Start(ctx context.Context) error {
 }
 
 func (pw *boostPieceStoreWrapper) OnReady(ready shared.ReadyFunc) {
-	ready(nil)
+	go ready(nil)
 }
 
 func (pw *boostPieceStoreWrapper) AddDealForPiece(pieceCID cid.Cid, dealInfo piecestore.DealInfo) error {
