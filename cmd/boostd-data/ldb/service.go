@@ -106,7 +106,7 @@ func (s *Store) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error
 	return nil
 }
 
-func (s *Store) GetRecords(pieceCid cid.Cid) ([]carindex.Record, error) {
+func (s *Store) GetRecords(pieceCid cid.Cid) ([]model.Record, error) {
 	log.Debugw("handle.get-iterable-index", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
@@ -186,11 +186,11 @@ func (s *Store) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
 	return s.db.GetPieceCidsByMultihash(ctx, m)
 }
 
-func (s *Store) GetIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
-	log.Debugw("handle.get-index", "pieceCid", pieceCid)
+func (s *Store) GetIndex(pieceCid cid.Cid) ([]model.Record, error) {
+	log.Warnw("handle.get-index", "pieceCid", pieceCid)
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-index", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Warnw("handled.get-index", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	s.Lock()
@@ -207,6 +207,8 @@ func (s *Store) GetIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	log.Warnw("handle.get-index.records", "len(records)", len(records))
 
 	return records, nil
 }
@@ -283,7 +285,7 @@ func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 		return err
 	}
 
-	err = s.db.Sync(ctx, datastore.NewKey(keyCursorPrefix))
+	err = s.db.Sync(ctx, datastore.NewKey(fmt.Sprintf("%d", cursor)))
 	if err != nil {
 		return err
 	}

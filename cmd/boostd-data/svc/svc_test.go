@@ -1,6 +1,8 @@
 package svc
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -122,6 +124,28 @@ func TestLdbService(t *testing.T) {
 		t.Fatal("expected pieceCid to be indexed")
 	}
 
+	recs, err := cl.GetRecords(pieceCid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(recs) == 0 {
+		t.Fatal("expected to get records back from GetIndex")
+	}
+
+	loadedSubject, err := cl.GetIndex(pieceCid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ok, err := compareIndices(subject, loadedSubject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		log.Fatal("compare failed")
+	}
+
 	log.Debug("sleeping for a while.. running tests..")
 
 	cleanup()
@@ -206,4 +230,20 @@ func getRecords(subject index.Index) ([]model.Record, error) {
 		return nil, errors.New(fmt.Sprintf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec()))
 	}
 	return records, nil
+}
+
+func compareIndices(subject, subjectDb index.Index) (bool, error) {
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+
+	subject.Marshal(w)
+
+	var b2 bytes.Buffer
+	w2 := bufio.NewWriter(&b2)
+
+	subjectDb.Marshal(w2)
+
+	res := bytes.Compare(b.Bytes(), b2.Bytes())
+
+	return res == 0, nil
 }

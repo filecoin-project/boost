@@ -7,7 +7,7 @@ import (
 	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	logger "github.com/ipfs/go-log/v2"
-	carindex "github.com/ipld/go-car/v2/index"
+	"github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -28,12 +28,39 @@ func NewStore(addr string) (*Store, error) {
 	}, nil
 }
 
-func (s *Store) GetIndex(pieceCid cid.Cid) ([]carindex.Record, error) {
-	var resp []carindex.Record
+func (s *Store) GetIndex(pieceCid cid.Cid) (index.Index, error) {
+	var resp []model.Record
 	err := s.client.Call(&resp, "boostddata_getIndex", pieceCid)
 	if err != nil {
 		return nil, err
 	}
+
+	//TODO: figure out how to remove this conversion
+	var records []index.Record
+	for _, r := range resp {
+		records = append(records, index.Record{
+			r.Cid,
+			r.Offset,
+		})
+	}
+
+	mis := make(index.MultihashIndexSorted)
+	err = mis.Load(records)
+	if err != nil {
+		return nil, err
+	}
+
+	return &mis, nil
+}
+
+func (s *Store) GetRecords(pieceCid cid.Cid) ([]model.Record, error) {
+	var resp []model.Record
+	err := s.client.Call(&resp, "boostddata_getIndex", pieceCid)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Warnw("get-index", "piece-cid", pieceCid, "records", len(resp))
 
 	return resp, nil
 }
@@ -63,6 +90,8 @@ func (s *Store) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error
 }
 
 func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
+	log.Warnw("add-index", "piece-cid", pieceCid, "records", len(records))
+
 	return s.client.Call(nil, "boostddata_addIndex", pieceCid, records)
 }
 

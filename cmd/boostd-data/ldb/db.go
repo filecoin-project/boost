@@ -11,7 +11,6 @@ import (
 	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
-	"github.com/ipld/go-car/v2/index"
 	carindex "github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
 )
@@ -31,8 +30,7 @@ var (
 	prefixMhtoPieceCids  uint64 = 2
 	sprefixMhtoPieceCids string
 
-	size    = binary.MaxVarintLen64
-	cutsize = size + 2
+	size = binary.MaxVarintLen64
 )
 
 func init() {
@@ -190,15 +188,14 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (mode
 }
 
 // AllRecords
-func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]index.Record, error) {
-	var records []index.Record
+func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, error) {
+	var records []model.Record
 
 	buf := make([]byte, size)
 	binary.PutUvarint(buf, cursor)
 
 	var q query.Query
-	q.Prefix = string(buf)
-
+	q.Prefix = fmt.Sprintf("%d/", cursor)
 	results, err := db.Query(ctx, q)
 	if err != nil {
 		return nil, err
@@ -210,18 +207,18 @@ func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]index.Record, er
 			break
 		}
 
-		k := r.Key[cutsize:]
+		k := r.Key[len(q.Prefix)+1:]
 
 		m, err := multihash.FromHexString(k)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 
 		kcid := cid.NewCidV1(cid.Raw, m)
 
 		offset, _ := binary.Uvarint(r.Value)
 
-		records = append(records, index.Record{
+		records = append(records, model.Record{
 			Cid:    kcid,
 			Offset: offset,
 		})

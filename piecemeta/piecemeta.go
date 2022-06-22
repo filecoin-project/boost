@@ -2,6 +2,8 @@ package piecemeta
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -9,6 +11,7 @@ import (
 	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/filecoin-project/boost/cmd/boostd-data/svc"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
@@ -19,6 +22,8 @@ import (
 	"github.com/ipld/go-car/v2/blockstore"
 	"github.com/ipld/go-car/v2/index"
 	carindex "github.com/ipld/go-car/v2/index"
+	"github.com/multiformats/go-multicodec"
+	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -37,7 +42,7 @@ type Store interface {
 	AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error
 	AddIndex(pieceCid cid.Cid, records []model.Record) error
 	IsIndexed(pieceCid cid.Cid) (bool, error)
-	GetIndex(pieceCid cid.Cid) ([]index.Record, error)
+	GetIndex(pieceCid cid.Cid) (index.Index, error)
 	GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error)
 	GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error)
 	PiecesContaining(m mh.Multihash) ([]cid.Cid, error)
@@ -51,7 +56,7 @@ type PieceMeta struct {
 	sealer Sealer
 }
 
-func NewPieceMeta() *PieceMeta {
+func NewPieceMeta(sa dagstore.SectorAccessor) *PieceMeta {
 	addr, _, err := svc.Setup("ldb")
 	if err != nil {
 		panic(err)
@@ -62,7 +67,16 @@ func NewPieceMeta() *PieceMeta {
 		panic(err)
 	}
 
-	return &PieceMeta{store: cl}
+	return &PieceMeta{store: cl, sealer: &sealer{sa}}
+}
+
+type sealer struct {
+	dagstore.SectorAccessor
+}
+
+func (s *sealer) GetReader(id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error) {
+	ctx := context.Background()
+	return s.SectorAccessor.UnsealSectorAt(ctx, id, offset.Unpadded(), length.Unpadded())
 }
 
 // Get the list of deals (and the sector the data is in) for a particular piece
@@ -124,25 +138,19 @@ func (ps *PieceMeta) addIndexForPiece(pieceCid cid.Cid, dealInfo model.DealInfo)
 		return fmt.Errorf("index is not iterable for piece %s", pieceCid)
 	}
 
-	_ = itidx
+	recs, err := getRecords(itidx)
+	if err != nil {
+		return err
+	}
 
-	//isIndexed, err := ps.store.IsIndexed(pieceCid)
-	//if err != nil {
-	//return err
-	//}
+	// Add mh => offset index to store
+	if err := ps.store.AddIndex(pieceCid, recs); err != nil {
+		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
+	}
 
-	//if !isIndexed {
-	//// Add mh => offset index to store
-	//if err := ps.carIndex.Add(pieceCid, itidx); err != nil {
-	//return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
-	//}
-	//}
-
-	//if !ps.mhToPieceIndex.IsIndexed(pieceCid) {
-	//// Add mh => piece index to store
-	//if err := ps.mhToPieceIndex.Add(pieceCid, itidx); err != nil {
+	// Add mh => piece index to store
+	//if err := ps.store.Add(pieceCid, itidx); err != nil {
 	//return fmt.Errorf("adding cid index for piece %s: %w", pieceCid, err)
-	//}
 	//}
 
 	return nil
@@ -221,8 +229,20 @@ func (ps *PieceMeta) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error
 }
 
 func (ps *PieceMeta) GetIterableIndex(pieceCid cid.Cid) (carindex.IterableIndex, error) {
-	return nil, nil
-	//return ps.carIndex.Index(pieceCid)
+	idx, err := ps.store.GetIndex(pieceCid)
+	if err != nil {
+		return nil, err
+	}
+
+	//switch idx := subject.(type) {
+	//case index.IterableIndex:
+
+	switch concrete := idx.(type) {
+	case carindex.IterableIndex:
+		return concrete, nil
+	default:
+		panic("expected MultihashIndexSorted idx")
+	}
 }
 
 // Get a block (used by Bitswap retrieval)
@@ -293,6 +313,7 @@ func (ps *PieceMeta) GetBlockstore(pieceCid cid.Cid) (bstore.Blockstore, error) 
 		return nil, fmt.Errorf("getting index for piece %s: %w", pieceCid, err)
 	}
 
+	// process index and store entries
 	// Create a blockstore from the index and the piece reader
 	bs, err := blockstore.NewReadOnly(reader, idx, carv2.ZeroLengthSectionAsEOF(true))
 	if err != nil {
@@ -300,4 +321,29 @@ func (ps *PieceMeta) GetBlockstore(pieceCid cid.Cid) (bstore.Blockstore, error) 
 	}
 
 	return bs, nil
+}
+
+func getRecords(subject index.Index) ([]model.Record, error) {
+	records := make([]model.Record, 0)
+
+	switch idx := subject.(type) {
+	case index.IterableIndex:
+		err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
+
+			cid := cid.NewCidV1(cid.Raw, m)
+
+			records = append(records, model.Record{
+				Cid:    cid,
+				Offset: offset,
+			})
+
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New(fmt.Sprintf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec()))
+	}
+	return records, nil
 }

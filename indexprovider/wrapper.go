@@ -42,10 +42,12 @@ type Wrapper struct {
 
 func NewWrapper() func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
 	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface,
+	pieceMeta *piecemeta.PieceMeta,
 	meshCreator idxprov.MeshCreator) *Wrapper {
 
 	return func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
 		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface,
+		pieceMeta *piecemeta.PieceMeta,
 		meshCreator idxprov.MeshCreator) *Wrapper {
 
 		_, isDisabled := prov.(*DisabledIndexProvider)
@@ -55,7 +57,8 @@ func NewWrapper() func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
 			prov:        prov,
 			meshCreator: meshCreator,
 			//cfg:         cfg,
-			enabled: !isDisabled,
+			enabled:   !isDisabled,
+			pieceMeta: pieceMeta,
 		}
 	}
 }

@@ -12,16 +12,21 @@ import (
 	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-fil-markets/stores"
+	"github.com/filecoin-project/lotus/api/v1api"
 	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
+	"github.com/filecoin-project/lotus/markets/sectoraccessor"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	bstore "github.com/ipfs/go-ipfs-blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
 )
 
-func NewPieceMeta(pp sectorstorage.PieceProvider) *piecemeta.PieceMeta {
-	// TODO: pass params
-	return piecemeta.NewPieceMeta()
+func NewPieceMeta(maddr dtypes.MinerAddress, secb sectorblocks.SectorBuilder, pp sectorstorage.PieceProvider, full v1api.FullNode) *piecemeta.PieceMeta {
+	sa := sectoraccessor.NewSectorAccessor(maddr, secb, pp, full)
+
+	return piecemeta.NewPieceMeta(sa)
 }
 
 func NewPieceStore(pm *piecemeta.PieceMeta) piecestore.PieceStore {
