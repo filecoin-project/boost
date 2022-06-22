@@ -20,35 +20,37 @@ var initCmd = &cli.Command{
 	Before: before,
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
+		outputInJson := cctx.Bool("json")
 
 		sdir, err := homedir.Expand(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		os.Mkdir(sdir, 0755) //nolint:errcheck
 
 		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		api, closer, err := lcli.GetGatewayAPI(cctx)
 		if err != nil {
-			return fmt.Errorf("cant setup gateway connection: %w", err)
+			augmentedError := fmt.Errorf("cant setup gateway connection: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 		defer closer()
 
 		walletAddr, err := n.Wallet.GetDefault()
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		log.Infow("default wallet set", "wallet", walletAddr)
 
 		walletBalance, err := api.WalletBalance(ctx, walletAddr)
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		log.Infow("wallet balance", "value", types.FIL(walletBalance).Short())
@@ -60,7 +62,7 @@ var initCmd = &cli.Command{
 
 				return nil
 			}
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		log.Infow("market balance", "escrow", types.FIL(marketBalance.Escrow).Short(), "locked", types.FIL(marketBalance.Locked).Short())

@@ -115,39 +115,42 @@ var offlineDealCmd = &cli.Command{
 
 func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	ctx := bcli.ReqContext(cctx)
+	outputInJson := cctx.Bool("json")
 
 	n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
 	if err != nil {
-		return err
+		return cmd.PrintError(err, outputInJson)
 	}
 
 	api, closer, err := lcli.GetGatewayAPI(cctx)
 	if err != nil {
-		return fmt.Errorf("cant setup gateway connection: %w", err)
+		augmentedError := fmt.Errorf("cant setup gateway connection: %w", err)
+		return cmd.PrintError(augmentedError, outputInJson)
 	}
 	defer closer()
 
 	walletAddr, err := n.GetProvidedOrDefaultWallet(ctx, cctx.String("wallet"))
 	if err != nil {
-		return err
+		return cmd.PrintError(err, outputInJson)
 	}
 
 	log.Debugw("selected wallet", "wallet", walletAddr)
 
 	maddr, err := address.NewFromString(cctx.String("provider"))
 	if err != nil {
-		return err
+		return cmd.PrintError(err, outputInJson)
 	}
 
 	addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
 	if err != nil {
-		return err
+		return cmd.PrintError(err, outputInJson)
 	}
 
 	log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
 
 	if err := n.Host.Connect(ctx, *addrInfo); err != nil {
-		return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+		augmentedError := fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+		return cmd.PrintError(augmentedError, outputInJson)
 	}
 
 	dealUuid := uuid.New()
@@ -155,23 +158,27 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	commp := cctx.String("commp")
 	pieceCid, err := cid.Parse(commp)
 	if err != nil {
-		return fmt.Errorf("parsing commp '%s': %w", commp, err)
+		augmentedError := fmt.Errorf("parsing commp '%s': %w", commp, err)
+		return cmd.PrintError(augmentedError, outputInJson)
 	}
 
 	pieceSize := cctx.Uint64("piece-size")
 	if pieceSize == 0 {
-		return fmt.Errorf("must provide piece-size parameter for CAR url")
+		augmentedError := fmt.Errorf("must provide piece-size parameter for CAR url")
+		return cmd.PrintError(augmentedError, outputInJson)
 	}
 
 	payloadCidStr := cctx.String("payload-cid")
 	rootCid, err := cid.Parse(payloadCidStr)
 	if err != nil {
-		return fmt.Errorf("parsing payload cid %s: %w", payloadCidStr, err)
+		augmentedError := fmt.Errorf("parsing payload cid %s: %w", payloadCidStr, err)
+		return cmd.PrintError(augmentedError, outputInJson)
 	}
 
 	carFileSize := cctx.Uint64("car-size")
 	if carFileSize == 0 {
-		return fmt.Errorf("size of car file cannot be 0")
+		augmentedError := fmt.Errorf("size of car file cannot be 0")
+		return cmd.PrintError(augmentedError, outputInJson)
 	}
 
 	transfer := types.Transfer{
@@ -187,7 +194,8 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 			for _, header := range cctx.StringSlice("http-headers") {
 				sp := strings.Split(header, "=")
 				if len(sp) != 2 {
-					return fmt.Errorf("malformed http header: %s", header)
+					augmentedError := fmt.Errorf("malformed http header: %s", header)
+					return cmd.PrintError(augmentedError, outputInJson)
 				}
 
 				transferParams.Headers[sp[0]] = sp[1]
@@ -196,7 +204,8 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 
 		paramsBytes, err := json.Marshal(transferParams)
 		if err != nil {
-			return fmt.Errorf("marshalling request parameters: %w", err)
+			augmentedError := fmt.Errorf("marshalling request parameters: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 		transfer.Type = "http"
 		transfer.Params = paramsBytes
@@ -208,7 +217,8 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	} else {
 		bounds, err := api.StateDealProviderCollateralBounds(ctx, abi.PaddedPieceSize(pieceSize), cctx.Bool("verified"), chain_types.EmptyTSK)
 		if err != nil {
-			return fmt.Errorf("node error getting collateral bounds: %w", err)
+			augmentedError := fmt.Errorf("node error getting collateral bounds: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		providerCollateral = big.Div(big.Mul(bounds.Min, big.NewInt(6)), big.NewInt(5)) // add 20%
@@ -220,7 +230,8 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	} else {
 		tipset, err := api.ChainHead(ctx)
 		if err != nil {
-			return fmt.Errorf("getting chain head: %w", err)
+			augmentedError := fmt.Errorf("getting chain head: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		head := tipset.Height()
@@ -233,7 +244,8 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	// Create a deal proposal to storage provider using deal protocol v1.2.0 format
 	dealProposal, err := dealProposal(ctx, n, walletAddr, rootCid, abi.PaddedPieceSize(pieceSize), pieceCid, maddr, startEpoch, cctx.Int("duration"), cctx.Bool("verified"), providerCollateral, abi.NewTokenAmount(cctx.Int64("storage-price")))
 	if err != nil {
-		return fmt.Errorf("failed to create a deal proposal: %w", err)
+		augmentedError := fmt.Errorf("failed to create a deal proposal: %w", err)
+		return cmd.PrintError(augmentedError, outputInJson)
 	}
 
 	dealParams := types.DealParams{
@@ -248,20 +260,23 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 
 	s, err := n.Host.NewStream(ctx, addrInfo.ID, DealProtocolv120)
 	if err != nil {
-		return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
+		augmentedError := fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
+		return cmd.PrintError(augmentedError, outputInJson)
 	}
 	defer s.Close()
 
 	var resp types.DealResponse
 	if err := doRpc(ctx, s, &dealParams, &resp); err != nil {
-		return fmt.Errorf("send proposal rpc: %w", err)
+		augmentedError := fmt.Errorf("send proposal rpc: %w", err)
+		return cmd.PrintError(augmentedError, outputInJson)
 	}
 
 	if !resp.Accepted {
-		return fmt.Errorf("deal proposal rejected: %s", resp.Message)
+		augmentedError := fmt.Errorf("deal proposal rejected: %s", resp.Message)
+		return cmd.PrintError(augmentedError, outputInJson)
 	}
 
-	if cctx.Bool("json") {
+	if outputInJson {
 		out := map[string]interface{}{
 			"dealUuid":           dealUuid.String(),
 			"provider":           maddr.String(),

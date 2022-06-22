@@ -42,10 +42,11 @@ var walletNew = &cli.Command{
 	ArgsUsage: "[bls|secp256k1 (default secp256k1)]",
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
+		outputInJson := cctx.Bool("json")
 
 		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		t := cctx.Args().First()
@@ -55,10 +56,10 @@ var walletNew = &cli.Command{
 
 		nk, err := n.Wallet.WalletNew(ctx, types.KeyType(t))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
-		if cctx.Bool("json") {
+		if outputInJson {
 			out := map[string]interface{}{
 				"address": nk.String(),
 			}
@@ -88,15 +89,17 @@ var walletList = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
+		outputInJson := cctx.Bool("json")
 
 		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		api, closer, err := lcli.GetGatewayAPI(cctx)
 		if err != nil {
-			return fmt.Errorf("cant setup gateway connection: %w", err)
+			augmentedError := fmt.Errorf("cant setup gateway connection: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 		defer closer()
 
@@ -104,7 +107,7 @@ var walletList = &cli.Command{
 
 		addrs, err := n.Wallet.WalletList(ctx)
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		// Assume an error means no default key is set
@@ -187,7 +190,7 @@ var walletList = &cli.Command{
 					marketAvailValue := types.FIL(types.BigSub(mbal.Escrow, mbal.Locked))
 					marketLockedValue := types.FIL(mbal.Locked)
 					// structure is different for these particular keys so we have to distinguish the cases here
-					if cctx.Bool("json") {
+					if outputInJson {
 						wallet[marketKey] = map[string]interface{}{
 							"available": marketAvailValue,
 							"locked":    marketLockedValue,
@@ -203,7 +206,7 @@ var walletList = &cli.Command{
 
 		if !cctx.Bool("addr-only") {
 
-			if cctx.Bool("json") {
+			if outputInJson {
 				// get a new list of wallets with json keys instead of tablewriter keys
 				var jsonWallets []map[string]interface{}
 				for _, wallet := range wallets {
@@ -249,15 +252,17 @@ var walletBalance = &cli.Command{
 	ArgsUsage: "[address]",
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
+		outputInJson := cctx.Bool("json")
 
 		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		api, closer, err := lcli.GetGatewayAPI(cctx)
 		if err != nil {
-			return fmt.Errorf("cant setup gateway connection: %w", err)
+			augmentedError := fmt.Errorf("cant setup gateway connection: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 		defer closer()
 
@@ -270,17 +275,17 @@ var walletBalance = &cli.Command{
 			addr, err = n.Wallet.GetDefault()
 		}
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		balance, err := api.WalletBalance(ctx, addr)
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		if balance.Equals(types.NewInt(0)) {
 			warningMessage := "may display 0 if chain sync in progress"
-			if cctx.Bool("json") {
+			if outputInJson {
 				out := map[string]interface{}{
 					"balance": types.FIL(balance),
 					"warning": warningMessage,
@@ -290,7 +295,7 @@ var walletBalance = &cli.Command{
 				afmt.Printf(fmt.Sprintf("%s (warning: %s)\n", types.FIL(balance), warningMessage))
 			}
 		} else {
-			if cctx.Bool("json") {
+			if outputInJson {
 				out := map[string]interface{}{
 					"balance": types.FIL(balance),
 				}
@@ -310,35 +315,36 @@ var walletExport = &cli.Command{
 	ArgsUsage: "[address]",
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
+		outputInJson := cctx.Bool("json")
 
 		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		afmt := NewAppFmt(cctx.App)
 
 		if !cctx.Args().Present() {
 			err := fmt.Errorf("must specify key to export")
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		addr, err := address.NewFromString(cctx.Args().First())
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		ki, err := n.Wallet.WalletExport(ctx, addr)
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		b, err := json.Marshal(ki)
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
-		if cctx.Bool("json") {
+		if outputInJson {
 			out := map[string]interface{}{
 				"key": hex.EncodeToString(b),
 			}
@@ -367,10 +373,11 @@ var walletImport = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
+		outputInJson := cctx.Bool("json")
 
 		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		var inpdata []byte
@@ -379,14 +386,14 @@ var walletImport = &cli.Command{
 			fmt.Print("Enter private key: ")
 			indata, err := reader.ReadBytes('\n')
 			if err != nil {
-				return err
+				return cmd.PrintError(err, outputInJson)
 			}
 			inpdata = indata
 
 		} else {
 			fdata, err := ioutil.ReadFile(cctx.Args().First())
 			if err != nil {
-				return err
+				return cmd.PrintError(err, outputInJson)
 			}
 			inpdata = fdata
 		}
@@ -396,15 +403,15 @@ var walletImport = &cli.Command{
 		case "hex-lotus":
 			data, err := hex.DecodeString(strings.TrimSpace(string(inpdata)))
 			if err != nil {
-				return err
+				return cmd.PrintError(err, outputInJson)
 			}
 
 			if err := json.Unmarshal(data, &ki); err != nil {
-				return err
+				return cmd.PrintError(err, outputInJson)
 			}
 		case "json-lotus":
 			if err := json.Unmarshal(inpdata, &ki); err != nil {
-				return err
+				return cmd.PrintError(err, outputInJson)
 			}
 		case "gfc-json":
 			var f struct {
@@ -414,7 +421,8 @@ var walletImport = &cli.Command{
 				}
 			}
 			if err := json.Unmarshal(inpdata, &f); err != nil {
-				return fmt.Errorf("failed to parse go-filecoin key: %s", err)
+				augmentedError := fmt.Errorf("failed to parse go-filecoin key: %s", err)
+				return cmd.PrintError(augmentedError, outputInJson)
 			}
 
 			gk := f.KeyInfo[0]
@@ -428,21 +436,23 @@ var walletImport = &cli.Command{
 				return fmt.Errorf("unrecognized key type: %d", gk.SigType)
 			}
 		default:
-			return fmt.Errorf("unrecognized format: %s", cctx.String("format"))
+			augmentedError := fmt.Errorf("unrecognized format: %s", cctx.String("format"))
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		addr, err := n.Wallet.WalletImport(ctx, &ki)
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		if cctx.Bool("as-default") {
 			if err := n.Wallet.SetDefault(addr); err != nil {
-				return fmt.Errorf("failed to set default key: %w", err)
+				augmentedError := fmt.Errorf("failed to set default key: %w", err)
+				return cmd.PrintError(augmentedError, outputInJson)
 			}
 		}
 
-		if cctx.Bool("json") {
+		if outputInJson {
 			out := map[string]interface{}{
 				"address": addr,
 			}
@@ -459,6 +469,7 @@ var walletGetDefault = &cli.Command{
 	Usage:   "Get default wallet address",
 	Aliases: []string{"get-default"},
 	Action: func(cctx *cli.Context) error {
+		outputInJson := cctx.Bool("json")
 		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
 			return err
@@ -468,10 +479,10 @@ var walletGetDefault = &cli.Command{
 
 		addr, err := n.Wallet.GetDefault()
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
-		if cctx.Bool("json") {
+		if outputInJson {
 			out := map[string]interface{}{
 				"address": addr.String(),
 			}
@@ -488,18 +499,20 @@ var walletSetDefault = &cli.Command{
 	Usage:     "Set default wallet address",
 	ArgsUsage: "[address]",
 	Action: func(cctx *cli.Context) error {
+		outputInJson := cctx.Bool("json")
 		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		if !cctx.Args().Present() {
-			return fmt.Errorf("must pass address to set as default")
+			augmentedError := fmt.Errorf("must pass address to set as default")
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		addr, err := address.NewFromString(cctx.Args().First())
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		return n.Wallet.SetDefault(addr)
@@ -512,19 +525,21 @@ var walletDelete = &cli.Command{
 	ArgsUsage: "<address> ",
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
+		outputInJson := cctx.Bool("json")
 
 		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		if !cctx.Args().Present() || cctx.NArg() != 1 {
-			return fmt.Errorf("must specify address to delete")
+			augmentedError := fmt.Errorf("must specify address to delete")
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		addr, err := address.NewFromString(cctx.Args().First())
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		return n.Wallet.WalletDelete(ctx, addr)

@@ -42,53 +42,62 @@ var libp2pInfoCmd = &cli.Command{
 	Before:      before,
 	Action: func(cctx *cli.Context) error {
 		ctx := ctxutil.ReqContext(cctx)
+		outputInJson := cctx.Bool("json")
 
 		if cctx.Args().Len() != 1 {
-			return fmt.Errorf("usage: protocols <provider address>")
+			err := fmt.Errorf("usage: protocols <provider address>")
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return fmt.Errorf("setting up CLI node: %w", err)
+			augmentedError := fmt.Errorf("setting up CLI node: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		api, closer, err := lcli.GetGatewayAPI(cctx)
 		if err != nil {
-			return fmt.Errorf("setting up gateway connection: %w", err)
+			augmentedError := fmt.Errorf("setting up gateway connection: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 		defer closer()
 
 		addrStr := cctx.Args().Get(0)
 		maddr, err := address.NewFromString(addrStr)
 		if err != nil {
-			return fmt.Errorf("parsing provider on-chain address %s: %w", addrStr, err)
+			augmentedError := fmt.Errorf("parsing provider on-chain address %s: %w", addrStr, err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
 		if err != nil {
-			return fmt.Errorf("getting provider multi-address: %w", err)
+			augmentedError := fmt.Errorf("getting provider multi-address: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		log.Debugw("connecting to storage provider",
 			"id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
 
 		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
-			return fmt.Errorf("connecting to peer %s: %w", addrInfo.ID, err)
+			augmentedError := fmt.Errorf("connecting to peer %s: %w", addrInfo.ID, err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		protos, err := n.Host.Peerstore().GetProtocols(addrInfo.ID)
 		if err != nil {
-			return fmt.Errorf("getting protocols for peer %s: %w", addrInfo.ID, err)
+			augmentedError := fmt.Errorf("getting protocols for peer %s: %w", addrInfo.ID, err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 		sort.Strings(protos)
 
 		agentVersionI, err := n.Host.Peerstore().Get(addrInfo.ID, "AgentVersion")
 		if err != nil {
-			return fmt.Errorf("getting agent version for peer %s: %w", addrInfo.ID, err)
+			augmentedError := fmt.Errorf("getting agent version for peer %s: %w", addrInfo.ID, err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 		agentVersion, _ := agentVersionI.(string)
 
-		if cctx.Bool("json") {
+		if outputInJson {
 			return cmd.PrintJson(map[string]interface{}{
 				"provider":   addrStr,
 				"agent":      agentVersion,
@@ -126,6 +135,7 @@ var storageAskCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := bcli.ReqContext(cctx)
+		outputInJson := cctx.Bool("json")
 
 		afmt := NewAppFmt(cctx.App)
 
@@ -136,18 +146,19 @@ var storageAskCmd = &cli.Command{
 
 		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		api, closer, err := lcli.GetGatewayAPI(cctx)
 		if err != nil {
-			return fmt.Errorf("cant setup gateway connection: %w", err)
+			augmentedError := fmt.Errorf("cant setup gateway connection: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 		defer closer()
 
 		maddr, err := address.NewFromString(cctx.Args().First())
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
@@ -158,12 +169,14 @@ var storageAskCmd = &cli.Command{
 		log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
 
 		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
-			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+			augmentedError := fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		s, err := n.Host.NewStream(ctx, addrInfo.ID, AskProtocolID)
 		if err != nil {
-			return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
+			augmentedError := fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 		defer s.Close()
 
@@ -174,7 +187,8 @@ var storageAskCmd = &cli.Command{
 		}
 
 		if err := doRpc(ctx, s, &askRequest, &resp); err != nil {
-			return fmt.Errorf("send ask request rpc: %w", err)
+			augmentedError := fmt.Errorf("send ask request rpc: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		ask := resp.Ask.Ask
@@ -214,6 +228,7 @@ var retrievalAskCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := bcli.ReqContext(cctx)
+		outputInJson := cctx.Bool("json")
 
 		afmt := NewAppFmt(cctx.App)
 		if cctx.NArg() != 2 {
@@ -223,39 +238,43 @@ var retrievalAskCmd = &cli.Command{
 
 		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		api, closer, err := lcli.GetGatewayAPI(cctx)
 		if err != nil {
-			return fmt.Errorf("cant setup gateway connection: %w", err)
+			augmentedError := fmt.Errorf("cant setup gateway connection: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 		defer closer()
 
 		maddr, err := address.NewFromString(cctx.Args().First())
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		dataCid, err := cid.Parse(cctx.Args().Get(1))
 		if err != nil {
-			return fmt.Errorf("parsing data cid: %w", err)
+			augmentedError := fmt.Errorf("parsing data cid: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
 
 		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
-			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+			augmentedError := fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		s, err := n.Host.NewStream(ctx, addrInfo.ID, QueryProtocolID)
 		if err != nil {
-			return fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
+			augmentedError := fmt.Errorf("failed to open stream to peer %s: %w", addrInfo.ID, err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 		defer s.Close()
 
@@ -267,7 +286,8 @@ var retrievalAskCmd = &cli.Command{
 		var ask retrievalmarket.QueryResponse
 
 		if err := doRpc(ctx, s, &req, &ask); err != nil {
-			return fmt.Errorf("send retrieval-ask request rpc: %w", err)
+			augmentedError := fmt.Errorf("send retrieval-ask request rpc: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		afmt.Printf("Status: %d\n", ask.Status)

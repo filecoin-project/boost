@@ -40,50 +40,54 @@ var dealStatusCmd = &cli.Command{
 	Before: before,
 	Action: func(cctx *cli.Context) error {
 		ctx := bcli.ReqContext(cctx)
+		outputInJson := cctx.Bool("json")
 
 		dealUUID, err := uuid.Parse(cctx.String("deal-uuid"))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		api, closer, err := lcli.GetGatewayAPI(cctx)
 		if err != nil {
-			return fmt.Errorf("cant setup gateway connection: %w", err)
+			augmentedError := fmt.Errorf("cant setup gateway connection: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 		defer closer()
 
 		walletAddr, err := n.GetProvidedOrDefaultWallet(ctx, cctx.String("wallet"))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		log.Debugw("selected wallet", "wallet", walletAddr)
 
 		maddr, err := address.NewFromString(cctx.String("provider"))
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
 		if err != nil {
-			return err
+			return cmd.PrintError(err, outputInJson)
 		}
 
 		log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
 
 		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
-			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+			augmentedError := fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		dc := lp2pimpl.NewDealClient(n.Host, walletAddr, node.DealProposalSigner{LocalWallet: n.Wallet})
 		resp, err := dc.SendDealStatusRequest(ctx, addrInfo.ID, dealUUID)
 		if err != nil {
-			return fmt.Errorf("send deal status request failed: %w", err)
+			augmentedError := fmt.Errorf("send deal status request failed: %w", err)
+			return cmd.PrintError(augmentedError, outputInJson)
 		}
 
 		label := resp.DealStatus.Proposal.Label
@@ -102,7 +106,7 @@ var dealStatusCmd = &cli.Command{
 			}
 		}
 
-		if cctx.Bool("json") {
+		if outputInJson {
 			out := map[string]interface{}{}
 			if resp.Error != "" {
 				out["error"] = resp.Error
