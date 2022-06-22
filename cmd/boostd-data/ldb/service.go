@@ -11,6 +11,7 @@ import (
 	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	ds "github.com/ipfs/go-datastore"
 	levelds "github.com/ipfs/go-ds-leveldb"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car/v2/index"
@@ -303,7 +304,7 @@ func (s *Store) IndexedAt(pieceCid cid.Cid) (time.Time, error) {
 	ctx := context.Background()
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil {
+	if err != nil && err != ds.ErrNotFound {
 		return time.Time{}, err
 	}
 

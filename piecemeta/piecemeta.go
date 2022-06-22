@@ -67,7 +67,7 @@ func NewPieceMeta() *PieceMeta {
 
 // Get the list of deals (and the sector the data is in) for a particular piece
 func (ps *PieceMeta) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
-	deals, err := ps.GetPieceDeals(pieceCid)
+	deals, err := ps.store.GetPieceDeals(pieceCid)
 	if err != nil {
 		return nil, fmt.Errorf("listing deals for piece %s: %w", pieceCid, err)
 	}
@@ -83,7 +83,7 @@ func (ps *PieceMeta) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) 
 	// TODO: pass dealInfo to addIndexForPiece
 
 	// Perform indexing of piece
-	if err := ps.addIndexForPiece(pieceCid); err != nil {
+	if err := ps.addIndexForPiece(pieceCid, dealInfo); err != nil {
 		return fmt.Errorf("adding index for piece %s: %w", pieceCid, err)
 	}
 
@@ -95,8 +95,9 @@ func (ps *PieceMeta) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) 
 	return nil
 }
 
-func (ps *PieceMeta) addIndexForPiece(pieceCid cid.Cid) error {
+func (ps *PieceMeta) addIndexForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	// Check if the indexes have already been added
+
 	isIndexed, err := ps.store.IsIndexed(pieceCid)
 	if err != nil {
 		return err
@@ -107,9 +108,9 @@ func (ps *PieceMeta) addIndexForPiece(pieceCid cid.Cid) error {
 	}
 
 	// Get a reader over the piece data
-	reader, err := ps.GetPieceReader(pieceCid)
+	reader, err := ps.sealer.GetReader(dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
 	if err != nil {
-		return fmt.Errorf("getting piece reader for piece %s: %w", pieceCid, err)
+		return err
 	}
 
 	// Get an index from the CAR file - works for both CARv1 and CARv2
