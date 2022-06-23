@@ -62,7 +62,7 @@ var walletNew = &cli.Command{
 			out := map[string]interface{}{
 				"address": nk.String(),
 			}
-			cmd.PrintJson(out)
+			cmd.PrintJson(out) //nolint:errcheck
 		} else {
 			fmt.Println(nk.String())
 		}
