@@ -3,8 +3,11 @@ package net
 import (
 	"context"
 	"sort"
+	"strings"
+	"time"
 
 	"go.uber.org/fx"
+	"golang.org/x/xerrors"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/metrics"
@@ -17,17 +20,21 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	lotus_lp2p "github.com/filecoin-project/lotus/node/modules/lp2p"
+	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 )
 
 type NetAPI struct {
 	fx.In
 
-	RawHost   lotus_lp2p.RawHost
-	Host      host.Host
-	Router    lotus_lp2p.BaseIpfsRouting
-	ConnGater *conngater.BasicConnectionGater
-	Reporter  metrics.Reporter
+	RawHost         lotus_lp2p.RawHost
+	Host            host.Host
+	Router          lotus_lp2p.BaseIpfsRouting
+	ResourceManager network.ResourceManager
+	ConnGater       *conngater.BasicConnectionGater
+	Reporter        metrics.Reporter
+	Sk              *dtypes.ScoreKeeper
 }
 
 func (a *NetAPI) ID(context.Context) (peer.ID, error) {
@@ -159,6 +166,30 @@ func (a *NetAPI) NetBandwidthStatsByPeer(ctx context.Context) (map[string]metric
 
 func (a *NetAPI) NetBandwidthStatsByProtocol(ctx context.Context) (map[protocol.ID]metrics.Stats, error) {
 	return a.Reporter.GetBandwidthByProtocol(), nil
+}
+
+func (a *NetAPI) NetPubsubScores(context.Context) ([]api.PubsubScore, error) {
+	scores := a.Sk.Get()
+	out := make([]api.PubsubScore, len(scores))
+	i := 0
+	for k, v := range scores {
+		out[i] = api.PubsubScore{ID: k, Score: v}
+		i++
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return strings.Compare(string(out[i].ID), string(out[j].ID)) > 0
+	})
+
+	return out, nil
+}
+
+func (a *NetAPI) NetPing(ctx context.Context, p peer.ID) (time.Duration, error) {
+	result, ok := <-ping.Ping(ctx, a.Host, p)
+	if !ok {
+		return 0, xerrors.Errorf("didn't get ping result: %w", ctx.Err())
+	}
+	return result.RTT, result.Error
 }
 
 var _ api.Net = &NetAPI{}

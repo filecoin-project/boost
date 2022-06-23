@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"errors"
+	"time"
 
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
@@ -201,9 +202,25 @@ type NetStruct struct {
 
 		NetFindPeer func(p0 context.Context, p1 peer.ID) (peer.AddrInfo, error) `perm:"read"`
 
+		NetLimit func(p0 context.Context, p1 string) (NetLimit, error) `perm:"read"`
+
 		NetPeerInfo func(p0 context.Context, p1 peer.ID) (*ExtendedPeerInfo, error) `perm:"read"`
 
 		NetPeers func(p0 context.Context) ([]peer.AddrInfo, error) `perm:"read"`
+
+		NetPing func(p0 context.Context, p1 peer.ID) (time.Duration, error) `perm:"read"`
+
+		NetProtectAdd func(p0 context.Context, p1 []peer.ID) error `perm:"admin"`
+
+		NetProtectList func(p0 context.Context) ([]peer.ID, error) `perm:"read"`
+
+		NetProtectRemove func(p0 context.Context, p1 []peer.ID) error `perm:"admin"`
+
+		NetPubsubScores func(p0 context.Context) ([]PubsubScore, error) `perm:"read"`
+
+		NetSetLimit func(p0 context.Context, p1 string, p2 NetLimit) error `perm:"admin"`
+
+		NetStat func(p0 context.Context, p1 string) (NetStat, error) `perm:"read"`
 	}
 }
 
@@ -935,6 +952,17 @@ func (s *NetStub) NetFindPeer(p0 context.Context, p1 peer.ID) (peer.AddrInfo, er
 	return *new(peer.AddrInfo), ErrNotSupported
 }
 
+func (s *NetStruct) NetLimit(p0 context.Context, p1 string) (NetLimit, error) {
+	if s.Internal.NetLimit == nil {
+		return *new(NetLimit), ErrNotSupported
+	}
+	return s.Internal.NetLimit(p0, p1)
+}
+
+func (s *NetStub) NetLimit(p0 context.Context, p1 string) (NetLimit, error) {
+	return *new(NetLimit), ErrNotSupported
+}
+
 func (s *NetStruct) NetPeerInfo(p0 context.Context, p1 peer.ID) (*ExtendedPeerInfo, error) {
 	if s.Internal.NetPeerInfo == nil {
 		return nil, ErrNotSupported
@@ -955,6 +983,83 @@ func (s *NetStruct) NetPeers(p0 context.Context) ([]peer.AddrInfo, error) {
 
 func (s *NetStub) NetPeers(p0 context.Context) ([]peer.AddrInfo, error) {
 	return *new([]peer.AddrInfo), ErrNotSupported
+}
+
+func (s *NetStruct) NetPing(p0 context.Context, p1 peer.ID) (time.Duration, error) {
+	if s.Internal.NetPing == nil {
+		return *new(time.Duration), ErrNotSupported
+	}
+	return s.Internal.NetPing(p0, p1)
+}
+
+func (s *NetStub) NetPing(p0 context.Context, p1 peer.ID) (time.Duration, error) {
+	return *new(time.Duration), ErrNotSupported
+}
+
+func (s *NetStruct) NetProtectAdd(p0 context.Context, p1 []peer.ID) error {
+	if s.Internal.NetProtectAdd == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.NetProtectAdd(p0, p1)
+}
+
+func (s *NetStub) NetProtectAdd(p0 context.Context, p1 []peer.ID) error {
+	return ErrNotSupported
+}
+
+func (s *NetStruct) NetProtectList(p0 context.Context) ([]peer.ID, error) {
+	if s.Internal.NetProtectList == nil {
+		return *new([]peer.ID), ErrNotSupported
+	}
+	return s.Internal.NetProtectList(p0)
+}
+
+func (s *NetStub) NetProtectList(p0 context.Context) ([]peer.ID, error) {
+	return *new([]peer.ID), ErrNotSupported
+}
+
+func (s *NetStruct) NetProtectRemove(p0 context.Context, p1 []peer.ID) error {
+	if s.Internal.NetProtectRemove == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.NetProtectRemove(p0, p1)
+}
+
+func (s *NetStub) NetProtectRemove(p0 context.Context, p1 []peer.ID) error {
+	return ErrNotSupported
+}
+
+func (s *NetStruct) NetPubsubScores(p0 context.Context) ([]PubsubScore, error) {
+	if s.Internal.NetPubsubScores == nil {
+		return *new([]PubsubScore), ErrNotSupported
+	}
+	return s.Internal.NetPubsubScores(p0)
+}
+
+func (s *NetStub) NetPubsubScores(p0 context.Context) ([]PubsubScore, error) {
+	return *new([]PubsubScore), ErrNotSupported
+}
+
+func (s *NetStruct) NetSetLimit(p0 context.Context, p1 string, p2 NetLimit) error {
+	if s.Internal.NetSetLimit == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.NetSetLimit(p0, p1, p2)
+}
+
+func (s *NetStub) NetSetLimit(p0 context.Context, p1 string, p2 NetLimit) error {
+	return ErrNotSupported
+}
+
+func (s *NetStruct) NetStat(p0 context.Context, p1 string) (NetStat, error) {
+	if s.Internal.NetStat == nil {
+		return *new(NetStat), ErrNotSupported
+	}
+	return s.Internal.NetStat(p0, p1)
+}
+
+func (s *NetStub) NetStat(p0 context.Context, p1 string) (NetStat, error) {
+	return *new(NetStat), ErrNotSupported
 }
 
 func (s *WalletStruct) WalletDelete(p0 context.Context, p1 address.Address) error {

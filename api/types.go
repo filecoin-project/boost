@@ -15,6 +15,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
+
+	"github.com/libp2p/go-libp2p-core/network"
 )
 
 // TODO: check if this exists anywhere else
@@ -104,6 +106,28 @@ func NewDataTransferChannel(hostID peer.ID, channelState datatransfer.ChannelSta
 		channel.OtherPeer = channelState.Sender()
 	}
 	return channel
+}
+
+type NetStat struct {
+	System    *network.ScopeStat           `json:",omitempty"`
+	Transient *network.ScopeStat           `json:",omitempty"`
+	Services  map[string]network.ScopeStat `json:",omitempty"`
+	Protocols map[string]network.ScopeStat `json:",omitempty"`
+	Peers     map[string]network.ScopeStat `json:",omitempty"`
+}
+
+type NetLimit struct {
+	Dynamic bool `json:",omitempty"`
+	// set if Dynamic is false
+	Memory int64 `json:",omitempty"`
+	// set if Dynamic is true
+	MemoryFraction float64 `json:",omitempty"`
+	MinMemory      int64   `json:",omitempty"`
+	MaxMemory      int64   `json:",omitempty"`
+
+	Streams, StreamsInbound, StreamsOutbound int
+	Conns, ConnsInbound, ConnsOutbound       int
+	FD                                       int
 }
 
 type NetBlockList struct {
