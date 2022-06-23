@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"github.com/filecoin-project/boost/db/migrations"
 	"testing"
 	"time"
 
@@ -17,7 +18,7 @@ func TestDealsDB(t *testing.T) {
 
 	sqldb := CreateTestTmpDB(t)
 	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
-	require.NoError(t, Migrate(sqldb))
+	require.NoError(t, migrations.Migrate(sqldb))
 
 	db := NewDealsDB(sqldb)
 	deals, err := GenerateDeals()
@@ -98,7 +99,7 @@ func TestDealsDBSearch(t *testing.T) {
 
 	sqldb := CreateTestTmpDB(t)
 	req.NoError(CreateAllBoostTables(ctx, sqldb, sqldb))
-	req.NoError(Migrate(sqldb))
+	req.NoError(migrations.Migrate(sqldb))
 
 	start := time.Now()
 	db := NewDealsDB(sqldb)
