@@ -3,7 +3,6 @@ package piecemeta
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 
@@ -175,22 +174,22 @@ func (ps *PieceMeta) DeleteDealForPiece(pieceCid cid.Cid, dealUuid uuid.UUID) er
 	return nil
 }
 
-func (ps *PieceMeta) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
-	// TODO: Maybe mark for GC instead of deleting immediately
+//func (ps *PieceMeta) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
+// TODO: Maybe mark for GC instead of deleting immediately
 
-	// Delete mh => offset index from store
-	//err := ps.carIndex.Delete(pieceCid)
-	//if err != nil {
-	//err = fmt.Errorf("deleting CAR index for piece %s: %w", pieceCid, err)
-	//}
+// Delete mh => offset index from store
+//err := ps.carIndex.Delete(pieceCid)
+//if err != nil {
+//err = fmt.Errorf("deleting CAR index for piece %s: %w", pieceCid, err)
+//}
 
-	//// Delete mh => piece index from store
-	//if mherr := ps.mhToPieceIndex.Delete(pieceCid); mherr != nil {
-	//err = multierror.Append(fmt.Errorf("deleting cid index for piece %s: %w", pieceCid, mherr))
-	//}
-	//return err
-	return nil
-}
+//// Delete mh => piece index from store
+//if mherr := ps.mhToPieceIndex.Delete(pieceCid); mherr != nil {
+//err = multierror.Append(fmt.Errorf("deleting cid index for piece %s: %w", pieceCid, mherr))
+//}
+//return err
+//return nil
+//}
 
 // Used internally, and also by HTTP retrieval
 func (ps *PieceMeta) GetPieceReader(pieceCid cid.Cid) (SectionReader, error) {
@@ -343,7 +342,7 @@ func getRecords(subject index.Index) ([]model.Record, error) {
 			return nil, err
 		}
 	default:
-		return nil, errors.New(fmt.Sprintf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec()))
+		return nil, fmt.Errorf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec())
 	}
 	return records, nil
 }

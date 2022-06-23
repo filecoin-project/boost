@@ -1,6 +1,6 @@
 module github.com/filecoin-project/boost
 
-go 1.18
+go 1.17
 
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
