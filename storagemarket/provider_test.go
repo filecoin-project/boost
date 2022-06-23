@@ -18,6 +18,7 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
+	"github.com/filecoin-project/boost/piecemeta"
 	mock_sealingpipeline "github.com/filecoin-project/boost/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -30,7 +31,6 @@ import (
 	"github.com/filecoin-project/boost/transport/mocks"
 	tspttypes "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
-	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/shared_testutil"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
@@ -48,8 +48,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	ds "github.com/ipfs/go-datastore"
-	dssync "github.com/ipfs/go-datastore/sync"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -1308,16 +1306,12 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 		return true, "", nil
 	}
 
-	ps, err := piecestoreimpl.NewPieceStore(dssync.MutexWrap(ds.NewMapDatastore()))
-	require.NoError(t, err)
-	dagStore := shared_testutil.NewMockDagStoreWrapper(ps, nil)
-
 	askStore := &mockAskStore{}
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
 	prvCfg := Config{MaxTransferDuration: time.Hour}
 	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, sps, minerStub, df, sqldb,
-		logsDB, dagStore, ps, &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
+		logsDB, piecemeta.NewPieceMeta(nil), &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
 	require.NoError(t, err)
 	ph.Provider = prov
 
@@ -1344,7 +1338,6 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	secInfo := lapi.SectorInfo{State: lapi.SectorState(sealing.Proving)}
 	ph.MockSealingPipelineAPI.EXPECT().SectorsStatus(gomock.Any(), gomock.Any(), false).Return(secInfo, nil).AnyTimes()
 
-	ph.DAGStore = dagStore
 	ph.MockFullNode = fn
 
 	return ph
@@ -1373,7 +1366,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	// construct a new provider with pre-existing state
 	prov, err := NewProvider(h.Provider.config, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
-		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.dagst, h.Provider.ps, &NoOpIndexProvider{}, h.Provider.askGetter,
+		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.pieceMeta, &NoOpIndexProvider{}, h.Provider.askGetter,
 		h.Provider.sigVerifier, h.Provider.dealLogger, h.Provider.Transport)
 
 	require.NoError(t, err)
@@ -1381,14 +1374,6 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 }
 
 func (h *ProviderHarness) Start(t *testing.T, ctx context.Context) {
-	require.NoError(t, h.Provider.ps.Start(ctx))
-	ready := make(chan error)
-	h.Provider.ps.OnReady(func(err error) {
-		ready <- err
-	})
-
-	require.NoError(t, <-ready)
-
 	h.NormalServer.Start()
 	h.BlockingServer.Start()
 	h.DisconnectingServer.Start()
