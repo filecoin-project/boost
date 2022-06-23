@@ -19,7 +19,7 @@ func (a *NetAPI) NetStat(ctx context.Context, scope string) (result api.NetStat,
 	case scope == "all":
 		rapi, ok := a.ResourceManager.(rcmgr.ResourceManagerState)
 		if !ok {
-			return result, xerrors.Errorf("rexource manager does not support ResourceManagerState API")
+			return result, xerrors.Errorf("resource manager does not support ResourceManagerState API") // nolint:staticcheck
 		}
 
 		stat := rapi.Stat()
@@ -85,7 +85,7 @@ func (a *NetAPI) NetStat(ctx context.Context, scope string) (result api.NetStat,
 		p := scope[5:]
 		pid, err := peer.IDFromString(p)
 		if err != nil {
-			return result, xerrors.Errorf("invalid peer ID: %s: %w", p, err)
+			return result, xerrors.Errorf("invalid peer ID: %s: %w", p, err) // nolint:staticcheck
 		}
 		err = a.ResourceManager.ViewPeer(pid, func(s network.PeerScope) error {
 			stat := s.Stat()

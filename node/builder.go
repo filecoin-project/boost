@@ -227,7 +227,7 @@ var LibP2P = Options(
 	Override(AutoNATSvcKey, lotus_lp2p.AutoNATService),
 
 	// Services (pubsub)
-	Override(new(*lotus_dtypes.ScoreKeeper), lotus_lp2p.ScoreKeeper),
+	Override(new(*dtypes.ScoreKeeper), lotus_lp2p.ScoreKeeper),
 	Override(new(*pubsub.PubSub), lotus_lp2p.GossipSub),
 	Override(new(*lotus_config.Pubsub), func(bs lotus_dtypes.Bootstrapper) *lotus_config.Pubsub {
 		return &lotus_config.Pubsub{

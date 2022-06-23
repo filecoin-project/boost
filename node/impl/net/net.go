@@ -187,7 +187,7 @@ func (a *NetAPI) NetPubsubScores(context.Context) ([]api.PubsubScore, error) {
 func (a *NetAPI) NetPing(ctx context.Context, p peer.ID) (time.Duration, error) {
 	result, ok := <-ping.Ping(ctx, a.Host, p)
 	if !ok {
-		return 0, xerrors.Errorf("didn't get ping result: %w", ctx.Err())
+		return 0, xerrors.Errorf("didn't get ping result: %w", ctx.Err()) // nolint:staticcheck
 	}
 	return result.RTT, result.Error
 }
