@@ -266,6 +266,6 @@ func (a *NetAPI) NetSetLimit(ctx context.Context, scope string, limit api.NetLim
 		return err
 
 	default:
-		return xerrors.Errorf("invalid scope %s", scope)
+		return xerrors.Errorf("invalid scope %s", scope) // nolint:staticcheck
 	}
 }

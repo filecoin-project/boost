@@ -141,7 +141,7 @@ var NetPing = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() != 1 {
-			return xerrors.Errorf("please provide a peerID")
+			return xerrors.Errorf("please provide a peerID") // nolint:staticcheck
 		}
 
 		api, closer, err := bcli.GetBoostAPI(cctx)
@@ -163,7 +163,7 @@ var NetPing = &cli.Command{
 		for _, pi := range pis {
 			err := api.NetConnect(ctx, pi)
 			if err != nil {
-				return xerrors.Errorf("connect: %w", err)
+				return xerrors.Errorf("connect: %w", err) // nolint:staticcheck
 			}
 
 			fmt.Printf("PING %s\n", pi.ID)
@@ -308,11 +308,11 @@ func addrInfoFromArg(ctx context.Context, cctx *cli.Context) ([]peer.AddrInfo, e
 
 		mi, err := na.StateMinerInfo(ctx, a, types.EmptyTSK)
 		if err != nil {
-			return nil, xerrors.Errorf("getting miner info: %w", err)
+			return nil, xerrors.Errorf("getting miner info: %w", err) // nolint:staticcheck
 		}
 
 		if mi.PeerId == nil {
-			return nil, xerrors.Errorf("no PeerID for miner")
+			return nil, xerrors.Errorf("no PeerID for miner") // nolint:staticcheck
 		}
 		multiaddrs := make([]multiaddr.Multiaddr, 0, len(mi.Multiaddrs))
 		for i, a := range mi.Multiaddrs {
@@ -727,7 +727,7 @@ var NetStatCmd = &cli.Command{
 
 		args := cctx.Args().Slice()
 		if len(args) != 1 {
-			return xerrors.Errorf("must specify exactly one scope")
+			return xerrors.Errorf("must specify exactly one scope") // nolint:staticcheck
 		}
 		scope := args[0]
 
@@ -773,7 +773,7 @@ var NetLimitCmd = &cli.Command{
 
 		if cctx.Bool("set") {
 			if len(args) != 2 {
-				return xerrors.Errorf("must specify exactly a scope and a limit")
+				return xerrors.Errorf("must specify exactly a scope and a limit") // nolint:staticcheck
 			}
 			scope := args[0]
 			limitStr := args[1]
@@ -781,7 +781,7 @@ var NetLimitCmd = &cli.Command{
 			var limit bapi.NetLimit
 			err := json.Unmarshal([]byte(limitStr), &limit)
 			if err != nil {
-				return xerrors.Errorf("error decoding limit: %w", err)
+				return xerrors.Errorf("error decoding limit: %w", err) // nolint:staticcheck
 			}
 
 			return api.NetSetLimit(ctx, scope, limit)
@@ -789,7 +789,7 @@ var NetLimitCmd = &cli.Command{
 		}
 
 		if len(args) != 1 {
-			return xerrors.Errorf("must specify exactly one scope")
+			return xerrors.Errorf("must specify exactly one scope") // nolint:staticcheck
 		}
 		scope := args[0]
 
@@ -870,12 +870,12 @@ var NetProtectRemove = &cli.Command{
 func decodePeerIDsFromArgs(cctx *cli.Context) ([]peer.ID, error) {
 	pidArgs := cctx.Args().Slice()
 	if len(pidArgs) == 0 {
-		return nil, xerrors.Errorf("must specify at least one peer ID as an argument")
+		return nil, xerrors.Errorf("must specify at least one peer ID as an argument") // nolint:staticcheck
 	}
 	var pids []peer.ID
 	for _, pidStr := range pidArgs {
 		if pidStr == "" {
-			return nil, xerrors.Errorf("peer ID must not be empty")
+			return nil, xerrors.Errorf("peer ID must not be empty") // nolint:staticcheck
 		}
 		pid, err := peer.Decode(pidStr)
 		if err != nil {
