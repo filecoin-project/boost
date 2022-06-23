@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/builtin/v8/market"
@@ -17,7 +18,7 @@ func TestProposalLogDB(t *testing.T) {
 
 	sqldb := CreateTestTmpDB(t)
 	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
-	require.NoError(t, Migrate(sqldb))
+	require.NoError(t, migrations.Migrate(sqldb))
 
 	ldb := NewProposalLogsDB(sqldb)
 

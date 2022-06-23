@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost/db/fielddef"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/google/uuid"
 )
@@ -37,21 +38,21 @@ func (s *StorageDB) Untag(ctx context.Context, dealUuid uuid.UUID) (uint64, erro
 	qry := "SELECT TransferSize FROM StorageTagged WHERE DealUUID = ?"
 	row := s.db.QueryRowContext(ctx, qry, dealUuid)
 
-	ps := &bigIntFieldDef{f: new(big.Int)}
-	err := row.Scan(&ps.marshalled)
+	ps := &fielddef.BigIntFieldDef{F: new(big.Int)}
+	err := row.Scan(&ps.Marshalled)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return 0, ErrNotFound
 		}
 		return 0, fmt.Errorf("getting untagged amount: %w", err)
 	}
-	err = ps.unmarshall()
+	err = ps.Unmarshall()
 	if err != nil {
 		return 0, fmt.Errorf("unmarshalling untagged TransferSize")
 	}
 
 	_, err = s.db.ExecContext(ctx, "DELETE FROM StorageTagged WHERE DealUUID = ?", dealUuid)
-	return (*ps.f).Uint64(), err
+	return (*ps.F).Uint64(), err
 }
 
 func (s *StorageDB) InsertLog(ctx context.Context, logs ...*StorageLog) error {
@@ -83,25 +84,25 @@ func (s *StorageDB) Logs(ctx context.Context) ([]StorageLog, error) {
 
 	storageLogs := make([]StorageLog, 0, 16)
 	for rows.Next() {
-		ps := &bigIntFieldDef{f: new(big.Int)}
+		ps := &fielddef.BigIntFieldDef{F: new(big.Int)}
 
 		var storageLog StorageLog
 		err := rows.Scan(
 			&storageLog.DealUUID,
 			&storageLog.CreatedAt,
-			&ps.marshalled,
+			&ps.Marshalled,
 			&storageLog.Text)
 
 		if err != nil {
 			return nil, err
 		}
 
-		err = ps.unmarshall()
+		err = ps.Unmarshall()
 		if err != nil {
 			return nil, fmt.Errorf("unmarshalling TransferSize: %w", err)
 		}
 
-		storageLog.TransferSize = (*ps.f).Uint64()
+		storageLog.TransferSize = (*ps.F).Uint64()
 		storageLogs = append(storageLogs, storageLog)
 	}
 	if err := rows.Err(); err != nil {
@@ -121,18 +122,18 @@ func (s *StorageDB) TotalTagged(ctx context.Context) (uint64, error) {
 	total := big.NewIntUnsigned(0)
 
 	for rows.Next() {
-		val := &bigIntFieldDef{f: new(big.Int)}
-		err := rows.Scan(&val.marshalled)
+		val := &fielddef.BigIntFieldDef{F: new(big.Int)}
+		err := rows.Scan(&val.Marshalled)
 		if err != nil {
 			return 0, fmt.Errorf("getting TransferSize: %w", err)
 		}
 
-		err = val.unmarshall()
+		err = val.Unmarshall()
 		if err != nil {
 			return 0, fmt.Errorf("unmarshalling untagged TransferSize: %w", err)
 		}
-		if val.f.Int != nil {
-			total = big.Add(total, *val.f)
+		if val.F.Int != nil {
+			total = big.Add(total, *val.F)
 		}
 	}
 	if err := rows.Err(); err != nil {
