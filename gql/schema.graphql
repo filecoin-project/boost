@@ -278,8 +278,8 @@ type Libp2pAddrInfo {
 }
 
 type StorageAsk {
-  Price: Uint64!
-  VerifiedPrice: Uint64!
+  Price: BigInt!
+  VerifiedPrice: BigInt!
   MinPieceSize: Uint64!
   MaxPieceSize: Uint64!
   ExpiryEpoch: Uint64!
@@ -287,8 +287,8 @@ type StorageAsk {
 }
 
 input StorageAskUpdate {
-  Price: Uint64
-  VerifiedPrice: Uint64
+  Price: BigInt
+  VerifiedPrice: BigInt
   MinPieceSize: Uint64
   MaxPieceSize: Uint64
 }

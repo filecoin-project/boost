@@ -13,8 +13,8 @@ import (
 )
 
 type storageAskResolver struct {
-	Price         types.Uint64
-	VerifiedPrice types.Uint64
+	Price         types.BigInt
+	VerifiedPrice types.BigInt
 	MinPieceSize  types.Uint64
 	MaxPieceSize  types.Uint64
 	ExpiryEpoch   types.Uint64
@@ -33,8 +33,8 @@ func (r *resolver) StorageAsk(ctx context.Context) (*storageAskResolver, error) 
 	expTime := time.Now().Add(time.Duration(expTimeEpochs) * time.Duration(build.BlockDelaySecs) * time.Second)
 
 	return &storageAskResolver{
-		Price:         types.Uint64(ask.Price.Uint64()),
-		VerifiedPrice: types.Uint64(ask.VerifiedPrice.Uint64()),
+		Price:         types.BigInt{Int: ask.Price},
+		VerifiedPrice: types.BigInt{Int: ask.VerifiedPrice},
 		MinPieceSize:  types.Uint64(ask.MinPieceSize),
 		MaxPieceSize:  types.Uint64(ask.MaxPieceSize),
 		ExpiryEpoch:   types.Uint64(ask.Expiry),
@@ -43,8 +43,8 @@ func (r *resolver) StorageAsk(ctx context.Context) (*storageAskResolver, error) 
 }
 
 type storageAskUpdate struct {
-	Price         *types.Uint64
-	VerifiedPrice *types.Uint64
+	Price         *types.BigInt
+	VerifiedPrice *types.BigInt
 	MinPieceSize  *types.Uint64
 	MaxPieceSize  *types.Uint64
 }
@@ -62,10 +62,10 @@ func (r *resolver) StorageAskUpdate(args struct{ Update storageAskUpdate }) (boo
 
 	update := args.Update
 	if update.Price != nil {
-		price = abi.NewTokenAmount(int64(*update.Price))
+		price = (*update.Price).Int
 	}
 	if update.VerifiedPrice != nil {
-		verifiedPrice = abi.NewTokenAmount(int64(*update.VerifiedPrice))
+		verifiedPrice = (*update.VerifiedPrice).Int
 	}
 	if update.MinPieceSize != nil {
 		opts = append(opts, storagemarket.MinPieceSize(abi.PaddedPieceSize(*update.MinPieceSize)))

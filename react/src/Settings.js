@@ -120,7 +120,7 @@ function StorageAsk(props) {
 
 export function EditableField(props) {
     const isCurrency = props.type === 'fil'
-    const initialValue = isCurrency ? props.value+'' : props.value+''
+    const initialValue = props.value+''
     const [editing, setEditing] = useState(false)
     const [currentVal, setCurrentVal] = useState(initialValue)
     const [storageAskUpdate] = useMutation(StorageAskUpdate, {
