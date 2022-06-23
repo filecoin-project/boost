@@ -63,8 +63,16 @@
   * [NetConnectedness](#netconnectedness)
   * [NetDisconnect](#netdisconnect)
   * [NetFindPeer](#netfindpeer)
+  * [NetLimit](#netlimit)
   * [NetPeerInfo](#netpeerinfo)
   * [NetPeers](#netpeers)
+  * [NetPing](#netping)
+  * [NetProtectAdd](#netprotectadd)
+  * [NetProtectList](#netprotectlist)
+  * [NetProtectRemove](#netprotectremove)
+  * [NetPubsubScores](#netpubsubscores)
+  * [NetSetLimit](#netsetlimit)
+  * [NetStat](#netstat)
 * [Pieces](#pieces)
   * [PiecesGetCIDInfo](#piecesgetcidinfo)
   * [PiecesGetMaxOffset](#piecesgetmaxoffset)
@@ -1265,6 +1273,36 @@ Response:
 }
 ```
 
+### NetLimit
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "string value"
+]
+```
+
+Response:
+```json
+{
+  "Dynamic": true,
+  "Memory": 9,
+  "MemoryFraction": 12.3,
+  "MinMemory": 9,
+  "MaxMemory": 9,
+  "Streams": 123,
+  "StreamsInbound": 123,
+  "StreamsOutbound": 123,
+  "Conns": 123,
+  "ConnsInbound": 123,
+  "ConnsOutbound": 123,
+  "FD": 123
+}
+```
+
 ### NetPeerInfo
 
 
@@ -1318,6 +1356,188 @@ Response:
     ]
   }
 ]
+```
+
+### NetPing
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"
+]
+```
+
+Response: `60000000000`
+
+### NetProtectAdd
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  [
+    "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"
+  ]
+]
+```
+
+Response: `{}`
+
+### NetProtectList
+
+
+Perms: read
+
+Inputs: `null`
+
+Response:
+```json
+[
+  "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"
+]
+```
+
+### NetProtectRemove
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  [
+    "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"
+  ]
+]
+```
+
+Response: `{}`
+
+### NetPubsubScores
+
+
+Perms: read
+
+Inputs: `null`
+
+Response:
+```json
+[
+  {
+    "ID": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+    "Score": {
+      "Score": 12.3,
+      "Topics": {
+        "/blocks": {
+          "TimeInMesh": 60000000000,
+          "FirstMessageDeliveries": 122,
+          "MeshMessageDeliveries": 1234,
+          "InvalidMessageDeliveries": 3
+        }
+      },
+      "AppSpecificScore": 12.3,
+      "IPColocationFactor": 12.3,
+      "BehaviourPenalty": 12.3
+    }
+  }
+]
+```
+
+### NetSetLimit
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  "string value",
+  {
+    "Dynamic": true,
+    "Memory": 9,
+    "MemoryFraction": 12.3,
+    "MinMemory": 9,
+    "MaxMemory": 9,
+    "Streams": 123,
+    "StreamsInbound": 123,
+    "StreamsOutbound": 123,
+    "Conns": 123,
+    "ConnsInbound": 123,
+    "ConnsOutbound": 123,
+    "FD": 123
+  }
+]
+```
+
+Response: `{}`
+
+### NetStat
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "string value"
+]
+```
+
+Response:
+```json
+{
+  "System": {
+    "NumStreamsInbound": 123,
+    "NumStreamsOutbound": 123,
+    "NumConnsInbound": 123,
+    "NumConnsOutbound": 123,
+    "NumFD": 123,
+    "Memory": 9
+  },
+  "Transient": {
+    "NumStreamsInbound": 123,
+    "NumStreamsOutbound": 123,
+    "NumConnsInbound": 123,
+    "NumConnsOutbound": 123,
+    "NumFD": 123,
+    "Memory": 9
+  },
+  "Services": {
+    "abc": {
+      "NumStreamsInbound": 1,
+      "NumStreamsOutbound": 2,
+      "NumConnsInbound": 3,
+      "NumConnsOutbound": 4,
+      "NumFD": 5,
+      "Memory": 123
+    }
+  },
+  "Protocols": {
+    "abc": {
+      "NumStreamsInbound": 1,
+      "NumStreamsOutbound": 2,
+      "NumConnsInbound": 3,
+      "NumConnsOutbound": 4,
+      "NumFD": 5,
+      "Memory": 123
+    }
+  },
+  "Peers": {
+    "abc": {
+      "NumStreamsInbound": 1,
+      "NumStreamsOutbound": 2,
+      "NumConnsInbound": 3,
+      "NumConnsOutbound": 4,
+      "NumFD": 5,
+      "Memory": 123
+    }
+  }
+}
 ```
 
 ## Pieces
