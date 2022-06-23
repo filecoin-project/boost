@@ -97,7 +97,7 @@ func (a *NetAPI) NetStat(ctx context.Context, scope string) (result api.NetStat,
 		return result, err
 
 	default:
-		return result, xerrors.Errorf("invalid scope %s", scope)
+		return result, xerrors.Errorf("invalid scope %s", scope) // nolint:staticcheck
 	}
 }
 
@@ -105,7 +105,7 @@ func (a *NetAPI) NetLimit(ctx context.Context, scope string) (result api.NetLimi
 	getLimit := func(s network.ResourceScope) error {
 		limiter, ok := s.(rcmgr.ResourceScopeLimiter)
 		if !ok {
-			return xerrors.Errorf("resource scope doesn't implement ResourceScopeLimiter interface")
+			return xerrors.Errorf("resource scope doesn't implement ResourceScopeLimiter interface") // nolint:staticcheck
 		}
 
 		limit := limiter.Limit()
@@ -134,7 +134,7 @@ func (a *NetAPI) NetLimit(ctx context.Context, scope string) (result api.NetLimi
 			result.FD = l.BaseLimit.FD
 
 		default:
-			return xerrors.Errorf("unknown limit type %T", limit)
+			return xerrors.Errorf("unknown limit type %T", limit) // nolint:staticcheck
 		}
 
 		return nil
@@ -171,7 +171,7 @@ func (a *NetAPI) NetLimit(ctx context.Context, scope string) (result api.NetLimi
 		p := scope[5:]
 		pid, err := peer.IDFromString(p)
 		if err != nil {
-			return result, xerrors.Errorf("invalid peer ID: %s: %w", p, err)
+			return result, xerrors.Errorf("invalid peer ID: %s: %w", p, err) // nolint:staticcheck
 		}
 		err = a.ResourceManager.ViewPeer(pid, func(s network.PeerScope) error {
 			return getLimit(s)
@@ -179,7 +179,7 @@ func (a *NetAPI) NetLimit(ctx context.Context, scope string) (result api.NetLimi
 		return result, err
 
 	default:
-		return result, xerrors.Errorf("invalid scope %s", scope)
+		return result, xerrors.Errorf("invalid scope %s", scope) // nolint:staticcheck
 	}
 }
 
@@ -187,7 +187,7 @@ func (a *NetAPI) NetSetLimit(ctx context.Context, scope string, limit api.NetLim
 	setLimit := func(s network.ResourceScope) error {
 		limiter, ok := s.(rcmgr.ResourceScopeLimiter)
 		if !ok {
-			return xerrors.Errorf("resource scope doesn't implement ResourceScopeLimiter interface")
+			return xerrors.Errorf("resource scope doesn't implement ResourceScopeLimiter interface") // nolint:staticcheck
 		}
 
 		var newLimit rcmgr.Limit
@@ -258,7 +258,7 @@ func (a *NetAPI) NetSetLimit(ctx context.Context, scope string, limit api.NetLim
 		p := scope[5:]
 		pid, err := peer.IDFromString(p)
 		if err != nil {
-			return xerrors.Errorf("invalid peer ID: %s: %w", p, err)
+			return xerrors.Errorf("invalid peer ID: %s: %w", p, err) // nolint:staticcheck
 		}
 		err = a.ResourceManager.ViewPeer(pid, func(s network.PeerScope) error {
 			return setLimit(s)

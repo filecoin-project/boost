@@ -20,7 +20,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/filecoin-project/boost/api"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_lp2p "github.com/filecoin-project/lotus/node/modules/lp2p"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 )
@@ -34,7 +34,7 @@ type NetAPI struct {
 	ResourceManager network.ResourceManager
 	ConnGater       *conngater.BasicConnectionGater
 	Reporter        metrics.Reporter
-	Sk              *dtypes.ScoreKeeper
+	Sk              *lotus_dtypes.ScoreKeeper
 }
 
 func (a *NetAPI) ID(context.Context) (peer.ID, error) {
