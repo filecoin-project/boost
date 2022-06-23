@@ -492,7 +492,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		// Lotus Markets
 		Override(new(lotus_dtypes.StagingBlockstore), lotus_modules.StagingBlockstore),
 		Override(new(lotus_dtypes.StagingGraphsync), lotus_modules.StagingGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
-		Override(new(lotus_dtypes.ProviderPieceStore), lotus_modules.NewProviderPieceStore),
+		Override(new(lotus_dtypes.ProviderPieceStore), modules.NewProviderPieceStore),
 
 		// Lotus Markets (retrieval deps)
 		Override(new(lotus_sectorstorage.PieceProvider), lotus_sectorstorage.NewPieceProvider),
