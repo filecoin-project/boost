@@ -19,6 +19,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/piecemeta"
+	mock_piecemeta "github.com/filecoin-project/boost/piecemeta/mocks"
 	mock_sealingpipeline "github.com/filecoin-project/boost/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -977,12 +978,12 @@ func (h *ProviderHarness) AssertPieceAdded(t *testing.T, ctx context.Context, dp
 	// Assert that the original file data we sent matches what was sent to the sealer
 	h.AssertSealedContents(t, carv2FilePath, *so.SealedBytes)
 	// assert that dagstore and piecestore have this deal
-	dbState, err := h.DealsDB.ByID(ctx, dp.DealUUID)
+	_, err := h.DealsDB.ByID(ctx, dp.DealUUID)
 	require.NoError(t, err)
-	rg, ok := h.DAGStore.GetRegistration(dbState.ClientDealProposal.Proposal.PieceCID)
-	require.True(t, ok)
-	require.True(t, rg.EagerInit)
-	require.Empty(t, rg.CarPath)
+	//rg, ok := h.DAGStore.GetRegistration(dbState.ClientDealProposal.Proposal.PieceCID)
+	//require.True(t, ok)
+	//require.True(t, rg.EagerInit)
+	//require.Empty(t, rg.CarPath)
 }
 
 func (h *ProviderHarness) EventuallyAssertNoTagged(t *testing.T, ctx context.Context) {
@@ -1309,9 +1310,15 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	askStore := &mockAskStore{}
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
+	store := mock_piecemeta.NewMockStore(ctrl)
+	store.EXPECT().IsIndexed(gomock.Any()).Return(true, nil).AnyTimes()
+	store.EXPECT().AddDealForPiece(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+	pm := piecemeta.NewPieceMeta(store, nil)
+
 	prvCfg := Config{MaxTransferDuration: time.Hour}
 	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, sps, minerStub, df, sqldb,
-		logsDB, piecemeta.NewPieceMeta(nil), &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
+		logsDB, pm, &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
 	require.NoError(t, err)
 	ph.Provider = prov
 

@@ -23,10 +23,10 @@ import (
 	carindex "github.com/ipld/go-car/v2/index"
 )
 
-func NewPieceMeta(maddr dtypes.MinerAddress, secb sectorblocks.SectorBuilder, pp sectorstorage.PieceProvider, full v1api.FullNode) *piecemeta.PieceMeta {
+func NewPieceMeta(maddr dtypes.MinerAddress, store piecemeta.Store, secb sectorblocks.SectorBuilder, pp sectorstorage.PieceProvider, full v1api.FullNode) *piecemeta.PieceMeta {
 	sa := sectoraccessor.NewSectorAccessor(maddr, secb, pp, full)
 
-	return piecemeta.NewPieceMeta(sa)
+	return piecemeta.NewPieceMeta(store, sa)
 }
 
 func NewPieceStore(pm *piecemeta.PieceMeta) piecestore.PieceStore {

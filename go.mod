@@ -6,7 +6,9 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
 replace github.com/filecoin-project/boost/cmd/boostd-data => ./cmd/boostd-data
 
-// replace github.com/filecoin-project/lotus => ../lotus
+//replace github.com/filecoin-project/lotus => ../lotus
+
+//replace github.com/filecoin-project/go-fil-markets => ../go-fil-markets
 
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
@@ -213,6 +215,7 @@ require (
 	github.com/ipfs/go-filestore v1.1.0 // indirect
 	github.com/ipfs/go-fs-lock v0.0.7 // indirect
 	github.com/ipfs/go-ipfs-cmds v0.6.0 // indirect
+	github.com/ipfs/go-ipfs-config v0.18.0 // indirect
 	github.com/ipfs/go-ipfs-delay v0.0.1 // indirect
 	github.com/ipfs/go-ipfs-http-client v0.0.6 // indirect
 	github.com/ipfs/go-ipfs-posinfo v0.0.1 // indirect
@@ -323,6 +326,7 @@ require (
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.1 // indirect
+	github.com/warpfork/go-testmark v0.9.0 // indirect
 	github.com/whyrusleeping/bencher v0.0.0-20190829221104-bb6607aa8bba // indirect
 	github.com/whyrusleeping/cbor v0.0.0-20171005072247-63513f603b11 // indirect
 	github.com/whyrusleeping/chunker v0.0.0-20181014151217-fe64bd25879f // indirect

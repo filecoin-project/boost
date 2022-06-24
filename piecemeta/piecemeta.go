@@ -55,7 +55,7 @@ type PieceMeta struct {
 	sealer Sealer
 }
 
-func NewPieceMeta(sa dagstore.SectorAccessor) *PieceMeta {
+func NewStore() *client.Store {
 	addr, _, err := svc.Setup("ldb")
 	if err != nil {
 		panic(err)
@@ -66,7 +66,11 @@ func NewPieceMeta(sa dagstore.SectorAccessor) *PieceMeta {
 		panic(err)
 	}
 
-	return &PieceMeta{store: cl, sealer: &sealer{sa}}
+	return cl
+}
+
+func NewPieceMeta(store Store, sa dagstore.SectorAccessor) *PieceMeta {
+	return &PieceMeta{store: store, sealer: &sealer{sa}}
 }
 
 type sealer struct {
