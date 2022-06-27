@@ -6,7 +6,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var NetCmd = &cli.Command{
+var netCmd = &cli.Command{
 	Name:  "net",
 	Usage: "Manage P2P Network",
 	Before: func(cctx *cli.Context) error {

@@ -47,7 +47,7 @@ func main() {
 			logCmd,
 			dagstoreCmd,
 			piecesCmd,
-			NetCmd,
+			netCmd,
 		},
 	}
 	app.Setup()
