@@ -84,14 +84,12 @@ export function DealTransfersMenuItem(props) {
 
         // Get average transfer rate over last 10 seconds
         var total = 0
-        const tenSecondsAgo = new Date().getTime() - 11 * 1000
-        for (const point of points) {
-            if (point.At.getTime() > tenSecondsAgo) {
-                const megabits = 8 * Number(point.Bytes) / 1e6
-                total += megabits
-            }
+        const subset = points.slice(points.length-10)
+        for (const point of subset) {
+            const megabits = 8 * Number(point.Bytes) / 1e6
+            total += megabits
         }
-        dataRate = total / 10
+        dataRate = total / subset.length
     }
 
     return <Link key="deal-transfers" className="menu-item" to="/deal-transfers">
