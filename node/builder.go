@@ -286,7 +286,7 @@ func ConfigCommon(cfg *config.Common) Option {
 			Override(new(lotus_dtypes.BootstrapPeers), modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)),
 		),
 
-		Override(new(network.ResourceManager), lp2p.ResourceManager(cfg.Libp2p.ConnMgrHigh)),
+		Override(new(network.ResourceManager), modules.ResourceManager(cfg.Libp2p.ConnMgrHigh)),
 		Override(ResourceManagerKey, lp2p.ResourceManagerOption),
 		Override(new(*pubsub.PubSub), lp2p.GossipSub),
 		Override(new(*lotus_config.Pubsub), &cfg.Pubsub),
