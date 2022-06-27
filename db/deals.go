@@ -212,6 +212,14 @@ func (d *DealsDB) ByPublishCID(ctx context.Context, publishCid string) ([]*types
 	return deals, nil
 }
 
+func (d *DealsDB) ByPieceCID(ctx context.Context, pieceCid cid.Cid) ([]*types.ProviderDealState, error) {
+	return d.list(ctx, 0, 0, "PieceCID=?", pieceCid.String())
+}
+
+func (d *DealsDB) ByRootPayloadCID(ctx context.Context, payloadCid cid.Cid) ([]*types.ProviderDealState, error) {
+	return d.list(ctx, 0, 0, "DealDataRoot=?", payloadCid.String())
+}
+
 func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid cid.Cid) (*types.ProviderDealState, error) {
 	qry := "SELECT " + dealFieldsStr + " FROM Deals WHERE SignedProposalCID=?"
 	row := d.db.QueryRowContext(ctx, qry, proposalCid.String())

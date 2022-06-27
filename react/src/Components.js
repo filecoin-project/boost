@@ -11,7 +11,8 @@ export function PageContainer(props) {
 }
 
 export function ShortDealLink(props) {
-    return <Link to={"/deals/" + props.id}>
+    const linkBase = props.isLegacy ? "/legacy-deals/" : "/deals/"
+    return <Link to={linkBase + props.id}>
         <ShortDealID id={props.id} />
     </Link>
 }
