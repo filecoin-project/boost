@@ -18,8 +18,7 @@ import (
 
 const metadaFileName = "metadata"
 
-var fm = []string{"api",
-	"boost.db",
+var fm = []string{"boost.db",
 	"boost.logs.db",
 	"config.toml",
 	"storage.json",
@@ -99,6 +98,10 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("error copying keys: %w", err)
 		}
 
+		if err := os.Mkdir(path.Join(bkpDir, "config"), 0755); err != nil {
+			return fmt.Errorf("error creating config directory %s: %w", path.Join(bkpDir, "config"), err)
+		}
+
 		fpathName := path.Join(bkpDir, metadaFileName)
 
 		fpath, err := homedir.Expand(fpathName)
@@ -121,6 +124,16 @@ var backupCmd = &cli.Command{
 
 		if err := bds.Backup(cctx.Context, out); err != nil {
 			return fmt.Errorf("backup error: %w", err)
+		}
+
+		cfgFiles, err := ioutil.ReadDir(path.Join(lr.Path(), "config"))
+		if err != nil {
+			return fmt.Errorf("failed to read files from config directory: %w", err)
+		}
+
+		for _, cfgFile := range cfgFiles {
+			f := path.Join("config", cfgFile.Name())
+			fm = append(fm, f)
 		}
 
 		fmt.Println("Copying the files to backup directory")
@@ -268,6 +281,16 @@ var restoreCmd = &cli.Command{
 		rpath, err := homedir.Expand(lr.Path())
 		if err != nil {
 			return fmt.Errorf("expanding boost repo path: %w", err)
+		}
+
+		cfgFiles, err := ioutil.ReadDir(path.Join(lb.Path(), "config"))
+		if err != nil {
+			return fmt.Errorf("failed to read files from config directory: %w", err)
+		}
+
+		for _, cfgFile := range cfgFiles {
+			f := path.Join("config", cfgFile.Name())
+			fm = append(fm, f)
 		}
 
 		for _, name := range fm {
