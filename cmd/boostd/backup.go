@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mitchellh/go-homedir"
@@ -20,7 +22,6 @@ const metadaFileName = "metadata"
 
 var fm = []string{"boost.db",
 	"boost.logs.db",
-	"config.toml",
 	"storage.json",
 	"token"}
 
@@ -283,6 +284,10 @@ var restoreCmd = &cli.Command{
 			return fmt.Errorf("expanding boost repo path: %w", err)
 		}
 
+		if err := os.Mkdir(path.Join(lr.Path(), "config"), 0755); err != nil {
+			return fmt.Errorf("error creating config directory %s: %w", path.Join(lr.Path(), "config"), err)
+		}
+
 		cfgFiles, err := ioutil.ReadDir(path.Join(lb.Path(), "config"))
 		if err != nil {
 			return fmt.Errorf("failed to read files from config directory: %w", err)
@@ -312,6 +317,44 @@ var restoreCmd = &cli.Command{
 				return fmt.Errorf("error copying file %s: %w", srcName, err)
 			}
 
+		}
+
+		configFiles, err := ioutil.ReadDir(path.Join(lr.Path(), "config"))
+		if err != nil {
+			return fmt.Errorf("failed to read the restored config files: %w", err)
+		}
+
+		cfgNum := 0
+
+		for _, v := range configFiles {
+			f := v.Name()
+			s := strings.Split(f, ".")
+			if (len(s) == 3) && (s[0] == "config") && (s[1] == "toml") {
+				if ver, err := strconv.Atoi(s[2]); err == nil {
+					if ver > cfgNum {
+						cfgNum = ver
+					}
+				}
+
+			}
+		}
+
+		//Remove default config.toml created with repo. Don't fail if file cannot be removed
+		if err = os.Remove(path.Join(lr.Path(), "config.toml")); err != nil {
+			fmt.Println(fmt.Errorf("failed to read the restored config files: %w", err))
+			fmt.Println("Please create the config.toml link manually")
+		}
+
+		latestCfgFile := "config.toml." + strconv.Itoa(cfgNum)
+
+		if err = os.Chdir(lr.Path()); err != nil {
+			fmt.Println(fmt.Errorf("failed to read the restored config files: %w", err))
+			fmt.Println("Please create the config.toml link manually")
+		}
+
+		if err = os.Symlink(path.Join("config", latestCfgFile), "config.toml"); err != nil {
+			fmt.Println(fmt.Errorf("failed to read the restored config files: %w", err))
+			fmt.Println("Please create the config.toml link manually")
 		}
 
 		fmt.Println("Boost repo successfully restored at " + lr.Path())
