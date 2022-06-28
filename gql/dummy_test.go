@@ -19,9 +19,10 @@ func TestDummyServer(t *testing.T) {
 	ctx := context.Background()
 
 	mux := http.NewServeMux()
-	listenAddr := fmt.Sprintf(":%d", httpPort)
+	port := 8080
+	listenAddr := fmt.Sprintf(":%d", port)
 	t.Logf("server listening on %s\n", listenAddr)
-	err := serveDummyDeals(mux)
+	err := serveDummyDeals(mux, port)
 	rq.NoError(err)
 
 	srv := &http.Server{Addr: listenAddr, Handler: mux}

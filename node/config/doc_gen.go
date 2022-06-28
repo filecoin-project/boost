@@ -56,6 +56,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "Graphql",
+			Type: "GraphqlConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "LotusDealmaking",
 			Type: "lotus_config.DealmakingConfig",
 
@@ -260,6 +266,14 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 			Type: "types.FIL",
 
 			Comment: `The maximum fee to pay when sending the AddBalance message (used by legacy markets)`,
+		},
+	},
+	"GraphqlConfig": []DocField{
+		{
+			Name: "Port",
+			Type: "uint64",
+
+			Comment: `The port that the graphql server listens on`,
 		},
 	},
 	"LotusDealmakingConfig": []DocField{
