@@ -41,6 +41,7 @@ type Boost struct {
 	SectorIndexApiInfo string
 	Dealmaking         DealmakingConfig
 	Wallets            WalletsConfig
+	Graphql            GraphqlConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
@@ -67,6 +68,11 @@ type WalletsConfig struct {
 	DealCollateral string
 	// Deprecated: Renamed to DealCollateral
 	PledgeCollateral string
+}
+
+type GraphqlConfig struct {
+	// The port that the graphql server listens on
+	Port uint64
 }
 
 type LotusDealmakingConfig struct {

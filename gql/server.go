@@ -21,8 +21,6 @@ import (
 
 var log = logging.Logger("gql")
 
-const httpPort = 8080
-
 type Server struct {
 	resolver *resolver
 	srv      *http.Server
@@ -47,13 +45,14 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	// Serve dummy deals
-	err = serveDummyDeals(mux)
+	port := int(s.resolver.cfg.Graphql.Port)
+	err = serveDummyDeals(mux, port)
 	if err != nil {
 		return err
 	}
 
 	// GraphQL handler (GUI for making GraphQL queries)
-	mux.HandleFunc("/graphiql", graphiql(httpPort))
+	mux.HandleFunc("/graphiql", graphiql(port))
 
 	// Allow resolving directly to fields (instead of requiring resolvers to
 	// have a method for every GraphQL field)
@@ -73,7 +72,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	wsHandler := graphqlws.NewHandlerFunc(schema, queryHandler, wsOpts...)
 
-	listenAddr := fmt.Sprintf(":%d", httpPort)
+	listenAddr := fmt.Sprintf(":%d", port)
 	s.srv = &http.Server{Addr: listenAddr, Handler: mux}
 	fmt.Printf("Graphql server listening on %s\n", listenAddr)
 	mux.Handle("/graphql/subscription", &corsHandler{wsHandler})

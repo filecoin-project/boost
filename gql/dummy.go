@@ -11,9 +11,10 @@ import (
 const DummyDealsDir = "/tmp/dummy"
 const DummyDealsPrefix = "dummy"
 
-var DummyDealsBase = fmt.Sprintf("http://localhost:%d/"+DummyDealsPrefix, httpPort)
+var DummyDealsBase string
 
-func serveDummyDeals(mux *http.ServeMux) error {
+func serveDummyDeals(mux *http.ServeMux, port int) error {
+	DummyDealsBase = fmt.Sprintf("http://localhost:%d/"+DummyDealsPrefix, port)
 	dpath := "/" + DummyDealsPrefix + "/"
 	if err := os.MkdirAll(DummyDealsDir, 0755); err != nil {
 		return fmt.Errorf("failed to mk directory %s for dummy deals: %w", DummyDealsDir, err)
