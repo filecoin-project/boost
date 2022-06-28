@@ -63,6 +63,10 @@ func DefaultBoost() *Boost {
 			ParallelFetchLimit: 10,
 		},
 
+		Graphql: GraphqlConfig{
+			Port: 8080,
+		},
+
 		Dealmaking: DealmakingConfig{
 			ConsiderOnlineStorageDeals:     true,
 			ConsiderOfflineStorageDeals:    true,

@@ -18,7 +18,6 @@ import (
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/impl"
 	"github.com/filecoin-project/boost/node/impl/common"
-	"github.com/filecoin-project/boost/node/impl/net"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/piecemeta"
@@ -273,7 +272,7 @@ func ConfigCommon(cfg *config.Common) Option {
 			return urls, nil
 		}),
 		ApplyIf(func(s *Settings) bool { return s.Base }), // apply only if Base has already been applied
-		Override(new(api.Net), From(new(net.NetAPI))),
+		Override(new(api.Net), From(new(lotus_net.NetAPI))),
 		Override(new(api.Common), From(new(common.CommonAPI))),
 
 		Override(new(lotus_api.Net), From(new(lotus_net.NetAPI))),
@@ -290,7 +289,7 @@ func ConfigCommon(cfg *config.Common) Option {
 			Override(new(lotus_dtypes.BootstrapPeers), modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)),
 		),
 
-		Override(new(network.ResourceManager), lp2p.ResourceManager(cfg.Libp2p.ConnMgrHigh)),
+		Override(new(network.ResourceManager), modules.ResourceManager(cfg.Libp2p.ConnMgrHigh)),
 		Override(ResourceManagerKey, lp2p.ResourceManagerOption),
 		Override(new(*pubsub.PubSub), lp2p.GossipSub),
 		Override(new(*lotus_config.Pubsub), &cfg.Pubsub),
