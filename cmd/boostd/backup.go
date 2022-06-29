@@ -5,8 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"strconv"
-	"strings"
+	"path/filepath"
 	"time"
 
 	"github.com/mitchellh/go-homedir"
@@ -22,6 +21,7 @@ const metadaFileName = "metadata"
 
 var fm = []string{"boost.db",
 	"boost.logs.db",
+	"config.toml",
 	"storage.json",
 	"token"}
 
@@ -65,9 +65,14 @@ var backupCmd = &cli.Command{
 			return err
 		}
 
-		bpath, err := homedir.Expand(cctx.Args().First())
+		bkpPath, err := homedir.Expand(cctx.Args().First())
 		if err != nil {
 			return fmt.Errorf("expanding backup directory path: %w", err)
+		}
+
+		bpath, err := filepath.Abs(bkpPath)
+		if err != nil {
+			return fmt.Errorf("failed get absolute path for backup directory: %w", err)
 		}
 
 		fmt.Println("Creating backup directory")
@@ -139,25 +144,13 @@ var backupCmd = &cli.Command{
 
 		fmt.Println("Copying the files to backup directory")
 
-		for _, name := range fm {
-			srcName := path.Join(lr.Path(), name)
+		destPath, err := homedir.Expand(bkpDir)
+		if err != nil {
+			return fmt.Errorf("expanding destination file path %s: %w", bkpDir, err)
+		}
 
-			srcPath, err := homedir.Expand(srcName)
-			if err != nil {
-				return fmt.Errorf("expanding source file path %s: %w", srcName, err)
-			}
-
-			destName := path.Join(bkpDir, name)
-
-			destPath, err := homedir.Expand(destName)
-			if err != nil {
-				return fmt.Errorf("expanding destination file path %s: %w", destName, err)
-			}
-
-			if err := copyFiles(srcPath, destPath); err != nil {
-				return fmt.Errorf("error copying file %s: %w", srcName, err)
-			}
-
+		if err := copyFiles(lr.Path(), destPath, fm); err != nil {
+			return fmt.Errorf("error copying file: %w", err)
 		}
 
 		fmt.Println("Boost repo successfully backed up at " + bkpDir)
@@ -176,9 +169,14 @@ var restoreCmd = &cli.Command{
 			return fmt.Errorf("restore only takes one argument (backup directory path)")
 		}
 
-		bpath, err := homedir.Expand(cctx.Args().First())
+		bkpPath, err := homedir.Expand(cctx.Args().First())
 		if err != nil {
 			return fmt.Errorf("expanding backup directory path: %w", err)
+		}
+
+		bpath, err := filepath.Abs(bkpPath)
+		if err != nil {
+			return fmt.Errorf("failed get absolute path for backup directory: %w", err)
 		}
 
 		fmt.Printf("Checking backup directory %s\n", bpath)
@@ -279,11 +277,6 @@ var restoreCmd = &cli.Command{
 
 		fmt.Println("Restoring files")
 
-		rpath, err := homedir.Expand(lr.Path())
-		if err != nil {
-			return fmt.Errorf("expanding boost repo path: %w", err)
-		}
-
 		if err := os.Mkdir(path.Join(lr.Path(), "config"), 0755); err != nil {
 			return fmt.Errorf("error creating config directory %s: %w", path.Join(lr.Path(), "config"), err)
 		}
@@ -298,63 +291,13 @@ var restoreCmd = &cli.Command{
 			fm = append(fm, f)
 		}
 
-		for _, name := range fm {
-			srcName := path.Join(bpath, name)
-
-			srcPath, err := homedir.Expand(srcName)
-			if err != nil {
-				return fmt.Errorf("expanding source file path %s: %w", srcName, err)
-			}
-
-			destName := path.Join(rpath, name)
-
-			destPath, err := homedir.Expand(destName)
-			if err != nil {
-				return fmt.Errorf("expanding destination file path %s: %w", destName, err)
-			}
-
-			if err := copyFiles(srcPath, destPath); err != nil {
-				return fmt.Errorf("error copying file %s: %w", srcName, err)
-			}
-
-		}
-
-		configFiles, err := ioutil.ReadDir(path.Join(lr.Path(), "config"))
-		if err != nil {
-			return fmt.Errorf("failed to read the restored config files: %w", err)
-		}
-
-		cfgNum := 0
-
-		for _, v := range configFiles {
-			f := v.Name()
-			s := strings.Split(f, ".")
-			if (len(s) == 3) && (s[0] == "config") && (s[1] == "toml") {
-				if ver, err := strconv.Atoi(s[2]); err == nil {
-					if ver > cfgNum {
-						cfgNum = ver
-					}
-				}
-
-			}
-		}
-
-		//Remove default config.toml created with repo. Don't fail if file cannot be removed
+		//Remove default config.toml created with repo to avoid conflict with symllink
 		if err = os.Remove(path.Join(lr.Path(), "config.toml")); err != nil {
-			fmt.Println(fmt.Errorf("failed to read the restored config files: %w", err))
-			fmt.Println("Please create the config.toml link manually")
+			return fmt.Errorf("failed to remove the default config file: %w", err)
 		}
 
-		latestCfgFile := "config.toml." + strconv.Itoa(cfgNum)
-
-		if err = os.Chdir(lr.Path()); err != nil {
-			fmt.Println(fmt.Errorf("failed to read the restored config files: %w", err))
-			fmt.Println("Please create the config.toml link manually")
-		}
-
-		if err = os.Symlink(path.Join("config", latestCfgFile), "config.toml"); err != nil {
-			fmt.Println(fmt.Errorf("failed to read the restored config files: %w", err))
-			fmt.Println("Please create the config.toml link manually")
+		if err := copyFiles(lb.Path(), lr.Path(), fm); err != nil {
+			return fmt.Errorf("error copying file: %w", err)
 		}
 
 		fmt.Println("Boost repo successfully restored at " + lr.Path())
@@ -363,26 +306,47 @@ var restoreCmd = &cli.Command{
 	},
 }
 
-func copyFiles(src, dest string) error {
-	f, err := os.Stat(src)
+// This function uses chdir() to deal with relative symlinks be careful when reusing
+func copyFiles(srcDir, destDir string, flist []string) error {
 
-	if os.IsNotExist(err) {
-		fmt.Printf("Not copying %s as file does not exists\n", src)
-		return nil
-	}
-
-	if err != nil && !os.IsNotExist(err) {
+	if err := os.Chdir(srcDir); err != nil {
 		return err
 	}
 
-	input, err := ioutil.ReadFile(src)
-	if err != nil {
-		return err
-	}
+	for _, fName := range flist {
 
-	err = ioutil.WriteFile(dest, input, f.Mode())
-	if err != nil {
-		return err
+		f, err := os.Lstat(fName)
+
+		if os.IsNotExist(err) {
+			fmt.Printf("Not copying %s as file does not exists\n", path.Join(srcDir, fName))
+			return nil
+		}
+
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+
+		// Handle if symlinks
+		if f.Mode()&os.ModeSymlink == os.ModeSymlink {
+			linkDest, err := os.Readlink(fName)
+			if err != nil {
+				return err
+			}
+			if err = os.Symlink(linkDest, path.Join(destDir, fName)); err != nil {
+				return err
+			}
+		} else {
+
+			input, err := ioutil.ReadFile(fName)
+			if err != nil {
+				return err
+			}
+
+			err = ioutil.WriteFile(path.Join(destDir, fName), input, f.Mode())
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
