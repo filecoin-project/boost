@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/filecoin-project/boost/cli/ctxutil"
@@ -18,7 +19,7 @@ var statsCmd = &cli.Command{
 	Name:        "stats",
 	Usage:       "",
 	ArgsUsage:   "",
-	Description: "",
+	Description: "Statistics on how many SPs are running Boost",
 	Before:      before,
 	Action: func(cctx *cli.Context) error {
 		ctx := ctxutil.ReqContext(cctx)
@@ -39,7 +40,7 @@ var statsCmd = &cli.Command{
 			return err
 		}
 
-		fmt.Println("got len total miners: ", len(miners))
+		fmt.Println("Total SPs on chain: ", len(miners))
 
 		var wg sync.WaitGroup
 		wg.Add(len(miners))
@@ -70,7 +71,7 @@ var statsCmd = &cli.Command{
 
 		wg.Wait()
 
-		fmt.Println("got len miners with min power: ", len(withMinPower))
+		fmt.Println("Total SPs with minimum power: ", len(withMinPower))
 
 		var boostNodes, marketsNodes, noProtocolsNodes int
 
@@ -99,15 +100,15 @@ var statsCmd = &cli.Command{
 				}
 				sort.Strings(protos)
 
-				fmt.Print("provider " + maddr.String())
+				fmt.Print("Provider " + maddr.String())
 				if contains(protos, "/fil/storage/mk/1.2.0") {
-					fmt.Print(" running boost")
+					fmt.Print(" is running boost")
 					boostNodes++
 				} else if contains(protos, "/fil/storage/mk/1.1.0") {
-					fmt.Print(" running markets")
+					fmt.Print(" is running markets")
 					marketsNodes++
 				} else {
-					fmt.Print(" running fewer protocols")
+					fmt.Print(" is running fewer protocols")
 					noProtocolsNodes++
 				}
 				fmt.Println()
@@ -115,15 +116,26 @@ var statsCmd = &cli.Command{
 				return nil
 			}()
 			if err != nil {
-				fmt.Println("err: ", err)
+				fmt.Println("Error: ", err)
 				continue
 			}
 		}
 
-		fmt.Println("total boost nodes:", boostNodes)
-		fmt.Println("total markets nodes:", marketsNodes)
-		fmt.Println("total few-protocols nodes:", noProtocolsNodes)
+		fmt.Println()
+		fmt.Println("Total Boost nodes:", boostNodes)
+		fmt.Println("Total Lotus Markets nodes:", marketsNodes)
+		fmt.Println("Total SPs with minimum power: ", len(withMinPower))
 
 		return nil
 	},
+}
+
+func contains(sl []string, substr string) bool {
+	for _, s := range sl {
+		if strings.Contains(s, substr) {
+			return true
+		}
+	}
+
+	return false
 }

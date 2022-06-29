@@ -295,13 +295,3 @@ var retrievalAskCmd = &cli.Command{
 		return nil
 	},
 }
-
-func contains(sl []string, substr string) bool {
-	for _, s := range sl {
-		if strings.Contains(s, substr) {
-			return true
-		}
-	}
-
-	return false
-}
