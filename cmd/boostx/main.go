@@ -11,6 +11,7 @@ import (
 
 	"github.com/filecoin-project/boost/build"
 	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boost/cmd"
 )
 
 var log = logging.Logger("boostx")
@@ -27,6 +28,7 @@ func main() {
 		Version:              build.UserVersion(),
 		Flags: []cli.Flag{
 			cliutil.FlagVeryVerbose,
+			cmd.FlagRepo,
 		},
 		Commands: []*cli.Command{
 			commpCmd,
