@@ -94,6 +94,8 @@ var runningBoostCmd = &cli.Command{
 
 		fmt.Println("got len miners with min power: ", len(withMinPower))
 
+		var boostNodes, marketsNodes, noProtocolsNodes int
+
 		for _, maddr := range withMinPower {
 			select {
 			case <-ctx.Done():
@@ -119,36 +121,19 @@ var runningBoostCmd = &cli.Command{
 				}
 				sort.Strings(protos)
 
-				fmt.Print("Provider " + maddr.String())
+				fmt.Print("provider " + maddr.String())
 				if contains(protos, "/fil/storage/mk/1.2.0") {
-					fmt.Println(" running boost")
+					fmt.Print(" running boost")
+					boostNodes++
 				} else if contains(protos, "/fil/storage/mk/1.1.0") {
-					fmt.Println(" running markets")
+					fmt.Print(" running markets")
+					marketsNodes++
+				} else {
+					fmt.Print(" running fewer protocols")
+					noProtocolsNodes++
 				}
+				fmt.Println()
 
-				//agentVersionI, err := n.Host.Peerstore().Get(addrInfo.ID, "AgentVersion")
-				//if err != nil {
-				//return fmt.Errorf("getting agent version for peer %s: %w", addrInfo.ID, err)
-				//}
-				//agentVersion, _ := agentVersionI.(string)
-
-				//if cctx.Bool("json") {
-				//return cmd.PrintJson(map[string]interface{}{
-				//"provider":   maddr.String(),
-				//"agent":      agentVersion,
-				//"id":         addrInfo.ID.String(),
-				//"multiaddrs": addrInfo.Addrs,
-				//"protocols":  protos,
-				//})
-				//}
-
-				//fmt.Println("Agent: " + agentVersion)
-				//fmt.Println("Peer ID: " + addrInfo.ID.String())
-				//fmt.Println("Peer Addresses:")
-				//for _, addr := range addrInfo.Addrs {
-				//fmt.Println("  " + addr.String())
-				//}
-				//fmt.Println("Protocols:\n" + "  " + strings.Join(protos, "\n  "))
 				return nil
 			}()
 			if err != nil {
@@ -156,6 +141,10 @@ var runningBoostCmd = &cli.Command{
 				continue
 			}
 		}
+
+		fmt.Println("total boost nodes:", boostNodes)
+		fmt.Println("total markets nodes:", marketsNodes)
+		fmt.Println("total few-protocols nodes:", noProtocolsNodes)
 
 		return nil
 	},
