@@ -1,6 +1,6 @@
 version: 2.1
 orbs:
-  go: gotest/tools@0.0.13
+  go: gotest/tools@0.0.14
 
 executors:
   golang:

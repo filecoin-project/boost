@@ -10,17 +10,15 @@ import (
 
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 
+	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	transporttypes "github.com/filecoin-project/boost/transport/types"
-	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	commcid "github.com/filecoin-project/go-fil-commcid"
 	commp "github.com/filecoin-project/go-fil-commp-hashhash"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
-	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
@@ -625,34 +623,23 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
 	pc := deal.ClientDealProposal.Proposal.PieceCID
 
-	// add deal to piecestore
-	if err := p.ps.AddDealForPiece(pc, piecestore.DealInfo{
-		DealID:   deal.ChainDealID,
-		SectorID: deal.SectorID,
-		Offset:   deal.Offset,
-		Length:   deal.Length,
+	// add deal to piece metadata store
+	if err := p.pieceMeta.AddDealForPiece(pc, model.DealInfo{
+		DealUuid:    deal.DealUuid,
+		ChainDealID: deal.ChainDealID,
+		SectorID:    deal.SectorID,
+		PieceOffset: deal.Offset,
+		PieceLength: deal.Length,
+		// TODO: Make sure the size of the CAR file is persisted.
+		// For offline deals the Transfer struct is empty.
+		CarLength: deal.Transfer.Size,
 	}); err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryAuto,
-			error: fmt.Errorf("failed to add deal to piecestore: %w", err),
+			error: fmt.Errorf("failed to add deal to piece metadata store: %w", err),
 		}
 	}
-	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piecestore")
-
-	// register with dagstore
-	err := stores.RegisterShardSync(ctx, p.dagst, pc, "", true)
-
-	if err != nil {
-		if !errors.Is(err, dagstore.ErrShardExists) {
-			return &dealMakingError{
-				retry: types.DealRetryAuto,
-				error: fmt.Errorf("failed to register deal with dagstore: %w", err),
-			}
-		}
-		p.dealLogger.Infow(deal.DealUuid, "deal has previously been registered in dagstore")
-	} else {
-		p.dealLogger.Infow(deal.DealUuid, "deal has successfully been registered in the dagstore")
-	}
+	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piece metadata store")
 
 	// if the index provider is enabled
 	if p.ip.Enabled() {

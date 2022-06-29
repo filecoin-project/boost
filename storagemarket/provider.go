@@ -16,6 +16,7 @@ import (
 	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/piecemeta"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -24,10 +25,8 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
-	"github.com/filecoin-project/go-fil-markets/stores"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
@@ -105,9 +104,7 @@ type Provider struct {
 
 	dealLogger *logs.DealLogger
 
-	dagst stores.DAGStoreWrapper
-	ps    piecestore.PieceStore
-
+	pieceMeta   *piecemeta.PieceMeta
 	ip          types.IndexProvider
 	askGetter   types.AskGetter
 	sigVerifier types.SignatureVerifier
@@ -115,7 +112,7 @@ type Provider struct {
 
 func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
-	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, askGetter types.AskGetter,
+	pieceMeta *piecemeta.PieceMeta, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
 
 	newDealPS, err := newDealPubsub()
@@ -157,9 +154,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		dealLogger: dl,
 		logsDB:     logsDB,
 
-		dagst: dagst,
-		ps:    ps,
-
+		pieceMeta:   pieceMeta,
 		ip:          ip,
 		askGetter:   askGetter,
 		sigVerifier: sigVerifier,
