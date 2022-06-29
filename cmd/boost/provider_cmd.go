@@ -92,7 +92,7 @@ var runningBoostCmd = &cli.Command{
 
 		wg.Wait()
 
-		fmt.Println("got len miners with min power: ", len(miners))
+		fmt.Println("got len miners with min power: ", len(withMinPower))
 
 		for _, maddr := range withMinPower {
 			select {
