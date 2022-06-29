@@ -17,8 +17,6 @@ import (
 
 var statsCmd = &cli.Command{
 	Name:        "stats",
-	Usage:       "",
-	ArgsUsage:   "",
 	Description: "Statistics on how many SPs are running Boost",
 	Before:      before,
 	Action: func(cctx *cli.Context) error {
