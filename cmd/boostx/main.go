@@ -33,6 +33,7 @@ func main() {
 			generatecarCmd,
 			marketAddCmd,
 			marketWithdrawCmd,
+			statsCmd,
 		},
 	}
 	app.Setup()
