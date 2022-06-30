@@ -5,17 +5,16 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/couchbase/gocb/v2"
 	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
-	levelds "github.com/ipfs/go-ds-leveldb"
 	carindex "github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
-	"github.com/syndtr/goleveldb/leveldb/opt"
-	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 var (
@@ -51,22 +50,32 @@ func init() {
 }
 
 type DB struct {
-	datastore.Batching
+	col *gocb.Collection
 }
 
-func newDB(path string, readonly bool) (*DB, error) {
-	ldb, err := levelds.NewDatastore(path, &levelds.Options{
-		Compression:         ldbopts.SnappyCompression,
-		NoSync:              true,
-		Strict:              ldbopts.StrictAll,
-		ReadOnly:            readonly,
-		CompactionTableSize: 4 * opt.MiB,
+func newDB() (*DB, error) {
+	bucketName := "piecestore"
+	username := "Administrator"
+	password := "boostdemo"
+
+	cluster, err := gocb.Connect("couchbase://127.0.0.1", gocb.ClusterOptions{
+		Authenticator: gocb.PasswordAuthenticator{
+			Username: username,
+			Password: password,
+		},
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return &DB{ldb}, nil
+	bucket := cluster.Bucket(bucketName)
+
+	err = bucket.WaitUntilReady(5*time.Second, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DB{col: bucket.DefaultCollection()}, nil
 }
 
 // NextCursor

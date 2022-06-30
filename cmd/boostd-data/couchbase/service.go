@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/couchbase/gocb/v2"
 	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -24,34 +23,17 @@ var log = logging.Logger("boostd-data-cb")
 
 type Store struct {
 	sync.Mutex
-	col *gocb.Collection
-	db  *DB
+	db *DB
 }
 
 func NewStore() *Store {
-	bucketName := "piecestore"
-	username := "Administrator"
-	password := "boostdemo"
-
-	cluster, err := gocb.Connect("couchbase://127.0.0.1", gocb.ClusterOptions{
-		Authenticator: gocb.PasswordAuthenticator{
-			Username: username,
-			Password: password,
-		},
-	})
+	db, err := newDB()
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	bucket := cluster.Bucket(bucketName)
-
-	err = bucket.WaitUntilReady(5*time.Second, nil)
-	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	return &Store{
-		col: bucket.DefaultCollection(),
+		db: db,
 	}
 }
 
