@@ -306,16 +306,11 @@ var restoreCmd = &cli.Command{
 	},
 }
 
-// This function uses chdir() to deal with relative symlinks be careful when reusing
 func copyFiles(srcDir, destDir string, flist []string) error {
-
-	if err := os.Chdir(srcDir); err != nil {
-		return err
-	}
 
 	for _, fName := range flist {
 
-		f, err := os.Lstat(fName)
+		f, err := os.Lstat(path.Join(srcDir, fName))
 
 		if os.IsNotExist(err) {
 			fmt.Printf("Not copying %s as file does not exists\n", path.Join(srcDir, fName))
@@ -328,7 +323,7 @@ func copyFiles(srcDir, destDir string, flist []string) error {
 
 		// Handle if symlinks
 		if f.Mode()&os.ModeSymlink == os.ModeSymlink {
-			linkDest, err := os.Readlink(fName)
+			linkDest, err := os.Readlink(path.Join(srcDir, fName))
 			if err != nil {
 				return err
 			}
@@ -337,7 +332,7 @@ func copyFiles(srcDir, destDir string, flist []string) error {
 			}
 		} else {
 
-			input, err := ioutil.ReadFile(fName)
+			input, err := ioutil.ReadFile(path.Join(srcDir, fName))
 			if err != nil {
 				return err
 			}
