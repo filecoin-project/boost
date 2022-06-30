@@ -1,4 +1,4 @@
-package ldb
+package couchbase
 
 import (
 	"context"

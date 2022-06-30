@@ -12,15 +12,12 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"
-	levelds "github.com/ipfs/go-ds-leveldb"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car/v2/index"
 	carindex "github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/syndtr/goleveldb/leveldb/opt"
-	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 var log = logging.Logger("boostd-data-ldb")
@@ -28,25 +25,6 @@ var log = logging.Logger("boostd-data-ldb")
 type Store struct {
 	sync.Mutex
 	db *DB
-}
-
-type DB struct {
-	datastore.Batching
-}
-
-func newDB(path string, readonly bool) (*DB, error) {
-	ldb, err := levelds.NewDatastore(path, &levelds.Options{
-		Compression:         ldbopts.SnappyCompression,
-		NoSync:              true,
-		Strict:              ldbopts.StrictAll,
-		ReadOnly:            readonly,
-		CompactionTableSize: 4 * opt.MiB,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &DB{ldb}, nil
 }
 
 func NewStore(_repopath string) *Store {
