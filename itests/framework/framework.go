@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/filecoin-project/lotus/storage/ctladdr"
+	"github.com/filecoin-project/lotus/storage/paths"
+	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -35,8 +38,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
-	"github.com/filecoin-project/lotus/extern/storage-sealing/sealiface"
 	"github.com/filecoin-project/lotus/itests/kit"
 	lnode "github.com/filecoin-project/lotus/node"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
@@ -44,7 +45,6 @@ import (
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	"github.com/filecoin-project/lotus/storage"
 	"github.com/filecoin-project/specs-actors/v8/actors/builtin"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -226,7 +226,7 @@ func (f *TestFramework) Start() error {
 	// The in-memory repo implementation assumes that its being used to test
 	// a miner, which has storage configuration.
 	// Boost doesn't have storage configuration so clear the storage config.
-	if err := lr.SetStorage(func(sc *stores.StorageConfig) {
+	if err := lr.SetStorage(func(sc *paths.StorageConfig) {
 		sc.StoragePaths = nil
 	}); err != nil {
 		return fmt.Errorf("set storage config: %w", err)
@@ -294,7 +294,7 @@ func (f *TestFramework) Start() error {
 		node.Repo(r),
 		node.Override(new(v1api.FullNode), fullnodeApi),
 
-		node.Override(new(*storage.AddressSelector), modules.AddressSelector(&lotus_config.MinerAddressConfig{
+		node.Override(new(*ctladdr.AddressSelector), modules.AddressSelector(&lotus_config.MinerAddressConfig{
 			DealPublishControl: []string{
 				psdWalletAddr.String(),
 			},
