@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/filecoin-project/lotus/storage/ctladdr"
-	"github.com/filecoin-project/lotus/storage/paths"
-	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
-	"io/ioutil"
+	"math/rand"
 	"os"
+	"path"
 	"sync"
 	"testing"
 	"time"
@@ -45,6 +43,9 @@ import (
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
+	"github.com/filecoin-project/lotus/storage/ctladdr"
+	"github.com/filecoin-project/lotus/storage/paths"
+	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
 	"github.com/filecoin-project/specs-actors/v8/actors/builtin"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -79,12 +80,11 @@ type TestFramework struct {
 }
 
 func NewTestFramework(ctx context.Context, t *testing.T) *TestFramework {
-	tempHome, _ := ioutil.TempDir("", "boost-tests-")
 	fullNode, miner := FullNodeAndMiner(t)
 
 	return &TestFramework{
 		ctx:        ctx,
-		HomeDir:    tempHome,
+		HomeDir:    t.TempDir(),
 		FullNode:   fullNode,
 		LotusMiner: miner,
 	}
@@ -651,7 +651,7 @@ func (f *TestFramework) WaitDealSealed(ctx context.Context, deal *cid.Cid) error
 	}
 }
 
-func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, deal *cid.Cid, root cid.Cid, carExport bool) (path string) {
+func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, deal *cid.Cid, root cid.Cid, carExport bool) string {
 	// perform retrieval.
 	info, err := f.FullNode.ClientGetDealInfo(ctx, *deal)
 	require.NoError(t, err)
@@ -660,7 +660,8 @@ func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, deal *cid.Ci
 	require.NoError(t, err)
 	require.NotEmpty(t, offers, "no offers")
 
-	carFile, err := ioutil.TempFile(f.HomeDir, "ret-car")
+	p := path.Join(t.TempDir(), "ret-car-"+t.Name())
+	carFile, err := os.Create(p)
 	require.NoError(t, err)
 
 	defer carFile.Close() //nolint:errcheck
@@ -733,7 +734,8 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 	fil, err := unixfile.NewUnixfsFile(ctx, dserv, nd)
 	require.NoError(t, err)
 
-	tmpfile, err := ioutil.TempFile(f.HomeDir, "file-in-car")
+	p := path.Join(t.TempDir(), fmt.Sprintf("file-in-car-%d", rand.Uint32()))
+	tmpfile, err := os.Create(p)
 	require.NoError(t, err)
 
 	defer tmpfile.Close() //nolint:errcheck
