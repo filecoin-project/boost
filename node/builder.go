@@ -32,9 +32,6 @@ import (
 	provider "github.com/filecoin-project/index-provider"
 	lotus_api "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
-	lotus_sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
-	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
-	"github.com/filecoin-project/lotus/extern/sector-storage/stores"
 	lotus_journal "github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/journal/alerting"
 	_ "github.com/filecoin-project/lotus/lib/sigs/bls"
@@ -54,7 +51,9 @@ import (
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_lp2p "github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	"github.com/filecoin-project/lotus/storage"
+	"github.com/filecoin-project/lotus/storage/ctladdr"
+	"github.com/filecoin-project/lotus/storage/paths"
+	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/filecoin-project/lotus/system"
 	logging "github.com/ipfs/go-log/v2"
@@ -262,10 +261,10 @@ func ConfigCommon(cfg *config.Common) Option {
 		Override(SetApiEndpointKey, func(lr lotus_repo.LockedRepo, e dtypes.APIEndpoint) error {
 			return lr.SetAPIEndpoint(e)
 		}),
-		Override(new(stores.URLs), func(e dtypes.APIEndpoint) (stores.URLs, error) {
+		Override(new(paths.URLs), func(e dtypes.APIEndpoint) (paths.URLs, error) {
 			ip := cfg.API.RemoteListenAddress
 
-			var urls stores.URLs
+			var urls paths.URLs
 			urls = append(urls, "http://"+ip+"/remote") // TODO: This makes no assumptions, and probably could...
 			return urls, nil
 		}),
@@ -388,7 +387,7 @@ func New(ctx context.Context, opts ...Option) (StopFunc, error) {
 }
 
 var BoostNode = Options(
-	Override(new(lotus_sectorstorage.StorageAuth), lotus_modules.StorageAuth),
+	Override(new(sealer.StorageAuth), lotus_modules.StorageAuth),
 
 	// Actor config
 	Override(new(lotus_dtypes.MinerAddress), lotus_modules.MinerAddress),
@@ -448,10 +447,10 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(lotus_dtypes.BootstrapPeers), lotus_modules.BuiltinBootstrap),
 		Override(new(lotus_dtypes.DrandBootstrap), lotus_modules.DrandBootstrap),
 
-		Override(new(stores.LocalStorage), From(new(lotus_repo.LockedRepo))),
-		Override(new(*stores.Local), lotus_modules.LocalStorage),
-		Override(new(sectorstorage.Config), cfg.StorageManager()),
-		Override(new(*stores.Remote), lotus_modules.RemoteStorage),
+		Override(new(paths.LocalStorage), From(new(lotus_repo.LockedRepo))),
+		Override(new(*paths.Local), lotus_modules.LocalStorage),
+		Override(new(sealer.Config), cfg.StorageManager()),
+		Override(new(*paths.Remote), lotus_modules.RemoteStorage),
 
 		Override(new(*fundmanager.FundManager), fundmanager.New(fundmanager.Config{
 			StorageMiner: walletMiner,
@@ -482,7 +481,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*gql.Server), modules.NewGraphqlServer(cfg)),
 
 		// Address selector
-		Override(new(*storage.AddressSelector), lotus_modules.AddressSelector(&lotus_config.MinerAddressConfig{
+		Override(new(*ctladdr.AddressSelector), lotus_modules.AddressSelector(&lotus_config.MinerAddressConfig{
 			DealPublishControl: []string{cfg.Wallets.PublishStorageDeals},
 		})),
 
@@ -492,7 +491,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(lotus_dtypes.ProviderPieceStore), lotus_modules.NewProviderPieceStore),
 
 		// Lotus Markets (retrieval deps)
-		Override(new(lotus_sectorstorage.PieceProvider), lotus_sectorstorage.NewPieceProvider),
+		Override(new(sealer.PieceProvider), sealer.NewPieceProvider),
 
 		Override(new(lotus_dtypes.RetrievalPricingFunc), lotus_modules.RetrievalPricingFunc(lotus_config.DealmakingConfig{
 			RetrievalPricing: &lotus_config.RetrievalPricing{
@@ -557,13 +556,13 @@ func ConfigBoost(cfg *config.Boost) Option {
 			StartEpochSealingBuffer: cfg.LotusDealmaking.StartEpochSealingBuffer,
 		})),
 
-		Override(new(sectorstorage.Unsealer), From(new(lotus_modules.MinerStorageService))),
-		Override(new(stores.SectorIndex), From(new(lotus_modules.MinerSealingService))),
+		Override(new(sealer.Unsealer), From(new(lotus_modules.MinerStorageService))),
+		Override(new(paths.SectorIndex), From(new(lotus_modules.MinerSealingService))),
 
 		Override(new(lotus_modules.MinerStorageService), lotus_modules.ConnectStorageService(cfg.SectorIndexApiInfo)),
 		Override(new(lotus_modules.MinerSealingService), lotus_modules.ConnectSealingService(cfg.SealerApiInfo)),
 
-		Override(new(sectorstorage.StorageAuth), lotus_modules.StorageAuthWithURL(cfg.SectorIndexApiInfo)),
+		Override(new(sealer.StorageAuth), lotus_modules.StorageAuthWithURL(cfg.SectorIndexApiInfo)),
 
 		// Dynamic Lotus configs
 		Override(new(lotus_dtypes.ConsiderOnlineStorageDealsConfigFunc), lotus_modules.NewConsiderOnlineStorageDealsConfigFunc),

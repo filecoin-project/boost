@@ -8,8 +8,6 @@ import (
 	"os"
 	"time"
 
-	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
-
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -25,6 +23,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
+	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"

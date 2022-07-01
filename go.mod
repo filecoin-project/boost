@@ -18,25 +18,25 @@ require (
 	github.com/etclabscore/go-openrpc-reflect v0.0.36
 	github.com/fatih/color v1.13.0
 	github.com/filecoin-project/dagstore v0.5.2
-	github.com/filecoin-project/go-address v0.0.6
+	github.com/filecoin-project/go-address v1.0.0
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-cbor-util v0.0.1
 	github.com/filecoin-project/go-commp-utils v0.1.3
-	github.com/filecoin-project/go-data-transfer v1.15.1
+	github.com/filecoin-project/go-data-transfer v1.15.2
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
-	github.com/filecoin-project/go-fil-markets v1.22.0
+	github.com/filecoin-project/go-fil-markets v1.22.2
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
 	github.com/filecoin-project/go-state-types v0.1.10
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/index-provider v0.8.0
-	github.com/filecoin-project/lotus v1.16.0-rc1
+	github.com/filecoin-project/index-provider v0.8.1
+	github.com/filecoin-project/lotus v1.17.0-rc1.0.20220630222754-f5225d7b25c4
 	github.com/filecoin-project/specs-actors v0.9.15
-	github.com/filecoin-project/specs-actors/v8 v8.0.0
+	github.com/filecoin-project/specs-actors/v8 v8.0.1
 	github.com/filecoin-project/specs-storage v0.4.1
-	github.com/filecoin-project/storetheindex v0.4.14
+	github.com/filecoin-project/storetheindex v0.4.17
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
@@ -45,40 +45,40 @@ require (
 	github.com/graph-gophers/graphql-transport-ws v0.0.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ipfs/go-block-format v0.0.3
-	github.com/ipfs/go-blockservice v0.2.1
-	github.com/ipfs/go-cid v0.1.0
-	github.com/ipfs/go-cidutil v0.0.2
+	github.com/ipfs/go-blockservice v0.3.0
+	github.com/ipfs/go-cid v0.2.0
+	github.com/ipfs/go-cidutil v0.1.0
 	github.com/ipfs/go-datastore v0.5.1
 	github.com/ipfs/go-graphsync v0.13.1
-	github.com/ipfs/go-ipfs-blockstore v1.1.2
+	github.com/ipfs/go-ipfs-blockstore v1.2.0
 	github.com/ipfs/go-ipfs-blocksutil v0.0.1
 	github.com/ipfs/go-ipfs-chunker v0.0.5
 	github.com/ipfs/go-ipfs-ds-help v1.1.0
 	github.com/ipfs/go-ipfs-exchange-interface v0.1.0
-	github.com/ipfs/go-ipfs-exchange-offline v0.1.1
-	github.com/ipfs/go-ipfs-files v0.0.9
-	github.com/ipfs/go-ipld-format v0.2.0
+	github.com/ipfs/go-ipfs-exchange-offline v0.2.0
+	github.com/ipfs/go-ipfs-files v0.1.1
+	github.com/ipfs/go-ipld-format v0.4.0
 	github.com/ipfs/go-log/v2 v2.5.1
-	github.com/ipfs/go-merkledag v0.5.1
+	github.com/ipfs/go-merkledag v0.6.0
 	github.com/ipfs/go-metrics-interface v0.0.1
 	github.com/ipfs/go-unixfs v0.3.1
-	github.com/ipld/go-car v0.3.4-0.20220124154420-9c7956a6eb9d
-	github.com/ipld/go-car/v2 v2.1.2-0.20220124154420-9c7956a6eb9d
-	github.com/ipld/go-ipld-prime v0.16.0
+	github.com/ipld/go-car v0.3.4-0.20220630140142-8171360c2218
+	github.com/ipld/go-car/v2 v2.2.0
+	github.com/ipld/go-ipld-prime v0.17.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/libp2p/go-eventbus v0.2.1
-	github.com/libp2p/go-libp2p v0.19.4
-	github.com/libp2p/go-libp2p-core v0.15.1
+	github.com/libp2p/go-libp2p v0.20.1
+	github.com/libp2p/go-libp2p-core v0.16.1
 	github.com/libp2p/go-libp2p-gostream v0.3.2-0.20220309102559-3d4abe2a19ac
 	github.com/libp2p/go-libp2p-http v0.2.1
 	github.com/libp2p/go-libp2p-kad-dht v0.15.0
-	github.com/libp2p/go-libp2p-peerstore v0.6.0
-	github.com/libp2p/go-libp2p-pubsub v0.6.1
+	github.com/libp2p/go-libp2p-peerstore v0.7.0
+	github.com/libp2p/go-libp2p-pubsub v0.7.0
 	github.com/libp2p/go-libp2p-record v0.1.3
-	github.com/libp2p/go-libp2p-swarm v0.10.2
+	github.com/libp2p/go-libp2p-swarm v0.11.0
 	github.com/mattn/go-sqlite3 v1.14.10
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/multiformats/go-multiaddr v0.5.0
