@@ -1,5 +1,7 @@
 package sealingpipeline
 
+//go:generate go run github.com/golang/mock/mockgen -destination=mock/sealingpipeline.go -package=mock . API
+
 import (
 	"context"
 	"time"
@@ -7,7 +9,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
+	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
 )
 
