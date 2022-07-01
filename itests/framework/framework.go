@@ -711,15 +711,13 @@ consumeEvents:
 
 	ret := carFile.Name()
 	if carExport {
-		actualFile := f.ExtractFileFromCAR(ctx, t, carFile)
-		ret = actualFile.Name()
-		_ = actualFile.Close() //nolint:errcheck
+		ret = f.ExtractFileFromCAR(ctx, t, carFile)
 	}
 
 	return ret
 }
 
-func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, file *os.File) (out *os.File) {
+func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, file *os.File) string {
 	bserv := dstest.Bserv()
 	ch, err := car.LoadCar(ctx, bserv.Blockstore(), file)
 	require.NoError(t, err)
@@ -734,14 +732,9 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 	fil, err := unixfile.NewUnixfsFile(ctx, dserv, nd)
 	require.NoError(t, err)
 
-	p := path.Join(t.TempDir(), fmt.Sprintf("file-in-car-%d", rand.Uint32()))
-	tmpfile, err := os.Create(p)
+	tmpFile := path.Join(t.TempDir(), fmt.Sprintf("file-in-car-%d", rand.Uint32()))
+	err = files.WriteTo(fil, tmpFile)
 	require.NoError(t, err)
 
-	defer tmpfile.Close() //nolint:errcheck
-
-	err = files.WriteTo(fil, tmpfile.Name())
-	require.NoError(t, err)
-
-	return tmpfile
+	return tmpFile
 }
