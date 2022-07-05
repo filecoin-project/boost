@@ -28,7 +28,6 @@ import (
 const DealProtocolv120 = "/fil/storage/mk/1.2.0"
 
 var dealFlags = []cli.Flag{
-	cmd.FlagRepo,
 	&cli.StringFlag{
 		Name:     "provider",
 		Usage:    "storage provider on-chain address",

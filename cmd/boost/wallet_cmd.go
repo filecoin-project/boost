@@ -23,7 +23,6 @@ import (
 var walletCmd = &cli.Command{
 	Name:  "wallet",
 	Usage: "Manage wallets with Boost",
-	Flags: []cli.Flag{cmd.FlagRepo},
 	Subcommands: []*cli.Command{
 		walletNew,
 		walletList,

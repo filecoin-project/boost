@@ -21,7 +21,6 @@ var dealStatusCmd = &cli.Command{
 	Name:  "deal-status",
 	Usage: "",
 	Flags: []cli.Flag{
-		cmd.FlagRepo,
 		&cli.StringFlag{
 			Name:     "provider",
 			Usage:    "storage provider on-chain address",
