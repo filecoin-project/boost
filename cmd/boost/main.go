@@ -31,7 +31,6 @@ func main() {
 		Flags: []cli.Flag{
 			cmd.FlagRepo,
 			cliutil.FlagVeryVerbose,
-			cmd.FlagRepo,
 			cmd.FlagJson,
 		},
 		Commands: []*cli.Command{
