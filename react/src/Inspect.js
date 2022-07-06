@@ -25,7 +25,7 @@ export function InspectMenuItem(props) {
 }
 
 export function InspectPage(props) {
-    return <PageContainer title="Piece Metadata">
+    return <PageContainer title="Inspect Piece metadata">
         <InspectContent />
     </PageContainer>
 }
@@ -90,7 +90,7 @@ function InspectContent(props) {
         { errorMsg ? <div>Error: {errorMsg}</div>  : null}
         { pieceStatus ? <PieceStatus pieceCid={pieceCid} pieceStatus={pieceStatus} /> : null }
         { showPayload ? <PiecesWithPayload payloadCid={searchQuery} pieceCids={pieceCids} setSearchQuery={setSearchQuery} /> : null }
-        { showInstructions ? <p>Enter the piece CID or payload CID into the Search Box</p> : null }
+        { showInstructions ? <p>Enter piece CID or payload CID into the search box</p> : null }
     </div>
 }
 
