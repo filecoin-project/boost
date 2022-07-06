@@ -50,25 +50,26 @@ var inspectPieceCmd = &cli.Command{
 		}
 		if err != nil {
 			fmt.Printf("Error getting piece info from Piece Store: %s\n", err)
-		} else {
-			// Write out all the deals with this piece
-			fmt.Printf("Deals with this piece in Piece Store: %d\n\n", len(pieceInfo.Deals))
-			tw := tablewriter.New(
-				tablewriter.Col("Deal ID"),
-				tablewriter.Col("Sector ID"),
-				tablewriter.Col("Offset"),
-				tablewriter.Col("Length"),
-			)
-			for _, dl := range pieceInfo.Deals {
-				tw.Write(map[string]interface{}{
-					"Deal ID":   dl.DealID,
-					"Sector ID": dl.SectorID,
-					"Offset":    dl.Length,
-					"Length":    dl.Length,
-				})
-			}
-			tw.Flush(os.Stdout) //nolint:errcheck
+			return nil
 		}
+
+		// Write out all the deals with this piece
+		fmt.Printf("Deals with this piece in Piece Store: %d\n\n", len(pieceInfo.Deals))
+		tw := tablewriter.New(
+			tablewriter.Col("Deal ID"),
+			tablewriter.Col("Sector ID"),
+			tablewriter.Col("Offset"),
+			tablewriter.Col("Length"),
+		)
+		for _, dl := range pieceInfo.Deals {
+			tw.Write(map[string]interface{}{
+				"Deal ID":   dl.DealID,
+				"Sector ID": dl.SectorID,
+				"Offset":    dl.Length,
+				"Length":    dl.Length,
+			})
+		}
+		tw.Flush(os.Stdout) //nolint:errcheck
 		return nil
 	},
 }
