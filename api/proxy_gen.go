@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"errors"
+	"time"
 
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
@@ -16,6 +17,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
+	lotus_api "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -179,7 +181,7 @@ type NetStruct struct {
 
 		NetAgentVersion func(p0 context.Context, p1 peer.ID) (string, error) `perm:"read"`
 
-		NetAutoNatStatus func(p0 context.Context) (NatInfo, error) `perm:"read"`
+		NetAutoNatStatus func(p0 context.Context) (lotus_api.NatInfo, error) `perm:"read"`
 
 		NetBandwidthStats func(p0 context.Context) (metrics.Stats, error) `perm:"read"`
 
@@ -187,11 +189,11 @@ type NetStruct struct {
 
 		NetBandwidthStatsByProtocol func(p0 context.Context) (map[protocol.ID]metrics.Stats, error) `perm:"read"`
 
-		NetBlockAdd func(p0 context.Context, p1 NetBlockList) error `perm:"admin"`
+		NetBlockAdd func(p0 context.Context, p1 lotus_api.NetBlockList) error `perm:"admin"`
 
-		NetBlockList func(p0 context.Context) (NetBlockList, error) `perm:"read"`
+		NetBlockList func(p0 context.Context) (lotus_api.NetBlockList, error) `perm:"read"`
 
-		NetBlockRemove func(p0 context.Context, p1 NetBlockList) error `perm:"admin"`
+		NetBlockRemove func(p0 context.Context, p1 lotus_api.NetBlockList) error `perm:"admin"`
 
 		NetConnect func(p0 context.Context, p1 peer.AddrInfo) error `perm:"write"`
 
@@ -201,9 +203,25 @@ type NetStruct struct {
 
 		NetFindPeer func(p0 context.Context, p1 peer.ID) (peer.AddrInfo, error) `perm:"read"`
 
-		NetPeerInfo func(p0 context.Context, p1 peer.ID) (*ExtendedPeerInfo, error) `perm:"read"`
+		NetLimit func(p0 context.Context, p1 string) (lotus_api.NetLimit, error) `perm:"read"`
+
+		NetPeerInfo func(p0 context.Context, p1 peer.ID) (*lotus_api.ExtendedPeerInfo, error) `perm:"read"`
 
 		NetPeers func(p0 context.Context) ([]peer.AddrInfo, error) `perm:"read"`
+
+		NetPing func(p0 context.Context, p1 peer.ID) (time.Duration, error) `perm:"read"`
+
+		NetProtectAdd func(p0 context.Context, p1 []peer.ID) error `perm:"admin"`
+
+		NetProtectList func(p0 context.Context) ([]peer.ID, error) `perm:"read"`
+
+		NetProtectRemove func(p0 context.Context, p1 []peer.ID) error `perm:"admin"`
+
+		NetPubsubScores func(p0 context.Context) ([]lotus_api.PubsubScore, error) `perm:"read"`
+
+		NetSetLimit func(p0 context.Context, p1 string, p2 lotus_api.NetLimit) error `perm:"admin"`
+
+		NetStat func(p0 context.Context, p1 string) (lotus_api.NetStat, error) `perm:"read"`
 	}
 }
 
@@ -814,15 +832,15 @@ func (s *NetStub) NetAgentVersion(p0 context.Context, p1 peer.ID) (string, error
 	return "", ErrNotSupported
 }
 
-func (s *NetStruct) NetAutoNatStatus(p0 context.Context) (NatInfo, error) {
+func (s *NetStruct) NetAutoNatStatus(p0 context.Context) (lotus_api.NatInfo, error) {
 	if s.Internal.NetAutoNatStatus == nil {
-		return *new(NatInfo), ErrNotSupported
+		return *new(lotus_api.NatInfo), ErrNotSupported
 	}
 	return s.Internal.NetAutoNatStatus(p0)
 }
 
-func (s *NetStub) NetAutoNatStatus(p0 context.Context) (NatInfo, error) {
-	return *new(NatInfo), ErrNotSupported
+func (s *NetStub) NetAutoNatStatus(p0 context.Context) (lotus_api.NatInfo, error) {
+	return *new(lotus_api.NatInfo), ErrNotSupported
 }
 
 func (s *NetStruct) NetBandwidthStats(p0 context.Context) (metrics.Stats, error) {
@@ -858,36 +876,36 @@ func (s *NetStub) NetBandwidthStatsByProtocol(p0 context.Context) (map[protocol.
 	return *new(map[protocol.ID]metrics.Stats), ErrNotSupported
 }
 
-func (s *NetStruct) NetBlockAdd(p0 context.Context, p1 NetBlockList) error {
+func (s *NetStruct) NetBlockAdd(p0 context.Context, p1 lotus_api.NetBlockList) error {
 	if s.Internal.NetBlockAdd == nil {
 		return ErrNotSupported
 	}
 	return s.Internal.NetBlockAdd(p0, p1)
 }
 
-func (s *NetStub) NetBlockAdd(p0 context.Context, p1 NetBlockList) error {
+func (s *NetStub) NetBlockAdd(p0 context.Context, p1 lotus_api.NetBlockList) error {
 	return ErrNotSupported
 }
 
-func (s *NetStruct) NetBlockList(p0 context.Context) (NetBlockList, error) {
+func (s *NetStruct) NetBlockList(p0 context.Context) (lotus_api.NetBlockList, error) {
 	if s.Internal.NetBlockList == nil {
-		return *new(NetBlockList), ErrNotSupported
+		return *new(lotus_api.NetBlockList), ErrNotSupported
 	}
 	return s.Internal.NetBlockList(p0)
 }
 
-func (s *NetStub) NetBlockList(p0 context.Context) (NetBlockList, error) {
-	return *new(NetBlockList), ErrNotSupported
+func (s *NetStub) NetBlockList(p0 context.Context) (lotus_api.NetBlockList, error) {
+	return *new(lotus_api.NetBlockList), ErrNotSupported
 }
 
-func (s *NetStruct) NetBlockRemove(p0 context.Context, p1 NetBlockList) error {
+func (s *NetStruct) NetBlockRemove(p0 context.Context, p1 lotus_api.NetBlockList) error {
 	if s.Internal.NetBlockRemove == nil {
 		return ErrNotSupported
 	}
 	return s.Internal.NetBlockRemove(p0, p1)
 }
 
-func (s *NetStub) NetBlockRemove(p0 context.Context, p1 NetBlockList) error {
+func (s *NetStub) NetBlockRemove(p0 context.Context, p1 lotus_api.NetBlockList) error {
 	return ErrNotSupported
 }
 
@@ -935,14 +953,25 @@ func (s *NetStub) NetFindPeer(p0 context.Context, p1 peer.ID) (peer.AddrInfo, er
 	return *new(peer.AddrInfo), ErrNotSupported
 }
 
-func (s *NetStruct) NetPeerInfo(p0 context.Context, p1 peer.ID) (*ExtendedPeerInfo, error) {
+func (s *NetStruct) NetLimit(p0 context.Context, p1 string) (lotus_api.NetLimit, error) {
+	if s.Internal.NetLimit == nil {
+		return *new(lotus_api.NetLimit), ErrNotSupported
+	}
+	return s.Internal.NetLimit(p0, p1)
+}
+
+func (s *NetStub) NetLimit(p0 context.Context, p1 string) (lotus_api.NetLimit, error) {
+	return *new(lotus_api.NetLimit), ErrNotSupported
+}
+
+func (s *NetStruct) NetPeerInfo(p0 context.Context, p1 peer.ID) (*lotus_api.ExtendedPeerInfo, error) {
 	if s.Internal.NetPeerInfo == nil {
 		return nil, ErrNotSupported
 	}
 	return s.Internal.NetPeerInfo(p0, p1)
 }
 
-func (s *NetStub) NetPeerInfo(p0 context.Context, p1 peer.ID) (*ExtendedPeerInfo, error) {
+func (s *NetStub) NetPeerInfo(p0 context.Context, p1 peer.ID) (*lotus_api.ExtendedPeerInfo, error) {
 	return nil, ErrNotSupported
 }
 
@@ -955,6 +984,83 @@ func (s *NetStruct) NetPeers(p0 context.Context) ([]peer.AddrInfo, error) {
 
 func (s *NetStub) NetPeers(p0 context.Context) ([]peer.AddrInfo, error) {
 	return *new([]peer.AddrInfo), ErrNotSupported
+}
+
+func (s *NetStruct) NetPing(p0 context.Context, p1 peer.ID) (time.Duration, error) {
+	if s.Internal.NetPing == nil {
+		return *new(time.Duration), ErrNotSupported
+	}
+	return s.Internal.NetPing(p0, p1)
+}
+
+func (s *NetStub) NetPing(p0 context.Context, p1 peer.ID) (time.Duration, error) {
+	return *new(time.Duration), ErrNotSupported
+}
+
+func (s *NetStruct) NetProtectAdd(p0 context.Context, p1 []peer.ID) error {
+	if s.Internal.NetProtectAdd == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.NetProtectAdd(p0, p1)
+}
+
+func (s *NetStub) NetProtectAdd(p0 context.Context, p1 []peer.ID) error {
+	return ErrNotSupported
+}
+
+func (s *NetStruct) NetProtectList(p0 context.Context) ([]peer.ID, error) {
+	if s.Internal.NetProtectList == nil {
+		return *new([]peer.ID), ErrNotSupported
+	}
+	return s.Internal.NetProtectList(p0)
+}
+
+func (s *NetStub) NetProtectList(p0 context.Context) ([]peer.ID, error) {
+	return *new([]peer.ID), ErrNotSupported
+}
+
+func (s *NetStruct) NetProtectRemove(p0 context.Context, p1 []peer.ID) error {
+	if s.Internal.NetProtectRemove == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.NetProtectRemove(p0, p1)
+}
+
+func (s *NetStub) NetProtectRemove(p0 context.Context, p1 []peer.ID) error {
+	return ErrNotSupported
+}
+
+func (s *NetStruct) NetPubsubScores(p0 context.Context) ([]lotus_api.PubsubScore, error) {
+	if s.Internal.NetPubsubScores == nil {
+		return *new([]lotus_api.PubsubScore), ErrNotSupported
+	}
+	return s.Internal.NetPubsubScores(p0)
+}
+
+func (s *NetStub) NetPubsubScores(p0 context.Context) ([]lotus_api.PubsubScore, error) {
+	return *new([]lotus_api.PubsubScore), ErrNotSupported
+}
+
+func (s *NetStruct) NetSetLimit(p0 context.Context, p1 string, p2 lotus_api.NetLimit) error {
+	if s.Internal.NetSetLimit == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.NetSetLimit(p0, p1, p2)
+}
+
+func (s *NetStub) NetSetLimit(p0 context.Context, p1 string, p2 lotus_api.NetLimit) error {
+	return ErrNotSupported
+}
+
+func (s *NetStruct) NetStat(p0 context.Context, p1 string) (lotus_api.NetStat, error) {
+	if s.Internal.NetStat == nil {
+		return *new(lotus_api.NetStat), ErrNotSupported
+	}
+	return s.Internal.NetStat(p0, p1)
+}
+
+func (s *NetStub) NetStat(p0 context.Context, p1 string) (lotus_api.NetStat, error) {
+	return *new(lotus_api.NetStat), ErrNotSupported
 }
 
 func (s *WalletStruct) WalletDelete(p0 context.Context, p1 address.Address) error {

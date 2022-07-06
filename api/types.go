@@ -106,12 +106,6 @@ func NewDataTransferChannel(hostID peer.ID, channelState datatransfer.ChannelSta
 	return channel
 }
 
-type NetBlockList struct {
-	Peers     []peer.ID
-	IPAddrs   []string
-	IPSubnets []string
-}
-
 type ExtendedPeerInfo struct {
 	ID          peer.ID
 	Agent       string

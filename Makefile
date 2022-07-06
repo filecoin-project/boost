@@ -72,8 +72,8 @@ CLEAN+=build/.update-modules
 debug: GOFLAGS+=-tags=debug
 debug: build-go
 
-calibnet: GOFLAGS+=-tags=calibnet
-calibnet: build-go
+calibnet-go: GOFLAGS+=-tags=calibnet
+calibnet-go: build-go
 
 deps: $(BUILD_DEPS)
 .PHONY: deps
@@ -129,6 +129,9 @@ build-go: boost devnet
 
 build: react build-go
 .PHONY: build
+
+calibnet: react calibnet-go
+.PHONY: calibnet
 
 install: install-boost install-devnet
 
