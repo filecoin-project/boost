@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	bcli "github.com/filecoin-project/boost/cli"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/tablewriter"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
-	"os"
-	"strings"
 )
 
 var doctorCmd = &cli.Command{
@@ -44,14 +45,14 @@ var doctorPieceCmd = &cli.Command{
 
 		fmt.Printf("Piece %s:\n", pieceCid)
 		pieceInfo, err := bapi.PiecesGetPieceInfo(ctx, pieceCid)
-		if isNotFoundErr(err) {
+		if err != nil && isNotFoundErr(err) {
 			err = fmt.Errorf("could not find piece '%s' in the piece store: %w", pieceCid, err)
 		}
 		if err != nil {
 			fmt.Printf("Error getting piece info from Piece Store: %s\n", err)
 		} else {
 			// Write out all the deals with this piece
-			fmt.Printf("%d deals with this piece in Piece Store:\n", len(pieceInfo.Deals))
+			fmt.Printf("Deals with this piece in Piece Store: %d\n\n", len(pieceInfo.Deals))
 			tw := tablewriter.New(
 				tablewriter.Col("Deal ID"),
 				tablewriter.Col("Sector ID"),
