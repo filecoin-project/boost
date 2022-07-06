@@ -25,14 +25,14 @@ require (
 	github.com/filecoin-project/go-data-transfer v1.15.2
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
-	github.com/filecoin-project/go-fil-markets v1.22.2
+	github.com/filecoin-project/go-fil-markets v1.23.0
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
 	github.com/filecoin-project/go-state-types v0.1.10
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/index-provider v0.8.1
-	github.com/filecoin-project/lotus v1.17.0-rc1.0.20220630222754-f5225d7b25c4
+	github.com/filecoin-project/lotus v1.17.0-rc1.0.20220706101903-9bcefce07b7c
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v8 v8.0.1
 	github.com/filecoin-project/specs-storage v0.4.1
@@ -62,8 +62,8 @@ require (
 	github.com/ipfs/go-merkledag v0.6.0
 	github.com/ipfs/go-metrics-interface v0.0.1
 	github.com/ipfs/go-unixfs v0.3.1
-	github.com/ipld/go-car v0.3.4-0.20220630140142-8171360c2218
-	github.com/ipld/go-car/v2 v2.2.0
+	github.com/ipld/go-car v0.4.1-0.20220706093353-3d969443294c
+	github.com/ipld/go-car/v2 v2.4.1-0.20220706093353-3d969443294c
 	github.com/ipld/go-ipld-prime v0.17.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
@@ -76,7 +76,7 @@ require (
 	github.com/libp2p/go-libp2p-http v0.2.1
 	github.com/libp2p/go-libp2p-kad-dht v0.15.0
 	github.com/libp2p/go-libp2p-peerstore v0.7.0
-	github.com/libp2p/go-libp2p-pubsub v0.7.0
+	github.com/libp2p/go-libp2p-pubsub v0.7.1
 	github.com/libp2p/go-libp2p-record v0.1.3
 	github.com/libp2p/go-libp2p-swarm v0.11.0
 	github.com/mattn/go-sqlite3 v1.14.10

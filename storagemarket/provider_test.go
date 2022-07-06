@@ -1026,7 +1026,9 @@ func (h *ProviderHarness) AssertSealedContents(t *testing.T, carV2FilePath strin
 	require.NoError(t, err)
 	defer cr.Close()
 
-	actual, err := ioutil.ReadAll(cr.DataReader())
+	r, err := cr.DataReader()
+	require.NoError(t, err)
+	actual, err := ioutil.ReadAll(r)
 	require.NoError(t, err)
 
 	// the read-bytes also contains extra zeros for the padding magic, so just match without the padding bytes.
