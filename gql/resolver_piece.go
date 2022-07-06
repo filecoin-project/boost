@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/dagstore"
@@ -264,7 +265,7 @@ func (r *resolver) getIndexStatus(ctx context.Context, pieceCid cid.Cid, deals [
 		c, err := cid.Parse(cidstr)
 		if err != nil {
 			// This should never happen, but check just in case
-			return nil, fmt.Errorf("parsing retrieved deal data root cid %s: %w", err)
+			return nil, fmt.Errorf("parsing retrieved deal data root cid %s: %w", cidstr, err)
 		}
 		ks, err := r.dagst.ShardsContainingMultihash(ctx, c.Hash())
 		if err != nil || len(ks) == 0 {
