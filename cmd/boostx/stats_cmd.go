@@ -10,7 +10,6 @@ import (
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -80,8 +79,8 @@ var statsCmd = &cli.Command{
 
 		var boostNodes, marketsNodes, noProtocolsNodes int
 
-		var boostRawBytePower abi.StoragePower
-		var boostQualityAdjPower abi.StoragePower
+		boostRawBytePower := big.NewInt(0)
+		boostQualityAdjPower := big.NewInt(0)
 
 		for _, maddr := range withMinPower {
 			select {
@@ -111,6 +110,11 @@ var statsCmd = &cli.Command{
 				fmt.Print("Provider " + maddr.String())
 				if contains(protos, "/fil/storage/mk/1.2.0") {
 					fmt.Print(" is running boost")
+					fmt.Println()
+
+					fmt.Println("boost provider ", maddr.String(), "raw power:", minerToMinerPower[maddr].RawBytePower)
+					fmt.Println("boost provider ", maddr.String(), "quality adj power:", minerToMinerPower[maddr].QualityAdjPower)
+
 					boostNodes++
 					boostQualityAdjPower = big.Add(boostQualityAdjPower, minerToMinerPower[maddr].QualityAdjPower)
 					boostRawBytePower = big.Add(boostRawBytePower, minerToMinerPower[maddr].RawBytePower)
