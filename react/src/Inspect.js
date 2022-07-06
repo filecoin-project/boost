@@ -10,17 +10,17 @@ import {Link, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import xImg from './bootstrap-icons/icons/x-lg.svg'
-import './PieceMeta.css'
+import './Inspect.css'
 
 const piecesBasePath = '/pieces'
 
-export function PieceMetaPage(props) {
+export function InspectPage(props) {
     return <PageContainer title="Piece Metadata">
-        <PieceMetaContent />
+        <InspectContent />
     </PageContainer>
 }
 
-function PieceMetaContent(props) {
+function InspectContent(props) {
     const params = useParams()
     const [searchQuery, setSearchQuery] = useState(params.query)
     const handleSearchQueryChange = (event) => {
@@ -75,7 +75,7 @@ function PieceMetaContent(props) {
     const pieceStatus = ((pieceRes || {}).data || {}).pieceStatus
     const showPayload = pieceCids.length > 1
     const showInstructions = !errorMsg && !pieceStatus && !showPayload
-    return <div className="piece-meta">
+    return <div className="inspect">
         <SearchBox value={searchQuery} clearSearchBox={clearSearchBox} onChange={handleSearchQueryChange} />
         { errorMsg ? <div>Error: {errorMsg}</div>  : null}
         { pieceStatus ? <PieceStatus pieceCid={pieceCid} pieceStatus={pieceStatus} /> : null }
@@ -89,7 +89,7 @@ function PiecesWithPayload({payloadCid, pieceCids, setSearchQuery}) {
         <div className="title">Pieces with payload CID {payloadCid}</div>
         {pieceCids.map(pc => (
             <div key={pc}>
-                <Link onClick={() => setSearchQuery(pc)} to={"/piece-meta/"+pc}>{pc}</Link>
+                <Link onClick={() => setSearchQuery(pc)} to={"/inspect/"+pc}>{pc}</Link>
             </div>
         ))}
     </div>

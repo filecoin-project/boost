@@ -1,26 +1,26 @@
-.piece-meta table {
+.inspect table {
     font-size: 1em;
     width: 100%;
 }
 
-.piece-meta td, .piece-meta th {
+.inspect td, .inspect th {
     padding: 0.5em 1em;
     font-weight: normal;
 }
 
-.piece-meta th {
+.inspect th {
     white-space: nowrap;
     text-align: left;
     opacity: 0.6;
 }
 
-.piece-meta .search {
+.inspect .search {
     position: absolute;
     right: 8em;
     top: 2em;
 }
 
-.piece-meta .search input {
+.inspect .search input {
     background-image: url("./bootstrap-icons/icons/search.svg");
     background-repeat: no-repeat;
     background-position: left 0.5em center;
@@ -28,7 +28,7 @@
     padding-right: 2em;
 }
 
-.piece-meta .search .clear-text {
+.inspect .search .clear-text {
     position: absolute;
     right: 1em;
     top: 1.1em;
