@@ -29,6 +29,7 @@ func main() {
 		EnableBashCompletion: true,
 		Version:              build.UserVersion(),
 		Flags: []cli.Flag{
+			cmd.FlagRepo,
 			cliutil.FlagVeryVerbose,
 			cmd.FlagJson,
 		},
