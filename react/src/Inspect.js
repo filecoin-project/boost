@@ -10,9 +10,19 @@ import {Link, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import xImg from './bootstrap-icons/icons/x-lg.svg'
+import inspectImg from './bootstrap-icons/icons/wrench.svg'
 import './Inspect.css'
 
 const piecesBasePath = '/pieces'
+
+export function InspectMenuItem(props) {
+    return (
+        <Link key="inspect" className="menu-item" to="/inspect">
+            <img className="icon" alt="" src={inspectImg} />
+            <h3>Inspect</h3>
+        </Link>
+    )
+}
 
 export function InspectPage(props) {
     return <PageContainer title="Piece Metadata">

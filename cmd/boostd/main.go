@@ -48,6 +48,7 @@ func main() {
 			dagstoreCmd,
 			piecesCmd,
 			netCmd,
+			doctorCmd,
 		},
 	}
 	app.Setup()

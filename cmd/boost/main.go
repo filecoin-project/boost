@@ -30,6 +30,7 @@ func main() {
 		Version:              build.UserVersion(),
 		Flags: []cli.Flag{
 			cliutil.FlagVeryVerbose,
+			cmd.FlagRepo,
 			cmd.FlagJson,
 		},
 		Commands: []*cli.Command{

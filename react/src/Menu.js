@@ -8,6 +8,7 @@ import {FundsMenuItem} from "./Funds";
 import gridImg from './bootstrap-icons/icons/grid-3x3-gap.svg'
 import './Menu.css'
 import {SettingsMenuItem} from "./Settings";
+import {InspectMenuItem} from "./Inspect";
 import {ProposalLogsMenuItem} from "./ProposalLogs";
 
 export function Menu(props) {
@@ -29,6 +30,7 @@ export function Menu(props) {
                 <h3>Message Pool</h3>
             </Link>
             <SettingsMenuItem />
+            <InspectMenuItem />
         </td>
     )
 }
