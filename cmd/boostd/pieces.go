@@ -14,7 +14,7 @@ import (
 
 var piecesCmd = &cli.Command{
 	Name:        "pieces",
-	Usage:       "interact with the piecestore",
+	Usage:       "Interact with the Piece Store",
 	Description: "The piecestore is a database that tracks and manages data that is made available to the retrieval market",
 	Subcommands: []*cli.Command{
 		piecesListPiecesCmd,
@@ -26,7 +26,7 @@ var piecesCmd = &cli.Command{
 
 var piecesListPiecesCmd = &cli.Command{
 	Name:  "list-pieces",
-	Usage: "list registered pieces",
+	Usage: "List registered pieces",
 	Action: func(cctx *cli.Context) error {
 		nodeApi, closer, err := bcli.GetBoostAPI(cctx)
 		if err != nil {
@@ -49,7 +49,7 @@ var piecesListPiecesCmd = &cli.Command{
 
 var piecesListCidInfosCmd = &cli.Command{
 	Name:  "list-cids",
-	Usage: "list registered payload CIDs",
+	Usage: "List registered payload CIDs",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:    "verbose",
@@ -123,7 +123,7 @@ var piecesListCidInfosCmd = &cli.Command{
 
 var piecesInfoCmd = &cli.Command{
 	Name:  "piece-info",
-	Usage: "get registered information for a given piece CID",
+	Usage: "Get registered information for a given piece CID",
 	Action: func(cctx *cli.Context) error {
 		if !cctx.Args().Present() {
 			return lcli.ShowHelp(cctx, fmt.Errorf("must specify piece cid"))
@@ -158,7 +158,7 @@ var piecesInfoCmd = &cli.Command{
 
 var piecesCidInfoCmd = &cli.Command{
 	Name:  "cid-info",
-	Usage: "get registered information for a given payload CID",
+	Usage: "Get registered information for a given payload CID",
 	Action: func(cctx *cli.Context) error {
 		if !cctx.Args().Present() {
 			return lcli.ShowHelp(cctx, fmt.Errorf("must specify payload cid"))

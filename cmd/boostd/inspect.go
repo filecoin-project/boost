@@ -12,18 +12,18 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var doctorCmd = &cli.Command{
-	Name:  "doctor",
-	Usage: "Fix problems with boostd data",
+var inspectCmd = &cli.Command{
+	Name:  "inspect",
+	Usage: "Inspect pieces and deals within Boost",
 	Subcommands: []*cli.Command{
-		doctorPieceCmd,
+		inspectPieceCmd,
 	},
 }
 
-var doctorPieceCmd = &cli.Command{
+var inspectPieceCmd = &cli.Command{
 	Name:        "piece",
 	ArgsUsage:   "[piece cid]",
-	Description: "get information about a piece",
+	Description: "Get information about a piece",
 	Flags:       []cli.Flag{},
 	Action: func(cctx *cli.Context) error {
 		if cctx.NArg() != 1 {
