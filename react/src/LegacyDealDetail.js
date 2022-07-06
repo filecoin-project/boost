@@ -5,7 +5,7 @@ import {useNavigate} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";
 import {humanFIL, addCommas, humanFileSize} from "./util";
-import {useParams} from "react-router-dom";
+import {useParams, Link} from "react-router-dom";
 import './DealDetail.css'
 import closeImg from './bootstrap-icons/icons/x-circle.svg'
 
@@ -79,7 +79,7 @@ export function LegacyDealDetail(props) {
                 </tr>
                 <tr>
                     <th>Deal Data Root CID</th>
-                    <td>{deal.DealDataRoot}</td>
+                    <td><Link to={'/inspect/'+deal.DealDataRoot}>{deal.DealDataRoot}</Link></td>
                 </tr>
                 <tr>
                     <th>CAR File Path</th>
@@ -87,7 +87,11 @@ export function LegacyDealDetail(props) {
                 </tr>
                 <tr>
                     <th>Piece CID</th>
-                    <td>{deal.PieceCid}</td>
+                    <td><Link to={'/inspect/'+deal.PieceCid}>{deal.PieceCid}</Link></td>
+                </tr>
+                <tr>
+                    <th>Verified</th>
+                    <td>{deal.IsVerified ? 'Yes' : 'No'}</td>
                 </tr>
                 <tr>
                     <th>Piece Size</th>
