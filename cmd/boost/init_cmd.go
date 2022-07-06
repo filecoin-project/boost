@@ -16,7 +16,6 @@ import (
 var initCmd = &cli.Command{
 	Name:   "init",
 	Usage:  "Initialise Boost client repo",
-	Flags:  []cli.Flag{cmd.FlagRepo},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
