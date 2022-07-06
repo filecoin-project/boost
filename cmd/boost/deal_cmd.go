@@ -33,6 +33,7 @@ var dealFlags = []cli.Flag{
 		Name:     "provider",
 		Usage:    "storage provider on-chain address",
 		Required: true,
+		EnvVars: []string{"BOOST_DEAL_PROVIDER"),
 	},
 	&cli.StringFlag{
 		Name:     "commp",
@@ -62,10 +63,12 @@ var dealFlags = []cli.Flag{
 		Name:  "duration",
 		Usage: "duration of the deal in epochs",
 		Value: 518400, // default is 2880 * 180 == 180 days
+		EnvVars: []string{"BOOST_DEAL_DURATION"),
 	},
 	&cli.IntFlag{
 		Name:  "provider-collateral",
 		Usage: "deal collateral that storage miner must put in escrow; if empty, the min collateral for the given piece size will be used",
+		EnvVars: []string{"BOOST_DEAL_COLLATERAL"),
 	},
 	&cli.Int64Flag{
 		Name:  "storage-price",
@@ -76,10 +79,12 @@ var dealFlags = []cli.Flag{
 		Name:  "verified",
 		Usage: "whether the deal funds should come from verified client data-cap",
 		Value: true,
+		EnvVars: []string{"BOOST_DEAL_VERIFIED"),
 	},
 	&cli.StringFlag{
 		Name:  "wallet",
 		Usage: "wallet address to be used to initiate the deal",
+		EnvVars: []string{"BOOST_DEAL_WALLET"),
 	},
 }
 
@@ -95,6 +100,7 @@ var dealCmd = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:  "http-headers",
 			Usage: "http headers to be passed with the request (e.g key=value)",
+			EnvVars: []string{"BOOST_DEAL_HTTP_HEADERS"),
 		},
 	}, dealFlags...),
 	Before: before,
