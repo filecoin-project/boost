@@ -998,8 +998,8 @@ github.com/ipld/edelweiss v0.1.2/go.mod h1:14NnBVHgrPO8cqDnKg7vc69LGI0aCAcax6mj2
 github.com/ipld/go-car v0.1.0/go.mod h1:RCWzaUh2i4mOEkB3W45Vc+9jnS/M6Qay5ooytiBHl3g=
 github.com/ipld/go-car v0.3.2/go.mod h1:WEjynkVt04dr0GwJhry0KlaTeSDEiEYyMPOxDBQ17KE=
 github.com/ipld/go-car v0.4.0/go.mod h1:Uslcn4O9cBKK9wqHm/cLTFacg6RAPv6LZx2mxd2Ypl4=
-github.com/ipld/go-car v0.4.1-0.20220706093353-3d969443294c h1:VP/ZM6OkD7uFBsJDB8W2/eOiLWPPGlzjzJC3uHdNvj4=
-github.com/ipld/go-car v0.4.1-0.20220706093353-3d969443294c/go.mod h1:Uslcn4O9cBKK9wqHm/cLTFacg6RAPv6LZx2mxd2Ypl4=
+github.com/ipld/go-car v0.4.1-0.20220707083113-89de8134e58e h1:0cTsDz2E2JTlKASIrwMhpNaSsrIthQ112+VAeO6HKFY=
+github.com/ipld/go-car v0.4.1-0.20220707083113-89de8134e58e/go.mod h1:Uslcn4O9cBKK9wqHm/cLTFacg6RAPv6LZx2mxd2Ypl4=
 github.com/ipld/go-car/v2 v2.1.1/go.mod h1:+2Yvf0Z3wzkv7NeI69i8tuZ+ft7jyjPYIWZzeVNeFcI=
 github.com/ipld/go-car/v2 v2.4.0/go.mod h1:zjpRf0Jew9gHqSvjsKVyoq9OY9SWoEKdYCQUKVaaPT0=
 github.com/ipld/go-car/v2 v2.4.1-0.20220706093353-3d969443294c h1:taGcTKh0NNSX7MPI4pjEfxUUXsT/r7RRoqDrSGQVTO8=
