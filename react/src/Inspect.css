@@ -81,3 +81,12 @@
 .piece-detail td, .piece-detail th {
     padding: 0.5em 1em;
 }
+
+.inspect .title {
+    font-size: 1.25em;
+    margin: 2em 0.8em 1em 0.8em;
+}
+
+.inspect .payload-cid {
+    padding: 0.5em 1em;
+}

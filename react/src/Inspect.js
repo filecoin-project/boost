@@ -1,6 +1,6 @@
 import {useQuery} from "@apollo/react-hooks";
 import {
-    DealsCountQuery, PieceStatusQuery, PiecesWithPayloadCidQuery, SealingPipelineQuery,
+    PieceStatusQuery, PiecesWithPayloadCidQuery
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
@@ -8,12 +8,9 @@ import React, {useState} from "react";
 import {PageContainer, ShortDealLink} from "./Components";
 import {Link, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
-import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import xImg from './bootstrap-icons/icons/x-lg.svg'
 import inspectImg from './bootstrap-icons/icons/wrench.svg'
 import './Inspect.css'
-
-const piecesBasePath = '/pieces'
 
 export function InspectMenuItem(props) {
     return (
@@ -40,36 +37,37 @@ function InspectContent(props) {
         setSearchQuery('')
     }
 
-
-    // Payload
-    // bafk2bzacedsnewk7clxwab2wgwyoi7u5tzdhldx7fkxpqdq7unrxz2zoy4d2g
-    // Piece
-    // 'baga6ea4seaqgbkvk6apsnfbtvnbjabpu4tsv6ns45c36452fdhkqxznt3vlnedq'
-
+    // Look up pieces by payload
     const payloadRes = useQuery(PiecesWithPayloadCidQuery, {
         variables: {
             payloadCid: searchQuery
         },
+        // Don't do this query if the search query is empty
         skip: !searchQuery
     })
 
+    // If the request for a payload CID has completed
     var pieceCid = null
     var pieceCids = []
     if (payloadRes && payloadRes.data) {
-        console.log('pieces with payload cid', payloadRes.data.piecesWithPayloadCid)
         pieceCids = payloadRes.data.piecesWithPayloadCid
         if (pieceCids.length === 0) {
+            // If there were no results for the lookup by payload CID, use the search
+            // query for a lookup by piece CID
             pieceCid = searchQuery
         } else if (pieceCids.length === 1) {
+            // If there was exactly one result for the lookup by payload CID, use
+            // the piece CID for the lookup by piece CID
             pieceCid = pieceCids[0]
         }
     }
 
-    console.log('piece cid', pieceCid)
+    // Lookup a piece by piece CID
     const pieceRes = useQuery(PieceStatusQuery, {
         variables: {
             pieceCid: pieceCid,
         },
+        // Don't do this query if there is no piece CID yet
         skip: !pieceCid
     })
 
@@ -96,9 +94,9 @@ function InspectContent(props) {
 
 function PiecesWithPayload({payloadCid, pieceCids, setSearchQuery}) {
     return <div>
-        <div className="title">Pieces with payload CID {payloadCid}</div>
+        <div className="title">Pieces with payload CID {payloadCid}:</div>
         {pieceCids.map(pc => (
-            <div key={pc}>
+            <div key={pc} className="payload-cid">
                 <Link onClick={() => setSearchQuery(pc)} to={"/inspect/"+pc}>{pc}</Link>
             </div>
         ))}
@@ -211,147 +209,3 @@ function SearchBox(props) {
         { props.value ? <img alt="clear" className="clear-text" onClick={props.clearSearchBox} src={xImg} /> : null }
     </div>
 }
-
-export function PiecesMenuItem(props) {
-    const {data} = useQuery(DealsCountQuery, {
-        pollInterval: 5000,
-        fetchPolicy: 'network-only',
-    })
-
-    return (
-        <div className="menu-item" >
-            <img className="icon" alt="" src={columnsGapImg} />
-            <Link key="pieces" to={piecesBasePath}>
-                <h3>Pieces</h3>
-            </Link>
-        </div>
-    )
-}
-
-function searchPayloadCid(payloadCid) {
-    const pieces = []
-    for (const p of mockPieces) {
-        if (p.RootCid == payloadCid) {
-            pieces.push(p)
-        }
-    }
-
-    return {
-        data: {
-            payload: {
-                RootCid: payloadCid,
-                Pieces: pieces
-            }
-        }
-    }
-}
-
-function searchPieceCid(pieceCid) {
-    for (const p of mockPieces) {
-        if (p.PieceCid == pieceCid) {
-            return {
-                data: { piece: p }
-            }
-        }
-    }
-
-    return {
-        data: { piece: null }
-    }
-}
-
-const mockPieces = [{
-    PieceCid: 'baga6ea4seaqgbkvk6apsnfbtvnbjabpu4tsv6ns45c36452fdhkqxznt3vlnedq',
-    RootCid: 'bafybeiagwnqiviaae5aet2zivwhhsorg75x2wka2pu55o7grr23ulx5kxm',
-    CidCount: '3214',
-    IndexStatus: 'Complete',
-    Deals: [{
-        DealUUID: '237fb3d0-fc11-40dc-a77a-0b75363ffa5e',
-        ChainDealID: '1',
-        SectorID: 1,
-        PieceLength: 2048,
-        PieceOffset: 0,
-        IsUnsealed: true,
-    }, {
-        DealUUID: '25332be9-54b4-471e-a669-0757f6b61fe8',
-        ChainDealID: '2',
-        SectorID: 4,
-        PieceLength: 2048,
-        PieceOffset: 2048,
-        IsUnsealed: false,
-    }]
-}, {
-    PieceCid: 'bafybeig3yg2msah74sgvow25uxddqbabex3f3mh6hysess3w5kmgiv6zqy',
-    RootCid: 'bafybeiagwnqiviaae5aet2zivwhhsorg75x2wka2pu55o7grr23ulx5kxm',
-    CidCount: '53234',
-    IndexStatus: 'Indexing',
-    Deals: [{
-        DealUUID: '237fb3d0-fc11-40dc-a77a-0b75363ffa5e',
-        ChainDealID: '1',
-        SectorID: 1,
-        PieceLength: 2048,
-        PieceOffset: 0,
-        IsUnsealed: true,
-    }, {
-        DealUUID: '25332be9-54b4-471e-a669-0757f6b61fe8',
-        ChainDealID: '2',
-        SectorID: 4,
-        PieceLength: 2048,
-        PieceOffset: 2048,
-        IsUnsealed: false,
-    }]
-}, {
-    PieceCid: 'bafybeiaij7wqrolyv5gx2glkordkq22yacpgg23bdwyweenwlknk37zjyu',
-    RootCid: 'bafybeigbb6jrtwwdlqtqu23uzvsezm5m7qpw57emqipy5muclgp5dakpmq',
-    CidCount: '14921',
-    IndexStatus: 'Complete',
-    Deals: [{
-        DealUUID: '237fb3d0-fc11-40dc-a77a-0b75363ffa5e',
-        ChainDealID: '1',
-        SectorID: 1,
-        PieceLength: 2048,
-        PieceOffset: 0,
-        IsUnsealed: true,
-    }, {
-        DealUUID: '25332be9-54b4-471e-a669-0757f6b61fe8',
-        ChainDealID: '2',
-        SectorID: 4,
-        PieceLength: 2048,
-        PieceOffset: 2048,
-        IsUnsealed: false,
-    }]
-}, {
-    PieceCid: 'bafybeicl6ujc6ncfktctxxroxognfn7d2fqavvrryoc2lv6m4i6hpbkfti',
-    Deals: [{
-        DealUUID: '237fb3d0-fc11-40dc-a77a-0b75363ffa5e',
-        ChainDealID: '1',
-        SectorID: 1,
-        PieceLength: 2048,
-        PieceOffset: 0,
-        IsUnsealed: true,
-    }, {
-        DealUUID: '25332be9-54b4-471e-a669-0757f6b61fe8',
-        ChainDealID: '2',
-        SectorID: 4,
-        PieceLength: 2048,
-        PieceOffset: 2048,
-        IsUnsealed: true,
-    }, {
-        DealUUID: '237fb3d0-fc11-40dc-a77a-0b75363ffa5e',
-        ChainDealID: '3',
-        SectorID: 6,
-        PieceLength: 2048,
-        PieceOffset: 0,
-        IsUnsealed: false,
-    }]
-}, {
-    PieceCid: 'bafybeihhponjv2pdbmg33nxvccrgj34546avahl3nojk5cplawofvn2d3m',
-    Deals: [{
-        DealUUID: '25332be9-54b4-471e-a669-0757f6b61fe8',
-        ChainDealID: '2',
-        SectorID: 4,
-        PieceLength: 2048,
-        PieceOffset: 2048,
-        IsUnsealed: true,
-    }]
-}]
