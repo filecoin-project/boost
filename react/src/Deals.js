@@ -195,7 +195,7 @@ export function StorageDealsMenuItem(props) {
                     <h3>Storage Deals</h3>
             </Link>
             {data ? (
-                <Link key="storage-deals" to={dealsBasePath}>
+                <Link key="legacy-storage-deals" to={dealsBasePath}>
                     <div className="menu-desc">
                         <b>{data.dealsCount}</b> deal{data.dealsCount === 1 ? '' : 's'}
                     </div>

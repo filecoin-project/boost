@@ -22,6 +22,7 @@ import (
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
+	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
@@ -35,7 +36,7 @@ import (
 	"github.com/filecoin-project/lotus/journal/alerting"
 	_ "github.com/filecoin-project/lotus/lib/sigs/bls"
 	_ "github.com/filecoin-project/lotus/lib/sigs/secp"
-	"github.com/filecoin-project/lotus/markets/dagstore"
+	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	lotus_dealfilter "github.com/filecoin-project/lotus/markets/dealfilter"
 	"github.com/filecoin-project/lotus/markets/idxprov"
 	"github.com/filecoin-project/lotus/markets/retrievaladapter"
@@ -500,12 +501,13 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		// DAG Store
-		Override(new(dagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
+		Override(new(mktsdagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
 		Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
+		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
 
 		// Lotus Markets (retrieval)
-		Override(new(dagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
-		Override(new(retrievalmarket.SectorAccessor), From(new(dagstore.SectorAccessor))),
+		Override(new(mktsdagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
+		Override(new(retrievalmarket.SectorAccessor), From(new(mktsdagstore.SectorAccessor))),
 		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
 		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
