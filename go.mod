@@ -62,7 +62,7 @@ require (
 	github.com/ipfs/go-merkledag v0.6.0
 	github.com/ipfs/go-metrics-interface v0.0.1
 	github.com/ipfs/go-unixfs v0.3.1
-	github.com/ipld/go-car v0.4.1-0.20220706093353-3d969443294c
+	github.com/ipld/go-car v0.4.1-0.20220707083113-89de8134e58e
 	github.com/ipld/go-car/v2 v2.4.1-0.20220706093353-3d969443294c
 	github.com/ipld/go-ipld-prime v0.17.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
