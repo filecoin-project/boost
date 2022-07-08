@@ -51,6 +51,11 @@ var runCmd = &cli.Command{
 			Usage: "the port the web server listens on",
 			Value: 7777,
 		},
+		&cli.BoolFlag{
+			Name:  "allow-indexing",
+			Usage: "allow booster-http to build an index for a CAR file on the fly if necessary (requires doing an extra pass over the CAR file)",
+			Value: false,
+		},
 		&cli.StringFlag{
 			Name:     "api-boost",
 			Usage:    "the endpoint for the boost API",
@@ -135,13 +140,26 @@ var runCmd = &cli.Command{
 		// Create the piece provider and sector accessors
 		pp := sealer.NewPieceProvider(storage, sealingService, sealingService)
 		sa := sectoraccessor.NewSectorAccessor(dtypes.MinerAddress(maddr), sealingService, pp, fullnodeApi)
+		allowIndexing := cctx.Bool("allow-indexing")
 		// Create the server API
 		sapi := serverApi{ctx: ctx, bapi: bapi, sa: sa}
-		server := NewHttpServer(cctx.String("base-path"), cctx.Int("port"), sapi)
+		server := NewHttpServer(
+			cctx.String("base-path"),
+			cctx.Int("port"),
+			allowIndexing,
+			sapi,
+		)
 
 		// Start the server
 		log.Infof("Starting booster-http node on port %d with base path '%s'",
 			cctx.Int("port"), cctx.String("base-path"))
+		var indexingStr string
+		if allowIndexing {
+			indexingStr = "Enabled"
+		} else {
+			indexingStr = "Disabled"
+		}
+		log.Info("On-the-fly indexing of CAR files is " + indexingStr)
 		server.Start(ctx)
 
 		// Monitor for shutdown.
