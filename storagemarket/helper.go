@@ -169,7 +169,7 @@ func (c *ChainDealManager) dealIDFromPublishDealsMsg(ctx context.Context, tok ct
 	if outIdx >= len(dealIDs) {
 		return dealID, ctypes.EmptyTSK, fmt.Errorf("invalid publish storage deals ret marking %d as valid while only returning %d valid deals in publish deal message %s", outIdx, len(dealIDs), publishCid)
 	}
-	return dealIDs[dealIdx], wmsg.TipSet, nil
+	return dealIDs[outIdx], wmsg.TipSet, nil
 }
 func (c *ChainDealManager) CheckDealEquality(ctx context.Context, tok ctypes.TipSetKey, p1, p2 market.DealProposal) (bool, error) {
 	p1ClientID, err := c.fullnodeApi.StateLookupID(ctx, p1.Client, tok)
