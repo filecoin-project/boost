@@ -1028,7 +1028,45 @@ over the worker address if this flag is set.`,
 			Name: "ParallelCheckLimit",
 			Type: "int",
 
-			Comment: `Maximum number of sector checks to run in parallel. (0 = unlimited)`,
+			Comment: `After changing this option, confirm that the new value works in your setup by invoking
+'lotus-miner proving compute window-post 0'`,
+		},
+		{
+			Name: "DisableBuiltinWindowPoSt",
+			Type: "bool",
+
+			Comment: `After changing this option, confirm that the new value works in your setup by invoking
+'lotus-miner proving compute window-post 0'`,
+		},
+		{
+			Name: "DisableBuiltinWinningPoSt",
+			Type: "bool",
+
+			Comment: `WARNING: If no WinningPoSt workers are connected, Winning PoSt WILL FAIL resulting in lost block rewards.
+Before enabling this option, make sure your PoSt workers work correctly.`,
+		},
+		{
+			Name: "DisableWDPoStPreChecks",
+			Type: "bool",
+
+			Comment: `After changing this option, confirm that the new value works in your setup by invoking
+'lotus-miner proving compute window-post 0'`,
+		},
+		{
+			Name: "MaxPartitionsPerPoStMessage",
+			Type: "int",
+
+			Comment: `Setting this value above the network limit has no effect`,
+		},
+		{
+			Name: "MaxPartitionsPerRecoveryMessage",
+			Type: "int",
+
+			Comment: `In some cases when submitting DeclareFaultsRecovered messages,
+there may be too many recoveries to fit in a BlockGasLimit.
+In those cases it may be necessary to set this value to something low (eg 1);
+Note that setting this value lower may result in less efficient gas use - more messages will be sent than needed,
+resulting in more total gas use (but each message will have lower gas limit)`,
 		},
 	},
 	"lotus_config.Pubsub": []DocField{
