@@ -248,7 +248,7 @@ func (s *Libp2pCarServer) sendCar(r *http.Request, w http.ResponseWriter, val *A
 	}}
 
 	// Get a channel that will be closed when the client closes the connection
-	stream := getConn(r).(network.Stream)
+	stream := getConn(r).(gostream.Stream)
 	closeCh := s.streamMonitor.getCloseChan(stream.ID())
 
 	// Send the content
