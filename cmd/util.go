@@ -39,6 +39,23 @@ func GetAddrInfo(ctx context.Context, api api.Gateway, maddr address.Address) (*
 	}, nil
 }
 
+/*
+inJson is one optional param, default to false
+*/
+func PrintError(err error, inJson ...bool) error {
+	outputInJson := false
+	if len(inJson) > 0 {
+		outputInJson = inJson[0]
+	}
+	if outputInJson {
+		return PrintJson(map[string]string{
+			"error": err.Error(),
+		})
+	} else {
+		return fmt.Errorf("%w", err)
+	}
+}
+
 func PrintJson(obj interface{}) error {
 	resJson, err := json.MarshalIndent(obj, "", "  ")
 	if err != nil {
