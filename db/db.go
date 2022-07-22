@@ -19,7 +19,12 @@ type Scannable interface {
 }
 
 func SqlDB(dbPath string) (*sql.DB, error) {
-	return sql.Open("sqlite3", "file:"+dbPath)
+	db, err := sql.Open("sqlite3", "file:"+dbPath)
+	if err == nil {
+		db.SetMaxOpenConns(1)
+	}
+
+	return db, err
 }
 
 //go:embed create_main_db.sql
