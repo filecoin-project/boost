@@ -10,6 +10,8 @@ import (
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/urfave/cli/v2"
@@ -44,6 +46,8 @@ var statsCmd = &cli.Command{
 		wg.Add(len(miners))
 		var lk sync.Mutex
 		var withMinPower []address.Address
+		minerToMinerPower := make(map[address.Address]power.Claim)
+		minerToTotalPower := make(map[address.Address]power.Claim)
 
 		throttle := make(chan struct{}, 50)
 		for _, miner := range miners {
@@ -62,6 +66,8 @@ var statsCmd = &cli.Command{
 				if power.HasMinPower { // TODO: Lower threshold
 					lk.Lock()
 					withMinPower = append(withMinPower, miner)
+					minerToMinerPower[miner] = power.MinerPower
+					minerToTotalPower[miner] = power.TotalPower
 					lk.Unlock()
 				}
 			}(miner)
@@ -72,6 +78,9 @@ var statsCmd = &cli.Command{
 		fmt.Println("Total SPs with minimum power: ", len(withMinPower))
 
 		var boostNodes, marketsNodes, noProtocolsNodes, indexerNodes int
+
+		boostRawBytePower := big.NewInt(0)
+		boostQualityAdjPower := big.NewInt(0)
 
 		for _, maddr := range withMinPower {
 			select {
@@ -101,7 +110,14 @@ var statsCmd = &cli.Command{
 				fmt.Print("Provider " + maddr.String())
 				if contains(protos, "/fil/storage/mk/1.2.0") {
 					fmt.Print(" is running boost")
+					fmt.Println()
+
+					fmt.Println("boost provider ", maddr.String(), "raw power:", minerToMinerPower[maddr].RawBytePower)
+					fmt.Println("boost provider ", maddr.String(), "quality adj power:", minerToMinerPower[maddr].QualityAdjPower)
+
 					boostNodes++
+					boostQualityAdjPower = big.Add(boostQualityAdjPower, minerToMinerPower[maddr].QualityAdjPower)
+					boostRawBytePower = big.Add(boostRawBytePower, minerToMinerPower[maddr].RawBytePower)
 				} else if contains(protos, "/fil/storage/mk/1.1.0") {
 					fmt.Print(" is running markets")
 					marketsNodes++
@@ -125,6 +141,8 @@ var statsCmd = &cli.Command{
 
 		fmt.Println()
 		fmt.Println("Total Boost nodes:", boostNodes)
+		fmt.Println("Total Boost raw power:", boostRawBytePower)
+		fmt.Println("Total Boost quality adj power:", boostQualityAdjPower)
 		fmt.Println("Total Lotus Markets nodes:", marketsNodes)
 		fmt.Println("Total SPs with minimum power: ", len(withMinPower))
 		fmt.Println("Total Indexer nodes:", indexerNodes)
