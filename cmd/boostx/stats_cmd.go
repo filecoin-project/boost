@@ -71,7 +71,7 @@ var statsCmd = &cli.Command{
 
 		fmt.Println("Total SPs with minimum power: ", len(withMinPower))
 
-		var boostNodes, marketsNodes, noProtocolsNodes int
+		var boostNodes, marketsNodes, noProtocolsNodes, indexerNodes int
 
 		for _, maddr := range withMinPower {
 			select {
@@ -109,6 +109,10 @@ var statsCmd = &cli.Command{
 					fmt.Print(" is running fewer protocols")
 					noProtocolsNodes++
 				}
+				if contains(protos, "/legs/head/") {
+					fmt.Print(" (with indexer)")
+					indexerNodes++
+				}
 				fmt.Println()
 
 				return nil
@@ -123,6 +127,7 @@ var statsCmd = &cli.Command{
 		fmt.Println("Total Boost nodes:", boostNodes)
 		fmt.Println("Total Lotus Markets nodes:", marketsNodes)
 		fmt.Println("Total SPs with minimum power: ", len(withMinPower))
+		fmt.Println("Total Indexer nodes:", indexerNodes)
 
 		return nil
 	},
