@@ -1,0 +1,15 @@
+# This file is currently restricting to just Lotus, and is
+# running daily to help catch any unexpected releases for API compat
+# checks. If we decide to add more modules later, we could switch this
+# to run on Wednesday's UTC mornings, to catch the Tuesday RC releases from
+# lotus, and avoid daily dependabot spam.
+
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    allow:
+      - dependency-name: "github.com/filecoin-project/lotus"
+        dependency-type: "direct"
