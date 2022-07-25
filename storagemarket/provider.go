@@ -53,6 +53,8 @@ var (
 type Config struct {
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration time.Duration
+	// Whether to do commp on the Boost node (local) or the sealing node (remote)
+	RemoteCommp bool
 }
 
 var log = logging.Logger("boost-provider")
@@ -95,6 +97,7 @@ type Provider struct {
 	transfers      *dealTransfers
 
 	pieceAdder                  types.PieceAdder
+	commpCalc                   smtypes.CommpCalculator
 	maxDealCollateralMultiplier uint64
 	chainDealManager            types.ChainDealManager
 
@@ -113,7 +116,8 @@ type Provider struct {
 	sigVerifier types.SignatureVerifier
 }
 
-func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder,
+func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
+	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, commpCalc smtypes.CommpCalculator,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
@@ -149,6 +153,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		dealPublisher:               dp,
 		fullnodeApi:                 fullnodeApi,
 		pieceAdder:                  pa,
+		commpCalc:                   commpCalc,
 		chainDealManager:            cm,
 		maxDealCollateralMultiplier: 2,
 		transfers:                   newDealTransfers(),

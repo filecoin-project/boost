@@ -24,16 +24,18 @@ func TestSimpleOfflineDealHappy(t *testing.T) {
 	// build the deal proposal with the blocking http test server and a completely blocking miner stub
 	td := harness.newDealBuilder(t, 1, withOfflineDeal()).withAllMinerCallsBlocking().build()
 
-	// create a deal proposal for the offline deal
-	pi, err := harness.Provider.ExecuteDeal(td.params, peer.ID(""))
-	require.NoError(t, err)
-	require.True(t, pi.Accepted)
-
 	// execute deal
-	require.NoError(t, td.executeAndSubscribeImportOfflineDeal())
+	require.NoError(t, td.executeAndSubscribe())
 
 	// wait for Accepted checkpoint
 	td.waitForAndAssert(t, ctx, dealcheckpoints.Accepted)
+
+	// import data for offline deal
+	require.NoError(t, td.executeAndSubscribeImportOfflineDeal())
+
+	// unblock commp -> wait for Transferred checkpoint
+	td.unblockCommp()
+	td.waitForAndAssert(t, ctx, dealcheckpoints.Transferred)
 
 	// unblock publish -> wait for published checkpoint and assert
 	td.unblockPublish()

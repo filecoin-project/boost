@@ -22,6 +22,7 @@ import (
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
@@ -474,6 +475,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg.DAGStore)),
 
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
+		Override(new(smtypes.CommpCalculator), From(new(lotus_modules.MinerStorageService))),
 
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner, cfg)),
 

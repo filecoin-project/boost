@@ -24,7 +24,7 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 				return h.newDealBuilder(t, 1).withBlockingHttpServer().build()
 			},
 			stubAfterResumeF: func(tb *testDealBuilder) *testDeal {
-				return tb.withAllMinerCallsNonBlocking().build()
+				return tb.withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().build()
 			},
 			unblockF: func(td *testDeal) {
 				td.unblockTransfer()
@@ -36,10 +36,22 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 		},
 		"resume after finishing transfer": {
 			dealBuilderF: func(h *ProviderHarness) *testDeal {
-				return h.newDealBuilder(t, 1).withPublishBlocking().withNormalHttpServer().build()
+				return h.newDealBuilder(t, 1).withCommpBlocking().withNormalHttpServer().build()
 			},
 			stubAfterResumeF: func(tb *testDealBuilder) *testDeal {
 				return tb.withAllMinerCallsNonBlocking().build()
+			},
+			waitForAndAssertBeforeResumeF: func(t *testing.T, h *ProviderHarness, td *testDeal) {
+				td.waitForAndAssert(t, ctx, dealcheckpoints.Accepted)
+				h.EventuallyAssertStorageFundState(t, ctx, td.params.Transfer.Size, h.MinPublishFees, td.params.ClientDealProposal.Proposal.ProviderCollateral)
+			},
+		},
+		"resume after finishing commp": {
+			dealBuilderF: func(h *ProviderHarness) *testDeal {
+				return h.newDealBuilder(t, 1).withCommpNonBlocking().withPublishBlocking().withNormalHttpServer().build()
+			},
+			stubAfterResumeF: func(tb *testDealBuilder) *testDeal {
+				return tb.withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().build()
 			},
 			waitForAndAssertBeforeResumeF: func(t *testing.T, h *ProviderHarness, td *testDeal) {
 				td.waitForAndAssert(t, ctx, dealcheckpoints.Transferred)
@@ -48,7 +60,7 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 		},
 		"resume after publishing": {
 			dealBuilderF: func(h *ProviderHarness) *testDeal {
-				return h.newDealBuilder(t, 1).withPublishNonBlocking().withPublishConfirmBlocking().withNormalHttpServer().build()
+				return h.newDealBuilder(t, 1).withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmBlocking().withNormalHttpServer().build()
 			},
 			stubAfterResumeF: func(tb *testDealBuilder) *testDeal {
 				return tb.withPublishConfirmNonBlocking().withAddPieceNonBlocking().build()
@@ -60,7 +72,7 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 		},
 		"resume after confirming publish": {
 			dealBuilderF: func(h *ProviderHarness) *testDeal {
-				return h.newDealBuilder(t, 1).withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceBlocking().withNormalHttpServer().build()
+				return h.newDealBuilder(t, 1).withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceBlocking().withNormalHttpServer().build()
 			},
 			stubAfterResumeF: func(tb *testDealBuilder) *testDeal {
 				return tb.withAddPieceNonBlocking().build()

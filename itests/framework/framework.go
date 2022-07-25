@@ -269,6 +269,7 @@ func (f *TestFramework) Start() error {
 	cfg.Dealmaking.PublishMsgPeriod = config.Duration(0)
 	cfg.Dealmaking.PublishMsgMaxFee = ltypes.FIL(big.NewInt(1000))
 	cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
+	cfg.Dealmaking.RemoteCommp = true
 	cfg.Storage.ParallelFetchLimit = 10
 
 	err = lr.SetConfig(func(raw interface{}) {
@@ -487,7 +488,7 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 	}
 	proposal := market.DealProposal{
 		PieceCID:             cidAndSize.PieceCID,
-		PieceSize:            cidAndSize.PieceSize,
+		PieceSize:            cidAndSize.Size,
 		VerifiedDeal:         false,
 		Client:               f.ClientAddr,
 		Provider:             f.MinerAddr,
