@@ -2,12 +2,12 @@
 
 Boost is a tool for Filecoin storage providers to manage data storage and retrievals on Filecoin.
 
-See [Documentation](https://boost.filecoin.io/) to get started.
+See the docs at [https://boost.filecoin.io](https://boost.filecoin.io/getting-started) to get started.
 
 ## For development:
 
 
-1. Install using instructions in [Documentation](https://boost.filecoin.io/).
+1. Install using instructions in the building and installation section in [the docs](https://boost.filecoin.io/getting-started#building-and-installing).
 
 2. Make sure you have a local Lotus fullnode and miner running and listening to `localhost:1234` and `localhost:2345` respectively, for example with a devnet:
 
