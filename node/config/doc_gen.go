@@ -253,6 +253,12 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 
 			Comment: `The maximum amount of time a transfer can take before it fails`,
 		},
+		{
+			Name: "HTTPRetrievalURL",
+			Type: "string",
+
+			Comment: `The public URL for retrieving deals with booster-http`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{
