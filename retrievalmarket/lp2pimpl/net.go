@@ -49,6 +49,16 @@ type QueryClient struct {
 	retryStream *shared.RetryStream
 }
 
+func NewQueryClient(h host.Host, options ...QueryClientOption) *QueryClient {
+	c := &QueryClient{
+		retryStream: shared.NewRetryStream(h),
+	}
+	for _, option := range options {
+		option(c)
+	}
+	return c
+}
+
 // SendQuery sends a retrieval query over a libp2p stream to the peer
 func (c *QueryClient) SendQuery(ctx context.Context, id peer.ID, query types.Query) (*types.QueryResponse, error) {
 	log.Debugw("send query", "pieceCID", query.PieceCID, "payloadCID", query.PayloadCID, "provider-peer", id)

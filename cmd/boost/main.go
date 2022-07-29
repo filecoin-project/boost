@@ -40,6 +40,7 @@ func main() {
 			offlineDealCmd,
 			providerCmd,
 			walletCmd,
+			retrievePieceCmd,
 		},
 	}
 	app.Setup()
