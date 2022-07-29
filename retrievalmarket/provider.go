@@ -167,7 +167,7 @@ func (p *Provider) ExecuteQuery(q *types.Query, remote peer.ID) *types.QueryResp
 	// we have the piece, but do we have it unsealed?
 	if !p.pieceInUnsealedSector(p.ctx, pieceInfo) {
 		answer.Status = types.QueryResponseError
-		answer.Error = fmt.Sprintf("piece not avialable in unsealed sector")
+		answer.Error = "piece not avialable in unsealed sector"
 		return &answer
 	}
 
