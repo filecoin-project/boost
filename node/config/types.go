@@ -175,6 +175,9 @@ type DealmakingConfig struct {
 
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration Duration
+
+	// The public URL for retrieving deals with booster-http
+	HTTPRetrievalURL string
 }
 
 type FeeConfig struct {
