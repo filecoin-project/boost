@@ -18,13 +18,14 @@ import (
 	"github.com/filecoin-project/boost/node/impl/common"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/retrievalmarket"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	lotus_retrievalmarket "github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
@@ -140,6 +141,7 @@ const (
 
 	// boost should be started after legacy markets (HandleDealsKey)
 	HandleBoostDealsKey
+	HandleBoostRetrievalsKey
 	HandleProposalLogCleanerKey
 
 	// daemon
@@ -476,6 +478,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
 
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner, cfg)),
+		Override(new(*retrievalmarket.Provider), modules.NewStorageMarketProvider(walletMiner, cfg)),
 
 		// GraphQL server
 		Override(new(*gql.Server), modules.NewGraphqlServer(cfg)),
@@ -507,13 +510,14 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// Lotus Markets (retrieval)
 		Override(new(mktsdagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
-		Override(new(retrievalmarket.SectorAccessor), From(new(mktsdagstore.SectorAccessor))),
-		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
+		Override(new(lotus_retrievalmarket.SectorAccessor), From(new(mktsdagstore.SectorAccessor))),
+		Override(new(lotus_retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
-		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
+		Override(new(lotus_retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
 		Override(new(idxprov.MeshCreator), idxprov.NewMeshCreator),
 		Override(new(provider.Interface), modules.IndexProvider(cfg.IndexProvider)),
+		Override(HandleBoostRetrievalsKey, modules.HandleBoostRetrievals),
 
 		// Lotus Markets (storage)
 		Override(new(lotus_dtypes.ProviderTransferNetwork), lotus_modules.NewProviderTransferNetwork),

@@ -15,6 +15,9 @@ import (
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/retrievalmarket"
+	rlp2pimpl "github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
+
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -23,7 +26,8 @@ import (
 	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	lotus_retrievalmarket "github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket/impl/askstore"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/crypto"
@@ -40,6 +44,8 @@ import (
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/namespace"
 	"github.com/libp2p/go-libp2p-core/host"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
@@ -53,7 +59,7 @@ func RetrievalDealFilter(userFilter dtypes.RetrievalDealFilter) func(onlineOk dt
 	offlineOk dtypes.ConsiderOfflineRetrievalDealsConfigFunc) dtypes.RetrievalDealFilter {
 	return func(onlineOk dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
 		offlineOk dtypes.ConsiderOfflineRetrievalDealsConfigFunc) dtypes.RetrievalDealFilter {
-		return func(ctx context.Context, state retrievalmarket.ProviderDealState) (bool, string, error) {
+		return func(ctx context.Context, state lotus_retrievalmarket.ProviderDealState) (bool, string, error) {
 			b, err := onlineOk()
 			if err != nil {
 				return false, "miner error", err
@@ -373,6 +379,40 @@ func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider
 	})
 }
 
+func HandleBoostRetrievals(lc fx.Lifecycle, h host.Host, prov *retrievalmarket.Provider, legacyRP lotus_retrievalmarket.RetrievalProvider) {
+	lp2pnet := rlp2pimpl.NewQueryProvider(h, prov)
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			// Wait for the legacy SP to fire the "ready" event before starting
+			// the boost SP.
+			// Boost overrides some listeners so it must start after the legacy SP.
+			errch := make(chan error, 1)
+			log.Info("waiting for legacy retrieval provider 'ready' event")
+			legacyRP.OnReady(func(err error) {
+				errch <- err
+			})
+			err := <-errch
+			if err != nil {
+				log.Errorf("failed to start retrieval storage provider: %w", err)
+				return err
+			}
+			log.Info("legacy retrieval provider started successfully")
+
+			// Start the Boost RP
+			log.Info("starting boost retrieval provider")
+			lp2pnet.Start(ctx)
+			log.Info("boost storage provider started successfully")
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			lp2pnet.Stop()
+			prov.Stop()
+			return nil
+		},
+	})
+}
+
 type signatureVerifier struct {
 	fn v1api.FullNode
 }
@@ -418,11 +458,49 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 	}
 }
 
-func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, fullNode v1api.FullNode) *gql.Server {
+// NewRetrievalMarketProvider creates a new retrieval provider attached to the provider blockstore
+func NewRetrievalMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, a v1api.FullNode,
+	sa mktsdagstore.SectorAccessor,
+	ds lotus_dtypes.MetadataDS,
+	pieceStore lotus_dtypes.ProviderPieceStore,
+	pricingFnc lotus_dtypes.RetrievalPricingFunc,
+	dagStore *mktsdagstore.Wrapper,
+) (*retrievalmarket.Provider, error) {
+	return func(lc fx.Lifecycle, a v1api.FullNode,
+		sa mktsdagstore.SectorAccessor,
+		ds lotus_dtypes.MetadataDS,
+		pieceStore lotus_dtypes.ProviderPieceStore,
+		pricingFnc lotus_dtypes.RetrievalPricingFunc,
+		dagStore *mktsdagstore.Wrapper,
+	) (*retrievalmarket.Provider, error) {
+
+		prvCfg := retrievalmarket.Config{
+			HTTPRetrievalURL: cfg.Dealmaking.HTTPRetrievalURL,
+		}
+		rds := namespace.Wrap(ds, datastore.NewKey("/retrievals/provider"))
+
+		askStore, err := askstore.NewAskStore(namespace.Wrap(rds, datastore.NewKey("retrieval-ask")), datastore.NewKey("latest"))
+		if err != nil {
+			return nil, err
+		}
+
+		return retrievalmarket.NewProvider(
+			prvCfg,
+			provAddr,
+			a,
+			sa,
+			pieceStore,
+			dagStore,
+			askStore,
+			retrievalmarket.RetrievalPricingFunc(pricingFnc),
+		)
+	}
+}
+func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, ps lotus_dtypes.ProviderPieceStore, sa lotus_retrievalmarket.SectorAccessor, dagst dagstore.Interface, fullNode v1api.FullNode) *gql.Server {
 	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
 		storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API,
 		legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer,
-		ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, fullNode v1api.FullNode) *gql.Server {
+		ps lotus_dtypes.ProviderPieceStore, sa lotus_retrievalmarket.SectorAccessor, dagst dagstore.Interface, fullNode v1api.FullNode) *gql.Server {
 
 		resolver := gql.NewResolver(cfg, r, h, dealsDB, logsDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyProv, legacyDT, ps, sa, dagst, publisher, fullNode)
 		server := gql.NewServer(resolver)
