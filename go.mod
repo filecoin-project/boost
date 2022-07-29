@@ -64,7 +64,7 @@ require (
 	github.com/ipfs/go-unixfs v0.3.1
 	github.com/ipld/go-car v0.4.1-0.20220707083113-89de8134e58e
 	github.com/ipld/go-car/v2 v2.4.2-0.20220707083113-89de8134e58e
-	github.com/ipld/go-ipld-prime v0.17.0
+	github.com/ipld/go-ipld-prime v0.17.1-0.20220627233435-adf99676901e
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
@@ -83,7 +83,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/multiformats/go-multiaddr v0.5.0
 	github.com/multiformats/go-multibase v0.0.3
-	github.com/multiformats/go-multihash v0.1.0
+	github.com/multiformats/go-multihash v0.2.0
 	github.com/multiformats/go-varint v0.0.6
 	github.com/open-rpc/meta-schema v0.0.0-20201029221707-1b72ef2ea333
 	github.com/pressly/goose/v3 v3.5.3

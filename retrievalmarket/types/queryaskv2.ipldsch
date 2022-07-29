@@ -1,0 +1,54 @@
+# Query is a query to a given provider to determine information about a piece
+# they may have available for retrieval
+type Query struct {
+  # If kind is Payload, response will error if not included
+	PayloadCID optional Link
+	# If kind is Piece, response will error if not included
+	PieceCID optional Link 
+}
+
+# QueryResponseStatus indicates whether a queried piece is available
+type QueryResponseStatus enum {
+  # QueryResponseAvailable indicates a provider has a piece and is prepared to
+	# return it
+	| QueryResponseAvailable ("0")
+
+	# QueryResponseUnavailable indicates a provider either does not have or cannot
+	# serve the queried piece to the client
+	| QueryResponseUnavailable ("1")
+
+	# QueryResponseError indicates something went wrong generating a query response
+	| QueryResponseError ("2")
+} representation int
+
+type Address bytes
+type TokenAmount bytes
+
+type QueryProtocols struct {
+   GraphsyncFilecoinV1 optional GraphsyncFilecoinV1Response (rename "graphsync/v1")
+   HTTPFilecoinV1 optional HTTPFilecoinV1Response (rename "http/v1")
+}
+
+# QueryResponse is a miners response to a given retrieval query
+type QueryResponse struct {
+	Status        QueryResponseStatus
+  Error         String
+	Protocols     QueryProtocols
+}
+
+# Structure of Graphsync Protocol Data
+type GraphsyncFilecoinV1Response struct {
+	Size Int
+	PaymentAddress             Address # address.Address to send funds to -- may be different than miner addr
+	MinPricePerByte            TokenAmount
+	MaxPaymentInterval         Int
+	MaxPaymentIntervalIncrease Int
+	Message                    String
+	UnsealPrice                TokenAmount
+}
+
+# Structure of HTTP V1 Response
+type HTTPFilecoinV1Response struct {
+      URL String
+      Size Int
+}
