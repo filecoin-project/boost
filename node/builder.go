@@ -514,10 +514,11 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(lotus_retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
 		Override(new(lotus_retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
-		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
+		Override(HandleRetrievalKey, modules.HandleLegacyRetrievals),
+		Override(HandleBoostRetrievalsKey, modules.HandleBoostRetrievals),
+
 		Override(new(idxprov.MeshCreator), idxprov.NewMeshCreator),
 		Override(new(provider.Interface), modules.IndexProvider(cfg.IndexProvider)),
-		Override(HandleBoostRetrievalsKey, modules.HandleBoostRetrievals),
 
 		// Lotus Markets (storage)
 		Override(new(lotus_dtypes.ProviderTransferNetwork), lotus_modules.NewProviderTransferNetwork),

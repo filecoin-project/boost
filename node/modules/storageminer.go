@@ -379,6 +379,11 @@ func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider
 	})
 }
 
+func HandleLegacyRetrievals(host host.Host, lc fx.Lifecycle, lrp lotus_retrievalmarket.RetrievalProvider, j journal.Journal) error {
+	log.Info("starting legacy retrieval provider")
+	modules.HandleRetrieval(host, lc, lrp, j)
+	return nil
+}
 func HandleBoostRetrievals(lc fx.Lifecycle, h host.Host, prov *retrievalmarket.Provider, legacyRP lotus_retrievalmarket.RetrievalProvider) {
 	lp2pnet := rlp2pimpl.NewQueryProvider(h, prov)
 
