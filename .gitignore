@@ -2,6 +2,7 @@
 /boostx
 /boostd
 /devnet
+/booster-http
 /docgen-md
 /docgen-openrpc
 extern/filecoin-ffi/rust/target

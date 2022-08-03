@@ -25,14 +25,14 @@ require (
 	github.com/filecoin-project/go-data-transfer v1.15.2
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
-	github.com/filecoin-project/go-fil-markets v1.23.0
+	github.com/filecoin-project/go-fil-markets v1.23.1
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
 	github.com/filecoin-project/go-state-types v0.1.10
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/index-provider v0.8.1
-	github.com/filecoin-project/lotus v1.17.0-rc1.0.20220706101903-9bcefce07b7c
+	github.com/filecoin-project/lotus v1.17.0-rc3
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v8 v8.0.1
 	github.com/filecoin-project/specs-storage v0.4.1
@@ -70,9 +70,9 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/libp2p/go-eventbus v0.2.1
-	github.com/libp2p/go-libp2p v0.20.1
+	github.com/libp2p/go-libp2p v0.20.3
 	github.com/libp2p/go-libp2p-core v0.16.1
-	github.com/libp2p/go-libp2p-gostream v0.3.2-0.20220309102559-3d4abe2a19ac
+	github.com/libp2p/go-libp2p-gostream v0.4.1-0.20220720161416-e1952aede109
 	github.com/libp2p/go-libp2p-http v0.2.1
 	github.com/libp2p/go-libp2p-kad-dht v0.15.0
 	github.com/libp2p/go-libp2p-peerstore v0.7.0
