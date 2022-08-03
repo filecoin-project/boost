@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"testing"
 
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cidutil"
 	"github.com/ipfs/go-datastore"
@@ -15,12 +16,67 @@ import (
 	chunk "github.com/ipfs/go-ipfs-chunker"
 	format "github.com/ipfs/go-ipld-format"
 	"github.com/ipfs/go-merkledag"
+	merkledagpb "github.com/ipfs/go-merkledag/pb"
 	"github.com/ipfs/go-unixfs/importer/balanced"
 	"github.com/ipfs/go-unixfs/importer/helpers"
 	"github.com/ipld/go-car"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCarOffsetWriterDagOrder(t *testing.T) {
+	ctx := context.Background()
+	ds := dss.MutexWrap(datastore.NewMapDatastore())
+	bs := bstore.NewBlockstore(ds)
+	bserv := blockservice.New(bs, nil)
+
+	// make a 3 block DAG, the links in the root aren't in DAG-PB spec sort order,
+	// they should be byte-order sorted by `Name` field, but we switch them here
+	// so we can test that traversal happens based on the links as they appear in
+	// the encoded bytes, which is what we get with go-codec-dagpb + go-ipld-prime
+	aaaa := "aaaa"
+	aaaaBlk := merkledag.NewRawNode([]byte(aaaa))
+	require.NoError(t, bserv.AddBlock(ctx, aaaaBlk))
+	bbbb := "bbbb"
+	bbbbBlk := merkledag.NewRawNode([]byte(bbbb))
+	require.NoError(t, bserv.AddBlock(ctx, bbbbBlk))
+	pbn := &merkledagpb.PBNode{
+		Links: []*merkledagpb.PBLink{
+			{Hash: bbbbBlk.Cid().Bytes(), Name: &bbbb},
+			{Hash: aaaaBlk.Cid().Bytes(), Name: &aaaa},
+		},
+	}
+	rootByts, err := pbn.Marshal()
+	require.NoError(t, err)
+	rootBlk := blocks.NewBlock(rootByts)
+	require.NoError(t, bserv.AddBlock(ctx, rootBlk))
+
+	// execute
+	fullCarCow := NewCarOffsetWriter(rootBlk.Cid(), bs, NewBlockInfoCache())
+	var fullBuff bytes.Buffer
+	require.NoError(t, fullCarCow.Write(context.Background(), &fullBuff, 0))
+
+	// decode result
+	reader, err := car.NewCarReader(bytes.NewReader(fullBuff.Bytes()))
+	require.NoError(t, err)
+
+	// header
+	require.Equal(t, 1, len(reader.Header.Roots))
+	require.Equal(t, rootBlk.Cid(), reader.Header.Roots[0])
+	blk, err := reader.Next()
+	require.NoError(t, err)
+
+	// 3 blocks, in the correct, unsorted order - root, bbbb, aaaa
+	require.Equal(t, blk.Cid(), rootBlk.Cid())
+	blk, err = reader.Next()
+	require.NoError(t, err)
+	require.Equal(t, blk.Cid(), bbbbBlk.Cid())
+	blk, err = reader.Next()
+	require.NoError(t, err)
+	require.Equal(t, blk.Cid(), aaaaBlk.Cid())
+	_, err = reader.Next()
+	require.Error(t, err)
+}
 
 func TestCarOffsetWriter(t *testing.T) {
 	ds := dss.MutexWrap(datastore.NewMapDatastore())
