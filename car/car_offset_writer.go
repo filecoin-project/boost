@@ -106,8 +106,13 @@ func (s *CarOffsetWriter) writeBlocks(ctx context.Context, w io.Writer, headerSi
 			return nil, fmt.Errorf("getting block %s: %w", c, err)
 		}
 
+		// take a copy of the links array before nd.RawData() triggers a sort
+		links := make([]*format.Link, len(nd.Links()))
+		copy(links, nd.Links())
+		byts := nd.RawData()
+
 		// Get the size of the block and metadata
-		ldsize := util.LdSize(nd.Cid().Bytes(), nd.RawData())
+		ldsize := util.LdSize(nd.Cid().Bytes(), byts)
 
 		// Check if the offset from which to start writing is in or before this
 		// block
@@ -121,7 +126,7 @@ func (s *CarOffsetWriter) writeBlocks(ctx context.Context, w io.Writer, headerSi
 
 			// Write the block data to the writer, starting at the block offset
 			_, err = skipWrite(w, blockWriteOffset, func(sw io.Writer) (int, error) {
-				return 0, util.LdWrite(sw, nd.Cid().Bytes(), nd.RawData())
+				return 0, util.LdWrite(sw, nd.Cid().Bytes(), byts)
 			})
 			if err != nil {
 				return nil, fmt.Errorf("writing CAR block %s: %w", c, err)
@@ -132,13 +137,13 @@ func (s *CarOffsetWriter) writeBlocks(ctx context.Context, w io.Writer, headerSi
 		s.blockInfos.Put(nd.Cid(), &BlockInfo{
 			offset: offset,
 			size:   ldsize,
-			links:  nd.Links(),
+			links:  links,
 		})
 
 		offset = nextBlockOffset
 
 		// Return any links from this block to other DAG blocks
-		return nd.Links(), nil
+		return links, nil
 	}
 
 	seen := cid.NewSet()
