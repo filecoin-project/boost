@@ -117,7 +117,7 @@ var dealStatusCmd = &cli.Command{
 				// resp.DealStatus should always be present if there's no error,
 				// but check just in case
 				if resp.DealStatus != nil {
-					out["label"] = label
+					out["label"] = lstr
 					out["chainDealId"] = resp.DealStatus.ChainDealID
 					out["status"] = resp.DealStatus.Status
 					out["publishCid"] = nil
