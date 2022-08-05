@@ -438,6 +438,10 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 	legacyFees := cfg.LotusFees.Legacy()
 
+	if types.BigCmp(types.BigInt(legacyFees.MaxPublishDealsFee), types.NewInt(0)) <= 0 {
+		return Error(fmt.Errorf("very low max publish deals fee: %v", legacyFees))
+	}
+
 	return Options(
 		ConfigCommon(&cfg.Common),
 
