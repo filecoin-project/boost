@@ -265,9 +265,9 @@ func (f *TestFramework) Start() error {
 	cfg.SealerApiInfo = apiInfo
 	cfg.Wallets.Miner = minerAddr.String()
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
-	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
-	cfg.Dealmaking.PublishMsgPeriod = config.Duration(0)
-	cfg.Dealmaking.PublishMsgMaxFee = ltypes.FIL(big.NewInt(1000))
+	cfg.LotusDealmaking.MaxDealsPerPublishMsg = 1
+	cfg.LotusDealmaking.PublishMsgPeriod = lotus_config.Duration(0)
+	cfg.LotusFees.MaxPublishDealsFee = ltypes.FIL(big.NewInt(100000000))
 	cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
 	cfg.Storage.ParallelFetchLimit = 10
 

@@ -141,14 +141,6 @@ type DealmakingConfig struct {
 	ExpectedSealDuration Duration
 	// Maximum amount of time proposed deal StartEpoch can be in future
 	MaxDealStartDelay Duration
-	// When a deal is ready to publish, the amount of time to wait for more
-	// deals to be ready to publish before publishing them all as a batch
-	PublishMsgPeriod Duration
-	// The maximum number of deals to include in a single PublishStorageDeals
-	// message
-	PublishMsgMaxDealsPerMsg uint64
-	// The maximum network fees to pay when sending the PublishStorageDeals message
-	PublishMsgMaxFee types.FIL
 	// The maximum collateral that the provider will put up against a deal,
 	// as a multiplier of the minimum collateral bound
 	MaxProviderCollateralMultiplier uint64
