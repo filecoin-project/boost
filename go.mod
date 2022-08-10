@@ -32,7 +32,7 @@ require (
 	github.com/filecoin-project/go-state-types v0.1.10
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/index-provider v0.8.1
-	github.com/filecoin-project/lotus v1.17.0-rc3
+	github.com/filecoin-project/lotus v1.17.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v8 v8.0.1
 	github.com/filecoin-project/specs-storage v0.4.1
