@@ -38,6 +38,8 @@ type BoostStruct struct {
 	Internal struct {
 		ActorSectorSize func(p0 context.Context, p1 address.Address) (abi.SectorSize, error) `perm:"read"`
 
+		BoostDagstoreDestroyShard func(p0 context.Context, p1 string) error `perm:"admin"`
+
 		BoostDagstoreGC func(p0 context.Context) ([]DagstoreShardResult, error) `perm:"admin"`
 
 		BoostDagstoreInitializeAll func(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) `perm:"admin"`
@@ -258,6 +260,17 @@ func (s *BoostStruct) ActorSectorSize(p0 context.Context, p1 address.Address) (a
 
 func (s *BoostStub) ActorSectorSize(p0 context.Context, p1 address.Address) (abi.SectorSize, error) {
 	return *new(abi.SectorSize), ErrNotSupported
+}
+
+func (s *BoostStruct) BoostDagstoreDestroyShard(p0 context.Context, p1 string) error {
+	if s.Internal.BoostDagstoreDestroyShard == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.BoostDagstoreDestroyShard(p0, p1)
+}
+
+func (s *BoostStub) BoostDagstoreDestroyShard(p0 context.Context, p1 string) error {
+	return ErrNotSupported
 }
 
 func (s *BoostStruct) BoostDagstoreGC(p0 context.Context) ([]DagstoreShardResult, error) {

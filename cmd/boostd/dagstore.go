@@ -24,6 +24,7 @@ var dagstoreCmd = &cli.Command{
 		dagstoreInitializeAllCmd,
 		dagstoreListShardsCmd,
 		dagstoreGcCmd,
+		dagstoreDestroyShardCmd,
 	},
 }
 
@@ -267,5 +268,44 @@ var dagstoreRecoverShardCmd = &cli.Command{
 		ctx := lcli.ReqContext(cctx)
 
 		return napi.BoostDagstoreRecoverShard(ctx, cctx.Args().First())
+	},
+}
+
+var dagstoreDestroyShardCmd = &cli.Command{
+	Name:      "destroy-shard",
+	ArgsUsage: "[key]",
+	Usage:     "Destroy a shard",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:        "color",
+			Usage:       "use color in display output",
+			DefaultText: "depends on output being a TTY",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		if cctx.IsSet("color") {
+			color.NoColor = !cctx.Bool("color")
+		}
+
+		if cctx.NArg() != 1 {
+			return fmt.Errorf("must provide a single shard key")
+		}
+
+		napi, closer, err := bcli.GetBoostAPI(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+
+		ctx := lcli.ReqContext(cctx)
+
+		shardKey := cctx.Args().First()
+		err = napi.BoostDagstoreDestroyShard(ctx, shardKey)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("Destroyed shard " + shardKey)
+		return nil
 	},
 }

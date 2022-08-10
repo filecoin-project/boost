@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/multiformats/go-multihash"
 	"net/http"
 	"sort"
+
+	"github.com/multiformats/go-multihash"
 
 	"github.com/filecoin-project/go-fil-markets/stores"
 
@@ -445,4 +446,30 @@ func (sm *BoostAPI) BoostDagstoreRecoverShard(ctx context.Context, key string) e
 	}
 
 	return res.Error
+}
+
+func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) error {
+	if sm.DAGStore == nil {
+		return fmt.Errorf("dagstore not available on this node")
+	}
+
+	// First check if the shard has already been registered
+	k := shard.KeyFromString(key)
+	_, err := sm.DAGStore.GetShardInfo(k)
+	if err != nil {
+		return fmt.Errorf("unable to query dagstore for shard info: %w", err)
+	}
+	// If the shard is not registered we would expect ErrShardUnknown
+	if !errors.Is(err, dagstore.ErrShardUnknown) {
+		return fmt.Errorf("shard not found in the dagstore: %w", err)
+	}
+
+	pieceCid, err := cid.Parse(key)
+	if err != nil {
+		return fmt.Errorf("parsing shard key as piece cid: %w", err)
+	}
+	if err = stores.DestroyShardSync(ctx, sm.DagStoreWrapper, pieceCid); err != nil {
+		return fmt.Errorf("failed to destroy shard: %w", err)
+	}
+	return nil
 }
