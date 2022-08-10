@@ -15,10 +15,12 @@ import (
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket/impl/askstore"
+	"github.com/filecoin-project/go-fil-markets/shared"
 	tut "github.com/filecoin-project/go-fil-markets/shared_testutil"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin/v8/market"
+	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
 	"github.com/filecoin-project/lotus/api/v1api"
@@ -136,7 +138,7 @@ func TestDynamicPricing(t *testing.T) {
 		pFnc RetrievalPricingFunc,
 		askStore retrievalmarket.AskStore,
 	) *Provider {
-		c, err := NewProvider(expectedConfig, expectedAddress, fn, sa, pieceStore, dagStore, askStore, pFnc)
+		c, err := NewProvider(expectedConfig, expectedAddress, fn, sa, pieceStore, dagStore, askStore, &mockSignatureVerifier{true, nil}, pFnc)
 		require.NoError(t, err)
 		return c
 	}
@@ -578,7 +580,9 @@ func TestDynamicPricing(t *testing.T) {
 				require.NoError(t, err)
 			}
 			p := buildProvider(t, sectorAccessor, fn, pieceStore, dagStore, tc.pricingFnc, askStore)
-			actualResp := p.ExecuteQuery(&tc.query, tc.peerID)
+			actualResp := p.ExecuteQuery(&types.SignedQuery{
+				Query: tc.query,
+			}, tc.peerID)
 			pieceStore.VerifyExpectations(t)
 			ctrl.Finish()
 
@@ -644,10 +648,11 @@ func TestHandleQueryStream(t *testing.T) {
 		t *testing.T,
 		fn v1api.FullNode,
 		sa *TestSectorAccessor,
-		query *types.Query,
+		query *types.SignedQuery,
 		config Config,
 		pieceStore piecestore.PieceStore,
 		dagStore *tut.MockDagStoreWrapper,
+		signatureVerifier SignatureVerifier,
 	) *types.QueryResponse {
 		ds := dss.MutexWrap(datastore.NewMapDatastore())
 		askStore, err := askstore.NewAskStore(namespace.Wrap(ds, datastore.NewKey("retrieval-ask")), datastore.NewKey("latest"))
@@ -667,7 +672,7 @@ func TestHandleQueryStream(t *testing.T) {
 			return ask, nil
 		}
 
-		c, err := NewProvider(config, expectedAddress, fn, sa, pieceStore, dagStore, askStore, priceFunc)
+		c, err := NewProvider(config, expectedAddress, fn, sa, pieceStore, dagStore, askStore, signatureVerifier, priceFunc)
 		require.NoError(t, err)
 
 		return c.ExecuteQuery(query, expectedPeer)
@@ -676,7 +681,9 @@ func TestHandleQueryStream(t *testing.T) {
 	testCases := []struct {
 		name                            string
 		httpRetrievalURL                string
-		query                           types.Query
+		validSignature                  bool
+		signatureError                  error
+		query                           types.SignedQuery
 		expResp                         types.QueryResponse
 		expFunc                         func(t *testing.T, pieceStore *tut.TestPieceStore, dagStore *tut.MockDagStoreWrapper)
 		sectorAccessorFunc              func(sa *TestSectorAccessor)
@@ -692,7 +699,7 @@ func TestHandleQueryStream(t *testing.T) {
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID)
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID2)
 			},
-			query: types.Query{PayloadCID: &payloadCID},
+			query: types.SignedQuery{Query: types.Query{PayloadCID: &payloadCID}},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseAvailable,
 				Protocols: types.QueryProtocols{
@@ -714,7 +721,7 @@ func TestHandleQueryStream(t *testing.T) {
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID)
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID2)
 			},
-			query: types.Query{PayloadCID: &payloadCID},
+			query: types.SignedQuery{Query: types.Query{PayloadCID: &payloadCID}},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseAvailable,
 				Protocols: types.QueryProtocols{
@@ -744,7 +751,7 @@ func TestHandleQueryStream(t *testing.T) {
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID)
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID2)
 			},
-			query: types.Query{PayloadCID: &payloadCID},
+			query: types.SignedQuery{Query: types.Query{PayloadCID: &payloadCID}},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseAvailable,
 				Protocols: types.QueryProtocols{
@@ -771,7 +778,7 @@ func TestHandleQueryStream(t *testing.T) {
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID)
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID2)
 			},
-			query: types.Query{PayloadCID: &payloadCID},
+			query: types.SignedQuery{Query: types.Query{PayloadCID: &payloadCID}},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseAvailable,
 				Protocols: types.QueryProtocols{
@@ -795,9 +802,11 @@ func TestHandleQueryStream(t *testing.T) {
 				loadPieceCIDS(t, pieceStore, expectedPieceCID)
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID)
 			},
-			query: types.Query{
-				PayloadCID: &payloadCID,
-				PieceCID:   &expectedPieceCID,
+			query: types.SignedQuery{
+				Query: types.Query{
+					PayloadCID: &payloadCID,
+					PieceCID:   &expectedPieceCID,
+				},
 			},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseAvailable,
@@ -818,9 +827,11 @@ func TestHandleQueryStream(t *testing.T) {
 				loadPieceCIDS(t, pieceStore, expectedPieceCID)
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID)
 			},
-			query: types.Query{
-				PayloadCID: &payloadCID,
-				PieceCID:   &expectedPieceCID,
+			query: types.SignedQuery{
+				Query: types.Query{
+					PayloadCID: &payloadCID,
+					PieceCID:   &expectedPieceCID,
+				},
 			},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseAvailable,
@@ -847,9 +858,11 @@ func TestHandleQueryStream(t *testing.T) {
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID)
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID2)
 			},
-			query: types.Query{
-				PayloadCID: &payloadCID,
-				PieceCID:   &expectedPieceCID,
+			query: types.SignedQuery{
+				Query: types.Query{
+					PayloadCID: &payloadCID,
+					PieceCID:   &expectedPieceCID,
+				},
 			},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseUnavailable,
@@ -861,9 +874,10 @@ func TestHandleQueryStream(t *testing.T) {
 			expectedUnsealPrice:             big.Zero(),
 		},
 		{name: "When ONLY PieceCID is provided, no http",
-			expFunc: func(t *testing.T, ps *tut.TestPieceStore, dagStore *tut.MockDagStoreWrapper) {},
-			query: types.Query{
-				PieceCID: &expectedPieceCID,
+			query: types.SignedQuery{
+				Query: types.Query{
+					PieceCID: &expectedPieceCID,
+				},
 			},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseError,
@@ -879,8 +893,10 @@ func TestHandleQueryStream(t *testing.T) {
 				p := expectedPiece.Deals[0]
 				sa.MarkUnsealed(context.TODO(), p.SectorID, p.Offset.Unpadded(), p.Length.Unpadded())
 			},
-			query: types.Query{
-				PieceCID: &expectedPieceCID,
+			query: types.SignedQuery{
+				Query: types.Query{
+					PieceCID: &expectedPieceCID,
+				},
 			},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseAvailable,
@@ -897,8 +913,10 @@ func TestHandleQueryStream(t *testing.T) {
 			expFunc: func(t *testing.T, pieceStore *tut.TestPieceStore, dagStore *tut.MockDagStoreWrapper) {
 				pieceStore.ExpectPiece(expectedPieceCID, expectedPiece)
 			},
-			query: types.Query{
-				PieceCID: &expectedPieceCID,
+			query: types.SignedQuery{
+				Query: types.Query{
+					PieceCID: &expectedPieceCID,
+				},
 			},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseError,
@@ -906,10 +924,11 @@ func TestHandleQueryStream(t *testing.T) {
 			},
 		},
 		{name: "When payload CID not found",
-			expFunc: func(t *testing.T, ps *tut.TestPieceStore, dagStore *tut.MockDagStoreWrapper) {},
-			query: types.Query{
-				PayloadCID: &payloadCID,
-				PieceCID:   &expectedPieceCID,
+			query: types.SignedQuery{
+				Query: types.Query{
+					PayloadCID: &payloadCID,
+					PieceCID:   &expectedPieceCID,
+				},
 			},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseUnavailable,
@@ -921,7 +940,7 @@ func TestHandleQueryStream(t *testing.T) {
 				pieceStore.ReturnErrorFromGetPieceInfo(errors.New("something went wrong"))
 				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID)
 			},
-			query: types.Query{PayloadCID: &payloadCID},
+			query: types.SignedQuery{Query: types.Query{PayloadCID: &payloadCID}},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseError,
 				Error:  "failed to fetch piece to retrieve from: could not locate piece: something went wrong",
@@ -933,15 +952,81 @@ func TestHandleQueryStream(t *testing.T) {
 			expFunc: func(t *testing.T, pieceStore *tut.TestPieceStore, dagStore *tut.MockDagStoreWrapper) {
 				pieceStore.ReturnErrorFromGetPieceInfo(errors.New("something went wrong"))
 			},
-			query: types.Query{PieceCID: &expectedPieceCID},
+			query: types.SignedQuery{Query: types.Query{PieceCID: &expectedPieceCID}},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseError,
 				Error:  "failed to fetch piece to retrieve from: something went wrong",
 			},
 		},
+		{
+			name: "address provided with valid signature",
+			expFunc: func(t *testing.T, pieceStore *tut.TestPieceStore, dagStore *tut.MockDagStoreWrapper) {
+				pieceStore.ExpectPiece(expectedPieceCID, expectedPiece)
+				pieceStore.ExpectPiece(expectedPieceCID2, expectedPiece2)
+				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID)
+				dagStore.AddBlockToPieceIndex(payloadCID, expectedPieceCID2)
+			},
+			validSignature: true,
+			query: types.SignedQuery{
+				Query: types.Query{
+					PayloadCID: &payloadCID,
+				},
+				ClientAddress: &address.TestAddress,
+				ClientSignature: &acrypto.Signature{
+					Type: acrypto.SigTypeSecp256k1,
+					Data: []byte{1, 2, 3, 4},
+				},
+			},
+			expResp: types.QueryResponse{
+				Status: types.QueryResponseAvailable,
+				Protocols: types.QueryProtocols{
+					GraphsyncFilecoinV1: &types.GraphsyncFilecoinV1Response{
+						Size: expectedSize,
+					},
+				},
+			},
+			expectedPricePerByte:            expectedPricePerByte,
+			expectedPaymentInterval:         expectedPaymentInterval,
+			expectedPaymentIntervalIncrease: expectedPaymentIntervalIncrease,
+			expectedUnsealPrice:             expectedUnsealPrice,
+		},
+		{
+			name: "address provided, invalid signature",
+			query: types.SignedQuery{
+				Query: types.Query{
+					PayloadCID: &payloadCID,
+				},
+				ClientAddress: &address.TestAddress,
+				ClientSignature: &acrypto.Signature{
+					Type: acrypto.SigTypeSecp256k1,
+					Data: []byte{1, 2, 3, 4},
+				},
+			},
+			expResp: types.QueryResponse{
+				Status: types.QueryResponseError,
+				Error:  "signature invalid",
+			},
+		},
+		{
+			name:           "address provided, signature validation error",
+			signatureError: errors.New("something went wrong"),
+			query: types.SignedQuery{
+				Query: types.Query{
+					PayloadCID: &payloadCID,
+				},
+				ClientAddress: &address.TestAddress,
+				ClientSignature: &acrypto.Signature{
+					Type: acrypto.SigTypeSecp256k1,
+					Data: []byte{1, 2, 3, 4},
+				},
+			},
+			expResp: types.QueryResponse{
+				Status: types.QueryResponseError,
+				Error:  "error while attempting to verify signature: something went wrong",
+			},
+		},
 		{name: "When neither PieceCID nor PayloadCID is provided",
-			expFunc: func(t *testing.T, ps *tut.TestPieceStore, dagStore *tut.MockDagStoreWrapper) {},
-			query:   types.Query{},
+			query: types.SignedQuery{Query: types.Query{}},
 			expResp: types.QueryResponse{
 				Status: types.QueryResponseError,
 				Error:  "either piece CID or payload CID must be present",
@@ -972,8 +1057,12 @@ func TestHandleQueryStream(t *testing.T) {
 				tc.sectorAccessorFunc(sa)
 			}
 
-			tc.expFunc(t, pieceStore, dagStore)
-			actualResp := receiveQueryOnProvider(t, fn, sa, &tc.query, Config{HTTPRetrievalURL: tc.httpRetrievalURL}, pieceStore, dagStore)
+			if tc.expFunc != nil {
+				tc.expFunc(t, pieceStore, dagStore)
+			}
+
+			signatureVerifier := &mockSignatureVerifier{tc.validSignature, tc.signatureError}
+			actualResp := receiveQueryOnProvider(t, fn, sa, &tc.query, Config{HTTPRetrievalURL: tc.httpRetrievalURL}, pieceStore, dagStore, signatureVerifier)
 
 			pieceStore.VerifyExpectations(t)
 			ctrl.Finish()
@@ -1057,4 +1146,13 @@ func loadPieceCIDS(t *testing.T, pieceStore *tut.TestPieceStore, expectedPieceCI
 	if expectedPieceCID != cid.Undef {
 		pieceStore.ExpectPiece(expectedPieceCID, expectedPieceInfo)
 	}
+}
+
+type mockSignatureVerifier struct {
+	valid bool
+	err   error
+}
+
+func (m *mockSignatureVerifier) VerifySignature(ctx context.Context, sig acrypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error) {
+	return m.valid, m.err
 }

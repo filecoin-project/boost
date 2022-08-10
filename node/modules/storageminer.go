@@ -497,6 +497,7 @@ func NewRetrievalMarketProvider(provAddr address.Address, cfg *config.Boost) fun
 			pieceStore,
 			dagStore,
 			askStore,
+			&signatureVerifier{a},
 			retrievalmarket.RetrievalPricingFunc(pricingFnc),
 		)
 	}

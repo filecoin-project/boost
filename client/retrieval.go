@@ -45,7 +45,7 @@ func NewRetrievalClient() (*RetrievalClient, error) {
 }
 
 // Query sends a retrieval query v2 to another peer
-func (c *RetrievalClient) Query(ctx context.Context, providerID peer.ID, query types.Query) (*types.QueryResponse, error) {
+func (c *RetrievalClient) Query(ctx context.Context, providerID peer.ID, query types.SignedQuery) (*types.QueryResponse, error) {
 	// Send the deal proposal to the provider
 	return c.queryClient.SendQuery(ctx, providerID, query)
 }

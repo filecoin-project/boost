@@ -9,15 +9,18 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
@@ -32,6 +35,11 @@ type Config struct {
 // RetrievalPricingFunc is a custom function that sets retrieval pricing
 type RetrievalPricingFunc func(ctx context.Context, dealPricingParams retrievalmarket.PricingInput) (retrievalmarket.Ask, error)
 
+// SignatureVerifier is just wrapper for verifying signatures against arbitrary byte data
+type SignatureVerifier interface {
+	VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error)
+}
+
 // Provider is the boost implementation of the retrieval provider, which currently
 // only implements the QueryAsk v2 protocol
 type Provider struct {
@@ -44,6 +52,7 @@ type Provider struct {
 	pieceStore           piecestore.PieceStore
 	sa                   dagstore.SectorAccessor
 	askStore             retrievalmarket.AskStore
+	signatureVerifier    SignatureVerifier
 	retrievalPricingFunc RetrievalPricingFunc
 }
 
@@ -55,6 +64,7 @@ func NewProvider(config Config,
 	pieceStore piecestore.PieceStore,
 	dagStore stores.DAGStoreWrapper,
 	askStore retrievalmarket.AskStore,
+	signatureVerifier SignatureVerifier,
 	retrievalPricingFunc RetrievalPricingFunc,
 ) (*Provider, error) {
 
@@ -71,6 +81,7 @@ func NewProvider(config Config,
 		retrievalPricingFunc: retrievalPricingFunc,
 		dagStore:             dagStore,
 		askStore:             askStore,
+		signatureVerifier:    signatureVerifier,
 		fullnodeAPI:          fullnodeAPI,
 		ctx:                  ctx,
 		cancel:               cancel,
@@ -83,10 +94,33 @@ func (p *Provider) Stop() {
 }
 
 // ExecuteQuery generates a query response for the queryAsk v2 protocol
-func (p *Provider) ExecuteQuery(q *types.Query, remote peer.ID) *types.QueryResponse {
+func (p *Provider) ExecuteQuery(q *types.SignedQuery, remote peer.ID) *types.QueryResponse {
 
 	answer := types.QueryResponse{
 		Status: types.QueryResponseUnavailable,
+	}
+
+	// if address is present, verify signature
+	if q.ClientAddress != nil {
+		input, err := types.BindnodeRegistry.TypeToBytes(&q.Query, dagcbor.Encode)
+		if err != nil {
+			answer.Status = types.QueryResponseError
+			answer.Error = fmt.Sprintf("error writing query to bytes: %s", err)
+			return &answer
+		}
+
+		valid, err := p.signatureVerifier.VerifySignature(p.ctx, *q.ClientSignature, *q.ClientAddress, input, ctypes.EmptyTSK.Bytes())
+		if err != nil {
+			answer.Status = types.QueryResponseError
+			answer.Error = fmt.Sprintf("error while attempting to verify signature: %s", err)
+			return &answer
+		}
+
+		if !valid {
+			answer.Status = types.QueryResponseError
+			answer.Error = "signature invalid"
+			return &answer
+		}
 	}
 
 	if q.PayloadCID != nil {
@@ -115,7 +149,7 @@ func (p *Provider) ExecuteQuery(q *types.Query, remote peer.ID) *types.QueryResp
 		}
 
 		// graphsync is always available for payloads, so assemble response -- we'll need
-		graphsyncFilecoinV1Response, err := p.graphsyncQueryResponse(q, remote, pieceInfo, isUnsealed)
+		graphsyncFilecoinV1Response, err := p.graphsyncQueryResponse(&q.Query, remote, pieceInfo, isUnsealed)
 		if err != nil {
 			answer.Status = types.QueryResponseError
 			answer.Error = err.Error()

@@ -11,6 +11,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/go-state-types/crypto"
 )
 
 // Query is a query to a given provider to determine information about a piece
@@ -18,6 +19,13 @@ import (
 type Query struct {
 	PayloadCID *cid.Cid // V0
 	PieceCID   *cid.Cid
+}
+
+// SignedQuery adds an optional address and signature to a Query
+type SignedQuery struct {
+	Query
+	ClientAddress   *address.Address
+	ClientSignature *crypto.Signature
 }
 
 // QueryResponseStatus indicates whether a queried piece is available
@@ -83,10 +91,15 @@ var TokenAmountBindnodeOption = bindnode.TypedBytesConverter(&abi.TokenAmount{},
 // field in a schema
 var AddressBindnodeOption = bindnode.TypedBytesConverter(&address.Address{}, addressFromBytes, addressToBytes)
 
+// SignatureBindnodeOption converts a filecoin Signature type to and from a
+// Bytes field in a schema
+var SignatureBindnodeOption = bindnode.TypedBytesConverter(&crypto.Signature{}, signatureFromBytes, signatureToBytes)
+
 var filecoinBindnodeOptions = []bindnode.Option{
 	BigIntBindnodeOption,
 	TokenAmountBindnodeOption,
 	AddressBindnodeOption,
+	SignatureBindnodeOption,
 }
 
 func tokenAmountFromBytes(b []byte) (interface{}, error) {
@@ -127,6 +140,36 @@ func addressToBytes(iface interface{}) ([]byte, error) {
 	return addr.Bytes(), nil
 }
 
+// Signature is a byteprefix union
+func signatureFromBytes(b []byte) (interface{}, error) {
+	if len(b) > crypto.SignatureMaxLength {
+		return nil, fmt.Errorf("string too long")
+	}
+	if len(b) == 0 {
+		return nil, fmt.Errorf("string empty")
+	}
+	var s crypto.Signature
+	switch crypto.SigType(b[0]) {
+	default:
+		return nil, fmt.Errorf("invalid signature type in cbor input: %d", b[0])
+	case crypto.SigTypeSecp256k1:
+		s.Type = crypto.SigTypeSecp256k1
+	case crypto.SigTypeBLS:
+		s.Type = crypto.SigTypeBLS
+	}
+	s.Data = b[1:]
+	return &s, nil
+}
+
+func signatureToBytes(iface interface{}) ([]byte, error) {
+	s, ok := iface.(*crypto.Signature)
+	if !ok {
+		return nil, fmt.Errorf("expected *Signature value")
+	}
+	ba := append([]byte{byte(s.Type)}, s.Data...)
+	return ba, nil
+}
+
 var BindnodeRegistry = bindnoderegistry.NewRegistry()
 
 func init() {
@@ -139,6 +182,7 @@ func init() {
 		{(*GraphsyncFilecoinV1Response)(nil), "GraphsyncFilecoinV1Response"},
 		{(*HTTPFilecoinV1Response)(nil), "HTTPFilecoinV1Response"},
 		{(*Query)(nil), "Query"},
+		{(*SignedQuery)(nil), "SignedQuery"},
 	} {
 		if err := BindnodeRegistry.RegisterType(r.typ, string(embedSchema), r.typName, filecoinBindnodeOptions...); err != nil {
 			panic(err.Error())

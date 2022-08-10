@@ -60,7 +60,7 @@ func NewQueryClient(h host.Host, options ...QueryClientOption) *QueryClient {
 }
 
 // SendQuery sends a retrieval query over a libp2p stream to the peer
-func (c *QueryClient) SendQuery(ctx context.Context, id peer.ID, query types.Query) (*types.QueryResponse, error) {
+func (c *QueryClient) SendQuery(ctx context.Context, id peer.ID, query types.SignedQuery) (*types.QueryResponse, error) {
 	log.Debugw("send query", "pieceCID", query.PieceCID, "payloadCID", query.PayloadCID, "provider-peer", id)
 
 	// Create a libp2p stream to the provider
@@ -125,12 +125,12 @@ func (p *QueryProvider) handleNewQueryStream(s network.Stream) {
 	defer s.SetReadDeadline(time.Time{}) // nolint
 
 	// Read the query from the stream
-	queryi, err := types.BindnodeRegistry.TypeFromReader(s, (*types.Query)(nil), dagcbor.Decode)
+	queryi, err := types.BindnodeRegistry.TypeFromReader(s, (*types.SignedQuery)(nil), dagcbor.Decode)
 	if err != nil {
 		log.Warnw("reading query from stream", "err", err)
 		return
 	}
-	query := queryi.(*types.Query)
+	query := queryi.(*types.SignedQuery)
 
 	// run the query to generate a response
 	queryResponse := p.prov.ExecuteQuery(query, s.Conn().RemotePeer())

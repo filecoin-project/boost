@@ -9,8 +9,10 @@ import (
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
 	"github.com/filecoin-project/go-address"
+	lapi "github.com/filecoin-project/lotus/api"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-cid"
+	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/urfave/cli/v2"
 )
 
@@ -27,6 +29,11 @@ var retrievePieceCmd = &cli.Command{
 			Name:     "piece-cid",
 			Usage:    "",
 			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "wallet",
+			Usage:    "wallet to identify the client of a potential deal",
+			Required: false,
 		},
 	},
 	Before: before,
@@ -59,16 +66,38 @@ var retrievePieceCmd = &cli.Command{
 			return err
 		}
 
+		walletAddr, err := n.GetProvidedOrDefaultWallet(ctx, cctx.String("wallet"))
+		if err != nil {
+			return err
+		}
+
 		log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
 
 		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
 			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
 		}
 
-		dc := lp2pimpl.NewQueryClient(n.Host)
-		resp, err := dc.SendQuery(ctx, addrInfo.ID, types.Query{
+		query := types.Query{
 			PieceCID: &pieceCID,
+		}
+
+		buf, err := types.BindnodeRegistry.TypeToBytes(query, dagcbor.Encode)
+		if err != nil {
+			return err
+		}
+
+		sig, err := n.Wallet.WalletSign(ctx, walletAddr, buf, lapi.MsgMeta{})
+		if err != nil {
+			return err
+		}
+
+		dc := lp2pimpl.NewQueryClient(n.Host)
+		resp, err := dc.SendQuery(ctx, addrInfo.ID, types.SignedQuery{
+			Query:           query,
+			ClientAddress:   &walletAddr,
+			ClientSignature: sig,
 		})
+
 		if err != nil {
 			return fmt.Errorf("send deal status request failed: %w", err)
 		}

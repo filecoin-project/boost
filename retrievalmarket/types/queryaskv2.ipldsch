@@ -7,6 +7,13 @@ type Query struct {
 	PieceCID optional Link 
 }
 
+# SignedQuery adds an optional address and signature to a Query 
+type SignedQuery struct {
+	Query Query
+	ClientAddress optional Address
+	ClientSignature optional Signature
+}
+
 # QueryResponseStatus indicates whether a queried piece is available
 type QueryResponseStatus enum {
   # QueryResponseAvailable indicates a provider has a piece and is prepared to
@@ -23,6 +30,7 @@ type QueryResponseStatus enum {
 
 type Address bytes
 type TokenAmount bytes
+type Signature bytes
 
 type QueryProtocols struct {
    GraphsyncFilecoinV1 optional GraphsyncFilecoinV1Response (rename "graphsync/v1")
