@@ -63,8 +63,9 @@ require (
 	github.com/ipfs/go-metrics-interface v0.0.1
 	github.com/ipfs/go-unixfs v0.3.1
 	github.com/ipld/go-car v0.4.1-0.20220707083113-89de8134e58e
-	github.com/ipld/go-car/v2 v2.4.2-0.20220707083113-89de8134e58e
+	github.com/ipld/go-car/v2 v2.4.2-0.20220810073527-4f3c172da48b
 	github.com/ipld/go-ipld-prime v0.17.0
+	github.com/ipld/go-ipld-prime/storage/bsadapter v0.0.0-20211210234204-ce2a1c70cd73
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
