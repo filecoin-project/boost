@@ -285,7 +285,9 @@ func StorageNetworkName(ctx helpers.MetricsCtx, a v1api.FullNode) (dtypes.Networ
 }
 
 func NewBoostDB(r lotus_repo.LockedRepo) (*sql.DB, error) {
-	dbPath := path.Join(r.Path(), "boost.db")
+	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
+	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
+	dbPath := path.Join(r.Path(), "boost.db?cache=shared")
 	return db.SqlDB(dbPath)
 }
 
@@ -294,7 +296,9 @@ type LogSqlDB struct {
 }
 
 func NewLogsSqlDB(r repo.LockedRepo) (*LogSqlDB, error) {
-	dbPath := path.Join(r.Path(), "boost.logs.db")
+	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
+	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
+	dbPath := path.Join(r.Path(), "boost.logs.db?cache=shared")
 	d, err := db.SqlDB(dbPath)
 	if err != nil {
 		return nil, err
