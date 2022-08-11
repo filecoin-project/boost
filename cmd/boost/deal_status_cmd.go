@@ -85,19 +85,21 @@ var dealStatusCmd = &cli.Command{
 			return fmt.Errorf("send deal status request failed: %w", err)
 		}
 
-		label := resp.DealStatus.Proposal.Label
 		var lstr string
-		if label.IsString() {
-			lstr, err = label.ToString()
-			if err != nil {
-				lstr = "could not marshall deal label"
-			}
-		} else {
-			lbz, err := label.ToBytes()
-			if err != nil {
-				lstr = "could not marshall deal label"
+		if resp != nil && resp.DealStatus != nil {
+			label := resp.DealStatus.Proposal.Label
+			if label.IsString() {
+				lstr, err = label.ToString()
+				if err != nil {
+					lstr = "could not marshall deal label"
+				}
 			} else {
-				lstr = "bytes: " + hex.EncodeToString(lbz)
+				lbz, err := label.ToBytes()
+				if err != nil {
+					lstr = "could not marshall deal label"
+				} else {
+					lstr = "bytes: " + hex.EncodeToString(lbz)
+				}
 			}
 		}
 
@@ -115,7 +117,7 @@ var dealStatusCmd = &cli.Command{
 				// resp.DealStatus should always be present if there's no error,
 				// but check just in case
 				if resp.DealStatus != nil {
-					out["label"] = label
+					out["label"] = lstr
 					out["chainDealId"] = resp.DealStatus.ChainDealID
 					out["status"] = resp.DealStatus.Status
 					out["publishCid"] = nil
