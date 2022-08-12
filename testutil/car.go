@@ -9,7 +9,6 @@ import (
 
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-cidutil"
 	ds "github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	bstore "github.com/ipfs/go-ipfs-blockstore"
@@ -137,14 +136,11 @@ func WriteUnixfsDAGTo(path string, into ipldformat.DAGService) (cid.Cid, error) 
 
 	bufferedDS := ipldformat.NewBufferedDAG(context.Background(), into)
 	params := ihelper.DagBuilderParams{
-		Maxlinks:  unixfsLinksPerLevel,
-		RawLeaves: true,
-		CidBuilder: cidutil.InlineBuilder{
-			Builder: prefix,
-			Limit:   126,
-		},
-		Dagserv: bufferedDS,
-		NoCopy:  true,
+		Maxlinks:   unixfsLinksPerLevel,
+		RawLeaves:  true,
+		CidBuilder: prefix,
+		Dagserv:    bufferedDS,
+		NoCopy:     true,
 	}
 
 	db, err := params.New(chunk.NewSizeSplitter(rpf, int64(unixfsChunkSize)))

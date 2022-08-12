@@ -77,12 +77,17 @@ func (c *QueryClient) SendQuery(ctx context.Context, id peer.ID, query types.Sig
 
 	// Write the retrieval query to the stream
 	// Write the re to the client
-	err = types.BindnodeRegistry.TypeToWriter(query, s, dagcbor.Encode)
+	err = types.BindnodeRegistry.TypeToWriter(&query, s, dagcbor.Encode)
 	if err != nil {
 
 		return nil, fmt.Errorf("sending query: %w", err)
 	}
+	log.Debugw("successfully wrote query to stream", "query", query)
 
+	err = s.CloseWrite()
+	if err != nil {
+		return nil, fmt.Errorf("closing write portion of stream: %w", err)
+	}
 	// Set a deadline on reading from the stream so it doesn't hang
 	_ = s.SetReadDeadline(time.Now().Add(clientReadDeadline))
 	defer s.SetReadDeadline(time.Time{}) // nolint
@@ -131,6 +136,7 @@ func (p *QueryProvider) handleNewQueryStream(s network.Stream) {
 		return
 	}
 	query := queryi.(*types.SignedQuery)
+	log.Debugw("successfully read query from stream", "query", query)
 
 	// run the query to generate a response
 	queryResponse := p.prov.ExecuteQuery(query, s.Conn().RemotePeer())
@@ -145,4 +151,7 @@ func (p *QueryProvider) handleNewQueryStream(s network.Stream) {
 		log.Warnw("writing query response", "pieceCID", query.PieceCID, "payloadCID", query.PayloadCID, "err", err)
 		return
 	}
+
+	log.Debugw("successfully wrote query response from to", "queryResponse", queryResponse)
+
 }

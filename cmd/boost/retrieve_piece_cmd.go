@@ -81,7 +81,7 @@ var retrievePieceCmd = &cli.Command{
 			PieceCID: &pieceCID,
 		}
 
-		buf, err := types.BindnodeRegistry.TypeToBytes(query, dagcbor.Encode)
+		buf, err := types.BindnodeRegistry.TypeToBytes(&query, dagcbor.Encode)
 		if err != nil {
 			return err
 		}

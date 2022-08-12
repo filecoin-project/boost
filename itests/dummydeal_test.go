@@ -56,7 +56,7 @@ func TestDummydealOnline(t *testing.T) {
 	// Make a deal
 	res, err := f.MakeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false)
 	require.NoError(t, err)
-	require.True(t, res.Accepted)
+	require.True(t, res.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
 	time.Sleep(2 * time.Second)
@@ -66,7 +66,7 @@ func TestDummydealOnline(t *testing.T) {
 	failingDealUuid := uuid.New()
 	res2, err2 := f.MakeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
 	require.NoError(t, err2)
-	require.Contains(t, res2.Reason, "no space left", res2.Reason)
+	require.Contains(t, res2.Result.Reason, "no space left", res2.Result.Reason)
 	log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
 
 	// Wait for the first deal to be added to a sector and cleaned up so space is made
@@ -78,10 +78,21 @@ func TestDummydealOnline(t *testing.T) {
 	passingDealUuid := uuid.New()
 	res2, err2 = f.MakeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
 	require.NoError(t, err2)
-	require.True(t, res2.Accepted)
+	require.True(t, res2.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
 
 	// Wait for the deal to be added to a sector
 	err = f.WaitForDealAddedToSector(passingDealUuid)
 	require.NoError(t, err)
+
+	queryResponse, err := f.PayloadQueryV2(rootCid)
+	require.NoError(t, err)
+
+	f.VerifySuccessfulPayloadQueryResponseV2(t, rootCid, queryResponse)
+
+	queryResponse, err = f.PieceQueryV2(res.DealParams.ClientDealProposal.Proposal.PieceCID)
+	require.NoError(t, err)
+
+	f.VerifySuccessfulPieceQueryResponseV2(t, res.DealParams.ClientDealProposal.Proposal.PieceCID, queryResponse)
+
 }

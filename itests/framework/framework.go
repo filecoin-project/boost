@@ -17,6 +17,7 @@ import (
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	rtypes "github.com/filecoin-project/boost/retrievalmarket/types"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -34,8 +35,7 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	lbuild "github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
-	chaintypes "github.com/filecoin-project/lotus/chain/types"
-	ltypes "github.com/filecoin-project/lotus/chain/types"
+	ctypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/itests/kit"
 	lnode "github.com/filecoin-project/lotus/node"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
@@ -57,6 +57,7 @@ import (
 	dstest "github.com/ipfs/go-merkledag/test"
 	unixfile "github.com/ipfs/go-unixfs/file"
 	"github.com/ipld/go-car"
+	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/stretchr/testify/require"
@@ -65,18 +66,21 @@ import (
 
 var Log = logging.Logger("boosttest")
 
+var httpRetrievalURL = "https://www.testme.com"
+
 type TestFramework struct {
 	ctx  context.Context
 	Stop func()
 
-	HomeDir       string
-	Client        *boostclient.StorageClient
-	Boost         api.Boost
-	FullNode      *kit.TestFullNode
-	LotusMiner    *kit.TestMiner
-	ClientAddr    address.Address
-	MinerAddr     address.Address
-	DefaultWallet address.Address
+	HomeDir         string
+	Client          *boostclient.StorageClient
+	RetrievalClient *boostclient.RetrievalClient
+	Boost           api.Boost
+	FullNode        *kit.TestFullNode
+	LotusMiner      *kit.TestMiner
+	ClientAddr      address.Address
+	MinerAddr       address.Address
+	DefaultWallet   address.Address
 }
 
 func NewTestFramework(ctx context.Context, t *testing.T) *TestFramework {
@@ -171,7 +175,7 @@ func (f *TestFramework) Start() error {
 	go func() {
 		Log.Info("Creating client wallet")
 
-		clientAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
+		clientAddr, _ = fullnodeApi.WalletNew(f.ctx, ctypes.KTBLS)
 
 		amt := abi.NewTokenAmount(1e18)
 		_ = sendFunds(f.ctx, fullnodeApi, clientAddr, amt)
@@ -184,7 +188,7 @@ func (f *TestFramework) Start() error {
 	var psdWalletAddr address.Address
 	go func() {
 		Log.Info("Creating publish storage deals wallet")
-		psdWalletAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
+		psdWalletAddr, _ = fullnodeApi.WalletNew(f.ctx, ctypes.KTBLS)
 
 		amt := abi.NewTokenAmount(1e18)
 		_ = sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
@@ -196,6 +200,11 @@ func (f *TestFramework) Start() error {
 	f.ClientAddr = clientAddr
 
 	f.Client, err = boostclient.NewStorageClient(f.ClientAddr, f.FullNode)
+	if err != nil {
+		return err
+	}
+
+	f.RetrievalClient, err = boostclient.NewRetrievalClient()
 	if err != nil {
 		return err
 	}
@@ -267,10 +276,10 @@ func (f *TestFramework) Start() error {
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.Dealmaking.PublishMsgMaxDealsPerMsg = 1
 	cfg.Dealmaking.PublishMsgPeriod = config.Duration(0)
-	cfg.Dealmaking.PublishMsgMaxFee = ltypes.FIL(big.NewInt(1000))
+	cfg.Dealmaking.PublishMsgMaxFee = ctypes.FIL(big.NewInt(1000))
 	cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
 	cfg.Storage.ParallelFetchLimit = 10
-
+	cfg.Dealmaking.HTTPRetrievalURL = httpRetrievalURL
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
 		*rcfg = *cfg
@@ -341,6 +350,7 @@ func (f *TestFramework) Start() error {
 		return err
 	}
 	f.Client.PeerStore.AddAddrs(boostAddrs.ID, boostAddrs.Addrs, time.Hour)
+	f.RetrievalClient.PeerStore.AddAddrs(boostAddrs.ID, boostAddrs.Addrs, time.Hour)
 
 	// Connect full node to boost so that full node can make legacy deals
 	// with boost
@@ -356,17 +366,17 @@ func (f *TestFramework) Start() error {
 		return err
 	}
 
-	minerInfo, err := fullnodeApi.StateMinerInfo(f.ctx, minerAddr, ltypes.EmptyTSK)
+	minerInfo, err := fullnodeApi.StateMinerInfo(f.ctx, minerAddr, ctypes.EmptyTSK)
 	if err != nil {
 		return err
 	}
 
-	msg := &ltypes.Message{
+	msg := &ctypes.Message{
 		To:     minerAddr,
 		From:   minerInfo.Owner,
 		Method: builtin.MethodsMiner.ChangePeerID,
 		Params: params,
-		Value:  ltypes.NewInt(0),
+		Value:  ctypes.NewInt(0),
 	}
 
 	signed, err := fullnodeApi.MpoolPushMessage(f.ctx, msg, nil)
@@ -414,7 +424,7 @@ func (f *TestFramework) AddClientProviderBalance(bal abi.TokenAmount) error {
 		return f.WaitMsg(mcid)
 	})
 	errgp.Go(func() error {
-		mi, err := f.FullNode.StateMinerInfo(f.ctx, f.MinerAddr, chaintypes.EmptyTSK)
+		mi, err := f.FullNode.StateMinerInfo(f.ctx, f.MinerAddr, ctypes.EmptyTSK)
 		if err != nil {
 			return err
 		}
@@ -470,7 +480,12 @@ func (f *TestFramework) WaitForDealAddedToSector(dealUuid uuid.UUID) error {
 	}
 }
 
-func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool) (*api.ProviderDealRejectionInfo, error) {
+type DealResult struct {
+	DealParams types.DealParams
+	Result     *api.ProviderDealRejectionInfo
+}
+
+func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool) (*DealResult, error) {
 	cidAndSize, err := storagemarket.GenerateCommP(carFilepath)
 	if err != nil {
 		return nil, err
@@ -536,7 +551,11 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		},
 	}
 
-	return f.Client.StorageDeal(f.ctx, dealParams, peerID)
+	res, err := f.Client.StorageDeal(f.ctx, dealParams, peerID)
+	return &DealResult{
+		DealParams: dealParams,
+		Result:     res,
+	}, err
 }
 
 func (f *TestFramework) signProposal(addr address.Address, proposal *market.DealProposal) (*market.ClientDealProposal, error) {
@@ -559,7 +578,7 @@ func (f *TestFramework) signProposal(addr address.Address, proposal *market.Deal
 func (f *TestFramework) DefaultMarketsV1DealParams() lapi.StartDealParams {
 	return lapi.StartDealParams{
 		Data:              &lotus_storagemarket.DataRef{TransferType: lotus_storagemarket.TTGraphsync},
-		EpochPrice:        ltypes.NewInt(62500000), // minimum asking price
+		EpochPrice:        ctypes.NewInt(62500000), // minimum asking price
 		MinBlocksDuration: uint64(lbuild.MinDealDuration),
 		Miner:             f.MinerAddr,
 		Wallet:            f.DefaultWallet,
@@ -574,7 +593,7 @@ func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Addr
 		return err
 	}
 
-	msg := &chaintypes.Message{
+	msg := &ctypes.Message{
 		From:  senderAddr,
 		To:    recipient,
 		Value: amount,
@@ -590,7 +609,7 @@ func sendFunds(ctx context.Context, sender lapi.FullNode, recipient address.Addr
 }
 
 func (f *TestFramework) setControlAddress(psdAddr address.Address) error {
-	mi, err := f.FullNode.StateMinerInfo(f.ctx, f.MinerAddr, chaintypes.EmptyTSK)
+	mi, err := f.FullNode.StateMinerInfo(f.ctx, f.MinerAddr, ctypes.EmptyTSK)
 	if err != nil {
 		return err
 	}
@@ -604,7 +623,7 @@ func (f *TestFramework) setControlAddress(psdAddr address.Address) error {
 		return err
 	}
 
-	smsg, err := f.FullNode.MpoolPushMessage(f.ctx, &chaintypes.Message{
+	smsg, err := f.FullNode.MpoolPushMessage(f.ctx, &ctypes.Message{
 		From:   mi.Owner,
 		To:     f.MinerAddr,
 		Method: builtin.MethodsMiner.ChangeWorkerAddress,
@@ -737,4 +756,83 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 	require.NoError(t, err)
 
 	return tmpFile
+}
+
+func (f *TestFramework) signQuery(query rtypes.Query) (rtypes.SignedQuery, error) {
+
+	buf, err := rtypes.BindnodeRegistry.TypeToBytes(&query, dagcbor.Encode)
+	if err != nil {
+		return rtypes.SignedQuery{}, err
+	}
+
+	sig, err := f.FullNode.WalletSign(f.ctx, f.ClientAddr, buf)
+	if err != nil {
+		return rtypes.SignedQuery{}, err
+	}
+
+	return rtypes.SignedQuery{
+		Query:           query,
+		ClientAddress:   &f.ClientAddr,
+		ClientSignature: sig,
+	}, nil
+
+}
+
+// PayloadQueryV2 makes a query by payload to the v2 protocol
+func (f *TestFramework) PayloadQueryV2(payloadCID cid.Cid) (*rtypes.QueryResponse, error) {
+
+	peerID, err := f.Boost.ID(f.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	query := rtypes.Query{
+		PayloadCID: &payloadCID,
+	}
+
+	signedQuery, err := f.signQuery(query)
+	if err != nil {
+		return nil, err
+	}
+
+	return f.RetrievalClient.Query(f.ctx, peerID, signedQuery)
+}
+
+// VerifySuccessfulPayloadQueryResponseV2 tests that a query response is represents a success response for the given payloadCID
+func (f *TestFramework) VerifySuccessfulPayloadQueryResponseV2(t *testing.T, payloadCID cid.Cid, queryResponse *rtypes.QueryResponse) {
+	require.Equal(t, rtypes.QueryResponseAvailable, queryResponse.Status)
+	require.NotNil(t, queryResponse.Protocols.HTTPFilecoinV1)
+	require.Equal(t, fmt.Sprintf("%s/payload/%s.car", httpRetrievalURL, payloadCID), queryResponse.Protocols.HTTPFilecoinV1.URL)
+	require.NotNil(t, queryResponse.Protocols.GraphsyncFilecoinV1)
+	mi, err := f.FullNode.StateMinerInfo(f.ctx, f.MinerAddr, ctypes.EmptyTSK)
+	require.NoError(t, err)
+	require.Equal(t, mi.Worker, queryResponse.Protocols.GraphsyncFilecoinV1.PaymentAddress)
+}
+
+// PieceQueryV2 makes a query by piece to the v2 protocol
+func (f *TestFramework) PieceQueryV2(pieceCID cid.Cid) (*rtypes.QueryResponse, error) {
+
+	peerID, err := f.Boost.ID(f.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	query := rtypes.Query{
+		PieceCID: &pieceCID,
+	}
+
+	signedQuery, err := f.signQuery(query)
+	if err != nil {
+		return nil, err
+	}
+
+	return f.RetrievalClient.Query(f.ctx, peerID, signedQuery)
+}
+
+// VerifySuccessfulPieceQueryResponseV2 tests that a query response is represents a success response for the given pieceCID
+func (f *TestFramework) VerifySuccessfulPieceQueryResponseV2(t *testing.T, pieceCID cid.Cid, queryResponse *rtypes.QueryResponse) {
+	require.Equal(t, rtypes.QueryResponseAvailable, queryResponse.Status)
+	require.NotNil(t, queryResponse.Protocols.HTTPFilecoinV1)
+	require.Equal(t, fmt.Sprintf("%s/piece/%s", httpRetrievalURL, pieceCID), queryResponse.Protocols.HTTPFilecoinV1.URL)
+	require.Nil(t, queryResponse.Protocols.GraphsyncFilecoinV1)
 }
