@@ -173,9 +173,9 @@ func statusMessage(resp *types.DealStatusResponse) string {
 	case dealcheckpoints.PublishConfirmed.String():
 		return "Adding to Sector"
 	case dealcheckpoints.AddedPiece.String():
-		return "Announcing"
-	case dealcheckpoints.IndexedAndAnnounced.String():
 		return "Sealing"
+	case dealcheckpoints.IndexedAndAnnounced.String():
+		return "Complete"
 	case dealcheckpoints.Complete.String():
 		if resp.DealStatus.Error != "" {
 			return "Error: " + resp.DealStatus.Error
