@@ -167,21 +167,30 @@ export function EditableField(props) {
                     /> {isCurrency ? 'atto' : 'bytes'}
                     <div className="button" onClick={save}>Save</div>
                     <div className="button cancel" onClick={cancel}>Cancel</div>
-                    { BigInt(currentVal) > oneNanoFil ? (
-                        <span className="human">({humanFIL(BigInt(currentVal))})</span>
-                    ) : null }
+                    <PreviewAmt currentVal={currentVal} isCurrency={isCurrency} />
                 </td>
             ) : (
                 <td className="val" onClick={() => setEditing(true)}>
                     {displayVal}
                     <span className="edit" />
-                    { BigInt(currentVal) > oneNanoFil ? (
-                        <span className="human">({humanFIL(BigInt(currentVal))})</span>
-                    ) : null }
+                    { isCurrency ? <PreviewAmt currentVal={currentVal} isCurrency={isCurrency}  /> : null }
                 </td>
             )}
         </tr>
     )
+}
+
+function PreviewAmt({currentVal, isCurrency}) {
+    if (isCurrency) {
+        if (BigInt(currentVal) > oneNanoFil) {
+            return <span className="human">({humanFIL(BigInt(currentVal))})</span>
+        }
+    } else {
+        if (BigInt(currentVal) > BigInt(1024)) {
+            return <span className="human">({humanFileSize(BigInt(currentVal))})</span>
+        }
+    }
+    return null
 }
 
 export function SettingsMenuItem(props) {
