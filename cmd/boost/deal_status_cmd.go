@@ -109,10 +109,9 @@ var dealStatusCmd = &cli.Command{
 				out["error"] = resp.Error
 			} else {
 				out = map[string]interface{}{
-					"dealUuid":      resp.DealUUID.String(),
-					"provider":      maddr.String(),
-					"clientWallet":  walletAddr.String(),
-					"statusMessage": statusMessage(resp),
+					"dealUuid":     resp.DealUUID.String(),
+					"provider":     maddr.String(),
+					"clientWallet": walletAddr.String(),
 				}
 				// resp.DealStatus should always be present if there's no error,
 				// but check just in case
@@ -120,6 +119,8 @@ var dealStatusCmd = &cli.Command{
 					out["label"] = lstr
 					out["chainDealId"] = resp.DealStatus.ChainDealID
 					out["status"] = resp.DealStatus.Status
+					out["sealingStatus"] = resp.DealStatus.SealingStatus
+					out["statusMessage"] = statusMessage(resp)
 					out["publishCid"] = nil
 					if resp.DealStatus.PublishCid != nil {
 						out["publishCid"] = resp.DealStatus.PublishCid.String()
@@ -175,12 +176,15 @@ func statusMessage(resp *types.DealStatusResponse) string {
 	case dealcheckpoints.AddedPiece.String():
 		return "Announcing"
 	case dealcheckpoints.IndexedAndAnnounced.String():
+		if resp.DealStatus.SealingStatus != "" {
+			return "Sealing: " + resp.DealStatus.SealingStatus
+		}
 		return "Sealing"
 	case dealcheckpoints.Complete.String():
 		if resp.DealStatus.Error != "" {
 			return "Error: " + resp.DealStatus.Error
 		}
-		return "Complete"
+		return "Expired"
 	}
 	return resp.DealStatus.Status
 }

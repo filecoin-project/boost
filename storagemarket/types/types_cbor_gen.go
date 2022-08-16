@@ -1199,7 +1199,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 
 	cw := cbg.NewCborWriter(w)
 
-	if _, err := cw.Write([]byte{166}); err != nil {
+	if _, err := cw.Write([]byte{167}); err != nil {
 		return err
 	}
 
@@ -1246,6 +1246,29 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 	if _, err := io.WriteString(w, string(t.Status)); err != nil {
+		return err
+	}
+
+	// t.SealingStatus (string) (string)
+	if len("SealingStatus") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"SealingStatus\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("SealingStatus"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("SealingStatus")); err != nil {
+		return err
+	}
+
+	if len(t.SealingStatus) > cbg.MaxLength {
+		return xerrors.Errorf("Value in field t.SealingStatus was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.SealingStatus))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string(t.SealingStatus)); err != nil {
 		return err
 	}
 
@@ -1381,6 +1404,17 @@ func (t *DealStatus) UnmarshalCBOR(r io.Reader) (err error) {
 				}
 
 				t.Status = string(sval)
+			}
+			// t.SealingStatus (string) (string)
+		case "SealingStatus":
+
+			{
+				sval, err := cbg.ReadString(cr)
+				if err != nil {
+					return err
+				}
+
+				t.SealingStatus = string(sval)
 			}
 			// t.Proposal (market.DealProposal) (struct)
 		case "Proposal":
