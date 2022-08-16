@@ -57,6 +57,8 @@ type DealStatus struct {
 	Error string
 	// Status is a string corresponding to a deal checkpoint
 	Status string
+	// SealingStatus is the sealing status reported by lotus miner
+	SealingStatus string
 	// Proposal is the deal proposal
 	Proposal market.DealProposal
 	// SignedProposalCid is the cid of the client deal proposal + signature
