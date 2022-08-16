@@ -45,7 +45,7 @@ func FromReader(reader io.Reader, def interface{}) (interface{}, error) {
 	return cfg, nil
 }
 
-func ConfigUpdate(cfgCur, cfgDef interface{}, comment bool) ([]byte, error) {
+func ConfigUpdateV0toV1(cfgCur, cfgDef interface{}, comment bool) ([]byte, error) {
 	var nodeStr, defStr string
 	if cfgDef != nil {
 		buf := new(bytes.Buffer)
@@ -155,8 +155,4 @@ func ConfigUpdate(cfgCur, cfgDef interface{}, comment bool) ([]byte, error) {
 	}
 
 	return []byte(nodeStr), nil
-}
-
-func ConfigComment(t interface{}) ([]byte, error) {
-	return ConfigUpdate(t, nil, true)
 }

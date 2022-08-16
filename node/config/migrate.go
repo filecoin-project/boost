@@ -12,12 +12,37 @@ var log = logging.Logger("cfg")
 
 // CurrentVersion is the config version expected by Boost.
 // We need to migrate the config file to this version.
-const CurrentVersion = 1
+const CurrentVersion = 2
 
 type migrateUpFn = func(cfgPath string) (string, error)
 
 var migrations = []migrateUpFn{
-	v0Tov1,
+	v0Tov1, // index 0 => version 0
+	v1Tov2, // index 1 => version 1
+}
+
+// Migrate from config version 1 to version 2 (i.e. remove a few redundant fields)
+func v1Tov2(cfgPath string) (string, error) {
+	cfg, err := FromFile(cfgPath, DefaultBoost())
+	if err != nil {
+		return "", fmt.Errorf("parsing config file %s: %w", cfgPath, err)
+	}
+
+	boostCfg, ok := cfg.(*Boost)
+	if !ok {
+		return "", fmt.Errorf("unexpected config type %T: expected *config.Boost", cfg)
+	}
+
+	// Update the Boost config version
+	boostCfg.ConfigVersion = 2
+
+	// Remove redundant fields
+	bz, err := RemoveRedundantFieldsV1toV2(boostCfg)
+	if err != nil {
+		return "", fmt.Errorf("applying configuration: %w", err)
+	}
+
+	return string(bz), nil
 }
 
 // Migrate from config version 0 to version 1
@@ -37,7 +62,7 @@ func v0Tov1(cfgPath string) (string, error) {
 
 	// For the migration from v0 to v1 just add the config version and add
 	// comments to the file
-	bz, err := ConfigUpdate(boostCfg, DefaultBoost(), true)
+	bz, err := ConfigUpdateV0toV1(boostCfg, DefaultBoost(), true)
 	if err != nil {
 		return "", fmt.Errorf("applying configuration: %w", err)
 	}
