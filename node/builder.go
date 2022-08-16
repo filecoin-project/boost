@@ -456,7 +456,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 			StorageMiner: walletMiner,
 			CollatWallet: walletDealCollat,
 			PubMsgWallet: walletPSD,
-			PubMsgBalMin: abi.TokenAmount(cfg.Dealmaking.PublishMsgMaxFee),
+			PubMsgBalMin: abi.TokenAmount(cfg.LotusFees.MaxPublishDealsFee),
 		})),
 
 		Override(new(*storagemanager.StorageManager), storagemanager.New(storagemanager.Config{
@@ -552,7 +552,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		),
 
 		Override(new(*lotus_storageadapter.DealPublisher), lotus_storageadapter.NewDealPublisher(&legacyFees, lotus_storageadapter.PublishMsgConfig{
-			Period:                  time.Duration(cfg.Dealmaking.PublishMsgPeriod),
+			Period:                  time.Duration(cfg.LotusDealmaking.PublishMsgPeriod),
 			MaxDealsPerMsg:          cfg.LotusDealmaking.MaxDealsPerPublishMsg,
 			StartEpochSealingBuffer: cfg.LotusDealmaking.StartEpochSealingBuffer,
 		})),

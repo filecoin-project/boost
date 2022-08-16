@@ -170,26 +170,6 @@ before being assigned to a sector`,
 			Comment: `Maximum amount of time proposed deal StartEpoch can be in future`,
 		},
 		{
-			Name: "PublishMsgPeriod",
-			Type: "Duration",
-
-			Comment: `When a deal is ready to publish, the amount of time to wait for more
-deals to be ready to publish before publishing them all as a batch`,
-		},
-		{
-			Name: "PublishMsgMaxDealsPerMsg",
-			Type: "uint64",
-
-			Comment: `The maximum number of deals to include in a single PublishStorageDeals
-message`,
-		},
-		{
-			Name: "PublishMsgMaxFee",
-			Type: "types.FIL",
-
-			Comment: `The maximum network fees to pay when sending the PublishStorageDeals message`,
-		},
-		{
 			Name: "MaxProviderCollateralMultiplier",
 			Type: "uint64",
 

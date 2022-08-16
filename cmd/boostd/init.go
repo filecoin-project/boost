@@ -698,9 +698,6 @@ func setBoostDealMakingCfg(bdm *config.DealmakingConfig, mktsCfg *lotus_config.S
 	bdm.PieceCidBlocklist = ldm.PieceCidBlocklist
 	bdm.ExpectedSealDuration = config.Duration(ldm.ExpectedSealDuration)
 	bdm.MaxDealStartDelay = config.Duration(ldm.MaxDealStartDelay)
-	bdm.PublishMsgPeriod = config.Duration(ldm.PublishMsgPeriod)
-	bdm.PublishMsgMaxDealsPerMsg = ldm.MaxDealsPerPublishMsg
-	bdm.PublishMsgMaxFee = mktsCfg.Fees.MaxPublishDealsFee
 	bdm.MaxProviderCollateralMultiplier = ldm.MaxProviderCollateralMultiplier
 	bdm.MaxStagingDealsBytes = ldm.MaxStagingDealsBytes
 	bdm.SimultaneousTransfersForStorage = ldm.SimultaneousTransfersForStorage
