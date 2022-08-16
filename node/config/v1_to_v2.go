@@ -1,10 +1,7 @@
 package config
 
 import (
-	"bytes"
 	"fmt"
-
-	"github.com/BurntSushi/toml"
 )
 
 // Migrate from config version 1 to version 2 (i.e. remove a few redundant fields)
@@ -31,19 +28,4 @@ func v1Tov2(cfgPath string) (string, error) {
 	}
 
 	return string(bz), nil
-}
-
-func RemoveRedundantFieldsV1toV2(cfgCur interface{}) ([]byte, error) {
-	var nodeStr string
-	{
-		buf := new(bytes.Buffer)
-		e := toml.NewEncoder(buf)
-		if err := e.Encode(cfgCur); err != nil {
-			return nil, fmt.Errorf("encoding node config: %w", err)
-		}
-
-		nodeStr = buf.String()
-	}
-
-	return []byte(nodeStr), nil
 }
