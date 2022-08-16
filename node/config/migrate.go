@@ -2,10 +2,13 @@ package config
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path"
 
+	"github.com/BurntSushi/toml"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/kelseyhightower/envconfig"
 )
 
 var log = logging.Logger("cfg")
@@ -19,55 +22,6 @@ type migrateUpFn = func(cfgPath string) (string, error)
 var migrations = []migrateUpFn{
 	v0Tov1, // index 0 => version 0
 	v1Tov2, // index 1 => version 1
-}
-
-// Migrate from config version 1 to version 2 (i.e. remove a few redundant fields)
-func v1Tov2(cfgPath string) (string, error) {
-	cfg, err := FromFile(cfgPath, DefaultBoost())
-	if err != nil {
-		return "", fmt.Errorf("parsing config file %s: %w", cfgPath, err)
-	}
-
-	boostCfg, ok := cfg.(*Boost)
-	if !ok {
-		return "", fmt.Errorf("unexpected config type %T: expected *config.Boost", cfg)
-	}
-
-	// Update the Boost config version
-	boostCfg.ConfigVersion = 2
-
-	// Remove redundant fields
-	bz, err := RemoveRedundantFieldsV1toV2(boostCfg)
-	if err != nil {
-		return "", fmt.Errorf("applying configuration: %w", err)
-	}
-
-	return string(bz), nil
-}
-
-// Migrate from config version 0 to version 1
-func v0Tov1(cfgPath string) (string, error) {
-	cfg, err := FromFile(cfgPath, DefaultBoost())
-	if err != nil {
-		return "", fmt.Errorf("parsing config file %s: %w", cfgPath, err)
-	}
-
-	boostCfg, ok := cfg.(*Boost)
-	if !ok {
-		return "", fmt.Errorf("unexpected config type %T: expected *config.Boost", cfg)
-	}
-
-	// Update the Boost config version
-	boostCfg.ConfigVersion = 1
-
-	// For the migration from v0 to v1 just add the config version and add
-	// comments to the file
-	bz, err := ConfigUpdateV0toV1(boostCfg, DefaultBoost(), true)
-	if err != nil {
-		return "", fmt.Errorf("applying configuration: %w", err)
-	}
-
-	return string(bz), nil
 }
 
 // This struct is used to get the config file version
@@ -199,4 +153,35 @@ func makeSymlink(cfgPath string, version int) error {
 	}
 
 	return nil
+}
+
+// FromFile loads config from a specified file overriding defaults specified in
+// the def parameter. If file does not exist or is empty defaults are assumed.
+func FromFile(path string, def interface{}) (interface{}, error) {
+	file, err := os.Open(path)
+	switch {
+	case os.IsNotExist(err):
+		return def, nil
+	case err != nil:
+		return nil, err
+	}
+
+	defer file.Close() //nolint:errcheck // The file is RO
+	return FromReader(file, def)
+}
+
+// FromReader loads config from a reader instance.
+func FromReader(reader io.Reader, def interface{}) (interface{}, error) {
+	cfg := def
+	_, err := toml.NewDecoder(reader).Decode(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	err = envconfig.Process("LOTUS", cfg)
+	if err != nil {
+		return nil, fmt.Errorf("processing env vars overrides: %s", err)
+	}
+
+	return cfg, nil
 }

@@ -3,49 +3,40 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"os"
 	"reflect"
 	"regexp"
 	"strings"
 	"unicode"
 
 	"github.com/BurntSushi/toml"
-	"github.com/kelseyhightower/envconfig"
 )
 
-// FromFile loads config from a specified file overriding defaults specified in
-// the def parameter. If file does not exist or is empty defaults are assumed.
-func FromFile(path string, def interface{}) (interface{}, error) {
-	file, err := os.Open(path)
-	switch {
-	case os.IsNotExist(err):
-		return def, nil
-	case err != nil:
-		return nil, err
+// Migrate from config version 0 to version 1
+func v0Tov1(cfgPath string) (string, error) {
+	cfg, err := FromFile(cfgPath, DefaultBoost())
+	if err != nil {
+		return "", fmt.Errorf("parsing config file %s: %w", cfgPath, err)
 	}
 
-	defer file.Close() //nolint:errcheck // The file is RO
-	return FromReader(file, def)
+	boostCfg, ok := cfg.(*Boost)
+	if !ok {
+		return "", fmt.Errorf("unexpected config type %T: expected *config.Boost", cfg)
+	}
+
+	// Update the Boost config version
+	boostCfg.ConfigVersion = 1
+
+	// For the migration from v0 to v1 just add the config version and add
+	// comments to the file
+	bz, err := ConfigUpdate(boostCfg, DefaultBoost(), true)
+	if err != nil {
+		return "", fmt.Errorf("applying configuration: %w", err)
+	}
+
+	return string(bz), nil
 }
 
-// FromReader loads config from a reader instance.
-func FromReader(reader io.Reader, def interface{}) (interface{}, error) {
-	cfg := def
-	_, err := toml.NewDecoder(reader).Decode(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	err = envconfig.Process("LOTUS", cfg)
-	if err != nil {
-		return nil, fmt.Errorf("processing env vars overrides: %s", err)
-	}
-
-	return cfg, nil
-}
-
-func ConfigUpdateV0toV1(cfgCur, cfgDef interface{}, comment bool) ([]byte, error) {
+func ConfigUpdate(cfgCur, cfgDef interface{}, comment bool) ([]byte, error) {
 	var nodeStr, defStr string
 	if cfgDef != nil {
 		buf := new(bytes.Buffer)
