@@ -267,7 +267,11 @@ func (f *TestFramework) Start() error {
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
 	cfg.LotusDealmaking.MaxDealsPerPublishMsg = 1
 	cfg.LotusDealmaking.PublishMsgPeriod = lotus_config.Duration(0)
-	cfg.LotusFees.MaxPublishDealsFee = ltypes.FIL(big.NewInt(100000000))
+	oneFIL, err := ltypes.ParseFIL("1 FIL")
+	if err != nil {
+		return err
+	}
+	cfg.LotusFees.MaxPublishDealsFee = oneFIL
 	cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
 	cfg.Storage.ParallelFetchLimit = 10
 
