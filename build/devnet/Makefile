@@ -1,11 +1,11 @@
-lotus_version?=v1.17.1-rc2
+lotus_version?=1.17.1-rc2
 boost_version?=1.3.0-rc1
 docker_user?=filecoin
 
 lotus_test_image=$(docker_user)/lotus-test:$(lotus_version)
 ##################################################################################
 lotus-$(lotus_version):
-	git clone --depth 1 --branch $(lotus_version) https://github.com/filecoin-project/lotus $@
+	git clone --depth 1 --branch v$(lotus_version) https://github.com/filecoin-project/lotus $@
 
 prepare/lotus-test: | lotus-$(lotus_version)
 	cd lotus-$(lotus_version) && docker build -f Dockerfile.lotus --target lotus-test -t $(lotus_test_image) .
