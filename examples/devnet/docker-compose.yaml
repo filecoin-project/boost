@@ -1,0 +1,75 @@
+version: '3.8'
+
+x-logging:
+  &default-logging
+  options:
+    max-size: '20m'
+    max-file: '3'
+  driver: json-file
+
+services:
+  lotus:
+    container_name: lotus
+    image: ${LOTUS_IMAGE}
+    # ports:
+    #   - "1234:1234"
+    environment:
+     - LOTUS_API_LISTENADDRESS=/dns/lotus/tcp/1234/http
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+     - ./data/lotus:/var/lib/lotus:rw
+     - ./data/genesis:/var/lib/genesis:rw
+     - ./data/filecoin-proof-parameters/:/var/tmp/filecoin-proof-parameters:rw
+
+  lotus-miner:
+    container_name: lotus-miner
+    image: ${LOTUS_MINER_IMAGE}
+    # ports:
+    #   - "2345:2345"
+    environment:
+     - LOTUS_API_LISTENADDRESS=/dns/lotus-miner/tcp/2345/http
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+     - ./data/lotus-miner:/var/lib/lotus-miner:rw
+     - ./data/lotus:/var/lib/lotus:ro
+     - ./data/genesis:/var/lib/genesis:ro
+     - ./data/filecoin-proof-parameters/:/var/tmp/filecoin-proof-parameters:rw  
+
+  boost:
+    container_name: boost
+    image: ${BOOST_IMAGE}
+    # ports:
+    #   - "8080:8080"
+    environment:
+     - LOTUS_PATH=/var/lib/lotus
+     - LOTUS_MINER_PATH=/var/lib/lotus-miner
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+     - ./data/boost:/var/lib/boost:rw
+     - ./data/lotus:/var/lib/lotus:ro
+     - ./data/lotus-miner:/var/lib/lotus-miner:ro
+     - ./data/sample:/app/public:rw  
+
+  boost-gui:
+    container_name: boost-gui
+    image: ${BOOST_GUI_IMAGE}
+    ports:
+      - "8000:8000"
+    environment:
+     - BOOST_URL=http://boost:8080
+    restart: unless-stopped
+    logging: *default-logging
+
+  demo-http-server:
+    container_name: demo-http-server
+    image: nginx:1.23-alpine
+    # ports:
+    #   - "8001:80"
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+     - ./data/sample:/usr/share/nginx/html:ro   
+    
