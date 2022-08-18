@@ -233,6 +233,12 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 
 			Comment: `The maximum amount of time a transfer can take before it fails`,
 		},
+		{
+			Name: "RemoteCommp",
+			Type: "bool",
+
+			Comment: `Whether to do commp on the Boost node (local) or on the Sealer (remote)`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{

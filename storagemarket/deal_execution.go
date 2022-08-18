@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"time"
 
@@ -14,16 +13,12 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	transporttypes "github.com/filecoin-project/boost/transport/types"
-	"github.com/filecoin-project/go-commp-utils/writer"
-	commcid "github.com/filecoin-project/go-fil-commcid"
-	commp "github.com/filecoin-project/go-fil-commp-hashhash"
 	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/google/uuid"
-	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-libp2p-core/event"
 )
@@ -188,10 +183,8 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 	} else if deal.Checkpoint < dealcheckpoints.Transferred {
 		// verify CommP matches for an offline deal
 		if err := p.verifyCommP(deal); err != nil {
-			return &dealMakingError{
-				retry: types.DealRetryFatal,
-				error: fmt.Errorf("error when matching commP for imported data for offline deal: %w", err),
-			}
+			err.error = fmt.Errorf("error when matching commP for imported data for offline deal: %w", err)
+			return err
 		}
 		p.dealLogger.Infow(deal.DealUuid, "commp matched successfully for imported data for offline deal")
 
@@ -326,29 +319,12 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 
 	// Verify CommP matches
 	if err := p.verifyCommP(deal); err != nil {
-		return &dealMakingError{
-			retry: smtypes.DealRetryFatal,
-			error: fmt.Errorf("failed to verify CommP: %w", err),
-		}
+		err.error = fmt.Errorf("failed to verify CommP: %w", err.error)
+		return err
 	}
 
 	p.dealLogger.Infow(deal.DealUuid, "commP matched successfully: deal-data verified")
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.Transferred)
-}
-
-func (p *Provider) verifyCommP(deal *types.ProviderDealState) error {
-	p.dealLogger.Infow(deal.DealUuid, "checking commP")
-	pieceCid, err := GeneratePieceCommitment(deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize)
-	if err != nil {
-		return fmt.Errorf("failed to generate CommP: %w", err)
-	}
-
-	clientPieceCid := deal.ClientDealProposal.Proposal.PieceCID
-	if pieceCid != clientPieceCid {
-		return fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid)
-	}
-
-	return nil
 }
 
 func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.Handler, pub event.Emitter, deal *types.ProviderDealState) error {
@@ -384,84 +360,6 @@ func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.
 			return ctx.Err()
 		}
 	}
-}
-
-// GenerateCommP
-func GenerateCommP(filepath string) (cidAndSize *writer.DataCIDSize, finalErr error) {
-	rd, err := carv2.OpenReader(filepath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get CARv2 reader: %w", err)
-	}
-
-	defer func() {
-		if err := rd.Close(); err != nil {
-			if finalErr == nil {
-				cidAndSize = nil
-				finalErr = fmt.Errorf("failed to close CARv2 reader: %w", err)
-				return
-			}
-		}
-	}()
-
-	// dump the CARv1 payload of the CARv2 file to the Commp Writer and get back the CommP.
-	w := &writer.Writer{}
-	r, err := rd.DataReader()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get reader over CAR file data: %w", err)
-	}
-	written, err := io.Copy(w, r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write to CommP writer: %w", err)
-	}
-
-	var size int64
-	switch rd.Version {
-	case 2:
-		size = int64(rd.Header.DataSize)
-	case 1:
-		st, err := os.Stat(filepath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to stat CARv1 file: %w", err)
-		}
-		size = st.Size()
-	}
-
-	if written != size {
-		return nil, fmt.Errorf("number of bytes written to CommP writer %d not equal to the CARv1 payload size %d", written, rd.Header.DataSize)
-	}
-
-	cidAndSize = &writer.DataCIDSize{}
-	*cidAndSize, err = w.Sum()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get CommP: %w", err)
-	}
-
-	return cidAndSize, nil
-}
-
-// GeneratePieceCommitment generates the pieceCid for the CARv1 deal payload in
-// the CARv2 file that already exists at the given path.
-func GeneratePieceCommitment(filepath string, dealSize abi.PaddedPieceSize) (c cid.Cid, finalErr error) {
-	cidAndSize, err := GenerateCommP(filepath)
-	if err != nil {
-		return cid.Undef, err
-	}
-
-	if cidAndSize.PieceSize < dealSize {
-		// need to pad up!
-		rawPaddedCommp, err := commp.PadCommP(
-			// we know how long a pieceCid "hash" is, just blindly extract the trailing 32 bytes
-			cidAndSize.PieceCID.Hash()[len(cidAndSize.PieceCID.Hash())-32:],
-			uint64(cidAndSize.PieceSize),
-			uint64(dealSize),
-		)
-		if err != nil {
-			return cid.Undef, fmt.Errorf("failed to pad data: %w", err)
-		}
-		cidAndSize.PieceCID, _ = commcid.DataCommitmentV1ToCID(rawPaddedCommp)
-	}
-
-	return cidAndSize.PieceCID, err
 }
 
 func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {

@@ -78,6 +78,7 @@ func newDealAccessor(db *sql.DB, deal *types.ProviderDealState) *dealAccessor {
 			"CheckpointAt":          &fielddef.FieldDef{F: &deal.CheckpointAt},
 			"Error":                 &fielddef.FieldDef{F: &deal.Err},
 			"Retry":                 &fielddef.FieldDef{F: &deal.Retry},
+
 			// Needed so the deal can be looked up by signed proposal cid
 			"SignedProposalCID": &fielddef.SignedPropFieldDef{Prop: deal.ClientDealProposal},
 		},
