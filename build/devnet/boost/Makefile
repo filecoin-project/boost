@@ -6,7 +6,9 @@ docker_dir=build/devnet/boost
 tag=$(service):$(version)
 
 dbuild: 
-	cd ../../../ && docker build -t $(tag) --build-arg BUILD_VERSION=$(version) -f $(docker_dir)/Dockerfile .
+	cd ../../../ && \
+	docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image)  --build-arg BUILD_VERSION=$(version) \
+		-t $(tag) -f $(docker_dir)/Dockerfile .
 
 dpush: dbuild
 	docker push $(tag)
