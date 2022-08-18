@@ -13,9 +13,9 @@ import (
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/lotus/api/v1api"
-	sectorstorage "github.com/filecoin-project/lotus/extern/sector-storage"
 	"github.com/filecoin-project/lotus/markets/sectoraccessor"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -23,7 +23,7 @@ import (
 	carindex "github.com/ipld/go-car/v2/index"
 )
 
-func NewPieceMeta(maddr dtypes.MinerAddress, store piecemeta.Store, secb sectorblocks.SectorBuilder, pp sectorstorage.PieceProvider, full v1api.FullNode) *piecemeta.PieceMeta {
+func NewPieceMeta(maddr dtypes.MinerAddress, store piecemeta.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecemeta.PieceMeta {
 	sa := sectoraccessor.NewSectorAccessor(maddr, secb, pp, full)
 
 	return piecemeta.NewPieceMeta(store, sa)
