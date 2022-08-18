@@ -1,6 +1,6 @@
-ARG LOTUS_TEST_DI=filecoin/lotus-test:latest
+ARG LOTUS_TEST_IMAGE=filecoin/lotus-test:latest
 #############################################################################
-FROM ${LOTUS_TEST_DI}
+FROM ${LOTUS_TEST_IMAGE}
 
 ARG BUILD_VERSION=0.1
 

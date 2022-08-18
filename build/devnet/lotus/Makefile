@@ -4,7 +4,7 @@ version?=$(lotus_version)
 ########### DOCKER ##################################################################
 tag=$(service):$(version)
 dbuild: 
-	docker build -t $(tag) --build-arg LOTUS_TEST_DI=$(lotus_test_image) --build-arg BUILD_VERSION=$(version) .
+	docker build -t $(tag) --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image) --build-arg BUILD_VERSION=$(version) .
 
 dpush: dbuild
 	docker push $(tag)
