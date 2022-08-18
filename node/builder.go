@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/dagstore"
-
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"

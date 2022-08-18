@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/query"
 	carindex "github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
 )
@@ -114,13 +114,32 @@ func (db *DB) GetPieceCidsByMultihash(ctx context.Context, mh multihash.Multihas
 	return pcids, nil
 }
 
-// SetMultihashToPieceCid
-func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Record, pieceCid cid.Cid) error {
-	batch, err := db.Batch(ctx)
+func (db *DB) Get(ctx context.Context, key datastore.Key) (value []byte, err error) {
+	var getResult *gocb.GetResult
+	getResult, err = db.col.Get("u:"+key.String(), nil)
 	if err != nil {
-		return fmt.Errorf("failed to create ds batch: %w", err)
+		return nil, err
 	}
 
+	//cas := getResult.Cas()
+
+	var val []byte
+	err = getResult.Content(&val)
+	if err != nil {
+		return nil, err
+	}
+
+	return val, nil
+}
+
+func (db *DB) Put(ctx context.Context, key datastore.Key, value []byte) error {
+	_, err := db.col.Upsert("u:"+key.String(), value, nil)
+
+	return err
+}
+
+// SetMultihashToPieceCid
+func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Record, pieceCid cid.Cid) error {
 	for _, r := range recs {
 		mh := r.Cid.Hash()
 
@@ -141,8 +160,8 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Reco
 					return fmt.Errorf("failed to marshal pieceCids slice: %w", err)
 				}
 
-				if err := batch.Put(ctx, key, b); err != nil {
-					return fmt.Errorf("failed to batch put mh=%s, err=%w", mh, err)
+				if err := db.Put(ctx, key, b); err != nil {
+					return fmt.Errorf("failed to put mh=%s, err=%w", mh, err)
 				}
 				return nil
 			}
@@ -164,8 +183,8 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Reco
 			if err != nil {
 				return fmt.Errorf("failed to marshal pieceCids slice: %w", err)
 			}
-			if err := batch.Put(ctx, key, b); err != nil {
-				return fmt.Errorf("failed to batch put mh=%s, err%w", mh, err)
+			if err := db.Put(ctx, key, b); err != nil {
+				return fmt.Errorf("failed to put mh=%s, err%w", mh, err)
 			}
 
 			return nil
@@ -173,15 +192,6 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Reco
 		if err != nil {
 			return err
 		}
-	}
-
-	if err := batch.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit batch: %w", err)
-	}
-
-	key := datastore.NewKey(sprefixMhtoPieceCids)
-	if err := db.Sync(ctx, key); err != nil {
-		return fmt.Errorf("failed to sync puts: %w", err)
 	}
 
 	return nil
@@ -220,42 +230,43 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (mode
 
 // AllRecords
 func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, error) {
-	var records []model.Record
+	return nil, errors.New("not impl")
+	//var records []model.Record
 
-	buf := make([]byte, size)
-	binary.PutUvarint(buf, cursor)
+	//buf := make([]byte, size)
+	//binary.PutUvarint(buf, cursor)
 
-	var q query.Query
-	q.Prefix = fmt.Sprintf("%d/", cursor)
-	results, err := db.Query(ctx, q)
-	if err != nil {
-		return nil, err
-	}
+	//var q query.Query
+	//q.Prefix = fmt.Sprintf("%d/", cursor)
+	//results, err := db.Query(ctx, q)
+	//if err != nil {
+	//return nil, err
+	//}
 
-	for {
-		r, ok := results.NextSync()
-		if !ok {
-			break
-		}
+	//for {
+	//r, ok := results.NextSync()
+	//if !ok {
+	//break
+	//}
 
-		k := r.Key[len(q.Prefix)+1:]
+	//k := r.Key[len(q.Prefix)+1:]
 
-		m, err := multihash.FromHexString(k)
-		if err != nil {
-			return nil, err
-		}
+	//m, err := multihash.FromHexString(k)
+	//if err != nil {
+	//return nil, err
+	//}
 
-		kcid := cid.NewCidV1(cid.Raw, m)
+	//kcid := cid.NewCidV1(cid.Raw, m)
 
-		offset, _ := binary.Uvarint(r.Value)
+	//offset, _ := binary.Uvarint(r.Value)
 
-		records = append(records, model.Record{
-			Cid:    kcid,
-			Offset: offset,
-		})
-	}
+	//records = append(records, model.Record{
+	//Cid:    kcid,
+	//Offset: offset,
+	//})
+	//}
 
-	return records, nil
+	//return records, nil
 }
 
 // AddOffset

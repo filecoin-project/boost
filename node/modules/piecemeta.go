@@ -112,6 +112,11 @@ type boostDAGStoreWrapper struct {
 	pieceMeta *piecemeta.PieceMeta
 }
 
+func (dw *boostDAGStoreWrapper) DestroyShard(ctx context.Context, pieceCid cid.Cid, resch chan dagstore.ShardResult) error {
+	// This is no longer used (CLI calls piece metadata store instead)
+	return nil
+}
+
 // Legacy markets calls piecestore.AddDealForPiece before RegisterShard,
 // so we do the real work in AddDealForPiece.
 func (dw *boostDAGStoreWrapper) RegisterShard(ctx context.Context, pieceCid cid.Cid, carPath string, eagerInit bool, resch chan dagstore.ShardResult) error {

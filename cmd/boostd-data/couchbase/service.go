@@ -9,7 +9,6 @@ import (
 
 	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car/v2/index"
@@ -202,10 +201,10 @@ func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 		return err
 	}
 
-	err = s.db.Sync(ctx, datastore.NewKey(fmt.Sprintf("%d", cursor)))
-	if err != nil {
-		return err
-	}
+	//err = s.db.Sync(ctx, datastore.NewKey(fmt.Sprintf("%d", cursor)))
+	//if err != nil {
+	//return err
+	//}
 
 	return nil
 }
