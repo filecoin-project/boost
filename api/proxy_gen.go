@@ -60,6 +60,8 @@ type BoostStruct struct {
 
 		BoostDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
+		BoostGetBlock func(p0 context.Context, p1 cid.Cid) ([]byte, error) `perm:"read"`
+
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
 
 		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
@@ -381,6 +383,17 @@ func (s *BoostStruct) BoostDummyDeal(p0 context.Context, p1 smtypes.DealParams) 
 
 func (s *BoostStub) BoostDummyDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
 	return nil, ErrNotSupported
+}
+
+func (s *BoostStruct) BoostGetBlock(p0 context.Context, p1 cid.Cid) ([]byte, error) {
+	if s.Internal.BoostGetBlock == nil {
+		return *new([]byte), ErrNotSupported
+	}
+	return s.Internal.BoostGetBlock(p0, p1)
+}
+
+func (s *BoostStub) BoostGetBlock(p0 context.Context, p1 cid.Cid) ([]byte, error) {
+	return *new([]byte), ErrNotSupported
 }
 
 func (s *BoostStruct) BoostIndexerAnnounceAllDeals(p0 context.Context) error {

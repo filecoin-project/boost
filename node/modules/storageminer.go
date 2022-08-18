@@ -23,6 +23,8 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/dagstore"
+	"github.com/filecoin-project/dagstore/indexbs"
+	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/shared"
@@ -433,4 +435,30 @@ func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo
 
 		return server
 	}
+}
+
+func NewIndexBackedBlockstore(dagst dagstore.Interface, rp retrievalmarket.RetrievalProvider, h host.Host) (dtypes.IndexBackedBlockstore, error) {
+	sf := indexbs.ShardSelectorF(func(c cid.Cid, shards []shard.Key) (shard.Key, error) {
+		for _, sk := range shards {
+			pieceCid, err := cid.Parse(sk.String())
+			if err != nil {
+				return shard.Key{}, fmt.Errorf("failed to parse cid")
+			}
+			b, err := rp.IsFreeAndUnsealed(context.TODO(), c, pieceCid)
+			if err != nil {
+				return shard.Key{}, fmt.Errorf("failed to verify is piece is free and unsealed")
+			}
+			if b {
+				return sk, nil
+			}
+		}
+
+		return shard.Key{}, indexbs.ErrNoShardSelected
+	})
+
+	rbs, err := indexbs.NewIndexBackedBlockstore(dagst, sf, 100)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create index backed blockstore: %w", err)
+	}
+	return dtypes.IndexBackedBlockstore(rbs), nil
 }

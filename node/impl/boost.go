@@ -15,6 +15,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -49,9 +50,9 @@ type BoostAPI struct {
 
 	Host host.Host
 
-	DAGStore        *dagstore.DAGStore
-	DagStoreWrapper *mktsdagstore.Wrapper
-
+	DAGStore              *dagstore.DAGStore
+	DagStoreWrapper       *mktsdagstore.Wrapper
+	IndexBackedBlockstore dtypes.IndexBackedBlockstore
 	// Boost
 	StorageProvider *storagemarket.Provider
 	IndexProvider   *indexprovider.Wrapper
@@ -472,4 +473,12 @@ func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) e
 		return fmt.Errorf("failed to destroy shard: %w", err)
 	}
 	return nil
+}
+
+func (sm *BoostAPI) BoostGetBlock(ctx context.Context, c cid.Cid) ([]byte, error) {
+	blk, err := sm.IndexBackedBlockstore.Get(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	return blk.RawData(), nil
 }
