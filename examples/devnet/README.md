@@ -27,7 +27,7 @@ root@83260455bbd2:/app# ./sample/make-a-deal.sh
 ## Accessing lotus from localhost
 
 By default the `docker-compose.yaml` does not expose any port of the `lotus` container. To access the `lotus` from a local machine: 
-1. You can either expose `1234` in `docker-compose.yaml` or find an IP of the `lotus` container using `docker inspect boost-gui | grep IPAddress` command.
+1. You can either expose `1234` in `docker-compose.yaml` or find an IP of the `lotus` container using `docker inspect lotus | grep IPAddress` command.
 2. Get the `FULLNODE_API_INFO`
 ```
 docker exec -it lotus lotus auth api-info --perm=admin
