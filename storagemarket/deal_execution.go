@@ -8,8 +8,6 @@ import (
 	"os"
 	"time"
 
-	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
-
 	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
@@ -23,6 +21,8 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
+	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
+	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
@@ -406,7 +406,11 @@ func GenerateCommP(filepath string) (cidAndSize *writer.DataCIDSize, finalErr er
 
 	// dump the CARv1 payload of the CARv2 file to the Commp Writer and get back the CommP.
 	w := &writer.Writer{}
-	written, err := io.Copy(w, rd.DataReader())
+	r, err := rd.DataReader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reader over CAR file data: %w", err)
+	}
+	written, err := io.Copy(w, r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write to CommP writer: %w", err)
 	}
@@ -586,7 +590,14 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 
 	// Inflate the deal size so that it exactly fills a piece
 	proposal := deal.ClientDealProposal.Proposal
-	paddedReader, err := padreader.NewInflator(v2r.DataReader(), size, proposal.PieceSize.Unpadded())
+	r, err := v2r.DataReader()
+	if err != nil {
+		return &dealMakingError{
+			retry: types.DealRetryFatal,
+			error: fmt.Errorf("failed to get data reader over CAR file: %w", err),
+		}
+	}
+	paddedReader, err := padreader.NewInflator(r, size, proposal.PieceSize.Unpadded())
 	if err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryFatal,

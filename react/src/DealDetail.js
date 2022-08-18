@@ -3,7 +3,7 @@
 import React, {useEffect, useState} from "react";
 import {useMutation, useQuery, useSubscription} from "@apollo/react-hooks";
 import {DealCancelMutation, DealFailPausedMutation, DealRetryPausedMutation, DealSubscription, EpochQuery} from "./gql";
-import {useNavigate, useParams} from "react-router-dom";
+import {useNavigate, useParams, Link} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";
 import {addCommas, humanFIL, humanFileSize} from "./util";
@@ -143,7 +143,7 @@ export function DealDetail(props) {
                 </tr>
                 <tr>
                     <th>Deal Data Root CID</th>
-                    <td>{deal.DealDataRoot}</td>
+                    <td><Link to={'/inspect/'+deal.DealDataRoot}>{deal.DealDataRoot}</Link></td>
                 </tr>
                 <tr>
                     <th>Verified</th>
@@ -151,7 +151,7 @@ export function DealDetail(props) {
                 </tr>
                 <tr>
                     <th>Piece CID</th>
-                    <td>{deal.PieceCid}</td>
+                    <td><Link to={'/inspect/'+deal.PieceCid}>{deal.PieceCid}</Link></td>
                 </tr>
                 <tr>
                     <th>Piece Size</th>

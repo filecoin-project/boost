@@ -21,7 +21,6 @@ var dealStatusCmd = &cli.Command{
 	Name:  "deal-status",
 	Usage: "",
 	Flags: []cli.Flag{
-		cmd.FlagRepo,
 		&cli.StringFlag{
 			Name:     "provider",
 			Usage:    "storage provider on-chain address",
@@ -86,19 +85,21 @@ var dealStatusCmd = &cli.Command{
 			return fmt.Errorf("send deal status request failed: %w", err)
 		}
 
-		label := resp.DealStatus.Proposal.Label
 		var lstr string
-		if label.IsString() {
-			lstr, err = label.ToString()
-			if err != nil {
-				lstr = "could not marshall deal label"
-			}
-		} else {
-			lbz, err := label.ToBytes()
-			if err != nil {
-				lstr = "could not marshall deal label"
+		if resp != nil && resp.DealStatus != nil {
+			label := resp.DealStatus.Proposal.Label
+			if label.IsString() {
+				lstr, err = label.ToString()
+				if err != nil {
+					lstr = "could not marshall deal label"
+				}
 			} else {
-				lstr = "bytes: " + hex.EncodeToString(lbz)
+				lbz, err := label.ToBytes()
+				if err != nil {
+					lstr = "could not marshall deal label"
+				} else {
+					lstr = "bytes: " + hex.EncodeToString(lbz)
+				}
 			}
 		}
 
@@ -108,17 +109,18 @@ var dealStatusCmd = &cli.Command{
 				out["error"] = resp.Error
 			} else {
 				out = map[string]interface{}{
-					"dealUuid":      resp.DealUUID.String(),
-					"provider":      maddr.String(),
-					"clientWallet":  walletAddr.String(),
-					"statusMessage": statusMessage(resp),
+					"dealUuid":     resp.DealUUID.String(),
+					"provider":     maddr.String(),
+					"clientWallet": walletAddr.String(),
 				}
 				// resp.DealStatus should always be present if there's no error,
 				// but check just in case
 				if resp.DealStatus != nil {
-					out["label"] = label
+					out["label"] = lstr
 					out["chainDealId"] = resp.DealStatus.ChainDealID
 					out["status"] = resp.DealStatus.Status
+					out["sealingStatus"] = resp.DealStatus.SealingStatus
+					out["statusMessage"] = statusMessage(resp)
 					out["publishCid"] = nil
 					if resp.DealStatus.PublishCid != nil {
 						out["publishCid"] = resp.DealStatus.PublishCid.String()
@@ -174,12 +176,15 @@ func statusMessage(resp *types.DealStatusResponse) string {
 	case dealcheckpoints.AddedPiece.String():
 		return "Announcing"
 	case dealcheckpoints.IndexedAndAnnounced.String():
+		if resp.DealStatus.SealingStatus != "" {
+			return "Sealing: " + resp.DealStatus.SealingStatus
+		}
 		return "Sealing"
 	case dealcheckpoints.Complete.String():
 		if resp.DealStatus.Error != "" {
 			return "Error: " + resp.DealStatus.Error
 		}
-		return "Complete"
+		return "Expired"
 	}
 	return resp.DealStatus.Status
 }

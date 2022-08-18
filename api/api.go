@@ -40,6 +40,7 @@ type Boost interface {
 	BoostDealBySignedProposalCid(ctx context.Context, proposalCid cid.Cid) (*smtypes.ProviderDealState, error)                     //perm:admin
 	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                        //perm:admin
 	BoostDagstoreRegisterShard(ctx context.Context, key string) error                                                              //perm:admin
+	BoostDagstoreDestroyShard(ctx context.Context, key string) error                                                               //perm:admin
 	BoostDagstoreInitializeShard(ctx context.Context, key string) error                                                            //perm:admin
 	BoostDagstoreInitializeAll(ctx context.Context, params DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) //perm:admin
 	BoostDagstoreRecoverShard(ctx context.Context, key string) error                                                               //perm:admin

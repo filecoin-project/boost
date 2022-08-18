@@ -26,7 +26,6 @@ const (
 var providerCmd = &cli.Command{
 	Name:  "provider",
 	Usage: "Info about Storage Providers",
-	Flags: []cli.Flag{cmd.FlagRepo},
 	Subcommands: []*cli.Command{
 		libp2pInfoCmd,
 		storageAskCmd,

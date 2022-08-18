@@ -23,6 +23,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/boost/transport/httptransport"
+	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/shared"
@@ -285,7 +286,9 @@ func StorageNetworkName(ctx helpers.MetricsCtx, a v1api.FullNode) (dtypes.Networ
 }
 
 func NewBoostDB(r lotus_repo.LockedRepo) (*sql.DB, error) {
-	dbPath := path.Join(r.Path(), "boost.db")
+	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
+	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
+	dbPath := path.Join(r.Path(), "boost.db?cache=shared")
 	return db.SqlDB(dbPath)
 }
 
@@ -294,7 +297,9 @@ type LogSqlDB struct {
 }
 
 func NewLogsSqlDB(r repo.LockedRepo) (*LogSqlDB, error) {
-	dbPath := path.Join(r.Path(), "boost.logs.db")
+	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
+	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
+	dbPath := path.Join(r.Path(), "boost.logs.db?cache=shared")
 	d, err := db.SqlDB(dbPath)
 	if err != nil {
 		return nil, err
@@ -324,8 +329,8 @@ func HandleLegacyDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, host host.Host,
 	return nil
 }
 
-func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB) {
-	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB)
+func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
+	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi)
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -392,11 +397,13 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 	sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
 	dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
 	pieceMeta *piecemeta.PieceMeta, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider,
+	//dagst *mktsdagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider,
 	cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
 		pieceMeta *piecemeta.PieceMeta, ip *indexprovider.Wrapper,
+		//dagst *mktsdagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper,
 		lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 
 		prvCfg := storagemarket.Config{
@@ -414,12 +421,13 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 	}
 }
 
-func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, fullNode v1api.FullNode) *gql.Server {
+func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, fullNode v1api.FullNode) *gql.Server {
 	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
 		storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API,
-		legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, fullNode v1api.FullNode) *gql.Server {
+		legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer,
+		ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, fullNode v1api.FullNode) *gql.Server {
 
-		resolver := gql.NewResolver(cfg, r, h, dealsDB, logsDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyProv, legacyDT, publisher, fullNode)
+		resolver := gql.NewResolver(cfg, r, h, dealsDB, logsDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyProv, legacyDT, ps, sa, dagst, publisher, fullNode)
 		server := gql.NewServer(resolver)
 
 		lc.Append(fx.Hook{

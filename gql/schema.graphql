@@ -140,6 +140,35 @@ type DealLog {
   Subsystem: String!
 }
 
+type IndexStatus {
+  Status: String!
+  Error: String!
+}
+
+type SealStatus {
+  IsUnsealed: Boolean!
+  Error: String!
+}
+
+type PieceDeal {
+  SealStatus: SealStatus!
+  Deal: DealBasic!
+  Sector: Sector!
+}
+
+type PieceInfoDeal {
+  ChainDealID: Uint64!
+  Sector: Sector!
+  SealStatus: SealStatus!
+}
+
+type PieceStatus {
+  PieceCid: String!
+  IndexStatus: IndexStatus!
+  Deals: [PieceDeal]!
+  PieceInfoDeals: [PieceInfoDeal]!
+}
+
 type ProposalLog {
   DealUUID: ID!
   Accepted: Boolean!
@@ -320,6 +349,12 @@ type RootQuery {
 
   """Get the number of accepted and rejected deal proposal logs"""
   proposalLogsCount: ProposalLogsCount!
+
+  """Get information about a piece from the piece store, DAG store and database"""
+  pieceStatus(pieceCid: String!): PieceStatus!
+
+  """Get the pieces that contain a particular payload CID"""
+  piecesWithPayloadCid(payloadCid: String!): [String!]!
 
   """Get storage space usage"""
   storage: Storage!

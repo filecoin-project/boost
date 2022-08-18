@@ -19,6 +19,7 @@ import {SettingsPage} from "./Settings";
 import {Banner} from "./Banner";
 import {PieceMetaDetail, PieceMetaPage} from "./PieceMeta";
 import {ProposalLogsPage} from "./ProposalLogs";
+import {InspectPage} from "./Inspect";
 
 function App(props) {
     return (
@@ -50,6 +51,8 @@ function App(props) {
                                         <Route path="/piece-meta" element={<PieceMetaPage />} />
                                         <Route path="/deals/:dealID" element={<DealDetail />} />
                                         <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
+                                        <Route path="/inspect" element={<InspectPage />} />
+                                        <Route path="/inspect/:query" element={<InspectPage />} />
                                         <Route path="/" element={<StorageDealsPage />} />
                                     </Routes>
                                 </div>

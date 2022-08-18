@@ -358,7 +358,7 @@ export function FundsMenuItem(props) {
 
         pubMsg.total = funds.PubMsg.Balance
         pubMsg.used = funds.PubMsg.Tagged
-        escrow.free = escrow.total - escrow.used
+        pubMsg.free = funds.PubMsg.Balance - funds.PubMsg.Tagged
     }
 
     escrow.bars = [{

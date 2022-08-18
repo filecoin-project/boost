@@ -300,6 +300,53 @@ const LegacyDealQuery = gql`
     }
 `;
 
+const PiecesWithPayloadCidQuery = gql`
+    query AppPiecesWithPayloadCidQuery($payloadCid: String!) {
+        piecesWithPayloadCid(payloadCid: $payloadCid)
+    }
+`;
+
+const PieceStatusQuery = gql`
+    query AppPieceStatusQuery($pieceCid: String!) {
+        pieceStatus(pieceCid: $pieceCid) {
+            PieceCid
+            IndexStatus {
+                Status
+                Error
+            }
+            Deals {
+                SealStatus {
+                    IsUnsealed
+                    Error
+                }
+                Deal {
+                    ID
+                    IsLegacy
+                    CreatedAt
+                    DealDataRoot
+                }
+                Sector {
+                    ID
+                    Offset
+                    Length
+                }
+            }
+            PieceInfoDeals {
+                ChainDealID
+                Sector {
+                    ID
+                    Offset
+                    Length
+                }
+                SealStatus {
+                    IsUnsealed
+                    Error
+                }
+            }
+        }
+    }
+`;
+
 const StorageQuery = gql`
     query AppStorageQuery {
         storage {
@@ -515,6 +562,8 @@ export {
     NewDealsSubscription,
     ProposalLogsListQuery,
     ProposalLogsCountQuery,
+    PiecesWithPayloadCidQuery,
+    PieceStatusQuery,
     StorageQuery,
     LegacyStorageQuery,
     FundsQuery,

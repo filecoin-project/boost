@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -212,16 +211,6 @@ var commpCmd = &cli.Command{
 			return err
 		}
 		defer rdr.Close() //nolint:errcheck
-
-		// check that the data is a car file; if it's not, retrieval won't work
-		_, err = car.ReadHeader(bufio.NewReader(rdr))
-		if err != nil {
-			return fmt.Errorf("not a car file: %w", err)
-		}
-
-		if _, err := rdr.Seek(0, io.SeekStart); err != nil {
-			return fmt.Errorf("seek to start: %w", err)
-		}
 
 		w := &writer.Writer{}
 		_, err = io.CopyBuffer(w, rdr, make([]byte, writer.CommPBuf))

@@ -5,6 +5,7 @@
   * [AuthNew](#authnew)
   * [AuthVerify](#authverify)
 * [Boost](#boost)
+  * [BoostDagstoreDestroyShard](#boostdagstoredestroyshard)
   * [BoostDagstoreGC](#boostdagstoregc)
   * [BoostDagstoreInitializeAll](#boostdagstoreinitializeall)
   * [BoostDagstoreInitializeShard](#boostdagstoreinitializeshard)
@@ -138,6 +139,20 @@ Response:
 
 ## Boost
 
+
+### BoostDagstoreDestroyShard
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  "string value"
+]
+```
+
+Response: `{}`
 
 ### BoostDagstoreGC
 

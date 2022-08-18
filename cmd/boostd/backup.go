@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/mitchellh/go-homedir"
@@ -18,8 +19,7 @@ import (
 
 const metadaFileName = "metadata"
 
-var fm = []string{"api",
-	"boost.db",
+var fm = []string{"boost.db",
 	"boost.logs.db",
 	"config.toml",
 	"storage.json",
@@ -65,9 +65,14 @@ var backupCmd = &cli.Command{
 			return err
 		}
 
-		bpath, err := homedir.Expand(cctx.Args().First())
+		bkpPath, err := homedir.Expand(cctx.Args().First())
 		if err != nil {
 			return fmt.Errorf("expanding backup directory path: %w", err)
+		}
+
+		bpath, err := filepath.Abs(bkpPath)
+		if err != nil {
+			return fmt.Errorf("failed get absolute path for backup directory: %w", err)
 		}
 
 		fmt.Println("Creating backup directory")
@@ -99,6 +104,10 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("error copying keys: %w", err)
 		}
 
+		if err := os.Mkdir(path.Join(bkpDir, "config"), 0755); err != nil {
+			return fmt.Errorf("error creating config directory %s: %w", path.Join(bkpDir, "config"), err)
+		}
+
 		fpathName := path.Join(bkpDir, metadaFileName)
 
 		fpath, err := homedir.Expand(fpathName)
@@ -123,27 +132,25 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("backup error: %w", err)
 		}
 
+		cfgFiles, err := ioutil.ReadDir(path.Join(lr.Path(), "config"))
+		if err != nil {
+			return fmt.Errorf("failed to read files from config directory: %w", err)
+		}
+
+		for _, cfgFile := range cfgFiles {
+			f := path.Join("config", cfgFile.Name())
+			fm = append(fm, f)
+		}
+
 		fmt.Println("Copying the files to backup directory")
 
-		for _, name := range fm {
-			srcName := path.Join(lr.Path(), name)
+		destPath, err := homedir.Expand(bkpDir)
+		if err != nil {
+			return fmt.Errorf("expanding destination file path %s: %w", bkpDir, err)
+		}
 
-			srcPath, err := homedir.Expand(srcName)
-			if err != nil {
-				return fmt.Errorf("expanding source file path %s: %w", srcName, err)
-			}
-
-			destName := path.Join(bkpDir, name)
-
-			destPath, err := homedir.Expand(destName)
-			if err != nil {
-				return fmt.Errorf("expanding destination file path %s: %w", destName, err)
-			}
-
-			if err := copyFiles(srcPath, destPath); err != nil {
-				return fmt.Errorf("error copying file %s: %w", srcName, err)
-			}
-
+		if err := copyFiles(lr.Path(), destPath, fm); err != nil {
+			return fmt.Errorf("error copying file: %w", err)
 		}
 
 		fmt.Println("Boost repo successfully backed up at " + bkpDir)
@@ -162,9 +169,14 @@ var restoreCmd = &cli.Command{
 			return fmt.Errorf("restore only takes one argument (backup directory path)")
 		}
 
-		bpath, err := homedir.Expand(cctx.Args().First())
+		bkpPath, err := homedir.Expand(cctx.Args().First())
 		if err != nil {
 			return fmt.Errorf("expanding backup directory path: %w", err)
+		}
+
+		bpath, err := filepath.Abs(bkpPath)
+		if err != nil {
+			return fmt.Errorf("failed get absolute path for backup directory: %w", err)
 		}
 
 		fmt.Printf("Checking backup directory %s\n", bpath)
@@ -265,30 +277,27 @@ var restoreCmd = &cli.Command{
 
 		fmt.Println("Restoring files")
 
-		rpath, err := homedir.Expand(lr.Path())
-		if err != nil {
-			return fmt.Errorf("expanding boost repo path: %w", err)
+		if err := os.Mkdir(path.Join(lr.Path(), "config"), 0755); err != nil {
+			return fmt.Errorf("error creating config directory %s: %w", path.Join(lr.Path(), "config"), err)
 		}
 
-		for _, name := range fm {
-			srcName := path.Join(bpath, name)
+		cfgFiles, err := ioutil.ReadDir(path.Join(lb.Path(), "config"))
+		if err != nil {
+			return fmt.Errorf("failed to read files from config directory: %w", err)
+		}
 
-			srcPath, err := homedir.Expand(srcName)
-			if err != nil {
-				return fmt.Errorf("expanding source file path %s: %w", srcName, err)
-			}
+		for _, cfgFile := range cfgFiles {
+			f := path.Join("config", cfgFile.Name())
+			fm = append(fm, f)
+		}
 
-			destName := path.Join(rpath, name)
+		//Remove default config.toml created with repo to avoid conflict with symllink
+		if err = os.Remove(path.Join(lr.Path(), "config.toml")); err != nil {
+			return fmt.Errorf("failed to remove the default config file: %w", err)
+		}
 
-			destPath, err := homedir.Expand(destName)
-			if err != nil {
-				return fmt.Errorf("expanding destination file path %s: %w", destName, err)
-			}
-
-			if err := copyFiles(srcPath, destPath); err != nil {
-				return fmt.Errorf("error copying file %s: %w", srcName, err)
-			}
-
+		if err := copyFiles(lb.Path(), lr.Path(), fm); err != nil {
+			return fmt.Errorf("error copying file: %w", err)
 		}
 
 		fmt.Println("Boost repo successfully restored at " + lr.Path())
@@ -297,26 +306,42 @@ var restoreCmd = &cli.Command{
 	},
 }
 
-func copyFiles(src, dest string) error {
-	f, err := os.Stat(src)
+func copyFiles(srcDir, destDir string, flist []string) error {
 
-	if os.IsNotExist(err) {
-		fmt.Printf("Not copying %s as file does not exists\n", src)
-		return nil
-	}
+	for _, fName := range flist {
 
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
+		f, err := os.Lstat(path.Join(srcDir, fName))
 
-	input, err := ioutil.ReadFile(src)
-	if err != nil {
-		return err
-	}
+		if os.IsNotExist(err) {
+			fmt.Printf("Not copying %s as file does not exists\n", path.Join(srcDir, fName))
+			return nil
+		}
 
-	err = ioutil.WriteFile(dest, input, f.Mode())
-	if err != nil {
-		return err
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+
+		// Handle if symlinks
+		if f.Mode()&os.ModeSymlink == os.ModeSymlink {
+			linkDest, err := os.Readlink(path.Join(srcDir, fName))
+			if err != nil {
+				return err
+			}
+			if err = os.Symlink(linkDest, path.Join(destDir, fName)); err != nil {
+				return err
+			}
+		} else {
+
+			input, err := ioutil.ReadFile(path.Join(srcDir, fName))
+			if err != nil {
+				return err
+			}
+
+			err = ioutil.WriteFile(path.Join(destDir, fName), input, f.Mode())
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

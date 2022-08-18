@@ -42,9 +42,9 @@ import (
 	lapi "github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
 	test "github.com/filecoin-project/lotus/chain/events/state/mock"
-	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
-	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	"github.com/filecoin-project/lotus/node/repo"
+	sealing "github.com/filecoin-project/lotus/storage/pipeline"
+	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
@@ -1025,7 +1025,9 @@ func (h *ProviderHarness) AssertSealedContents(t *testing.T, carV2FilePath strin
 	require.NoError(t, err)
 	defer cr.Close()
 
-	actual, err := ioutil.ReadAll(cr.DataReader())
+	r, err := cr.DataReader()
+	require.NoError(t, err)
+	actual, err := ioutil.ReadAll(r)
 	require.NoError(t, err)
 
 	// the read-bytes also contains extra zeros for the padding magic, so just match without the padding bytes.
