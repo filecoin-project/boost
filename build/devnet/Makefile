@@ -14,10 +14,14 @@ prepare/lotus-test: | lotus-$(lotus_version)
 ##################################################################################
 build/%: prepare/lotus-test
 	cd $* && make dbuild
+push/%: prepare/lotus-test
+	cd $* && make dpush	
 ##################################################################################
 build/all: build/lotus build/lotus-miner build/boost build/boost-gui
 .PHONY: build/all
-
+##################################################################################
+push/all: push/lotus push/lotus-miner push/boost push/boost-gui
+.PHONY: push/all
 ##################################################################################
 clean: clean/lotus-test
 .PHONY: clean
