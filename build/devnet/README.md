@@ -7,7 +7,7 @@ NOTE: These docker images are for demo and devs ONLY. They MUST NOT/CAN NOT be u
 ## Building images:
 
 1. Select lotus version, for example: `lotus_version=1.17.1-rc2`. It must be the tag name of [the lotus git repo](https://github.com/filecoin-project/lotus/tags) without `v` prefix.
-2. Select boost version, for example: `boost_version=1.3.0-rc1`. Docker images for the boost will be built on the current code base. The `boost_version` is just used to tag images. It you want to build images for a specific boost version then you have to chechout that version first.
+2. Select boost version, for example: `boost_version=1.3.0-rc1`. Docker images for the boost will be built on the current code base. The `boost_version` is just used to tag images. If you want to build images for a specific boost version then you have to checkout that version first.
 3. Build images:
 
 ```
@@ -15,7 +15,7 @@ make build/all lotus_version=1.17.1-rc2 boost_version=1.3.0-rc1
 ```
 ## Publishing images:
 
-1. Login to docker with `filecoin` user.
+1. Log in to docker with the `filecoin` user.
 2. Publish
 ```
 make push/all lotus_version=1.17.1-rc2 boost_version=1.3.0-rc1

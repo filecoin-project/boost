@@ -13,7 +13,7 @@ printf "\n
 Hello to the demo script that makes a storage deal using the boost client\n \
 ###################################################################################\n \
 1. The boost client needs to know how to connect to the lotus instance. \
-We need to set ${cb}FULLNODE_API_INFO${cn} env var. We have lotus client here that will provide connection token.\n \
+We need to set ${cb}FULLNODE_API_INFO${cn} env var. We have the lotus client here that will provide a connection token.\n \
  : ${ci}lotus auth api-info --perm=admin${cn} - returns lotus connection token \n\n"
 read -rsp $'Press any key to export variable...\n' -n1 key
 export `lotus auth api-info --perm=admin`
@@ -29,7 +29,7 @@ boost init
 printf "\n\nGreat. Boost client has been initialized.\n \
 ###################################################################################\n"
 ###################################################################################
-printf "3. Now add  some funds from lotus to boost actor wallet. We will use the lotus client:\n\n \
+printf "3. Now add some funds from lotus to boost wallet. We will use the lotus client:\n\n \
  : ${ci}lotus wallet default${cn} - returns default lotus wallet\n \
  : ${ci}boost wallet default${cn} - returns default wallet for the current boost client actor\n \
  : ${ci}lotus send --from=`lotus wallet default` `boost wallet default` 10${cn} - sends 10 FIL\n"
@@ -40,7 +40,7 @@ lotus send --from=`lotus wallet default` `boost wallet default` 10
 printf "\n\nDone. Funds transfer was initiated\n \
 ###################################################################################\n"
 ###################################################################################
-printf "4. Now add  some funds to the market actor\n \
+printf "4. Now add some funds to the market actor\n \
  : ${ci}boostx market-add 1${cn}\n\n"
 read -rsp $'Press any key to execute it...\n' -n1 key
 
@@ -49,7 +49,7 @@ until boostx market-add 1; do printf "\nOpps, maybe funds not added yet.\nNeed t
 printf "\n\nYes done. We can make a deal now.\n \
 ###################################################################################\n"
 ###################################################################################
-printf "5. Lets generate a sample file in ${ci}/app/public/sample.txt${cn}. We will use it as a demo file.\n\n"
+printf "5. Let's generate a sample file in ${ci}/app/public/sample.txt${cn}. We will use it as a demo file.\n\n"
 read -rsp $'Press any key to generate it...\n\n' -n1 key
 rm -f /app/public/sample.txt 
 for i in {1..7}; do echo "Hi Boost, $i times" >> /app/public/sample.txt; done
@@ -60,7 +60,7 @@ printf "\n\n \
 ###################################################################################\n"
 ###################################################################################
 
-printf "6. After that you need to generate a car file for data you want to store on Filecoin (${ci}/app/public/sample.txt${cn}), \
+printf "6. After that, you need to generate a car file for data you want to store on Filecoin (${ci}/app/public/sample.txt${cn}), \
 and note down its ${ci}payload-cid${cn}. \
 We will use the ${ci}boostx${cn} utility\n \
  : ${ci}boostx generate-car /app/public/sample.txt /app/public/sample.car${cn}\n\n"
