@@ -46,7 +46,7 @@ read -rsp $'Press any key to execute it...\n' -n1 key
 
 until boostx market-add 1; do printf "\nOpps, maybe funds not added yet.\nNeed to wait some time. \n"; read -rsp $'Press any key to try again...\n' -n1 key; done
 
-printf "\n\nYes done. We can make a deal now.\n \
+printf "\n\nYes. We can make a deal now.\n \
 ###################################################################################\n"
 ###################################################################################
 printf "5. Let's generate a sample file in ${ci}/app/public/sample.txt${cn}. We will use it as a demo file.\n\n"
