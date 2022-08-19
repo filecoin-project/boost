@@ -98,6 +98,12 @@ booster-http: $(BUILD_DEPS)
 .PHONY: booster-http
 BINS+=booster-http
 
+booster-bitswap: $(BUILD_DEPS)
+	rm -f booster-bitswap
+	$(GOCC) build $(GOFLAGS) -o booster-bitswap ./cmd/booster-bitswap
+.PHONY: booster-bitswap
+BINS+=booster-bitswap
+
 devnet: $(BUILD_DEPS)
 	rm -f devnet
 	$(GOCC) build $(GOFLAGS) -o devnet ./cmd/devnet

@@ -12,7 +12,7 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 )
 
-var logbs = logging.Logger("remote-blockstore")
+var log = logging.Logger("remote-blockstore")
 
 var ErrBlockNotFound = errors.New("block not found")
 var ErrNotFound = errors.New("not found")
@@ -42,11 +42,13 @@ func NewRemoteBlockstore(api RemoteBlockstoreAPI) blockstore.Blockstore {
 }
 
 func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block, err error) {
+	log.Debugw("processing request for block", "cid", c)
 	data, err := ro.api.BoostGetBlock(ctx, c)
+	log.Debugw("boost api response for get block", "cid", c, "error", err)
 	if err != nil {
 		return nil, err
 	}
-	return blocks.NewBlock(data), nil
+	return blocks.NewBlockWithCid(data, c)
 }
 
 func (ro *RemoteBlockstore) Has(ctx context.Context, c cid.Cid) (bool, error) {

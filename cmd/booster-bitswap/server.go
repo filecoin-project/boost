@@ -11,8 +11,8 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	nilrouting "github.com/ipfs/go-ipfs-routing/none"
 	"github.com/libp2p/go-libp2p"
+	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/network"
-	crypto "github.com/libp2p/go-libp2p-crypto"
 	"github.com/libp2p/go-libp2p/p2p/muxer/mplex"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
@@ -61,9 +61,11 @@ func (s *BitswapServer) Start(ctx context.Context) error {
 		return err
 	}
 	bsopts := []server.Option{server.MaxOutstandingBytesPerPeer(1 << 20)}
-	s.server = server.New(ctx, bsnetwork.NewFromIpfsHost(host, nilRouter), s.remoteStore, bsopts...)
+	net := bsnetwork.NewFromIpfsHost(host, nilRouter)
+	s.server = server.New(ctx, net, s.remoteStore, bsopts...)
+	net.Start(s.server)
 
-	fmt.Printf("bitswap server running on SP, addrs: %s, peerID: %s", host.Addrs(), host.ID())
+	fmt.Printf("bitswap server running on SP, addrs: %s, peerID: %s\n", host.Addrs(), host.ID())
 	log.Infow("bitswap server running on SP", "multiaddrs", host.Addrs(), "peerId", host.ID())
 	return nil
 }
