@@ -11,6 +11,7 @@ import (
 	commp "github.com/filecoin-project/go-fil-commp-hashhash"
 	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
 )
@@ -18,8 +19,8 @@ import (
 // Verify that the commp provided in the deal proposal matches commp calculated
 // over the downloaded file
 func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
-	p.dealLogger.Infow(deal.DealUuid, "checking commP")
-	pieceCid, err := p.generatePieceCommitment(deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize)
+	p.dealLogger.Infow(deal.DealUuid, "about to check commP")
+	pieceCid, err := p.generatePieceCommitment(deal.DealUuid, deal.InboundFilePath, deal.ClientDealProposal.Proposal.PieceSize)
 	if err != nil {
 		err.error = fmt.Errorf("failed to generate CommP: %w", err.error)
 		return err
@@ -38,9 +39,10 @@ func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
 
 // generatePieceCommitment generates commp either locally or remotely,
 // depending on config, and pads it as necessary to match the piece size.
-func (p *Provider) generatePieceCommitment(filepath string, pieceSize abi.PaddedPieceSize) (cid.Cid, *dealMakingError) {
+func (p *Provider) generatePieceCommitment(dealUuid uuid.UUID, filepath string, pieceSize abi.PaddedPieceSize) (cid.Cid, *dealMakingError) {
 	var pi *abi.PieceInfo
 	if p.config.RemoteCommp {
+		p.dealLogger.Infow(dealUuid, "remote check commP")
 		var err *dealMakingError
 		pi, err = p.remoteCommP(filepath)
 		if err != nil {
@@ -48,6 +50,10 @@ func (p *Provider) generatePieceCommitment(filepath string, pieceSize abi.Padded
 			return cid.Undef, err
 		}
 	} else {
+		p.commpMu.Lock()
+		defer p.commpMu.Unlock()
+
+		p.dealLogger.Infow(dealUuid, "checking commP")
 		var err error
 		pi, err = GenerateCommP(filepath)
 		if err != nil {

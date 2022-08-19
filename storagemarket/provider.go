@@ -96,8 +96,11 @@ type Provider struct {
 	dealPublisher  types.DealPublisher
 	transfers      *dealTransfers
 
-	pieceAdder                  types.PieceAdder
-	commpCalc                   smtypes.CommpCalculator
+	pieceAdder types.PieceAdder
+
+	commpMu   sync.Mutex
+	commpCalc smtypes.CommpCalculator
+
 	maxDealCollateralMultiplier uint64
 	chainDealManager            types.ChainDealManager
 
