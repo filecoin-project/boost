@@ -44,7 +44,7 @@ LABEL org.opencontainers.image.version=$BUILD_VERSION \
 WORKDIR /app
 ENV BOOST_PATH /var/lib/boost
 VOLUME /var/lib/boost
-EXPOSE 8000  
+EXPOSE 8080  
 
 COPY --from=builder /go/src/boostd /usr/local/bin/
 COPY --from=builder /go/src/boost /usr/local/bin/
