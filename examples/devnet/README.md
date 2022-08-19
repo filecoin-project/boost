@@ -1,25 +1,25 @@
 # Devnet in docker
 
-The docker-copose file contains a realization of the [devnet guide](../../documentation/devnet.md) in docker containers. 
+The docker-compose file contains a realization of the [devnet guide](../../documentation/devnet.md) in docker containers. 
 
 ## To start devnet:
 
 1. Run
 ```
-docker-compose up -d
+docker compose up -d
 ```
 It will spin up `lotus`, `lotus-miner`, `boost`, `boost-gui` and `demo-http-server` containers. All temporary data will be saved in `./data` folder.
 The initial setup could take up to 20 min or more (it takes time to download filecoin proof parameters). During the initial setup, it is normal to see error messages in the log. Containers are waiting for the lotus to be ready. It may timeout several times. Restart is expected to be managed by `docker`.
 
 2. Try opening the boost GUI http://localhost:8000 with a browser. Devnet is ready to operate when the URL opens and indicates no errors on the startup page.
-Also, you can try to inspect the status using `docker-compose logs -f`.  
+Also, you can try to inspect the status using `docker compose logs -f`.  
 
 ## Making a deal
 
 The `boost` container is packed with `boost` and `lotus` clients. You can connect to the container with the command `docker-compose exec boost /bin/bash` and follow instructions for [storing files with Boost guide](https://boost.filecoin.io/tutorials/how-to-store-files-with-boost-on-filecoin). But the recommended startup is to follow the semi-interactive demo first:
 ```
 # attach to a running boost container
-docker-compose exec boost /bin/bash
+docker compose exec boost /bin/bash
 
 # execute the demo script /app/sample/make-a-deal.sh 
 root@83260455bbd2:/app# ./sample/make-a-deal.sh 
@@ -37,9 +37,9 @@ FULLNODE_API_INFO=eyJ...ms4:/dns/lotus/tcp/1234/http
 
 ## Cleaning devnet
 
-To stop containers and drop everything (except docker  images): 
+To stop containers and drop everything: 
 ```
-docker-compose stop && docker-compose rm -f
+docker compose down --rmi all
 
 sudo rm -rf ./data
 ```

@@ -1,18 +1,17 @@
 ##################################################################################
 start: 
-	docker-compose up -d
-	docker-compose logs -f
+	docker compose up -d
+	docker compose logs -f
 .PHONY: start
 ##################################################################################
 ssh/boost: 
-	docker-compose exec boost /bin/bash
+	docker compose exec boost /bin/bash
 .PHONY: ssh/boost
 ##################################################################################
 clean: clean/docker
 	rm -rf data
 .PHONY: clean
 clean/docker:
-	docker-compose stop
-	docker-compose rm -f
+	docker compose down
 .PHONY: clean/docker
 ##################################################################################
