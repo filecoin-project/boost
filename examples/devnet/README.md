@@ -16,7 +16,7 @@ Also, you can try to inspect the status using `docker compose logs -f`.
 
 ## Making a deal
 
-The `boost` container is packed with `boost` and `lotus` clients. You can connect to the container with the command `docker-compose exec boost /bin/bash` and follow instructions for [storing files with Boost guide](https://boost.filecoin.io/tutorials/how-to-store-files-with-boost-on-filecoin). But the recommended startup is to follow the semi-interactive demo first:
+The `boost` container is packed with `boost` and `lotus` clients. You can connect to the container with the command `docker compose exec boost /bin/bash` and follow instructions for [storing files with Boost guide](https://boost.filecoin.io/tutorials/how-to-store-files-with-boost-on-filecoin). But the recommended startup is to follow the semi-interactive demo first:
 ```
 # attach to a running boost container
 docker compose exec boost /bin/bash
@@ -26,8 +26,8 @@ root@83260455bbd2:/app# ./sample/make-a-deal.sh
 ```
 ## Accessing lotus from localhost
 
-By default the `docker-compose.yaml` does not expose any port of the `lotus` container. To access the `lotus` from a local machine: 
-1. You can either expose `1234` in `docker-compose.yaml` or find an IP of the `lotus` container using `docker inspect lotus | grep IPAddress` command.
+By default the [docker-compose.yaml](./docker-compose.yaml) does not expose any port of the `lotus` container. To access the `lotus` from a local machine: 
+1. You can either expose `1234` in [docker-compose.yaml](./docker-compose.yaml) or find the IP of the `lotus` container using `docker inspect lotus | grep IPAddress` command.
 2. Get the `FULLNODE_API_INFO`
 ```
 docker exec -it lotus lotus auth api-info --perm=admin

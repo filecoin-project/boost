@@ -72,4 +72,3 @@ services:
     logging: *default-logging
     volumes:
      - ./data/sample:/usr/share/nginx/html:ro  
- 

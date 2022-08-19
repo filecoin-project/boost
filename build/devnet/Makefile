@@ -1,3 +1,4 @@
+##################################################################################
 lotus_version?=1.17.1-rc2
 boost_version?=1.3.0-rc1
 docker_user?=filecoin
@@ -10,7 +11,6 @@ lotus-$(lotus_version):
 prepare/lotus-test: | lotus-$(lotus_version)
 	cd lotus-$(lotus_version) && docker build -f Dockerfile.lotus --target lotus-test -t $(lotus_test_image) .
 .PHONY: prepare/lotus-test
-##################################################################################
 ##################################################################################
 build/%: prepare/lotus-test
 	cd $* && make dbuild
@@ -31,3 +31,4 @@ clean/lotus-test:
 .PHONY: clean/lotus-test
 
 .EXPORT_ALL_VARIABLES:
+##################################################################################
