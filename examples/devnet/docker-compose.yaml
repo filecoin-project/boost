@@ -71,5 +71,5 @@ services:
     restart: unless-stopped
     logging: *default-logging
     volumes:
-     - ./data/sample:/usr/share/nginx/html:ro   
-    
+     - ./data/sample:/usr/share/nginx/html:ro  
+ 
