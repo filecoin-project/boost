@@ -60,6 +60,9 @@ services:
       - "8000:8000"
     environment:
      - BOOST_URL=http://boost:8080
+    healthcheck: # try reloading nginx configuration if IP of the boost container changes
+      test: "nc -zv boost 8080 &> curr.ip && ( cmp curr.ip prev.ip || ( cp curr.ip prev.ip && kill -1 1 ))"
+      interval: "20s" 
     restart: unless-stopped
     logging: *default-logging
 
