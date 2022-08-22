@@ -169,6 +169,10 @@ type DealmakingConfig struct {
 	MaxTransferDuration Duration
 	// Whether to do commp on the Boost node (local) or on the Sealer (remote)
 	RemoteCommp bool
+
+	// The public multi-address for retrieving deals with booster-http.
+	// Note: Must be in multiaddr format, eg /dns6/foo.com/tcp/80/http
+	HTTPRetrievalMultiAddr string
 }
 
 type FeeConfig struct {
