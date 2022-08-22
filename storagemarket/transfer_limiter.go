@@ -47,6 +47,7 @@ type TransferLimiterConfig struct {
 // The queue is ordered such that we
 // - start transferring data for the oldest deal first
 // - prefer to start transfers with peers that don't have any ongoing transfer
+// - once the soft limit is reached, don't allow any new transfers with stalled peers
 //
 // For example, if there is
 // - one active transfer with peer A
@@ -60,7 +61,8 @@ type TransferLimiterConfig struct {
 // eg if there is a limit of 5 concurrent transfers and there are
 // - three active transfers
 // - two stalled transfers
-// then two more transfers are permitted to start.
+// then two more transfers are permitted to start (as long as they're not with
+// one of the stalled peers)
 //
 type transferLimiter struct {
 	cfg TransferLimiterConfig
@@ -109,6 +111,7 @@ func (tl *transferLimiter) check(now time.Time) {
 	// Count how many transfers are active (not stalled)
 	var activeCount uint64
 	transferringPeers := make(map[peer.ID]struct{}, len(tl.xfers))
+	stalledPeers := make(map[peer.ID]struct{}, len(tl.xfers))
 	unstartedXfers := make([]*transfer, 0, len(tl.xfers))
 	for _, xfer := range tl.xfers {
 		if !xfer.isStarted() {
@@ -125,6 +128,8 @@ func (tl *transferLimiter) check(now time.Time) {
 		// Check each transfer to see if it has stalled
 		if now.Sub(xfer.updatedAt) < tl.cfg.StallTimeout {
 			activeCount++
+		} else {
+			stalledPeers[xfer.deal.ClientPeerID] = struct{}{}
 		}
 	}
 
@@ -145,6 +150,14 @@ func (tl *transferLimiter) check(now time.Time) {
 		for _, xfer := range unstartedXfers {
 			// Skip transfers that have already been started
 			if xfer.isStarted() {
+				continue
+			}
+
+			// If there is already a transfer to the same peer and it's stalled,
+			// allow a new transfer with that peer, but only up to the soft
+			// limit
+			_, isStalledPeer := stalledPeers[xfer.deal.ClientPeerID]
+			if isStalledPeer && tl.startedCount() >= tl.cfg.MaxConcurrent {
 				continue
 			}
 
@@ -179,6 +192,22 @@ func (tl *transferLimiter) check(now time.Time) {
 		next.updatedAt = time.Now()
 		close(next.started)
 	}
+}
+
+// Count how many transfers have been started but not completed
+func (tl *transferLimiter) startedCount() uint64 {
+	var count uint64
+	for _, xfer := range tl.xfers {
+		if xfer.isStarted() {
+			count++
+		}
+	}
+	return count
+}
+
+// Count how many transfers there are in total
+func (tl *transferLimiter) transfersCount() int {
+	return len(tl.xfers)
 }
 
 // Wait for the next open spot in the transfer queue

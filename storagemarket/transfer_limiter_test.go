@@ -19,8 +19,10 @@ func generateDeal() *smtypes.ProviderDealState {
 }
 
 func TestTransferLimiterBasic(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	// Set up the transfer limiter
-	ctx := context.Background()
 	tl, err := newTransferLimiter(TransferLimiterConfig{
 		MaxConcurrent:    1,
 		StallCheckPeriod: time.Millisecond,
@@ -39,8 +41,12 @@ func TestTransferLimiterBasic(t *testing.T) {
 	tl.complete(deal1.DealUuid)
 }
 
+// Verifies that a new transfer is blocked until the number of ongoing
+// transfers falls below the limit
 func TestTransferLimiterQueueSize(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	tl, err := newTransferLimiter(TransferLimiterConfig{
 		MaxConcurrent:    1,
 		StallCheckPeriod: time.Millisecond,
@@ -65,9 +71,8 @@ func TestTransferLimiterQueueSize(t *testing.T) {
 		started <- struct{}{}
 	}()
 
-	// Wait a little while to make sure the go routines have had a
-	// chance to start
-	time.Sleep(100 * time.Millisecond)
+	// Wait till both go-routines call waitInQueue
+	require.Eventually(t, func() bool { return tl.transfersCount() == 2 }, time.Second, time.Millisecond)
 
 	// Expect the first transfer to start
 	tl.check(time.Now())
@@ -89,8 +94,12 @@ func TestTransferLimiterQueueSize(t *testing.T) {
 	<-started
 }
 
+// Verifies that if a transfer stalls, another transfer is allowed to start,
+// even if that means the total number of transfers breaks the soft limit
 func TestTransferLimiterStalledTransfer(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	cfg := TransferLimiterConfig{
 		MaxConcurrent:    1,
 		StallCheckPeriod: time.Millisecond,
@@ -116,9 +125,8 @@ func TestTransferLimiterStalledTransfer(t *testing.T) {
 		started <- struct{}{}
 	}()
 
-	// Wait a little while to make sure the go routines have had a
-	// chance to start
-	time.Sleep(100 * time.Millisecond)
+	// Wait till both go-routines call waitInQueue
+	require.Eventually(t, func() bool { return tl.transfersCount() == 2 }, time.Second, time.Millisecond)
 
 	// Expect the first transfer to start
 	tl.check(time.Now())
@@ -153,8 +161,11 @@ func TestTransferLimiterStalledTransfer(t *testing.T) {
 	<-started
 }
 
+// Verifies that transfers are prioritized in order from oldest to newest
 func TestTransferLimiterPriorityOldestFirst(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	cfg := TransferLimiterConfig{
 		MaxConcurrent:    1,
 		StallCheckPeriod: time.Millisecond,
@@ -190,9 +201,7 @@ func TestTransferLimiterPriorityOldestFirst(t *testing.T) {
 	}
 
 	// Wait for all the deals to be added to the transfer queue
-	require.Eventually(t, func() bool {
-		return len(dealsReversed) == 0
-	}, time.Second, time.Millisecond)
+	require.Eventually(t, func() bool { return len(dealsReversed) == 0 }, time.Second, time.Millisecond)
 
 	// Start processing transfers
 	go tl.run(ctx)
@@ -207,8 +216,17 @@ func TestTransferLimiterPriorityOldestFirst(t *testing.T) {
 	}
 }
 
-func TestTransferLimiterPriorityNoPeerFirst(t *testing.T) {
-	ctx := context.Background()
+// Verifies that the prioritization favours transfers to peers that don't
+// already have an ongoing transfer.
+// eg there is
+// - an ongoing transfer to peer A
+// - a queued transfer to peer A
+// - a queued transfer to peer B
+// The next transfer should be the one to peer B
+func TestTransferLimiterPriorityNoExistingTransferToPeerFirst(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	cfg := TransferLimiterConfig{
 		MaxConcurrent:    2,
 		StallCheckPeriod: time.Millisecond,
@@ -241,9 +259,7 @@ func TestTransferLimiterPriorityNoPeerFirst(t *testing.T) {
 	}
 
 	// Wait for all the deals to be added to the transfer queue
-	require.Eventually(t, func() bool {
-		return len(deals) == 0
-	}, time.Second, time.Millisecond)
+	require.Eventually(t, func() bool { return len(deals) == 0 }, time.Second, time.Millisecond)
 
 	// The queue size limit is 2.
 	// The oldest to newest order is deal1, deal2, deal3
@@ -264,4 +280,81 @@ func TestTransferLimiterPriorityNoPeerFirst(t *testing.T) {
 	tl.check(time.Now())
 	dl = <-started
 	require.Equal(t, deal2.DealUuid, dl.DealUuid)
+}
+
+// Verifies that a new transfer will not be started if there are already
+// transfers to that same peer that are stalled, and the soft limit has
+// been reached
+func TestTransferLimiterStalledTransferHardLimited(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cfg := TransferLimiterConfig{
+		MaxConcurrent:    2,
+		StallCheckPeriod: time.Millisecond,
+		StallTimeout:     time.Second,
+	}
+	tl, err := newTransferLimiter(cfg)
+	require.NoError(t, err)
+
+	// Generate a deal and add to the transfer queue
+	deal1 := generateDeal()
+
+	started := make(chan struct{}, 3)
+	go func() {
+		err := tl.waitInQueue(ctx, deal1)
+		require.NoError(t, err)
+		started <- struct{}{}
+	}()
+
+	// Wait till go-routine calls waitInQueue
+	require.Eventually(t, func() bool { return tl.transfersCount() == 1 }, time.Second, time.Millisecond)
+
+	// Expect the first transfer to start
+	tl.check(time.Now())
+	<-started
+
+	// Mark the first transfer as stalled
+	tl.check(time.Now().Add(cfg.StallTimeout))
+
+	// Generate a second deal to the same peer
+	deal2 := generateDeal()
+	deal2.ClientPeerID = deal1.ClientPeerID
+
+	go func() {
+		err := tl.waitInQueue(ctx, deal2)
+		require.NoError(t, err)
+		started <- struct{}{}
+	}()
+
+	// Wait till go-routine calls waitInQueue
+	require.Eventually(t, func() bool { return tl.transfersCount() == 2 }, time.Second, time.Millisecond)
+
+	// It should be allowed to start, because even though there's a stalled
+	// transfer to the peer, we're still below the soft limit
+	tl.check(time.Now().Add(cfg.StallTimeout))
+	<-started
+
+	// Generate a third deal to the same peer
+	deal3 := generateDeal()
+	deal3.ClientPeerID = deal1.ClientPeerID
+
+	go func() {
+		err := tl.waitInQueue(ctx, deal3)
+		require.NoError(t, err)
+		started <- struct{}{}
+	}()
+
+	// Wait till go-routine calls waitInQueue
+	require.Eventually(t, func() bool { return tl.transfersCount() == 3 }, time.Second, time.Millisecond)
+
+	tl.check(time.Now().Add(cfg.StallTimeout))
+
+	// Expect the third transfer not to start yet, because there's a stalled
+	// transfer to the same peer in the queue and we've reached the soft limit
+	select {
+	case <-started:
+		require.Fail(t, "expected third transfer not to start yet")
+	default:
+	}
 }
