@@ -26,12 +26,12 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 
 		// If there's an http retrieval address specified, add HTTP to the list
 		// of supported protocols
-		if cfg.Dealmaking.HTTPRetrievalMultiAddr != "" {
-			maddr, err := multiaddr.NewMultiaddr(cfg.Dealmaking.HTTPRetrievalMultiAddr)
+		if cfg.Dealmaking.HTTPRetrievalMultiaddr != "" {
+			maddr, err := multiaddr.NewMultiaddr(cfg.Dealmaking.HTTPRetrievalMultiaddr)
 			if err != nil {
 				msg := "HTTPRetrievalURL must be in multi-address format. "
 				msg += "Could not parse '%s' as multiaddr: %w"
-				return nil, fmt.Errorf(msg, cfg.Dealmaking.HTTPRetrievalMultiAddr, err)
+				return nil, fmt.Errorf(msg, cfg.Dealmaking.HTTPRetrievalMultiaddr, err)
 			}
 
 			protos = append(protos, types.Protocol{

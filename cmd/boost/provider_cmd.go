@@ -9,12 +9,16 @@ import (
 	"github.com/filecoin-project/boost/cli/ctxutil"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
+	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/network"
+	// TODO: This multiaddr util library should probably live in its own repo
+	multiaddrutil "github.com/filecoin-project/go-legs/httpsync/multiaddr"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-cid"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
 )
 
@@ -30,6 +34,7 @@ var providerCmd = &cli.Command{
 		libp2pInfoCmd,
 		storageAskCmd,
 		retrievalAskCmd,
+		retrievalTransportsCmd,
 	},
 }
 
@@ -293,4 +298,108 @@ var retrievalAskCmd = &cli.Command{
 
 		return nil
 	},
+}
+
+var retrievalTransportsCmd = &cli.Command{
+	Name:      "retrieval-transports",
+	Usage:     "Query a storage provider's available retrieval transports (libp2p, http, etc)",
+	ArgsUsage: "[provider]",
+	Action: func(cctx *cli.Context) error {
+		ctx := bcli.ReqContext(cctx)
+
+		afmt := NewAppFmt(cctx.App)
+		if cctx.NArg() != 1 {
+			afmt.Println("Usage: retrieval-transports [provider]")
+			return nil
+		}
+
+		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
+		if err != nil {
+			return err
+		}
+
+		api, closer, err := lcli.GetGatewayAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("cant setup gateway connection: %w", err)
+		}
+		defer closer()
+
+		maddr, err := address.NewFromString(cctx.Args().First())
+		if err != nil {
+			return err
+		}
+
+		addrInfo, err := cmd.GetAddrInfo(ctx, api, maddr)
+		if err != nil {
+			return err
+		}
+
+		log.Debugw("found storage provider", "id", addrInfo.ID, "multiaddrs", addrInfo.Addrs, "addr", maddr)
+
+		if err := n.Host.Connect(ctx, *addrInfo); err != nil {
+			return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+		}
+
+		// Send the query to the Storage Provider
+		client := lp2pimpl.NewTransportsClient(n.Host)
+		resp, err := client.SendQuery(ctx, addrInfo.ID)
+		if err != nil {
+			return fmt.Errorf("failed to fetch transports from peer %s: %w", addrInfo.ID, err)
+		}
+
+		if cctx.Bool("json") {
+			type addr struct {
+				Multiaddr string `json:"multiaddr"`
+				Address   string `json:"address,omitempty"`
+			}
+			json := make(map[string]interface{}, len(resp.Protocols))
+			for _, p := range resp.Protocols {
+				addrs := make([]addr, 0, len(p.Addresses))
+				for _, ma := range p.Addresses {
+					// Get the multiaddress, and also try to get the address
+					// in the protocol's native format (eg URL format for
+					// http protocol)
+					addrs = append(addrs, addr{
+						Multiaddr: ma.String(),
+						Address:   multiaddrToNative(p.Name, ma),
+					})
+				}
+				json[p.Name] = addrs
+			}
+			return cmd.PrintJson(json)
+		}
+
+		if len(resp.Protocols) == 0 {
+			afmt.Println("No available retrieval protocols")
+			return nil
+		}
+		for _, p := range resp.Protocols {
+			afmt.Println(p.Name)
+			for _, a := range p.Addresses {
+				// Output the multiaddress
+				afmt.Println("  " + a.String())
+				// Try to get the address in the protocol's native format
+				// (eg URL format for http protocol)
+				nativeFmt := multiaddrToNative(p.Name, a)
+				if nativeFmt != "" {
+					afmt.Println("    " + nativeFmt)
+				}
+			}
+		}
+
+		return nil
+	},
+}
+
+func multiaddrToNative(proto string, ma multiaddr.Multiaddr) string {
+	switch proto {
+	case "http", "https":
+		u, err := multiaddrutil.ToURL(ma)
+		if err != nil {
+			return ""
+		}
+		return u.String()
+	}
+
+	return ""
 }

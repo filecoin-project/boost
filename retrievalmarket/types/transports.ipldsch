@@ -1,5 +1,6 @@
 # Defines the response to a query asking which transport protocols a
 # Storage Provider supports
+type Multiaddr bytes
 
 type Protocol struct {
   # The name of the transport protocol eg "libp2p" or "http"

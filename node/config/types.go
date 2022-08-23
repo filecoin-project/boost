@@ -171,8 +171,8 @@ type DealmakingConfig struct {
 	RemoteCommp bool
 
 	// The public multi-address for retrieving deals with booster-http.
-	// Note: Must be in multiaddr format, eg /dns6/foo.com/tcp/80/http
-	HTTPRetrievalMultiAddr string
+	// Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https
+	HTTPRetrievalMultiaddr string
 }
 
 type FeeConfig struct {

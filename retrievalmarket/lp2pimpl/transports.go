@@ -28,8 +28,8 @@ type TransportsListener struct {
 	protocols []types.Protocol
 }
 
-const streamReadDeadline = 10 * time.Second
-const streamWriteDeadline = 10 * time.Second
+const streamReadDeadline = 30 * time.Second
+const streamWriteDeadline = 30 * time.Second
 
 // QueryClientOption is an option for configuring the libp2p storage deal client
 type QueryClientOption func(*TransportsClient)
@@ -58,7 +58,7 @@ func NewTransportsClient(h host.Host, options ...QueryClientOption) *TransportsC
 
 // SendQuery sends a retrieval query over a libp2p stream to the peer
 func (c *TransportsClient) SendQuery(ctx context.Context, id peer.ID) (*types.QueryResponse, error) {
-	clog.Debugw("query", "provider-peer", id)
+	clog.Debugw("query", "peer", id)
 
 	// Create a libp2p stream to the provider
 	s, err := c.retryStream.OpenStream(ctx, id, []protocol.ID{TransportsProtocolID})
@@ -79,7 +79,7 @@ func (c *TransportsClient) SendQuery(ctx context.Context, id peer.ID) (*types.Qu
 	}
 	queryResponse := queryResponsei.(*types.QueryResponse)
 
-	clog.Debugw("response", "provider-peer", id)
+	clog.Debugw("response", "peer", id)
 
 	return queryResponse, nil
 }
@@ -112,7 +112,7 @@ func (l *TransportsListener) handleNewQueryStream(s network.Stream) {
 	defer s.SetWriteDeadline(time.Time{}) // nolint
 
 	// Write the response to the client
-	err := types.BindnodeRegistry.TypeToWriter(response, s, dagcbor.Encode)
+	err := types.BindnodeRegistry.TypeToWriter(&response, s, dagcbor.Encode)
 	if err != nil {
 		slog.Infow("error writing query response", "peer", s.Conn().RemotePeer(), "err", err)
 		return

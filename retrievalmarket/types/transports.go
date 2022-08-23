@@ -24,41 +24,30 @@ type QueryResponse struct {
 var embedSchema []byte
 
 func multiAddrFromBytes(b []byte) (interface{}, error) {
-	return multiaddr.NewMultiaddrBytes(b)
+	ma, err := multiaddr.NewMultiaddrBytes(b)
+	if err != nil {
+		return nil, err
+	}
+	return &ma, err
 }
 
 func multiAddrToBytes(iface interface{}) ([]byte, error) {
-	var ma multiaddr.Multiaddr
-	ma, ok := iface.(multiaddr.Multiaddr)
+	ma, ok := iface.(*multiaddr.Multiaddr)
 	if !ok {
 		return nil, fmt.Errorf("expected *Multiaddr value")
 	}
 
-	return ma.Bytes(), nil
-}
-
-// MultiAddrBindnodeOption converts a filecoin Multiaddr type to and from a Bytes
-// field in a schema
-var dummyMa multiaddr.Multiaddr
-var MultiAddrBindnodeOption = bindnode.TypedBytesConverter(&dummyMa, multiAddrFromBytes, multiAddrToBytes)
-
-var bindnodeOptions = []bindnode.Option{
-	MultiAddrBindnodeOption,
+	return (*ma).Bytes(), nil
 }
 
 var BindnodeRegistry = bindnoderegistry.NewRegistry()
 
 func init() {
-	for _, r := range []struct {
-		typ     interface{}
-		typName string
-	}{
-		{(*QueryResponse)(nil), "QueryResponse"},
-		{(*Protocol)(nil), "Protocol"},
-		{(multiaddr.Multiaddr)(nil), "Multiaddr"},
-	} {
-		if err := BindnodeRegistry.RegisterType(r.typ, string(embedSchema), r.typName, bindnodeOptions...); err != nil {
-			panic(err.Error())
-		}
+	var dummyMa multiaddr.Multiaddr
+	var bindnodeOptions = []bindnode.Option{
+		bindnode.TypedBytesConverter(&dummyMa, multiAddrFromBytes, multiAddrToBytes),
+	}
+	if err := BindnodeRegistry.RegisterType((*QueryResponse)(nil), string(embedSchema), "QueryResponse", bindnodeOptions...); err != nil {
+		panic(err.Error())
 	}
 }
