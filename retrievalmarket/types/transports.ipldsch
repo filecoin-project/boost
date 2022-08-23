@@ -3,7 +3,8 @@
 type Multiaddr bytes
 
 type Protocol struct {
-  # The name of the transport protocol eg "libp2p" or "http"
+  # The name of the transport protocol
+  # Known protocols: "libp2p", "http", "https"
   Name String
   # The addresses of the endpoint in multiaddr format
   Addresses [Multiaddr]
