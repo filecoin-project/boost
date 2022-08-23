@@ -39,6 +39,9 @@ func TestDummydealOnline(t *testing.T) {
 	failingFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
 	require.NoError(t, err)
 
+	// NOTE: these calls to CreateDenseCARv2 have the identity CID builder enabled so will
+	// produce a root identity CID for this case. So we're testing deal-making and retrieval
+	// where a DAG has an identity CID root
 	rootCid, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
 	require.NoError(t, err)
 
@@ -85,6 +88,7 @@ func TestDummydealOnline(t *testing.T) {
 	err = f.WaitForDealAddedToSector(passingDealUuid)
 	require.NoError(t, err)
 
-	outCar := f.RetrieveDirect(ctx, t, rootCid, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true)
-	kit.AssertFilesEqual(t, carFilepath, outCar)
+	// rootCid is an identity CID
+	outFile := f.RetrieveDirect(ctx, t, rootCid, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true)
+	kit.AssertFilesEqual(t, randomFilepath, outFile)
 }

@@ -48,6 +48,7 @@ import (
 	"github.com/filecoin-project/lotus/storage/paths"
 	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
 	"github.com/google/uuid"
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	files "github.com/ipfs/go-ipfs-files"
@@ -58,7 +59,12 @@ import (
 	unixfile "github.com/ipfs/go-unixfs/file"
 	"github.com/ipld/go-car"
 	"github.com/libp2p/go-libp2p"
+<<<<<<< HEAD
 	"github.com/libp2p/go-libp2p/core/host"
+=======
+	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/multiformats/go-multihash"
+>>>>>>> 108ee6c (fix: cleanup test & handle identity roots)
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
@@ -684,8 +690,16 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 	ch, err := car.LoadCar(ctx, bserv.Blockstore(), file)
 	require.NoError(t, err)
 
-	b, err := bserv.GetBlock(ctx, ch.Roots[0])
-	require.NoError(t, err)
+	var b blocks.Block
+	if ch.Roots[0].Prefix().MhType == multihash.IDENTITY {
+		mh, err := multihash.Decode(ch.Roots[0].Hash())
+		require.NoError(t, err)
+		b, err = blocks.NewBlockWithCid(mh.Digest, ch.Roots[0])
+		require.NoError(t, err)
+	} else {
+		b, err = bserv.GetBlock(ctx, ch.Roots[0])
+		require.NoError(t, err)
+	}
 
 	nd, err := ipld.Decode(b)
 	require.NoError(t, err)

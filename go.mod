@@ -8,6 +8,12 @@ replace github.com/filecoin-project/go-jsonrpc => github.com/nonsense/go-jsonrpc
 
 // replace github.com/filecoin-project/lotus => ../lotus
 
+// replace github.com/filecoin-project/go-fil-markets => ../go-fil-markets
+
+// replace github.com/filecoin-project/dagstore => ../dagstore
+
+// replace github.com/ipld/go-car/v2 => ../../ipld/go-car/v2
+
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
 	github.com/BurntSushi/toml v1.1.0
