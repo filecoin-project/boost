@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"fmt"
 
-	"github.com/filecoin-project/go-address"
 	"github.com/ipld/go-ipld-prime/node/bindnode"
 	bindnoderegistry "github.com/ipld/go-ipld-prime/node/bindnode/registry"
 	"github.com/multiformats/go-multiaddr"
@@ -14,7 +13,7 @@ type Protocol struct {
 	// The name of the transport protocol eg "libp2p" or "http"
 	Name string
 	// The address of the endpoint in multiaddr format
-	Endpoint multiaddr.Multiaddr
+	Addresses []multiaddr.Multiaddr
 }
 
 type QueryResponse struct {
@@ -23,10 +22,6 @@ type QueryResponse struct {
 
 //go:embed transports.ipldsch
 var embedSchema []byte
-
-// MultiAddrBindnodeOption converts a filecoin Address type to and from a Bytes
-// field in a schema
-var MultiAddrBindnodeOption = bindnode.TypedBytesConverter(&address.Address{}, multiAddrFromBytes, multiAddrToBytes)
 
 func multiAddrFromBytes(b []byte) (interface{}, error) {
 	return multiaddr.NewMultiaddrBytes(b)
@@ -42,4 +37,28 @@ func multiAddrToBytes(iface interface{}) ([]byte, error) {
 	return ma.Bytes(), nil
 }
 
+// MultiAddrBindnodeOption converts a filecoin Multiaddr type to and from a Bytes
+// field in a schema
+var dummyMa multiaddr.Multiaddr
+var MultiAddrBindnodeOption = bindnode.TypedBytesConverter(&dummyMa, multiAddrFromBytes, multiAddrToBytes)
+
+var bindnodeOptions = []bindnode.Option{
+	MultiAddrBindnodeOption,
+}
+
 var BindnodeRegistry = bindnoderegistry.NewRegistry()
+
+func init() {
+	for _, r := range []struct {
+		typ     interface{}
+		typName string
+	}{
+		{(*QueryResponse)(nil), "QueryResponse"},
+		{(*Protocol)(nil), "Protocol"},
+		{(multiaddr.Multiaddr)(nil), "Multiaddr"},
+	} {
+		if err := BindnodeRegistry.RegisterType(r.typ, string(embedSchema), r.typName, bindnodeOptions...); err != nil {
+			panic(err.Error())
+		}
+	}
+}

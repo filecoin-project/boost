@@ -16,12 +16,11 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 	return func(h host.Host) (*lp2pimpl.TransportsListener, error) {
 		protos := []types.Protocol{}
 
-		// Get the libp2p address from the Host
+		// Get the libp2p addresses from the Host
 		if len(h.Addrs()) > 0 {
-			// TODO: should this be a list of addresses instead?
 			protos = append(protos, types.Protocol{
-				Name:     "libp2p",
-				Endpoint: h.Addrs()[0],
+				Name:      "libp2p",
+				Addresses: h.Addrs(),
 			})
 		}
 
@@ -36,8 +35,8 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 			}
 
 			protos = append(protos, types.Protocol{
-				Name:     "http",
-				Endpoint: maddr,
+				Name:      "http",
+				Addresses: []multiaddr.Multiaddr{maddr},
 			})
 		}
 
@@ -45,7 +44,7 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 	}
 }
 
-func HandleRetrievalTransports(lc fx.Lifecycle, l lp2pimpl.TransportsListener) {
+func HandleRetrievalTransports(lc fx.Lifecycle, l *lp2pimpl.TransportsListener) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			log.Debug("starting retrieval transports listener")
