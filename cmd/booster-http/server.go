@@ -99,7 +99,7 @@ const idxPage = `
       <tbody>
       <tr>
         <td>
-          Download a CAR file by payload CID
+          Download a raw piece by payload CID
         </td>
         <td>
           <a href="/payload/payloadcid">/payload/<payload cid></a>
@@ -107,10 +107,26 @@ const idxPage = `
       </tr>
       <tr>
         <td>
-          Download a CAR file by piece CID
+          Download a CAR file by payload CID
+        </td>
+        <td>
+          <a href="/payload/payloadcid.car">/payload/<payload cid>.car</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Download a raw piece by piece CID
         </td>
         <td>
           <a href="/piece/piececid">/piece/<piece cid></a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Download a CAR file by piece CID
+        </td>
+        <td>
+          <a href="/piece/piececid.car">/piece/<piece cid>.car</a>
         </td>
       </tr>
       </tbody>
@@ -125,9 +141,10 @@ func (s *HttpServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) {
+	// Remove the path up to the payload cid
 	prefixLen := len(s.payloadBasePath())
 	if len(r.URL.Path) <= prefixLen {
-		msg := fmt.Sprintf("path '%s' is missing piece CID", r.URL.Path)
+		msg := fmt.Sprintf("path '%s' is missing payload CID", r.URL.Path)
 		writeError(w, r, http.StatusBadRequest, msg)
 		return
 	}
@@ -142,6 +159,7 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Find all the pieces that contain the payload cid
 	pieces, err := s.api.PiecesContainingMultihash(payloadCid.Hash())
 	if err != nil {
 		if isNotFoundError(err) {
@@ -160,7 +178,9 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 	pieceCid := pieces[0]
 	ctx := r.Context()
 	content, err := s.getPieceContent(ctx, pieceCid)
-	if err == nil && isCar {
+	if err == nil && isCar && r.Method != "HEAD" {
+		// Note: Getting the CAR content out of the piece is non-trivial, so
+		// we don't do it for HEAD requests
 		content, err = s.getCarContent(pieceCid, content)
 	}
 	if err != nil {
@@ -179,6 +199,7 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
+	// Remove the path up to the piece cid
 	prefixLen := len(s.pieceBasePath())
 	if len(r.URL.Path) <= prefixLen {
 		msg := fmt.Sprintf("path '%s' is missing piece CID", r.URL.Path)
@@ -196,9 +217,12 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get a reader over the the piece
 	ctx := r.Context()
 	content, err := s.getPieceContent(ctx, pieceCid)
-	if err == nil && isCar {
+	if err == nil && isCar && r.Method != "HEAD" {
+		// Note: Getting the CAR content out of the piece is non-trivial, so
+		// we don't do it for HEAD requests
 		content, err = s.getCarContent(pieceCid, content)
 	}
 	if err != nil {
@@ -417,11 +441,13 @@ func (s *HttpServer) unsealedDeal(ctx context.Context, pieceInfo piecestore.Piec
 			continue
 		}
 		if isUnsealed {
+			// Found a deal with an unsealed piece, so return the deal info
 			return &di, nil
 		}
 		sealedCount++
 	}
 
+	// It wasn't possible to find a deal with the piece cid that is unsealed.
 	// Try to return an error message with as much useful information as possible
 	dealSectors := make([]string, 0, len(pieceInfo.Deals))
 	for _, di := range pieceInfo.Deals {
