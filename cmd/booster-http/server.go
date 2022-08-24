@@ -27,6 +27,11 @@ import (
 
 var ErrNotFound = errors.New("not found")
 
+// For data served by the endpoints in the HTTP server that never changes
+// (eg pieces identified by a piece CID) send a cache header with a constant,
+// non-zero last modified time.
+var lastModified = time.UnixMilli(1)
+
 const carSuffix = ".car"
 
 type HttpServer struct {
@@ -196,6 +201,13 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Set an Etag based on the piece cid
+	etag := pieceCid.String()
+	if isCar {
+		etag += carSuffix
+	}
+	w.Header().Set("Etag", etag)
+
 	serveContent(w, r, content, getContentType(isCar))
 }
 
@@ -237,6 +249,13 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set an Etag based on the piece cid
+	etag := pieceCid.String()
+	if isCar {
+		etag += carSuffix
+	}
+	w.Header().Set("Etag", etag)
+
 	serveContent(w, r, content, getContentType(isCar))
 }
 
@@ -268,9 +287,11 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 	}}
 
 	// Send the content
+	// Note that the last modified time is a constant value because the data
+	// in a piece identified by a cid will never change.
 	start := time.Now()
 	alogAt(start, "%s\tGET %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
-	http.ServeContent(writeErrWatcher, r, "", time.Time{}, content)
+	http.ServeContent(writeErrWatcher, r, "", lastModified, content)
 
 	// Check if there was an error during the transfer
 	end := time.Now()
