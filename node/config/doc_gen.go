@@ -239,6 +239,13 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 
 			Comment: `Whether to do commp on the Boost node (local) or on the Sealer (remote)`,
 		},
+		{
+			Name: "HTTPRetrievalMultiaddr",
+			Type: "string",
+
+			Comment: `The public multi-address for retrieving deals with booster-http.
+Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{
