@@ -30,9 +30,10 @@ var ErrNotFound = errors.New("not found")
 const carSuffix = ".car"
 
 type HttpServer struct {
-	path string
-	port int
-	api  HttpServerApi
+	path          string
+	port          int
+	allowIndexing bool
+	api           HttpServerApi
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -47,8 +48,8 @@ type HttpServerApi interface {
 	UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error)
 }
 
-func NewHttpServer(path string, port int, api HttpServerApi) *HttpServer {
-	return &HttpServer{path: path, port: port, api: api}
+func NewHttpServer(path string, port int, allowIndexing bool, api HttpServerApi) *HttpServer {
+	return &HttpServer{path: path, port: port, allowIndexing: allowIndexing, api: api}
 }
 
 func (s *HttpServer) payloadBasePath() string {
@@ -331,9 +332,12 @@ func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.
 func (s *HttpServer) getCarContent(pieceCid cid.Cid, pieceReader io.ReadSeeker) (io.ReadSeeker, error) {
 	maxOffset, err := s.api.GetMaxPieceOffset(pieceCid)
 	if err != nil {
-		// If it's not possible to get the max piece offset it may be because
-		// the CAR file hasn't been indexed yet. So try to index it in real time.
-		maxOffset, err = getMaxPieceOffset(pieceReader)
+		if s.allowIndexing {
+			// If it's not possible to get the max piece offset it may be because
+			// the CAR file hasn't been indexed yet. So try to index it in real time.
+			alog("%s\tbuilding index for %s", color.New(color.FgBlue).Sprintf("INFO"), pieceCid)
+			maxOffset, err = getMaxPieceOffset(pieceReader)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("getting max offset for piece %s: %w", pieceCid, err)
 		}
