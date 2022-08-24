@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 
 	bsnetwork "github.com/ipfs/go-bitswap/network"
@@ -19,8 +18,6 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 )
 
-var ErrNotFound = errors.New("not found")
-
 type BitswapServer struct {
 	port        int
 	remoteStore blockstore.Blockstore
@@ -30,7 +27,7 @@ type BitswapServer struct {
 	server *server.Server
 }
 
-func NewBitswapServer(path string, port int, remoteStore blockstore.Blockstore) *BitswapServer {
+func NewBitswapServer(port int, remoteStore blockstore.Blockstore) *BitswapServer {
 	return &BitswapServer{port: port, remoteStore: remoteStore}
 }
 
@@ -65,8 +62,7 @@ func (s *BitswapServer) Start(ctx context.Context) error {
 	s.server = server.New(ctx, net, s.remoteStore, bsopts...)
 	net.Start(s.server)
 
-	fmt.Printf("bitswap server running on SP, addrs: %s, peerID: %s\n", host.Addrs(), host.ID())
-	log.Infow("bitswap server running on SP", "multiaddrs", host.Addrs(), "peerId", host.ID())
+	log.Infow("bitswap server running", "multiaddrs", host.Addrs(), "peerId", host.ID())
 	return nil
 }
 

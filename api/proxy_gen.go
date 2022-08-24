@@ -38,6 +38,12 @@ type BoostStruct struct {
 	Internal struct {
 		ActorSectorSize func(p0 context.Context, p1 address.Address) (abi.SectorSize, error) `perm:"read"`
 
+		BlockstoreGet func(p0 context.Context, p1 cid.Cid) ([]byte, error) `perm:"read"`
+
+		BlockstoreGetSize func(p0 context.Context, p1 cid.Cid) (int, error) `perm:"read"`
+
+		BlockstoreHas func(p0 context.Context, p1 cid.Cid) (bool, error) `perm:"read"`
+
 		BoostDagstoreDestroyShard func(p0 context.Context, p1 string) error `perm:"admin"`
 
 		BoostDagstoreGC func(p0 context.Context) ([]DagstoreShardResult, error) `perm:"admin"`
@@ -59,8 +65,6 @@ type BoostStruct struct {
 		BoostDealBySignedProposalCid func(p0 context.Context, p1 cid.Cid) (*smtypes.ProviderDealState, error) `perm:"admin"`
 
 		BoostDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
-
-		BoostGetBlock func(p0 context.Context, p1 cid.Cid) ([]byte, error) `perm:"read"`
 
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
 
@@ -264,6 +268,39 @@ func (s *BoostStub) ActorSectorSize(p0 context.Context, p1 address.Address) (abi
 	return *new(abi.SectorSize), ErrNotSupported
 }
 
+func (s *BoostStruct) BlockstoreGet(p0 context.Context, p1 cid.Cid) ([]byte, error) {
+	if s.Internal.BlockstoreGet == nil {
+		return *new([]byte), ErrNotSupported
+	}
+	return s.Internal.BlockstoreGet(p0, p1)
+}
+
+func (s *BoostStub) BlockstoreGet(p0 context.Context, p1 cid.Cid) ([]byte, error) {
+	return *new([]byte), ErrNotSupported
+}
+
+func (s *BoostStruct) BlockstoreGetSize(p0 context.Context, p1 cid.Cid) (int, error) {
+	if s.Internal.BlockstoreGetSize == nil {
+		return 0, ErrNotSupported
+	}
+	return s.Internal.BlockstoreGetSize(p0, p1)
+}
+
+func (s *BoostStub) BlockstoreGetSize(p0 context.Context, p1 cid.Cid) (int, error) {
+	return 0, ErrNotSupported
+}
+
+func (s *BoostStruct) BlockstoreHas(p0 context.Context, p1 cid.Cid) (bool, error) {
+	if s.Internal.BlockstoreHas == nil {
+		return false, ErrNotSupported
+	}
+	return s.Internal.BlockstoreHas(p0, p1)
+}
+
+func (s *BoostStub) BlockstoreHas(p0 context.Context, p1 cid.Cid) (bool, error) {
+	return false, ErrNotSupported
+}
+
 func (s *BoostStruct) BoostDagstoreDestroyShard(p0 context.Context, p1 string) error {
 	if s.Internal.BoostDagstoreDestroyShard == nil {
 		return ErrNotSupported
@@ -383,17 +420,6 @@ func (s *BoostStruct) BoostDummyDeal(p0 context.Context, p1 smtypes.DealParams) 
 
 func (s *BoostStub) BoostDummyDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
 	return nil, ErrNotSupported
-}
-
-func (s *BoostStruct) BoostGetBlock(p0 context.Context, p1 cid.Cid) ([]byte, error) {
-	if s.Internal.BoostGetBlock == nil {
-		return *new([]byte), ErrNotSupported
-	}
-	return s.Internal.BoostGetBlock(p0, p1)
-}
-
-func (s *BoostStub) BoostGetBlock(p0 context.Context, p1 cid.Cid) ([]byte, error) {
-	return *new([]byte), ErrNotSupported
 }
 
 func (s *BoostStruct) BoostIndexerAnnounceAllDeals(p0 context.Context) error {

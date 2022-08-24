@@ -475,10 +475,18 @@ func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) e
 	return nil
 }
 
-func (sm *BoostAPI) BoostGetBlock(ctx context.Context, c cid.Cid) ([]byte, error) {
+func (sm *BoostAPI) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error) {
 	blk, err := sm.IndexBackedBlockstore.Get(ctx, c)
 	if err != nil {
 		return nil, err
 	}
 	return blk.RawData(), nil
+}
+
+func (sm *BoostAPI) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) {
+	return sm.IndexBackedBlockstore.Has(ctx, c)
+}
+
+func (sm *BoostAPI) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) {
+	return sm.IndexBackedBlockstore.GetSize(ctx, c)
 }

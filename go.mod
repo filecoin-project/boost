@@ -75,7 +75,6 @@ require (
 	github.com/libp2p/go-eventbus v0.2.1
 	github.com/libp2p/go-libp2p v0.21.0
 	github.com/libp2p/go-libp2p-core v0.19.1
-	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-gostream v0.4.1-0.20220720161416-e1952aede109
 	github.com/libp2p/go-libp2p-http v0.2.1
 	github.com/libp2p/go-libp2p-kad-dht v0.17.0

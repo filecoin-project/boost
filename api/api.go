@@ -47,7 +47,12 @@ type Boost interface {
 	BoostDagstoreGC(ctx context.Context) ([]DagstoreShardResult, error)                                                            //perm:admin
 	BoostDagstorePiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error)                         //perm:read
 	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error)                                                      //perm:read
-	BoostGetBlock(ctx context.Context, c cid.Cid) ([]byte, error)                                                                  //perm:read
+
+	// MethodGroup: Blockstore
+	BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error)  //perm:read
+	BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error)    //perm:read
+	BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) //perm:read
+
 	// RuntimeSubsystems returns the subsystems that are enabled
 	// in this instance.
 	RuntimeSubsystems(ctx context.Context) (lapi.MinerSubsystems, error) //perm:read

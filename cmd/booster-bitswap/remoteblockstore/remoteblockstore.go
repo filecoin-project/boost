@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	blocks "github.com/ipfs/go-block-format"
-	format "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/ipfs/go-cid"
@@ -14,23 +13,15 @@ import (
 
 var log = logging.Logger("remote-blockstore")
 
-var ErrBlockNotFound = errors.New("block not found")
-var ErrNotFound = errors.New("not found")
-
 var _ blockstore.Blockstore = (*RemoteBlockstore)(nil)
 
-// ErrNoPieceSelected means that the piece selection function rejected all of the given pieces.
-var ErrNoPieceSelected = errors.New("no piece selected")
-
-// PieceSelectorF helps select a piece to fetch a cid from if the given cid is present in multiple pieces.
-// It should return `ErrNoPieceSelected` if none of the given piece is selected.
-type PieceSelectorF func(c cid.Cid, pieceCids []cid.Cid) (cid.Cid, error)
-
 type RemoteBlockstoreAPI interface {
-	BoostGetBlock(ctx context.Context, c cid.Cid) ([]byte, error)
+	BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error)
+	BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error)
+	BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error)
 }
 
-// RemoteBlockstore is a read only blockstore over all cids across all pieces on a provider.
+// RemoteBlockstore is a read-only blockstore over all cids across all pieces on a provider.
 type RemoteBlockstore struct {
 	api RemoteBlockstoreAPI
 }
@@ -42,9 +33,9 @@ func NewRemoteBlockstore(api RemoteBlockstoreAPI) blockstore.Blockstore {
 }
 
 func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block, err error) {
-	log.Debugw("processing request for block", "cid", c)
-	data, err := ro.api.BoostGetBlock(ctx, c)
-	log.Debugw("boost api response for get block", "cid", c, "error", err)
+	log.Debugw("Get", "cid", c)
+	data, err := ro.api.BlockstoreGet(ctx, c)
+	log.Debugw("Get response", "cid", c, "error", err)
 	if err != nil {
 		return nil, err
 	}
@@ -52,22 +43,17 @@ func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block,
 }
 
 func (ro *RemoteBlockstore) Has(ctx context.Context, c cid.Cid) (bool, error) {
-	_, err := ro.api.BoostGetBlock(ctx, c)
-	if err != nil {
-		if format.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
+	log.Debugw("Has", "cid", c)
+	has, err := ro.api.BlockstoreHas(ctx, c)
+	log.Debugw("Has response", "cid", c, "has", has, "error", err)
+	return has, err
 }
 
 func (ro *RemoteBlockstore) GetSize(ctx context.Context, c cid.Cid) (int, error) {
-	data, err := ro.api.BoostGetBlock(ctx, c)
-	if err != nil {
-		return 0, err
-	}
-	return len(data), nil
+	log.Debugw("GetSize", "cid", c)
+	size, err := ro.api.BlockstoreGetSize(ctx, c)
+	log.Debugw("GetSize response", "cid", c, "size", size, "error", err)
+	return size, err
 }
 
 // --- UNSUPPORTED BLOCKSTORE METHODS -------

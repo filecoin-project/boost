@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -14,7 +13,6 @@ import (
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
 	"github.com/filecoin-project/go-jsonrpc"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/urfave/cli/v2"
 )
 
@@ -35,16 +33,6 @@ var runCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:     "api-boost",
 			Usage:    "the endpoint for the boost API",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "api-fullnode",
-			Usage:    "the endpoint for the full node API",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "api-sealer",
-			Usage:    "the endpoint for the sealer API",
 			Required: true,
 		},
 	},
@@ -69,11 +57,11 @@ var runCmd = &cli.Command{
 
 		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi)
 		// Create the server API
-		server := NewBitswapServer(cctx.String("base-path"), cctx.Int("port"), remoteStore)
+		port := cctx.Int("port")
+		server := NewBitswapServer(port, remoteStore)
 
 		// Start the server
-		log.Infof("Starting booster-http node on port %d with base path '%s'",
-			cctx.Int("port"), cctx.String("base-path"))
+		log.Infof("Starting booster-bitswap node on port %d", port)
 		err = server.Start(ctx)
 		if err != nil {
 			return err
@@ -94,16 +82,6 @@ var runCmd = &cli.Command{
 
 		return nil
 	},
-}
-
-func storageAuthWithURL(apiInfo string) (sealer.StorageAuth, error) {
-	s := strings.Split(apiInfo, ":")
-	if len(s) != 2 {
-		return nil, errors.New("unexpected format of `apiInfo`")
-	}
-	headers := http.Header{}
-	headers.Add("Authorization", "Bearer "+s[0])
-	return sealer.StorageAuth(headers), nil
 }
 
 func getBoostAPI(ctx context.Context, ai string) (api.Boost, jsonrpc.ClientCloser, error) {
