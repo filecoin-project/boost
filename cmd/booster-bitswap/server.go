@@ -35,6 +35,9 @@ func (s *BitswapServer) Start(ctx context.Context) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	// setup libp2p host
 	privKey, _, err := crypto.GenerateECDSAKeyPair(rand.Reader)
+	if err != nil {
+		return err
+	}
 
 	host, err := libp2p.New(
 		libp2p.ListenAddrStrings(
