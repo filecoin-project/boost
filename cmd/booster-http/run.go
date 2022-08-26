@@ -67,8 +67,8 @@ var runCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.StringFlag{
-			Name:     "api-sealer",
-			Usage:    "the endpoint for the sealer API",
+			Name:     "api-storage",
+			Usage:    "the endpoint for the storage node API",
 			Required: true,
 		},
 	},
@@ -99,19 +99,19 @@ var runCmd = &cli.Command{
 		}
 		defer ncloser()
 
-		// Connect to the sealing API
-		sealingApiInfo := cctx.String("api-sealer")
-		sauth, err := storageAuthWithURL(sealingApiInfo)
+		// Connect to the storage API
+		storageApiInfo := cctx.String("api-storage")
+		sauth, err := storageAuthWithURL(storageApiInfo)
 		if err != nil {
-			return fmt.Errorf("parsing sealing API endpoint: %w", err)
+			return fmt.Errorf("parsing storage API endpoint: %w", err)
 		}
-		sealingService, sealerCloser, err := getMinerApi(ctx, sealingApiInfo)
+		storageService, storageCloser, err := getMinerApi(ctx, storageApiInfo)
 		if err != nil {
 			return fmt.Errorf("getting miner API: %w", err)
 		}
-		defer sealerCloser()
+		defer storageCloser()
 
-		maddr, err := sealingService.ActorAddress(ctx)
+		maddr, err := storageService.ActorAddress(ctx)
 		if err != nil {
 			return fmt.Errorf("getting miner actor address: %w", err)
 		}
@@ -129,17 +129,17 @@ var runCmd = &cli.Command{
 
 		// Create the store interface
 		var urls []string
-		lstor, err := paths.NewLocal(ctx, lr, sealingService, urls)
+		lstor, err := paths.NewLocal(ctx, lr, storageService, urls)
 		if err != nil {
 			return fmt.Errorf("creating new local store: %w", err)
 		}
-		storage := lotus_modules.RemoteStorage(lstor, sealingService, sauth, sealer.Config{
+		storage := lotus_modules.RemoteStorage(lstor, storageService, sauth, sealer.Config{
 			// TODO: Not sure if I need this, or any of the other fields in this struct
 			ParallelFetchLimit: 1,
 		})
 		// Create the piece provider and sector accessors
-		pp := sealer.NewPieceProvider(storage, sealingService, sealingService)
-		sa := sectoraccessor.NewSectorAccessor(dtypes.MinerAddress(maddr), sealingService, pp, fullnodeApi)
+		pp := sealer.NewPieceProvider(storage, storageService, storageService)
+		sa := sectoraccessor.NewSectorAccessor(dtypes.MinerAddress(maddr), storageService, pp, fullnodeApi)
 		allowIndexing := cctx.Bool("allow-indexing")
 		// Create the server API
 		sapi := serverApi{ctx: ctx, bapi: bapi, sa: sa}
@@ -269,7 +269,7 @@ func getMinerApi(ctx context.Context, ai string) (v0api.StorageMiner, jsonrpc.Cl
 		return nil, nil, fmt.Errorf("could not get DialArgs: %w", err)
 	}
 
-	log.Infof("Using sealing API at %s", addr)
+	log.Infof("Using storage API at %s", addr)
 	api, closer, err := client.NewStorageMinerRPCV0(ctx, addr, info.AuthHeader())
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating miner service API: %w", err)
