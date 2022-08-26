@@ -1,4 +1,4 @@
-package httptransport
+package util
 
 import (
 	"fmt"
@@ -9,19 +9,16 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-type httpError struct {
-	error
-	code int
+const Libp2pScheme = "libp2p"
+
+type TransportUrl struct {
+	Scheme    string
+	Url       string
+	PeerID    peer.ID
+	Multiaddr multiaddr.Multiaddr
 }
 
-type transportUrl struct {
-	scheme    string
-	url       string
-	peerID    peer.ID
-	multiaddr multiaddr.Multiaddr
-}
-
-func parseUrl(urlStr string) (*transportUrl, error) {
+func ParseUrl(urlStr string) (*TransportUrl, error) {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("parsing url '%s': %w", urlStr, err)
@@ -29,15 +26,15 @@ func parseUrl(urlStr string) (*transportUrl, error) {
 	if u.Scheme == "" {
 		return nil, fmt.Errorf("parsing url '%s': could not parse scheme", urlStr)
 	}
-	if u.Scheme == libp2pScheme {
+	if u.Scheme == Libp2pScheme {
 		return parseLibp2pUrl(urlStr)
 	}
-	return &transportUrl{scheme: u.Scheme, url: urlStr}, nil
+	return &TransportUrl{Scheme: u.Scheme, Url: urlStr}, nil
 }
 
-func parseLibp2pUrl(urlStr string) (*transportUrl, error) {
+func parseLibp2pUrl(urlStr string) (*TransportUrl, error) {
 	// Remove libp2p prefix
-	prefix := libp2pScheme + "://"
+	prefix := Libp2pScheme + "://"
 	if !strings.HasPrefix(urlStr, prefix) {
 		return nil, fmt.Errorf("libp2p URL '%s' must start with prefix '%s'", urlStr, prefix)
 	}
@@ -53,10 +50,10 @@ func parseLibp2pUrl(urlStr string) (*transportUrl, error) {
 		return nil, fmt.Errorf("expected only one address in url '%s'", urlStr)
 	}
 
-	return &transportUrl{
-		scheme:    libp2pScheme,
-		url:       libp2pScheme + "://" + addrInfo.ID.String(),
-		peerID:    addrInfo.ID,
-		multiaddr: addrInfo.Addrs[0],
+	return &TransportUrl{
+		Scheme:    Libp2pScheme,
+		Url:       Libp2pScheme + "://" + addrInfo.ID.String(),
+		PeerID:    addrInfo.ID,
+		Multiaddr: addrInfo.Addrs[0],
 	}, nil
 }

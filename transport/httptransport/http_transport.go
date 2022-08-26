@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/storagemarket/logs"
-
 	"github.com/filecoin-project/boost/transport"
+	"github.com/filecoin-project/boost/transport/httptransport/util"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/google/uuid"
 	"github.com/jpillora/backoff"
@@ -30,9 +30,12 @@ const (
 	maxBackOff           = 10 * time.Minute
 	factor               = 1.5
 	maxReconnectAttempts = 15
-
-	libp2pScheme = "libp2p"
 )
+
+type httpError struct {
+	error
+	code int
+}
 
 var _ transport.Transport = (*httpTransport)(nil)
 
@@ -98,11 +101,11 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	}
 
 	// parse request URL
-	u, err := parseUrl(tInfo.URL)
+	u, err := util.ParseUrl(tInfo.URL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse request url: %w", err)
 	}
-	tInfo.URL = u.url
+	tInfo.URL = u.Url
 
 	// check that the outputFile exists
 	fi, err := os.Stat(dealInfo.OutputFile)
@@ -146,8 +149,8 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	}
 
 	// If this is a libp2p URL
-	if u.scheme == libp2pScheme {
-		h.dl.Infow(duuid, "libp2p-http url", "url", tInfo.URL, "peer id", u.peerID, "multiaddr", u.multiaddr)
+	if u.Scheme == util.Libp2pScheme {
+		h.dl.Infow(duuid, "libp2p-http url", "url", tInfo.URL, "peer id", u.PeerID, "multiaddr", u.Multiaddr)
 
 		// Use the libp2p client
 		t.client = h.libp2pClient
@@ -157,13 +160,13 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 		if deadline, ok := ctx.Deadline(); ok {
 			addrTtl = time.Until(deadline)
 		}
-		h.libp2pHost.Peerstore().AddAddr(u.peerID, u.multiaddr, addrTtl)
+		h.libp2pHost.Peerstore().AddAddr(u.PeerID, u.Multiaddr, addrTtl)
 
 		// Protect the connection for the lifetime of the data transfer
 		tag := uuid.New().String()
-		h.libp2pHost.ConnManager().Protect(u.peerID, tag)
+		h.libp2pHost.ConnManager().Protect(u.PeerID, tag)
 		cleanupFns = append(cleanupFns, func() {
-			h.libp2pHost.ConnManager().Unprotect(u.peerID, tag)
+			h.libp2pHost.ConnManager().Unprotect(u.PeerID, tag)
 		})
 	} else {
 		t.client = http.DefaultClient

@@ -1619,6 +1619,10 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	require.NoError(tbuilder.t, err)
 	name := carv2Fileinfo.Name()
 
+	req := tspttypes.HttpRequest{URL: "http://foo.bar"}
+	xferParams, err := json.Marshal(req)
+	require.NoError(t, err)
+
 	// assemble the final deal params to send to the provider
 	dealParams := &types.DealParams{
 		DealUUID:  uuid.New(),
@@ -1632,8 +1636,9 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 		},
 		DealDataRoot: rootCid,
 		Transfer: types.Transfer{
-			Type: "http",
-			Size: uint64(carv2Fileinfo.Size()),
+			Type:   "http",
+			Params: xferParams,
+			Size:   uint64(carv2Fileinfo.Size()),
 		},
 	}
 

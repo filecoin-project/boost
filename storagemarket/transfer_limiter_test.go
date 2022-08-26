@@ -2,19 +2,38 @@ package storagemarket
 
 import (
 	"context"
-	smtypes "github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/boost/testutil"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
+	"encoding/json"
+	"fmt"
+	"golang.org/x/exp/rand"
 	"testing"
 	"time"
+
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/boost/transport/types"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 )
 
 func generateDeal() *smtypes.ProviderDealState {
+	return generateDealWithHost(fmt.Sprintf("foo.bar:%d", rand.Uint64()))
+}
+
+func generateDealWithHost(host string) *smtypes.ProviderDealState {
+	transferParams := types.HttpRequest{
+		URL: fmt.Sprintf("http://%s/piece/%s", host, uuid.New()),
+	}
+	json, err := json.Marshal(transferParams)
+	if err != nil {
+		panic(err)
+	}
 	return &smtypes.ProviderDealState{
-		DealUuid:     uuid.New(),
-		CreatedAt:    time.Now(),
-		ClientPeerID: testutil.GeneratePeer(),
+		DealUuid:  uuid.New(),
+		CreatedAt: time.Now(),
+		Transfer: smtypes.Transfer{
+			Type:   "http",
+			Params: json,
+		},
 	}
 }
 
@@ -237,9 +256,10 @@ func TestTransferLimiterPriorityNoExistingTransferToPeerFirst(t *testing.T) {
 
 	// Generate three deals, where the first two have the same peer
 	p := testutil.GeneratePeer()
-	deal1 := generateDeal()
+	h := "myhost.com"
+	deal1 := generateDealWithHost(h)
 	deal1.ClientPeerID = p
-	deal2 := generateDeal()
+	deal2 := generateDealWithHost(h)
 	deal2.ClientPeerID = p
 	deal3 := generateDeal()
 
@@ -298,7 +318,8 @@ func TestTransferLimiterStalledTransferHardLimited(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate a deal and add to the transfer queue
-	deal1 := generateDeal()
+	h := "myhost.com"
+	deal1 := generateDealWithHost(h)
 
 	started := make(chan struct{}, 3)
 	go func() {
@@ -318,7 +339,7 @@ func TestTransferLimiterStalledTransferHardLimited(t *testing.T) {
 	tl.check(time.Now().Add(cfg.StallTimeout))
 
 	// Generate a second deal to the same peer
-	deal2 := generateDeal()
+	deal2 := generateDealWithHost(h)
 	deal2.ClientPeerID = deal1.ClientPeerID
 
 	go func() {
@@ -336,7 +357,7 @@ func TestTransferLimiterStalledTransferHardLimited(t *testing.T) {
 	<-started
 
 	// Generate a third deal to the same peer
-	deal3 := generateDeal()
+	deal3 := generateDealWithHost(h)
 	deal3.ClientPeerID = deal1.ClientPeerID
 
 	go func() {

@@ -9,12 +9,12 @@ import (
 
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/google/uuid"
-	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 type transfer struct {
 	started   chan struct{}
 	deal      *smtypes.ProviderDealState
+	host      string
 	updatedAt time.Time
 	bytes     uint64
 }
@@ -47,7 +47,11 @@ type TransferLimiterConfig struct {
 // The queue is ordered such that we
 // - start transferring data for the oldest deal first
 // - prefer to start transfers with peers that don't have any ongoing transfer
-// - once the soft limit is reached, don't allow any new transfers with stalled peers
+// - once the soft limit is reached, don't allow any new transfers with peers
+//   that have existing stalled transfers
+//
+// Note that peers are distinguished by their host (eg foo.bar:8080) not by
+// libp2p peer ID.
 //
 // For example, if there is
 // - one active transfer with peer A
@@ -121,8 +125,8 @@ func (tl *transferLimiter) check(now time.Time) {
 
 	// Count how many transfers are active (not stalled)
 	var activeCount uint64
-	transferringPeers := make(map[peer.ID]struct{}, len(xfers))
-	stalledPeers := make(map[peer.ID]struct{}, len(xfers))
+	transferringPeers := make(map[string]struct{}, len(xfers))
+	stalledPeers := make(map[string]struct{}, len(xfers))
 	unstartedXfers := make([]*transfer, 0, len(xfers))
 	for _, xfer := range xfers {
 		if !xfer.isStarted() {
@@ -134,13 +138,13 @@ func (tl *transferLimiter) check(now time.Time) {
 		}
 
 		// Build the set of peers that have an ongoing transfer (needed later)
-		transferringPeers[xfer.deal.ClientPeerID] = struct{}{}
+		transferringPeers[xfer.host] = struct{}{}
 
 		// Check each transfer to see if it has stalled
 		if now.Sub(xfer.updatedAt) < tl.cfg.StallTimeout {
 			activeCount++
 		} else {
-			stalledPeers[xfer.deal.ClientPeerID] = struct{}{}
+			stalledPeers[xfer.host] = struct{}{}
 		}
 	}
 
@@ -171,7 +175,7 @@ func (tl *transferLimiter) check(now time.Time) {
 			// If there is already a transfer to the same peer and it's stalled,
 			// allow a new transfer with that peer, but only up to the soft
 			// limit
-			_, isStalledPeer := stalledPeers[xfer.deal.ClientPeerID]
+			_, isStalledPeer := stalledPeers[xfer.host]
 			if isStalledPeer && startedCount >= tl.cfg.MaxConcurrent {
 				continue
 			}
@@ -186,7 +190,7 @@ func (tl *transferLimiter) check(now time.Time) {
 			// This helps ensure that a slow peer doesn't block up the transfer
 			// queue, because we'll favour opening a transfer to a new peer
 			// over a peer that already has a transfer (which may be slow).
-			if _, ok := transferringPeers[xfer.deal.ClientPeerID]; !ok {
+			if _, ok := transferringPeers[xfer.host]; !ok {
 				return xfer
 			}
 		}
@@ -202,7 +206,7 @@ func (tl *transferLimiter) check(now time.Time) {
 		}
 
 		// Update the list of peers with active transfers
-		transferringPeers[next.deal.ClientPeerID] = struct{}{}
+		transferringPeers[next.host] = struct{}{}
 
 		// Signal that the transfer has started
 		next.updatedAt = time.Now()
@@ -228,8 +232,13 @@ func (tl *transferLimiter) transfersCount() int {
 
 // Wait for the next open spot in the transfer queue
 func (tl *transferLimiter) waitInQueue(ctx context.Context, deal *smtypes.ProviderDealState) error {
+	host, err := deal.Transfer.Host()
+	if err != nil {
+		return fmt.Errorf("getting host from Transfer params for deal %s: %w", deal.DealUuid, err)
+	}
 	xfer := &transfer{
 		deal:    deal,
+		host:    host,
 		started: make(chan struct{}),
 	}
 
