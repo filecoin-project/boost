@@ -4,6 +4,7 @@ import (
 	"fmt"
 )
 
+// Migrate from config version 2 to version 3 (i.e. remove a few fields and add recently added fields)
 func v2Tov3(cfgPath string) (string, error) {
 	cfg, err := FromFile(cfgPath, DefaultBoost())
 	if err != nil {
@@ -14,9 +15,6 @@ func v2Tov3(cfgPath string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("unexpected config type %T: expected *config.Boost", cfg)
 	}
-
-	// For the migration from v1 to v2 just remove fields and update config version and add
-	// comments to the file
 
 	// Update the Boost config version
 	boostCfg.ConfigVersion = 3
