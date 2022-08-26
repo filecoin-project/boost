@@ -147,10 +147,6 @@ type DealmakingConfig struct {
 	// The maximum allowed disk usage size in bytes of staging deals not yet
 	// passed to the sealing node by the markets service. 0 is unlimited.
 	MaxStagingDealsBytes int64
-	// The maximum number of parallel online data transfers for storage deals
-	SimultaneousTransfersForStorage uint64
-	// The maximum number of parallel online data transfers for retrieval deals
-	SimultaneousTransfersForRetrieval uint64
 	// Minimum start epoch buffer to give time for sealing of sector with deal.
 	StartEpochSealingBuffer uint64
 	// The amount of time to keep deal proposal logs for before cleaning them up.
