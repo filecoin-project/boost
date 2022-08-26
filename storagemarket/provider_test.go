@@ -1356,7 +1356,15 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	askStore := &mockAskStore{}
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
-	prvCfg := Config{MaxTransferDuration: time.Hour, RemoteCommp: !pc.localCommp}
+	prvCfg := Config{
+		MaxTransferDuration: time.Hour,
+		RemoteCommp:         !pc.localCommp,
+		TransferLimiter: TransferLimiterConfig{
+			MaxConcurrent:    10,
+			StallCheckPeriod: time.Millisecond,
+			StallTimeout:     time.Hour,
+		},
+	}
 	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, minerStub, sps, minerStub, df, sqldb,
 		logsDB, dagStore, ps, &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
 	require.NoError(t, err)

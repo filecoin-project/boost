@@ -33,7 +33,7 @@ type TransferLimiterConfig struct {
 	MaxConcurrent uint64
 	// The period between checking if a connection has stalled
 	StallCheckPeriod time.Duration
-	// If no data is sent within the stall timeout the connection is assumed to have stalled
+	// The time that can elapse before a download is considered stalled
 	StallTimeout time.Duration
 }
 
@@ -93,6 +93,8 @@ func (tl *transferLimiter) run(ctx context.Context) {
 	ticker := time.NewTicker(tl.cfg.StallCheckPeriod)
 	defer ticker.Stop()
 
+	// Note: The first tick will occur after one stall check period (not
+	// immediately).
 	for {
 		select {
 		case t := <-ticker.C:
@@ -105,15 +107,24 @@ func (tl *transferLimiter) run(ctx context.Context) {
 }
 
 func (tl *transferLimiter) check(now time.Time) {
+	// Take a copy of the transfers map.
+	// We do this to avoid lock contention with the SetBytes message which
+	// is called with high frequency when there are a lot of concurrent
+	// transfers (every time data is received).
 	tl.lk.Lock()
-	defer tl.lk.Unlock()
+	xfers := make(map[uuid.UUID]*transfer, len(tl.xfers))
+	for id, xfer := range tl.xfers {
+		cp := *xfer
+		xfers[id] = &cp
+	}
+	tl.lk.Unlock()
 
 	// Count how many transfers are active (not stalled)
 	var activeCount uint64
-	transferringPeers := make(map[peer.ID]struct{}, len(tl.xfers))
-	stalledPeers := make(map[peer.ID]struct{}, len(tl.xfers))
-	unstartedXfers := make([]*transfer, 0, len(tl.xfers))
-	for _, xfer := range tl.xfers {
+	transferringPeers := make(map[peer.ID]struct{}, len(xfers))
+	stalledPeers := make(map[peer.ID]struct{}, len(xfers))
+	unstartedXfers := make([]*transfer, 0, len(xfers))
+	for _, xfer := range xfers {
 		if !xfer.isStarted() {
 			// Build a list of unstarted transfers (needed later)
 			unstartedXfers = append(unstartedXfers, xfer)
@@ -146,9 +157,13 @@ func (tl *transferLimiter) check(now time.Time) {
 	// Gets the next transfer that should be started
 	nextTransfer := func() *transfer {
 		var next *transfer
-		// Iterate over transfers from oldest to newest
+
+		// Iterate over unstarted transfers from oldest to newest
+		startedCount := tl.startedCount(xfers)
 		for _, xfer := range unstartedXfers {
-			// Skip transfers that have already been started
+			// Skip transfers that have already been started.
+			// Note: A previous call to nextTransfer may have started the
+			// transfer.
 			if xfer.isStarted() {
 				continue
 			}
@@ -157,7 +172,7 @@ func (tl *transferLimiter) check(now time.Time) {
 			// allow a new transfer with that peer, but only up to the soft
 			// limit
 			_, isStalledPeer := stalledPeers[xfer.deal.ClientPeerID]
-			if isStalledPeer && tl.startedCount() >= tl.cfg.MaxConcurrent {
+			if isStalledPeer && startedCount >= tl.cfg.MaxConcurrent {
 				continue
 			}
 
@@ -169,7 +184,8 @@ func (tl *transferLimiter) check(now time.Time) {
 			// If there are no transfers with the peer that sent the storage deal,
 			// start a transfer.
 			// This helps ensure that a slow peer doesn't block up the transfer
-			// queue.
+			// queue, because we'll favour opening a transfer to a new peer
+			// over a peer that already has a transfer (which may be slow).
 			if _, ok := transferringPeers[xfer.deal.ClientPeerID]; !ok {
 				return xfer
 			}
@@ -195,9 +211,9 @@ func (tl *transferLimiter) check(now time.Time) {
 }
 
 // Count how many transfers have been started but not completed
-func (tl *transferLimiter) startedCount() uint64 {
+func (tl *transferLimiter) startedCount(xfers map[uuid.UUID]*transfer) uint64 {
 	var count uint64
-	for _, xfer := range tl.xfers {
+	for _, xfer := range xfers {
 		if xfer.isStarted() {
 			count++
 		}
@@ -242,7 +258,6 @@ func (tl *transferLimiter) complete(dealUuid uuid.UUID) {
 
 // Called each time the transfer progresses
 func (tl *transferLimiter) setBytes(dealUuid uuid.UUID, bytes uint64) {
-	// TODO: avoid locking contention with the check function
 	tl.lk.Lock()
 	defer tl.lk.Unlock()
 

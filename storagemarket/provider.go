@@ -153,8 +153,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		updateRetryStateChan: make(chan updateRetryStateReq),
 		storageSpaceChan:     make(chan storageSpaceDealReq),
 
-		Transport: tspt,
-		// TODO: make params configurable
+		Transport:      tspt,
 		xferLimiter:    xferLimiter,
 		fundManager:    fundMgr,
 		storageManager: storageMgr,
@@ -430,7 +429,7 @@ func (p *Provider) Start() error {
 	// Start sampling transfer data rate
 	go p.transfers.start(p.ctx)
 
-	// TODO: wait until all deals have been added to the transfer limiter
+	// Start the transfer limiter
 	go p.xferLimiter.run(p.ctx)
 
 	log.Infow("storage provider: started")
