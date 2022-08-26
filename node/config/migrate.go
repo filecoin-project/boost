@@ -20,8 +20,8 @@ const CurrentVersion = 3
 type migrateUpFn = func(cfgPath string) (string, error)
 
 var migrations = []migrateUpFn{
-	v0Tov1, // index 0 => version 0
-	v1Tov2, // index 1 => version 3
+	v0Tov1, // index 0 => version 1
+	v1Tov2, // index 1 => version 2
 	v2Tov3, // index 2 => version 3
 }
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 )
 
-// Migrate from config version 2 to version 3 (i.e. remove a few fields and add recently added fields)
 func v2Tov3(cfgPath string) (string, error) {
 	cfg, err := FromFile(cfgPath, DefaultBoost())
 	if err != nil {
