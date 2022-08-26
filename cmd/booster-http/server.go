@@ -184,9 +184,7 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 	pieceCid := pieces[0]
 	ctx := r.Context()
 	content, err := s.getPieceContent(ctx, pieceCid)
-	if err == nil && isCar && r.Method != "HEAD" {
-		// Note: Getting the CAR content out of the piece is non-trivial, so
-		// we don't do it for HEAD requests
+	if err == nil && isCar {
 		content, err = s.getCarContent(pieceCid, content)
 	}
 	if err != nil {
@@ -233,9 +231,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	// Get a reader over the the piece
 	ctx := r.Context()
 	content, err := s.getPieceContent(ctx, pieceCid)
-	if err == nil && isCar && r.Method != "HEAD" {
-		// Note: Getting the CAR content out of the piece is non-trivial, so
-		// we don't do it for HEAD requests
+	if err == nil && isCar {
 		content, err = s.getCarContent(pieceCid, content)
 	}
 	if err != nil {
@@ -272,7 +268,7 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 	w.Header().Set("Content-Type", contentType)
 
 	if r.Method == "HEAD" {
-		// For an HTTP HEAD request we don't send any data (just headers)
+		// For an HTTP HEAD request ServeContent doesn't send any data (just headers)
 		http.ServeContent(w, r, "", time.Time{}, content)
 		alog("%s\tHEAD %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
 		return
