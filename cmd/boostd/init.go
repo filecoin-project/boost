@@ -700,8 +700,6 @@ func setBoostDealMakingCfg(bdm *config.DealmakingConfig, mktsCfg *lotus_config.S
 	bdm.MaxDealStartDelay = config.Duration(ldm.MaxDealStartDelay)
 	bdm.MaxProviderCollateralMultiplier = ldm.MaxProviderCollateralMultiplier
 	bdm.MaxStagingDealsBytes = ldm.MaxStagingDealsBytes
-	bdm.SimultaneousTransfersForStorage = ldm.SimultaneousTransfersForStorage
-	bdm.SimultaneousTransfersForRetrieval = ldm.SimultaneousTransfersForRetrieval
 	bdm.StartEpochSealingBuffer = ldm.StartEpochSealingBuffer
 	bdm.Filter = ldm.Filter
 	bdm.RetrievalFilter = ldm.RetrievalFilter

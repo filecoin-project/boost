@@ -184,18 +184,6 @@ as a multiplier of the minimum collateral bound`,
 passed to the sealing node by the markets service. 0 is unlimited.`,
 		},
 		{
-			Name: "SimultaneousTransfersForStorage",
-			Type: "uint64",
-
-			Comment: `The maximum number of parallel online data transfers for storage deals`,
-		},
-		{
-			Name: "SimultaneousTransfersForRetrieval",
-			Type: "uint64",
-
-			Comment: `The maximum number of parallel online data transfers for retrieval deals`,
-		},
-		{
 			Name: "StartEpochSealingBuffer",
 			Type: "uint64",
 

@@ -79,9 +79,6 @@ func DefaultBoost() *Boost {
 			ExpectedSealDuration:            Duration(time.Hour * 24),
 			MaxProviderCollateralMultiplier: 2,
 
-			SimultaneousTransfersForStorage:   DefaultSimultaneousTransfers,
-			SimultaneousTransfersForRetrieval: DefaultSimultaneousTransfers,
-
 			StartEpochSealingBuffer: 480, // 480 epochs buffer == 4 hours from adding deal to sector to sector being sealed
 
 			DealProposalLogDuration: Duration(time.Hour * 24),
