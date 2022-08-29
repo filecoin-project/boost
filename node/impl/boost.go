@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"sort"
 
+	tracing "github.com/filecoin-project/boost/tracing"
 	"github.com/multiformats/go-multihash"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/filecoin-project/go-fil-markets/stores"
 
@@ -117,6 +119,12 @@ func (sm *BoostAPI) BoostDummyDeal(ctx context.Context, params types.DealParams)
 }
 
 func (sm *BoostAPI) BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
+	// TODO: Use a middleware function that wraps the entire api implementation for all RPC calls
+	// Testing for now until a middleware function is created
+	ctx, span := tracing.Tracer.Start(ctx, "BoostDeal")
+	defer span.End()
+	span.SetAttributes(attribute.String("dealUuid", dealUuid.String())) // Example of adding additional attributes
+
 	return sm.StorageProvider.Deal(ctx, dealUuid)
 }
 
