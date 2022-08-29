@@ -227,6 +227,9 @@ func (tl *transferLimiter) startedCount(xfers map[uuid.UUID]*transfer) uint64 {
 
 // Count how many transfers there are in total
 func (tl *transferLimiter) transfersCount() int {
+	tl.lk.RLock()
+	defer tl.lk.RUnlock()
+
 	return len(tl.xfers)
 }
 

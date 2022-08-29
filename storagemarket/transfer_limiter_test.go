@@ -198,14 +198,16 @@ func TestTransferLimiterPriorityOldestFirst(t *testing.T) {
 	dealCount := 100
 	deals := make([]*smtypes.ProviderDealState, 0, dealCount)
 	for i := 0; i < dealCount; i++ {
-		deals = append(deals, generateDeal())
+		dl := generateDeal()
+		dl.CreatedAt = time.Now().Add(-time.Hour).Round(time.Minute).Add(time.Duration(i) * time.Second)
+		deals = append(deals, dl)
 	}
-	dealsReversed := make(chan *smtypes.ProviderDealState, dealCount)
+	dealsReversed := make(chan *smtypes.ProviderDealState, len(deals))
 	for i := len(deals) - 1; i >= 0; i-- {
 		dealsReversed <- deals[i]
 	}
 
-	started := make(chan *smtypes.ProviderDealState, 3)
+	started := make(chan *smtypes.ProviderDealState)
 	for i := 0; i < len(deals); i++ {
 		// The order in which the go routines run is non-deterministic,
 		// but by adding deals in newest-to-oldest order, we can assume that
@@ -220,13 +222,12 @@ func TestTransferLimiterPriorityOldestFirst(t *testing.T) {
 	}
 
 	// Wait for all the deals to be added to the transfer queue
-	require.Eventually(t, func() bool { return len(dealsReversed) == 0 }, time.Second, time.Millisecond)
-
-	// Start processing transfers
-	go tl.run(ctx)
+	require.Eventually(t, func() bool { return tl.transfersCount() == dealCount }, time.Second, time.Millisecond)
 
 	// Expect the deals to be started in order from oldest to newest
 	for i := 0; i < len(deals); i++ {
+		go tl.check(time.Now())
+
 		dl := <-started
 		require.Equal(t, deals[i].DealUuid, dl.DealUuid)
 
