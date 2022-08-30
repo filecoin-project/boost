@@ -287,8 +287,27 @@ func (p *Provider) untagFundsAfterPublish(ctx context.Context, deal *types.Provi
 }
 
 func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
-	p.dealLogger.Infow(deal.DealUuid, "transferring deal data", "transfer client id", deal.Transfer.ClientID)
+	p.dealLogger.Infow(deal.DealUuid, "deal queued for transfer", "transfer client id", deal.Transfer.ClientID)
 
+	// Wait for a spot in the transfer queue
+	err := p.xferLimiter.waitInQueue(ctx, deal)
+	if err != nil {
+		// If boost was shutdown while waiting for the transfer to start,
+		// automatically retry on restart.
+		if errors.Is(err, context.Canceled) {
+			return &dealMakingError{
+				retry: smtypes.DealRetryAuto,
+				error: fmt.Errorf("boost shutdown while waiting to start transfer for deal %s: %w", deal.DealUuid, err),
+			}
+		}
+		return &dealMakingError{
+			retry: smtypes.DealRetryFatal,
+			error: fmt.Errorf("queued transfer failed to start for deal %s: %w", deal.DealUuid, err),
+		}
+	}
+	defer p.xferLimiter.complete(deal.DealUuid)
+
+	p.dealLogger.Infow(deal.DealUuid, "start deal data transfer", "transfer client id", deal.Transfer.ClientID)
 	tctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.config.MaxTransferDuration))
 	defer cancel()
 
@@ -316,6 +335,10 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 			error: fmt.Errorf("data-transfer failed: %w", err),
 		}
 	}
+
+	// Make room in the transfer queue for the next transfer
+	p.xferLimiter.complete(deal.DealUuid)
+
 	p.dealLogger.Infow(deal.DealUuid, "deal data-transfer completed successfully", "bytes received", deal.NBytesReceived, "time taken",
 		time.Since(st).String())
 
@@ -332,8 +355,9 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.Handler, pub event.Emitter, deal *types.ProviderDealState) error {
 	defer handler.Close()
 	defer p.transfers.complete(deal.DealUuid)
-	var lastOutputPct int64
 
+	// log transfer progress to the deal log every 10%
+	var lastOutputPct int64
 	logTransferProgress := func(received int64) {
 		pct := (100 * received) / int64(deal.Transfer.Size)
 		outputPct := pct / 10
@@ -355,6 +379,7 @@ func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.
 			}
 			deal.NBytesReceived = evt.NBytesReceived
 			p.transfers.setBytes(deal.DealUuid, uint64(evt.NBytesReceived))
+			p.xferLimiter.setBytes(deal.DealUuid, uint64(evt.NBytesReceived))
 			p.fireEventDealUpdate(pub, deal)
 			logTransferProgress(deal.NBytesReceived)
 

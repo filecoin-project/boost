@@ -54,7 +54,8 @@ type Config struct {
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration time.Duration
 	// Whether to do commp on the Boost node (local) or the sealing node (remote)
-	RemoteCommp bool
+	RemoteCommp     bool
+	TransferLimiter TransferLimiterConfig
 }
 
 var log = logging.Logger("boost-provider")
@@ -91,6 +92,7 @@ type Provider struct {
 	logsDB    *db.LogsDB
 
 	Transport      transport.Transport
+	xferLimiter    *transferLimiter
 	fundManager    *fundmanager.FundManager
 	storageManager *storagemanager.StorageManager
 	dealPublisher  types.DealPublisher
@@ -122,6 +124,11 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
 
+	xferLimiter, err := newTransferLimiter(cfg.TransferLimiter)
+	if err != nil {
+		return nil, err
+	}
+
 	newDealPS, err := newDealPubsub()
 	if err != nil {
 		return nil, err
@@ -147,6 +154,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		storageSpaceChan:     make(chan storageSpaceDealReq),
 
 		Transport:      tspt,
+		xferLimiter:    xferLimiter,
 		fundManager:    fundMgr,
 		storageManager: storageMgr,
 
@@ -420,6 +428,9 @@ func (p *Provider) Start() error {
 
 	// Start sampling transfer data rate
 	go p.transfers.start(p.ctx)
+
+	// Start the transfer limiter
+	go p.xferLimiter.run(p.ctx)
 
 	log.Infow("storage provider: started")
 	return nil

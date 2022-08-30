@@ -163,12 +163,23 @@ type DealmakingConfig struct {
 
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration Duration
+
 	// Whether to do commp on the Boost node (local) or on the Sealer (remote)
 	RemoteCommp bool
 
 	// The public multi-address for retrieving deals with booster-http.
 	// Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https
 	HTTPRetrievalMultiaddr string
+
+	// The maximum number of concurrent storage deal HTTP downloads.
+	// Note that this is a soft maximum; if some downloads stall,
+	// more downloads are allowed to start.
+	HttpTransferMaxConcurrentDownloads uint64
+	// The period between checking if downloads have stalled.
+	HttpTransferStallCheckPeriod Duration
+	// The time that can elapse before a download is considered stalled (and
+	// another concurrent download is allowed to start).
+	HttpTransferStallTimeout Duration
 }
 
 type FeeConfig struct {

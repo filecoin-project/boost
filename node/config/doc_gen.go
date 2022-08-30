@@ -234,6 +234,27 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 			Comment: `The public multi-address for retrieving deals with booster-http.
 Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https`,
 		},
+		{
+			Name: "HttpTransferMaxConcurrentDownloads",
+			Type: "uint64",
+
+			Comment: `The maximum number of concurrent storage deal HTTP downloads.
+Note that this is a soft maximum; if some downloads stall,
+more downloads are allowed to start.`,
+		},
+		{
+			Name: "HttpTransferStallCheckPeriod",
+			Type: "Duration",
+
+			Comment: `The period between checking if downloads have stalled.`,
+		},
+		{
+			Name: "HttpTransferStallTimeout",
+			Type: "Duration",
+
+			Comment: `The time that can elapse before a download is considered stalled (and
+another concurrent download is allowed to start).`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{
