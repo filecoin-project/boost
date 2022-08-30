@@ -2,14 +2,14 @@
 set -e
 if [ ! -f $LOTUS_PATH/.init.params ]; then
 	echo Initializing fetch params ...
-	lotus fetch-params 2048
+	lotus fetch-params $SECTOR_SIZE
 	touch $LOTUS_PATH/.init.params
 	echo Done
 fi
 
 if [ ! -f $LOTUS_PATH/.init.genesis ]; then
 	echo Initializing pre seal ...
-	lotus-seed --sector-dir $GENESIS_PATH pre-seal --sector-size 2KiB --num-sectors 2
+	lotus-seed --sector-dir $GENESIS_PATH pre-seal --sector-size $SECTOR_SIZE --num-sectors 1
 	echo Initializing genesis ...
 	lotus-seed --sector-dir $GENESIS_PATH genesis new $LOTUS_PATH/localnet.json
 	echo Initializing address ...

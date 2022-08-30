@@ -30,6 +30,9 @@ services:
     environment:
      - LOTUS_API_LISTENADDRESS=/dns/lotus-miner/tcp/2345/http
      - LOTUS_API_REMOTELISTENADDRESS=lotus-miner:2345
+     - LOTUS_SEALING_BATCHPRECOMMITS=false
+     - LOTUS_SEALING_AGGREGATECOMMITS=false
+     - LOTUS_SUBSYSTEMS_ENABLEMARKETS=false
     restart: unless-stopped
     logging: *default-logging
     volumes:
