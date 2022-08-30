@@ -26,7 +26,10 @@ RUN cd boost && make debug
 #########################################################################################
 FROM ubuntu:20.04 as runner
 
-RUN apt update && apt install -y hwloc
+RUN apt update && apt install -y \
+      curl \
+      hwloc \
+      jq
 
 ARG BUILD_VERSION=0.1
 

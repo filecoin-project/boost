@@ -52,7 +52,7 @@ printf "\n\nYes. We can make a deal now.\n \
 printf "5. Let's generate a sample file in ${ci}/app/public/sample.txt${cn}. We will use it as a demo file.\n\n"
 read -rsp $'Press any key to generate it...\n\n' -n1 key
 rm -f /app/public/sample.txt 
-for i in {1..7}; do echo "Hi Boost, $i times" >> /app/public/sample.txt; done
+for i in {1..57}; do echo "Hi Boost, $i times" >> /app/public/sample.txt; done
 
 printf "\n\nFile content:\n\n"
 cat /app/public/sample.txt
@@ -94,13 +94,45 @@ printf "8. That's it. We are ready to make the deal. \n \
 --payload-cid=$PAYLOAD_CID --storage-price 20000000000\n\n${cn}"
 read -rsp $'Press any key to make the deal...\n\n' -n1 key
 
-boost deal --verified=false \
+until boost deal --verified=false \
            --provider=t01000 \
            --http-url=http://demo-http-server/sample.car \
            --commp=$COMMP_CID \
            --car-size=$CAR \
            --piece-size=$PIECE \
            --payload-cid=$PAYLOAD_CID --storage-price 20000000000
+do  
+    printf "\nThe error has occured. Perhaps we should wait some time for funds to arrive into the market account.\n\n" 
+    read -rsp $'Press any key to check the boost wallet...\n\n' -n1 key
+    boost init
+    read -rsp $'\n\nPress any key to try making the deal again...\n' -n1 key 
+done           
 
 printf "\n\n   ${cb}Congrats! You have made it.${cn}\n\n \
 ###################################################################################\n"
+###################################################################################"
+printf "9. Deal has been made, and it will be published automatically after some time, but you can do it manually using boost's graphql API\n \
+: ${ci}curl -X POST -H \"Content-Type: application/json\" -d '{\"query\":\"mutation { dealPublishNow }\"}' http://localhost:8080/graphql/query ${cn}\n\n"
+read -rsp $'Press any key to publish the deal...\n\n' -n1 key
+
+curl -X POST -H "Content-Type: application/json" -d '{"query":"mutation { dealPublishNow }"}' http://localhost:8080/graphql/query | jq
+printf "\nDone.\n\n \
+###################################################################################\n"
+###################################################################################
+printf "10. To retrieve the file from the ${cb}lotus${cn} system you can use \n\
+${ci}lotus client retrieve${cn} or ${ci}lotus client cat${cn} commands.\n\
+: ${ci}lotus client cat --miner t01000 $PAYLOAD_CID ${cn}\n\n"
+
+read -rsp $'Press any key to show the file content...\n\n' -n1 key
+until lotus client cat --miner t01000 $PAYLOAD_CID 
+do  
+    printf "\nFile publishing may take time, please wait some time until the deal is finished and try again.\n\n" 
+    read -rsp $'Press any key to try again...\n' -n1 key 
+done
+
+printf "\n\nIf you see a file content you have just completed the demo. You have succesfully:\n\n\
+  1) initiated the boost client\n\
+  2) prepared sample file\n\
+  3) sent the sample file to the Filecoin devnet\n\
+  4) retrieved the content of the file from it.\n\n\
+More info at ${cb}https://boost.filecoin.io${cn} or ${cb}https://github.com/filecoin-project/boost${cn}.\n\n\n"
