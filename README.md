@@ -4,77 +4,11 @@ Boost is a tool for Filecoin storage providers to manage data storage and retrie
 
 See the docs at [https://boost.filecoin.io](https://boost.filecoin.io/getting-started) to get started.
 
-## For development:
+## Building and Installing
 
+Compile and install using the instructions at the `Building and installing` section in [the docs](https://boost.filecoin.io/getting-started#building-and-installing).
 
-1. Install using instructions in the building and installation section in [the docs](https://boost.filecoin.io/getting-started#building-and-installing).
-
-2. Make sure you have a local Lotus fullnode and miner running and listening to `localhost:1234` and `localhost:2345` respectively, for example with a devnet:
-
-```
-devnet
-```
-
-Note that currently `devnet` is using the default paths that `lotus` and `lotus-miner` use for their repositories, and you should make sure these directories are empty:
-
-```
-LOTUS_PATH=~/.lotus
-LOTUS_MINER_PATH=~/.lotusminer
-
-rm -rf ~/.lotus ~/.lotusminer
-```
-
-
-3. Create Boost repository
-
-```
-export $(lotus auth api-info --perm=admin)
-export $(lotus-miner auth api-info --perm=admin)
-
-boostd --vv init \
-       --api-sealer=`lotus-miner auth api-info --perm=admin` \
-       --api-sector-index=`lotus-miner auth api-info --perm=admin` \
-       --wallet-publish-storage-deals=`lotus wallet new bls` \
-       --wallet-deal-collateral=`lotus wallet new bls` \
-       --max-staging-deals-bytes=50000000000
-```
-
-4. Run the Boost daemon service
-
-```
-export $(lotus auth api-info --perm=admin)
-
-boostd --vv run
-```
-
-5. Interact with Boost
-
-Pass the client address (wallet) and the provider address to the `dummydeal` command.
-Note that
-- the client address is the address of a wallet with funds in `lotus wallet list`
-- you can find the provider address in `~/.boost/config.toml` under the config key `Wallets.Miner`
-
-```
-boostd dummydeal <client address> <provider address>
-```
-
-## Running the UI in Development Mode:
-
-1. Run the server
-
-```
-cd react
-npm install
-npm start
-```
-
-2. Open UI
-
-```
-http://localhost:3000
-```
-
-## Running a local Devnet
+## Running Boost for development
 
 To run Boost on your development machine, you will need to set up a devnet:
 
@@ -256,7 +190,7 @@ Note that above you already ran a command to export FULLNODE_API (and point it t
 
 Note also that the provider address is `t01000` and you will need to supply an appropriate `--storage-price` when using `boost deal` since the devnet has a minimum price. Alternatively, using "Settings" in the Boost web UI to set the deal price to zero. 
 
-# Devnet in Docker
+## Running Boost devnet in Docker
 
 ## Devnet docker images for lotus and boost
 
@@ -264,7 +198,7 @@ This dir contains scripts for building docker images that are required to start 
 
 NOTE: These docker images are for demo and devs ONLY. They MUST NOT/CAN NOT be used in production environments.
 
-## Building images:
+## Building Docker images:
 
 1. Select lotus version, for example: `lotus_version=1.17.1-rc2`. It must be the tag name of [the lotus git repo](https://github.com/filecoin-project/lotus/tags) without `v` prefix.
 2. Select boost version, for example: `boost_version=1.3.0-rc1`. Docker images for the boost will be built on the current code base. The `boost_version` is just used to tag images. If you want to build images for a specific boost version then you have to checkout that version first.
@@ -273,7 +207,7 @@ NOTE: These docker images are for demo and devs ONLY. They MUST NOT/CAN NOT be u
 ```
 make build/all lotus_version=1.17.1-rc2 boost_version=1.3.0-rc1
 ```
-## Publishing images:
+## Publishing Docker images:
 
 1. Log in to docker with the `filecoin` user.
 2. Publish
