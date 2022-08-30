@@ -87,6 +87,12 @@ const DealsListQuery = gql`
                     Size
                     Params
                 }
+                Transferred
+                TransferSamples {
+                    At
+                    Bytes
+                }
+                IsTransferStalled
                 Sector {
                     ID
                     Offset
@@ -454,6 +460,24 @@ const TransfersQuery = gql`
     }
 `;
 
+const TransferStatsQuery = gql`
+    query AppTransferStatsQuery {
+        transferStats {
+            HttpMaxConcurrentDownloads
+            Stats {
+                Host
+                Total
+                Started
+                Stalled
+                TransferSamples {
+                    At
+                    Bytes
+                }
+            }
+        }
+    }
+`;
+
 const FundsLogsQuery = gql`
     query AppFundsLogsQuery($cursor: BigInt, $offset: Int, $limit: Int) {
         fundsLogs(cursor: $cursor, offset: $offset, limit: $limit) {
@@ -573,6 +597,7 @@ export {
     FundsMoveToEscrow,
     StorageAskUpdate,
     TransfersQuery,
+    TransferStatsQuery,
     MpoolQuery,
     SealingPipelineQuery,
     Libp2pAddrInfoQuery,

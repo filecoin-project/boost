@@ -51,6 +51,11 @@
     flex-grow: 1;
 }
 
+.deals tr.show-actions td.message .message-content .message-text .transfer-rate {
+    padding-left: 1em;
+    color: #999999;
+}
+
 .deals tr.show-actions td.message .buttons {
     display: inline-block;
     min-width: 6em;

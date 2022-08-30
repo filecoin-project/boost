@@ -195,10 +195,6 @@ func (p *Provider) DealBySignedProposalCid(ctx context.Context, propCid cid.Cid)
 	return deal, nil
 }
 
-func (p *Provider) NBytesReceived(dealUuid uuid.UUID) uint64 {
-	return p.transfers.getBytes(dealUuid)
-}
-
 func (p *Provider) GetAsk() *storagemarket.SignedStorageAsk {
 	return p.askGetter.GetAsk()
 }
