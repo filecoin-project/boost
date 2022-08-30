@@ -11,6 +11,9 @@ ssh/boost:
 clean: clean/docker
 	rm -rf data
 .PHONY: clean
+clean/all: clean
+	rm -rf /var/tmp/filecoin-proof-parameters
+.PHONY: clean/all
 clean/docker:
 	docker compose down
 .PHONY: clean/docker
