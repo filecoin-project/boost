@@ -29,6 +29,7 @@ services:
     #   - "2345:2345"
     environment:
      - LOTUS_API_LISTENADDRESS=/dns/lotus-miner/tcp/2345/http
+     - LOTUS_API_REMOTELISTENADDRESS=lotus-miner:2345
     restart: unless-stopped
     logging: *default-logging
     volumes:
