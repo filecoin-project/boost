@@ -207,21 +207,6 @@ NOTE: These docker images are for demo and devs ONLY. They MUST NOT/CAN NOT be u
 ```
 make build/all lotus_version=1.17.1-rc2 boost_version=1.3.0-rc1
 ```
-## Publishing Docker images:
-
-1. Log in to docker with the `filecoin` user.
-2. Publish
-```
-make push/all lotus_version=1.17.1-rc2 boost_version=1.3.0-rc1
-```
-3. If you want to publish using a non `filecoin` account (for some testing purposes)
-
-```
-make push/all lotus_version=1.17.1-rc2 boost_version=1.3.0-rc1 docker_user=<some_user>
-```
-## How to run devnet in docker:
-
-Follow the instructions in the [docker-compose devnet guide](../../examples/devnet/README.md)
 
 ## To start devnet:
 
