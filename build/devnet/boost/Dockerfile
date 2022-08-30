@@ -1,5 +1,4 @@
 #########################################################################################
-## docker will invoke this file from ../../.. dir in order to access the code
 #########################################################################################
 ARG LOTUS_TEST_IMAGE=filecoin/lotus-test:latest
 FROM ${LOTUS_TEST_IMAGE} as lotus-dev
@@ -20,10 +19,10 @@ RUN apt update && apt install -y \
 
 WORKDIR /go/src/
 
-# copy src
-COPY . /go/src/
+ARG BUILD_VERSION=0.1
+RUN git clone --depth 1 --branch v${BUILD_VERSION} https://github.com/filecoin-project/boost
 
-RUN make debug
+RUN cd boost && make debug
 #########################################################################################
 FROM ubuntu:20.04 as runner
 
@@ -46,9 +45,9 @@ ENV BOOST_PATH /var/lib/boost
 VOLUME /var/lib/boost
 EXPOSE 8080  
 
-COPY --from=builder /go/src/boostd /usr/local/bin/
-COPY --from=builder /go/src/boost /usr/local/bin/
-COPY --from=builder /go/src/boostx /usr/local/bin/
+COPY --from=builder /go/src/boost/boostd /usr/local/bin/
+COPY --from=builder /go/src/boost/boost /usr/local/bin/
+COPY --from=builder /go/src/boost/boostx /usr/local/bin/
 COPY --from=lotus-dev /usr/local/bin/lotus /usr/local/bin/
 COPY --from=lotus-dev /usr/local/bin/lotus-miner /usr/local/bin/
 ## Fix missing lib libhwloc.so.5
@@ -56,7 +55,7 @@ RUN ls -1 /lib/x86_64-linux-gnu/libhwloc.so.* | head -n 1 | xargs -n1 -I {} ln -
 ## Smoke test for the boost and lotus
 RUN lotus -v && boost -v 
 
-COPY build/devnet/boost/entrypoint.sh /app/
-COPY build/devnet/boost/sample/* /app/sample/
+COPY entrypoint.sh /app/
+COPY sample/* /app/sample/
 
 ENTRYPOINT ["./entrypoint.sh"]

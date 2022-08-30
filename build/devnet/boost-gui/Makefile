@@ -1,12 +1,11 @@
 #####################################################################################
 service=$(docker_user)/boost-gui
 version=$(boost_version)
-docker_dir=build/devnet/boost-gui
 ########### DOCKER ##################################################################
 tag=$(service):$(version)
 
 dbuild: 
-	cd ../../../ && docker build -t $(tag) --build-arg BUILD_VERSION=$(version) -f $(docker_dir)/Dockerfile .
+	docker build -t $(tag) --build-arg BUILD_VERSION=$(version) .
 
 dpush: dbuild
 	docker push $(tag)

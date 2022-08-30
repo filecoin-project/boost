@@ -1,16 +1,17 @@
 #########################################################################################
-## docker will invoke this file from ../../.. dir in order to access the code
 #########################################################################################
 FROM node:16.16-alpine3.15 AS builder
 
-WORKDIR /build/react
-COPY react/package.json react/package-lock.json /build/react/
+RUN apk --no-cache --update add git
+
+ARG BUILD_VERSION=0.1
+WORKDIR /src
+RUN git clone --depth 1 --branch v${BUILD_VERSION} https://github.com/filecoin-project/boost 
+
+WORKDIR /src/boost/react
 
 #TODO remove force after fixing npm dependencies 
 RUN npm install --force 
-
-COPY react /build/react
-COPY gql /build/gql
 
 RUN npm run build
 #####################################################################################
@@ -31,8 +32,8 @@ LABEL org.opencontainers.image.version=$BUILD_VERSION \
 EXPOSE 8000
 ENV BOOST_URL=http://boost:8080
 
-COPY --from=builder /build/react/build usr/share/nginx/html
-COPY build/devnet/boost-gui/nginx.conf.in /app/nginx.conf.in
-COPY build/devnet/boost-gui/entrypoint.sh /app/entrypoint.sh
+COPY --from=builder /src/boost/react/build usr/share/nginx/html
+COPY nginx.conf.in /app/nginx.conf.in
+COPY entrypoint.sh /app/entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
