@@ -287,6 +287,13 @@ type TransferPoint {
   Bytes: Uint64!
 }
 
+type TransferStats {
+  Host: String!
+  Total: Int!
+  Started: Int!
+  Stalled: Int!
+}
+
 type MpoolMessage {
   From: String!
   To: String!
@@ -376,6 +383,9 @@ type RootQuery {
 
   """Get ongoing transfers"""
   transfers: [TransferPoint]!
+
+  """Get stats about queued / active transfers"""
+  transferStats: [TransferStats]!
 
   """Get local messages in the mpool"""
   mpool(local: Boolean!): [MpoolMessage]!

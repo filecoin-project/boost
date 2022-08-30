@@ -279,3 +279,64 @@ func (tl *transferLimiter) setBytes(dealUuid uuid.UUID, bytes uint64) {
 		xfer.bytes = bytes
 	}
 }
+
+func (tl *transferLimiter) isStalled(dealUuid uuid.UUID) bool {
+	now := time.Now()
+
+	tl.lk.RLock()
+	defer tl.lk.RUnlock()
+
+	xfer, ok := tl.xfers[dealUuid]
+	if !ok {
+		return false
+	}
+
+	if !xfer.isStarted() {
+		return false
+	}
+
+	return now.Sub(xfer.updatedAt) >= tl.cfg.StallTimeout
+}
+
+type HostTransferStats struct {
+	Host    string
+	Total   int
+	Started int
+	Stalled int
+}
+
+func (tl *transferLimiter) stats() []*HostTransferStats {
+	now := time.Now()
+
+	tl.lk.RLock()
+	defer tl.lk.RUnlock()
+
+	// Count the number of transfers, started and stalled per host
+	stats := make(map[string]*HostTransferStats)
+	for _, xfer := range tl.xfers {
+		hostStats, ok := stats[xfer.host]
+		if !ok {
+			hostStats = &HostTransferStats{Host: xfer.host}
+			stats[xfer.host] = hostStats
+		}
+
+		hostStats.Total++
+		if !xfer.isStarted() {
+			continue
+		}
+		hostStats.Started++
+		if now.Sub(xfer.updatedAt) >= tl.cfg.StallTimeout {
+			hostStats.Stalled++
+		}
+	}
+
+	// Sort the stats by host
+	statsArr := make([]*HostTransferStats, 0, len(stats))
+	for _, s := range stats {
+		statsArr = append(statsArr, s)
+	}
+	sort.Slice(statsArr, func(i, j int) bool {
+		return statsArr[i].Host < statsArr[j].Host
+	})
+	return statsArr
+}

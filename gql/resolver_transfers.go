@@ -55,3 +55,25 @@ func (r *resolver) Transfers(_ context.Context) ([]*transferPoint, error) {
 
 	return pts, nil
 }
+
+type hostTransferStats struct {
+	Host    string
+	Total   int32
+	Started int32
+	Stalled int32
+}
+
+// query: transferStats: TransferStats
+func (r *resolver) TransferStats(_ context.Context) []*hostTransferStats {
+	stats := r.provider.TransferStats()
+	sqlStats := make([]*hostTransferStats, 0, len(stats))
+	for _, s := range stats {
+		sqlStats = append(sqlStats, &hostTransferStats{
+			Host:    s.Host,
+			Total:   int32(s.Total),
+			Started: int32(s.Started),
+			Stalled: int32(s.Stalled),
+		})
+	}
+	return sqlStats
+}

@@ -8,13 +8,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// Keep up to 60s of samples
+// Keep up to 20s of samples
 const maxSamples = 20
-
-// Transfers returns a map of active transfers, sampled for up to 60s
-func (p *Provider) Transfers() map[uuid.UUID][]transferPoint {
-	return p.transfers.transfers()
-}
 
 // A sample of the number of bytes transferred at the given time
 type transferPoint struct {
@@ -116,7 +111,7 @@ func (dt *dealTransfers) sample(now time.Time) {
 
 		// If the maximum number of samples has been reached
 		if len(points) > maxSamples {
-			// If the transfer has been inactive for 60s, delete the samples
+			// If the transfer has been inactive for 20s, delete the samples
 			if points[0].Bytes == points[len(points)-1].Bytes {
 				delete(dt.samples, dealUUID)
 				continue
@@ -143,6 +138,28 @@ func (dt *dealTransfers) transfers() map[uuid.UUID][]transferPoint {
 	return deals
 }
 
+// Get the number of bytes transferred in the last sampleCount samples
+func (dt *dealTransfers) transferredIn(dealUUID uuid.UUID, sampleCount int) uint64 {
+	dt.samplesLk.RLock()
+	defer dt.samplesLk.RUnlock()
+
+	pts, ok := dt.samples[dealUUID]
+	if !ok {
+		return 0
+	}
+
+	// Sum the number of bytes transferred in the last sampleCount samples
+	var sum uint64
+	for i := 0; i < sampleCount; i++ {
+		idx := len(pts) - 1 - i
+		if idx < 0 {
+			return sum
+		}
+		sum += pts[idx].Bytes
+	}
+	return sum
+}
+
 func (dt *dealTransfers) setBytes(dealUUID uuid.UUID, bytes uint64) {
 	dt.activeLk.Lock()
 	defer dt.activeLk.Unlock()
@@ -162,4 +179,29 @@ func (dt *dealTransfers) complete(dealUUID uuid.UUID) {
 	defer dt.activeLk.Unlock()
 
 	delete(dt.active, dealUUID)
+}
+
+// Transfers returns a map of active transfers, sampled for up to 20s
+func (p *Provider) Transfers() map[uuid.UUID][]transferPoint {
+	return p.transfers.transfers()
+}
+
+// Get the number of bytes downloaded in total for the given deal
+func (p *Provider) NBytesReceived(dealUuid uuid.UUID) uint64 {
+	return p.transfers.getBytes(dealUuid)
+}
+
+// Get the number of bytes received in the last N seconds for the given deal
+func (p *Provider) NBytesReceivedIn(dealUuid uuid.UUID, seconds int) uint64 {
+	return p.transfers.transferredIn(dealUuid, seconds)
+}
+
+// Indicates if a transfer has been marked as "stalled", ie the transfer is
+// not making any progress
+func (p *Provider) IsTransferStalled(dealUuid uuid.UUID) bool {
+	return p.xferLimiter.isStalled(dealUuid)
+}
+
+func (p *Provider) TransferStats() []*HostTransferStats {
+	return p.xferLimiter.stats()
 }
