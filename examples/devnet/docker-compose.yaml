@@ -33,6 +33,7 @@ services:
      - LOTUS_SEALING_BATCHPRECOMMITS=false
      - LOTUS_SEALING_AGGREGATECOMMITS=false
      - LOTUS_SUBSYSTEMS_ENABLEMARKETS=false
+     - LOTUS_SEALING_WAITDEALSDELAY=1h
     restart: unless-stopped
     logging: *default-logging
     volumes:
