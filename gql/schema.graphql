@@ -59,6 +59,8 @@ type Deal {
   PublishCid: String!
   IsOffline: Boolean!
   Transfer: TransferParams!
+  TransferSamples: [TransferPoint]!
+  IsTransferStalled: Boolean!
   Checkpoint: String!
   CheckpointAt: Time!
   Err: String!
@@ -287,6 +289,19 @@ type TransferPoint {
   Bytes: Uint64!
 }
 
+type HostStats {
+  Host: String!
+  Total: Int!
+  Started: Int!
+  Stalled: Int!
+  TransferSamples: [TransferPoint]!
+}
+
+type TransferStats {
+  HttpMaxConcurrentDownloads: Int!
+  Stats: [HostStats]!
+}
+
 type MpoolMessage {
   From: String!
   To: String!
@@ -376,6 +391,9 @@ type RootQuery {
 
   """Get ongoing transfers"""
   transfers: [TransferPoint]!
+
+  """Get stats about queued / active transfers"""
+  transferStats: TransferStats!
 
   """Get local messages in the mpool"""
   mpool(local: Boolean!): [MpoolMessage]!

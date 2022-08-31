@@ -1,0 +1,23 @@
+.transfer-stats {
+    margin: 1em;
+}
+
+.transfer-stats .config {
+    margin: 2em 0 1em 0;
+}
+
+.transfer-stats table th, .transfer-stats table td {
+    padding: 0.5em 1em;
+}
+
+.transfer-stats table th {
+    text-align: left;
+}
+
+.transfer-stats table td {
+    text-align: right;
+}
+
+.transfer-stats table td.transfer-rate {
+    color: #999999;
+}
