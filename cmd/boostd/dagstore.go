@@ -26,6 +26,7 @@ var dagstoreCmd = &cli.Command{
 		dagstoreListShardsCmd,
 		dagstoreGcCmd,
 		dagstoreDestroyShardCmd,
+		dagstoreLookupCmd,
 	},
 }
 
