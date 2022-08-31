@@ -19,9 +19,9 @@ Compile and install using the instructions at the `Building and installing` sect
 
 To run Boost on your development machine, you will need to set up a devnet:
 
-1. Remove any existing lotus repo and boost repo
+1. Remove any existing Lotus and Boost repositories
 ```
-rm -rf ~/.lotusmarkets && rm -rf ~/.lotus && rm -rf ~/.lotusminer && rm -rf ~/.genesis_sectors
+rm -rf ~/.lotusmarkets ~/.lotus ~/.lotusminer ~/.genesis_sectors
 rm -rf ~/.boost
 ```
 
