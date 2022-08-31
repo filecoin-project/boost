@@ -7,6 +7,10 @@ x-logging:
     max-file: '3'
   driver: json-file
 
+networks:
+  default:
+    name: devnet
+
 services:
   lotus:
     container_name: lotus
