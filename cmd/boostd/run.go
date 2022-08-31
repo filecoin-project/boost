@@ -6,6 +6,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/tracing"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -129,6 +130,12 @@ var runCmd = &cli.Command{
 			return fmt.Errorf("connecting to full node (libp2p): %w", err)
 		}
 
+		// Instantiate the tracer and exporter
+		tracingStopper, err := tracing.New(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to instantiate tracer: %w", err)
+		}
+
 		// Instantiate the boost service JSON RPC handler.
 		handler, err := node.BoostHandler(boostApi, true)
 		if err != nil {
@@ -147,6 +154,7 @@ var runCmd = &cli.Command{
 		finishCh := node.MonitorShutdown(shutdownChan,
 			node.ShutdownHandler{Component: "rpc server", StopFunc: rpcStopper},
 			node.ShutdownHandler{Component: "boost", StopFunc: stop},
+			node.ShutdownHandler{Component: "tracing", StopFunc: tracingStopper},
 		)
 
 		<-finishCh

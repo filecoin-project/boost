@@ -96,6 +96,10 @@ require (
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
 	github.com/whyrusleeping/cbor-gen v0.0.0-20220323183124-98fa8256a799
 	go.opencensus.io v0.23.0
+	go.opentelemetry.io/otel v1.9.0
+	go.opentelemetry.io/otel/exporters/jaeger v1.2.0
+	go.opentelemetry.io/otel/sdk v1.9.0
+	go.opentelemetry.io/otel/trace v1.9.0
 	go.uber.org/atomic v1.9.0
 	go.uber.org/fx v1.15.0
 	go.uber.org/multierr v1.8.0
@@ -103,5 +107,7 @@ require (
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/tools v0.1.11
 	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f
+	google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1 // indirect
+	google.golang.org/grpc v1.46.2 // indirect
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
 )

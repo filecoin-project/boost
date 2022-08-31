@@ -320,7 +320,7 @@ func TestDealRejectedForDuplicateProposal(t *testing.T) {
 		err := td.executeAndSubscribe()
 		require.NoError(t, err)
 
-		pi, err := td.ph.Provider.ExecuteDeal(td.params, "")
+		pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 		require.Contains(t, pi.Reason, "deal proposal is identical")
@@ -328,10 +328,10 @@ func TestDealRejectedForDuplicateProposal(t *testing.T) {
 
 	t.Run("offline", func(t *testing.T) {
 		td := harness.newDealBuilder(t, 1, withOfflineDeal()).withNoOpMinerStub().build()
-		_, err := td.ph.Provider.ExecuteDeal(td.params, "")
+		_, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
 		require.NoError(t, err)
 
-		pi, err := td.ph.Provider.ExecuteDeal(td.params, "")
+		pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 		require.Contains(t, pi.Reason, "deal proposal is identical")
@@ -352,7 +352,7 @@ func TestDealRejectedForDuplicateUuid(t *testing.T) {
 
 		td2 := harness.newDealBuilder(t, 2).withNoOpMinerStub().withBlockingHttpServer().build()
 		td2.params.DealUUID = td.params.DealUUID
-		pi, err := td.ph.Provider.ExecuteDeal(td2.params, "")
+		pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td2.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 		require.Contains(t, pi.Reason, "deal has the same uuid")
@@ -360,12 +360,12 @@ func TestDealRejectedForDuplicateUuid(t *testing.T) {
 
 	t.Run("offline", func(t *testing.T) {
 		td := harness.newDealBuilder(t, 1, withOfflineDeal()).withNoOpMinerStub().build()
-		_, err := td.ph.Provider.ExecuteDeal(td.params, "")
+		_, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
 		require.NoError(t, err)
 
 		td2 := harness.newDealBuilder(t, 2, withOfflineDeal()).withNoOpMinerStub().build()
 		td2.params.DealUUID = td.params.DealUUID
-		pi, err := td.ph.Provider.ExecuteDeal(td2.params, "")
+		pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td2.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 		require.Contains(t, pi.Reason, "deal has the same uuid")
@@ -382,7 +382,7 @@ func TestDealRejectedForInsufficientProviderFunds(t *testing.T) {
 	defer harness.Stop()
 
 	td := harness.newDealBuilder(t, 1).withNoOpMinerStub().withBlockingHttpServer().build()
-	pi, err := td.ph.Provider.ExecuteDeal(td.params, peer.ID(""))
+	pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, peer.ID(""))
 	require.NoError(t, err)
 	require.False(t, pi.Accepted)
 	require.Contains(t, pi.Reason, "insufficient funds")
@@ -398,7 +398,7 @@ func TestDealRejectedForInsufficientProviderStorageSpace(t *testing.T) {
 	defer harness.Stop()
 
 	td := harness.newDealBuilder(t, 1).withNoOpMinerStub().withBlockingHttpServer().build()
-	pi, err := td.ph.Provider.ExecuteDeal(td.params, peer.ID(""))
+	pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, peer.ID(""))
 	require.NoError(t, err)
 	require.False(t, pi.Accepted)
 	require.Contains(t, pi.Reason, "no space left")
@@ -1860,7 +1860,7 @@ type testDeal struct {
 }
 
 func (td *testDeal) executeAndSubscribeImportOfflineDeal() error {
-	pi, err := td.ph.Provider.ImportOfflineDealData(td.params.DealUUID, td.carv2FilePath)
+	pi, err := td.ph.Provider.ImportOfflineDealData(context.Background(), td.params.DealUUID, td.carv2FilePath)
 	if err != nil {
 		return err
 	}
@@ -1878,7 +1878,7 @@ func (td *testDeal) executeAndSubscribeImportOfflineDeal() error {
 }
 
 func (td *testDeal) executeAndSubscribe() error {
-	pi, err := td.ph.Provider.ExecuteDeal(td.params, "")
+	pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
 	if err != nil {
 		return err
 	}
