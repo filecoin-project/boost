@@ -208,20 +208,23 @@ Note also that the provider address is `t01000` and you will need to supply an a
 
 1. Select Lotus version, for example: `lotus_version=1.17.1-rc2`. It must be the tag name of [the Lotus git repo](https://github.com/filecoin-project/lotus/tags) without `v` prefix.
 
-2. Select Boost version, for example: `boost_version=1.3.0-rc1`. Docker images for Boost will be built on the current codebase. The `boost_version` is just used to tag images. If you want to build images for a specific boost version then you have to checkout that version first.
+2. Select Boost version, for example: `boost_version=1.3.0-rc1`.
 
 3. Build images
 
 ```
-cd docker
-make build/all lotus_version=1.17.1-rc2 boost_version=1.3.0-rc1
+cd docker/devnet
+make build/all
 ```
+
+If you need to build a different version, edit the `.env` file.
 
 ### Start devnet docker stack
 
 1. Run
 
 ```
+cd docker/devnet
 docker compose up -d
 ```
 
@@ -263,6 +266,8 @@ To stop containers and drop everything:
 docker compose down --rmi local
 
 rm -rf ./data
+
+rm -rf /var/tmp/filecoin-proof-parameters
 ```
 
 ## License
