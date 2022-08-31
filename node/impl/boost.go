@@ -459,10 +459,6 @@ func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) e
 	if err != nil {
 		return fmt.Errorf("unable to query dagstore for shard info: %w", err)
 	}
-	// If the shard is not registered we would expect ErrShardUnknown
-	if !errors.Is(err, dagstore.ErrShardUnknown) {
-		return fmt.Errorf("shard not found in the dagstore: %w", err)
-	}
 
 	pieceCid, err := cid.Parse(key)
 	if err != nil {
