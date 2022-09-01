@@ -228,6 +228,13 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 			Comment: `Whether to do commp on the Boost node (local) or on the Sealer (remote)`,
 		},
 		{
+			Name: "MaxConcurrentLocalCommp",
+			Type: "uint64",
+
+			Comment: `The maximum number of commp processes to run in parallel on the local
+boost process`,
+		},
+		{
 			Name: "HTTPRetrievalMultiaddr",
 			Type: "string",
 
