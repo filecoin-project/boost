@@ -29,6 +29,7 @@ import (
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
@@ -437,18 +438,60 @@ func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo
 	}
 }
 
-func NewIndexBackedBlockstore(dagst dagstore.Interface, rp retrievalmarket.RetrievalProvider, h host.Host) (dtypes.IndexBackedBlockstore, error) {
+func NewIndexBackedBlockstore(dagst dagstore.Interface, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, rp retrievalmarket.RetrievalProvider, h host.Host) (dtypes.IndexBackedBlockstore, error) {
 	sf := indexbs.ShardSelectorF(func(c cid.Cid, shards []shard.Key) (shard.Key, error) {
 		for _, sk := range shards {
+			// parse piece CID
 			pieceCid, err := cid.Parse(sk.String())
 			if err != nil {
 				return shard.Key{}, fmt.Errorf("failed to parse cid")
 			}
-			b, err := rp.IsFreeAndUnsealed(context.TODO(), c, pieceCid)
+			// read piece info from piece store
+			pieceInfo, err := ps.GetPieceInfo(pieceCid)
 			if err != nil {
-				return shard.Key{}, fmt.Errorf("failed to verify is piece is free and unsealed")
+				return shard.Key{}, fmt.Errorf("failed to get piece info: %w", err)
 			}
-			if b {
+
+			// check if piece is in unsealed sector
+			isUnsealed := false
+			for _, di := range pieceInfo.Deals {
+				isUnsealed, err = sa.IsUnsealed(context.TODO(), di.SectorID, di.Offset.Unpadded(), di.Length.Unpadded())
+				if err != nil {
+					log.Errorf("failed to find out if sector %d is unsealed, err=%s", di.SectorID, err)
+					continue
+				}
+				if isUnsealed {
+					break
+				}
+			}
+
+			// sealed sector, skip
+			if !isUnsealed {
+				continue
+			}
+
+			// The piece is in an unsealed sector
+			// Is it marked for free retrieval ?
+			// we don't pass the payload cid so we can potentially cache on a piece cid basis
+			input := retrievalmarket.PricingInput{
+				// piece from which the payload will be retrieved
+				PieceCID: pieceInfo.PieceCID,
+				Unsealed: true,
+			}
+
+			var dealsIds []abi.DealID
+			for _, d := range pieceInfo.Deals {
+				dealsIds = append(dealsIds, d.DealID)
+			}
+
+			ask, err := rp.GetDynamicAsk(context.TODO(), input, dealsIds)
+			if err != nil {
+				return shard.Key{}, fmt.Errorf("failed to get retrieval ask: %w", err)
+			}
+
+			// if piece is free we found a match
+			// otherwise, go to the next shard
+			if ask.PricePerByte.NilOrZero() {
 				return sk, nil
 			}
 		}
