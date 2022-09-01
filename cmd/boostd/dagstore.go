@@ -313,9 +313,10 @@ var dagstoreDestroyShardCmd = &cli.Command{
 }
 
 var dagstoreLookupCmd = &cli.Command{
-	Name:      "lookup-cid",
+	Name:      "lookup-piece-cid",
 	ArgsUsage: "[key]",
 	Usage:     "Performs a reverse lookup with payload CID to get Piece CID",
+	Aliases:   []string{"lpc"},
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:        "color",
