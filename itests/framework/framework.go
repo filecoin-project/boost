@@ -59,12 +59,8 @@ import (
 	unixfile "github.com/ipfs/go-unixfs/file"
 	"github.com/ipld/go-car"
 	"github.com/libp2p/go-libp2p"
-<<<<<<< HEAD
-	"github.com/libp2p/go-libp2p/core/host"
-=======
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/multiformats/go-multihash"
->>>>>>> 108ee6c (fix: cleanup test & handle identity roots)
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
