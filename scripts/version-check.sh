@@ -37,3 +37,4 @@ if [[ ! -z "${CIRCLE_TAG}" ]]; then
 else
   echo "No CI tag found. Skipping version check."
 fi
+
