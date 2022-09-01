@@ -106,10 +106,22 @@ services:
       - --config.file=/etc/prometheus.yaml
       - --web.enable-remote-write-receiver
       - --enable-feature=exemplar-storage
+    logging: *default-logging
     volumes:
       - ../../build/devnet/tempo/prometheus.yaml:/etc/prometheus.yaml
     ports:
       - "9090:9090"
+
+  loki:
+    container_name: loki
+    image: grafana/loki:2.6.1
+    command:
+      - -config.file=/etc/loki/local-config.yaml
+      - -table-manager.retention-period=1d
+      - -table-manager.retention-deletes-enabled=true
+    logging: *default-logging
+    ports:
+      - "3100:3100"
 
   grafana:
     container_name: grafana

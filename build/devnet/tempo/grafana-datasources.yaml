@@ -10,6 +10,28 @@ datasources:
   isDefault: false
   version: 1
   editable: false
+  jsonData:
+    httpMethod: GET
+    exemplarTraceIdDestinations:
+    - name: traceID
+      datasourceUid: tempo
+- name: Loki
+  type: loki
+  uid: loki
+  access: proxy
+  orgId: 1
+  url: http://loki:3100
+  basicAuth: false
+  isDefault: false
+  version: 1
+  editable: true
+  apiVersion: 1
+  jsonData:
+    derivedFields:
+      - name: TraceID
+        datasourceUid: tempo
+        matcherRegex: (?:traceID|trace_id)=(\w+)
+        url: $${__value.raw}
 - name: Tempo
   type: tempo
   access: proxy
@@ -21,3 +43,8 @@ datasources:
   editable: false
   apiVersion: 1
   uid: tempo
+  jsonData:
+    httpMethod: GET
+    tracesToLogs:
+      datasourceUid: 'loki'
+      tags: ['job', 'instance', 'pod', 'namespace']

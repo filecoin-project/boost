@@ -115,6 +115,10 @@ func (sm *BoostAPI) ServeRemote(perm bool) func(w http.ResponseWriter, r *http.R
 }
 
 func (sm *BoostAPI) BoostDummyDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
+	// TODO: Use a middleware function that wraps the entire api implementation for all RPC calls
+	// Testing for now until a middleware function is created
+	ctx, span := tracing.Tracer.Start(ctx, "BoostDummyDeal")
+	defer span.End()
 	return sm.StorageProvider.ExecuteDeal(&params, "dummy")
 }
 
@@ -122,6 +126,8 @@ func (sm *BoostAPI) BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*types.P
 	// TODO: Use a middleware function that wraps the entire api implementation for all RPC calls
 	// Testing for now until a middleware function is created
 	ctx, span := tracing.Tracer.Start(ctx, "BoostDeal")
+	traceId := span.SpanContext().TraceID()
+	log.Info("msg", "getting deal", "traceID", traceId)
 	defer span.End()
 	span.SetAttributes(attribute.String("dealUuid", dealUuid.String())) // Example of adding additional attributes
 
