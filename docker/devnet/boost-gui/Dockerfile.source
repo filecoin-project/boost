@@ -1,0 +1,38 @@
+#########################################################################################
+## docker will invoke this file from ../../.. dir in order to access the code
+#########################################################################################
+FROM node:16.16-alpine3.15 AS builder
+
+WORKDIR /build/react
+COPY react/package.json react/package-lock.json /build/react/
+
+#TODO remove force after fixing npm dependencies 
+RUN npm install --force 
+
+COPY react /build/react
+COPY gql /build/gql
+
+RUN npm run build
+#####################################################################################
+FROM nginx:1.23-alpine
+
+ARG BUILD_VERSION=0.1
+
+LABEL org.opencontainers.image.version=$BUILD_VERSION \
+      org.opencontainers.image.authors="Boost Dev Team" \
+      name="boost-gui" \
+      maintainer="Boost Dev Team" \
+      vendor="Boost Dev Team" \
+      version=$BUILD_VERSION \
+      release=$BUILD_VERSION \
+      summary="This image is used to host the boost-gui service" \
+      description="This image is used to host the boost-gui service" 
+
+EXPOSE 8000
+ENV BOOST_URL=http://boost:8080
+
+COPY --from=builder /build/react/build usr/share/nginx/html
+COPY build/devnet/boost-gui/nginx.conf.in /app/nginx.conf.in
+COPY build/devnet/boost-gui/entrypoint.sh /app/entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]

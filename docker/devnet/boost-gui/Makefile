@@ -5,7 +5,7 @@ version=$(boost_version)
 tag=$(service):$(version)
 
 dbuild: 
-	docker build -t $(tag) --build-arg BUILD_VERSION=$(version) .
+	docker build -t $(tag) -f Dockerfile.source --build-arg BUILD_VERSION=$(version) .
 
 dpush: dbuild
 	docker push $(tag)

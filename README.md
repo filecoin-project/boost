@@ -236,6 +236,25 @@ The initial setup could take up to 20 min or more as it needs to download Fileco
 
 You can inspect the status using `docker compose logs -f`.
 
+### Start monitoring docker stack
+
+```
+docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+
+cd docker/monitoring
+docker compose up -d
+```
+
+### Connect monitoring stack to devnet stack
+
+```
+docker network connect devnet tempo
+```
+
+### Explore Grafana / Tempo and search for traces
+
+http://localhost:3000
+
 ### Making a deal
 
 The `boost` container is packed with `boost` and `lotus` clients. You can connect to the container with the command `docker compose exec boost /bin/bash` and follow instructions for [storing files with Boost guide](https://boost.filecoin.io/tutorials/how-to-store-files-with-boost-on-filecoin). But the recommended startup is to follow the semi-interactive demo first:
