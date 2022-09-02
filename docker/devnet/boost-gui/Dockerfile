@@ -2,16 +2,14 @@
 #########################################################################################
 FROM node:16.16-alpine3.15 AS builder
 
-RUN apk --no-cache --update add git
-
 ARG BUILD_VERSION=0.1
-WORKDIR /src
-RUN git clone --depth 1 --branch v${BUILD_VERSION} https://github.com/filecoin-project/boost 
+WORKDIR /src/react
 
-WORKDIR /src/boost/react
+COPY react /src/react
+COPY gql /src/gql
 
 #TODO remove force after fixing npm dependencies 
-RUN npm install --force 
+RUN npm ci --force 
 
 RUN npm run build
 #####################################################################################
@@ -32,8 +30,8 @@ LABEL org.opencontainers.image.version=$BUILD_VERSION \
 EXPOSE 8000
 ENV BOOST_URL=http://boost:8080
 
-COPY --from=builder /src/boost/react/build usr/share/nginx/html
-COPY nginx.conf.in /app/nginx.conf.in
-COPY entrypoint.sh /app/entrypoint.sh
+COPY --from=builder /src/react/build usr/share/nginx/html
+COPY docker/devnet/boost-gui/nginx.conf.in /app/nginx.conf.in
+COPY docker/devnet/boost-gui/entrypoint.sh /app/entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
