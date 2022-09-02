@@ -14,6 +14,8 @@ prepare/lotus-test: | lotus-$(lotus_version)
 ##################################################################################
 build/%: prepare/lotus-test
 	cd $* && make dbuild
+build/boost:
+	cd boost && make dbuild
 push/%: prepare/lotus-test
 	cd $* && make dpush	
 ##################################################################################

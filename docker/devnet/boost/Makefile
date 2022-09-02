@@ -1,12 +1,13 @@
 #####################################################################################
 service=$(docker_user)/boost-dev
-version=$(boost_version)
+version=dev
 ########### DOCKER ##################################################################
 tag=$(service):$(version)
+rootdir=$(realpath .)
 
 dbuild: 
-	docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image)  --build-arg BUILD_VERSION=$(version) \
-		-t $(tag) .
+	docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image) \
+		-t $(tag) -f Dockerfile.source $(rootdir)/../../../
 
 dpush: dbuild
 	docker push $(tag)
