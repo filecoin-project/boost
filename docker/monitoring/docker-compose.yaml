@@ -14,7 +14,7 @@ services:
       - ./overrides.yaml:/etc/overrides.yaml
       - ./tempo-data:/tmp/tempo
     ports:
-      - "14268"  # jaeger ingest
+      - "14268:14268"  # jaeger ingest
     logging:
       driver: loki
       options:
@@ -60,7 +60,7 @@ services:
       #- GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       #- GF_AUTH_DISABLE_LOGIN_FORM=true
     ports:
-      - "3000:3000"
+      - "3333:3000"
     logging:
       driver: loki
       options:

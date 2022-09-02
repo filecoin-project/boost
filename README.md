@@ -253,7 +253,7 @@ docker network connect devnet tempo
 
 ### Explore Grafana / Tempo and search for traces
 
-http://localhost:3000
+http://localhost:3333
 
 ### Making a deal
 
