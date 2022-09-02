@@ -12,14 +12,12 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"go.opencensus.io/tag"
-	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node/impl"
-	"github.com/filecoin-project/boost/tracing"
 
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/metrics/proxy"
@@ -62,12 +60,6 @@ func ServeRPC(h http.Handler, id string, addr multiaddr.Multiaddr) (StopFunc, er
 
 // BoostHandler returns a boost service handler, to be mounted as-is on the server.
 func BoostHandler(a api.Boost, permissioned bool) (http.Handler, error) {
-	_, span := tracing.Tracer.Start(context.Background(), "BoostHandler")
-	traceId := span.SpanContext().TraceID()
-	log.Info("msg", "returning boost handler", "traceID", traceId)
-	defer span.End()
-	span.SetAttributes(attribute.String("additional_attribute", "test")) // Example of adding additional attributes
-
 	m := mux.NewRouter()
 
 	mapi := proxy.MetricedBoostAPI(a)

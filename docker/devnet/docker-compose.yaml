@@ -85,52 +85,11 @@ services:
     volumes:
      - ./data/sample:/usr/share/nginx/html:ro
 
-  tempo:
-    container_name: tempo
-    image: grafana/tempo:latest
-    command: [ "-config.file=/etc/tempo.yaml" ]
-    volumes:
-      - ../../build/devnet/tempo/tempo-local.yaml:/etc/tempo.yaml
-      - ./tempo-data:/tmp/tempo
+  jaeger:
+    container_name: jaeger
+    image: jaegertracing/all-in-one:1.37
     ports:
-      - "14268:14268"  # jaeger ingest
-      - "3200:3200"   # tempo
-      - "4317:4317"  # otlp grpc
-      - "4318:4318"  # otlp http
-      - "9411:9411"   # zipkin
-
-  prometheus:
-    container_name: prometheus
-    image: prom/prometheus:latest
-    command:
-      - --config.file=/etc/prometheus.yaml
-      - --web.enable-remote-write-receiver
-      - --enable-feature=exemplar-storage
-    logging: *default-logging
-    volumes:
-      - ../../build/devnet/tempo/prometheus.yaml:/etc/prometheus.yaml
-    ports:
-      - "9090:9090"
-
-  loki:
-    container_name: loki
-    image: grafana/loki:2.6.1
-    command:
-      - -config.file=/etc/loki/local-config.yaml
-      - -table-manager.retention-period=1d
-      - -table-manager.retention-deletes-enabled=true
-    logging: *default-logging
-    ports:
-      - "3100:3100"
-
-  grafana:
-    container_name: grafana
-    image: grafana/grafana:8.1.6
-    volumes:
-      - ../../build/devnet/tempo/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - "16686:16686"
+      - "4318:4318"
     environment:
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-      - GF_AUTH_DISABLE_LOGIN_FORM=true
-    ports:
-      - "3000:3000"  
+      - COLLECTOR_OLTP_ENABLED=true
