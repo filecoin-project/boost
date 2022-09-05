@@ -39,6 +39,7 @@ func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
 // generatePieceCommitment generates commp either locally or remotely,
 // depending on config, and pads it as necessary to match the piece size.
 func (p *Provider) generatePieceCommitment(filepath string, pieceSize abi.PaddedPieceSize) (cid.Cid, *dealMakingError) {
+	// Check whether to send commp to a remote process or do it locally
 	var pi *abi.PieceInfo
 	if p.config.RemoteCommp {
 		var err *dealMakingError
@@ -48,6 +49,10 @@ func (p *Provider) generatePieceCommitment(filepath string, pieceSize abi.Padded
 			return cid.Undef, err
 		}
 	} else {
+		// Throttle the number of processes that can do local commp in parallel
+		p.commpThrottle <- struct{}{}
+		defer func() { <-p.commpThrottle }()
+
 		var err error
 		pi, err = GenerateCommP(filepath)
 		if err != nil {

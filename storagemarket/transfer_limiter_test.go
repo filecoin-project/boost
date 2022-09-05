@@ -362,8 +362,7 @@ func TestTransferLimiterStalledTransferHardLimited(t *testing.T) {
 	deal3.ClientPeerID = deal1.ClientPeerID
 
 	go func() {
-		err := tl.waitInQueue(ctx, deal3)
-		require.NoError(t, err)
+		tl.waitInQueue(ctx, deal3) //nolint:errcheck
 		started <- struct{}{}
 	}()
 

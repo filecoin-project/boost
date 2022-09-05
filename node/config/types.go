@@ -166,6 +166,9 @@ type DealmakingConfig struct {
 
 	// Whether to do commp on the Boost node (local) or on the Sealer (remote)
 	RemoteCommp bool
+	// The maximum number of commp processes to run in parallel on the local
+	// boost process
+	MaxConcurrentLocalCommp uint64
 
 	// The public multi-address for retrieving deals with booster-http.
 	// Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https

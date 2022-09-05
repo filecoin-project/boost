@@ -54,8 +54,10 @@ type Config struct {
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration time.Duration
 	// Whether to do commp on the Boost node (local) or the sealing node (remote)
-	RemoteCommp     bool
-	TransferLimiter TransferLimiterConfig
+	RemoteCommp bool
+	// The number of commp processes that can run in parallel
+	MaxConcurrentLocalCommp uint64
+	TransferLimiter         TransferLimiterConfig
 }
 
 var log = logging.Logger("boost-provider")
@@ -99,6 +101,7 @@ type Provider struct {
 	transfers      *dealTransfers
 
 	pieceAdder                  types.PieceAdder
+	commpThrottle               chan struct{}
 	commpCalc                   smtypes.CommpCalculator
 	maxDealCollateralMultiplier uint64
 	chainDealManager            types.ChainDealManager
@@ -135,6 +138,11 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Make sure that max concurrent local commp is at least 1
+	if cfg.MaxConcurrentLocalCommp == 0 {
+		cfg.MaxConcurrentLocalCommp = 1
+	}
+
 	return &Provider{
 		ctx:       ctx,
 		cancel:    cancel,
@@ -161,6 +169,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		dealPublisher:               dp,
 		fullnodeApi:                 fullnodeApi,
 		pieceAdder:                  pa,
+		commpThrottle:               make(chan struct{}, cfg.MaxConcurrentLocalCommp),
 		commpCalc:                   commpCalc,
 		chainDealManager:            cm,
 		maxDealCollateralMultiplier: 2,
