@@ -72,3 +72,4 @@ fi
 
 echo Starting boost in dev mode...
 exec boostd -vv run
+
