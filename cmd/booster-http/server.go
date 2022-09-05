@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
@@ -46,7 +47,7 @@ type HttpServer struct {
 }
 
 type HttpServerApi interface {
-	PiecesContainingMultihash(mh multihash.Multihash) ([]cid.Cid, error)
+	PiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error)
 	GetMaxPieceOffset(pieceCid cid.Cid) (uint64, error)
 	GetPieceInfo(pieceCID cid.Cid) (*piecestore.PieceInfo, error)
 	IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error)
@@ -147,6 +148,9 @@ func (s *HttpServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) {
+	ctx, span := tracing.Tracer.Start(r.Context(), "http.payload_cid")
+	defer span.End()
+
 	// Remove the path up to the payload cid
 	prefixLen := len(s.payloadBasePath())
 	if len(r.URL.Path) <= prefixLen {
@@ -166,7 +170,7 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Find all the pieces that contain the payload cid
-	pieces, err := s.api.PiecesContainingMultihash(payloadCid.Hash())
+	pieces, err := s.api.PiecesContainingMultihash(ctx, payloadCid.Hash())
 	if err != nil {
 		if isNotFoundError(err) {
 			msg := fmt.Sprintf("getting piece that contains payload CID '%s': %s", payloadCid, err.Error())
@@ -182,7 +186,6 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 	// Just get the content of the first piece returned (if the client wants a
 	// different piece they can just call the /piece endpoint)
 	pieceCid := pieces[0]
-	ctx := r.Context()
 	content, err := s.getPieceContent(ctx, pieceCid)
 	if err == nil && isCar {
 		content, err = s.getCarContent(pieceCid, content)

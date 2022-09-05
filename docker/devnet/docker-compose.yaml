@@ -32,55 +32,32 @@ services:
     # ports:
     #   - "2345:2345"
     environment:
-     - LOTUS_API_LISTENADDRESS=/dns/lotus-miner/tcp/2345/http
-     - LOTUS_API_REMOTELISTENADDRESS=lotus-miner:2345
-     - LOTUS_SEALING_BATCHPRECOMMITS=false
-     - LOTUS_SEALING_AGGREGATECOMMITS=false
-     - LOTUS_SUBSYSTEMS_ENABLEMARKETS=false
-     - LOTUS_SEALING_WAITDEALSDELAY=20s
+      - LOTUS_API_LISTENADDRESS=/dns/lotus-miner/tcp/2345/http
+      - LOTUS_API_REMOTELISTENADDRESS=lotus-miner:2345
+      - LOTUS_SEALING_BATCHPRECOMMITS=false
+      - LOTUS_SEALING_AGGREGATECOMMITS=false
+      - LOTUS_SUBSYSTEMS_ENABLEMARKETS=false
+      - LOTUS_SEALING_WAITDEALSDELAY=20s
     restart: unless-stopped
     logging: *default-logging
     volumes:
-     - ./data/lotus-miner:/var/lib/lotus-miner:rw
-     - ./data/lotus:/var/lib/lotus:ro
-     - ./data/genesis:/var/lib/genesis:ro
-     - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters:rw  
+      - ./data/lotus-miner:/var/lib/lotus-miner:rw
+      - ./data/lotus:/var/lib/lotus:ro
+      - ./data/genesis:/var/lib/genesis:ro
+      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters:rw
 
   boost:
     container_name: boost
     image: ${BOOST_IMAGE}
-    # ports:
-    #   - "8080:8080"
-    environment:
-     - LOTUS_PATH=/var/lib/lotus
-     - LOTUS_MINER_PATH=/var/lib/lotus-miner
-    restart: unless-stopped
-    logging: *default-logging
-    volumes:
-     - ./data/boost:/var/lib/boost:rw
-     - ./data/lotus:/var/lib/lotus:ro
-     - ./data/lotus-miner:/var/lib/lotus-miner:ro
-     - ./data/sample:/app/public:rw  
-
-  boost-gui:
-    container_name: boost-gui
-    image: ${BOOST_GUI_IMAGE}
     ports:
-      - "8000:8000"
+      - "8080:8080"
     environment:
-     - BOOST_URL=http://boost:8080
-    healthcheck: # try reloading nginx configuration if IP of the boost container changes
-      test: "nc -zv boost 8080 &> curr.ip && ( cmp curr.ip prev.ip || ( cp curr.ip prev.ip && kill -1 1 ))"
-      interval: "20s" 
-    restart: unless-stopped
-    logging: *default-logging
-
-  demo-http-server:
-    container_name: demo-http-server
-    image: nginx:1.23-alpine
-    # ports:
-    #   - "8001:80"
+      - LOTUS_PATH=/var/lib/lotus
+      - LOTUS_MINER_PATH=/var/lib/lotus-miner
     restart: unless-stopped
     logging: *default-logging
     volumes:
-     - ./data/sample:/usr/share/nginx/html:ro  
+      - ./data/boost:/var/lib/boost:rw
+      - ./data/lotus:/var/lib/lotus:ro
+      - ./data/lotus-miner:/var/lib/lotus-miner:ro
+      - ./data/sample:/app/public:rw

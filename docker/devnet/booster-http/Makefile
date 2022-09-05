@@ -1,12 +1,13 @@
 #####################################################################################
-service=$(docker_user)/boost-gui
+service=$(docker_user)/booster-http-dev
 version=dev
 ########### DOCKER ##################################################################
 tag=$(service):$(version)
 rootdir=$(realpath .)
 
 dbuild: 
-	docker build -t $(tag) -f Dockerfile.source --build-arg BUILD_VERSION=$(version) $(rootdir)/../../../
+	docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image) \
+		-t $(tag) -f Dockerfile.source $(rootdir)/../../../
 
 dpush: dbuild
 	docker push $(tag)

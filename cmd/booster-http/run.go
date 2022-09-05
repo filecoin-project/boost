@@ -210,8 +210,8 @@ type serverApi struct {
 
 var _ HttpServerApi = (*serverApi)(nil)
 
-func (s serverApi) PiecesContainingMultihash(mh multihash.Multihash) ([]cid.Cid, error) {
-	return s.bapi.BoostDagstorePiecesContainingMultihash(s.ctx, mh)
+func (s serverApi) PiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
+	return s.bapi.BoostDagstorePiecesContainingMultihash(ctx, mh)
 }
 
 func (s serverApi) GetMaxPieceOffset(pieceCid cid.Cid) (uint64, error) {
