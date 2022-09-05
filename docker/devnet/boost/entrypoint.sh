@@ -70,9 +70,6 @@ if [ ! -f $BOOST_PATH/.register.boost ]; then
 	echo Super. DONE! Boostd is now configured and will be started soon
 fi
 
-echo Starting booster-http...
-booster-http run --api-boost=$BOOST_API_INFO --api-fullnode=$FULLNODE_API_INFO --api-sealer=$MINER_API_INFO &
-
 echo Starting boost in dev mode...
 exec boostd -vv run
 
