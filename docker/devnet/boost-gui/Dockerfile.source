@@ -32,7 +32,7 @@ EXPOSE 8000
 ENV BOOST_URL=http://boost:8080
 
 COPY --from=builder /build/react/build usr/share/nginx/html
-COPY build/devnet/boost-gui/nginx.conf.in /app/nginx.conf.in
-COPY build/devnet/boost-gui/entrypoint.sh /app/entrypoint.sh
+COPY docker/devnet/boost-gui/nginx.conf.in /app/nginx.conf.in
+COPY docker/devnet/boost-gui/entrypoint.sh /app/entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
