@@ -131,7 +131,7 @@ var runCmd = &cli.Command{
 		}
 
 		// Instantiate the tracer and exporter
-		tracingStopper, err := tracing.New(ctx)
+		tracingStopper, err := tracing.New(ctx, "boostd")
 		if err != nil {
 			return fmt.Errorf("failed to instantiate tracer: %w", err)
 		}

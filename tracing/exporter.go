@@ -10,13 +10,9 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 )
 
-const (
-	service = "boostd"
-)
-
 // Registers a Tracer provider globally and returns it's shutdown function
-func New(ctx context.Context) (func(context.Context) error, error) {
-	provider, err := tracerProvider("http://tempo:14268/api/traces")
+func New(ctx context.Context, service string) (func(context.Context) error, error) {
+	provider, err := tracerProvider("http://tempo:14268/api/traces", service)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +27,7 @@ func New(ctx context.Context) (func(context.Context) error, error) {
 // the Jaeger exporter that will send spans to the provided url. The returned
 // TracerProvider will also use a Resource configured with all the information
 // about the application.
-func tracerProvider(url string) (*sdktrace.TracerProvider, error) {
+func tracerProvider(url, service string) (*sdktrace.TracerProvider, error) {
 	// Create the Jaeger exporter
 	exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(url)))
 	if err != nil {

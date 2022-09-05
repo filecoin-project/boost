@@ -11,6 +11,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	bclient "github.com/filecoin-project/boost/api/client"
 	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-jsonrpc"
@@ -111,6 +112,12 @@ var runCmd = &cli.Command{
 		}
 		defer storageCloser()
 
+		// Instantiate the tracer and exporter
+		tracingStopper, err := tracing.New(ctx, "booster-http")
+		if err != nil {
+			return fmt.Errorf("failed to instantiate tracer: %w", err)
+		}
+
 		maddr, err := storageService.ActorAddress(ctx)
 		if err != nil {
 			return fmt.Errorf("getting miner actor address: %w", err)
@@ -175,6 +182,11 @@ var runCmd = &cli.Command{
 
 		// Sync all loggers.
 		_ = log.Sync() //nolint:errcheck
+
+		err = tracingStopper(ctx)
+		if err != nil {
+			return err
+		}
 
 		return nil
 	},
