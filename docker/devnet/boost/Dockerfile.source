@@ -20,10 +20,30 @@ RUN apt update && apt install -y \
 
 WORKDIR /go/src/
 
-# copy src
-COPY . /go/src/
+COPY Makefile /go/src/
+##############################################
+# prebuild filecoin-ffi
+COPY extern /go/src/extern
+COPY build /go/src/build
+COPY .git/modules/extern/filecoin-ffi /go/src/.git/modules/extern/filecoin-ffi
 
-RUN make debug
+RUN make build/.filecoin-install
+##############################################
+# download go dependencies
+COPY go.mod go.sum /go/src/
+RUN go mod download
+##############################################
+##############################################
+#COPY . /go/src
+
+# we need to copy all source except build/ and extern/
+# docker does not allow to do it easy, we can write docker COPY for each dir, 
+# but there are a lot of dirs and may be added new ones
+COPY . /tmp/src
+RUN rm -rf /tmp/src/build /tmp/src/extern /tmp/src/docker /tmp/src/boost*
+RUN cp -r /tmp/src/* /tmp/src/.git /go/src/ 
+##############################################
+RUN --mount=type=cache,target=/root/.cache/go-build make debug
 #########################################################################################
 FROM ubuntu:20.04 as runner
 
@@ -49,13 +69,15 @@ ENV BOOST_PATH /var/lib/boost
 VOLUME /var/lib/boost
 EXPOSE 8080  
 
+## Fix missing lib libhwloc.so.5
+RUN ls -1 /lib/*/libhwloc.so.* | head -n 1 | xargs -n1 -I {} ln -s {} /lib/libhwloc.so.5
+
+COPY --from=lotus-dev /usr/local/bin/lotus /usr/local/bin/
+COPY --from=lotus-dev /usr/local/bin/lotus-miner /usr/local/bin/
+
 COPY --from=builder /go/src/boostd /usr/local/bin/
 COPY --from=builder /go/src/boost /usr/local/bin/
 COPY --from=builder /go/src/boostx /usr/local/bin/
-COPY --from=lotus-dev /usr/local/bin/lotus /usr/local/bin/
-COPY --from=lotus-dev /usr/local/bin/lotus-miner /usr/local/bin/
-## Fix missing lib libhwloc.so.5
-RUN ls -1 /lib/x86_64-linux-gnu/libhwloc.so.* | head -n 1 | xargs -n1 -I {} ln -s {} /lib/x86_64-linux-gnu/libhwloc.so.5
 ## Smoke test for the boost and lotus
 RUN lotus -v && boost -v 
 
