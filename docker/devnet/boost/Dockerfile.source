@@ -33,15 +33,7 @@ RUN make build/.filecoin-install
 COPY go.mod go.sum /go/src/
 RUN go mod download
 ##############################################
-##############################################
-#COPY . /go/src
-
-# we need to copy all source except build/ and extern/
-# docker does not allow to do it easy, we can write docker COPY for each dir, 
-# but there are a lot of dirs and may be added new ones
-COPY . /tmp/src
-RUN rm -rf /tmp/src/build /tmp/src/extern /tmp/src/docker /tmp/src/boost*
-RUN cp -r /tmp/src/* /tmp/src/.git /go/src/ 
+COPY . /go/src
 ##############################################
 RUN --mount=type=cache,target=/root/.cache/go-build make debug
 #########################################################################################
