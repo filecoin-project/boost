@@ -3,7 +3,9 @@ package tracing
 import (
 	"context"
 
+	octrace "go.opencensus.io/trace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/bridge/opencensus"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -19,6 +21,11 @@ func New(ctx context.Context, service string) (func(context.Context) error, erro
 
 	// Sets the global Tracer provider
 	otel.SetTracerProvider(provider)
+
+	// Opencensus bridge so that older OC spans are compatible with OT
+	// This is specifically to support capturing traces in contexts provided to go-jsonrpc,
+	// as it creates spans with OC instead of OT
+	octrace.DefaultTracer = opencensus.NewTracer(Tracer)
 
 	return provider.Shutdown, nil
 }
