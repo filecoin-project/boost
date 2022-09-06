@@ -29,13 +29,11 @@ COPY .git/modules/extern/filecoin-ffi /go/src/.git/modules/extern/filecoin-ffi
 
 RUN make build/.filecoin-install
 ##############################################
-# download go dependencies
-COPY go.mod go.sum /go/src/
-RUN go mod download
-##############################################
 COPY . /go/src
 ##############################################
-RUN --mount=type=cache,target=/root/.cache/go-build make debug
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+      make debug
 #########################################################################################
 FROM ubuntu:20.04 as runner
 
