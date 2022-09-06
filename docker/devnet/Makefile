@@ -19,10 +19,10 @@ build/boost:
 push/%: prepare/lotus-test
 	cd $* && make dpush	
 ##################################################################################
-build/all: build/lotus build/lotus-miner build/boost build/boost-gui
+build/all: build/lotus build/lotus-miner build/boost build/boost-gui build/booster-http
 .PHONY: build/all
 ##################################################################################
-push/all: push/lotus push/lotus-miner push/boost push/boost-gui
+push/all: push/lotus push/lotus-miner push/boost push/boost-gui push/booster-http
 .PHONY: push/all
 ##################################################################################
 clean: clean/lotus-test
