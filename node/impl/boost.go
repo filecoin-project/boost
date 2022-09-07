@@ -195,6 +195,10 @@ func (sm *BoostAPI) BoostDagstoreListShards(ctx context.Context) ([]api.Dagstore
 }
 
 func (sm *BoostAPI) BoostDagstorePiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "Boost.BoostDagstorePiecesContainingMultihash")
+	span.SetAttributes(attribute.String("multihash", mh.String()))
+	defer span.End()
+
 	if sm.DAGStore == nil {
 		return nil, fmt.Errorf("dagstore not available on this node")
 	}
