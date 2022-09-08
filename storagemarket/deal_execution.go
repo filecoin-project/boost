@@ -111,15 +111,16 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) *d
 		return derr
 	}
 
-	p.dealLogger.Infow(deal.DealUuid, "deal execution completed successfully")
 	// deal has been sent for sealing -> we can cleanup the deal state now and simply watch the deal on chain
 	// to wait for deal completion/slashing and update the state in DB accordingly.
 	p.cleanupDeal(deal)
 	p.dealLogger.Infow(deal.DealUuid, "finished deal cleanup after successful execution")
 
 	// Watch the sealing status of the deal and fire events for each change
+	p.dealLogger.Infow(deal.DealUuid, "watching deal sealing state changes")
 	p.fireSealingUpdateEvents(dh, deal.DealUuid, deal.SectorID)
 	p.cleanupDealHandler(deal.DealUuid)
+	p.dealLogger.Infow(deal.DealUuid, "deal sealing reached termination state")
 
 	// TODO
 	// Watch deal on chain and change state in DB and emit notifications.
@@ -632,6 +633,7 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 				return si.State
 			}
 
+			p.dealLogger.Infow(dealUuid, "sealing state: %s", si.State)
 			p.fireEventDealUpdate(dh.Publisher, deal)
 		}
 		return si.State
