@@ -46,8 +46,6 @@ type BoostAPI struct {
 	api.Net
 
 	Full lapi.FullNode
-	//LocalStore  *stores.Local
-	//RemoteStore *stores.Remote
 
 	Host host.Host
 
@@ -72,9 +70,12 @@ type BoostAPI struct {
 
 	// Sealing Pipeline API
 	Sps sealingpipeline.API
-	// TODO: Figure out how to start graphql server without it needing
-	// to be a dependency of another fx object
+
+	// GraphSQL server
 	GraphqlServer *gql.Server
+
+	// Tracing
+	Tracing *tracing.Tracing
 
 	DS lotus_dtypes.MetadataDS
 

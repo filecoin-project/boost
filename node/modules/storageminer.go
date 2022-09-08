@@ -21,6 +21,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
@@ -438,5 +439,22 @@ func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo
 		})
 
 		return server
+	}
+}
+
+func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, error) {
+	return func(lc fx.Lifecycle) (*tracing.Tracing, error) {
+		if cfg.Tracing.Enabled {
+			// Instantiate the tracer and exporter
+			stop, err := tracing.New(cfg.Tracing.ServiceName, cfg.Tracing.Endpoint)
+			if err != nil {
+				return nil, fmt.Errorf("failed to instantiate tracer: %w", err)
+			}
+			lc.Append(fx.Hook{
+				OnStop: stop,
+			})
+		}
+
+		return &tracing.Tracing{}, nil
 	}
 }

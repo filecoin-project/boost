@@ -67,8 +67,9 @@ func DefaultBoost() *Boost {
 		},
 
 		Tracing: TracingConfig{
-			Enabled:  false,
-			Endpoint: "",
+			Enabled:     false,
+			Endpoint:    "",
+			ServiceName: "boostd",
 		},
 
 		Dealmaking: DealmakingConfig{

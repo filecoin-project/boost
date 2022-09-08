@@ -13,8 +13,8 @@ import (
 )
 
 // Registers a Tracer provider globally and returns it's shutdown function
-func New(ctx context.Context, service string) (func(context.Context) error, error) {
-	provider, err := tracerProvider("http://tempo:14268/api/traces", service)
+func New(service, endpoint string) (func(context.Context) error, error) {
+	provider, err := tracerProvider(endpoint, service)
 	if err != nil {
 		return nil, err
 	}

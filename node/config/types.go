@@ -77,8 +77,9 @@ type GraphqlConfig struct {
 }
 
 type TracingConfig struct {
-	Enabled  bool
-	Endpoint string
+	Enabled     bool
+	ServiceName string
+	Endpoint    string
 }
 
 type LotusDealmakingConfig struct {
