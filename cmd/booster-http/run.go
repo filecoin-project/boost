@@ -72,6 +72,11 @@ var runCmd = &cli.Command{
 			Usage:    "the endpoint for the storage node API",
 			Required: true,
 		},
+		&cli.BoolFlag{
+			Name:  "enable-tracing",
+			Usage: "enables tracing of booster-http calls",
+			Value: false,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -113,9 +118,14 @@ var runCmd = &cli.Command{
 		defer storageCloser()
 
 		// Instantiate the tracer and exporter
-		tracingStopper, err := tracing.New(ctx, "booster-http")
-		if err != nil {
-			return fmt.Errorf("failed to instantiate tracer: %w", err)
+		enableTracing := cctx.Bool("enable-tracing")
+		var tracingStopper func(context.Context) error
+		if enableTracing {
+			tracingStopper, err = tracing.New(ctx, "booster-http")
+			if err != nil {
+				return fmt.Errorf("failed to instantiate tracer: %w", err)
+			}
+			log.Info("Tracing exporter enabled")
 		}
 
 		maddr, err := storageService.ActorAddress(ctx)
@@ -183,9 +193,11 @@ var runCmd = &cli.Command{
 		// Sync all loggers.
 		_ = log.Sync() //nolint:errcheck
 
-		err = tracingStopper(ctx)
-		if err != nil {
-			return err
+		if enableTracing {
+			err = tracingStopper(ctx)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
