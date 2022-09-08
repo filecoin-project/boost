@@ -1,1 +1,10 @@
-examples
+docker/devnet/data
+react/node_modules
+# filecoin-ffi installation
+build/.filecoin-install
+extern/filecoin-ffi/.install-filcrypto
+extern/filecoin-ffi/filcrypto.*
+extern/filecoin-ffi/libfilcrypto.a
+# local binaries
+boost*
+devnet
