@@ -62,6 +62,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "Tracing",
+			Type: "TracingConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "LotusDealmaking",
 			Type: "lotus_config.DealmakingConfig",
 
@@ -390,6 +396,26 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 			Type: "int",
 
 			Comment: `The maximum number of concurrent fetch operations to the storage subsystem`,
+		},
+	},
+	"TracingConfig": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: ``,
+		},
+		{
+			Name: "ServiceName",
+			Type: "string",
+
+			Comment: ``,
+		},
+		{
+			Name: "Endpoint",
+			Type: "string",
+
+			Comment: ``,
 		},
 	},
 	"WalletsConfig": []DocField{
