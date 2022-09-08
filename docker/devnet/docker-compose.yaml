@@ -55,6 +55,9 @@ services:
       - LOTUS_API_LISTENADDRESS=/dns/boost/tcp/1288/http
       - LOTUS_PATH=/var/lib/lotus
       - LOTUS_MINER_PATH=/var/lib/lotus-miner
+      - LOTUS_TRACING_ENABLED=true
+      - LOTUS_TRACING_SERVICENAME=boostd
+      - LOTUS_TRACING_ENDPOINT=http://tempo:14268/api/traces
     restart: unless-stopped
     logging: *default-logging
     volumes:

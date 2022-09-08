@@ -66,6 +66,12 @@ func DefaultBoost() *Boost {
 			Port: 8080,
 		},
 
+		Tracing: TracingConfig{
+			Enabled:     false,
+			Endpoint:    "",
+			ServiceName: "boostd",
+		},
+
 		Dealmaking: DealmakingConfig{
 			ConsiderOnlineStorageDeals:     true,
 			ConsiderOfflineStorageDeals:    true,

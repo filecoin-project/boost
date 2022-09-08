@@ -16,3 +16,5 @@ var (
 		trace.WithSchemaURL(semconv.SchemaURL),
 	)
 )
+
+type Tracing struct{}
