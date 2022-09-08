@@ -424,6 +424,27 @@ func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
 			}),
 		},
 	}, {
+		name:        "non-recoverable error when transport fails",
+		expectedErr: "data-transfer failed",
+		opts: []harnessOpt{
+			// Inject a Transport that returns success from Execute, but then
+			// returns an error from the transfer progress channel
+			withTransportBuilder(func(ctrl *gomock.Controller) transport.Transport {
+				th := mocks.NewMockHandler(ctrl)
+				evts := make(chan tspttypes.TransportEvent, 1)
+				evts <- tspttypes.TransportEvent{
+					NBytesReceived: 0,
+					Error:          errors.New("data-transfer failed"),
+				}
+				close(evts)
+				th.EXPECT().Sub().Return(evts)
+				th.EXPECT().Close()
+				tspt := mocks.NewMockTransport(ctrl)
+				tspt.EXPECT().Execute(gomock.Any(), gomock.Any(), gomock.Any()).Return(th, nil)
+				return tspt
+			}),
+		},
+	}, {
 		name:        "non-recoverable error when commp fails",
 		expectedErr: "failed to verify CommP",
 		opts: []harnessOpt{
@@ -570,18 +591,6 @@ func TestDealRestartAfterManualRecoverableErrors(t *testing.T) {
 		expectedErr string
 		onResume    func(builder *testDealBuilder) *testDeal
 	}{{
-		name: "transfer fails",
-		dbuilder: func(h *ProviderHarness) *testDeal {
-			// Simulate data transfer failure
-			return h.newDealBuilder(t, 1).withFailingHttpServer().build()
-		},
-		expectedErr: "data-transfer failed",
-		onResume: func(builder *testDealBuilder) *testDeal {
-			td := builder.withAllMinerCallsNonBlocking().build()
-			td.setTransferWorking(true)
-			return td
-		},
-	}, {
 		name: "publish fails",
 		dbuilder: func(h *ProviderHarness) *testDeal {
 			// Simulate publish deal failure
@@ -1750,12 +1759,6 @@ func (tbuilder *testDealBuilder) withAllMinerCallsBlocking() *testDealBuilder {
 	return tbuilder
 }
 
-func (tbuilder *testDealBuilder) withFailingHttpServer() *testDealBuilder {
-	tbuilder.setTransferParams(tbuilder.ph.NormalServer.URL)
-	tbuilder.ph.NormalServer.SetWorking(false)
-	return tbuilder
-}
-
 func (tbuilder *testDealBuilder) withBlockingHttpServer() *testDealBuilder {
 	tbuilder.ph.BlockingServer.AddFile(tbuilder.td.carv2FileName)
 	tbuilder.setTransferParams(tbuilder.td.ph.BlockingServer.URL)
@@ -1999,10 +2002,6 @@ func (td *testDeal) unblockTransfer() {
 
 func (td *testDeal) unblockCommp() {
 	td.ph.MinerStub.UnblockCommp(td.params.DealUUID)
-}
-
-func (td *testDeal) setTransferWorking(working bool) {
-	td.ph.NormalServer.SetWorking(working)
 }
 
 func (td *testDeal) unblockPublish() {

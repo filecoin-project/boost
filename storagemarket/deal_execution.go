@@ -143,35 +143,11 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 				return derr
 			}
 
-			if err := p.transferAndVerify(dh.transferCtx, pub, deal); err != nil {
+			if err := p.transferAndVerify(dh, pub, deal); err != nil {
 				// The transfer has failed. If the user tries to cancel the
 				// transfer after this point it's a no-op.
 				dh.setCancelTransferResponse(nil)
 
-				// Pass through fatal errors
-				if err.retry == smtypes.DealRetryFatal {
-					return err
-				}
-
-				// If the transfer failed because the user cancelled the
-				// transfer, it's non-recoverable
-				if dh.TransferCancelledByUser() {
-					return &dealMakingError{
-						retry: types.DealRetryFatal,
-						error: fmt.Errorf("data transfer cancelled after %d bytes: %w", deal.NBytesReceived, err),
-					}
-				}
-
-				// If the transfer failed because boost was shut down, it's
-				// automatically recoverable
-				if errors.Is(err.error, context.Canceled) {
-					return &dealMakingError{
-						retry: types.DealRetryAuto,
-						error: fmt.Errorf("data transfer paused by boost shutdown after %d bytes: %w", deal.NBytesReceived, err),
-					}
-				}
-
-				// Pass through any other transfer failure
 				return err
 			}
 
@@ -286,12 +262,24 @@ func (p *Provider) untagFundsAfterPublish(ctx context.Context, deal *types.Provi
 	}
 }
 
-func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
+func (p *Provider) transferAndVerify(dh *dealHandler, pub event.Emitter, deal *smtypes.ProviderDealState) *dealMakingError {
+	// Use a context specifically for transfers, that can be cancelled by the user
+	ctx := dh.transferCtx
+
 	p.dealLogger.Infow(deal.DealUuid, "deal queued for transfer", "transfer client id", deal.Transfer.ClientID)
 
 	// Wait for a spot in the transfer queue
 	err := p.xferLimiter.waitInQueue(ctx, deal)
 	if err != nil {
+		// If the transfer failed because the user cancelled the
+		// transfer, it's non-recoverable
+		if dh.TransferCancelledByUser() {
+			return &dealMakingError{
+				retry: types.DealRetryFatal,
+				error: fmt.Errorf("data transfer manually cancelled by user: %w", err),
+			}
+		}
+
 		// If boost was shutdown while waiting for the transfer to start,
 		// automatically retry on restart.
 		if errors.Is(err, context.Canceled) {
@@ -308,7 +296,8 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 	defer p.xferLimiter.complete(deal.DealUuid)
 
 	p.dealLogger.Infow(deal.DealUuid, "start deal data transfer", "transfer client id", deal.Transfer.ClientID)
-	tctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.config.MaxTransferDuration))
+	transferStart := time.Now()
+	tctx, cancel := context.WithDeadline(ctx, transferStart.Add(p.config.MaxTransferDuration))
 	defer cancel()
 
 	st := time.Now()
@@ -326,12 +315,29 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 
 	// wait for data-transfer to finish
 	if err := p.waitForTransferFinish(tctx, handler, pub, deal); err != nil {
+		// If the transfer failed because the user cancelled the
+		// transfer, it's non-recoverable
+		if dh.TransferCancelledByUser() {
+			return &dealMakingError{
+				retry: types.DealRetryFatal,
+				error: fmt.Errorf("data transfer manually cancelled by user after %d bytes: %w", deal.NBytesReceived, err),
+			}
+		}
+
+		// If the transfer failed because boost was shut down, it's
+		// automatically recoverable
+		if errors.Is(err, context.Canceled) && time.Since(transferStart) < p.config.MaxTransferDuration {
+			return &dealMakingError{
+				retry: types.DealRetryAuto,
+				error: fmt.Errorf("data transfer paused by boost shutdown after %d bytes: %w", deal.NBytesReceived, err),
+			}
+		}
+
 		// Note that the data transfer has automatic retries built in, so if
 		// it fails, it means it's already retried several times and we should
-		// surface the problem to the user so they can decide manually whether
-		// to keep retrying
+		// fail the deal
 		return &dealMakingError{
-			retry: smtypes.DealRetryManual,
+			retry: smtypes.DealRetryFatal,
 			error: fmt.Errorf("data-transfer failed: %w", err),
 		}
 	}
