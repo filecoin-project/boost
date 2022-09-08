@@ -73,7 +73,7 @@ var runCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.BoolFlag{
-			Name:  "enable-tracing",
+			Name:  "tracing",
 			Usage: "enables tracing of booster-http calls",
 			Value: false,
 		},
@@ -118,7 +118,7 @@ var runCmd = &cli.Command{
 		defer storageCloser()
 
 		// Instantiate the tracer and exporter
-		enableTracing := cctx.Bool("enable-tracing")
+		enableTracing := cctx.Bool("tracing")
 		var tracingStopper func(context.Context) error
 		if enableTracing {
 			tracingStopper, err = tracing.New(ctx, "booster-http")
