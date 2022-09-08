@@ -66,6 +66,11 @@ func DefaultBoost() *Boost {
 			Port: 8080,
 		},
 
+		Tracing: TracingConfig{
+			Enabled:  false,
+			Endpoint: "",
+		},
+
 		Dealmaking: DealmakingConfig{
 			ConsiderOnlineStorageDeals:     true,
 			ConsiderOfflineStorageDeals:    true,

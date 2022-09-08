@@ -42,6 +42,7 @@ type Boost struct {
 	Dealmaking         DealmakingConfig
 	Wallets            WalletsConfig
 	Graphql            GraphqlConfig
+	Tracing            TracingConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
@@ -73,6 +74,11 @@ type WalletsConfig struct {
 type GraphqlConfig struct {
 	// The port that the graphql server listens on
 	Port uint64
+}
+
+type TracingConfig struct {
+	Enabled  bool
+	Endpoint string
 }
 
 type LotusDealmakingConfig struct {
