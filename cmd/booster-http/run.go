@@ -77,6 +77,11 @@ var runCmd = &cli.Command{
 			Usage: "enables tracing of booster-http calls",
 			Value: false,
 		},
+		&cli.StringFlag{
+			Name:  "tracing-endpoint",
+			Usage: "the endpoint for the tracing exporter",
+			Value: "http://tempo:14268/api/traces",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -121,7 +126,7 @@ var runCmd = &cli.Command{
 		enableTracing := cctx.Bool("tracing")
 		var tracingStopper func(context.Context) error
 		if enableTracing {
-			tracingStopper, err = tracing.New(ctx, "booster-http")
+			tracingStopper, err = tracing.New("booster-http", cctx.String("tracing-endpoint"))
 			if err != nil {
 				return fmt.Errorf("failed to instantiate tracer: %w", err)
 			}
