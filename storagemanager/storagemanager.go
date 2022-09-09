@@ -26,13 +26,6 @@ type Config struct {
 	MaxStagingDealsPercentPerHost uint64
 }
 
-func (c Config) check() error {
-	if c.MaxStagingDealsPercentPerHost > 100 {
-		return fmt.Errorf("MaxStagingDealsPercentPerHost is %d but it must be a percentage between 0 - 100", c.MaxStagingDealsPercentPerHost)
-	}
-	return nil
-}
-
 type StorageManager struct {
 	lr                 lotus_repo.LockedRepo
 	db                 *db.StorageDB
@@ -42,8 +35,8 @@ type StorageManager struct {
 
 func New(cfg Config) func(lr lotus_repo.LockedRepo, sqldb *sql.DB) (*StorageManager, error) {
 	return func(lr lotus_repo.LockedRepo, sqldb *sql.DB) (*StorageManager, error) {
-		if err := cfg.check(); err != nil {
-			return nil, err
+		if cfg.MaxStagingDealsPercentPerHost > 100 {
+			return nil, fmt.Errorf("MaxStagingDealsPercentPerHost is %d but it must be a percentage between 0 - 100", cfg.MaxStagingDealsPercentPerHost)
 		}
 
 		stagingPath := filepath.Join(lr.Path(), StagingAreaDirName)
@@ -83,11 +76,13 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, size uint6
 
 	if m.cfg.MaxStagingDealsBytes != 0 {
 		if m.cfg.MaxStagingDealsPercentPerHost != 0 {
+			// Get the total amount tagged for download from the host
 			tagged, err := m.TotalTaggedForHost(ctx, host)
 			if err != nil {
 				return fmt.Errorf("getting total tagged for host: %w", err)
 			}
 
+			// Check the amount tagged + the size of the proposed deal against the limit
 			limit := (m.cfg.MaxStagingDealsBytes * m.cfg.MaxStagingDealsPercentPerHost) / 100
 			if tagged+size >= limit {
 				return fmt.Errorf("%w: cannot accept piece of size %d from host %s, "+
@@ -97,11 +92,13 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, size uint6
 			}
 		}
 
+		// Get the total amount tagged for download from all hosts
 		tagged, err := m.TotalTagged(ctx)
 		if err != nil {
 			return fmt.Errorf("getting total tagged: %w", err)
 		}
 
+		// Check the amount tagged + the size of the proposed deal against the limit
 		if tagged+size >= m.cfg.MaxStagingDealsBytes {
 			err := fmt.Errorf("%w: cannot accept piece of size %d, on top of already allocated %d bytes, because it would exceed max staging area size %d",
 				ErrNoSpaceLeft, size, tagged, m.cfg.MaxStagingDealsBytes)
