@@ -26,10 +26,10 @@ func NewStorageDB(db *sql.DB) *StorageDB {
 	return &StorageDB{db: db}
 }
 
-func (s *StorageDB) Tag(ctx context.Context, dealUuid uuid.UUID, size uint64) error {
-	qry := "INSERT INTO StorageTagged (DealUUID, CreatedAt, TransferSize) "
-	qry += "VALUES (?, ?, ?)"
-	values := []interface{}{dealUuid, time.Now(), fmt.Sprintf("%d", size)}
+func (s *StorageDB) Tag(ctx context.Context, dealUuid uuid.UUID, size uint64, host string) error {
+	qry := "INSERT INTO StorageTagged (DealUUID, CreatedAt, TransferSize, TransferHost) "
+	qry += "VALUES (?, ?, ?, ?)"
+	values := []interface{}{dealUuid, time.Now(), fmt.Sprintf("%d", size), host}
 	_, err := s.db.ExecContext(ctx, qry, values...)
 	return err
 }
@@ -112,8 +112,22 @@ func (s *StorageDB) Logs(ctx context.Context) ([]StorageLog, error) {
 	return storageLogs, nil
 }
 
+func (s *StorageDB) TotalTaggedForHost(ctx context.Context, host string) (uint64, error) {
+	return s.totalTagged(ctx, host)
+}
+
 func (s *StorageDB) TotalTagged(ctx context.Context) (uint64, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT TransferSize FROM StorageTagged")
+	return s.totalTagged(ctx, "")
+}
+
+func (s *StorageDB) totalTagged(ctx context.Context, host string) (uint64, error) {
+	qry := "SELECT TransferSize FROM StorageTagged"
+	var args []interface{}
+	if host != "" {
+		qry += " WHERE TransferHost = ?"
+		args = append(args, host)
+	}
+	rows, err := s.db.QueryContext(ctx, qry, args...)
 	if err != nil {
 		return 0, fmt.Errorf("getting total tagged: %w", err)
 	}

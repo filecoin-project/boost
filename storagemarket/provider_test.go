@@ -390,15 +390,73 @@ func TestDealRejectedForInsufficientProviderFunds(t *testing.T) {
 
 func TestDealRejectedForInsufficientProviderStorageSpace(t *testing.T) {
 	ctx := context.Background()
-	// setup the provider test harness with only 1 byte of storage
-	// space for incoming deals.
-	harness := NewHarness(t, withMaxStagingDealsBytes(1))
+	// setup the provider test harness with only enough storage
+	// space for 1.5 deals
+	fileSize := 2000
+	harness := NewHarness(t, withMaxStagingDealsBytes(uint64(fileSize*3)/2))
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
 
-	td := harness.newDealBuilder(t, 1).withNoOpMinerStub().withBlockingHttpServer().build()
+	// Make a deal
+	td := harness.newDealBuilder(t, 1, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
 	pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, peer.ID(""))
+	require.NoError(t, err)
+	require.True(t, pi.Accepted)
+
+	// Make a second deal - this one should fail because there is not enough
+	// space in the staging area for a second deal
+	td2 := harness.newDealBuilder(t, 2, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
+	pi, err = td2.ph.Provider.ExecuteDeal(context.Background(), td2.params, peer.ID(""))
+	require.NoError(t, err)
+	require.False(t, pi.Accepted)
+	require.Contains(t, pi.Reason, "no space left")
+}
+
+func TestDealRejectedForInsufficientProviderStorageSpacePerHost(t *testing.T) {
+	ctx := context.Background()
+	// Set up the harness such that
+	// - the download staging area is large enough for 10 deals
+	// - the portion of the staging area reserved for each host is 15%
+	//   (ie enough space for 1.5 deals)
+	// Therefore it should be possible to make several deals where the data
+	// for each deal is on a different host. But it should not be possible
+	// to make 2 deals where the data is on the same host.
+	fileSize := 2000
+	harness := NewHarness(t,
+		withMaxStagingDealsBytes(uint64(fileSize*10)),
+		withMaxStagingDealsPercentPerHost(15))
+	// start the provider test harness
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	hostA := "http://1.2.3.4:1234"
+	hostB := "http://5.6.7.8:5678"
+	downloadUrl := func(h string) string {
+		return fmt.Sprintf(`{"URL":"%s/%d.car"}`, h, rand.Intn(2<<30))
+	}
+
+	// Make a deal with data url on host A
+	hostADeal := harness.newDealBuilder(t, 1, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
+	hostADeal.params.Transfer.Params = []byte(downloadUrl(hostA))
+	pi, err := hostADeal.ph.Provider.ExecuteDeal(ctx, hostADeal.params, "")
+	require.NoError(t, err)
+	require.True(t, pi.Accepted)
+
+	// Make a deal with data url on host B
+	hostBDeal := harness.newDealBuilder(t, 2, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
+	pi, err = hostBDeal.ph.Provider.ExecuteDeal(ctx, hostBDeal.params, "")
+	hostBDeal.params.Transfer.Params = []byte(downloadUrl(hostB))
+	require.NoError(t, err)
+	require.True(t, pi.Accepted)
+
+	// Make a second deal with data url on host A.
+	// This one should fail because we've already made a deal with
+	// data url on host A, and the download space per host is limited
+	// to 1.5 x the deal size.
+	hostADeal2 := harness.newDealBuilder(t, 3, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
+	hostADeal2.params.Transfer.Params = []byte(downloadUrl(hostA))
+	pi, err = hostADeal2.ph.Provider.ExecuteDeal(ctx, hostADeal2.params, "")
 	require.NoError(t, err)
 	require.False(t, pi.Accepted)
 	require.Contains(t, pi.Reason, "no space left")
@@ -1122,20 +1180,21 @@ func (h *ProviderHarness) AssertDealDBState(t *testing.T, ctx context.Context, d
 }
 
 type ProviderHarness struct {
-	Host                   host.Host
-	GoMockCtrl             *gomock.Controller
-	TempDir                string
-	MinerAddr              address.Address
-	ClientAddr             address.Address
-	MockFullNode           *lotusmocks.MockFullNode
-	MinerStub              *smtestutil.MinerStub
-	DealsDB                *db.DealsDB
-	FundsDB                *db.FundsDB
-	StorageDB              *db.StorageDB
-	PublishWallet          address.Address
-	MinPublishFees         abi.TokenAmount
-	MaxStagingDealBytes    uint64
-	MockSealingPipelineAPI *mock_sealingpipeline.MockAPI
+	Host                         host.Host
+	GoMockCtrl                   *gomock.Controller
+	TempDir                      string
+	MinerAddr                    address.Address
+	ClientAddr                   address.Address
+	MockFullNode                 *lotusmocks.MockFullNode
+	MinerStub                    *smtestutil.MinerStub
+	DealsDB                      *db.DealsDB
+	FundsDB                      *db.FundsDB
+	StorageDB                    *db.StorageDB
+	PublishWallet                address.Address
+	MinPublishFees               abi.TokenAmount
+	MaxStagingDealBytes          uint64
+	MaxStagingDealPercentPerHost uint64
+	MockSealingPipelineAPI       *mock_sealingpipeline.MockAPI
 
 	Provider *Provider
 
@@ -1153,11 +1212,12 @@ type ProviderHarness struct {
 type providerConfig struct {
 	mockCtrl *gomock.Controller
 
-	maxStagingDealBytes  uint64
-	minPublishFees       abi.TokenAmount
-	disconnectAfterEvery int64
-	httpOpts             []httptransport.Option
-	transport            transport.Transport
+	maxStagingDealBytes          uint64
+	maxStagingDealPercentPerHost uint64
+	minPublishFees               abi.TokenAmount
+	disconnectAfterEvery         int64
+	httpOpts                     []httptransport.Option
+	transport                    transport.Transport
 
 	lockedFunds      big.Int
 	escrowFunds      big.Int
@@ -1203,6 +1263,12 @@ func withPublishWalletBal(bal int64) harnessOpt {
 func withMaxStagingDealsBytes(max uint64) harnessOpt {
 	return func(pc *providerConfig) {
 		pc.maxStagingDealBytes = max
+	}
+}
+
+func withMaxStagingDealsPercentPerHost(max uint64) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.maxStagingDealPercentPerHost = max
 	}
 }
 
@@ -1324,15 +1390,16 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 		DisconnectingServer: disconnServer,
 		Transport:           tspt,
 
-		MockSealingPipelineAPI: sps,
-		DealsDB:                dealsDB,
-		FundsDB:                db.NewFundsDB(sqldb),
-		StorageDB:              db.NewStorageDB(sqldb),
-		PublishWallet:          pw,
-		MinerStub:              minerStub,
-		MinPublishFees:         pc.minPublishFees,
-		MaxStagingDealBytes:    pc.maxStagingDealBytes,
-		SqlDB:                  sqldb,
+		MockSealingPipelineAPI:       sps,
+		DealsDB:                      dealsDB,
+		FundsDB:                      db.NewFundsDB(sqldb),
+		StorageDB:                    db.NewStorageDB(sqldb),
+		PublishWallet:                pw,
+		MinerStub:                    minerStub,
+		MinPublishFees:               pc.minPublishFees,
+		MaxStagingDealBytes:          pc.maxStagingDealBytes,
+		MaxStagingDealPercentPerHost: pc.maxStagingDealPercentPerHost,
+		SqlDB:                        sqldb,
 	}
 
 	// fund manager
@@ -1348,7 +1415,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	lr, err := fsRepo.Lock(repo.StorageMiner)
 	require.NoError(t, err)
 	smInitF := storagemanager.New(storagemanager.Config{
-		MaxStagingDealsBytes: ph.MaxStagingDealBytes,
+		MaxStagingDealsBytes:          ph.MaxStagingDealBytes,
+		MaxStagingDealsPercentPerHost: ph.MaxStagingDealPercentPerHost,
 	})
 	sm, err := smInitF(lr, sqldb)
 	require.NoError(t, err)

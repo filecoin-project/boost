@@ -151,9 +151,25 @@ type DealmakingConfig struct {
 	// The maximum collateral that the provider will put up against a deal,
 	// as a multiplier of the minimum collateral bound
 	MaxProviderCollateralMultiplier uint64
-	// The maximum allowed disk usage size in bytes of staging deals not yet
-	// passed to the sealing node by the markets service. 0 is unlimited.
+	// The maximum allowed disk usage size in bytes of downloaded deal data
+	// that has not yet been passed to the sealing node by boost.
+	// When the client makes a new deal proposal to download data from a host,
+	// boost checks this config value against the sum of:
+	// - the amount of data downloaded in the staging area
+	// - the amount of data that is queued for download
+	// - the amount of data in the proposed deal
+	// If the total amount would exceed the limit, boost rejects the deal.
+	// Set this value to 0 to indicate there is no limit.
 	MaxStagingDealsBytes int64
+	// The percentage of MaxStagingDealsBytes that is allocated to each host.
+	// When the client makes a new deal proposal to download data from a host,
+	// boost checks this config value against the sum of:
+	// - the amount of data downloaded from the host in the staging area
+	// - the amount of data that is queued for download from the host
+	// - the amount of data in the proposed deal
+	// If the total amount would exceed the limit, boost rejects the deal.
+	// Set this value to 0 to indicate there is no limit per host.
+	MaxStagingDealsPercentPerHost uint64
 	// Minimum start epoch buffer to give time for sealing of sector with deal.
 	StartEpochSealingBuffer uint64
 	// The amount of time to keep deal proposal logs for before cleaning them up.

@@ -20,10 +20,10 @@ import (
 var clientAddrs = []uint64{01312, 42134, 01322, 43242, 04212}
 
 func GenerateDeals() ([]types.ProviderDealState, error) {
-	return generateDeals(len(clientAddrs))
+	return GenerateNDeals(len(clientAddrs))
 }
 
-func generateDeals(count int) ([]types.ProviderDealState, error) {
+func GenerateNDeals(count int) ([]types.ProviderDealState, error) {
 	provAddr, err := address.NewActorAddress([]byte("f1523"))
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func generateDeals(count int) ([]types.ProviderDealState, error) {
 				InboundFilePath: fmt.Sprintf("/data/staging/inbound/file-%d.car", rand.Intn(10000)),
 				Transfer: types.Transfer{
 					Type:   "http",
-					Params: []byte(fmt.Sprintf("{url:'http://files.org/file%d.car'}", rand.Intn(1000))),
+					Params: []byte(fmt.Sprintf(`{"url":"http://files.org/file%d.car"}`, rand.Intn(1000))),
 					Size:   uint64(rand.Intn(10000)),
 				},
 				ChainDealID: abi.DealID(rand.Intn(10000)),

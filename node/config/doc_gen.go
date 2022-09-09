@@ -186,8 +186,28 @@ as a multiplier of the minimum collateral bound`,
 			Name: "MaxStagingDealsBytes",
 			Type: "int64",
 
-			Comment: `The maximum allowed disk usage size in bytes of staging deals not yet
-passed to the sealing node by the markets service. 0 is unlimited.`,
+			Comment: `The maximum allowed disk usage size in bytes of downloaded deal data
+that has not yet been passed to the sealing node by boost.
+When the client makes a new deal proposal to download data from a host,
+boost checks this config value against the sum of:
+- the amount of data downloaded in the staging area
+- the amount of data that is queued for download
+- the amount of data in the proposed deal
+If the total amount would exceed the limit, boost rejects the deal.
+Set this value to 0 to indicate there is no limit.`,
+		},
+		{
+			Name: "MaxStagingDealsPercentPerHost",
+			Type: "uint64",
+
+			Comment: `The percentage of MaxStagingDealsBytes that is allocated to each host.
+When the client makes a new deal proposal to download data from a host,
+boost checks this config value against the sum of:
+- the amount of data downloaded from the host in the staging area
+- the amount of data that is queued for download from the host
+- the amount of data in the proposed deal
+If the total amount would exceed the limit, boost rejects the deal.
+Set this value to 0 to indicate there is no limit per host.`,
 		},
 		{
 			Name: "StartEpochSealingBuffer",

@@ -464,7 +464,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		Override(new(*storagemanager.StorageManager), storagemanager.New(storagemanager.Config{
-			MaxStagingDealsBytes: uint64(cfg.Dealmaking.MaxStagingDealsBytes),
+			MaxStagingDealsBytes:          uint64(cfg.Dealmaking.MaxStagingDealsBytes),
+			MaxStagingDealsPercentPerHost: uint64(cfg.Dealmaking.MaxStagingDealsPercentPerHost),
 		})),
 
 		// Sector API

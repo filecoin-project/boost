@@ -103,7 +103,7 @@ func TestDealsDBSearch(t *testing.T) {
 
 	start := time.Now()
 	db := NewDealsDB(sqldb)
-	deals, err := generateDeals(5)
+	deals, err := GenerateNDeals(5)
 	req.NoError(err)
 	t.Logf("generated %d deals in %s", len(deals), time.Since(start))
 
