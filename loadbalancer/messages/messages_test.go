@@ -3,6 +3,8 @@ package messages_test
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
+	"io"
 	"testing"
 	"time"
 
@@ -76,4 +78,135 @@ func TestRoundtripForwardingResponse(t *testing.T) {
 	outMessage, err := messages.BindnodeRegistry.TypeFromReader(buf, (*messages.ForwardingResponse)(nil), dagcbor.Decode)
 	require.NoError(t, err)
 	require.Equal(t, expectedMessage, outMessage)
+}
+
+func TestReadWriteFunctions(t *testing.T) {
+	singleTestProtocol := protocol.ID("test/me")
+	testProtocols := []protocol.ID{"applesauce/cheese", "big/face"}
+	expiry := time.Now().Add(time.Hour)
+	expiry = time.Unix(0, expiry.UnixNano())
+	responseErr := errors.New("something went wrong")
+	remote := peer.ID("something")
+	_, pubKey, err := crypto.GenerateECDSAKeyPair(rand.Reader)
+	require.NoError(t, err)
+
+	var testCases = []struct {
+		name          string
+		write         func(io.Writer) error
+		read          func(io.Reader) (interface{}, error)
+		expectedValue interface{}
+	}{
+		{
+			name:  "new RoutingRequest",
+			write: func(w io.Writer) error { return messages.WriteNewRoutingRequest(w, testProtocols) },
+			read:  func(r io.Reader) (interface{}, error) { return messages.ReadRoutingRequest(r) },
+			expectedValue: &messages.RoutingRequest{
+				Kind:      messages.RoutingKindNew,
+				Protocols: testProtocols,
+			},
+		},
+		{
+			name:  "extend RoutingRequest",
+			write: func(w io.Writer) error { return messages.WriteExtendRoutingRequest(w, testProtocols) },
+			read:  func(r io.Reader) (interface{}, error) { return messages.ReadRoutingRequest(r) },
+			expectedValue: &messages.RoutingRequest{
+				Kind:      messages.RoutingKindExtend,
+				Protocols: testProtocols,
+			},
+		},
+		{
+			name:  "terminate RoutingRequest",
+			write: func(w io.Writer) error { return messages.WriteTerminateRoutingRequest(w, testProtocols) },
+			read:  func(r io.Reader) (interface{}, error) { return messages.ReadRoutingRequest(r) },
+			expectedValue: &messages.RoutingRequest{
+				Kind:      messages.RoutingKindTerminate,
+				Protocols: testProtocols,
+			},
+		},
+		{
+			name:  "success RoutingResponse",
+			write: func(w io.Writer) error { return messages.WriteRoutingResponseSuccess(w, &expiry) },
+			read:  func(r io.Reader) (interface{}, error) { return messages.ReadRoutingResponse(r) },
+			expectedValue: &messages.RoutingResponse{
+				Code:   messages.ResponseOk,
+				Expiry: &expiry,
+			},
+		},
+		{
+			name:  "error RoutingResponse",
+			write: func(w io.Writer) error { return messages.WriteRoutingResponseError(w, responseErr) },
+			read:  func(r io.Reader) (interface{}, error) { return messages.ReadRoutingResponse(r) },
+			expectedValue: &messages.RoutingResponse{
+				Code:    messages.ResponseRejected,
+				Message: "something went wrong",
+				Expiry:  nil,
+			},
+		},
+		{
+			name:  "outbound ForwardingRequest",
+			write: func(w io.Writer) error { return messages.WriteOutboundForwardingRequest(w, remote, testProtocols) },
+			read:  func(r io.Reader) (interface{}, error) { return messages.ReadForwardingRequest(r) },
+			expectedValue: &messages.ForwardingRequest{
+				Kind:      messages.ForwardingOutbound,
+				Remote:    remote,
+				Protocols: testProtocols,
+			},
+		},
+		{
+			name: "inbound ForwardingRequest",
+			write: func(w io.Writer) error {
+				return messages.WriteInboundForwardingRequest(w, remote, pubKey, singleTestProtocol)
+			},
+			read: func(r io.Reader) (interface{}, error) { return messages.ReadForwardingRequest(r) },
+			expectedValue: &messages.ForwardingRequest{
+				Kind:         messages.ForwardingInbound,
+				Remote:       remote,
+				RemotePubKey: &pubKey,
+				Protocols:    []protocol.ID{singleTestProtocol},
+			},
+		},
+		{
+			name: "outbound success ForwardingResponse",
+			write: func(w io.Writer) error {
+				return messages.WriteOutboundForwardingResponseSuccess(w, pubKey, singleTestProtocol)
+			},
+			read: func(r io.Reader) (interface{}, error) { return messages.ReadForwardingResponse(r) },
+			expectedValue: &messages.ForwardingResponse{
+				Code:         messages.ResponseOk,
+				RemotePubKey: &pubKey,
+				ProtocolID:   &singleTestProtocol,
+			},
+		},
+		{
+			name: "inbound success ForwardingResponse",
+			write: func(w io.Writer) error {
+				return messages.WriteInboundForwardingResponseSuccess(w)
+			},
+			read: func(r io.Reader) (interface{}, error) { return messages.ReadForwardingResponse(r) },
+			expectedValue: &messages.ForwardingResponse{
+				Code: messages.ResponseOk,
+			},
+		},
+		{
+			name: "error ForwardingResponse",
+			write: func(w io.Writer) error {
+				return messages.WriteForwardingResponseError(w, responseErr)
+			},
+			read: func(r io.Reader) (interface{}, error) { return messages.ReadForwardingResponse(r) },
+			expectedValue: &messages.ForwardingResponse{
+				Code:    messages.ResponseRejected,
+				Message: responseErr.Error(),
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			err := testCase.write(buf)
+			require.NoError(t, err)
+			resultValue, err := testCase.read(buf)
+			require.NoError(t, err)
+			require.Equal(t, testCase.expectedValue, resultValue)
+		})
+	}
 }
