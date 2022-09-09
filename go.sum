@@ -431,8 +431,8 @@ github.com/filecoin-project/go-storedcounter v0.1.0 h1:Mui6wSUBC+cQGHbDUBcO7rfh5
 github.com/filecoin-project/go-storedcounter v0.1.0/go.mod h1:4ceukaXi4vFURIoxYMfKzaRF5Xv/Pinh2oTnoxpv+z8=
 github.com/filecoin-project/index-provider v0.8.1 h1:ggoBWvMSWR91HZQCWfv8SZjoTGNyJBwNMLuN9bJZrbU=
 github.com/filecoin-project/index-provider v0.8.1/go.mod h1:c/Ym5HtWPp9NQgNc9dgSBMpSNsZ/DE9FEi9qVubl5RM=
-github.com/filecoin-project/lotus v1.17.1-0.20220819044554-215598c1e9cb h1:kpy8YuyDgoUf+nKCkF49UIRG7ywigkZaZpzlfoEbP3U=
-github.com/filecoin-project/lotus v1.17.1-0.20220819044554-215598c1e9cb/go.mod h1:FK/JSFBxylpRuzIKgQCthHQ06fiseSzJlpdhQVpQzeU=
+github.com/filecoin-project/lotus v1.17.0 h1:FiOxLzX1vfDrI46rO9PpqjF8pBAaxhEQGdHw3u5UOaw=
+github.com/filecoin-project/lotus v1.17.0/go.mod h1:hZ5L7E4uKWwp8E/8Bw3pBaai4wV7Utq/ZSbl9hIoFnU=
 github.com/filecoin-project/pubsub v1.0.0 h1:ZTmT27U07e54qV1mMiQo4HDr0buo8I1LDHBYLXlsNXM=
 github.com/filecoin-project/pubsub v1.0.0/go.mod h1:GkpB33CcUtUNrLPhJgfdy4FDx4OMNR9k+46DHx/Lqrg=
 github.com/filecoin-project/specs-actors v0.9.13/go.mod h1:TS1AW/7LbG+615j4NsjMK1qlpAwaFsG9w0V2tg2gSao=
@@ -1192,6 +1192,7 @@ github.com/libp2p/go-libp2p v0.18.0/go.mod h1:+veaZ9z1SZQhmc5PW78jvnnxZ89Mgvmh4c
 github.com/libp2p/go-libp2p v0.19.4/go.mod h1:MIt8y481VDhUe4ErWi1a4bvt/CjjFfOq6kZTothWIXY=
 github.com/libp2p/go-libp2p v0.20.0/go.mod h1:g0C5Fu+aXXbCXkusCzLycuBowEih3ElmDqtbo61Em7k=
 github.com/libp2p/go-libp2p v0.20.1/go.mod h1:XgJHsOhEBVBXp/2Sj9bm/yEyD94uunAaP6oaegdcKks=
+github.com/libp2p/go-libp2p v0.20.3/go.mod h1:I+vndVanE/p/SjFbnA+BEmmfAUEpWxrdXZeyQ1Dus5c=
 github.com/libp2p/go-libp2p v0.21.0 h1:s9yYScuIFY33FOOzwTXbc8QqbvsRyKIWFf0FCSJKrfM=
 github.com/libp2p/go-libp2p v0.21.0/go.mod h1:zvcA6/C4mr5/XQarRICh+L1SN9dAHHlSWDq4x5VYxg4=
 github.com/libp2p/go-libp2p-asn-util v0.0.0-20200825225859-85005c6cf052/go.mod h1:nRMRTab+kZuk0LnKZpxhOVH/ndsdr2Nr//Zltc/vwgo=
@@ -1296,7 +1297,6 @@ github.com/libp2p/go-libp2p-interface-connmgr v0.0.5/go.mod h1:GarlRLH0LdeWcLnYM
 github.com/libp2p/go-libp2p-interface-pnet v0.0.1/go.mod h1:el9jHpQAXK5dnTpKA4yfCNBZXvrzdOU75zz+C6ryp3k=
 github.com/libp2p/go-libp2p-kad-dht v0.2.1/go.mod h1:k7ONOlup7HKzQ68dE6lSnp07cdxdkmnRa+6B4Fh9/w0=
 github.com/libp2p/go-libp2p-kad-dht v0.15.0/go.mod h1:rZtPxYu1TnHHz6n1RggdGrxUX/tA1C2/Wiw3ZMUDrU0=
-github.com/libp2p/go-libp2p-kad-dht v0.16.1-0.20220811151450-6a2603e9927e/go.mod h1:zeE26Xo+PY7sS2AgkBQQcBnJEazMT26KGZLUFttl+rk=
 github.com/libp2p/go-libp2p-kad-dht v0.17.0 h1:HWEjqjNVDuf8yuccuswGy1vYGzB0v4Z+yQ4DMDMSIqk=
 github.com/libp2p/go-libp2p-kad-dht v0.17.0/go.mod h1:zeE26Xo+PY7sS2AgkBQQcBnJEazMT26KGZLUFttl+rk=
 github.com/libp2p/go-libp2p-kbucket v0.2.1/go.mod h1:/Rtu8tqbJ4WQ2KTCOMJhggMukOLNLNPY1EtEWWLxUvc=

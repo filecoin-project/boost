@@ -1358,7 +1358,11 @@ Inputs:
 Response:
 ```json
 {
+  "Dynamic": true,
   "Memory": 9,
+  "MemoryFraction": 12.3,
+  "MinMemory": 9,
+  "MaxMemory": 9,
   "Streams": 123,
   "StreamsInbound": 123,
   "StreamsOutbound": 123,
@@ -1524,7 +1528,11 @@ Inputs:
 [
   "string value",
   {
+    "Dynamic": true,
     "Memory": 9,
+    "MemoryFraction": 12.3,
+    "MinMemory": 9,
+    "MaxMemory": 9,
     "Streams": 123,
     "StreamsInbound": 123,
     "StreamsOutbound": 123,

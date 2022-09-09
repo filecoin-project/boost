@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	net "github.com/filecoin-project/boost/node/impl/net"
 	lotus_api "github.com/filecoin-project/lotus/api"
-	lotus_net "github.com/filecoin-project/lotus/node/impl/net"
 	metrics "github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -74,4 +74,4 @@ type CommonNet interface {
 	Net
 }
 
-var _ Net = (*lotus_net.NetAPI)(nil)
+var _ Net = (*net.NetAPI)(nil)

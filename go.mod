@@ -33,7 +33,7 @@ require (
 	github.com/filecoin-project/go-state-types v0.1.10
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/index-provider v0.8.1
-	github.com/filecoin-project/lotus v1.17.1-0.20220819044554-215598c1e9cb
+	github.com/filecoin-project/lotus v1.17.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v8 v8.0.1
 	github.com/filecoin-project/specs-storage v0.4.1
@@ -82,7 +82,10 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.7.1
 	github.com/libp2p/go-libp2p-record v0.1.3
 	github.com/libp2p/go-libp2p-resource-manager v0.5.3
+	github.com/libp2p/go-libp2p-routing-helpers v0.2.3
+	github.com/libp2p/go-maddr-filter v0.1.0
 	github.com/mattn/go-sqlite3 v1.14.10
+	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/multiformats/go-multiaddr v0.6.0
 	github.com/multiformats/go-multibase v0.1.1
@@ -97,6 +100,7 @@ require (
 	github.com/urfave/cli/v2 v2.8.1
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
 	github.com/whyrusleeping/cbor-gen v0.0.0-20220323183124-98fa8256a799
+	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7
 	go.opencensus.io v0.23.0
 	go.uber.org/atomic v1.9.0
 	go.uber.org/fx v1.15.0
