@@ -639,7 +639,7 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 				return si.State
 			}
 
-			p.dealLogger.Infow(dealUuid, "sealing state: %s", si.State)
+			p.dealLogger.Infow(dealUuid, "current sealing state", "state", si.State)
 			p.fireEventDealUpdate(dh.Publisher, deal)
 		}
 		return si.State
