@@ -206,18 +206,13 @@ Note also that the provider address is `t01000` and you will need to supply an a
 
 ### Building Docker images
 
-1. Select Lotus version, for example: `lotus_version=1.17.1-rc2`. It must be the tag name of [the Lotus git repo](https://github.com/filecoin-project/lotus/tags) without `v` prefix.
-
-2. Select Boost version, for example: `boost_version=1.3.0-rc1`.
-
-3. Build images
+1. Build images
 
 ```
-cd docker/devnet
-make build/all
+make docker/all
 ```
 
-If you need to build a different version, edit the `.env` file.
+If you need to build containers using a specific version of lotus then provide the version as a parameter, e.g. `make docker/all lotus_version=1.17.0`. The version must be a tag name of [Lotus git repo](https://github.com/filecoin-project/lotus/tags) without `v` prefix. Or you can build using a local source of lotus - `make docker/all lotus_src_dir=<path of lotus source>`. Also, before starting devnet, you need to update versions in the [.env](docker/devnet/.env) file.
 
 ### Start devnet docker stack
 
