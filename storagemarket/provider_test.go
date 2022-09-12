@@ -320,7 +320,7 @@ func TestDealRejectedForDuplicateProposal(t *testing.T) {
 		err := td.executeAndSubscribe()
 		require.NoError(t, err)
 
-		pi, err := td.ph.Provider.ExecuteDeal(td.params, "")
+		pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 		require.Contains(t, pi.Reason, "deal proposal is identical")
@@ -328,10 +328,10 @@ func TestDealRejectedForDuplicateProposal(t *testing.T) {
 
 	t.Run("offline", func(t *testing.T) {
 		td := harness.newDealBuilder(t, 1, withOfflineDeal()).withNoOpMinerStub().build()
-		_, err := td.ph.Provider.ExecuteDeal(td.params, "")
+		_, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
 		require.NoError(t, err)
 
-		pi, err := td.ph.Provider.ExecuteDeal(td.params, "")
+		pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 		require.Contains(t, pi.Reason, "deal proposal is identical")
@@ -352,7 +352,7 @@ func TestDealRejectedForDuplicateUuid(t *testing.T) {
 
 		td2 := harness.newDealBuilder(t, 2).withNoOpMinerStub().withBlockingHttpServer().build()
 		td2.params.DealUUID = td.params.DealUUID
-		pi, err := td.ph.Provider.ExecuteDeal(td2.params, "")
+		pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td2.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 		require.Contains(t, pi.Reason, "deal has the same uuid")
@@ -360,12 +360,12 @@ func TestDealRejectedForDuplicateUuid(t *testing.T) {
 
 	t.Run("offline", func(t *testing.T) {
 		td := harness.newDealBuilder(t, 1, withOfflineDeal()).withNoOpMinerStub().build()
-		_, err := td.ph.Provider.ExecuteDeal(td.params, "")
+		_, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
 		require.NoError(t, err)
 
 		td2 := harness.newDealBuilder(t, 2, withOfflineDeal()).withNoOpMinerStub().build()
 		td2.params.DealUUID = td.params.DealUUID
-		pi, err := td.ph.Provider.ExecuteDeal(td2.params, "")
+		pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td2.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 		require.Contains(t, pi.Reason, "deal has the same uuid")
@@ -382,7 +382,7 @@ func TestDealRejectedForInsufficientProviderFunds(t *testing.T) {
 	defer harness.Stop()
 
 	td := harness.newDealBuilder(t, 1).withNoOpMinerStub().withBlockingHttpServer().build()
-	pi, err := td.ph.Provider.ExecuteDeal(td.params, peer.ID(""))
+	pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, peer.ID(""))
 	require.NoError(t, err)
 	require.False(t, pi.Accepted)
 	require.Contains(t, pi.Reason, "insufficient funds")
@@ -390,15 +390,73 @@ func TestDealRejectedForInsufficientProviderFunds(t *testing.T) {
 
 func TestDealRejectedForInsufficientProviderStorageSpace(t *testing.T) {
 	ctx := context.Background()
-	// setup the provider test harness with only 1 byte of storage
-	// space for incoming deals.
-	harness := NewHarness(t, withMaxStagingDealsBytes(1))
+	// setup the provider test harness with only enough storage
+	// space for 1.5 deals
+	fileSize := 2000
+	harness := NewHarness(t, withMaxStagingDealsBytes(uint64(fileSize*3)/2))
 	// start the provider test harness
 	harness.Start(t, ctx)
 	defer harness.Stop()
 
-	td := harness.newDealBuilder(t, 1).withNoOpMinerStub().withBlockingHttpServer().build()
-	pi, err := td.ph.Provider.ExecuteDeal(td.params, peer.ID(""))
+	// Make a deal
+	td := harness.newDealBuilder(t, 1, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
+	pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, peer.ID(""))
+	require.NoError(t, err)
+	require.True(t, pi.Accepted)
+
+	// Make a second deal - this one should fail because there is not enough
+	// space in the staging area for a second deal
+	td2 := harness.newDealBuilder(t, 2, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
+	pi, err = td2.ph.Provider.ExecuteDeal(context.Background(), td2.params, peer.ID(""))
+	require.NoError(t, err)
+	require.False(t, pi.Accepted)
+	require.Contains(t, pi.Reason, "no space left")
+}
+
+func TestDealRejectedForInsufficientProviderStorageSpacePerHost(t *testing.T) {
+	ctx := context.Background()
+	// Set up the harness such that
+	// - the download staging area is large enough for 10 deals
+	// - the portion of the staging area reserved for each host is 15%
+	//   (ie enough space for 1.5 deals)
+	// Therefore it should be possible to make several deals where the data
+	// for each deal is on a different host. But it should not be possible
+	// to make 2 deals where the data is on the same host.
+	fileSize := 2000
+	harness := NewHarness(t,
+		withMaxStagingDealsBytes(uint64(fileSize*10)),
+		withMaxStagingDealsPercentPerHost(15))
+	// start the provider test harness
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	hostA := "http://1.2.3.4:1234"
+	hostB := "http://5.6.7.8:5678"
+	downloadUrl := func(h string) string {
+		return fmt.Sprintf(`{"URL":"%s/%d.car"}`, h, rand.Intn(2<<30))
+	}
+
+	// Make a deal with data url on host A
+	hostADeal := harness.newDealBuilder(t, 1, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
+	hostADeal.params.Transfer.Params = []byte(downloadUrl(hostA))
+	pi, err := hostADeal.ph.Provider.ExecuteDeal(ctx, hostADeal.params, "")
+	require.NoError(t, err)
+	require.True(t, pi.Accepted)
+
+	// Make a deal with data url on host B
+	hostBDeal := harness.newDealBuilder(t, 2, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
+	pi, err = hostBDeal.ph.Provider.ExecuteDeal(ctx, hostBDeal.params, "")
+	hostBDeal.params.Transfer.Params = []byte(downloadUrl(hostB))
+	require.NoError(t, err)
+	require.True(t, pi.Accepted)
+
+	// Make a second deal with data url on host A.
+	// This one should fail because we've already made a deal with
+	// data url on host A, and the download space per host is limited
+	// to 1.5 x the deal size.
+	hostADeal2 := harness.newDealBuilder(t, 3, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
+	hostADeal2.params.Transfer.Params = []byte(downloadUrl(hostA))
+	pi, err = hostADeal2.ph.Provider.ExecuteDeal(ctx, hostADeal2.params, "")
 	require.NoError(t, err)
 	require.False(t, pi.Accepted)
 	require.Contains(t, pi.Reason, "no space left")
@@ -420,6 +478,27 @@ func TestDealFailuresHandlingNonRecoverableErrors(t *testing.T) {
 			withTransportBuilder(func(ctrl *gomock.Controller) transport.Transport {
 				tspt := mocks.NewMockTransport(ctrl)
 				tspt.EXPECT().Execute(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("somerr"))
+				return tspt
+			}),
+		},
+	}, {
+		name:        "non-recoverable error when transport fails",
+		expectedErr: "data-transfer failed",
+		opts: []harnessOpt{
+			// Inject a Transport that returns success from Execute, but then
+			// returns an error from the transfer progress channel
+			withTransportBuilder(func(ctrl *gomock.Controller) transport.Transport {
+				th := mocks.NewMockHandler(ctrl)
+				evts := make(chan tspttypes.TransportEvent, 1)
+				evts <- tspttypes.TransportEvent{
+					NBytesReceived: 0,
+					Error:          errors.New("data-transfer failed"),
+				}
+				close(evts)
+				th.EXPECT().Sub().Return(evts)
+				th.EXPECT().Close()
+				tspt := mocks.NewMockTransport(ctrl)
+				tspt.EXPECT().Execute(gomock.Any(), gomock.Any(), gomock.Any()).Return(th, nil)
 				return tspt
 			}),
 		},
@@ -570,18 +649,6 @@ func TestDealRestartAfterManualRecoverableErrors(t *testing.T) {
 		expectedErr string
 		onResume    func(builder *testDealBuilder) *testDeal
 	}{{
-		name: "transfer fails",
-		dbuilder: func(h *ProviderHarness) *testDeal {
-			// Simulate data transfer failure
-			return h.newDealBuilder(t, 1).withFailingHttpServer().build()
-		},
-		expectedErr: "data-transfer failed",
-		onResume: func(builder *testDealBuilder) *testDeal {
-			td := builder.withAllMinerCallsNonBlocking().build()
-			td.setTransferWorking(true)
-			return td
-		},
-	}, {
 		name: "publish fails",
 		dbuilder: func(h *ProviderHarness) *testDeal {
 			// Simulate publish deal failure
@@ -1113,20 +1180,21 @@ func (h *ProviderHarness) AssertDealDBState(t *testing.T, ctx context.Context, d
 }
 
 type ProviderHarness struct {
-	Host                   host.Host
-	GoMockCtrl             *gomock.Controller
-	TempDir                string
-	MinerAddr              address.Address
-	ClientAddr             address.Address
-	MockFullNode           *lotusmocks.MockFullNode
-	MinerStub              *smtestutil.MinerStub
-	DealsDB                *db.DealsDB
-	FundsDB                *db.FundsDB
-	StorageDB              *db.StorageDB
-	PublishWallet          address.Address
-	MinPublishFees         abi.TokenAmount
-	MaxStagingDealBytes    uint64
-	MockSealingPipelineAPI *mock_sealingpipeline.MockAPI
+	Host                         host.Host
+	GoMockCtrl                   *gomock.Controller
+	TempDir                      string
+	MinerAddr                    address.Address
+	ClientAddr                   address.Address
+	MockFullNode                 *lotusmocks.MockFullNode
+	MinerStub                    *smtestutil.MinerStub
+	DealsDB                      *db.DealsDB
+	FundsDB                      *db.FundsDB
+	StorageDB                    *db.StorageDB
+	PublishWallet                address.Address
+	MinPublishFees               abi.TokenAmount
+	MaxStagingDealBytes          uint64
+	MaxStagingDealPercentPerHost uint64
+	MockSealingPipelineAPI       *mock_sealingpipeline.MockAPI
 
 	Provider *Provider
 
@@ -1144,11 +1212,12 @@ type ProviderHarness struct {
 type providerConfig struct {
 	mockCtrl *gomock.Controller
 
-	maxStagingDealBytes  uint64
-	minPublishFees       abi.TokenAmount
-	disconnectAfterEvery int64
-	httpOpts             []httptransport.Option
-	transport            transport.Transport
+	maxStagingDealBytes          uint64
+	maxStagingDealPercentPerHost uint64
+	minPublishFees               abi.TokenAmount
+	disconnectAfterEvery         int64
+	httpOpts                     []httptransport.Option
+	transport                    transport.Transport
 
 	lockedFunds      big.Int
 	escrowFunds      big.Int
@@ -1194,6 +1263,12 @@ func withPublishWalletBal(bal int64) harnessOpt {
 func withMaxStagingDealsBytes(max uint64) harnessOpt {
 	return func(pc *providerConfig) {
 		pc.maxStagingDealBytes = max
+	}
+}
+
+func withMaxStagingDealsPercentPerHost(max uint64) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.maxStagingDealPercentPerHost = max
 	}
 }
 
@@ -1315,15 +1390,16 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 		DisconnectingServer: disconnServer,
 		Transport:           tspt,
 
-		MockSealingPipelineAPI: sps,
-		DealsDB:                dealsDB,
-		FundsDB:                db.NewFundsDB(sqldb),
-		StorageDB:              db.NewStorageDB(sqldb),
-		PublishWallet:          pw,
-		MinerStub:              minerStub,
-		MinPublishFees:         pc.minPublishFees,
-		MaxStagingDealBytes:    pc.maxStagingDealBytes,
-		SqlDB:                  sqldb,
+		MockSealingPipelineAPI:       sps,
+		DealsDB:                      dealsDB,
+		FundsDB:                      db.NewFundsDB(sqldb),
+		StorageDB:                    db.NewStorageDB(sqldb),
+		PublishWallet:                pw,
+		MinerStub:                    minerStub,
+		MinPublishFees:               pc.minPublishFees,
+		MaxStagingDealBytes:          pc.maxStagingDealBytes,
+		MaxStagingDealPercentPerHost: pc.maxStagingDealPercentPerHost,
+		SqlDB:                        sqldb,
 	}
 
 	// fund manager
@@ -1339,7 +1415,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	lr, err := fsRepo.Lock(repo.StorageMiner)
 	require.NoError(t, err)
 	smInitF := storagemanager.New(storagemanager.Config{
-		MaxStagingDealsBytes: ph.MaxStagingDealBytes,
+		MaxStagingDealsBytes:          ph.MaxStagingDealBytes,
+		MaxStagingDealsPercentPerHost: ph.MaxStagingDealPercentPerHost,
 	})
 	sm, err := smInitF(lr, sqldb)
 	require.NoError(t, err)
@@ -1356,7 +1433,15 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	askStore := &mockAskStore{}
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
-	prvCfg := Config{MaxTransferDuration: time.Hour, RemoteCommp: !pc.localCommp}
+	prvCfg := Config{
+		MaxTransferDuration: time.Hour,
+		RemoteCommp:         !pc.localCommp,
+		TransferLimiter: TransferLimiterConfig{
+			MaxConcurrent:    10,
+			StallCheckPeriod: time.Millisecond,
+			StallTimeout:     time.Hour,
+		},
+	}
 	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, minerStub, sps, minerStub, df, sqldb,
 		logsDB, dagStore, ps, &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
 	require.NoError(t, err)
@@ -1611,6 +1696,10 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	require.NoError(tbuilder.t, err)
 	name := carv2Fileinfo.Name()
 
+	req := tspttypes.HttpRequest{URL: "http://foo.bar"}
+	xferParams, err := json.Marshal(req)
+	require.NoError(t, err)
+
 	// assemble the final deal params to send to the provider
 	dealParams := &types.DealParams{
 		DealUUID:  uuid.New(),
@@ -1624,8 +1713,9 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 		},
 		DealDataRoot: rootCid,
 		Transfer: types.Transfer{
-			Type: "http",
-			Size: uint64(carv2Fileinfo.Size()),
+			Type:   "http",
+			Params: xferParams,
+			Size:   uint64(carv2Fileinfo.Size()),
 		},
 	}
 
@@ -1737,12 +1827,6 @@ func (tbuilder *testDealBuilder) withAllMinerCallsBlocking() *testDealBuilder {
 	return tbuilder
 }
 
-func (tbuilder *testDealBuilder) withFailingHttpServer() *testDealBuilder {
-	tbuilder.setTransferParams(tbuilder.ph.NormalServer.URL)
-	tbuilder.ph.NormalServer.SetWorking(false)
-	return tbuilder
-}
-
 func (tbuilder *testDealBuilder) withBlockingHttpServer() *testDealBuilder {
 	tbuilder.ph.BlockingServer.AddFile(tbuilder.td.carv2FileName)
 	tbuilder.setTransferParams(tbuilder.td.ph.BlockingServer.URL)
@@ -1847,7 +1931,7 @@ type testDeal struct {
 }
 
 func (td *testDeal) executeAndSubscribeImportOfflineDeal() error {
-	pi, err := td.ph.Provider.ImportOfflineDealData(td.params.DealUUID, td.carv2FilePath)
+	pi, err := td.ph.Provider.ImportOfflineDealData(context.Background(), td.params.DealUUID, td.carv2FilePath)
 	if err != nil {
 		return err
 	}
@@ -1865,7 +1949,7 @@ func (td *testDeal) executeAndSubscribeImportOfflineDeal() error {
 }
 
 func (td *testDeal) executeAndSubscribe() error {
-	pi, err := td.ph.Provider.ExecuteDeal(td.params, "")
+	pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
 	if err != nil {
 		return err
 	}
@@ -1986,10 +2070,6 @@ func (td *testDeal) unblockTransfer() {
 
 func (td *testDeal) unblockCommp() {
 	td.ph.MinerStub.UnblockCommp(td.params.DealUUID)
-}
-
-func (td *testDeal) setTransferWorking(working bool) {
-	td.ph.NormalServer.SetWorking(working)
 }
 
 func (td *testDeal) unblockPublish() {

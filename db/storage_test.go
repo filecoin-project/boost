@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/google/uuid"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,6 +16,7 @@ func TestStorageDB(t *testing.T) {
 
 	sqldb := CreateTestTmpDB(t)
 	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
+	req.NoError(migrations.Migrate(sqldb))
 
 	db := NewStorageDB(sqldb)
 
@@ -28,12 +29,20 @@ func TestStorageDB(t *testing.T) {
 	req.True(errors.Is(err, ErrNotFound))
 	req.Equal(uint64(0), amt)
 
-	err = db.Tag(ctx, dealUUID, 1111)
+	err = db.Tag(ctx, dealUUID, 1111, "foo.bar:1234")
+	req.NoError(err)
+
+	dealUUID2 := uuid.New()
+	err = db.Tag(ctx, dealUUID2, 2222, "my.host:5678")
 	req.NoError(err)
 
 	total, err := db.TotalTagged(ctx)
 	req.NoError(err)
-	req.Equal(uint64(1111), total)
+	req.Equal(uint64(3333), total)
+
+	total, err = db.TotalTaggedForHost(ctx, "my.host:5678")
+	req.NoError(err)
+	req.Equal(uint64(2222), total)
 
 	amt, err = db.Untag(ctx, dealUUID)
 	req.NoError(err)

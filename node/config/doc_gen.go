@@ -62,6 +62,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "Tracing",
+			Type: "TracingConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "LotusDealmaking",
 			Type: "lotus_config.DealmakingConfig",
 
@@ -180,20 +186,28 @@ as a multiplier of the minimum collateral bound`,
 			Name: "MaxStagingDealsBytes",
 			Type: "int64",
 
-			Comment: `The maximum allowed disk usage size in bytes of staging deals not yet
-passed to the sealing node by the markets service. 0 is unlimited.`,
+			Comment: `The maximum allowed disk usage size in bytes of downloaded deal data
+that has not yet been passed to the sealing node by boost.
+When the client makes a new deal proposal to download data from a host,
+boost checks this config value against the sum of:
+- the amount of data downloaded in the staging area
+- the amount of data that is queued for download
+- the amount of data in the proposed deal
+If the total amount would exceed the limit, boost rejects the deal.
+Set this value to 0 to indicate there is no limit.`,
 		},
 		{
-			Name: "SimultaneousTransfersForStorage",
+			Name: "MaxStagingDealsPercentPerHost",
 			Type: "uint64",
 
-			Comment: `The maximum number of parallel online data transfers for storage deals`,
-		},
-		{
-			Name: "SimultaneousTransfersForRetrieval",
-			Type: "uint64",
-
-			Comment: `The maximum number of parallel online data transfers for retrieval deals`,
+			Comment: `The percentage of MaxStagingDealsBytes that is allocated to each host.
+When the client makes a new deal proposal to download data from a host,
+boost checks this config value against the sum of:
+- the amount of data downloaded from the host in the staging area
+- the amount of data that is queued for download from the host
+- the amount of data in the proposed deal
+If the total amount would exceed the limit, boost rejects the deal.
+Set this value to 0 to indicate there is no limit per host.`,
 		},
 		{
 			Name: "StartEpochSealingBuffer",
@@ -240,11 +254,39 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 			Comment: `Whether to do commp on the Boost node (local) or on the Sealer (remote)`,
 		},
 		{
+			Name: "MaxConcurrentLocalCommp",
+			Type: "uint64",
+
+			Comment: `The maximum number of commp processes to run in parallel on the local
+boost process`,
+		},
+		{
 			Name: "HTTPRetrievalMultiaddr",
 			Type: "string",
 
 			Comment: `The public multi-address for retrieving deals with booster-http.
 Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https`,
+		},
+		{
+			Name: "HttpTransferMaxConcurrentDownloads",
+			Type: "uint64",
+
+			Comment: `The maximum number of concurrent storage deal HTTP downloads.
+Note that this is a soft maximum; if some downloads stall,
+more downloads are allowed to start.`,
+		},
+		{
+			Name: "HttpTransferStallCheckPeriod",
+			Type: "Duration",
+
+			Comment: `The period between checking if downloads have stalled.`,
+		},
+		{
+			Name: "HttpTransferStallTimeout",
+			Type: "Duration",
+
+			Comment: `The time that can elapse before a download is considered stalled (and
+another concurrent download is allowed to start).`,
 		},
 	},
 	"FeeConfig": []DocField{
@@ -374,6 +416,26 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 			Type: "int",
 
 			Comment: `The maximum number of concurrent fetch operations to the storage subsystem`,
+		},
+	},
+	"TracingConfig": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: ``,
+		},
+		{
+			Name: "ServiceName",
+			Type: "string",
+
+			Comment: ``,
+		},
+		{
+			Name: "Endpoint",
+			Type: "string",
+
+			Comment: ``,
 		},
 	},
 	"WalletsConfig": []DocField{

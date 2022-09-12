@@ -8,16 +8,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// Keep up to 60s of samples
+// Keep up to 20s of samples
 const maxSamples = 20
 
-// Transfers returns a map of active transfers, sampled for up to 60s
-func (p *Provider) Transfers() map[uuid.UUID][]transferPoint {
-	return p.transfers.transfers()
-}
-
 // A sample of the number of bytes transferred at the given time
-type transferPoint struct {
+type TransferPoint struct {
 	// The time at which the sample was taken, truncated to the nearest second
 	At time.Time
 	// The number of bytes transferred
@@ -29,7 +24,7 @@ type dealTransfers struct {
 	// maps from deal UUID -> samples of the number of bytes transferred in
 	// the last 60 seconds
 	samplesLk sync.RWMutex
-	samples   map[uuid.UUID][]transferPoint
+	samples   map[uuid.UUID][]TransferPoint
 
 	// Maps from active transfer deal UUID to number of bytes transferred
 	activeLk sync.RWMutex
@@ -38,7 +33,7 @@ type dealTransfers struct {
 
 func newDealTransfers() *dealTransfers {
 	return &dealTransfers{
-		samples: make(map[uuid.UUID][]transferPoint),
+		samples: make(map[uuid.UUID][]TransferPoint),
 		active:  make(map[uuid.UUID]uint64),
 	}
 }
@@ -77,11 +72,11 @@ func (dt *dealTransfers) sample(now time.Time) {
 		// Get the array of samples
 		points, ok := dt.samples[dealUUID]
 		if !ok {
-			points = []transferPoint{}
+			points = []TransferPoint{}
 		}
 
 		// Add a point for the current second
-		point := transferPoint{
+		point := TransferPoint{
 			At:    now,
 			Bytes: bytes,
 		}
@@ -91,7 +86,7 @@ func (dt *dealTransfers) sample(now time.Time) {
 		if len(points) > maxSamples {
 			// We need to make a copy of the array to avoid leaking memory.
 			// It may be worth using a ring-buffer if this is too slow.
-			newPoints := make([]transferPoint, maxSamples)
+			newPoints := make([]TransferPoint, maxSamples)
 			copy(newPoints, points[len(points)-maxSamples:])
 			points = newPoints
 		}
@@ -109,14 +104,14 @@ func (dt *dealTransfers) sample(now time.Time) {
 
 		// Add a point for non-active samples, with the same transferred bytes
 		// as the previous point
-		points = append(points, transferPoint{
+		points = append(points, TransferPoint{
 			At:    now,
 			Bytes: points[len(points)-1].Bytes,
 		})
 
 		// If the maximum number of samples has been reached
 		if len(points) > maxSamples {
-			// If the transfer has been inactive for 60s, delete the samples
+			// If the transfer has been inactive for 20s, delete the samples
 			if points[0].Bytes == points[len(points)-1].Bytes {
 				delete(dt.samples, dealUUID)
 				continue
@@ -130,17 +125,30 @@ func (dt *dealTransfers) sample(now time.Time) {
 	}
 }
 
-func (dt *dealTransfers) transfers() map[uuid.UUID][]transferPoint {
+func (dt *dealTransfers) transfers() map[uuid.UUID][]TransferPoint {
 	dt.samplesLk.RLock()
 	defer dt.samplesLk.RUnlock()
 
-	deals := make(map[uuid.UUID][]transferPoint, len(dt.samples))
+	deals := make(map[uuid.UUID][]TransferPoint, len(dt.samples))
 	for dealUUID, points := range dt.samples {
-		pts := make([]transferPoint, len(points))
+		pts := make([]TransferPoint, len(points))
 		copy(pts, points)
 		deals[dealUUID] = pts
 	}
 	return deals
+}
+
+func (dt *dealTransfers) transfer(dealUUID uuid.UUID) []TransferPoint {
+	dt.samplesLk.RLock()
+	defer dt.samplesLk.RUnlock()
+
+	points, ok := dt.samples[dealUUID]
+	if !ok {
+		return nil
+	}
+	pts := make([]TransferPoint, len(points))
+	copy(pts, points)
+	return pts
 }
 
 func (dt *dealTransfers) setBytes(dealUUID uuid.UUID, bytes uint64) {
@@ -162,4 +170,29 @@ func (dt *dealTransfers) complete(dealUUID uuid.UUID) {
 	defer dt.activeLk.Unlock()
 
 	delete(dt.active, dealUUID)
+}
+
+// Transfers returns a map of active transfers, sampled for up to 20s
+func (p *Provider) Transfers() map[uuid.UUID][]TransferPoint {
+	return p.transfers.transfers()
+}
+
+// Transfer returns samples of an active transfer, sampled for up to 20s
+func (p *Provider) Transfer(dealUuid uuid.UUID) []TransferPoint {
+	return p.transfers.transfer(dealUuid)
+}
+
+// Get the number of bytes downloaded in total for the given deal
+func (p *Provider) NBytesReceived(dealUuid uuid.UUID) uint64 {
+	return p.transfers.getBytes(dealUuid)
+}
+
+// Indicates if a transfer has been marked as "stalled", ie the transfer is
+// not making any progress
+func (p *Provider) IsTransferStalled(dealUuid uuid.UUID) bool {
+	return p.xferLimiter.isStalled(dealUuid)
+}
+
+func (p *Provider) TransferStats() []*HostTransferStats {
+	return p.xferLimiter.stats()
 }

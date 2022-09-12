@@ -22,6 +22,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
@@ -38,6 +39,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 var (
@@ -55,6 +57,9 @@ type Config struct {
 	MaxTransferDuration time.Duration
 	// Whether to do commp on the Boost node (local) or the sealing node (remote)
 	RemoteCommp bool
+	// The number of commp processes that can run in parallel
+	MaxConcurrentLocalCommp uint64
+	TransferLimiter         TransferLimiterConfig
 }
 
 var log = logging.Logger("boost-provider")
@@ -91,12 +96,14 @@ type Provider struct {
 	logsDB    *db.LogsDB
 
 	Transport      transport.Transport
+	xferLimiter    *transferLimiter
 	fundManager    *fundmanager.FundManager
 	storageManager *storagemanager.StorageManager
 	dealPublisher  types.DealPublisher
 	transfers      *dealTransfers
 
 	pieceAdder                  types.PieceAdder
+	commpThrottle               chan struct{}
 	commpCalc                   smtypes.CommpCalculator
 	maxDealCollateralMultiplier uint64
 	chainDealManager            types.ChainDealManager
@@ -122,11 +129,21 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
 
+	xferLimiter, err := newTransferLimiter(cfg.TransferLimiter)
+	if err != nil {
+		return nil, err
+	}
+
 	newDealPS, err := newDealPubsub()
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// Make sure that max concurrent local commp is at least 1
+	if cfg.MaxConcurrentLocalCommp == 0 {
+		cfg.MaxConcurrentLocalCommp = 1
+	}
 
 	return &Provider{
 		ctx:       ctx,
@@ -147,12 +164,14 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		storageSpaceChan:     make(chan storageSpaceDealReq),
 
 		Transport:      tspt,
+		xferLimiter:    xferLimiter,
 		fundManager:    fundMgr,
 		storageManager: storageMgr,
 
 		dealPublisher:               dp,
 		fullnodeApi:                 fullnodeApi,
 		pieceAdder:                  pa,
+		commpThrottle:               make(chan struct{}, cfg.MaxConcurrentLocalCommp),
 		commpCalc:                   commpCalc,
 		chainDealManager:            cm,
 		maxDealCollateralMultiplier: 2,
@@ -172,6 +191,10 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 }
 
 func (p *Provider) Deal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "Provider.Deal")
+	defer span.End()
+	span.SetAttributes(attribute.String("dealUuid", dealUuid.String())) // Example of adding additional attributes
+
 	deal, err := p.dealsDB.ByID(ctx, dealUuid)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("getting deal %s: %w", dealUuid, ErrDealNotFound)
@@ -187,17 +210,13 @@ func (p *Provider) DealBySignedProposalCid(ctx context.Context, propCid cid.Cid)
 	return deal, nil
 }
 
-func (p *Provider) NBytesReceived(dealUuid uuid.UUID) uint64 {
-	return p.transfers.getBytes(dealUuid)
-}
-
 func (p *Provider) GetAsk() *storagemarket.SignedStorageAsk {
 	return p.askGetter.GetAsk()
 }
 
 // ImportOfflineDealData is called when the Storage Provider imports data for
 // an offline deal (the deal must already have been proposed by the client)
-func (p *Provider) ImportOfflineDealData(dealUuid uuid.UUID, filePath string) (pi *api.ProviderDealRejectionInfo, err error) {
+func (p *Provider) ImportOfflineDealData(ctx context.Context, dealUuid uuid.UUID, filePath string) (pi *api.ProviderDealRejectionInfo, err error) {
 	p.dealLogger.Infow(dealUuid, "import data for offline deal", "filepath", filePath)
 
 	// db should already have a deal with this uuid as the deal proposal should have been agreed before hand
@@ -217,7 +236,7 @@ func (p *Provider) ImportOfflineDealData(dealUuid uuid.UUID, filePath string) (p
 
 	ds.InboundFilePath = filePath
 
-	resp, err := p.checkForDealAcceptance(ds, true)
+	resp, err := p.checkForDealAcceptance(ctx, ds, true)
 	if err != nil {
 		p.dealLogger.LogError(dealUuid, "failed to send deal for acceptance", err)
 		return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
@@ -240,7 +259,12 @@ func (p *Provider) ImportOfflineDealData(dealUuid uuid.UUID, filePath string) (p
 
 // ExecuteDeal is called when the Storage Provider receives a deal proposal
 // from the network
-func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (*api.ProviderDealRejectionInfo, error) {
+func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, clientPeer peer.ID) (*api.ProviderDealRejectionInfo, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "Provider.ExecuteDeal")
+	defer span.End()
+
+	span.SetAttributes(attribute.String("dealUuid", dp.DealUUID.String())) // Example of adding additional attributes
+
 	p.dealLogger.Infow(dp.DealUUID, "executing deal proposal received from network", "peer", clientPeer)
 
 	ds := types.ProviderDealState{
@@ -265,14 +289,17 @@ func (p *Provider) ExecuteDeal(dp *types.DealParams, clientPeer peer.ID) (*api.P
 		}, nil
 	}
 
-	return p.executeDeal(ds)
+	return p.executeDeal(ctx, ds)
 }
 
 // executeDeal sends the deal to the main provider run loop for execution
-func (p *Provider) executeDeal(ds smtypes.ProviderDealState) (*api.ProviderDealRejectionInfo, error) {
+func (p *Provider) executeDeal(ctx context.Context, ds smtypes.ProviderDealState) (*api.ProviderDealRejectionInfo, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "Provider.executeDeal")
+	defer span.End()
+
 	ri, err := func() (*api.ProviderDealRejectionInfo, error) {
 		// send the deal to the main provider loop for execution
-		resp, err := p.checkForDealAcceptance(&ds, false)
+		resp, err := p.checkForDealAcceptance(ctx, &ds, false)
 		if err != nil {
 			p.dealLogger.LogError(ds.DealUuid, "failed to send deal for acceptance", err)
 			return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
@@ -304,7 +331,10 @@ func (p *Provider) executeDeal(ds smtypes.ProviderDealState) (*api.ProviderDealR
 	return ri, nil
 }
 
-func (p *Provider) checkForDealAcceptance(ds *types.ProviderDealState, isImport bool) (acceptDealResp, error) {
+func (p *Provider) checkForDealAcceptance(ctx context.Context, ds *types.ProviderDealState, isImport bool) (acceptDealResp, error) {
+	_, span := tracing.Tracer.Start(ctx, "Provider.checkForDealAcceptance")
+	defer span.End()
+
 	// send message to run loop to run the deal through the acceptance filter and reserve the required resources
 	// then wait for a response and return the response to the client.
 	respChan := make(chan acceptDealResp, 1)
@@ -420,6 +450,9 @@ func (p *Provider) Start() error {
 
 	// Start sampling transfer data rate
 	go p.transfers.start(p.ctx)
+
+	// Start the transfer limiter
+	go p.xferLimiter.run(p.ctx)
 
 	log.Infow("storage provider: started")
 	return nil

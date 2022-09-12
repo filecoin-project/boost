@@ -71,6 +71,15 @@ type acceptError struct {
 }
 
 func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptError {
+	host, err := deal.Transfer.Host()
+	if err != nil {
+		return &acceptError{
+			error:         fmt.Errorf("failed to get deal transfer host: %w", err),
+			reason:        fmt.Sprintf("server error: get deal transfer host: %s", err),
+			isSevereError: false,
+		}
+	}
+
 	// Check that the deal proposal is unique
 	if aerr := p.checkDealPropUnique(deal); aerr != nil {
 		return aerr
@@ -85,13 +94,14 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
 	if err != nil {
 		return &acceptError{
-			error:         fmt.Errorf("failed to fetch sealing pipleine status: %w", err),
+			error:         fmt.Errorf("failed to fetch sealing pipeline status: %w", err),
 			reason:        "server error: get sealing status",
 			isSevereError: true,
 		}
 	}
 
-	// run custom decision logic
+	// run custom decision logic by invoking the deal filter
+	// (the deal filter can be configured by the user)
 	params := types.DealParams{
 		DealUUID:           deal.DealUuid,
 		ClientDealProposal: deal.ClientDealProposal,
@@ -161,7 +171,7 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 	p.logFunds(deal.DealUuid, trsp)
 
 	// tag the storage required for the deal in the staging area
-	err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.Transfer.Size)
+	err = p.storageManager.Tag(p.ctx, deal.DealUuid, deal.Transfer.Size, host)
 	if err != nil {
 		cleanup()
 
