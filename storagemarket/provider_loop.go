@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/filecoin-project/boost/api"
@@ -534,6 +535,8 @@ func (p *Provider) startDealThread(dh *dealHandler, deal *types.ProviderDealStat
 		return false, nil
 	}
 
+	var started sync.WaitGroup
+	started.Add(1)
 	p.runWG.Add(1)
 	go func() {
 		defer p.runWG.Done()
@@ -542,9 +545,14 @@ func (p *Provider) startDealThread(dh *dealHandler, deal *types.ProviderDealStat
 		}()
 
 		// Run deal
+		started.Done()
 		p.runDeal(deal, dh)
 		p.dealLogger.Infow(deal.DealUuid, "deal go-routine finished execution")
 	}()
+
+	// Wait for go-routine to start before returning, so that deal execution
+	// is started in order
+	started.Wait()
 
 	return true, nil
 }
