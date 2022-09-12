@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"os"
+	"path/filepath"
 
+	"github.com/filecoin-project/boost/loadbalancer"
 	bsnetwork "github.com/ipfs/go-bitswap/network"
 	"github.com/ipfs/go-bitswap/server"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -12,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/network"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p/p2p/muxer/mplex"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
@@ -31,10 +35,17 @@ func NewBitswapServer(port int, remoteStore blockstore.Blockstore) *BitswapServe
 	return &BitswapServer{port: port, remoteStore: remoteStore}
 }
 
-func (s *BitswapServer) Start(ctx context.Context) error {
+func (s *BitswapServer) Start(ctx context.Context, dataDir string, balancer peer.AddrInfo) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
-	// setup libp2p host
-	privKey, _, err := crypto.GenerateECDSAKeyPair(rand.Reader)
+	if dataDir == "" {
+		return fmt.Errorf("dataDir must be set")
+	}
+
+	if err := os.MkdirAll(dataDir, 0744); err != nil {
+		return err
+	}
+
+	peerkey, err := loadPeerKey(dataDir)
 	if err != nil {
 		return err
 	}
@@ -48,9 +59,14 @@ func (s *BitswapServer) Start(ctx context.Context) error {
 		libp2p.Transport(quic.NewTransport),
 		libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
 		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
-		libp2p.Identity(privKey),
+		libp2p.Identity(peerkey),
 		libp2p.ResourceManager(network.NullResourceManager),
 	)
+	if err != nil {
+		return err
+	}
+
+	host, err = loadbalancer.NewServiceNode(ctx, host, balancer)
 	if err != nil {
 		return err
 	}
@@ -72,4 +88,45 @@ func (s *BitswapServer) Start(ctx context.Context) error {
 func (s *BitswapServer) Stop() error {
 	s.cancel()
 	return s.server.Close()
+}
+
+func loadPeerKey(dataDir string) (crypto.PrivKey, error) {
+	var peerkey crypto.PrivKey
+	keyPath := filepath.Join(dataDir, "peerkey")
+	keyFile, err := os.ReadFile(keyPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+
+		log.Infof("Generating new peer key...")
+
+		key, _, err := crypto.GenerateEd25519Key(rand.Reader)
+		if err != nil {
+			return nil, err
+		}
+		peerkey = key
+
+		data, err := crypto.MarshalPrivateKey(key)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := os.WriteFile(keyPath, data, 0600); err != nil {
+			return nil, err
+		}
+	} else {
+		key, err := crypto.UnmarshalPrivateKey(keyFile)
+		if err != nil {
+			return nil, err
+		}
+
+		peerkey = key
+	}
+
+	if peerkey == nil {
+		panic("sanity check: peer key is uninitialized")
+	}
+
+	return peerkey, nil
 }

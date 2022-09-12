@@ -2,12 +2,16 @@ package modules
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/filecoin-project/boost/loadbalancer"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/fx"
 )
@@ -39,6 +43,12 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 				Addresses: []multiaddr.Multiaddr{maddr},
 			})
 		}
+		if cfg.Dealmaking.BitswapPeerID != peer.ID("") {
+			protos = append(protos, types.Protocol{
+				Name:      "bitswap",
+				Addresses: h.Addrs(),
+			})
+		}
 
 		return lp2pimpl.NewTransportsListener(h, protos), nil
 	}
@@ -55,6 +65,32 @@ func HandleRetrievalTransports(lc fx.Lifecycle, l *lp2pimpl.TransportsListener) 
 			log.Debug("stopping retrieval transports listener")
 			l.Stop()
 			return nil
+		},
+	})
+}
+
+func NewLoadBalancer(cfg *config.Boost) func(h host.Host) *loadbalancer.LoadBalancer {
+	return func(h host.Host) *loadbalancer.LoadBalancer {
+		return loadbalancer.NewLoadBalancer(h, func(p peer.ID, protocols []protocol.ID) error {
+			// for now, our load balancer simply filters all peers except the one accepted by bitswap
+			if p == cfg.Dealmaking.BitswapPeerID {
+				return nil
+			}
+			return errors.New("unauthorized")
+		})
+	}
+}
+
+func HandleLoadBalancer(lc fx.Lifecycle, lb *loadbalancer.LoadBalancer) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			log.Debug("starting retrieval transports listener")
+			lb.Start(ctx)
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			log.Debug("stopping retrieval transports listener")
+			return lb.Close()
 		},
 	})
 }

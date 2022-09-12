@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+	"path"
 	"strings"
 
 	"github.com/filecoin-project/boost/api"
@@ -85,9 +87,13 @@ var runCmd = &cli.Command{
 		port := cctx.Int("port")
 		server := NewBitswapServer(port, remoteStore)
 
+		addrs, err := bapi.NetAddrsListen(ctx)
+		if err != nil {
+			return fmt.Errorf("getting boost API addrs: %w", err)
+		}
 		// Start the server
 		log.Infof("Starting booster-bitswap node on port %d", port)
-		err = server.Start(ctx)
+		err = server.Start(ctx, dataDirPath(cctx), addrs)
 		if err != nil {
 			return err
 		}
@@ -124,4 +130,19 @@ func getBoostAPI(ctx context.Context, ai string) (api.Boost, jsonrpc.ClientClose
 	}
 
 	return api, closer, nil
+}
+
+func dataDirPath(ctx *cli.Context) string {
+	dataDir := ctx.String("data-dir")
+
+	if dataDir == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			homeDir = "./"
+		}
+
+		dataDir = path.Join(homeDir, "/.booster-bitswap")
+	}
+
+	return dataDir
 }

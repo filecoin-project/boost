@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/loadbalancer"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/impl"
 	"github.com/filecoin-project/boost/node/impl/common"
@@ -140,6 +141,7 @@ const (
 	HandleDealsKey
 	HandleRetrievalKey
 	HandleRetrievalTransportsKey
+	HandleLoadBalancerKey
 	RunSectorServiceKey
 
 	// boost should be started after legacy markets (HandleDealsKey)
@@ -523,7 +525,9 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
+		Override(new(*loadbalancer.LoadBalancer), modules.NewLoadBalancer(cfg)),
 		Override(HandleRetrievalTransportsKey, modules.HandleRetrievalTransports),
+		Override(HandleLoadBalancerKey, modules.HandleLoadBalancer),
 		Override(new(idxprov.MeshCreator), idxprov.NewMeshCreator),
 		Override(new(provider.Interface), modules.IndexProvider(cfg.IndexProvider)),
 
