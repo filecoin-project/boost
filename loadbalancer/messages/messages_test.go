@@ -97,29 +97,13 @@ func TestReadWriteFunctions(t *testing.T) {
 		expectedValue interface{}
 	}{
 		{
-			name:  "new RoutingRequest",
-			write: func(w io.Writer) error { return messages.WriteNewRoutingRequest(w, testProtocols) },
-			read:  func(r io.Reader) (interface{}, error) { return messages.ReadRoutingRequest(r) },
+			name: "new RoutingRequest",
+			write: func(w io.Writer) error {
+				return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
+			},
+			read: func(r io.Reader) (interface{}, error) { return messages.ReadRoutingRequest(r) },
 			expectedValue: &messages.RoutingRequest{
 				Kind:      messages.RoutingKindNew,
-				Protocols: testProtocols,
-			},
-		},
-		{
-			name:  "extend RoutingRequest",
-			write: func(w io.Writer) error { return messages.WriteExtendRoutingRequest(w, testProtocols) },
-			read:  func(r io.Reader) (interface{}, error) { return messages.ReadRoutingRequest(r) },
-			expectedValue: &messages.RoutingRequest{
-				Kind:      messages.RoutingKindExtend,
-				Protocols: testProtocols,
-			},
-		},
-		{
-			name:  "terminate RoutingRequest",
-			write: func(w io.Writer) error { return messages.WriteTerminateRoutingRequest(w, testProtocols) },
-			read:  func(r io.Reader) (interface{}, error) { return messages.ReadRoutingRequest(r) },
-			expectedValue: &messages.RoutingRequest{
-				Kind:      messages.RoutingKindTerminate,
 				Protocols: testProtocols,
 			},
 		},

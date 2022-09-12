@@ -21,28 +21,10 @@ func ReadRoutingRequest(s io.Reader) (*RoutingRequest, error) {
 	return routingRequestI.(*RoutingRequest), nil
 }
 
-// WriteNewRoutingRequest sends a new routing request to a load balancer for the given protocols
-func WriteNewRoutingRequest(s io.Writer, protocols []protocol.ID) error {
+// WriteRoutingRequest sends a routing request to a load balancer for the given protocols
+func WriteRoutingRequest(s io.Writer, kind RoutingKind, protocols []protocol.ID) error {
 	request := &RoutingRequest{
-		Kind:      RoutingKindNew,
-		Protocols: protocols,
-	}
-	return BindnodeRegistry.TypeToWriter(request, s, dagcbor.Encode)
-}
-
-// WriteTerminateRoutingRequest sends a terminate routing request to a load balancer for the given protocols
-func WriteTerminateRoutingRequest(s io.Writer, protocols []protocol.ID) error {
-	request := &RoutingRequest{
-		Kind:      RoutingKindTerminate,
-		Protocols: protocols,
-	}
-	return BindnodeRegistry.TypeToWriter(request, s, dagcbor.Encode)
-}
-
-// WriteExtendRoutingRequest sends a extend routing request to a load balancer for the given protocols
-func WriteExtendRoutingRequest(s io.Writer, protocols []protocol.ID) error {
-	request := &RoutingRequest{
-		Kind:      RoutingKindExtend,
+		Kind:      kind,
 		Protocols: protocols,
 	}
 	return BindnodeRegistry.TypeToWriter(request, s, dagcbor.Encode)
