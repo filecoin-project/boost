@@ -513,6 +513,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(mktsdagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
 		Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
 		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
+		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore),
 
 		// Lotus Markets (retrieval)
 		Override(new(mktsdagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),

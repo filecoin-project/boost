@@ -3,6 +3,7 @@
 /boostd
 /devnet
 /booster-http
+/booster-bitswap
 /docgen-md
 /docgen-openrpc
 extern/filecoin-ffi/rust/target
