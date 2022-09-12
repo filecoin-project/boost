@@ -39,13 +39,12 @@ type LoadBalancer struct {
 // NewRouteFilter allows user control over whether to accept a new register route request
 type NewRouteFilter func(p peer.ID, protocols []protocol.ID) error
 
-func NewLoadBalancer(ctx context.Context, h host.Host, newRouteFilter NewRouteFilter) *LoadBalancer {
-	return newLoadBalancer(ctx, h, newRouteFilter, clock.New())
+func NewLoadBalancer(h host.Host, newRouteFilter NewRouteFilter) *LoadBalancer {
+	return newLoadBalancer(h, newRouteFilter, clock.New())
 }
 
-func newLoadBalancer(ctx context.Context, h host.Host, newRouteFilter NewRouteFilter, clock clock.Clock) *LoadBalancer {
+func newLoadBalancer(h host.Host, newRouteFilter NewRouteFilter, clock clock.Clock) *LoadBalancer {
 	return &LoadBalancer{
-		ctx:            ctx,
 		h:              h,
 		newRouteFilter: newRouteFilter,
 		clock:          clock,
@@ -54,7 +53,8 @@ func newLoadBalancer(ctx context.Context, h host.Host, newRouteFilter NewRouteFi
 	}
 }
 
-func (lb *LoadBalancer) Start() {
+func (lb *LoadBalancer) Start(ctx context.Context) {
+	lb.ctx = ctx
 	lb.h.SetStreamHandler(RegisterRoutingProtocolID, lb.handleRoutingRequest)
 	lb.h.SetStreamHandler(ForwardingProtocolID, lb.handleForwarding)
 }

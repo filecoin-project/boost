@@ -4,6 +4,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
 	"github.com/ipfs/go-cid"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 // // NOTE: ONLY PUT STRUCT DEFINITIONS IN THIS FILE
@@ -173,6 +174,7 @@ type DealmakingConfig struct {
 	// The public multi-address for retrieving deals with booster-http.
 	// Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https
 	HTTPRetrievalMultiaddr string
+	BitswapPeerID          peer.ID
 }
 
 type FeeConfig struct {

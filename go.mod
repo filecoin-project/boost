@@ -10,6 +10,7 @@ require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
 	github.com/BurntSushi/toml v1.1.0
 	github.com/alecthomas/jsonschema v0.0.0-20200530073317-71f438968921
+	github.com/benbjohnson/clock v1.3.0
 	github.com/buger/goterm v1.0.3
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/davecgh/go-spew v1.1.1
@@ -82,7 +83,7 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.7.1
 	github.com/libp2p/go-libp2p-record v0.1.3
 	github.com/libp2p/go-libp2p-resource-manager v0.5.3
-	github.com/libp2p/go-msgio v0.2.0 // indirect
+	github.com/libp2p/go-msgio v0.2.0
 	github.com/mattn/go-sqlite3 v1.14.10
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/multiformats/go-multiaddr v0.6.0
