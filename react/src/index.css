@@ -132,3 +132,6 @@ h3 {
   color: #FFFFFF;
 }
 
+#dark .modal {
+  background-color: #3D3D3D;
+}

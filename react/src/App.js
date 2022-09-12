@@ -31,7 +31,7 @@ function App(props) {
 
     const toggleTheme = () => {
         const newTheme = theme ===  'light' ? 'dark' : 'light';
-        setTheme(newTheme)
+        setTheme(newTheme);
     };
     return (
         <BrowserRouter>
@@ -39,7 +39,7 @@ function App(props) {
                 <div className="dmbutton">
                     <ReactSwitch onChange={toggleTheme} onHandleColor="#888888" checkedHandleIcon={<img className="icon" alt="" src={lightImg} className="dmicon"/>} uncheckedHandleIcon={<img className="icon" alt="" src={darkImg} className="dmicon"/>} onColor="#FFFFFF" checked={theme === "dark"} uncheckedIcon={false} checkedIcon={true} />
                 </div>
-                <table className="content-table">
+                <table className="content-table" id={theme}>
                     <tbody>
                         <tr>
                             <Menu />
