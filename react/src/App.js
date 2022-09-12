@@ -19,11 +19,26 @@ import {SettingsPage} from "./Settings";
 import {Banner} from "./Banner";
 import {ProposalLogsPage} from "./ProposalLogs";
 import {InspectPage} from "./Inspect";
+import ReactSwitch from "react-switch";
+import useLocalStorage from 'use-local-storage';
+import './DarkMode.css'
+import lightImg from './bootstrap-icons/icons/sun.svg'
+import darkImg from './bootstrap-icons/icons/moon.svg'
+
 
 function App(props) {
+    const [theme, setTheme] = useLocalStorage('theme' ? 'dark': 'light');
+
+    const toggleTheme = () => {
+        const newTheme = theme ===  'light' ? 'dark' : 'light';
+        setTheme(newTheme)
+    };
     return (
         <BrowserRouter>
             <div id="content">
+                <div className="dmbutton">
+                    <ReactSwitch onChange={toggleTheme} onHandleColor="#888888" checkedHandleIcon={<img className="icon" alt="" src={lightImg} className="dmicon"/>} uncheckedHandleIcon={<img className="icon" alt="" src={darkImg} className="dmicon"/>} onColor="#FFFFFF" checked={theme === "dark"} uncheckedIcon={false} checkedIcon={true} />
+                </div>
                 <table className="content-table">
                     <tbody>
                         <tr>

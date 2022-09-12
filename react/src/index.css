@@ -111,3 +111,24 @@ h3 {
   font-weight: normal;
   font-size: 1.25em;
 }
+
+#dark body {
+  background-color: #3D3D3D;
+}
+
+#dark .page-content {
+  background-color: #3D3D3D;
+}
+
+#dark .main-content {
+  background-color: #212121;
+}
+
+#dark .page-title {
+  color: #FFFFFF;
+}
+
+#darl h3 {
+  color: #FFFFFF;
+}
+

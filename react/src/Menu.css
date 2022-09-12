@@ -58,3 +58,27 @@
 .cumulative-bar-chart .bar.free {
     background-color: rgb(210, 221, 236);
 }
+
+#dark .menu .menu-item {
+    background-color: rgb(24,24,24);
+}
+
+#dark .menu {
+    background-color: #212121;
+}
+
+#dark .menu .menu-item .menu-desc .title {
+    color: #ffffff;
+}
+
+#dark .menu .menu-item .menu-desc b {
+    color: #AAAAAA;
+}
+
+#dark .menu .menu-item h3 {
+    color: #FFFFFF;
+}
+
+#dark .menu .menu-item .icon {
+    color: #ffffff;
+}

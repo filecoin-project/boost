@@ -23,8 +23,10 @@
     "react-relay": "^12.0.0",
     "react-router-dom": "^6.2.1",
     "react-scripts": "5.0.1",
+    "react-switch": "^7.0.0",
     "relay-runtime": "^12.0.0",
     "subscriptions-transport-ws": "^0.11.0",
+    "use-local-storage": "^2.3.6",
     "web-vitals": "^1.0.1"
   },
   "scripts": {
