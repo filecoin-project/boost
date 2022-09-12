@@ -205,8 +205,7 @@ else
     lotus_checkout_dir=
 endif
 lotus_test_image=$(docker_user)/lotus-test:$(lotus_version)
-docker_build_cmd=DOCKER_BUILDKIT=1 \
-	docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image) $(docker_args)
+docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image) $(docker_args)
 
 ### lotus test docker image
 info/lotus-test:
@@ -225,7 +224,8 @@ docker/%: docker/lotus-test
 	cd docker/devnet/$* && $(docker_build_cmd) -t $(docker_user)/$*-dev:$(lotus_version) \
 		--build-arg BUILD_VERSION=$(lotus_version) .
 docker/boost: build/.update-modules docker/lotus-test
-	$(docker_build_cmd) -t $(docker_user)/boost-dev:dev --build-arg BUILD_VERSION=dev \
+	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
+		-t $(docker_user)/boost-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/boost/Dockerfile.source .
 .PHONY: docker/boost
 docker/booster-http: 
