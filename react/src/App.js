@@ -36,15 +36,13 @@ function App(props) {
     return (
         <BrowserRouter>
             <div id="content">
-                <div className="dmbutton">
-                    <ReactSwitch onChange={toggleTheme} onHandleColor="#888888" checkedHandleIcon={<img className="icon" alt="" src={lightImg} className="dmicon"/>} uncheckedHandleIcon={<img className="icon" alt="" src={darkImg} className="dmicon"/>} onColor="#FFFFFF" checked={theme === "dark"} uncheckedIcon={false} checkedIcon={true} />
-                </div>
                 <table className="content-table" id={theme}>
                     <tbody>
                         <tr>
                             <Menu />
                             <td className="main-content">
                                 <div className="page-content">
+                                    <ReactSwitch onChange={toggleTheme} onHandleColor="#888888" checkedHandleIcon={<img alt="" src={lightImg} class="dmicon" />} uncheckedHandleIcon={<img alt="" src={darkImg} class="dmicon" />} onColor="#FFFFFF" checked={theme === "dark"} uncheckedIcon={false} checkedIcon={true}/>
                                     <Epoch />
                                     <Banner />
                                     <Routes>

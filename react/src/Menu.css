@@ -60,11 +60,11 @@
 }
 
 #dark .menu .menu-item {
-    background-color: rgb(24,24,24);
+    background-color: #3D3D3D;
 }
 
 #dark .menu {
-    background-color: #212121;
+    background-color: #3D3D3D;
 }
 
 #dark .menu .menu-item .menu-desc .title {
@@ -80,5 +80,5 @@
 }
 
 #dark .menu .menu-item .icon {
-    color: #ffffff;
+    filter: invert(100%);
 }
