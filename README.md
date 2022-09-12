@@ -228,11 +228,11 @@ cd docker/devnet
 docker compose up -d
 ```
 
-It will spin up `lotus`, `lotus-miner`, `boost`, `boost-gui` and `demo-http-server` containers. All temporary data will be saved in `./data` folder.
+It will spin up `lotus`, `lotus-miner`, `boost`, `booster-http` and `demo-http-server` containers. All temporary data will be saved in `./data` folder.
 
 The initial setup could take up to 20 min or more as it needs to download Filecoin proof parameters. During the initial setup, it is normal to see error messages in the log. Containers are waiting for the lotus to be ready. It may timeout several times. Restart is expected to be managed by `docker`.
 
-2. Try opening the Boost GUI http://localhost:8000 . Devnet is ready to operate when the URL opens and indicates no errors on the startup page.
+2. Try opening the Boost GUI http://localhost:8080 . Devnet is ready to operate when the URL opens and indicates no errors on the startup page.
 
 You can inspect the status using `docker compose logs -f`.
 
