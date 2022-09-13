@@ -1,27 +1,9 @@
-type RequestKind enum {
-  | New ("n")
-  | Extend ("e")
-  | Terminate ("t")
-} representation string
-
 type ProtocolID string
-type RoutingRequest struct {
-   Kind RequestKind (rename "k")
-   Protocols [ProtocolID] (rename "ps")
-} representation map
 
 type ResponseCode enum {
   | Ok ("o")
   | Rejected ("r")
 } representation string
-
-type DateTime int
-
-type RoutingResponse struct {
-  Code ResponseCode (rename "c")
-  Message String (rename "m") # more info if rejected
-  Expiry optional DateTime (rename "e")
-} representation map
 
 type ForwardingKind enum {
   | Inbound ("i")
@@ -41,6 +23,6 @@ type ForwardingRequest struct {
 type ForwardingResponse struct {
   Code ResponseCode (rename "c")
   Message String (rename "m") # more info if rejected
-  ProtocolID optional ProtocolID (rename "p") # only present in response to outbound request
-  RemotePubKey optional PubKey (rename "pk") # only present in response to outbound request
+  ProtocolID optional ProtocolID (rename "p") 
+  RemotePubKey optional PubKey (rename "pk") 
 }

@@ -4,7 +4,6 @@ import (
 	// to embed schema
 	_ "embed"
 	"fmt"
-	"time"
 
 	"github.com/ipld/go-ipld-prime/node/bindnode"
 	bindnoderegistry "github.com/ipld/go-ipld-prime/node/bindnode/registry"
@@ -12,24 +11,6 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 )
-
-// RoutingKind indicates the type of routing request we are making
-type RoutingKind string
-
-const (
-	// RoutingKindNew is a request to register a new protocol route
-	RoutingKindNew RoutingKind = "New"
-	// RoutingKindExtend is a request to extend an existing protocol route
-	RoutingKindExtend RoutingKind = "Extend"
-	// RoutingKindTerminate is a request to terminate an existing protocol route
-	RoutingKindTerminate RoutingKind = "Terminate"
-)
-
-// RoutingRequest is a request to register a new route, extend a route, or terminate a route
-type RoutingRequest struct {
-	Kind      RoutingKind
-	Protocols []protocol.ID
-}
 
 // ResponseCode indicates a success or failure on either the register-routing or the forwarding protocols
 type ResponseCode string
@@ -41,13 +22,6 @@ const (
 	// of the response
 	ResponseRejected ResponseCode = "Rejected"
 )
-
-// RoutingResponse is a response on the register-routing protocol
-type RoutingResponse struct {
-	Code    ResponseCode
-	Message string // more info if rejected
-	Expiry  *time.Time
-}
 
 // ForwardingKind indicates the direction of a forwarding request
 type ForwardingKind string
@@ -69,29 +43,16 @@ type ForwardingRequest struct {
 	Protocols    []protocol.ID  // Should always be length 1 for Inbound requests
 }
 
-// ForwardingResponse is a response indicating the result of a forwarding request
+// ForwardingResponse is a response to and outbound forwarding request
 type ForwardingResponse struct {
 	Code         ResponseCode
-	Message      string         // more info if rejected
-	ProtocolID   *protocol.ID   // only present in response to outbound request
-	RemotePubKey *crypto.PubKey // only present in response to outbound request
+	Message      string // more info if rejected
+	ProtocolID   *protocol.ID
+	RemotePubKey *crypto.PubKey
 }
 
 //go:embed messages.ipldsch
 var embedSchema []byte
-
-func timeFromInt(i int64) (interface{}, error) {
-	t := time.Unix(0, i)
-	return &t, nil
-}
-
-func timeToInt(iface interface{}) (int64, error) {
-	t, ok := iface.(*time.Time)
-	if !ok {
-		return 0, fmt.Errorf("expected time.Time value")
-	}
-	return t.UnixNano(), nil
-}
 
 func pubKeyToBytes(iface interface{}) ([]byte, error) {
 	pk, ok := iface.(*crypto.PubKey)
@@ -109,9 +70,6 @@ func pubKeyFromBytes(b []byte) (interface{}, error) {
 	return &pk, err
 }
 
-// TimeBindnodeOption converts a time.Time to and from an encoded CBOR int
-var TimeBindnodeOption = bindnode.TypedIntConverter(&time.Time{}, timeFromInt, timeToInt)
-
 // PubKeyBindnodeOption converts a crypto.PubKey to and from bytes
 var PubKeyBindnodeOption = bindnode.TypedBytesConverter(((*crypto.PubKey)(nil)), pubKeyFromBytes, pubKeyToBytes)
 
@@ -119,7 +77,6 @@ var PubKeyBindnodeOption = bindnode.TypedBytesConverter(((*crypto.PubKey)(nil)),
 var BindnodeRegistry = bindnoderegistry.NewRegistry()
 
 var messagesBindnodeOptions = []bindnode.Option{
-	TimeBindnodeOption,
 	PubKeyBindnodeOption,
 }
 
@@ -128,8 +85,6 @@ func init() {
 		typ     interface{}
 		typName string
 	}{
-		{(*RoutingRequest)(nil), "RoutingRequest"},
-		{(*RoutingResponse)(nil), "RoutingResponse"},
 		{(*ForwardingRequest)(nil), "ForwardingRequest"},
 		{(*ForwardingResponse)(nil), "ForwardingResponse"},
 	} {

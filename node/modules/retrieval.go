@@ -2,13 +2,13 @@ package modules
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/filecoin-project/boost/loadbalancer"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
+	"github.com/ipfs/go-bitswap/network"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
@@ -69,15 +69,18 @@ func HandleRetrievalTransports(lc fx.Lifecycle, l *lp2pimpl.TransportsListener) 
 	})
 }
 
-func NewLoadBalancer(cfg *config.Boost) func(h host.Host) *loadbalancer.LoadBalancer {
-	return func(h host.Host) *loadbalancer.LoadBalancer {
-		return loadbalancer.NewLoadBalancer(h, func(p peer.ID, protocols []protocol.ID) error {
-			// for now, our load balancer simply filters all peers except the one accepted by bitswap
-			if p == cfg.Dealmaking.BitswapPeerID {
-				return nil
+func NewLoadBalancer(cfg *config.Boost) func(h host.Host) (*loadbalancer.LoadBalancer, error) {
+	return func(h host.Host) (*loadbalancer.LoadBalancer, error) {
+		peerConfig := map[peer.ID][]protocol.ID{}
+		if cfg.Dealmaking.BitswapPeerID != "" {
+			peerConfig[cfg.Dealmaking.BitswapPeerID] = []protocol.ID{
+				network.ProtocolBitswap,
+				network.ProtocolBitswapNoVers,
+				network.ProtocolBitswapOneOne,
+				network.ProtocolBitswapOneZero,
 			}
-			return errors.New("unauthorized")
-		})
+		}
+		return loadbalancer.NewLoadBalancer(h, peerConfig)
 	}
 }
 
