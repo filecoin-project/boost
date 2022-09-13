@@ -239,8 +239,6 @@ func (lb *LoadBalancer) handleForwarding(s network.Stream) {
 		return
 	}
 
-	defer s.Close()
-
 	// only accept outbound requests
 	if request.Kind != messages.ForwardingOutbound {
 		messages.WriteForwardingResponseError(s, ErrNoInboundRequests)
