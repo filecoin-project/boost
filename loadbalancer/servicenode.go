@@ -421,7 +421,9 @@ func (sn *ServiceNode) RemoveStreamHandler(pid protocol.ID) {
 	handler.closeLk.Unlock()
 
 	// stop any timers on the channel
-	handler.renewTimer.Stop()
+	if handler.renewTimer != nil {
+		handler.renewTimer.Stop()
+	}
 
 	// Terminate a route with the load balancer
 	// TODO: What should we do if this erorrs? We may continue to get
