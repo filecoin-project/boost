@@ -11,6 +11,7 @@ import (
 	bclient "github.com/filecoin-project/boost/api/client"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
+	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/go-jsonrpc"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/urfave/cli/v2"
@@ -35,6 +36,16 @@ var runCmd = &cli.Command{
 			Usage:    "the endpoint for the boost API",
 			Required: true,
 		},
+		&cli.BoolFlag{
+			Name:  "tracing",
+			Usage: "enables tracing of booster-bitswap calls",
+			Value: false,
+		},
+		&cli.StringFlag{
+			Name:  "tracing-endpoint",
+			Usage: "the endpoint for the tracing exporter",
+			Value: "http://tempo:14268/api/traces",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -46,8 +57,22 @@ var runCmd = &cli.Command{
 			}()
 		}
 
-		// Connect to the Boost API
 		ctx := lcli.ReqContext(cctx)
+
+		// Instantiate the tracer and exporter
+		if cctx.Bool("tracing") {
+			tracingStopper, err := tracing.New("booster-bitswap", cctx.String("tracing-endpoint"))
+			if err != nil {
+				return fmt.Errorf("failed to instantiate tracer: %w", err)
+			}
+			log.Info("Tracing exporter enabled")
+
+			defer func() {
+				_ = tracingStopper(ctx)
+			}()
+		}
+
+		// Connect to the Boost API
 		boostAPIInfo := cctx.String("api-boost")
 		bapi, bcloser, err := getBoostAPI(ctx, boostAPIInfo)
 		if err != nil {

@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 
+	"github.com/filecoin-project/boost/tracing"
 	blocks "github.com/ipfs/go-block-format"
 	logging "github.com/ipfs/go-log/v2"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -33,6 +35,10 @@ func NewRemoteBlockstore(api RemoteBlockstoreAPI) blockstore.Blockstore {
 }
 
 func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block, err error) {
+	ctx, span := tracing.Tracer.Start(ctx, "rbls.get")
+	defer span.End()
+	span.SetAttributes(attribute.String("cid", c.String()))
+
 	log.Debugw("Get", "cid", c)
 	data, err := ro.api.BlockstoreGet(ctx, c)
 	log.Debugw("Get response", "cid", c, "error", err)
@@ -43,6 +49,10 @@ func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block,
 }
 
 func (ro *RemoteBlockstore) Has(ctx context.Context, c cid.Cid) (bool, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "rbls.has")
+	defer span.End()
+	span.SetAttributes(attribute.String("cid", c.String()))
+
 	log.Debugw("Has", "cid", c)
 	has, err := ro.api.BlockstoreHas(ctx, c)
 	log.Debugw("Has response", "cid", c, "has", has, "error", err)
@@ -50,6 +60,10 @@ func (ro *RemoteBlockstore) Has(ctx context.Context, c cid.Cid) (bool, error) {
 }
 
 func (ro *RemoteBlockstore) GetSize(ctx context.Context, c cid.Cid) (int, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "rbls.get_size")
+	defer span.End()
+	span.SetAttributes(attribute.String("cid", c.String()))
+
 	log.Debugw("GetSize", "cid", c)
 	size, err := ro.api.BlockstoreGetSize(ctx, c)
 	log.Debugw("GetSize response", "cid", c, "size", size, "error", err)

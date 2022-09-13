@@ -82,6 +82,22 @@ services:
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/lotus-miner:/var/lib/lotus-miner:ro
 
+  booster-bitswap:
+    container_name: booster-bitswap
+    image: ${BOOSTER_BITSWAP_IMAGE}
+    ports:
+      - "8888:8888"
+    environment:
+      - BOOST_PATH=/var/lib/boost
+      - LOTUS_PATH=/var/lib/lotus
+      - LOTUS_MINER_PATH=/var/lib/lotus-miner
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./data/boost:/var/lib/boost:ro
+      - ./data/lotus:/var/lib/lotus:ro
+      - ./data/lotus-miner:/var/lib/lotus-miner:ro
+
   demo-http-server:
     container_name: demo-http-server
     image: nginx:1.23-alpine
