@@ -10,4 +10,4 @@ echo $MINER_API_INFO
 echo $BOOST_API_INFO
 
 echo Starting booster-bitswap...
-exec booster-bitswap run --api-boost=$BOOST_API_INFO
+exec booster-bitswap run --api-boost=$BOOST_API_INFO --tracing
