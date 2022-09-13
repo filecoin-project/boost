@@ -1,5 +1,5 @@
 type RequestKind enum {
-	| New ("n")
+  | New ("n")
   | Extend ("e")
   | Terminate ("t")
 } representation string
