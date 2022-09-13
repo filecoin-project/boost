@@ -90,7 +90,9 @@ func (sn *ServiceNode) Close() error {
 			registeredHandler.closeLk.Unlock()
 
 			// stop any renew timers
-			registeredHandler.renewTimer.Stop()
+			if registeredHandler.renewTimer != nil {
+				registeredHandler.renewTimer.Stop()
+			}
 
 			// attempt to cancel routing
 			_, err := sn.sendRoutingRequest(messages.RoutingKindTerminate, id)
