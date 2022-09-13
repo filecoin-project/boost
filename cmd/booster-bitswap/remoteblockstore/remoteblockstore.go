@@ -3,14 +3,16 @@ package remoteblockstore
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/filecoin-project/boost/tracing"
 	blocks "github.com/ipfs/go-block-format"
-	logging "github.com/ipfs/go-log/v2"
-	"go.opentelemetry.io/otel/attribute"
-
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	format "github.com/ipfs/go-ipld-format"
+	logging "github.com/ipfs/go-log/v2"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 var log = logging.Logger("remote-blockstore")
@@ -41,6 +43,7 @@ func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block,
 
 	log.Debugw("Get", "cid", c)
 	data, err := ro.api.BlockstoreGet(ctx, c)
+	err = normalizeError(err)
 	log.Debugw("Get response", "cid", c, "error", err)
 	if err != nil {
 		return nil, err
@@ -66,6 +69,7 @@ func (ro *RemoteBlockstore) GetSize(ctx context.Context, c cid.Cid) (int, error)
 
 	log.Debugw("GetSize", "cid", c)
 	size, err := ro.api.BlockstoreGetSize(ctx, c)
+	err = normalizeError(err)
 	log.Debugw("GetSize response", "cid", c, "size", size, "error", err)
 	return size, err
 }
@@ -83,4 +87,46 @@ func (ro *RemoteBlockstore) PutMany(context.Context, []blocks.Block) error {
 }
 func (ro *RemoteBlockstore) AllKeysChan(ctx context.Context) (<-chan cid.Cid, error) {
 	return nil, errors.New("unsupported operation AllKeysChan")
+}
+
+const (
+	ipldNotFoundUndefCid = "ipld: could not find node"
+	ipldNotFoundPrefix   = "ipld: could not find "
+)
+
+// go-bitswap expects that if a block is not found, the blockstore methods
+// will return an ipld.ErrNotFound
+// However the remote blockstore calls across an RPC boundary, which turns
+// errors into strings. Therefore we need to parse the string and return
+// the ipld.ErrNotFound type where appropriate.
+func normalizeError(err error) error {
+	errMsg := err.Error()
+
+	// First check for ErrNotFound with an undefined cid
+	idx := strings.Index(errMsg, ipldNotFoundUndefCid)
+	if idx != -1 {
+		rest := errMsg[:idx]
+		if len(rest) > 2 && rest[len(rest)-2:] != ": " {
+			rest += ": "
+		}
+		return fmt.Errorf("%s%w", rest, format.ErrNotFound{})
+	}
+
+	// Check for ErrNotFound with a cid
+	idx = strings.Index(errMsg, ipldNotFoundPrefix)
+	if idx == -1 {
+		return err
+	}
+
+	cidStr := errMsg[idx+len(ipldNotFoundPrefix):]
+	c, e := cid.Parse(cidStr)
+	if e != nil {
+		return err
+	}
+
+	rest := errMsg[:idx]
+	if len(rest) > 2 && rest[len(rest)-2:] != ": " {
+		rest += ": "
+	}
+	return fmt.Errorf("%s%w", rest, format.ErrNotFound{Cid: c})
 }
