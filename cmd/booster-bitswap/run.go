@@ -38,7 +38,7 @@ var runCmd = &cli.Command{
 		},
 		&cli.BoolFlag{
 			Name:  "tracing",
-			Usage: "enables tracing of booster-http calls",
+			Usage: "enables tracing of booster-bitswap calls",
 			Value: false,
 		},
 		&cli.StringFlag{
@@ -67,7 +67,9 @@ var runCmd = &cli.Command{
 			}
 			log.Info("Tracing exporter enabled")
 
-			defer tracingStopper(ctx)
+			defer func() {
+				_ = tracingStopper(ctx)
+			}()
 		}
 
 		// Connect to the Boost API
