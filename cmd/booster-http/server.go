@@ -223,7 +223,8 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 
 func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
-	ctx := r.Context()
+	ctx, span := tracing.Tracer.Start(r.Context(), "http.piece_cid")
+	defer span.End()
 	stats.Record(ctx, metrics.HttpPieceByCidRequestCount.M(1))
 
 	// Remove the path up to the piece cid
