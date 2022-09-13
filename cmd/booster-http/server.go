@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
@@ -24,6 +25,7 @@ import (
 	"github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
 	"github.com/multiformats/go-varint"
+	"go.opencensus.io/stats"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -75,6 +77,7 @@ func (s *HttpServer) Start(ctx context.Context) {
 	handler.HandleFunc(s.pieceBasePath(), s.handleByPieceCid)
 	handler.HandleFunc("/", s.handleIndex)
 	handler.HandleFunc("/index.html", s.handleIndex)
+	handler.Handle("/metrics", metrics.Exporter("booster_http")) // metrics
 	s.server = &http.Server{
 		Addr:    listenAddr,
 		Handler: handler,
@@ -148,8 +151,11 @@ func (s *HttpServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
 	ctx, span := tracing.Tracer.Start(r.Context(), "http.payload_cid")
 	defer span.End()
+
+	stats.Record(ctx, metrics.HttpPayloadByCidRequestCount.M(1))
 
 	// Remove the path up to the payload cid
 	prefixLen := len(s.payloadBasePath())
@@ -210,9 +216,17 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Etag", etag)
 
 	serveContent(w, r, content, getContentType(isCar))
+
+	// Record retrieval duration
+	stats.Record(ctx, metrics.HttpPayloadByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
 
 func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+	ctx, span := tracing.Tracer.Start(r.Context(), "http.piece_cid")
+	defer span.End()
+	stats.Record(ctx, metrics.HttpPieceByCidRequestCount.M(1))
+
 	// Remove the path up to the piece cid
 	prefixLen := len(s.pieceBasePath())
 	if len(r.URL.Path) <= prefixLen {
@@ -232,7 +246,6 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get a reader over the the piece
-	ctx := r.Context()
 	content, err := s.getPieceContent(ctx, pieceCid)
 	if err == nil && isCar {
 		content, err = s.getCarContent(pieceCid, content)
@@ -256,6 +269,9 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Etag", etag)
 
 	serveContent(w, r, content, getContentType(isCar))
+
+	// Record retrieval duration
+	stats.Record(ctx, metrics.HttpPieceByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
 
 func getContentType(isCar bool) string {

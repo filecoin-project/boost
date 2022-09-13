@@ -7,11 +7,16 @@ import (
 	"contrib.go.opencensus.io/exporter/prometheus"
 	logging "github.com/ipfs/go-log/v2"
 	promclient "github.com/prometheus/client_golang/prometheus"
+	"go.opencensus.io/stats/view"
 )
 
 var log = logging.Logger("metrics")
 
-func Exporter() http.Handler {
+func Exporter(namespace string) http.Handler {
+	if err := view.Register(DefaultViews...); err != nil {
+		log.Errorf("cannot register default metric views: %s", err)
+	}
+
 	// Prometheus globals are exposed as interfaces, but the prometheus
 	// OpenCensus exporter expects a concrete *Registry. The concrete type of
 	// the globals are actually *Registry, so we downcast them, staying
@@ -22,7 +27,7 @@ func Exporter() http.Handler {
 	}
 	exporter, err := prometheus.NewExporter(prometheus.Options{
 		Registry:  registry,
-		Namespace: "lotus",
+		Namespace: namespace,
 	})
 	if err != nil {
 		log.Errorf("could not create the prometheus stats exporter: %v", err)
