@@ -3,7 +3,6 @@ package messages
 import (
 	"bytes"
 	"io"
-	"time"
 
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -11,52 +10,6 @@ import (
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-msgio"
 )
-
-// ReadRoutingRequest reads a new routing request from a network stream
-func ReadRoutingRequest(s io.Reader) (*RoutingRequest, error) {
-	routingRequestI, err := BindnodeRegistry.TypeFromReader(s, (*RoutingRequest)(nil), dagcbor.Decode)
-	if err != nil {
-		return nil, err
-	}
-	return routingRequestI.(*RoutingRequest), nil
-}
-
-// WriteRoutingRequest sends a routing request to a load balancer for the given protocols
-func WriteRoutingRequest(s io.Writer, kind RoutingKind, protocols []protocol.ID) error {
-	request := &RoutingRequest{
-		Kind:      kind,
-		Protocols: protocols,
-	}
-	return BindnodeRegistry.TypeToWriter(request, s, dagcbor.Encode)
-}
-
-// ReadRoutingResponse reads a new routing response from a network stream
-func ReadRoutingResponse(s io.Reader) (*RoutingResponse, error) {
-	routingResponseI, err := BindnodeRegistry.TypeFromReader(s, (*RoutingResponse)(nil), dagcbor.Decode)
-	if err != nil {
-		return nil, err
-	}
-	return routingResponseI.(*RoutingResponse), nil
-}
-
-// WriteRoutingResponseError sends a routing response with code Rejected and a message containing the error to
-// an io.Writer
-func WriteRoutingResponseError(s io.Writer, err error) error {
-	response := &RoutingResponse{
-		Code:    ResponseRejected,
-		Message: err.Error(),
-	}
-	return BindnodeRegistry.TypeToWriter(response, s, dagcbor.Encode)
-}
-
-// WriteRoutingResponseSuccess sends a routing response with code OK and the given expiry, if present
-func WriteRoutingResponseSuccess(s io.Writer, expiry *time.Time) error {
-	response := &RoutingResponse{
-		Code:   ResponseOk,
-		Expiry: expiry,
-	}
-	return BindnodeRegistry.TypeToWriter(response, s, dagcbor.Encode)
-}
 
 // ReadForwardingRequest reads a forwarding request from a network stream
 func ReadForwardingRequest(s io.Reader) (*ForwardingRequest, error) {
@@ -127,19 +80,6 @@ func WriteOutboundForwardingResponseSuccess(s io.Writer, remotePubKey crypto.Pub
 		Code:         ResponseOk,
 		RemotePubKey: &remotePubKey,
 		ProtocolID:   &protocolID,
-	}
-	buf, err := BindnodeRegistry.TypeToBytes(response, dagcbor.Encode)
-	if err != nil {
-		return err
-	}
-	delimited := msgio.NewVarintWriter(s)
-	return delimited.WriteMsg(buf)
-}
-
-// WriteInboundForwardingResponseSuccess writes a new inbound forwarding success response to a network strema
-func WriteInboundForwardingResponseSuccess(s io.Writer) error {
-	response := &ForwardingResponse{
-		Code: ResponseOk,
 	}
 	buf, err := BindnodeRegistry.TypeToBytes(response, dagcbor.Encode)
 	if err != nil {

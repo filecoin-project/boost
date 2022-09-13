@@ -8,223 +8,116 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benbjohnson/clock"
 	"github.com/filecoin-project/boost/loadbalancer/messages"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/multiformats/go-multiaddr"
 )
 
 const DefaultDuration = time.Hour
 
 var log = logging.Logger("loadbalancer")
 
-type registeredRoute struct {
-	protocol    protocol.ID
-	expiryTimer *clock.Timer
-}
-
 type LoadBalancer struct {
 	ctx            context.Context
 	h              host.Host
-	newRouteFilter NewRouteFilter
-	clock          clock.Clock
-	routesLk       sync.RWMutex
-	peers          map[peer.ID][]*registeredRoute
-	routes         map[protocol.ID]peer.ID
+	peerConfig     map[peer.ID][]protocol.ID
+	activeRoutesLk sync.RWMutex
+	activeRoutes   map[protocol.ID]peer.ID
 }
 
-// NewRouteFilter allows user control over whether to accept a new register route request
-type NewRouteFilter func(p peer.ID, protocols []protocol.ID) error
-
-func NewLoadBalancer(h host.Host, newRouteFilter NewRouteFilter) *LoadBalancer {
-	return newLoadBalancer(h, newRouteFilter, clock.New())
-}
-
-func newLoadBalancer(h host.Host, newRouteFilter NewRouteFilter, clock clock.Clock) *LoadBalancer {
-	return &LoadBalancer{
-		h:              h,
-		newRouteFilter: newRouteFilter,
-		clock:          clock,
-		peers:          make(map[peer.ID][]*registeredRoute),
-		routes:         make(map[protocol.ID]peer.ID),
+func NewLoadBalancer(h host.Host, peerConfig map[peer.ID][]protocol.ID) (*LoadBalancer, error) {
+	// for now, double check no peers overlap in config
+	// TODO: support multiple peers owning a config
+	routesSet := map[protocol.ID]struct{}{}
+	for _, protocols := range peerConfig {
+		for _, protocol := range protocols {
+			_, existing := routesSet[protocol]
+			if existing {
+				return nil, errors.New("Route registered for multiple peers")
+			}
+		}
 	}
+	return &LoadBalancer{
+		h:            h,
+		activeRoutes: make(map[protocol.ID]peer.ID),
+		peerConfig:   peerConfig,
+	}, nil
 }
 
 func (lb *LoadBalancer) Start(ctx context.Context) {
 	lb.ctx = ctx
-	lb.h.SetStreamHandler(RegisterRoutingProtocolID, lb.handleRoutingRequest)
 	lb.h.SetStreamHandler(ForwardingProtocolID, lb.handleForwarding)
+	lb.h.Network().Notify(lb)
 }
 
 func (lb *LoadBalancer) Close() error {
-	lb.h.RemoveStreamHandler(RegisterRoutingProtocolID)
 	lb.h.RemoveStreamHandler(ForwardingProtocolID)
 
-	lb.routesLk.RLock()
-	for id := range lb.routes {
+	lb.activeRoutesLk.RLock()
+	for id := range lb.activeRoutes {
 		lb.h.RemoveStreamHandler(id)
 	}
-	lb.routesLk.RUnlock()
+	lb.activeRoutesLk.RUnlock()
+	lb.h.Network().StopNotify(lb)
 	return nil
 }
 
-// handling a new routing request
-func (lb *LoadBalancer) handleRoutingRequest(s network.Stream) {
-	p := s.Conn().RemotePeer()
+// Listen satifies the network.Notifee interface but does nothing
+func (lb *LoadBalancer) Listen(network.Network, multiaddr.Multiaddr) {} // called when network starts listening on an addr
 
-	// read request
-	request, err := messages.ReadRoutingRequest(s)
-	if err != nil {
-		log.Warnf("reading routingRequest: %s", err)
-		_ = s.Reset()
+// ListenClose satifies the network.Notifee interface but does nothing
+func (lb *LoadBalancer) ListenClose(network.Network, multiaddr.Multiaddr) {} // called when network stops listening on an addr
+
+// Connected checks the peersConfig and begins listening any time a service node connects
+func (lb *LoadBalancer) Connected(n network.Network, c network.Conn) {
+	// read the peer that just connected
+	p := c.RemotePeer()
+
+	// check if they are in the peer config
+	protocols, isServiceNode := lb.peerConfig[p]
+
+	if !isServiceNode {
 		return
 	}
 
-	defer s.Close()
-
-	expiry := lb.clock.Now().Add(DefaultDuration)
-
-	// process request
-	routingErr := lb.processRoutingRequest(p, request, expiry)
-
-	// send response
-	if routingErr != nil {
-		err = messages.WriteRoutingResponseError(s, routingErr)
-	} else {
-		// don't send an expiry for terminate requests
-		expiryPtr := &expiry
-		if request.Kind == messages.RoutingKindTerminate {
-			expiryPtr = nil
-		}
-		err = messages.WriteRoutingResponseSuccess(s, expiryPtr)
-	}
-
-	// log any errors writing the response
-	if err != nil {
-		log.Warnf("writing routing response: %s", err)
-		return
-	}
-}
-
-func (lb *LoadBalancer) processRoutingRequest(p peer.ID, request *messages.RoutingRequest, expiry time.Time) error {
-	lb.routesLk.Lock()
-	defer lb.routesLk.Unlock()
-	switch request.Kind {
-	case messages.RoutingKindNew:
-		// handle new requests
-		return lb.setupNewRoutes(p, request.Protocols, expiry)
-	case messages.RoutingKindExtend:
-		// handle route extensions
-		return lb.extendRoutes(p, request.Protocols, expiry)
-	case messages.RoutingKindTerminate:
-		// handle terminates
-		return lb.terminateRoutes(p, request.Protocols)
-	default:
-		// this case really shouldn't happen -- it should fail deserializing the request
-		return errors.New("unrecognized request kind")
-	}
-}
-
-func (lb *LoadBalancer) setupNewRoutes(p peer.ID, protocols []protocol.ID, expiry time.Time) error {
-
-	// check route filter if present to verify if we can setup this route
-	if lb.newRouteFilter != nil {
-		err := lb.newRouteFilter(p, protocols)
-		if err != nil {
-			return err
-		}
-	}
-
-	// check existing routes
+	// if they are in the peer config, listen on all protocols they are setup for
+	lb.activeRoutesLk.Lock()
+	defer lb.activeRoutesLk.Unlock()
 	for _, id := range protocols {
-		if _, ok := lb.routes[id]; ok {
-			// error if this protocol is already registered
-			return ErrAlreadyRegistered{id}
+		// check if we already registered this protocol
+		if _, ok := lb.activeRoutes[id]; ok {
+			continue
 		}
-	}
-
-	// setup routes
-	for _, id := range protocols {
-		id := id
-		expiryTimer := lb.clock.AfterFunc(expiry.Sub(lb.clock.Now()), func() {
-			lb.routesLk.Lock()
-			lb.expireRoute(id, false)
-			lb.routesLk.Unlock()
-		})
-		lb.peers[p] = append(lb.peers[p], &registeredRoute{id, expiryTimer})
-		lb.routes[id] = p
+		lb.activeRoutes[id] = p
 		lb.h.SetStreamHandler(id, lb.handleIncoming)
 	}
-	return nil
 }
 
-func (lb *LoadBalancer) extendRoutes(p peer.ID, protocols []protocol.ID, expiry time.Time) error {
+// Disconnected checks the peersConfig and removes listening when a service node disconnects
+func (lb *LoadBalancer) Disconnected(n network.Network, c network.Conn) { // called when a connection closed
+	// read the peer that just connected
+	p := c.RemotePeer()
 
-	// check routes to verify ownership
-	for _, id := range protocols {
-		registeredPeer, ok := lb.routes[id]
-		if !ok || p != registeredPeer {
-			// error if this protocol not registered to this peer
-			return ErrNotRegistered{p, id}
-		}
-	}
+	// check if they are in the peer config
+	protocols, isServiceNode := lb.peerConfig[p]
 
-	// setup routes
-	for _, id := range protocols {
-		id := id
-		for _, route := range lb.peers[p] {
-			if route.protocol == id {
-				// TODO: is there a race around the timer stopping but the after func not yet being called?
-				route.expiryTimer.Stop()
-				route.expiryTimer = lb.clock.AfterFunc(expiry.Sub(lb.clock.Now()), func() {
-					lb.routesLk.Lock()
-					lb.expireRoute(id, false)
-					lb.routesLk.Unlock()
-				})
-				break
-			}
-		}
-	}
-	return nil
-}
-
-func (lb *LoadBalancer) terminateRoutes(p peer.ID, protocols []protocol.ID) error {
-
-	// check routes to verify ownership
-	for _, id := range protocols {
-		registeredPeer, ok := lb.routes[id]
-		if !ok || p != registeredPeer {
-			// error if this protocol not registered to this peer
-			return ErrNotRegistered{p, id}
-		}
-	}
-
-	// expire each route
-	for _, id := range protocols {
-		lb.expireRoute(id, true)
-	}
-	return nil
-}
-
-func (lb *LoadBalancer) expireRoute(id protocol.ID, stopTimer bool) {
-	p, ok := lb.routes[id]
-	if !ok {
+	if !isServiceNode {
 		return
 	}
-	lb.h.RemoveStreamHandler(id)
-	delete(lb.routes, id)
-	for i, route := range lb.peers[p] {
-		if route.protocol == id {
-			if stopTimer {
-				route.expiryTimer.Stop()
-			}
-			lb.peers[p][i] = lb.peers[p][len(lb.peers)-1]
-			lb.peers[p] = lb.peers[p][:len(lb.peers[p])-1]
+	// if they are in the peer config, 'un'-listen on all protocols they are setup for
+	lb.activeRoutesLk.Lock()
+	defer lb.activeRoutesLk.Unlock()
+	for _, id := range protocols {
+		// check if we already de-registered this protocol
+		if _, ok := lb.activeRoutes[id]; !ok {
+			continue
 		}
-		break
+		delete(lb.activeRoutes, id)
+		lb.h.RemoveStreamHandler(id)
 	}
 }
 
@@ -273,17 +166,17 @@ func (lb *LoadBalancer) handleForwarding(s network.Stream) {
 }
 
 func (lb *LoadBalancer) processForwardingRequest(p peer.ID, remote peer.ID, protocols []protocol.ID) (network.Stream, error) {
-	lb.routesLk.RLock()
+	lb.activeRoutesLk.RLock()
 	// check routes to verify ownership
 	for _, id := range protocols {
-		registeredPeer, ok := lb.routes[id]
+		registeredPeer, ok := lb.activeRoutes[id]
 		if !ok || p != registeredPeer {
-			lb.routesLk.RUnlock()
+			lb.activeRoutesLk.RUnlock()
 			// error if this protocol not registered to this peer
 			return nil, ErrNotRegistered{p, id}
 		}
 	}
-	lb.routesLk.RUnlock()
+	lb.activeRoutesLk.RUnlock()
 	s, err := lb.h.NewStream(lb.ctx, remote, protocols...)
 	if err != nil {
 		return nil, fmt.Errorf("remote peer: %w", err)
@@ -320,9 +213,9 @@ func (lb *LoadBalancer) handleIncoming(s network.Stream) {
 	defer s.Close()
 
 	// check routed peer for this stream
-	lb.routesLk.RLock()
-	routedPeer, ok := lb.routes[s.Protocol()]
-	lb.routesLk.RUnlock()
+	lb.activeRoutesLk.RLock()
+	routedPeer, ok := lb.activeRoutes[s.Protocol()]
+	lb.activeRoutesLk.RUnlock()
 	if !ok {
 		// if none exists, return
 		log.Warnf("received protocol request for protocol '%s' with no router peer", s.Protocol())
@@ -344,21 +237,6 @@ func (lb *LoadBalancer) handleIncoming(s network.Stream) {
 	if err != nil {
 		log.Warnf("writing forwarding request: %s", err)
 		routedStream.Reset()
-		s.Reset()
-		return
-	}
-
-	// read the response
-	inbound, err := messages.ReadForwardingResponse(routedStream)
-	if err != nil {
-		log.Warnf("reading forwarding response: %s", err)
-		routedStream.Reset()
-		s.Reset()
-		return
-	}
-
-	// close streams and reset if the forwarding request was not accepted
-	if inbound.Code != messages.ResponseOk {
 		s.Reset()
 		return
 	}
