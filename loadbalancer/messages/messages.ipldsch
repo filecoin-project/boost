@@ -20,7 +20,7 @@ type DateTime int
 type RoutingResponse struct {
   Code ResponseCode (rename "c")
   Message String (rename "m") # more info if rejected
-  Expiry optional DateTime
+  Expiry optional DateTime (rename "e")
 } representation map
 
 type ForwardingKind enum {
