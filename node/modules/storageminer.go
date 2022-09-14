@@ -506,7 +506,7 @@ func NewIndexBackedBlockstore(dagst dagstore.Interface, ps lotus_dtypes.Provider
 		return shard.Key{}, indexbs.ErrNoShardSelected
 	})
 
-	rbs, err := indexbs.NewIndexBackedBlockstore(dagst, sf, 100)
+	rbs, err := indexbs.NewIndexBackedBlockstore(dagst, sf, 100, tracing.Tracer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create index backed blockstore: %w", err)
 	}
