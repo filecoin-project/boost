@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/index"
 	"github.com/filecoin-project/dagstore/mount"
@@ -84,6 +85,8 @@ func NewDAGStore(cfg lotus_config.DAGStoreConfig, minerApi mktsdagstore.MinerAPI
 		MaxConcurrentIndex:        cfg.MaxConcurrentIndex,
 		MaxConcurrentReadyFetches: cfg.MaxConcurrentReadyFetches,
 		RecoverOnStart:            dagstore.RecoverOnAcquire,
+
+		Tracer: tracing.Tracer,
 	}
 
 	dagst, err := dagstore.NewDAGStore(dcfg)
