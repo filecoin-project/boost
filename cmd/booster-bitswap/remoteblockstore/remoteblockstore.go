@@ -100,6 +100,9 @@ const (
 // errors into strings. Therefore we need to parse the string and return
 // the ipld.ErrNotFound type where appropriate.
 func normalizeError(err error) error {
+	if err == nil {
+		return nil
+	}
 	errMsg := err.Error()
 
 	// First check for ErrNotFound with an undefined cid
