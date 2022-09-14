@@ -5,7 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"path"
+	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/filecoin-project/boost/build"
@@ -16,6 +19,7 @@ import (
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/sealingpipeline"
+	"github.com/filecoin-project/boost/storage/sectorblocks"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -24,7 +28,9 @@ import (
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/dagstore"
+	"github.com/filecoin-project/dagstore/index"
 	"github.com/filecoin-project/dagstore/indexbs"
+	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
@@ -36,18 +42,31 @@ import (
 	ctypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/lib/sigs"
+	mdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
+	lotus_config "github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/filecoin-project/lotus/node/repo"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/ipfs/go-cid"
+	ds "github.com/ipfs/go-datastore"
+	levelds "github.com/ipfs/go-ds-leveldb"
+	measure "github.com/ipfs/go-ds-measure"
 	"github.com/libp2p/go-libp2p-core/host"
+	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
+	"golang.org/x/xerrors"
+)
+
+const lotusScheme = "lotus"
+
+const (
+	EnvDAGStoreCopyConcurrency = "LOTUS_DAGSTORE_COPY_CONCURRENCY"
+	DefaultDAGStoreDir         = "dagstore"
 )
 
 var (
@@ -397,12 +416,12 @@ func NewChainDealManager(a v1api.FullNode) *storagemarket.ChainDealManager {
 	return storagemarket.NewChainDealManager(a, cdmCfg)
 }
 
-func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, dagst *mktsdagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
+func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, dagst *Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks,
 		commpc types.CommpCalculator, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
-		dagst *mktsdagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper,
+		dagst *Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper,
 		lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 
 		prvCfg := storagemarket.Config{
@@ -528,4 +547,129 @@ func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, erro
 
 		return &tracing.Tracing{}, nil
 	}
+}
+
+// DAGStore constructs a DAG store using the supplied minerAPI, and the
+// user configuration. It returns both the DAGStore and the Wrapper suitable for
+// passing to markets.
+func DAGStore(cfg lotus_config.DAGStoreConfig) func(lc fx.Lifecycle, r lotus_repo.LockedRepo, minerAPI mdagstore.MinerAPI, h host.Host) (*dagstore.DAGStore, *Wrapper, error) {
+	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo, minerAPI mdagstore.MinerAPI, h host.Host) (*dagstore.DAGStore, *Wrapper, error) {
+		// fall back to default root directory if not explicitly set in the config.
+		if cfg.RootDir == "" {
+			cfg.RootDir = filepath.Join(r.Path(), DefaultDAGStoreDir)
+		}
+
+		v, ok := os.LookupEnv(EnvDAGStoreCopyConcurrency)
+		if ok {
+			concurrency, err := strconv.Atoi(v)
+			if err == nil {
+				cfg.MaxConcurrentReadyFetches = concurrency
+			}
+		}
+
+		dagst, w, err := NewDAGStore(cfg, minerAPI, h)
+		if err != nil {
+			return nil, nil, xerrors.Errorf("failed to create DAG store: %w", err)
+		}
+
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				return w.Start(ctx)
+			},
+			OnStop: func(context.Context) error {
+				return w.Close()
+			},
+		})
+
+		return dagst, w, nil
+	}
+}
+
+func NewDAGStore(cfg lotus_config.DAGStoreConfig, minerApi mdagstore.MinerAPI, h host.Host) (*dagstore.DAGStore, *Wrapper, error) {
+	// construct the DAG Store.
+	registry := mount.NewRegistry()
+	if err := registry.Register(lotusScheme, mountTemplate(minerApi)); err != nil {
+		return nil, nil, xerrors.Errorf("failed to create registry: %w", err)
+	}
+
+	// The dagstore will write Shard failures to the `failureCh` here.
+	failureCh := make(chan dagstore.ShardResult, 1)
+
+	// The dagstore will write Trace events to the `traceCh` here.
+	traceCh := make(chan dagstore.Trace, 32)
+
+	var (
+		transientsDir = filepath.Join(cfg.RootDir, "transients")
+		datastoreDir  = filepath.Join(cfg.RootDir, "datastore")
+		indexDir      = filepath.Join(cfg.RootDir, "index")
+	)
+
+	dstore, err := newDatastore(datastoreDir)
+	if err != nil {
+		return nil, nil, xerrors.Errorf("failed to create dagstore datastore in %s: %w", datastoreDir, err)
+	}
+
+	irepo, err := index.NewFSRepo(indexDir)
+	if err != nil {
+		return nil, nil, xerrors.Errorf("failed to initialise dagstore index repo: %w", err)
+	}
+
+	topIndex := index.NewInverted(dstore)
+	dcfg := dagstore.Config{
+		TransientsDir: transientsDir,
+		IndexRepo:     irepo,
+		Datastore:     dstore,
+		MountRegistry: registry,
+		FailureCh:     failureCh,
+		TraceCh:       traceCh,
+		TopLevelIndex: topIndex,
+		// not limiting fetches globally, as the Lotus mount does
+		// conditional throttling.
+		MaxConcurrentIndex:        cfg.MaxConcurrentIndex,
+		MaxConcurrentReadyFetches: cfg.MaxConcurrentReadyFetches,
+		RecoverOnStart:            dagstore.RecoverOnAcquire,
+	}
+
+	dagst, err := dagstore.NewDAGStore(dcfg)
+	if err != nil {
+		return nil, nil, xerrors.Errorf("failed to create DAG store: %w", err)
+	}
+
+	w := &Wrapper{
+		cfg:        cfg,
+		dagst:      dagst,
+		minerAPI:   minerApi,
+		failureCh:  failureCh,
+		traceCh:    traceCh,
+		gcInterval: time.Duration(cfg.GCInterval),
+	}
+
+	return dagst, w, nil
+}
+
+// newDatastore creates a datastore under the given base directory
+// for dagstore metadata.
+func newDatastore(dir string) (ds.Batching, error) {
+	// Create the datastore directory if it doesn't exist yet.
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, xerrors.Errorf("failed to create directory %s for DAG store datastore: %w", dir, err)
+	}
+
+	// Create a new LevelDB datastore
+	dstore, err := levelds.NewDatastore(dir, &levelds.Options{
+		Compression: ldbopts.NoCompression,
+		NoSync:      false,
+		Strict:      ldbopts.StrictAll,
+		ReadOnly:    false,
+	})
+	if err != nil {
+		return nil, xerrors.Errorf("failed to open datastore for DAG store: %w", err)
+	}
+	// Keep statistics about the datastore
+	mds := measure.New("measure.", dstore)
+	return mds, nil
+}
+
+func mountTemplate(api mktsdagstore.MinerAPI) *mktsdagstore.LotusMount {
+	return &mktsdagstore.LotusMount{API: api}
 }

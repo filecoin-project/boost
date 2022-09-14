@@ -511,7 +511,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// DAG Store
 		Override(new(mktsdagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
-		Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
+		Override(DAGStoreKey, modules.DAGStore(cfg.DAGStore)),
 		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
 		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore),
 
