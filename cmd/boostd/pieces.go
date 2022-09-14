@@ -84,7 +84,7 @@ var piecesListCidInfosCmd = &cli.Command{
 
 		if cctx.Bool("json") && !cctx.Bool("verbose") {
 			dataCidsJson := map[string]interface{}{
-				"DataCids": cids,
+				"dataCids": cids,
 			}
 
 			return cmd.PrintJson(dataCidsJson)
@@ -138,15 +138,15 @@ var piecesListCidInfosCmd = &cli.Command{
 					})
 
 					deal := map[string]interface{}{
-						"Deal":       deal.DealID,
+						"ID":       deal.DealID,
 						"Sector":     deal.SectorID,
-						"DealOffset": deal.Offset,
-						"DealLen":    deal.Length,
+						"Offset": deal.Offset,
+						"Length":    deal.Length,
 					}
 					tpbl := pbl{
 						"PieceCid":    pi.PieceCID,
 						"BlockOffset": location.RelOffset,
-						"BlockLen":    location.BlockSize,
+						"BlockLength":    location.BlockSize,
 						"Deal":        deal,
 					}
 
@@ -205,7 +205,7 @@ var piecesInfoCmd = &cli.Command{
 			var deals []deal
 			for _, d := range pi.Deals {
 				dl := deal{
-					"DealID":   d.DealID,
+					"ID":   d.DealID,
 					"SectorID": d.SectorID,
 					"Offset":   d.Offset,
 					"Length":   d.Length,
@@ -214,7 +214,7 @@ var piecesInfoCmd = &cli.Command{
 			}
 
 			pieceinfo := map[string]interface{}{
-				"pieceCid": pi.PieceCID,
+				"PieceCid": pi.PieceCID,
 				"Deals":    deals,
 			}
 
