@@ -11,23 +11,19 @@ import (
 	"github.com/filecoin-project/lotus/node/repo"
 	"go.uber.org/fx"
 
-	dst "github.com/filecoin-project/dagstore"
-	lotus_config "github.com/filecoin-project/lotus/node/config"
-
-	"github.com/filecoin-project/lotus/markets/dagstore"
-	"github.com/filecoin-project/lotus/markets/idxprov"
-
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/hashicorp/go-multierror"
-	logging "github.com/ipfs/go-log/v2"
-
-	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/index-provider/metadata"
-
 	"github.com/filecoin-project/boost/db"
+	mdagstore "github.com/filecoin-project/boost/node/modules/dagstore"
+	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	dst "github.com/filecoin-project/dagstore"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	provider "github.com/filecoin-project/index-provider"
+	"github.com/filecoin-project/index-provider/metadata"
+	"github.com/filecoin-project/lotus/markets/idxprov"
+	lotus_config "github.com/filecoin-project/lotus/node/config"
+	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
 )
 
 var log = logging.Logger("index-provider-wrapper")
@@ -40,16 +36,16 @@ type Wrapper struct {
 	dealsDB     *db.DealsDB
 	legacyProv  lotus_storagemarket.StorageProvider
 	prov        provider.Interface
-	dagStore    *dagstore.Wrapper
+	dagStore    *mdagstore.Wrapper
 	meshCreator idxprov.MeshCreator
 }
 
 func NewWrapper(cfg lotus_config.DAGStoreConfig) func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
-	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
+	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *mdagstore.Wrapper,
 	meshCreator idxprov.MeshCreator) *Wrapper {
 
 	return func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
-		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
+		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *mdagstore.Wrapper,
 		meshCreator idxprov.MeshCreator) *Wrapper {
 		if cfg.RootDir == "" {
 			cfg.RootDir = filepath.Join(r.Path(), defaultDagStoreDir)

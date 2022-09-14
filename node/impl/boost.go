@@ -17,6 +17,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
+	mdagstore "github.com/filecoin-project/boost/node/modules/dagstore"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -27,7 +28,6 @@ import (
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	lapi "github.com/filecoin-project/lotus/api"
-	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
@@ -51,7 +51,7 @@ type BoostAPI struct {
 	Host host.Host
 
 	DAGStore              *dagstore.DAGStore
-	DagStoreWrapper       *mktsdagstore.Wrapper
+	DagStoreWrapper       *mdagstore.Wrapper
 	IndexBackedBlockstore dtypes.IndexBackedBlockstore
 	// Boost
 	StorageProvider *storagemarket.Provider

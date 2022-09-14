@@ -1,4 +1,4 @@
-package modules
+package dagstore
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/filecoin-project/dagstore"
+	"github.com/filecoin-project/dagstore/index"
+	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/providerstates"
@@ -18,15 +20,115 @@ import (
 	"github.com/filecoin-project/go-statemachine/fsm"
 	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/config"
+	lotus_config "github.com/filecoin-project/lotus/node/config"
 	"github.com/ipfs/go-cid"
+	ds "github.com/ipfs/go-datastore"
+	levelds "github.com/ipfs/go-ds-leveldb"
+	measure "github.com/ipfs/go-ds-measure"
+	logging "github.com/ipfs/go-log/v2"
 	carindex "github.com/ipld/go-car/v2/index"
+	"github.com/libp2p/go-libp2p-core/host"
+	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 	"golang.org/x/xerrors"
 )
+
+var log = logging.Logger("dagstore-wrapper")
 
 const (
 	maxRecoverAttempts = 1
 	shardRegMarker     = ".shard-registration-complete"
 )
+
+const lotusScheme = "lotus"
+
+func NewDAGStore(cfg lotus_config.DAGStoreConfig, minerApi mktsdagstore.MinerAPI, h host.Host) (*dagstore.DAGStore, *Wrapper, error) {
+	// construct the DAG Store.
+	registry := mount.NewRegistry()
+	if err := registry.Register(lotusScheme, mountTemplate(minerApi)); err != nil {
+		return nil, nil, xerrors.Errorf("failed to create registry: %w", err)
+	}
+
+	// The dagstore will write Shard failures to the `failureCh` here.
+	failureCh := make(chan dagstore.ShardResult, 1)
+
+	// The dagstore will write Trace events to the `traceCh` here.
+	traceCh := make(chan dagstore.Trace, 32)
+
+	var (
+		transientsDir = filepath.Join(cfg.RootDir, "transients")
+		datastoreDir  = filepath.Join(cfg.RootDir, "datastore")
+		indexDir      = filepath.Join(cfg.RootDir, "index")
+	)
+
+	dstore, err := newDatastore(datastoreDir)
+	if err != nil {
+		return nil, nil, xerrors.Errorf("failed to create dagstore datastore in %s: %w", datastoreDir, err)
+	}
+
+	irepo, err := index.NewFSRepo(indexDir)
+	if err != nil {
+		return nil, nil, xerrors.Errorf("failed to initialise dagstore index repo: %w", err)
+	}
+
+	topIndex := index.NewInverted(dstore)
+	dcfg := dagstore.Config{
+		TransientsDir: transientsDir,
+		IndexRepo:     irepo,
+		Datastore:     dstore,
+		MountRegistry: registry,
+		FailureCh:     failureCh,
+		TraceCh:       traceCh,
+		TopLevelIndex: topIndex,
+		// not limiting fetches globally, as the Lotus mount does
+		// conditional throttling.
+		MaxConcurrentIndex:        cfg.MaxConcurrentIndex,
+		MaxConcurrentReadyFetches: cfg.MaxConcurrentReadyFetches,
+		RecoverOnStart:            dagstore.RecoverOnAcquire,
+	}
+
+	dagst, err := dagstore.NewDAGStore(dcfg)
+	if err != nil {
+		return nil, nil, xerrors.Errorf("failed to create DAG store: %w", err)
+	}
+
+	w := &Wrapper{
+		cfg:        cfg,
+		dagst:      dagst,
+		minerAPI:   minerApi,
+		failureCh:  failureCh,
+		traceCh:    traceCh,
+		gcInterval: time.Duration(cfg.GCInterval),
+	}
+
+	return dagst, w, nil
+}
+
+// newDatastore creates a datastore under the given base directory
+// for dagstore metadata.
+func newDatastore(dir string) (ds.Batching, error) {
+	// Create the datastore directory if it doesn't exist yet.
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, xerrors.Errorf("failed to create directory %s for DAG store datastore: %w", dir, err)
+	}
+
+	// Create a new LevelDB datastore
+	dstore, err := levelds.NewDatastore(dir, &levelds.Options{
+		Compression: ldbopts.NoCompression,
+		NoSync:      false,
+		Strict:      ldbopts.StrictAll,
+		ReadOnly:    false,
+	})
+	if err != nil {
+		return nil, xerrors.Errorf("failed to open datastore for DAG store: %w", err)
+	}
+	// Keep statistics about the datastore
+	mds := measure.New("measure.", dstore)
+	return mds, nil
+}
+
+func mountTemplate(api mktsdagstore.MinerAPI) *mktsdagstore.LotusMount {
+	return &mktsdagstore.LotusMount{API: api}
+}
 
 type Wrapper struct {
 	ctx          context.Context
