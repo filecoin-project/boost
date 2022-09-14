@@ -17,9 +17,6 @@ var piecesCmd = &cli.Command{
 	Name:        "pieces",
 	Usage:       "Interact with the Piece Store",
 	Description: "The piecestore is a database that tracks and manages data that is made available to the retrieval market",
-	Flags: []cli.Flag{
-		cmd.FlagJson,
-	},
 	Subcommands: []*cli.Command{
 		piecesListPiecesCmd,
 		piecesListCidInfosCmd,
@@ -50,12 +47,12 @@ var piecesListPiecesCmd = &cli.Command{
 				"pieceCids": pieceCids,
 			}
 			return cmd.PrintJson(pieceCidsJson)
-
-		} else {
-			for _, pc := range pieceCids {
-				fmt.Println(pc)
-			}
 		}
+
+		for _, pc := range pieceCids {
+			fmt.Println(pc)
+		}
+
 		return nil
 	},
 }
@@ -138,15 +135,15 @@ var piecesListCidInfosCmd = &cli.Command{
 					})
 
 					deal := map[string]interface{}{
-						"ID":       deal.DealID,
-						"Sector":     deal.SectorID,
+						"ID":     deal.DealID,
+						"Sector": deal.SectorID,
 						"Offset": deal.Offset,
-						"Length":    deal.Length,
+						"Length": deal.Length,
 					}
 					tpbl := pbl{
 						"PieceCid":    pi.PieceCID,
 						"BlockOffset": location.RelOffset,
-						"BlockLength":    location.BlockSize,
+						"BlockLength": location.BlockSize,
 						"Deal":        deal,
 					}
 
@@ -205,7 +202,7 @@ var piecesInfoCmd = &cli.Command{
 			var deals []deal
 			for _, d := range pi.Deals {
 				dl := deal{
-					"ID":   d.DealID,
+					"ID":       d.DealID,
 					"SectorID": d.SectorID,
 					"Offset":   d.Offset,
 					"Length":   d.Length,
