@@ -458,6 +458,8 @@ func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo
 
 func NewIndexBackedBlockstore(dagst dagstore.Interface, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, rp retrievalmarket.RetrievalProvider, h host.Host) (dtypes.IndexBackedBlockstore, error) {
 	sf := indexbs.ShardSelectorF(func(c cid.Cid, shards []shard.Key) (shard.Key, error) {
+		return shards[0], nil
+
 		for _, sk := range shards {
 			// parse piece CID
 			pieceCid, err := cid.Parse(sk.String())
@@ -471,22 +473,22 @@ func NewIndexBackedBlockstore(dagst dagstore.Interface, ps lotus_dtypes.Provider
 			}
 
 			// check if piece is in unsealed sector
-			isUnsealed := false
-			for _, di := range pieceInfo.Deals {
-				isUnsealed, err = sa.IsUnsealed(context.TODO(), di.SectorID, di.Offset.Unpadded(), di.Length.Unpadded())
-				if err != nil {
-					log.Errorf("failed to find out if sector %d is unsealed, err=%s", di.SectorID, err)
-					continue
-				}
-				if isUnsealed {
-					break
-				}
-			}
+			//isUnsealed := false
+			//for _, di := range pieceInfo.Deals {
+			//isUnsealed, err = sa.IsUnsealed(context.TODO(), di.SectorID, di.Offset.Unpadded(), di.Length.Unpadded())
+			//if err != nil {
+			//log.Errorf("failed to find out if sector %d is unsealed, err=%s", di.SectorID, err)
+			//continue
+			//}
+			//if isUnsealed {
+			//break
+			//}
+			//}
 
-			// sealed sector, skip
-			if !isUnsealed {
-				continue
-			}
+			//// sealed sector, skip
+			//if !isUnsealed {
+			//continue
+			//}
 
 			// The piece is in an unsealed sector
 			// Is it marked for free retrieval ?
