@@ -46,8 +46,9 @@ var piecesListPiecesCmd = &cli.Command{
 
 		if cctx.Bool("json") {
 
-			var pieceCidsJson map[string]interface{}
-			pieceCidsJson["pieceCids"] = pieceCids
+			pieceCidsJson := map[string]interface{}{
+				"pieceCids": pieceCids,
+			}
 			return cmd.PrintJson(pieceCidsJson)
 
 		} else {
@@ -82,8 +83,10 @@ var piecesListCidInfosCmd = &cli.Command{
 		}
 
 		if cctx.Bool("json") && !cctx.Bool("verbose") {
-			var dataCidsJson map[string]interface{}
-			dataCidsJson["DataCids"] = cids
+			dataCidsJson := map[string]interface{}{
+				"DataCids": cids,
+			}
+
 			return cmd.PrintJson(dataCidsJson)
 		}
 
