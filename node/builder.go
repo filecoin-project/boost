@@ -520,7 +520,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(retrievalmarket.SectorAccessor), From(new(mktsdagstore.SectorAccessor))),
 		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
-		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
+		Override(new(retrievalmarket.RetrievalProvider), modules.RetrievalProvider),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
 		Override(HandleRetrievalTransportsKey, modules.HandleRetrievalTransports),
