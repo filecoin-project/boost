@@ -4,6 +4,15 @@
 ARG LOTUS_TEST_IMAGE=filecoin/lotus-test:latest
 FROM ${LOTUS_TEST_IMAGE} as lotus-dev
 #########################################################################################
+FROM node:16.16-alpine3.15 AS react-builder
+
+WORKDIR /src
+COPY react /src/react
+COPY gql /src/gql
+
+RUN npm_config_legacy_peer_deps=yes npm ci --no-audit --prefix react&& \
+      npm run --prefix react build
+#########################################################################################
 FROM golang:1.18-bullseye as builder
 
 RUN apt update && apt install -y \
@@ -31,6 +40,8 @@ RUN make build/.filecoin-install
 ##############################################
 COPY . /go/src
 ##############################################
+COPY --from=react-builder /src/react/build /go/src/react/build
+
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
       make debug
