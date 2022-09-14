@@ -190,7 +190,11 @@ func (lb *LoadBalancer) bridgeStreams(s1, s2 network.Stream) {
 		// pipe reads on s1 to writes on s2
 		defer wg.Done()
 		_, err := io.Copy(s2, s1)
-		s2.CloseWrite()
+		if err != nil {
+			s1.Reset()
+			return
+		}
+		err = s2.CloseWrite()
 		if err != nil {
 			s1.Reset()
 		}
@@ -199,7 +203,10 @@ func (lb *LoadBalancer) bridgeStreams(s1, s2 network.Stream) {
 		// pipe reads on s2 to writes on s1
 		defer wg.Done()
 		_, err := io.Copy(s1, s2)
-		s1.CloseWrite()
+		if err != nil {
+			s2.Reset()
+		}
+		err = s1.CloseWrite()
 		if err != nil {
 			s2.Reset()
 		}

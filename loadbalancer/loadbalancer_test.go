@@ -3,7 +3,6 @@ package loadbalancer
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -23,285 +22,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRoutingRequest(t *testing.T) {
-	testProtocols := []protocol.ID{"applesauce/mcgee", "test/me"}
-	startTime := time.Date(2001, 12, 1, 0, 0, 0, 0, time.UTC)
-	expiry := time.Unix(0, startTime.Add(DefaultDuration).UnixNano())
-	expiryAfterHalfDurationPassed := time.Unix(0, startTime.Add(DefaultDuration*3/2).UnixNano())
-	expiryAfterTwiceDurationPassed := time.Unix(0, startTime.Add(DefaultDuration*3).UnixNano())
-	ctx := context.Background()
-	peers := makePeers(t)
-	testCases := []struct {
-		name             string
-		newRouteFilter   func(p peer.ID, protocols []protocol.ID) error
-		pre              func(t *testing.T, tn *testNet, testClock *clock.Mock)
-		write            func(io.Writer) error
-		expectedResponse *messages.RoutingResponse
-	}{
-		{
-			name: "new - simple success",
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:   messages.ResponseOk,
-				Expiry: &expiry,
-			},
-		},
-		{
-			name: "new - filter errors",
-			newRouteFilter: func(p peer.ID, protocols []protocol.ID) error {
-				return errors.New("unauthorized")
-			},
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:    messages.ResponseRejected,
-				Message: "unauthorized",
-			},
-		},
-		{
-			name: "new - already registered",
-			pre: func(t *testing.T, tn *testNet, testClock *clock.Mock) {
-				tn.claimRoutesForOtherNode(testProtocols)
-			},
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:    messages.ResponseRejected,
-				Message: ErrAlreadyRegistered{testProtocols[0]}.Error(),
-			},
-		},
-		{
-			name: "new - already registered but expired",
-			pre: func(t *testing.T, tn *testNet, testClock *clock.Mock) {
-				tn.claimRoutesForOtherNode(testProtocols)
-				testClock.Add(DefaultDuration * 2)
-			},
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:   messages.ResponseOk,
-				Expiry: &expiryAfterTwiceDurationPassed,
-			},
-		},
-		{
-			name: "new - registered then deleted",
-			pre: func(t *testing.T, tn *testNet, testClock *clock.Mock) {
-				tn.claimRoutesForOtherNode(testProtocols)
-				tn.releaseRoutesForOtherNode(testProtocols)
-			},
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:   messages.ResponseOk,
-				Expiry: &expiry,
-			},
-		},
-		{
-			name: "extend - already registered",
-			pre: func(t *testing.T, tn *testNet, testClock *clock.Mock) {
-				response := tn.sendRoutingRequest(func(w io.Writer) error {
-					return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
-				})
-				require.Equal(t, &messages.RoutingResponse{
-					Code:   messages.ResponseOk,
-					Expiry: &expiry,
-				}, response)
-				testClock.Add(DefaultDuration / 2)
-			},
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindExtend, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:   messages.ResponseOk,
-				Expiry: &expiryAfterHalfDurationPassed,
-			},
-		},
-		{
-			name: "extend - not registered",
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindExtend, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:    messages.ResponseRejected,
-				Message: ErrNotRegistered{peers.serviceNode.id, testProtocols[0]}.Error(),
-			},
-		},
-		{
-			name: "extend - registered to other",
-			pre: func(t *testing.T, tn *testNet, testClock *clock.Mock) {
-				tn.claimRoutesForOtherNode(testProtocols)
-			},
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindExtend, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:    messages.ResponseRejected,
-				Message: ErrNotRegistered{peers.serviceNode.id, testProtocols[0]}.Error(),
-			},
-		},
-		{
-			name: "extend - registered but expired",
-			pre: func(t *testing.T, tn *testNet, testClock *clock.Mock) {
-				response := tn.sendRoutingRequest(func(w io.Writer) error {
-					return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
-				})
-				require.Equal(t, &messages.RoutingResponse{
-					Code:   messages.ResponseOk,
-					Expiry: &expiry,
-				}, response)
-				testClock.Add(DefaultDuration * 2)
-			},
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindExtend, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:    messages.ResponseRejected,
-				Message: ErrNotRegistered{peers.serviceNode.id, testProtocols[0]}.Error(),
-			},
-		},
-		{
-			name: "extend - registered then deleted",
-			pre: func(t *testing.T, tn *testNet, testClock *clock.Mock) {
-				response := tn.sendRoutingRequest(func(w io.Writer) error {
-					return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
-				})
-				require.Equal(t, &messages.RoutingResponse{
-					Code:   messages.ResponseOk,
-					Expiry: &expiry,
-				}, response)
-				response = tn.sendRoutingRequest(func(w io.Writer) error {
-					return messages.WriteRoutingRequest(w, messages.RoutingKindTerminate, testProtocols)
-				})
-				require.Equal(t, &messages.RoutingResponse{
-					Code: messages.ResponseOk,
-				}, response)
-			},
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindExtend, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:    messages.ResponseRejected,
-				Message: ErrNotRegistered{peers.serviceNode.id, testProtocols[0]}.Error(),
-			},
-		},
-		{
-			name: "terminate - already registered",
-			pre: func(t *testing.T, tn *testNet, testClock *clock.Mock) {
-				response := tn.sendRoutingRequest(func(w io.Writer) error {
-					return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
-				})
-				require.Equal(t, &messages.RoutingResponse{
-					Code:   messages.ResponseOk,
-					Expiry: &expiry,
-				}, response)
-			},
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindTerminate, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code: messages.ResponseOk,
-			},
-		},
-		{
-			name: "terminate - not registered",
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindTerminate, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:    messages.ResponseRejected,
-				Message: ErrNotRegistered{peers.serviceNode.id, testProtocols[0]}.Error(),
-			},
-		},
-		{
-			name: "terminate - registered to other",
-			pre: func(t *testing.T, tn *testNet, testClock *clock.Mock) {
-				tn.claimRoutesForOtherNode(testProtocols)
-			},
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindTerminate, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:    messages.ResponseRejected,
-				Message: ErrNotRegistered{peers.serviceNode.id, testProtocols[0]}.Error(),
-			},
-		},
-		{
-			name: "terminate - registered but expired",
-			pre: func(t *testing.T, tn *testNet, testClock *clock.Mock) {
-				response := tn.sendRoutingRequest(func(w io.Writer) error {
-					return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
-				})
-				require.Equal(t, &messages.RoutingResponse{
-					Code:   messages.ResponseOk,
-					Expiry: &expiry,
-				}, response)
-				testClock.Add(DefaultDuration * 2)
-			},
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindTerminate, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:    messages.ResponseRejected,
-				Message: ErrNotRegistered{peers.serviceNode.id, testProtocols[0]}.Error(),
-			},
-		},
-		{
-			name: "terminate - registered then deleted",
-			pre: func(t *testing.T, tn *testNet, testClock *clock.Mock) {
-				response := tn.sendRoutingRequest(func(w io.Writer) error {
-					return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
-				})
-				require.Equal(t, &messages.RoutingResponse{
-					Code:   messages.ResponseOk,
-					Expiry: &expiry,
-				}, response)
-				response = tn.sendRoutingRequest(func(w io.Writer) error {
-					return messages.WriteRoutingRequest(w, messages.RoutingKindTerminate, testProtocols)
-				})
-				require.Equal(t, &messages.RoutingResponse{
-					Code: messages.ResponseOk,
-				}, response)
-			},
-			write: func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindTerminate, testProtocols)
-			},
-			expectedResponse: &messages.RoutingResponse{
-				Code:    messages.ResponseRejected,
-				Message: ErrNotRegistered{peers.serviceNode.id, testProtocols[0]}.Error(),
-			},
-		},
-	}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			defer cancel()
-			tn := setupTestNet(ctx, t, peers)
-			testClock := clock.NewMock()
-			testClock.Set(startTime)
-			lb := newLoadBalancer(ctx, tn.loadBalancer, testCase.newRouteFilter, testClock)
-			lb.Start()
-			if testCase.pre != nil {
-				testCase.pre(t, tn, testClock)
-			}
-			response := tn.sendRoutingRequest(testCase.write)
-			require.Equal(t, testCase.expectedResponse, response)
-			err := lb.Close()
-			require.NoError(t, err)
-		})
-	}
-}
-
 func TestOutboundForwarding(t *testing.T) {
 	testProtocols := []protocol.ID{"applesauce/mcgee", "test/me"}
 	otherProtocol := protocol.ID("noprotocol/here")
 	startTime := time.Date(2001, 12, 1, 0, 0, 0, 0, time.UTC)
-	expiry := time.Unix(0, startTime.Add(DefaultDuration).UnixNano())
 	ctx := context.Background()
 	peers := makePeers(t)
 	testCases := []struct {
@@ -362,16 +86,11 @@ func TestOutboundForwarding(t *testing.T) {
 			tn := setupTestNet(ctx, t, peers)
 			testClock := clock.NewMock()
 			testClock.Set(startTime)
-			lb := newLoadBalancer(ctx, tn.loadBalancer, nil, testClock)
-			lb.Start()
-			// register routes
-			routingResponse := tn.sendRoutingRequest(func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
+			lb, err := NewLoadBalancer(tn.loadBalancer, map[peer.ID][]protocol.ID{
+				peers.serviceNode.id: testProtocols,
 			})
-			require.Equal(t, &messages.RoutingResponse{
-				Code:   messages.ResponseOk,
-				Expiry: &expiry,
-			}, routingResponse)
+			require.NoError(t, err)
+			lb.Start(ctx)
 
 			if testCase.registerHandler {
 				handler := func(s network.Stream) {
@@ -396,7 +115,7 @@ func TestOutboundForwarding(t *testing.T) {
 				require.Equal(t, "response", string(streamResponse))
 				s.Close()
 			}
-			err := lb.Close()
+			err = lb.Close()
 			require.NoError(t, err)
 		})
 	}
@@ -406,12 +125,12 @@ func TestInboundForwarding(t *testing.T) {
 	testProtocols := []protocol.ID{"applesauce/mcgee", "test/me"}
 	otherProtocol := protocol.ID("noprotocol/here")
 	startTime := time.Date(2001, 12, 1, 0, 0, 0, 0, time.UTC)
-	expiry := time.Unix(0, startTime.Add(DefaultDuration).UnixNano())
 	ctx := context.Background()
 	peers := makePeers(t)
 	testCases := []struct {
 		name             string
 		protocols        []protocol.ID
+		doNotConnect     bool
 		willErrorOpening bool
 		willErrorReading bool
 		registerHandler  bool
@@ -421,6 +140,14 @@ func TestInboundForwarding(t *testing.T) {
 			name:             "simple success",
 			protocols:        testProtocols,
 			willErrorOpening: false,
+			willErrorReading: false,
+			registerHandler:  true,
+		},
+		{
+			name:             "error - not connected to service node",
+			protocols:        []protocol.ID{otherProtocol},
+			doNotConnect:     true,
+			willErrorOpening: true,
 			willErrorReading: false,
 			registerHandler:  true,
 		},
@@ -454,17 +181,11 @@ func TestInboundForwarding(t *testing.T) {
 			tn := setupTestNet(ctx, t, peers)
 			testClock := clock.NewMock()
 			testClock.Set(startTime)
-			lb := newLoadBalancer(ctx, tn.loadBalancer, nil, testClock)
-			lb.Start()
-			// register routes
-			routingResponse := tn.sendRoutingRequest(func(w io.Writer) error {
-				return messages.WriteRoutingRequest(w, messages.RoutingKindNew, testProtocols)
+			lb, err := NewLoadBalancer(tn.loadBalancer, map[peer.ID][]protocol.ID{
+				peers.serviceNode.id: testProtocols,
 			})
-			require.Equal(t, &messages.RoutingResponse{
-				Code:   messages.ResponseOk,
-				Expiry: &expiry,
-			}, routingResponse)
-
+			require.NoError(t, err)
+			lb.Start(ctx)
 			if testCase.registerHandler {
 				handler := func(s network.Stream) {
 					defer s.Close()
@@ -477,9 +198,8 @@ func TestInboundForwarding(t *testing.T) {
 					}, request)
 					require.NoError(tn.t, err)
 					if testCase.rejectResponse {
-						err = messages.WriteForwardingResponseError(s, errors.New("something went wrong"))
+						s.Reset()
 					} else {
-						err = messages.WriteInboundForwardingResponseSuccess(s)
 						userRequest, err := ioutil.ReadAll(s)
 						require.NoError(t, err)
 						require.Equal(t, "request", string(userRequest))
@@ -488,6 +208,14 @@ func TestInboundForwarding(t *testing.T) {
 					}
 				}
 				tn.serviceNode.SetStreamHandler(ForwardingProtocolID, handler)
+			}
+			if !testCase.doNotConnect {
+				tn.serviceNode.Connect(ctx, peer.AddrInfo{
+					ID: peers.loadBalancer.id,
+					Addrs: []multiaddr.Multiaddr{
+						peers.loadBalancer.multiAddr,
+					},
+				})
 			}
 			s, err := tn.publicNode.NewStream(tn.ctx, tn.loadBalancer.ID(), testCase.protocols...)
 			if testCase.willErrorOpening {
@@ -558,41 +286,6 @@ func setupTestNet(ctx context.Context, t *testing.T, pis peerInfos) *testNet {
 		publicNode:       pn,
 	}
 	return tn
-}
-
-func (tn *testNet) sendRoutingRequest(write func(io.Writer) error) *messages.RoutingResponse {
-	s, err := tn.serviceNode.NewStream(tn.ctx, tn.loadBalancer.ID(), RegisterRoutingProtocolID)
-	require.NoError(tn.t, err)
-	err = write(s)
-	require.NoError(tn.t, err)
-	err = s.CloseWrite()
-	require.NoError(tn.t, err)
-	response, err := messages.ReadRoutingResponse(s)
-	require.NoError(tn.t, err)
-	return response
-}
-
-func (tn *testNet) claimRoutesForOtherNode(protocols []protocol.ID) {
-	s, err := tn.otherServiceNode.NewStream(tn.ctx, tn.loadBalancer.ID(), RegisterRoutingProtocolID)
-	require.NoError(tn.t, err)
-	err = messages.WriteRoutingRequest(s, messages.RoutingKindNew, protocols)
-	require.NoError(tn.t, err)
-	err = s.CloseWrite()
-	require.NoError(tn.t, err)
-	response, err := messages.ReadRoutingResponse(s)
-	require.NoError(tn.t, err)
-	require.Equal(tn.t, messages.ResponseOk, response.Code)
-}
-
-func (tn *testNet) releaseRoutesForOtherNode(protocols []protocol.ID) {
-	s, err := tn.otherServiceNode.NewStream(tn.ctx, tn.loadBalancer.ID(), RegisterRoutingProtocolID)
-	require.NoError(tn.t, err)
-	err = messages.WriteRoutingRequest(s, messages.RoutingKindTerminate, protocols)
-	require.NoError(tn.t, err)
-	s.CloseWrite()
-	response, err := messages.ReadRoutingResponse(s)
-	require.NoError(tn.t, err)
-	require.Equal(tn.t, messages.ResponseOk, response.Code)
 }
 
 func (tn *testNet) openOutboundForwardingRequest(write func(io.Writer) error) (*messages.ForwardingResponse, network.Stream) {
