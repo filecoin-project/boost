@@ -48,6 +48,16 @@ func TestNormalizeError(t *testing.T) {
 		expected:      fmt.Errorf("some err: %w", format.ErrNotFound{Cid: dummyCid}),
 		isNotFoundErr: true,
 	}, {
+		name:          "ipld ErrorNotFound no cid with prefix",
+		err:           fmt.Errorf("some err: %w", format.ErrNotFound{}),
+		expected:      fmt.Errorf("some err: %w", format.ErrNotFound{}),
+		isNotFoundErr: true,
+	}, {
+		name:          "stringified ipld ErrorNotFound no cid with prefix",
+		err:           fmt.Errorf(fmt.Errorf("some err: %w", format.ErrNotFound{}).Error()),
+		expected:      fmt.Errorf("some err: %w", format.ErrNotFound{}),
+		isNotFoundErr: true,
+	}, {
 		name:          "different error",
 		err:           fmt.Errorf("some other err"),
 		expected:      fmt.Errorf("some other err"),
