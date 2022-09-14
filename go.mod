@@ -18,7 +18,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/etclabscore/go-openrpc-reflect v0.0.36
 	github.com/fatih/color v1.13.0
-	github.com/filecoin-project/dagstore v0.5.4-0.20220914100749-fb45594a64df
+	github.com/filecoin-project/dagstore v0.5.4-0.20220914105136-f4f006b06a7e
 	github.com/filecoin-project/go-address v1.0.0
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-cbor-util v0.0.1

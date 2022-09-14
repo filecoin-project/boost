@@ -628,6 +628,7 @@ func NewDAGStore(cfg lotus_config.DAGStoreConfig, minerApi mdagstore.MinerAPI, h
 		MaxConcurrentIndex:        cfg.MaxConcurrentIndex,
 		MaxConcurrentReadyFetches: cfg.MaxConcurrentReadyFetches,
 		RecoverOnStart:            dagstore.RecoverOnAcquire,
+		Tracer:                    tracing.Tracer, // TODO: use proper dep injection
 	}
 
 	dagst, err := dagstore.NewDAGStore(dcfg)
