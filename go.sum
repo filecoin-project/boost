@@ -362,6 +362,8 @@ github.com/filecoin-project/dagstore v0.5.4-0.20220914123807-4caadf89b7e6 h1:v47
 github.com/filecoin-project/dagstore v0.5.4-0.20220914123807-4caadf89b7e6/go.mod h1:ijFKvL6hJPlprPN8HT4LL7LoVxGSAFVI2ltxm21tiRY=
 github.com/filecoin-project/dagstore v0.5.4-0.20220914123858-e8a14902a7de h1:uaU9WC7GPqorT+cgBabL/VKKtBdDQv3sSCvFOQDsW4k=
 github.com/filecoin-project/dagstore v0.5.4-0.20220914123858-e8a14902a7de/go.mod h1:ijFKvL6hJPlprPN8HT4LL7LoVxGSAFVI2ltxm21tiRY=
+github.com/filecoin-project/dagstore v0.5.4-0.20220914125648-be39e9479163 h1:C+SUD72zM7WXJ/YqYh0bMTExeZQMAYSJWPkZuFohxz8=
+github.com/filecoin-project/dagstore v0.5.4-0.20220914125648-be39e9479163/go.mod h1:ijFKvL6hJPlprPN8HT4LL7LoVxGSAFVI2ltxm21tiRY=
 github.com/filecoin-project/go-address v0.0.3/go.mod h1:jr8JxKsYx+lQlQZmF5i2U0Z+cGQ59wMIps/8YW/lDj8=
 github.com/filecoin-project/go-address v0.0.5/go.mod h1:jr8JxKsYx+lQlQZmF5i2U0Z+cGQ59wMIps/8YW/lDj8=
 github.com/filecoin-project/go-address v0.0.6/go.mod h1:7B0/5DA13n6nHkB8bbGx1gWzG/dbTsZ0fgOJVGsM3TE=
