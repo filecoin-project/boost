@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/filecoin-project/boost/cmd"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 
@@ -29,6 +30,7 @@ func main() {
 				Usage:   "boost repo path",
 				Value:   "~/.boost",
 			},
+			cmd.FlagJson,
 			cliutil.FlagVeryVerbose,
 		},
 		Commands: []*cli.Command{
