@@ -94,6 +94,8 @@ type Boost interface {
 	DealsSetConsiderVerifiedStorageDeals(context.Context, bool) error   //perm:admin
 	DealsConsiderUnverifiedStorageDeals(context.Context) (bool, error)  //perm:admin
 	DealsSetConsiderUnverifiedStorageDeals(context.Context, bool) error //perm:admin
+	DealsGetBitswapPeerID(context.Context) (peer.ID, error)             //perm:admin
+	DealsSetBitswapPeerID(context.Context, peer.ID) error               //perm:admin
 }
 
 // DagstoreShardInfo is the serialized form of dagstore.DagstoreShardInfo that

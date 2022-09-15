@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,17 +26,23 @@ import (
 type BitswapServer struct {
 	port        int
 	remoteStore blockstore.Blockstore
+	papi        PeerIDAPI
 
 	ctx    context.Context
 	cancel context.CancelFunc
 	server *server.Server
 }
 
-func NewBitswapServer(port int, remoteStore blockstore.Blockstore) *BitswapServer {
-	return &BitswapServer{port: port, remoteStore: remoteStore}
+type PeerIDAPI interface {
+	DealsGetBitswapPeerID(ctx context.Context) (peer.ID, error)
+	DealsSetBitswapPeerID(ctx context.Context, p peer.ID) error
 }
 
-func (s *BitswapServer) Start(ctx context.Context, dataDir string, balancer peer.AddrInfo) error {
+func NewBitswapServer(port int, remoteStore blockstore.Blockstore, papi PeerIDAPI) *BitswapServer {
+	return &BitswapServer{port: port, remoteStore: remoteStore, papi: papi}
+}
+
+func (s *BitswapServer) Start(ctx context.Context, dataDir string, balancer peer.AddrInfo, overrideExistingPeerID bool) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	if dataDir == "" {
 		return fmt.Errorf("dataDir must be set")
@@ -48,6 +55,28 @@ func (s *BitswapServer) Start(ctx context.Context, dataDir string, balancer peer
 	peerkey, err := loadPeerKey(dataDir)
 	if err != nil {
 		return err
+	}
+
+	selfPid, err := peer.IDFromPrivateKey(peerkey)
+	if err != nil {
+		return err
+	}
+	existingPid, err := s.papi.DealsGetBitswapPeerID(ctx)
+	peerIDNotSet := err != nil && err.Error() == "no bitswap peer id set"
+	if err != nil && !peerIDNotSet {
+		return err
+	}
+	matchesPid := existingPid == selfPid
+	log.Infow("get/set peer id of bitswap from boost", "local", selfPid.String(), "boost", existingPid.String(), "boost not set", peerIDNotSet, "override", overrideExistingPeerID)
+	// error if a peer id is set that is different and we aren't overriding
+	if !peerIDNotSet && !matchesPid && !overrideExistingPeerID {
+		return errors.New("bitswap peer id does not match boost node configuration. use --override-peer-id to force a change")
+	}
+	if peerIDNotSet || (!matchesPid && overrideExistingPeerID) {
+		err = s.papi.DealsSetBitswapPeerID(ctx, selfPid)
+		if err != nil {
+			return err
+		}
 	}
 
 	host, err := libp2p.New(

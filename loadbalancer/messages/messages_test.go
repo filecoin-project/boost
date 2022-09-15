@@ -18,15 +18,12 @@ import (
 
 func TestRoundtripForwardingRequest(t *testing.T) {
 	buf := new(bytes.Buffer)
-	_, pub, err := crypto.GenerateECDSAKeyPair(rand.Reader)
-	require.NoError(t, err)
 	expectedMessage := &messages.ForwardingRequest{
-		Kind:         messages.ForwardingInbound,
-		Remote:       peer.ID("apples"),
-		RemotePubKey: &pub,
-		Protocols:    []protocol.ID{"applesauce/cheese", "house/door"},
+		Kind:      messages.ForwardingInbound,
+		Remote:    peer.ID("apples"),
+		Protocols: []protocol.ID{"applesauce/cheese", "house/door"},
 	}
-	err = messages.BindnodeRegistry.TypeToWriter(expectedMessage, buf, dagcbor.Encode)
+	err := messages.BindnodeRegistry.TypeToWriter(expectedMessage, buf, dagcbor.Encode)
 	require.NoError(t, err)
 	outMessage, err := messages.BindnodeRegistry.TypeFromReader(buf, (*messages.ForwardingRequest)(nil), dagcbor.Decode)
 	require.NoError(t, err)
@@ -35,16 +32,13 @@ func TestRoundtripForwardingRequest(t *testing.T) {
 
 func TestRoundtripForwardingResponse(t *testing.T) {
 	buf := new(bytes.Buffer)
-	_, pub, err := crypto.GenerateECDSAKeyPair(rand.Reader)
 	protocol := protocol.ID("applesauce/cheese")
-	require.NoError(t, err)
 	expectedMessage := &messages.ForwardingResponse{
-		Code:         messages.ResponseOk,
-		Message:      "",
-		RemotePubKey: &pub,
-		ProtocolID:   &protocol,
+		Code:       messages.ResponseOk,
+		Message:    "",
+		ProtocolID: &protocol,
 	}
-	err = messages.BindnodeRegistry.TypeToWriter(expectedMessage, buf, dagcbor.Encode)
+	err := messages.BindnodeRegistry.TypeToWriter(expectedMessage, buf, dagcbor.Encode)
 	require.NoError(t, err)
 	outMessage, err := messages.BindnodeRegistry.TypeFromReader(buf, (*messages.ForwardingResponse)(nil), dagcbor.Decode)
 	require.NoError(t, err)
@@ -80,14 +74,13 @@ func TestReadWriteFunctions(t *testing.T) {
 		{
 			name: "inbound ForwardingRequest",
 			write: func(w io.Writer) error {
-				return messages.WriteInboundForwardingRequest(w, remote, pubKey, singleTestProtocol)
+				return messages.WriteInboundForwardingRequest(w, remote, singleTestProtocol)
 			},
 			read: func(r io.Reader) (interface{}, error) { return messages.ReadForwardingRequest(r) },
 			expectedValue: &messages.ForwardingRequest{
-				Kind:         messages.ForwardingInbound,
-				Remote:       remote,
-				RemotePubKey: &pubKey,
-				Protocols:    []protocol.ID{singleTestProtocol},
+				Kind:      messages.ForwardingInbound,
+				Remote:    remote,
+				Protocols: []protocol.ID{singleTestProtocol},
 			},
 		},
 		{
@@ -97,9 +90,8 @@ func TestReadWriteFunctions(t *testing.T) {
 			},
 			read: func(r io.Reader) (interface{}, error) { return messages.ReadForwardingResponse(r) },
 			expectedValue: &messages.ForwardingResponse{
-				Code:         messages.ResponseOk,
-				RemotePubKey: &pubKey,
-				ProtocolID:   &singleTestProtocol,
+				Code:       messages.ResponseOk,
+				ProtocolID: &singleTestProtocol,
 			},
 		},
 		{

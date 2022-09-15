@@ -3,11 +3,8 @@ package messages
 import (
 	// to embed schema
 	_ "embed"
-	"fmt"
 
-	"github.com/ipld/go-ipld-prime/node/bindnode"
 	bindnoderegistry "github.com/ipld/go-ipld-prime/node/bindnode/registry"
-	"github.com/libp2p/go-libp2p-core/crypto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 )
@@ -37,48 +34,23 @@ const (
 
 // ForwardingRequest is a request to forward traffic through the load balancer
 type ForwardingRequest struct {
-	Kind         ForwardingKind
-	Remote       peer.ID
-	RemotePubKey *crypto.PubKey // only present for inbound
-	Protocols    []protocol.ID  // Should always be length 1 for Inbound requests
+	Kind      ForwardingKind
+	Remote    peer.ID
+	Protocols []protocol.ID // Should always be length 1 for Inbound requests
 }
 
 // ForwardingResponse is a response to and outbound forwarding request
 type ForwardingResponse struct {
-	Code         ResponseCode
-	Message      string // more info if rejected
-	ProtocolID   *protocol.ID
-	RemotePubKey *crypto.PubKey
+	Code       ResponseCode
+	Message    string // more info if rejected
+	ProtocolID *protocol.ID
 }
 
 //go:embed messages.ipldsch
 var embedSchema []byte
 
-func pubKeyToBytes(iface interface{}) ([]byte, error) {
-	pk, ok := iface.(*crypto.PubKey)
-	if !ok {
-		return nil, fmt.Errorf("expected crypto.PubKey value")
-	}
-	return crypto.MarshalPublicKey(*pk)
-}
-
-func pubKeyFromBytes(b []byte) (interface{}, error) {
-	pk, err := crypto.UnmarshalPublicKey(b)
-	if err != nil {
-		return (*crypto.PubKey)(nil), err
-	}
-	return &pk, err
-}
-
-// PubKeyBindnodeOption converts a crypto.PubKey to and from bytes
-var PubKeyBindnodeOption = bindnode.TypedBytesConverter(((*crypto.PubKey)(nil)), pubKeyFromBytes, pubKeyToBytes)
-
 // BindnodeRegistry is the serialization/deserialization tool for messages
 var BindnodeRegistry = bindnoderegistry.NewRegistry()
-
-var messagesBindnodeOptions = []bindnode.Option{
-	PubKeyBindnodeOption,
-}
 
 func init() {
 	for _, r := range []struct {
@@ -88,7 +60,7 @@ func init() {
 		{(*ForwardingRequest)(nil), "ForwardingRequest"},
 		{(*ForwardingResponse)(nil), "ForwardingResponse"},
 	} {
-		if err := BindnodeRegistry.RegisterType(r.typ, string(embedSchema), r.typName, messagesBindnodeOptions...); err != nil {
+		if err := BindnodeRegistry.RegisterType(r.typ, string(embedSchema), r.typName); err != nil {
 			panic(err.Error())
 		}
 	}

@@ -81,7 +81,8 @@ import (
 var log = logging.Logger("builder")
 
 // special is a type used to give keys to modules which
-//  can't really be identified by the returned type
+//
+//	can't really be identified by the returned type
 type special struct{ id int }
 
 //nolint:golint
@@ -105,6 +106,7 @@ var (
 type invoke int
 
 // Invokes are called in the order they are defined.
+//
 //nolint:golint
 const (
 	// InitJournal at position 0 initializes the journal global var as soon as
@@ -620,6 +622,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(dtypes.GetExpectedSealDurationFunc), modules.NewGetExpectedSealDurationFunc),
 		Override(new(dtypes.SetMaxDealStartDelayFunc), modules.NewSetMaxDealStartDelayFunc),
 		Override(new(dtypes.GetMaxDealStartDelayFunc), modules.NewGetMaxDealStartDelayFunc),
+		Override(new(dtypes.GetBitswapPeerIDFunc), modules.NewGetBitswapPeerIDFunc),
+		Override(new(dtypes.SetBitswapPeerIDFunc), modules.NewSetBitswapPeerIDFunc),
 	)
 }
 

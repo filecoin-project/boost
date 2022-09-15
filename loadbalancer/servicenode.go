@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/boost/loadbalancer/messages"
-	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -60,15 +59,13 @@ func (sn *ServiceNode) SetStreamHandler(pid protocol.ID, handler network.StreamH
 // from the original peer, so that it's processed as if it were
 type wrappedStream struct {
 	network.Stream
-	protocol     protocol.ID
-	remote       peer.ID
-	remotePubKey crypto.PubKey
+	protocol protocol.ID
+	remote   peer.ID
 }
 
 type wrappedConn struct {
 	network.Conn
-	remote       peer.ID
-	remotePubKey crypto.PubKey
+	remote peer.ID
 }
 
 func (ws *wrappedStream) Protocol() protocol.ID {
@@ -77,15 +74,11 @@ func (ws *wrappedStream) Protocol() protocol.ID {
 
 func (ws *wrappedStream) Conn() network.Conn {
 	conn := ws.Stream.Conn()
-	return &wrappedConn{conn, ws.remote, ws.remotePubKey}
+	return &wrappedConn{conn, ws.remote}
 }
 
 func (wc *wrappedConn) RemotePeer() peer.ID {
 	return wc.remote
-}
-
-func (wc *wrappedConn) RemotePublicKey() crypto.PubKey {
-	return wc.remotePubKey
 }
 
 // handle inbound forwarding requests
@@ -104,6 +97,8 @@ func (sn *ServiceNode) handleForwarding(s network.Stream) {
 		return
 	}
 
+	log.Debugw("received forwarding request for protoocl", "protocols", request.Protocols, "remote", request.Remote)
+
 	// validate the request
 	handler, responseErr := sn.validateForwardingRequest(request)
 
@@ -114,7 +109,7 @@ func (sn *ServiceNode) handleForwarding(s network.Stream) {
 	}
 
 	// forward to regular handler, which will close stream
-	handler(&wrappedStream{s, request.Protocols[0], request.Remote, *request.RemotePubKey})
+	handler(&wrappedStream{s, request.Protocols[0], request.Remote})
 }
 
 // validates a forwarding request is one we can accept
@@ -175,7 +170,7 @@ func (sn *ServiceNode) NewStream(ctx context.Context, p peer.ID, protocols ...pr
 	}
 
 	// return a wrapped stream that appears like a normal stream with the original peer
-	return &wrappedStream{routedStream, *outbound.ProtocolID, p, *outbound.RemotePubKey}, nil
+	return &wrappedStream{routedStream, *outbound.ProtocolID, p}, nil
 }
 
 // RemoveStreamHandler removes a stream handler by shutting down registered route with the original host

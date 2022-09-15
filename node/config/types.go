@@ -4,7 +4,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
 	"github.com/ipfs/go-cid"
-	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 // // NOTE: ONLY PUT STRUCT DEFINITIONS IN THIS FILE
@@ -208,7 +207,7 @@ type DealmakingConfig struct {
 	// another concurrent download is allowed to start).
 	HttpTransferStallTimeout Duration
 
-	BitswapPeerID          peer.ID
+	BitswapPeerID          string
 }
 
 type FeeConfig struct {

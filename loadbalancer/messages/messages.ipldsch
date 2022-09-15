@@ -11,12 +11,10 @@ type ForwardingKind enum {
 } representation string
 
 type PeerID string
-type PubKey bytes
 
 type ForwardingRequest struct {
    Kind ForwardingKind (rename "k")
    Remote PeerID (rename "r")
-   RemotePubKey optional PubKey (rename "pk") # only present for inbound
    Protocols [ProtocolID] (rename "ps") # Should always be length 1 for Inbound requests 
 }
 
@@ -24,5 +22,4 @@ type ForwardingResponse struct {
   Code ResponseCode (rename "c")
   Message String (rename "m") # more info if rejected
   ProtocolID optional ProtocolID (rename "p") 
-  RemotePubKey optional PubKey (rename "pk") 
 }

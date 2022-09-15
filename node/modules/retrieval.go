@@ -6,8 +6,10 @@ import (
 
 	"github.com/filecoin-project/boost/loadbalancer"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-bitswap/network"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -43,7 +45,7 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 				Addresses: []multiaddr.Multiaddr{maddr},
 			})
 		}
-		if cfg.Dealmaking.BitswapPeerID != peer.ID("") {
+		if cfg.Dealmaking.BitswapPeerID != "" {
 			protos = append(protos, types.Protocol{
 				Name:      "bitswap",
 				Addresses: h.Addrs(),
@@ -73,7 +75,11 @@ func NewLoadBalancer(cfg *config.Boost) func(h host.Host) (*loadbalancer.LoadBal
 	return func(h host.Host) (*loadbalancer.LoadBalancer, error) {
 		peerConfig := map[peer.ID][]protocol.ID{}
 		if cfg.Dealmaking.BitswapPeerID != "" {
-			peerConfig[cfg.Dealmaking.BitswapPeerID] = []protocol.ID{
+			bsPeerID, err := peer.Decode(cfg.Dealmaking.BitswapPeerID)
+			if err != nil {
+				return nil, err
+			}
+			peerConfig[bsPeerID] = []protocol.ID{
 				network.ProtocolBitswap,
 				network.ProtocolBitswapNoVers,
 				network.ProtocolBitswapOneOne,
@@ -87,13 +93,51 @@ func NewLoadBalancer(cfg *config.Boost) func(h host.Host) (*loadbalancer.LoadBal
 func HandleLoadBalancer(lc fx.Lifecycle, lb *loadbalancer.LoadBalancer) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			log.Debug("starting retrieval transports listener")
+			log.Debug("starting load balancer")
 			lb.Start(ctx)
 			return nil
 		},
 		OnStop: func(context.Context) error {
-			log.Debug("stopping retrieval transports listener")
+			log.Debug("stopping load balancer")
 			return lb.Close()
 		},
 	})
+}
+
+func NewSetBitswapPeerIDFunc(r lotus_repo.LockedRepo, lb *loadbalancer.LoadBalancer) (dtypes.SetBitswapPeerIDFunc, error) {
+	return func(p peer.ID) (err error) {
+		err = mutateCfg(r, func(cfg *config.Boost) {
+			cfg.Dealmaking.BitswapPeerID = peer.Encode(p)
+		})
+		if err != nil {
+			return
+		}
+		peerConfig := map[peer.ID][]protocol.ID{}
+		peerConfig[p] = []protocol.ID{
+			network.ProtocolBitswap,
+			network.ProtocolBitswapNoVers,
+			network.ProtocolBitswapOneOne,
+			network.ProtocolBitswapOneZero,
+		}
+		lb.UpdatePeerConfig(peerConfig)
+		return
+	}, nil
+}
+
+func NewGetBitswapPeerIDFunc(r lotus_repo.LockedRepo) (dtypes.GetBitswapPeerIDFunc, error) {
+	return func() (p peer.ID, err error) {
+		var pString string
+		err = mutateCfg(r, func(cfg *config.Boost) {
+			pString = cfg.Dealmaking.BitswapPeerID
+		})
+		if err != nil {
+			return
+		}
+		if pString == "" {
+			err = fmt.Errorf("no bitswap peer id set")
+			return
+		}
+		p, err = peer.Decode(pString)
+		return
+	}, nil
 }

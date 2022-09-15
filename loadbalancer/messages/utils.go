@@ -28,12 +28,11 @@ func ReadForwardingRequest(s io.Reader) (*ForwardingRequest, error) {
 }
 
 // WriteInboundForwardingRequest writes a new inbound forwarding request to a network strema
-func WriteInboundForwardingRequest(s io.Writer, remote peer.ID, remotePubKey crypto.PubKey, protocolID protocol.ID) error {
+func WriteInboundForwardingRequest(s io.Writer, remote peer.ID, protocolID protocol.ID) error {
 	request := &ForwardingRequest{
-		Kind:         ForwardingInbound,
-		Remote:       remote,
-		RemotePubKey: &remotePubKey,
-		Protocols:    []protocol.ID{protocolID},
+		Kind:      ForwardingInbound,
+		Remote:    remote,
+		Protocols: []protocol.ID{protocolID},
 	}
 	buf, err := BindnodeRegistry.TypeToBytes(request, dagcbor.Encode)
 	if err != nil {
@@ -77,9 +76,8 @@ func ReadForwardingResponse(s io.Reader) (*ForwardingResponse, error) {
 // WriteOutboundForwardingResponseSuccess writes a new outbound forwarding success response to a network strema
 func WriteOutboundForwardingResponseSuccess(s io.Writer, remotePubKey crypto.PubKey, protocolID protocol.ID) error {
 	response := &ForwardingResponse{
-		Code:         ResponseOk,
-		RemotePubKey: &remotePubKey,
-		ProtocolID:   &protocolID,
+		Code:       ResponseOk,
+		ProtocolID: &protocolID,
 	}
 	buf, err := BindnodeRegistry.TypeToBytes(response, dagcbor.Encode)
 	if err != nil {

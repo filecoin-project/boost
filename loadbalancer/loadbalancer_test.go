@@ -40,9 +40,8 @@ func TestOutboundForwarding(t *testing.T) {
 				return messages.WriteOutboundForwardingRequest(w, peers.publicNode.id, testProtocols)
 			},
 			expectedResponse: &messages.ForwardingResponse{
-				Code:         messages.ResponseOk,
-				ProtocolID:   &testProtocols[1],
-				RemotePubKey: &peers.publicNode.publicKey,
+				Code:       messages.ResponseOk,
+				ProtocolID: &testProtocols[1],
 			},
 			registerHandler: true,
 		},
@@ -60,7 +59,7 @@ func TestOutboundForwarding(t *testing.T) {
 		{
 			name: "error - no inbound requests",
 			write: func(w io.Writer) error {
-				return messages.WriteInboundForwardingRequest(w, peers.publicNode.id, peers.publicNode.publicKey, testProtocols[0])
+				return messages.WriteInboundForwardingRequest(w, peers.publicNode.id, testProtocols[0])
 			},
 			expectedResponse: &messages.ForwardingResponse{
 				Code:    messages.ResponseRejected,
@@ -191,10 +190,9 @@ func TestInboundForwarding(t *testing.T) {
 					defer s.Close()
 					request, err := messages.ReadForwardingRequest(s)
 					require.Equal(t, &messages.ForwardingRequest{
-						Kind:         messages.ForwardingInbound,
-						Remote:       peers.publicNode.id,
-						RemotePubKey: &peers.publicNode.publicKey,
-						Protocols:    []protocol.ID{testProtocols[0]},
+						Kind:      messages.ForwardingInbound,
+						Remote:    peers.publicNode.id,
+						Protocols: []protocol.ID{testProtocols[0]},
 					}, request)
 					require.NoError(tn.t, err)
 					if testCase.rejectResponse {

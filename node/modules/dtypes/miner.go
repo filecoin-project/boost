@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
+	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
@@ -94,3 +95,6 @@ type StorageDealFilter func(ctx context.Context, deal types.DealFilterParams) (b
 type RetrievalDealFilter func(ctx context.Context, deal retrievalmarket.ProviderDealState) (bool, string, error)
 
 type RetrievalPricingFunc func(ctx context.Context, dealPricingParams retrievalmarket.PricingInput) (retrievalmarket.Ask, error)
+
+type GetBitswapPeerIDFunc func() (peer.ID, error)
+type SetBitswapPeerIDFunc func(peer.ID) error

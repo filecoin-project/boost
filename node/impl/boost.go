@@ -35,6 +35,7 @@ import (
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/host"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 	"go.uber.org/fx"
 )
 
@@ -98,6 +99,9 @@ type BoostAPI struct {
 	GetSealingConfigFunc                        lotus_dtypes.GetSealingConfigFunc                        `optional:"true"`
 	GetExpectedSealDurationFunc                 lotus_dtypes.GetExpectedSealDurationFunc                 `optional:"true"`
 	SetExpectedSealDurationFunc                 lotus_dtypes.SetExpectedSealDurationFunc                 `optional:"true"`
+
+	GetBitswapPeerIDFunc dtypes.GetBitswapPeerIDFunc
+	SetBitswapPeerIDFunc dtypes.SetBitswapPeerIDFunc
 }
 
 var _ api.Boost = &BoostAPI{}
@@ -498,4 +502,12 @@ func (sm *BoostAPI) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) 
 
 func (sm *BoostAPI) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) {
 	return sm.IndexBackedBlockstore.GetSize(ctx, c)
+}
+
+func (sm *BoostAPI) DealsGetBitswapPeerID(ctx context.Context) (peer.ID, error) {
+	return sm.GetBitswapPeerIDFunc()
+}
+
+func (sm *BoostAPI) DealsSetBitswapPeerID(ctx context.Context, p peer.ID) error {
+	return sm.SetBitswapPeerIDFunc(p)
 }

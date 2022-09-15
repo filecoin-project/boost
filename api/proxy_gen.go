@@ -82,7 +82,11 @@ type BoostStruct struct {
 
 		DealsConsiderVerifiedStorageDeals func(p0 context.Context) (bool, error) `perm:"admin"`
 
+		DealsGetBitswapPeerID func(p0 context.Context) (peer.ID, error) `perm:"admin"`
+
 		DealsPieceCidBlocklist func(p0 context.Context) ([]cid.Cid, error) `perm:"admin"`
+
+		DealsSetBitswapPeerID func(p0 context.Context, p1 peer.ID) error `perm:"admin"`
 
 		DealsSetConsiderOfflineRetrievalDeals func(p0 context.Context, p1 bool) error `perm:"admin"`
 
@@ -510,6 +514,17 @@ func (s *BoostStub) DealsConsiderVerifiedStorageDeals(p0 context.Context) (bool,
 	return false, ErrNotSupported
 }
 
+func (s *BoostStruct) DealsGetBitswapPeerID(p0 context.Context) (peer.ID, error) {
+	if s.Internal.DealsGetBitswapPeerID == nil {
+		return *new(peer.ID), ErrNotSupported
+	}
+	return s.Internal.DealsGetBitswapPeerID(p0)
+}
+
+func (s *BoostStub) DealsGetBitswapPeerID(p0 context.Context) (peer.ID, error) {
+	return *new(peer.ID), ErrNotSupported
+}
+
 func (s *BoostStruct) DealsPieceCidBlocklist(p0 context.Context) ([]cid.Cid, error) {
 	if s.Internal.DealsPieceCidBlocklist == nil {
 		return *new([]cid.Cid), ErrNotSupported
@@ -519,6 +534,17 @@ func (s *BoostStruct) DealsPieceCidBlocklist(p0 context.Context) ([]cid.Cid, err
 
 func (s *BoostStub) DealsPieceCidBlocklist(p0 context.Context) ([]cid.Cid, error) {
 	return *new([]cid.Cid), ErrNotSupported
+}
+
+func (s *BoostStruct) DealsSetBitswapPeerID(p0 context.Context, p1 peer.ID) error {
+	if s.Internal.DealsSetBitswapPeerID == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.DealsSetBitswapPeerID(p0, p1)
+}
+
+func (s *BoostStub) DealsSetBitswapPeerID(p0 context.Context, p1 peer.ID) error {
+	return ErrNotSupported
 }
 
 func (s *BoostStruct) DealsSetConsiderOfflineRetrievalDeals(p0 context.Context, p1 bool) error {

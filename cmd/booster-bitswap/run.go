@@ -48,6 +48,11 @@ var runCmd = &cli.Command{
 			Usage: "the endpoint for the tracing exporter",
 			Value: "http://tempo:14268/api/traces",
 		},
+		&cli.BoolFlag{
+			Name:  "override-peer-id",
+			Usage: "if present, forces a change to boost's peer id for bitswap",
+			Value: false,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -85,15 +90,17 @@ var runCmd = &cli.Command{
 		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi)
 		// Create the server API
 		port := cctx.Int("port")
-		server := NewBitswapServer(port, remoteStore)
+		server := NewBitswapServer(port, remoteStore, bapi)
 
 		addrs, err := bapi.NetAddrsListen(ctx)
 		if err != nil {
 			return fmt.Errorf("getting boost API addrs: %w", err)
 		}
+
+		overrideExistingPeerID := cctx.Bool("override-peer-id")
 		// Start the server
 		log.Infof("Starting booster-bitswap node on port %d", port)
-		err = server.Start(ctx, dataDirPath(cctx), addrs)
+		err = server.Start(ctx, dataDirPath(cctx), addrs, overrideExistingPeerID)
 		if err != nil {
 			return err
 		}

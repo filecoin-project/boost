@@ -30,6 +30,18 @@ type LoadBalancer struct {
 }
 
 func NewLoadBalancer(h host.Host, peerConfig map[peer.ID][]protocol.ID) (*LoadBalancer, error) {
+	err := validatePeerConfig(peerConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &LoadBalancer{
+		h:            h,
+		activeRoutes: make(map[protocol.ID]peer.ID),
+		peerConfig:   peerConfig,
+	}, nil
+}
+
+func validatePeerConfig(peerConfig map[peer.ID][]protocol.ID) error {
 	// for now, double check no peers overlap in config
 	// TODO: support multiple peers owning a config
 	routesSet := map[protocol.ID]struct{}{}
@@ -37,15 +49,11 @@ func NewLoadBalancer(h host.Host, peerConfig map[peer.ID][]protocol.ID) (*LoadBa
 		for _, protocol := range protocols {
 			_, existing := routesSet[protocol]
 			if existing {
-				return nil, errors.New("Route registered for multiple peers")
+				return errors.New("Route registered for multiple peers")
 			}
 		}
 	}
-	return &LoadBalancer{
-		h:            h,
-		activeRoutes: make(map[protocol.ID]peer.ID),
-		peerConfig:   peerConfig,
-	}, nil
+	return nil
 }
 
 func (lb *LoadBalancer) Start(ctx context.Context) {
@@ -57,12 +65,29 @@ func (lb *LoadBalancer) Start(ctx context.Context) {
 func (lb *LoadBalancer) Close() error {
 	lb.h.RemoveStreamHandler(ForwardingProtocolID)
 
-	lb.activeRoutesLk.RLock()
+	lb.activeRoutesLk.Lock()
 	for id := range lb.activeRoutes {
 		lb.h.RemoveStreamHandler(id)
 	}
-	lb.activeRoutesLk.RUnlock()
+	lb.activeRoutes = map[protocol.ID]peer.ID{}
+	lb.activeRoutesLk.Unlock()
 	lb.h.Network().StopNotify(lb)
+	return nil
+}
+
+// UpdatePeerConfig updates the load balancer with a new peer config
+// existing nodes will have to disconnect and reconnect
+func (lb *LoadBalancer) UpdatePeerConfig(peerConfig map[peer.ID][]protocol.ID) error {
+	err := validatePeerConfig(peerConfig)
+	if err != nil {
+		return err
+	}
+	err = lb.Close()
+	if err != nil {
+		return err
+	}
+	lb.peerConfig = peerConfig
+	lb.Start(lb.ctx)
 	return nil
 }
 
@@ -83,6 +108,8 @@ func (lb *LoadBalancer) Connected(n network.Network, c network.Conn) {
 	if !isServiceNode {
 		return
 	}
+
+	log.Infow("service node connected activating peer protocols", "peerID", p, "protocols", protocols)
 
 	// if they are in the peer config, listen on all protocols they are setup for
 	lb.activeRoutesLk.Lock()
@@ -108,6 +135,9 @@ func (lb *LoadBalancer) Disconnected(n network.Network, c network.Conn) { // cal
 	if !isServiceNode {
 		return
 	}
+
+	log.Infow("service node disconnected deactivating peer protocols", "peerID", p, "protocols", protocols)
+
 	// if they are in the peer config, 'un'-listen on all protocols they are setup for
 	lb.activeRoutesLk.Lock()
 	defer lb.activeRoutesLk.Unlock()
@@ -137,6 +167,8 @@ func (lb *LoadBalancer) handleForwarding(s network.Stream) {
 		messages.WriteForwardingResponseError(s, ErrNoInboundRequests)
 		return
 	}
+
+	log.Debugw("outgoing forwarding stream", "protocols", request.Protocols, "routed peer", p, "remote peer", request.Remote)
 
 	// open the forwarding stream
 	outgoingStream, streamErr := lb.processForwardingRequest(p, request.Remote, request.Protocols)
@@ -221,6 +253,9 @@ func (lb *LoadBalancer) handleIncoming(s network.Stream) {
 	lb.activeRoutesLk.RLock()
 	routedPeer, ok := lb.activeRoutes[s.Protocol()]
 	lb.activeRoutesLk.RUnlock()
+
+	log.Debugw("incoming stream, reforwarding to peer", "protocol", s.Protocol(), "routed peer", routedPeer, "remote peer", s.Conn().RemotePeer())
+
 	if !ok {
 		// if none exists, return
 		log.Warnf("received protocol request for protocol '%s' with no router peer", s.Protocol())
@@ -238,7 +273,7 @@ func (lb *LoadBalancer) handleIncoming(s network.Stream) {
 
 	defer routedStream.Close()
 	// write an inbound forwarding request with the remote peer and protoocol
-	err = messages.WriteInboundForwardingRequest(routedStream, s.Conn().RemotePeer(), s.Conn().RemotePublicKey(), s.Protocol())
+	err = messages.WriteInboundForwardingRequest(routedStream, s.Conn().RemotePeer(), s.Protocol())
 	if err != nil {
 		log.Warnf("writing forwarding request: %s", err)
 		routedStream.Reset()
