@@ -29,7 +29,9 @@
   * [DealsConsiderOnlineStorageDeals](#dealsconsideronlinestoragedeals)
   * [DealsConsiderUnverifiedStorageDeals](#dealsconsiderunverifiedstoragedeals)
   * [DealsConsiderVerifiedStorageDeals](#dealsconsiderverifiedstoragedeals)
+  * [DealsGetBitswapPeerID](#dealsgetbitswappeerid)
   * [DealsPieceCidBlocklist](#dealspiececidblocklist)
+  * [DealsSetBitswapPeerID](#dealssetbitswappeerid)
   * [DealsSetConsiderOfflineRetrievalDeals](#dealssetconsiderofflineretrievaldeals)
   * [DealsSetConsiderOfflineStorageDeals](#dealssetconsiderofflinestoragedeals)
   * [DealsSetConsiderOnlineRetrievalDeals](#dealssetconsideronlineretrievaldeals)
@@ -603,6 +605,15 @@ Inputs: `null`
 
 Response: `true`
 
+### DealsGetBitswapPeerID
+
+
+Perms: admin
+
+Inputs: `null`
+
+Response: `"12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"`
+
 ### DealsPieceCidBlocklist
 
 
@@ -618,6 +629,20 @@ Response:
   }
 ]
 ```
+
+### DealsSetBitswapPeerID
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"
+]
+```
+
+Response: `{}`
 
 ### DealsSetConsiderOfflineRetrievalDeals
 
