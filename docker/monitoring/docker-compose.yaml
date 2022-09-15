@@ -42,6 +42,8 @@ services:
     command: [ "--config.file=/etc/prometheus.yaml" ]
     volumes:
       - ./prometheus.yaml:/etc/prometheus.yaml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "9090:9090"
     logging:
@@ -68,3 +70,19 @@ services:
       driver: loki
       options:
         loki-url: 'http://localhost:3100/loki/api/v1/push'
+
+  #####################
+  ## DEBUG CONTAINER ##
+  #####################
+  #ubuntu:
+    #container_name: ubuntu
+    #image: ubuntu:latest
+    #command: [ "sleep", "3600" ]
+    #ports:
+      #- "8098:8098"
+    #extra_hosts:
+      #- "host.docker.internal:host-gateway"
+    #logging:
+      #driver: loki
+      #options:
+        #loki-url: 'http://localhost:3100/loki/api/v1/push'

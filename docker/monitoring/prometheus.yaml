@@ -12,3 +12,6 @@ scrape_configs:
   - job_name: 'booster-http'
     static_configs:
       - targets: [ 'booster-http:7777' ]
+  - job_name: 'lotus-miner'
+    static_configs:
+      - targets: [ 'host.docker.internal:8787/debug/metrics' ]
