@@ -197,3 +197,46 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 	./docgen-openrpc "api/api.go" "Boost" "api" "./api" -gzip > build/openrpc/boost.json.gz
 
 .PHONY: docsgen docsgen-md-bin docsgen-openrpc-bin
+
+## DOCKER IMAGES
+docker_user?=filecoin
+lotus_version?=1.17.1-rc2
+lotus_src_dir?=
+ 
+ifeq ($(lotus_src_dir),)
+    lotus_src_dir=/tmp/lotus-$(lotus_version)
+    lotus_checkout_dir=$(lotus_src_dir)
+else
+    lotus_version=dev
+    lotus_checkout_dir=
+endif
+lotus_test_image=$(docker_user)/lotus-test:$(lotus_version)
+docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image) $(docker_args)
+
+### lotus test docker image
+info/lotus-test:
+	@echo Lotus dir = $(lotus_src_dir)
+	@echo Lotus ver = $(lotus_version)
+.PHONY: info/lotus-test	
+$(lotus_checkout_dir):
+	git clone --depth 1 --branch v$(lotus_version) https://github.com/filecoin-project/lotus $@
+docker/lotus-test: info/lotus-test | $(lotus_checkout_dir)
+	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile.lotus --target lotus-test \
+		-t $(lotus_test_image) .
+.PHONY: docker/lotus-test
+
+### devnet images
+docker/%: docker/lotus-test
+	cd docker/devnet/$* && $(docker_build_cmd) -t $(docker_user)/$*-dev:$(lotus_version) \
+		--build-arg BUILD_VERSION=$(lotus_version) .
+docker/boost: build/.update-modules docker/lotus-test
+	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
+		-t $(docker_user)/boost-dev:dev --build-arg BUILD_VERSION=dev \
+		-f docker/devnet/boost/Dockerfile.source .
+.PHONY: docker/boost
+docker/booster-http: 
+	$(docker_build_cmd) -t $(docker_user)/booster-http-dev:dev --build-arg BUILD_VERSION=dev \
+		-f docker/devnet/booster-http/Dockerfile.source .
+.PHONY: docker/booster-http
+docker/all: docker/boost docker/booster-http docker/lotus docker/lotus-miner 
+.PHONY: docker/all

@@ -51,6 +51,7 @@ services:
     image: ${BOOST_IMAGE}
     ports:
       - "8080:8080"
+      - "1288:1288" # For the /metrics endpoint
     environment:
       - LOTUS_API_LISTENADDRESS=/dns/boost/tcp/1288/http
       - LOTUS_PATH=/var/lib/lotus
