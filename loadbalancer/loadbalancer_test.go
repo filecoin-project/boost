@@ -108,7 +108,8 @@ func TestOutboundForwarding(t *testing.T) {
 			if response.Code == messages.ResponseOk {
 				_, err := s.Write([]byte("request"))
 				require.NoError(t, err)
-				s.CloseWrite()
+				err = s.CloseWrite()
+				require.NoError(t, err)
 				streamResponse, err := io.ReadAll(s)
 				require.NoError(t, err)
 				require.Equal(t, "response", string(streamResponse))
@@ -196,7 +197,7 @@ func TestInboundForwarding(t *testing.T) {
 					}, request)
 					require.NoError(tn.t, err)
 					if testCase.rejectResponse {
-						s.Reset()
+						_ = s.Reset()
 					} else {
 						userRequest, err := ioutil.ReadAll(s)
 						require.NoError(t, err)
@@ -208,12 +209,13 @@ func TestInboundForwarding(t *testing.T) {
 				tn.serviceNode.SetStreamHandler(ForwardingProtocolID, handler)
 			}
 			if !testCase.doNotConnect {
-				tn.serviceNode.Connect(ctx, peer.AddrInfo{
+				err = tn.serviceNode.Connect(ctx, peer.AddrInfo{
 					ID: peers.loadBalancer.id,
 					Addrs: []multiaddr.Multiaddr{
 						peers.loadBalancer.multiAddr,
 					},
 				})
+				require.NoError(t, err)
 			}
 			s, err := tn.publicNode.NewStream(tn.ctx, tn.loadBalancer.ID(), testCase.protocols...)
 			if testCase.willErrorOpening {
@@ -223,7 +225,8 @@ func TestInboundForwarding(t *testing.T) {
 				_, err := s.Write([]byte("request"))
 
 				require.NoError(t, err)
-				s.CloseWrite()
+				_ = s.CloseWrite()
+				require.NoError(t, err)
 				streamResponse, err := io.ReadAll(s)
 				if testCase.willErrorReading {
 					require.Error(t, err)
@@ -239,7 +242,6 @@ func TestInboundForwarding(t *testing.T) {
 	}
 }
 
-type forwardingRequestHandler func(*messages.ForwardingRequest, io.Writer) error
 type testNet struct {
 	ctx              context.Context
 	t                *testing.T

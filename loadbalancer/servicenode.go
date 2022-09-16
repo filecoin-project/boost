@@ -85,7 +85,7 @@ func (wc *wrappedConn) RemotePeer() peer.ID {
 func (sn *ServiceNode) handleForwarding(s network.Stream) {
 	// only accept requests from the load balancer
 	if s.Conn().RemotePeer() != sn.balancer {
-		s.Reset()
+		_ = s.Reset()
 		return
 	}
 
@@ -93,7 +93,7 @@ func (sn *ServiceNode) handleForwarding(s network.Stream) {
 	request, err := messages.ReadForwardingRequest(s)
 	if err != nil {
 		log.Warnf("reading forwarding request: %s", err)
-		s.Reset()
+		_ = s.Reset()
 		return
 	}
 
@@ -104,7 +104,7 @@ func (sn *ServiceNode) handleForwarding(s network.Stream) {
 
 	if responseErr != nil {
 		log.Infof("rejected forwarding request: %s", responseErr)
-		s.Reset()
+		_ = s.Reset()
 		return
 	}
 

@@ -164,7 +164,10 @@ func (lb *LoadBalancer) handleForwarding(s network.Stream) {
 
 	// only accept outbound requests
 	if request.Kind != messages.ForwardingOutbound {
-		messages.WriteForwardingResponseError(s, ErrNoInboundRequests)
+		err = messages.WriteForwardingResponseError(s, ErrNoInboundRequests)
+		if err != nil {
+			log.Warnf("writing forwarding response: %s", err)
+		}
 		return
 	}
 
@@ -223,12 +226,12 @@ func (lb *LoadBalancer) bridgeStreams(s1, s2 network.Stream) {
 		defer wg.Done()
 		_, err := io.Copy(s2, s1)
 		if err != nil {
-			s1.Reset()
+			_ = s1.Reset()
 			return
 		}
 		err = s2.CloseWrite()
 		if err != nil {
-			s1.Reset()
+			_ = s1.Reset()
 		}
 	}()
 	go func() {
@@ -236,11 +239,11 @@ func (lb *LoadBalancer) bridgeStreams(s1, s2 network.Stream) {
 		defer wg.Done()
 		_, err := io.Copy(s1, s2)
 		if err != nil {
-			s2.Reset()
+			_ = s2.Reset()
 		}
 		err = s1.CloseWrite()
 		if err != nil {
-			s2.Reset()
+			_ = s2.Reset()
 		}
 	}()
 	wg.Wait()
@@ -259,7 +262,7 @@ func (lb *LoadBalancer) handleIncoming(s network.Stream) {
 	if !ok {
 		// if none exists, return
 		log.Warnf("received protocol request for protocol '%s' with no router peer", s.Protocol())
-		s.Reset()
+		_ = s.Reset()
 		return
 	}
 
@@ -267,7 +270,7 @@ func (lb *LoadBalancer) handleIncoming(s network.Stream) {
 	routedStream, err := lb.h.NewStream(lb.ctx, routedPeer, ForwardingProtocolID)
 	if err != nil {
 		log.Warnf("unable to open forwarding stream for protocol '%s' with peer %s", s.Protocol(), routedPeer)
-		s.Reset()
+		_ = s.Reset()
 		return
 	}
 
@@ -276,8 +279,8 @@ func (lb *LoadBalancer) handleIncoming(s network.Stream) {
 	err = messages.WriteInboundForwardingRequest(routedStream, s.Conn().RemotePeer(), s.Protocol())
 	if err != nil {
 		log.Warnf("writing forwarding request: %s", err)
-		routedStream.Reset()
-		s.Reset()
+		_ = routedStream.Reset()
+		_ = s.Reset()
 		return
 	}
 

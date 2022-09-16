@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"testing"
-	"time"
 
 	"github.com/filecoin-project/boost/loadbalancer/messages"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
@@ -48,8 +47,6 @@ func TestRoundtripForwardingResponse(t *testing.T) {
 func TestReadWriteFunctions(t *testing.T) {
 	singleTestProtocol := protocol.ID("test/me")
 	testProtocols := []protocol.ID{"applesauce/cheese", "big/face"}
-	expiry := time.Now().Add(time.Hour)
-	expiry = time.Unix(0, expiry.UnixNano())
 	responseErr := errors.New("something went wrong")
 	remote := peer.ID("something")
 	_, pubKey, err := crypto.GenerateECDSAKeyPair(rand.Reader)

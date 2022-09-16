@@ -119,7 +119,7 @@ func NewSetBitswapPeerIDFunc(r lotus_repo.LockedRepo, lb *loadbalancer.LoadBalan
 			network.ProtocolBitswapOneOne,
 			network.ProtocolBitswapOneZero,
 		}
-		lb.UpdatePeerConfig(peerConfig)
+		err = lb.UpdatePeerConfig(peerConfig)
 		return
 	}, nil
 }
