@@ -244,6 +244,7 @@ docker compose up -d
 
 ```
 docker network connect devnet tempo
+docker network connect devnet prometheus
 ```
 
 ### Explore Grafana / Tempo and search for traces
