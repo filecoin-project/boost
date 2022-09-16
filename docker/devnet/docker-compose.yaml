@@ -15,12 +15,12 @@ services:
   lotus:
     container_name: lotus
     image: ${LOTUS_IMAGE}
-    # ports:
-    #   - "1234:1234"
     environment:
       - LOTUS_API_LISTENADDRESS=/dns/lotus/tcp/1234/http
     restart: unless-stopped
     logging: *default-logging
+    ports:
+      - "1234:1234"
     volumes:
       - ./data/lotus:/var/lib/lotus:rw
       - ./data/genesis:/var/lib/genesis:rw
@@ -29,8 +29,6 @@ services:
   lotus-miner:
     container_name: lotus-miner
     image: ${LOTUS_MINER_IMAGE}
-    # ports:
-    #   - "2345:2345"
     environment:
       - LOTUS_API_LISTENADDRESS=/dns/lotus-miner/tcp/2345/http
       - LOTUS_API_REMOTELISTENADDRESS=lotus-miner:2345
@@ -40,6 +38,8 @@ services:
       - LOTUS_SEALING_WAITDEALSDELAY=20s
     restart: unless-stopped
     logging: *default-logging
+    ports:
+      - "2345:2345"
     volumes:
       - ./data/lotus-miner:/var/lib/lotus-miner:rw
       - ./data/lotus:/var/lib/lotus:ro
@@ -50,7 +50,7 @@ services:
     container_name: boost
     image: ${BOOST_IMAGE}
     ports:
-      - "8080:8080"
+      - "8080:8080" # Boost GUI React endpoint
       - "1288:1288" # For the /metrics endpoint
     environment:
       - LOTUS_API_LISTENADDRESS=/dns/boost/tcp/1288/http
