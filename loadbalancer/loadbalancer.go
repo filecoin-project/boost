@@ -240,6 +240,7 @@ func (lb *LoadBalancer) bridgeStreams(s1, s2 network.Stream) {
 		_, err := io.Copy(s1, s2)
 		if err != nil {
 			_ = s2.Reset()
+			return
 		}
 		err = s1.CloseWrite()
 		if err != nil {
