@@ -97,7 +97,7 @@ func (sn *ServiceNode) handleForwarding(s network.Stream) {
 		return
 	}
 
-	log.Debugw("received forwarding request for protoocl", "protocols", request.Protocols, "remote", request.Remote)
+	log.Debugw("received forwarding request for protocol", "protocols", request.Protocols, "remote", request.Remote)
 
 	// validate the request
 	handler, responseErr := sn.validateForwardingRequest(request)
