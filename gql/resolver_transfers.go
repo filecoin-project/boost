@@ -6,6 +6,8 @@ import (
 	"time"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/storagemarket"
+	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
 )
 
@@ -15,15 +17,62 @@ type transferPoint struct {
 }
 
 // query: transfers: [TransferPoint]
-func (r *resolver) Transfers(_ context.Context) ([]*transferPoint, error) {
-	deals := r.provider.Transfers()
+func (r *resolver) Transfers(_ context.Context) []*transferPoint {
+	return r.getTransferSamples(r.provider.Transfers(), nil)
+}
+
+type transferStats struct {
+	HttpMaxConcurrentDownloads int32
+	Stats                      []*hostTransferStats
+}
+
+type hostTransferStats struct {
+	Host            string
+	Total           int32
+	Started         int32
+	Stalled         int32
+	TransferSamples []*transferPoint
+}
+
+// query: transferStats: TransferStats
+func (r *resolver) TransferStats(_ context.Context) *transferStats {
+	transfersByDeal := r.provider.Transfers()
+	stats := r.provider.TransferStats()
+	gqlStats := make([]*hostTransferStats, 0, len(stats))
+	for _, s := range stats {
+		gqlStats = append(gqlStats, &hostTransferStats{
+			Host:            s.Host,
+			Total:           int32(s.Total),
+			Started:         int32(s.Started),
+			Stalled:         int32(s.Stalled),
+			TransferSamples: r.getTransferSamples(transfersByDeal, s.DealUuids),
+		})
+	}
+	return &transferStats{
+		HttpMaxConcurrentDownloads: int32(r.cfg.Dealmaking.HttpTransferMaxConcurrentDownloads),
+		Stats:                      gqlStats,
+	}
+}
+
+func (r *resolver) getTransferSamples(deals map[uuid.UUID][]storagemarket.TransferPoint, filter []uuid.UUID) []*transferPoint {
+	// If filter is nil, include all deals
+	if filter == nil {
+		for dealUuid := range deals {
+			filter = append(filter, dealUuid)
+		}
+	}
 
 	// We have
 	// dealUUID -> [At: <time>, Transferred: <bytes>, At: <time>, Transferred: <bytes>, ...]
 	// Convert this to
 	// <time> -> <transferred per second>
 	totalAt := make(map[time.Time]uint64)
-	for _, points := range deals {
+	for _, dealUuid := range filter {
+		points, ok := deals[dealUuid]
+		if !ok {
+			continue
+		}
+
 		var prev uint64
 		first := true
 		for _, pt := range points {
@@ -53,5 +102,5 @@ func (r *resolver) Transfers(_ context.Context) ([]*transferPoint, error) {
 		return pts[i].At.Before(pts[j].At.Time)
 	})
 
-	return pts, nil
+	return pts
 }

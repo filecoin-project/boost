@@ -113,9 +113,33 @@ var (
 	SplitstoreCompactionHot         = stats.Int64("splitstore/hot", "Number of hot blocks in last compaction", stats.UnitDimensionless)
 	SplitstoreCompactionCold        = stats.Int64("splitstore/cold", "Number of cold blocks in last compaction", stats.UnitDimensionless)
 	SplitstoreCompactionDead        = stats.Int64("splitstore/dead", "Number of dead blocks in last compaction", stats.UnitDimensionless)
+
+	// http
+	HttpPayloadByCidRequestCount    = stats.Int64("http/payload_by_cid_request_count", "Counter of /payload/<payload-cid> requests", stats.UnitDimensionless)
+	HttpPayloadByCidRequestDuration = stats.Float64("http/payload_by_cid_request_duration_ms", "Time spent retrieving a payload by cid", stats.UnitMilliseconds)
+	HttpPieceByCidRequestCount      = stats.Int64("http/piece_by_cid_request_count", "Counter of /piece/<piece-cid> requests", stats.UnitDimensionless)
+	HttpPieceByCidRequestDuration   = stats.Float64("http/piece_by_cid_request_duration_ms", "Time spent retrieving a piece by cid", stats.UnitMilliseconds)
 )
 
 var (
+	// http
+	HttpPayloadByCidRequestCountView = &view.View{
+		Measure:     HttpPayloadByCidRequestCount,
+		Aggregation: view.Count(),
+	}
+	HttpPayloadByCidRequestDurationView = &view.View{
+		Measure:     HttpPayloadByCidRequestDuration,
+		Aggregation: defaultMillisecondsDistribution,
+	}
+	HttpPieceByCidRequestCountView = &view.View{
+		Measure:     HttpPieceByCidRequestCount,
+		Aggregation: view.Count(),
+	}
+	HttpPieceByCidRequestDurationView = &view.View{
+		Measure:     HttpPieceByCidRequestDuration,
+		Aggregation: defaultMillisecondsDistribution,
+	}
+
 	InfoView = &view.View{
 		Name:        "info",
 		Description: "Lotus node information",
@@ -386,6 +410,10 @@ var DefaultViews = func() []*view.View {
 		InfoView,
 		PeerCountView,
 		APIRequestDurationView,
+		HttpPayloadByCidRequestCountView,
+		HttpPayloadByCidRequestDurationView,
+		HttpPieceByCidRequestCountView,
+		HttpPieceByCidRequestDurationView,
 	}
 	//views = append(views, blockstore.DefaultViews...)
 	views = append(views, rpcmetrics.DefaultViews...)

@@ -66,6 +66,12 @@ func DefaultBoost() *Boost {
 			Port: 8080,
 		},
 
+		Tracing: TracingConfig{
+			Enabled:     false,
+			Endpoint:    "",
+			ServiceName: "boostd",
+		},
+
 		Dealmaking: DealmakingConfig{
 			ConsiderOnlineStorageDeals:     true,
 			ConsiderOfflineStorageDeals:    true,
@@ -78,9 +84,6 @@ func DefaultBoost() *Boost {
 			MaxDealStartDelay:               Duration(time.Hour * 24 * 14),
 			ExpectedSealDuration:            Duration(time.Hour * 24),
 			MaxProviderCollateralMultiplier: 2,
-
-			SimultaneousTransfersForStorage:   DefaultSimultaneousTransfers,
-			SimultaneousTransfersForRetrieval: DefaultSimultaneousTransfers,
 
 			StartEpochSealingBuffer: 480, // 480 epochs buffer == 4 hours from adding deal to sector to sector being sealed
 
@@ -97,7 +100,13 @@ func DefaultBoost() *Boost {
 			},
 
 			MaxTransferDuration: Duration(24 * 3600 * time.Second),
-			RemoteCommp:         false,
+
+			RemoteCommp:             false,
+			MaxConcurrentLocalCommp: 1,
+
+			HttpTransferMaxConcurrentDownloads: 20,
+			HttpTransferStallTimeout:           Duration(5 * time.Minute),
+			HttpTransferStallCheckPeriod:       Duration(30 * time.Second),
 		},
 
 		LotusDealmaking: lotus_config.DealmakingConfig{

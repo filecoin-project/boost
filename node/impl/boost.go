@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"sort"
 
+	tracing "github.com/filecoin-project/boost/tracing"
 	"github.com/multiformats/go-multihash"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/filecoin-project/go-fil-markets/stores"
 
@@ -44,8 +46,6 @@ type BoostAPI struct {
 	api.Net
 
 	Full lapi.FullNode
-	//LocalStore  *stores.Local
-	//RemoteStore *stores.Remote
 
 	Host host.Host
 
@@ -70,9 +70,12 @@ type BoostAPI struct {
 
 	// Sealing Pipeline API
 	Sps sealingpipeline.API
-	// TODO: Figure out how to start graphql server without it needing
-	// to be a dependency of another fx object
+
+	// GraphSQL server
 	GraphqlServer *gql.Server
+
+	// Tracing
+	Tracing *tracing.Tracing
 
 	DS lotus_dtypes.MetadataDS
 
@@ -113,10 +116,16 @@ func (sm *BoostAPI) ServeRemote(perm bool) func(w http.ResponseWriter, r *http.R
 }
 
 func (sm *BoostAPI) BoostDummyDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
-	return sm.StorageProvider.ExecuteDeal(&params, "dummy")
+	return sm.StorageProvider.ExecuteDeal(ctx, &params, "dummy")
 }
 
 func (sm *BoostAPI) BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
+	// TODO: Use a middleware function that wraps the entire api implementation for all RPC calls
+	// Testing for now until a middleware function is created
+	ctx, span := tracing.Tracer.Start(ctx, "BoostAPI.BoostDeal")
+	defer span.End()
+	span.SetAttributes(attribute.String("dealUuid", dealUuid.String())) // Example of adding additional attributes
+
 	return sm.StorageProvider.Deal(ctx, dealUuid)
 }
 
@@ -128,8 +137,8 @@ func (sm *BoostAPI) BoostIndexerAnnounceAllDeals(ctx context.Context) error {
 	return sm.IndexProvider.IndexerAnnounceAllDeals(ctx)
 }
 
-func (sm *BoostAPI) BoostOfflineDealWithData(_ context.Context, dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
-	res, err := sm.StorageProvider.ImportOfflineDealData(dealUuid, filePath)
+func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
+	res, err := sm.StorageProvider.ImportOfflineDealData(ctx, dealUuid, filePath)
 	return res, err
 }
 
@@ -187,6 +196,10 @@ func (sm *BoostAPI) BoostDagstoreListShards(ctx context.Context) ([]api.Dagstore
 }
 
 func (sm *BoostAPI) BoostDagstorePiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "Boost.BoostDagstorePiecesContainingMultihash")
+	span.SetAttributes(attribute.String("multihash", mh.String()))
+	defer span.End()
+
 	if sm.DAGStore == nil {
 		return nil, fmt.Errorf("dagstore not available on this node")
 	}
@@ -458,10 +471,6 @@ func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) e
 	_, err := sm.DAGStore.GetShardInfo(k)
 	if err != nil {
 		return fmt.Errorf("unable to query dagstore for shard info: %w", err)
-	}
-	// If the shard is not registered we would expect ErrShardUnknown
-	if !errors.Is(err, dagstore.ErrShardUnknown) {
-		return fmt.Errorf("shard not found in the dagstore: %w", err)
 	}
 
 	pieceCid, err := cid.Parse(key)

@@ -199,7 +199,7 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 	// Start executing the deal.
 	// Note: This method just waits for the deal to be accepted, it doesn't
 	// wait for deal execution to complete.
-	res, err := p.prov.ExecuteDeal(&proposal, s.Conn().RemotePeer())
+	res, err := p.prov.ExecuteDeal(context.Background(), &proposal, s.Conn().RemotePeer())
 	if err != nil {
 		log.Warnw("deal proposal failed", "id", proposal.DealUUID, "err", err, "reason", res.Reason)
 	}

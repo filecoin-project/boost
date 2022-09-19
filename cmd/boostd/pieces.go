@@ -6,6 +6,7 @@ import (
 	"text/tabwriter"
 
 	bcli "github.com/filecoin-project/boost/cli"
+	"github.com/filecoin-project/boost/cmd"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/tablewriter"
 	"github.com/ipfs/go-cid"
@@ -40,9 +41,18 @@ var piecesListPiecesCmd = &cli.Command{
 			return err
 		}
 
+		if cctx.Bool("json") {
+
+			pieceCidsJson := map[string]interface{}{
+				"pieceCids": pieceCids,
+			}
+			return cmd.PrintJson(pieceCidsJson)
+		}
+
 		for _, pc := range pieceCids {
 			fmt.Println(pc)
 		}
+
 		return nil
 	},
 }
@@ -69,6 +79,14 @@ var piecesListCidInfosCmd = &cli.Command{
 			return err
 		}
 
+		if cctx.Bool("json") && !cctx.Bool("verbose") {
+			dataCidsJson := map[string]interface{}{
+				"dataCids": cids,
+			}
+
+			return cmd.PrintJson(dataCidsJson)
+		}
+
 		w := tablewriter.New(tablewriter.Col("CID"),
 			tablewriter.Col("Piece"),
 			tablewriter.Col("BlockOffset"),
@@ -79,11 +97,17 @@ var piecesListCidInfosCmd = &cli.Command{
 			tablewriter.Col("DealLen"),
 		)
 
+		type dataCids map[string]interface{}
+		var out []dataCids
+
 		for _, c := range cids {
 			if !cctx.Bool("verbose") {
 				fmt.Println(c)
 				continue
 			}
+
+			type pbl map[string]interface{}
+			var pbls []pbl
 
 			ci, err := nodeApi.PiecesGetCIDInfo(ctx, c)
 			if err != nil {
@@ -109,8 +133,34 @@ var piecesListCidInfosCmd = &cli.Command{
 						"DealOffset":  deal.Offset,
 						"DealLen":     deal.Length,
 					})
+
+					deal := map[string]interface{}{
+						"ID":     deal.DealID,
+						"Sector": deal.SectorID,
+						"Offset": deal.Offset,
+						"Length": deal.Length,
+					}
+					tpbl := pbl{
+						"PieceCid":    pi.PieceCID,
+						"BlockOffset": location.RelOffset,
+						"BlockLength": location.BlockSize,
+						"Deal":        deal,
+					}
+
+					pbls = append(pbls, tpbl)
 				}
 			}
+
+			tdataCids := dataCids{
+				"DataCid":            c,
+				"PieceBlockLocation": pbls,
+			}
+
+			out = append(out, tdataCids)
+		}
+
+		if cctx.Bool("json") && cctx.Bool("verbose") {
+			return cmd.PrintJson(out)
 		}
 
 		if cctx.Bool("verbose") {
@@ -146,6 +196,28 @@ var piecesInfoCmd = &cli.Command{
 			return err
 		}
 
+		if cctx.Bool("json") {
+
+			type deal map[string]interface{}
+			var deals []deal
+			for _, d := range pi.Deals {
+				dl := deal{
+					"ID":       d.DealID,
+					"SectorID": d.SectorID,
+					"Offset":   d.Offset,
+					"Length":   d.Length,
+				}
+				deals = append(deals, dl)
+			}
+
+			pieceinfo := map[string]interface{}{
+				"PieceCid": pi.PieceCID,
+				"Deals":    deals,
+			}
+
+			return cmd.PrintJson(pieceinfo)
+		}
+
 		fmt.Println("Piece: ", pi.PieceCID)
 		w := tabwriter.NewWriter(os.Stdout, 4, 4, 2, ' ', 0)
 		fmt.Fprintln(w, "Deals:\nDealID\tSectorID\tLength\tOffset")
@@ -179,6 +251,31 @@ var piecesCidInfoCmd = &cli.Command{
 		ci, err := nodeApi.PiecesGetCIDInfo(ctx, c)
 		if err != nil {
 			return err
+		}
+
+		if cctx.Bool("json") {
+
+			type pbl map[string]interface{}
+			type bl map[string]interface{}
+			var pbls []pbl
+			for _, d := range ci.PieceBlockLocations {
+				tbp := bl{
+					"RelOffset": d.RelOffset,
+					"BlockSize": d.BlockSize,
+				}
+				tpbl := pbl{
+					"PieceCid":      d.PieceCID,
+					"BlockLocation": tbp,
+				}
+				pbls = append(pbls, tpbl)
+			}
+
+			pieceinfo := map[string]interface{}{
+				"DataCid":            ci.CID,
+				"PieceBlockLocation": pbls,
+			}
+
+			return cmd.PrintJson(pieceinfo)
 		}
 
 		fmt.Println("Info for: ", ci.CID)

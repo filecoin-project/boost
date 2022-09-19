@@ -274,6 +274,8 @@ func (f *TestFramework) Start() error {
 	cfg.LotusFees.MaxPublishDealsFee = val
 	cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
 	cfg.Dealmaking.RemoteCommp = true
+	// No transfers will start until the first stall check period has elapsed
+	cfg.Dealmaking.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
 	cfg.Storage.ParallelFetchLimit = 10
 
 	err = lr.SetConfig(func(raw interface{}) {

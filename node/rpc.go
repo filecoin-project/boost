@@ -76,7 +76,7 @@ func BoostHandler(a api.Boost, permissioned bool) (http.Handler, error) {
 	m.PathPrefix("/remote").HandlerFunc(a.(*impl.BoostAPI).ServeRemote(permissioned))
 
 	// debugging
-	m.Handle("/debug/metrics", metrics.Exporter())
+	m.Handle("/metrics", metrics.Exporter("boost"))
 	m.PathPrefix("/").Handler(http.DefaultServeMux) // pprof
 
 	if !permissioned {

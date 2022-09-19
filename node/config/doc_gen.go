@@ -62,6 +62,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "Tracing",
+			Type: "TracingConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "LotusDealmaking",
 			Type: "lotus_config.DealmakingConfig",
 
@@ -180,20 +186,28 @@ as a multiplier of the minimum collateral bound`,
 			Name: "MaxStagingDealsBytes",
 			Type: "int64",
 
-			Comment: `The maximum allowed disk usage size in bytes of staging deals not yet
-passed to the sealing node by the markets service. 0 is unlimited.`,
+			Comment: `The maximum allowed disk usage size in bytes of downloaded deal data
+that has not yet been passed to the sealing node by boost.
+When the client makes a new deal proposal to download data from a host,
+boost checks this config value against the sum of:
+- the amount of data downloaded in the staging area
+- the amount of data that is queued for download
+- the amount of data in the proposed deal
+If the total amount would exceed the limit, boost rejects the deal.
+Set this value to 0 to indicate there is no limit.`,
 		},
 		{
-			Name: "SimultaneousTransfersForStorage",
+			Name: "MaxStagingDealsPercentPerHost",
 			Type: "uint64",
 
-			Comment: `The maximum number of parallel online data transfers for storage deals`,
-		},
-		{
-			Name: "SimultaneousTransfersForRetrieval",
-			Type: "uint64",
-
-			Comment: `The maximum number of parallel online data transfers for retrieval deals`,
+			Comment: `The percentage of MaxStagingDealsBytes that is allocated to each host.
+When the client makes a new deal proposal to download data from a host,
+boost checks this config value against the sum of:
+- the amount of data downloaded from the host in the staging area
+- the amount of data that is queued for download from the host
+- the amount of data in the proposed deal
+If the total amount would exceed the limit, boost rejects the deal.
+Set this value to 0 to indicate there is no limit per host.`,
 		},
 		{
 			Name: "StartEpochSealingBuffer",
@@ -238,6 +252,41 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 			Type: "bool",
 
 			Comment: `Whether to do commp on the Boost node (local) or on the Sealer (remote)`,
+		},
+		{
+			Name: "MaxConcurrentLocalCommp",
+			Type: "uint64",
+
+			Comment: `The maximum number of commp processes to run in parallel on the local
+boost process`,
+		},
+		{
+			Name: "HTTPRetrievalMultiaddr",
+			Type: "string",
+
+			Comment: `The public multi-address for retrieving deals with booster-http.
+Note: Must be in multiaddr format, eg /dns/foo.com/tcp/443/https`,
+		},
+		{
+			Name: "HttpTransferMaxConcurrentDownloads",
+			Type: "uint64",
+
+			Comment: `The maximum number of concurrent storage deal HTTP downloads.
+Note that this is a soft maximum; if some downloads stall,
+more downloads are allowed to start.`,
+		},
+		{
+			Name: "HttpTransferStallCheckPeriod",
+			Type: "Duration",
+
+			Comment: `The period between checking if downloads have stalled.`,
+		},
+		{
+			Name: "HttpTransferStallTimeout",
+			Type: "Duration",
+
+			Comment: `The time that can elapse before a download is considered stalled (and
+another concurrent download is allowed to start).`,
 		},
 	},
 	"FeeConfig": []DocField{
@@ -367,6 +416,26 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 			Type: "int",
 
 			Comment: `The maximum number of concurrent fetch operations to the storage subsystem`,
+		},
+	},
+	"TracingConfig": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: ``,
+		},
+		{
+			Name: "ServiceName",
+			Type: "string",
+
+			Comment: ``,
+		},
+		{
+			Name: "Endpoint",
+			Type: "string",
+
+			Comment: ``,
 		},
 	},
 	"WalletsConfig": []DocField{
@@ -1182,6 +1251,13 @@ This parameter is ONLY applicable if the retrieval pricing policy strategy has b
 			Comment: ``,
 		},
 		{
+			Name: "LocalWorkerName",
+			Type: "string",
+
+			Comment: `LocalWorkerName specifies a custom name for the builtin worker.
+If set to an empty string (default) os hostname will be used`,
+		},
+		{
 			Name: "Assigner",
 			Type: "string",
 
@@ -1435,6 +1511,30 @@ the compaction boundary; default is 0.`,
 			Comment: `HotStoreFullGCFrequency specifies how often to perform a full (moving) GC on the hotstore.
 A value of 0 disables, while a value 1 will do full GC in every compaction.
 Default is 20 (about once a week).`,
+		},
+		{
+			Name: "EnableColdStoreAutoPrune",
+			Type: "bool",
+
+			Comment: `EnableColdStoreAutoPrune turns on compaction of the cold store i.e. pruning
+where hotstore compaction occurs every finality epochs pruning happens every 3 finalities
+Default is false`,
+		},
+		{
+			Name: "ColdStoreFullGCFrequency",
+			Type: "uint64",
+
+			Comment: `ColdStoreFullGCFrequency specifies how often to performa a full (moving) GC on the coldstore.
+Only applies if auto prune is enabled.  A value of 0 disables while a value of 1 will do
+full GC in every prune.
+Default is 7 (about once every a week)`,
+		},
+		{
+			Name: "ColdStoreRetention",
+			Type: "int64",
+
+			Comment: `ColdStoreRetention specifies the retention policy for data reachable from the chain, in
+finalities beyond the compaction boundary, default is 0, -1 retains everything`,
 		},
 	},
 	"lotus_config.StorageMiner": []DocField{

@@ -540,10 +540,6 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 		return nil, fmt.Errorf("failed to parse wallet-deal-collateral: %s; err: %w", cctx.String("wallet-deal-collateral"), err)
 	}
 
-	if walletPSD.String() == walletCP.String() {
-		return nil, fmt.Errorf("wallets for PublishStorageDeals and deal collateral must be different")
-	}
-
 	if cctx.Int64("max-staging-deals-bytes") <= 0 {
 		return nil, fmt.Errorf("max size for staging deals area must be > 0 bytes")
 	}
@@ -700,8 +696,6 @@ func setBoostDealMakingCfg(bdm *config.DealmakingConfig, mktsCfg *lotus_config.S
 	bdm.MaxDealStartDelay = config.Duration(ldm.MaxDealStartDelay)
 	bdm.MaxProviderCollateralMultiplier = ldm.MaxProviderCollateralMultiplier
 	bdm.MaxStagingDealsBytes = ldm.MaxStagingDealsBytes
-	bdm.SimultaneousTransfersForStorage = ldm.SimultaneousTransfersForStorage
-	bdm.SimultaneousTransfersForRetrieval = ldm.SimultaneousTransfersForRetrieval
 	bdm.StartEpochSealingBuffer = ldm.StartEpochSealingBuffer
 	bdm.Filter = ldm.Filter
 	bdm.RetrievalFilter = ldm.RetrievalFilter

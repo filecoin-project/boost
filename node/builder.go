@@ -19,11 +19,13 @@ import (
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
@@ -138,6 +140,7 @@ const (
 	HandleMigrateProviderFundsKey
 	HandleDealsKey
 	HandleRetrievalKey
+	HandleRetrievalTransportsKey
 	RunSectorServiceKey
 
 	// boost should be started after legacy markets (HandleDealsKey)
@@ -462,7 +465,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		Override(new(*storagemanager.StorageManager), storagemanager.New(storagemanager.Config{
-			MaxStagingDealsBytes: uint64(cfg.Dealmaking.MaxStagingDealsBytes),
+			MaxStagingDealsBytes:          uint64(cfg.Dealmaking.MaxStagingDealsBytes),
+			MaxStagingDealsPercentPerHost: uint64(cfg.Dealmaking.MaxStagingDealsPercentPerHost),
 		})),
 
 		// Sector API
@@ -482,6 +486,9 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// GraphQL server
 		Override(new(*gql.Server), modules.NewGraphqlServer(cfg)),
+
+		// Tracing
+		Override(new(*tracing.Tracing), modules.NewTracing(cfg)),
 
 		// Address selector
 		Override(new(*ctladdr.AddressSelector), lotus_modules.AddressSelector(&lotus_config.MinerAddressConfig{
@@ -525,6 +532,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
 		Override(new(retrievalmarket.RetrievalProvider), modules.RetrievalProvider),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
+		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
+		Override(HandleRetrievalTransportsKey, modules.HandleRetrievalTransports),
 		Override(new(idxprov.MeshCreator), idxprov.NewMeshCreator),
 		Override(new(provider.Interface), modules.IndexProvider(cfg.IndexProvider)),
 

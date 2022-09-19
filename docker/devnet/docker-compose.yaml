@@ -1,0 +1,92 @@
+version: '3.8'
+
+x-logging:
+  &default-logging
+  options:
+    max-size: '20m'
+    max-file: '3'
+  driver: json-file
+
+networks:
+  default:
+    name: devnet
+
+services:
+  lotus:
+    container_name: lotus
+    image: ${LOTUS_IMAGE}
+    # ports:
+    #   - "1234:1234"
+    environment:
+      - LOTUS_API_LISTENADDRESS=/dns/lotus/tcp/1234/http
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./data/lotus:/var/lib/lotus:rw
+      - ./data/genesis:/var/lib/genesis:rw
+      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters:rw
+
+  lotus-miner:
+    container_name: lotus-miner
+    image: ${LOTUS_MINER_IMAGE}
+    # ports:
+    #   - "2345:2345"
+    environment:
+      - LOTUS_API_LISTENADDRESS=/dns/lotus-miner/tcp/2345/http
+      - LOTUS_API_REMOTELISTENADDRESS=lotus-miner:2345
+      - LOTUS_SEALING_BATCHPRECOMMITS=false
+      - LOTUS_SEALING_AGGREGATECOMMITS=false
+      - LOTUS_SUBSYSTEMS_ENABLEMARKETS=false
+      - LOTUS_SEALING_WAITDEALSDELAY=20s
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./data/lotus-miner:/var/lib/lotus-miner:rw
+      - ./data/lotus:/var/lib/lotus:ro
+      - ./data/genesis:/var/lib/genesis:ro
+      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters:rw
+
+  boost:
+    container_name: boost
+    image: ${BOOST_IMAGE}
+    ports:
+      - "8080:8080"
+      - "1288:1288" # For the /metrics endpoint
+    environment:
+      - LOTUS_API_LISTENADDRESS=/dns/boost/tcp/1288/http
+      - LOTUS_PATH=/var/lib/lotus
+      - LOTUS_MINER_PATH=/var/lib/lotus-miner
+      - LOTUS_TRACING_ENABLED=true
+      - LOTUS_TRACING_SERVICENAME=boostd
+      - LOTUS_TRACING_ENDPOINT=http://tempo:14268/api/traces
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./data/boost:/var/lib/boost:rw
+      - ./data/lotus:/var/lib/lotus:ro
+      - ./data/lotus-miner:/var/lib/lotus-miner:ro
+      - ./data/sample:/app/public:rw
+
+  booster-http:
+    container_name: booster-http
+    image: ${BOOSTER_HTTP_IMAGE}
+    ports:
+      - "7777:7777"
+    environment:
+      - BOOST_PATH=/var/lib/boost
+      - LOTUS_PATH=/var/lib/lotus
+      - LOTUS_MINER_PATH=/var/lib/lotus-miner
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./data/boost:/var/lib/boost:ro
+      - ./data/lotus:/var/lib/lotus:ro
+      - ./data/lotus-miner:/var/lib/lotus-miner:ro
+
+  demo-http-server:
+    container_name: demo-http-server
+    image: nginx:1.23-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./data/sample:/usr/share/nginx/html:ro

@@ -109,15 +109,16 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) *d
 		return derr
 	}
 
-	p.dealLogger.Infow(deal.DealUuid, "deal execution completed successfully")
 	// deal has been sent for sealing -> we can cleanup the deal state now and simply watch the deal on chain
 	// to wait for deal completion/slashing and update the state in DB accordingly.
 	p.cleanupDeal(deal)
 	p.dealLogger.Infow(deal.DealUuid, "finished deal cleanup after successful execution")
 
 	// Watch the sealing status of the deal and fire events for each change
+	p.dealLogger.Infow(deal.DealUuid, "watching deal sealing state changes")
 	p.fireSealingUpdateEvents(dh, deal.DealUuid, deal.SectorID)
 	p.cleanupDealHandler(deal.DealUuid)
+	p.dealLogger.Infow(deal.DealUuid, "deal sealing reached termination state")
 
 	// TODO
 	// Watch deal on chain and change state in DB and emit notifications.
@@ -141,35 +142,11 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 				return derr
 			}
 
-			if err := p.transferAndVerify(dh.transferCtx, pub, deal); err != nil {
+			if err := p.transferAndVerify(dh, pub, deal); err != nil {
 				// The transfer has failed. If the user tries to cancel the
 				// transfer after this point it's a no-op.
 				dh.setCancelTransferResponse(nil)
 
-				// Pass through fatal errors
-				if err.retry == smtypes.DealRetryFatal {
-					return err
-				}
-
-				// If the transfer failed because the user cancelled the
-				// transfer, it's non-recoverable
-				if dh.TransferCancelledByUser() {
-					return &dealMakingError{
-						retry: types.DealRetryFatal,
-						error: fmt.Errorf("data transfer cancelled after %d bytes: %w", deal.NBytesReceived, err),
-					}
-				}
-
-				// If the transfer failed because boost was shut down, it's
-				// automatically recoverable
-				if errors.Is(err.error, context.Canceled) {
-					return &dealMakingError{
-						retry: types.DealRetryAuto,
-						error: fmt.Errorf("data transfer paused by boost shutdown after %d bytes: %w", deal.NBytesReceived, err),
-					}
-				}
-
-				// Pass through any other transfer failure
 				return err
 			}
 
@@ -284,10 +261,42 @@ func (p *Provider) untagFundsAfterPublish(ctx context.Context, deal *types.Provi
 	}
 }
 
-func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
-	p.dealLogger.Infow(deal.DealUuid, "transferring deal data", "transfer client id", deal.Transfer.ClientID)
+func (p *Provider) transferAndVerify(dh *dealHandler, pub event.Emitter, deal *smtypes.ProviderDealState) *dealMakingError {
+	// Use a context specifically for transfers, that can be cancelled by the user
+	ctx := dh.transferCtx
 
-	tctx, cancel := context.WithDeadline(ctx, time.Now().Add(p.config.MaxTransferDuration))
+	p.dealLogger.Infow(deal.DealUuid, "deal queued for transfer", "transfer client id", deal.Transfer.ClientID)
+
+	// Wait for a spot in the transfer queue
+	err := p.xferLimiter.waitInQueue(ctx, deal)
+	if err != nil {
+		// If the transfer failed because the user cancelled the
+		// transfer, it's non-recoverable
+		if dh.TransferCancelledByUser() {
+			return &dealMakingError{
+				retry: types.DealRetryFatal,
+				error: fmt.Errorf("data transfer manually cancelled by user: %w", err),
+			}
+		}
+
+		// If boost was shutdown while waiting for the transfer to start,
+		// automatically retry on restart.
+		if errors.Is(err, context.Canceled) {
+			return &dealMakingError{
+				retry: smtypes.DealRetryAuto,
+				error: fmt.Errorf("boost shutdown while waiting to start transfer for deal %s: %w", deal.DealUuid, err),
+			}
+		}
+		return &dealMakingError{
+			retry: smtypes.DealRetryFatal,
+			error: fmt.Errorf("queued transfer failed to start for deal %s: %w", deal.DealUuid, err),
+		}
+	}
+	defer p.xferLimiter.complete(deal.DealUuid)
+
+	p.dealLogger.Infow(deal.DealUuid, "start deal data transfer", "transfer client id", deal.Transfer.ClientID)
+	transferStart := time.Now()
+	tctx, cancel := context.WithDeadline(ctx, transferStart.Add(p.config.MaxTransferDuration))
 	defer cancel()
 
 	st := time.Now()
@@ -305,15 +314,36 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 
 	// wait for data-transfer to finish
 	if err := p.waitForTransferFinish(tctx, handler, pub, deal); err != nil {
+		// If the transfer failed because the user cancelled the
+		// transfer, it's non-recoverable
+		if dh.TransferCancelledByUser() {
+			return &dealMakingError{
+				retry: types.DealRetryFatal,
+				error: fmt.Errorf("data transfer manually cancelled by user after %d bytes: %w", deal.NBytesReceived, err),
+			}
+		}
+
+		// If the transfer failed because boost was shut down, it's
+		// automatically recoverable
+		if errors.Is(err, context.Canceled) && time.Since(transferStart) < p.config.MaxTransferDuration {
+			return &dealMakingError{
+				retry: types.DealRetryAuto,
+				error: fmt.Errorf("data transfer paused by boost shutdown after %d bytes: %w", deal.NBytesReceived, err),
+			}
+		}
+
 		// Note that the data transfer has automatic retries built in, so if
 		// it fails, it means it's already retried several times and we should
-		// surface the problem to the user so they can decide manually whether
-		// to keep retrying
+		// fail the deal
 		return &dealMakingError{
-			retry: smtypes.DealRetryManual,
+			retry: smtypes.DealRetryFatal,
 			error: fmt.Errorf("data-transfer failed: %w", err),
 		}
 	}
+
+	// Make room in the transfer queue for the next transfer
+	p.xferLimiter.complete(deal.DealUuid)
+
 	p.dealLogger.Infow(deal.DealUuid, "deal data-transfer completed successfully", "bytes received", deal.NBytesReceived, "time taken",
 		time.Since(st).String())
 
@@ -330,8 +360,9 @@ func (p *Provider) transferAndVerify(ctx context.Context, pub event.Emitter, dea
 func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.Handler, pub event.Emitter, deal *types.ProviderDealState) error {
 	defer handler.Close()
 	defer p.transfers.complete(deal.DealUuid)
-	var lastOutputPct int64
 
+	// log transfer progress to the deal log every 10%
+	var lastOutputPct int64
 	logTransferProgress := func(received int64) {
 		pct := (100 * received) / int64(deal.Transfer.Size)
 		outputPct := pct / 10
@@ -353,6 +384,7 @@ func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.
 			}
 			deal.NBytesReceived = evt.NBytesReceived
 			p.transfers.setBytes(deal.DealUuid, uint64(evt.NBytesReceived))
+			p.xferLimiter.setBytes(deal.DealUuid, uint64(evt.NBytesReceived))
 			p.fireEventDealUpdate(pub, deal)
 			logTransferProgress(deal.NBytesReceived)
 
@@ -594,6 +626,7 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 				return si.State
 			}
 
+			p.dealLogger.Infow(dealUuid, "current sealing state", "state", si.State)
 			p.fireEventDealUpdate(dh.Publisher, deal)
 		}
 		return si.State
