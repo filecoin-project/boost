@@ -292,6 +292,71 @@ func (db *DB) GetOffset(ctx context.Context, cursorPrefix string, m multihash.Mu
 	return offset, nil
 }
 
+// RemoveAllRecords
+func (db *DB) RemoveAllRecords(ctx context.Context, cursor uint64) error {
+	return errors.New("not impl")
+	//buf := make([]byte, size)
+	//binary.PutUvarint(buf, cursor)
+	//
+	//var q query.Query
+	//q.Prefix = fmt.Sprintf("%d/", cursor)
+	//results, err := db.Query(ctx, q)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//entries, err := results.Rest()
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//batch, err := db.Batch(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//var keys []ds.Key
+	//
+	//for _, r := range entries {
+	//	k := ds.NewKey(r.Key)
+	//	keys = append(keys, k)
+	//	if err := batch.Delete(ctx, k); err != nil {
+	//		return fmt.Errorf("failed to batch delete mh=%s, err%w", r.Key[len(q.Prefix)+1:], err)
+	//	}
+	//}
+	//
+	//if err := batch.Commit(ctx); err != nil {
+	//	return fmt.Errorf("failed to commit batch: %w", err)
+	//}
+	//
+	//// Should we only sync the last entry to avoid this loop?
+	//// Would it guarantee the sync for previous keys
+	//for _, v := range keys {
+	//	if err := db.Sync(ctx, v); err != nil {
+	//		return fmt.Errorf("failed to sync delete: %w", err)
+	//	}
+	//}
+	//// TODO: Requires DB compaction for removing the key
+	//return nil
+}
+
+// RemoveAllMetadataForPieceCid(key)
+func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
+	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
+
+	options := gocb.ExistsOptions{
+		Context: ctx,
+	}
+
+	db.col.
+
+	if res, err := db.col.Exists("u:"+key.String(), &options); !res.Exists() {
+		return err
+	}
+	// TODO: Requires DB compaction for removing the key
+	return db.Delete(ctx, key)
+}
+
 func has(list []cid.Cid, v cid.Cid) bool {
 	for _, l := range list {
 		if l.Equals(v) {
@@ -299,4 +364,14 @@ func has(list []cid.Cid, v cid.Cid) bool {
 		}
 	}
 	return false
+}
+
+func (db *DB) Delete(ctx context.Context, key datastore.Key) error {
+
+	options := gocb.RemoveOptions{
+		Context: ctx,
+	}
+	_, err := db.col.Remove("u:"+key.String(), &options)
+
+	return err
 }

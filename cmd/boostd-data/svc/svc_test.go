@@ -146,6 +146,171 @@ func TestLdbService(t *testing.T) {
 		log.Fatal("compare failed")
 	}
 
+	err = cl.RemoveDeal(pieceCid, di.DealUuid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loadedSubject1, err := cl.GetIndex(pieceCid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Debug(loadedSubject1)
+
+	log.Debug("sleeping for a while.. running tests..")
+
+	cleanup()
+}
+
+func TestLdbRemoveService(t *testing.T) {
+	addr, cleanup, err := Setup("ldb")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cl, err := client.NewStore("http://" + addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sampleidx := "fixtures/baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka.full.idx"
+
+	pieceCid, err := cid.Parse("baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	subject, err := loadIndex(sampleidx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	records, err := getRecords(subject)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	randomuuid := uuid.New()
+
+	err = cl.AddIndex(pieceCid, records)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	di := model.DealInfo{
+		DealUuid:    randomuuid,
+		SectorID:    abi.SectorNumber(1),
+		PieceOffset: 1,
+		PieceLength: 2,
+		CarLength:   3,
+	}
+
+	err = cl.AddDealForPiece(pieceCid, di)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b, err := hex.DecodeString("1220ff63d7689e2d9567d1a90a7a68425f430137142e1fbc28fe4780b9ee8a5ef842")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mhash, err := multihash.Cast(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	offset, err := cl.GetOffset(pieceCid, mhash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if offset != 3039040395 {
+		t.Fatal("got wrong offset")
+	}
+
+	pcids, err := cl.PiecesContaining(mhash)
+
+	if len(pcids) != 1 {
+		t.Fatalf("expected len of 1 for pieceCids, got: %d", len(pcids))
+	}
+
+	if !pcids[0].Equals(pieceCid) {
+		t.Fatal("expected for pieceCids to match")
+	}
+
+	dis, err := cl.GetPieceDeals(pieceCid)
+
+	if len(dis) != 1 {
+		t.Fatalf("expected len of 1 for dis, got: %d", len(dis))
+	}
+
+	if dis[0] != di {
+		t.Fatal("expected for dealInfos to match")
+	}
+
+	indexed, err := cl.IsIndexed(pieceCid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !indexed {
+		t.Fatal("expected pieceCid to be indexed")
+	}
+
+	recs, err := cl.GetRecords(pieceCid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(recs) == 0 {
+		t.Fatal("expected to get records back from GetIndex")
+	}
+
+	loadedSubject, err := cl.GetIndex(pieceCid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ok, err := compareIndices(subject, loadedSubject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		log.Fatal("compare failed")
+	}
+
+	err = cl.RemoveDeal(pieceCid, di.DealUuid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loadedSubject, err = cl.GetIndex(pieceCid)
+	if loadedSubject != nil {
+		log.Fatal(err)
+	}
+
+	recs, err = cl.GetRecords(pieceCid)
+	if recs != nil {
+		log.Fatal(err)
+	}
+	//require.ErrorContains(t, err, "key not found")
+	//require.Empty(t, recs)
+
+	indexed, err = cl.IsIndexed(pieceCid)
+	if indexed != false {
+		log.Fatal(err)
+	}
+	//require.ErrorContains(t, err, "key not found")
+	//require.Empty(t, indexed)
+
+	dis, err = cl.GetPieceDeals(pieceCid)
+	if dis != nil {
+		log.Fatal(err)
+	}
+	//require.Contains(t, err, "key not found")
+	//require.Empty(t, dis)
+
 	log.Debug("sleeping for a while.. running tests..")
 
 	cleanup()
