@@ -1,4 +1,4 @@
-package loadbalancer
+package protocolproxy
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"github.com/filecoin-project/boost/loadbalancer/messages"
+	"github.com/filecoin-project/boost/protocolproxy/messages"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -85,11 +85,11 @@ func TestOutboundForwarding(t *testing.T) {
 			tn := setupTestNet(ctx, t, peers)
 			testClock := clock.NewMock()
 			testClock.Set(startTime)
-			lb, err := NewLoadBalancer(tn.loadBalancer, map[peer.ID][]protocol.ID{
+			pp, err := NewProtocolProxy(tn.proxyNode, map[peer.ID][]protocol.ID{
 				peers.serviceNode.id: testProtocols,
 			})
 			require.NoError(t, err)
-			lb.Start(ctx)
+			pp.Start(ctx)
 
 			if testCase.registerHandler {
 				handler := func(s network.Stream) {
@@ -115,8 +115,7 @@ func TestOutboundForwarding(t *testing.T) {
 				require.Equal(t, "response", string(streamResponse))
 				s.Close()
 			}
-			err = lb.Close()
-			require.NoError(t, err)
+			pp.Close()
 		})
 	}
 }
@@ -145,10 +144,10 @@ func TestInboundForwarding(t *testing.T) {
 		},
 		{
 			name:             "error - not connected to service node",
-			protocols:        []protocol.ID{otherProtocol},
+			protocols:        testProtocols,
 			doNotConnect:     true,
-			willErrorOpening: true,
-			willErrorReading: false,
+			willErrorOpening: false,
+			willErrorReading: true,
 			registerHandler:  true,
 		},
 		{
@@ -181,11 +180,11 @@ func TestInboundForwarding(t *testing.T) {
 			tn := setupTestNet(ctx, t, peers)
 			testClock := clock.NewMock()
 			testClock.Set(startTime)
-			lb, err := NewLoadBalancer(tn.loadBalancer, map[peer.ID][]protocol.ID{
+			pp, err := NewProtocolProxy(tn.proxyNode, map[peer.ID][]protocol.ID{
 				peers.serviceNode.id: testProtocols,
 			})
 			require.NoError(t, err)
-			lb.Start(ctx)
+			pp.Start(ctx)
 			if testCase.registerHandler {
 				handler := func(s network.Stream) {
 					defer s.Close()
@@ -210,14 +209,14 @@ func TestInboundForwarding(t *testing.T) {
 			}
 			if !testCase.doNotConnect {
 				err = tn.serviceNode.Connect(ctx, peer.AddrInfo{
-					ID: peers.loadBalancer.id,
+					ID: peers.proxyNode.id,
 					Addrs: []multiaddr.Multiaddr{
-						peers.loadBalancer.multiAddr,
+						peers.proxyNode.multiAddr,
 					},
 				})
 				require.NoError(t, err)
 			}
-			s, err := tn.publicNode.NewStream(tn.ctx, tn.loadBalancer.ID(), testCase.protocols...)
+			s, err := tn.publicNode.NewStream(tn.ctx, tn.proxyNode.ID(), testCase.protocols...)
 			if testCase.willErrorOpening {
 				require.Error(t, err)
 			} else {
@@ -236,8 +235,7 @@ func TestInboundForwarding(t *testing.T) {
 					s.Close()
 				}
 			}
-			err = lb.Close()
-			require.NoError(t, err)
+			pp.Close()
 		})
 	}
 }
@@ -245,7 +243,7 @@ func TestInboundForwarding(t *testing.T) {
 type testNet struct {
 	ctx              context.Context
 	t                *testing.T
-	loadBalancer     host.Host
+	proxyNode        host.Host
 	serviceNode      host.Host
 	otherServiceNode host.Host
 	publicNode       host.Host
@@ -259,7 +257,7 @@ type peerInfo struct {
 }
 
 type peerInfos struct {
-	loadBalancer     peerInfo
+	proxyNode        peerInfo
 	serviceNode      peerInfo
 	otherServiceNode peerInfo
 	publicNode       peerInfo
@@ -267,7 +265,7 @@ type peerInfos struct {
 
 func setupTestNet(ctx context.Context, t *testing.T, pis peerInfos) *testNet {
 	mn := mocknet.New()
-	lb, err := mn.AddPeer(pis.loadBalancer.key, pis.loadBalancer.multiAddr)
+	prn, err := mn.AddPeer(pis.proxyNode.key, pis.proxyNode.multiAddr)
 	require.NoError(t, err)
 	sn, err := mn.AddPeer(pis.serviceNode.key, pis.serviceNode.multiAddr)
 	require.NoError(t, err)
@@ -280,7 +278,7 @@ func setupTestNet(ctx context.Context, t *testing.T, pis peerInfos) *testNet {
 	tn := &testNet{
 		t:                t,
 		ctx:              ctx,
-		loadBalancer:     lb,
+		proxyNode:        prn,
 		serviceNode:      sn,
 		otherServiceNode: osn,
 		publicNode:       pn,
@@ -289,7 +287,7 @@ func setupTestNet(ctx context.Context, t *testing.T, pis peerInfos) *testNet {
 }
 
 func (tn *testNet) openOutboundForwardingRequest(write func(io.Writer) error) (*messages.ForwardingResponse, network.Stream) {
-	s, err := tn.serviceNode.NewStream(tn.ctx, tn.loadBalancer.ID(), ForwardingProtocolID)
+	s, err := tn.serviceNode.NewStream(tn.ctx, tn.proxyNode.ID(), ForwardingProtocolID)
 	require.NoError(tn.t, err)
 	err = write(s)
 	require.NoError(tn.t, err)
@@ -318,7 +316,7 @@ func makePeer(t *testing.T) peerInfo {
 
 func makePeers(t *testing.T) peerInfos {
 	return peerInfos{
-		loadBalancer:     makePeer(t),
+		proxyNode:        makePeer(t),
 		serviceNode:      makePeer(t),
 		otherServiceNode: makePeer(t),
 		publicNode:       makePeer(t),

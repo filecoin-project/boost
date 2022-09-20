@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/filecoin-project/boost/loadbalancer"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
@@ -17,6 +17,13 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/fx"
 )
+
+var bitswapProtocols = []protocol.ID{
+	network.ProtocolBitswap,
+	network.ProtocolBitswapNoVers,
+	network.ProtocolBitswapOneOne,
+	network.ProtocolBitswapOneZero,
+}
 
 func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.TransportsListener, error) {
 	return func(h host.Host) (*lp2pimpl.TransportsListener, error) {
@@ -71,55 +78,40 @@ func HandleRetrievalTransports(lc fx.Lifecycle, l *lp2pimpl.TransportsListener) 
 	})
 }
 
-func NewLoadBalancer(cfg *config.Boost) func(h host.Host) (*loadbalancer.LoadBalancer, error) {
-	return func(h host.Host) (*loadbalancer.LoadBalancer, error) {
+func NewProtocolProxy(cfg *config.Boost) func(h host.Host) (*protocolproxy.ProtocolProxy, error) {
+	return func(h host.Host) (*protocolproxy.ProtocolProxy, error) {
 		peerConfig := map[peer.ID][]protocol.ID{}
 		if cfg.Dealmaking.BitswapPeerID != "" {
 			bsPeerID, err := peer.Decode(cfg.Dealmaking.BitswapPeerID)
 			if err != nil {
 				return nil, err
 			}
-			peerConfig[bsPeerID] = []protocol.ID{
-				network.ProtocolBitswap,
-				network.ProtocolBitswapNoVers,
-				network.ProtocolBitswapOneOne,
-				network.ProtocolBitswapOneZero,
-			}
+			peerConfig[bsPeerID] = bitswapProtocols
 		}
-		return loadbalancer.NewLoadBalancer(h, peerConfig)
+		return protocolproxy.NewProtocolProxy(h, peerConfig)
 	}
 }
 
-func HandleLoadBalancer(lc fx.Lifecycle, lb *loadbalancer.LoadBalancer) {
+func HandleProtocolProxy(lc fx.Lifecycle, pp *protocolproxy.ProtocolProxy) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			log.Debug("starting load balancer")
-			lb.Start(ctx)
+			log.Info("starting load balancer")
+			pp.Start(ctx)
 			return nil
 		},
 		OnStop: func(context.Context) error {
-			log.Debug("stopping load balancer")
-			return lb.Close()
+			log.Info("stopping load balancer")
+			pp.Close()
+			return nil
 		},
 	})
 }
 
-func NewSetBitswapPeerIDFunc(r lotus_repo.LockedRepo, lb *loadbalancer.LoadBalancer) (dtypes.SetBitswapPeerIDFunc, error) {
+func NewSetBitswapPeerIDFunc(r lotus_repo.LockedRepo) (dtypes.SetBitswapPeerIDFunc, error) {
 	return func(p peer.ID) (err error) {
 		err = mutateCfg(r, func(cfg *config.Boost) {
 			cfg.Dealmaking.BitswapPeerID = peer.Encode(p)
 		})
-		if err != nil {
-			return
-		}
-		peerConfig := map[peer.ID][]protocol.ID{}
-		peerConfig[p] = []protocol.ID{
-			network.ProtocolBitswap,
-			network.ProtocolBitswapNoVers,
-			network.ProtocolBitswapOneOne,
-			network.ProtocolBitswapOneZero,
-		}
-		err = lb.UpdatePeerConfig(peerConfig)
 		return
 	}, nil
 }
@@ -127,14 +119,14 @@ func NewSetBitswapPeerIDFunc(r lotus_repo.LockedRepo, lb *loadbalancer.LoadBalan
 func NewGetBitswapPeerIDFunc(r lotus_repo.LockedRepo) (dtypes.GetBitswapPeerIDFunc, error) {
 	return func() (p peer.ID, err error) {
 		var pString string
-		err = mutateCfg(r, func(cfg *config.Boost) {
+		err = readCfg(r, func(cfg *config.Boost) {
 			pString = cfg.Dealmaking.BitswapPeerID
 		})
 		if err != nil {
 			return
 		}
 		if pString == "" {
-			err = fmt.Errorf("no bitswap peer id set")
+			p = peer.ID("")
 			return
 		}
 		p, err = peer.Decode(pString)

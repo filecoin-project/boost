@@ -1,4 +1,4 @@
-package loadbalancer
+package protocolproxy
 
 import (
 	"context"
@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"time"
 
-	"github.com/filecoin-project/boost/loadbalancer/messages"
+	"github.com/filecoin-project/boost/protocolproxy/messages"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -17,93 +16,71 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-const DefaultDuration = time.Hour
+var log = logging.Logger("protocolproxy")
 
-var log = logging.Logger("loadbalancer")
-
-type LoadBalancer struct {
-	ctx            context.Context
-	h              host.Host
-	peerConfig     map[peer.ID][]protocol.ID
-	activeRoutesLk sync.RWMutex
-	activeRoutes   map[protocol.ID]peer.ID
+type ProtocolProxy struct {
+	ctx                context.Context
+	h                  host.Host
+	peerConfig         map[peer.ID][]protocol.ID
+	supportedProtocols map[protocol.ID]peer.ID
+	activeRoutesLk     sync.RWMutex
+	activeRoutes       map[protocol.ID]peer.ID
 }
 
-func NewLoadBalancer(h host.Host, peerConfig map[peer.ID][]protocol.ID) (*LoadBalancer, error) {
-	err := validatePeerConfig(peerConfig)
-	if err != nil {
-		return nil, err
-	}
-	return &LoadBalancer{
-		h:            h,
-		activeRoutes: make(map[protocol.ID]peer.ID),
-		peerConfig:   peerConfig,
-	}, nil
-}
-
-func validatePeerConfig(peerConfig map[peer.ID][]protocol.ID) error {
+func NewProtocolProxy(h host.Host, peerConfig map[peer.ID][]protocol.ID) (*ProtocolProxy, error) {
 	// for now, double check no peers overlap in config
 	// TODO: support multiple peers owning a config
-	routesSet := map[protocol.ID]struct{}{}
-	for _, protocols := range peerConfig {
+	routesSet := map[protocol.ID]peer.ID{}
+	for p, protocols := range peerConfig {
 		for _, protocol := range protocols {
 			_, existing := routesSet[protocol]
 			if existing {
-				return errors.New("Route registered for multiple peers")
+				return nil, errors.New("Route registered for multiple peers")
 			}
+			routesSet[protocol] = p
 		}
 	}
-	return nil
+	return &ProtocolProxy{
+		h:                  h,
+		activeRoutes:       make(map[protocol.ID]peer.ID),
+		supportedProtocols: routesSet,
+		peerConfig:         peerConfig,
+	}, nil
 }
 
-func (lb *LoadBalancer) Start(ctx context.Context) {
-	lb.ctx = ctx
-	lb.h.SetStreamHandler(ForwardingProtocolID, lb.handleForwarding)
-	lb.h.Network().Notify(lb)
+func (pp *ProtocolProxy) Start(ctx context.Context) {
+	pp.ctx = ctx
+	pp.h.SetStreamHandler(ForwardingProtocolID, pp.handleForwarding)
+	for id := range pp.supportedProtocols {
+		pp.h.SetStreamHandler(id, pp.handleIncoming)
+	}
+	pp.h.Network().Notify(pp)
 }
 
-func (lb *LoadBalancer) Close() error {
-	lb.h.RemoveStreamHandler(ForwardingProtocolID)
-
-	lb.activeRoutesLk.Lock()
-	for id := range lb.activeRoutes {
-		lb.h.RemoveStreamHandler(id)
+func (pp *ProtocolProxy) Close() {
+	pp.h.RemoveStreamHandler(ForwardingProtocolID)
+	for id := range pp.supportedProtocols {
+		pp.h.RemoveStreamHandler(id)
 	}
-	lb.activeRoutes = map[protocol.ID]peer.ID{}
-	lb.activeRoutesLk.Unlock()
-	lb.h.Network().StopNotify(lb)
-	return nil
-}
-
-// UpdatePeerConfig updates the load balancer with a new peer config
-// existing nodes will have to disconnect and reconnect
-func (lb *LoadBalancer) UpdatePeerConfig(peerConfig map[peer.ID][]protocol.ID) error {
-	err := validatePeerConfig(peerConfig)
-	if err != nil {
-		return err
-	}
-	err = lb.Close()
-	if err != nil {
-		return err
-	}
-	lb.peerConfig = peerConfig
-	lb.Start(lb.ctx)
-	return nil
+	pp.activeRoutesLk.Lock()
+	pp.activeRoutes = map[protocol.ID]peer.ID{}
+	pp.activeRoutesLk.Unlock()
+	pp.h.Network().StopNotify(pp)
 }
 
 // Listen satifies the network.Notifee interface but does nothing
-func (lb *LoadBalancer) Listen(network.Network, multiaddr.Multiaddr) {} // called when network starts listening on an addr
+func (pp *ProtocolProxy) Listen(network.Network, multiaddr.Multiaddr) {} // called when network starts listening on an addr
 
 // ListenClose satifies the network.Notifee interface but does nothing
-func (lb *LoadBalancer) ListenClose(network.Network, multiaddr.Multiaddr) {} // called when network stops listening on an addr
+func (pp *ProtocolProxy) ListenClose(network.Network, multiaddr.Multiaddr) {} // called when network stops listening on an addr
 
 // Connected checks the peersConfig and begins listening any time a service node connects
-func (lb *LoadBalancer) Connected(n network.Network, c network.Conn) {
+func (pp *ProtocolProxy) Connected(n network.Network, c network.Conn) {
 	// read the peer that just connected
 	p := c.RemotePeer()
 
 	// check if they are in the peer config
-	protocols, isServiceNode := lb.peerConfig[p]
+	protocols, isServiceNode := pp.peerConfig[p]
 
 	if !isServiceNode {
 		return
@@ -112,25 +89,20 @@ func (lb *LoadBalancer) Connected(n network.Network, c network.Conn) {
 	log.Infow("service node connected activating peer protocols", "peerID", p, "protocols", protocols)
 
 	// if they are in the peer config, listen on all protocols they are setup for
-	lb.activeRoutesLk.Lock()
-	defer lb.activeRoutesLk.Unlock()
+	pp.activeRoutesLk.Lock()
+	defer pp.activeRoutesLk.Unlock()
 	for _, id := range protocols {
-		// check if we already registered this protocol
-		if _, ok := lb.activeRoutes[id]; ok {
-			continue
-		}
-		lb.activeRoutes[id] = p
-		lb.h.SetStreamHandler(id, lb.handleIncoming)
+		pp.activeRoutes[id] = p
 	}
 }
 
 // Disconnected checks the peersConfig and removes listening when a service node disconnects
-func (lb *LoadBalancer) Disconnected(n network.Network, c network.Conn) { // called when a connection closed
+func (pp *ProtocolProxy) Disconnected(n network.Network, c network.Conn) { // called when a connection closed
 	// read the peer that just connected
 	p := c.RemotePeer()
 
 	// check if they are in the peer config
-	protocols, isServiceNode := lb.peerConfig[p]
+	protocols, isServiceNode := pp.peerConfig[p]
 
 	if !isServiceNode {
 		return
@@ -139,20 +111,15 @@ func (lb *LoadBalancer) Disconnected(n network.Network, c network.Conn) { // cal
 	log.Infow("service node disconnected deactivating peer protocols", "peerID", p, "protocols", protocols)
 
 	// if they are in the peer config, 'un'-listen on all protocols they are setup for
-	lb.activeRoutesLk.Lock()
-	defer lb.activeRoutesLk.Unlock()
+	pp.activeRoutesLk.Lock()
+	defer pp.activeRoutesLk.Unlock()
 	for _, id := range protocols {
-		// check if we already de-registered this protocol
-		if _, ok := lb.activeRoutes[id]; !ok {
-			continue
-		}
-		delete(lb.activeRoutes, id)
-		lb.h.RemoveStreamHandler(id)
+		delete(pp.activeRoutes, id)
 	}
 }
 
 // handle a request from a routed peer to make an external ougoing connection
-func (lb *LoadBalancer) handleForwarding(s network.Stream) {
+func (pp *ProtocolProxy) handleForwarding(s network.Stream) {
 	defer s.Close()
 	p := s.Conn().RemotePeer()
 	request, err := messages.ReadForwardingRequest(s)
@@ -174,7 +141,7 @@ func (lb *LoadBalancer) handleForwarding(s network.Stream) {
 	log.Debugw("outgoing forwarding stream", "protocols", request.Protocols, "routed peer", p, "remote peer", request.Remote)
 
 	// open the forwarding stream
-	outgoingStream, streamErr := lb.processForwardingRequest(p, request.Remote, request.Protocols)
+	outgoingStream, streamErr := pp.processForwardingRequest(p, request.Remote, request.Protocols)
 
 	// if we failed to open the stream, write the response and return
 	if streamErr != nil {
@@ -195,30 +162,30 @@ func (lb *LoadBalancer) handleForwarding(s network.Stream) {
 	}
 
 	// bridge the streams together
-	lb.bridgeStreams(s, outgoingStream)
+	pp.bridgeStreams(s, outgoingStream)
 }
 
-func (lb *LoadBalancer) processForwardingRequest(p peer.ID, remote peer.ID, protocols []protocol.ID) (network.Stream, error) {
-	lb.activeRoutesLk.RLock()
+func (pp *ProtocolProxy) processForwardingRequest(p peer.ID, remote peer.ID, protocols []protocol.ID) (network.Stream, error) {
+	pp.activeRoutesLk.RLock()
 	// check routes to verify ownership
 	for _, id := range protocols {
-		registeredPeer, ok := lb.activeRoutes[id]
+		registeredPeer, ok := pp.activeRoutes[id]
 		if !ok || p != registeredPeer {
-			lb.activeRoutesLk.RUnlock()
+			pp.activeRoutesLk.RUnlock()
 			// error if this protocol not registered to this peer
 			return nil, ErrNotRegistered{p, id}
 		}
 	}
-	lb.activeRoutesLk.RUnlock()
-	s, err := lb.h.NewStream(lb.ctx, remote, protocols...)
+	pp.activeRoutesLk.RUnlock()
+	s, err := pp.h.NewStream(pp.ctx, remote, protocols...)
 	if err != nil {
 		return nil, fmt.Errorf("remote peer: %w", err)
 	}
 	return s, nil
 }
 
-// pipe a stream through the LB
-func (lb *LoadBalancer) bridgeStreams(s1, s2 network.Stream) {
+// pipe a stream through the PP
+func (pp *ProtocolProxy) bridgeStreams(s1, s2 network.Stream) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
@@ -250,25 +217,25 @@ func (lb *LoadBalancer) bridgeStreams(s1, s2 network.Stream) {
 	wg.Wait()
 }
 
-func (lb *LoadBalancer) handleIncoming(s network.Stream) {
+func (pp *ProtocolProxy) handleIncoming(s network.Stream) {
 	defer s.Close()
 
 	// check routed peer for this stream
-	lb.activeRoutesLk.RLock()
-	routedPeer, ok := lb.activeRoutes[s.Protocol()]
-	lb.activeRoutesLk.RUnlock()
-
-	log.Debugw("incoming stream, reforwarding to peer", "protocol", s.Protocol(), "routed peer", routedPeer, "remote peer", s.Conn().RemotePeer())
+	pp.activeRoutesLk.RLock()
+	routedPeer, ok := pp.activeRoutes[s.Protocol()]
+	pp.activeRoutesLk.RUnlock()
 
 	if !ok {
 		// if none exists, return
-		log.Warnf("received protocol request for protocol '%s' with no router peer", s.Protocol())
+		log.Infof("received protocol request for protocol '%s' with no active peer", s.Protocol())
 		_ = s.Reset()
 		return
 	}
 
+	log.Debugw("incoming stream, reforwarding to peer", "protocol", s.Protocol(), "routed peer", routedPeer, "remote peer", s.Conn().RemotePeer())
+
 	// open a forwarding stream
-	routedStream, err := lb.h.NewStream(lb.ctx, routedPeer, ForwardingProtocolID)
+	routedStream, err := pp.h.NewStream(pp.ctx, routedPeer, ForwardingProtocolID)
 	if err != nil {
 		log.Warnf("unable to open forwarding stream for protocol '%s' with peer %s", s.Protocol(), routedPeer)
 		_ = s.Reset()
@@ -285,5 +252,5 @@ func (lb *LoadBalancer) handleIncoming(s network.Stream) {
 		return
 	}
 
-	lb.bridgeStreams(s, routedStream)
+	pp.bridgeStreams(s, routedStream)
 }

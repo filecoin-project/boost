@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
-	"path"
 	"strings"
 
 	"github.com/filecoin-project/boost/api"
@@ -48,11 +46,6 @@ var runCmd = &cli.Command{
 			Usage: "the endpoint for the tracing exporter",
 			Value: "http://tempo:14268/api/traces",
 		},
-		&cli.BoolFlag{
-			Name:  "override-peer-id",
-			Usage: "if present, forces a change to boost's peer id for bitswap",
-			Value: false,
-		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -90,20 +83,25 @@ var runCmd = &cli.Command{
 		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi)
 		// Create the server API
 		port := cctx.Int("port")
-		server := NewBitswapServer(port, remoteStore, bapi)
+		repoDir := cctx.String(FlagRepo.Name)
+		host, err := setupHost(ctx, repoDir, port, bapi)
+		if err != nil {
+			return fmt.Errorf("setting up libp2p host: %w", err)
+		}
+		// Start the server
+		server := NewBitswapServer(remoteStore, host)
 
 		addrs, err := bapi.NetAddrsListen(ctx)
 		if err != nil {
 			return fmt.Errorf("getting boost API addrs: %w", err)
 		}
 
-		overrideExistingPeerID := cctx.Bool("override-peer-id")
-		// Start the server
 		log.Infof("Starting booster-bitswap node on port %d", port)
-		err = server.Start(ctx, dataDirPath(cctx), addrs, overrideExistingPeerID)
+		err = server.Start(ctx, addrs)
 		if err != nil {
 			return err
 		}
+
 		// Monitor for shutdown.
 		<-ctx.Done()
 
@@ -137,19 +135,4 @@ func getBoostAPI(ctx context.Context, ai string) (api.Boost, jsonrpc.ClientClose
 	}
 
 	return api, closer, nil
-}
-
-func dataDirPath(ctx *cli.Context) string {
-	dataDir := ctx.String("data-dir")
-
-	if dataDir == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			homeDir = "./"
-		}
-
-		dataDir = path.Join(homeDir, "/.booster-bitswap")
-	}
-
-	return dataDir
 }

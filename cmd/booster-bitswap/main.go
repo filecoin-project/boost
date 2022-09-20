@@ -11,6 +11,13 @@ import (
 
 var log = logging.Logger("booster")
 
+var FlagRepo = &cli.StringFlag{
+	Name:    "repo",
+	Usage:   "repo directory for Booster bitswap",
+	Value:   "~/.booster-bitswap",
+	EnvVars: []string{"BOOST_BITSWAP_REPO"},
+}
+
 func main() {
 	app := &cli.App{
 		Name:                 "booster-bitswap",
@@ -19,8 +26,10 @@ func main() {
 		Version:              build.UserVersion(),
 		Flags: []cli.Flag{
 			cliutil.FlagVeryVerbose,
+			FlagRepo,
 		},
 		Commands: []*cli.Command{
+			initCmd,
 			runCmd,
 		},
 	}

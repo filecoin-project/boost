@@ -1,4 +1,4 @@
-package loadbalancer
+package protocolproxy
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/loadbalancer/messages"
+	"github.com/filecoin-project/boost/protocolproxy/messages"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
@@ -43,13 +43,13 @@ func TestSetStreamHandler(t *testing.T) {
 			tn := setupTestNet(ctx, t, peers)
 
 			// setup a mock load balancer for routing
-			sn, err := NewServiceNode(ctx, tn.serviceNode, peer.AddrInfo{
-				ID:    peers.loadBalancer.id,
-				Addrs: []multiaddr.Multiaddr{peers.loadBalancer.multiAddr},
+			fh, err := NewForwardingHost(ctx, tn.serviceNode, peer.AddrInfo{
+				ID:    peers.proxyNode.id,
+				Addrs: []multiaddr.Multiaddr{peers.proxyNode.multiAddr},
 			})
 			require.NoError(t, err)
 
-			sn.SetStreamHandler(testProtocol, func(s network.Stream) {
+			fh.SetStreamHandler(testProtocol, func(s network.Stream) {
 				defer s.Close()
 				require.Equal(t, s.Protocol(), testProtocol)
 				require.Equal(t, s.Conn().RemotePeer(), peers.publicNode.id)
@@ -59,7 +59,7 @@ func TestSetStreamHandler(t *testing.T) {
 				_, err = s.Write([]byte("response"))
 				require.NoError(t, err)
 			})
-			s, err := tn.loadBalancer.NewStream(ctx, tn.serviceNode.ID(), ForwardingProtocolID)
+			s, err := tn.proxyNode.NewStream(ctx, tn.serviceNode.ID(), ForwardingProtocolID)
 			require.NoError(t, err)
 			defer s.Close()
 			err = messages.WriteInboundForwardingRequest(s, tn.publicNode.ID(), testCase.protocol)
@@ -84,10 +84,10 @@ func TestNewStream(t *testing.T) {
 	ctx := context.Background()
 	peers := makePeers(t)
 	testCases := []struct {
-		name                        string
-		loadBalancerForwardingError error
-		writeForwardingResponse     func(io.Writer) error
-		expectedDataResponse        []byte
+		name                         string
+		protocolProxyForwardingError error
+		writeForwardingResponse      func(io.Writer) error
+		expectedDataResponse         []byte
 	}{
 		{
 			name: "outbound - simple success",
@@ -100,7 +100,7 @@ func TestNewStream(t *testing.T) {
 			writeForwardingResponse: func(w io.Writer) error {
 				return messages.WriteForwardingResponseError(w, errors.New("something went wrong"))
 			},
-			loadBalancerForwardingError: fmt.Errorf("opening forwarded stream: something went wrong"),
+			protocolProxyForwardingError: fmt.Errorf("opening forwarded stream: something went wrong"),
 		},
 	}
 	for _, testCase := range testCases {
@@ -109,7 +109,7 @@ func TestNewStream(t *testing.T) {
 			defer cancel()
 			tn := setupTestNet(ctx, t, peers)
 
-			tn.loadBalancer.SetStreamHandler(ForwardingProtocolID, func(s network.Stream) {
+			tn.proxyNode.SetStreamHandler(ForwardingProtocolID, func(s network.Stream) {
 				defer s.Close()
 				request, err := messages.ReadForwardingRequest(s)
 				require.NoError(t, err)
@@ -120,7 +120,7 @@ func TestNewStream(t *testing.T) {
 					err = testCase.writeForwardingResponse(s)
 					require.NoError(t, err)
 				}
-				if testCase.loadBalancerForwardingError == nil {
+				if testCase.protocolProxyForwardingError == nil {
 					data, err := io.ReadAll(s)
 					require.NoError(t, err)
 					require.Equal(t, []byte("request"), data)
@@ -128,14 +128,14 @@ func TestNewStream(t *testing.T) {
 					require.NoError(t, err)
 				}
 			})
-			sn, err := NewServiceNode(ctx, tn.serviceNode, peer.AddrInfo{
-				ID:    peers.loadBalancer.id,
-				Addrs: []multiaddr.Multiaddr{peers.loadBalancer.multiAddr},
+			fh, err := NewForwardingHost(ctx, tn.serviceNode, peer.AddrInfo{
+				ID:    peers.proxyNode.id,
+				Addrs: []multiaddr.Multiaddr{peers.proxyNode.multiAddr},
 			})
 			require.NoError(t, err)
-			s, err := sn.NewStream(ctx, tn.publicNode.ID(), testProtocol)
-			if testCase.loadBalancerForwardingError != nil {
-				require.EqualError(t, err, testCase.loadBalancerForwardingError.Error())
+			s, err := fh.NewStream(ctx, tn.publicNode.ID(), testProtocol)
+			if testCase.protocolProxyForwardingError != nil {
+				require.EqualError(t, err, testCase.protocolProxyForwardingError.Error())
 			} else {
 				require.NoError(t, err)
 				defer s.Close()

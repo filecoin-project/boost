@@ -7,7 +7,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/filecoin-project/boost/loadbalancer/messages"
+	"github.com/filecoin-project/boost/protocolproxy/messages"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	peer "github.com/libp2p/go-libp2p-core/peer"

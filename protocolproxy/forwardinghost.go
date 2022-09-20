@@ -1,58 +1,58 @@
-package loadbalancer
+package protocolproxy
 
 import (
 	"context"
 	"fmt"
 	"sync"
 
-	"github.com/filecoin-project/boost/loadbalancer/messages"
+	"github.com/filecoin-project/boost/protocolproxy/messages"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 )
 
-// ServiceNode is a host that behaves as a service node connected to a load balancer
+// ForwardingHost is a host that behaves as a service node connected to a load balancer
 // -- all traffic is routed through the load balancer for each registered protocol
-type ServiceNode struct {
+type ForwardingHost struct {
 	host.Host
 	balancer   peer.ID
 	handlersLk sync.RWMutex
 	handlers   map[protocol.ID]network.StreamHandler
 }
 
-// NewServiceNode node constructs a service node connected to the given load balancer on the passed
+// NewForwardingHost node constructs a service node connected to the given load balancer on the passed
 // in host. A service node behaves exactly like a host.Host but setting up new protocol handlers
 // registers routes on the load balancer
-func NewServiceNode(ctx context.Context, h host.Host, balancer peer.AddrInfo) (host.Host, error) {
+func NewForwardingHost(ctx context.Context, h host.Host, balancer peer.AddrInfo) (host.Host, error) {
 	err := h.Connect(ctx, balancer)
 	if err != nil {
 		return nil, err
 	}
-	sn := &ServiceNode{
+	fh := &ForwardingHost{
 		Host:     h,
 		balancer: balancer.ID,
 		handlers: make(map[protocol.ID]network.StreamHandler),
 	}
-	sn.Host.SetStreamHandler(ForwardingProtocolID, sn.handleForwarding)
-	return sn, nil
+	fh.Host.SetStreamHandler(ForwardingProtocolID, fh.handleForwarding)
+	return fh, nil
 }
 
 // Close shuts down a service node host's forwarding
-func (sn *ServiceNode) Close() error {
-	sn.Host.RemoveStreamHandler(ForwardingProtocolID)
-	return sn.Host.Close()
+func (fh *ForwardingHost) Close() error {
+	fh.Host.RemoveStreamHandler(ForwardingProtocolID)
+	return fh.Host.Close()
 }
 
 // SetStreamHandler interrupts the normal process of setting up stream handlers by instead
 // registering a route on the connected load balancer. All traffic for this protocol
 // will go through the forwarding handshake with load balancer, then the native handler will
 // be called
-func (sn *ServiceNode) SetStreamHandler(pid protocol.ID, handler network.StreamHandler) {
+func (fh *ForwardingHost) SetStreamHandler(pid protocol.ID, handler network.StreamHandler) {
 	// only set the handler if we are successful in registering the route
-	sn.handlersLk.Lock()
-	sn.handlers[pid] = handler
-	sn.handlersLk.Unlock()
+	fh.handlersLk.Lock()
+	fh.handlers[pid] = handler
+	fh.handlersLk.Unlock()
 }
 
 // these wrappings on the stream or conn make it SEEM like the request is coming
@@ -82,9 +82,9 @@ func (wc *wrappedConn) RemotePeer() peer.ID {
 }
 
 // handle inbound forwarding requests
-func (sn *ServiceNode) handleForwarding(s network.Stream) {
+func (fh *ForwardingHost) handleForwarding(s network.Stream) {
 	// only accept requests from the load balancer
-	if s.Conn().RemotePeer() != sn.balancer {
+	if s.Conn().RemotePeer() != fh.balancer {
 		_ = s.Reset()
 		return
 	}
@@ -100,7 +100,7 @@ func (sn *ServiceNode) handleForwarding(s network.Stream) {
 	log.Debugw("received forwarding request for protocol", "protocols", request.Protocols, "remote", request.Remote)
 
 	// validate the request
-	handler, responseErr := sn.validateForwardingRequest(request)
+	handler, responseErr := fh.validateForwardingRequest(request)
 
 	if responseErr != nil {
 		log.Infof("rejected forwarding request: %s", responseErr)
@@ -113,9 +113,9 @@ func (sn *ServiceNode) handleForwarding(s network.Stream) {
 }
 
 // validates a forwarding request is one we can accept
-func (sn *ServiceNode) validateForwardingRequest(request *messages.ForwardingRequest) (network.StreamHandler, error) {
-	sn.handlersLk.RLock()
-	defer sn.handlersLk.RUnlock()
+func (fh *ForwardingHost) validateForwardingRequest(request *messages.ForwardingRequest) (network.StreamHandler, error) {
+	fh.handlersLk.RLock()
+	defer fh.handlersLk.RUnlock()
 
 	// only accept inbound requests
 	if request.Kind != messages.ForwardingInbound {
@@ -128,11 +128,11 @@ func (sn *ServiceNode) validateForwardingRequest(request *messages.ForwardingReq
 	}
 
 	// check for a registered handler
-	registeredHandler, ok := sn.handlers[request.Protocols[0]]
+	registeredHandler, ok := fh.handlers[request.Protocols[0]]
 
 	// don't accept inbound requests on protocols we didn't setup routing for
 	if !ok {
-		return nil, ErrNotRegistered{sn.ID(), request.Protocols[0]}
+		return nil, ErrNotRegistered{fh.ID(), request.Protocols[0]}
 	}
 
 	// return the registered handler
@@ -141,10 +141,10 @@ func (sn *ServiceNode) validateForwardingRequest(request *messages.ForwardingReq
 
 // Calls to "NewStream" open an outbound forwarding request to the load balancer, that is then sent on
 // the the specified peer
-func (sn *ServiceNode) NewStream(ctx context.Context, p peer.ID, protocols ...protocol.ID) (network.Stream, error) {
+func (fh *ForwardingHost) NewStream(ctx context.Context, p peer.ID, protocols ...protocol.ID) (network.Stream, error) {
 
 	// open a forwarding stream
-	routedStream, err := sn.Host.NewStream(ctx, sn.balancer, ForwardingProtocolID)
+	routedStream, err := fh.Host.NewStream(ctx, fh.balancer, ForwardingProtocolID)
 	if err != nil {
 		return nil, err
 	}
@@ -174,15 +174,15 @@ func (sn *ServiceNode) NewStream(ctx context.Context, p peer.ID, protocols ...pr
 }
 
 // RemoveStreamHandler removes a stream handler by shutting down registered route with the original host
-func (sn *ServiceNode) RemoveStreamHandler(pid protocol.ID) {
+func (fh *ForwardingHost) RemoveStreamHandler(pid protocol.ID) {
 	// check if the handler is exists
-	sn.handlersLk.Lock()
-	delete(sn.handlers, pid)
-	sn.handlersLk.Unlock()
+	fh.handlersLk.Lock()
+	delete(fh.handlers, pid)
+	fh.handlersLk.Unlock()
 }
 
 // Connect for now does nothing
-func (sn *ServiceNode) Connect(ctx context.Context, pi peer.AddrInfo) error {
+func (fh *ForwardingHost) Connect(ctx context.Context, pi peer.AddrInfo) error {
 	// for now, this does nothing -- see discussion/improvements
 	return nil
 }
