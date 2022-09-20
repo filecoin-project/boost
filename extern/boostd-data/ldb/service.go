@@ -50,6 +50,11 @@ func NewStore(_repopath string) *Store {
 		db.SetNextCursor(context.Background(), 100)
 	}
 
+	_, _, err = db.NextCursor(context.Background())
+	if err != nil {
+		db.SetNextCursor(context.Background(), 100)
+	}
+
 	log.Debugw("new piece meta service", "repo path", repopath)
 
 	return &Store{
