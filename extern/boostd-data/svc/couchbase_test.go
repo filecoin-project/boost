@@ -10,8 +10,8 @@ import (
 	"github.com/docker/docker/api/types/container"
 	cl "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
-	"github.com/filecoin-project/boost/cmd/boostd-data/client"
-	"github.com/filecoin-project/boost/cmd/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/client"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	"golang.org/x/net/context"
 )

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/filecoin-project/boost/cmd/boostd-data/client"
-	"github.com/filecoin-project/boost/cmd/boostd-data/model"
-	"github.com/filecoin-project/boost/cmd/boostd-data/svc"
+	"github.com/filecoin-project/boostd-data/client"
+	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/google/uuid"

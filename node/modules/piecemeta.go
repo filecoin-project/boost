@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/filecoin-project/boost/cmd/boostd-data/model"
 	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-fil-markets/piecestore"

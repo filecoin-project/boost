@@ -4,7 +4,7 @@ go 1.17
 
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
-replace github.com/filecoin-project/boost/cmd/boostd-data => ./cmd/boostd-data
+replace github.com/filecoin-project/boostd-data => ./extern/boostd-data
 
 //replace github.com/filecoin-project/lotus => ../lotus
 
@@ -21,7 +21,6 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/etclabscore/go-openrpc-reflect v0.0.36
 	github.com/fatih/color v1.13.0
-	github.com/filecoin-project/boost/cmd/boostd-data v0.0.0-00010101000000-000000000000
 	github.com/filecoin-project/dagstore v0.5.3
 	github.com/filecoin-project/go-address v1.0.0
 	github.com/filecoin-project/go-bitfield v0.2.4
@@ -118,6 +117,8 @@ require (
 	google.golang.org/grpc v1.46.2 // indirect
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
 )
+
+require github.com/filecoin-project/boostd-data v0.0.0-00010101000000-000000000000
 
 require (
 	github.com/DataDog/zstd v1.4.1 // indirect

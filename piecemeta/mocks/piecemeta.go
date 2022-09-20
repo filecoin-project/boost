@@ -7,8 +7,8 @@ package mock_piecemeta
 import (
 	reflect "reflect"
 
-	model "github.com/filecoin-project/boost/cmd/boostd-data/model"
 	piecemeta "github.com/filecoin-project/boost/piecemeta"
+	model "github.com/filecoin-project/boostd-data/model"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/filecoin-project/boost/cmd/boostd-data/svc"
+	"github.com/filecoin-project/boostd-data/svc"
 	logging "github.com/ipfs/go-log/v2"
 )
 

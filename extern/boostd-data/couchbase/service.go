@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/cmd/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/filecoin-project/boost/cmd/boostd-data/couchbase"
-	"github.com/filecoin-project/boost/cmd/boostd-data/ldb"
+	"github.com/filecoin-project/boostd-data/couchbase"
+	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/gorilla/mux"
 	logging "github.com/ipfs/go-log/v2"
 )

@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/filecoin-project/boost/cmd/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	logger "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car/v2/index"
