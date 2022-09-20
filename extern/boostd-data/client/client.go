@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/filecoin-project/boost/cmd/boostd-data/model"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	logger "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car/v2/index"
@@ -122,4 +123,34 @@ func (s *Store) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
 	}
 
 	return resp, nil
+}
+
+func (s *Store) RemoveDeal(pieceCid cid.Cid, dealId uuid.UUID) error {
+	var resp error
+	err := s.client.Call(&resp, "boostddata_removeDealForPiece", pieceCid, dealId)
+	if err != nil {
+		return err
+	}
+
+	return resp
+}
+
+func (s *Store) RemovePieceMetadata(pieceCid cid.Cid) error {
+	var resp error
+	err := s.client.Call(&resp, "boostddata_removePieceMetadata", pieceCid)
+	if err != nil {
+		return err
+	}
+
+	return resp
+}
+
+func (s *Store) RemoveMultihashes(pieceCid cid.Cid) error {
+	var resp error
+	err := s.client.Call(&resp, "boostddata_removeAllMultihashes", pieceCid)
+	if err != nil {
+		return err
+	}
+
+	return resp
 }

@@ -280,3 +280,61 @@ func has(list []cid.Cid, v cid.Cid) bool {
 	}
 	return false
 }
+
+// RemoveAllRecords
+func (db *DB) RemoveAllRecords(ctx context.Context, cursor uint64) error {
+	buf := make([]byte, size)
+	binary.PutUvarint(buf, cursor)
+
+	var q query.Query
+	q.Prefix = fmt.Sprintf("%d/", cursor)
+	results, err := db.Query(ctx, q)
+	if err != nil {
+		return err
+	}
+
+	entries, err := results.Rest()
+	if err != nil {
+		return err
+	}
+
+	batch, err := db.Batch(ctx)
+	if err != nil {
+		return err
+	}
+
+	var keys []ds.Key
+
+	for _, r := range entries {
+		k := ds.NewKey(r.Key)
+		keys = append(keys, k)
+		if err := batch.Delete(ctx, k); err != nil {
+			return fmt.Errorf("failed to batch delete mh=%s, err%w", r.Key[len(q.Prefix)+1:], err)
+		}
+	}
+
+	if err := batch.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit batch: %w", err)
+	}
+
+	// Should we only sync the last entry to avoid this loop?
+	// Would it guarantee the sync for previous keys
+	for _, v := range keys {
+		if err := db.Sync(ctx, v); err != nil {
+			return fmt.Errorf("failed to sync delete: %w", err)
+		}
+	}
+	// TODO: Requires DB compaction for removing the key
+	return nil
+}
+
+// RemoveAllMetadataForPieceCid
+func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
+	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
+
+	if ok, err := db.Has(ctx, key); !ok {
+		return err
+	}
+	// TODO: Requires DB compaction for removing the key
+	return db.Delete(ctx, key)
+}
