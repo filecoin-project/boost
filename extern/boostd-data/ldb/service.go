@@ -318,13 +318,7 @@ func (s *Store) RemoveDealForPiece(pieceCid cid.Cid, dealUuid uuid.UUID) error {
 		}
 	}
 
-	// This order is important as md.Cursor is required in case RemoveAllRecords fails
-	// and needs to be run manually
 	if len(md.Deals) == 0 {
-		// Remove all MultiHash Records as well. Don't fail even if error is returned
-		if err := s.db.RemoveAllRecords(ctx, md.Cursor); err != nil {
-			log.Errorf("Failed to remove Multihashes after removing the last deal: %w", err)
-		}
 		// Remove Metadata if removed deal was last one. Don't fail even if error is returned
 		if err := s.db.RemoveMetadata(ctx, pieceCid); err != nil {
 			log.Errorf("Failed to remove the Metadata after removing the last deal: %w", err)
@@ -361,7 +355,8 @@ func (s *Store) RemovePieceMetadata(pieceCid cid.Cid) error {
 }
 
 // Remove all MultiHashes for pieceCID. To be used manually in case of failure
-// in RemoveDealForPiece
+// in RemoveDealForPiece or RemovePieceMetadata. Medata for the piece must be
+// present in the database
 func (s *Store) RemoveAllMultiHashes(pieceCid cid.Cid) error {
 	log.Debugw("handle.remove-multihashes-for-piece", "piece-cid", pieceCid)
 
@@ -379,7 +374,7 @@ func (s *Store) RemoveAllMultiHashes(pieceCid cid.Cid) error {
 		return err
 	}
 
-	if err := s.db.RemoveAllRecords(ctx, md.Cursor); err != nil {
+	if err := s.db.removeAllRecords(ctx, md.Cursor); err != nil {
 		return err
 	}
 

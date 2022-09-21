@@ -282,7 +282,7 @@ func has(list []cid.Cid, v cid.Cid) bool {
 }
 
 // RemoveAllRecords
-func (db *DB) RemoveAllRecords(ctx context.Context, cursor uint64) error {
+func (db *DB) removeAllRecords(ctx context.Context, cursor uint64) error {
 	buf := make([]byte, size)
 	binary.PutUvarint(buf, cursor)
 
@@ -331,10 +331,29 @@ func (db *DB) RemoveAllRecords(ctx context.Context, cursor uint64) error {
 // RemoveAllMetadataForPieceCid
 func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
 	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
+	var metadata model.Metadata
 
-	if ok, err := db.Has(ctx, key); !ok {
+	piece, err := db.Get(ctx, key)
+	if err != nil {
 		return err
 	}
+
+	err = json.Unmarshal(piece, &metadata)
+	if err != nil {
+		return fmt.Errorf("error while reading metadata: %w", err)
+	}
+
+	// Remove all multihashes before, as without Metadata, they are useless
+	// This order is important as metadata.Cursor is required in case RemoveAllRecords fails
+	// and needs to be run manually
+	if err = db.removeAllRecords(ctx, metadata.Cursor); err != nil {
+		return err
+	}
+
 	// TODO: Requires DB compaction for removing the key
-	return db.Delete(ctx, key)
+	if err = db.Delete(ctx, key); err != nil {
+		return err
+	}
+
+	return nil
 }
