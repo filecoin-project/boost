@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	bclient "github.com/filecoin-project/boost/api/client"
 	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/blockfilter"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/go-jsonrpc"
@@ -80,7 +81,9 @@ var runCmd = &cli.Command{
 		}
 		defer bcloser()
 
-		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi)
+		blockFilter := blockfilter.NewBlockFilter()
+		blockFilter.Start(ctx)
+		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi, blockFilter)
 		// Create the server API
 		port := cctx.Int("port")
 		repoDir := cctx.String(FlagRepo.Name)
