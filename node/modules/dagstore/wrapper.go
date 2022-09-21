@@ -48,7 +48,7 @@ func NewDAGStore(cfg lotus_config.DAGStoreConfig, minerApi mktsdagstore.MinerAPI
 	registry := mount.NewRegistry()
 
 	mt := reflect.TypeOf(mountTemplate(minerApi))
-	log.Errorw("dagstore registry Register", "mountTemplate", fmt.Sprintf("%T", mt), "mountTemplate.String", mt.String())
+	log.Errorw("dagstore registry Register", "mountTemplate", fmt.Sprintf("%T", mountTemplate(minerApi)), "mountTemplate.String", mt.String())
 
 	if err := registry.Register(lotusScheme, mountTemplate(minerApi)); err != nil {
 		return nil, nil, xerrors.Errorf("failed to create registry: %w", err)
