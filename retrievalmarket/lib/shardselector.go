@@ -3,6 +3,7 @@ package lib
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/filecoin-project/dagstore/indexbs"
@@ -10,7 +11,6 @@ import (
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
-	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	lru "github.com/hnlq715/golang-lru"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -23,14 +23,18 @@ var sslog = logging.Logger("shardselect")
 // It chooses the first shard that is unsealed and free (zero cost).
 // It caches the results per-shard.
 type ShardSelector struct {
-	ctx   context.Context
-	ps    lotus_dtypes.ProviderPieceStore
-	sa    retrievalmarket.SectorAccessor
-	rp    retrievalmarket.RetrievalProvider
-	cache *lru.Cache
+	ctx context.Context
+	ps  piecestore.PieceStore
+	sa  retrievalmarket.SectorAccessor
+	rp  retrievalmarket.RetrievalProvider
+
+	// The striped lock protects against multiple threads doing a lookup
+	// against the sealing subsystem / retrieval ask for the same shard
+	stripedLock [256]sync.Mutex
+	cache       *lru.Cache
 }
 
-func NewShardSelector(ctx context.Context, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, rp retrievalmarket.RetrievalProvider) (*ShardSelector, error) {
+func NewShardSelector(ctx context.Context, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, rp retrievalmarket.RetrievalProvider) (*ShardSelector, error) {
 	cache, err := lru.New(2048)
 	if err != nil {
 		return nil, fmt.Errorf("creating shard selector cache: %w", err)
@@ -53,39 +57,19 @@ func (s *ShardSelector) ShardSelectorF(c cid.Cid, shards []shard.Key) (shard.Key
 
 	sslog.Debugw("shard selection", "shards", shards)
 	for _, sk := range shards {
-		// Check if the shard key is in the cache
-		var res *shardSelectResult
-		resi, cached := s.cache.Get(sk)
-		if cached {
-			res = resi.(*shardSelectResult)
-			sslog.Debugw("shard cache hit", "shard", sk)
-		} else {
-			sslog.Debugw("shard cache miss", "shard", sk)
+		lkidx := s.stripedLockIndex(sk)
+		s.stripedLock[lkidx].Lock()
+		available, err := s.isAvailable(sk)
+		s.stripedLock[lkidx].Unlock()
 
-			// Check if the shard is available
-			res = &shardSelectResult{}
-			res.available, res.err = s.isAvailable(sk)
-			expireIn := selectorCacheDuration
-			if res.err != nil {
-				// If there's an error, cache for a short duration so that we
-				// don't wait too long to try again.
-				expireIn = selectorCacheErrorDuration
-				res.available = false
-				res.err = fmt.Errorf("running shard selection for shard %s: %w", sk, res.err)
-				sslog.Warnw("checking shard availability", "shard", sk, "err", res.err)
-			}
-			// Add the result to the cache
-			s.cache.AddEx(sk, res, expireIn)
-		}
-
-		if res.available {
+		if available {
 			// We found an available shard, return it
 			sslog.Debugw("shard selected", "shard", sk)
 			return sk, nil
 		}
-		if res.err != nil {
-			sslog.Debugw("shard error", "shard", sk, "err", res.err)
-			lastErr = res.err
+		if err != nil {
+			sslog.Debugw("shard error", "shard", sk, "err", err)
+			lastErr = err
 		}
 	}
 
@@ -95,6 +79,35 @@ func (s *ShardSelector) ShardSelectorF(c cid.Cid, shards []shard.Key) (shard.Key
 }
 
 func (s *ShardSelector) isAvailable(sk shard.Key) (bool, error) {
+	// Check if the shard key is in the cache
+	var res *shardSelectResult
+	resi, cached := s.cache.Get(sk)
+	if cached {
+		res = resi.(*shardSelectResult)
+		sslog.Debugw("shard cache hit", "shard", sk)
+		return res.available, res.err
+	}
+	sslog.Debugw("shard cache miss", "shard", sk)
+
+	// Check if the shard is available
+	res = &shardSelectResult{}
+	res.available, res.err = s.checkIsAvailable(sk)
+	expireIn := selectorCacheDuration
+	if res.err != nil {
+		// If there's an error, cache for a short duration so that we
+		// don't wait too long to try again.
+		expireIn = selectorCacheErrorDuration
+		res.available = false
+		res.err = fmt.Errorf("running shard selection for shard %s: %w", sk, res.err)
+		sslog.Warnw("checking shard availability", "shard", sk, "err", res.err)
+	}
+	// Add the result to the cache
+	s.cache.AddEx(sk, res, expireIn)
+
+	return res.available, res.err
+}
+
+func (s *ShardSelector) checkIsAvailable(sk shard.Key) (bool, error) {
 	// Parse piece CID
 	pieceCid, err := cid.Parse(sk.String())
 	if err != nil {
@@ -160,4 +173,9 @@ func (s *ShardSelector) isAvailable(sk shard.Key) (bool, error) {
 
 	sslog.Debugw("asking price-per-byte for unsealed deals is non-zero", "shard", sk, "price", ask.PricePerByte.String())
 	return false, nil
+}
+
+func (s *ShardSelector) stripedLockIndex(sk shard.Key) int {
+	skstr := sk.String()
+	return int(skstr[len(skstr)-1])
 }
