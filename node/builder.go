@@ -622,8 +622,6 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(dtypes.GetExpectedSealDurationFunc), modules.NewGetExpectedSealDurationFunc),
 		Override(new(dtypes.SetMaxDealStartDelayFunc), modules.NewSetMaxDealStartDelayFunc),
 		Override(new(dtypes.GetMaxDealStartDelayFunc), modules.NewGetMaxDealStartDelayFunc),
-		Override(new(dtypes.GetBitswapPeerIDFunc), modules.NewGetBitswapPeerIDFunc),
-		Override(new(dtypes.SetBitswapPeerIDFunc), modules.NewSetBitswapPeerIDFunc),
 	)
 }
 

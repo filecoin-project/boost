@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,51 +20,30 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-type PeerIDAPI interface {
-	DealsGetBitswapPeerID(ctx context.Context) (peer.ID, error)
-	DealsSetBitswapPeerID(ctx context.Context, p peer.ID) error
-}
-
-func configureRepo(ctx context.Context, cfgDir string, papi PeerIDAPI, overrideExistingPeerID bool) (crypto.PrivKey, error) {
+func configureRepo(ctx context.Context, cfgDir string, createIfNotExist bool) (peer.ID, crypto.PrivKey, error) {
 	if cfgDir == "" {
-		return nil, fmt.Errorf("dataDir must be set")
+		return "", nil, fmt.Errorf("dataDir must be set")
 	}
 
 	if err := os.MkdirAll(cfgDir, 0744); err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
-	peerkey, err := loadPeerKey(cfgDir)
+	peerkey, err := loadPeerKey(cfgDir, createIfNotExist)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	selfPid, err := peer.IDFromPrivateKey(peerkey)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	existingPid, err := papi.DealsGetBitswapPeerID(ctx)
-	if err != nil {
-		return nil, err
-	}
-	peerIDNotSet := existingPid == peer.ID("")
-	matchesPid := existingPid == selfPid
-	log.Infow("get/set peer id of bitswap from boost", "local", selfPid.String(), "boost", existingPid.String(), "boost not set", peerIDNotSet, "override", overrideExistingPeerID)
-	// error if a peer id is set that is different and we aren't overriding
-	if !peerIDNotSet && !matchesPid && !overrideExistingPeerID {
-		return nil, errors.New("bitswap peer id does not match boost node configuration. use --override-peer-id to force a change")
-	}
-	if peerIDNotSet || (!matchesPid && overrideExistingPeerID) {
-		err = papi.DealsSetBitswapPeerID(ctx, selfPid)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return peerkey, nil
+
+	return selfPid, peerkey, nil
 }
 
-func setupHost(ctx context.Context, cfgDir string, port int, papi PeerIDAPI) (host.Host, error) {
-	peerKey, err := configureRepo(ctx, cfgDir, papi, false)
+func setupHost(ctx context.Context, cfgDir string, port int) (host.Host, error) {
+	_, peerKey, err := configureRepo(ctx, cfgDir, false)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +61,7 @@ func setupHost(ctx context.Context, cfgDir string, port int, papi PeerIDAPI) (ho
 	)
 }
 
-func loadPeerKey(cfgDir string) (crypto.PrivKey, error) {
+func loadPeerKey(cfgDir string, createIfNotExists bool) (crypto.PrivKey, error) {
 	var peerkey crypto.PrivKey
 	keyPath := filepath.Join(cfgDir, "libp2p.key")
 	keyFile, err := os.ReadFile(keyPath)
@@ -91,7 +69,9 @@ func loadPeerKey(cfgDir string) (crypto.PrivKey, error) {
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
-
+		if os.IsNotExist(err) && !createIfNotExists {
+			return nil, err
+		}
 		log.Infof("Generating new peer key...")
 
 		key, _, err := crypto.GenerateEd25519Key(rand.Reader)
@@ -128,27 +108,15 @@ var initCmd = &cli.Command{
 	Name:   "init",
 	Usage:  "Init booster-bitswap config",
 	Before: before,
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:     "api-boost",
-			Usage:    "the endpoint for the boost API",
-			Required: true,
-		},
-	},
+	Flags:  []cli.Flag{},
 	Action: func(cctx *cli.Context) error {
 
 		ctx := lcli.ReqContext(cctx)
 
-		// Connect to the Boost API
-		boostAPIInfo := cctx.String("api-boost")
-		bapi, bcloser, err := getBoostAPI(ctx, boostAPIInfo)
-		if err != nil {
-			return fmt.Errorf("getting boost API: %w", err)
-		}
-		defer bcloser()
 		repoDir := cctx.String(FlagRepo.Name)
 
-		_, err = configureRepo(ctx, repoDir, bapi, true)
+		peerID, _, err := configureRepo(ctx, repoDir, true)
+		fmt.Println(peerID)
 		return err
 	},
 }

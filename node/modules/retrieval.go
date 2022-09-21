@@ -5,11 +5,9 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
-	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-bitswap/network"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -105,31 +103,4 @@ func HandleProtocolProxy(lc fx.Lifecycle, pp *protocolproxy.ProtocolProxy) {
 			return nil
 		},
 	})
-}
-
-func NewSetBitswapPeerIDFunc(r lotus_repo.LockedRepo) (dtypes.SetBitswapPeerIDFunc, error) {
-	return func(p peer.ID) (err error) {
-		err = mutateCfg(r, func(cfg *config.Boost) {
-			cfg.Dealmaking.BitswapPeerID = peer.Encode(p)
-		})
-		return
-	}, nil
-}
-
-func NewGetBitswapPeerIDFunc(r lotus_repo.LockedRepo) (dtypes.GetBitswapPeerIDFunc, error) {
-	return func() (p peer.ID, err error) {
-		var pString string
-		err = readCfg(r, func(cfg *config.Boost) {
-			pString = cfg.Dealmaking.BitswapPeerID
-		})
-		if err != nil {
-			return
-		}
-		if pString == "" {
-			p = peer.ID("")
-			return
-		}
-		p, err = peer.Decode(pString)
-		return
-	}, nil
 }

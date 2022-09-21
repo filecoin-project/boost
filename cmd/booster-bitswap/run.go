@@ -84,7 +84,7 @@ var runCmd = &cli.Command{
 		// Create the server API
 		port := cctx.Int("port")
 		repoDir := cctx.String(FlagRepo.Name)
-		host, err := setupHost(ctx, repoDir, port, bapi)
+		host, err := setupHost(ctx, repoDir, port)
 		if err != nil {
 			return fmt.Errorf("setting up libp2p host: %w", err)
 		}
