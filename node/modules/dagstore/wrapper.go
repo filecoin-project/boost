@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"time"
 
@@ -45,6 +46,10 @@ const lotusScheme = "lotus"
 func NewDAGStore(cfg lotus_config.DAGStoreConfig, minerApi mktsdagstore.MinerAPI, h host.Host) (*dagstore.DAGStore, *Wrapper, error) {
 	// construct the DAG Store.
 	registry := mount.NewRegistry()
+
+	mt := reflect.TypeOf(mountTemplate(minerApi))
+	log.Errorw("dagstore registry Register", "mountTemplate", fmt.Sprintf("%T", mt), "mountTemplate.String", mt.String())
+
 	if err := registry.Register(lotusScheme, mountTemplate(minerApi)); err != nil {
 		return nil, nil, xerrors.Errorf("failed to create registry: %w", err)
 	}
