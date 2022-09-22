@@ -202,7 +202,7 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 docker_user?=filecoin
 lotus_version?=1.17.2-rc2
 lotus_src_dir?=
-
+ffi_from_source?=0
 ifeq ($(lotus_src_dir),)
     lotus_src_dir=/tmp/lotus-$(lotus_version)
     lotus_checkout_dir=$(lotus_src_dir)
@@ -211,7 +211,8 @@ else
     lotus_checkout_dir=
 endif
 lotus_test_image=$(docker_user)/lotus-test:$(lotus_version)
-docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image) $(docker_args)
+docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image) \
+	--build-arg FFI_BUILD_FROM_SOURCE=$(ffi_from_source) $(docker_args)
 
 ### lotus test docker image
 info/lotus-test:
