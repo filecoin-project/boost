@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boost/node/impl/common"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
@@ -80,7 +81,8 @@ import (
 var log = logging.Logger("builder")
 
 // special is a type used to give keys to modules which
-//  can't really be identified by the returned type
+//
+//	can't really be identified by the returned type
 type special struct{ id int }
 
 //nolint:golint
@@ -104,6 +106,7 @@ var (
 type invoke int
 
 // Invokes are called in the order they are defined.
+//
 //nolint:golint
 const (
 	// InitJournal at position 0 initializes the journal global var as soon as
@@ -140,6 +143,7 @@ const (
 	HandleDealsKey
 	HandleRetrievalKey
 	HandleRetrievalTransportsKey
+	HandleProtocolProxyKey
 	RunSectorServiceKey
 
 	// boost should be started after legacy markets (HandleDealsKey)
@@ -523,7 +527,9 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
+		Override(new(*protocolproxy.ProtocolProxy), modules.NewProtocolProxy(cfg)),
 		Override(HandleRetrievalTransportsKey, modules.HandleRetrievalTransports),
+		Override(HandleProtocolProxyKey, modules.HandleProtocolProxy),
 		Override(new(idxprov.MeshCreator), idxprov.NewMeshCreator),
 		Override(new(provider.Interface), modules.IndexProvider(cfg.IndexProvider)),
 

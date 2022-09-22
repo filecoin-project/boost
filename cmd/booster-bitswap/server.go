@@ -2,55 +2,33 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"fmt"
 
+	"github.com/filecoin-project/boost/protocolproxy"
 	bsnetwork "github.com/ipfs/go-bitswap/network"
 	"github.com/ipfs/go-bitswap/server"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	nilrouting "github.com/ipfs/go-ipfs-routing/none"
-	"github.com/libp2p/go-libp2p"
-	crypto "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p/p2p/muxer/mplex"
-	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
-	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
-	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	"github.com/libp2p/go-libp2p-core/host"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 type BitswapServer struct {
-	port        int
 	remoteStore blockstore.Blockstore
 
 	ctx    context.Context
 	cancel context.CancelFunc
 	server *server.Server
+	host   host.Host
 }
 
-func NewBitswapServer(port int, remoteStore blockstore.Blockstore) *BitswapServer {
-	return &BitswapServer{port: port, remoteStore: remoteStore}
+func NewBitswapServer(remoteStore blockstore.Blockstore, host host.Host) *BitswapServer {
+	return &BitswapServer{remoteStore: remoteStore, host: host}
 }
 
-func (s *BitswapServer) Start(ctx context.Context) error {
+func (s *BitswapServer) Start(ctx context.Context, balancer peer.AddrInfo) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
-	// setup libp2p host
-	privKey, _, err := crypto.GenerateECDSAKeyPair(rand.Reader)
-	if err != nil {
-		return err
-	}
 
-	host, err := libp2p.New(
-		libp2p.ListenAddrStrings(
-			fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", s.port),
-			fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", s.port),
-		),
-		libp2p.Transport(tcp.NewTCPTransport),
-		libp2p.Transport(quic.NewTransport),
-		libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
-		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
-		libp2p.Identity(privKey),
-		libp2p.ResourceManager(network.NullResourceManager),
-	)
+	host, err := protocolproxy.NewForwardingHost(ctx, s.host, balancer)
 	if err != nil {
 		return err
 	}

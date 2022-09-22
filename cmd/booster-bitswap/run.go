@@ -83,14 +83,25 @@ var runCmd = &cli.Command{
 		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi)
 		// Create the server API
 		port := cctx.Int("port")
-		server := NewBitswapServer(port, remoteStore)
-
+		repoDir := cctx.String(FlagRepo.Name)
+		host, err := setupHost(ctx, repoDir, port)
+		if err != nil {
+			return fmt.Errorf("setting up libp2p host: %w", err)
+		}
 		// Start the server
+		server := NewBitswapServer(remoteStore, host)
+
+		addrs, err := bapi.NetAddrsListen(ctx)
+		if err != nil {
+			return fmt.Errorf("getting boost API addrs: %w", err)
+		}
+
 		log.Infof("Starting booster-bitswap node on port %d", port)
-		err = server.Start(ctx)
+		err = server.Start(ctx, addrs)
 		if err != nil {
 			return err
 		}
+
 		// Monitor for shutdown.
 		<-ctx.Done()
 

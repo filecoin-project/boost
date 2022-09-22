@@ -288,6 +288,12 @@ more downloads are allowed to start.`,
 			Comment: `The time that can elapse before a download is considered stalled (and
 another concurrent download is allowed to start).`,
 		},
+		{
+			Name: "BitswapPeerID",
+			Type: "string",
+
+			Comment: ``,
+		},
 	},
 	"FeeConfig": []DocField{
 		{

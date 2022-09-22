@@ -206,6 +206,8 @@ type DealmakingConfig struct {
 	// The time that can elapse before a download is considered stalled (and
 	// another concurrent download is allowed to start).
 	HttpTransferStallTimeout Duration
+
+	BitswapPeerID          string
 }
 
 type FeeConfig struct {
