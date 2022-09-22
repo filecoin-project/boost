@@ -83,7 +83,7 @@ COPY --from=builder /go/src/boostd /usr/local/bin/
 COPY --from=lotus-dev /usr/local/bin/lotus /usr/local/bin/
 COPY --from=lotus-dev /usr/local/bin/lotus-miner /usr/local/bin/
 ## Fix missing lib libhwloc.so.5
-RUN ls -1 /lib/x86_64-linux-gnu/libhwloc.so.* | head -n 1 | xargs -n1 -I {} ln -s {} /lib/x86_64-linux-gnu/libhwloc.so.5
+RUN ls -1 /lib/*/libhwloc.so.* | head -n 1 | xargs -n1 -I {} ln -s {} /lib/libhwloc.so.5
 
 COPY docker/devnet/booster-http/entrypoint.sh /app/
 
