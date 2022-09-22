@@ -115,10 +115,18 @@ var (
 	SplitstoreCompactionDead        = stats.Int64("splitstore/dead", "Number of dead blocks in last compaction", stats.UnitDimensionless)
 
 	// http
-	HttpPayloadByCidRequestCount    = stats.Int64("http/payload_by_cid_request_count", "Counter of /payload/<payload-cid> requests", stats.UnitDimensionless)
-	HttpPayloadByCidRequestDuration = stats.Float64("http/payload_by_cid_request_duration_ms", "Time spent retrieving a payload by cid", stats.UnitMilliseconds)
-	HttpPieceByCidRequestCount      = stats.Int64("http/piece_by_cid_request_count", "Counter of /piece/<piece-cid> requests", stats.UnitDimensionless)
-	HttpPieceByCidRequestDuration   = stats.Float64("http/piece_by_cid_request_duration_ms", "Time spent retrieving a piece by cid", stats.UnitMilliseconds)
+	HttpPayloadByCidRequestCount     = stats.Int64("http/payload_by_cid_request_count", "Counter of /payload/<payload-cid> requests", stats.UnitDimensionless)
+	HttpPayloadByCidRequestDuration  = stats.Float64("http/payload_by_cid_request_duration_ms", "Time spent retrieving a payload by cid", stats.UnitMilliseconds)
+	HttpPayloadByCid200ResponseCount = stats.Int64("http/payload_by_cid_200_response_count", "Counter of /payload/<payload-cid> 200 responses", stats.UnitDimensionless)
+	HttpPayloadByCid400ResponseCount = stats.Int64("http/payload_by_cid_400_response_count", "Counter of /payload/<payload-cid> 400 responses", stats.UnitDimensionless)
+	HttpPayloadByCid404ResponseCount = stats.Int64("http/payload_by_cid_404_response_count", "Counter of /payload/<payload-cid> 404 responses", stats.UnitDimensionless)
+	HttpPayloadByCid500ResponseCount = stats.Int64("http/payload_by_cid_500_response_count", "Counter of /payload/<payload-cid> 500 responses", stats.UnitDimensionless)
+	HttpPieceByCidRequestCount       = stats.Int64("http/piece_by_cid_request_count", "Counter of /piece/<piece-cid> requests", stats.UnitDimensionless)
+	HttpPieceByCidRequestDuration    = stats.Float64("http/piece_by_cid_request_duration_ms", "Time spent retrieving a piece by cid", stats.UnitMilliseconds)
+	HttpPieceByCid200ResponseCount   = stats.Int64("http/piece_by_cid_200_response_count", "Counter of /piece/<piece-cid> 200 responses", stats.UnitDimensionless)
+	HttpPieceByCid400ResponseCount   = stats.Int64("http/piece_by_cid_400_response_count", "Counter of /piece/<piece-cid> 400 responses", stats.UnitDimensionless)
+	HttpPieceByCid404ResponseCount   = stats.Int64("http/piece_by_cid_404_response_count", "Counter of /piece/<piece-cid> 404 responses", stats.UnitDimensionless)
+	HttpPieceByCid500ResponseCount   = stats.Int64("http/piece_by_cid_500_response_count", "Counter of /piece/<piece-cid> 500 responses", stats.UnitDimensionless)
 )
 
 var (
@@ -131,6 +139,22 @@ var (
 		Measure:     HttpPayloadByCidRequestDuration,
 		Aggregation: defaultMillisecondsDistribution,
 	}
+	HttpPayloadByCid200ResponseCountView = &view.View{
+		Measure:     HttpPayloadByCid200ResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpPayloadByCid400ResponseCountView = &view.View{
+		Measure:     HttpPayloadByCid400ResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpPayloadByCid404ResponseCountView = &view.View{
+		Measure:     HttpPayloadByCid404ResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpPayloadByCid500ResponseCountView = &view.View{
+		Measure:     HttpPayloadByCid500ResponseCount,
+		Aggregation: view.Count(),
+	}
 	HttpPieceByCidRequestCountView = &view.View{
 		Measure:     HttpPieceByCidRequestCount,
 		Aggregation: view.Count(),
@@ -138,6 +162,22 @@ var (
 	HttpPieceByCidRequestDurationView = &view.View{
 		Measure:     HttpPieceByCidRequestDuration,
 		Aggregation: defaultMillisecondsDistribution,
+	}
+	HttpPieceByCid200ResponseCountView = &view.View{
+		Measure:     HttpPieceByCid200ResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpPieceByCid400ResponseCountView = &view.View{
+		Measure:     HttpPieceByCid400ResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpPieceByCid404ResponseCountView = &view.View{
+		Measure:     HttpPieceByCid404ResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpPieceByCid500ResponseCountView = &view.View{
+		Measure:     HttpPieceByCid500ResponseCount,
+		Aggregation: view.Count(),
 	}
 
 	InfoView = &view.View{
@@ -412,8 +452,16 @@ var DefaultViews = func() []*view.View {
 		APIRequestDurationView,
 		HttpPayloadByCidRequestCountView,
 		HttpPayloadByCidRequestDurationView,
+		HttpPayloadByCid200ResponseCountView,
+		HttpPayloadByCid400ResponseCountView,
+		HttpPayloadByCid404ResponseCountView,
+		HttpPayloadByCid500ResponseCountView,
 		HttpPieceByCidRequestCountView,
 		HttpPieceByCidRequestDurationView,
+		HttpPieceByCid200ResponseCountView,
+		HttpPieceByCid400ResponseCountView,
+		HttpPieceByCid404ResponseCountView,
+		HttpPieceByCid500ResponseCountView,
 	}
 	//views = append(views, blockstore.DefaultViews...)
 	views = append(views, rpcmetrics.DefaultViews...)
