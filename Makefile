@@ -220,10 +220,10 @@ docker/lotus-test: info/lotus-test | $(lotus_checkout_dir)
 .PHONY: docker/lotus-test
 
 ### devnet images
-docker/%: docker/lotus-test
+docker/%:
 	cd docker/devnet/$* && $(docker_build_cmd) -t $(docker_user)/$*-dev:$(lotus_version) \
 		--build-arg BUILD_VERSION=$(lotus_version) .
-docker/boost: build/.update-modules docker/lotus-test
+docker/boost: build/.update-modules
 	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
 		-t $(docker_user)/boost-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/boost/Dockerfile.source .
