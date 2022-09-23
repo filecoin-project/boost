@@ -91,9 +91,11 @@ var runCmd = &cli.Command{
 		}
 		// Start the server
 
-		blockFilter := blockfilter.NewBlockFilter()
-		blockFilter.Start(ctx)
-
+		blockFilter := blockfilter.NewBlockFilter(repoDir)
+		err = blockFilter.Start(ctx)
+		if err != nil {
+			return fmt.Errorf("starting block filter: %w", err)
+		}
 		server := NewBitswapServer(remoteStore, host, blockFilter)
 
 		addrs, err := bapi.NetAddrsListen(ctx)

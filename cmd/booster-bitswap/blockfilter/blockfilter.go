@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -40,8 +42,10 @@ func FetchBadBitsList(ifModifiedSince time.Time) (bool, io.ReadCloser, error) {
 	if err != nil {
 		return false, nil, err
 	}
-
-	req.Header.Set("If-Modified-Since", ifModifiedSince.Format(http.TimeFormat))
+	// set the modification sync header, assuming we are not given time zero
+	if !ifModifiedSince.IsZero() {
+		req.Header.Set("If-Modified-Since", ifModifiedSince.Format(http.TimeFormat))
+	}
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return false, nil, err
@@ -57,6 +61,7 @@ func FetchBadBitsList(ifModifiedSince time.Time) (bool, io.ReadCloser, error) {
 
 // BlockFilter manages updating a deny list and checking for CID inclusion in that list
 type BlockFilter struct {
+	cacheFile        string
 	lastUpdated      time.Time
 	denyListFetcher  DenyListFetcher
 	filteredHashesLk sync.RWMutex
@@ -67,8 +72,9 @@ type BlockFilter struct {
 	onTimerSet       func()
 }
 
-func newBlockFilter(denyListFetcher DenyListFetcher, clock clock.Clock, onTimerSet func()) *BlockFilter {
+func newBlockFilter(cfgDir string, denyListFetcher DenyListFetcher, clock clock.Clock, onTimerSet func()) *BlockFilter {
 	return &BlockFilter{
+		cacheFile:       filepath.Join(cfgDir, "denylist.json"),
 		denyListFetcher: denyListFetcher,
 		filteredHashes:  make(map[string]struct{}),
 		clock:           clock,
@@ -77,16 +83,34 @@ func newBlockFilter(denyListFetcher DenyListFetcher, clock clock.Clock, onTimerS
 }
 
 // NewBlockFilter returns a block filter
-func NewBlockFilter() *BlockFilter {
-	return newBlockFilter(FetchBadBitsList, clock.New(), nil)
+func NewBlockFilter(cfgDir string) *BlockFilter {
+	return newBlockFilter(cfgDir, FetchBadBitsList, clock.New(), nil)
 }
 
 // Start initializes asynchronous updates to the deny list filter
 // It blocks to confirm at least one synchronous update of the denylist
-func (bf *BlockFilter) Start(ctx context.Context) {
+func (bf *BlockFilter) Start(ctx context.Context) error {
 	bf.ctx, bf.cancel = context.WithCancel(ctx)
-	bf.updateDenyList()
-	go bf.run()
+	// open the cache file if it eixsts
+	cache, err := os.Open(bf.cacheFile)
+	var cachedCopy bool
+	// if the file does not exist, synchronously fetch the list
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		bf.updateDenyList()
+	} else {
+		defer cache.Close()
+		// otherwise, read the file and fetch the list asynchronously
+		cachedCopy = true
+		bf.filteredHashes, err = bf.parseDenyList(cache, len(bf.filteredHashes)+expectedListGrowth)
+		if err != nil {
+			return err
+		}
+	}
+	go bf.run(cachedCopy)
+	return nil
 }
 
 // Close shuts down asynchronous updating
@@ -172,8 +196,15 @@ func (bf *BlockFilter) updateDenyList() {
 		return
 	}
 	defer denyListStream.Close()
+	// open the cache file
+	cache, err := os.OpenFile(bf.cacheFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		log.Errorf("opening cache file: %s", err)
+	}
+	defer cache.Close()
+	forkedStream := io.TeeReader(denyListStream, cache)
 	bf.lastUpdated = fetchTime
-	filteredHashes, err := bf.parseDenyList(denyListStream, len(bf.filteredHashes)+expectedListGrowth)
+	filteredHashes, err := bf.parseDenyList(forkedStream, len(bf.filteredHashes)+expectedListGrowth)
 	if err != nil {
 		log.Errorf("parsing deny list: %s", err)
 		return
@@ -184,7 +215,11 @@ func (bf *BlockFilter) updateDenyList() {
 }
 
 // run periodically updates the deny list asynchronously
-func (bf *BlockFilter) run() {
+func (bf *BlockFilter) run(cachedCopy bool) {
+	// if there was a cached copy, immediately asynchornously fetch an update
+	if cachedCopy {
+		bf.updateDenyList()
+	}
 	updater := bf.clock.Timer(UpdateInterval)
 	// call the callback if set
 	if bf.onTimerSet != nil {

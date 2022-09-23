@@ -2,8 +2,11 @@ package blockfilter
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -26,8 +29,17 @@ func TestBlockFilter(t *testing.T) {
 	clock := clock.NewMock()
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	bf := newBlockFilter(ff.fetchDenyList, clock, onTimerSet)
-	bf.Start(ctx)
+	cfgDir, err := os.MkdirTemp("", "blockFilter")
+	require.NoError(t, err)
+	bf := newBlockFilter(cfgDir, ff.fetchDenyList, clock, onTimerSet)
+	err = bf.Start(ctx)
+	require.NoError(t, err)
+	cache, err := os.ReadFile(filepath.Join(cfgDir, "denylist.json"))
+	require.NoError(t, err)
+	require.Equal(t, `[
+		{ "anchor": "09770fe7ec3124653c1d8f6917e3cd72cbd58a3e24a734bc362f656844c4ee7d"}
+	]
+	`, string(cache))
 	isFiltered, err := bf.IsFiltered(blockedCid1)
 	require.NoError(t, err)
 	require.True(t, isFiltered)
@@ -57,6 +69,28 @@ func TestBlockFilter(t *testing.T) {
 		t.Fatal("should have updated list but didn't")
 	case <-timerSetChan:
 	}
+	isFiltered, err = bf.IsFiltered(blockedCid1)
+	require.NoError(t, err)
+	require.True(t, isFiltered)
+	isFiltered, err = bf.IsFiltered(blockedCid2)
+	require.NoError(t, err)
+	require.True(t, isFiltered)
+	cache, err = os.ReadFile(filepath.Join(cfgDir, "denylist.json"))
+	require.NoError(t, err)
+	require.Equal(t, `[
+			{ "anchor": "09770fe7ec3124653c1d8f6917e3cd72cbd58a3e24a734bc362f656844c4ee7d"},
+			{ "anchor": "6a98dfc49e852da7eee32d7df49801cb3ae7a432aa73200cd652ba149272481a"}
+		]
+		`, string(cache))
+
+	// now restart a new instance, with a fetcher that always errors,
+	// and verify disk cache works
+	bf.Close()
+	bf = newBlockFilter(cfgDir, func(time.Time) (bool, io.ReadCloser, error) {
+		return false, nil, errors.New("something went wrong")
+	}, clock, onTimerSet)
+	err = bf.Start(ctx)
+	require.NoError(t, err)
 	isFiltered, err = bf.IsFiltered(blockedCid1)
 	require.NoError(t, err)
 	require.True(t, isFiltered)
