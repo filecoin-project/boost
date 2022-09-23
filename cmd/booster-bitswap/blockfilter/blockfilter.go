@@ -26,25 +26,38 @@ const BadBitsDenyList string = "https://badbits.dwebops.pub/denylist.json"
 // UpdateInterval is the default interval at which the public list is refected and updated
 const UpdateInterval = 5 * time.Minute
 
-// DenyListFetcher is a function that returns a readable stream formatted in the json style of the BadBits list
-type DenyListFetcher func() (io.ReadCloser, error)
+// DenyListFetcher is a function that fetches a deny list in the json style of the BadBits list
+// The first return value indicates whether any update has occurred since the last fetch time
+// The second return is a stream of data if an update has occurred
+// The third is any error
+type DenyListFetcher func(lastFetchTime time.Time) (bool, io.ReadCloser, error)
 
 const expectedListGrowth = 128
 
 // FetchBadBitsList is the default function used to get the BadBits list
-func FetchBadBitsList() (io.ReadCloser, error) {
-	response, err := http.DefaultClient.Get(BadBitsDenyList)
+func FetchBadBitsList(ifModifiedSince time.Time) (bool, io.ReadCloser, error) {
+	req, err := http.NewRequest("GET", BadBitsDenyList, nil)
 	if err != nil {
-		return nil, err
+		return false, nil, err
+	}
+
+	req.Header.Set("If-Modified-Since", ifModifiedSince.Format(http.TimeFormat))
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false, nil, err
+	}
+	if response.StatusCode == http.StatusNotModified {
+		return false, nil, nil
 	}
 	if response.StatusCode < 200 && response.StatusCode > 299 {
-		return nil, errors.New("http status code was not success")
+		return false, nil, errors.New("http status code was not success")
 	}
-	return response.Body, nil
+	return true, response.Body, nil
 }
 
 // BlockFilter manages updating a deny list and checking for CID inclusion in that list
 type BlockFilter struct {
+	lastUpdated      time.Time
 	denyListFetcher  DenyListFetcher
 	filteredHashesLk sync.RWMutex
 	filteredHashes   map[string]struct{}
@@ -110,13 +123,8 @@ func (bf *BlockFilter) IsFiltered(c cid.Cid) (bool, error) {
 // fetch deny list fetches and parses a deny list to get a new set of filtered hashes
 // it uses streaming JSON decoding to avoid an intermediate copy of the entire response
 // lenSuggestion is used to avoid a large number of allocations as the list grows
-func (bf *BlockFilter) fetchDenyList(lenSuggestion int) (map[string]struct{}, error) {
+func (bf *BlockFilter) parseDenyList(denyListStream io.Reader, lenSuggestion int) (map[string]struct{}, error) {
 	// first fetch the reading for the deny list
-	denyListStream, err := bf.denyListFetcher()
-	if err != nil {
-		return nil, fmt.Errorf("unable to fetch deny list: %w", err)
-	}
-	defer denyListStream.Close()
 	type blockedCid struct {
 		Anchor string `json:"anchor"`
 	}
@@ -124,7 +132,7 @@ func (bf *BlockFilter) fetchDenyList(lenSuggestion int) (map[string]struct{}, er
 	jsonDenyList := json.NewDecoder(denyListStream)
 
 	// read open bracket
-	_, err = jsonDenyList.Token()
+	_, err := jsonDenyList.Token()
 	if err != nil {
 		return nil, fmt.Errorf("parsing denylist: %w", err)
 	}
@@ -154,9 +162,20 @@ func (bf *BlockFilter) fetchDenyList(lenSuggestion int) (map[string]struct{}, er
 // updateDenyList replaces the current filtered hashes after successfully
 // fetching and parsing the latest deny list
 func (bf *BlockFilter) updateDenyList() {
-	filteredHashes, err := bf.fetchDenyList(len(bf.filteredHashes) + expectedListGrowth)
+	fetchTime := time.Now()
+	updated, denyListStream, err := bf.denyListFetcher(bf.lastUpdated)
 	if err != nil {
-		log.Errorf("updating deny list: %s", err)
+		log.Errorf("fetching deny list: %s", err)
+		return
+	}
+	if !updated {
+		return
+	}
+	defer denyListStream.Close()
+	bf.lastUpdated = fetchTime
+	filteredHashes, err := bf.parseDenyList(denyListStream, len(bf.filteredHashes)+expectedListGrowth)
+	if err != nil {
+		log.Errorf("parsing deny list: %s", err)
 		return
 	}
 	bf.filteredHashesLk.Lock()

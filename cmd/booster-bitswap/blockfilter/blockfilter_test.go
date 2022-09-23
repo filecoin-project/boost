@@ -50,6 +50,18 @@ func TestBlockFilter(t *testing.T) {
 	require.True(t, isFiltered)
 	isFiltered, err = bf.IsFiltered(blockedCid2)
 	require.NoError(t, err)
+	require.False(t, isFiltered)
+	clock.Add(UpdateInterval)
+	select {
+	case <-ctx.Done():
+		t.Fatal("should have updated list but didn't")
+	case <-timerSetChan:
+	}
+	isFiltered, err = bf.IsFiltered(blockedCid1)
+	require.NoError(t, err)
+	require.True(t, isFiltered)
+	isFiltered, err = bf.IsFiltered(blockedCid2)
+	require.NoError(t, err)
 	require.True(t, isFiltered)
 }
 
@@ -57,12 +69,16 @@ type fakeFetcher struct {
 	fetchCount int
 }
 
-func (ff *fakeFetcher) fetchDenyList() (io.ReadCloser, error) {
+func (ff *fakeFetcher) fetchDenyList(fetchTime time.Time) (bool, io.ReadCloser, error) {
 	denyList := `[
 		{ "anchor": "09770fe7ec3124653c1d8f6917e3cd72cbd58a3e24a734bc362f656844c4ee7d"}
 	]
 	`
-	if ff.fetchCount > 0 {
+	updated := true
+	if ff.fetchCount == 1 {
+		updated = false
+	}
+	if ff.fetchCount > 1 {
 		denyList = `[
 			{ "anchor": "09770fe7ec3124653c1d8f6917e3cd72cbd58a3e24a734bc362f656844c4ee7d"},
 			{ "anchor": "6a98dfc49e852da7eee32d7df49801cb3ae7a432aa73200cd652ba149272481a"}
@@ -70,5 +86,5 @@ func (ff *fakeFetcher) fetchDenyList() (io.ReadCloser, error) {
 		`
 	}
 	ff.fetchCount++
-	return ioutil.NopCloser(strings.NewReader(denyList)), nil
+	return updated, ioutil.NopCloser(strings.NewReader(denyList)), nil
 }
