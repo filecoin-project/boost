@@ -25,17 +25,12 @@ type RemoteBlockstoreAPI interface {
 	BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error)
 }
 
-type BlockFilter interface {
-	IsFiltered(c cid.Cid) (bool, error)
-}
-
 // RemoteBlockstore is a read-only blockstore over all cids across all pieces on a provider.
 type RemoteBlockstore struct {
-	bf  BlockFilter
 	api RemoteBlockstoreAPI
 }
 
-func NewRemoteBlockstore(api RemoteBlockstoreAPI, bf BlockFilter) blockstore.Blockstore {
+func NewRemoteBlockstore(api RemoteBlockstoreAPI) blockstore.Blockstore {
 	return &RemoteBlockstore{
 		api: api,
 	}
@@ -46,16 +41,6 @@ func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block,
 	defer span.End()
 	span.SetAttributes(attribute.String("cid", c.String()))
 
-	log.Debugw("IsFiltered", "cid", c)
-	filtered, err := ro.bf.IsFiltered(c)
-	log.Debugw("IsFiltered response", "cid", c, "filtered", filtered, "err", err)
-	if err != nil {
-		return nil, err
-	}
-	// treat filtered as a not found
-	if filtered {
-		return nil, format.ErrNotFound{Cid: c}
-	}
 	log.Debugw("Get", "cid", c)
 	data, err := ro.api.BlockstoreGet(ctx, c)
 	err = normalizeError(err)
@@ -71,16 +56,6 @@ func (ro *RemoteBlockstore) Has(ctx context.Context, c cid.Cid) (bool, error) {
 	defer span.End()
 	span.SetAttributes(attribute.String("cid", c.String()))
 
-	log.Debugw("IsFiltered", "cid", c)
-	filtered, err := ro.bf.IsFiltered(c)
-	log.Debugw("IsFiltered response", "cid", c, "filtered", filtered, "err", err)
-	if err != nil {
-		return false, err
-	}
-	// treat filtered as a not found
-	if filtered {
-		return false, nil
-	}
 	log.Debugw("Has", "cid", c)
 	has, err := ro.api.BlockstoreHas(ctx, c)
 	log.Debugw("Has response", "cid", c, "has", has, "error", err)
@@ -92,16 +67,6 @@ func (ro *RemoteBlockstore) GetSize(ctx context.Context, c cid.Cid) (int, error)
 	defer span.End()
 	span.SetAttributes(attribute.String("cid", c.String()))
 
-	log.Debugw("IsFiltered", "cid", c)
-	filtered, err := ro.bf.IsFiltered(c)
-	log.Debugw("IsFiltered response", "cid", c, "filtered", filtered, "err", err)
-	if err != nil {
-		return 0, err
-	}
-	// treat filtered as a not found
-	if filtered {
-		return 0, format.ErrNotFound{Cid: c}
-	}
 	log.Debugw("GetSize", "cid", c)
 	size, err := ro.api.BlockstoreGetSize(ctx, c)
 	err = normalizeError(err)

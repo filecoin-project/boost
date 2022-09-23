@@ -81,9 +81,7 @@ var runCmd = &cli.Command{
 		}
 		defer bcloser()
 
-		blockFilter := blockfilter.NewBlockFilter()
-		blockFilter.Start(ctx)
-		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi, blockFilter)
+		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi)
 		// Create the server API
 		port := cctx.Int("port")
 		repoDir := cctx.String(FlagRepo.Name)
@@ -92,7 +90,11 @@ var runCmd = &cli.Command{
 			return fmt.Errorf("setting up libp2p host: %w", err)
 		}
 		// Start the server
-		server := NewBitswapServer(remoteStore, host)
+
+		blockFilter := blockfilter.NewBlockFilter()
+		blockFilter.Start(ctx)
+
+		server := NewBitswapServer(remoteStore, host, blockFilter)
 
 		addrs, err := bapi.NetAddrsListen(ctx)
 		if err != nil {
