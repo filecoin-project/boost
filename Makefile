@@ -232,5 +232,5 @@ docker/booster-http:
 	$(docker_build_cmd) -t $(docker_user)/booster-http-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/booster-http/Dockerfile.source .
 .PHONY: docker/booster-http
-docker/all: docker/boost docker/booster-http docker/lotus docker/lotus-miner 
+docker/all: docker/lotus-test docker/boost docker/booster-http docker/lotus docker/lotus-miner
 .PHONY: docker/all
