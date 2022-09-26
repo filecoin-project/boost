@@ -97,7 +97,7 @@ func (bf *BlockFilter) Start(ctx context.Context) error {
 	// if the file does not exist, synchronously fetch the list
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return err
+			return fmt.Errorf("fetching badbits list: %w", err)
 		}
 		bf.updateDenyList()
 	} else {
