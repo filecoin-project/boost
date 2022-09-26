@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -54,7 +53,8 @@ func FetchBadBitsList(ifModifiedSince time.Time) (bool, io.ReadCloser, error) {
 		return false, nil, nil
 	}
 	if response.StatusCode < 200 && response.StatusCode > 299 {
-		return false, nil, errors.New("http status code was not success")
+		bodyText, _ := io.ReadAll(response.Body)
+		return false, nil, fmt.Errorf("expected HTTP success code, got: %s, response body: %s", http.StatusText(response.StatusCode), string(bodyText))
 	}
 	return true, response.Body, nil
 }
@@ -220,7 +220,7 @@ func (bf *BlockFilter) run(cachedCopy bool) {
 	if cachedCopy {
 		bf.updateDenyList()
 	}
-	updater := bf.clock.Timer(UpdateInterval)
+	updater := bf.clock.Ticker(UpdateInterval)
 	// call the callback if set
 	if bf.onTimerSet != nil {
 		bf.onTimerSet()
@@ -232,9 +232,6 @@ func (bf *BlockFilter) run(cachedCopy bool) {
 		case <-updater.C:
 			// when timer expires, update deny list
 			bf.updateDenyList()
-
-			// then reset the timer
-			updater.Reset(UpdateInterval)
 			// call the callback if set
 			if bf.onTimerSet != nil {
 				bf.onTimerSet()
