@@ -45,6 +45,8 @@ import (
 	"github.com/filecoin-project/lotus/node/repo/imports"
 	"github.com/filecoin-project/lotus/storage/sealer/sealtasks"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var ExampleValues = map[reflect.Type]interface{}{
@@ -363,7 +365,7 @@ func exampleStruct(method string, t, parent reflect.Type) interface{} {
 		if f.Type == parent {
 			continue
 		}
-		if strings.Title(f.Name) == f.Name {
+		if cases.Title(language.Und, cases.NoLower).String(f.Name) == f.Name {
 			ns.Elem().Field(i).Set(reflect.ValueOf(ExampleValue(method, f.Type, t)))
 		}
 	}
