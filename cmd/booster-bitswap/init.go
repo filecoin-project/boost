@@ -22,7 +22,7 @@ import (
 
 func configureRepo(ctx context.Context, cfgDir string, createIfNotExist bool) (peer.ID, crypto.PrivKey, error) {
 	if cfgDir == "" {
-		return "", nil, fmt.Errorf("dataDir must be set")
+		return "", nil, fmt.Errorf("%s is a required flag", FlagRepo.Name)
 	}
 
 	if err := os.MkdirAll(cfgDir, 0744); err != nil {
@@ -70,7 +70,7 @@ func loadPeerKey(cfgDir string, createIfNotExists bool) (crypto.PrivKey, error) 
 			return nil, err
 		}
 		if os.IsNotExist(err) && !createIfNotExists {
-			return nil, err
+			return nil, fmt.Errorf("booster-bitswap has not been initialized. Run the booster-bitswap init command")
 		}
 		log.Infof("Generating new peer key...")
 
