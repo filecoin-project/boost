@@ -444,6 +444,8 @@ github.com/filecoin-project/lotus v1.17.1-0.20220926145317-235d975e58aa h1:tAebY
 github.com/filecoin-project/lotus v1.17.1-0.20220926145317-235d975e58aa/go.mod h1:FK/JSFBxylpRuzIKgQCthHQ06fiseSzJlpdhQVpQzeU=
 github.com/filecoin-project/lotus v1.17.1-0.20220926145545-eb17e2e6bdc9 h1:aRhsv8Ue3z2CEr6E0ew4TWLqVJ8P5wzDI4m7oc0rq1M=
 github.com/filecoin-project/lotus v1.17.1-0.20220926145545-eb17e2e6bdc9/go.mod h1:FK/JSFBxylpRuzIKgQCthHQ06fiseSzJlpdhQVpQzeU=
+github.com/filecoin-project/lotus v1.17.1-0.20220926155444-e1bdf2680c92 h1:mOe8QHeUasXtbwoFtsfb+7gZWg6yqgxItY/rxspRzco=
+github.com/filecoin-project/lotus v1.17.1-0.20220926155444-e1bdf2680c92/go.mod h1:FK/JSFBxylpRuzIKgQCthHQ06fiseSzJlpdhQVpQzeU=
 github.com/filecoin-project/pubsub v1.0.0 h1:ZTmT27U07e54qV1mMiQo4HDr0buo8I1LDHBYLXlsNXM=
 github.com/filecoin-project/pubsub v1.0.0/go.mod h1:GkpB33CcUtUNrLPhJgfdy4FDx4OMNR9k+46DHx/Lqrg=
 github.com/filecoin-project/specs-actors v0.9.13/go.mod h1:TS1AW/7LbG+615j4NsjMK1qlpAwaFsG9w0V2tg2gSao=
