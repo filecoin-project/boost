@@ -10,7 +10,7 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin/v8/market"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // ProviderDealState is the local state tracked for a deal by the StorageProvider.

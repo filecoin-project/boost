@@ -13,7 +13,7 @@ import (
 	bcli "github.com/filecoin-project/boost/cli"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/urfave/cli/v2"
 )
 

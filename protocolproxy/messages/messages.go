@@ -5,8 +5,8 @@ import (
 	_ "embed"
 
 	bindnoderegistry "github.com/ipld/go-ipld-prime/node/bindnode/registry"
-	peer "github.com/libp2p/go-libp2p-core/peer"
-	protocol "github.com/libp2p/go-libp2p-core/protocol"
+	peer "github.com/libp2p/go-libp2p/core/peer"
+	protocol "github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // ResponseCode indicates a success or failure on either the register-routing or the forwarding protocols
