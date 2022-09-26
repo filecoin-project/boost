@@ -12,9 +12,9 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 )
 
 // StorageClient starts storage deals with Boost over libp2p
