@@ -3,6 +3,7 @@ package tracing
 import (
 	"context"
 
+	"github.com/filecoin-project/lotus/storage/sealer"
 	octrace "go.opencensus.io/trace"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/bridge/opencensus"
@@ -26,6 +27,8 @@ func New(service, endpoint string) (func(context.Context) error, error) {
 	// This is specifically to support capturing traces in contexts provided to go-jsonrpc,
 	// as it creates spans with OC instead of OT
 	octrace.DefaultTracer = opencensus.NewTracer(Tracer)
+
+	sealer.Tracer = Tracer
 
 	return provider.Shutdown, nil
 }
