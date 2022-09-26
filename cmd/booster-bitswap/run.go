@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	bclient "github.com/filecoin-project/boost/api/client"
 	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/blockfilter"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/go-jsonrpc"
@@ -89,7 +90,13 @@ var runCmd = &cli.Command{
 			return fmt.Errorf("setting up libp2p host: %w", err)
 		}
 		// Start the server
-		server := NewBitswapServer(remoteStore, host)
+
+		blockFilter := blockfilter.NewBlockFilter(repoDir)
+		err = blockFilter.Start(ctx)
+		if err != nil {
+			return fmt.Errorf("starting block filter: %w", err)
+		}
+		server := NewBitswapServer(remoteStore, host, blockFilter)
 
 		addrs, err := bapi.NetAddrsListen(ctx)
 		if err != nil {

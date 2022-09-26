@@ -6,23 +6,28 @@ import (
 	"github.com/filecoin-project/boost/protocolproxy"
 	bsnetwork "github.com/ipfs/go-bitswap/network"
 	"github.com/ipfs/go-bitswap/server"
+	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	nilrouting "github.com/ipfs/go-ipfs-routing/none"
 	"github.com/libp2p/go-libp2p-core/host"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
-type BitswapServer struct {
-	remoteStore blockstore.Blockstore
-
-	ctx    context.Context
-	cancel context.CancelFunc
-	server *server.Server
-	host   host.Host
+type BlockFilter interface {
+	IsFiltered(c cid.Cid) (bool, error)
 }
 
-func NewBitswapServer(remoteStore blockstore.Blockstore, host host.Host) *BitswapServer {
-	return &BitswapServer{remoteStore: remoteStore, host: host}
+type BitswapServer struct {
+	remoteStore blockstore.Blockstore
+	blockFilter BlockFilter
+	ctx         context.Context
+	cancel      context.CancelFunc
+	server      *server.Server
+	host        host.Host
+}
+
+func NewBitswapServer(remoteStore blockstore.Blockstore, host host.Host, blockFilter BlockFilter) *BitswapServer {
+	return &BitswapServer{remoteStore: remoteStore, host: host, blockFilter: blockFilter}
 }
 
 func (s *BitswapServer) Start(ctx context.Context, balancer peer.AddrInfo) error {
@@ -38,7 +43,12 @@ func (s *BitswapServer) Start(ctx context.Context, balancer peer.AddrInfo) error
 	if err != nil {
 		return err
 	}
-	bsopts := []server.Option{server.MaxOutstandingBytesPerPeer(1 << 20)}
+	bsopts := []server.Option{server.MaxOutstandingBytesPerPeer(1 << 20), server.WithPeerBlockRequestFilter(func(p peer.ID, c cid.Cid) bool {
+		filtered, err := s.blockFilter.IsFiltered(c)
+		// peer request block filter expects a true if the request should be fulfilled, so
+		// we only return true for cids that aren't filtered and have no errors
+		return !filtered && err == nil
+	})}
 	net := bsnetwork.NewFromIpfsHost(host, nilRouter)
 	s.server = server.New(ctx, net, s.remoteStore, bsopts...)
 	net.Start(s.server)
