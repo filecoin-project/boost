@@ -9,6 +9,7 @@ import (
 	"go.opencensus.io/tag"
 
 	rpcmetrics "github.com/filecoin-project/go-jsonrpc/metrics"
+	lotusmetrics "github.com/filecoin-project/lotus/metrics"
 )
 
 // Distribution
@@ -462,6 +463,14 @@ var DefaultViews = func() []*view.View {
 		HttpPieceByCid400ResponseCountView,
 		HttpPieceByCid404ResponseCountView,
 		HttpPieceByCid500ResponseCountView,
+		lotusmetrics.DagStorePRBytesDiscardedView,
+		lotusmetrics.DagStorePRBytesRequestedView,
+		lotusmetrics.DagStorePRDiscardCountView,
+		lotusmetrics.DagStorePRInitCountView,
+		lotusmetrics.DagStorePRSeekBackBytesView,
+		lotusmetrics.DagStorePRSeekBackCountView,
+		lotusmetrics.DagStorePRSeekForwardBytesView,
+		lotusmetrics.DagStorePRSeekForwardCountView,
 	}
 	//views = append(views, blockstore.DefaultViews...)
 	views = append(views, rpcmetrics.DefaultViews...)
