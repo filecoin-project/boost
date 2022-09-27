@@ -207,7 +207,14 @@ type DealmakingConfig struct {
 	// another concurrent download is allowed to start).
 	HttpTransferStallTimeout Duration
 
-	BitswapPeerID          string
+	// The peed id used by booster-bitswap. To set, copy the value
+	// printed by running 'booster-bitswap init'. If this value is set,
+	// Boost will:
+	// - listen on bitswap protocols on its own peer id and forward them
+	// to booster bitswap
+	// - advertise bitswap records to the content indexer
+	// - list bitswap in available transports on the retrieval transport protocol
+	BitswapPeerID string
 }
 
 type FeeConfig struct {
