@@ -60,8 +60,8 @@ func (s *BitswapServer) Start(ctx context.Context) error {
 		return err
 	}
 	bsopts := []server.Option{
-		server.MaxOutstandingBytesPerPeer(0),
-		server.WithTargetMessageSize(32 << 20),
+		server.MaxOutstandingBytesPerPeer(128 << 20),
+		server.WithTargetMessageSize(128 << 20),
 	}
 
 	net := bsnetwork.NewFromIpfsHost(host, nilRouter)
