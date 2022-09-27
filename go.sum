@@ -915,7 +915,6 @@ github.com/ipfs/go-ipfs-keystore v0.0.2/go.mod h1:H49tRmibOEs7gLMgbOsjC4dqh1u5e0
 github.com/ipfs/go-ipfs-pinner v0.2.1/go.mod h1:l1AtLL5bovb7opnG77sh4Y10waINz3Y1ni6CvTzx7oo=
 github.com/ipfs/go-ipfs-posinfo v0.0.1 h1:Esoxj+1JgSjX0+ylc0hUmJCOv6V2vFoZiETLR6OtpRs=
 github.com/ipfs/go-ipfs-posinfo v0.0.1/go.mod h1:SwyeVP+jCwiDu0C313l/8jg6ZxM0qqtlt2a0vILTc1A=
-github.com/ipfs/go-ipfs-pq v0.0.1/go.mod h1:LWIqQpqfRG3fNc5XsnIhz/wQ2XXGyugQwls7BgUmUfY=
 github.com/ipfs/go-ipfs-pq v0.0.2 h1:e1vOOW6MuOwG2lqxcLA+wEn93i/9laCY8sXAw76jFOY=
 github.com/ipfs/go-ipfs-pq v0.0.2/go.mod h1:LWIqQpqfRG3fNc5XsnIhz/wQ2XXGyugQwls7BgUmUfY=
 github.com/ipfs/go-ipfs-provider v0.7.1/go.mod h1:QwdDYRYnC5sYGLlOwVDY/0ZB6T3zcMtu+5+GdGeUuw8=
@@ -986,13 +985,6 @@ github.com/ipfs/go-path v0.1.1/go.mod h1:vC8q4AKOtrjJz2NnllIrmr2ZbGlF5fW2OKKyhV9
 github.com/ipfs/go-path v0.2.1/go.mod h1:NOScsVgxfC/eIw4nz6OiGwK42PjaSJ4Y/ZFPn1Xe07I=
 github.com/ipfs/go-path v0.3.0 h1:tkjga3MtpXyM5v+3EbRvOHEoo+frwi4oumw5K+KYWyA=
 github.com/ipfs/go-path v0.3.0/go.mod h1:NOScsVgxfC/eIw4nz6OiGwK42PjaSJ4Y/ZFPn1Xe07I=
-github.com/ipfs/go-peertaskqueue v0.0.4/go.mod h1:03H8fhyeMfKNFWqzYEVyMbcPUeYrqP1MX6Kd+aN+rMQ=
-github.com/ipfs/go-peertaskqueue v0.1.0/go.mod h1:Jmk3IyCcfl1W3jTW3YpghSwSEC6IJ3Vzz/jUmWw8Z0U=
-github.com/ipfs/go-peertaskqueue v0.1.1/go.mod h1:Jmk3IyCcfl1W3jTW3YpghSwSEC6IJ3Vzz/jUmWw8Z0U=
-github.com/ipfs/go-peertaskqueue v0.2.0/go.mod h1:5/eNrBEbtSKWCG+kQK8K8fGNixoYUnr+P7jivavs9lY=
-github.com/ipfs/go-peertaskqueue v0.7.0/go.mod h1:M/akTIE/z1jGNXMU7kFB4TeSEFvj68ow0Rrb04donIU=
-github.com/ipfs/go-peertaskqueue v0.7.1 h1:7PLjon3RZwRQMgOTvYccZ+mjzkmds/7YzSWKFlBAypE=
-github.com/ipfs/go-peertaskqueue v0.7.1/go.mod h1:M/akTIE/z1jGNXMU7kFB4TeSEFvj68ow0Rrb04donIU=
 github.com/ipfs/go-pinning-service-http-client v0.1.0/go.mod h1:tcCKmlkWWH9JUUkKs8CrOZBanacNc1dmKLfjlyXAMu4=
 github.com/ipfs/go-todocounter v0.0.1/go.mod h1:l5aErvQc8qKE2r7NDMjmq5UNAvuZy0rC8BHOplkWvZ4=
 github.com/ipfs/go-unixfs v0.2.2-0.20190827150610-868af2e9e5cb/go.mod h1:IwAAgul1UQIcNZzKPYZWOCijryFBeCV79cNubPzol+k=
@@ -1827,6 +1819,8 @@ github.com/nikkolasg/hexjson v0.0.0-20181101101858-78e39397e00c h1:5bFTChQxSKNwy
 github.com/nikkolasg/hexjson v0.0.0-20181101101858-78e39397e00c/go.mod h1:7qN3Y0BvzRUf4LofcoJplQL10lsFDb4PYlePTVwrP28=
 github.com/nkovacs/streamquote v1.0.0 h1:PmVIV08Zlx2lZK5fFZlMZ04eHcDTIFJCv/5/0twVUow=
 github.com/nkovacs/streamquote v1.0.0/go.mod h1:BN+NaZ2CmdKqUuTUXUEm9j95B2TRbpOWpxbJYzzgUsc=
+github.com/nonsense/go-peertaskqueue v0.7.2 h1:umKdiiXJhZbJy+nP8pRkjLmp3WaVDiX2Lh5vREJPwGQ=
+github.com/nonsense/go-peertaskqueue v0.7.2/go.mod h1:Z+h0CZdtk0mxvI+nXSbFuz9ZfC9QPgG0VhInXWn5ESs=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/nxadm/tail v1.4.8/go.mod h1:+ncqLTQzXmGhMZNUePPaPqPvBxHAIsmXswZKocGu+AU=

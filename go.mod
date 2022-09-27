@@ -130,3 +130,5 @@ require (
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
 )
+
+replace github.com/ipfs/go-peertaskqueue => github.com/nonsense/go-peertaskqueue v0.7.2
