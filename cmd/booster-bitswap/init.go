@@ -69,7 +69,7 @@ func loadPeerKey(cfgDir string, createIfNotExists bool) (crypto.PrivKey, error) 
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
-		if os.IsNotExist(err) && !createIfNotExists {
+		if !createIfNotExists {
 			return nil, fmt.Errorf("booster-bitswap has not been initialized. Run the booster-bitswap init command")
 		}
 		log.Infof("Generating new peer key...")
