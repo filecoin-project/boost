@@ -1,7 +1,7 @@
 package protocolproxy
 
 import (
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // ForwardingProtocolID identifies the protocol for requesting forwarding of a protocol for the libp2p load balancer

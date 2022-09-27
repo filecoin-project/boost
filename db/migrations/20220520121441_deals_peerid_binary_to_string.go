@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pressly/goose/v3"
 )
 

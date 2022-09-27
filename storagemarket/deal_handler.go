@@ -9,7 +9,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-eventbus"
-	"github.com/libp2p/go-libp2p-core/event"
+	"github.com/libp2p/go-libp2p/core/event"
 	"go.uber.org/atomic"
 )
 

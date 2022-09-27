@@ -21,7 +21,7 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	inet "github.com/libp2p/go-libp2p-core/network"
+	inet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/urfave/cli/v2"
 )
 
