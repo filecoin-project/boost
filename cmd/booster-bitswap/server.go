@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-
 	bsnetwork "github.com/ipfs/go-bitswap/network"
 	"github.com/ipfs/go-bitswap/server"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -60,7 +59,11 @@ func (s *BitswapServer) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	bsopts := []server.Option{server.MaxOutstandingBytesPerPeer(1 << 20)}
+	bsopts := []server.Option{
+		server.MaxOutstandingBytesPerPeer(0),
+		server.WithTargetMessageSize(32 << 20),
+	}
+
 	net := bsnetwork.NewFromIpfsHost(host, nilRouter)
 	s.server = server.New(ctx, net, s.remoteStore, bsopts...)
 	net.Start(s.server)
