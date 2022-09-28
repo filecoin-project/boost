@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/filecoin-project/boost/node/bstoreserver"
 	"os"
 	"path"
 	"path/filepath"
@@ -526,4 +527,14 @@ func DAGStore(cfg lotus_config.DAGStoreConfig) func(lc fx.Lifecycle, r lotus_rep
 
 		return dagst, w, nil
 	}
+}
+
+func NewBlockstoreHttpServer(lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore) *bstoreserver.BstoreHttpServer {
+	svr := bstoreserver.NewBlockstoreHttpServer(ibs)
+	lc.Append(fx.Hook{
+		OnStart: svr.Start,
+		OnStop:  svr.Stop,
+	})
+
+	return svr
 }

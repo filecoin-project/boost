@@ -50,8 +50,6 @@ func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block,
 	if err != nil {
 		return nil, err
 	}
-	newBlockStart := time.Now()
-	defer func() { log.Debugw("NewBlockWithCid", "duration-ms", time.Since(newBlockStart).Milliseconds()) }()
 	return blocks.NewBlockWithCid(data, c)
 }
 

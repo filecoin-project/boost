@@ -3,9 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/filecoin-project/boost/node/bstoreserver"
+	blocks "github.com/ipfs/go-block-format"
+	"github.com/ipfs/go-cid"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"io/ioutil"
 	"net/http"
+	"net/http/httptrace"
 	_ "net/http/pprof"
 	"strings"
+	"time"
 
 	"github.com/filecoin-project/boost/api"
 	bclient "github.com/filecoin-project/boost/api/client"
@@ -81,9 +88,10 @@ var runCmd = &cli.Command{
 		defer bcloser()
 
 		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi)
+		bs := &httpGetStore{Blockstore: remoteStore}
 		// Create the server API
 		port := cctx.Int("port")
-		server := NewBitswapServer(port, remoteStore)
+		server := NewBitswapServer(port, bs)
 
 		// Start the server
 		log.Infof("Starting booster-bitswap node on port %d", port)
@@ -124,4 +132,42 @@ func getBoostAPI(ctx context.Context, ai string) (api.Boost, jsonrpc.ClientClose
 	}
 
 	return api, closer, nil
+}
+
+type httpGetStore struct {
+	blockstore.Blockstore
+}
+
+func (s *httpGetStore) Get(ctx context.Context, c cid.Cid) (blocks.Block, error) {
+	start := time.Now()
+	url := "http://localhost:8555" + bstoreserver.BasePathBlock + c.String()
+	req, err := http.NewRequest("GET", url, nil)
+	req = req.WithContext(ctx)
+	var timeToFirstByte time.Duration
+	trace := &httptrace.ClientTrace{
+		GotFirstResponseByte: func() {
+			timeToFirstByte = time.Since(start)
+		},
+	}
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send http req: %w", err)
+	}
+	defer resp.Body.Close() // nolint
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("http req failed: code: %d, status: %s", resp.StatusCode, resp.Status)
+	}
+
+	startRead := time.Now()
+	data, err := ioutil.ReadAll(resp.Body)
+	log.Debugw("http get block", "cid", c, "error", err,
+		"duration-ms", time.Since(start).Milliseconds(),
+		"time-to-first-byte-ms", timeToFirstByte.Milliseconds(),
+		"read-ms", time.Since(startRead).Milliseconds())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read block: %w", err)
+	}
+	return blocks.NewBlockWithCid(data, c)
 }

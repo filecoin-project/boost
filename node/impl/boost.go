@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/filecoin-project/boost/node/bstoreserver"
 	"net/http"
 	"sort"
 	"time"
@@ -75,6 +76,9 @@ type BoostAPI struct {
 
 	// GraphSQL server
 	GraphqlServer *gql.Server
+
+	// Blockstore server
+	BstoreServer *bstoreserver.BstoreHttpServer
 
 	// Tracing
 	Tracing *tracing.Tracing
@@ -492,8 +496,6 @@ func (sm *BoostAPI) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	rawDataStart := time.Now()
-	defer func() { log.Debugw("RawData", "duration-ms", time.Since(rawDataStart).Milliseconds()) }()
 	return blk.RawData(), nil
 }
 

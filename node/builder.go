@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/filecoin-project/boost/node/bstoreserver"
 	"time"
 
 	"github.com/filecoin-project/boost/api"
@@ -485,6 +486,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// GraphQL server
 		Override(new(*gql.Server), modules.NewGraphqlServer(cfg)),
+
+		Override(new(*bstoreserver.BstoreHttpServer), modules.NewBlockstoreHttpServer),
 
 		// Tracing
 		Override(new(*tracing.Tracing), modules.NewTracing(cfg)),
