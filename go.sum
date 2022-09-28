@@ -352,8 +352,6 @@ github.com/fatih/color v1.13.0 h1:8LOYc1KYPPmyKMuN8QV2DNRWNbLo6LZ0iLs8+mlH53w=
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=
 github.com/felixge/httpsnoop v1.0.1/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/filecoin-project/dagstore v0.5.2/go.mod h1:mdqKzYrRBHf1pRMthYfMv3n37oOw0Tkx7+TxPt240M0=
-github.com/filecoin-project/dagstore v0.5.4-0.20220923095139-f5b00e5b68ee h1:yp9XxAOKkA3ilESLkfxyHRyzzHqaNPsh6M00jHkks5c=
-github.com/filecoin-project/dagstore v0.5.4-0.20220923095139-f5b00e5b68ee/go.mod h1:syEs3Hv/Kd8+t7Bm/cgWB5xfqTvfynX78VW/TI7h/bA=
 github.com/filecoin-project/dagstore v0.5.4-0.20220927143220-6b4ad45dfa80 h1:FL/zPP7UCYsNPp2MRsYZvvInGG90MnUry12vgwyzT1c=
 github.com/filecoin-project/dagstore v0.5.4-0.20220927143220-6b4ad45dfa80/go.mod h1:syEs3Hv/Kd8+t7Bm/cgWB5xfqTvfynX78VW/TI7h/bA=
 github.com/filecoin-project/go-address v0.0.3/go.mod h1:jr8JxKsYx+lQlQZmF5i2U0Z+cGQ59wMIps/8YW/lDj8=
@@ -436,8 +434,6 @@ github.com/filecoin-project/go-storedcounter v0.1.0 h1:Mui6wSUBC+cQGHbDUBcO7rfh5
 github.com/filecoin-project/go-storedcounter v0.1.0/go.mod h1:4ceukaXi4vFURIoxYMfKzaRF5Xv/Pinh2oTnoxpv+z8=
 github.com/filecoin-project/index-provider v0.8.1 h1:ggoBWvMSWR91HZQCWfv8SZjoTGNyJBwNMLuN9bJZrbU=
 github.com/filecoin-project/index-provider v0.8.1/go.mod h1:c/Ym5HtWPp9NQgNc9dgSBMpSNsZ/DE9FEi9qVubl5RM=
-github.com/filecoin-project/lotus v1.17.1-0.20220927124912-b0c31ee9ccbb h1:hL4Uvp5/Jm/gIV4nYBRwBwy53Q05U1Pv6EXbAKml6e4=
-github.com/filecoin-project/lotus v1.17.1-0.20220927124912-b0c31ee9ccbb/go.mod h1:FK/JSFBxylpRuzIKgQCthHQ06fiseSzJlpdhQVpQzeU=
 github.com/filecoin-project/lotus v1.17.1-0.20220927144554-8e98e386d99c h1:WbP/eCxntydcn1nH4DKlYKe74phjA+ZM2gazMxlatrM=
 github.com/filecoin-project/lotus v1.17.1-0.20220927144554-8e98e386d99c/go.mod h1:FK/JSFBxylpRuzIKgQCthHQ06fiseSzJlpdhQVpQzeU=
 github.com/filecoin-project/pubsub v1.0.0 h1:ZTmT27U07e54qV1mMiQo4HDr0buo8I1LDHBYLXlsNXM=

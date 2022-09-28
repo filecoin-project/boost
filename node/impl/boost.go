@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"time"
 
 	tracing "github.com/filecoin-project/boost/tracing"
 	"github.com/multiformats/go-multihash"
@@ -485,17 +486,29 @@ func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) e
 }
 
 func (sm *BoostAPI) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error) {
+	start := time.Now()
 	blk, err := sm.IndexBackedBlockstore.Get(ctx, c)
+	log.Debugw("BlockstoreGet", "cid", c, "error", err, "duration-ms", time.Since(start).Milliseconds())
 	if err != nil {
 		return nil, err
 	}
+	rawDataStart := time.Now()
+	defer func() { log.Debugw("RawData", "duration-ms", time.Since(rawDataStart).Milliseconds()) }()
 	return blk.RawData(), nil
 }
 
 func (sm *BoostAPI) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) {
+	start := time.Now()
+	defer func() {
+		log.Debugw("BlockstoreHas", "cid", c, "duration-ms", time.Since(start).Milliseconds())
+	}()
 	return sm.IndexBackedBlockstore.Has(ctx, c)
 }
 
 func (sm *BoostAPI) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) {
+	start := time.Now()
+	defer func() {
+		log.Debugw("BlockstoreGetSize", "cid", c, "duration-ms", time.Since(start).Milliseconds())
+	}()
 	return sm.IndexBackedBlockstore.GetSize(ctx, c)
 }

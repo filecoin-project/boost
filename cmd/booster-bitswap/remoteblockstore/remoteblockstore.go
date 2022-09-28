@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/filecoin-project/boost/tracing"
 	blocks "github.com/ipfs/go-block-format"
@@ -42,12 +43,15 @@ func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block,
 	span.SetAttributes(attribute.String("cid", c.String()))
 
 	log.Debugw("Get", "cid", c)
+	start := time.Now()
 	data, err := ro.api.BlockstoreGet(ctx, c)
 	err = normalizeError(err)
-	log.Debugw("Get response", "cid", c, "error", err)
+	log.Debugw("Get response", "cid", c, "error", err, "duration-ms", time.Since(start).Milliseconds())
 	if err != nil {
 		return nil, err
 	}
+	newBlockStart := time.Now()
+	defer func() { log.Debugw("NewBlockWithCid", "duration-ms", time.Since(newBlockStart).Milliseconds()) }()
 	return blocks.NewBlockWithCid(data, c)
 }
 
@@ -57,8 +61,9 @@ func (ro *RemoteBlockstore) Has(ctx context.Context, c cid.Cid) (bool, error) {
 	span.SetAttributes(attribute.String("cid", c.String()))
 
 	log.Debugw("Has", "cid", c)
+	start := time.Now()
 	has, err := ro.api.BlockstoreHas(ctx, c)
-	log.Debugw("Has response", "cid", c, "has", has, "error", err)
+	log.Debugw("Has response", "cid", c, "has", has, "error", err, "duration-ms", time.Since(start).Milliseconds())
 	return has, err
 }
 
@@ -68,9 +73,10 @@ func (ro *RemoteBlockstore) GetSize(ctx context.Context, c cid.Cid) (int, error)
 	span.SetAttributes(attribute.String("cid", c.String()))
 
 	log.Debugw("GetSize", "cid", c)
+	start := time.Now()
 	size, err := ro.api.BlockstoreGetSize(ctx, c)
 	err = normalizeError(err)
-	log.Debugw("GetSize response", "cid", c, "size", size, "error", err)
+	log.Debugw("GetSize response", "cid", c, "size", size, "error", err, "duration-ms", time.Since(start).Milliseconds())
 	return size, err
 }
 
