@@ -26,8 +26,8 @@ func NewBlockstoreHttpServer(ibs dtypes.IndexBackedBlockstore) *BstoreHttpServer
 	return &BstoreHttpServer{port: 8555, ibs: ibs}
 }
 
-func (s BstoreHttpServer) Start(ctx context.Context) error {
-	log.Info("starting bstore server")
+func (s *BstoreHttpServer) Start(ctx context.Context) error {
+	log.Warn("starting bstore server")
 
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
@@ -53,13 +53,13 @@ func (s BstoreHttpServer) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s BstoreHttpServer) Stop(ctx context.Context) error {
+func (s *BstoreHttpServer) Stop(ctx context.Context) error {
 	log.Info("stopping bstore server")
 	s.cancel()
 	return s.server.Close()
 }
 
-func (s BstoreHttpServer) handleBlock(w http.ResponseWriter, r *http.Request) {
+func (s *BstoreHttpServer) handleBlock(w http.ResponseWriter, r *http.Request) {
 	prefixLen := len(BasePathBlock)
 	if len(r.URL.Path) <= prefixLen {
 		msg := fmt.Sprintf("path '%s' is missing payload CID", r.URL.Path)

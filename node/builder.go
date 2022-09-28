@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/filecoin-project/boost/node/bstoreserver"
 	"time"
 
 	"github.com/filecoin-project/boost/api"
@@ -146,6 +145,7 @@ const (
 	// boost should be started after legacy markets (HandleDealsKey)
 	HandleBoostDealsKey
 	HandleProposalLogCleanerKey
+	HandleBoostHttpBlockstoreServer
 
 	// daemon
 	ExtractApiKey
@@ -487,8 +487,6 @@ func ConfigBoost(cfg *config.Boost) Option {
 		// GraphQL server
 		Override(new(*gql.Server), modules.NewGraphqlServer(cfg)),
 
-		Override(new(*bstoreserver.BstoreHttpServer), modules.NewBlockstoreHttpServer),
-
 		// Tracing
 		Override(new(*tracing.Tracing), modules.NewTracing(cfg)),
 
@@ -541,6 +539,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(HandleDealsKey, modules.HandleLegacyDeals),
 		Override(HandleBoostDealsKey, modules.HandleBoostDeals),
 		Override(HandleProposalLogCleanerKey, modules.HandleProposalLogCleaner(time.Duration(cfg.Dealmaking.DealProposalLogDuration))),
+
+		Override(HandleBoostHttpBlockstoreServer, modules.HandleBoostHttpBlockstoreServer),
 
 		// Boost storage deal filter
 		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),

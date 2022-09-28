@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/filecoin-project/boost/node/bstoreserver"
 	"net/http"
 	"sort"
 	"time"
@@ -76,9 +75,6 @@ type BoostAPI struct {
 
 	// GraphSQL server
 	GraphqlServer *gql.Server
-
-	// Blockstore server
-	BstoreServer *bstoreserver.BstoreHttpServer
 
 	// Tracing
 	Tracing *tracing.Tracing

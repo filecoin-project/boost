@@ -529,12 +529,11 @@ func DAGStore(cfg lotus_config.DAGStoreConfig) func(lc fx.Lifecycle, r lotus_rep
 	}
 }
 
-func NewBlockstoreHttpServer(lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore) *bstoreserver.BstoreHttpServer {
+func HandleBoostHttpBlockstoreServer(lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore) {
+	log.Warn("starting boost http blockstore server")
 	svr := bstoreserver.NewBlockstoreHttpServer(ibs)
 	lc.Append(fx.Hook{
 		OnStart: svr.Start,
 		OnStop:  svr.Stop,
 	})
-
-	return svr
 }
