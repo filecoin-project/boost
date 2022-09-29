@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	bcli "github.com/filecoin-project/boost/cli"
@@ -154,7 +153,6 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	if err != nil {
 		return fmt.Errorf("getting protocols for peer %s: %w", addrInfo.ID, err)
 	}
-	sort.Strings(protos)
 
 	var protoFound bool
 	for _, v := range protos {
@@ -163,7 +161,6 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 			break
 		}
 		protoFound = false
-		continue
 	}
 
 	if !protoFound {
