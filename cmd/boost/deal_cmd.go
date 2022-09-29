@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	bcli "github.com/filecoin-project/boost/cli"
@@ -147,6 +148,26 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 
 	if err := n.Host.Connect(ctx, *addrInfo); err != nil {
 		return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
+	}
+
+	protos, err := n.Host.Peerstore().GetProtocols(addrInfo.ID)
+	if err != nil {
+		return fmt.Errorf("getting protocols for peer %s: %w", addrInfo.ID, err)
+	}
+	sort.Strings(protos)
+
+	var protoFound bool
+	for _, v := range protos {
+		if v == DealProtocolv120 {
+			protoFound = true
+			break
+		}
+		protoFound = false
+		continue
+	}
+
+	if !protoFound {
+		return fmt.Errorf("boost client cannot make a deal with storage provider because it does not support protocol version 1.2.0")
 	}
 
 	dealUuid := uuid.New()
