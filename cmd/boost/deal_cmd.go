@@ -160,7 +160,6 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 			protoFound = true
 			break
 		}
-		protoFound = false
 	}
 
 	if !protoFound {
