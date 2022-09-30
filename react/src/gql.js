@@ -106,8 +106,8 @@ const DealsListQuery = gql`
 `;
 
 const LegacyDealsListQuery = gql`
-    query AppLegacyDealsListQuery($cursor: ID, $offset: Int, $limit: Int) {
-        legacyDeals(cursor: $cursor, offset: $offset, limit: $limit) {
+    query AppLegacyDealsListQuery($query: String, $cursor: ID, $offset: Int, $limit: Int) {
+        legacyDeals(query: $query, cursor: $cursor, offset: $offset, limit: $limit) {
             deals {
                 ID
                 CreatedAt
