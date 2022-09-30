@@ -79,6 +79,12 @@
     background-image: url("./icons/play-white.svg");
 }
 
+.deals .legacy-storage-deals-link {
+    position: absolute;
+    left: 2em;
+    top: 3em;
+}
+
 .deals .search {
     position: absolute;
     right: 8em;
