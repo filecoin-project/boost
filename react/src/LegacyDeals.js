@@ -129,7 +129,7 @@ function DealRow(props) {
 
 export function LegacyStorageDealsCount(props) {
     const {data} = useQuery(LegacyDealsCountQuery, {
-        pollInterval: 5000,
+        pollInterval: 30000,
         fetchPolicy: 'network-only',
     })
 
