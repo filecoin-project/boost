@@ -457,7 +457,7 @@ func NewIndexBackedBlockstore(lc fx.Lifecycle, dagst dagstore.Interface, ps lotu
 	if err != nil {
 		return nil, fmt.Errorf("creating shard selector: %w", err)
 	}
-	rbs, err := indexbs.NewIndexBackedBlockstore(dagst, ss.ShardSelectorF, 100)
+	rbs, err := indexbs.NewIndexBackedBlockstore(ctx, dagst, ss.ShardSelectorF, 100)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create index backed blockstore: %w", err)
 	}
