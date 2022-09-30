@@ -49,7 +49,7 @@ func (r *resolver) withTransferState(ctx context.Context, dl storagemarket.Miner
 	return dr
 }
 
-// query: legacyDeals(cursor, offset, limit) DealList
+// query: legacyDeals(query, cursor, offset, limit) DealList
 func (r *resolver) LegacyDeals(ctx context.Context, args dealsArgs) (*legacyDealListResolver, error) {
 	offset := 0
 	if args.Offset.Set && args.Offset.Value != nil && *args.Offset.Value > 0 {
@@ -76,17 +76,31 @@ func (r *resolver) LegacyDeals(ctx context.Context, args dealsArgs) (*legacyDeal
 		return nil, fmt.Errorf("getting deal count: %w", err)
 	}
 
-	// Get a page worth of deals, plus one extra so we can see if there are more deals
-	pageDeals, err := r.legacyProv.ListLocalDealsPage(startPropCid, offset, limit+1)
-	if err != nil {
-		return nil, fmt.Errorf("getting page of deals: %w", err)
-	}
+	var more bool
+	var pageDeals []storagemarket.MinerDeal
+	if args.Query.Value != nil && *args.Query.Value != "" {
+		// If there is a search query, assume the query is the deal
+		// proposal cid and try to fetch the corresponding deal
+		propCidQuery, err := cid.Parse(*args.Query.Value)
+		if err == nil {
+			dl, err := r.legacyProv.GetLocalDeal(propCidQuery)
+			if err == nil {
+				pageDeals = []storagemarket.MinerDeal{dl}
+			}
+		}
+	} else {
+		// Get a page worth of deals, plus one extra so we can see if there are more deals
+		pageDeals, err = r.legacyProv.ListLocalDealsPage(startPropCid, offset, limit+1)
+		if err != nil {
+			return nil, fmt.Errorf("getting page of deals: %w", err)
+		}
 
-	// If there is another page of deals available
-	more := len(pageDeals) > limit
-	if more {
-		// Filter for deals on the current page
-		pageDeals = pageDeals[:limit]
+		// If there is another page of deals available
+		more = len(pageDeals) > limit
+		if more {
+			// Filter for deals on the current page
+			pageDeals = pageDeals[:limit]
+		}
 	}
 
 	resolvers := make([]*legacyDealResolver, 0, len(pageDeals))

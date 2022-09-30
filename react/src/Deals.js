@@ -150,7 +150,7 @@ function LegacyDealsLink(props) {
     )
 }
 
-function SearchBox(props) {
+export function SearchBox(props) {
     return <div className="search">
         <DebounceInput
             autoFocus={!!props.value}
