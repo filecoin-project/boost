@@ -93,12 +93,12 @@ func NewProtocolProxy(cfg *config.Boost) func(h host.Host) (*protocolproxy.Proto
 func HandleProtocolProxy(lc fx.Lifecycle, pp *protocolproxy.ProtocolProxy) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			log.Info("starting load balancer")
+			log.Info("starting libp2p protocol proxy")
 			pp.Start(ctx)
 			return nil
 		},
 		OnStop: func(context.Context) error {
-			log.Info("stopping load balancer")
+			log.Info("stopping libp2p protocol proxy")
 			pp.Close()
 			return nil
 		},
