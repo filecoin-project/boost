@@ -123,7 +123,7 @@ var fetchCmd = &cli.Command{
 			return fmt.Errorf("getting blocks: %w", err)
 		}
 
-		log.Infow("fetch complete", "count", count, "size", size, "duration", time.Since(start))
+		log.Infow("fetch complete", "count", count, "size", size, "duration", time.Since(start).String())
 		log.Debug("finalizing")
 		finalizeStart := time.Now()
 		defer func() { log.Infow("finalize complete", "duration", time.Since(finalizeStart).String()) }()
@@ -146,7 +146,7 @@ func getBlocks(ctx context.Context, bsClient *client.Client, c cid.Cid, throttle
 	}
 
 	var size = uint64(len(blk.RawData()))
-	log.Debugw("receive", "cid", c, "size", size, "duration", time.Since(start))
+	log.Debugw("receive", "cid", c, "size", size, "duration", time.Since(start).String())
 
 	// Read the links from the block to child nodes in the DAG
 	var count = uint64(1)
