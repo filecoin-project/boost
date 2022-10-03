@@ -31,6 +31,7 @@ func main() {
 		Commands: []*cli.Command{
 			initCmd,
 			runCmd,
+			fetchCmd,
 		},
 	}
 	app.Setup()
