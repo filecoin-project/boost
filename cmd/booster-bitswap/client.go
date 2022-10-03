@@ -108,7 +108,7 @@ var fetchCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("connecting to %s: %w", serverAddrInfo, err)
 		}
-		log.Debugw("connected to server", "duration", time.Since(connectStart))
+		log.Debugw("connected to server", "duration", time.Since(connectStart).String())
 
 		var throttle chan struct{}
 		concurrency := cctx.Int("concurrency")
@@ -126,7 +126,7 @@ var fetchCmd = &cli.Command{
 		log.Infow("fetch complete", "count", count, "size", size, "duration", time.Since(start))
 		log.Debug("finalizing")
 		finalizeStart := time.Now()
-		defer func() { log.Infow("finalize complete", "duration", time.Since(finalizeStart)) }()
+		defer func() { log.Infow("finalize complete", "duration", time.Since(finalizeStart).String()) }()
 		return bs.Finalize()
 	},
 }
