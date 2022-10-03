@@ -16,5 +16,6 @@ scrape_configs:
     static_configs:
       - targets: [ 'booster-http:7777' ]
   - job_name: 'lotus-miner'
+    metrics_path: "/debug/metrics"
     static_configs:
       - targets: [ 'lotus-miner:2345' ]
