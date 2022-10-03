@@ -5,12 +5,10 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/ipld/go-car/v2/blockstore"
-	"net/http"
 	_ "net/http/pprof"
 	"sync/atomic"
 	"time"
 
-	"github.com/filecoin-project/boost/tracing"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-bitswap/client"
 	bsnetwork "github.com/ipfs/go-bitswap/network"
@@ -25,7 +23,6 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
-	"github.com/pkg/profile"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -44,16 +41,6 @@ var fetchCmd = &cli.Command{
 			Name:  "concurrency",
 			Usage: "concurrent request limit - 0 means unlimited",
 			Value: 10,
-		},
-		&cli.BoolFlag{
-			Name:  "tracing",
-			Usage: "enables tracing of booster-bitswap calls",
-			Value: false,
-		},
-		&cli.StringFlag{
-			Name:  "tracing-endpoint",
-			Usage: "the endpoint for the tracing exporter",
-			Value: "http://tempo:14268/api/traces",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -75,31 +62,7 @@ var fetchCmd = &cli.Command{
 
 		outputCarPath := cctx.Args().Get(2)
 
-		defer profile.Start(profile.TraceProfile, profile.ProfilePath(".")).Stop()
-
-		if cctx.Bool("pprof") {
-			go func() {
-				err := http.ListenAndServe("localhost:6065", nil)
-				if err != nil {
-					log.Error(err)
-				}
-			}()
-		}
-
 		ctx := lcli.ReqContext(cctx)
-
-		// Instantiate the tracer and exporter
-		if cctx.Bool("tracing") {
-			tracingStopper, err := tracing.New("booster-bsclient", cctx.String("tracing-endpoint"))
-			if err != nil {
-				return fmt.Errorf("failed to instantiate tracer: %w", err)
-			}
-			log.Info("Tracing exporter enabled")
-
-			defer func() {
-				_ = tracingStopper(ctx)
-			}()
-		}
 
 		// setup libp2p host
 		log.Infow("generating libp2p key")
@@ -132,13 +95,16 @@ var fetchCmd = &cli.Command{
 		}
 
 		bsClient := client.New(ctx, net, bs)
+		defer bsClient.Close()
 		net.Start(bsClient)
 
+		connectStart := time.Now()
 		log.Infow("connecting to server", "server", serverAddrInfo.String())
 		err = host.Connect(ctx, *serverAddrInfo)
 		if err != nil {
 			return fmt.Errorf("connecting to %s: %w", serverAddrInfo, err)
 		}
+		log.Debugw("connected to server", "duration", time.Since(connectStart))
 
 		var throttle chan struct{}
 		concurrency := cctx.Int("concurrency")
@@ -153,8 +119,11 @@ var fetchCmd = &cli.Command{
 			return fmt.Errorf("getting blocks: %w", err)
 		}
 
-		log.Infow("complete", "count", count, "size", size, "duration", time.Since(start))
-		return nil
+		log.Infow("fetch complete", "count", count, "size", size, "duration", time.Since(start))
+		log.Info("finalizing")
+		finalizeStart := time.Now()
+		defer func() { log.Info("finalize complete", "duration", time.Since(finalizeStart)) }()
+		return bs.Finalize()
 	},
 }
 
