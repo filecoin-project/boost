@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipld/go-car/v2/blockstore"
 	_ "net/http/pprof"
 	"sync/atomic"
@@ -94,7 +95,10 @@ var fetchCmd = &cli.Command{
 			return fmt.Errorf("creating blockstore at %s: %w", outputCarPath, err)
 		}
 
-		bsClient := client.New(ctx, net, bs)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		brn := &blockReceiver{bs: bs, ctx: ctx, cancel: cancel}
+		bsClient := client.New(ctx, net, bs, client.WithBlockReceivedNotifier(brn))
 		defer bsClient.Close()
 		net.Start(bsClient)
 
@@ -120,9 +124,9 @@ var fetchCmd = &cli.Command{
 		}
 
 		log.Infow("fetch complete", "count", count, "size", size, "duration", time.Since(start))
-		log.Info("finalizing")
+		log.Debug("finalizing")
 		finalizeStart := time.Now()
-		defer func() { log.Info("finalize complete", "duration", time.Since(finalizeStart)) }()
+		defer func() { log.Infow("finalize complete", "duration", time.Since(finalizeStart)) }()
 		return bs.Finalize()
 	},
 }
@@ -133,7 +137,6 @@ func getBlocks(ctx context.Context, bsClient *client.Client, c cid.Cid, throttle
 	}
 	// Get the block
 	start := time.Now()
-	log.Debugw("get", "cid", c)
 	blk, err := bsClient.GetBlock(ctx, c)
 	if throttle != nil {
 		<-throttle
@@ -167,5 +170,20 @@ func getBlocks(ctx context.Context, bsClient *client.Client, c cid.Cid, throttle
 			return nil
 		})
 	}
+
 	return count, size, eg.Wait()
+}
+
+type blockReceiver struct {
+	bs     *blockstore.ReadWrite
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
+func (b blockReceiver) ReceivedBlocks(id peer.ID, blks []blocks.Block) {
+	err := b.bs.PutMany(b.ctx, blks)
+	if err != nil {
+		log.Errorw("failed to write blocks to blockstore: %s", err)
+		b.cancel()
+	}
 }
