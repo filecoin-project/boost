@@ -162,6 +162,7 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 	if len(r.URL.Path) <= prefixLen {
 		msg := fmt.Sprintf("path '%s' is missing payload CID", r.URL.Path)
 		writeError(w, r, http.StatusBadRequest, msg)
+		stats.Record(ctx, metrics.HttpPayloadByCid400ResponseCount.M(1))
 		return
 	}
 
@@ -172,6 +173,7 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		msg := fmt.Sprintf("parsing payload CID '%s': %s", payloadCidStr, err.Error())
 		writeError(w, r, http.StatusBadRequest, msg)
+		stats.Record(ctx, metrics.HttpPayloadByCid400ResponseCount.M(1))
 		return
 	}
 
@@ -181,11 +183,13 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 		if isNotFoundError(err) {
 			msg := fmt.Sprintf("getting piece that contains payload CID '%s': %s", payloadCid, err.Error())
 			writeError(w, r, http.StatusNotFound, msg)
+			stats.Record(ctx, metrics.HttpPayloadByCid404ResponseCount.M(1))
 			return
 		}
 		log.Errorf("getting piece that contains payload CID '%s': %s", payloadCid, err)
 		msg := fmt.Sprintf("server error getting piece that contains payload CID '%s'", payloadCidStr)
 		writeError(w, r, http.StatusInternalServerError, msg)
+		stats.Record(ctx, metrics.HttpPayloadByCid500ResponseCount.M(1))
 		return
 	}
 
@@ -200,11 +204,13 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 		if isNotFoundError(err) {
 			msg := fmt.Sprintf("getting content for payload CID %s in piece %s: %s", payloadCidStr, pieceCid, err)
 			writeError(w, r, http.StatusNotFound, msg)
+			stats.Record(ctx, metrics.HttpPayloadByCid404ResponseCount.M(1))
 			return
 		}
 		log.Errorf("getting content for payload CID %s in piece %s: %s", payloadCid, pieceCid, err)
 		msg := fmt.Sprintf("server error getting content for payload CID %s in piece %s", payloadCidStr, pieceCid)
 		writeError(w, r, http.StatusInternalServerError, msg)
+		stats.Record(ctx, metrics.HttpPayloadByCid500ResponseCount.M(1))
 		return
 	}
 
@@ -217,7 +223,7 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 
 	serveContent(w, r, content, getContentType(isCar))
 
-	// Record retrieval duration
+	stats.Record(ctx, metrics.HttpPayloadByCid200ResponseCount.M(1))
 	stats.Record(ctx, metrics.HttpPayloadByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
 
@@ -232,6 +238,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	if len(r.URL.Path) <= prefixLen {
 		msg := fmt.Sprintf("path '%s' is missing piece CID", r.URL.Path)
 		writeError(w, r, http.StatusBadRequest, msg)
+		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
 		return
 	}
 
@@ -242,6 +249,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		msg := fmt.Sprintf("parsing piece CID '%s': %s", pieceCidStr, err.Error())
 		writeError(w, r, http.StatusBadRequest, msg)
+		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
 		return
 	}
 
@@ -253,11 +261,13 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if isNotFoundError(err) {
 			writeError(w, r, http.StatusNotFound, err.Error())
+			stats.Record(ctx, metrics.HttpPieceByCid404ResponseCount.M(1))
 			return
 		}
 		log.Errorf("getting content for piece %s: %s", pieceCid, err)
 		msg := fmt.Sprintf("server error getting content for piece CID %s", pieceCidStr)
 		writeError(w, r, http.StatusInternalServerError, msg)
+		stats.Record(ctx, metrics.HttpPieceByCid500ResponseCount.M(1))
 		return
 	}
 
@@ -270,7 +280,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 
 	serveContent(w, r, content, getContentType(isCar))
 
-	// Record retrieval duration
+	stats.Record(ctx, metrics.HttpPieceByCid200ResponseCount.M(1))
 	stats.Record(ctx, metrics.HttpPieceByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
 

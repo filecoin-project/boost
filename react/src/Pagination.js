@@ -1,7 +1,29 @@
-import {Link} from "react-router-dom";
+import {Link, useNavigate} from "react-router-dom";
 import "./Pagination.css"
+import {useState} from "react";
 
 export function Pagination({basePath, cursor, pageNum, moreRows, totalCount, rowsPerPage, onRowsPerPageChange, onLinkClick}) {
+    const navigate = useNavigate()
+    const [goToPage, setGoToPage] = useState('')
+    const handleGoToPageChange = (event) => {
+        setGoToPage(event.target.value)
+    }
+    const goToKeyDown = (event) => {
+        if (event.key === 'Enter') {
+            var dest = basePath
+            var pageNum = parseInt(goToPage)
+            if (pageNum < 0) {
+                pageNum = 1
+            }
+            if (pageNum > 1) {
+                dest = basePath+'/from/'+cursor+'/page/'+pageNum
+            }
+            setGoToPage('')
+            window.scrollTo({ top: 0, behavior: "smooth" })
+            navigate(dest)
+        }
+    }
+
     var totalPages = Math.ceil(totalCount / rowsPerPage)
 
     var pageLinks = {}
@@ -37,6 +59,10 @@ export function Pagination({basePath, cursor, pageNum, moreRows, totalCount, row
                         </select>
                     </div>
                 ) : null}
+                <div className="go-to">
+                    Go to
+                    <input type="number" value={goToPage} onKeyDown={goToKeyDown} onChange={handleGoToPageChange} />
+                </div>
             </div>
         </div>
     )

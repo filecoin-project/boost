@@ -226,10 +226,10 @@ docker/lotus-test: info/lotus-test | $(lotus_checkout_dir)
 .PHONY: docker/lotus-test
 
 ### devnet images
-docker/%: docker/lotus-test
+docker/%:
 	cd docker/devnet/$* && $(docker_build_cmd) -t $(docker_user)/$*-dev:$(lotus_version) \
 		--build-arg BUILD_VERSION=$(lotus_version) .
-docker/boost: build/.update-modules docker/lotus-test
+docker/boost: build/.update-modules
 	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
 		-t $(docker_user)/boost-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/boost/Dockerfile.source .
@@ -238,5 +238,5 @@ docker/booster-http:
 	$(docker_build_cmd) -t $(docker_user)/booster-http-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/booster-http/Dockerfile.source .
 .PHONY: docker/booster-http
-docker/all: docker/boost docker/booster-http docker/lotus docker/lotus-miner 
+docker/all: docker/lotus-test docker/boost docker/booster-http docker/lotus docker/lotus-miner
 .PHONY: docker/all

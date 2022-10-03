@@ -149,6 +149,15 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		return fmt.Errorf("failed to connect to peer %s: %w", addrInfo.ID, err)
 	}
 
+	x, err := n.Host.Peerstore().FirstSupportedProtocol(addrInfo.ID, DealProtocolv120)
+	if err != nil {
+		return fmt.Errorf("getting protocols for peer %s: %w", addrInfo.ID, err)
+	}
+
+	if len(x) == 0 {
+		return fmt.Errorf("boost client cannot make a deal with storage provider because it does not support protocol version 1.2.0")
+	}
+
 	dealUuid := uuid.New()
 
 	commp := cctx.String("commp")

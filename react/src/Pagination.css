@@ -46,3 +46,11 @@
     outline: none;
     color: #999;
 }
+
+.pagination .go-to {
+    color: #999;
+}
+
+.pagination .go-to input {
+    width: 5em;
+}
