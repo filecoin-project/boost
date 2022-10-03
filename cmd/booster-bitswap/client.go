@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/ipld/go-car/v2/blockstore"
 	"net/http"
 	_ "net/http/pprof"
 	"sync/atomic"
@@ -14,8 +15,6 @@ import (
 	"github.com/ipfs/go-bitswap/client"
 	bsnetwork "github.com/ipfs/go-bitswap/network"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	bstore "github.com/ipfs/go-ipfs-blockstore"
 	nilrouting "github.com/ipfs/go-ipfs-routing/none"
 	ipldlegacy "github.com/ipfs/go-ipld-legacy"
 	"github.com/libp2p/go-libp2p"
@@ -33,7 +32,7 @@ import (
 
 var fetchCmd = &cli.Command{
 	Name:        "fetch",
-	Usage:       "fetch <multiaddr> <root cid>",
+	Usage:       "fetch <multiaddr> <root cid> <output car path>",
 	Description: "Fetch all blocks in the DAG under the given root cid from the bitswap node at multiaddr",
 	Before:      before,
 	Flags: []cli.Flag{
@@ -58,8 +57,8 @@ var fetchCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		if cctx.Args().Len() != 2 {
-			return fmt.Errorf("usage: fetch <multiaddr> <cid>")
+		if cctx.Args().Len() != 3 {
+			return fmt.Errorf("usage: fetch <multiaddr> <root cid> <output car path>")
 		}
 
 		addrInfoStr := cctx.Args().Get(0)
@@ -73,6 +72,8 @@ var fetchCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("parsing cid %s: %w", rootCidStr, err)
 		}
+
+		outputCarPath := cctx.Args().Get(2)
 
 		defer profile.Start(profile.TraceProfile, profile.ProfilePath(".")).Stop()
 
@@ -125,7 +126,11 @@ var fetchCmd = &cli.Command{
 			return err
 		}
 		net := bsnetwork.NewFromIpfsHost(host, nilRouter)
-		bs := bstore.NewBlockstore(datastore.NewNullDatastore())
+		bs, err := blockstore.OpenReadWrite(outputCarPath, []cid.Cid{rootCid}, blockstore.UseWholeCIDs(true))
+		if err != nil {
+			return fmt.Errorf("creating blockstore at %s: %w", outputCarPath, err)
+		}
+
 		bsClient := client.New(ctx, net, bs)
 		net.Start(bsClient)
 
