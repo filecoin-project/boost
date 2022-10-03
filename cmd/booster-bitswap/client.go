@@ -6,6 +6,7 @@ import (
 	"fmt"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipld/go-car/v2/blockstore"
+	"net/http"
 	_ "net/http/pprof"
 	"sync/atomic"
 	"time"
@@ -36,7 +37,7 @@ var fetchCmd = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "pprof",
-			Usage: "run pprof web server on localhost:6070",
+			Usage: "run pprof web server on localhost:6071",
 		},
 		&cli.IntFlag{
 			Name:  "concurrency",
@@ -45,6 +46,15 @@ var fetchCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
+		if cctx.Bool("pprof") {
+			go func() {
+				err := http.ListenAndServe("localhost:6071", nil)
+				if err != nil {
+					log.Error(err)
+				}
+			}()
+		}
+
 		if cctx.Args().Len() != 3 {
 			return fmt.Errorf("usage: fetch <multiaddr> <root cid> <output car path>")
 		}
