@@ -47,6 +47,7 @@
   * [MarketListDataTransfers](#marketlistdatatransfers)
   * [MarketListIncompleteDeals](#marketlistincompletedeals)
   * [MarketListRetrievalDeals](#marketlistretrievaldeals)
+  * [MarketPendingDeals](#marketpendingdeals)
   * [MarketRestartDataTransfer](#marketrestartdatatransfer)
   * [MarketSetAsk](#marketsetask)
   * [MarketSetRetrievalAsk](#marketsetretrievalask)
@@ -82,6 +83,8 @@
   * [PiecesListPieces](#pieceslistpieces)
 * [Runtime](#runtime)
   * [RuntimeSubsystems](#runtimesubsystems)
+* [Sectors](#sectors)
+  * [SectorsRefs](#sectorsrefs)
 ## Actor
 
 
@@ -992,6 +995,44 @@ Response:
 ]
 ```
 
+### MarketPendingDeals
+
+
+Perms: write
+
+Inputs: `null`
+
+Response:
+```json
+{
+  "Deals": [
+    {
+      "Proposal": {
+        "PieceCID": {
+          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+        },
+        "PieceSize": 1032,
+        "VerifiedDeal": true,
+        "Client": "f01234",
+        "Provider": "f01234",
+        "Label": "",
+        "StartEpoch": 10101,
+        "EndEpoch": 10101,
+        "StoragePricePerEpoch": "0",
+        "ProviderCollateral": "0",
+        "ClientCollateral": "0"
+      },
+      "ClientSignature": {
+        "Type": 2,
+        "Data": "Ynl0ZSBhcnJheQ=="
+      }
+    }
+  ],
+  "PublishPeriodStart": "0001-01-01T00:00:00Z",
+  "PublishPeriod": 60000000000
+}
+```
+
 ### MarketRestartDataTransfer
 
 
@@ -1686,5 +1727,28 @@ Response:
 [
   "Markets"
 ]
+```
+
+## Sectors
+
+
+### SectorsRefs
+
+
+Perms: read
+
+Inputs: `null`
+
+Response:
+```json
+{
+  "98000": [
+    {
+      "SectorID": 100,
+      "Offset": 10485760,
+      "Size": 1048576
+    }
+  ]
+}
 ```
 

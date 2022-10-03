@@ -64,6 +64,8 @@ type Boost interface {
 	MarketCancelDataTransfer(ctx context.Context, transferID datatransfer.TransferID, otherPeer peer.ID, isInitiator bool) error                                                         //perm:write
 	MarketImportDealData(ctx context.Context, propcid cid.Cid, path string) error                                                                                                        //perm:write
 	MarketListIncompleteDeals(ctx context.Context) ([]storagemarket.MinerDeal, error)                                                                                                    //perm:read
+	MarketPendingDeals(ctx context.Context) (lapi.PendingDealInfo, error)                                                                                                                //perm:write
+	SectorsRefs(context.Context) (map[string][]lapi.SealedRef, error)                                                                                                                    //perm:read
 
 	PiecesListPieces(ctx context.Context) ([]cid.Cid, error)                                 //perm:read
 	PiecesListCidInfos(ctx context.Context) ([]cid.Cid, error)                               //perm:read
