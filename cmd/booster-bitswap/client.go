@@ -133,6 +133,7 @@ func getBlocks(ctx context.Context, bsClient *client.Client, c cid.Cid, throttle
 	}
 	// Get the block
 	start := time.Now()
+	log.Debugw("get", "cid", c)
 	blk, err := bsClient.GetBlock(ctx, c)
 	if throttle != nil {
 		<-throttle
