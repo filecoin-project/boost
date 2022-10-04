@@ -108,6 +108,8 @@ type BoostStruct struct {
 
 		MarketListRetrievalDeals func(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) `perm:"read"`
 
+		MarketPendingDeals func(p0 context.Context) (lapi.PendingDealInfo, error) `perm:"write"`
+
 		MarketRestartDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error `perm:"write"`
 
 		MarketSetAsk func(p0 context.Context, p1 types.BigInt, p2 types.BigInt, p3 abi.ChainEpoch, p4 abi.PaddedPieceSize, p5 abi.PaddedPieceSize) error `perm:"admin"`
@@ -125,6 +127,8 @@ type BoostStruct struct {
 		PiecesListPieces func(p0 context.Context) ([]cid.Cid, error) `perm:"read"`
 
 		RuntimeSubsystems func(p0 context.Context) (lapi.MinerSubsystems, error) `perm:"read"`
+
+		SectorsRefs func(p0 context.Context) (map[string][]lapi.SealedRef, error) `perm:"read"`
 	}
 }
 
@@ -647,6 +651,17 @@ func (s *BoostStub) MarketListRetrievalDeals(p0 context.Context) ([]retrievalmar
 	return *new([]retrievalmarket.ProviderDealState), ErrNotSupported
 }
 
+func (s *BoostStruct) MarketPendingDeals(p0 context.Context) (lapi.PendingDealInfo, error) {
+	if s.Internal.MarketPendingDeals == nil {
+		return *new(lapi.PendingDealInfo), ErrNotSupported
+	}
+	return s.Internal.MarketPendingDeals(p0)
+}
+
+func (s *BoostStub) MarketPendingDeals(p0 context.Context) (lapi.PendingDealInfo, error) {
+	return *new(lapi.PendingDealInfo), ErrNotSupported
+}
+
 func (s *BoostStruct) MarketRestartDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
 	if s.Internal.MarketRestartDataTransfer == nil {
 		return ErrNotSupported
@@ -744,6 +759,17 @@ func (s *BoostStruct) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystem
 
 func (s *BoostStub) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystems, error) {
 	return *new(lapi.MinerSubsystems), ErrNotSupported
+}
+
+func (s *BoostStruct) SectorsRefs(p0 context.Context) (map[string][]lapi.SealedRef, error) {
+	if s.Internal.SectorsRefs == nil {
+		return *new(map[string][]lapi.SealedRef), ErrNotSupported
+	}
+	return s.Internal.SectorsRefs(p0)
+}
+
+func (s *BoostStub) SectorsRefs(p0 context.Context) (map[string][]lapi.SealedRef, error) {
+	return *new(map[string][]lapi.SealedRef), ErrNotSupported
 }
 
 func (s *ChainIOStruct) ChainHasObj(p0 context.Context, p1 cid.Cid) (bool, error) {
