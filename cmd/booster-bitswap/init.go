@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 )
 
@@ -114,6 +115,12 @@ var initCmd = &cli.Command{
 		ctx := lcli.ReqContext(cctx)
 
 		repoDir := cctx.String(FlagRepo.Name)
+
+		var err error
+		repoDir, err = homedir.Expand(repoDir)
+		if err != nil {
+			return fmt.Errorf("expanding repo file path: %w", err)
+		}
 
 		peerID, _, err := configureRepo(ctx, repoDir, true)
 		fmt.Println(peerID)
