@@ -200,9 +200,9 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=1.17.1-rc2
+lotus_version?=1.17.2-rc2
 lotus_src_dir?=
- 
+
 ifeq ($(lotus_src_dir),)
     lotus_src_dir=/tmp/lotus-$(lotus_version)
     lotus_checkout_dir=$(lotus_src_dir)
@@ -217,7 +217,7 @@ docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image) $
 info/lotus-test:
 	@echo Lotus dir = $(lotus_src_dir)
 	@echo Lotus ver = $(lotus_version)
-.PHONY: info/lotus-test	
+.PHONY: info/lotus-test
 $(lotus_checkout_dir):
 	git clone --depth 1 --branch v$(lotus_version) https://github.com/filecoin-project/lotus $@
 docker/lotus-test: info/lotus-test | $(lotus_checkout_dir)
@@ -234,9 +234,13 @@ docker/boost: build/.update-modules
 		-t $(docker_user)/boost-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/boost/Dockerfile.source .
 .PHONY: docker/boost
-docker/booster-http: 
+docker/booster-http:
 	$(docker_build_cmd) -t $(docker_user)/booster-http-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/booster-http/Dockerfile.source .
 .PHONY: docker/booster-http
+docker/booster-bitswap:
+	$(docker_build_cmd) -t $(docker_user)/booster-bitswap-dev:dev --build-arg BUILD_VERSION=dev \
+		-f docker/devnet/booster-bitswap/Dockerfile.source .
+.PHONY: docker/booster-bitswap
 docker/all: docker/lotus-test docker/boost docker/booster-http docker/lotus docker/lotus-miner
 .PHONY: docker/all

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/filecoin-project/dagstore/shard"
@@ -242,4 +243,24 @@ func (sm *BoostAPI) PiecesGetMaxOffset(ctx context.Context, pieceCid cid.Cid) (u
 
 func (sm *BoostAPI) RuntimeSubsystems(context.Context) (res lapi.MinerSubsystems, err error) {
 	return []lapi.MinerSubsystem{lapi.SubsystemMarkets}, nil
+}
+
+func (sm *BoostAPI) MarketPendingDeals(ctx context.Context) (lapi.PendingDealInfo, error) {
+	return sm.DealPublisher.PendingDeals(), nil
+}
+
+func (sm *BoostAPI) SectorsRefs(ctx context.Context) (map[string][]lapi.SealedRef, error) {
+	// json can't handle cids as map keys
+	out := map[string][]lapi.SealedRef{}
+
+	refs, err := sm.SectorBlocks.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range refs {
+		out[strconv.FormatUint(k, 10)] = v
+	}
+
+	return out, nil
 }

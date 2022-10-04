@@ -52,6 +52,7 @@ func (fh *ForwardingHost) SetStreamHandler(pid protocol.ID, handler network.Stre
 	fh.Host.SetStreamHandler(pid, handler)
 
 	// Save the handler so it can be invoked from the forwarding protocol's handler
+	// only set the handler if we are successful in registering the route
 	fh.handlersLk.Lock()
 	fh.handlers[pid] = handler
 	fh.handlersLk.Unlock()
