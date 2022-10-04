@@ -12,26 +12,26 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
-// ForwardingHost is a host that behaves as a service node connected to a load balancer
-// -- all traffic is routed through the load balancer for each registered protocol
+// ForwardingHost is a host that behaves as a service node connected to a proxy
+// -- all traffic is routed through the proxy for each registered protocol
 type ForwardingHost struct {
 	host.Host
-	balancer   peer.ID
+	proxy      peer.ID
 	handlersLk sync.RWMutex
 	handlers   map[protocol.ID]network.StreamHandler
 }
 
-// NewForwardingHost node constructs a service node connected to the given load balancer on the passed
-// in host. A service node behaves exactly like a host.Host but setting up new protocol handlers
-// registers routes on the load balancer
-func NewForwardingHost(ctx context.Context, h host.Host, balancer peer.AddrInfo) (host.Host, error) {
-	err := h.Connect(ctx, balancer)
+// NewForwardingHost node constructs a service node connected to the given proxy on the passed
+// in host. A forwarding host behaves exactly like a host.Host but setting up new protocol handlers
+// registers routes on the proxy node.
+func NewForwardingHost(ctx context.Context, h host.Host, proxy peer.AddrInfo) (host.Host, error) {
+	err := h.Connect(ctx, proxy)
 	if err != nil {
 		return nil, err
 	}
 	fh := &ForwardingHost{
 		Host:     h,
-		balancer: balancer.ID,
+		proxy:    proxy.ID,
 		handlers: make(map[protocol.ID]network.StreamHandler),
 	}
 	fh.Host.SetStreamHandler(ForwardingProtocolID, fh.handleForwarding)
@@ -44,12 +44,14 @@ func (fh *ForwardingHost) Close() error {
 	return fh.Host.Close()
 }
 
-// SetStreamHandler interrupts the normal process of setting up stream handlers by instead
-// registering a route on the connected load balancer. All traffic for this protocol
-// will go through the forwarding handshake with load balancer, then the native handler will
-// be called
+// SetStreamHandler interrupts the normal process of setting up stream handlers by also
+// registering a route on the connected protocol proxy. All traffic on the forwarding
+// protocol will go through the forwarding handshake with the proxy, then the native
+// handler will be called
 func (fh *ForwardingHost) SetStreamHandler(pid protocol.ID, handler network.StreamHandler) {
-	// only set the handler if we are successful in registering the route
+	fh.Host.SetStreamHandler(pid, handler)
+
+	// Save the handler so it can be invoked from the forwarding protocol's handler
 	fh.handlersLk.Lock()
 	fh.handlers[pid] = handler
 	fh.handlersLk.Unlock()
@@ -83,8 +85,8 @@ func (wc *wrappedConn) RemotePeer() peer.ID {
 
 // handle inbound forwarding requests
 func (fh *ForwardingHost) handleForwarding(s network.Stream) {
-	// only accept requests from the load balancer
-	if s.Conn().RemotePeer() != fh.balancer {
+	// only accept requests from the proxy
+	if s.Conn().RemotePeer() != fh.proxy {
 		_ = s.Reset()
 		return
 	}
@@ -139,12 +141,12 @@ func (fh *ForwardingHost) validateForwardingRequest(request *messages.Forwarding
 	return registeredHandler, nil
 }
 
-// Calls to "NewStream" open an outbound forwarding request to the load balancer, that is then sent on
+// Calls to "NewStream" open an outbound forwarding request to the proxy, that is then sent on
 // the the specified peer
 func (fh *ForwardingHost) NewStream(ctx context.Context, p peer.ID, protocols ...protocol.ID) (network.Stream, error) {
 
 	// open a forwarding stream
-	routedStream, err := fh.Host.NewStream(ctx, fh.balancer, ForwardingProtocolID)
+	routedStream, err := fh.Host.NewStream(ctx, fh.proxy, ForwardingProtocolID)
 	if err != nil {
 		return nil, err
 	}
