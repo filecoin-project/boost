@@ -17,11 +17,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-graphsync"
-	"github.com/libp2p/go-libp2p-core/metrics"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/metrics"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
 
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -45,6 +45,8 @@ import (
 	"github.com/filecoin-project/lotus/node/repo/imports"
 	"github.com/filecoin-project/lotus/storage/sealer/sealtasks"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var ExampleValues = map[reflect.Type]interface{}{
@@ -372,7 +374,7 @@ func exampleStruct(method string, t, parent reflect.Type) interface{} {
 		if f.Type == parent {
 			continue
 		}
-		if strings.Title(f.Name) == f.Name {
+		if cases.Title(language.Und, cases.NoLower).String(f.Name) == f.Name {
 			ns.Elem().Field(i).Set(reflect.ValueOf(ExampleValue(method, f.Type, t)))
 		}
 	}

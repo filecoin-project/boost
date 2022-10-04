@@ -58,7 +58,7 @@ import (
 	unixfile "github.com/ipfs/go-unixfs/file"
 	"github.com/ipld/go-car"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )

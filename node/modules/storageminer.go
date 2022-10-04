@@ -8,6 +8,8 @@ import (
 	"path"
 	"time"
 
+	brm "github.com/filecoin-project/boost/retrievalmarket/lib"
+
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
@@ -24,6 +26,7 @@ import (
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/dagstore"
+	"github.com/filecoin-project/dagstore/indexbs"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/shared"
@@ -42,7 +45,7 @@ import (
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p/core/host"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
 )
@@ -440,6 +443,25 @@ func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo
 
 		return server
 	}
+}
+
+func NewIndexBackedBlockstore(lc fx.Lifecycle, dagst dagstore.Interface, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, rp retrievalmarket.RetrievalProvider) (dtypes.IndexBackedBlockstore, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			cancel()
+			return nil
+		},
+	})
+	ss, err := brm.NewShardSelector(ctx, ps, sa, rp)
+	if err != nil {
+		return nil, fmt.Errorf("creating shard selector: %w", err)
+	}
+	rbs, err := indexbs.NewIndexBackedBlockstore(ctx, dagst, ss.ShardSelectorF, 100)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create index backed blockstore: %w", err)
+	}
+	return dtypes.IndexBackedBlockstore(rbs), nil
 }
 
 func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, error) {

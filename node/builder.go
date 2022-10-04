@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boost/node/impl/common"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
@@ -61,16 +62,16 @@ import (
 	"github.com/filecoin-project/lotus/system"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipfs/go-metrics-interface"
-	ci "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	record "github.com/libp2p/go-libp2p-record"
+	ci "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 	"github.com/libp2p/go-libp2p/p2p/net/conngater"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/fx"
@@ -80,7 +81,8 @@ import (
 var log = logging.Logger("builder")
 
 // special is a type used to give keys to modules which
-//  can't really be identified by the returned type
+//
+//	can't really be identified by the returned type
 type special struct{ id int }
 
 //nolint:golint
@@ -104,6 +106,7 @@ var (
 type invoke int
 
 // Invokes are called in the order they are defined.
+//
 //nolint:golint
 const (
 	// InitJournal at position 0 initializes the journal global var as soon as
@@ -140,6 +143,7 @@ const (
 	HandleDealsKey
 	HandleRetrievalKey
 	HandleRetrievalTransportsKey
+	HandleProtocolProxyKey
 	RunSectorServiceKey
 
 	// boost should be started after legacy markets (HandleDealsKey)
@@ -513,6 +517,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(mktsdagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
 		Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
 		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
+		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore),
 
 		// Lotus Markets (retrieval)
 		Override(new(mktsdagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
@@ -522,7 +527,9 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
+		Override(new(*protocolproxy.ProtocolProxy), modules.NewProtocolProxy(cfg)),
 		Override(HandleRetrievalTransportsKey, modules.HandleRetrievalTransports),
+		Override(HandleProtocolProxyKey, modules.HandleProtocolProxy),
 		Override(new(idxprov.MeshCreator), idxprov.NewMeshCreator),
 		Override(new(provider.Interface), modules.IndexProvider(cfg.IndexProvider)),
 

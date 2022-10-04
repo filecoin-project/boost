@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/filecoin-project/dagstore/shard"
-	"github.com/multiformats/go-multihash"
-
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
@@ -19,7 +17,8 @@ import (
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p-core/peer"
+	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multihash"
 )
 
 func (sm *BoostAPI) MarketListDataTransfers(ctx context.Context) ([]lapi.DataTransferChannel, error) {

@@ -21,10 +21,10 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	metrics "github.com/libp2p/go-libp2p-core/metrics"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	metrics "github.com/libp2p/go-libp2p/core/metrics"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multihash"
 )
 
@@ -37,6 +37,12 @@ type BoostStruct struct {
 
 	Internal struct {
 		ActorSectorSize func(p0 context.Context, p1 address.Address) (abi.SectorSize, error) `perm:"read"`
+
+		BlockstoreGet func(p0 context.Context, p1 cid.Cid) ([]byte, error) `perm:"read"`
+
+		BlockstoreGetSize func(p0 context.Context, p1 cid.Cid) (int, error) `perm:"read"`
+
+		BlockstoreHas func(p0 context.Context, p1 cid.Cid) (bool, error) `perm:"read"`
 
 		BoostDagstoreDestroyShard func(p0 context.Context, p1 string) error `perm:"admin"`
 
@@ -264,6 +270,39 @@ func (s *BoostStruct) ActorSectorSize(p0 context.Context, p1 address.Address) (a
 
 func (s *BoostStub) ActorSectorSize(p0 context.Context, p1 address.Address) (abi.SectorSize, error) {
 	return *new(abi.SectorSize), ErrNotSupported
+}
+
+func (s *BoostStruct) BlockstoreGet(p0 context.Context, p1 cid.Cid) ([]byte, error) {
+	if s.Internal.BlockstoreGet == nil {
+		return *new([]byte), ErrNotSupported
+	}
+	return s.Internal.BlockstoreGet(p0, p1)
+}
+
+func (s *BoostStub) BlockstoreGet(p0 context.Context, p1 cid.Cid) ([]byte, error) {
+	return *new([]byte), ErrNotSupported
+}
+
+func (s *BoostStruct) BlockstoreGetSize(p0 context.Context, p1 cid.Cid) (int, error) {
+	if s.Internal.BlockstoreGetSize == nil {
+		return 0, ErrNotSupported
+	}
+	return s.Internal.BlockstoreGetSize(p0, p1)
+}
+
+func (s *BoostStub) BlockstoreGetSize(p0 context.Context, p1 cid.Cid) (int, error) {
+	return 0, ErrNotSupported
+}
+
+func (s *BoostStruct) BlockstoreHas(p0 context.Context, p1 cid.Cid) (bool, error) {
+	if s.Internal.BlockstoreHas == nil {
+		return false, ErrNotSupported
+	}
+	return s.Internal.BlockstoreHas(p0, p1)
+}
+
+func (s *BoostStub) BlockstoreHas(p0 context.Context, p1 cid.Cid) (bool, error) {
+	return false, ErrNotSupported
 }
 
 func (s *BoostStruct) BoostDagstoreDestroyShard(p0 context.Context, p1 string) error {
