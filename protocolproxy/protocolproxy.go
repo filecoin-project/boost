@@ -60,10 +60,13 @@ func (pp *ProtocolProxy) Start(ctx context.Context) {
 	log.Infof("started protocol proxy with protocols:\n%s", msg)
 }
 
+const routedHostTag = "protocol-proxy-routed-host"
+
 func (pp *ProtocolProxy) Close() {
 	pp.h.RemoveStreamHandler(ForwardingProtocolID)
-	for id := range pp.supportedProtocols {
+	for id, pid := range pp.supportedProtocols {
 		pp.h.RemoveStreamHandler(id)
+		pp.h.ConnManager().Unprotect(pid, routedHostTag)
 	}
 	pp.activeRoutesLk.Lock()
 	pp.activeRoutes = map[protocol.ID]peer.ID{}
@@ -97,6 +100,8 @@ func (pp *ProtocolProxy) Connected(n network.Network, c network.Conn) {
 	for _, id := range protocols {
 		pp.activeRoutes[id] = p
 	}
+
+	pp.h.ConnManager().Protect(p, routedHostTag)
 }
 
 // Disconnected checks the peersConfig and removes listening when a service node disconnects

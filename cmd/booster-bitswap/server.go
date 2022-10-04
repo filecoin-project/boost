@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/filecoin-project/boost/protocolproxy"
 	bsnetwork "github.com/ipfs/go-bitswap/network"
@@ -22,6 +24,7 @@ type BitswapServer struct {
 	blockFilter BlockFilter
 	ctx         context.Context
 	cancel      context.CancelFunc
+	proxy       peer.AddrInfo
 	server      *server.Server
 	host        host.Host
 }
@@ -30,16 +33,27 @@ func NewBitswapServer(remoteStore blockstore.Blockstore, host host.Host, blockFi
 	return &BitswapServer{remoteStore: remoteStore, host: host, blockFilter: blockFilter}
 }
 
-func (s *BitswapServer) Start(ctx context.Context, balancer peer.AddrInfo) error {
-	s.ctx, s.cancel = context.WithCancel(ctx)
+const protectTag = "bitswap-server-to-proxy"
 
-	host, err := protocolproxy.NewForwardingHost(ctx, s.host, balancer)
+func (s *BitswapServer) Start(ctx context.Context, proxy peer.AddrInfo) error {
+	s.ctx, s.cancel = context.WithCancel(ctx)
+	s.proxy = proxy
+
+	// Connect to the proxy over libp2p
+	log.Infow("connecting to proxy", "proxy", proxy)
+	err := s.host.Connect(s.ctx, proxy)
+	if err != nil {
+		return fmt.Errorf("connecting to proxy %s: %w", proxy, err)
+	}
+	s.host.ConnManager().Protect(proxy.ID, protectTag)
+
+	host, err := protocolproxy.NewForwardingHost(s.host, proxy)
 	if err != nil {
 		return err
 	}
 
 	// start a bitswap session on the provider
-	nilRouter, err := nilrouting.ConstructNilRouting(ctx, nil, nil, nil)
+	nilRouter, err := nilrouting.ConstructNilRouting(s.ctx, nil, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -50,14 +64,40 @@ func (s *BitswapServer) Start(ctx context.Context, balancer peer.AddrInfo) error
 		return !filtered && err == nil
 	})}
 	net := bsnetwork.NewFromIpfsHost(host, nilRouter)
-	s.server = server.New(ctx, net, s.remoteStore, bsopts...)
+	s.server = server.New(s.ctx, net, s.remoteStore, bsopts...)
 	net.Start(s.server)
+
+	go s.keepProxyConnectionAlive(s.ctx, proxy)
 
 	log.Infow("bitswap server running", "multiaddrs", host.Addrs(), "peerId", host.ID())
 	return nil
 }
 
 func (s *BitswapServer) Stop() error {
+	s.host.ConnManager().Unprotect(s.proxy.ID, protectTag)
 	s.cancel()
 	return s.server.Close()
+}
+
+func (s *BitswapServer) keepProxyConnectionAlive(ctx context.Context, proxy peer.AddrInfo) {
+	// Periodically ensure that the connection over libp2p to the proxy is alive
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	connected := true
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			err := s.host.Connect(ctx, proxy)
+			if err != nil {
+				connected = false
+				log.Warnw("failed to connect to proxy", "address", proxy)
+			} else if !connected {
+				log.Infow("reconnected to proxy", "address", proxy)
+				connected = true
+			}
+		}
+	}
 }
