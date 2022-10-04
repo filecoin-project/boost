@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/filecoin-project/dagstore/shard"
-	"github.com/multiformats/go-multihash"
-
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
@@ -19,6 +18,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multihash"
 )
 
 func (sm *BoostAPI) MarketListDataTransfers(ctx context.Context) ([]lapi.DataTransferChannel, error) {
@@ -242,4 +242,24 @@ func (sm *BoostAPI) PiecesGetMaxOffset(ctx context.Context, pieceCid cid.Cid) (u
 
 func (sm *BoostAPI) RuntimeSubsystems(context.Context) (res lapi.MinerSubsystems, err error) {
 	return []lapi.MinerSubsystem{lapi.SubsystemMarkets}, nil
+}
+
+func (sm *BoostAPI) MarketPendingDeals(ctx context.Context) (lapi.PendingDealInfo, error) {
+	return sm.DealPublisher.PendingDeals(), nil
+}
+
+func (sm *BoostAPI) SectorsRefs(ctx context.Context) (map[string][]lapi.SealedRef, error) {
+	// json can't handle cids as map keys
+	out := map[string][]lapi.SealedRef{}
+
+	refs, err := sm.SectorBlocks.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range refs {
+		out[strconv.FormatUint(k, 10)] = v
+	}
+
+	return out, nil
 }

@@ -25,7 +25,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	datatransfer "github.com/filecoin-project/go-data-transfer"
-	filestore "github.com/filecoin-project/go-fil-markets/filestore"
+	"github.com/filecoin-project/go-fil-markets/filestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	textselector "github.com/ipld/go-ipld-selector-text-lite"
@@ -300,6 +300,15 @@ func init() {
 	addExample(dealcheckpoints.Transferred)
 	addExample(lapi.SubsystemMarkets)
 	addExample(types2.DealRetryAuto)
+	addExample(map[string][]lapi.SealedRef{
+		"98000": {
+			lapi.SealedRef{
+				SectorID: 100,
+				Offset:   10 << 20,
+				Size:     1 << 20,
+			},
+		},
+	})
 }
 
 func GetAPIType(name, pkg string) (i interface{}, t reflect.Type, permStruct []reflect.Type) {

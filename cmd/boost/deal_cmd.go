@@ -155,7 +155,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	}
 
 	if len(x) == 0 {
-		return fmt.Errorf("boost client cannot make a deal with storage provider because it does not support protocol version 1.2.0")
+		return fmt.Errorf("boost client cannot make a deal with storage provider %s because it does not support protocol version 1.2.0", maddr)
 	}
 
 	dealUuid := uuid.New()
