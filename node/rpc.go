@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"github.com/filecoin-project/boost/lib/rpcenc"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -13,15 +14,14 @@ import (
 	manet "github.com/multiformats/go-multiaddr/net"
 	"go.opencensus.io/tag"
 
-	"github.com/filecoin-project/go-jsonrpc"
-	"github.com/filecoin-project/go-jsonrpc/auth"
+	"github.com/dirkmc/go-jsonrpc"
+	"github.com/dirkmc/go-jsonrpc/auth"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node/impl"
 
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/metrics/proxy"
-	"github.com/filecoin-project/lotus/lib/rpcenc"
 )
 
 var rpclog = logging.Logger("rpc")

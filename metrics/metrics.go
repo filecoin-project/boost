@@ -8,7 +8,7 @@ import (
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
 
-	rpcmetrics "github.com/filecoin-project/go-jsonrpc/metrics"
+	rpcmetrics "github.com/dirkmc/go-jsonrpc/metrics"
 	lotusmetrics "github.com/filecoin-project/lotus/metrics"
 )
 

@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/filecoin-project/go-jsonrpc"
+	"github.com/dirkmc/go-jsonrpc"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/lib/rpcenc"

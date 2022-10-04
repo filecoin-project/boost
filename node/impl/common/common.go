@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/filecoin-project/go-jsonrpc/auth"
+	"github.com/dirkmc/go-jsonrpc/auth"
 	"github.com/gbrlsnchs/jwt/v3"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"

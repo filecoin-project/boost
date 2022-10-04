@@ -18,7 +18,7 @@ import (
 	"github.com/raulk/go-watchdog"
 	"go.uber.org/fx"
 
-	"github.com/filecoin-project/go-jsonrpc/auth"
+	"github.com/dirkmc/go-jsonrpc/auth"
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/node/modules/dtypes"

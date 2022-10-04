@@ -11,7 +11,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 
-	"github.com/filecoin-project/go-jsonrpc"
+	"github.com/dirkmc/go-jsonrpc"
 
 	logging "github.com/ipfs/go-log/v2"
 

@@ -14,6 +14,7 @@ import (
 
 	"github.com/filecoin-project/go-fil-markets/stores"
 
+	"github.com/dirkmc/go-jsonrpc/auth"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
@@ -25,7 +26,6 @@ import (
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
-	"github.com/filecoin-project/go-jsonrpc/auth"
 	lapi "github.com/filecoin-project/lotus/api"
 	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
