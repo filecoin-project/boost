@@ -58,6 +58,16 @@ func TestNormalizeError(t *testing.T) {
 		expected:      fmt.Errorf("some err: %w", format.ErrNotFound{}),
 		isNotFoundErr: true,
 	}, {
+		name:          "block not found",
+		err:           fmt.Errorf("block not found"),
+		expected:      format.ErrNotFound{},
+		isNotFoundErr: true,
+	}, {
+		name:          "different capitalization not found",
+		err:           fmt.Errorf("block nOt FoUnd"),
+		expected:      format.ErrNotFound{},
+		isNotFoundErr: true,
+	}, {
 		name:          "different error",
 		err:           fmt.Errorf("some other err"),
 		expected:      fmt.Errorf("some other err"),
@@ -66,6 +76,11 @@ func TestNormalizeError(t *testing.T) {
 		name:          "stringified ipld ErrorNotFound with bad cid",
 		err:           fmt.Errorf(ipldNotFoundPrefix + "badcid"),
 		expected:      fmt.Errorf(ipldNotFoundPrefix + "badcid"),
+		isNotFoundErr: false,
+	}, {
+		name:          "nil error",
+		err:           nil,
+		expected:      nil,
 		isNotFoundErr: false,
 	}}
 
@@ -77,7 +92,11 @@ func TestNormalizeError(t *testing.T) {
 			} else {
 				require.False(t, format.IsNotFound(err))
 			}
-			require.Equal(t, tc.expected.Error(), err.Error())
+			if tc.err == nil {
+				require.Nil(t, err)
+			} else {
+				require.Equal(t, tc.expected.Error(), err.Error())
+			}
 		})
 	}
 }
