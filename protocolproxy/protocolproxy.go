@@ -51,10 +51,13 @@ func NewProtocolProxy(h host.Host, peerConfig map[peer.ID][]protocol.ID) (*Proto
 func (pp *ProtocolProxy) Start(ctx context.Context) {
 	pp.ctx = ctx
 	pp.h.SetStreamHandler(ForwardingProtocolID, pp.handleForwarding)
-	for id := range pp.supportedProtocols {
+	msg := ""
+	for id, pid := range pp.supportedProtocols {
 		pp.h.SetStreamHandler(id, pp.handleIncoming)
+		msg += "  " + pid.String() + ": " + string(id) + "\n"
 	}
 	pp.h.Network().Notify(pp)
+	log.Infof("started protocol proxy with protocols:\n%s", msg)
 }
 
 func (pp *ProtocolProxy) Close() {

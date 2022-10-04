@@ -4,24 +4,17 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/bitswap"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
-	"github.com/ipfs/go-bitswap/network"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/fx"
 )
-
-var bitswapProtocols = []protocol.ID{
-	network.ProtocolBitswap,
-	network.ProtocolBitswapNoVers,
-	network.ProtocolBitswapOneOne,
-	network.ProtocolBitswapOneZero,
-}
 
 func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.TransportsListener, error) {
 	return func(h host.Host) (*lp2pimpl.TransportsListener, error) {
@@ -84,7 +77,7 @@ func NewProtocolProxy(cfg *config.Boost) func(h host.Host) (*protocolproxy.Proto
 			if err != nil {
 				return nil, err
 			}
-			peerConfig[bsPeerID] = bitswapProtocols
+			peerConfig[bsPeerID] = bitswap.Protocols
 		}
 		return protocolproxy.NewProtocolProxy(h, peerConfig)
 	}
@@ -93,12 +86,12 @@ func NewProtocolProxy(cfg *config.Boost) func(h host.Host) (*protocolproxy.Proto
 func HandleProtocolProxy(lc fx.Lifecycle, pp *protocolproxy.ProtocolProxy) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			log.Info("starting load balancer")
+			log.Info("starting libp2p protocol proxy")
 			pp.Start(ctx)
 			return nil
 		},
 		OnStop: func(context.Context) error {
-			log.Info("stopping load balancer")
+			log.Info("stopping libp2p protocol proxy")
 			pp.Close()
 			return nil
 		},
