@@ -4,19 +4,21 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	blocks "github.com/ipfs/go-block-format"
-	"github.com/ipld/go-car/v2/blockstore"
 	"net/http"
 	_ "net/http/pprof"
+	"sort"
 	"sync/atomic"
 	"time"
 
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/bitswap"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-bitswap/client"
 	bsnetwork "github.com/ipfs/go-bitswap/network"
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	nilrouting "github.com/ipfs/go-ipfs-routing/none"
 	ipldlegacy "github.com/ipfs/go-ipld-legacy"
+	"github.com/ipld/go-car/v2/blockstore"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -112,6 +114,7 @@ var fetchCmd = &cli.Command{
 		defer bsClient.Close()
 		net.Start(bsClient)
 
+		// Connect to host
 		connectStart := time.Now()
 		log.Infow("connecting to server", "server", serverAddrInfo.String())
 		err = host.Connect(ctx, *serverAddrInfo)
@@ -120,12 +123,30 @@ var fetchCmd = &cli.Command{
 		}
 		log.Debugw("connected to server", "duration", time.Since(connectStart).String())
 
+		// Check host's libp2p protocols
+		protos, err := host.Peerstore().GetProtocols(serverAddrInfo.ID)
+		if err != nil {
+			return fmt.Errorf("getting protocols from peer store for %s: %w", serverAddrInfo.ID, err)
+		}
+		sort.Slice(protos, func(i, j int) bool {
+			return protos[i] < protos[j]
+		})
+		log.Debugw("host libp2p protocols", "protocols", protos)
+		p, err := host.Peerstore().FirstSupportedProtocol(serverAddrInfo.ID, bitswap.ProtocolStrings...)
+		if err != nil {
+			return fmt.Errorf("getting first supported protocol from peer store for %s: %w", serverAddrInfo.ID, err)
+		}
+		if p == "" {
+			return fmt.Errorf("host %s does not support any know bitswap protocols: %s", serverAddrInfo.ID, bitswap.ProtocolStrings)
+		}
+
 		var throttle chan struct{}
 		concurrency := cctx.Int("concurrency")
 		if concurrency > 0 {
 			throttle = make(chan struct{}, concurrency)
 		}
 
+		// Fetch all blocks under the root cid
 		log.Infow("fetch", "cid", rootCid, "concurrency", concurrency)
 		start := time.Now()
 		count, size, err := getBlocks(ctx, bsClient, rootCid, throttle)
