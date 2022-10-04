@@ -117,19 +117,25 @@ func normalizeError(err error) error {
 
 	// Check for ErrNotFound with a cid
 	idx = strings.Index(errMsg, ipldNotFoundPrefix)
-	if idx == -1 {
-		return err
+	if idx != -1 {
+		cidStr := errMsg[idx+len(ipldNotFoundPrefix):]
+		c, e := cid.Parse(cidStr)
+		if e != nil {
+			return err
+		}
+
+		rest := errMsg[:idx]
+		if len(rest) > 2 && rest[len(rest)-2:] != ": " {
+			rest += ": "
+		}
+		return fmt.Errorf("%s%w", rest, format.ErrNotFound{Cid: c})
 	}
 
-	cidStr := errMsg[idx+len(ipldNotFoundPrefix):]
-	c, e := cid.Parse(cidStr)
-	if e != nil {
-		return err
+	// Check for any error with the string "not found"
+	idx = strings.Index(strings.ToLower(errMsg), "not found")
+	if idx != -1 {
+		return format.ErrNotFound{}
 	}
 
-	rest := errMsg[:idx]
-	if len(rest) > 2 && rest[len(rest)-2:] != ": " {
-		rest += ": "
-	}
-	return fmt.Errorf("%s%w", rest, format.ErrNotFound{Cid: c})
+	return err
 }
