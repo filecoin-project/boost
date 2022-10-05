@@ -1949,6 +1949,16 @@ func (td *testDeal) executeAndSubscribeImportOfflineDeal() error {
 }
 
 func (td *testDeal) executeAndSubscribe() error {
+	dh, err := td.ph.Provider.mkAndInsertDealHandler(td.params.DealUUID)
+	if err != nil {
+		return err
+	}
+	sub, err := dh.subscribeUpdates()
+	if err != nil {
+		return err
+	}
+	td.sub = sub
+
 	pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
 	if err != nil {
 		return err
@@ -1956,12 +1966,6 @@ func (td *testDeal) executeAndSubscribe() error {
 	if !pi.Accepted {
 		return fmt.Errorf("deal not accepted: %s", pi.Reason)
 	}
-	dh := td.ph.Provider.getDealHandler(td.params.DealUUID)
-	sub, err := dh.subscribeUpdates()
-	if err != nil {
-		return err
-	}
-	td.sub = sub
 
 	return nil
 }
