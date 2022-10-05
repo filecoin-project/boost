@@ -141,6 +141,14 @@ func (fh *ForwardingHost) validateForwardingRequest(request *messages.Forwarding
 // Calls to "NewStream" open an outbound forwarding request to the proxy, that is then sent on
 // the the specified peer
 func (fh *ForwardingHost) NewStream(ctx context.Context, p peer.ID, protocols ...protocol.ID) (network.Stream, error) {
+	// If there is a direct connection to the peer (or there was a connection
+	// recently) open the stream over the direct connection
+	if p != fh.proxy {
+		connectedness := fh.Host.Network().Connectedness(p)
+		if connectedness == network.Connected || connectedness == network.CanConnect {
+			return fh.Host.NewStream(ctx, p, protocols...)
+		}
+	}
 
 	// open a forwarding stream
 	routedStream, err := fh.Host.NewStream(ctx, fh.proxy, ForwardingProtocolID)
@@ -148,7 +156,7 @@ func (fh *ForwardingHost) NewStream(ctx context.Context, p peer.ID, protocols ..
 		return nil, err
 	}
 
-	// write an outbound forwarding request with the remote peer and protoocol
+	// write an outbound forwarding request with the remote peer and protocol
 	err = messages.WriteOutboundForwardingRequest(routedStream, p, protocols)
 	if err != nil {
 		routedStream.Close()
@@ -174,7 +182,7 @@ func (fh *ForwardingHost) NewStream(ctx context.Context, p peer.ID, protocols ..
 
 // RemoveStreamHandler removes a stream handler by shutting down registered route with the original host
 func (fh *ForwardingHost) RemoveStreamHandler(pid protocol.ID) {
-	// check if the handler is exists
+	// check if the handler exists
 	fh.handlersLk.Lock()
 	delete(fh.handlers, pid)
 	fh.handlersLk.Unlock()
