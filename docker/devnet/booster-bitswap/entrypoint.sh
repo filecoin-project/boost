@@ -20,4 +20,5 @@ if [ ! -f $BOOSTER_BITSWAP_REPO/.init.booster-bitswap ]; then
 fi
 
 echo Starting booster-bitswap...
-exec booster-bitswap run --api-boost=$BOOST_API_INFO --tracing
+export GOLOG_LOG_LEVEL=remote-blockstore=debug,booster=debug,engine=debug,bitswap-server=debug
+exec booster-bitswap --vv run --api-boost=$BOOST_API_INFO --tracing

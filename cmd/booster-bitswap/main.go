@@ -15,7 +15,7 @@ var FlagRepo = &cli.StringFlag{
 	Name:    "repo",
 	Usage:   "repo directory for Booster bitswap",
 	Value:   "~/.booster-bitswap",
-	EnvVars: []string{"BOOST_BITSWAP_REPO"},
+	EnvVars: []string{"BOOSTER_BITSWAP_REPO"},
 }
 
 func main() {

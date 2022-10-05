@@ -1,13 +1,11 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/libp2p/go-libp2p"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -17,10 +15,11 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 )
 
-func configureRepo(ctx context.Context, cfgDir string, createIfNotExist bool) (peer.ID, crypto.PrivKey, error) {
+func configureRepo(cfgDir string, createIfNotExist bool) (peer.ID, crypto.PrivKey, error) {
 	if cfgDir == "" {
 		return "", nil, fmt.Errorf("%s is a required flag", FlagRepo.Name)
 	}
@@ -42,8 +41,8 @@ func configureRepo(ctx context.Context, cfgDir string, createIfNotExist bool) (p
 	return selfPid, peerkey, nil
 }
 
-func setupHost(ctx context.Context, cfgDir string, port int) (host.Host, error) {
-	_, peerKey, err := configureRepo(ctx, cfgDir, false)
+func setupHost(cfgDir string, port int) (host.Host, error) {
+	_, peerKey, err := configureRepo(cfgDir, false)
 	if err != nil {
 		return nil, err
 	}
@@ -62,46 +61,35 @@ func setupHost(ctx context.Context, cfgDir string, port int) (host.Host, error) 
 }
 
 func loadPeerKey(cfgDir string, createIfNotExists bool) (crypto.PrivKey, error) {
-	var peerkey crypto.PrivKey
 	keyPath := filepath.Join(cfgDir, "libp2p.key")
 	keyFile, err := os.ReadFile(keyPath)
+	if err == nil {
+		return crypto.UnmarshalPrivateKey(keyFile)
+	}
+
+	if !os.IsNotExist(err) {
+		return nil, err
+	}
+	if !createIfNotExists {
+		return nil, fmt.Errorf("booster-bitswap has not been initialized. Run the booster-bitswap init command")
+	}
+	log.Infof("Generating new peer key...")
+
+	key, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, err
-		}
-		if !createIfNotExists {
-			return nil, fmt.Errorf("booster-bitswap has not been initialized. Run the booster-bitswap init command")
-		}
-		log.Infof("Generating new peer key...")
-
-		key, _, err := crypto.GenerateEd25519Key(rand.Reader)
-		if err != nil {
-			return nil, err
-		}
-		peerkey = key
-
-		data, err := crypto.MarshalPrivateKey(key)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := os.WriteFile(keyPath, data, 0600); err != nil {
-			return nil, err
-		}
-	} else {
-		key, err := crypto.UnmarshalPrivateKey(keyFile)
-		if err != nil {
-			return nil, err
-		}
-
-		peerkey = key
+		return nil, err
 	}
 
-	if peerkey == nil {
-		panic("sanity check: peer key is uninitialized")
+	data, err := crypto.MarshalPrivateKey(key)
+	if err != nil {
+		return nil, err
 	}
 
-	return peerkey, nil
+	if err := os.WriteFile(keyPath, data, 0600); err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }
 
 var initCmd = &cli.Command{
@@ -110,13 +98,13 @@ var initCmd = &cli.Command{
 	Before: before,
 	Flags:  []cli.Flag{},
 	Action: func(cctx *cli.Context) error {
+		repoDir, err := homedir.Expand(cctx.String(FlagRepo.Name))
+		if err != nil {
+			return fmt.Errorf("expanding repo file path: %w", err)
+		}
 
-		ctx := lcli.ReqContext(cctx)
-
-		repoDir := cctx.String(FlagRepo.Name)
-
-		peerID, _, err := configureRepo(ctx, repoDir, true)
-		fmt.Println(peerID)
+		peerID, _, err := configureRepo(repoDir, true)
+		fmt.Println("Initialized booster-bitswap with libp2p peer ID: " + peerID)
 		return err
 	},
 }

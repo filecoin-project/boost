@@ -15,6 +15,7 @@ import (
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/go-jsonrpc"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/urfave/cli/v2"
 )
 
@@ -36,6 +37,10 @@ var runCmd = &cli.Command{
 			Name:     "api-boost",
 			Usage:    "the endpoint for the boost API",
 			Required: true,
+		},
+		&cli.StringFlag{
+			Name:  "proxy",
+			Usage: "the multiaddr of the libp2p proxy that this node connects through",
 		},
 		&cli.BoolFlag{
 			Name:  "tracing",
@@ -85,12 +90,12 @@ var runCmd = &cli.Command{
 		// Create the server API
 		port := cctx.Int("port")
 		repoDir := cctx.String(FlagRepo.Name)
-		host, err := setupHost(ctx, repoDir, port)
+		host, err := setupHost(repoDir, port)
 		if err != nil {
 			return fmt.Errorf("setting up libp2p host: %w", err)
 		}
-		// Start the server
 
+		// Create the bitswap server
 		blockFilter := blockfilter.NewBlockFilter(repoDir)
 		err = blockFilter.Start(ctx)
 		if err != nil {
@@ -98,13 +103,18 @@ var runCmd = &cli.Command{
 		}
 		server := NewBitswapServer(remoteStore, host, blockFilter)
 
-		addrs, err := bapi.NetAddrsListen(ctx)
-		if err != nil {
-			return fmt.Errorf("getting boost API addrs: %w", err)
+		var proxyAddrInfo *peer.AddrInfo
+		if cctx.IsSet("proxy") {
+			proxy := cctx.String("proxy")
+			proxyAddrInfo, err = peer.AddrInfoFromString(proxy)
+			if err != nil {
+				return fmt.Errorf("parsing proxy multiaddr %s: %w", proxy, err)
+			}
 		}
 
+		// Start the bitswap server
 		log.Infof("Starting booster-bitswap node on port %d", port)
-		err = server.Start(ctx, addrs)
+		err = server.Start(ctx, proxyAddrInfo)
 		if err != nil {
 			return err
 		}

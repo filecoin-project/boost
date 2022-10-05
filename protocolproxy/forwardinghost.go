@@ -24,18 +24,14 @@ type ForwardingHost struct {
 // NewForwardingHost node constructs a service node connected to the given proxy on the passed
 // in host. A forwarding host behaves exactly like a host.Host but setting up new protocol handlers
 // registers routes on the proxy node.
-func NewForwardingHost(ctx context.Context, h host.Host, proxy peer.AddrInfo) (host.Host, error) {
-	err := h.Connect(ctx, proxy)
-	if err != nil {
-		return nil, err
-	}
+func NewForwardingHost(h host.Host, proxy peer.AddrInfo) host.Host {
 	fh := &ForwardingHost{
 		Host:     h,
 		proxy:    proxy.ID,
 		handlers: make(map[protocol.ID]network.StreamHandler),
 	}
 	fh.Host.SetStreamHandler(ForwardingProtocolID, fh.handleForwarding)
-	return fh, nil
+	return fh
 }
 
 // Close shuts down a service node host's forwarding
@@ -145,6 +141,14 @@ func (fh *ForwardingHost) validateForwardingRequest(request *messages.Forwarding
 // Calls to "NewStream" open an outbound forwarding request to the proxy, that is then sent on
 // the the specified peer
 func (fh *ForwardingHost) NewStream(ctx context.Context, p peer.ID, protocols ...protocol.ID) (network.Stream, error) {
+	// If there is a direct connection to the peer (or there was a connection
+	// recently) open the stream over the direct connection
+	if p != fh.proxy {
+		connectedness := fh.Host.Network().Connectedness(p)
+		if connectedness == network.Connected || connectedness == network.CanConnect {
+			return fh.Host.NewStream(ctx, p, protocols...)
+		}
+	}
 
 	// open a forwarding stream
 	routedStream, err := fh.Host.NewStream(ctx, fh.proxy, ForwardingProtocolID)
@@ -152,7 +156,7 @@ func (fh *ForwardingHost) NewStream(ctx context.Context, p peer.ID, protocols ..
 		return nil, err
 	}
 
-	// write an outbound forwarding request with the remote peer and protoocol
+	// write an outbound forwarding request with the remote peer and protocol
 	err = messages.WriteOutboundForwardingRequest(routedStream, p, protocols)
 	if err != nil {
 		routedStream.Close()
@@ -178,7 +182,7 @@ func (fh *ForwardingHost) NewStream(ctx context.Context, p peer.ID, protocols ..
 
 // RemoveStreamHandler removes a stream handler by shutting down registered route with the original host
 func (fh *ForwardingHost) RemoveStreamHandler(pid protocol.ID) {
-	// check if the handler is exists
+	// check if the handler exists
 	fh.handlersLk.Lock()
 	delete(fh.handlers, pid)
 	fh.handlersLk.Unlock()
