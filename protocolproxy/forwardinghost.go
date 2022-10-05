@@ -24,14 +24,14 @@ type ForwardingHost struct {
 // NewForwardingHost node constructs a service node connected to the given proxy on the passed
 // in host. A forwarding host behaves exactly like a host.Host but setting up new protocol handlers
 // registers routes on the proxy node.
-func NewForwardingHost(h host.Host, proxy peer.AddrInfo) (host.Host, error) {
+func NewForwardingHost(h host.Host, proxy peer.AddrInfo) host.Host {
 	fh := &ForwardingHost{
 		Host:     h,
 		proxy:    proxy.ID,
 		handlers: make(map[protocol.ID]network.StreamHandler),
 	}
 	fh.Host.SetStreamHandler(ForwardingProtocolID, fh.handleForwarding)
-	return fh, nil
+	return fh
 }
 
 // Close shuts down a service node host's forwarding
