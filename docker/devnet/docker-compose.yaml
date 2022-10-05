@@ -89,12 +89,14 @@ services:
     ports:
       - "8888:8888"
     environment:
+      - BOOSTER_BITSWAP_REPO=/var/lib/booster-bitswap
       - BOOST_PATH=/var/lib/boost
       - LOTUS_PATH=/var/lib/lotus
       - LOTUS_MINER_PATH=/var/lib/lotus-miner
     restart: unless-stopped
     logging: *default-logging
     volumes:
+      - ./data/booster-bitswap:/var/lib/booster-bitswap:rw
       - ./data/boost:/var/lib/boost:ro
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/lotus-miner:/var/lib/lotus-miner:ro

@@ -43,11 +43,10 @@ func TestSetStreamHandler(t *testing.T) {
 			tn := setupTestNet(ctx, t, peers)
 
 			// setup a mock load balancer for routing
-			fh, err := NewForwardingHost(tn.serviceNode, peer.AddrInfo{
+			fh := NewForwardingHost(tn.serviceNode, peer.AddrInfo{
 				ID:    peers.proxyNode.id,
 				Addrs: []multiaddr.Multiaddr{peers.proxyNode.multiAddr},
 			})
-			require.NoError(t, err)
 
 			fh.SetStreamHandler(testProtocol, func(s network.Stream) {
 				defer s.Close()
@@ -128,11 +127,10 @@ func TestNewStream(t *testing.T) {
 					require.NoError(t, err)
 				}
 			})
-			fh, err := NewForwardingHost(tn.serviceNode, peer.AddrInfo{
+			fh := NewForwardingHost(tn.serviceNode, peer.AddrInfo{
 				ID:    peers.proxyNode.id,
 				Addrs: []multiaddr.Multiaddr{peers.proxyNode.multiAddr},
 			})
-			require.NoError(t, err)
 			s, err := fh.NewStream(ctx, tn.publicNode.ID(), testProtocol)
 			if testCase.protocolProxyForwardingError != nil {
 				require.EqualError(t, err, testCase.protocolProxyForwardingError.Error())

@@ -24,7 +24,7 @@ type BitswapServer struct {
 	blockFilter BlockFilter
 	ctx         context.Context
 	cancel      context.CancelFunc
-	proxy       peer.AddrInfo
+	proxy       *peer.AddrInfo
 	server      *server.Server
 	host        host.Host
 }
@@ -35,24 +35,25 @@ func NewBitswapServer(remoteStore blockstore.Blockstore, host host.Host, blockFi
 
 const protectTag = "bitswap-server-to-proxy"
 
-func (s *BitswapServer) Start(ctx context.Context, proxy peer.AddrInfo) error {
+func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	s.proxy = proxy
 
-	// Connect to the proxy over libp2p
-	log.Infow("connecting to proxy", "proxy", proxy)
-	err := s.host.Connect(s.ctx, proxy)
-	if err != nil {
-		return fmt.Errorf("connecting to proxy %s: %w", proxy, err)
-	}
-	s.host.ConnManager().Protect(proxy.ID, protectTag)
+	host := s.host
+	if proxy != nil {
+		// If there's a proxy host, connect to the proxy over libp2p
+		log.Infow("connecting to proxy", "proxy", proxy)
+		err := s.host.Connect(s.ctx, *proxy)
+		if err != nil {
+			return fmt.Errorf("connecting to proxy %s: %w", proxy, err)
+		}
+		s.host.ConnManager().Protect(proxy.ID, protectTag)
 
-	host, err := protocolproxy.NewForwardingHost(s.host, proxy)
-	if err != nil {
-		return err
+		// Create a forwarding host that registers routes with the proxy
+		host = protocolproxy.NewForwardingHost(s.host, *proxy)
 	}
 
-	// start a bitswap session on the provider
+	// Start a bitswap server on the provider
 	nilRouter, err := nilrouting.ConstructNilRouting(s.ctx, nil, nil, nil)
 	if err != nil {
 		return err
@@ -67,14 +68,19 @@ func (s *BitswapServer) Start(ctx context.Context, proxy peer.AddrInfo) error {
 	s.server = server.New(s.ctx, net, s.remoteStore, bsopts...)
 	net.Start(s.server)
 
-	go s.keepProxyConnectionAlive(s.ctx, proxy)
-
 	log.Infow("bitswap server running", "multiaddrs", host.Addrs(), "peerId", host.ID())
+	if proxy != nil {
+		go s.keepProxyConnectionAlive(s.ctx, *proxy)
+		log.Infow("with proxy", "multiaddrs", proxy.Addrs, "peerId", proxy.ID)
+	}
+
 	return nil
 }
 
 func (s *BitswapServer) Stop() error {
-	s.host.ConnManager().Unprotect(s.proxy.ID, protectTag)
+	if s.proxy != nil {
+		s.host.ConnManager().Unprotect(s.proxy.ID, protectTag)
+	}
 	s.cancel()
 	return s.server.Close()
 }
