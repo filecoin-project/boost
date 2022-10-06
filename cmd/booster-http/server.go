@@ -90,7 +90,7 @@ func (s *HttpServer) Start(ctx context.Context) {
 
 	go func() {
 		if err := s.server.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("http.ListenAndServe(): %v", err)
+			log.Fatalf("http.ListenAndServe(): %w", err)
 		}
 	}()
 }
