@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/tracing"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	format "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
+	"go.opencensus.io/stats"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -40,14 +42,17 @@ func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block,
 	ctx, span := tracing.Tracer.Start(ctx, "rbls.get")
 	defer span.End()
 	span.SetAttributes(attribute.String("cid", c.String()))
+	stats.Record(ctx, metrics.BitswapRblsGetRequestCount.M(1))
 
 	log.Debugw("Get", "cid", c)
 	data, err := ro.api.BlockstoreGet(ctx, c)
 	err = normalizeError(err)
 	log.Debugw("Get response", "cid", c, "error", err)
 	if err != nil {
+		stats.Record(ctx, metrics.BitswapRblsGetFailResponseCount.M(1))
 		return nil, err
 	}
+	stats.Record(ctx, metrics.BitswapRblsGetSuccessResponseCount.M(1))
 	return blocks.NewBlockWithCid(data, c)
 }
 
@@ -55,10 +60,16 @@ func (ro *RemoteBlockstore) Has(ctx context.Context, c cid.Cid) (bool, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "rbls.has")
 	defer span.End()
 	span.SetAttributes(attribute.String("cid", c.String()))
+	stats.Record(ctx, metrics.BitswapRblsHasRequestCount.M(1))
 
 	log.Debugw("Has", "cid", c)
 	has, err := ro.api.BlockstoreHas(ctx, c)
 	log.Debugw("Has response", "cid", c, "has", has, "error", err)
+	if err != nil {
+		stats.Record(ctx, metrics.BitswapRblsHasFailResponseCount.M(1))
+	} else {
+		stats.Record(ctx, metrics.BitswapRblsHasSuccessResponseCount.M(1))
+	}
 	return has, err
 }
 
@@ -66,11 +77,17 @@ func (ro *RemoteBlockstore) GetSize(ctx context.Context, c cid.Cid) (int, error)
 	ctx, span := tracing.Tracer.Start(ctx, "rbls.get_size")
 	defer span.End()
 	span.SetAttributes(attribute.String("cid", c.String()))
+	stats.Record(ctx, metrics.BitswapRblsGetSizeRequestCount.M(1))
 
 	log.Debugw("GetSize", "cid", c)
 	size, err := ro.api.BlockstoreGetSize(ctx, c)
 	err = normalizeError(err)
 	log.Debugw("GetSize response", "cid", c, "size", size, "error", err)
+	if err != nil {
+		stats.Record(ctx, metrics.BitswapRblsGetSizeFailResponseCount.M(1))
+	} else {
+		stats.Record(ctx, metrics.BitswapRblsGetSizeSuccessResponseCount.M(1))
+	}
 	return size, err
 }
 
