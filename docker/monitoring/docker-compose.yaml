@@ -41,7 +41,7 @@ services:
     image: prom/prometheus:latest
     command: [ "--config.file=/etc/prometheus.yaml" ]
     volumes:
-      - ./prometheus.yaml:/etc/prometheus.yaml
+      - ./${PROMETHEUS_CONFIG_FILE:-prometheus.yaml}:/etc/prometheus.yaml
     ports:
       - "9090:9090"
     logging:
@@ -61,6 +61,8 @@ services:
       #- GF_AUTH_ANONYMOUS_ENABLED=true
       #- GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       #- GF_AUTH_DISABLE_LOGIN_FORM=true
+      GF_AUTH_SIGV4_AUTH_ENABLED: true
+      AWS_SDK_LOAD_CONFIG: true
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/var/lib/grafana/dashboards/exported_dashboard.json"
     ports:
       - "3333:3000"
