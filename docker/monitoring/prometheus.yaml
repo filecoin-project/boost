@@ -17,7 +17,7 @@ scrape_configs:
       - targets: [ 'booster-http:7777' ]
   - job_name: 'booster-bitswap'
     static_configs:
-      - targets: [ 'booster-bitswap:1234' ]
+      - targets: [ 'booster-bitswap:9696' ]
   - job_name: 'lotus-miner'
     metrics_path: "/debug/metrics"
     static_configs:

@@ -3,10 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
-	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/protocolproxy"
 	bsnetwork "github.com/ipfs/go-bitswap/network"
 	"github.com/ipfs/go-bitswap/server"
@@ -75,14 +73,6 @@ func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo) error {
 		go s.keepProxyConnectionAlive(s.ctx, *proxy)
 		log.Infow("with proxy", "multiaddrs", proxy.Addrs, "peerId", proxy.ID)
 	}
-
-	// Start the metrics web server
-	http.Handle("/metrics", metrics.Exporter("booster_bitswap")) // metrics server
-	go func() {
-		if err := http.ListenAndServe("0.0.0.0:1234", nil); err != nil {
-			log.Errorf("could not start prometheus metric exporter server: %s", err)
-		}
-	}()
 
 	return nil
 }

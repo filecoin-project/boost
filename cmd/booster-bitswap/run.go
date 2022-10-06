@@ -12,6 +12,7 @@ import (
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/blockfilter"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
+	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/go-jsonrpc"
 	lcli "github.com/filecoin-project/lotus/cli"
@@ -29,9 +30,19 @@ var runCmd = &cli.Command{
 			Usage: "run pprof web server on localhost:6070",
 		},
 		&cli.UintFlag{
+			Name:  "pprof-port",
+			Usage: "the http port to serve pprof on",
+			Value: 6070,
+		},
+		&cli.UintFlag{
 			Name:  "port",
 			Usage: "the port to listen for bitswap requests on",
 			Value: 8888,
+		},
+		&cli.UintFlag{
+			Name:  "metrics-port",
+			Usage: "the http port to serve prometheus metrics on",
+			Value: 9696,
 		},
 		&cli.StringFlag{
 			Name:     "api-boost",
@@ -55,8 +66,9 @@ var runCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
+			pprofPort := cctx.Int("pprof-port")
 			go func() {
-				err := http.ListenAndServe("localhost:6070", nil)
+				err := http.ListenAndServe(fmt.Sprintf("localhost:%d", pprofPort), nil)
 				if err != nil {
 					log.Error(err)
 				}
@@ -118,6 +130,16 @@ var runCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
+
+		// Start the metrics web server
+		metricsPort := cctx.Int("metrics-port")
+		log.Infof("Starting booster-bitswap metrics web server on port %d", metricsPort)
+		http.Handle("/metrics", metrics.Exporter("booster_bitswap")) // metrics server
+		go func() {
+			if err := http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", metricsPort), nil); err != nil {
+				log.Errorf("could not start prometheus metric exporter server: %s", err)
+			}
+		}()
 
 		// Monitor for shutdown.
 		<-ctx.Done()
