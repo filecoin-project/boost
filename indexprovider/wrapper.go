@@ -108,7 +108,12 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 	var merr error
 
 	for _, d := range deals {
-		if d.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
+		// filter out deals that will announce automatically at a later
+		// point in their execution, as well as deals that are not processing at all
+		// (i.e. in an error state or expired)
+		// (note technically this is only one check point state IndexedAndAnnounced but is written so
+		// it will work if we ever introduce additional states between IndexedAndAnnounced & Complete)
+		if d.Checkpoint < dealcheckpoints.IndexedAndAnnounced || d.Checkpoint >= dealcheckpoints.Complete {
 			continue
 		}
 
