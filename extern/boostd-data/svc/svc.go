@@ -18,12 +18,15 @@ var (
 	log = logging.Logger("svc")
 )
 
-func New(db string, repopath string) *http.Server {
+func New(ctx context.Context, db string, repopath string) (*http.Server, error) {
 	server := rpc.NewServer()
 
 	switch db {
 	case "couchbase":
-		ds := couchbase.NewStore()
+		ds, err := couchbase.NewStore(ctx)
+		if err != nil {
+			return nil, err
+		}
 		server.RegisterName("boostddata", ds)
 	case "ldb":
 		ds := ldb.NewStore(repopath)
@@ -37,16 +40,19 @@ func New(db string, repopath string) *http.Server {
 
 	log.Infow("server is listening", "addr", "localhost:8089")
 
-	return &http.Server{Handler: router}
+	return &http.Server{Handler: router}, nil
 }
 
-func Setup(db string) (string, func(), error) {
+func Setup(ctx context.Context, db string) (string, func(), error) {
 	addr := "localhost:0"
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return "", nil, err
 	}
-	srv := New(db, "")
+	srv, err := New(ctx, db, "")
+	if err != nil {
+		return "", nil, err
+	}
 
 	done := make(chan struct{})
 

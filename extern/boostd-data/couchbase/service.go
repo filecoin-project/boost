@@ -9,31 +9,27 @@ import (
 
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
-	ds "github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car/v2/index"
 	carindex "github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multicodec"
-	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 )
 
 var log = logging.Logger("boostd-data-cb")
 
 type Store struct {
-	sync.Mutex
-	db *DB
+	db         *DB
+	pieceLocks [1024]sync.RWMutex
 }
 
-func NewStore() *Store {
-	db, err := newDB()
+func NewStore(ctx context.Context) (*Store, error) {
+	db, err := newDB(ctx)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("creating new couchbase store: %w", err)
 	}
 
-	return &Store{
-		db: db,
-	}
+	return &Store{db: db}, nil
 }
 
 func (s *Store) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
@@ -43,7 +39,8 @@ func (s *Store) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error
 		log.Debugw("handled.add-deal-for-piece", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	return nil
+	ctx := context.Background()
+	return s.db.AddDealForPiece(ctx, pieceCid, dealInfo)
 }
 
 func (s *Store) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
@@ -53,7 +50,8 @@ func (s *Store) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
 		log.Debugw("handled.get-offset", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	return 0, nil
+	ctx := context.TODO()
+	return s.db.GetOffset(ctx, pieceCid, hash)
 }
 
 func (s *Store) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
@@ -63,7 +61,13 @@ func (s *Store) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
 		log.Debugw("handled.get-piece-deals", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	return nil, nil
+	ctx := context.TODO()
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return nil, fmt.Errorf("getting piece deals for piece %s: %w", pieceCid, err)
+	}
+
+	return md.Deals, nil
 }
 
 // Get all pieces that contain a multihash (used when retrieving by payload CID)
@@ -74,9 +78,11 @@ func (s *Store) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
 		log.Debugw("handled.pieces-containing-mh", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	return nil, nil
+	ctx := context.TODO()
+	return s.db.GetPieceCidsByMultihash(ctx, m)
 }
 
+// TODO: Why do we have both GetRecords and GetIndex?
 func (s *Store) GetRecords(pieceCid cid.Cid) ([]model.Record, error) {
 	log.Debugw("handle.get-iterable-index", "piece-cid", pieceCid)
 
@@ -84,22 +90,21 @@ func (s *Store) GetRecords(pieceCid cid.Cid) ([]model.Record, error) {
 		log.Debugw("handled.get-iterable-index", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	s.Lock()
-	defer s.Unlock()
+	s.pieceLocks[toStripedLockIndex(pieceCid)].RLock()
+	defer s.pieceLocks[toStripedLockIndex(pieceCid)].RUnlock()
 
-	ctx := context.Background()
-
-	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil {
-		return nil, err
-	}
-
-	records, err := s.db.AllRecords(ctx, md.Cursor)
+	ctx := context.TODO()
+	records, err := s.db.AllRecords(ctx, pieceCid)
 	if err != nil {
 		return nil, err
 	}
 
 	return records, nil
+}
+
+func toStripedLockIndex(pieceCid cid.Cid) byte {
+	bz := pieceCid.Bytes()
+	return bz[len(bz)-1]
 }
 
 func (s *Store) GetIndex(pieceCid cid.Cid) ([]model.Record, error) {
@@ -109,17 +114,11 @@ func (s *Store) GetIndex(pieceCid cid.Cid) ([]model.Record, error) {
 		log.Warnw("handled.get-index", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	s.Lock()
-	defer s.Unlock()
+	s.pieceLocks[toStripedLockIndex(pieceCid)].RLock()
+	defer s.pieceLocks[toStripedLockIndex(pieceCid)].RUnlock()
 
-	ctx := context.Background()
-
-	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil {
-		return nil, err
-	}
-
-	records, err := s.db.AllRecords(ctx, md.Cursor)
+	ctx := context.TODO()
+	records, err := s.db.AllRecords(ctx, pieceCid)
 	if err != nil {
 		return nil, err
 	}
@@ -132,14 +131,13 @@ func (s *Store) GetIndex(pieceCid cid.Cid) ([]model.Record, error) {
 func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 	log.Debugw("handle.add-index", "records", len(records))
 
-	defer func(now time.Time) {
-		log.Debugw("handled.add-index", "took", fmt.Sprintf("%s", time.Since(now)))
-	}(time.Now())
+	start := time.Now()
+	defer func() { log.Debugw("handled.add-index", "took", time.Since(start).String()) }()
 
-	s.Lock()
-	defer s.Unlock()
+	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
+	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
 
-	ctx := context.Background()
+	ctx := context.TODO()
 
 	var recs []carindex.Record
 	for _, r := range records {
@@ -149,22 +147,12 @@ func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 		})
 	}
 
+	setMhStart := time.Now()
 	err := s.db.SetMultihashesToPieceCid(ctx, recs, pieceCid)
 	if err != nil {
 		return fmt.Errorf("failed to add entry from mh to pieceCid: %w", err)
 	}
-
-	// get and set next cursor (handle synchronization, maybe with CAS)
-	cursor, keyCursorPrefix, err := s.db.NextCursor(ctx)
-	if err != nil {
-		return fmt.Errorf("couldnt generate next cursor: %w", err)
-	}
-
-	// alloacte metadata for pieceCid
-	err = s.db.SetNextCursor(ctx, cursor+1)
-	if err != nil {
-		return err
-	}
+	log.Debugw("handled.add-index SetMultihashesToPieceCid", "took", time.Since(setMhStart).String())
 
 	mis := make(index.MultihashIndexSorted)
 	err = mis.Load(recs)
@@ -176,35 +164,26 @@ func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 	subject = &mis
 
 	// process index and store entries
-	switch idx := subject.(type) {
-	case index.IterableIndex:
-		err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
-
-			return s.db.AddOffset(ctx, keyCursorPrefix, m, offset)
-		})
-		if err != nil {
-			return err
-		}
-
-	default:
+	addOffsetsStart := time.Now()
+	idx, ok := subject.(index.IterableIndex)
+	if !ok {
 		return errors.New(fmt.Sprintf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec()))
 	}
+	if err := s.db.AddOffsets(ctx, pieceCid, idx); err != nil {
+		return err
+	}
+	log.Debugw("handled.add-index AddOffsets", "took", time.Since(addOffsetsStart).String())
 
 	// mark that indexing is complete
 	md := model.Metadata{
-		Cursor:    cursor,
 		IndexedAt: time.Now(),
+		Deals:     []model.DealInfo{},
 	}
 
 	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
 	if err != nil {
 		return err
 	}
-
-	//err = s.db.Sync(ctx, datastore.NewKey(fmt.Sprintf("%d", cursor)))
-	//if err != nil {
-	//return err
-	//}
 
 	return nil
 }
@@ -216,13 +195,9 @@ func (s *Store) IndexedAt(pieceCid cid.Cid) (time.Time, error) {
 		log.Debugw("handled.indexed-at", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	s.Lock()
-	defer s.Unlock()
-
-	ctx := context.Background()
-
+	ctx := context.TODO()
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil && err != ds.ErrNotFound {
+	if err != nil && !isNotFoundErr(err) {
 		return time.Time{}, err
 	}
 

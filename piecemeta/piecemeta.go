@@ -55,8 +55,8 @@ type PieceMeta struct {
 	sealer Sealer
 }
 
-func NewStore() *client.Store {
-	addr, _, err := svc.Setup("ldb")
+func NewStore(ctx context.Context) *client.Store {
+	addr, _, err := svc.Setup(ctx, "ldb")
 	if err != nil {
 		panic(err)
 	}

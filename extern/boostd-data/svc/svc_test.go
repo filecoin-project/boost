@@ -22,46 +22,47 @@ import (
 	"github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
+	"github.com/stretchr/testify/require"
 )
 
 func init() {
 	logging.SetLogLevel("*", "debug")
 }
 
-func TestLdbService(t *testing.T) {
-	addr, cleanup, err := Setup("ldb")
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestService(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	t.Run("level db", func(t *testing.T) {
+		testService(ctx, t, "ldb")
+	})
+	t.Run("couchbase", func(t *testing.T) {
+		testService(ctx, t, "couchbase")
+	})
+}
+
+func testService(ctx context.Context, t *testing.T, name string) {
+	addr, cleanup, err := Setup(ctx, name)
+	require.NoError(t, err)
 
 	cl, err := client.NewStore("http://" + addr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	sampleidx := "fixtures/baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka.full.idx"
 
 	pieceCid, err := cid.Parse("baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	subject, err := loadIndex(sampleidx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	records, err := getRecords(subject)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	randomuuid := uuid.New()
 
 	err = cl.AddIndex(pieceCid, records)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	di := model.DealInfo{
 		DealUuid:    randomuuid,
@@ -72,92 +73,54 @@ func TestLdbService(t *testing.T) {
 	}
 
 	err = cl.AddDealForPiece(pieceCid, di)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	b, err := hex.DecodeString("1220ff63d7689e2d9567d1a90a7a68425f430137142e1fbc28fe4780b9ee8a5ef842")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	mhash, err := multihash.Cast(b)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	offset, err := cl.GetOffset(pieceCid, mhash)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if offset != 3039040395 {
-		t.Fatal("got wrong offset")
-	}
+	require.NoError(t, err)
+	require.EqualValues(t, 3039040395, offset)
 
 	pcids, err := cl.PiecesContaining(mhash)
-
-	if len(pcids) != 1 {
-		t.Fatalf("expected len of 1 for pieceCids, got: %d", len(pcids))
-	}
-
-	if !pcids[0].Equals(pieceCid) {
-		t.Fatal("expected for pieceCids to match")
-	}
+	require.NoError(t, err)
+	require.Len(t, pcids, 1)
+	require.Equal(t, pieceCid, pcids[0])
 
 	dis, err := cl.GetPieceDeals(pieceCid)
-
-	if len(dis) != 1 {
-		t.Fatalf("expected len of 1 for dis, got: %d", len(dis))
-	}
-
-	if dis[0] != di {
-		t.Fatal("expected for dealInfos to match")
-	}
+	require.NoError(t, err)
+	require.Len(t, dis, 1)
+	require.Equal(t, di, dis[0])
 
 	indexed, err := cl.IsIndexed(pieceCid)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !indexed {
-		t.Fatal("expected pieceCid to be indexed")
-	}
+	require.NoError(t, err)
+	require.True(t, indexed)
 
 	recs, err := cl.GetRecords(pieceCid)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(recs) == 0 {
-		t.Fatal("expected to get records back from GetIndex")
-	}
+	require.NoError(t, err)
+	require.Equal(t, len(records), len(recs))
 
 	loadedSubject, err := cl.GetIndex(pieceCid)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	ok, err := compareIndices(subject, loadedSubject)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ok {
-		log.Fatal("compare failed")
-	}
-
-	log.Debug("sleeping for a while.. running tests..")
+	require.NoError(t, err)
+	require.True(t, ok)
 
 	cleanup()
 }
 
-func setupService(t *testing.T, db string) (string, func()) {
+func setupService(ctx context.Context, t *testing.T, db string) (string, func()) {
 	addr := "localhost:0"
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := New(db, "")
+	srv, err := New(ctx, db, "")
+	require.NoError(t, err)
 
 	done := make(chan struct{})
 

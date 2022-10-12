@@ -3,7 +3,6 @@ package modules
 import (
 	"context"
 	"fmt"
-
 	"github.com/filecoin-project/boost/piecemeta"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/dagstore"
@@ -22,6 +21,11 @@ import (
 	bstore "github.com/ipfs/go-ipfs-blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
 )
+
+func NewPieceMetaStore() piecemeta.Store {
+	// TODO: create a Start method instead of using context.TODO
+	return piecemeta.NewStore(context.TODO())
+}
 
 func NewPieceMeta(maddr dtypes.MinerAddress, store piecemeta.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecemeta.PieceMeta {
 	sa := sectoraccessor.NewSectorAccessor(maddr, secb, pp, full)

@@ -3,300 +3,302 @@ package couchbase
 import (
 	"context"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"golang.org/x/sync/errgroup"
+	"strconv"
 	"time"
 
 	"github.com/couchbase/gocb/v2"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	ds "github.com/ipfs/go-datastore"
 	carindex "github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
 )
 
+const bucketName = "piecestore"
+
 var (
-	// LevelDB key value for storing next free cursor.
-	keyNextCursor   uint64 = 0
-	dskeyNextCursor datastore.Key
+	// couchbase key prefix for PieceCid to metadata table.
+	// couchbase keys will be built by concatenating prefix with PieceCid.
+	prefixPieceCidToMetadata  uint64 = 1
+	sprefixPieceCidToMetadata string
 
-	// LevelDB key prefix for PieceCid to cursor table.
-	// LevelDB keys will be built by concatenating PieceCid to this prefix.
-	prefixPieceCidToCursor  uint64 = 1
-	sprefixPieceCidToCursor string
-
-	// LevelDB key prefix for Multihash to PieceCids table.
-	// LevelDB keys will be built by concatenating Multihash to this prefix.
+	// couchbase key prefix for Multihash to PieceCids table.
+	// couchbase keys will be built by concatenating prefix with Multihash.
 	prefixMhtoPieceCids  uint64 = 2
 	sprefixMhtoPieceCids string
 
-	size = binary.MaxVarintLen64
+	// couchbase key prefix for PieceCid to offsets map.
+	// couchbase keys will be built by concatenating prefix with PieceCid.
+	prefixPieceCidToOffsets  uint64 = 3
+	sprefixPieceCidToOffsets string
+
+	maxVarIntSize = binary.MaxVarintLen64
+
+	binaryTranscoder = gocb.NewRawBinaryTranscoder()
 )
 
 func init() {
-	buf := make([]byte, size)
-	binary.PutUvarint(buf, keyNextCursor)
-	dskeyNextCursor = datastore.NewKey(string(buf))
+	buf := make([]byte, maxVarIntSize)
+	binary.PutUvarint(buf, prefixPieceCidToMetadata)
+	sprefixPieceCidToMetadata = string(buf)
 
-	buf = make([]byte, size)
-	binary.PutUvarint(buf, prefixPieceCidToCursor)
-	sprefixPieceCidToCursor = string(buf)
-
-	buf = make([]byte, size)
+	buf = make([]byte, maxVarIntSize)
 	binary.PutUvarint(buf, prefixMhtoPieceCids)
 	sprefixMhtoPieceCids = string(buf)
+
+	buf = make([]byte, maxVarIntSize)
+	binary.PutUvarint(buf, prefixPieceCidToOffsets)
+	sprefixPieceCidToOffsets = string(buf)
 }
 
 type DB struct {
-	col *gocb.Collection
+	cluster *gocb.Cluster
+	col     *gocb.Collection
 }
 
-func newDB() (*DB, error) {
-	bucketName := "piecestore"
+func newDB(ctx context.Context) (*DB, error) {
 	username := "Administrator"
 	password := "boostdemo"
 
-	cluster, err := gocb.Connect("couchbase://127.0.0.1", gocb.ClusterOptions{
+	connStr := "couchbase://127.0.0.1"
+	cluster, err := gocb.Connect(connStr, gocb.ClusterOptions{
 		Authenticator: gocb.PasswordAuthenticator{
 			Username: username,
 			Password: password,
 		},
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("connecting to couchbase DB %s: %w", connStr, err)
+	}
+
+	_, err = cluster.Buckets().GetBucket(bucketName, &gocb.GetBucketOptions{Context: ctx})
+	if err != nil {
+		if !errors.Is(err, gocb.ErrBucketNotFound) {
+			return nil, fmt.Errorf("getting bucket %s: %w", bucketName, err)
+		}
+
+		err = cluster.Buckets().CreateBucket(gocb.CreateBucketSettings{
+			BucketSettings: gocb.BucketSettings{
+				Name:       bucketName,
+				RAMQuotaMB: 256,
+				BucketType: gocb.CouchbaseBucketType,
+			},
+		}, &gocb.CreateBucketOptions{Context: ctx})
+		if err != nil {
+			return nil, fmt.Errorf("creating bucket %s: %w", bucketName, err)
+		}
+
+		// TODO: For some reason WaitUntilReady times out if we don't put
+		// this sleep here
+		time.Sleep(time.Second)
+	}
+
+	err = cluster.QueryIndexes().CreatePrimaryIndex(bucketName, &gocb.CreatePrimaryQueryIndexOptions{
+		IgnoreIfExists: true,
+		Context:        ctx,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating primary index on %s: %w", bucketName, err)
 	}
 
 	bucket := cluster.Bucket(bucketName)
-
 	err = bucket.WaitUntilReady(5*time.Second, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("waiting for couchbase bucket to be ready: %w", err)
 	}
 
-	return &DB{col: bucket.DefaultCollection()}, nil
-}
-
-// NextCursor
-func (db *DB) NextCursor(ctx context.Context) (uint64, string, error) {
-	b, err := db.Get(ctx, dskeyNextCursor)
-	if err != nil {
-		return 0, "", err
-	}
-
-	cursor, _ := binary.Uvarint(b)
-	return cursor, fmt.Sprintf("%d", cursor) + "/", nil // adding "/" because of Query method in go-datastore
-}
-
-// SetNextCursor
-func (db *DB) SetNextCursor(ctx context.Context, cursor uint64) error {
-	buf := make([]byte, size)
-	binary.PutUvarint(buf, cursor)
-
-	return db.Put(ctx, dskeyNextCursor, buf)
+	return &DB{cluster: cluster, col: bucket.DefaultCollection()}, nil
 }
 
 // GetPieceCidsByMultihash
 func (db *DB) GetPieceCidsByMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
-	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixMhtoPieceCids, mh.String()))
+	key := fmt.Sprintf("%s%s", sprefixMhtoPieceCids, mh.String())
+	k := toCouchKey(key)
 
-	val, err := db.Get(ctx, key)
+	var getResult *gocb.GetResult
+	getResult, err := db.col.Get(k, &gocb.GetOptions{Context: ctx})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get value for multihash %s, err: %w", mh, err)
+		return nil, fmt.Errorf("getting piece cids by multihash %s: %w", mh, err)
 	}
 
-	var pcids []cid.Cid
-	if err := json.Unmarshal(val, &pcids); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal pieceCids slice: %w", err)
+	//cas := getResult.Cas()
+
+	var cidStrs []string
+	err = getResult.Content(&cidStrs)
+	if err != nil {
+		return nil, fmt.Errorf("getting piece cids content by multihash %s: %w", mh, err)
+	}
+
+	pcids := make([]cid.Cid, 0, len(cidStrs))
+	for _, c := range cidStrs {
+		pcid, err := cid.Decode(c)
+		if err != nil {
+			return nil, fmt.Errorf("getting piece cids by multihash %s: parsing piece cid %s: %w", mh, pcid, err)
+		}
+		pcids = append(pcids, pcid)
 	}
 
 	return pcids, nil
 }
 
-func (db *DB) Get(ctx context.Context, key datastore.Key) (value []byte, err error) {
-	var getResult *gocb.GetResult
-	getResult, err = db.col.Get("u:"+key.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	//cas := getResult.Cas()
-
-	var val []byte
-	err = getResult.Content(&val)
-	if err != nil {
-		return nil, err
-	}
-
-	return val, nil
-}
-
-func (db *DB) Put(ctx context.Context, key datastore.Key, value []byte) error {
-	_, err := db.col.Upsert("u:"+key.String(), value, nil)
-
-	return err
-}
+const throttleSize = 32
 
 // SetMultihashToPieceCid
 func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Record, pieceCid cid.Cid) error {
+	throttle := make(chan struct{}, throttleSize)
+	var eg errgroup.Group
 	for _, r := range recs {
 		mh := r.Cid.Hash()
 
-		err := func() error {
-			key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixMhtoPieceCids, mh.String()))
+		throttle <- struct{}{}
+		eg.Go(func() error {
+			defer func() { <-throttle }()
 
-			// do we already have an entry for this multihash ?
-			val, err := db.Get(ctx, key)
-			if err != nil && err != ds.ErrNotFound {
-				return fmt.Errorf("failed to get value for multihash %s, err: %w", mh, err)
-			}
+			cbKey := toCouchKey(sprefixMhtoPieceCids + mh.String())
 
-			// if we don't have an existing entry for this mh, create one
-			if err == ds.ErrNotFound {
-				v := []cid.Cid{pieceCid}
-				b, err := json.Marshal(v)
-				if err != nil {
-					return fmt.Errorf("failed to marshal pieceCids slice: %w", err)
-				}
-
-				if err := db.Put(ctx, key, b); err != nil {
-					return fmt.Errorf("failed to put mh=%s, err=%w", mh, err)
-				}
-				return nil
-			}
-
-			// else, append the pieceCid to the existing list
-			var pcids []cid.Cid
-			if err := json.Unmarshal(val, &pcids); err != nil {
-				return fmt.Errorf("failed to unmarshal pieceCids slice: %w", err)
-			}
-
-			// if we already have the pieceCid indexed for the multihash, nothing to do here.
-			if has(pcids, pieceCid) {
-				return nil
-			}
-
-			pcids = append(pcids, pieceCid)
-
-			b, err := json.Marshal(pcids)
+			// Create the array
+			upsertDocResult, err := db.col.Upsert(cbKey, []int{}, &gocb.UpsertOptions{Context: ctx})
 			if err != nil {
-				return fmt.Errorf("failed to marshal pieceCids slice: %w", err)
+				return fmt.Errorf("adding multihash %s to piece %s: upsert doc: %w", mh, pieceCid, err)
 			}
-			if err := db.Put(ctx, key, b); err != nil {
-				return fmt.Errorf("failed to put mh=%s, err%w", mh, err)
+
+			// Add the piece cid to the set of piece cids
+			mops := []gocb.MutateInSpec{
+				gocb.ArrayAddUniqueSpec("", pieceCid.String(), &gocb.ArrayAddUniqueSpecOptions{}),
+			}
+			_, err = db.col.MutateIn(cbKey, mops, &gocb.MutateInOptions{
+				Context: ctx,
+				Cas:     upsertDocResult.Cas(),
+			})
+			if err != nil {
+				return fmt.Errorf("adding multihash %s to piece %s: mutate doc: %w", mh, pieceCid, err)
 			}
 
 			return nil
-		}()
-		if err != nil {
-			return err
-		}
+		})
+	}
+
+	return eg.Wait()
+}
+
+// SetPieceCidToMetadata
+func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md model.Metadata) error {
+	k := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
+	_, err := db.col.Upsert(k, md, &gocb.UpsertOptions{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
 	}
 
 	return nil
 }
 
-// SetPieceCidToMetadata
-func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md model.Metadata) error {
-	b, err := json.Marshal(md)
+func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+	cbKey := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
+
+	// Add the deal to the list of deals
+	mops := []gocb.MutateInSpec{
+		gocb.ArrayAppendSpec("deals", dealInfo, nil),
+	}
+	_, err := db.col.MutateIn(cbKey, mops, &gocb.MutateInOptions{Context: ctx})
 	if err != nil {
-		return err
+		return fmt.Errorf("adding deal %s to piece %s: mutate doc: %w", dealInfo.DealUuid, pieceCid, err)
 	}
 
-	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
-
-	return db.Put(ctx, key, b)
+	return nil
 }
 
 // GetPieceCidToMetadata
 func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
 	var metadata model.Metadata
 
-	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
-
-	b, err := db.Get(ctx, key)
+	var getResult *gocb.GetResult
+	k := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
+	getResult, err := db.col.Get(k, &gocb.GetOptions{Context: ctx})
 	if err != nil {
-		return metadata, err
+		return model.Metadata{}, fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
 	}
 
-	err = json.Unmarshal(b, &metadata)
+	//cas := getResult.Cas()
+
+	err = getResult.Content(&metadata)
 	if err != nil {
-		return metadata, err
+		return model.Metadata{}, fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
 	}
 
 	return metadata, nil
 }
 
 // AllRecords
-func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, error) {
-	return nil, errors.New("not impl")
-	//var records []model.Record
+func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
+	cbMap := db.col.Map(pieceCid.String())
+	recMap, err := cbMap.Iterator()
+	if err != nil {
+		return nil, fmt.Errorf("getting all records for cursor %d: %w", err)
+	}
 
-	//buf := make([]byte, size)
-	//binary.PutUvarint(buf, cursor)
+	recs := make([]model.Record, 0, len(recMap))
+	for mhStr, offsetIfce := range recMap {
+		mh, err := multihash.FromHexString(mhStr)
+		if err != nil {
+			return nil, fmt.Errorf("parsing piece cid %s multihash value '%s': %w", pieceCid, mhStr, err)
+		}
+		offsetStr, ok := offsetIfce.(string)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type for piece cid %s offset value: %T", pieceCid, offsetIfce)
+		}
+		offset, err := strconv.ParseUint(offsetStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parsing piece cid %s offset value '%s' as uint64: %w", pieceCid, offsetStr, err)
+		}
 
-	//var q query.Query
-	//q.Prefix = fmt.Sprintf("%d/", cursor)
-	//results, err := db.Query(ctx, q)
-	//if err != nil {
-	//return nil, err
-	//}
+		recs = append(recs, model.Record{Cid: cid.NewCidV1(cid.Raw, mh), Offset: offset})
+	}
 
-	//for {
-	//r, ok := results.NextSync()
-	//if !ok {
-	//break
-	//}
-
-	//k := r.Key[len(q.Prefix)+1:]
-
-	//m, err := multihash.FromHexString(k)
-	//if err != nil {
-	//return nil, err
-	//}
-
-	//kcid := cid.NewCidV1(cid.Raw, m)
-
-	//offset, _ := binary.Uvarint(r.Value)
-
-	//records = append(records, model.Record{
-	//Cid:    kcid,
-	//Offset: offset,
-	//})
-	//}
-
-	//return records, nil
+	return recs, nil
 }
 
-// AddOffset
-func (db *DB) AddOffset(ctx context.Context, cursorPrefix string, m multihash.Multihash, offset uint64) error {
-	key := datastore.NewKey(fmt.Sprintf("%s%s", cursorPrefix, m.String()))
+// AddOffsets
+func (db *DB) AddOffsets(ctx context.Context, pieceCid cid.Cid, idx carindex.IterableIndex) error {
+	mhToOffset := make(map[string]string)
+	err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
+		mhToOffset[m.String()] = fmt.Sprintf("%d", offset)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 
-	value := make([]byte, size)
-	binary.PutUvarint(value, offset)
+	_, err = db.col.Upsert(pieceCid.String(), mhToOffset, &gocb.UpsertOptions{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("adding offsets for piece %s: %w", pieceCid, err)
+	}
 
-	return db.Put(ctx, key, value)
+	return nil
 }
 
 // GetOffset
-func (db *DB) GetOffset(ctx context.Context, cursorPrefix string, m multihash.Multihash) (uint64, error) {
-	key := datastore.NewKey(fmt.Sprintf("%s%s", cursorPrefix, m.String()))
-
-	b, err := db.Get(ctx, key)
+func (db *DB) GetOffset(ctx context.Context, pieceCid cid.Cid, m multihash.Multihash) (uint64, error) {
+	var val string
+	cbMap := db.col.Map(pieceCid.String())
+	err := cbMap.At(m.String(), &val)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("getting cursor %d offset for multihash %s: %w", pieceCid, m, err)
 	}
 
-	offset, _ := binary.Uvarint(b)
-	return offset, nil
+	num, err := strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parsing cursor %d offset value '%s' as uint64: %w", pieceCid, val, err)
+	}
+
+	return num, nil
 }
 
-func has(list []cid.Cid, v cid.Cid) bool {
-	for _, l := range list {
-		if l.Equals(v) {
-			return true
-		}
-	}
-	return false
+func toCouchKey(key string) string {
+	return "u:" + key
+}
+
+func isNotFoundErr(err error) bool {
+	return errors.Is(err, gocb.ErrDocumentNotFound)
 }
