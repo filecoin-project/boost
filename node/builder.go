@@ -480,7 +480,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		// Sealing Pipeline State API
 		Override(new(sealingpipeline.API), From(new(lotus_modules.MinerStorageService))),
 
-		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg.DAGStore)),
+		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg)),
 
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
 		Override(new(smtypes.CommpCalculator), From(new(lotus_modules.MinerStorageService))),
@@ -540,7 +540,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*storedask.StoredAsk), lotus_modules.NewStorageAsk),
 
 		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&legacyFees, &cfg.LotusDealmaking)),
-		Override(new(lotus_storagemarket.StorageProvider), lotus_modules.StorageProvider),
+		Override(new(lotus_storagemarket.StorageProvider), modules.NewLegacyStorageProvider(cfg)),
 		Override(HandleDealsKey, modules.HandleLegacyDeals),
 		Override(HandleBoostDealsKey, modules.HandleBoostDeals),
 		Override(HandleProposalLogCleanerKey, modules.HandleProposalLogCleaner(time.Duration(cfg.Dealmaking.DealProposalLogDuration))),
