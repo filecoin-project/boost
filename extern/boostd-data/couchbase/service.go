@@ -98,10 +98,10 @@ func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Recor
 }
 
 func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
-	log.Warnw("handle.get-index", "pieceCid", pieceCid)
+	log.Debugw("handle.get-index", "pieceCid", pieceCid)
 
 	defer func(now time.Time) {
-		log.Warnw("handled.get-index", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-index", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	s.pieceLocks[toStripedLockIndex(pieceCid)].RLock()
@@ -112,7 +112,7 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 		return nil, err
 	}
 
-	log.Warnw("handle.get-index.records", "len(records)", len(records))
+	log.Debugw("handle.get-index.records", "len(records)", len(records))
 
 	return records, nil
 }

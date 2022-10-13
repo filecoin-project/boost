@@ -60,7 +60,7 @@ func (s *Store) GetRecords(pieceCid cid.Cid) ([]model.Record, error) {
 		return nil, err
 	}
 
-	log.Warnw("get-index", "piece-cid", pieceCid, "records", len(resp))
+	log.Debugw("get-index", "piece-cid", pieceCid, "records", len(resp))
 
 	return resp, nil
 }
@@ -90,7 +90,7 @@ func (s *Store) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error
 }
 
 func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
-	log.Warnw("add-index", "piece-cid", pieceCid, "records", len(records))
+	log.Debugw("add-index", "piece-cid", pieceCid, "records", len(records))
 
 	return s.client.Call(nil, "boostddata_addIndex", pieceCid, records)
 }
