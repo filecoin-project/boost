@@ -56,7 +56,7 @@ type PieceMeta struct {
 }
 
 func NewStore(ctx context.Context) *client.Store {
-	addr, _, err := svc.Setup(ctx, "ldb")
+	addr, _, err := svc.Setup(ctx, "couchbase")
 	if err != nil {
 		panic(err)
 	}
@@ -93,12 +93,10 @@ func (ps *PieceMeta) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
 }
 
 func (ps *PieceMeta) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
-	return 0, fmt.Errorf("GetOffset not implemented")
+	return ps.store.GetOffset(pieceCid, hash)
 }
 
 func (ps *PieceMeta) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
-	// TODO: pass dealInfo to addIndexForPiece
-
 	// Perform indexing of piece
 	if err := ps.addIndexForPiece(pieceCid, dealInfo); err != nil {
 		return fmt.Errorf("adding index for piece %s: %w", pieceCid, err)
@@ -114,7 +112,6 @@ func (ps *PieceMeta) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) 
 
 func (ps *PieceMeta) addIndexForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	// Check if the indexes have already been added
-
 	isIndexed, err := ps.store.IsIndexed(pieceCid)
 	if err != nil {
 		return err
@@ -146,15 +143,11 @@ func (ps *PieceMeta) addIndexForPiece(pieceCid cid.Cid, dealInfo model.DealInfo)
 		return err
 	}
 
-	// Add mh => offset index to store
+	// Add mh => piece index to store: "which piece contains the multihash?"
+	// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
 	if err := ps.store.AddIndex(pieceCid, recs); err != nil {
 		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
 	}
-
-	// Add mh => piece index to store
-	//if err := ps.store.Add(pieceCid, itidx); err != nil {
-	//return fmt.Errorf("adding cid index for piece %s: %w", pieceCid, err)
-	//}
 
 	return nil
 }
@@ -236,9 +229,6 @@ func (ps *PieceMeta) GetIterableIndex(pieceCid cid.Cid) (carindex.IterableIndex,
 	if err != nil {
 		return nil, err
 	}
-
-	//switch idx := subject.(type) {
-	//case index.IterableIndex:
 
 	switch concrete := idx.(type) {
 	case carindex.IterableIndex:
