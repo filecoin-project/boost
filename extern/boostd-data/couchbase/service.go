@@ -32,36 +32,33 @@ func NewStore(ctx context.Context) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
-func (s *Store) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	log.Debugw("handle.add-deal-for-piece", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
 		log.Debugw("handled.add-deal-for-piece", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	ctx := context.Background()
 	return s.db.AddDealForPiece(ctx, pieceCid, dealInfo)
 }
 
-func (s *Store) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
+func (s *Store) GetOffset(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
 	log.Debugw("handle.get-offset", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
 		log.Debugw("handled.get-offset", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	ctx := context.TODO()
 	return s.db.GetOffset(ctx, pieceCid, hash)
 }
 
-func (s *Store) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
+func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
 	log.Debugw("handle.get-piece-deals", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
 		log.Debugw("handled.get-piece-deals", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	ctx := context.TODO()
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
 		return nil, fmt.Errorf("getting piece deals for piece %s: %w", pieceCid, err)
@@ -71,19 +68,18 @@ func (s *Store) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
 }
 
 // Get all pieces that contain a multihash (used when retrieving by payload CID)
-func (s *Store) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
+func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
 	log.Debugw("handle.pieces-containing-mh", "mh", m)
 
 	defer func(now time.Time) {
 		log.Debugw("handled.pieces-containing-mh", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	ctx := context.TODO()
 	return s.db.GetPieceCidsByMultihash(ctx, m)
 }
 
 // TODO: Why do we have both GetRecords and GetIndex?
-func (s *Store) GetRecords(pieceCid cid.Cid) ([]model.Record, error) {
+func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
 	log.Debugw("handle.get-iterable-index", "piece-cid", pieceCid)
 
 	defer func(now time.Time) {
@@ -93,7 +89,6 @@ func (s *Store) GetRecords(pieceCid cid.Cid) ([]model.Record, error) {
 	s.pieceLocks[toStripedLockIndex(pieceCid)].RLock()
 	defer s.pieceLocks[toStripedLockIndex(pieceCid)].RUnlock()
 
-	ctx := context.TODO()
 	records, err := s.db.AllRecords(ctx, pieceCid)
 	if err != nil {
 		return nil, err
@@ -102,12 +97,7 @@ func (s *Store) GetRecords(pieceCid cid.Cid) ([]model.Record, error) {
 	return records, nil
 }
 
-func toStripedLockIndex(pieceCid cid.Cid) byte {
-	bz := pieceCid.Bytes()
-	return bz[len(bz)-1]
-}
-
-func (s *Store) GetIndex(pieceCid cid.Cid) ([]model.Record, error) {
+func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
 	log.Warnw("handle.get-index", "pieceCid", pieceCid)
 
 	defer func(now time.Time) {
@@ -117,7 +107,6 @@ func (s *Store) GetIndex(pieceCid cid.Cid) ([]model.Record, error) {
 	s.pieceLocks[toStripedLockIndex(pieceCid)].RLock()
 	defer s.pieceLocks[toStripedLockIndex(pieceCid)].RUnlock()
 
-	ctx := context.TODO()
 	records, err := s.db.AllRecords(ctx, pieceCid)
 	if err != nil {
 		return nil, err
@@ -128,7 +117,7 @@ func (s *Store) GetIndex(pieceCid cid.Cid) ([]model.Record, error) {
 	return records, nil
 }
 
-func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
+func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error {
 	log.Debugw("handle.add-index", "records", len(records))
 
 	start := time.Now()
@@ -136,8 +125,6 @@ func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 
 	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
 	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
-
-	ctx := context.TODO()
 
 	var recs []carindex.Record
 	for _, r := range records {
@@ -188,18 +175,22 @@ func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 	return nil
 }
 
-func (s *Store) IndexedAt(pieceCid cid.Cid) (time.Time, error) {
+func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, error) {
 	log.Debugw("handle.indexed-at", "pieceCid", pieceCid)
 
 	defer func(now time.Time) {
 		log.Debugw("handled.indexed-at", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	ctx := context.TODO()
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil && !isNotFoundErr(err) {
 		return time.Time{}, err
 	}
 
 	return md.IndexedAt, nil
+}
+
+func toStripedLockIndex(pieceCid cid.Cid) byte {
+	bz := pieceCid.Bytes()
+	return bz[len(bz)-1]
 }

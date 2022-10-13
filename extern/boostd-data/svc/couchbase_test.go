@@ -20,7 +20,7 @@ func XTestCouchbaseService(t *testing.T) {
 	removeContainer := setupCouchbase(t)
 	defer removeContainer()
 
-	addr, cleanup := setupService(t, "couchbase")
+	addr, cleanup := setupService(context.Background(), t, "couchbase")
 
 	cl, err := client.NewStore("http://" + addr)
 	if err != nil {
