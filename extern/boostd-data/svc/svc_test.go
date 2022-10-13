@@ -7,18 +7,22 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"golang.org/x/sync/errgroup"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
@@ -111,6 +115,144 @@ func testService(ctx context.Context, t *testing.T, name string) {
 	require.True(t, ok)
 
 	cleanup()
+}
+
+func TestServiceFuzz(t *testing.T) {
+	t.Skip()
+	logging.SetLogLevel("*", "info")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	t.Run("level db", func(t *testing.T) {
+		testServiceFuzz(ctx, t, "ldb")
+	})
+	t.Run("couchbase", func(t *testing.T) {
+		testServiceFuzz(ctx, t, "couchbase")
+	})
+}
+
+func testServiceFuzz(ctx context.Context, t *testing.T, name string) {
+	addr, cleanup, err := Setup(ctx, name)
+	require.NoError(t, err)
+	defer cleanup()
+
+	cl, err := client.NewStore("http://" + addr)
+	require.NoError(t, err)
+
+	var idxs []index.Index
+	for i := 0; i < 10; i++ {
+		idxs = append(idxs, createCarIndex(t))
+	}
+
+	throttle := make(chan struct{}, 64)
+	var eg errgroup.Group
+	for _, idx := range idxs {
+		idx := idx
+		eg.Go(func() error {
+			records, err := getRecords(idx)
+			require.NoError(t, err)
+
+			randomuuid := uuid.New()
+			pieceCid := testutil.GenerateCid()
+			err = cl.AddIndex(pieceCid, records)
+			require.NoError(t, err)
+
+			di := model.DealInfo{
+				DealUuid:    randomuuid,
+				SectorID:    abi.SectorNumber(1),
+				PieceOffset: 1,
+				PieceLength: 2,
+				CarLength:   3,
+			}
+
+			err = cl.AddDealForPiece(pieceCid, di)
+			require.NoError(t, err)
+
+			dis, err := cl.GetPieceDeals(pieceCid)
+			require.NoError(t, err)
+			require.Len(t, dis, 1)
+			require.Equal(t, di, dis[0])
+
+			indexed, err := cl.IsIndexed(pieceCid)
+			require.NoError(t, err)
+			require.True(t, indexed)
+
+			recs, err := cl.GetRecords(pieceCid)
+			require.NoError(t, err)
+			require.Equal(t, len(records), len(recs))
+
+			var offsetEG errgroup.Group
+			for _, r := range recs {
+				if rand.Float32() > 0.1 {
+					continue
+				}
+
+				throttle <- struct{}{}
+				mhash := r.Cid.Hash()
+				offsetEG.Go(func() error {
+					defer func() { <-throttle }()
+
+					var err error
+					idx.GetAll(r.Cid, func(expected uint64) bool {
+						var offset uint64
+						offset, err = cl.GetOffset(pieceCid, mhash)
+						if err != nil {
+							return false
+						}
+						if expected != offset {
+							err = fmt.Errorf("cid %s: expected offset %d, got offset %d", r.Cid, expected, offset)
+							return false
+						}
+						return true
+					})
+
+					var pcids []cid.Cid
+					pcids, err = cl.PiecesContaining(mhash)
+					if err != nil {
+						return err
+					}
+					if len(pcids) != 1 {
+						return fmt.Errorf("expected 1 piece, got %d", len(pcids))
+					}
+					if pieceCid != pcids[0] {
+						return fmt.Errorf("expected piece %s, got %s", pieceCid, pcids[0])
+					}
+					return nil
+				})
+			}
+			err = offsetEG.Wait()
+			require.NoError(t, err)
+
+			loadedSubject, err := cl.GetIndex(pieceCid)
+			require.NoError(t, err)
+
+			ok, err := compareIndices(idx, loadedSubject)
+			require.NoError(t, err)
+			require.True(t, ok)
+
+			return nil
+		})
+	}
+
+	err = eg.Wait()
+	require.NoError(t, err)
+}
+
+func createCarIndex(t *testing.T) index.Index {
+	// Create a CAR file
+	rseed := rand.Int()
+	size := (5 + rand.Intn(3)) << 20
+
+	randomFilePath, err := testutil.CreateRandomFile(t.TempDir(), rseed, size)
+	require.NoError(t, err)
+	_, carFilePath, err := testutil.CreateDenseCARv2(t.TempDir(), randomFilePath)
+	require.NoError(t, err)
+	carFile, err := os.Open(carFilePath)
+	require.NoError(t, err)
+	defer carFile.Close()
+	idx, err := car.ReadOrGenerateIndex(carFile)
+	require.NoError(t, err)
+	return idx
 }
 
 func setupService(ctx context.Context, t *testing.T, db string) (string, func()) {

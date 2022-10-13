@@ -235,7 +235,7 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 	cbMap := db.col.Map(pieceCid.String())
 	recMap, err := cbMap.Iterator()
 	if err != nil {
-		return nil, fmt.Errorf("getting all records for cursor %d: %w", err)
+		return nil, fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
 	}
 
 	recs := make([]model.Record, 0, len(recMap))
@@ -284,12 +284,12 @@ func (db *DB) GetOffset(ctx context.Context, pieceCid cid.Cid, m multihash.Multi
 	cbMap := db.col.Map(pieceCid.String())
 	err := cbMap.At(m.String(), &val)
 	if err != nil {
-		return 0, fmt.Errorf("getting cursor %d offset for multihash %s: %w", pieceCid, m, err)
+		return 0, fmt.Errorf("getting offset for piece %s multihash %s: %w", pieceCid, m, err)
 	}
 
 	num, err := strconv.ParseUint(val, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("parsing cursor %d offset value '%s' as uint64: %w", pieceCid, val, err)
+		return 0, fmt.Errorf("parsing piece %s offset value '%s' as uint64: %w", pieceCid, val, err)
 	}
 
 	return num, nil
