@@ -5,11 +5,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"strconv"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/couchbase/gocb/v2"
+	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	carindex "github.com/ipld/go-car/v2/index"
@@ -114,6 +116,9 @@ func newDB(ctx context.Context) (*DB, error) {
 
 // GetPieceCidsByMultihash
 func (db *DB) GetPieceCidsByMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.get_piece_cids_by_multihash")
+	defer span.End()
+
 	key := fmt.Sprintf("%s%s", sprefixMhtoPieceCids, mh.String())
 	k := toCouchKey(key)
 
@@ -147,6 +152,9 @@ const throttleSize = 32
 
 // SetMultihashToPieceCid
 func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Record, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.set_multihashes_to_piece_cid")
+	defer span.End()
+
 	throttle := make(chan struct{}, throttleSize)
 	var eg errgroup.Group
 	for _, r := range recs {
@@ -185,6 +193,9 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Reco
 
 // SetPieceCidToMetadata
 func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md model.Metadata) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.set_piece_cid_to_metadata")
+	defer span.End()
+
 	k := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
 	_, err := db.col.Upsert(k, md, &gocb.UpsertOptions{Context: ctx})
 	if err != nil {
@@ -195,6 +206,9 @@ func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md mo
 }
 
 func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.add_deal_for_piece")
+	defer span.End()
+
 	cbKey := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
 
 	// Add the deal to the list of deals
@@ -211,6 +225,9 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 
 // GetPieceCidToMetadata
 func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.get_piece_cid_to_metadata")
+	defer span.End()
+
 	var metadata model.Metadata
 
 	var getResult *gocb.GetResult
@@ -232,6 +249,9 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (mode
 
 // AllRecords
 func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.all_records")
+	defer span.End()
+
 	cbMap := db.col.Map(pieceCid.String())
 	recMap, err := cbMap.Iterator()
 	if err != nil {
@@ -261,6 +281,9 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 
 // AddOffsets
 func (db *DB) AddOffsets(ctx context.Context, pieceCid cid.Cid, idx carindex.IterableIndex) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.add_offsets")
+	defer span.End()
+
 	mhToOffset := make(map[string]string)
 	err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
 		mhToOffset[m.String()] = fmt.Sprintf("%d", offset)
@@ -280,6 +303,9 @@ func (db *DB) AddOffsets(ctx context.Context, pieceCid cid.Cid, idx carindex.Ite
 
 // GetOffset
 func (db *DB) GetOffset(ctx context.Context, pieceCid cid.Cid, m multihash.Multihash) (uint64, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.get_offset")
+	defer span.End()
+
 	var val string
 	cbMap := db.col.Map(pieceCid.String())
 	err := cbMap.At(m.String(), &val)

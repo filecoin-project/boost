@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
@@ -28,9 +29,9 @@ func NewStore(addr string) (*Store, error) {
 	}, nil
 }
 
-func (s *Store) GetIndex(pieceCid cid.Cid) (index.Index, error) {
+func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, error) {
 	var resp []model.Record
-	err := s.client.Call(&resp, "boostddata_getIndex", pieceCid)
+	err := s.client.Call(&resp, "boostddata_getIndex", ctx, pieceCid)
 	if err != nil {
 		return nil, err
 	}
@@ -53,9 +54,9 @@ func (s *Store) GetIndex(pieceCid cid.Cid) (index.Index, error) {
 	return &mis, nil
 }
 
-func (s *Store) GetRecords(pieceCid cid.Cid) ([]model.Record, error) {
+func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
 	var resp []model.Record
-	err := s.client.Call(&resp, "boostddata_getIndex", pieceCid)
+	err := s.client.Call(&resp, "boostddata_getIndex", ctx, pieceCid)
 	if err != nil {
 		return nil, err
 	}
@@ -65,9 +66,9 @@ func (s *Store) GetRecords(pieceCid cid.Cid) ([]model.Record, error) {
 	return resp, nil
 }
 
-func (s *Store) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
+func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
 	var resp []model.DealInfo
-	err := s.client.Call(&resp, "boostddata_getPieceDeals", pieceCid)
+	err := s.client.Call(&resp, "boostddata_getPieceDeals", ctx, pieceCid)
 	if err != nil {
 		return nil, err
 	}
@@ -75,9 +76,9 @@ func (s *Store) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
 	return resp, nil
 }
 
-func (s *Store) PiecesContaining(m mh.Multihash) ([]cid.Cid, error) {
+func (s *Store) PiecesContaining(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
 	var resp []cid.Cid
-	err := s.client.Call(&resp, "boostddata_piecesContainingMultihash", m)
+	err := s.client.Call(&resp, "boostddata_piecesContainingMultihash", ctx, m)
 	if err != nil {
 		return nil, err
 	}
@@ -85,38 +86,38 @@ func (s *Store) PiecesContaining(m mh.Multihash) ([]cid.Cid, error) {
 	return resp, nil
 }
 
-func (s *Store) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
-	return s.client.Call(nil, "boostddata_addDealForPiece", pieceCid, dealInfo)
+func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+	return s.client.Call(nil, "boostddata_addDealForPiece", ctx, pieceCid, dealInfo)
 }
 
-func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
+func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error {
 	log.Debugw("add-index", "piece-cid", pieceCid, "records", len(records))
 
-	return s.client.Call(nil, "boostddata_addIndex", pieceCid, records)
+	return s.client.Call(nil, "boostddata_addIndex", ctx, pieceCid, records)
 }
 
-func (s *Store) IsIndexed(pieceCid cid.Cid) (bool, error) {
+func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 	var t time.Time
 
-	err := s.client.Call(&t, "boostddata_indexedAt", pieceCid)
+	err := s.client.Call(&t, "boostddata_indexedAt", ctx, pieceCid)
 	if err != nil {
 		return false, err
 	}
 	return !t.IsZero(), nil
 }
 
-func (s *Store) IndexedAt(pieceCid cid.Cid) (time.Time, error) {
+func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, error) {
 	var ts time.Time
-	err := s.client.Call(&ts, "boostddata_indexedAt", pieceCid)
+	err := s.client.Call(&ts, "boostddata_indexedAt", ctx, pieceCid)
 	if err != nil {
 		return time.Time{}, err
 	}
 	return ts, nil
 }
 
-func (s *Store) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
+func (s *Store) GetOffset(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
 	var resp uint64
-	err := s.client.Call(&resp, "boostddata_getOffset", pieceCid, hash)
+	err := s.client.Call(&resp, "boostddata_getOffset", ctx, pieceCid, hash)
 	if err != nil {
 		return 0, err
 	}

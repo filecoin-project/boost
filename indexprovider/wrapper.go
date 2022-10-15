@@ -105,7 +105,7 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 func (w *Wrapper) Start(ctx context.Context) {
 	w.prov.RegisterMultihashLister(func(ctx context.Context, contextID []byte) (provider.MultihashIterator, error) {
 		provideF := func(pieceCid cid.Cid) (provider.MultihashIterator, error) {
-			ii, err := w.pieceMeta.GetIterableIndex(pieceCid)
+			ii, err := w.pieceMeta.GetIterableIndex(ctx, pieceCid)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get iterable index: %w", err)
 			}

@@ -32,8 +32,9 @@ func main() {
 	flag.Parse()
 
 	done := make(chan struct{})
+	ctx := context.Background()
 
-	srv := svc.New(db, repopath)
+	srv, _ := svc.New(ctx, db, repopath)
 	addr := "localhost:8089"
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {

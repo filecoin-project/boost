@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -90,6 +91,9 @@ func (db *DB) SetNextCursor(ctx context.Context, cursor uint64) error {
 
 // GetPieceCidsByMultihash
 func (db *DB) GetPieceCidsByMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.get_piece_cids_by_multihash")
+	defer span.End()
+
 	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixMhtoPieceCids, mh.String()))
 
 	val, err := db.Get(ctx, key)
@@ -107,6 +111,9 @@ func (db *DB) GetPieceCidsByMultihash(ctx context.Context, mh multihash.Multihas
 
 // SetMultihashToPieceCid
 func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Record, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.set_multihashes_to_piece_cid")
+	defer span.End()
+
 	batch, err := db.Batch(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create ds batch: %w", err)
@@ -180,6 +187,9 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Reco
 
 // SetPieceCidToMetadata
 func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md model.Metadata) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.set_piece_cid_to_metadata")
+	defer span.End()
+
 	b, err := json.Marshal(md)
 	if err != nil {
 		return err
@@ -192,6 +202,9 @@ func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md mo
 
 // GetPieceCidToMetadata
 func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.get_piece_cid_to_metadata")
+	defer span.End()
+
 	var metadata model.Metadata
 
 	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
@@ -211,6 +224,9 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (mode
 
 // AllRecords
 func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.all_records")
+	defer span.End()
+
 	var records []model.Record
 
 	buf := make([]byte, size)
@@ -251,6 +267,9 @@ func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, er
 
 // AddOffset
 func (db *DB) AddOffset(ctx context.Context, cursorPrefix string, m multihash.Multihash, offset uint64) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.add_offsets")
+	defer span.End()
+
 	key := datastore.NewKey(fmt.Sprintf("%s%s", cursorPrefix, m.String()))
 
 	value := make([]byte, size)
@@ -261,6 +280,9 @@ func (db *DB) AddOffset(ctx context.Context, cursorPrefix string, m multihash.Mu
 
 // GetOffset
 func (db *DB) GetOffset(ctx context.Context, cursorPrefix string, m multihash.Multihash) (uint64, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.get_offset")
+	defer span.End()
+
 	key := datastore.NewKey(fmt.Sprintf("%s%s", cursorPrefix, m.String()))
 
 	b, err := db.Get(ctx, key)
