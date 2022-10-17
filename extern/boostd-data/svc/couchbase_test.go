@@ -32,7 +32,7 @@ func XTestCouchbaseService(t *testing.T) {
 		t.Fatal(err)
 	}
 	dealInfo := model.DealInfo{}
-	err = cl.AddDealForPiece(pieceCid, dealInfo)
+	err = cl.AddDealForPiece(context.TODO(), pieceCid, dealInfo)
 	if err != nil {
 		t.Fatal(err)
 	}

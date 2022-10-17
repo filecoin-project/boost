@@ -5,6 +5,7 @@
 package mock_piecemeta
 
 import (
+	"context"
 	reflect "reflect"
 
 	piecemeta "github.com/filecoin-project/boost/piecemeta"
@@ -108,18 +109,18 @@ func (m *MockSealer) EXPECT() *MockSealerMockRecorder {
 }
 
 // GetReader mocks base method.
-func (m *MockSealer) GetReader(id abi.SectorNumber, offset, length abi.PaddedPieceSize) (piecemeta.SectionReader, error) {
+func (m *MockSealer) GetReader(ctx context.Context, id abi.SectorNumber, offset, length abi.PaddedPieceSize) (piecemeta.SectionReader, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetReader", id, offset, length)
+	ret := m.ctrl.Call(m, "GetReader", ctx, id, offset, length)
 	ret0, _ := ret[0].(piecemeta.SectionReader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetReader indicates an expected call of GetReader.
-func (mr *MockSealerMockRecorder) GetReader(id, offset, length interface{}) *gomock.Call {
+func (mr *MockSealerMockRecorder) GetReader(ctx, id, offset, length interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetReader", reflect.TypeOf((*MockSealer)(nil).GetReader), id, offset, length)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetReader", reflect.TypeOf((*MockSealer)(nil).GetReader), ctx, id, offset, length)
 }
 
 // MockStore is a mock of Store interface.
@@ -146,104 +147,104 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 }
 
 // AddDealForPiece mocks base method.
-func (m *MockStore) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (m *MockStore) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddDealForPiece", pieceCid, dealInfo)
+	ret := m.ctrl.Call(m, "AddDealForPiece", ctx, pieceCid, dealInfo)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddDealForPiece indicates an expected call of AddDealForPiece.
-func (mr *MockStoreMockRecorder) AddDealForPiece(pieceCid, dealInfo interface{}) *gomock.Call {
+func (mr *MockStoreMockRecorder) AddDealForPiece(ctx, pieceCid, dealInfo interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddDealForPiece", reflect.TypeOf((*MockStore)(nil).AddDealForPiece), pieceCid, dealInfo)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddDealForPiece", reflect.TypeOf((*MockStore)(nil).AddDealForPiece), ctx, pieceCid, dealInfo)
 }
 
 // AddIndex mocks base method.
-func (m *MockStore) AddIndex(pieceCid cid.Cid, records []model.Record) error {
+func (m *MockStore) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddIndex", pieceCid, records)
+	ret := m.ctrl.Call(m, "AddIndex", ctx, pieceCid, records)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddIndex indicates an expected call of AddIndex.
-func (mr *MockStoreMockRecorder) AddIndex(pieceCid, records interface{}) *gomock.Call {
+func (mr *MockStoreMockRecorder) AddIndex(ctx, pieceCid, records interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddIndex", reflect.TypeOf((*MockStore)(nil).AddIndex), pieceCid, records)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddIndex", reflect.TypeOf((*MockStore)(nil).AddIndex), ctx, pieceCid, records)
 }
 
 // GetIndex mocks base method.
-func (m *MockStore) GetIndex(pieceCid cid.Cid) (index.Index, error) {
+func (m *MockStore) GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetIndex", pieceCid)
+	ret := m.ctrl.Call(m, "GetIndex", ctx, pieceCid)
 	ret0, _ := ret[0].(index.Index)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetIndex indicates an expected call of GetIndex.
-func (mr *MockStoreMockRecorder) GetIndex(pieceCid interface{}) *gomock.Call {
+func (mr *MockStoreMockRecorder) GetIndex(ctx, pieceCid interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetIndex", reflect.TypeOf((*MockStore)(nil).GetIndex), pieceCid)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetIndex", reflect.TypeOf((*MockStore)(nil).GetIndex), ctx, pieceCid)
 }
 
 // GetOffset mocks base method.
-func (m *MockStore) GetOffset(pieceCid cid.Cid, hash multihash.Multihash) (uint64, error) {
+func (m *MockStore) GetOffset(ctx context.Context, pieceCid cid.Cid, hash multihash.Multihash) (uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOffset", pieceCid, hash)
+	ret := m.ctrl.Call(m, "GetOffset", ctx, pieceCid, hash)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetOffset indicates an expected call of GetOffset.
-func (mr *MockStoreMockRecorder) GetOffset(pieceCid, hash interface{}) *gomock.Call {
+func (mr *MockStoreMockRecorder) GetOffset(ctx, pieceCid, hash interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOffset", reflect.TypeOf((*MockStore)(nil).GetOffset), pieceCid, hash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOffset", reflect.TypeOf((*MockStore)(nil).GetOffset), ctx, pieceCid, hash)
 }
 
 // GetPieceDeals mocks base method.
-func (m *MockStore) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
+func (m *MockStore) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPieceDeals", pieceCid)
+	ret := m.ctrl.Call(m, "GetPieceDeals", ctx, pieceCid)
 	ret0, _ := ret[0].([]model.DealInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetPieceDeals indicates an expected call of GetPieceDeals.
-func (mr *MockStoreMockRecorder) GetPieceDeals(pieceCid interface{}) *gomock.Call {
+func (mr *MockStoreMockRecorder) GetPieceDeals(ctx, pieceCid interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPieceDeals", reflect.TypeOf((*MockStore)(nil).GetPieceDeals), pieceCid)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPieceDeals", reflect.TypeOf((*MockStore)(nil).GetPieceDeals), ctx, pieceCid)
 }
 
 // IsIndexed mocks base method.
-func (m *MockStore) IsIndexed(pieceCid cid.Cid) (bool, error) {
+func (m *MockStore) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsIndexed", pieceCid)
+	ret := m.ctrl.Call(m, "IsIndexed", ctx, pieceCid)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // IsIndexed indicates an expected call of IsIndexed.
-func (mr *MockStoreMockRecorder) IsIndexed(pieceCid interface{}) *gomock.Call {
+func (mr *MockStoreMockRecorder) IsIndexed(ctx, pieceCid interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsIndexed", reflect.TypeOf((*MockStore)(nil).IsIndexed), pieceCid)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsIndexed", reflect.TypeOf((*MockStore)(nil).IsIndexed), ctx, pieceCid)
 }
 
 // PiecesContaining mocks base method.
-func (m_2 *MockStore) PiecesContaining(m multihash.Multihash) ([]cid.Cid, error) {
+func (m_2 *MockStore) PiecesContaining(ctx context.Context, m multihash.Multihash) ([]cid.Cid, error) {
 	m_2.ctrl.T.Helper()
-	ret := m_2.ctrl.Call(m_2, "PiecesContaining", m)
+	ret := m_2.ctrl.Call(m_2, "PiecesContaining", ctx, m)
 	ret0, _ := ret[0].([]cid.Cid)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PiecesContaining indicates an expected call of PiecesContaining.
-func (mr *MockStoreMockRecorder) PiecesContaining(m interface{}) *gomock.Call {
+func (mr *MockStoreMockRecorder) PiecesContaining(ctx, m interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PiecesContaining", reflect.TypeOf((*MockStore)(nil).PiecesContaining), m)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PiecesContaining", reflect.TypeOf((*MockStore)(nil).PiecesContaining), ctx, m)
 }

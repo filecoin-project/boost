@@ -564,7 +564,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	pc := deal.ClientDealProposal.Proposal.PieceCID
 
 	// add deal to piece metadata store
-	if err := p.pieceMeta.AddDealForPiece(pc, model.DealInfo{
+	if err := p.pieceMeta.AddDealForPiece(ctx, pc, model.DealInfo{
 		DealUuid:    deal.DealUuid,
 		ChainDealID: deal.ChainDealID,
 		SectorID:    deal.SectorID,

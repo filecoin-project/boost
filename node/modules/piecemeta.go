@@ -3,6 +3,7 @@ package modules
 import (
 	"context"
 	"fmt"
+
 	"github.com/filecoin-project/boost/piecemeta"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/dagstore"
@@ -61,7 +62,7 @@ func (pw *boostPieceStoreWrapper) AddDealForPiece(pieceCID cid.Cid, dealInfo pie
 		// markets without having access to the piece data itself)
 		CarLength: 0,
 	}
-	return pw.pieceMeta.AddDealForPiece(pieceCID, di)
+	return pw.pieceMeta.AddDealForPiece(context.Background(), pieceCID, di)
 }
 
 func (pw *boostPieceStoreWrapper) AddPieceBlockLocations(pieceCID cid.Cid, blockLocations map[cid.Cid]piecestore.BlockLocation) error {
@@ -70,7 +71,7 @@ func (pw *boostPieceStoreWrapper) AddPieceBlockLocations(pieceCID cid.Cid, block
 }
 
 func (pw *boostPieceStoreWrapper) GetPieceInfo(pieceCID cid.Cid) (piecestore.PieceInfo, error) {
-	pieceDeals, err := pw.pieceMeta.GetPieceDeals(pieceCID)
+	pieceDeals, err := pw.pieceMeta.GetPieceDeals(context.TODO(), pieceCID)
 	if err != nil {
 		return piecestore.PieceInfo{}, fmt.Errorf("getting piece deals from piece metadata store: %w", err)
 	}
@@ -139,7 +140,7 @@ func (dw *boostDAGStoreWrapper) RegisterShard(ctx context.Context, pieceCid cid.
 }
 
 func (dw *boostDAGStoreWrapper) LoadShard(ctx context.Context, pieceCid cid.Cid) (stores.ClosableBlockstore, error) {
-	bs, err := dw.pieceMeta.GetBlockstore(pieceCid)
+	bs, err := dw.pieceMeta.GetBlockstore(ctx, pieceCid)
 	if err != nil {
 		return nil, fmt.Errorf("getting blockstore in LoadShard: %w", err)
 	}
@@ -152,11 +153,11 @@ func (dw *boostDAGStoreWrapper) MigrateDeals(ctx context.Context, deals []storag
 }
 
 func (dw *boostDAGStoreWrapper) GetPiecesContainingBlock(blockCID cid.Cid) ([]cid.Cid, error) {
-	return dw.pieceMeta.PiecesContainingMultihash(blockCID.Hash())
+	return dw.pieceMeta.PiecesContainingMultihash(context.TODO(), blockCID.Hash())
 }
 
 func (dw *boostDAGStoreWrapper) GetIterableIndexForPiece(pieceCid cid.Cid) (carindex.IterableIndex, error) {
-	return dw.pieceMeta.GetIterableIndex(pieceCid)
+	return dw.pieceMeta.GetIterableIndex(context.TODO(), pieceCid)
 }
 
 func (dw *boostDAGStoreWrapper) Close() error {

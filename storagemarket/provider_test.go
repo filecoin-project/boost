@@ -1429,8 +1429,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
 	store := mock_piecemeta.NewMockStore(ctrl)
-	store.EXPECT().IsIndexed(gomock.Any()).Return(true, nil).AnyTimes()
-	store.EXPECT().AddDealForPiece(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	store.EXPECT().IsIndexed(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+	store.EXPECT().AddDealForPiece(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	pm := piecemeta.NewPieceMeta(store, nil)
 

@@ -63,7 +63,7 @@ func testService(ctx context.Context, t *testing.T, name string) {
 
 	randomuuid := uuid.New()
 
-	err = cl.AddIndex(pieceCid, records)
+	err = cl.AddIndex(ctx, pieceCid, records)
 	require.NoError(t, err)
 
 	di := model.DealInfo{
@@ -74,7 +74,7 @@ func testService(ctx context.Context, t *testing.T, name string) {
 		CarLength:   3,
 	}
 
-	err = cl.AddDealForPiece(pieceCid, di)
+	err = cl.AddDealForPiece(ctx, pieceCid, di)
 	require.NoError(t, err)
 
 	b, err := hex.DecodeString("1220ff63d7689e2d9567d1a90a7a68425f430137142e1fbc28fe4780b9ee8a5ef842")
@@ -83,29 +83,29 @@ func testService(ctx context.Context, t *testing.T, name string) {
 	mhash, err := multihash.Cast(b)
 	require.NoError(t, err)
 
-	offset, err := cl.GetOffset(pieceCid, mhash)
+	offset, err := cl.GetOffset(ctx, pieceCid, mhash)
 	require.NoError(t, err)
 	require.EqualValues(t, 3039040395, offset)
 
-	pcids, err := cl.PiecesContaining(mhash)
+	pcids, err := cl.PiecesContaining(ctx, mhash)
 	require.NoError(t, err)
 	require.Len(t, pcids, 1)
 	require.Equal(t, pieceCid, pcids[0])
 
-	dis, err := cl.GetPieceDeals(pieceCid)
+	dis, err := cl.GetPieceDeals(ctx, pieceCid)
 	require.NoError(t, err)
 	require.Len(t, dis, 1)
 	require.Equal(t, di, dis[0])
 
-	indexed, err := cl.IsIndexed(pieceCid)
+	indexed, err := cl.IsIndexed(ctx, pieceCid)
 	require.NoError(t, err)
 	require.True(t, indexed)
 
-	recs, err := cl.GetRecords(pieceCid)
+	recs, err := cl.GetRecords(ctx, pieceCid)
 	require.NoError(t, err)
 	require.Equal(t, len(records), len(recs))
 
-	loadedSubject, err := cl.GetIndex(pieceCid)
+	loadedSubject, err := cl.GetIndex(ctx, pieceCid)
 	require.NoError(t, err)
 
 	ok, err := compareIndices(subject, loadedSubject)
@@ -118,7 +118,7 @@ func testService(ctx context.Context, t *testing.T, name string) {
 func TestServiceFuzz(t *testing.T) {
 	t.Skip()
 	logging.SetLogLevel("*", "info")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	t.Run("level db", func(t *testing.T) {
@@ -152,7 +152,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, name string) {
 
 			randomuuid := uuid.New()
 			pieceCid := testutil.GenerateCid()
-			err = cl.AddIndex(pieceCid, records)
+			err = cl.AddIndex(ctx, pieceCid, records)
 			require.NoError(t, err)
 
 			di := model.DealInfo{
@@ -163,19 +163,19 @@ func testServiceFuzz(ctx context.Context, t *testing.T, name string) {
 				CarLength:   3,
 			}
 
-			err = cl.AddDealForPiece(pieceCid, di)
+			err = cl.AddDealForPiece(ctx, pieceCid, di)
 			require.NoError(t, err)
 
-			dis, err := cl.GetPieceDeals(pieceCid)
+			dis, err := cl.GetPieceDeals(ctx, pieceCid)
 			require.NoError(t, err)
 			require.Len(t, dis, 1)
 			require.Equal(t, di, dis[0])
 
-			indexed, err := cl.IsIndexed(pieceCid)
+			indexed, err := cl.IsIndexed(ctx, pieceCid)
 			require.NoError(t, err)
 			require.True(t, indexed)
 
-			recs, err := cl.GetRecords(pieceCid)
+			recs, err := cl.GetRecords(ctx, pieceCid)
 			require.NoError(t, err)
 			require.Equal(t, len(records), len(recs))
 
@@ -193,7 +193,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, name string) {
 					var err error
 					idx.GetAll(r.Cid, func(expected uint64) bool {
 						var offset uint64
-						offset, err = cl.GetOffset(pieceCid, mhash)
+						offset, err = cl.GetOffset(ctx, pieceCid, mhash)
 						if err != nil {
 							return false
 						}
@@ -205,7 +205,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, name string) {
 					})
 
 					var pcids []cid.Cid
-					pcids, err = cl.PiecesContaining(mhash)
+					pcids, err = cl.PiecesContaining(ctx, mhash)
 					if err != nil {
 						return err
 					}
@@ -221,7 +221,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, name string) {
 			err = offsetEG.Wait()
 			require.NoError(t, err)
 
-			loadedSubject, err := cl.GetIndex(pieceCid)
+			loadedSubject, err := cl.GetIndex(ctx, pieceCid)
 			require.NoError(t, err)
 
 			ok, err := compareIndices(idx, loadedSubject)

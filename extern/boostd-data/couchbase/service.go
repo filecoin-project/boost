@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -35,6 +36,9 @@ func NewStore(ctx context.Context) (*Store, error) {
 func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	log.Debugw("handle.add-deal-for-piece", "piece-cid", pieceCid)
 
+	ctx, span := tracing.Tracer.Start(context.Background(), "store.add_deal_for_piece")
+	defer span.End()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.add-deal-for-piece", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
@@ -45,6 +49,9 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 func (s *Store) GetOffset(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
 	log.Debugw("handle.get-offset", "piece-cid", pieceCid)
 
+	ctx, span := tracing.Tracer.Start(ctx, "store.get_offset")
+	defer span.End()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.get-offset", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
@@ -54,6 +61,9 @@ func (s *Store) GetOffset(ctx context.Context, pieceCid cid.Cid, hash mh.Multiha
 
 func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
 	log.Debugw("handle.get-piece-deals", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.get_piece_deals")
+	defer span.End()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.get-piece-deals", "took", fmt.Sprintf("%s", time.Since(now)))
@@ -71,6 +81,9 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
 	log.Debugw("handle.pieces-containing-mh", "mh", m)
 
+	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_containing_multihash")
+	defer span.End()
+
 	defer func(now time.Time) {
 		log.Debugw("handled.pieces-containing-mh", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
@@ -81,6 +94,9 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 // TODO: Why do we have both GetRecords and GetIndex?
 func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
 	log.Debugw("handle.get-iterable-index", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.get_records")
+	defer span.End()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.get-iterable-index", "took", fmt.Sprintf("%s", time.Since(now)))
@@ -99,6 +115,9 @@ func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Recor
 
 func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
 	log.Debugw("handle.get-index", "pieceCid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.get_index")
+	defer span.End()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.get-index", "took", fmt.Sprintf("%s", time.Since(now)))
@@ -119,6 +138,9 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 
 func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error {
 	log.Debugw("handle.add-index", "records", len(records))
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.add_index")
+	defer span.End()
 
 	start := time.Now()
 	defer func() { log.Debugw("handled.add-index", "took", time.Since(start).String()) }()
@@ -177,6 +199,9 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 
 func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, error) {
 	log.Debugw("handle.indexed-at", "pieceCid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.indexed_at")
+	defer span.End()
 
 	defer func(now time.Time) {
 		log.Debugw("handled.indexed-at", "took", fmt.Sprintf("%s", time.Since(now)))

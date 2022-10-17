@@ -101,7 +101,7 @@ func main() {
 			panic(err)
 		}
 
-		err = piecemeta.AddIndex(pieceCid, records)
+		err = piecemeta.AddIndex(ctx, pieceCid, records)
 		if err != nil {
 			panic(err)
 		}
@@ -123,7 +123,7 @@ func main() {
 				PieceLength: d.Length,
 			}
 
-			err = piecemeta.AddDealForPiece(pcid, dealInfo)
+			err = piecemeta.AddDealForPiece(ctx, pcid, dealInfo)
 			if err != nil {
 				log.Errorw("cant add deal for piece", "pcid", pcid)
 			}
