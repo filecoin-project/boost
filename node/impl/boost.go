@@ -17,6 +17,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -33,7 +34,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p/core/host"
 	"go.uber.org/fx"
 )
 
@@ -49,9 +50,9 @@ type BoostAPI struct {
 
 	Host host.Host
 
-	DAGStore        *dagstore.DAGStore
-	DagStoreWrapper *mktsdagstore.Wrapper
-
+	DAGStore              *dagstore.DAGStore
+	DagStoreWrapper       *mktsdagstore.Wrapper
+	IndexBackedBlockstore dtypes.IndexBackedBlockstore
 	// Boost
 	StorageProvider *storagemarket.Provider
 	IndexProvider   *indexprovider.Wrapper
@@ -481,4 +482,20 @@ func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) e
 		return fmt.Errorf("failed to destroy shard: %w", err)
 	}
 	return nil
+}
+
+func (sm *BoostAPI) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error) {
+	blk, err := sm.IndexBackedBlockstore.Get(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	return blk.RawData(), nil
+}
+
+func (sm *BoostAPI) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) {
+	return sm.IndexBackedBlockstore.Has(ctx, c)
+}
+
+func (sm *BoostAPI) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) {
+	return sm.IndexBackedBlockstore.GetSize(ctx, c)
 }

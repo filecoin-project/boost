@@ -282,7 +282,7 @@ docker compose down --rmi local
 
 rm -rf ./data
 
-rm -rf /var/tmp/filecoin-proof-parameters
+rm -rf ~/.cache/filecoin-proof-parameters
 ```
 
 ## License

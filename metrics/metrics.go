@@ -9,6 +9,7 @@ import (
 	"go.opencensus.io/tag"
 
 	rpcmetrics "github.com/filecoin-project/go-jsonrpc/metrics"
+	lotusmetrics "github.com/filecoin-project/lotus/metrics"
 )
 
 // Distribution
@@ -115,10 +116,29 @@ var (
 	SplitstoreCompactionDead        = stats.Int64("splitstore/dead", "Number of dead blocks in last compaction", stats.UnitDimensionless)
 
 	// http
-	HttpPayloadByCidRequestCount    = stats.Int64("http/payload_by_cid_request_count", "Counter of /payload/<payload-cid> requests", stats.UnitDimensionless)
-	HttpPayloadByCidRequestDuration = stats.Float64("http/payload_by_cid_request_duration_ms", "Time spent retrieving a payload by cid", stats.UnitMilliseconds)
-	HttpPieceByCidRequestCount      = stats.Int64("http/piece_by_cid_request_count", "Counter of /piece/<piece-cid> requests", stats.UnitDimensionless)
-	HttpPieceByCidRequestDuration   = stats.Float64("http/piece_by_cid_request_duration_ms", "Time spent retrieving a piece by cid", stats.UnitMilliseconds)
+	HttpPayloadByCidRequestCount     = stats.Int64("http/payload_by_cid_request_count", "Counter of /payload/<payload-cid> requests", stats.UnitDimensionless)
+	HttpPayloadByCidRequestDuration  = stats.Float64("http/payload_by_cid_request_duration_ms", "Time spent retrieving a payload by cid", stats.UnitMilliseconds)
+	HttpPayloadByCid200ResponseCount = stats.Int64("http/payload_by_cid_200_response_count", "Counter of /payload/<payload-cid> 200 responses", stats.UnitDimensionless)
+	HttpPayloadByCid400ResponseCount = stats.Int64("http/payload_by_cid_400_response_count", "Counter of /payload/<payload-cid> 400 responses", stats.UnitDimensionless)
+	HttpPayloadByCid404ResponseCount = stats.Int64("http/payload_by_cid_404_response_count", "Counter of /payload/<payload-cid> 404 responses", stats.UnitDimensionless)
+	HttpPayloadByCid500ResponseCount = stats.Int64("http/payload_by_cid_500_response_count", "Counter of /payload/<payload-cid> 500 responses", stats.UnitDimensionless)
+	HttpPieceByCidRequestCount       = stats.Int64("http/piece_by_cid_request_count", "Counter of /piece/<piece-cid> requests", stats.UnitDimensionless)
+	HttpPieceByCidRequestDuration    = stats.Float64("http/piece_by_cid_request_duration_ms", "Time spent retrieving a piece by cid", stats.UnitMilliseconds)
+	HttpPieceByCid200ResponseCount   = stats.Int64("http/piece_by_cid_200_response_count", "Counter of /piece/<piece-cid> 200 responses", stats.UnitDimensionless)
+	HttpPieceByCid400ResponseCount   = stats.Int64("http/piece_by_cid_400_response_count", "Counter of /piece/<piece-cid> 400 responses", stats.UnitDimensionless)
+	HttpPieceByCid404ResponseCount   = stats.Int64("http/piece_by_cid_404_response_count", "Counter of /piece/<piece-cid> 404 responses", stats.UnitDimensionless)
+	HttpPieceByCid500ResponseCount   = stats.Int64("http/piece_by_cid_500_response_count", "Counter of /piece/<piece-cid> 500 responses", stats.UnitDimensionless)
+
+	// bitswap
+	BitswapRblsGetRequestCount             = stats.Int64("bitswap/rbls_get_request_count", "Counter of RemoteBlockstore Get requests", stats.UnitDimensionless)
+	BitswapRblsGetSuccessResponseCount     = stats.Int64("bitswap/rbls_get_success_response_count", "Counter of successful RemoteBlockstore Get responses", stats.UnitDimensionless)
+	BitswapRblsGetFailResponseCount        = stats.Int64("bitswap/rbls_get_fail_response_count", "Counter of failed RemoteBlockstore Get responses", stats.UnitDimensionless)
+	BitswapRblsGetSizeRequestCount         = stats.Int64("bitswap/rbls_getsize_request_count", "Counter of RemoteBlockstore GetSize requests", stats.UnitDimensionless)
+	BitswapRblsGetSizeSuccessResponseCount = stats.Int64("bitswap/rbls_getsize_success_response_count", "Counter of successful RemoteBlockstore GetSize responses", stats.UnitDimensionless)
+	BitswapRblsGetSizeFailResponseCount    = stats.Int64("bitswap/rbls_getsize_fail_response_count", "Counter of failed RemoteBlockstore GetSize responses", stats.UnitDimensionless)
+	BitswapRblsHasRequestCount             = stats.Int64("bitswap/rbls_has_request_count", "Counter of RemoteBlockstore Has requests", stats.UnitDimensionless)
+	BitswapRblsHasSuccessResponseCount     = stats.Int64("bitswap/rbls_has_success_response_count", "Counter of successful RemoteBlockstore Has responses", stats.UnitDimensionless)
+	BitswapRblsHasFailResponseCount        = stats.Int64("bitswap/rbls_has_fail_response_count", "Counter of failed RemoteBlockstore Has responses", stats.UnitDimensionless)
 )
 
 var (
@@ -131,6 +151,22 @@ var (
 		Measure:     HttpPayloadByCidRequestDuration,
 		Aggregation: defaultMillisecondsDistribution,
 	}
+	HttpPayloadByCid200ResponseCountView = &view.View{
+		Measure:     HttpPayloadByCid200ResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpPayloadByCid400ResponseCountView = &view.View{
+		Measure:     HttpPayloadByCid400ResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpPayloadByCid404ResponseCountView = &view.View{
+		Measure:     HttpPayloadByCid404ResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpPayloadByCid500ResponseCountView = &view.View{
+		Measure:     HttpPayloadByCid500ResponseCount,
+		Aggregation: view.Count(),
+	}
 	HttpPieceByCidRequestCountView = &view.View{
 		Measure:     HttpPieceByCidRequestCount,
 		Aggregation: view.Count(),
@@ -138,6 +174,60 @@ var (
 	HttpPieceByCidRequestDurationView = &view.View{
 		Measure:     HttpPieceByCidRequestDuration,
 		Aggregation: defaultMillisecondsDistribution,
+	}
+	HttpPieceByCid200ResponseCountView = &view.View{
+		Measure:     HttpPieceByCid200ResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpPieceByCid400ResponseCountView = &view.View{
+		Measure:     HttpPieceByCid400ResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpPieceByCid404ResponseCountView = &view.View{
+		Measure:     HttpPieceByCid404ResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpPieceByCid500ResponseCountView = &view.View{
+		Measure:     HttpPieceByCid500ResponseCount,
+		Aggregation: view.Count(),
+	}
+
+	// bitswap
+	BitswapRblsGetRequestCountView = &view.View{
+		Measure:     BitswapRblsGetRequestCount,
+		Aggregation: view.Count(),
+	}
+	BitswapRblsGetSuccessResponseCountView = &view.View{
+		Measure:     BitswapRblsGetSuccessResponseCount,
+		Aggregation: view.Count(),
+	}
+	BitswapRblsGetFailResponseCountView = &view.View{
+		Measure:     BitswapRblsGetFailResponseCount,
+		Aggregation: view.Count(),
+	}
+	BitswapRblsGetSizeRequestCountView = &view.View{
+		Measure:     BitswapRblsGetSizeRequestCount,
+		Aggregation: view.Count(),
+	}
+	BitswapRblsGetSizeSuccessResponseCountView = &view.View{
+		Measure:     BitswapRblsGetSizeSuccessResponseCount,
+		Aggregation: view.Count(),
+	}
+	BitswapRblsGetSizeFailResponseCountView = &view.View{
+		Measure:     BitswapRblsGetSizeFailResponseCount,
+		Aggregation: view.Count(),
+	}
+	BitswapRblsHasRequestCountView = &view.View{
+		Measure:     BitswapRblsHasRequestCount,
+		Aggregation: view.Count(),
+	}
+	BitswapRblsHasSuccessResponseCountView = &view.View{
+		Measure:     BitswapRblsHasSuccessResponseCount,
+		Aggregation: view.Count(),
+	}
+	BitswapRblsHasFailResponseCountView = &view.View{
+		Measure:     BitswapRblsHasFailResponseCount,
+		Aggregation: view.Count(),
 	}
 
 	InfoView = &view.View{
@@ -412,8 +502,33 @@ var DefaultViews = func() []*view.View {
 		APIRequestDurationView,
 		HttpPayloadByCidRequestCountView,
 		HttpPayloadByCidRequestDurationView,
+		HttpPayloadByCid200ResponseCountView,
+		HttpPayloadByCid400ResponseCountView,
+		HttpPayloadByCid404ResponseCountView,
+		HttpPayloadByCid500ResponseCountView,
 		HttpPieceByCidRequestCountView,
 		HttpPieceByCidRequestDurationView,
+		HttpPieceByCid200ResponseCountView,
+		HttpPieceByCid400ResponseCountView,
+		HttpPieceByCid404ResponseCountView,
+		HttpPieceByCid500ResponseCountView,
+		BitswapRblsGetRequestCountView,
+		BitswapRblsGetSuccessResponseCountView,
+		BitswapRblsGetFailResponseCountView,
+		BitswapRblsGetSizeRequestCountView,
+		BitswapRblsGetSizeSuccessResponseCountView,
+		BitswapRblsGetSizeFailResponseCountView,
+		BitswapRblsHasRequestCountView,
+		BitswapRblsHasSuccessResponseCountView,
+		BitswapRblsHasFailResponseCountView,
+		lotusmetrics.DagStorePRBytesDiscardedView,
+		lotusmetrics.DagStorePRBytesRequestedView,
+		lotusmetrics.DagStorePRDiscardCountView,
+		lotusmetrics.DagStorePRInitCountView,
+		lotusmetrics.DagStorePRSeekBackBytesView,
+		lotusmetrics.DagStorePRSeekBackCountView,
+		lotusmetrics.DagStorePRSeekForwardBytesView,
+		lotusmetrics.DagStorePRSeekForwardCountView,
 	}
 	//views = append(views, blockstore.DefaultViews...)
 	views = append(views, rpcmetrics.DefaultViews...)

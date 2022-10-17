@@ -11,6 +11,9 @@ import {dateFormat} from "./util-date";
 import {TimestampFormat} from "./timestamp";
 import {DealsPerPage} from "./deals-per-page";
 import {Pagination} from "./Pagination";
+import {SearchBox} from "./Deals";
+
+const legacyDealsBasePath = '/legacy-storage-deals'
 
 export function LegacyStorageDealsPage(props) {
     return <PageContainer pageType="legacy-storage-deals" title="Legacy Storage Deals">
@@ -34,15 +37,30 @@ function LegacyStorageDealsContent(props) {
         const val = parseInt(e.target.value)
         DealsPerPage.save(val)
         setDealsPerPage(val)
-        navigate('/legacy-storage-deals')
+        navigate(legacyDealsBasePath)
         scrollTop()
+    }
+
+    const [searchQuery, setSearchQuery] = useState('')
+    const handleSearchQueryChange = (event) => {
+        if (pageNum !== 1) {
+            navigate(legacyDealsBasePath)
+        }
+        setSearchQuery(event.target.value)
+    }
+    const clearSearchBox = () => {
+        if (pageNum !== 1) {
+            navigate(legacyDealsBasePath)
+        }
+        setSearchQuery('')
     }
 
     const dealListOffset = (pageNum-1) * dealsPerPage
     const queryCursor = pageNum === 1 ? null : params.cursor
     const {loading, error, data} = useQuery(LegacyDealsListQuery, {
-        pollInterval: pageNum === 1 ? 5000 : undefined,
+        pollInterval: searchQuery ? undefined : (pageNum === 1 ? 5000 : undefined),
         variables: {
+            query: searchQuery,
             cursor: queryCursor,
             limit: dealsPerPage,
             offset: dealListOffset,
@@ -69,6 +87,7 @@ function LegacyStorageDealsContent(props) {
     }
 
     return <div className="deals">
+        <SearchBox value={searchQuery} clearSearchBox={clearSearchBox} onChange={handleSearchQueryChange} />
         <table>
             <tbody>
             <tr>
@@ -129,7 +148,7 @@ function DealRow(props) {
 
 export function LegacyStorageDealsCount(props) {
     const {data} = useQuery(LegacyDealsCountQuery, {
-        pollInterval: 5000,
+        pollInterval: 30000,
         fetchPolicy: 'network-only',
     })
 

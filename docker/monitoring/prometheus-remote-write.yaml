@@ -1,0 +1,41 @@
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: [ 'localhost:9090' ]
+        labels:
+          host: 'unknown'
+  - job_name: 'tempo'
+    static_configs:
+      - targets: [ 'tempo:3200' ]
+        labels:
+          host: 'unknown'
+  - job_name: 'boost'
+    static_configs:
+      - targets: [ 'boost:1288' ]
+        labels:
+          host: 'unknown'
+  - job_name: 'booster-http'
+    static_configs:
+      - targets: [ 'booster-http:7777' ]
+        labels:
+          host: 'unknown'
+  - job_name: 'lotus-miner'
+    static_configs:
+      - targets: [ 'lotus-miner:2345' ]
+        labels:
+          host: 'unknown'
+
+remote_write:
+  - url: <remote-write-url>
+    sigv4:
+      region: <region>
+      access_key: <access-key>
+      secret_key: <secret-key>
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2500

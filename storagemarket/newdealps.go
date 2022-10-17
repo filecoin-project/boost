@@ -5,7 +5,7 @@ import (
 
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/libp2p/go-eventbus"
-	"github.com/libp2p/go-libp2p-core/event"
+	"github.com/libp2p/go-libp2p/core/event"
 )
 
 // newDealPS provides a nicer interface to keep track of "new deal" events

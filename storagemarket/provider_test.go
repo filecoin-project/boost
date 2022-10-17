@@ -52,9 +52,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
-	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -1941,6 +1941,16 @@ func (td *testDeal) executeAndSubscribeImportOfflineDeal() error {
 }
 
 func (td *testDeal) executeAndSubscribe() error {
+	dh, err := td.ph.Provider.mkAndInsertDealHandler(td.params.DealUUID)
+	if err != nil {
+		return err
+	}
+	sub, err := dh.subscribeUpdates()
+	if err != nil {
+		return err
+	}
+	td.sub = sub
+
 	pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
 	if err != nil {
 		return err
@@ -1948,12 +1958,6 @@ func (td *testDeal) executeAndSubscribe() error {
 	if !pi.Accepted {
 		return fmt.Errorf("deal not accepted: %s", pi.Reason)
 	}
-	dh := td.ph.Provider.getDealHandler(td.params.DealUUID)
-	sub, err := dh.subscribeUpdates()
-	if err != nil {
-		return err
-	}
-	td.sub = sub
 
 	return nil
 }

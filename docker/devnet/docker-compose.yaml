@@ -24,13 +24,13 @@ services:
     volumes:
       - ./data/lotus:/var/lib/lotus:rw
       - ./data/genesis:/var/lib/genesis:rw
-      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters:rw
+      - ${FIL_PROOFS_PARAMETER_CACHE}:/var/tmp/filecoin-proof-parameters:rw
 
   lotus-miner:
     container_name: lotus-miner
     image: ${LOTUS_MINER_IMAGE}
-    # ports:
-    #   - "2345:2345"
+    ports:
+      - "2345:2345"
     environment:
       - LOTUS_API_LISTENADDRESS=/dns/lotus-miner/tcp/2345/http
       - LOTUS_API_REMOTELISTENADDRESS=lotus-miner:2345
@@ -44,7 +44,7 @@ services:
       - ./data/lotus-miner:/var/lib/lotus-miner:rw
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/genesis:/var/lib/genesis:ro
-      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters:rw
+      - ${FIL_PROOFS_PARAMETER_CACHE}:/var/tmp/filecoin-proof-parameters:rw
 
   boost:
     container_name: boost
@@ -79,6 +79,24 @@ services:
     restart: unless-stopped
     logging: *default-logging
     volumes:
+      - ./data/boost:/var/lib/boost:ro
+      - ./data/lotus:/var/lib/lotus:ro
+      - ./data/lotus-miner:/var/lib/lotus-miner:ro
+
+  booster-bitswap:
+    container_name: booster-bitswap
+    image: ${BOOSTER_BITSWAP_IMAGE}
+    ports:
+      - "8888:8888"
+    environment:
+      - BOOSTER_BITSWAP_REPO=/var/lib/booster-bitswap
+      - BOOST_PATH=/var/lib/boost
+      - LOTUS_PATH=/var/lib/lotus
+      - LOTUS_MINER_PATH=/var/lib/lotus-miner
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./data/booster-bitswap:/var/lib/booster-bitswap:rw
       - ./data/boost:/var/lib/boost:ro
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/lotus-miner:/var/lib/lotus-miner:ro

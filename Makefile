@@ -98,6 +98,12 @@ booster-http: $(BUILD_DEPS)
 .PHONY: booster-http
 BINS+=booster-http
 
+booster-bitswap: $(BUILD_DEPS)
+	rm -f booster-bitswap
+	$(GOCC) build $(GOFLAGS) -o booster-bitswap ./cmd/booster-bitswap
+.PHONY: booster-bitswap
+BINS+=booster-bitswap
+
 devnet: $(BUILD_DEPS)
 	rm -f devnet
 	$(GOCC) build $(GOFLAGS) -o devnet ./cmd/devnet
@@ -194,9 +200,9 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=1.17.1-rc2
+lotus_version?=1.17.2-rc2
 lotus_src_dir?=
- 
+
 ifeq ($(lotus_src_dir),)
     lotus_src_dir=/tmp/lotus-$(lotus_version)
     lotus_checkout_dir=$(lotus_src_dir)
@@ -211,7 +217,7 @@ docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image) $
 info/lotus-test:
 	@echo Lotus dir = $(lotus_src_dir)
 	@echo Lotus ver = $(lotus_version)
-.PHONY: info/lotus-test	
+.PHONY: info/lotus-test
 $(lotus_checkout_dir):
 	git clone --depth 1 --branch v$(lotus_version) https://github.com/filecoin-project/lotus $@
 docker/lotus-test: info/lotus-test | $(lotus_checkout_dir)
@@ -220,17 +226,24 @@ docker/lotus-test: info/lotus-test | $(lotus_checkout_dir)
 .PHONY: docker/lotus-test
 
 ### devnet images
-docker/%: docker/lotus-test
+docker/%:
 	cd docker/devnet/$* && $(docker_build_cmd) -t $(docker_user)/$*-dev:$(lotus_version) \
 		--build-arg BUILD_VERSION=$(lotus_version) .
-docker/boost: build/.update-modules docker/lotus-test
+docker/boost: build/.update-modules
 	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
 		-t $(docker_user)/boost-dev:dev --build-arg BUILD_VERSION=dev \
-		-f docker/devnet/boost/Dockerfile.source .
+		-f docker/devnet/Dockerfile.source --target boost-dev .
 .PHONY: docker/boost
-docker/booster-http: 
-	$(docker_build_cmd) -t $(docker_user)/booster-http-dev:dev --build-arg BUILD_VERSION=dev \
-		-f docker/devnet/booster-http/Dockerfile.source .
+docker/booster-http:
+	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
+		-t $(docker_user)/booster-http-dev:dev --build-arg BUILD_VERSION=dev \
+		-f docker/devnet/Dockerfile.source --target booster-http-dev .
 .PHONY: docker/booster-http
-docker/all: docker/boost docker/booster-http docker/lotus docker/lotus-miner 
+docker/booster-bitswap:
+	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
+		-t $(docker_user)/booster-bitswap-dev:dev --build-arg BUILD_VERSION=dev \
+		-f docker/devnet/Dockerfile.source --target booster-bitswap-dev .
+.PHONY: docker/booster-bitswap
+docker/all: docker/lotus-test docker/boost docker/booster-http docker/booster-bitswap \
+	docker/lotus docker/lotus-miner
 .PHONY: docker/all

@@ -4,57 +4,76 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
-	"github.com/filecoin-project/boost/piecemeta"
-	"github.com/filecoin-project/lotus/node/repo"
-	"go.uber.org/fx"
-
-	"github.com/filecoin-project/lotus/markets/idxprov"
-
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/hashicorp/go-multierror"
-	logging "github.com/ipfs/go-log/v2"
-
-	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/index-provider/metadata"
+	"path/filepath"
 
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	provider "github.com/filecoin-project/index-provider"
+	"github.com/filecoin-project/index-provider/metadata"
+	"github.com/filecoin-project/lotus/markets/dagstore"
+	"github.com/filecoin-project/lotus/markets/idxprov"
+	lotus_config "github.com/filecoin-project/lotus/node/config"
+	"github.com/filecoin-project/lotus/node/repo"
+	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
+	"go.uber.org/fx"
 )
 
 var log = logging.Logger("index-provider-wrapper")
+var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
-	enabled     bool
-	dealsDB     *db.DealsDB
-	legacyProv  lotus_storagemarket.StorageProvider
-	prov        provider.Interface
-	pieceMeta   *piecemeta.PieceMeta
-	meshCreator idxprov.MeshCreator
+	cfg            lotus_config.DAGStoreConfig
+	enabled        bool
+	dealsDB        *db.DealsDB
+	legacyProv     lotus_storagemarket.StorageProvider
+	prov           provider.Interface
+	dagStore       *dagstore.Wrapper
+	pieceMeta      *piecemeta.PieceMeta
+	meshCreator    idxprov.MeshCreator
+	bitswapEnabled bool
 }
 
-func NewWrapper() func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
-	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface,
-	pieceMeta *piecemeta.PieceMeta,
-	meshCreator idxprov.MeshCreator) *Wrapper {
+func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
+	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
+	pieceMeta *piecemeta.PieceMeta, meshCreator idxprov.MeshCreator) *Wrapper {
 
 	return func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
 		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface,
-		pieceMeta *piecemeta.PieceMeta,
+		dagStore *dagstore.Wrapper, pieceMeta *piecemeta.PieceMeta,
 		meshCreator idxprov.MeshCreator) *Wrapper {
 
-		_, isDisabled := prov.(*DisabledIndexProvider)
-		return &Wrapper{
-			dealsDB:     dealsDB,
-			legacyProv:  legacyProv,
-			prov:        prov,
-			meshCreator: meshCreator,
-			//cfg:         cfg,
-			enabled:   !isDisabled,
-			pieceMeta: pieceMeta,
+		if cfg.DAGStore.RootDir == "" {
+			cfg.DAGStore.RootDir = filepath.Join(r.Path(), defaultDagStoreDir)
 		}
+
+		_, isDisabled := prov.(*DisabledIndexProvider)
+		w := &Wrapper{
+			dealsDB:        dealsDB,
+			legacyProv:     legacyProv,
+			prov:           prov,
+			dagStore:       dagStore,
+			meshCreator:    meshCreator,
+			cfg:            cfg.DAGStore,
+			bitswapEnabled: cfg.Dealmaking.BitswapPeerID != "",
+			enabled:        !isDisabled,
+			pieceMeta:      pieceMeta,
+		}
+		// announce all deals on startup in case of a config change
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				go func() {
+					_ = w.IndexerAnnounceAllDeals(ctx)
+				}()
+				return nil
+			},
+		})
+		return w
 	}
 }
 
@@ -85,13 +104,21 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 	var merr error
 
 	for _, d := range deals {
-		if d.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
+		// filter out deals that will announce automatically at a later
+		// point in their execution, as well as deals that are not processing at all
+		// (i.e. in an error state or expired)
+		// (note technically this is only one check point state IndexedAndAnnounced but is written so
+		// it will work if we ever introduce additional states between IndexedAndAnnounced & Complete)
+		if d.Checkpoint < dealcheckpoints.IndexedAndAnnounced || d.Checkpoint >= dealcheckpoints.Complete {
 			continue
 		}
 
 		if _, err := w.AnnounceBoostDeal(ctx, d); err != nil {
-			merr = multierror.Append(merr, err)
-			log.Errorw("failed to announce boost deal to Index provider", "dealId", d.DealUuid, "err", err)
+			// don't log already advertised errors as errors - just skip them
+			if !errors.Is(err, provider.ErrAlreadyAdvertised) {
+				merr = multierror.Append(merr, err)
+				log.Errorw("failed to announce boost deal to Index provider", "dealId", d.DealUuid, "err", err)
+			}
 			continue
 		}
 		shards[d.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
@@ -147,11 +174,18 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDeal
 	}
 
 	// Announce deal to network Indexer
-	fm := metadata.New(&metadata.GraphsyncFilecoinV1{
-		PieceCID:      pds.ClientDealProposal.Proposal.PieceCID,
-		FastRetrieval: true,
-		VerifiedDeal:  pds.ClientDealProposal.Proposal.VerifiedDeal,
-	})
+	protocols := []metadata.Protocol{
+		&metadata.GraphsyncFilecoinV1{
+			PieceCID:      pds.ClientDealProposal.Proposal.PieceCID,
+			FastRetrieval: true,
+			VerifiedDeal:  pds.ClientDealProposal.Proposal.VerifiedDeal,
+		},
+	}
+	if w.bitswapEnabled {
+		protocols = append(protocols, metadata.Bitswap{})
+	}
+
+	fm := metadata.New(protocols...)
 
 	// ensure we have a connection with the full node host so that the index provider gossip sub announcements make their
 	// way to the filecoin bootstrapper network

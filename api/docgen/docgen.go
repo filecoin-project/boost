@@ -17,15 +17,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-graphsync"
-	"github.com/libp2p/go-libp2p-core/metrics"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/metrics"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
 
 	datatransfer "github.com/filecoin-project/go-data-transfer"
-	filestore "github.com/filecoin-project/go-fil-markets/filestore"
+	"github.com/filecoin-project/go-fil-markets/filestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	textselector "github.com/ipld/go-ipld-selector-text-lite"
@@ -45,6 +45,8 @@ import (
 	"github.com/filecoin-project/lotus/node/repo/imports"
 	"github.com/filecoin-project/lotus/storage/sealer/sealtasks"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var ExampleValues = map[reflect.Type]interface{}{
@@ -298,6 +300,15 @@ func init() {
 	addExample(dealcheckpoints.Transferred)
 	addExample(lapi.SubsystemMarkets)
 	addExample(types2.DealRetryAuto)
+	addExample(map[string][]lapi.SealedRef{
+		"98000": {
+			lapi.SealedRef{
+				SectorID: 100,
+				Offset:   10 << 20,
+				Size:     1 << 20,
+			},
+		},
+	})
 }
 
 func GetAPIType(name, pkg string) (i interface{}, t reflect.Type, permStruct []reflect.Type) {
@@ -363,7 +374,7 @@ func exampleStruct(method string, t, parent reflect.Type) interface{} {
 		if f.Type == parent {
 			continue
 		}
-		if strings.Title(f.Name) == f.Name {
+		if cases.Title(language.Und, cases.NoLower).String(f.Name) == f.Name {
 			ns.Elem().Field(i).Set(reflect.ValueOf(ExampleValue(method, f.Type, t)))
 		}
 	}

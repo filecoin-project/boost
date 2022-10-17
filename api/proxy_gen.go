@@ -21,10 +21,10 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	metrics "github.com/libp2p/go-libp2p-core/metrics"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	metrics "github.com/libp2p/go-libp2p/core/metrics"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multihash"
 )
 
@@ -37,6 +37,12 @@ type BoostStruct struct {
 
 	Internal struct {
 		ActorSectorSize func(p0 context.Context, p1 address.Address) (abi.SectorSize, error) `perm:"read"`
+
+		BlockstoreGet func(p0 context.Context, p1 cid.Cid) ([]byte, error) `perm:"read"`
+
+		BlockstoreGetSize func(p0 context.Context, p1 cid.Cid) (int, error) `perm:"read"`
+
+		BlockstoreHas func(p0 context.Context, p1 cid.Cid) (bool, error) `perm:"read"`
 
 		BoostDagstoreDestroyShard func(p0 context.Context, p1 string) error `perm:"admin"`
 
@@ -108,6 +114,8 @@ type BoostStruct struct {
 
 		MarketListRetrievalDeals func(p0 context.Context) ([]retrievalmarket.ProviderDealState, error) `perm:"read"`
 
+		MarketPendingDeals func(p0 context.Context) (lapi.PendingDealInfo, error) `perm:"write"`
+
 		MarketRestartDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error `perm:"write"`
 
 		MarketSetAsk func(p0 context.Context, p1 types.BigInt, p2 types.BigInt, p3 abi.ChainEpoch, p4 abi.PaddedPieceSize, p5 abi.PaddedPieceSize) error `perm:"admin"`
@@ -125,6 +133,8 @@ type BoostStruct struct {
 		PiecesListPieces func(p0 context.Context) ([]cid.Cid, error) `perm:"read"`
 
 		RuntimeSubsystems func(p0 context.Context) (lapi.MinerSubsystems, error) `perm:"read"`
+
+		SectorsRefs func(p0 context.Context) (map[string][]lapi.SealedRef, error) `perm:"read"`
 	}
 }
 
@@ -260,6 +270,39 @@ func (s *BoostStruct) ActorSectorSize(p0 context.Context, p1 address.Address) (a
 
 func (s *BoostStub) ActorSectorSize(p0 context.Context, p1 address.Address) (abi.SectorSize, error) {
 	return *new(abi.SectorSize), ErrNotSupported
+}
+
+func (s *BoostStruct) BlockstoreGet(p0 context.Context, p1 cid.Cid) ([]byte, error) {
+	if s.Internal.BlockstoreGet == nil {
+		return *new([]byte), ErrNotSupported
+	}
+	return s.Internal.BlockstoreGet(p0, p1)
+}
+
+func (s *BoostStub) BlockstoreGet(p0 context.Context, p1 cid.Cid) ([]byte, error) {
+	return *new([]byte), ErrNotSupported
+}
+
+func (s *BoostStruct) BlockstoreGetSize(p0 context.Context, p1 cid.Cid) (int, error) {
+	if s.Internal.BlockstoreGetSize == nil {
+		return 0, ErrNotSupported
+	}
+	return s.Internal.BlockstoreGetSize(p0, p1)
+}
+
+func (s *BoostStub) BlockstoreGetSize(p0 context.Context, p1 cid.Cid) (int, error) {
+	return 0, ErrNotSupported
+}
+
+func (s *BoostStruct) BlockstoreHas(p0 context.Context, p1 cid.Cid) (bool, error) {
+	if s.Internal.BlockstoreHas == nil {
+		return false, ErrNotSupported
+	}
+	return s.Internal.BlockstoreHas(p0, p1)
+}
+
+func (s *BoostStub) BlockstoreHas(p0 context.Context, p1 cid.Cid) (bool, error) {
+	return false, ErrNotSupported
 }
 
 func (s *BoostStruct) BoostDagstoreDestroyShard(p0 context.Context, p1 string) error {
@@ -647,6 +690,17 @@ func (s *BoostStub) MarketListRetrievalDeals(p0 context.Context) ([]retrievalmar
 	return *new([]retrievalmarket.ProviderDealState), ErrNotSupported
 }
 
+func (s *BoostStruct) MarketPendingDeals(p0 context.Context) (lapi.PendingDealInfo, error) {
+	if s.Internal.MarketPendingDeals == nil {
+		return *new(lapi.PendingDealInfo), ErrNotSupported
+	}
+	return s.Internal.MarketPendingDeals(p0)
+}
+
+func (s *BoostStub) MarketPendingDeals(p0 context.Context) (lapi.PendingDealInfo, error) {
+	return *new(lapi.PendingDealInfo), ErrNotSupported
+}
+
 func (s *BoostStruct) MarketRestartDataTransfer(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error {
 	if s.Internal.MarketRestartDataTransfer == nil {
 		return ErrNotSupported
@@ -744,6 +798,17 @@ func (s *BoostStruct) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystem
 
 func (s *BoostStub) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystems, error) {
 	return *new(lapi.MinerSubsystems), ErrNotSupported
+}
+
+func (s *BoostStruct) SectorsRefs(p0 context.Context) (map[string][]lapi.SealedRef, error) {
+	if s.Internal.SectorsRefs == nil {
+		return *new(map[string][]lapi.SealedRef), ErrNotSupported
+	}
+	return s.Internal.SectorsRefs(p0)
+}
+
+func (s *BoostStub) SectorsRefs(p0 context.Context) (map[string][]lapi.SealedRef, error) {
+	return *new(map[string][]lapi.SealedRef), ErrNotSupported
 }
 
 func (s *ChainIOStruct) ChainHasObj(p0 context.Context, p1 cid.Cid) (bool, error) {

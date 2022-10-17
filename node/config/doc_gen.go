@@ -288,6 +288,18 @@ more downloads are allowed to start.`,
 			Comment: `The time that can elapse before a download is considered stalled (and
 another concurrent download is allowed to start).`,
 		},
+		{
+			Name: "BitswapPeerID",
+			Type: "string",
+
+			Comment: `The peed id used by booster-bitswap. To set, copy the value
+printed by running 'booster-bitswap init'. If this value is set,
+Boost will:
+- listen on bitswap protocols on its own peer id and forward them
+to booster bitswap
+- advertise bitswap records to the content indexer
+- list bitswap in available transports on the retrieval transport protocol`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{
@@ -778,14 +790,14 @@ regardless of this number.`,
 			Type: "string",
 
 			Comment: `A command used for fine-grained evaluation of storage deals
-see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-fine-grained-storage-and-retrieval-deal-acceptance for more details`,
+see https://lotus.filecoin.io/storage-providers/advanced-configurations/market/#using-filters-for-fine-grained-storage-and-retrieval-deal-acceptance for more details`,
 		},
 		{
 			Name: "RetrievalFilter",
 			Type: "string",
 
 			Comment: `A command used for fine-grained evaluation of retrieval deals
-see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-fine-grained-storage-and-retrieval-deal-acceptance for more details`,
+see https://lotus.filecoin.io/storage-providers/advanced-configurations/market/#using-filters-for-fine-grained-storage-and-retrieval-deal-acceptance for more details`,
 		},
 		{
 			Name: "RetrievalPricing",
@@ -1203,10 +1215,16 @@ This parameter is ONLY applicable if the retrieval pricing policy strategy has b
 			Comment: ``,
 		},
 		{
+			Name: "AllowSectorDownload",
+			Type: "bool",
+
+			Comment: ``,
+		},
+		{
 			Name: "AllowAddPiece",
 			Type: "bool",
 
-			Comment: `Local worker config`,
+			Comment: ``,
 		},
 		{
 			Name: "AllowPreCommit1",
@@ -1327,6 +1345,20 @@ flow when the volume of storage deals is lower.`,
 			Type: "uint64",
 
 			Comment: `Upper bound on how many sectors can be sealing+upgrading at the same time when upgrading CC sectors with deals (0 = MaxSealingSectorsForDeals)`,
+		},
+		{
+			Name: "MinUpgradeSectorExpiration",
+			Type: "uint64",
+
+			Comment: `Note that if all deals waiting in the input queue have lifetimes longer than this value, upgrade sectors will be
+required to have expiration of at least the soonest-ending deal`,
+		},
+		{
+			Name: "MinTargetUpgradeSectorExpiration",
+			Type: "uint64",
+
+			Comment: `Setting this to a high value (for example to maximum deal duration - 1555200) will disable selection based on
+initial pledge - upgrade sectors will always be chosen based on longest expiration`,
 		},
 		{
 			Name: "CommittedCapacitySectorLifetime",

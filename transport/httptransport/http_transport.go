@@ -17,8 +17,8 @@ import (
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/google/uuid"
 	"github.com/jpillora/backoff"
-	"github.com/libp2p/go-libp2p-core/host"
 	p2phttp "github.com/libp2p/go-libp2p-http"
+	"github.com/libp2p/go-libp2p/core/host"
 )
 
 const (

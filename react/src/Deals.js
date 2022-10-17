@@ -2,7 +2,7 @@
 import {useQuery} from "@apollo/react-hooks";
 import {
     DealsCountQuery,
-    DealsListQuery,
+    DealsListQuery, LegacyDealsCountQuery,
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
@@ -106,6 +106,7 @@ function StorageDealsContent(props) {
     }
 
     return <div className="deals">
+        <LegacyDealsLink />
         <SearchBox value={searchQuery} clearSearchBox={clearSearchBox} onChange={handleSearchQueryChange} />
         <table>
             <tbody>
@@ -132,7 +133,24 @@ function StorageDealsContent(props) {
     </div>
 }
 
-function SearchBox(props) {
+function LegacyDealsLink(props) {
+    const {data} = useQuery(LegacyDealsCountQuery, {
+        pollInterval: 5000,
+        fetchPolicy: 'network-only',
+    })
+
+    if (!data || !data.legacyDealsCount) {
+        return null
+    }
+
+    return (
+        <Link key="legacy-storage-deals" className="legacy-storage-deals-link" to="/legacy-storage-deals">
+            Show legacy deals ➜
+        </Link>
+    )
+}
+
+export function SearchBox(props) {
     return <div className="search">
         <DebounceInput
             autoFocus={!!props.value}

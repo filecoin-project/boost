@@ -14,7 +14,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multihash"
 )
 
@@ -48,6 +48,11 @@ type Boost interface {
 	BoostDagstorePiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error)                         //perm:read
 	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error)                                                      //perm:read
 
+	// MethodGroup: Blockstore
+	BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error)  //perm:read
+	BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error)    //perm:read
+	BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) //perm:read
+
 	// RuntimeSubsystems returns the subsystems that are enabled
 	// in this instance.
 	RuntimeSubsystems(ctx context.Context) (lapi.MinerSubsystems, error) //perm:read
@@ -64,6 +69,8 @@ type Boost interface {
 	MarketCancelDataTransfer(ctx context.Context, transferID datatransfer.TransferID, otherPeer peer.ID, isInitiator bool) error                                                         //perm:write
 	MarketImportDealData(ctx context.Context, propcid cid.Cid, path string) error                                                                                                        //perm:write
 	MarketListIncompleteDeals(ctx context.Context) ([]storagemarket.MinerDeal, error)                                                                                                    //perm:read
+	MarketPendingDeals(ctx context.Context) (lapi.PendingDealInfo, error)                                                                                                                //perm:write
+	SectorsRefs(context.Context) (map[string][]lapi.SealedRef, error)                                                                                                                    //perm:read
 
 	PiecesListPieces(ctx context.Context) ([]cid.Cid, error)                                 //perm:read
 	PiecesListCidInfos(ctx context.Context) ([]cid.Cid, error)                               //perm:read
