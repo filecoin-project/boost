@@ -232,15 +232,18 @@ docker/%:
 docker/boost: build/.update-modules
 	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
 		-t $(docker_user)/boost-dev:dev --build-arg BUILD_VERSION=dev \
-		-f docker/devnet/boost/Dockerfile.source .
+		-f docker/devnet/Dockerfile.source --target boost-dev .
 .PHONY: docker/boost
 docker/booster-http:
-	$(docker_build_cmd) -t $(docker_user)/booster-http-dev:dev --build-arg BUILD_VERSION=dev \
-		-f docker/devnet/booster-http/Dockerfile.source .
+	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
+		-t $(docker_user)/booster-http-dev:dev --build-arg BUILD_VERSION=dev \
+		-f docker/devnet/Dockerfile.source --target booster-http-dev .
 .PHONY: docker/booster-http
 docker/booster-bitswap:
-	$(docker_build_cmd) -t $(docker_user)/booster-bitswap-dev:dev --build-arg BUILD_VERSION=dev \
-		-f docker/devnet/booster-bitswap/Dockerfile.source .
+	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
+		-t $(docker_user)/booster-bitswap-dev:dev --build-arg BUILD_VERSION=dev \
+		-f docker/devnet/Dockerfile.source --target booster-bitswap-dev .
 .PHONY: docker/booster-bitswap
-docker/all: docker/lotus-test docker/boost docker/booster-http docker/lotus docker/lotus-miner
+docker/all: docker/lotus-test docker/boost docker/booster-http docker/booster-bitswap \
+	docker/lotus docker/lotus-miner
 .PHONY: docker/all
