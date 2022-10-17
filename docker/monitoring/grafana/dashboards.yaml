@@ -7,3 +7,4 @@ providers:
   type: 'file'
   options:
     folder: '/var/lib/grafana/dashboards'
+  allowUiUpdates: true

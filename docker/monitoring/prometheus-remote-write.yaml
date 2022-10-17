@@ -7,28 +7,35 @@ scrape_configs:
     static_configs:
       - targets: [ 'localhost:9090' ]
         labels:
-          host: 'local'
+          host: 'unknown'
   - job_name: 'tempo'
     static_configs:
       - targets: [ 'tempo:3200' ]
         labels:
-          host: 'local'
+          host: 'unknown'
   - job_name: 'boost'
     static_configs:
       - targets: [ 'boost:1288' ]
         labels:
-          host: 'local'
+          host: 'unknown'
   - job_name: 'booster-http'
     static_configs:
       - targets: [ 'booster-http:7777' ]
-  - job_name: 'booster-bitswap'
-    static_configs:
-      - targets: [ 'booster-bitswap:9696' ]
         labels:
-          host: 'local'
+          host: 'unknown'
   - job_name: 'lotus-miner'
-    metrics_path: "/debug/metrics"
     static_configs:
       - targets: [ 'lotus-miner:2345' ]
         labels:
-          host: 'local'
+          host: 'unknown'
+
+remote_write:
+  - url: <remote-write-url>
+    sigv4:
+      region: <region>
+      access_key: <access-key>
+      secret_key: <secret-key>
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2500
