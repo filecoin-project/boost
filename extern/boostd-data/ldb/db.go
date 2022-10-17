@@ -211,12 +211,12 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (mode
 
 	b, err := db.Get(ctx, key)
 	if err != nil {
-		return metadata, err
+		return metadata, fmt.Errorf("getting piece metadata for piece %s: %w", pieceCid, err)
 	}
 
 	err = json.Unmarshal(b, &metadata)
 	if err != nil {
-		return metadata, err
+		return metadata, fmt.Errorf("unmarshaling piece metadata for piece %s: %w", pieceCid, err)
 	}
 
 	return metadata, nil

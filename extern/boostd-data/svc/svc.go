@@ -43,13 +43,13 @@ func New(ctx context.Context, db string, repopath string) (*http.Server, error) 
 	return &http.Server{Handler: router}, nil
 }
 
-func Setup(ctx context.Context, db string) (string, func(), error) {
+func Setup(ctx context.Context, db string, repoPath string) (string, func(), error) {
 	addr := "localhost:0"
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return "", nil, err
 	}
-	srv, err := New(ctx, db, "")
+	srv, err := New(ctx, db, repoPath)
 	if err != nil {
 		return "", nil, err
 	}

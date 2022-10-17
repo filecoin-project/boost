@@ -44,7 +44,7 @@ func TestService(t *testing.T) {
 }
 
 func testService(ctx context.Context, t *testing.T, name string) {
-	addr, cleanup, err := Setup(ctx, name)
+	addr, cleanup, err := Setup(ctx, name, "")
 	require.NoError(t, err)
 
 	cl, err := client.NewStore("http://" + addr)
@@ -130,7 +130,7 @@ func TestServiceFuzz(t *testing.T) {
 }
 
 func testServiceFuzz(ctx context.Context, t *testing.T, name string) {
-	addr, cleanup, err := Setup(ctx, name)
+	addr, cleanup, err := Setup(ctx, name, "")
 	require.NoError(t, err)
 	defer cleanup()
 

@@ -57,7 +57,7 @@ type PieceMeta struct {
 }
 
 func NewStore(ctx context.Context) *client.Store {
-	addr, _, err := svc.Setup(ctx, "couchbase")
+	addr, _, err := svc.Setup(ctx, "couchbase", "")
 	if err != nil {
 		panic(err)
 	}
