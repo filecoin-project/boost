@@ -21,7 +21,7 @@ import (
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
-	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p/core/host"
 )
 
 func StorageProvider(minerAddress dtypes.MinerAddress,

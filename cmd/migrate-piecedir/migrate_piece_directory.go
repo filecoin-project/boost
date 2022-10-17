@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -48,7 +47,7 @@ var migrateLevelDBCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		defer zl.Sync()
+		defer zl.Sync() //nolint:errcheck
 		logger := zl.Sugar()
 
 		repoDir, err := homedir.Expand(cctx.String(FlagBoostRepo))
@@ -104,7 +103,7 @@ var migrateLevelDBCmd = &cli.Command{
 
 		// Migrate the piece store
 		bar.Describe("[cyan][2/3][reset] Migrating piece info...")
-		bar.Set(0)
+		bar.Set(0) //nolint:errcheck
 		errCount, err = migratePieceStore(ctx, logger, bar, repoDir, cl)
 		if errCount > 0 {
 			msg := fmt.Sprintf("Warning: there were errors migrating %d piece deal infos.", errCount)
@@ -144,7 +143,7 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 		start := time.Now()
 
 		indexed, err := migrateIndex(ctx, ipath, store)
-		bar.Add(1)
+		bar.Add(1) //nolint:errcheck
 		if err != nil {
 			logger.Errorw("migrate index failed", "piece cid", ipath.name, "err", err)
 			errCount++
@@ -251,7 +250,7 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 	var count int
 	var errorCount int
 	for i, pcid := range pcids {
-		bar.Add(1)
+		bar.Add(1) //nolint:errcheck
 
 		pieceStart := time.Now()
 
@@ -327,6 +326,9 @@ func newPieceStore(path string) (piecestore.PieceStore, error) {
 	}
 
 	ps, err := piecestoreimpl.NewPieceStore(namespace.Wrap(bds, datastore.NewKey("/storagemarket")))
+	if err != nil {
+		return nil, fmt.Errorf("creating piece store: %w", err)
+	}
 
 	return ps, nil
 }
@@ -402,32 +404,4 @@ func loadIndex(path string) (index.Index, error) {
 	}
 
 	return subject, nil
-}
-
-func ByteCountSI(b int64) string {
-	const unit = 1000
-	if b < unit {
-		return fmt.Sprintf("%d B", b)
-	}
-	div, exp := int64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB",
-		float64(b)/float64(div), "kMGTPE"[exp])
-}
-
-func DirSize(path string) (int64, error) {
-	var size int64
-	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			size += info.Size()
-		}
-		return err
-	})
-	return size, err
 }
