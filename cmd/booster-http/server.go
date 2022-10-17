@@ -159,7 +159,7 @@ func (s *HttpServer) handlePieceRequest(w http.ResponseWriter, r *http.Request) 
 	if len(q[payloadPrefix]) == 1 && len(q["format"]) == 1 {
 		s.handleByPayloadCid(w, r)
 	} else if len(q[piecePrefix]) == 1 && len(q["format"]) == 1 {
-		s.handlePieceRequest(w, r)
+		s.handleByPieceCid(w, r)
 	} else {
 		writeError(w, r, http.StatusBadRequest, "unsupported query")
 	}
