@@ -91,9 +91,18 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) *d
 		// Read the bytes received from the downloaded / imported file
 		fi, err := os.Stat(deal.InboundFilePath)
 		if err != nil {
-			return &dealMakingError{
-				error: fmt.Errorf("failed to get size of %s '%s': %w", transferType, deal.InboundFilePath, err),
-				retry: smtypes.DealRetryFatal,
+			// Allow manual retry in case user accidentally gave wrong input
+			// like a non-existent file
+			if deal.IsOffline {
+				return &dealMakingError{
+					error: fmt.Errorf("failed to get size of %s '%s': %w", transferType, deal.InboundFilePath, err),
+					retry: smtypes.DealRetryManual,
+				}
+			} else {
+				return &dealMakingError{
+					error: fmt.Errorf("failed to get size of %s '%s': %w", transferType, deal.InboundFilePath, err),
+					retry: smtypes.DealRetryFatal,
+				}
 			}
 		}
 		deal.NBytesReceived = fi.Size()

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-commp-utils/writer"
@@ -27,9 +28,17 @@ func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
 
 	clientPieceCid := deal.ClientDealProposal.Proposal.PieceCID
 	if pieceCid != clientPieceCid {
-		return &dealMakingError{
-			retry: types.DealRetryFatal,
-			error: fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid),
+		// Allow manual retry in case user accidentally gave wrong input
+		if deal.IsOffline {
+			return &dealMakingError{
+				retry: types.DealRetryManual,
+				error: fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid),
+			}
+		} else {
+			return &dealMakingError{
+				retry: types.DealRetryFatal,
+				error: fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid),
+			}
 		}
 	}
 
@@ -56,6 +65,13 @@ func (p *Provider) generatePieceCommitment(filepath string, pieceSize abi.Padded
 		var err error
 		pi, err = GenerateCommP(filepath)
 		if err != nil {
+			// Allow auto retry to cover cases where IO copy fails due to lack of space
+			if strings.Contains(err.Error(), "failed to write to CommP writer") {
+				return cid.Undef, &dealMakingError{
+					retry: types.DealRetryAuto,
+					error: fmt.Errorf("performing local commp: %w", err),
+				}
+			}
 			return cid.Undef, &dealMakingError{
 				retry: types.DealRetryFatal,
 				error: fmt.Errorf("performing local commp: %w", err),
