@@ -21,8 +21,6 @@ import (
 	"github.com/ipld/go-car/v2/blockstore"
 	"github.com/ipld/go-car/v2/index"
 	carindex "github.com/ipld/go-car/v2/index"
-	"github.com/multiformats/go-multicodec"
-	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -130,20 +128,23 @@ func (ps *PieceMeta) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dea
 		return err
 	}
 
-	// Get an index from the CAR file - works for both CARv1 and CARv2
-	idx, err := car.ReadOrGenerateIndex(reader, car.ZeroLengthSectionAsEOF(true), car.StoreIdentityCIDs(true))
+	// Iterate over all the blocks in the piece to extract the index records
+	recs := make([]model.Record, 0)
+	it := func(c cid.Cid, offset uint64, blockLength uint64) bool {
+		recs = append(recs, model.Record{
+			Cid: c,
+			OffsetSize: model.OffsetSize{
+				Offset: offset,
+				Size:   blockLength,
+			},
+		})
+		return true
+	}
+
+	opts := []carv2.Option{car.ZeroLengthSectionAsEOF(true), car.StoreIdentityCIDs(true)}
+	err = car.IterateIndex(reader, it, opts...)
 	if err != nil {
 		return fmt.Errorf("generating index for piece %s: %w", pieceCid, err)
-	}
-
-	itidx, ok := idx.(carindex.IterableIndex)
-	if !ok {
-		return fmt.Errorf("index is not iterable for piece %s", pieceCid)
-	}
-
-	recs, err := getRecords(itidx)
-	if err != nil {
-		return err
 	}
 
 	// Add mh => piece index to store: "which piece contains the multihash?"
@@ -334,32 +335,4 @@ func (ps *PieceMeta) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (bstor
 	}
 
 	return bs, nil
-}
-
-func getRecords(subject index.Index) ([]model.Record, error) {
-	records := make([]model.Record, 0)
-
-	switch idx := subject.(type) {
-	case index.IterableIndex:
-		err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
-
-			cid := cid.NewCidV1(cid.Raw, m)
-
-			records = append(records, model.Record{
-				Cid: cid,
-				OffsetSize: model.OffsetSize{
-					Offset: offset,
-					Size:   0,
-				},
-			})
-
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec())
-	}
-	return records, nil
 }
