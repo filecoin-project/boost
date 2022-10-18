@@ -28,8 +28,8 @@ func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
 
 	clientPieceCid := deal.ClientDealProposal.Proposal.PieceCID
 	if pieceCid != clientPieceCid {
-		// Allow manual retry in case user accidentally gave wrong input
 		if deal.IsOffline {
+			// Allow manual retry in case user accidentally gave wrong input
 			return &dealMakingError{
 				retry: types.DealRetryManual,
 				error: fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid),
