@@ -337,7 +337,7 @@ func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, m multihash.M
 	ctx, span := tracing.Tracer.Start(ctx, "db.get_offset_size")
 	defer span.End()
 
-	var val *offsetSize
+	var val offsetSize
 	cbMap := db.col.Map(pieceCid.String())
 	err := cbMap.At(m.String(), &val)
 	if err != nil {
