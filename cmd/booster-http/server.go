@@ -156,8 +156,15 @@ func (s *HttpServer) handlePieceRequest(w http.ResponseWriter, r *http.Request) 
 	}
 
 	isCar := false
-	if len(q["format"]) != 0 && q["format"][0] == "car" {
-		isCar = true
+
+	if len(q["format"]) == 1 {
+		if q["format"][0] == "car" { // Check if format value is car
+			isCar = true
+		} else if q["format"][0] != "piece" { // Check if format value is not piece
+			writeError(w, r, http.StatusBadRequest, "unsupported format")
+		}
+	} else { // Error if more than 1 format value
+		writeError(w, r, http.StatusBadRequest, "unsupported query")
 	}
 
 	// Check provided cid and format and redirect the request appropriately
