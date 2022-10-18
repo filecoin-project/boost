@@ -343,8 +343,11 @@ func getRecords(subject index.Index) ([]model.Record, error) {
 			cid := cid.NewCidV1(cid.Raw, m)
 
 			records = append(records, model.Record{
-				Cid:    cid,
-				Offset: offset,
+				Cid: cid,
+				OffsetSize: model.OffsetSize{
+					Offset: offset,
+					Size:   0,
+				},
 			})
 
 			return nil

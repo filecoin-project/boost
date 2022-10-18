@@ -115,12 +115,12 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	return ts, nil
 }
 
-func (s *Store) GetOffset(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
-	var resp uint64
-	err := s.client.CallContext(ctx, &resp, "boostddata_getOffset", pieceCid, hash)
+func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
+	var resp model.OffsetSize
+	err := s.client.CallContext(ctx, &resp, "boostddata_getOffsetSize", pieceCid, hash)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return resp, nil
+	return &resp, nil
 }

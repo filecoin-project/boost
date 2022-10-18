@@ -83,9 +83,10 @@ func testService(ctx context.Context, t *testing.T, name string) {
 	mhash, err := multihash.Cast(b)
 	require.NoError(t, err)
 
-	offset, err := cl.GetOffset(ctx, pieceCid, mhash)
+	offset, err := cl.GetOffsetSize(ctx, pieceCid, mhash)
 	require.NoError(t, err)
-	require.EqualValues(t, 3039040395, offset)
+	require.EqualValues(t, 3039040395, offset.Offset)
+	require.EqualValues(t, 0, offset.Size)
 
 	pcids, err := cl.PiecesContaining(ctx, mhash)
 	require.NoError(t, err)
@@ -192,20 +193,22 @@ func testServiceFuzz(ctx context.Context, t *testing.T, name string) {
 
 					var err error
 					idx.GetAll(r.Cid, func(expected uint64) bool {
-						var offset uint64
-						offset, err = cl.GetOffset(ctx, pieceCid, mhash)
+						var offsetSize *model.OffsetSize
+						offsetSize, err = cl.GetOffsetSize(ctx, pieceCid, mhash)
 						if err != nil {
 							return false
 						}
-						if expected != offset {
-							err = fmt.Errorf("cid %s: expected offset %d, got offset %d", r.Cid, expected, offset)
+						if expected != offsetSize.Offset {
+							err = fmt.Errorf("cid %s: expected offset %d, got offset %d", r.Cid, expected, offsetSize.Offset)
 							return false
 						}
 						return true
 					})
+					if err != nil {
+						return err
+					}
 
-					var pcids []cid.Cid
-					pcids, err = cl.PiecesContaining(ctx, mhash)
+					pcids, err := cl.PiecesContaining(ctx, mhash)
 					if err != nil {
 						return err
 					}
@@ -320,8 +323,11 @@ func getRecords(subject index.Index) ([]model.Record, error) {
 			cid := cid.NewCidV1(cid.Raw, m)
 
 			records = append(records, model.Record{
-				Cid:    cid,
-				Offset: offset,
+				Cid: cid,
+				OffsetSize: model.OffsetSize{
+					Offset: offset,
+					Size:   0,
+				},
 			})
 
 			return nil

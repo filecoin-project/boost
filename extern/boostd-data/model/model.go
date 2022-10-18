@@ -35,6 +35,11 @@ type Metadata struct {
 }
 
 type Record struct {
-	Cid    cid.Cid
+	Cid cid.Cid
+	OffsetSize
+}
+
+type OffsetSize struct {
 	Offset uint64
+	Size   uint64
 }
