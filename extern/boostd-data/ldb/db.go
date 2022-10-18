@@ -33,20 +33,18 @@ var (
 	// LevelDB keys will be built by concatenating Multihash to this prefix.
 	prefixMhtoPieceCids  uint64 = 2
 	sprefixMhtoPieceCids string
-
-	size = binary.MaxVarintLen64
 )
 
 func init() {
-	buf := make([]byte, size)
+	buf := make([]byte, binary.MaxVarintLen64)
 	binary.PutUvarint(buf, keyNextCursor)
 	dskeyNextCursor = datastore.NewKey(string(buf))
 
-	buf = make([]byte, size)
+	buf = make([]byte, binary.MaxVarintLen64)
 	binary.PutUvarint(buf, prefixPieceCidToCursor)
 	sprefixPieceCidToCursor = string(buf)
 
-	buf = make([]byte, size)
+	buf = make([]byte, binary.MaxVarintLen64)
 	binary.PutUvarint(buf, prefixMhtoPieceCids)
 	sprefixMhtoPieceCids = string(buf)
 }
@@ -83,7 +81,7 @@ func (db *DB) NextCursor(ctx context.Context) (uint64, string, error) {
 
 // SetNextCursor
 func (db *DB) SetNextCursor(ctx context.Context, cursor uint64) error {
-	buf := make([]byte, size)
+	buf := make([]byte, binary.MaxVarintLen64)
 	binary.PutUvarint(buf, cursor)
 
 	return db.Put(ctx, dskeyNextCursor, buf)
@@ -229,7 +227,7 @@ func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, er
 
 	var records []model.Record
 
-	buf := make([]byte, size)
+	buf := make([]byte, binary.MaxVarintLen64)
 	binary.PutUvarint(buf, cursor)
 
 	var q query.Query
@@ -254,32 +252,37 @@ func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, er
 
 		kcid := cid.NewCidV1(cid.Raw, m)
 
-		offset, _ := binary.Uvarint(r.Value)
+		offset, n := binary.Uvarint(r.Value)
+		size, n := binary.Uvarint(r.Value[n:])
 
 		records = append(records, model.Record{
-			Cid:    kcid,
-			Offset: offset,
+			Cid: kcid,
+			OffsetSize: model.OffsetSize{
+				Offset: offset,
+				Size:   size,
+			},
 		})
 	}
 
 	return records, nil
 }
 
-// AddOffset
-func (db *DB) AddOffset(ctx context.Context, cursorPrefix string, m multihash.Multihash, offset uint64) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.add_offsets")
+// AddIndexRecord
+func (db *DB) AddIndexRecord(ctx context.Context, cursorPrefix string, rec model.Record) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.add_index_record")
 	defer span.End()
 
-	key := datastore.NewKey(fmt.Sprintf("%s%s", cursorPrefix, m.String()))
+	key := datastore.NewKey(fmt.Sprintf("%s%s", cursorPrefix, rec.Cid.Hash().String()))
 
-	value := make([]byte, size)
-	binary.PutUvarint(value, offset)
+	value := make([]byte, 2*binary.MaxVarintLen64)
+	no := binary.PutUvarint(value, rec.Offset)
+	ns := binary.PutUvarint(value[no:], rec.Size)
 
-	return db.Put(ctx, key, value)
+	return db.Put(ctx, key, value[:no+ns])
 }
 
-// GetOffset
-func (db *DB) GetOffset(ctx context.Context, cursorPrefix string, m multihash.Multihash) (uint64, error) {
+// GetOffsetSize
+func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihash.Multihash) (*model.OffsetSize, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.get_offset")
 	defer span.End()
 
@@ -287,11 +290,15 @@ func (db *DB) GetOffset(ctx context.Context, cursorPrefix string, m multihash.Mu
 
 	b, err := db.Get(ctx, key)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	offset, _ := binary.Uvarint(b)
-	return offset, nil
+	offset, n := binary.Uvarint(b)
+	size, n := binary.Uvarint(b[n:])
+	return &model.OffsetSize{
+		Offset: offset,
+		Size:   size,
+	}, nil
 }
 
 func has(list []cid.Cid, v cid.Cid) bool {

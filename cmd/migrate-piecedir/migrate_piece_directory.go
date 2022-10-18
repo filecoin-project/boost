@@ -343,8 +343,11 @@ func getRecords(subject index.Index) ([]model.Record, error) {
 			cid := cid.NewCidV1(cid.Raw, m)
 
 			records = append(records, model.Record{
-				Cid:    cid,
-				Offset: offset,
+				Cid: cid,
+				OffsetSize: model.OffsetSize{
+					Offset: offset,
+					Size:   0,
+				},
 			})
 
 			return nil
@@ -389,7 +392,7 @@ func getIndexPaths(pathDir string) ([]idxPath, error) {
 
 func loadIndex(path string) (index.Index, error) {
 	defer func(now time.Time) {
-		log.Debugw("loadindex", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("loadindex", "took", time.Since(now))
 	}(time.Now())
 
 	idxf, err := os.Open(path)

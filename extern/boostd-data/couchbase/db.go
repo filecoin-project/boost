@@ -259,10 +259,19 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 	}
 
 	recs := make([]model.Record, 0, len(recMap))
-	for mhStr, offsetIfce := range recMap {
+	for mhStr, offsetSizeIfce := range recMap {
 		mh, err := multihash.FromHexString(mhStr)
 		if err != nil {
 			return nil, fmt.Errorf("parsing piece cid %s multihash value '%s': %w", pieceCid, mhStr, err)
+		}
+		val, ok := offsetSizeIfce.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected type for piece cid %s offset/size value: %T", pieceCid, offsetSizeIfce)
+		}
+
+		offsetIfce, ok := val["o"]
+		if !ok {
+			return nil, fmt.Errorf("parsing piece %s offset value '%s': missing Offset map key", pieceCid, val)
 		}
 		offsetStr, ok := offsetIfce.(string)
 		if !ok {
@@ -270,55 +279,81 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 		}
 		offset, err := strconv.ParseUint(offsetStr, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("parsing piece cid %s offset value '%s' as uint64: %w", pieceCid, offsetStr, err)
+			return nil, fmt.Errorf("parsing piece %s offset value '%s' as uint64: %w", pieceCid, val, err)
 		}
 
-		recs = append(recs, model.Record{Cid: cid.NewCidV1(cid.Raw, mh), Offset: offset})
+		sizeIfce, ok := val["s"]
+		if !ok {
+			return nil, fmt.Errorf("parsing piece %s offset value '%s': missing Size map key", pieceCid, val)
+		}
+		sizeStr, ok := sizeIfce.(string)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type for piece cid %s size value: %T", pieceCid, offsetIfce)
+		}
+		size, err := strconv.ParseUint(sizeStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parsing piece %s size value '%s' as uint64: %w", pieceCid, val, err)
+		}
+
+		recs = append(recs, model.Record{Cid: cid.NewCidV1(cid.Raw, mh), OffsetSize: model.OffsetSize{
+			Offset: offset,
+			Size:   size,
+		}})
 	}
 
 	return recs, nil
 }
 
-// AddOffsets
-func (db *DB) AddOffsets(ctx context.Context, pieceCid cid.Cid, idx carindex.IterableIndex) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.add_offsets")
+type offsetSize struct {
+	// Need to use strings instead of uint64 because uint64 may not fit into
+	// Javascript number
+	Offset string `json:"o"`
+	Size   string `json:"s"`
+}
+
+// AddIndexRecords
+func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.add_index_records")
 	defer span.End()
 
-	mhToOffset := make(map[string]string)
-	err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
-		mhToOffset[m.String()] = fmt.Sprintf("%d", offset)
-		return nil
-	})
-	if err != nil {
-		return err
+	mhToOffsetSize := make(map[string]offsetSize)
+	for _, rec := range recs {
+		mhToOffsetSize[rec.Cid.Hash().String()] = offsetSize{
+			Offset: fmt.Sprintf("%d", rec.Offset),
+			Size:   fmt.Sprintf("%d", rec.Size),
+		}
 	}
 
-	_, err = db.col.Upsert(pieceCid.String(), mhToOffset, &gocb.UpsertOptions{Context: ctx})
+	_, err := db.col.Upsert(pieceCid.String(), mhToOffsetSize, &gocb.UpsertOptions{Context: ctx})
 	if err != nil {
-		return fmt.Errorf("adding offsets for piece %s: %w", pieceCid, err)
+		return fmt.Errorf("adding offset / sizes for piece %s: %w", pieceCid, err)
 	}
 
 	return nil
 }
 
-// GetOffset
-func (db *DB) GetOffset(ctx context.Context, pieceCid cid.Cid, m multihash.Multihash) (uint64, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "db.get_offset")
+// GetOffsetSize
+func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, m multihash.Multihash) (*model.OffsetSize, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.get_offset_size")
 	defer span.End()
 
-	var val string
+	var val offsetSize
 	cbMap := db.col.Map(pieceCid.String())
 	err := cbMap.At(m.String(), &val)
 	if err != nil {
-		return 0, fmt.Errorf("getting offset for piece %s multihash %s: %w", pieceCid, m, err)
+		return nil, fmt.Errorf("getting offset/size for piece %s multihash %s: %w", pieceCid, m, err)
 	}
 
-	num, err := strconv.ParseUint(val, 10, 64)
+	offset, err := strconv.ParseUint(val.Offset, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("parsing piece %s offset value '%s' as uint64: %w", pieceCid, val, err)
+		return nil, fmt.Errorf("parsing piece %s offset value '%s' as uint64: %w", pieceCid, val, err)
+	}
+	size, err := strconv.ParseUint(val.Size, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("parsing piece %s size value '%s' as uint64: %w", pieceCid, val, err)
 	}
 
-	return num, nil
+	return &model.OffsetSize{Offset: offset, Size: size}, nil
 }
 
 func toCouchKey(key string) string {

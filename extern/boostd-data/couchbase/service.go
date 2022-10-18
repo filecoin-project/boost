@@ -2,7 +2,6 @@ package couchbase
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -11,9 +10,7 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-car/v2/index"
 	carindex "github.com/ipld/go-car/v2/index"
-	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -46,17 +43,17 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	return s.db.AddDealForPiece(ctx, pieceCid, dealInfo)
 }
 
-func (s *Store) GetOffset(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
-	log.Debugw("handle.get-offset", "piece-cid", pieceCid)
+func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
+	log.Debugw("handle.get-offset-size", "piece-cid", pieceCid)
 
-	ctx, span := tracing.Tracer.Start(ctx, "store.get_offset")
+	ctx, span := tracing.Tracer.Start(ctx, "store.get_offset_size")
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-offset", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-offset-size", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	return s.db.GetOffset(ctx, pieceCid, hash)
+	return s.db.GetOffsetSize(ctx, pieceCid, hash)
 }
 
 func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
@@ -148,6 +145,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
 	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
 
+	// TODO: use array of cids instead of array of Records
 	var recs []carindex.Record
 	for _, r := range records {
 		recs = append(recs, carindex.Record{
@@ -163,25 +161,12 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 	}
 	log.Debugw("handled.add-index SetMultihashesToPieceCid", "took", time.Since(setMhStart).String())
 
-	mis := make(index.MultihashIndexSorted)
-	err = mis.Load(recs)
-	if err != nil {
-		return err
-	}
-
-	var subject index.Index
-	subject = &mis
-
 	// process index and store entries
 	addOffsetsStart := time.Now()
-	idx, ok := subject.(index.IterableIndex)
-	if !ok {
-		return errors.New(fmt.Sprintf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec()))
-	}
-	if err := s.db.AddOffsets(ctx, pieceCid, idx); err != nil {
+	if err := s.db.AddIndexRecords(ctx, pieceCid, records); err != nil {
 		return err
 	}
-	log.Debugw("handled.add-index AddOffsets", "took", time.Since(addOffsetsStart).String())
+	log.Debugw("handled.add-index AddIndexRecords", "took", time.Since(addOffsetsStart).String())
 
 	// mark that indexing is complete
 	md := model.Metadata{

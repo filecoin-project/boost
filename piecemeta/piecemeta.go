@@ -27,6 +27,8 @@ import (
 	mh "github.com/multiformats/go-multihash"
 )
 
+//go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecemeta.go -package=mock_piecemeta . SectionReader,Sealer,Store
+
 type SectionReader interface {
 	io.Reader
 	io.ReaderAt
@@ -43,7 +45,7 @@ type Store interface {
 	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error
 	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
 	GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, error)
-	GetOffset(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (uint64, error)
+	GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error)
 	GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error)
 	PiecesContaining(ctx context.Context, m mh.Multihash) ([]cid.Cid, error)
 
@@ -98,11 +100,11 @@ func (ps *PieceMeta) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]mod
 	return deals, nil
 }
 
-func (ps *PieceMeta) GetOffset(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
+func (ps *PieceMeta) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_offset")
 	defer span.End()
 
-	return ps.store.GetOffset(ctx, pieceCid, hash)
+	return ps.store.GetOffsetSize(ctx, pieceCid, hash)
 }
 
 func (ps *PieceMeta) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
@@ -288,15 +290,15 @@ func (ps *PieceMeta) GetBlock(ctx context.Context, c cid.Cid) ([]byte, error) {
 			}
 
 			// Get the offset of the block within the piece (CAR file)
-			offset, err := ps.GetOffset(ctx, pieceCid, c.Hash())
+			offsetSize, err := ps.GetOffsetSize(ctx, pieceCid, c.Hash())
 			if err != nil {
-				return nil, fmt.Errorf("getting offset for cid %s in piece %s: %w", c, pieceCid, err)
+				return nil, fmt.Errorf("getting offset/size for cid %s in piece %s: %w", c, pieceCid, err)
 			}
 
 			// Seek to the block offset
-			_, err = reader.Seek(int64(offset), io.SeekStart)
+			_, err = reader.Seek(int64(offsetSize.Offset), io.SeekStart)
 			if err != nil {
-				return nil, fmt.Errorf("seeking to offset %d in piece reader: %w", int64(offset), err)
+				return nil, fmt.Errorf("seeking to offset %d in piece reader: %w", int64(offsetSize.Offset), err)
 			}
 
 			// Read the block data
@@ -355,8 +357,11 @@ func getRecords(subject index.Index) ([]model.Record, error) {
 			cid := cid.NewCidV1(cid.Raw, m)
 
 			records = append(records, model.Record{
-				Cid:    cid,
-				Offset: offset,
+				Cid: cid,
+				OffsetSize: model.OffsetSize{
+					Offset: offset,
+					Size:   0,
+				},
 			})
 
 			return nil

@@ -14,10 +14,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-car/v2/index"
 	carindex "github.com/ipld/go-car/v2/index"
-	"github.com/multiformats/go-multicodec"
-	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -117,14 +114,14 @@ func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Recor
 	return records, nil
 }
 
-func (s *Store) GetOffset(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
-	log.Debugw("handle.get-offset", "piece-cid", pieceCid)
+func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
+	log.Debugw("handle.get-offset-size", "piece-cid", pieceCid)
 
-	ctx, span := tracing.Tracer.Start(ctx, "store.get_offset")
+	ctx, span := tracing.Tracer.Start(ctx, "store.get_offset_size")
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-offset", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-offset-size", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	s.Lock()
@@ -132,10 +129,10 @@ func (s *Store) GetOffset(ctx context.Context, pieceCid cid.Cid, hash mh.Multiha
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return s.db.GetOffset(ctx, fmt.Sprintf("%d", md.Cursor)+"/", hash)
+	return s.db.GetOffsetSize(ctx, fmt.Sprintf("%d", md.Cursor)+"/", hash)
 }
 
 func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
@@ -236,34 +233,18 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 		return fmt.Errorf("couldnt generate next cursor: %w", err)
 	}
 
-	// alloacte metadata for pieceCid
+	// allocate metadata for pieceCid
 	err = s.db.SetNextCursor(ctx, cursor+1)
 	if err != nil {
 		return err
 	}
 
-	mis := make(index.MultihashIndexSorted)
-	err = mis.Load(recs)
-	if err != nil {
-		return err
-	}
-
-	var subject index.Index
-	subject = &mis
-
 	// process index and store entries
-	switch idx := subject.(type) {
-	case index.IterableIndex:
-		err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
-
-			return s.db.AddOffset(ctx, keyCursorPrefix, m, offset)
-		})
+	for _, rec := range records {
+		err := s.db.AddIndexRecord(ctx, keyCursorPrefix, rec)
 		if err != nil {
 			return err
 		}
-
-	default:
-		return errors.New(fmt.Sprintf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec()))
 	}
 
 	// mark that indexing is complete
@@ -299,7 +280,7 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	defer s.Unlock()
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil && err != ds.ErrNotFound {
+	if err != nil && !errors.Is(err, ds.ErrNotFound) {
 		return time.Time{}, err
 	}
 
