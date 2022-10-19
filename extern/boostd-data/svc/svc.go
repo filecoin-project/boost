@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/filecoin-project/boost/cmd/boostd-data/couchbase"
 	"github.com/filecoin-project/boost/cmd/boostd-data/ldb"
+	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/gorilla/mux"
 	logging "github.com/ipfs/go-log/v2"
 )
@@ -19,15 +19,15 @@ var (
 )
 
 func New(db string, repopath string) *http.Server {
-	server := rpc.NewServer()
+	server := jsonrpc.NewServer()
 
 	switch db {
 	case "couchbase":
 		ds := couchbase.NewStore()
-		server.RegisterName("boostddata", ds)
+		server.Register("boostddata", ds)
 	case "ldb":
 		ds := ldb.NewStore(repopath)
-		server.RegisterName("boostddata", ds)
+		server.Register("boostddata", ds)
 	default:
 		panic(fmt.Sprintf("unknown db: %s", db))
 	}
