@@ -1,10 +1,10 @@
 package storagemarket
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-commp-utils/writer"
@@ -15,6 +15,8 @@ import (
 	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
 )
+
+var errLocalCommpIOFail = errors.New("failed to write to CommP writer")
 
 // Verify that the commp provided in the deal proposal matches commp calculated
 // over the downloaded file
@@ -34,11 +36,10 @@ func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
 				retry: types.DealRetryManual,
 				error: fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid),
 			}
-		} else {
-			return &dealMakingError{
-				retry: types.DealRetryFatal,
-				error: fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid),
-			}
+		}
+		return &dealMakingError{
+			retry: types.DealRetryFatal,
+			error: fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid),
 		}
 	}
 
@@ -66,7 +67,7 @@ func (p *Provider) generatePieceCommitment(filepath string, pieceSize abi.Padded
 		pi, err = GenerateCommP(filepath)
 		if err != nil {
 			// Allow auto retry to cover cases where IO copy fails due to lack of space
-			if strings.Contains(err.Error(), "failed to write to CommP writer") {
+			if errors.Is(err, errLocalCommpIOFail) {
 				return cid.Undef, &dealMakingError{
 					retry: types.DealRetryAuto,
 					error: fmt.Errorf("performing local commp: %w", err),
@@ -174,7 +175,7 @@ func GenerateCommP(filepath string) (*abi.PieceInfo, error) {
 
 	written, err := io.Copy(w, r)
 	if err != nil {
-		return nil, fmt.Errorf("failed to write to CommP writer: %w", err)
+		return nil, fmt.Errorf("%s: %w", errLocalCommpIOFail, err)
 	}
 
 	// get the size of the CAR file
