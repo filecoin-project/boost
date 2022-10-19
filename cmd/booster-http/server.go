@@ -110,7 +110,7 @@ const idxPage = `
           Download a raw piece by payload CID
         </td>
         <td>
-          <a href="/piece?payloadCid=bafySomePayloadCid&format=piece" > /payload/<payload cid></a>
+          <a href="/piece?payloadCid=bafySomePayloadCid&format=piece" > /piece?payloadCid=<payload cid>&format=piece</a>
         </td>
       </tr>
       <tr>
@@ -118,7 +118,7 @@ const idxPage = `
           Download a CAR file by payload CID
         </td>
         <td>
-          <a href="/piece?payloadCid=bafySomePayloadCid&format=car" > /payload/<payload cid>.car</a>
+          <a href="/piece?payloadCid=bafySomePayloadCid&format=car" > /piece?payloadCid=<payload cid>&format=car</a>
         </td>
       </tr>
       <tr>
@@ -126,7 +126,7 @@ const idxPage = `
           Download a raw piece by piece CID
         </td>
         <td>
-          <a href="/piece?pieceCid=bagaSomePieceCID&format=piece" > /piece/<piece cid></a>
+          <a href="/piece?pieceCid=bagaSomePieceCID&format=piece" > /piece?pieceCid=<piece cid>&format=piece</a>
         </td>
       </tr>
       <tr>
@@ -134,7 +134,7 @@ const idxPage = `
           Download a CAR file by piece CID
         </td>
         <td>
-          <a href="/piece?pieceCid=bagaSomePieceCID&format=car" > /piece/<piece cid>.car</a>
+          <a href="/piece?pieceCid=bagaSomePieceCID&format=car" > /piece?payloadCid=<piece cid>&format=car</a>
         </td>
       </tr>
       </tbody>
@@ -165,6 +165,8 @@ func (s *HttpServer) handlePieceRequest(w http.ResponseWriter, r *http.Request) 
 			writeError(w, r, http.StatusBadRequest, "incorrect `format` query parameter")
 			return
 		}
+	} else if len(q["format"]) == 0 {
+		isCar = false
 	} else { // Error if more than 1 format value
 		writeError(w, r, http.StatusBadRequest, "single `format` query parameter is allowed")
 		return
