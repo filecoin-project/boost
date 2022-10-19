@@ -6,6 +6,7 @@ import (
 
 	"github.com/filecoin-project/boost/piecemeta"
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
@@ -21,11 +22,33 @@ import (
 	"github.com/ipfs/go-cid"
 	bstore "github.com/ipfs/go-ipfs-blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
+	"go.uber.org/fx"
 )
 
-func NewPieceMetaStore() piecemeta.Store {
-	// TODO: create a Start method instead of using context.TODO
-	return piecemeta.NewStore(context.TODO())
+func NewPieceMetaStore(lc fx.Lifecycle) piecemeta.Store {
+	client := piecemeta.NewStore()
+
+	var cancel context.CancelFunc
+	var svcCtx context.Context
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			svcCtx, cancel = context.WithCancel(ctx)
+			//bdsvc := svc.NewCouchbase()
+			bdsvc := svc.NewLevelDB("")
+			addr, err := bdsvc.Start(svcCtx)
+			if err != nil {
+				return fmt.Errorf("starting piece directory service: %w", err)
+			}
+
+			return client.Dial(ctx, "http://"+addr)
+		},
+		OnStop: func(ctx context.Context) error {
+			cancel()
+			return nil
+		},
+	})
+
+	return client
 }
 
 func NewPieceMeta(maddr dtypes.MinerAddress, store piecemeta.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecemeta.PieceMeta {

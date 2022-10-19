@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"golang.org/x/sync/errgroup"
 	"math/rand"
-	"net"
-	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -36,18 +34,21 @@ func TestService(t *testing.T) {
 	defer cancel()
 
 	t.Run("level db", func(t *testing.T) {
-		testService(ctx, t, "ldb")
+		bdsvc := NewLevelDB("")
+		testService(ctx, t, bdsvc)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		testService(ctx, t, "couchbase")
+		bdsvc := NewCouchbase()
+		testService(ctx, t, bdsvc)
 	})
 }
 
-func testService(ctx context.Context, t *testing.T, name string) {
-	addr, cleanup, err := Setup(ctx, name, "")
+func testService(ctx context.Context, t *testing.T, bdsvc Service) {
+	addr, err := bdsvc.Start(ctx)
 	require.NoError(t, err)
 
-	cl, err := client.NewStore("http://" + addr)
+	cl := client.NewStore()
+	err = cl.Dial(ctx, "http://"+addr)
 	require.NoError(t, err)
 
 	sampleidx := "fixtures/baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka.full.idx"
@@ -112,8 +113,6 @@ func testService(ctx context.Context, t *testing.T, name string) {
 	ok, err := compareIndices(subject, loadedSubject)
 	require.NoError(t, err)
 	require.True(t, ok)
-
-	cleanup()
 }
 
 func TestServiceFuzz(t *testing.T) {
@@ -123,19 +122,21 @@ func TestServiceFuzz(t *testing.T) {
 	defer cancel()
 
 	t.Run("level db", func(t *testing.T) {
-		testServiceFuzz(ctx, t, "ldb")
+		bdsvc := NewLevelDB("")
+		testServiceFuzz(ctx, t, bdsvc)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		testServiceFuzz(ctx, t, "couchbase")
+		bdsvc := NewCouchbase()
+		testServiceFuzz(ctx, t, bdsvc)
 	})
 }
 
-func testServiceFuzz(ctx context.Context, t *testing.T, name string) {
-	addr, cleanup, err := Setup(ctx, name, "")
+func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc Service) {
+	addr, err := bdsvc.Start(ctx)
 	require.NoError(t, err)
-	defer cleanup()
 
-	cl, err := client.NewStore("http://" + addr)
+	cl := client.NewStore()
+	err = cl.Dial(ctx, "http://"+addr)
 	require.NoError(t, err)
 
 	var idxs []index.Index
@@ -254,44 +255,6 @@ func createCarIndex(t *testing.T) index.Index {
 	idx, err := car.ReadOrGenerateIndex(carFile)
 	require.NoError(t, err)
 	return idx
-}
-
-func setupService(ctx context.Context, t *testing.T, db string) (string, func()) {
-	addr := "localhost:0"
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv, err := New(ctx, db, "")
-	require.NoError(t, err)
-
-	done := make(chan struct{})
-
-	log.Infow("server is listening", "addr", ln.Addr())
-
-	go func() {
-		err = srv.Serve(ln)
-		if err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
-		}
-
-		done <- struct{}{}
-	}()
-
-	cleanup := func() {
-		log.Debug("shutting down server")
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		if err := srv.Shutdown(ctx); err != nil {
-			panic(err) // failure/timeout shutting down the server gracefully
-		}
-
-		<-done
-	}
-
-	return ln.Addr().String(), cleanup
 }
 
 func loadIndex(path string) (index.Index, error) {

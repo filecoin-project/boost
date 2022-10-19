@@ -60,15 +60,18 @@ var migrateLevelDBCmd = &cli.Command{
 		fmt.Println(logPath)
 
 		// Start a leveldb server
+		svcCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
 		ldbRepoPath := path.Join(repoDir, "piece-directory")
-		addr, cleanup, err := svc.Setup(ctx, "ldb", ldbRepoPath)
+		ldbsvc := svc.NewLevelDB(ldbRepoPath)
+		addr, err := ldbsvc.Start(svcCtx)
 		if err != nil {
 			return err
 		}
-		defer cleanup()
 
 		// Create a client to connect to the server
-		cl, err := client.NewStore("http://" + addr)
+		cl := client.NewStore()
+		err = cl.Dial(ctx, "http://"+addr)
 		if err != nil {
 			return err
 		}

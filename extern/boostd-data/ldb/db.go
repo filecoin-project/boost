@@ -62,7 +62,7 @@ func newDB(path string, readonly bool) (*DB, error) {
 		CompactionTableSize: 4 * opt.MiB,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating level db datstore: %w", err)
 	}
 
 	return &DB{ldb}, nil

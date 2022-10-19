@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
@@ -18,15 +19,18 @@ type Store struct {
 	client *rpc.Client
 }
 
-func NewStore(addr string) (*Store, error) {
-	client, err := rpc.Dial(addr)
+func NewStore() *Store {
+	return &Store{}
+}
+
+func (s *Store) Dial(ctx context.Context, addr string) error {
+	client, err := rpc.DialContext(ctx, addr)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("dialing boostd-data server: %w", err)
 	}
 
-	return &Store{
-		client: client,
-	}, nil
+	s.client = client
+	return nil
 }
 
 func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, error) {

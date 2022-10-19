@@ -9,7 +9,6 @@ import (
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/google/uuid"
@@ -58,18 +57,8 @@ type PieceMeta struct {
 	sealer Sealer
 }
 
-func NewStore(ctx context.Context) *client.Store {
-	addr, _, err := svc.Setup(ctx, "couchbase", "")
-	if err != nil {
-		panic(err)
-	}
-
-	cl, err := client.NewStore("http://" + addr)
-	if err != nil {
-		panic(err)
-	}
-
-	return cl
+func NewStore() *client.Store {
+	return client.NewStore()
 }
 
 func NewPieceMeta(store Store, sa dagstore.SectorAccessor) *PieceMeta {
