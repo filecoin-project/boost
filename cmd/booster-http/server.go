@@ -110,7 +110,7 @@ const idxPage = `
           Download a raw piece by payload CID
         </td>
         <td>
-          <a href="/piece?payloadcid=bafySomePayloadCid&format=piece" > /payload/<payload cid></a>
+          <a href="/piece?payloadCid=bafySomePayloadCid&format=piece" > /payload/<payload cid></a>
         </td>
       </tr>
       <tr>
@@ -118,7 +118,7 @@ const idxPage = `
           Download a CAR file by payload CID
         </td>
         <td>
-          <a href="/piece?payloadcid=bafySomePayloadCid&format=car" > /payload/<payload cid>.car</a>
+          <a href="/piece?payloadCid=bafySomePayloadCid&format=car" > /payload/<payload cid>.car</a>
         </td>
       </tr>
       <tr>
@@ -126,7 +126,7 @@ const idxPage = `
           Download a raw piece by piece CID
         </td>
         <td>
-          <a href="/piece?piececid=bagaSomePieceCID&format=piece" > /piece/<payload cid></a>
+          <a href="/piece?pieceCid=bagaSomePieceCID&format=piece" > /piece/<piece cid></a>
         </td>
       </tr>
       <tr>
@@ -134,7 +134,7 @@ const idxPage = `
           Download a CAR file by piece CID
         </td>
         <td>
-          <a href="/piece?piececid=bagaSomePieceCID&format=car" > /piece/<payload cid>.car</a>
+          <a href="/piece?pieceCid=bagaSomePieceCID&format=car" > /piece/<piece cid>.car</a>
         </td>
       </tr>
       </tbody>
@@ -153,6 +153,7 @@ func (s *HttpServer) handlePieceRequest(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		msg := fmt.Sprintf("parsing query: %s", err.Error())
 		writeError(w, r, http.StatusBadRequest, msg)
+		return
 	}
 
 	isCar := false
@@ -161,10 +162,12 @@ func (s *HttpServer) handlePieceRequest(w http.ResponseWriter, r *http.Request) 
 		if q["format"][0] == "car" { // Check if format value is car
 			isCar = true
 		} else if q["format"][0] != "piece" { // Check if format value is not piece
-			writeError(w, r, http.StatusBadRequest, "unsupported format")
+			writeError(w, r, http.StatusBadRequest, "incorrect `format` query parameter")
+			return
 		}
 	} else { // Error if more than 1 format value
-		writeError(w, r, http.StatusBadRequest, "unsupported query")
+		writeError(w, r, http.StatusBadRequest, "single `format` query parameter is allowed")
+		return
 	}
 
 	// Check provided cid and format and redirect the request appropriately
