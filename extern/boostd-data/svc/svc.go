@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
+	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/gorilla/mux"
 	logging "github.com/ipfs/go-log/v2"
 )
@@ -18,67 +19,61 @@ var (
 	log = logging.Logger("svc")
 )
 
-func New(ctx context.Context, db string, repopath string) (*http.Server, error) {
-	server := rpc.NewServer()
-
-	switch db {
-	case "couchbase":
-		ds, err := couchbase.NewStore(ctx)
-		if err != nil {
-			return nil, err
-		}
-		server.RegisterName("boostddata", ds)
-	case "ldb":
-		ds := ldb.NewStore(repopath)
-		server.RegisterName("boostddata", ds)
-	default:
-		panic(fmt.Sprintf("unknown db: %s", db))
-	}
-
-	router := mux.NewRouter()
-	router.Handle("/", server)
-
-	log.Infow("server is listening", "addr", "localhost:8089")
-
-	return &http.Server{Handler: router}, nil
+type Service struct {
+	impl types.ServiceImpl
 }
 
-func Setup(ctx context.Context, db string, repoPath string) (string, func(), error) {
+func NewCouchbase() Service {
+	return Service{impl: couchbase.NewStore()}
+}
+
+func NewLevelDB(repopath string) Service {
+	return Service{impl: ldb.NewStore(repopath)}
+}
+
+func (s *Service) Start(ctx context.Context) (string, error) {
 	addr := "localhost:0"
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return "", nil, err
+		return "", fmt.Errorf("setting up listener for boostd-data service: %w", err)
 	}
-	srv, err := New(ctx, db, repoPath)
+
+	err = s.impl.Start(ctx)
 	if err != nil {
-		return "", nil, err
+		return "", fmt.Errorf("starting boostd-data service: %w", err)
 	}
+
+	server := rpc.NewServer()
+	server.RegisterName("boostddata", s.impl)
+	router := mux.NewRouter()
+	router.Handle("/", server)
+
+	srv := &http.Server{Handler: router}
+	log.Infow("boost-data server is listening", "addr", ln.Addr())
 
 	done := make(chan struct{})
-
-	log.Infow("server is listening", "addr", ln.Addr())
-
 	go func() {
 		err = srv.Serve(ln)
 		if err != nil && err != http.ErrServerClosed {
-			panic(err)
+			log.Errorf("exiting boost-data server: %s", err)
 		}
 
 		done <- struct{}{}
 	}()
 
-	cleanup := func() {
+	go func() {
+		<-ctx.Done()
 		log.Debug("shutting down server")
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		if err := srv.Shutdown(ctx); err != nil {
-			panic(err)
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Errorf("shutting down boost-data server: %s", err)
 		}
 
 		<-done
-	}
+	}()
 
-	return ln.Addr().String(), cleanup, nil
+	return ln.Addr().String(), nil
 }

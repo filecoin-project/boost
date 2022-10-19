@@ -8,6 +8,7 @@ import (
 
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	carindex "github.com/ipld/go-car/v2/index"
@@ -21,13 +22,20 @@ type Store struct {
 	pieceLocks [1024]sync.RWMutex
 }
 
-func NewStore(ctx context.Context) (*Store, error) {
+var _ types.ServiceImpl = (*Store)(nil)
+
+func NewStore() *Store {
+	return &Store{}
+}
+
+func (s *Store) Start(ctx context.Context) error {
 	db, err := newDB(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("creating new couchbase store: %w", err)
+		return fmt.Errorf("starting couchbase service: %w", err)
 	}
 
-	return &Store{db: db}, nil
+	s.db = db
+	return nil
 }
 
 func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {

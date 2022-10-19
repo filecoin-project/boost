@@ -20,9 +20,14 @@ func XTestCouchbaseService(t *testing.T) {
 	removeContainer := setupCouchbase(t)
 	defer removeContainer()
 
-	addr, cleanup := setupService(context.Background(), t, "couchbase")
+	bdsvc := NewCouchbase()
+	addr, err := bdsvc.Start(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	cl, err := client.NewStore("http://" + addr)
+	cl := client.NewStore()
+	err = cl.Dial(context.Background(), "http://"+addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,8 +44,6 @@ func XTestCouchbaseService(t *testing.T) {
 
 	log.Debug("sleeping for a while.. running tests..")
 	time.Sleep(2 * time.Second)
-
-	cleanup()
 }
 
 func setupCouchbase(t *testing.T) func() {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"
@@ -22,42 +23,41 @@ var log = logging.Logger("boostd-data-ldb")
 
 type Store struct {
 	sync.Mutex
-	db *DB
+	db       *DB
+	repopath string
 }
 
-func NewStore(_repopath string) *Store {
-	// tests
-	repopath := _repopath
-	if _repopath == "" {
+var _ types.ServiceImpl = (*Store)(nil)
+
+func NewStore(repopath string) *Store {
+	return &Store{repopath: repopath}
+}
+
+func (s *Store) Start(_ context.Context) error {
+	repopath := s.repopath
+	if s.repopath == "" {
+		// used by tests
 		var err error
 		repopath, err = ioutil.TempDir("", "ds-leveldb")
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("creating level db tmp dir", err)
 		}
 	}
 
-	db, err := newDB(repopath, false)
+	var err error
+	s.db, err = newDB(repopath, false)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	// tests
-	if _repopath == "" {
-		// prepare db
+	if s.repopath == "" {
+		// used by tests - prepare db with a cursor
 		log.Debug("preparing db with next cursor")
-		db.SetNextCursor(context.Background(), 100)
-	}
-
-	_, _, err = db.NextCursor(context.Background())
-	if err != nil {
-		db.SetNextCursor(context.Background(), 100)
+		s.db.SetNextCursor(context.Background(), 100)
 	}
 
 	log.Debugw("new piece meta service", "repo path", repopath)
-
-	return &Store{
-		db: db,
-	}
+	return nil
 }
 
 func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
