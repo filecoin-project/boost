@@ -31,6 +31,7 @@ import (
 	textselector "github.com/ipld/go-ipld-selector-text-lite"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/go-state-types/exitcode"
 
@@ -133,7 +134,10 @@ func init() {
 	addExample(retrievalmarket.DealStatusNew)
 	addExample(&textSelExample)
 	addExample(network.ReachabilityPublic)
-	addExample(build.NewestNetworkVersion)
+	addExample(build.TestNetworkVersion)
+	allocationID := verifreg.AllocationId(0)
+	addExample(allocationID)
+	addExample(&allocationID)
 	addExample(map[string]int{"name": 42})
 	addExample(map[string]time.Time{"name": time.Unix(1615243938, 0).UTC()})
 	addExample(&types.ExecutionTrace{

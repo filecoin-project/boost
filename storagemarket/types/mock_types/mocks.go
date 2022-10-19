@@ -11,7 +11,7 @@ import (
 
 	storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	abi "github.com/filecoin-project/go-state-types/abi"
-	market "github.com/filecoin-project/go-state-types/builtin/v8/market"
+	market "github.com/filecoin-project/go-state-types/builtin/v9/market"
 	api "github.com/filecoin-project/lotus/api"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"
