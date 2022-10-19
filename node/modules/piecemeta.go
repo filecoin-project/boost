@@ -44,6 +44,7 @@ func NewPieceMetaStore(lc fx.Lifecycle) piecemeta.Store {
 		},
 		OnStop: func(ctx context.Context) error {
 			cancel()
+			client.Close(ctx)
 			return nil
 		},
 	})

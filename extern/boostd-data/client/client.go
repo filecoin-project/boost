@@ -15,19 +15,17 @@ import (
 
 var log = logger.Logger("boostd-data-client")
 
-type Client struct {
-	AddDealForPiece           func(context.Context, cid.Cid, model.DealInfo) error
-	AddIndex                  func(context.Context, cid.Cid, []model.Record) error
-	GetIndex                  func(context.Context, cid.Cid) ([]model.Record, error)
-	GetOffsetSize             func(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
-	GetPieceDeals             func(context.Context, cid.Cid) ([]model.DealInfo, error)
-	GetRecords                func(context.Context, cid.Cid) ([]model.Record, error)
-	IndexedAt                 func(context.Context, cid.Cid) (time.Time, error)
-	PiecesContainingMultihash func(context.Context, mh.Multihash) ([]cid.Cid, error)
-}
-
 type Store struct {
-	client Client
+	client struct {
+		AddDealForPiece           func(context.Context, cid.Cid, model.DealInfo) error
+		AddIndex                  func(context.Context, cid.Cid, []model.Record) error
+		GetIndex                  func(context.Context, cid.Cid) ([]model.Record, error)
+		GetOffsetSize             func(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
+		GetPieceDeals             func(context.Context, cid.Cid) ([]model.DealInfo, error)
+		GetRecords                func(context.Context, cid.Cid) ([]model.Record, error)
+		IndexedAt                 func(context.Context, cid.Cid) (time.Time, error)
+		PiecesContainingMultihash func(context.Context, mh.Multihash) ([]cid.Cid, error)
+	}
 	closer jsonrpc.ClientCloser
 }
 
@@ -36,14 +34,11 @@ func NewStore() *Store {
 }
 
 func (s *Store) Dial(ctx context.Context, addr string) error {
-	var client Client
-
-	closer, err := jsonrpc.NewClient(ctx, addr, "boostddata", &client, nil)
+	closer, err := jsonrpc.NewClient(ctx, addr, "boostddata", &s.client, nil)
 	if err != nil {
 		return fmt.Errorf("dialing boostd-data server: %w", err)
 	}
 
-	s.client = client
 	s.closer = closer
 	return nil
 }

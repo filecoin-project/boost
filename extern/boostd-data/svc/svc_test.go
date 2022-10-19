@@ -7,11 +7,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"
@@ -50,6 +51,7 @@ func testService(ctx context.Context, t *testing.T, bdsvc Service) {
 	cl := client.NewStore()
 	err = cl.Dial(ctx, "http://"+addr)
 	require.NoError(t, err)
+	defer cl.Close(ctx)
 
 	sampleidx := "fixtures/baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka.full.idx"
 
@@ -138,6 +140,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc Service) {
 	cl := client.NewStore()
 	err = cl.Dial(ctx, "http://"+addr)
 	require.NoError(t, err)
+	defer cl.Close(ctx)
 
 	var idxs []index.Index
 	for i := 0; i < 10; i++ {
