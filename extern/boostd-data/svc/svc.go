@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/gorilla/mux"
 	logging "github.com/ipfs/go-log/v2"
 )
@@ -43,8 +43,8 @@ func (s *Service) Start(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("starting boostd-data service: %w", err)
 	}
 
-	server := rpc.NewServer()
-	server.RegisterName("boostddata", s.impl)
+	server := jsonrpc.NewServer()
+	server.Register("boostddata", s.impl)
 	router := mux.NewRouter()
 	router.Handle("/", server)
 

@@ -28,6 +28,7 @@ func XTestCouchbaseService(t *testing.T) {
 
 	cl := client.NewStore()
 	err = cl.Dial(context.Background(), "http://"+addr)
+	defer cl.Close(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

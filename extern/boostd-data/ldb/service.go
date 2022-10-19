@@ -40,7 +40,7 @@ func (s *Store) Start(_ context.Context) error {
 		var err error
 		repopath, err = ioutil.TempDir("", "ds-leveldb")
 		if err != nil {
-			return fmt.Errorf("creating level db tmp dir", err)
+			return fmt.Errorf("creating leveldb tmp dir: %w", err)
 		}
 	}
 
