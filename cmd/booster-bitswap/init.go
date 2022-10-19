@@ -104,7 +104,7 @@ var initCmd = &cli.Command{
 		}
 
 		peerID, _, err := configureRepo(repoDir, true)
-		fmt.Println("Initialized booster-bitswap with libp2p peer ID: " + peerID)
+		fmt.Println("Initialized booster-bitswap with libp2p peer ID: " + peerID.String())
 		return err
 	},
 }
