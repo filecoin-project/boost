@@ -45,6 +45,9 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
 	touch $BOOST_PATH/.init.boost
 fi
 
+# TODO(anteva): fixme: hack as boostd fails to start without this dir
+mkdir -p /var/lib/boost/deal-staging
+
 if [ ! -f $BOOST_PATH/.register.boost ]; then
 	echo Temporary starting boost to get maddr...
 	
