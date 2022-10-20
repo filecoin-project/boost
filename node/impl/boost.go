@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/filecoin-project/boost/piecemeta"
 	tracing "github.com/filecoin-project/boost/tracing"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
@@ -53,6 +54,8 @@ type BoostAPI struct {
 	DAGStore              *dagstore.DAGStore
 	DagStoreWrapper       *mktsdagstore.Wrapper
 	IndexBackedBlockstore dtypes.IndexBackedBlockstore
+	PieceDirectory        piecemeta.Store
+
 	// Boost
 	StorageProvider *storagemarket.Provider
 	IndexProvider   *indexprovider.Wrapper

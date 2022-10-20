@@ -12,8 +12,9 @@ import (
 	bclient "github.com/filecoin-project/boost/api/client"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/tracing"
+	pdclient "github.com/filecoin-project/boostd-data/client"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/dagstore/mount"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
@@ -71,6 +72,12 @@ var runCmd = &cli.Command{
 			Name:     "api-storage",
 			Usage:    "the endpoint for the storage node API",
 			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "api-piece-directory",
+			Usage:    "the endpoint for the piece directory API",
+			Required: true,
+			Value:    "http://localhost:8089",
 		},
 		&cli.BoolFlag{
 			Name:  "tracing",
@@ -163,8 +170,15 @@ var runCmd = &cli.Command{
 		pp := sealer.NewPieceProvider(storage, storageService, storageService)
 		sa := sectoraccessor.NewSectorAccessor(dtypes.MinerAddress(maddr), storageService, pp, fullnodeApi)
 		allowIndexing := cctx.Bool("allow-indexing")
+
+		pd := pdclient.NewStore()
+		err = pd.Dial(ctx, cctx.String("api-piece-directory"))
+		if err != nil {
+			return err
+		}
+
 		// Create the server API
-		sapi := serverApi{ctx: ctx, bapi: bapi, sa: sa}
+		sapi := serverApi{ctx: ctx, bapi: bapi, sa: sa, pieceDirectory: pd}
 		server := NewHttpServer(
 			cctx.String("base-path"),
 			cctx.Int("port"),
@@ -220,23 +234,26 @@ func storageAuthWithURL(apiInfo string) (sealer.StorageAuth, error) {
 }
 
 type serverApi struct {
-	ctx  context.Context
-	bapi api.Boost
-	sa   dagstore.SectorAccessor
+	ctx            context.Context
+	bapi           api.Boost
+	pieceDirectory *pdclient.Store
+	sa             dagstore.SectorAccessor
 }
 
 var _ HttpServerApi = (*serverApi)(nil)
 
 func (s serverApi) PiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
-	return s.bapi.BoostDagstorePiecesContainingMultihash(ctx, mh)
+	return s.pieceDirectory.PiecesContaining(ctx, mh)
 }
 
 func (s serverApi) GetMaxPieceOffset(pieceCid cid.Cid) (uint64, error) {
-	return s.bapi.PiecesGetMaxOffset(s.ctx, pieceCid)
+	panic("get max piece offset")
+
+	return 0, errors.New("should remove this method")
 }
 
-func (s serverApi) GetPieceInfo(pieceCID cid.Cid) (*piecestore.PieceInfo, error) {
-	return s.bapi.PiecesGetPieceInfo(s.ctx, pieceCID)
+func (s serverApi) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
+	return s.pieceDirectory.GetPieceDeals(ctx, pieceCid)
 }
 
 func (s serverApi) IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error) {
