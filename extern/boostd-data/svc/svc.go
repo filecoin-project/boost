@@ -32,7 +32,7 @@ func NewLevelDB(repopath string) Service {
 }
 
 func (s *Service) Start(ctx context.Context, port int) (string, error) {
-	addr := fmt.Sprintf("localhost:%d", port)
+	addr := fmt.Sprintf("0.0.0.0:%d", port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return "", fmt.Errorf("setting up listener for boostd-data service: %w", err)
