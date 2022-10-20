@@ -44,7 +44,7 @@ COPY --from=react-builder /src/react/build /go/src/react/build
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-      make debug booster-http booster-bitswap
+      make debug booster-http booster-bitswap boostd-data
 #########################################################################################
 FROM ubuntu:20.04 as runner
 
@@ -83,6 +83,7 @@ EXPOSE 8080
 
 COPY --from=builder /go/src/boostd /usr/local/bin/
 COPY --from=builder /go/src/boost /usr/local/bin/
+COPY --from=builder /go/src/boostd-data /usr/local/bin/
 COPY --from=builder /go/src/boostx /usr/local/bin/
 COPY docker/devnet/boost/entrypoint.sh /app/
 COPY docker/devnet/boost/sample/* /app/sample/

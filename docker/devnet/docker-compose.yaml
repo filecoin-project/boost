@@ -51,6 +51,7 @@ services:
     image: ${BOOST_IMAGE}
     ports:
       - "8080:8080"
+      - "8089:8089" # for boostd-data service
       - "1288:1288" # For the /metrics endpoint
     environment:
       - LOTUS_API_LISTENADDRESS=/dns/boost/tcp/1288/http

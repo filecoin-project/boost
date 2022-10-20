@@ -35,7 +35,7 @@ func NewPieceMetaStore(lc fx.Lifecycle) piecemeta.Store {
 			svcCtx, cancel = context.WithCancel(ctx)
 			//bdsvc := svc.NewCouchbase()
 			bdsvc := svc.NewLevelDB("")
-			addr, err := bdsvc.Start(svcCtx)
+			addr, err := bdsvc.Start(svcCtx, 8089)
 			if err != nil {
 				return fmt.Errorf("starting piece directory service: %w", err)
 			}
