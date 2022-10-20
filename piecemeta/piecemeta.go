@@ -131,7 +131,7 @@ func (ps *PieceMeta) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dea
 
 	// Iterate over all the blocks in the piece to extract the index records
 	recs := make([]model.Record, 0)
-	opts := []carv2.Option{car.ZeroLengthSectionAsEOF(true), car.StoreIdentityCIDs(true)}
+	opts := []carv2.Option{car.ZeroLengthSectionAsEOF(true)}
 	blockReader, err := carv2.NewBlockReader(reader, opts...)
 	if err != nil {
 		return fmt.Errorf("getting block reader over piece %s: %w", pieceCid, err)
