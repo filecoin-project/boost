@@ -17,6 +17,7 @@ import (
 	"github.com/multiformats/go-multihash"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 var (
@@ -271,8 +272,10 @@ func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, er
 func (db *DB) AddIndexRecord(ctx context.Context, cursorPrefix string, rec model.Record) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.add_index_record")
 	defer span.End()
+	span.SetAttributes(attribute.String("rec", rec.Cid.Hash().String()))
 
 	key := datastore.NewKey(fmt.Sprintf("%s%s", cursorPrefix, rec.Cid.Hash().String()))
+	span.SetAttributes(attribute.String("key", key.String()))
 
 	value := make([]byte, 2*binary.MaxVarintLen64)
 	no := binary.PutUvarint(value, rec.Offset)
@@ -285,8 +288,10 @@ func (db *DB) AddIndexRecord(ctx context.Context, cursorPrefix string, rec model
 func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihash.Multihash) (*model.OffsetSize, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.get_offset")
 	defer span.End()
+	span.SetAttributes(attribute.String("m", m.String()))
 
 	key := datastore.NewKey(fmt.Sprintf("%s%s", cursorPrefix, m.String()))
+	span.SetAttributes(attribute.String("key", key.String()))
 
 	b, err := db.Get(ctx, key)
 	if err != nil {

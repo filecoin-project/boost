@@ -24,6 +24,7 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecemeta.go -package=mock_piecemeta . SectionReader,Sealer,Store
@@ -99,6 +100,8 @@ func (ps *PieceMeta) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash m
 func (ps *PieceMeta) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.add_deal_for_piece")
 	defer span.End()
+	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
+	span.SetAttributes(attribute.String("dealUuid", dealInfo.DealUuid.String()))
 
 	// Perform indexing of piece
 	if err := ps.addIndexForPiece(ctx, pieceCid, dealInfo); err != nil {
