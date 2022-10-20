@@ -51,15 +51,15 @@ mkdir -p /var/lib/boost/deal-staging
 if [ ! -f $BOOST_PATH/.register.boost ]; then
 	echo Temporary starting boost to get maddr...
 	
-	boostd -vv run &> $BOOST_PATH/boostd.log &
+	boostd -vv run &> $BOOST_PATH/boostd-register.log &
 	BOOST_PID=`echo $!`
 	echo Got boost PID = $BOOST_PID
 
-	until cat $BOOST_PATH/boostd.log | grep maddr; do echo "Waiting for boost..."; sleep 1; done
+	until cat $BOOST_PATH/boostd-register.log | grep maddr; do echo "Waiting for boost..."; sleep 1; done
 	echo Looks like boost started and initialized...
 	
 	echo Registering to lotus-miner...
-	MADDR=`cat $BOOST_PATH/boostd.log | grep maddr | cut -f3 -d"{" | cut -f1 -d:`
+	MADDR=`cat $BOOST_PATH/boostd-register.log | grep maddr | cut -f3 -d"{" | cut -f1 -d:`
 	echo Got maddr=${MADDR}
 	
 	lotus-miner actor set-peer-id ${MADDR}
@@ -69,10 +69,10 @@ if [ ! -f $BOOST_PATH/.register.boost ]; then
 	touch $BOOST_PATH/.register.boost
 	echo Try to stop boost...
     kill -15 $BOOST_PID || kill -9 $BOOST_PID
-	rm -f $BOOST_PATH/boostd.log
+	rm -f $BOOST_PATH/boostd-register.log
 	echo Super. DONE! Boostd is now configured and will be started soon
 fi
 
 echo Starting boost in dev mode...
-exec boostd -vv run
+exec boostd -vv run 2>&1 | tee $BOOST_PATH/boostd.log
 

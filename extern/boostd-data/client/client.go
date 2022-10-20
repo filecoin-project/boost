@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/ipfs/go-cid"
@@ -86,6 +87,9 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 }
 
 func (s *Store) PiecesContaining(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "bd.pieces_containing")
+	defer span.End()
+
 	return s.client.PiecesContainingMultihash(ctx, m)
 }
 
