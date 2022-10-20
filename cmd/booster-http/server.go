@@ -220,7 +220,7 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 	}
 	w.Header().Set("Etag", etag)
 
-	serveContent(w, r, content, getContentType(isCar))
+	serveContent(ctx, w, r, content, getContentType(isCar))
 
 	stats.Record(ctx, metrics.HttpPayloadByCid200ResponseCount.M(1))
 	stats.Record(ctx, metrics.HttpPayloadByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
@@ -277,7 +277,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Etag", etag)
 
-	serveContent(w, r, content, getContentType(isCar))
+	serveContent(ctx, w, r, content, getContentType(isCar))
 
 	stats.Record(ctx, metrics.HttpPieceByCid200ResponseCount.M(1))
 	stats.Record(ctx, metrics.HttpPieceByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
@@ -290,7 +290,10 @@ func getContentType(isCar bool) string {
 	return "application/piece"
 }
 
-func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker, contentType string) {
+func serveContent(ctx context.Context, w http.ResponseWriter, r *http.Request, content io.ReadSeeker, contentType string) {
+	ctx, span := tracing.Tracer.Start(r.Context(), "http.serveContent")
+	defer span.End()
+
 	// Set the Content-Type header explicitly so that http.ServeContent doesn't
 	// try to do it implicitly
 	w.Header().Set("Content-Type", contentType)

@@ -106,7 +106,7 @@ func DefaultBoost() *Boost {
 
 			HttpTransferMaxConcurrentDownloads: 20,
 			HttpTransferStallTimeout:           Duration(5 * time.Minute),
-			HttpTransferStallCheckPeriod:       Duration(30 * time.Second),
+			HttpTransferStallCheckPeriod:       Duration(5 * time.Second),
 		},
 
 		LotusDealmaking: lotus_config.DealmakingConfig{
