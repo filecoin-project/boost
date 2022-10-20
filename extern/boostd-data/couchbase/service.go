@@ -2,6 +2,7 @@ package couchbase
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"sync"
 	"time"
@@ -17,9 +18,11 @@ import (
 
 var log = logging.Logger("boostd-data-cb")
 
+const stripedLockSize = 1024
+
 type Store struct {
 	db         *DB
-	pieceLocks [1024]sync.RWMutex
+	pieceLocks [stripedLockSize]sync.RWMutex
 }
 
 var _ types.ServiceImpl = (*Store)(nil)
@@ -208,7 +211,7 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	return md.IndexedAt, nil
 }
 
-func toStripedLockIndex(pieceCid cid.Cid) byte {
+func toStripedLockIndex(pieceCid cid.Cid) uint16 {
 	bz := pieceCid.Bytes()
-	return bz[len(bz)-1]
+	return binary.BigEndian.Uint16(bz[len(bz)-2:]) % stripedLockSize
 }
