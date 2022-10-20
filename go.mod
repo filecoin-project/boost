@@ -72,8 +72,8 @@ require (
 	github.com/ipfs/go-metrics-interface v0.0.1
 	github.com/ipfs/go-unixfs v0.3.1
 	// Use custom go-car version with modifications needed by boost
-	github.com/ipld/go-car v0.4.1-0.20221018143708-799bd4227e8b
-	github.com/ipld/go-car/v2 v2.5.0
+	github.com/ipld/go-car v0.5.1-0.20221020015614-d03186dc4f82
+	github.com/ipld/go-car/v2 v2.5.1-0.20221020015614-d03186dc4f82
 	github.com/ipld/go-ipld-prime v0.18.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c

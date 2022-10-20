@@ -34,12 +34,16 @@ type Metadata struct {
 	Deals     []DealInfo `json:"deals"`
 }
 
+// Record is the information stored in the index for each block in a piece
 type Record struct {
 	Cid cid.Cid
 	OffsetSize
 }
 
 type OffsetSize struct {
+	// Offset is the offset into the CAR file of the section, where a section
+	// is <section size><cid><block data>
 	Offset uint64
-	Size   uint64
+	// Size is the size of the block data (not the whole section)
+	Size uint64
 }

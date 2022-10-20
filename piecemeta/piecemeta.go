@@ -3,6 +3,7 @@ package piecemeta
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -125,25 +126,30 @@ func (ps *PieceMeta) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dea
 	// Get a reader over the piece data
 	reader, err := ps.sealer.GetReader(ctx, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
 	if err != nil {
-		return err
+		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
 
 	// Iterate over all the blocks in the piece to extract the index records
 	recs := make([]model.Record, 0)
-	it := func(c cid.Cid, offset uint64, blockLength uint64) bool {
-		recs = append(recs, model.Record{
-			Cid: c,
-			OffsetSize: model.OffsetSize{
-				Offset: offset,
-				Size:   blockLength,
-			},
-		})
-		return true
+	opts := []carv2.Option{car.ZeroLengthSectionAsEOF(true), car.StoreIdentityCIDs(true)}
+	blockReader, err := carv2.NewBlockReader(reader, opts...)
+	if err != nil {
+		return fmt.Errorf("getting block reader over piece %s: %w", pieceCid, err)
 	}
 
-	opts := []carv2.Option{car.ZeroLengthSectionAsEOF(true), car.StoreIdentityCIDs(true)}
-	err = car.IterateIndex(reader, it, opts...)
-	if err != nil {
+	blockMetadata, err := blockReader.SkipNext()
+	for err == nil {
+		recs = append(recs, model.Record{
+			Cid: blockMetadata.Cid,
+			OffsetSize: model.OffsetSize{
+				Offset: blockMetadata.Offset,
+				Size:   blockMetadata.Size,
+			},
+		})
+
+		blockMetadata, err = blockReader.SkipNext()
+	}
+	if !errors.Is(err, io.EOF) {
 		return fmt.Errorf("generating index for piece %s: %w", pieceCid, err)
 	}
 
