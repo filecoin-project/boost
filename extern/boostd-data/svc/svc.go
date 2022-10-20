@@ -31,8 +31,8 @@ func NewLevelDB(repopath string) Service {
 	return Service{impl: ldb.NewStore(repopath)}
 }
 
-func (s *Service) Start(ctx context.Context) (string, error) {
-	addr := "localhost:0"
+func (s *Service) Start(ctx context.Context, port int) (string, error) {
+	addr := fmt.Sprintf("localhost:%d", port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return "", fmt.Errorf("setting up listener for boostd-data service: %w", err)

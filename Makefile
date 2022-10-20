@@ -104,6 +104,12 @@ booster-bitswap: $(BUILD_DEPS)
 .PHONY: booster-bitswap
 BINS+=booster-bitswap
 
+boostd-data:
+	rm -f boostd-data
+	cd extern/boostd-data && $(GOCC) build -o ../../boostd-data .
+.PHONY: boostd-data
+BINS+=boostd-data
+
 devnet: $(BUILD_DEPS)
 	rm -f devnet
 	$(GOCC) build $(GOFLAGS) -o devnet ./cmd/devnet

@@ -3,16 +3,18 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/filecoin-project/boostd-data/svc"
-	logging "github.com/ipfs/go-log/v2"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/filecoin-project/boostd-data/svc"
+	logging "github.com/ipfs/go-log/v2"
 )
 
 var (
 	repopath string
 	db       string
+	port     int
 
 	log = logging.Logger("boostd-data")
 )
@@ -21,6 +23,7 @@ func init() {
 	logging.SetLogLevel("*", "debug")
 
 	flag.StringVar(&db, "db", "", "db type for boostd-data (couchbase or ldb)")
+	flag.IntVar(&port, "port", 8089, "")
 	flag.StringVar(&repopath, "repopath", "", "path for repo")
 }
 
@@ -29,7 +32,7 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	bdsvc := svc.NewLevelDB(repopath)
-	_, err := bdsvc.Start(ctx)
+	_, err := bdsvc.Start(ctx, port)
 	if err != nil {
 		log.Fatal(err)
 	}
