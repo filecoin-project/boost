@@ -3,8 +3,12 @@ package modules
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
 
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/dagstore"
@@ -16,6 +20,7 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/markets/sectoraccessor"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/google/uuid"
@@ -25,31 +30,56 @@ import (
 	"go.uber.org/fx"
 )
 
-func NewPieceMetaStore(lc fx.Lifecycle) piecemeta.Store {
-	client := piecemeta.NewStore()
+const pieceDirectoryPath = "piece-directory"
 
-	var cancel context.CancelFunc
-	var svcCtx context.Context
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			svcCtx, cancel = context.WithCancel(ctx)
-			//bdsvc := svc.NewCouchbase()
-			bdsvc := svc.NewLevelDB("")
-			addr, err := bdsvc.Start(svcCtx)
-			if err != nil {
-				return fmt.Errorf("starting piece directory service: %w", err)
-			}
+func NewPieceMetaStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) piecemeta.Store {
+	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) piecemeta.Store {
+		client := piecemeta.NewStore()
 
-			return client.Dial(ctx, "http://"+addr)
-		},
-		OnStop: func(ctx context.Context) error {
-			cancel()
-			client.Close(ctx)
-			return nil
-		},
-	})
+		var cancel context.CancelFunc
+		var svcCtx context.Context
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				svcCtx, cancel = context.WithCancel(ctx)
 
-	return client
+				var bdsvc svc.Service
+				if cfg.PieceDirectory.Couchbase.ConnectString != "" {
+					// If the couchbase connect string is defined, set up a
+					// couchbase client
+					bdsvc = svc.NewCouchbase(couchbase.DBSettings{
+						ConnectString: cfg.PieceDirectory.Couchbase.ConnectString,
+						Auth: couchbase.DBSettingsAuth{
+							Username: cfg.PieceDirectory.Couchbase.Username,
+							Password: cfg.PieceDirectory.Couchbase.Password,
+						},
+						Bucket: couchbase.DBSettingsBucket{
+							RAMQuotaMB: cfg.PieceDirectory.Couchbase.RAMQuotaMB,
+						},
+					})
+				} else {
+					// Setup a leveldb client
+					levelDBRepo := path.Join(r.Path(), pieceDirectoryPath)
+					if err := os.MkdirAll(levelDBRepo, os.ModePerm); err != nil {
+						return fmt.Errorf("failed to create level db repo directory %s: %w", levelDBRepo, err)
+					}
+					bdsvc = svc.NewLevelDB(levelDBRepo)
+				}
+				addr, err := bdsvc.Start(svcCtx)
+				if err != nil {
+					return fmt.Errorf("starting piece directory service: %w", err)
+				}
+
+				return client.Dial(ctx, "http://"+addr)
+			},
+			OnStop: func(ctx context.Context) error {
+				cancel()
+				client.Close(ctx)
+				return nil
+			},
+		})
+
+		return client
+	}
 }
 
 func NewPieceMeta(maddr dtypes.MinerAddress, store piecemeta.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecemeta.PieceMeta {

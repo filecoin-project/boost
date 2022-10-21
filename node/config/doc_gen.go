@@ -68,6 +68,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "PieceDirectory",
+			Type: "PieceDirectoryConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "LotusDealmaking",
 			Type: "lotus_config.DealmakingConfig",
 
@@ -420,6 +426,41 @@ see https://docs.filecoin.io/mine/lotus/miner-configuration/#using-filters-for-f
 			Type: "*lotus_config.RetrievalPricing",
 
 			Comment: ``,
+		},
+	},
+	"PieceDirectoryConfig": []DocField{
+		{
+			Name: "Couchbase",
+			Type: "PieceDirectoryCouchbaseConfig",
+
+			Comment: ``,
+		},
+	},
+	"PieceDirectoryCouchbaseConfig": []DocField{
+		{
+			Name: "ConnectString",
+			Type: "string",
+
+			Comment: `The couchbase connect string eg "couchbase://127.0.0.1"
+If empty, a leveldb database is used instead.`,
+		},
+		{
+			Name: "Username",
+			Type: "string",
+
+			Comment: ``,
+		},
+		{
+			Name: "Password",
+			Type: "string",
+
+			Comment: ``,
+		},
+		{
+			Name: "RAMQuotaMB",
+			Type: "uint64",
+
+			Comment: `Bucket setting RAMQuotaMB`,
 		},
 	},
 	"StorageConfig": []DocField{

@@ -23,8 +23,8 @@ type Service struct {
 	impl types.ServiceImpl
 }
 
-func NewCouchbase() Service {
-	return Service{impl: couchbase.NewStore()}
+func NewCouchbase(settings couchbase.DBSettings) Service {
+	return Service{impl: couchbase.NewStore(settings)}
 }
 
 func NewLevelDB(repopath string) Service {

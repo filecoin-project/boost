@@ -43,6 +43,7 @@ type Boost struct {
 	Wallets            WalletsConfig
 	Graphql            GraphqlConfig
 	Tracing            TracingConfig
+	PieceDirectory     PieceDirectoryConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
@@ -234,4 +235,18 @@ func (c *FeeConfig) Legacy() lotus_config.MinerFeeConfig {
 type StorageConfig struct {
 	// The maximum number of concurrent fetch operations to the storage subsystem
 	ParallelFetchLimit int
+}
+
+type PieceDirectoryCouchbaseConfig struct {
+	// The couchbase connect string eg "couchbase://127.0.0.1"
+	// If empty, a leveldb database is used instead.
+	ConnectString string
+	Username      string
+	Password      string
+	// Bucket setting RAMQuotaMB
+	RAMQuotaMB uint64
+}
+
+type PieceDirectoryConfig struct {
+	Couchbase PieceDirectoryCouchbaseConfig
 }

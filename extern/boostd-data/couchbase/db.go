@@ -60,19 +60,30 @@ type DB struct {
 	col     *gocb.Collection
 }
 
-func newDB(ctx context.Context) (*DB, error) {
-	username := "Administrator"
-	password := "boostdemo"
+type DBSettingsAuth struct {
+	Username string
+	Password string
+}
 
-	connStr := "couchbase://127.0.0.1"
-	cluster, err := gocb.Connect(connStr, gocb.ClusterOptions{
+type DBSettingsBucket struct {
+	RAMQuotaMB uint64
+}
+
+type DBSettings struct {
+	ConnectString string
+	Auth          DBSettingsAuth
+	Bucket        DBSettingsBucket
+}
+
+func newDB(ctx context.Context, settings DBSettings) (*DB, error) {
+	cluster, err := gocb.Connect(settings.ConnectString, gocb.ClusterOptions{
 		Authenticator: gocb.PasswordAuthenticator{
-			Username: username,
-			Password: password,
+			Username: settings.Auth.Username,
+			Password: settings.Auth.Password,
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("connecting to couchbase DB %s: %w", connStr, err)
+		return nil, fmt.Errorf("connecting to couchbase DB %s: %w", settings.ConnectString, err)
 	}
 
 	_, err = cluster.Buckets().GetBucket(bucketName, &gocb.GetBucketOptions{Context: ctx})
@@ -84,7 +95,7 @@ func newDB(ctx context.Context) (*DB, error) {
 		err = cluster.Buckets().CreateBucket(gocb.CreateBucketSettings{
 			BucketSettings: gocb.BucketSettings{
 				Name:       bucketName,
-				RAMQuotaMB: 256,
+				RAMQuotaMB: settings.Bucket.RAMQuotaMB,
 				BucketType: gocb.CouchbaseBucketType,
 			},
 		}, &gocb.CreateBucketOptions{Context: ctx})

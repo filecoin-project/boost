@@ -21,18 +21,19 @@ var log = logging.Logger("boostd-data-cb")
 const stripedLockSize = 1024
 
 type Store struct {
+	settings   DBSettings
 	db         *DB
 	pieceLocks [stripedLockSize]sync.RWMutex
 }
 
 var _ types.ServiceImpl = (*Store)(nil)
 
-func NewStore() *Store {
-	return &Store{}
+func NewStore(settings DBSettings) *Store {
+	return &Store{settings: settings}
 }
 
 func (s *Store) Start(ctx context.Context) error {
-	db, err := newDB(ctx)
+	db, err := newDB(ctx, s.settings)
 	if err != nil {
 		return fmt.Errorf("starting couchbase service: %w", err)
 	}

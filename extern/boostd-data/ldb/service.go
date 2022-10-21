@@ -33,9 +33,9 @@ func NewStore(repopath string) *Store {
 	return &Store{repopath: repopath}
 }
 
-func (s *Store) Start(_ context.Context) error {
+func (s *Store) Start(ctx context.Context) error {
 	repopath := s.repopath
-	if s.repopath == "" {
+	if repopath == "" {
 		// used by tests
 		var err error
 		repopath, err = ioutil.TempDir("", "ds-leveldb")
@@ -50,13 +50,11 @@ func (s *Store) Start(_ context.Context) error {
 		return err
 	}
 
-	if s.repopath == "" {
-		// used by tests - prepare db with a cursor
-		log.Debug("preparing db with next cursor")
-		s.db.SetNextCursor(context.Background(), 100)
-	}
+	// Prepare db with a cursor
+	log.Debug("preparing db with next cursor")
+	s.db.SetNextCursor(ctx, 100)
 
-	log.Debugw("new piece meta service", "repo path", repopath)
+	log.Debugw("new leveldb piece directory service", "repo path", repopath)
 	return nil
 }
 

@@ -7,15 +7,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"
+	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
@@ -28,6 +28,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testCouchSettings = couchbase.DBSettings{
+	ConnectString: "couchbase://127.0.0.1",
+	Auth: couchbase.DBSettingsAuth{
+		Username: "Administrator",
+		Password: "boostdemo",
+	},
+	Bucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 256,
+	},
+}
+
 func TestService(t *testing.T) {
 	logging.SetLogLevel("*", "debug")
 
@@ -39,7 +50,7 @@ func TestService(t *testing.T) {
 		testService(ctx, t, bdsvc)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		bdsvc := NewCouchbase()
+		bdsvc := NewCouchbase(testCouchSettings)
 		testService(ctx, t, bdsvc)
 	})
 }
@@ -128,7 +139,7 @@ func TestServiceFuzz(t *testing.T) {
 		testServiceFuzz(ctx, t, bdsvc)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		bdsvc := NewCouchbase()
+		bdsvc := NewCouchbase(testCouchSettings)
 		testServiceFuzz(ctx, t, bdsvc)
 	})
 }
