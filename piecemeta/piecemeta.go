@@ -3,6 +3,7 @@ package piecemeta
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -21,8 +22,6 @@ import (
 	"github.com/ipld/go-car/v2/blockstore"
 	"github.com/ipld/go-car/v2/index"
 	carindex "github.com/ipld/go-car/v2/index"
-	"github.com/multiformats/go-multicodec"
-	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -127,23 +126,31 @@ func (ps *PieceMeta) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dea
 	// Get a reader over the piece data
 	reader, err := ps.sealer.GetReader(ctx, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
 	if err != nil {
-		return err
+		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
 
-	// Get an index from the CAR file - works for both CARv1 and CARv2
-	idx, err := car.ReadOrGenerateIndex(reader, car.ZeroLengthSectionAsEOF(true), car.StoreIdentityCIDs(true))
+	// Iterate over all the blocks in the piece to extract the index records
+	recs := make([]model.Record, 0)
+	opts := []carv2.Option{car.ZeroLengthSectionAsEOF(true)}
+	blockReader, err := carv2.NewBlockReader(reader, opts...)
 	if err != nil {
+		return fmt.Errorf("getting block reader over piece %s: %w", pieceCid, err)
+	}
+
+	blockMetadata, err := blockReader.SkipNext()
+	for err == nil {
+		recs = append(recs, model.Record{
+			Cid: blockMetadata.Cid,
+			OffsetSize: model.OffsetSize{
+				Offset: blockMetadata.Offset,
+				Size:   blockMetadata.Size,
+			},
+		})
+
+		blockMetadata, err = blockReader.SkipNext()
+	}
+	if !errors.Is(err, io.EOF) {
 		return fmt.Errorf("generating index for piece %s: %w", pieceCid, err)
-	}
-
-	itidx, ok := idx.(carindex.IterableIndex)
-	if !ok {
-		return fmt.Errorf("index is not iterable for piece %s", pieceCid)
-	}
-
-	recs, err := getRecords(itidx)
-	if err != nil {
-		return err
 	}
 
 	// Add mh => piece index to store: "which piece contains the multihash?"
@@ -334,32 +341,4 @@ func (ps *PieceMeta) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (bstor
 	}
 
 	return bs, nil
-}
-
-func getRecords(subject index.Index) ([]model.Record, error) {
-	records := make([]model.Record, 0)
-
-	switch idx := subject.(type) {
-	case index.IterableIndex:
-		err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
-
-			cid := cid.NewCidV1(cid.Raw, m)
-
-			records = append(records, model.Record{
-				Cid: cid,
-				OffsetSize: model.OffsetSize{
-					Offset: offset,
-					Size:   0,
-				},
-			})
-
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec())
-	}
-	return records, nil
 }
