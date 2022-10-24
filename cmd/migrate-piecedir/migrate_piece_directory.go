@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 	"io/ioutil"
 	"os"
 	"path"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/filecoin-project/boost/piecemeta"
 	"github.com/filecoin-project/boostd-data/client"
+	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
@@ -29,6 +29,7 @@ import (
 	"github.com/multiformats/go-multihash"
 	"github.com/schollz/progressbar/v3"
 	"github.com/urfave/cli/v2"
+	"go.uber.org/zap"
 )
 
 var migrateLevelDBCmd = &cli.Command{
@@ -36,90 +37,140 @@ var migrateLevelDBCmd = &cli.Command{
 	Description: "Migrate boost piece information and dagstore to a leveldb store",
 	Before:      before,
 	Action: func(cctx *cli.Context) error {
-		ctx := lcli.ReqContext(cctx)
-
-		// Create a logger for the migration that outputs to a file in the
-		// current working directory
-		logPath := "migrate-leveldb.log"
-		logCfg := zap.NewDevelopmentConfig()
-		logCfg.OutputPaths = []string{logPath}
-		zl, err := logCfg.Build()
-		if err != nil {
-			return err
-		}
-		defer zl.Sync() //nolint:errcheck
-		logger := zl.Sugar()
-
+		// Create a boost-data leveldb service
 		repoDir, err := homedir.Expand(cctx.String(FlagBoostRepo))
 		if err != nil {
 			return err
 		}
 
-		fmt.Print("Migrating dagstore to leveldb Piece Directory. ")
-		fmt.Println("See detailed logs of the migration at")
-		fmt.Println(logPath)
-
-		// Start a leveldb server
-		svcCtx, cancel := context.WithCancel(ctx)
-		defer cancel()
 		ldbRepoPath := path.Join(repoDir, "piece-directory")
-		ldbsvc := svc.NewLevelDB(ldbRepoPath)
-		addr, err := ldbsvc.Start(svcCtx)
-		if err != nil {
-			return err
-		}
-
-		// Create a client to connect to the server
-		cl := client.NewStore()
-		err = cl.Dial(ctx, "http://"+addr)
-		if err != nil {
-			return err
-		}
-
-		// Create a progress bar
-		bar := progressbar.NewOptions(100,
-			progressbar.OptionEnableColorCodes(true),
-			progressbar.OptionFullWidth(),
-			progressbar.OptionSetPredictTime(true),
-			progressbar.OptionSetElapsedTime(false),
-			progressbar.OptionShowCount(),
-			progressbar.OptionSetTheme(progressbar.Theme{
-				Saucer:        "[green]=[reset]",
-				SaucerHead:    "[green]>[reset]",
-				SaucerPadding: " ",
-				BarStart:      "[",
-				BarEnd:        "]",
-			}))
-
-		// Migrate the indices
-		bar.Describe("[cyan][1/3][reset] Migrating indices...")
-		errCount, err := migrateIndices(ctx, logger, bar, repoDir, cl)
-		if errCount > 0 {
-			msg := fmt.Sprintf("Warning: there were errors migrating %d indices.", errCount)
-			msg += " See the log for details:\n" + logPath
-			fmt.Fprintf(os.Stderr, "\n"+msg+"\n")
-		}
-		// TODO: just log error
-		if err != nil {
-			return fmt.Errorf("migrating indices: %w", err)
-		}
-
-		// Migrate the piece store
-		bar.Describe("[cyan][2/3][reset] Migrating piece info...")
-		bar.Set(0) //nolint:errcheck
-		errCount, err = migratePieceStore(ctx, logger, bar, repoDir, cl)
-		if errCount > 0 {
-			msg := fmt.Sprintf("Warning: there were errors migrating %d piece deal infos.", errCount)
-			msg += " See the log for details:\n" + logPath
-			fmt.Fprintf(os.Stderr, "\n"+msg+"\n")
-		}
-		// TODO: just log error
-		if err != nil {
-			return fmt.Errorf("migrating piece store: %w", err)
-		}
-
-		return nil
+		bdsvc := svc.NewLevelDB(ldbRepoPath)
+		return migrate(cctx, "leveldb", bdsvc)
 	},
+}
+
+var migrateCouchDBCmd = &cli.Command{
+	Name:        "couchbase",
+	Description: "Migrate boost piece information and dagstore to a couchbase store",
+	Before:      before,
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "connect-string",
+			Usage:    "couchbase connect string eg 'couchbase://127.0.0.1'",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "username",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "password",
+			Required: true,
+		},
+		&cli.Uint64Flag{
+			Name:     "ram-quota-mb",
+			Usage:    "megabytes of ram allocated to couchbase bucket (recommended at least 1024)",
+			Value:    1024,
+			Required: true,
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		// Create a boostd-data couchbase service
+		settings := couchbase.DBSettings{
+			ConnectString: cctx.String("connect-string"),
+			Auth: couchbase.DBSettingsAuth{
+				Username: cctx.String("username"),
+				Password: cctx.String("password"),
+			},
+			Bucket: couchbase.DBSettingsBucket{
+				RAMQuotaMB: cctx.Uint64("ram-quota-mb"),
+			},
+		}
+		bdsvc := svc.NewCouchbase(settings)
+		return migrate(cctx, "couchbase", bdsvc)
+	},
+}
+
+func migrate(cctx *cli.Context, dbType string, bdsvc svc.Service) error {
+	ctx := lcli.ReqContext(cctx)
+	svcCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	addr, err := bdsvc.Start(svcCtx)
+	if err != nil {
+		return err
+	}
+
+	// Create a logger for the migration that outputs to a file in the
+	// current working directory
+	logPath := "migrate-" + dbType + ".log"
+	logCfg := zap.NewDevelopmentConfig()
+	logCfg.OutputPaths = []string{logPath}
+	zl, err := logCfg.Build()
+	if err != nil {
+		return err
+	}
+	defer zl.Sync() //nolint:errcheck
+	logger := zl.Sugar()
+
+	repoDir, err := homedir.Expand(cctx.String(FlagBoostRepo))
+	if err != nil {
+		return err
+	}
+
+	fmt.Print("Migrating dagstore to " + dbType + " Piece Directory. ")
+	fmt.Println("See detailed logs of the migration at")
+	fmt.Println(logPath)
+
+	// Create a client to connect to the server
+	cl := client.NewStore()
+	err = cl.Dial(ctx, "http://"+addr)
+	if err != nil {
+		return err
+	}
+
+	// Create a progress bar
+	bar := progressbar.NewOptions(100,
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionFullWidth(),
+		progressbar.OptionSetPredictTime(true),
+		progressbar.OptionSetElapsedTime(false),
+		progressbar.OptionShowCount(),
+		progressbar.OptionSetTheme(progressbar.Theme{
+			Saucer:        "[green]=[reset]",
+			SaucerHead:    "[green]>[reset]",
+			SaucerPadding: " ",
+			BarStart:      "[",
+			BarEnd:        "]",
+		}))
+
+	// Migrate the indices
+	bar.Describe("[cyan][1/3][reset] Migrating indices...")
+	errCount, err := migrateIndices(ctx, logger, bar, repoDir, cl)
+	if errCount > 0 {
+		msg := fmt.Sprintf("Warning: there were errors migrating %d indices.", errCount)
+		msg += " See the log for details:\n" + logPath
+		fmt.Fprintf(os.Stderr, "\n"+msg+"\n")
+	}
+	// TODO: just log error
+	if err != nil {
+		return fmt.Errorf("migrating indices: %w", err)
+	}
+
+	// Migrate the piece store
+	bar.Describe("[cyan][2/3][reset] Migrating piece info...")
+	bar.Set(0) //nolint:errcheck
+	errCount, err = migratePieceStore(ctx, logger, bar, repoDir, cl)
+	if errCount > 0 {
+		msg := fmt.Sprintf("Warning: there were errors migrating %d piece deal infos.", errCount)
+		msg += " See the log for details:\n" + logPath
+		fmt.Fprintf(os.Stderr, "\n"+msg+"\n")
+	}
+	// TODO: just log error
+	if err != nil {
+		return fmt.Errorf("migrating piece store: %w", err)
+	}
+
+	return nil
 }
 
 func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store *client.Store) (int, error) {
@@ -288,8 +339,12 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 		}
 		took := time.Since(pieceStart)
 		indexTime += took
+		avgDenom := count
+		if avgDenom == 0 {
+			avgDenom = 1
+		}
 		logger.Infow("migrated piece deals", "piece cid", pcid, "processed", i+1, "total", len(pcids),
-			"took", took.String(), "average", (indexTime / time.Duration(count)).String())
+			"took", took.String(), "average", (indexTime / time.Duration(avgDenom)).String())
 	}
 
 	logger.Infow("migrated piece deals", "count", len(pcids), "errors", errorCount, "took", time.Since(start))
