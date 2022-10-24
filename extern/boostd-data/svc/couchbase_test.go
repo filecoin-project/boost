@@ -20,7 +20,7 @@ func XTestCouchbaseService(t *testing.T) {
 	removeContainer := setupCouchbase(t)
 	defer removeContainer()
 
-	bdsvc := NewCouchbase()
+	bdsvc := NewCouchbase(testCouchSettings)
 	addr, err := bdsvc.Start(context.Background())
 	if err != nil {
 		t.Fatal(err)

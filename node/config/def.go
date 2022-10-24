@@ -72,6 +72,15 @@ func DefaultBoost() *Boost {
 			ServiceName: "boostd",
 		},
 
+		PieceDirectory: PieceDirectoryConfig{
+			Couchbase: PieceDirectoryCouchbaseConfig{
+				ConnectString: "",
+				Username:      "",
+				Password:      "",
+				RAMQuotaMB:    0,
+			},
+		},
+
 		Dealmaking: DealmakingConfig{
 			ConsiderOnlineStorageDeals:     true,
 			ConsiderOfflineStorageDeals:    true,
