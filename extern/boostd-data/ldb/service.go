@@ -51,8 +51,10 @@ func (s *Store) Start(ctx context.Context) error {
 	}
 
 	// Prepare db with a cursor
-	log.Debug("preparing db with next cursor")
-	s.db.SetNextCursor(ctx, 100)
+	err = s.db.InitCursor(ctx)
+	if err != nil {
+		return err
+	}
 
 	log.Debugw("new leveldb piece directory service", "repo path", repopath)
 	return nil

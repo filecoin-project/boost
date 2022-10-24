@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/filecoin-project/boost/tracing"
@@ -66,6 +67,25 @@ func newDB(path string, readonly bool) (*DB, error) {
 	}
 
 	return &DB{ldb}, nil
+}
+
+func (db *DB) InitCursor(ctx context.Context) error {
+	_, err := db.Get(ctx, dskeyNextCursor)
+	if err == nil {
+		// Cursor has already been initialized, so just return
+		log.Debug("leveldb cursor already initialized")
+		return nil
+	}
+
+	if errors.Is(err, ds.ErrNotFound) {
+		// Cursor has not yet been initialized so initialize it
+		log.Debug("initializing leveldb cursor")
+		err = db.SetNextCursor(ctx, 100)
+		if err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("initializing database cursor: %w", err)
 }
 
 // NextCursor

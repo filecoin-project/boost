@@ -75,8 +75,13 @@ type DBSettings struct {
 	Bucket        DBSettingsBucket
 }
 
+const connectTimeout = 5 * time.Second
+
 func newDB(ctx context.Context, settings DBSettings) (*DB, error) {
 	cluster, err := gocb.Connect(settings.ConnectString, gocb.ClusterOptions{
+		TimeoutsConfig: gocb.TimeoutsConfig{
+			ConnectTimeout: connectTimeout,
+		},
 		Authenticator: gocb.PasswordAuthenticator{
 			Username: settings.Auth.Username,
 			Password: settings.Auth.Password,
@@ -86,10 +91,11 @@ func newDB(ctx context.Context, settings DBSettings) (*DB, error) {
 		return nil, fmt.Errorf("connecting to couchbase DB %s: %w", settings.ConnectString, err)
 	}
 
-	_, err = cluster.Buckets().GetBucket(bucketName, &gocb.GetBucketOptions{Context: ctx})
+	_, err = cluster.Buckets().GetBucket(bucketName, &gocb.GetBucketOptions{Context: ctx, Timeout: connectTimeout})
 	if err != nil {
 		if !errors.Is(err, gocb.ErrBucketNotFound) {
-			return nil, fmt.Errorf("getting bucket %s: %w", bucketName, err)
+			msg := fmt.Sprintf("getting bucket %s for couchbase server %s", bucketName, settings.ConnectString)
+			return nil, fmt.Errorf(msg+": %w\nCheck the couchbase server is running and the username / password are correct", err)
 		}
 
 		err = cluster.Buckets().CreateBucket(gocb.CreateBucketSettings{
