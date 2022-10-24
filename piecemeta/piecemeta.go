@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	bstore "github.com/ipfs/go-ipfs-blockstore"
+	format "github.com/ipfs/go-ipld-format"
 	"github.com/ipld/go-car/util"
 	"github.com/ipld/go-car/v2"
 	carv2 "github.com/ipld/go-car/v2"
@@ -261,7 +262,7 @@ func (ps *PieceMeta) GetIterableIndex(ctx context.Context, pieceCid cid.Cid) (ca
 }
 
 // Get a block (used by Bitswap retrieval)
-func (ps *PieceMeta) GetBlock(ctx context.Context, c cid.Cid) ([]byte, error) {
+func (ps *PieceMeta) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error) {
 	// TODO: use caching to make this efficient for repeated Gets against the same piece
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_block")
 	defer span.End()
@@ -314,6 +315,58 @@ func (ps *PieceMeta) GetBlock(ctx context.Context, c cid.Cid) ([]byte, error) {
 	}
 
 	return nil, merr
+}
+
+func (ps *PieceMeta) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "pm.get_block_size")
+	defer span.End()
+
+	// Get the pieces that contain the cid
+	pieces, err := ps.PiecesContainingMultihash(ctx, c.Hash())
+	if err != nil {
+		return 0, fmt.Errorf("getting pieces containing cid %s: %w", c, err)
+	}
+	if len(pieces) == 0 {
+		// We must return ipld ErrNotFound here because that's the only type
+		// that bitswap interprets as a not found error. All other error types
+		// are treated as general errors.
+		return 0, format.ErrNotFound{Cid: c}
+	}
+
+	// Get the size of the block from the first piece (should be the same for
+	// any piece)
+	offsetSize, err := ps.GetOffsetSize(ctx, pieces[0], c.Hash())
+	if err != nil {
+		return 0, fmt.Errorf("getting size of cid %s in piece %s: %w", c, pieces[0], err)
+	}
+
+	// If the index for the piece was imported without block size information
+	//if offsetSize.Size == 0 {
+	//	TODO:
+	//	- get a reader over the piece
+	//	- read the block size
+	//	- set the block size in the cache
+	//	- return the block size
+	//
+	//	Or alternatively, just re-index the piece?
+	//	may be more efficient than lots of small reads to get the size if
+	//	there are many calls to GetBlockSize for the same piece
+	//
+	//}
+
+	return int(offsetSize.Size), nil
+}
+
+func (ps *PieceMeta) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "pm.has_block")
+	defer span.End()
+
+	// Get the pieces that contain the cid
+	pieces, err := ps.PiecesContainingMultihash(ctx, c.Hash())
+	if err != nil {
+		return false, fmt.Errorf("getting pieces containing cid %s: %w", c, err)
+	}
+	return len(pieces) > 0, nil
 }
 
 // Get a blockstore over a piece (used by Graphsync retrieval)

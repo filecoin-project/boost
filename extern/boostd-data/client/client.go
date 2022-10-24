@@ -42,7 +42,9 @@ func (s *Store) Dial(ctx context.Context, addr string) error {
 }
 
 func (s *Store) Close(_ context.Context) {
-	s.closer()
+	if s != nil && s.closer != nil {
+		s.closer()
+	}
 }
 
 func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, error) {

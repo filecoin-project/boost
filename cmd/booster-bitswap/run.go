@@ -1,23 +1,19 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"net/http"
-	_ "net/http/pprof"
-	"strings"
-
-	"github.com/filecoin-project/boost/api"
-	bclient "github.com/filecoin-project/boost/api/client"
-	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/blockfilter"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
+	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/metrics"
+	"github.com/filecoin-project/boost/piecemeta"
 	"github.com/filecoin-project/boost/tracing"
-	"github.com/filecoin-project/go-jsonrpc"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
+	"net/http"
+	_ "net/http/pprof"
 )
 
 var runCmd = &cli.Command{
@@ -45,8 +41,18 @@ var runCmd = &cli.Command{
 			Value: 9696,
 		},
 		&cli.StringFlag{
-			Name:     "api-boost",
-			Usage:    "the endpoint for the boost API",
+			Name:     "api-fullnode",
+			Usage:    "the endpoint for the full node API",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "api-storage",
+			Usage:    "the endpoint for the storage node API",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "api-piece-directory",
+			Usage:    "the endpoint for the piece directory API",
 			Required: true,
 		},
 		&cli.StringFlag{
@@ -90,18 +96,36 @@ var runCmd = &cli.Command{
 			}()
 		}
 
-		// Connect to the Boost API
-		boostAPIInfo := cctx.String("api-boost")
-		bapi, bcloser, err := getBoostAPI(ctx, boostAPIInfo)
+		// Connect to the full node API
+		fnApiInfo := cctx.String("api-fullnode")
+		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log)
 		if err != nil {
-			return fmt.Errorf("getting boost API: %w", err)
+			return fmt.Errorf("getting full node API: %w", err)
 		}
-		defer bcloser()
+		defer ncloser()
 
-		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi)
-		// Create the server API
+		// Connect to the storage API and create a sector accessor
+		storageApiInfo := cctx.String("api-storage")
+		sa, storageCloser, err := lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
+		if err != nil {
+			return err
+		}
+		defer storageCloser()
+
+		// Connect to the piece directory service
+		pdClient := piecemeta.NewStore()
+		defer pdClient.Close(ctx)
+		err = pdClient.Dial(ctx, cctx.String("api-piece-directory"))
+		if err != nil {
+			return fmt.Errorf("connecting to piece directory service: %w", err)
+		}
+
+		// Create the bitswap host
 		port := cctx.Int("port")
-		repoDir := cctx.String(FlagRepo.Name)
+		repoDir, err := homedir.Expand(cctx.String(FlagRepo.Name))
+		if err != nil {
+			return fmt.Errorf("creating repo dir %s: %w", cctx.String(FlagRepo.Name), err)
+		}
 		host, err := setupHost(repoDir, port)
 		if err != nil {
 			return fmt.Errorf("setting up libp2p host: %w", err)
@@ -113,6 +137,8 @@ var runCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)
 		}
+		pieceMeta := piecemeta.NewPieceMeta(pdClient, sa)
+		remoteStore := remoteblockstore.NewRemoteBlockstore(pieceMeta)
 		server := NewBitswapServer(remoteStore, host, blockFilter)
 
 		var proxyAddrInfo *peer.AddrInfo
@@ -157,21 +183,4 @@ var runCmd = &cli.Command{
 
 		return nil
 	},
-}
-
-func getBoostAPI(ctx context.Context, ai string) (api.Boost, jsonrpc.ClientCloser, error) {
-	ai = strings.TrimPrefix(strings.TrimSpace(ai), "BOOST_API_INFO=")
-	info := cliutil.ParseApiInfo(ai)
-	addr, err := info.DialArgs("v0")
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get DialArgs: %w", err)
-	}
-
-	log.Infof("Using boost API at %s", addr)
-	api, closer, err := bclient.NewBoostRPCV0(ctx, addr, info.AuthHeader())
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating full node service API: %w", err)
-	}
-
-	return api, closer, nil
 }
