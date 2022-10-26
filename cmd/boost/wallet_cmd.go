@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/tablewriter"
@@ -32,6 +33,7 @@ var walletCmd = &cli.Command{
 		walletGetDefault,
 		walletSetDefault,
 		walletDelete,
+		walletSign,
 	},
 }
 
@@ -527,5 +529,51 @@ var walletDelete = &cli.Command{
 		}
 
 		return n.Wallet.WalletDelete(ctx, addr)
+	},
+}
+
+var walletSign = &cli.Command{
+	Name:      "sign",
+	Usage:     "Sign a message",
+	ArgsUsage: "<signing address> <hexMessage>",
+	Action: func(cctx *cli.Context) error {
+		ctx := lcli.ReqContext(cctx)
+
+		n, err := node.Setup(cctx.String(cmd.FlagRepo.Name))
+		if err != nil {
+			return err
+		}
+
+		if !cctx.Args().Present() || cctx.NArg() != 2 {
+			return fmt.Errorf("must specify signing address and message to sign")
+		}
+
+		addr, err := address.NewFromString(cctx.Args().First())
+		if err != nil {
+			return err
+		}
+
+		msg, err := hex.DecodeString(cctx.Args().Get(1))
+		if err != nil {
+			return err
+		}
+
+		sig, err := n.Wallet.WalletSign(ctx, addr, msg, api.MsgMeta{Type: api.MTUnknown})
+		if err != nil {
+			return err
+		}
+
+		sigBytes := append([]byte{byte(sig.Type)}, sig.Data...)
+
+		if cctx.Bool("json") {
+			out := map[string]interface{}{
+				"signature": hex.EncodeToString(sigBytes),
+			}
+			cmd.PrintJson(out)
+		} else {
+			fmt.Println(hex.EncodeToString(sigBytes))
+		}
+
+		return nil
 	},
 }
