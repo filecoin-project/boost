@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/client"
@@ -47,6 +48,7 @@ type Store interface {
 	GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error)
 	GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error)
 	PiecesContaining(ctx context.Context, m mh.Multihash) ([]cid.Cid, error)
+	MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error
 
 	//Delete(ctx context.Context, pieceCid cid.Cid) error
 	//DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid uuid.UUID) (bool, error)
@@ -55,14 +57,21 @@ type Store interface {
 type PieceMeta struct {
 	store  Store
 	sealer Sealer
+
+	addIdxThrottle chan struct{}
+	addIdxOpByCid  sync.Map
 }
 
 func NewStore() *client.Store {
 	return client.NewStore()
 }
 
-func NewPieceMeta(store Store, sa dagstore.SectorAccessor) *PieceMeta {
-	return &PieceMeta{store: store, sealer: &sealer{sa}}
+func NewPieceMeta(store Store, sa dagstore.SectorAccessor, addIndexThrottleSize int) *PieceMeta {
+	return &PieceMeta{
+		store:          store,
+		sealer:         &sealer{sa},
+		addIdxThrottle: make(chan struct{}, addIndexThrottleSize),
+	}
 }
 
 type sealer struct {
@@ -100,12 +109,21 @@ func (ps *PieceMeta) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, deal
 	ctx, span := tracing.Tracer.Start(ctx, "pm.add_deal_for_piece")
 	defer span.End()
 
-	// Perform indexing of piece
-	if err := ps.addIndexForPiece(ctx, pieceCid, dealInfo); err != nil {
-		return fmt.Errorf("adding index for piece %s: %w", pieceCid, err)
+	// Check if the indexes have already been added
+	isIndexed, err := ps.store.IsIndexed(ctx, pieceCid)
+	if err != nil {
+		return err
+	}
+
+	if !isIndexed {
+		// Perform indexing of piece
+		if err := ps.addIndexForPieceThrottled(ctx, pieceCid, dealInfo); err != nil {
+			return fmt.Errorf("adding index for piece %s: %w", pieceCid, err)
+		}
 	}
 
 	// Add deal to list of deals for this piece
+	// TODO: store must ensure deals in list of deals for piece are unique
 	if err := ps.store.AddDealForPiece(ctx, pieceCid, dealInfo); err != nil {
 		return fmt.Errorf("saving deal %s to store: %w", dealInfo.DealUuid, err)
 	}
@@ -113,17 +131,49 @@ func (ps *PieceMeta) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, deal
 	return nil
 }
 
+type addIndexOperation struct {
+	done chan struct{}
+	err  error
+}
+
+func (ps *PieceMeta) addIndexForPieceThrottled(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+	// Check if there is already an add index operation in progress for the
+	// given piece cid. If not, create a new one.
+	opi, loaded := ps.addIdxOpByCid.LoadOrStore(pieceCid, &addIndexOperation{
+		done: make(chan struct{}),
+	})
+	op := opi.(*addIndexOperation)
+	if loaded {
+		// There is an add index operation in progress, so wait for it to
+		// complete
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-op.done:
+			return op.err
+		}
+	} else {
+		// A new operation was added to the map, so clean it up when it's done
+		defer ps.addIdxOpByCid.Delete(pieceCid)
+	}
+
+	// Wait for the throttle to yield an open spot
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case ps.addIdxThrottle <- struct{}{}:
+	}
+	defer func() { <-ps.addIdxThrottle }()
+
+	// Perform the add index operation
+	op.err = ps.addIndexForPiece(ctx, pieceCid, dealInfo)
+	close(op.done)
+
+	// Return the result
+	return op.err
+}
+
 func (ps *PieceMeta) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
-	// Check if the indexes have already been added
-	isIndexed, err := ps.store.IsIndexed(ctx, pieceCid)
-	if err != nil {
-		return err
-	}
-
-	if isIndexed {
-		return nil
-	}
-
 	// Get a reader over the piece data
 	reader, err := ps.sealer.GetReader(ctx, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
 	if err != nil {
@@ -158,6 +208,24 @@ func (ps *PieceMeta) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dea
 	// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
 	if err := ps.store.AddIndex(ctx, pieceCid, recs); err != nil {
 		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
+	}
+
+	return nil
+}
+
+func (ps *PieceMeta) buildIndexForPiece(ctx context.Context, pieceCid cid.Cid) error {
+	dls, err := ps.GetPieceDeals(ctx, pieceCid)
+	if err != nil {
+		return fmt.Errorf("getting piece deals: %w", err)
+	}
+
+	if len(dls) == 0 {
+		return fmt.Errorf("getting piece deals: no deals found for piece %s", pieceCid)
+	}
+
+	err = ps.addIndexForPieceThrottled(ctx, pieceCid, dls[0])
+	if err != nil {
+		return fmt.Errorf("adding index for piece deal %d: %w", dls[0].ChainDealID, err)
 	}
 
 	return nil
@@ -340,19 +408,28 @@ func (ps *PieceMeta) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, err
 		return 0, fmt.Errorf("getting size of cid %s in piece %s: %w", c, pieces[0], err)
 	}
 
-	// If the index for the piece was imported without block size information
-	//if offsetSize.Size == 0 {
-	//	TODO:
-	//	- get a reader over the piece
-	//	- read the block size
-	//	- set the block size in the cache
-	//	- return the block size
-	//
-	//	Or alternatively, just re-index the piece?
-	//	may be more efficient than lots of small reads to get the size if
-	//	there are many calls to GetBlockSize for the same piece
-	//
-	//}
+	// Indexes imported from the DAG store do not have block size information
+	// (they only have offset information). If the block has no size
+	// information, rebuild the index from the piece data
+	if offsetSize.Size == 0 {
+		err = ps.buildIndexForPiece(ctx, pieces[0])
+		if err != nil {
+			return 0, fmt.Errorf("re-building index for piece %s: %w", pieces[0], err)
+		}
+
+		offsetSize, err = ps.GetOffsetSize(ctx, pieces[0], c.Hash())
+		if err != nil {
+			return 0, fmt.Errorf("getting size of cid %s in piece %s: %w", c, pieces[0], err)
+		}
+		if offsetSize.Size == 0 {
+			zeroSizeErr := fmt.Errorf("bad index: size of block %s is zero", c)
+			err = ps.store.MarkIndexErrored(ctx, pieces[0], zeroSizeErr)
+			if err != nil {
+				return 0, fmt.Errorf("setting index for piece %s to error state (%s): %w", pieces[0], zeroSizeErr, err)
+			}
+			return 0, fmt.Errorf("re-building index for piece %s: %w", pieces[0], zeroSizeErr)
+		}
+	}
 
 	return int(offsetSize.Size), nil
 }

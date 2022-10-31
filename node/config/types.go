@@ -249,4 +249,9 @@ type PieceDirectoryCouchbaseConfig struct {
 
 type PieceDirectoryConfig struct {
 	Couchbase PieceDirectoryCouchbaseConfig
+	// The maximum number of add index operations allowed to execute in parallel.
+	// The add index operation is executed when a new deal is created - it fetches
+	// the piece from the sealing subsystem, creates an index of where each block
+	// is in the piece, and adds the index to the piece directory.
+	ParallelAddIndexLimit int
 }

@@ -22,6 +22,7 @@ type Store struct {
 		GetIndex                  func(context.Context, cid.Cid) ([]model.Record, error)
 		GetOffsetSize             func(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
 		GetPieceDeals             func(context.Context, cid.Cid) ([]model.DealInfo, error)
+		MarkIndexErrored          func(context.Context, cid.Cid, error) error
 		IndexedAt                 func(context.Context, cid.Cid) (time.Time, error)
 		PiecesContainingMultihash func(context.Context, mh.Multihash) ([]cid.Cid, error)
 	}
@@ -87,6 +88,10 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 
 func (s *Store) PiecesContaining(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
 	return s.client.PiecesContainingMultihash(ctx, m)
+}
+
+func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error {
+	return s.client.MarkIndexErrored(ctx, pieceCid, err)
 }
 
 func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {

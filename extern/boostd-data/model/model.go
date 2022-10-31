@@ -32,6 +32,8 @@ type Metadata struct {
 	Cursor    uint64     `json:"cursor"`
 	IndexedAt time.Time  `json:"indexed_at"`
 	Deals     []DealInfo `json:"deals"`
+	Error     string     `json:"error"`
+	ErrorType string     `json:"error_type"`
 }
 
 // Record is the information stored in the index for each block in a piece

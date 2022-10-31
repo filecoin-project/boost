@@ -234,6 +234,20 @@ func (mr *MockStoreMockRecorder) IsIndexed(arg0, arg1 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsIndexed", reflect.TypeOf((*MockStore)(nil).IsIndexed), arg0, arg1)
 }
 
+// MarkIndexErrored mocks base method.
+func (m *MockStore) MarkIndexErrored(arg0 context.Context, arg1 cid.Cid, arg2 error) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkIndexErrored", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkIndexErrored indicates an expected call of MarkIndexErrored.
+func (mr *MockStoreMockRecorder) MarkIndexErrored(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkIndexErrored", reflect.TypeOf((*MockStore)(nil).MarkIndexErrored), arg0, arg1, arg2)
+}
+
 // PiecesContaining mocks base method.
 func (m *MockStore) PiecesContaining(arg0 context.Context, arg1 multihash.Multihash) ([]cid.Cid, error) {
 	m.ctrl.T.Helper()

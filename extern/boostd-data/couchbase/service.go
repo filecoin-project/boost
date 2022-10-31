@@ -54,6 +54,19 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	return s.db.AddDealForPiece(ctx, pieceCid, dealInfo)
 }
 
+func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error {
+	log.Debugw("handle.mark-piece-index-errored", "piece-cid", pieceCid, "err", err)
+
+	ctx, span := tracing.Tracer.Start(context.Background(), "store.mark-piece-index-errored")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.mark-piece-index-errored", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	return s.db.MarkIndexErrored(ctx, pieceCid, err)
+}
+
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
 	log.Debugw("handle.get-offset-size", "piece-cid", pieceCid)
 

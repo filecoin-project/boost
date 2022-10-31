@@ -55,6 +55,11 @@ var runCmd = &cli.Command{
 			Usage:    "the endpoint for the piece directory API",
 			Required: true,
 		},
+		&cli.IntFlag{
+			Name:  "add-index-throttle",
+			Usage: "the maximum number of add index operations that can run in parallel",
+			Value: 4,
+		},
 		&cli.StringFlag{
 			Name:  "proxy",
 			Usage: "the multiaddr of the libp2p proxy that this node connects through",
@@ -137,7 +142,7 @@ var runCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)
 		}
-		pieceMeta := piecemeta.NewPieceMeta(pdClient, sa)
+		pieceMeta := piecemeta.NewPieceMeta(pdClient, sa, cctx.Int("add-index-throttle"))
 		remoteStore := remoteblockstore.NewRemoteBlockstore(pieceMeta)
 		server := NewBitswapServer(remoteStore, host, blockFilter)
 
