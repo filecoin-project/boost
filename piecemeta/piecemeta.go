@@ -19,7 +19,6 @@ import (
 	bstore "github.com/ipfs/go-ipfs-blockstore"
 	format "github.com/ipfs/go-ipld-format"
 	"github.com/ipld/go-car/util"
-	"github.com/ipld/go-car/v2"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
 	"github.com/ipld/go-car/v2/index"
@@ -182,7 +181,7 @@ func (ps *PieceMeta) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dea
 
 	// Iterate over all the blocks in the piece to extract the index records
 	recs := make([]model.Record, 0)
-	opts := []carv2.Option{car.ZeroLengthSectionAsEOF(true)}
+	opts := []carv2.Option{carv2.ZeroLengthSectionAsEOF(true)}
 	blockReader, err := carv2.NewBlockReader(reader, opts...)
 	if err != nil {
 		return fmt.Errorf("getting block reader over piece %s: %w", pieceCid, err)
