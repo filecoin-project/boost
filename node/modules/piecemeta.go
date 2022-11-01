@@ -85,8 +85,8 @@ func NewPieceMetaStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.Loc
 func NewPieceMeta(cfg *config.Boost) func(maddr dtypes.MinerAddress, store piecemeta.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecemeta.PieceMeta {
 	return func(maddr dtypes.MinerAddress, store piecemeta.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecemeta.PieceMeta {
 		sa := sectoraccessor.NewSectorAccessor(maddr, secb, pp, full)
-
-		return piecemeta.NewPieceMeta(store, sa, cfg.PieceDirectory.ParallelAddIndexLimit)
+		pr := &piecemeta.SectorAccessorAsPieceReader{SectorAccessor: sa}
+		return piecemeta.NewPieceMeta(store, pr, cfg.PieceDirectory.ParallelAddIndexLimit)
 	}
 }
 

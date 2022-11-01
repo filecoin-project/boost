@@ -237,11 +237,19 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 		}
 	}
 
-	// mark that indexing is complete
-	md := model.Metadata{
-		Cursor:    cursor,
-		IndexedAt: time.Now(),
+	// get the metadata for the piece
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		if !errors.Is(err, ds.ErrNotFound) {
+			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
+		}
+		// there isn't yet any metadata, so create new metadata
+		md = model.Metadata{}
 	}
+
+	// mark indexing as complete
+	md.Cursor = cursor
+	md.IndexedAt = time.Now()
 
 	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
 	if err != nil {

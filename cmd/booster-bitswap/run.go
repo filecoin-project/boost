@@ -142,7 +142,8 @@ var runCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)
 		}
-		pieceMeta := piecemeta.NewPieceMeta(pdClient, sa, cctx.Int("add-index-throttle"))
+		pr := &piecemeta.SectorAccessorAsPieceReader{SectorAccessor: sa}
+		pieceMeta := piecemeta.NewPieceMeta(pdClient, pr, cctx.Int("add-index-throttle"))
 		remoteStore := remoteblockstore.NewRemoteBlockstore(pieceMeta)
 		server := NewBitswapServer(remoteStore, host, blockFilter)
 

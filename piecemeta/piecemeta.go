@@ -27,7 +27,7 @@ import (
 	mh "github.com/multiformats/go-multihash"
 )
 
-//go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecemeta.go -package=mock_piecemeta . SectionReader,Sealer,Store
+//go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecemeta.go -package=mock_piecemeta . SectionReader,PieceReader,Store
 
 type SectionReader interface {
 	io.Reader
@@ -35,7 +35,7 @@ type SectionReader interface {
 	io.Seeker
 }
 
-type Sealer interface {
+type PieceReader interface {
 	// GetReader returns a reader over a piece. If there is no unsealed copy, returns ErrSealed.
 	GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error)
 }
@@ -55,8 +55,8 @@ type Store interface {
 }
 
 type PieceMeta struct {
-	store  Store
-	sealer Sealer
+	store       Store
+	pieceReader PieceReader
 
 	addIdxThrottle chan struct{}
 	addIdxOpByCid  sync.Map
@@ -66,19 +66,19 @@ func NewStore() *client.Store {
 	return client.NewStore()
 }
 
-func NewPieceMeta(store Store, sa dagstore.SectorAccessor, addIndexThrottleSize int) *PieceMeta {
+func NewPieceMeta(store Store, pr PieceReader, addIndexThrottleSize int) *PieceMeta {
 	return &PieceMeta{
 		store:          store,
-		sealer:         &sealer{sa},
+		pieceReader:    pr,
 		addIdxThrottle: make(chan struct{}, addIndexThrottleSize),
 	}
 }
 
-type sealer struct {
+type SectorAccessorAsPieceReader struct {
 	dagstore.SectorAccessor
 }
 
-func (s *sealer) GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error) {
+func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "sealer.get_reader")
 	defer span.End()
 
@@ -175,7 +175,7 @@ func (ps *PieceMeta) addIndexForPieceThrottled(ctx context.Context, pieceCid cid
 
 func (ps *PieceMeta) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	// Get a reader over the piece data
-	reader, err := ps.sealer.GetReader(ctx, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
+	reader, err := ps.pieceReader.GetReader(ctx, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
 	if err != nil {
 		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
@@ -220,7 +220,7 @@ func (ps *PieceMeta) buildIndexForPiece(ctx context.Context, pieceCid cid.Cid) e
 	}
 
 	if len(dls) == 0 {
-		return fmt.Errorf("getting piece deals: no deals found for piece %s", pieceCid)
+		return fmt.Errorf("getting piece deals: no deals found for piece")
 	}
 
 	err = ps.addIndexForPieceThrottled(ctx, pieceCid, dls[0])
@@ -289,7 +289,7 @@ func (ps *PieceMeta) GetPieceReader(ctx context.Context, pieceCid cid.Cid) (Sect
 	// it is stored in
 	var merr error
 	for i, dl := range deals {
-		reader, err := ps.sealer.GetReader(ctx, dl.SectorID, dl.PieceOffset, dl.PieceLength)
+		reader, err := ps.pieceReader.GetReader(ctx, dl.SectorID, dl.PieceOffset, dl.PieceLength)
 		if err != nil {
 			// TODO: log error
 			if i < 3 {
