@@ -96,11 +96,11 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) *d
 		}
 		deal.NBytesReceived = fi.Size()
 		p.dealLogger.Infow(deal.DealUuid, "size of "+transferType, "filepath", deal.InboundFilePath, "size", fi.Size())
-	} else {
-		// if the deal has already been handed to the sealer, the inbound file
-		// could already have been removed and in that case, the number of
-		// bytes received should be the same as deal size as we've already
-		// verified the transfer.
+	} else if !deal.IsOffline {
+		// For online deals where the deal has already been handed to the sealer,
+		// the inbound file could already have been removed and in that case,
+		// the number of bytes received should be the same as deal size as
+		// we've already verified the transfer.
 		deal.NBytesReceived = int64(deal.Transfer.Size)
 	}
 
@@ -570,9 +570,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 		SectorID:    deal.SectorID,
 		PieceOffset: deal.Offset,
 		PieceLength: deal.Length,
-		// TODO: Make sure the size of the CAR file is persisted.
-		// For offline deals the Transfer struct is empty.
-		CarLength: deal.Transfer.Size,
+		CarLength:   uint64(deal.NBytesReceived),
 	}); err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryAuto,
