@@ -122,7 +122,6 @@ func (ps *PieceMeta) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, deal
 	}
 
 	// Add deal to list of deals for this piece
-	// TODO: store must ensure deals in list of deals for piece are unique
 	if err := ps.store.AddDealForPiece(ctx, pieceCid, dealInfo); err != nil {
 		return fmt.Errorf("saving deal %s to store: %w", dealInfo.DealUuid, err)
 	}

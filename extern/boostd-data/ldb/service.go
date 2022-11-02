@@ -73,13 +73,23 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	s.Lock()
 	defer s.Unlock()
 
+	// Get the existing deals for the piece
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
 		return err
 	}
 
+	// Check if the deal has already been added
+	for _, dl := range md.Deals {
+		if dl == dealInfo {
+			return nil
+		}
+	}
+
+	// Add the deal to the list
 	md.Deals = append(md.Deals, dealInfo)
 
+	// Write the piece metadata back to the db
 	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
 	if err != nil {
 		return err

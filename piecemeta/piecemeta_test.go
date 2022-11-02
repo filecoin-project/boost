@@ -41,7 +41,8 @@ func TestPieceMeta(t *testing.T) {
 	defer cancel()
 
 	t.Run("level db", func(t *testing.T) {
-		bdsvc := svc.NewLevelDB("")
+		bdsvc, err := svc.NewLevelDB("")
+		require.NoError(t, err)
 		testPieceMetaBlockstoreMethods(ctx, t, bdsvc)
 	})
 	t.Run("couchbase", func(t *testing.T) {
@@ -53,7 +54,7 @@ func TestPieceMeta(t *testing.T) {
 	})
 }
 
-func testPieceMetaBlockstoreMethods(ctx context.Context, t *testing.T, bdsvc svc.Service) {
+func testPieceMetaBlockstoreMethods(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
 	addr, err := bdsvc.Start(ctx)
 	require.NoError(t, err)
 
