@@ -269,7 +269,8 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 	ctx, span := tracing.Tracer.Start(ctx, "db.all_records")
 	defer span.End()
 
-	cbMap := db.col.Map(pieceCid.String())
+	cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String())
+	cbMap := db.col.Map(cbKey)
 	recMap, err := cbMap.Iterator()
 	if err != nil {
 		return nil, fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
@@ -341,7 +342,8 @@ func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []mode
 		}
 	}
 
-	_, err := db.col.Upsert(pieceCid.String(), mhToOffsetSize, &gocb.UpsertOptions{Context: ctx})
+	cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String())
+	_, err := db.col.Upsert(cbKey, mhToOffsetSize, &gocb.UpsertOptions{Context: ctx})
 	if err != nil {
 		return fmt.Errorf("adding offset / sizes for piece %s: %w", pieceCid, err)
 	}
@@ -354,8 +356,9 @@ func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, m multihash.M
 	ctx, span := tracing.Tracer.Start(ctx, "db.get_offset_size")
 	defer span.End()
 
+	cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String())
+	cbMap := db.col.Map(cbKey)
 	var val offsetSize
-	cbMap := db.col.Map(pieceCid.String())
 	err := cbMap.At(m.String(), &val)
 	if err != nil {
 		return nil, fmt.Errorf("getting offset/size for piece %s multihash %s: %w", pieceCid, m, err)
