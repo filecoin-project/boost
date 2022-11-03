@@ -18,7 +18,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/tablewriter"
-	cli "github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2"
 )
 
 var walletCmd = &cli.Command{
@@ -569,7 +569,10 @@ var walletSign = &cli.Command{
 			out := map[string]interface{}{
 				"signature": hex.EncodeToString(sigBytes),
 			}
-			cmd.PrintJson(out)
+			err = cmd.PrintJson(out)
+			if err != nil {
+				return err
+			}
 		} else {
 			fmt.Println(hex.EncodeToString(sigBytes))
 		}
