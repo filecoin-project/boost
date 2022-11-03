@@ -44,11 +44,14 @@ type Libp2pCarServer struct {
 	netListener   net.Listener
 	streamMonitor *streamCloseMonitor
 
+	throttler chan struct{}
+
 	*transfersMgr
 }
 
 type ServerConfig struct {
 	BlockInfoCacheManager car.BlockInfoCacheManager
+	ThrottleLimit         uint
 }
 
 func NewLibp2pCarServer(h host.Host, auth *AuthTokenDB, bstore blockstore.Blockstore, cfg ServerConfig) *Libp2pCarServer {
@@ -56,12 +59,17 @@ func NewLibp2pCarServer(h host.Host, auth *AuthTokenDB, bstore blockstore.Blocks
 	if bcim == nil {
 		bcim = car.NewRefCountBICM()
 	}
+	var throttler chan struct{}
+	if cfg.ThrottleLimit > 0 {
+		throttler = make(chan struct{}, cfg.ThrottleLimit)
+	}
 	return &Libp2pCarServer{
 		h:            h,
 		auth:         auth,
 		bstore:       bstore,
 		cfg:          cfg,
 		bicm:         bcim,
+		throttler:    throttler,
 		transfersMgr: newTransfersManager(),
 	}
 }
@@ -142,6 +150,23 @@ func (s *Libp2pCarServer) handler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to parse remote address '"+r.RemoteAddr+"' as peer ID", http.StatusBadRequest)
 		return
 	}
+
+	if s.throttler != nil {
+		select {
+		case s.throttler <- struct{}{}:
+		default:
+			code := http.StatusServiceUnavailable // returning code 5xx so that Boost retries later based on its backoff
+			log.Warnw("throttler is full, dropping request, client should come back later", "code", code, "peer", r.RemoteAddr)
+			w.WriteHeader(code)
+			return
+		}
+	}
+
+	defer func() {
+		if s.throttler != nil {
+			<-s.throttler
+		}
+	}()
 
 	// Protect the libp2p connection for the lifetime of the transfer
 	tag := uuid.New().String()
