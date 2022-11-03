@@ -115,6 +115,11 @@ boostci: $(BUILD_DEPS)
 	$(GOCC) build $(GOFLAGS) -o boostci ./cmd/boostci
 .PHONY: boostci
 
+booster-tester: $(BUILD_DEPS)
+	rm -f booster-tester
+	$(GOCC) build $(GOFLAGS) -o booster-tester ./cmd/booster-tester
+.PHONY: booster-tester
+
 react: check-node-lts
 	npm_config_legacy_peer_deps=yes npm ci --no-audit --prefix react
 	npm run --prefix react build
@@ -244,6 +249,11 @@ docker/booster-bitswap:
 		-t $(docker_user)/booster-bitswap-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/Dockerfile.source --target booster-bitswap-dev .
 .PHONY: docker/booster-bitswap
+docker/booster-tester:
+	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
+		-t $(docker_user)/booster-tester-dev:dev --build-arg BUILD_VERSION=dev \
+		-f docker/devnet/Dockerfile.source --target booster-tester-dev .
+.PHONY: docker/booster-tester
 docker/all: docker/lotus-test docker/boost docker/booster-http docker/booster-bitswap \
-	docker/lotus docker/lotus-miner
+	docker/booster-tester docker/lotus docker/lotus-miner
 .PHONY: docker/all

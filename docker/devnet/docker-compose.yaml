@@ -108,3 +108,18 @@ services:
     logging: *default-logging
     volumes:
       - ./data/sample:/usr/share/nginx/html:ro
+  
+  booster-tester:
+    container_name: booster-tester
+    image: ${BOOSTER_TESTER_IMAGE}
+    tty: true
+    environment:
+      - BOOST_PATH=/var/lib/boost
+      - LOTUS_PATH=/var/lib/lotus
+      - LOTUS_MINER_PATH=/var/lib/lotus-miner
+    logging: *default-logging
+    volumes:
+      - ./data/booster-tester:/var/lib/booster-tester
+      - ./data/boost:/var/lib/boost:ro
+      - ./data/lotus:/var/lib/lotus:ro
+      - ./data/lotus-miner:/var/lib/lotus-miner:ro
