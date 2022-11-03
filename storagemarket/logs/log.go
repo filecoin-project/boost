@@ -82,3 +82,27 @@ func paramsWithDealID(dealId uuid.UUID, kvs ...interface{}) []interface{} {
 	kvs = append([]interface{}{"id", dealId}, kvs...)
 	return kvs
 }
+
+func (d *DealLogger) LogCleanup(ctx context.Context, logDuration int) {
+
+	now := time.Now().Truncate(time.Hour)
+
+	// Create a ticker with a one second tick
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			now = now.Add(time.Hour)
+			d.logger.Debugf("Cleaning logs older than %d from logsDB ", logDuration)
+			err := d.logsDB.CleanupLogs(ctx, logDuration)
+			if err != nil {
+				d.logger.Errorf("Failed to cleanup old logs from logsDB: %s", err)
+			}
+
+		case <-ctx.Done():
+			return
+		}
+	}
+}

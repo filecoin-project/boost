@@ -63,3 +63,14 @@ func (d *LogsDB) Logs(ctx context.Context, dealID uuid.UUID) ([]DealLog, error) 
 
 	return dealLogs, nil
 }
+
+func (d *LogsDB) CleanupLogs(ctx context.Context, duration int) error {
+
+	t := time.Now()
+	td := t.AddDate(0, 0, -1*duration)
+
+	qry := "DELETE from DealLogs WHERE DealUUID IN (SELECT DealUUID FROM DealLogs WHERE CreatedAt < ?)"
+
+	_, err := d.db.ExecContext(ctx, qry, td)
+	return err
+}

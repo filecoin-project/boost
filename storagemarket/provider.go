@@ -60,6 +60,8 @@ type Config struct {
 	// The number of commp processes that can run in parallel
 	MaxConcurrentLocalCommp uint64
 	TransferLimiter         TransferLimiterConfig
+	// Cleanup deal logs from DB older than this many number of days
+	DealLogDuration int
 }
 
 var log = logging.Logger("boost-provider")
@@ -453,6 +455,11 @@ func (p *Provider) Start() error {
 
 	// Start the transfer limiter
 	go p.xferLimiter.run(p.ctx)
+
+	// Start hourly deal log cleanup
+	if p.config.DealLogDuration > 0 {
+		go p.dealLogger.LogCleanup(p.ctx, p.config.DealLogDuration)
+	}
 
 	log.Infow("storage provider: started")
 	return nil
