@@ -569,7 +569,10 @@ var walletSign = &cli.Command{
 			out := map[string]interface{}{
 				"signature": hex.EncodeToString(sigBytes),
 			}
-			cmd.PrintJson(out)
+			err := cmd.PrintJson(out)
+			if err != nil {
+				return err
+			}
 		} else {
 			fmt.Println(hex.EncodeToString(sigBytes))
 		}
