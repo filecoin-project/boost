@@ -300,6 +300,13 @@ to booster bitswap
 - advertise bitswap records to the content indexer
 - list bitswap in available transports on the retrieval transport protocol`,
 		},
+		{
+			Name: "DealLogDuration",
+			Type: "int",
+
+			Comment: `The deal logs older than DealLogDuration days are deleted from the logsDB
+to keep the size of logsDB in check. Set the value as "0" to disable log cleanup`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{
