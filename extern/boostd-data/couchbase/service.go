@@ -12,7 +12,6 @@ import (
 	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
-	carindex "github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -100,28 +99,6 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	return s.db.GetPieceCidsByMultihash(ctx, m)
 }
 
-// TODO: Why do we have both GetRecords and GetIndex?
-func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
-	log.Debugw("handle.get-iterable-index", "piece-cid", pieceCid)
-
-	ctx, span := tracing.Tracer.Start(ctx, "store.get_records")
-	defer span.End()
-
-	defer func(now time.Time) {
-		log.Debugw("handled.get-iterable-index", "took", fmt.Sprintf("%s", time.Since(now)))
-	}(time.Now())
-
-	s.pieceLocks[toStripedLockIndex(pieceCid)].RLock()
-	defer s.pieceLocks[toStripedLockIndex(pieceCid)].RUnlock()
-
-	records, err := s.db.AllRecords(ctx, pieceCid)
-	if err != nil {
-		return nil, err
-	}
-
-	return records, nil
-}
-
 func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
 	log.Debugw("handle.get-index", "pieceCid", pieceCid)
 
@@ -157,30 +134,29 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
 	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
 
-	// TODO: use array of cids instead of array of Records
-	var recs []carindex.Record
+	// Add a mapping from multihash -> piece cid so that clients can look up
+	// which pieces contain a multihash
+	mhs := make([]mh.Multihash, 0, len(records))
 	for _, r := range records {
-		recs = append(recs, carindex.Record{
-			Cid:    r.Cid,
-			Offset: r.Offset,
-		})
+		mhs = append(mhs, r.Cid.Hash())
 	}
 
 	setMhStart := time.Now()
-	err := s.db.SetMultihashesToPieceCid(ctx, recs, pieceCid)
+	err := s.db.SetMultihashesToPieceCid(ctx, mhs, pieceCid)
 	if err != nil {
 		return fmt.Errorf("failed to add entry from mh to pieceCid: %w", err)
 	}
 	log.Debugw("handled.add-index SetMultihashesToPieceCid", "took", time.Since(setMhStart).String())
 
-	// process index and store entries
+	// Add a mapping from piece cid -> offset / size of each block so that
+	// clients can get the block info for all blocks in a piece
 	addOffsetsStart := time.Now()
 	if err := s.db.AddIndexRecords(ctx, pieceCid, records); err != nil {
 		return err
 	}
 	log.Debugw("handled.add-index AddIndexRecords", "took", time.Since(addOffsetsStart).String())
 
-	// mark that indexing is complete
+	// Mark indexing as complete
 	md := model.Metadata{
 		IndexedAt: time.Now(),
 		Deals:     []model.DealInfo{},

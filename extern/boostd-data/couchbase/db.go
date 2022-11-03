@@ -14,7 +14,6 @@ import (
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
-	carindex "github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
 )
 
@@ -167,15 +166,15 @@ func (db *DB) GetPieceCidsByMultihash(ctx context.Context, mh multihash.Multihas
 
 const throttleSize = 32
 
-// SetMultihashToPieceCid
-func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Record, pieceCid cid.Cid) error {
+// SetMultihashesToPieceCid
+func (db *DB) SetMultihashesToPieceCid(ctx context.Context, mhs []multihash.Multihash, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.set_multihashes_to_piece_cid")
 	defer span.End()
 
 	throttle := make(chan struct{}, throttleSize)
 	var eg errgroup.Group
-	for _, r := range recs {
-		mh := r.Cid.Hash()
+	for _, mh := range mhs {
+		mh := mh
 
 		throttle <- struct{}{}
 		eg.Go(func() error {

@@ -22,7 +22,6 @@ type Store struct {
 		GetIndex                  func(context.Context, cid.Cid) ([]model.Record, error)
 		GetOffsetSize             func(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
 		GetPieceDeals             func(context.Context, cid.Cid) ([]model.DealInfo, error)
-		GetRecords                func(context.Context, cid.Cid) ([]model.Record, error)
 		IndexedAt                 func(context.Context, cid.Cid) (time.Time, error)
 		PiecesContainingMultihash func(context.Context, mh.Multihash) ([]cid.Cid, error)
 	}
@@ -52,12 +51,11 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, er
 		return nil, err
 	}
 
-	//TODO: figure out how to remove this conversion
 	var records []index.Record
 	for _, r := range resp {
 		records = append(records, index.Record{
-			r.Cid,
-			r.Offset,
+			Cid:    r.Cid,
+			Offset: r.Offset,
 		})
 	}
 
@@ -76,7 +74,7 @@ func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Recor
 		return nil, err
 	}
 
-	log.Debugw("get-index", "piece-cid", pieceCid, "records", len(resp))
+	log.Debugw("get-records", "piece-cid", pieceCid, "records", len(resp))
 
 	return resp, nil
 }

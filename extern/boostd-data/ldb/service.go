@@ -88,32 +88,6 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	return nil
 }
 
-func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
-	log.Debugw("handle.get-iterable-index", "piece-cid", pieceCid)
-
-	ctx, span := tracing.Tracer.Start(ctx, "store.get_records")
-	defer span.End()
-
-	defer func(now time.Time) {
-		log.Debugw("handled.get-iterable-index", "took", fmt.Sprintf("%s", time.Since(now)))
-	}(time.Now())
-
-	s.Lock()
-	defer s.Unlock()
-
-	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil {
-		return nil, err
-	}
-
-	records, err := s.db.AllRecords(ctx, md.Cursor)
-	if err != nil {
-		return nil, err
-	}
-
-	return records, nil
-}
-
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
 	log.Debugw("handle.get-offset-size", "piece-cid", pieceCid)
 
