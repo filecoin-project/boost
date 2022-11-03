@@ -229,7 +229,7 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr err
 	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
 	defer span.End()
 
-	return db.withCasRetry(func() error {
+	return db.withCasRetry("mark-index-errored", func() error {
 		// Get the metadata from the db
 		var getResult *gocb.GetResult
 		k := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
@@ -270,7 +270,7 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 	ctx, span := tracing.Tracer.Start(ctx, "db.add_deal_for_piece")
 	defer span.End()
 
-	return db.withCasRetry(func() error {
+	return db.withCasRetry("add-deal-for-piece", func() error {
 		// Get the piece metadata from the db
 		cbKey := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
 		getResult, err := db.col.Get(cbKey, &gocb.GetOptions{Context: ctx})
@@ -447,7 +447,7 @@ func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, m multihash.M
 // Note: cas mismatch is caused when
 // - there is a get + update
 // - another process applied the update before this process
-func (db *DB) withCasRetry(f func() error) error {
+func (db *DB) withCasRetry(opName string, f func() error) error {
 	var err error
 	for i := 0; i < maxCasRetries; i++ {
 		err = f()
@@ -457,6 +457,10 @@ func (db *DB) withCasRetry(f func() error) error {
 		if !errors.Is(err, gocb.ErrCasMismatch) {
 			return err
 		}
+	}
+
+	if err != nil {
+		log.Warnw("exceeded max compare and swap retries (%d) for "+opName+": %w", maxCasRetries, err)
 	}
 
 	return err
