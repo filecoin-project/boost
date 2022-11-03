@@ -160,13 +160,11 @@ func (s *Libp2pCarServer) handler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(code)
 			return
 		}
-	}
 
-	defer func() {
-		if s.throttler != nil {
+		defer func() {
 			<-s.throttler
-		}
-	}()
+		}()
+	}
 
 	// Protect the libp2p connection for the lifetime of the transfer
 	tag := uuid.New().String()
