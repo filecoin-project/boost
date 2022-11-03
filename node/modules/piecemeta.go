@@ -3,9 +3,6 @@ package modules
 import (
 	"context"
 	"fmt"
-	"os"
-	"path"
-
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecemeta"
 	"github.com/filecoin-project/boostd-data/couchbase"
@@ -30,8 +27,6 @@ import (
 	"go.uber.org/fx"
 )
 
-const pieceDirectoryPath = "piece-directory"
-
 func NewPieceMetaStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) piecemeta.Store {
 	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) piecemeta.Store {
 		client := piecemeta.NewStore()
@@ -42,7 +37,7 @@ func NewPieceMetaStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.Loc
 			OnStart: func(ctx context.Context) error {
 				svcCtx, cancel = context.WithCancel(ctx)
 
-				var bdsvc svc.Service
+				var bdsvc *svc.Service
 				if cfg.PieceDirectory.Couchbase.ConnectString != "" {
 					// If the couchbase connect string is defined, set up a
 					// couchbase client
@@ -58,11 +53,11 @@ func NewPieceMetaStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.Loc
 					})
 				} else {
 					// Setup a leveldb client
-					levelDBRepo := path.Join(r.Path(), pieceDirectoryPath)
-					if err := os.MkdirAll(levelDBRepo, os.ModePerm); err != nil {
-						return fmt.Errorf("failed to create level db repo directory %s: %w", levelDBRepo, err)
+					var err error
+					bdsvc, err = svc.NewLevelDB(r.Path())
+					if err != nil {
+						return fmt.Errorf("creating leveldb piece directory: %w", err)
 					}
-					bdsvc = svc.NewLevelDB(levelDBRepo)
 				}
 				addr, err := bdsvc.Start(svcCtx)
 				if err != nil {

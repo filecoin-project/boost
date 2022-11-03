@@ -43,8 +43,10 @@ var migrateLevelDBCmd = &cli.Command{
 			return err
 		}
 
-		ldbRepoPath := path.Join(repoDir, "piece-directory")
-		bdsvc := svc.NewLevelDB(ldbRepoPath)
+		bdsvc, err := svc.NewLevelDB(repoDir)
+		if err != nil {
+			return fmt.Errorf("creating leveldb piece directory service")
+		}
 		return migrate(cctx, "leveldb", bdsvc)
 	},
 }
@@ -90,7 +92,7 @@ var migrateCouchDBCmd = &cli.Command{
 	},
 }
 
-func migrate(cctx *cli.Context, dbType string, bdsvc svc.Service) error {
+func migrate(cctx *cli.Context, dbType string, bdsvc *svc.Service) error {
 	ctx := lcli.ReqContext(cctx)
 	svcCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -143,7 +145,7 @@ func migrate(cctx *cli.Context, dbType string, bdsvc svc.Service) error {
 		}))
 
 	// Migrate the indices
-	bar.Describe("[cyan][1/3][reset] Migrating indices...")
+	bar.Describe("[cyan][1/2][reset] Migrating indices...")
 	errCount, err := migrateIndices(ctx, logger, bar, repoDir, cl)
 	if errCount > 0 {
 		msg := fmt.Sprintf("Warning: there were errors migrating %d indices.", errCount)
@@ -156,7 +158,7 @@ func migrate(cctx *cli.Context, dbType string, bdsvc svc.Service) error {
 	}
 
 	// Migrate the piece store
-	bar.Describe("[cyan][2/3][reset] Migrating piece info...")
+	bar.Describe("[cyan][2/2][reset] Migrating piece info...")
 	bar.Set(0) //nolint:errcheck
 	errCount, err = migratePieceStore(ctx, logger, bar, repoDir, cl)
 	if errCount > 0 {

@@ -28,8 +28,11 @@ func main() {
 	flag.Parse()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	bdsvc := svc.NewLevelDB(repopath)
-	_, err := bdsvc.Start(ctx)
+	bdsvc, err := svc.NewLevelDB(repopath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = bdsvc.Start(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

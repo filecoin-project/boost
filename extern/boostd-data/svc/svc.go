@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path"
 	"time"
 
 	"github.com/filecoin-project/boostd-data/couchbase"
@@ -23,12 +25,19 @@ type Service struct {
 	impl types.ServiceImpl
 }
 
-func NewCouchbase(settings couchbase.DBSettings) Service {
-	return Service{impl: couchbase.NewStore(settings)}
+func NewCouchbase(settings couchbase.DBSettings) *Service {
+	return &Service{impl: couchbase.NewStore(settings)}
 }
 
-func NewLevelDB(repopath string) Service {
-	return Service{impl: ldb.NewStore(repopath)}
+func NewLevelDB(repoPath string) (*Service, error) {
+	if repoPath != "" { // an empty repo path is used for testing
+		repoPath = path.Join(repoPath, "piece-directory", "leveldb")
+		if err := os.MkdirAll(repoPath, os.ModePerm); err != nil {
+			return nil, fmt.Errorf("creating leveldb repo directory %s: %w", repoPath, err)
+		}
+	}
+
+	return &Service{impl: ldb.NewStore(repoPath)}, nil
 }
 
 func (s *Service) Start(ctx context.Context) (string, error) {

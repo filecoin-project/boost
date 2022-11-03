@@ -46,7 +46,8 @@ func TestService(t *testing.T) {
 	defer cancel()
 
 	t.Run("level db", func(t *testing.T) {
-		bdsvc := NewLevelDB("")
+		bdsvc, err := NewLevelDB("")
+		require.NoError(t, err)
 		testService(ctx, t, bdsvc)
 	})
 	t.Run("couchbase", func(t *testing.T) {
@@ -55,7 +56,7 @@ func TestService(t *testing.T) {
 	})
 }
 
-func testService(ctx context.Context, t *testing.T, bdsvc Service) {
+func testService(ctx context.Context, t *testing.T, bdsvc *Service) {
 	addr, err := bdsvc.Start(ctx)
 	require.NoError(t, err)
 
@@ -135,7 +136,8 @@ func TestServiceFuzz(t *testing.T) {
 	defer cancel()
 
 	t.Run("level db", func(t *testing.T) {
-		bdsvc := NewLevelDB("")
+		bdsvc, err := NewLevelDB("")
+		require.NoError(t, err)
 		testServiceFuzz(ctx, t, bdsvc)
 	})
 	t.Run("couchbase", func(t *testing.T) {
@@ -144,7 +146,7 @@ func TestServiceFuzz(t *testing.T) {
 	})
 }
 
-func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc Service) {
+func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service) {
 	addr, err := bdsvc.Start(ctx)
 	require.NoError(t, err)
 
