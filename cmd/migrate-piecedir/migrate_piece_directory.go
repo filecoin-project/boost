@@ -68,10 +68,9 @@ var migrateCouchDBCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.Uint64Flag{
-			Name:     "ram-quota-mb",
-			Usage:    "megabytes of ram allocated to couchbase bucket (recommended at least 1024)",
-			Value:    1024,
-			Required: true,
+			Name:  "ram-quota-mb",
+			Usage: "megabytes of ram allocated to couchbase bucket (recommended at least 1024)",
+			Value: 1024,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
