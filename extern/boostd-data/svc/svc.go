@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	log = logging.Logger("svc")
+	log = logging.Logger("piecedir")
 )
 
 type Service struct {

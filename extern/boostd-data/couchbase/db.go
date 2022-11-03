@@ -19,6 +19,10 @@ import (
 
 const bucketName = "piecestore"
 
+// maxCasRetries is the number of times to retry an update operation when
+// there is a cas mismatch
+const maxCasRetries = 10
+
 var (
 	// couchbase key prefix for PieceCid to metadata table.
 	// couchbase keys will be built by concatenating prefix with PieceCid.
@@ -221,6 +225,47 @@ func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md mo
 	return nil
 }
 
+func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr error) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
+	defer span.End()
+
+	return db.withCasRetry(func() error {
+		// Get the metadata from the db
+		var getResult *gocb.GetResult
+		k := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
+		getResult, err := db.col.Get(k, &gocb.GetOptions{Context: ctx})
+		if err != nil {
+			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
+		}
+
+		var metadata model.Metadata
+		err = getResult.Content(&metadata)
+		if err != nil {
+			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
+		}
+
+		if metadata.Error != "" {
+			// If the error state has already been set, don't over-write the existing error
+			return nil
+		}
+
+		// Set the error state
+		metadata.Error = idxErr.Error()
+		metadata.ErrorType = fmt.Sprintf(idxErr.Error(), "%T")
+
+		// Update the metadata in the db
+		_, err = db.col.Replace(k, metadata, &gocb.ReplaceOptions{
+			Context: ctx,
+			Cas:     getResult.Cas(),
+		})
+		if err != nil {
+			return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
+		}
+
+		return nil
+	})
+}
+
 func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.add_deal_for_piece")
 	defer span.End()
@@ -373,6 +418,23 @@ func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, m multihash.M
 	}
 
 	return &model.OffsetSize{Offset: offset, Size: size}, nil
+}
+
+// Attempt to perform an update operation. If the operation fails due to a
+// cas mismatch, retry several times before giving up.
+func (db *DB) withCasRetry(f func() error) error {
+	var err error
+	for i := 0; i < maxCasRetries; i++ {
+		err = f()
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, gocb.ErrCasMismatch) {
+			return err
+		}
+	}
+
+	return err
 }
 
 func toCouchKey(key string) string {

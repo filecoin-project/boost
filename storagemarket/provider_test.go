@@ -1432,7 +1432,7 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	store.EXPECT().IsIndexed(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	store.EXPECT().AddDealForPiece(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
-	pm := piecemeta.NewPieceMeta(store, nil)
+	pm := piecemeta.NewPieceMeta(store, nil, 1)
 
 	prvCfg := Config{
 		MaxTransferDuration: time.Hour,

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/client"
@@ -16,6 +17,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	bstore "github.com/ipfs/go-ipfs-blockstore"
+	format "github.com/ipfs/go-ipld-format"
 	"github.com/ipld/go-car/util"
 	"github.com/ipld/go-car/v2"
 	carv2 "github.com/ipld/go-car/v2"
@@ -25,7 +27,7 @@ import (
 	mh "github.com/multiformats/go-multihash"
 )
 
-//go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecemeta.go -package=mock_piecemeta . SectionReader,Sealer,Store
+//go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecemeta.go -package=mock_piecemeta . SectionReader,PieceReader,Store
 
 type SectionReader interface {
 	io.Reader
@@ -33,7 +35,7 @@ type SectionReader interface {
 	io.Seeker
 }
 
-type Sealer interface {
+type PieceReader interface {
 	// GetReader returns a reader over a piece. If there is no unsealed copy, returns ErrSealed.
 	GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error)
 }
@@ -46,29 +48,37 @@ type Store interface {
 	GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error)
 	GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error)
 	PiecesContaining(ctx context.Context, m mh.Multihash) ([]cid.Cid, error)
+	MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error
 
 	//Delete(ctx context.Context, pieceCid cid.Cid) error
 	//DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid uuid.UUID) (bool, error)
 }
 
 type PieceMeta struct {
-	store  Store
-	sealer Sealer
+	store       Store
+	pieceReader PieceReader
+
+	addIdxThrottle chan struct{}
+	addIdxOpByCid  sync.Map
 }
 
 func NewStore() *client.Store {
 	return client.NewStore()
 }
 
-func NewPieceMeta(store Store, sa dagstore.SectorAccessor) *PieceMeta {
-	return &PieceMeta{store: store, sealer: &sealer{sa}}
+func NewPieceMeta(store Store, pr PieceReader, addIndexThrottleSize int) *PieceMeta {
+	return &PieceMeta{
+		store:          store,
+		pieceReader:    pr,
+		addIdxThrottle: make(chan struct{}, addIndexThrottleSize),
+	}
 }
 
-type sealer struct {
+type SectorAccessorAsPieceReader struct {
 	dagstore.SectorAccessor
 }
 
-func (s *sealer) GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error) {
+func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "sealer.get_reader")
 	defer span.End()
 
@@ -99,12 +109,21 @@ func (ps *PieceMeta) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, deal
 	ctx, span := tracing.Tracer.Start(ctx, "pm.add_deal_for_piece")
 	defer span.End()
 
-	// Perform indexing of piece
-	if err := ps.addIndexForPiece(ctx, pieceCid, dealInfo); err != nil {
-		return fmt.Errorf("adding index for piece %s: %w", pieceCid, err)
+	// Check if the indexes have already been added
+	isIndexed, err := ps.store.IsIndexed(ctx, pieceCid)
+	if err != nil {
+		return err
+	}
+
+	if !isIndexed {
+		// Perform indexing of piece
+		if err := ps.addIndexForPieceThrottled(ctx, pieceCid, dealInfo); err != nil {
+			return fmt.Errorf("adding index for piece %s: %w", pieceCid, err)
+		}
 	}
 
 	// Add deal to list of deals for this piece
+	// TODO: store must ensure deals in list of deals for piece are unique
 	if err := ps.store.AddDealForPiece(ctx, pieceCid, dealInfo); err != nil {
 		return fmt.Errorf("saving deal %s to store: %w", dealInfo.DealUuid, err)
 	}
@@ -112,19 +131,51 @@ func (ps *PieceMeta) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, deal
 	return nil
 }
 
+type addIndexOperation struct {
+	done chan struct{}
+	err  error
+}
+
+func (ps *PieceMeta) addIndexForPieceThrottled(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+	// Check if there is already an add index operation in progress for the
+	// given piece cid. If not, create a new one.
+	opi, loaded := ps.addIdxOpByCid.LoadOrStore(pieceCid, &addIndexOperation{
+		done: make(chan struct{}),
+	})
+	op := opi.(*addIndexOperation)
+	if loaded {
+		// There is an add index operation in progress, so wait for it to
+		// complete
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-op.done:
+			return op.err
+		}
+	} else {
+		// A new operation was added to the map, so clean it up when it's done
+		defer ps.addIdxOpByCid.Delete(pieceCid)
+	}
+
+	// Wait for the throttle to yield an open spot
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case ps.addIdxThrottle <- struct{}{}:
+	}
+	defer func() { <-ps.addIdxThrottle }()
+
+	// Perform the add index operation
+	op.err = ps.addIndexForPiece(ctx, pieceCid, dealInfo)
+	close(op.done)
+
+	// Return the result
+	return op.err
+}
+
 func (ps *PieceMeta) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
-	// Check if the indexes have already been added
-	isIndexed, err := ps.store.IsIndexed(ctx, pieceCid)
-	if err != nil {
-		return err
-	}
-
-	if isIndexed {
-		return nil
-	}
-
 	// Get a reader over the piece data
-	reader, err := ps.sealer.GetReader(ctx, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
+	reader, err := ps.pieceReader.GetReader(ctx, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
 	if err != nil {
 		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
@@ -157,6 +208,24 @@ func (ps *PieceMeta) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dea
 	// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
 	if err := ps.store.AddIndex(ctx, pieceCid, recs); err != nil {
 		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
+	}
+
+	return nil
+}
+
+func (ps *PieceMeta) buildIndexForPiece(ctx context.Context, pieceCid cid.Cid) error {
+	dls, err := ps.GetPieceDeals(ctx, pieceCid)
+	if err != nil {
+		return fmt.Errorf("getting piece deals: %w", err)
+	}
+
+	if len(dls) == 0 {
+		return fmt.Errorf("getting piece deals: no deals found for piece")
+	}
+
+	err = ps.addIndexForPieceThrottled(ctx, pieceCid, dls[0])
+	if err != nil {
+		return fmt.Errorf("adding index for piece deal %d: %w", dls[0].ChainDealID, err)
 	}
 
 	return nil
@@ -220,7 +289,7 @@ func (ps *PieceMeta) GetPieceReader(ctx context.Context, pieceCid cid.Cid) (Sect
 	// it is stored in
 	var merr error
 	for i, dl := range deals {
-		reader, err := ps.sealer.GetReader(ctx, dl.SectorID, dl.PieceOffset, dl.PieceLength)
+		reader, err := ps.pieceReader.GetReader(ctx, dl.SectorID, dl.PieceOffset, dl.PieceLength)
 		if err != nil {
 			// TODO: log error
 			if i < 3 {
@@ -261,7 +330,7 @@ func (ps *PieceMeta) GetIterableIndex(ctx context.Context, pieceCid cid.Cid) (ca
 }
 
 // Get a block (used by Bitswap retrieval)
-func (ps *PieceMeta) GetBlock(ctx context.Context, c cid.Cid) ([]byte, error) {
+func (ps *PieceMeta) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error) {
 	// TODO: use caching to make this efficient for repeated Gets against the same piece
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_block")
 	defer span.End()
@@ -314,6 +383,67 @@ func (ps *PieceMeta) GetBlock(ctx context.Context, c cid.Cid) ([]byte, error) {
 	}
 
 	return nil, merr
+}
+
+func (ps *PieceMeta) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "pm.get_block_size")
+	defer span.End()
+
+	// Get the pieces that contain the cid
+	pieces, err := ps.PiecesContainingMultihash(ctx, c.Hash())
+	if err != nil {
+		return 0, fmt.Errorf("getting pieces containing cid %s: %w", c, err)
+	}
+	if len(pieces) == 0 {
+		// We must return ipld ErrNotFound here because that's the only type
+		// that bitswap interprets as a not found error. All other error types
+		// are treated as general errors.
+		return 0, format.ErrNotFound{Cid: c}
+	}
+
+	// Get the size of the block from the first piece (should be the same for
+	// any piece)
+	offsetSize, err := ps.GetOffsetSize(ctx, pieces[0], c.Hash())
+	if err != nil {
+		return 0, fmt.Errorf("getting size of cid %s in piece %s: %w", c, pieces[0], err)
+	}
+
+	// Indexes imported from the DAG store do not have block size information
+	// (they only have offset information). If the block has no size
+	// information, rebuild the index from the piece data
+	if offsetSize.Size == 0 {
+		err = ps.buildIndexForPiece(ctx, pieces[0])
+		if err != nil {
+			return 0, fmt.Errorf("re-building index for piece %s: %w", pieces[0], err)
+		}
+
+		offsetSize, err = ps.GetOffsetSize(ctx, pieces[0], c.Hash())
+		if err != nil {
+			return 0, fmt.Errorf("getting size of cid %s in piece %s: %w", c, pieces[0], err)
+		}
+		if offsetSize.Size == 0 {
+			zeroSizeErr := fmt.Errorf("bad index: size of block %s is zero", c)
+			err = ps.store.MarkIndexErrored(ctx, pieces[0], zeroSizeErr)
+			if err != nil {
+				return 0, fmt.Errorf("setting index for piece %s to error state (%s): %w", pieces[0], zeroSizeErr, err)
+			}
+			return 0, fmt.Errorf("re-building index for piece %s: %w", pieces[0], zeroSizeErr)
+		}
+	}
+
+	return int(offsetSize.Size), nil
+}
+
+func (ps *PieceMeta) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "pm.has_block")
+	defer span.End()
+
+	// Get the pieces that contain the cid
+	pieces, err := ps.PiecesContainingMultihash(ctx, c.Hash())
+	if err != nil {
+		return false, fmt.Errorf("getting pieces containing cid %s: %w", c, err)
+	}
+	return len(pieces) > 0, nil
 }
 
 // Get a blockstore over a piece (used by Graphsync retrieval)

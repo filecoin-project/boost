@@ -54,6 +54,19 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	return s.db.AddDealForPiece(ctx, pieceCid, dealInfo)
 }
 
+func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error {
+	log.Debugw("handle.mark-piece-index-errored", "piece-cid", pieceCid, "err", err)
+
+	ctx, span := tracing.Tracer.Start(context.Background(), "store.mark-piece-index-errored")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.mark-piece-index-errored", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	return s.db.MarkIndexErrored(ctx, pieceCid, err)
+}
+
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
 	log.Debugw("handle.get-offset-size", "piece-cid", pieceCid)
 
@@ -156,10 +169,20 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 	}
 	log.Debugw("handled.add-index AddIndexRecords", "took", time.Since(addOffsetsStart).String())
 
+	// get the metadata for the piece
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		if !isNotFoundErr(err) {
+			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
+		}
+		// there isn't yet any metadata, so create new metadata
+		md = model.Metadata{}
+	}
+
 	// Mark indexing as complete
-	md := model.Metadata{
-		IndexedAt: time.Now(),
-		Deals:     []model.DealInfo{},
+	md.IndexedAt = time.Now()
+	if md.Deals == nil {
+		md.Deals = []model.DealInfo{}
 	}
 
 	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)

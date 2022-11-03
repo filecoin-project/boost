@@ -79,6 +79,7 @@ func DefaultBoost() *Boost {
 				Password:      "",
 				RAMQuotaMB:    0,
 			},
+			ParallelAddIndexLimit: 4,
 		},
 
 		Dealmaking: DealmakingConfig{
