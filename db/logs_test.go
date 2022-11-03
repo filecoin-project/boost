@@ -44,20 +44,32 @@ func TestLogsDBCleanup(t *testing.T) {
 
 	deals, err := GenerateDeals()
 	req.NoError(err)
-	deal := deals[0]
+	deal1 := deals[0]
+	deal2 := deals[1]
 
-	err = ldb.InsertLog(ctx, &DealLog{DealUUID: deal.DealUuid, CreatedAt: time.Now(), LogLevel: "INFO", LogParams: "params", LogMsg: "Test", Subsystem: "Sub"})
+	err = ldb.InsertLog(ctx, &DealLog{DealUUID: deal1.DealUuid, CreatedAt: time.Now(), LogLevel: "INFO", LogParams: "params", LogMsg: "Test", Subsystem: "Sub"})
 	req.NoError(err)
 
-	logs, err := ldb.Logs(ctx, deal.DealUuid)
+	err = ldb.InsertLog(ctx, &DealLog{DealUUID: deal2.DealUuid, CreatedAt: time.Now().AddDate(0, 0, -7), LogLevel: "INFO", LogParams: "params", LogMsg: "Test", Subsystem: "Sub"})
+	req.NoError(err)
+
+	logs, err := ldb.Logs(ctx, deal1.DealUuid)
 	req.NoError(err)
 	req.Len(logs, 1)
 
-	// Provide a negative duration to delete everything from today
-	err = ldb.CleanupLogs(ctx, -1)
+	logs, err = ldb.Logs(ctx, deal2.DealUuid)
+	req.NoError(err)
+	req.Len(logs, 1)
+
+	// Delete logs older than 1 day
+	err = ldb.CleanupLogs(ctx, 1)
 	req.NoError(err)
 
-	logs, err = ldb.Logs(ctx, deal.DealUuid)
+	logs, err = ldb.Logs(ctx, deal1.DealUuid)
+	req.NoError(err)
+	req.Len(logs, 1)
+
+	logs, err = ldb.Logs(ctx, deal2.DealUuid)
 	req.NoError(err)
 	req.Len(logs, 0)
 }
