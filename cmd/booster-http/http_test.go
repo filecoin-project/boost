@@ -21,7 +21,7 @@ func TestNewHttpServer(t *testing.T) {
 	httpServer.Start(context.Background())
 
 	// Check that server is up
-	resp, err := http.Get("http://127.0.0.1:7777/")
+	resp, err := http.Get("http://localhost:7777/")
 	require.NoError(t, err)
 	require.Equal(t, 200, resp.StatusCode)
 
@@ -59,7 +59,8 @@ func TestHttpGzipResponse(t *testing.T) {
 
 	// Create a client
 	client := new(http.Client)
-	request, err := http.NewRequest("GET", "http://127.0.0.1:7777/piece?payloadCid=bafyCid&format=piece", nil)
+	request, err := http.NewRequest("GET", "http://localhost:7777/piece?payloadCid=bafyCid&format=piece", nil)
+	require.NoError(t, err)
 	request.Header.Add("Accept-Encoding", "gzip")
 
 	response, err := client.Do(request)
