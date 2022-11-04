@@ -76,7 +76,8 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service) {
 	records, err := getRecords(subject)
 	require.NoError(t, err)
 
-	randomuuid := uuid.New()
+	randomuuid, err := uuid.Parse("4d8f5ce6-dbfd-40dc-8b03-29308e97357b")
+	require.NoError(t, err)
 
 	err = cl.AddIndex(ctx, pieceCid, records)
 	require.NoError(t, err)
@@ -89,8 +90,19 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service) {
 		CarLength:   3,
 	}
 
+	// Add a deal for the piece
 	err = cl.AddDealForPiece(ctx, pieceCid, di)
 	require.NoError(t, err)
+
+	// Add the same deal a second time to test uniqueness
+	err = cl.AddDealForPiece(ctx, pieceCid, di)
+	require.NoError(t, err)
+
+	// There should only be one deal
+	dis, err := cl.GetPieceDeals(ctx, pieceCid)
+	require.NoError(t, err)
+	require.Len(t, dis, 1)
+	require.Equal(t, di, dis[0])
 
 	b, err := hex.DecodeString("1220ff63d7689e2d9567d1a90a7a68425f430137142e1fbc28fe4780b9ee8a5ef842")
 	require.NoError(t, err)
@@ -107,11 +119,6 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service) {
 	require.NoError(t, err)
 	require.Len(t, pcids, 1)
 	require.Equal(t, pieceCid, pcids[0])
-
-	dis, err := cl.GetPieceDeals(ctx, pieceCid)
-	require.NoError(t, err)
-	require.Len(t, dis, 1)
-	require.Equal(t, di, dis[0])
 
 	indexed, err := cl.IsIndexed(ctx, pieceCid)
 	require.NoError(t, err)

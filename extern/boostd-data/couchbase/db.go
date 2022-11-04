@@ -229,7 +229,7 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr err
 	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
 	defer span.End()
 
-	return db.withCasRetry(func() error {
+	return db.withCasRetry("mark-index-errored", func() error {
 		// Get the metadata from the db
 		var getResult *gocb.GetResult
 		k := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
@@ -270,26 +270,49 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 	ctx, span := tracing.Tracer.Start(ctx, "db.add_deal_for_piece")
 	defer span.End()
 
-	cbKey := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
+	return db.withCasRetry("add-deal-for-piece", func() error {
+		// Get the piece metadata from the db
+		cbKey := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
+		getResult, err := db.col.Get(cbKey, &gocb.GetOptions{Context: ctx})
+		if err != nil {
+			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
+		}
 
-	// Add the deal to the list of deals
-	mops := []gocb.MutateInSpec{
-		gocb.ArrayAppendSpec("deals", dealInfo, nil),
-	}
-	_, err := db.col.MutateIn(cbKey, mops, &gocb.MutateInOptions{Context: ctx})
-	if err != nil {
-		return fmt.Errorf("adding deal %s to piece %s: mutate doc: %w", dealInfo.DealUuid, pieceCid, err)
-	}
+		var md model.Metadata
+		err = getResult.Content(&md)
+		if err != nil {
+			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
+		}
 
-	return nil
+		// Check if the deal has already been added
+		for _, dl := range md.Deals {
+			if dl == dealInfo {
+				return nil
+			}
+		}
+
+		// Add the deal to the list.
+		// Note: we can't use ArrayAddUniqueSpec here because it only works
+		// with primitives, not objects.
+		md.Deals = append(md.Deals, dealInfo)
+
+		// Write the piece metadata back to the db
+		_, err = db.col.Replace(cbKey, md, &gocb.ReplaceOptions{
+			Context: ctx,
+			Cas:     getResult.Cas(),
+		})
+		if err != nil {
+			return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
+		}
+
+		return nil
+	})
 }
 
 // GetPieceCidToMetadata
 func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.get_piece_cid_to_metadata")
 	defer span.End()
-
-	var metadata model.Metadata
 
 	var getResult *gocb.GetResult
 	k := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
@@ -298,8 +321,7 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (mode
 		return model.Metadata{}, fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
 	}
 
-	//cas := getResult.Cas()
-
+	var metadata model.Metadata
 	err = getResult.Content(&metadata)
 	if err != nil {
 		return model.Metadata{}, fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
@@ -422,7 +444,10 @@ func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, m multihash.M
 
 // Attempt to perform an update operation. If the operation fails due to a
 // cas mismatch, retry several times before giving up.
-func (db *DB) withCasRetry(f func() error) error {
+// Note: cas mismatch is caused when
+// - there is a get + update
+// - another process applied the update before this process
+func (db *DB) withCasRetry(opName string, f func() error) error {
 	var err error
 	for i := 0; i < maxCasRetries; i++ {
 		err = f()
@@ -432,6 +457,10 @@ func (db *DB) withCasRetry(f func() error) error {
 		if !errors.Is(err, gocb.ErrCasMismatch) {
 			return err
 		}
+	}
+
+	if err != nil {
+		log.Warnw("exceeded max compare and swap retries (%d) for "+opName+": %w", maxCasRetries, err)
 	}
 
 	return err
