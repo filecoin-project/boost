@@ -15,25 +15,26 @@ import (
 // Piece          ......[            ]......
 // CAR            ......[      ]............
 type DealInfo struct {
-	DealUuid    uuid.UUID           `json:"deal_uuid"`
-	ChainDealID abi.DealID          `json:"chain_deal_id"`
-	SectorID    abi.SectorNumber    `json:"sector_id"`
-	PieceOffset abi.PaddedPieceSize `json:"piece_offset"`
-	PieceLength abi.PaddedPieceSize `json:"piece_length"`
+	DealUuid    uuid.UUID           `json:"u"`
+	ChainDealID abi.DealID          `json:"i"`
+	SectorID    abi.SectorNumber    `json:"s"`
+	PieceOffset abi.PaddedPieceSize `json:"o"`
+	PieceLength abi.PaddedPieceSize `json:"l"`
 	// The size of the CAR file without zero-padding.
 	// This value may be zero if the size is unknown.
-	CarLength uint64 `json:"car_length"`
+	CarLength uint64 `json:"c"`
 
-	// If we don't have CarLength, we have to iterate over all offsets, get the largest offset and sum it with length.
+	// If we don't have CarLength, we have to iterate over all offsets, get
+	// the largest offset and sum it with length.
 }
 
 // Metadata for PieceCid
 type Metadata struct {
-	Cursor    uint64     `json:"cursor"`
-	IndexedAt time.Time  `json:"indexed_at"`
-	Deals     []DealInfo `json:"deals"`
-	Error     string     `json:"error"`
-	ErrorType string     `json:"error_type"`
+	Cursor    uint64     `json:"c"`
+	IndexedAt time.Time  `json:"i"`
+	Deals     []DealInfo `json:"d"`
+	Error     string     `json:"e"`
+	ErrorType string     `json:"t"`
 }
 
 // Record is the information stored in the index for each block in a piece
