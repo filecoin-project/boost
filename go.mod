@@ -120,6 +120,7 @@ require (
 	github.com/GeertJohan/go.rice v1.0.2 // indirect
 	github.com/Gurpartap/async v0.0.0-20180927173644-4f7f499dd9ee // indirect
 	github.com/Kubuxu/imtui v0.0.0-20210401140320-41663d68d0fa // indirect
+	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
