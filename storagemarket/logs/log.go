@@ -92,7 +92,7 @@ func (d *DealLogger) LogCleanup(ctx context.Context, DealLogDurationDays int) {
 	for {
 		select {
 		case <-ticker.C:
-			d.logger.Infof("Cleaning logs older than %d from logsDB ", DealLogDurationDays)
+			d.logger.Infof("Cleaning logs older than %d days from logsDB ", DealLogDurationDays)
 			err := d.logsDB.CleanupLogs(ctx, DealLogDurationDays)
 			if err != nil {
 				d.logger.Errorf("Failed to cleanup old logs from logsDB: %s", err)
