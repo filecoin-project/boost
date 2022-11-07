@@ -2,14 +2,14 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"testing"
 
 	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
+	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/golang/mock/gomock"
+	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,32 +34,46 @@ func TestHttpGzipResponse(t *testing.T) {
 
 	// Create a new mock Http server with custom functions
 	ctrl := gomock.NewController(t)
-	httpServer := NewHttpServer("", 7777, false, mocks_booster_http.NewMockHttpServerApi(ctrl))
-	httpServer.ctx, httpServer.cancel = context.WithCancel(context.Background())
-	listenAddr := fmt.Sprintf(":%d", httpServer.port)
-	handler := http.NewServeMux()
-	handler.HandleFunc(httpServer.pieceBasePath(), testHandlePieceRequest)
-	handler.HandleFunc("/", httpServer.handleIndex)
-	handler.HandleFunc("/index.html", httpServer.handleIndex)
-	httpServer.server = &http.Server{
-		Addr:    listenAddr,
-		Handler: handler,
-		// This context will be the parent of the context associated with all
-		// incoming requests
-		BaseContext: func(listener net.Listener) context.Context {
-			return httpServer.ctx
-		},
+	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
+	httpServer := NewHttpServer("", 7777, false, mockHttpServer)
+	httpServer.Start(context.Background())
+
+	// Create mock unsealed file for piece/car
+	f, _ := os.Create("data")
+	for i := 0; i < 1000; i++ {
+		_, _ = f.WriteString("Test file")
+	}
+	defer f.Close()
+	defer os.Remove("data")
+
+	//Create CID
+	var cids []cid.Cid
+	cid, err := cid.Parse("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi")
+	require.NoError(t, err)
+	cids = append(cids, cid)
+
+	// Crate pieceInfo
+	deal := piecestore.DealInfo{
+		DealID:   1234567,
+		SectorID: 0,
+		Offset:   1233,
+		Length:   123,
+	}
+	var deals []piecestore.DealInfo
+
+	pieceInfo := piecestore.PieceInfo{
+		PieceCID: cid,
+		Deals:    append(deals, deal),
 	}
 
-	go func() {
-		if err := httpServer.server.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("http.ListenAndServe(): %w", err)
-		}
-	}()
+	mockHttpServer.EXPECT().UnsealSectorAt(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(f, nil)
+	mockHttpServer.EXPECT().IsUnsealed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(true, nil)
+	mockHttpServer.EXPECT().PiecesContainingMultihash(gomock.Any(), gomock.Any()).AnyTimes().Return(cids, nil)
+	mockHttpServer.EXPECT().GetPieceInfo(gomock.Any()).AnyTimes().Return(&pieceInfo, nil)
 
 	// Create a client
 	client := new(http.Client)
-	request, err := http.NewRequest("GET", "http://localhost:7777/piece?payloadCid=bafyCid&format=piece", nil)
+	request, err := http.NewRequest("GET", "http://localhost:7777/piece?payloadCid=bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi&format=piece", nil)
 	require.NoError(t, err)
 	request.Header.Add("Accept-Encoding", "gzip")
 
@@ -71,14 +85,4 @@ func TestHttpGzipResponse(t *testing.T) {
 	// Stop the server
 	err = httpServer.Stop()
 	require.NoError(t, err)
-}
-
-func testHandlePieceRequest(w http.ResponseWriter, r *http.Request) {
-	f, _ := os.Create("data")
-	for i := 0; i < 1000; i++ {
-		_, _ = f.WriteString("Test file")
-	}
-	defer f.Close()
-	defer os.Remove("data")
-	serveContent(w, r, f, "application/piece")
 }

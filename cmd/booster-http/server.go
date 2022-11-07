@@ -305,12 +305,16 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 	// try to do it implicitly
 	w.Header().Set("Content-Type", contentType)
 
+	var writer http.ResponseWriter
+
 	// http.ServeContent ignores errors when writing to the stream, so we
 	// replace the writer with a class that watches for errors
 	var err error
 	writeErrWatcher := &writeErrorWatcher{ResponseWriter: w, onError: func(e error) {
 		err = e
 	}}
+
+	writer = writeErrWatcher //Need writeErrWatcher to be of type writeErrorWatcher for addCommas()
 
 	// Note that the last modified time is a constant value because the data
 	// in a piece identified by a cid will never change.
@@ -319,31 +323,22 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 		// If Accept-Encoding header contains gzip then send a gzipped response
 
-		gzipwriter := &gziphandler.GzipResponseWriter{
+		writer = &gziphandler.GzipResponseWriter{
 			ResponseWriter: writeErrWatcher,
 		}
 		// Set the Content-Encoding header to gzip
 		w.Header().Set("Content-Encoding", "gzip")
-		if r.Method == "HEAD" {
-			// For an HTTP HEAD request ServeContent doesn't send any data (just headers)
-			http.ServeContent(w, r, "", time.Time{}, content)
-			alog("%s\tHEAD %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
-			return
-		}
-
-		// Send the content
-		http.ServeContent(gzipwriter, r, "", lastModified, content)
-	} else {
-		if r.Method == "HEAD" {
-			// For an HTTP HEAD request ServeContent doesn't send any data (just headers)
-			http.ServeContent(w, r, "", time.Time{}, content)
-			alog("%s\tHEAD %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
-			return
-		}
-
-		// Send the content
-		http.ServeContent(writeErrWatcher, r, "", lastModified, content)
 	}
+
+	if r.Method == "HEAD" {
+		// For an HTTP HEAD request ServeContent doesn't send any data (just headers)
+		http.ServeContent(w, r, "", time.Time{}, content)
+		alog("%s\tHEAD %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
+		return
+	}
+
+	// Send the content
+	http.ServeContent(writer, r, "", lastModified, content)
 
 	// Check if there was an error during the transfer
 	end := time.Now()
