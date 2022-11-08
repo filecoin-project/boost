@@ -9,6 +9,7 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
 	github.com/BurntSushi/toml v1.1.0
+	github.com/NYTimes/gziphandler v1.1.1
 	github.com/alecthomas/jsonschema v0.0.0-20200530073317-71f438968921
 	github.com/benbjohnson/clock v1.3.0
 	github.com/buger/goterm v1.0.3

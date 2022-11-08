@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NYTimes/gziphandler"
 	"github.com/fatih/color"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/tracing"
@@ -28,6 +29,8 @@ import (
 	"github.com/multiformats/go-varint"
 	"go.opencensus.io/stats"
 )
+
+//go:generate go run github.com/golang/mock/mockgen -destination=mocks/mock_booster_http.go -package=mocks_booster_http -source=server.go HttpServerApi,serverApi
 
 var ErrNotFound = errors.New("not found")
 
@@ -302,14 +305,8 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 	// try to do it implicitly
 	w.Header().Set("Content-Type", contentType)
 
-	if r.Method == "HEAD" {
-		// For an HTTP HEAD request ServeContent doesn't send any data (just headers)
-		http.ServeContent(w, r, "", time.Time{}, content)
-		alog("%s\tHEAD %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
-		return
-	}
+	var writer http.ResponseWriter
 
-	// Send the CAR file
 	// http.ServeContent ignores errors when writing to the stream, so we
 	// replace the writer with a class that watches for errors
 	var err error
@@ -317,17 +314,41 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 		err = e
 	}}
 
-	// Send the content
+	writer = writeErrWatcher //Need writeErrWatcher to be of type writeErrorWatcher for addCommas()
+
 	// Note that the last modified time is a constant value because the data
 	// in a piece identified by a cid will never change.
 	start := time.Now()
 	alogAt(start, "%s\tGET %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
-	http.ServeContent(writeErrWatcher, r, "", lastModified, content)
+	isGzipped := strings.Contains(r.Header.Get("Accept-Encoding"), "gzip")
+	if isGzipped {
+		// If Accept-Encoding header contains gzip then send a gzipped response
 
-	// Check if there was an error during the transfer
+		gzwriter := gziphandler.GzipResponseWriter{
+			ResponseWriter: writeErrWatcher,
+		}
+		// Close the writer to flush buffer
+		defer gzwriter.Close()
+		writer = &gzwriter
+	}
+
+	if r.Method == "HEAD" {
+		// For an HTTP HEAD request ServeContent doesn't send any data (just headers)
+		http.ServeContent(writer, r, "", time.Time{}, content)
+		alog("%s\tHEAD %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
+		return
+	}
+
+	// Send the content
+	http.ServeContent(writer, r, "", lastModified, content)
+
+	// Write a line to the log
 	end := time.Now()
 	completeMsg := fmt.Sprintf("GET %s\n%s - %s: %s / %s bytes transferred",
 		r.URL, end.Format(timeFmt), start.Format(timeFmt), time.Since(start), addCommas(writeErrWatcher.count))
+	if isGzipped {
+		completeMsg += " (gzipped)"
+	}
 	if err == nil {
 		alogAt(end, "%s\t%s", color.New(color.FgGreen).Sprint("DONE"), completeMsg)
 	} else {
