@@ -8,16 +8,20 @@ import (
 	"strconv"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/couchbase/gocb/v2"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multihash"
+	"go.opentelemetry.io/otel/attribute"
+	"golang.org/x/sync/errgroup"
 )
 
 const bucketName = "piecestore"
+
+// The maximum length for a couchbase key is 250 bytes, but we don't need a
+// key that long, 128 bytes is more than enough
+const maxCouchKeyLen = 128
 
 // maxCasRetries is the number of times to retry an update operation when
 // there is a cas mismatch
@@ -79,11 +83,13 @@ type DBSettings struct {
 }
 
 const connectTimeout = 5 * time.Second
+const kvTimeout = 30 * time.Second
 
 func newDB(ctx context.Context, settings DBSettings) (*DB, error) {
 	cluster, err := gocb.Connect(settings.ConnectString, gocb.ClusterOptions{
 		TimeoutsConfig: gocb.TimeoutsConfig{
 			ConnectTimeout: connectTimeout,
+			KVTimeout:      kvTimeout,
 		},
 		Authenticator: gocb.PasswordAuthenticator{
 			Username: settings.Auth.Username,
@@ -106,6 +112,10 @@ func newDB(ctx context.Context, settings DBSettings) (*DB, error) {
 				Name:       bucketName,
 				RAMQuotaMB: settings.Bucket.RAMQuotaMB,
 				BucketType: gocb.CouchbaseBucketType,
+				// The default eviction policy requires couchbase to keep all
+				// keys (and metadata) in memory. So use an eviction policy
+				// that allows keys to be stored on disk (but not in memory).
+				EvictionPolicy: gocb.EvictionPolicyTypeFull,
 			},
 		}, &gocb.CreateBucketOptions{Context: ctx})
 		if err != nil {
@@ -148,8 +158,6 @@ func (db *DB) GetPieceCidsByMultihash(ctx context.Context, mh multihash.Multihas
 		return nil, fmt.Errorf("getting piece cids by multihash %s: %w", mh, err)
 	}
 
-	//cas := getResult.Cas()
-
 	var cidStrs []string
 	err = getResult.Content(&cidStrs)
 	if err != nil {
@@ -184,27 +192,39 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, mhs []multihash.Mult
 		eg.Go(func() error {
 			defer func() { <-throttle }()
 
-			cbKey := toCouchKey(sprefixMhtoPieceCids + mh.String())
+			return db.withCasRetry("multihash -> pieces", func() error {
+				cbKey := toCouchKey(sprefixMhtoPieceCids + mh.String())
 
-			// Create the array
-			upsertDocResult, err := db.col.Upsert(cbKey, []int{}, &gocb.UpsertOptions{Context: ctx})
-			if err != nil {
-				return fmt.Errorf("adding multihash %s to piece %s: upsert doc: %w", mh, pieceCid, err)
-			}
+				// Insert a tuple into the bucket: multihash -> [piece cid]
+				_, err := db.col.Insert(cbKey, []string{pieceCid.String()}, &gocb.InsertOptions{Context: ctx})
+				if err == nil {
+					return nil
+				}
 
-			// Add the piece cid to the set of piece cids
-			mops := []gocb.MutateInSpec{
-				gocb.ArrayAddUniqueSpec("", pieceCid.String(), &gocb.ArrayAddUniqueSpecOptions{}),
-			}
-			_, err = db.col.MutateIn(cbKey, mops, &gocb.MutateInOptions{
-				Context: ctx,
-				Cas:     upsertDocResult.Cas(),
+				// If the value already exists, it's not an error, we'll just
+				// add the piece cid to the existing set of piece cids
+				isDocExists := errors.Is(err, gocb.ErrDocumentExists)
+				if !isDocExists {
+					// If there was some other error, return it
+					return fmt.Errorf("adding multihash %s to piece %s: insert doc: %w", mh, pieceCid, err)
+				}
+
+				// Add the piece cid to the set of piece cids
+				mops := []gocb.MutateInSpec{
+					gocb.ArrayAddUniqueSpec("", pieceCid.String(), &gocb.ArrayAddUniqueSpecOptions{}),
+				}
+				_, err = db.col.MutateIn(cbKey, mops, &gocb.MutateInOptions{Context: ctx})
+				if err != nil {
+					if errors.Is(err, gocb.ErrPathExists) {
+						// If the set of piece cids already contains the piece,
+						// it's not an error, just return nil
+						return nil
+					}
+					return fmt.Errorf("adding multihash %s to piece %s: mutate doc: %w", mh, pieceCid, err)
+				}
+
+				return nil
 			})
-			if err != nil {
-				return fmt.Errorf("adding multihash %s to piece %s: mutate doc: %w", mh, pieceCid, err)
-			}
-
-			return nil
 		})
 	}
 
@@ -212,7 +232,7 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, mhs []multihash.Mult
 }
 
 // SetPieceCidToMetadata
-func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md model.Metadata) error {
+func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md CouchbaseMetadata) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.set_piece_cid_to_metadata")
 	defer span.End()
 
@@ -238,7 +258,7 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr err
 			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
 		}
 
-		var metadata model.Metadata
+		var metadata CouchbaseMetadata
 		err = getResult.Content(&metadata)
 		if err != nil {
 			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
@@ -278,7 +298,7 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
 		}
 
-		var md model.Metadata
+		var md CouchbaseMetadata
 		err = getResult.Content(&md)
 		if err != nil {
 			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
@@ -310,7 +330,7 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 }
 
 // GetPieceCidToMetadata
-func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (CouchbaseMetadata, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.get_piece_cid_to_metadata")
 	defer span.End()
 
@@ -318,118 +338,45 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (mode
 	k := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
 	getResult, err := db.col.Get(k, &gocb.GetOptions{Context: ctx})
 	if err != nil {
-		return model.Metadata{}, fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
+		return CouchbaseMetadata{}, fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
 	}
 
-	var metadata model.Metadata
+	var metadata CouchbaseMetadata
 	err = getResult.Content(&metadata)
 	if err != nil {
-		return model.Metadata{}, fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
+		return CouchbaseMetadata{}, fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
 	}
 
 	return metadata, nil
 }
 
-// AllRecords
-func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "db.all_records")
-	defer span.End()
-
-	cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String())
-	cbMap := db.col.Map(cbKey)
-	recMap, err := cbMap.Iterator()
-	if err != nil {
-		return nil, fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
-	}
-
-	recs := make([]model.Record, 0, len(recMap))
-	for mhStr, offsetSizeIfce := range recMap {
-		mh, err := multihash.FromHexString(mhStr)
-		if err != nil {
-			return nil, fmt.Errorf("parsing piece cid %s multihash value '%s': %w", pieceCid, mhStr, err)
-		}
-		val, ok := offsetSizeIfce.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("unexpected type for piece cid %s offset/size value: %T", pieceCid, offsetSizeIfce)
-		}
-
-		offsetIfce, ok := val["o"]
-		if !ok {
-			return nil, fmt.Errorf("parsing piece %s offset value '%s': missing Offset map key", pieceCid, val)
-		}
-		offsetStr, ok := offsetIfce.(string)
-		if !ok {
-			return nil, fmt.Errorf("unexpected type for piece cid %s offset value: %T", pieceCid, offsetIfce)
-		}
-		offset, err := strconv.ParseUint(offsetStr, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("parsing piece %s offset value '%s' as uint64: %w", pieceCid, val, err)
-		}
-
-		sizeIfce, ok := val["s"]
-		if !ok {
-			return nil, fmt.Errorf("parsing piece %s offset value '%s': missing Size map key", pieceCid, val)
-		}
-		sizeStr, ok := sizeIfce.(string)
-		if !ok {
-			return nil, fmt.Errorf("unexpected type for piece cid %s size value: %T", pieceCid, offsetIfce)
-		}
-		size, err := strconv.ParseUint(sizeStr, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("parsing piece %s size value '%s' as uint64: %w", pieceCid, val, err)
-		}
-
-		recs = append(recs, model.Record{Cid: cid.NewCidV1(cid.Raw, mh), OffsetSize: model.OffsetSize{
-			Offset: offset,
-			Size:   size,
-		}})
-	}
-
-	return recs, nil
-}
-
-type offsetSize struct {
-	// Need to use strings instead of uint64 because uint64 may not fit into
-	// Javascript number
-	Offset string `json:"o"`
-	Size   string `json:"s"`
-}
-
-// AddIndexRecords
-func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.add_index_records")
-	defer span.End()
-
-	mhToOffsetSize := make(map[string]offsetSize)
-	for _, rec := range recs {
-		mhToOffsetSize[rec.Cid.Hash().String()] = offsetSize{
-			Offset: fmt.Sprintf("%d", rec.Offset),
-			Size:   fmt.Sprintf("%d", rec.Size),
-		}
-	}
-
-	cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String())
-	_, err := db.col.Upsert(cbKey, mhToOffsetSize, &gocb.UpsertOptions{Context: ctx})
-	if err != nil {
-		return fmt.Errorf("adding offset / sizes for piece %s: %w", pieceCid, err)
-	}
-
-	return nil
-}
-
-// GetOffsetSize
-func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, m multihash.Multihash) (*model.OffsetSize, error) {
+// GetOffsetSize gets the offset and size of the multihash in the given piece.
+// Note that recordCount is needed in order to determine which shard the multihash is in.
+func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash multihash.Multihash, recordCount int) (*model.OffsetSize, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.get_offset_size")
 	defer span.End()
 
-	cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String())
+	// Get the prefix for the shard that the multihash is in
+	shardPrefixBitCount, _ := getShardPrefixBitCount(recordCount)
+	mask := get2ByteMask(shardPrefixBitCount)
+	shardPrefix := hashToShardPrefix(hash, mask)
+
+	// Get the map of multihash -> offset/size.
+	// Note: This doesn't actually fetch the map, it just gets a reference to it.
+	cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String() + shardPrefix)
 	cbMap := db.col.Map(cbKey)
+
+	// Get the offset/size from the map.
+	// Note: This doesn't actually fetch the map, it tells couchbase to find
+	// the key in the map on the server side, and return the value.
 	var val offsetSize
-	err := cbMap.At(m.String(), &val)
+	err := cbMap.At(hash.String(), &val)
 	if err != nil {
-		return nil, fmt.Errorf("getting offset/size for piece %s multihash %s: %w", pieceCid, m, err)
+		return nil, fmt.Errorf("getting offset/size for piece %s multihash %s: %w", pieceCid, hash, err)
 	}
 
+	// Parse the offset and size (they have to be stored as strings as they
+	// may be too large for a javascript number)
 	offset, err := strconv.ParseUint(val.Offset, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("parsing piece %s offset value '%s' as uint64: %w", pieceCid, val, err)
@@ -440,6 +387,183 @@ func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, m multihash.M
 	}
 
 	return &model.OffsetSize{Offset: offset, Size: size}, nil
+}
+
+// AllRecords gets all the mulithash -> offset/size mappings in a given piece.
+// Note that recordCount is needed in order to determine the shard structure.
+func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid, recordCount int) ([]model.Record, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.all_records")
+	defer span.End()
+
+	recs := make([]model.Record, 0, recordCount)
+
+	// Get the number of shards
+	_, totalShards := getShardPrefixBitCount(recordCount)
+	for i := 0; i < totalShards; i++ {
+		// Get the map of multihash -> offset/size for the shard
+		shardPrefix, err := getShardPrefix(i)
+		if err != nil {
+			return nil, err
+		}
+		cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String() + shardPrefix)
+		cbMap := db.col.Map(cbKey)
+		recMap, err := cbMap.Iterator()
+		if err != nil {
+			if isNotFoundErr(err) {
+				// If there are no records in a particular shard just skip the shard
+				continue
+			}
+			return nil, fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
+		}
+
+		// Get each value in the map
+		for mhStr, offsetSizeIfce := range recMap {
+			mh, err := multihash.FromHexString(mhStr)
+			if err != nil {
+				return nil, fmt.Errorf("parsing piece cid %s multihash value '%s': %w", pieceCid, mhStr, err)
+			}
+			val, ok := offsetSizeIfce.(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf("unexpected type for piece cid %s offset/size value: %T", pieceCid, offsetSizeIfce)
+			}
+
+			offsetIfce, ok := val["o"]
+			if !ok {
+				return nil, fmt.Errorf("parsing piece %s offset value '%s': missing Offset map key", pieceCid, val)
+			}
+			offsetStr, ok := offsetIfce.(string)
+			if !ok {
+				return nil, fmt.Errorf("unexpected type for piece cid %s offset value: %T", pieceCid, offsetIfce)
+			}
+			offset, err := strconv.ParseUint(offsetStr, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("parsing piece %s offset value '%s' as uint64: %w", pieceCid, val, err)
+			}
+
+			sizeIfce, ok := val["s"]
+			if !ok {
+				return nil, fmt.Errorf("parsing piece %s offset value '%s': missing Size map key", pieceCid, val)
+			}
+			sizeStr, ok := sizeIfce.(string)
+			if !ok {
+				return nil, fmt.Errorf("unexpected type for piece cid %s size value: %T", pieceCid, offsetIfce)
+			}
+			size, err := strconv.ParseUint(sizeStr, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("parsing piece %s size value '%s' as uint64: %w", pieceCid, val, err)
+			}
+
+			recs = append(recs, model.Record{Cid: cid.NewCidV1(cid.Raw, mh), OffsetSize: model.OffsetSize{
+				Offset: offset,
+				Size:   size,
+			}})
+		}
+	}
+
+	return recs, nil
+}
+
+type offsetSize struct {
+	// Need to use strings instead of uint64 because uint64 may not fit into
+	// a Javascript number
+	Offset string `json:"o"`
+	Size   string `json:"s"`
+}
+
+// Couchbase has an upper limit on the size of a value: 20mb
+// A JSON-encoded map with 128k keys results in a value of about 8mb in size
+// so this is well under the 20mb limit.
+var maxRecsPerShard = 128 * 1024
+
+// Limit the number of shards to 2048. This means there is an upper limit of
+// ~270 million blocks per piece, which should be more than enough:
+// 64 Gib piece / (2048 * 128 * 1024) = 238 bytes per block
+const maxShardsPerPiece = 2048
+
+var maxRecsPerPiece = maxShardsPerPiece * maxRecsPerShard
+
+func getShardPrefixBitCount(recordCount int) (int, int) {
+	// The number of shards required to store all the keys
+	requiredShards := (recordCount / maxRecsPerShard) + 1
+	// The number of shards that will be created must be a power of 2,
+	// so get the first power of two that's >= requiredShards
+	shardPrefixBits := 0
+	totalShards := 1
+	for totalShards < requiredShards {
+		shardPrefixBits += 1
+		totalShards *= 2
+	}
+
+	return shardPrefixBits, totalShards
+}
+
+func getShardPrefix(shardIndex int) (string, error) {
+	if shardIndex >= 1<<16 {
+		return "", fmt.Errorf("shard index of size %d does not fit into 2 byte prefix", shardIndex)
+	}
+
+	shardPrefix := []byte{0, 0}
+	shardPrefix[1] = byte(shardIndex)
+	shardPrefix[0] = byte(shardIndex >> 8)
+	return string(shardPrefix), nil
+}
+
+// AddIndexRecords
+func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.add_index_records")
+	span.SetAttributes(attribute.Int("recs", len(recs)))
+	defer span.End()
+
+	if len(recs) > maxRecsPerPiece {
+		return fmt.Errorf("index for piece %s too large: %d records (size limit is %d)", pieceCid, len(recs), maxRecsPerPiece)
+	}
+
+	// Get the number of bits in the shard prefix, and the total number of shards
+	shardPrefixBitCount, totalShards := getShardPrefixBitCount(len(recs))
+
+	// Initialize the multihash -> offset/size map for each shard
+	type mhToOffsetSizeMap map[string]offsetSize
+	shardMaps := make(map[string]mhToOffsetSizeMap, totalShards)
+	for i := 0; i < totalShards; i++ {
+		shardPrefix, err := getShardPrefix(i)
+		if err != nil {
+			return err
+		}
+		shardMaps[shardPrefix] = make(map[string]offsetSize)
+	}
+
+	// Create a mask of the required number of bits
+	// eg 3 bit mask = 0000 0000 0000 0111
+	mask := get2ByteMask(shardPrefixBitCount)
+
+	// For each record
+	for _, rec := range recs {
+		// Apply the bit mask to the last 2 bytes of the multihash to get the
+		// shard prefix
+		hash := rec.Cid.Hash()
+		shardPrefix := hashToShardPrefix(hash, mask)
+
+		// Add the record to the shard's map
+		shardMaps[shardPrefix][hash.String()] = offsetSize{
+			Offset: fmt.Sprintf("%d", rec.Offset),
+			Size:   fmt.Sprintf("%d", rec.Size),
+		}
+	}
+
+	// Add each shard's map to couchbase
+	for shardPrefix, shardMap := range shardMaps {
+		if len(shardMap) == 0 {
+			continue
+		}
+
+		cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String() + shardPrefix)
+		_, err := db.col.Upsert(cbKey, shardMap, &gocb.UpsertOptions{Context: ctx})
+		if err != nil {
+			return fmt.Errorf("adding offset / sizes for piece %s: %w", pieceCid, err)
+		}
+	}
+
+	return nil
 }
 
 // Attempt to perform an update operation. If the operation fails due to a
@@ -467,9 +591,34 @@ func (db *DB) withCasRetry(opName string, f func() error) error {
 }
 
 func toCouchKey(key string) string {
-	return "u:" + key
+	k := "u:" + key
+	if len(k) > maxCouchKeyLen {
+		// There is usually important stuff at the beginning and end of a key,
+		// so cut out the characters in the middle
+		k = k[:maxCouchKeyLen/2] + k[len(k)-maxCouchKeyLen/2:]
+	}
+	return k
 }
 
 func isNotFoundErr(err error) bool {
 	return errors.Is(err, gocb.ErrDocumentNotFound)
+}
+
+// Create a 2 byte mask of the required number of bits
+// eg 3 bit mask = 0000 0000 0000 0111
+func get2ByteMask(bits int) [2]byte {
+	buf := [2]byte{0, 0}
+	buf[1] = (1 << bits) - 1
+	if bits >= 8 {
+		buf[0] = (1 << (bits - 8)) - 1
+	}
+	return buf
+}
+
+// Apply a mask to the last two bytes of the hash to use as the shard prefix
+func hashToShardPrefix(hash multihash.Multihash, mask [2]byte) string {
+	return string([]byte{
+		hash[len(hash)-2] & mask[0],
+		hash[len(hash)-1] & mask[1],
+	})
 }

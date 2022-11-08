@@ -17,6 +17,11 @@ import (
 
 var log = logging.Logger("boostd-data-cb")
 
+type CouchbaseMetadata struct {
+	model.Metadata
+	BlockCount int `json:"b"`
+}
+
 const stripedLockSize = 1024
 
 type Store struct {
@@ -77,7 +82,12 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 		log.Debugw("handled.get-offset-size", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	return s.db.GetOffsetSize(ctx, pieceCid, hash)
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return nil, fmt.Errorf("getting piece metadata for piece %s: %w", pieceCid, err)
+	}
+
+	return s.db.GetOffsetSize(ctx, pieceCid, hash, md.BlockCount)
 }
 
 func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
@@ -125,9 +135,14 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 	s.pieceLocks[toStripedLockIndex(pieceCid)].RLock()
 	defer s.pieceLocks[toStripedLockIndex(pieceCid)].RUnlock()
 
-	records, err := s.db.AllRecords(ctx, pieceCid)
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting piece cid %s metadata: %w", pieceCid, err)
+	}
+
+	records, err := s.db.AllRecords(ctx, pieceCid, md.BlockCount)
+	if err != nil {
+		return nil, fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
 	}
 
 	log.Debugw("handle.get-index.records", "len(records)", len(records))
@@ -176,15 +191,17 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
 		}
 		// there isn't yet any metadata, so create new metadata
-		md = model.Metadata{}
+		md = CouchbaseMetadata{}
 	}
 
 	// Mark indexing as complete
 	md.IndexedAt = time.Now()
+	md.BlockCount = len(records)
 	if md.Deals == nil {
 		md.Deals = []model.DealInfo{}
 	}
 
+	// store the metadata for the piece
 	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
 	if err != nil {
 		return err
