@@ -312,16 +312,23 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 
 	return db.withCasRetry("add-deal-for-piece", func() error {
 		// Get the piece metadata from the db
+		var md CouchbaseMetadata
+		var pieceMetaExists bool
 		cbKey := toCouchKey(pieceCid.String())
 		getResult, err := db.pcidToMeta.Get(cbKey, &gocb.GetOptions{Context: ctx})
-		if err != nil {
-			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
-		}
-
-		var md CouchbaseMetadata
-		err = getResult.Content(&md)
-		if err != nil {
-			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
+		if err == nil {
+			pieceMetaExists = true
+			err = getResult.Content(&md)
+			if err != nil {
+				return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
+			}
+		} else {
+			if !isNotFoundErr(err) {
+				return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
+			}
+			// there isn't yet any metadata, so create new metadata
+			pieceMetaExists = false
+			md = CouchbaseMetadata{}
 		}
 
 		// Check if the deal has already been added
@@ -337,10 +344,14 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 		md.Deals = append(md.Deals, dealInfo)
 
 		// Write the piece metadata back to the db
-		_, err = db.pcidToMeta.Replace(cbKey, md, &gocb.ReplaceOptions{
-			Context: ctx,
-			Cas:     getResult.Cas(),
-		})
+		if pieceMetaExists {
+			_, err = db.pcidToMeta.Replace(cbKey, md, &gocb.ReplaceOptions{
+				Context: ctx,
+				Cas:     getResult.Cas(),
+			})
+		} else {
+			_, err = db.pcidToMeta.Insert(cbKey, md, &gocb.InsertOptions{Context: ctx})
+		}
 		if err != nil {
 			return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
 		}
@@ -587,7 +598,8 @@ func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []mode
 }
 
 // Attempt to perform an update operation. If the operation fails due to a
-// cas mismatch, retry several times before giving up.
+// cas mismatch, or inserting a document at a key that already exists, retry
+// several times before giving up.
 // Note: cas mismatch is caused when
 // - there is a get + update
 // - another process applied the update before this process
@@ -598,7 +610,7 @@ func (db *DB) withCasRetry(opName string, f func() error) error {
 		if err == nil {
 			return nil
 		}
-		if !errors.Is(err, gocb.ErrCasMismatch) {
+		if !errors.Is(err, gocb.ErrCasMismatch) && !errors.Is(err, gocb.ErrDocumentExists) {
 			return err
 		}
 	}
