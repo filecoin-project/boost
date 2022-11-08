@@ -10,9 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/boost/piecemeta"
-	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/couchbase"
+	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
@@ -32,10 +31,25 @@ import (
 	"go.uber.org/zap"
 )
 
+// The methods on the store that are used for migration
+type StoreMigrationApi interface {
+	Start(ctx context.Context) error
+	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
+	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error
+	AddDealForPiece(ctx context.Context, pcid cid.Cid, info model.DealInfo) error
+}
+
 var desc = "It is recommended to do the dagstore migration while boost is running. " +
 	"The dagstore migration may take several hours. It is safe to stop and restart " +
 	"the process. It will continue from where it was stopped.\n" +
 	"The pieceinfo migration must be done after boost has been shut down."
+
+func checkMigrateType(migrateType string) error {
+	if migrateType != "dagstore" && migrateType != "pieceinfo" {
+		return fmt.Errorf("invalid migration type '%s': must be either dagstore or pieceinfo", migrateType)
+	}
+	return nil
+}
 
 var migrateLevelDBCmd = &cli.Command{
 	Name:        "leveldb",
@@ -47,31 +61,28 @@ var migrateLevelDBCmd = &cli.Command{
 			return fmt.Errorf("must specify either dagstore or pieceinfo migration")
 		}
 
+		// Get the type of migration (dagstore vs pieceinfo)
 		migrateType := cctx.Args().Get(0)
 		err := checkMigrateType(migrateType)
 		if err != nil {
 			return err
 		}
 
-		// Create a boost-data leveldb service
+		// Create the leveldb directory if it doesn't already exist
 		repoDir, err := homedir.Expand(cctx.String(FlagBoostRepo))
 		if err != nil {
 			return err
 		}
 
-		bdsvc, err := svc.NewLevelDB(repoDir)
+		repoPath, err := svc.MakeLevelDBDir(repoDir)
 		if err != nil {
-			return fmt.Errorf("creating leveldb piece directory service")
+			return err
 		}
-		return migrate(cctx, "leveldb", bdsvc, migrateType)
-	},
-}
 
-func checkMigrateType(migrateType string) error {
-	if migrateType != "dagstore" && migrateType != "pieceinfo" {
-		return fmt.Errorf("invalid migration type '%s': must be either dagstore or pieceinfo", migrateType)
-	}
-	return nil
+		// Create a connection to the leveldb store
+		store := ldb.NewStore(repoPath)
+		return migrate(cctx, "leveldb", store, migrateType)
+	},
 }
 
 var migrateCouchDBCmd = &cli.Command{
@@ -104,13 +115,14 @@ var migrateCouchDBCmd = &cli.Command{
 			return fmt.Errorf("must specify either dagstore or pieceinfo migration")
 		}
 
+		// Get the type of migration (dagstore vs pieceinfo)
 		migrateType := cctx.Args().Get(0)
 		err := checkMigrateType(migrateType)
 		if err != nil {
 			return err
 		}
 
-		// Create a boostd-data couchbase service
+		// Create a connection to the couchbase piece directory
 		settings := couchbase.DBSettings{
 			ConnectString: cctx.String("connect-string"),
 			Auth: couchbase.DBSettingsAuth{
@@ -121,20 +133,19 @@ var migrateCouchDBCmd = &cli.Command{
 				RAMQuotaMB: cctx.Uint64("ram-quota-mb"),
 			},
 		}
-		bdsvc := svc.NewCouchbase(settings)
-		return migrate(cctx, "couchbase", bdsvc, migrateType)
+
+		store := couchbase.NewStore(settings)
+		return migrate(cctx, "couchbase", store, migrateType)
 	},
 }
 
-func migrate(cctx *cli.Context, dbType string, bdsvc *svc.Service, migrateType string) error {
+func migrate(cctx *cli.Context, dbType string, store StoreMigrationApi, migrateType string) error {
 	ctx := lcli.ReqContext(cctx)
 	svcCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	// Start the piece directory service
-	addr, err := bdsvc.Start(svcCtx)
+	err := store.Start(svcCtx)
 	if err != nil {
-		return err
+		return fmt.Errorf("starting "+dbType+" store: %w", err)
 	}
 
 	// Create a logger for the migration that outputs to a file in the
@@ -158,13 +169,6 @@ func migrate(cctx *cli.Context, dbType string, bdsvc *svc.Service, migrateType s
 	fmt.Println("See detailed logs of the migration at")
 	fmt.Println(logPath)
 
-	// Create a client to connect to the server
-	cl := client.NewStore()
-	err = cl.Dial(ctx, "http://"+addr)
-	if err != nil {
-		return err
-	}
-
 	// Create a progress bar
 	bar := progressbar.NewOptions(100,
 		progressbar.OptionEnableColorCodes(true),
@@ -183,7 +187,7 @@ func migrate(cctx *cli.Context, dbType string, bdsvc *svc.Service, migrateType s
 	if migrateType == "dagstore" {
 		// Migrate the indices
 		bar.Describe("Migrating indices...")
-		errCount, err := migrateIndices(ctx, logger, bar, repoDir, cl)
+		errCount, err := migrateIndices(ctx, logger, bar, repoDir, store)
 		if errCount > 0 {
 			msg := fmt.Sprintf("Warning: there were errors migrating %d indices.", errCount)
 			msg += " See the log for details:\n" + logPath
@@ -199,7 +203,7 @@ func migrate(cctx *cli.Context, dbType string, bdsvc *svc.Service, migrateType s
 	// Migrate the piece store
 	bar.Describe("Migrating piece info...")
 	bar.Set(0) //nolint:errcheck
-	errCount, err := migratePieceStore(ctx, logger, bar, repoDir, cl)
+	errCount, err := migratePieceStore(ctx, logger, bar, repoDir, store)
 	if errCount > 0 {
 		msg := fmt.Sprintf("Warning: there were errors migrating %d piece deal infos.", errCount)
 		msg += " See the log for details:\n" + logPath
@@ -212,7 +216,7 @@ func migrate(cctx *cli.Context, dbType string, bdsvc *svc.Service, migrateType s
 	return nil
 }
 
-func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store *client.Store) (int, error) {
+func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store StoreMigrationApi) (int, error) {
 	indicesPath := path.Join(repoDir, "dagstore", "index")
 	logger.Infof("migrating dagstore indices at %s", indicesPath)
 
@@ -258,7 +262,7 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 	return errCount, nil
 }
 
-func migrateIndex(ctx context.Context, ipath idxPath, store *client.Store) (bool, error) {
+func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi) (bool, error) {
 	pieceCid, err := cid.Parse(ipath.name)
 	if err != nil {
 		return false, fmt.Errorf("parsing index name %s as cid: %w", ipath.name, err)
@@ -301,7 +305,7 @@ func migrateIndex(ctx context.Context, ipath idxPath, store *client.Store) (bool
 	return true, nil
 }
 
-func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store piecemeta.Store) (int, error) {
+func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store StoreMigrationApi) (int, error) {
 	logger.Infof("migrating piece store deal information to Piece Directory")
 	start := time.Now()
 
@@ -367,7 +371,7 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 			if err == nil {
 				addedDeals = true
 			} else {
-				logger.Errorw("cant add deal for piece", "pcid", pcid, "err", err)
+				logger.Errorw("cant add deal for piece", "pcid", pcid, "chain-deal-id", d.DealID, "err", err)
 			}
 		}
 

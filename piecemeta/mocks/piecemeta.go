@@ -249,7 +249,7 @@ func (mr *MockStoreMockRecorder) MarkIndexErrored(arg0, arg1, arg2 interface{}) 
 }
 
 // PiecesContaining mocks base method.
-func (m *MockStore) PiecesContaining(arg0 context.Context, arg1 multihash.Multihash) ([]cid.Cid, error) {
+func (m *MockStore) PiecesContainingMultihash(arg0 context.Context, arg1 multihash.Multihash) ([]cid.Cid, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PiecesContaining", arg0, arg1)
 	ret0, _ := ret[0].([]cid.Cid)
@@ -258,7 +258,7 @@ func (m *MockStore) PiecesContaining(arg0 context.Context, arg1 multihash.Multih
 }
 
 // PiecesContaining indicates an expected call of PiecesContaining.
-func (mr *MockStoreMockRecorder) PiecesContaining(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockStoreMockRecorder) PiecesContainingMultihash(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PiecesContaining", reflect.TypeOf((*MockStore)(nil).PiecesContaining), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PiecesContaining", reflect.TypeOf((*MockStore)(nil).PiecesContainingMultihash), arg0, arg1)
 }

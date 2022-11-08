@@ -31,13 +31,22 @@ func NewCouchbase(settings couchbase.DBSettings) *Service {
 
 func NewLevelDB(repoPath string) (*Service, error) {
 	if repoPath != "" { // an empty repo path is used for testing
-		repoPath = path.Join(repoPath, "piece-directory", "leveldb")
-		if err := os.MkdirAll(repoPath, os.ModePerm); err != nil {
-			return nil, fmt.Errorf("creating leveldb repo directory %s: %w", repoPath, err)
+		var err error
+		repoPath, err = MakeLevelDBDir(repoPath)
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	return &Service{impl: ldb.NewStore(repoPath)}, nil
+}
+
+func MakeLevelDBDir(repoPath string) (string, error) {
+	repoPath = path.Join(repoPath, "piece-directory", "leveldb")
+	if err := os.MkdirAll(repoPath, os.ModePerm); err != nil {
+		return "", fmt.Errorf("creating leveldb repo directory %s: %w", repoPath, err)
+	}
+	return repoPath, nil
 }
 
 func (s *Service) Start(ctx context.Context) (string, error) {
