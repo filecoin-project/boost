@@ -201,6 +201,14 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 	return records, nil
 }
 
+func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
+	t, err := s.IndexedAt(ctx, pieceCid)
+	if err != nil {
+		return false, err
+	}
+	return !t.IsZero(), nil
+}
+
 func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error {
 	log.Debugw("handle.add-index", "records", len(records))
 

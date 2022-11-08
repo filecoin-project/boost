@@ -46,7 +46,7 @@ type Store interface {
 	GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, error)
 	GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error)
 	GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error)
-	PiecesContaining(ctx context.Context, m mh.Multihash) ([]cid.Cid, error)
+	PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error)
 	MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error
 
 	//Delete(ctx context.Context, pieceCid cid.Cid) error
@@ -307,7 +307,7 @@ func (ps *PieceMeta) PiecesContainingMultihash(ctx context.Context, m mh.Multiha
 	ctx, span := tracing.Tracer.Start(ctx, "pm.pieces_containing_multihash")
 	defer span.End()
 
-	return ps.store.PiecesContaining(ctx, m)
+	return ps.store.PiecesContainingMultihash(ctx, m)
 }
 
 func (ps *PieceMeta) GetIterableIndex(ctx context.Context, pieceCid cid.Cid) (carindex.IterableIndex, error) {

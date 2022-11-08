@@ -115,7 +115,7 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service) {
 	require.EqualValues(t, 3039040395, offset.Offset)
 	require.EqualValues(t, 0, offset.Size)
 
-	pcids, err := cl.PiecesContaining(ctx, mhash)
+	pcids, err := cl.PiecesContainingMultihash(ctx, mhash)
 	require.NoError(t, err)
 	require.Len(t, pcids, 1)
 	require.Equal(t, pieceCid, pcids[0])
@@ -232,7 +232,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service) {
 						return err
 					}
 
-					pcids, err := cl.PiecesContaining(ctx, mhash)
+					pcids, err := cl.PiecesContainingMultihash(ctx, mhash)
 					if err != nil {
 						return err
 					}

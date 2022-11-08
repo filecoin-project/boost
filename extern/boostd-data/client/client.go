@@ -19,6 +19,7 @@ type Store struct {
 	client struct {
 		AddDealForPiece           func(context.Context, cid.Cid, model.DealInfo) error
 		AddIndex                  func(context.Context, cid.Cid, []model.Record) error
+		IsIndexed                 func(ctx context.Context, pieceCid cid.Cid) (bool, error)
 		GetIndex                  func(context.Context, cid.Cid) ([]model.Record, error)
 		GetOffsetSize             func(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
 		GetPieceDeals             func(context.Context, cid.Cid) ([]model.DealInfo, error)
@@ -86,7 +87,7 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 	return s.client.GetPieceDeals(ctx, pieceCid)
 }
 
-func (s *Store) PiecesContaining(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
+func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
 	return s.client.PiecesContainingMultihash(ctx, m)
 }
 
@@ -105,11 +106,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 }
 
 func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
-	t, err := s.client.IndexedAt(ctx, pieceCid)
-	if err != nil {
-		return false, err
-	}
-	return !t.IsZero(), nil
+	return s.client.IsIndexed(ctx, pieceCid)
 }
 
 func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, error) {
