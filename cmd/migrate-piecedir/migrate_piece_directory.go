@@ -32,11 +32,27 @@ import (
 	"go.uber.org/zap"
 )
 
+var desc = "It is recommended to do the dagstore migration while boost is running. " +
+	"The dagstore migration may take several hours. It is safe to stop and restart " +
+	"the process. It will continue from where it was stopped.\n" +
+	"The pieceinfo migration must be done after boost has been shut down."
+
 var migrateLevelDBCmd = &cli.Command{
 	Name:        "leveldb",
-	Description: "Migrate boost piece information and dagstore to a leveldb store",
+	Description: "Migrate boost piece information and dagstore to a leveldb store.\n" + desc,
+	Usage:       "migrate-piecedir leveldb dagstore|pieceinfo",
 	Before:      before,
 	Action: func(cctx *cli.Context) error {
+		if cctx.Args().Len() == 0 {
+			return fmt.Errorf("must specify either dagstore or pieceinfo migration")
+		}
+
+		migrateType := cctx.Args().Get(0)
+		err := checkMigrateType(migrateType)
+		if err != nil {
+			return err
+		}
+
 		// Create a boost-data leveldb service
 		repoDir, err := homedir.Expand(cctx.String(FlagBoostRepo))
 		if err != nil {
@@ -47,13 +63,21 @@ var migrateLevelDBCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("creating leveldb piece directory service")
 		}
-		return migrate(cctx, "leveldb", bdsvc)
+		return migrate(cctx, "leveldb", bdsvc, migrateType)
 	},
+}
+
+func checkMigrateType(migrateType string) error {
+	if migrateType != "dagstore" && migrateType != "pieceinfo" {
+		return fmt.Errorf("invalid migration type '%s': must be either dagstore or pieceinfo", migrateType)
+	}
+	return nil
 }
 
 var migrateCouchDBCmd = &cli.Command{
 	Name:        "couchbase",
-	Description: "Migrate boost piece information and dagstore to a couchbase store",
+	Description: "Migrate boost piece information and dagstore to a couchbase store\n" + desc,
+	Usage:       "migrate-piecedir couchbase dagstore|pieceinfo",
 	Before:      before,
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -76,6 +100,16 @@ var migrateCouchDBCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
+		if cctx.Args().Len() == 0 {
+			return fmt.Errorf("must specify either dagstore or pieceinfo migration")
+		}
+
+		migrateType := cctx.Args().Get(0)
+		err := checkMigrateType(migrateType)
+		if err != nil {
+			return err
+		}
+
 		// Create a boostd-data couchbase service
 		settings := couchbase.DBSettings{
 			ConnectString: cctx.String("connect-string"),
@@ -88,14 +122,16 @@ var migrateCouchDBCmd = &cli.Command{
 			},
 		}
 		bdsvc := svc.NewCouchbase(settings)
-		return migrate(cctx, "couchbase", bdsvc)
+		return migrate(cctx, "couchbase", bdsvc, migrateType)
 	},
 }
 
-func migrate(cctx *cli.Context, dbType string, bdsvc *svc.Service) error {
+func migrate(cctx *cli.Context, dbType string, bdsvc *svc.Service, migrateType string) error {
 	ctx := lcli.ReqContext(cctx)
 	svcCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	// Start the piece directory service
 	addr, err := bdsvc.Start(svcCtx)
 	if err != nil {
 		return err
@@ -118,7 +154,7 @@ func migrate(cctx *cli.Context, dbType string, bdsvc *svc.Service) error {
 		return err
 	}
 
-	fmt.Print("Migrating dagstore to " + dbType + " Piece Directory. ")
+	fmt.Print("Migrating to " + dbType + " Piece Directory. ")
 	fmt.Println("See detailed logs of the migration at")
 	fmt.Println(logPath)
 
@@ -144,33 +180,35 @@ func migrate(cctx *cli.Context, dbType string, bdsvc *svc.Service) error {
 			BarEnd:        "]",
 		}))
 
-	// Migrate the indices
-	bar.Describe("[cyan][1/2][reset] Migrating indices...")
-	errCount, err := migrateIndices(ctx, logger, bar, repoDir, cl)
-	if errCount > 0 {
-		msg := fmt.Sprintf("Warning: there were errors migrating %d indices.", errCount)
-		msg += " See the log for details:\n" + logPath
-		fmt.Fprintf(os.Stderr, "\n"+msg+"\n")
-	}
-	// TODO: just log error
-	if err != nil {
-		return fmt.Errorf("migrating indices: %w", err)
+	if migrateType == "dagstore" {
+		// Migrate the indices
+		bar.Describe("Migrating indices...")
+		errCount, err := migrateIndices(ctx, logger, bar, repoDir, cl)
+		if errCount > 0 {
+			msg := fmt.Sprintf("Warning: there were errors migrating %d indices.", errCount)
+			msg += " See the log for details:\n" + logPath
+			fmt.Fprintf(os.Stderr, "\n"+msg+"\n")
+		}
+		if err != nil {
+			return fmt.Errorf("migrating indices: %w", err)
+		}
+		fmt.Println()
+		return nil
 	}
 
 	// Migrate the piece store
-	bar.Describe("[cyan][2/2][reset] Migrating piece info...")
+	bar.Describe("Migrating piece info...")
 	bar.Set(0) //nolint:errcheck
-	errCount, err = migratePieceStore(ctx, logger, bar, repoDir, cl)
+	errCount, err := migratePieceStore(ctx, logger, bar, repoDir, cl)
 	if errCount > 0 {
 		msg := fmt.Sprintf("Warning: there were errors migrating %d piece deal infos.", errCount)
 		msg += " See the log for details:\n" + logPath
 		fmt.Fprintf(os.Stderr, "\n"+msg+"\n")
 	}
-	// TODO: just log error
 	if err != nil {
 		return fmt.Errorf("migrating piece store: %w", err)
 	}
-
+	fmt.Println()
 	return nil
 }
 

@@ -31,7 +31,7 @@ var FlagVeryVerbose = &cli.BoolFlag{
 
 func main() {
 	app := &cli.App{
-		Name:                 "migrate",
+		Name:                 "migrate-piecedir",
 		Usage:                "Migrate boost to Piece Directory",
 		EnableBashCompletion: true,
 		Version:              build.UserVersion(),
