@@ -329,12 +329,7 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 		}
 		// Close the writer to flush buffer
 		defer gzwriter.Close()
-
 		writer = &gzwriter
-
-		// Set the Content-Type to empty to allow gzip operation
-		// gzip writer takes care of setting Content-Encoding
-		w.Header().Set("Content-Type", "")
 	}
 
 	if r.Method == "HEAD" {
