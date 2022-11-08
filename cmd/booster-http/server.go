@@ -323,11 +323,15 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 		// If Accept-Encoding header contains gzip then send a gzipped response
 
-		writer = &gziphandler.GzipResponseWriter{
+		gzwriter := gziphandler.GzipResponseWriter{
 			ResponseWriter: writeErrWatcher,
 		}
+
+		writer = &gzwriter
+
 		// Set the Content-Encoding header to gzip
-		w.Header().Set("Content-Encoding", "gzip")
+		//w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Set("Content-Type", "")
 	}
 
 	if r.Method == "HEAD" {
