@@ -88,9 +88,11 @@ func TestHttpGzipResponse(t *testing.T) {
 
 	// Read reponse in gzip reader
 	rawReader, err := gzip.NewReader(response.Body)
+	require.NoError(t, err)
 
 	// Get the uncompressed bytes
 	out, err := io.ReadAll(rawReader)
+	require.NoError(t, err)
 
 	// Compare bytes from original file to uncompressed http response
 	require.Equal(t, testFileBytes, out)
