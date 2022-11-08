@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/couchbase/gocb/v2"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multihash"
+	"go.opentelemetry.io/otel/attribute"
+	"golang.org/x/sync/errgroup"
 )
 
 const bucketName = "piecestore"
@@ -401,7 +401,10 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid, recordCount int)
 	_, totalShards := getShardPrefixBitCount(recordCount)
 	for i := 0; i < totalShards; i++ {
 		// Get the map of multihash -> offset/size for the shard
-		shardPrefix := getShardPrefix(i)
+		shardPrefix, err := getShardPrefix(i)
+		if err != nil {
+			return nil, err
+		}
 		cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String() + shardPrefix)
 		cbMap := db.col.Map(cbKey)
 		recMap, err := cbMap.Iterator()
@@ -494,16 +497,21 @@ func getShardPrefixBitCount(recordCount int) (int, int) {
 	return shardPrefixBits, totalShards
 }
 
-func getShardPrefix(shardIndex int) string {
+func getShardPrefix(shardIndex int) (string, error) {
+	if shardIndex >= 1<<16 {
+		return "", fmt.Errorf("shard index of size %d does not fit into 2 byte prefix", shardIndex)
+	}
+
 	shardPrefix := []byte{0, 0}
 	shardPrefix[1] = byte(shardIndex)
 	shardPrefix[0] = byte(shardIndex >> 8)
-	return string(shardPrefix)
+	return string(shardPrefix), nil
 }
 
 // AddIndexRecords
 func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.add_index_records")
+	span.SetAttributes(attribute.Int("recs", len(recs)))
 	defer span.End()
 
 	if len(recs) > maxRecsPerPiece {
@@ -517,7 +525,10 @@ func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []mode
 	type mhToOffsetSizeMap map[string]offsetSize
 	shardMaps := make(map[string]mhToOffsetSizeMap, totalShards)
 	for i := 0; i < totalShards; i++ {
-		shardPrefix := getShardPrefix(i)
+		shardPrefix, err := getShardPrefix(i)
+		if err != nil {
+			return err
+		}
 		shardMaps[shardPrefix] = make(map[string]offsetSize)
 	}
 

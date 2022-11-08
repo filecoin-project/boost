@@ -72,14 +72,23 @@ func TestGetShardPrefix(t *testing.T) {
 	}, {
 		shardIndex: 257,
 		expected:   string([]byte{1, 1}),
+	}, {
+		shardIndex: (1 << 16) - 1,
+		expected:   string([]byte{255, 255}),
 	}}
 
 	for _, tc := range tcs {
 		t.Run(fmt.Sprintf("%d", tc.shardIndex), func(t *testing.T) {
-			prefix := getShardPrefix(tc.shardIndex)
+			prefix, err := getShardPrefix(tc.shardIndex)
+			require.NoError(t, err)
 			require.Equal(t, tc.expected, prefix)
 		})
 	}
+
+	t.Run(fmt.Sprintf("%d", 1<<16), func(t *testing.T) {
+		_, err := getShardPrefix(1 << 16)
+		require.Error(t, err)
+	})
 }
 
 var testCouchSettings = DBSettings{
