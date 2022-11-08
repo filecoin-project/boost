@@ -320,23 +320,26 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 	// in a piece identified by a cid will never change.
 	start := time.Now()
 	alogAt(start, "%s\tGET %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
-	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+	isGzipped := strings.Contains(r.Header.Get("Accept-Encoding"), "gzip")
+	if isGzipped {
 		// If Accept-Encoding header contains gzip then send a gzipped response
 
 		gzwriter := gziphandler.GzipResponseWriter{
 			ResponseWriter: writeErrWatcher,
 		}
+		// Close the writer to flush buffer
+		defer gzwriter.Close()
 
 		writer = &gzwriter
 
-		// Set the Content-Encoding header to gzip
-		//w.Header().Set("Content-Encoding", "gzip")
+		// Set the Content-Type to empty to allow gzip operation
+		// gzip writer takes care of setting Content-Encoding
 		w.Header().Set("Content-Type", "")
 	}
 
 	if r.Method == "HEAD" {
 		// For an HTTP HEAD request ServeContent doesn't send any data (just headers)
-		http.ServeContent(w, r, "", time.Time{}, content)
+		http.ServeContent(writer, r, "", time.Time{}, content)
 		alog("%s\tHEAD %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
 		return
 	}
@@ -344,10 +347,13 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 	// Send the content
 	http.ServeContent(writer, r, "", lastModified, content)
 
-	// Check if there was an error during the transfer
+	// Write a line to the log
 	end := time.Now()
 	completeMsg := fmt.Sprintf("GET %s\n%s - %s: %s / %s bytes transferred",
 		r.URL, end.Format(timeFmt), start.Format(timeFmt), time.Since(start), addCommas(writeErrWatcher.count))
+	if isGzipped {
+		completeMsg += " (gzipped)"
+	}
 	if err == nil {
 		alogAt(end, "%s\t%s", color.New(color.FgGreen).Sprint("DONE"), completeMsg)
 	} else {

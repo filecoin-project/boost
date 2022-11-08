@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"io"
 	"net/http"
@@ -15,7 +16,6 @@ import (
 )
 
 const testFile = "test/test_file"
-const gzTestFile = "test/test_file.gz"
 
 func TestNewHttpServer(t *testing.T) {
 
@@ -44,6 +44,10 @@ func TestHttpGzipResponse(t *testing.T) {
 
 	// Create mock unsealed file for piece/car
 	f, _ := os.Open(testFile)
+	testFileBytes, err := io.ReadAll(f)
+	require.NoError(t, err)
+	_, err = f.Seek(0, io.SeekStart)
+	require.NoError(t, err)
 	defer f.Close()
 
 	//Create CID
@@ -71,6 +75,7 @@ func TestHttpGzipResponse(t *testing.T) {
 	mockHttpServer.EXPECT().PiecesContainingMultihash(gomock.Any(), gomock.Any()).AnyTimes().Return(cids, nil)
 	mockHttpServer.EXPECT().GetPieceInfo(gomock.Any()).AnyTimes().Return(&pieceInfo, nil)
 
+	// Create a client and make request with Encoding header
 	client := new(http.Client)
 	request, err := http.NewRequest("GET", "http://localhost:7777/piece?payloadCid=bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi&format=piece", nil)
 	require.NoError(t, err)
@@ -81,31 +86,14 @@ func TestHttpGzipResponse(t *testing.T) {
 	require.Equal(t, "gzip", response.Header.Get("Content-Encoding"))
 	defer response.Body.Close()
 
-	out, err := io.ReadAll(response.Body)
-	//l := len(out)
-	//fmt.Println(out[l-10 : l])
-	//t.Log(len(out))
+	// Read reponse in gzip reader
+	rawReader, err := gzip.NewReader(response.Body)
 
-	outF, err := os.CreateTemp("test", "tf")
-	require.NoError(t, err)
+	// Get the uncompressed bytes
+	out, err := io.ReadAll(rawReader)
 
-	//oB, err := io.ReadAll(response.Body)
-	//require.NoError(t, err)
-
-	n, err := outF.Write(out)
-	require.NoError(t, err)
-
-	t.Log(n)
-
-	outF.Close()
-
-	//out, err := gzip.NewReader(outF)
-	//outBytes, err := io.ReadAll(out)
-	//require.NoError(t, err)
-	//
-	//gzBytes, err := io.ReadAll(f)
-	//require.NoError(t, err)
-	//require.Equal(t, 0, bytes.Compare(gzBytes, outBytes))
+	// Compare bytes from original file to uncompressed http response
+	require.Equal(t, testFileBytes, out)
 
 	// Stop the server
 	err = httpServer.Stop()
