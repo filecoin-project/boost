@@ -195,21 +195,31 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, mhs []multihash.Mult
 			return db.withCasRetry("multihash -> pieces", func() error {
 				cbKey := toCouchKey(sprefixMhtoPieceCids + mh.String())
 
-				// Create the array
-				upsertDocResult, err := db.col.Upsert(cbKey, []int{}, &gocb.UpsertOptions{Context: ctx})
-				if err != nil {
-					return fmt.Errorf("adding multihash %s to piece %s: upsert doc: %w", mh, pieceCid, err)
+				// Insert a tuple into the bucket: multihash -> [piece cid]
+				_, err := db.col.Insert(cbKey, []string{pieceCid.String()}, &gocb.InsertOptions{Context: ctx})
+				if err == nil {
+					return nil
+				}
+
+				// If the value already exists, it's not an error, we'll just
+				// add the piece cid to the existing set of piece cids
+				isDocExists := errors.Is(err, gocb.ErrDocumentExists)
+				if !isDocExists {
+					// If there was some other error, return it
+					return fmt.Errorf("adding multihash %s to piece %s: insert doc: %w", mh, pieceCid, err)
 				}
 
 				// Add the piece cid to the set of piece cids
 				mops := []gocb.MutateInSpec{
 					gocb.ArrayAddUniqueSpec("", pieceCid.String(), &gocb.ArrayAddUniqueSpecOptions{}),
 				}
-				_, err = db.col.MutateIn(cbKey, mops, &gocb.MutateInOptions{
-					Context: ctx,
-					Cas:     upsertDocResult.Cas(),
-				})
+				_, err = db.col.MutateIn(cbKey, mops, &gocb.MutateInOptions{Context: ctx})
 				if err != nil {
+					if errors.Is(err, gocb.ErrPathExists) {
+						// If the set of piece cids already contains the piece,
+						// it's not an error, just return nil
+						return nil
+					}
 					return fmt.Errorf("adding multihash %s to piece %s: mutate doc: %w", mh, pieceCid, err)
 				}
 
