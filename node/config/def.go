@@ -74,10 +74,12 @@ func DefaultBoost() *Boost {
 
 		PieceDirectory: PieceDirectoryConfig{
 			Couchbase: PieceDirectoryCouchbaseConfig{
-				ConnectString: "",
-				Username:      "",
-				Password:      "",
-				RAMQuotaMB:    0,
+				ConnectString:           "",
+				Username:                "",
+				Password:                "",
+				PieceMetadataBucket:     PieceDirectoryCouchbaseBucketConfig{},
+				MultihashToPiecesBucket: PieceDirectoryCouchbaseBucketConfig{},
+				PieceOffsetsBucket:      PieceDirectoryCouchbaseBucketConfig{},
 			},
 			ParallelAddIndexLimit: 4,
 		},

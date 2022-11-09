@@ -97,8 +97,14 @@ var testCouchSettings = DBSettings{
 		Username: "Administrator",
 		Password: "boostdemo",
 	},
-	Bucket: DBSettingsBucket{
-		RAMQuotaMB: 256,
+	PieceMetadataBucket: DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	MultihashToPiecesBucket: DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	PieceOffsetsBucket: DBSettingsBucket{
+		RAMQuotaMB: 128,
 	},
 }
 
