@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/ipfs/go-cid"
+	"os"
 	"strings"
 
 	bcli "github.com/filecoin-project/boost/cli"
@@ -21,6 +22,11 @@ var importDataCmd = &cli.Command{
 
 		id := cctx.Args().Get(0)
 		filePath := cctx.Args().Get(1)
+
+		_, err := os.Stat(filePath)
+		if err != nil {
+			return fmt.Errorf("opening file %s: %w", filePath, err)
+		}
 
 		// Parse the first parameter as a deal UUID or a proposal CID
 		var proposalCid *cid.Cid

@@ -15,6 +15,8 @@ import (
 	carv2 "github.com/ipld/go-car/v2"
 )
 
+var ErrCommpMismatch = fmt.Errorf("commp mismatch")
+
 // Verify that the commp provided in the deal proposal matches commp calculated
 // over the downloaded file
 func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
@@ -27,9 +29,17 @@ func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
 
 	clientPieceCid := deal.ClientDealProposal.Proposal.PieceCID
 	if pieceCid != clientPieceCid {
+		if deal.IsOffline {
+			// Allow manual retry in case user accidentally supplied the wrong
+			// file when importing an offline deal
+			return &dealMakingError{
+				retry: types.DealRetryManual,
+				error: fmt.Errorf("commP expected=%s, actual=%s: %w", clientPieceCid, pieceCid, ErrCommpMismatch),
+			}
+		}
 		return &dealMakingError{
 			retry: types.DealRetryFatal,
-			error: fmt.Errorf("commP mismatch, expected=%s, actual=%s", clientPieceCid, pieceCid),
+			error: fmt.Errorf("commP expected=%s, actual=%s: %w", clientPieceCid, pieceCid, ErrCommpMismatch),
 		}
 	}
 
@@ -158,7 +168,7 @@ func GenerateCommP(filepath string) (*abi.PieceInfo, error) {
 
 	written, err := io.Copy(w, r)
 	if err != nil {
-		return nil, fmt.Errorf("failed to write to CommP writer: %w", err)
+		return nil, fmt.Errorf("writing to commp writer: %w", err)
 	}
 
 	// get the size of the CAR file
