@@ -30,7 +30,6 @@ type DealInfo struct {
 
 // Metadata for PieceCid
 type Metadata struct {
-	Cursor    uint64     `json:"c"`
 	IndexedAt time.Time  `json:"i"`
 	Deals     []DealInfo `json:"d"`
 	Error     string     `json:"e"`

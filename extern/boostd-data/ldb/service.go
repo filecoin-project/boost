@@ -21,6 +21,11 @@ import (
 
 var log = logging.Logger("boostd-data-ldb")
 
+type LeveldbMetadata struct {
+	model.Metadata
+	Cursor uint64 `json:"c"`
+}
+
 type Store struct {
 	sync.Mutex
 	db       *DB
@@ -262,7 +267,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
 		}
 		// there isn't yet any metadata, so create new metadata
-		md = model.Metadata{}
+		md = LeveldbMetadata{}
 	}
 
 	// mark indexing as complete
