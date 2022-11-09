@@ -47,8 +47,14 @@ func NewPieceMetaStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.Loc
 							Username: cfg.PieceDirectory.Couchbase.Username,
 							Password: cfg.PieceDirectory.Couchbase.Password,
 						},
-						Bucket: couchbase.DBSettingsBucket{
-							RAMQuotaMB: cfg.PieceDirectory.Couchbase.RAMQuotaMB,
+						PieceMetadataBucket: couchbase.DBSettingsBucket{
+							RAMQuotaMB: cfg.PieceDirectory.Couchbase.PieceMetadataBucket.RAMQuotaMB,
+						},
+						MultihashToPiecesBucket: couchbase.DBSettingsBucket{
+							RAMQuotaMB: cfg.PieceDirectory.Couchbase.MultihashToPiecesBucket.RAMQuotaMB,
+						},
+						PieceOffsetsBucket: couchbase.DBSettingsBucket{
+							RAMQuotaMB: cfg.PieceDirectory.Couchbase.PieceOffsetsBucket.RAMQuotaMB,
 						},
 					})
 				} else {

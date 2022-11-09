@@ -31,8 +31,14 @@ var testCouchSettings = couchbase.DBSettings{
 		Username: "Administrator",
 		Password: "boostdemo",
 	},
-	Bucket: couchbase.DBSettingsBucket{
-		RAMQuotaMB: 256,
+	PieceMetadataBucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	MultihashToPiecesBucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	PieceOffsetsBucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 128,
 	},
 }
 

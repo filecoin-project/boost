@@ -2,7 +2,6 @@ package couchbase
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"strconv"
@@ -17,7 +16,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const bucketName = "piecestore"
+const pieceDirBucketPrefix = "piece-dir."
+const pieceCidToMetadataBucket = pieceDirBucketPrefix + "piece-metadata"
+const multihashToPiecesBucket = pieceDirBucketPrefix + "mh-to-pieces"
+const pieceOffsetsBucket = pieceDirBucketPrefix + "piece-offsets"
 
 // The maximum length for a couchbase key is 250 bytes, but we don't need a
 // key that long, 128 bytes is more than enough
@@ -27,44 +29,11 @@ const maxCouchKeyLen = 128
 // there is a cas mismatch
 const maxCasRetries = 10
 
-var (
-	// couchbase key prefix for PieceCid to metadata table.
-	// couchbase keys will be built by concatenating prefix with PieceCid.
-	prefixPieceCidToMetadata  uint64 = 1
-	sprefixPieceCidToMetadata string
-
-	// couchbase key prefix for Multihash to PieceCids table.
-	// couchbase keys will be built by concatenating prefix with Multihash.
-	prefixMhtoPieceCids  uint64 = 2
-	sprefixMhtoPieceCids string
-
-	// couchbase key prefix for PieceCid to offsets map.
-	// couchbase keys will be built by concatenating prefix with PieceCid.
-	prefixPieceCidToOffsets  uint64 = 3
-	sprefixPieceCidToOffsets string
-
-	maxVarIntSize = binary.MaxVarintLen64
-
-	binaryTranscoder = gocb.NewRawBinaryTranscoder()
-)
-
-func init() {
-	buf := make([]byte, maxVarIntSize)
-	binary.PutUvarint(buf, prefixPieceCidToMetadata)
-	sprefixPieceCidToMetadata = string(buf)
-
-	buf = make([]byte, maxVarIntSize)
-	binary.PutUvarint(buf, prefixMhtoPieceCids)
-	sprefixMhtoPieceCids = string(buf)
-
-	buf = make([]byte, maxVarIntSize)
-	binary.PutUvarint(buf, prefixPieceCidToOffsets)
-	sprefixPieceCidToOffsets = string(buf)
-}
-
 type DB struct {
-	cluster *gocb.Cluster
-	col     *gocb.Collection
+	cluster      *gocb.Cluster
+	pcidToMeta   *gocb.Collection
+	mhToPieces   *gocb.Collection
+	pieceOffsets *gocb.Collection
 }
 
 type DBSettingsAuth struct {
@@ -77,9 +46,11 @@ type DBSettingsBucket struct {
 }
 
 type DBSettings struct {
-	ConnectString string
-	Auth          DBSettingsAuth
-	Bucket        DBSettingsBucket
+	ConnectString           string
+	Auth                    DBSettingsAuth
+	PieceMetadataBucket     DBSettingsBucket
+	MultihashToPiecesBucket DBSettingsBucket
+	PieceOffsetsBucket      DBSettingsBucket
 }
 
 const connectTimeout = 5 * time.Second
@@ -97,20 +68,71 @@ func newDB(ctx context.Context, settings DBSettings) (*DB, error) {
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("connecting to couchbase DB %s: %w", settings.ConnectString, err)
+		return nil, fmt.Errorf("connecting to couchbase cluster %s: %w", settings.ConnectString, err)
 	}
 
-	_, err = cluster.Buckets().GetBucket(bucketName, &gocb.GetBucketOptions{Context: ctx, Timeout: connectTimeout})
+	pingStart := time.Now()
+	err = pingCluster(ctx, cluster, settings.ConnectString)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infow("Connected to couchbase cluster",
+		"connect-string", settings.ConnectString,
+		"max-service-latency", time.Since(pingStart).String())
+
+	// Set up the buckets
+	db := &DB{cluster: cluster}
+	db.pcidToMeta, err = createBucket(ctx, cluster, pieceCidToMetadataBucket, settings.PieceMetadataBucket.RAMQuotaMB)
+	if err != nil {
+		return nil, fmt.Errorf("Creating bucket %s for couchbase server %s: %w", pieceCidToMetadataBucket, settings.ConnectString, err)
+	}
+	db.mhToPieces, err = createBucket(ctx, cluster, multihashToPiecesBucket, settings.MultihashToPiecesBucket.RAMQuotaMB)
+	if err != nil {
+		return nil, fmt.Errorf("Creating bucket %s for couchbase server %s: %w", multihashToPiecesBucket, settings.ConnectString, err)
+	}
+	db.pieceOffsets, err = createBucket(ctx, cluster, pieceOffsetsBucket, settings.PieceOffsetsBucket.RAMQuotaMB)
+	if err != nil {
+		return nil, fmt.Errorf("Creating bucket %s for couchbase server %s: %w", pieceOffsetsBucket, settings.ConnectString, err)
+	}
+
+	return db, nil
+}
+
+func pingCluster(ctx context.Context, cluster *gocb.Cluster, connectString string) error {
+	res, err := cluster.Ping(&gocb.PingOptions{
+		Timeout: connectTimeout,
+		Context: ctx,
+	})
+	if err == nil {
+		for svc, png := range res.Services {
+			if len(png) > 0 && png[0].State != gocb.PingStateOk {
+				err = fmt.Errorf("connecting to %s service", serviceName(svc))
+				break
+			}
+		}
+	}
+
+	if err != nil {
+		msg := fmt.Sprintf("Connecting to couchbase server %s", connectString)
+		return fmt.Errorf(msg+": %w\nCheck the couchbase server is running and the username / password are correct", err)
+	}
+
+	return nil
+}
+
+func createBucket(ctx context.Context, cluster *gocb.Cluster, bucketName string, ramMb uint64) (*gocb.Collection, error) {
+	_, err := cluster.Buckets().GetBucket(bucketName, &gocb.GetBucketOptions{Context: ctx, Timeout: connectTimeout})
 	if err != nil {
 		if !errors.Is(err, gocb.ErrBucketNotFound) {
-			msg := fmt.Sprintf("getting bucket %s for couchbase server %s", bucketName, settings.ConnectString)
+			msg := fmt.Sprintf("getting bucket %s", bucketName)
 			return nil, fmt.Errorf(msg+": %w\nCheck the couchbase server is running and the username / password are correct", err)
 		}
 
 		err = cluster.Buckets().CreateBucket(gocb.CreateBucketSettings{
 			BucketSettings: gocb.BucketSettings{
 				Name:       bucketName,
-				RAMQuotaMB: settings.Bucket.RAMQuotaMB,
+				RAMQuotaMB: ramMb,
 				BucketType: gocb.CouchbaseBucketType,
 				// The default eviction policy requires couchbase to keep all
 				// keys (and metadata) in memory. So use an eviction policy
@@ -141,7 +163,7 @@ func newDB(ctx context.Context, settings DBSettings) (*DB, error) {
 		return nil, fmt.Errorf("waiting for couchbase bucket to be ready: %w", err)
 	}
 
-	return &DB{cluster: cluster, col: bucket.DefaultCollection()}, nil
+	return bucket.DefaultCollection(), nil
 }
 
 // GetPieceCidsByMultihash
@@ -149,11 +171,9 @@ func (db *DB) GetPieceCidsByMultihash(ctx context.Context, mh multihash.Multihas
 	ctx, span := tracing.Tracer.Start(ctx, "db.get_piece_cids_by_multihash")
 	defer span.End()
 
-	key := fmt.Sprintf("%s%s", sprefixMhtoPieceCids, mh.String())
-	k := toCouchKey(key)
-
+	k := toCouchKey(mh.String())
 	var getResult *gocb.GetResult
-	getResult, err := db.col.Get(k, &gocb.GetOptions{Context: ctx})
+	getResult, err := db.mhToPieces.Get(k, &gocb.GetOptions{Context: ctx})
 	if err != nil {
 		return nil, fmt.Errorf("getting piece cids by multihash %s: %w", mh, err)
 	}
@@ -193,10 +213,10 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, mhs []multihash.Mult
 			defer func() { <-throttle }()
 
 			return db.withCasRetry("multihash -> pieces", func() error {
-				cbKey := toCouchKey(sprefixMhtoPieceCids + mh.String())
+				cbKey := toCouchKey(mh.String())
 
 				// Insert a tuple into the bucket: multihash -> [piece cid]
-				_, err := db.col.Insert(cbKey, []string{pieceCid.String()}, &gocb.InsertOptions{Context: ctx})
+				_, err := db.mhToPieces.Insert(cbKey, []string{pieceCid.String()}, &gocb.InsertOptions{Context: ctx})
 				if err == nil {
 					return nil
 				}
@@ -213,7 +233,7 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, mhs []multihash.Mult
 				mops := []gocb.MutateInSpec{
 					gocb.ArrayAddUniqueSpec("", pieceCid.String(), &gocb.ArrayAddUniqueSpecOptions{}),
 				}
-				_, err = db.col.MutateIn(cbKey, mops, &gocb.MutateInOptions{Context: ctx})
+				_, err = db.mhToPieces.MutateIn(cbKey, mops, &gocb.MutateInOptions{Context: ctx})
 				if err != nil {
 					if errors.Is(err, gocb.ErrPathExists) {
 						// If the set of piece cids already contains the piece,
@@ -236,8 +256,8 @@ func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md Co
 	ctx, span := tracing.Tracer.Start(ctx, "db.set_piece_cid_to_metadata")
 	defer span.End()
 
-	k := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
-	_, err := db.col.Upsert(k, md, &gocb.UpsertOptions{Context: ctx})
+	k := toCouchKey(pieceCid.String())
+	_, err := db.pcidToMeta.Upsert(k, md, &gocb.UpsertOptions{Context: ctx})
 	if err != nil {
 		return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
 	}
@@ -252,8 +272,8 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr err
 	return db.withCasRetry("mark-index-errored", func() error {
 		// Get the metadata from the db
 		var getResult *gocb.GetResult
-		k := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
-		getResult, err := db.col.Get(k, &gocb.GetOptions{Context: ctx})
+		k := toCouchKey(pieceCid.String())
+		getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
 		if err != nil {
 			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
 		}
@@ -274,7 +294,7 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr err
 		metadata.ErrorType = fmt.Sprintf(idxErr.Error(), "%T")
 
 		// Update the metadata in the db
-		_, err = db.col.Replace(k, metadata, &gocb.ReplaceOptions{
+		_, err = db.pcidToMeta.Replace(k, metadata, &gocb.ReplaceOptions{
 			Context: ctx,
 			Cas:     getResult.Cas(),
 		})
@@ -292,8 +312,8 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 
 	return db.withCasRetry("add-deal-for-piece", func() error {
 		// Get the piece metadata from the db
-		cbKey := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
-		getResult, err := db.col.Get(cbKey, &gocb.GetOptions{Context: ctx})
+		cbKey := toCouchKey(pieceCid.String())
+		getResult, err := db.pcidToMeta.Get(cbKey, &gocb.GetOptions{Context: ctx})
 		if err != nil {
 			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
 		}
@@ -317,7 +337,7 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 		md.Deals = append(md.Deals, dealInfo)
 
 		// Write the piece metadata back to the db
-		_, err = db.col.Replace(cbKey, md, &gocb.ReplaceOptions{
+		_, err = db.pcidToMeta.Replace(cbKey, md, &gocb.ReplaceOptions{
 			Context: ctx,
 			Cas:     getResult.Cas(),
 		})
@@ -335,8 +355,8 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (Couc
 	defer span.End()
 
 	var getResult *gocb.GetResult
-	k := toCouchKey(sprefixPieceCidToMetadata + pieceCid.String())
-	getResult, err := db.col.Get(k, &gocb.GetOptions{Context: ctx})
+	k := toCouchKey(pieceCid.String())
+	getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
 	if err != nil {
 		return CouchbaseMetadata{}, fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
 	}
@@ -363,8 +383,8 @@ func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash multihas
 
 	// Get the map of multihash -> offset/size.
 	// Note: This doesn't actually fetch the map, it just gets a reference to it.
-	cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String() + shardPrefix)
-	cbMap := db.col.Map(cbKey)
+	cbKey := toCouchKey(pieceCid.String() + shardPrefix)
+	cbMap := db.pieceOffsets.Map(cbKey)
 
 	// Get the offset/size from the map.
 	// Note: This doesn't actually fetch the map, it tells couchbase to find
@@ -405,8 +425,8 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid, recordCount int)
 		if err != nil {
 			return nil, err
 		}
-		cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String() + shardPrefix)
-		cbMap := db.col.Map(cbKey)
+		cbKey := toCouchKey(pieceCid.String() + shardPrefix)
+		cbMap := db.pieceOffsets.Map(cbKey)
 		recMap, err := cbMap.Iterator()
 		if err != nil {
 			if isNotFoundErr(err) {
@@ -556,8 +576,8 @@ func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []mode
 			continue
 		}
 
-		cbKey := toCouchKey(sprefixPieceCidToOffsets + pieceCid.String() + shardPrefix)
-		_, err := db.col.Upsert(cbKey, shardMap, &gocb.UpsertOptions{Context: ctx})
+		cbKey := toCouchKey(pieceCid.String() + shardPrefix)
+		_, err := db.pieceOffsets.Upsert(cbKey, shardMap, &gocb.UpsertOptions{Context: ctx})
 		if err != nil {
 			return fmt.Errorf("adding offset / sizes for piece %s: %w", pieceCid, err)
 		}
@@ -621,4 +641,22 @@ func hashToShardPrefix(hash multihash.Multihash, mask [2]byte) string {
 		hash[len(hash)-2] & mask[0],
 		hash[len(hash)-1] & mask[1],
 	})
+}
+
+func serviceName(svc gocb.ServiceType) string {
+	switch svc {
+	case gocb.ServiceTypeManagement:
+		return "mgmt"
+	case gocb.ServiceTypeKeyValue:
+		return "kv"
+	case gocb.ServiceTypeViews:
+		return "views"
+	case gocb.ServiceTypeQuery:
+		return "query"
+	case gocb.ServiceTypeSearch:
+		return "search"
+	case gocb.ServiceTypeAnalytics:
+		return "analytics"
+	}
+	return "unknown"
 }

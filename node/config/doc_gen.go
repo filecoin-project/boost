@@ -445,6 +445,14 @@ the piece from the sealing subsystem, creates an index of where each block
 is in the piece, and adds the index to the piece directory.`,
 		},
 	},
+	"PieceDirectoryCouchbaseBucketConfig": []DocField{
+		{
+			Name: "RAMQuotaMB",
+			Type: "uint64",
+
+			Comment: `Bucket setting RAMQuotaMB`,
+		},
+	},
 	"PieceDirectoryCouchbaseConfig": []DocField{
 		{
 			Name: "ConnectString",
@@ -466,10 +474,22 @@ If empty, a leveldb database is used instead.`,
 			Comment: ``,
 		},
 		{
-			Name: "RAMQuotaMB",
-			Type: "uint64",
+			Name: "PieceMetadataBucket",
+			Type: "PieceDirectoryCouchbaseBucketConfig",
 
-			Comment: `Bucket setting RAMQuotaMB`,
+			Comment: ``,
+		},
+		{
+			Name: "MultihashToPiecesBucket",
+			Type: "PieceDirectoryCouchbaseBucketConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "PieceOffsetsBucket",
+			Type: "PieceDirectoryCouchbaseBucketConfig",
+
+			Comment: ``,
 		},
 	},
 	"StorageConfig": []DocField{

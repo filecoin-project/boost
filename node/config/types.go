@@ -237,14 +237,20 @@ type StorageConfig struct {
 	ParallelFetchLimit int
 }
 
+type PieceDirectoryCouchbaseBucketConfig struct {
+	// Bucket setting RAMQuotaMB
+	RAMQuotaMB uint64
+}
+
 type PieceDirectoryCouchbaseConfig struct {
 	// The couchbase connect string eg "couchbase://127.0.0.1"
 	// If empty, a leveldb database is used instead.
-	ConnectString string
-	Username      string
-	Password      string
-	// Bucket setting RAMQuotaMB
-	RAMQuotaMB uint64
+	ConnectString           string
+	Username                string
+	Password                string
+	PieceMetadataBucket     PieceDirectoryCouchbaseBucketConfig
+	MultihashToPiecesBucket PieceDirectoryCouchbaseBucketConfig
+	PieceOffsetsBucket      PieceDirectoryCouchbaseBucketConfig
 }
 
 type PieceDirectoryConfig struct {

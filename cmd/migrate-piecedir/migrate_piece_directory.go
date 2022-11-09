@@ -105,8 +105,18 @@ var migrateCouchDBCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.Uint64Flag{
-			Name:  "ram-quota-mb",
-			Usage: "megabytes of ram allocated to couchbase bucket (recommended at least 1024)",
+			Name:  "piece-meta-ram-quota-mb",
+			Usage: "megabytes of ram allocated to piece metadata couchbase bucket (recommended at least 1024)",
+			Value: 1024,
+		},
+		&cli.Uint64Flag{
+			Name:  "mh-pieces-ram-quota-mb",
+			Usage: "megabytes of ram allocated to multihash to piece cid couchbase bucket (recommended at least 1024)",
+			Value: 1024,
+		},
+		&cli.Uint64Flag{
+			Name:  "piece-offsets-ram-quota-mb",
+			Usage: "megabytes of ram allocated to piece offsets couchbase bucket (recommended at least 1024)",
 			Value: 1024,
 		},
 	},
@@ -129,8 +139,14 @@ var migrateCouchDBCmd = &cli.Command{
 				Username: cctx.String("username"),
 				Password: cctx.String("password"),
 			},
-			Bucket: couchbase.DBSettingsBucket{
-				RAMQuotaMB: cctx.Uint64("ram-quota-mb"),
+			PieceMetadataBucket: couchbase.DBSettingsBucket{
+				RAMQuotaMB: cctx.Uint64("piece-meta-ram-quota-mb"),
+			},
+			MultihashToPiecesBucket: couchbase.DBSettingsBucket{
+				RAMQuotaMB: cctx.Uint64("mh-pieces-ram-quota-mb"),
+			},
+			PieceOffsetsBucket: couchbase.DBSettingsBucket{
+				RAMQuotaMB: cctx.Uint64("piece-offsets-ram-quota-mb"),
 			},
 		}
 
