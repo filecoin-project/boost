@@ -229,11 +229,7 @@ var walletList = &cli.Command{
 					tablewriter.NewLineCol(errorKey))
 				// populate it with content
 				for _, wallet := range wallets {
-					for k, v := range wallet {
-						tw.Write(map[string]interface{}{
-							k: v,
-						})
-					}
+					tw.Write(wallet)
 				}
 				// return the corresponding string
 				return tw.Flush(os.Stdout)
