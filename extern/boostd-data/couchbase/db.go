@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/couchbase/gocb/v2"
@@ -387,26 +386,20 @@ func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash multihas
 	cbMap := db.pieceOffsets.Map(cbKey)
 
 	// Get the offset/size from the map.
-	// Note: This doesn't actually fetch the map, it tells couchbase to find
-	// the key in the map on the server side, and return the value.
-	var val offsetSize
+	// Note: This doesn't actually fetch the whole map, it tells couchbase to
+	// find the key in the map on the server side, and return the value.
+	var val string
 	err := cbMap.At(hash.String(), &val)
 	if err != nil {
 		return nil, fmt.Errorf("getting offset/size for piece %s multihash %s: %w", pieceCid, hash, err)
 	}
 
-	// Parse the offset and size (they have to be stored as strings as they
-	// may be too large for a javascript number)
-	offset, err := strconv.ParseUint(val.Offset, 10, 64)
+	var ofsz model.OffsetSize
+	err = ofsz.UnmarshallBase64(val)
 	if err != nil {
-		return nil, fmt.Errorf("parsing piece %s offset value '%s' as uint64: %w", pieceCid, val, err)
+		return nil, fmt.Errorf("parsing piece %s offset / size value '%s': %w", pieceCid, val, err)
 	}
-	size, err := strconv.ParseUint(val.Size, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("parsing piece %s size value '%s' as uint64: %w", pieceCid, val, err)
-	}
-
-	return &model.OffsetSize{Offset: offset, Size: size}, nil
+	return &ofsz, nil
 }
 
 // AllRecords gets all the mulithash -> offset/size mappings in a given piece.
@@ -442,52 +435,23 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid, recordCount int)
 			if err != nil {
 				return nil, fmt.Errorf("parsing piece cid %s multihash value '%s': %w", pieceCid, mhStr, err)
 			}
-			val, ok := offsetSizeIfce.(map[string]interface{})
+
+			val, ok := offsetSizeIfce.(string)
 			if !ok {
 				return nil, fmt.Errorf("unexpected type for piece cid %s offset/size value: %T", pieceCid, offsetSizeIfce)
 			}
 
-			offsetIfce, ok := val["o"]
-			if !ok {
-				return nil, fmt.Errorf("parsing piece %s offset value '%s': missing Offset map key", pieceCid, val)
-			}
-			offsetStr, ok := offsetIfce.(string)
-			if !ok {
-				return nil, fmt.Errorf("unexpected type for piece cid %s offset value: %T", pieceCid, offsetIfce)
-			}
-			offset, err := strconv.ParseUint(offsetStr, 10, 64)
+			var ofsz model.OffsetSize
+			err = ofsz.UnmarshallBase64(val)
 			if err != nil {
-				return nil, fmt.Errorf("parsing piece %s offset value '%s' as uint64: %w", pieceCid, val, err)
+				return nil, fmt.Errorf("parsing piece %s offset / size value '%s': %w", pieceCid, val, err)
 			}
 
-			sizeIfce, ok := val["s"]
-			if !ok {
-				return nil, fmt.Errorf("parsing piece %s offset value '%s': missing Size map key", pieceCid, val)
-			}
-			sizeStr, ok := sizeIfce.(string)
-			if !ok {
-				return nil, fmt.Errorf("unexpected type for piece cid %s size value: %T", pieceCid, offsetIfce)
-			}
-			size, err := strconv.ParseUint(sizeStr, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("parsing piece %s size value '%s' as uint64: %w", pieceCid, val, err)
-			}
-
-			recs = append(recs, model.Record{Cid: cid.NewCidV1(cid.Raw, mh), OffsetSize: model.OffsetSize{
-				Offset: offset,
-				Size:   size,
-			}})
+			recs = append(recs, model.Record{Cid: cid.NewCidV1(cid.Raw, mh), OffsetSize: ofsz})
 		}
 	}
 
 	return recs, nil
-}
-
-type offsetSize struct {
-	// Need to use strings instead of uint64 because uint64 may not fit into
-	// a Javascript number
-	Offset string `json:"o"`
-	Size   string `json:"s"`
 }
 
 // Couchbase has an upper limit on the size of a value: 20mb
@@ -542,14 +506,14 @@ func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []mode
 	shardPrefixBitCount, totalShards := getShardPrefixBitCount(len(recs))
 
 	// Initialize the multihash -> offset/size map for each shard
-	type mhToOffsetSizeMap map[string]offsetSize
+	type mhToOffsetSizeMap map[string]string
 	shardMaps := make(map[string]mhToOffsetSizeMap, totalShards)
 	for i := 0; i < totalShards; i++ {
 		shardPrefix, err := getShardPrefix(i)
 		if err != nil {
 			return err
 		}
-		shardMaps[shardPrefix] = make(map[string]offsetSize)
+		shardMaps[shardPrefix] = make(map[string]string)
 	}
 
 	// Create a mask of the required number of bits
@@ -564,10 +528,7 @@ func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []mode
 		shardPrefix := hashToShardPrefix(hash, mask)
 
 		// Add the record to the shard's map
-		shardMaps[shardPrefix][hash.String()] = offsetSize{
-			Offset: fmt.Sprintf("%d", rec.Offset),
-			Size:   fmt.Sprintf("%d", rec.Size),
-		}
+		shardMaps[shardPrefix][hash.String()] = rec.MarshallBase64()
 	}
 
 	// Add each shard's map to couchbase

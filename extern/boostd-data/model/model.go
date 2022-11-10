@@ -1,6 +1,9 @@
 package model
 
 import (
+	"encoding/base64"
+	"encoding/binary"
+	"fmt"
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -48,4 +51,26 @@ type OffsetSize struct {
 	Offset uint64
 	// Size is the size of the block data (not the whole section)
 	Size uint64
+}
+
+func (ofsz *OffsetSize) MarshallBase64() string {
+	buf := make([]byte, 2*binary.MaxVarintLen64)
+	n := binary.PutUvarint(buf, ofsz.Offset)
+	n += binary.PutUvarint(buf[n:], ofsz.Size)
+	return base64.StdEncoding.EncodeToString(buf[:n])
+}
+
+func (ofsz *OffsetSize) UnmarshallBase64(str string) error {
+	buf, err := base64.StdEncoding.DecodeString(str)
+	if err != nil {
+		return fmt.Errorf("decoding offset/size from base64 string: %w", err)
+	}
+
+	offset, n := binary.Uvarint(buf)
+	size, _ := binary.Uvarint(buf[n:])
+
+	ofsz.Offset = offset
+	ofsz.Size = size
+
+	return nil
 }
