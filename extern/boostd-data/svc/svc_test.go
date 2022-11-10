@@ -173,7 +173,8 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service) {
 
 	var idxs []index.Index
 	for i := 0; i < 10; i++ {
-		idxs = append(idxs, createCarIndex(t))
+		size := (5 + (i % 3)) << 20
+		idxs = append(idxs, createCarIndex(t, size, i+1))
 	}
 
 	throttle := make(chan struct{}, 64)
@@ -219,20 +220,22 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service) {
 					continue
 				}
 
+				idx := idx
+				c := r.Cid
 				throttle <- struct{}{}
-				mhash := r.Cid.Hash()
 				offsetEG.Go(func() error {
 					defer func() { <-throttle }()
 
+					mhash := c.Hash()
 					var err error
-					idx.GetAll(r.Cid, func(expected uint64) bool {
+					idx.GetAll(c, func(expected uint64) bool {
 						var offsetSize *model.OffsetSize
 						offsetSize, err = cl.GetOffsetSize(ctx, pieceCid, mhash)
 						if err != nil {
 							return false
 						}
 						if expected != offsetSize.Offset {
-							err = fmt.Errorf("cid %s: expected offset %d, got offset %d", r.Cid, expected, offsetSize.Offset)
+							err = fmt.Errorf("cid %s: expected offset %d, got offset %d", c, expected, offsetSize.Offset)
 							return false
 						}
 						return true
@@ -272,11 +275,8 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service) {
 	require.NoError(t, err)
 }
 
-func createCarIndex(t *testing.T) index.Index {
+func createCarIndex(t *testing.T, size int, rseed int) index.Index {
 	// Create a CAR file
-	rseed := rand.Int()
-	size := (5 + rand.Intn(3)) << 20
-
 	randomFilePath, err := testutil.CreateRandomFile(t.TempDir(), rseed, size)
 	require.NoError(t, err)
 	_, carFilePath, err := testutil.CreateDenseCARv2(t.TempDir(), randomFilePath)
