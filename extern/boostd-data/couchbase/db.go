@@ -322,13 +322,8 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 			if err != nil {
 				return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
 			}
-		} else {
-			if !isNotFoundErr(err) {
-				return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
-			}
-			// there isn't yet any metadata, so create new metadata
-			pieceMetaExists = false
-			md = CouchbaseMetadata{}
+		} else if !isNotFoundErr(err) {
+			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
 		}
 
 		// Check if the deal has already been added
