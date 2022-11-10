@@ -81,7 +81,11 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	// Get the existing deals for the piece
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
-		return err
+		if !errors.Is(err, ds.ErrNotFound) {
+			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
+		}
+		// there isn't yet any metadata, so create new metadata
+		md = LeveldbMetadata{}
 	}
 
 	// Check if the deal has already been added
