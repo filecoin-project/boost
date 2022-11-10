@@ -204,7 +204,7 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Reco
 }
 
 // SetPieceCidToMetadata
-func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md model.Metadata) error {
+func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md LeveldbMetadata) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.set_piece_cid_to_metadata")
 	defer span.End()
 
@@ -219,11 +219,11 @@ func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md mo
 }
 
 // GetPieceCidToMetadata
-func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (LeveldbMetadata, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.get_piece_cid_to_metadata")
 	defer span.End()
 
-	var metadata model.Metadata
+	var metadata LeveldbMetadata
 
 	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
 
