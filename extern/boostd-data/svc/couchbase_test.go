@@ -21,13 +21,13 @@ func XTestCouchbaseService(t *testing.T) {
 	defer removeContainer()
 
 	bdsvc := NewCouchbase(testCouchSettings)
-	addr, err := bdsvc.Start(context.Background())
+	err := bdsvc.Start(context.Background(), 8042)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), "http://"+addr)
+	err = cl.Dial(context.Background(), "http://localhost:8042")
 	defer cl.Close(context.Background())
 	if err != nil {
 		t.Fatal(err)

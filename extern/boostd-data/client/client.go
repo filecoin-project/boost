@@ -38,7 +38,7 @@ func (s *Store) Dial(ctx context.Context, addr string) error {
 	var err error
 	s.closer, err = jsonrpc.NewClient(ctx, addr, "boostddata", &s.client, nil)
 	if err != nil {
-		return fmt.Errorf("dialing boostd-data server: %w", err)
+		return fmt.Errorf("dialing piece directory server: %w", err)
 	}
 	return nil
 }

@@ -13,6 +13,7 @@ import (
 var (
 	repopath string
 	db       string
+	port     int
 
 	log = logging.Logger("boostd-data")
 )
@@ -20,8 +21,9 @@ var (
 func init() {
 	logging.SetLogLevel("*", "debug")
 
-	flag.StringVar(&db, "db", "", "db type for boostd-data (couchbase or ldb)")
+	flag.StringVar(&db, "db", "", "db type for piece directory (couchbase or ldb)")
 	flag.StringVar(&repopath, "repopath", "", "path for repo")
+	flag.IntVar(&port, "port", 8042, "port to run the service on")
 }
 
 func main() {
@@ -32,7 +34,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = bdsvc.Start(ctx)
+	err = bdsvc.Start(ctx, port)
 	if err != nil {
 		log.Fatal(err)
 	}

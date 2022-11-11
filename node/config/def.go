@@ -82,6 +82,8 @@ func DefaultBoost() *Boost {
 				PieceOffsetsBucket:      PieceDirectoryCouchbaseBucketConfig{},
 			},
 			ParallelAddIndexLimit: 4,
+			EmbeddedServicePort:   8042,
+			ServiceApiInfo:        "",
 		},
 
 		Dealmaking: DealmakingConfig{

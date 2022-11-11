@@ -61,11 +61,11 @@ func TestPieceMeta(t *testing.T) {
 }
 
 func testPieceMetaBlockstoreMethods(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
-	addr, err := bdsvc.Start(ctx)
+	err := bdsvc.Start(ctx, 8042)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(ctx, "http://"+addr)
+	err = cl.Dial(ctx, "http://localhost:8042")
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
