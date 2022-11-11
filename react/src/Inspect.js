@@ -131,7 +131,7 @@ function PieceStatus({pieceCid, pieceStatus}) {
                 </tbody>
             </table>
 
-            <h3>Piece Store</h3>
+            <h3>Piece Directory</h3>
             {pieceStatus.PieceInfoDeals.length ? (
                 <table className="deals">
                     <tbody>
@@ -154,11 +154,11 @@ function PieceStatus({pieceCid, pieceStatus}) {
                     </tbody>
                 </table>
             ) : (
-                <p>No data found in piece store for piece CID {pieceCid}</p>
+                <p>No deals found in piece directory for piece CID {pieceCid}</p>
             )}
 
             <h3>Deals</h3>
-            {pieceStatus.PieceInfoDeals.length ? (
+            {pieceStatus.Deals.length ? (
                 <table className="deals">
                     <tbody>
                     <tr>

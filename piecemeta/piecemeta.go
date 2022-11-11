@@ -45,6 +45,7 @@ type Store interface {
 	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
 	GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, error)
 	GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error)
+	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
 	GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error)
 	PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error)
 	MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error
@@ -82,6 +83,14 @@ func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, id abi.Sect
 	defer span.End()
 
 	return s.SectorAccessor.UnsealSectorAt(ctx, id, offset.Unpadded(), length.Unpadded())
+}
+
+// Get all metadata about a particular piece
+func (ps *PieceMeta) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_metadata")
+	defer span.End()
+
+	return ps.store.GetPieceMetadata(ctx, pieceCid)
 }
 
 // Get the list of deals (and the sector the data is in) for a particular piece

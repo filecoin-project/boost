@@ -219,6 +219,21 @@ func (mr *MockStoreMockRecorder) GetPieceDeals(arg0, arg1 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPieceDeals", reflect.TypeOf((*MockStore)(nil).GetPieceDeals), arg0, arg1)
 }
 
+// GetPieceMetadata mocks base method.
+func (m *MockStore) GetPieceMetadata(arg0 context.Context, arg1 cid.Cid) (model.Metadata, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPieceMetadata", arg0, arg1)
+	ret0, _ := ret[0].(model.Metadata)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPieceMetadata indicates an expected call of GetPieceMetadata.
+func (mr *MockStoreMockRecorder) GetPieceMetadata(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPieceMetadata", reflect.TypeOf((*MockStore)(nil).GetPieceMetadata), arg0, arg1)
+}
+
 // IsIndexed mocks base method.
 func (m *MockStore) IsIndexed(arg0 context.Context, arg1 cid.Cid) (bool, error) {
 	m.ctrl.T.Helper()
@@ -248,17 +263,17 @@ func (mr *MockStoreMockRecorder) MarkIndexErrored(arg0, arg1, arg2 interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkIndexErrored", reflect.TypeOf((*MockStore)(nil).MarkIndexErrored), arg0, arg1, arg2)
 }
 
-// PiecesContaining mocks base method.
+// PiecesContainingMultihash mocks base method.
 func (m *MockStore) PiecesContainingMultihash(arg0 context.Context, arg1 multihash.Multihash) ([]cid.Cid, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PiecesContaining", arg0, arg1)
+	ret := m.ctrl.Call(m, "PiecesContainingMultihash", arg0, arg1)
 	ret0, _ := ret[0].([]cid.Cid)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// PiecesContaining indicates an expected call of PiecesContaining.
+// PiecesContainingMultihash indicates an expected call of PiecesContainingMultihash.
 func (mr *MockStoreMockRecorder) PiecesContainingMultihash(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PiecesContaining", reflect.TypeOf((*MockStore)(nil).PiecesContainingMultihash), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PiecesContainingMultihash", reflect.TypeOf((*MockStore)(nil).PiecesContainingMultihash), arg0, arg1)
 }
