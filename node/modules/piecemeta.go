@@ -35,12 +35,26 @@ func NewPieceMetaStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.Loc
 		var svcCtx context.Context
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
+				if cfg.PieceDirectory.ServiceApiInfo != "" {
+					return client.Dial(ctx, cfg.PieceDirectory.ServiceApiInfo)
+				}
+
+				port := int(cfg.PieceDirectory.EmbeddedServicePort)
+				if port == 0 {
+					return fmt.Errorf("starting piece directory client:" +
+						"either PieceDirectory.ServiceApiInfo must be defined or " +
+						"PieceDirectory.EmbeddedServicePort must be non-zero")
+				}
+
 				svcCtx, cancel = context.WithCancel(ctx)
 
 				var bdsvc *svc.Service
 				if cfg.PieceDirectory.Couchbase.ConnectString != "" {
+					log.Infow("piece-directory: connecting to couchbase server",
+						"connect-string", cfg.PieceDirectory.Couchbase.ConnectString)
+
 					// If the couchbase connect string is defined, set up a
-					// couchbase client
+					// piece directory service that connects to the couchbase db
 					bdsvc = svc.NewCouchbase(couchbase.DBSettings{
 						ConnectString: cfg.PieceDirectory.Couchbase.ConnectString,
 						Auth: couchbase.DBSettingsAuth{
@@ -58,19 +72,24 @@ func NewPieceMetaStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.Loc
 						},
 					})
 				} else {
-					// Setup a leveldb client
+					log.Infow("piece-directory: connecting to leveldb instance")
+
+					// Setup a piece directory service that connects to the leveldb
 					var err error
 					bdsvc, err = svc.NewLevelDB(r.Path())
 					if err != nil {
 						return fmt.Errorf("creating leveldb piece directory: %w", err)
 					}
 				}
-				addr, err := bdsvc.Start(svcCtx)
+
+				// Start the embedded piece directory service
+				err := bdsvc.Start(svcCtx, port)
 				if err != nil {
 					return fmt.Errorf("starting piece directory service: %w", err)
 				}
 
-				return client.Dial(ctx, "http://"+addr)
+				// Connect to the embedded service
+				return client.Dial(ctx, fmt.Sprintf("http://localhost:%d", port))
 			},
 			OnStop: func(ctx context.Context) error {
 				cancel()

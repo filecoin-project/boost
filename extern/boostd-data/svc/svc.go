@@ -49,16 +49,16 @@ func MakeLevelDBDir(repoPath string) (string, error) {
 	return repoPath, nil
 }
 
-func (s *Service) Start(ctx context.Context) (string, error) {
-	addr := "localhost:0"
+func (s *Service) Start(ctx context.Context, port int) error {
+	addr := fmt.Sprintf("localhost:%d", port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return "", fmt.Errorf("setting up listener for boostd-data service: %w", err)
+		return fmt.Errorf("setting up listener for piece directory service: %w", err)
 	}
 
 	err = s.impl.Start(ctx)
 	if err != nil {
-		return "", fmt.Errorf("starting boostd-data service: %w", err)
+		return fmt.Errorf("starting piece directory service: %w", err)
 	}
 
 	server := jsonrpc.NewServer()
@@ -67,13 +67,13 @@ func (s *Service) Start(ctx context.Context) (string, error) {
 	router.Handle("/", server)
 
 	srv := &http.Server{Handler: router}
-	log.Infow("boost-data server is listening", "addr", ln.Addr())
+	log.Infow("piece directory server is listening", "addr", ln.Addr())
 
 	done := make(chan struct{})
 	go func() {
 		err = srv.Serve(ln)
 		if err != nil && err != http.ErrServerClosed {
-			log.Errorf("exiting boost-data server: %s", err)
+			log.Errorf("exiting piece directory server: %s", err)
 		}
 
 		done <- struct{}{}
@@ -87,11 +87,11 @@ func (s *Service) Start(ctx context.Context) (string, error) {
 		defer cancel()
 
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			log.Errorf("shutting down boost-data server: %s", err)
+			log.Errorf("shutting down piece directory server: %s", err)
 		}
 
 		<-done
 	}()
 
-	return ln.Addr().String(), nil
+	return nil
 }

@@ -444,6 +444,21 @@ The add index operation is executed when a new deal is created - it fetches
 the piece from the sealing subsystem, creates an index of where each block
 is in the piece, and adds the index to the piece directory.`,
 		},
+		{
+			Name: "EmbeddedServicePort",
+			Type: "uint64",
+
+			Comment: `The port that the embedded piece directory service runs on.
+Set this value to zero to disable the embedded piece directory service
+(the piece directory service must be running externally)`,
+		},
+		{
+			Name: "ServiceApiInfo",
+			Type: "string",
+
+			Comment: `The connect string for the piece directory service RPC API
+Set this value to "" if the piece directory service is embedded.`,
+		},
 	},
 	"PieceDirectoryCouchbaseBucketConfig": []DocField{
 		{

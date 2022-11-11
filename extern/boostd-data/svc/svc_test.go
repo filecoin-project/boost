@@ -66,11 +66,11 @@ func TestService(t *testing.T) {
 }
 
 func testService(ctx context.Context, t *testing.T, bdsvc *Service) {
-	addr, err := bdsvc.Start(ctx)
+	err := bdsvc.Start(ctx, 8042)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(ctx, "http://"+addr)
+	err = cl.Dial(context.Background(), "http://localhost:8042")
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
@@ -163,11 +163,11 @@ func TestServiceFuzz(t *testing.T) {
 }
 
 func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service) {
-	addr, err := bdsvc.Start(ctx)
+	err := bdsvc.Start(ctx, 8042)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(ctx, "http://"+addr)
+	err = cl.Dial(context.Background(), "http://localhost:8042")
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
