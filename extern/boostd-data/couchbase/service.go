@@ -69,7 +69,8 @@ func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err erro
 		log.Debugw("handled.mark-piece-index-errored", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	return s.db.MarkIndexErrored(ctx, pieceCid, err)
+	err = s.db.MarkIndexErrored(ctx, pieceCid, err)
+	return normalizePieceCidError(pieceCid, err)
 }
 
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
@@ -84,10 +85,31 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
+		err = normalizePieceCidError(pieceCid, err)
 		return nil, fmt.Errorf("getting piece metadata for piece %s: %w", pieceCid, err)
 	}
 
-	return s.db.GetOffsetSize(ctx, pieceCid, hash, md.BlockCount)
+	ofsz, err := s.db.GetOffsetSize(ctx, pieceCid, hash, md.BlockCount)
+	return ofsz, normalizePieceCidError(pieceCid, err)
+}
+
+func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+	log.Debugw("handle.get-piece-metadata", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.get_piece_metadata")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.get-piece-metadata", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		err = normalizePieceCidError(pieceCid, err)
+		return model.Metadata{}, fmt.Errorf("getting piece metadata for piece %s: %w", pieceCid, err)
+	}
+
+	return md.Metadata, nil
 }
 
 func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
@@ -102,6 +124,7 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
+		err = normalizePieceCidError(pieceCid, err)
 		return nil, fmt.Errorf("getting piece deals for piece %s: %w", pieceCid, err)
 	}
 
@@ -119,7 +142,8 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 		log.Debugw("handled.pieces-containing-mh", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	return s.db.GetPieceCidsByMultihash(ctx, m)
+	pcids, err := s.db.GetPieceCidsByMultihash(ctx, m)
+	return pcids, normalizeMultihashError(m, err)
 }
 
 func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
@@ -137,11 +161,13 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
+		err = normalizePieceCidError(pieceCid, err)
 		return nil, fmt.Errorf("getting piece cid %s metadata: %w", pieceCid, err)
 	}
 
 	records, err := s.db.AllRecords(ctx, pieceCid, md.BlockCount)
 	if err != nil {
+		err = normalizePieceCidError(pieceCid, err)
 		return nil, fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
 	}
 
@@ -239,4 +265,24 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 func toStripedLockIndex(pieceCid cid.Cid) uint16 {
 	bz := pieceCid.Bytes()
 	return binary.BigEndian.Uint16(bz[len(bz)-2:]) % stripedLockSize
+}
+
+func normalizePieceCidError(pieceCid cid.Cid, err error) error {
+	if err == nil {
+		return nil
+	}
+	if isNotFoundErr(err) {
+		return fmt.Errorf("piece %s: %s", pieceCid, types.ErrNotFound)
+	}
+	return err
+}
+
+func normalizeMultihashError(m mh.Multihash, err error) error {
+	if err == nil {
+		return nil
+	}
+	if isNotFoundErr(err) {
+		return fmt.Errorf("multihash %s: %s", m, types.ErrNotFound)
+	}
+	return err
 }

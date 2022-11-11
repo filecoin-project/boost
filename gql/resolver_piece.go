@@ -2,14 +2,11 @@ package gql
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/filecoin-project/dagstore"
-	"github.com/filecoin-project/dagstore/shard"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
@@ -98,9 +95,9 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 		return nil, fmt.Errorf("%s is not a valid piece cid", args.PieceCid)
 	}
 
-	// Get sector info from PieceStore
-	pieceInfo, err := r.ps.GetPieceInfo(pieceCid)
-	if err != nil && !errors.Is(err, retrievalmarket.ErrNotFound) {
+	// Get piece info from piece directory
+	pieceInfo, err := r.pieceMeta.GetPieceMetadata(ctx, pieceCid)
+	if err != nil && !types.IsNotFound(err) {
 		return nil, err
 	}
 
@@ -123,12 +120,12 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 		}
 	}
 
-	// Convert piece info deals to graphQL format
+	// Convert piece directory deals to graphQL format
 	var pids []*pieceInfoDeal
 	for _, dl := range pieceInfo.Deals {
 		// Check the sealing status of each deal
 		errMsg := ""
-		isUnsealed, err := r.sa.IsUnsealed(ctx, dl.SectorID, dl.Offset.Unpadded(), dl.Length.Unpadded())
+		isUnsealed, err := r.sa.IsUnsealed(ctx, dl.SectorID, dl.PieceOffset.Unpadded(), dl.PieceLength.Unpadded())
 		if err != nil {
 			errMsg = err.Error()
 		}
@@ -138,11 +135,11 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 				IsUnsealed: isUnsealed,
 				Error:      errMsg,
 			},
-			ChainDealID: gqltypes.Uint64(dl.DealID),
+			ChainDealID: gqltypes.Uint64(dl.ChainDealID),
 			Sector: &sectorResolver{
 				ID:     gqltypes.Uint64(dl.SectorID),
-				Offset: gqltypes.Uint64(dl.Offset),
-				Length: gqltypes.Uint64(dl.Length),
+				Offset: gqltypes.Uint64(dl.PieceOffset),
+				Length: gqltypes.Uint64(dl.PieceLength),
 			},
 		})
 	}
@@ -223,7 +220,7 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 		})
 	}
 
-	// Get the state of the piece in the DAG store
+	// Get the state of the piece
 	idxStatus, err := r.getIndexStatus(ctx, pieceCid, deals)
 	if err != nil {
 		return nil, err
@@ -238,24 +235,23 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 }
 
 func (r *resolver) getIndexStatus(ctx context.Context, pieceCid cid.Cid, deals []*pieceDealResolver) (*indexStatus, error) {
-	si, err := r.dagst.GetShardInfo(shard.KeyFromCID(pieceCid))
-	if err != nil && !errors.Is(err, dagstore.ErrShardUnknown) {
-		return nil, err
-	}
-	idxst := IndexStatusUnknown
+	var idxst IndexStatus
 	idxerr := ""
+
+	md, err := r.pieceMeta.GetPieceMetadata(ctx, pieceCid)
 	switch {
-	case err != nil && errors.Is(err, dagstore.ErrShardUnknown):
+	case err != nil && types.IsNotFound(err):
 		idxst = IndexStatusNotFound
-	case si.ShardState == dagstore.ShardStateNew, si.ShardState == dagstore.ShardStateInitializing:
-		idxst = IndexStatusRegistered
-	case si.ShardState == dagstore.ShardStateAvailable, si.ShardState == dagstore.ShardStateServing:
-		idxst = IndexStatusComplete
-	case si.ShardState == dagstore.ShardStateErrored, si.ShardState == dagstore.ShardStateRecovering:
+	case err != nil:
 		idxst = IndexStatusFailed
-		if si.Error != nil {
-			idxerr = si.Error.Error()
-		}
+		idxerr = err.Error()
+	case md.Error != "":
+		idxst = IndexStatusFailed
+		idxerr = md.ErrorType + ": " + md.Error
+	case md.IndexedAt.IsZero():
+		idxst = IndexStatusRegistered
+	default:
+		idxst = IndexStatusComplete
 	}
 
 	// Try retrieving the piece payload cid as a means to check if the
@@ -267,8 +263,8 @@ func (r *resolver) getIndexStatus(ctx context.Context, pieceCid cid.Cid, deals [
 			// This should never happen, but check just in case
 			return nil, fmt.Errorf("parsing retrieved deal data root cid %s: %w", cidstr, err)
 		}
-		ks, err := r.dagst.ShardsContainingMultihash(ctx, c.Hash())
-		if err != nil || len(ks) == 0 {
+		pieces, err := r.pieceMeta.PiecesContainingMultihash(ctx, c.Hash())
+		if err != nil || len(pieces) == 0 {
 			idxst = IndexStatusFailed
 			idxerr = fmt.Sprintf("unable to resolve piece's root payload cid %s to piece cid", cidstr)
 		}

@@ -16,6 +16,7 @@ import (
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
+	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
@@ -49,18 +50,18 @@ func TestPieceMeta(t *testing.T) {
 	t.Run("level db", func(t *testing.T) {
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
-		testPieceMetaBlockstoreMethods(ctx, t, bdsvc)
+		testPieceMeta(ctx, t, bdsvc)
 	})
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container as part of the test
 		t.Skip()
 		bdsvc := svc.NewCouchbase(testCouchSettings)
-		testPieceMetaBlockstoreMethods(ctx, t, bdsvc)
+		testPieceMeta(ctx, t, bdsvc)
 	})
 }
 
-func testPieceMetaBlockstoreMethods(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
+func testPieceMeta(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
 	err := bdsvc.Start(ctx, 8042)
 	require.NoError(t, err)
 
@@ -69,13 +70,46 @@ func testPieceMetaBlockstoreMethods(ctx context.Context, t *testing.T, bdsvc *sv
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
-	t.Run("basic", func(t *testing.T) {
+	t.Run("not found", func(t *testing.T) {
+		testPieceMetaNotFound(ctx, t, cl)
+	})
+
+	t.Run("basic blockstore", func(t *testing.T) {
 		testBasicBlockstoreMethods(ctx, t, cl)
 	})
 
 	t.Run("imported index", func(t *testing.T) {
 		testImportedIndex(ctx, t, cl)
 	})
+}
+
+func testPieceMetaNotFound(ctx context.Context, t *testing.T, cl *client.Store) {
+	ctrl := gomock.NewController(t)
+	pr := mock_piecemeta.NewMockPieceReader(ctrl)
+	pm := piecemeta.NewPieceMeta(cl, pr, 1)
+
+	nonExistentPieceCid, err := cid.Parse("bafkqaaa")
+	require.NoError(t, err)
+
+	_, err = pm.GetPieceMetadata(ctx, nonExistentPieceCid)
+	require.True(t, types.IsNotFound(err))
+	require.Error(t, err)
+
+	_, err = pm.GetPieceDeals(ctx, nonExistentPieceCid)
+	require.True(t, types.IsNotFound(err))
+	require.Error(t, err)
+
+	_, err = pm.GetOffsetSize(ctx, nonExistentPieceCid, nonExistentPieceCid.Hash())
+	require.True(t, types.IsNotFound(err))
+	require.Error(t, err)
+
+	_, err = pm.GetIterableIndex(ctx, nonExistentPieceCid)
+	require.True(t, types.IsNotFound(err))
+	require.Error(t, err)
+
+	_, err = pm.PiecesContainingMultihash(ctx, nonExistentPieceCid.Hash())
+	require.True(t, types.IsNotFound(err))
+	require.Error(t, err)
 }
 
 // Verify that Has, GetSize and Get block work

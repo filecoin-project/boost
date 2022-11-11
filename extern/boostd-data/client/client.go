@@ -22,6 +22,7 @@ type Store struct {
 		IsIndexed                 func(ctx context.Context, pieceCid cid.Cid) (bool, error)
 		GetIndex                  func(context.Context, cid.Cid) ([]model.Record, error)
 		GetOffsetSize             func(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
+		GetPieceMetadata          func(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
 		GetPieceDeals             func(context.Context, cid.Cid) ([]model.DealInfo, error)
 		MarkIndexErrored          func(context.Context, cid.Cid, error) error
 		IndexedAt                 func(context.Context, cid.Cid) (time.Time, error)
@@ -81,6 +82,10 @@ func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Recor
 	log.Debugw("get-records", "piece-cid", pieceCid, "records", len(resp))
 
 	return resp, nil
+}
+
+func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+	return s.client.GetPieceMetadata(ctx, pieceCid)
 }
 
 func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {

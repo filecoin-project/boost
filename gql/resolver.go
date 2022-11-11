@@ -10,13 +10,13 @@ import (
 	"github.com/filecoin-project/boost/fundmanager"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/piecemeta"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
-	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
@@ -54,13 +54,13 @@ type resolver struct {
 	legacyDT   lotus_dtypes.ProviderDataTransfer
 	ps         piecestore.PieceStore
 	sa         retrievalmarket.SectorAccessor
-	dagst      dagstore.Interface
+	pieceMeta  *piecemeta.PieceMeta
 	publisher  *storageadapter.DealPublisher
 	spApi      sealingpipeline.API
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, pieceMeta *piecemeta.PieceMeta, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		cfg:        cfg,
 		repo:       r,
@@ -76,7 +76,7 @@ func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsD
 		legacyDT:   legacyDT,
 		ps:         ps,
 		sa:         sa,
-		dagst:      dagst,
+		pieceMeta:  pieceMeta,
 		publisher:  publisher,
 		spApi:      spApi,
 		fullNode:   fullNode,
