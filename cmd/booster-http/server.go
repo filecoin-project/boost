@@ -246,12 +246,11 @@ func (s *HttpServer) handleBlockRequest(w http.ResponseWriter, r *http.Request) 
 	utf8Name := url.PathEscape(blockCidStr)
 	asciiName := url.PathEscape(regexp.MustCompile("[[:^ascii:]]").ReplaceAllLiteralString(blockCidStr, "_"))
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", asciiName, utf8Name))
-	w.Header().Set("Content-Type", "application/vnd.ipld.raw")
 	w.Header().Set("X-Content-Type-Options", "nosniff") // no funny business in the browsers :^)
 
 	b := bytes.NewReader(data)
 
-	serveContent(w, r, b, "application/octet-stream")
+	serveContent(w, r, b, "application/vnd.ipld.raw")
 	stats.Record(ctx, metrics.HttpBlockByCid200ResponseCount.M(1))
 	stats.Record(ctx, metrics.HttpBlockByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
