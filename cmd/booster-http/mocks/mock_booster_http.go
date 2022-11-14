@@ -39,6 +39,7 @@ func (m *MockHttpServerApi) EXPECT() *MockHttpServerApiMockRecorder {
 	return m.recorder
 }
 
+<<<<<<< HEAD
 // GetBlockByCid mocks base method.
 func (m *MockHttpServerApi) GetBlockByCid(ctx context.Context, blockCid cid.Cid) ([]byte, error) {
 	m.ctrl.T.Helper()
@@ -57,6 +58,11 @@ func (mr *MockHttpServerApiMockRecorder) GetBlockByCid(ctx, blockCid interface{}
 // GetCarSize mocks base method.
 func (m *MockHttpServerApi) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
 	m.ctrl.T.Helper()
+=======
+// GetCarSize mocks base method.
+func (m *MockHttpServerApi) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
+	m.ctrl.T.Helper()
+>>>>>>> 7b31cb5 (refactor: merge piece directory into booster-http)
 	ret := m.ctrl.Call(m, "GetCarSize", ctx, pieceCid)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(error)

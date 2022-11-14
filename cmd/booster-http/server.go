@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/boostd-data/model"
-
 	"github.com/NYTimes/gziphandler"
 	"github.com/fatih/color"
 	"github.com/filecoin-project/boost/metrics"

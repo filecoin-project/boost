@@ -3,6 +3,7 @@ package main
 import (
 	"compress/gzip"
 	"context"
+	"github.com/filecoin-project/boostd-data/model"
 	"io"
 	"net/http"
 	"os"
