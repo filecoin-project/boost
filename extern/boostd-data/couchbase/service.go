@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	mh "github.com/multiformats/go-multihash"
@@ -274,6 +275,99 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	}
 
 	return md.IndexedAt, nil
+}
+
+// Remove Single deal for pieceCID. If []Deals is empty then Metadata is removed as well
+func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid uuid.UUID) error {
+	log.Debugw("handle.remove-deal-for-piece", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.remove-deal-for-piece", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
+	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return err
+	}
+
+	for i, v := range md.Deals {
+		if v.DealUuid == dealUuid {
+			md.Deals[i] = md.Deals[len(md.Deals)-1]
+			md.Deals = md.Deals[:len(md.Deals)-1]
+			break
+		}
+	}
+
+	// Remove Metadata if removed deal was last one. Don't fail even if error is returned
+	if len(md.Deals) == 0 {
+		if err := s.db.RemoveMetadata(ctx, pieceCid); err != nil {
+			log.Errorf("Failed to remove the Metadata after removing the last deal: %w", err)
+		}
+		return nil
+	}
+
+	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Remove all Metadata for pieceCID. To be used manually in case of failure
+// in RemoveDealForPiece
+func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
+	log.Debugw("handle.remove-piece-metadata", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.remove_piece_metadata")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.remove-piece-metadata", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
+	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
+
+	if err := s.db.RemoveMetadata(ctx, pieceCid); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Removes all MultiHashes for pieceCID. To be used manually in case of failure
+// in RemoveDealForPiece or RemovePieceMetadata. Metadata for the piece must be
+// present in the database
+func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
+	log.Debugw("handle.remove-indexes", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.remove_indexes")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handle.remove-indexes", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
+	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return err
+	}
+
+	if err := s.db.RemoveIndexes(ctx, pieceCid, md.BlockCount); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func toStripedLockIndex(pieceCid cid.Cid) uint16 {

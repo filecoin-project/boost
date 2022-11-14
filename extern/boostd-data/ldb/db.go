@@ -358,6 +358,135 @@ func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihas
 	}, nil
 }
 
+// RemoveAllMetadataForPieceCid
+func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.remove_metadata")
+	defer span.End()
+
+	var metadata LeveldbMetadata
+
+	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
+
+	piece, err := db.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(piece, &metadata)
+	if err != nil {
+		return fmt.Errorf("error while reading metadata: %w", err)
+	}
+
+	// Remove all multihashes before, as without Metadata, they are useless
+	// This order is important as metadata.Cursor is required in case RemoveAllRecords fails
+	// and needs to be run manually
+	if err = db.RemoveIndexes(ctx, metadata.Cursor, pieceCid); err != nil {
+		return err
+	}
+
+	// TODO: Requires DB compaction for removing the key
+	if err = db.Delete(ctx, key); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemoveAllRecords
+// It removes multihash -> pieceCid and if empty record is left then multihash -> offset
+// entry is also removed
+func (db *DB) RemoveIndexes(ctx context.Context, cursor uint64, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.remove_indexes")
+	defer span.End()
+
+	buf := make([]byte, binary.MaxVarintLen64)
+	binary.PutUvarint(buf, cursor)
+
+	var q query.Query
+	q.Prefix = fmt.Sprintf("%d/", cursor)
+	results, err := db.Query(ctx, q)
+	if err != nil {
+		return fmt.Errorf("error querying the database:  %w", err)
+	}
+
+	batch, err := db.Batch(ctx)
+	if err != nil {
+		return fmt.Errorf("error in creating batching:  %w", err)
+	}
+
+	for {
+		r, ok := results.NextSync()
+		if !ok {
+			break
+		}
+
+		m := r.Key[len(q.Prefix)+1:]
+
+		err = func() error {
+			key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixMhtoPieceCids, m))
+
+			val, err := db.Get(ctx, key)
+			if err != nil && err != ds.ErrNotFound {
+				return fmt.Errorf("failed to get value for multihash %s, err: %w", m, err)
+			}
+
+			if err == ds.ErrNotFound {
+				return nil
+			}
+
+			var pcids []cid.Cid
+			if err := json.Unmarshal(val, &pcids); err != nil {
+				return fmt.Errorf("failed to unmarshal pieceCids slice: %w", err)
+			}
+
+			if !has(pcids, pieceCid) {
+				return nil
+			}
+
+			if len(pcids) <= 1 {
+				// Remove multihash -> pieceCId (key+value)
+				if err := batch.Delete(ctx, key); err != nil {
+					return fmt.Errorf("failed to batch delete multihash to pieceCid mh=%s, pieceCid=%s err%w", key, pcids[0], err)
+				}
+				return nil
+			}
+
+			// Remove multihash -> pieceCId (value only)
+			for i, v := range pcids {
+				if v == pieceCid {
+					pcids[i] = pcids[len(pcids)-1]
+					pcids[len(pcids)-1] = cid.Undef
+					pcids = pcids[:len(pcids)-1]
+				}
+			}
+
+			b, err := json.Marshal(pcids)
+			if err != nil {
+				return fmt.Errorf("failed to marshal pieceCids slice: %w", err)
+			}
+			if err := batch.Put(ctx, key, b); err != nil {
+				return fmt.Errorf("failed to batch put mh=%s, err%w", m, err)
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return err
+		}
+
+		// Remove (cursor+multihash) -> Offset
+		if err := batch.Delete(ctx, ds.NewKey(r.Key)); err != nil {
+			return fmt.Errorf("failed to batch delete mh=%s, err%w", r.Key, err)
+		}
+	}
+
+	if err := batch.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit batch: %w", err)
+	}
+
+	return nil
+}
+
 func has(list []cid.Cid, v cid.Cid) bool {
 	for _, l := range list {
 		if l.Equals(v) {

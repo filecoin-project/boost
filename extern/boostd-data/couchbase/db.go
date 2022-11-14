@@ -448,6 +448,7 @@ func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash multihas
 // AllRecords gets all the mulithash -> offset/size mappings in a given piece.
 // Note that recordCount is needed in order to determine the shard structure.
 func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid, recordCount int) ([]model.Record, error) {
+	// Implementation not complete
 	ctx, span := tracing.Tracer.Start(ctx, "db.all_records")
 	defer span.End()
 
@@ -584,6 +585,97 @@ func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []mode
 		_, err := db.pieceOffsets.Upsert(cbKey, shardMap, &gocb.UpsertOptions{Context: ctx})
 		if err != nil {
 			return fmt.Errorf("adding offset / sizes for piece %s: %w", pieceCid, err)
+		}
+	}
+
+	return nil
+}
+
+// RemoveAllMetadataForPieceCid
+func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.remove_metadata")
+	defer span.End()
+
+	k := toCouchKey(pieceCid.String())
+	metadata, err := db.GetPieceCidToMetadata(ctx, pieceCid)
+
+	// Remove all multihashes before, as without Metadata, they are useless
+	// This order is important as metadata.Cursor is required in case RemoveAllRecords fails
+	// and needs to be run manually
+	if err = db.RemoveIndexes(ctx, pieceCid, metadata.BlockCount); err != nil {
+		return err
+	}
+
+	_, err = db.pcidToMeta.Remove(k, &gocb.RemoveOptions{Context: ctx})
+	if err != nil {
+		return fmt.Errorf("removing piece %s metadata: %w", pieceCid, err)
+	}
+
+	return nil
+}
+
+// RemoveAllRecords
+func (db *DB) RemoveIndexes(ctx context.Context, pieceCid cid.Cid, recordCount int) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.remove_indexes")
+	defer span.End()
+
+	// Get the number of shards
+	_, totalShards := getShardPrefixBitCount(recordCount)
+	for i := 0; i < totalShards; i++ {
+		// Get the map of multihash -> offset/size for the shard
+		shardPrefix, err := getShardPrefix(i)
+		if err != nil {
+			return err
+		}
+		cbKey := toCouchKey(pieceCid.String() + shardPrefix)
+		cbMap := db.pieceOffsets.Map(cbKey)
+		recMap, err := cbMap.Iterator()
+		if err != nil {
+			if isNotFoundErr(err) {
+				// If there are no records in a particular shard just skip the shard
+				continue
+			}
+			fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
+		}
+
+		// Get each value in the map
+		for mhStr, _ := range recMap {
+			cbKey := toCouchKey(mhStr)
+			getResult, err := db.mhToPieces.Get(cbKey, &gocb.GetOptions{Context: ctx})
+			if err != nil {
+				return nil
+			}
+			var cidStrs []string
+			err = getResult.Content(&cidStrs)
+			if err != nil {
+				return err
+			}
+			if len(cidStrs) <= 1 {
+				_, err = db.mhToPieces.Remove(mhStr, &gocb.RemoveOptions{Context: ctx})
+				if err != nil {
+					return err
+				}
+			}
+
+			// Remove multihash -> pieceCId (value only)
+			for i, v := range cidStrs {
+				if v == pieceCid.String() {
+					cidStrs[i] = cidStrs[len(cidStrs)-1]
+					cidStrs[len(cidStrs)-1] = ""
+					cidStrs = cidStrs[:len(cidStrs)-1]
+				}
+			}
+
+			_, err = db.mhToPieces.Upsert(cbKey, cidStrs, &gocb.UpsertOptions{Context: ctx})
+			if err != nil {
+				return fmt.Errorf("removing multihash %s to piece %s: update doc: %w", mhStr, pieceCid, err)
+			}
+		}
+		// Add the piece cid to the set of piece cids
+
+		_, err = db.pieceOffsets.Remove(cbKey, &gocb.RemoveOptions{Context: ctx})
+		if err != nil {
+			return err
 		}
 	}
 

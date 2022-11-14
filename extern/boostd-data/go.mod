@@ -20,6 +20,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/stretchr/testify v1.8.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
+	go.opentelemetry.io/otel v1.9.0
 	golang.org/x/net v0.0.0-20220920183852-bf014ff85ad5
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 )
@@ -102,7 +103,6 @@ require (
 	github.com/whyrusleeping/cbor-gen v0.0.0-20220323183124-98fa8256a799 // indirect
 	github.com/whyrusleeping/chunker v0.0.0-20181014151217-fe64bd25879f // indirect
 	go.opencensus.io v0.23.0 // indirect
-	go.opentelemetry.io/otel v1.9.0 // indirect
 	go.opentelemetry.io/otel/bridge/opencensus v0.31.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.2.0 // indirect
 	go.opentelemetry.io/otel/metric v0.31.0 // indirect
