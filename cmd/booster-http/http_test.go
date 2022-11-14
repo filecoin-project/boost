@@ -97,3 +97,30 @@ func TestHttpGzipResponse(t *testing.T) {
 	err = httpServer.Stop()
 	require.NoError(t, err)
 }
+
+func TestBlockRetrieval(t *testing.T) {
+	//Create a new mock Http server with custom functions
+	ctrl := gomock.NewController(t)
+	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
+	httpServer := NewHttpServer("", 7777, false, mockHttpServer)
+	httpServer.Start(context.Background())
+
+	data := []byte("Hello World!")
+
+	mockHttpServer.EXPECT().GetBlockByCid(gomock.Any(), gomock.Any()).AnyTimes().Return(data, nil)
+
+	// Create a client and make request with Encoding header
+	client := new(http.Client)
+	request, err := http.NewRequest("GET", "http://localhost:7777/block/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
+	require.NoError(t, err)
+
+	response, err := client.Do(request)
+	require.NoError(t, err)
+	defer response.Body.Close()
+
+	out, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+
+	require.Equal(t, data, out)
+
+}
