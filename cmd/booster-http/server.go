@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -68,7 +69,7 @@ func (s *HttpServer) pieceBasePath() string {
 }
 
 func (s *HttpServer) blockBasePath() string {
-	return s.path + "/block/"
+	return s.path + "/ipfs/"
 }
 
 func (s *HttpServer) Start(ctx context.Context) {
@@ -147,7 +148,7 @@ const idxPage = `
           Download a block by CID
         </td>
         <td>
-          <a href="/block/blockCid" > /block/<blockCid></a>
+          <a href="/ipfs/blockCid?filename="ABC" > /block/<blockCid></a>
         </td>
       </tr>
       </tbody>
@@ -242,7 +243,17 @@ func (s *HttpServer) handleBlockRequest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/octet-stream")
+	filename := r.URL.Query().Get("filename")
+	if filename == "" {
+		filename = blockCidStr
+	}
+
+	utf8Name := url.PathEscape(filename)
+	asciiName := url.PathEscape(regexp.MustCompile("[[:^ascii:]]").ReplaceAllLiteralString(filename, "_"))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=\"%s\"; filename*=UTF-8''%s", "attachment", asciiName, utf8Name))
+	w.Header().Set("Content-Type", "application/vnd.ipld.raw")
+	w.Header().Set("X-Content-Type-Options", "nosniff") // no funny business in the browsers :^)
+
 	b := bytes.NewReader(data)
 
 	serveContent(w, r, b, "application/octet-stream")

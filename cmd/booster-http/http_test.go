@@ -3,7 +3,6 @@ package main
 import (
 	"compress/gzip"
 	"context"
-	"github.com/filecoin-project/boostd-data/model"
 	"io"
 	"net/http"
 	"os"
@@ -112,7 +111,7 @@ func TestBlockRetrieval(t *testing.T) {
 
 	// Create a client and make request with Encoding header
 	client := new(http.Client)
-	request, err := http.NewRequest("GET", "http://localhost:7777/block/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
+	request, err := http.NewRequest("GET", "http://localhost:7777/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
 	require.NoError(t, err)
 
 	response, err := client.Do(request)
