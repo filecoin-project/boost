@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/filecoin-project/boostd-data/model"
 	"io"
 	"net"
 	"net/http"

@@ -8,8 +8,9 @@ import (
 	"os"
 	"testing"
 
-	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
 	"github.com/filecoin-project/boostd-data/model"
+
+	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
 	"github.com/golang/mock/gomock"
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
