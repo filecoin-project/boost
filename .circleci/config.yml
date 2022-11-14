@@ -108,8 +108,11 @@ jobs:
         description: Test suite name to report to CircleCI.
     executor: << parameters.executor >>
     steps:
-      - install-deps
       - prepare
+      - restore_cache:
+          name: Restore go mod cache
+          keys:
+            - go-mod-1-18-v1-{{ checksum "go.mod" }}-{{ checksum "go.sum" }}
       - run:
           command: make boostci
           no_output_timeout: 30m
@@ -122,6 +125,11 @@ jobs:
               << parameters.go-test-flags >> \
               << parameters.target >>
           no_output_timeout: 30m
+      - save_cache:
+          name: Save go mod cache
+          key: go-mod-1-18-v1-{{ checksum "go.mod" }}-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
 
   build-macos:
     description: build darwin boost binary
@@ -319,3 +327,4 @@ workflows:
           name: piece-directory
           suite: all
           cwd: "./extern/boostd-data"
+
