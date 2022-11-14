@@ -216,6 +216,10 @@ type DealmakingConfig struct {
 	// - advertise bitswap records to the content indexer
 	// - list bitswap in available transports on the retrieval transport protocol
 	BitswapPeerID string
+
+	// The deal logs older than DealLogDurationDays are deleted from the logsDB
+	// to keep the size of logsDB in check. Set the value as "0" to disable log cleanup
+	DealLogDurationDays int
 }
 
 type FeeConfig struct {

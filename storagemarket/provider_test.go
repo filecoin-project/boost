@@ -637,6 +637,81 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 	}
 }
 
+func TestOfflineDealRestartAfterManualRecoverableErrors(t *testing.T) {
+	ctx := context.Background()
+
+	tcs := []struct {
+		name        string
+		dbuilder    func(h *ProviderHarness) *testDeal
+		expectedErr string
+		onResume    func(builder *testDealBuilder) *testDeal
+	}{{
+		name: "commp mismatch",
+		dbuilder: func(h *ProviderHarness) *testDeal {
+			// Simulate commp mismatch
+			return h.newDealBuilder(t, 1, withOfflineDeal()).withCommpFailing(errors.New("mismatcherr")).build()
+		},
+		expectedErr: "mismatcherr",
+		onResume: func(builder *testDealBuilder) *testDeal {
+			return builder.withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().build()
+		},
+	}}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup the provider test harness
+			harness := NewHarness(t)
+			// start the provider test harness
+			harness.Start(t, ctx)
+			defer harness.Stop()
+
+			// build the deal proposal
+			td := tc.dbuilder(harness)
+
+			_, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
+			require.NoError(t, err)
+
+			// execute deal
+			err = td.executeAndSubscribeImportOfflineDeal()
+			require.NoError(t, err)
+
+			// expect recoverable error with retry type Manual
+			err = td.waitForError(tc.expectedErr, types.DealRetryManual)
+			require.NoError(t, err)
+
+			// shutdown the existing provider and create a new provider
+			harness.shutdownAndCreateNewProvider(t)
+
+			// update the test deal state with the new provider
+			tbuilder := td.updateWithRestartedProvider(harness)
+			td = tc.onResume(tbuilder)
+
+			// start the provider
+			err = harness.Provider.Start()
+			require.NoError(t, err)
+
+			// expect the deal not to have been automatically restarted
+			// (because it was paused with retry set to "manual")
+			require.False(t, harness.Provider.isRunning(td.params.DealUUID))
+
+			// manually retry the deal
+			err = harness.Provider.RetryPausedDeal(td.params.DealUUID)
+			require.NoError(t, err)
+
+			// expect the deal to complete successfully
+			dh := harness.Provider.getDealHandler(td.params.DealUUID)
+			require.NotNil(t, dh)
+			sub, err := dh.subscribeUpdates()
+			require.NoError(t, err)
+			td.sub = sub
+			td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
+
+			// assert funds and storage are no longer tagged
+			harness.EventuallyAssertNoTagged(t, ctx)
+		})
+	}
+}
+
 // Tests scenarios where a deal is paused with an error that the user must
 // resolve by retrying manually, and the user retries the deal
 func TestDealRestartAfterManualRecoverableErrors(t *testing.T) {
@@ -1759,6 +1834,11 @@ func (tbuilder *testDealBuilder) withPublishConfirmFailing(err error) *testDealB
 
 func (tbuilder *testDealBuilder) withAddPieceFailing(err error) *testDealBuilder {
 	tbuilder.msAddPiece = &minerStubCall{err: err}
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withCommpFailing(err error) *testDealBuilder {
+	tbuilder.msCommp = &minerStubCall{err: err}
 	return tbuilder
 }
 

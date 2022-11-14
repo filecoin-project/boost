@@ -8,9 +8,11 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
+	"github.com/NYTimes/gziphandler"
 	"github.com/fatih/color"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/tracing"
@@ -28,6 +30,8 @@ import (
 	"go.opencensus.io/stats"
 )
 
+//go:generate go run github.com/golang/mock/mockgen -destination=mocks/mock_booster_http.go -package=mocks_booster_http -source=server.go HttpServerApi,serverApi
+
 var ErrNotFound = errors.New("not found")
 
 // For data served by the endpoints in the HTTP server that never changes
@@ -36,6 +40,8 @@ var ErrNotFound = errors.New("not found")
 var lastModified = time.UnixMilli(1)
 
 const carSuffix = ".car"
+const pieceCidParam = "pieceCid"
+const payloadCidParam = "payloadCid"
 
 type HttpServer struct {
 	path          string
@@ -60,10 +66,6 @@ func NewHttpServer(path string, port int, allowIndexing bool, api HttpServerApi)
 	return &HttpServer{path: path, port: port, allowIndexing: allowIndexing, api: api}
 }
 
-func (s *HttpServer) payloadBasePath() string {
-	return s.path + "/payload/"
-}
-
 func (s *HttpServer) pieceBasePath() string {
 	return s.path + "/piece/"
 }
@@ -73,8 +75,7 @@ func (s *HttpServer) Start(ctx context.Context) {
 
 	listenAddr := fmt.Sprintf(":%d", s.port)
 	handler := http.NewServeMux()
-	handler.HandleFunc(s.payloadBasePath(), s.handleByPayloadCid)
-	handler.HandleFunc(s.pieceBasePath(), s.handleByPieceCid)
+	handler.HandleFunc(s.pieceBasePath(), s.handlePieceRequest)
 	handler.HandleFunc("/", s.handleIndex)
 	handler.HandleFunc("/index.html", s.handleIndex)
 	handler.Handle("/metrics", metrics.Exporter("booster_http")) // metrics
@@ -112,7 +113,7 @@ const idxPage = `
           Download a raw piece by payload CID
         </td>
         <td>
-          <a href="/payload/payloadcid">/payload/<payload cid></a>
+          <a href="/piece?payloadCid=bafySomePayloadCid&format=piece" > /piece?payloadCid=<payload cid>&format=piece</a>
         </td>
       </tr>
       <tr>
@@ -120,7 +121,7 @@ const idxPage = `
           Download a CAR file by payload CID
         </td>
         <td>
-          <a href="/payload/payloadcid.car">/payload/<payload cid>.car</a>
+          <a href="/piece?payloadCid=bafySomePayloadCid&format=car" > /piece?payloadCid=<payload cid>&format=car</a>
         </td>
       </tr>
       <tr>
@@ -128,7 +129,7 @@ const idxPage = `
           Download a raw piece by piece CID
         </td>
         <td>
-          <a href="/piece/piececid">/piece/<piece cid></a>
+          <a href="/piece?pieceCid=bagaSomePieceCID&format=piece" > /piece?pieceCid=<piece cid>&format=piece</a>
         </td>
       </tr>
       <tr>
@@ -136,7 +137,7 @@ const idxPage = `
           Download a CAR file by piece CID
         </td>
         <td>
-          <a href="/piece/piececid.car">/piece/<piece cid>.car</a>
+          <a href="/piece?pieceCid=bagaSomePieceCID&format=car" > /piece?payloadCid=<piece cid>&format=car</a>
         </td>
       </tr>
       </tbody>
@@ -150,32 +151,60 @@ func (s *HttpServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(idxPage)) //nolint:errcheck
 }
 
-func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) {
+func (s *HttpServer) handlePieceRequest(w http.ResponseWriter, r *http.Request) {
+	q, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		msg := fmt.Sprintf("parsing query: %s", err.Error())
+		writeError(w, r, http.StatusBadRequest, msg)
+		return
+	}
+
+	isCar := false
+
+	if len(q["format"]) == 1 {
+		if q["format"][0] == "car" { // Check if format value is car
+			isCar = true
+		} else if q["format"][0] != "piece" { // Check if format value is not piece
+			writeError(w, r, http.StatusBadRequest, "incorrect `format` query parameter")
+			return
+		}
+	} else if len(q["format"]) == 0 {
+		isCar = false
+	} else { // Error if more than 1 format value
+		writeError(w, r, http.StatusBadRequest, "single `format` query parameter is allowed")
+		return
+	}
+
+	// Check provided cid and format and redirect the request appropriately
+	if len(q[payloadCidParam]) == 1 {
+		payloadCid, err := cid.Parse(q[payloadCidParam][0])
+		if err != nil {
+			msg := fmt.Sprintf("parsing payload CID '%s': %s", q[payloadCidParam][0], err.Error())
+			writeError(w, r, http.StatusBadRequest, msg)
+			stats.Record(r.Context(), metrics.HttpPayloadByCidRequestCount.M(1))
+			return
+		}
+		s.handleByPayloadCid(payloadCid, isCar, w, r)
+	} else if len(q[pieceCidParam]) == 1 {
+		pieceCid, err := cid.Parse(q[pieceCidParam][0])
+		if err != nil {
+			msg := fmt.Sprintf("parsing piece CID '%s': %s", q[pieceCidParam][0], err.Error())
+			writeError(w, r, http.StatusBadRequest, msg)
+			stats.Record(r.Context(), metrics.HttpPieceByCidRequestCount.M(1))
+			return
+		}
+		s.handleByPieceCid(pieceCid, isCar, w, r)
+	} else {
+		writeError(w, r, http.StatusBadRequest, "unsupported query")
+	}
+}
+
+func (s *HttpServer) handleByPayloadCid(payloadCid cid.Cid, isCar bool, w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 	ctx, span := tracing.Tracer.Start(r.Context(), "http.payload_cid")
 	defer span.End()
 
 	stats.Record(ctx, metrics.HttpPayloadByCidRequestCount.M(1))
-
-	// Remove the path up to the payload cid
-	prefixLen := len(s.payloadBasePath())
-	if len(r.URL.Path) <= prefixLen {
-		msg := fmt.Sprintf("path '%s' is missing payload CID", r.URL.Path)
-		writeError(w, r, http.StatusBadRequest, msg)
-		stats.Record(ctx, metrics.HttpPayloadByCid400ResponseCount.M(1))
-		return
-	}
-
-	fileName := r.URL.Path[prefixLen:]
-	isCar := strings.HasSuffix(fileName, carSuffix)
-	payloadCidStr := strings.Replace(fileName, ".car", "", 1)
-	payloadCid, err := cid.Parse(payloadCidStr)
-	if err != nil {
-		msg := fmt.Sprintf("parsing payload CID '%s': %s", payloadCidStr, err.Error())
-		writeError(w, r, http.StatusBadRequest, msg)
-		stats.Record(ctx, metrics.HttpPayloadByCid400ResponseCount.M(1))
-		return
-	}
 
 	// Find all the pieces that contain the payload cid
 	pieces, err := s.api.PiecesContainingMultihash(ctx, payloadCid.Hash())
@@ -187,7 +216,7 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		log.Errorf("getting piece that contains payload CID '%s': %s", payloadCid, err)
-		msg := fmt.Sprintf("server error getting piece that contains payload CID '%s'", payloadCidStr)
+		msg := fmt.Sprintf("server error getting piece that contains payload CID '%s'", payloadCid)
 		writeError(w, r, http.StatusInternalServerError, msg)
 		stats.Record(ctx, metrics.HttpPayloadByCid500ResponseCount.M(1))
 		return
@@ -202,13 +231,13 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 	}
 	if err != nil {
 		if isNotFoundError(err) {
-			msg := fmt.Sprintf("getting content for payload CID %s in piece %s: %s", payloadCidStr, pieceCid, err)
+			msg := fmt.Sprintf("getting content for payload CID %s in piece %s: %s", payloadCid, pieceCid, err)
 			writeError(w, r, http.StatusNotFound, msg)
 			stats.Record(ctx, metrics.HttpPayloadByCid404ResponseCount.M(1))
 			return
 		}
 		log.Errorf("getting content for payload CID %s in piece %s: %s", payloadCid, pieceCid, err)
-		msg := fmt.Sprintf("server error getting content for payload CID %s in piece %s", payloadCidStr, pieceCid)
+		msg := fmt.Sprintf("server error getting content for payload CID %s in piece %s", payloadCid, pieceCid)
 		writeError(w, r, http.StatusInternalServerError, msg)
 		stats.Record(ctx, metrics.HttpPayloadByCid500ResponseCount.M(1))
 		return
@@ -227,33 +256,13 @@ func (s *HttpServer) handleByPayloadCid(w http.ResponseWriter, r *http.Request) 
 	stats.Record(ctx, metrics.HttpPayloadByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
 
-func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
+func (s *HttpServer) handleByPieceCid(pieceCid cid.Cid, isCar bool, w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 	ctx, span := tracing.Tracer.Start(r.Context(), "http.piece_cid")
 	defer span.End()
 	stats.Record(ctx, metrics.HttpPieceByCidRequestCount.M(1))
 
-	// Remove the path up to the piece cid
-	prefixLen := len(s.pieceBasePath())
-	if len(r.URL.Path) <= prefixLen {
-		msg := fmt.Sprintf("path '%s' is missing piece CID", r.URL.Path)
-		writeError(w, r, http.StatusBadRequest, msg)
-		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
-		return
-	}
-
-	fileName := r.URL.Path[prefixLen:]
-	isCar := strings.HasSuffix(fileName, carSuffix)
-	pieceCidStr := strings.Replace(fileName, carSuffix, "", 1)
-	pieceCid, err := cid.Parse(pieceCidStr)
-	if err != nil {
-		msg := fmt.Sprintf("parsing piece CID '%s': %s", pieceCidStr, err.Error())
-		writeError(w, r, http.StatusBadRequest, msg)
-		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
-		return
-	}
-
-	// Get a reader over the the piece
+	// Get a reader over the piece
 	content, err := s.getPieceContent(ctx, pieceCid)
 	if err == nil && isCar {
 		content, err = s.getCarContent(pieceCid, content)
@@ -265,7 +274,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Errorf("getting content for piece %s: %s", pieceCid, err)
-		msg := fmt.Sprintf("server error getting content for piece CID %s", pieceCidStr)
+		msg := fmt.Sprintf("server error getting content for piece CID %s", pieceCid)
 		writeError(w, r, http.StatusInternalServerError, msg)
 		stats.Record(ctx, metrics.HttpPieceByCid500ResponseCount.M(1))
 		return
@@ -296,14 +305,8 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 	// try to do it implicitly
 	w.Header().Set("Content-Type", contentType)
 
-	if r.Method == "HEAD" {
-		// For an HTTP HEAD request ServeContent doesn't send any data (just headers)
-		http.ServeContent(w, r, "", time.Time{}, content)
-		alog("%s\tHEAD %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
-		return
-	}
+	var writer http.ResponseWriter
 
-	// Send the CAR file
 	// http.ServeContent ignores errors when writing to the stream, so we
 	// replace the writer with a class that watches for errors
 	var err error
@@ -311,17 +314,41 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 		err = e
 	}}
 
-	// Send the content
+	writer = writeErrWatcher //Need writeErrWatcher to be of type writeErrorWatcher for addCommas()
+
 	// Note that the last modified time is a constant value because the data
 	// in a piece identified by a cid will never change.
 	start := time.Now()
 	alogAt(start, "%s\tGET %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
-	http.ServeContent(writeErrWatcher, r, "", lastModified, content)
+	isGzipped := strings.Contains(r.Header.Get("Accept-Encoding"), "gzip")
+	if isGzipped {
+		// If Accept-Encoding header contains gzip then send a gzipped response
 
-	// Check if there was an error during the transfer
+		gzwriter := gziphandler.GzipResponseWriter{
+			ResponseWriter: writeErrWatcher,
+		}
+		// Close the writer to flush buffer
+		defer gzwriter.Close()
+		writer = &gzwriter
+	}
+
+	if r.Method == "HEAD" {
+		// For an HTTP HEAD request ServeContent doesn't send any data (just headers)
+		http.ServeContent(writer, r, "", time.Time{}, content)
+		alog("%s\tHEAD %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
+		return
+	}
+
+	// Send the content
+	http.ServeContent(writer, r, "", lastModified, content)
+
+	// Write a line to the log
 	end := time.Now()
 	completeMsg := fmt.Sprintf("GET %s\n%s - %s: %s / %s bytes transferred",
 		r.URL, end.Format(timeFmt), start.Format(timeFmt), time.Since(start), addCommas(writeErrWatcher.count))
+	if isGzipped {
+		completeMsg += " (gzipped)"
+	}
 	if err == nil {
 		alogAt(end, "%s\t%s", color.New(color.FgGreen).Sprint("DONE"), completeMsg)
 	} else {
