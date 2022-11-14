@@ -148,7 +148,7 @@ const idxPage = `
           Download a block by CID
         </td>
         <td>
-          <a href="/ipfs/blockCid?filename="ABC" > /block/<blockCid></a>
+          <a href="/ipfs/blockCid" > /block/<blockCid></a>
         </td>
       </tr>
       </tbody>
@@ -243,14 +243,9 @@ func (s *HttpServer) handleBlockRequest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	filename := r.URL.Query().Get("filename")
-	if filename == "" {
-		filename = blockCidStr
-	}
-
-	utf8Name := url.PathEscape(filename)
-	asciiName := url.PathEscape(regexp.MustCompile("[[:^ascii:]]").ReplaceAllLiteralString(filename, "_"))
-	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=\"%s\"; filename*=UTF-8''%s", "attachment", asciiName, utf8Name))
+	utf8Name := url.PathEscape(blockCidStr)
+	asciiName := url.PathEscape(regexp.MustCompile("[[:^ascii:]]").ReplaceAllLiteralString(blockCidStr, "_"))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", asciiName, utf8Name))
 	w.Header().Set("Content-Type", "application/vnd.ipld.raw")
 	w.Header().Set("X-Content-Type-Options", "nosniff") // no funny business in the browsers :^)
 
