@@ -102,7 +102,7 @@ func TestBlockRetrieval(t *testing.T) {
 	//Create a new mock Http server with custom functions
 	ctrl := gomock.NewController(t)
 	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
-	httpServer := NewHttpServer("", 7777, false, mockHttpServer)
+	httpServer := NewHttpServer("", 7777, mockHttpServer)
 	httpServer.Start(context.Background())
 
 	data := []byte("Hello World!")
