@@ -98,6 +98,10 @@ jobs:
         type: string
         default: "./..."
         description: Import paths of packages to be tested.
+      cwd:
+        type: string
+        default: "."
+        description: Directory in which to run the test command
       suite:
         type: string
         default: unit
@@ -113,6 +117,7 @@ jobs:
       - run:
           name: go test
           command: |
+            cd << parameters.cwd >>
             go test \
               << parameters.go-test-flags >> \
               << parameters.target >>
@@ -309,3 +314,8 @@ workflows:
           name: test-all
           suite: all
           target: "`go list ./... | grep -v boost/itests`"
+
+      - test:
+          name: piece-directory
+          suite: all
+          cwd: "./extern/boostd-data"
