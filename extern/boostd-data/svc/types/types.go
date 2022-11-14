@@ -29,6 +29,7 @@ type Service interface {
 	GetOffsetSize(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
 	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
 	GetPieceDeals(context.Context, cid.Cid) ([]model.DealInfo, error)
+	SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error
 	IndexedAt(context.Context, cid.Cid) (time.Time, error)
 	PiecesContainingMultihash(context.Context, mh.Multihash) ([]cid.Cid, error)
 }

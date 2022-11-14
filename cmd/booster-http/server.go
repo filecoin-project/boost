@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -16,17 +15,14 @@ import (
 	"github.com/fatih/color"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/tracing"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/dagstore/mount"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	"github.com/ipld/go-car/v2"
-	"github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
-	"github.com/multiformats/go-varint"
 	"go.opencensus.io/stats"
 )
 
@@ -44,10 +40,9 @@ const pieceCidParam = "pieceCid"
 const payloadCidParam = "payloadCid"
 
 type HttpServer struct {
-	path          string
-	port          int
-	allowIndexing bool
-	api           HttpServerApi
+	path string
+	port int
+	api  HttpServerApi
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -56,14 +51,14 @@ type HttpServer struct {
 
 type HttpServerApi interface {
 	PiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error)
-	GetMaxPieceOffset(pieceCid cid.Cid) (uint64, error)
-	GetPieceInfo(pieceCID cid.Cid) (*piecestore.PieceInfo, error)
+	GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error)
+	GetPieceDeals(ctx context.Context, pieceCID cid.Cid) ([]model.DealInfo, error)
 	IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error)
 	UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error)
 }
 
-func NewHttpServer(path string, port int, allowIndexing bool, api HttpServerApi) *HttpServer {
-	return &HttpServer{path: path, port: port, allowIndexing: allowIndexing, api: api}
+func NewHttpServer(path string, port int, api HttpServerApi) *HttpServer {
+	return &HttpServer{path: path, port: port, api: api}
 }
 
 func (s *HttpServer) pieceBasePath() string {
@@ -227,7 +222,7 @@ func (s *HttpServer) handleByPayloadCid(payloadCid cid.Cid, isCar bool, w http.R
 	pieceCid := pieces[0]
 	content, err := s.getPieceContent(ctx, pieceCid)
 	if err == nil && isCar {
-		content, err = s.getCarContent(pieceCid, content)
+		content, err = s.getCarContent(ctx, pieceCid, content)
 	}
 	if err != nil {
 		if isNotFoundError(err) {
@@ -265,7 +260,7 @@ func (s *HttpServer) handleByPieceCid(pieceCid cid.Cid, isCar bool, w http.Respo
 	// Get a reader over the piece
 	content, err := s.getPieceContent(ctx, pieceCid)
 	if err == nil && isCar {
-		content, err = s.getCarContent(pieceCid, content)
+		content, err = s.getCarContent(ctx, pieceCid, content)
 	}
 	if err != nil {
 		if isNotFoundError(err) {
@@ -382,19 +377,19 @@ func writeError(w http.ResponseWriter, r *http.Request, status int, msg string) 
 
 func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.ReadSeeker, error) {
 	// Get the deals for the piece
-	pieceInfo, err := s.api.GetPieceInfo(pieceCid)
+	pieceDeals, err := s.api.GetPieceDeals(ctx, pieceCid)
 	if err != nil {
 		return nil, fmt.Errorf("getting sector info for piece %s: %w", pieceCid, err)
 	}
 
 	// Get the first unsealed deal
-	di, err := s.unsealedDeal(ctx, *pieceInfo)
+	di, err := s.unsealedDeal(ctx, pieceCid, pieceDeals)
 	if err != nil {
 		return nil, fmt.Errorf("getting unsealed CAR file: %w", err)
 	}
 
 	// Get the raw piece data from the sector
-	pieceReader, err := s.api.UnsealSectorAt(ctx, di.SectorID, di.Offset.Unpadded(), di.Length.Unpadded())
+	pieceReader, err := s.api.UnsealSectorAt(ctx, di.SectorID, di.PieceOffset.Unpadded(), di.PieceLength.Unpadded())
 	if err != nil {
 		return nil, fmt.Errorf("getting raw data from sector %d: %w", di.SectorID, err)
 	}
@@ -402,41 +397,12 @@ func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.
 	return pieceReader, nil
 }
 
-func (s *HttpServer) getCarContent(pieceCid cid.Cid, pieceReader io.ReadSeeker) (io.ReadSeeker, error) {
-	maxOffset, err := s.api.GetMaxPieceOffset(pieceCid)
+func (s *HttpServer) getCarContent(ctx context.Context, pieceCid cid.Cid, pieceReader io.ReadSeeker) (io.ReadSeeker, error) {
+	// Get the CAR size from the piece directory
+	unpaddedCarSize, err := s.api.GetCarSize(ctx, pieceCid)
 	if err != nil {
-		if s.allowIndexing {
-			// If it's not possible to get the max piece offset it may be because
-			// the CAR file hasn't been indexed yet. So try to index it in real time.
-			alog("%s\tbuilding index for %s", color.New(color.FgBlue).Sprintf("INFO"), pieceCid)
-			maxOffset, err = getMaxPieceOffset(pieceReader)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("getting max offset for piece %s: %w", pieceCid, err)
-		}
+		return nil, fmt.Errorf("getting unpadded CAR size: %w", err)
 	}
-
-	// Seek to the max offset
-	_, err = pieceReader.Seek(int64(maxOffset), io.SeekStart)
-	if err != nil {
-		return nil, fmt.Errorf("seeking to offset %d in piece data: %w", maxOffset, err)
-	}
-
-	// A section consists of
-	// <size of cid+block><cid><block>
-
-	// Get <size of cid+block>
-	cr := &countReader{r: bufio.NewReader(pieceReader)}
-	dataLength, err := varint.ReadUvarint(cr)
-	if err != nil {
-		return nil, fmt.Errorf("reading CAR section length: %w", err)
-	}
-
-	// The number of bytes in the uvarint that records <size of cid+block>
-	dataLengthUvarSize := cr.count
-
-	// Get the size of the (unpadded) CAR file
-	unpaddedCarSize := maxOffset + dataLengthUvarSize + dataLength
 
 	// Seek to the end of the CAR to get its (padded) size
 	paddedCarSize, err := pieceReader.Seek(0, io.SeekEnd)
@@ -459,33 +425,6 @@ func (s *HttpServer) getCarContent(pieceCid cid.Cid, pieceReader io.ReadSeeker) 
 	return lr, nil
 }
 
-// getMaxPieceOffset generates a CAR file index from the reader, and returns
-// the maximum offset in the index
-func getMaxPieceOffset(reader io.ReadSeeker) (uint64, error) {
-	idx, err := car.GenerateIndex(reader, car.ZeroLengthSectionAsEOF(true), car.StoreIdentityCIDs(true))
-	if err != nil {
-		return 0, fmt.Errorf("generating CAR index: %w", err)
-	}
-
-	itidx, ok := idx.(index.IterableIndex)
-	if !ok {
-		return 0, fmt.Errorf("could not cast CAR file index %t to an IterableIndex", idx)
-	}
-
-	var maxOffset uint64
-	err = itidx.ForEach(func(m multihash.Multihash, offset uint64) error {
-		if offset > maxOffset {
-			maxOffset = offset
-		}
-		return nil
-	})
-	if err != nil {
-		return 0, fmt.Errorf("getting max offset: %w", err)
-	}
-
-	return maxOffset, nil
-}
-
 type limitSeekReader struct {
 	io.Reader
 	readSeeker   io.ReadSeeker
@@ -502,17 +441,17 @@ func (l *limitSeekReader) Seek(offset int64, whence int) (int64, error) {
 	return l.readSeeker.Seek(offset, whence)
 }
 
-func (s *HttpServer) unsealedDeal(ctx context.Context, pieceInfo piecestore.PieceInfo) (*piecestore.DealInfo, error) {
+func (s *HttpServer) unsealedDeal(ctx context.Context, pieceCid cid.Cid, pieceDeals []model.DealInfo) (*model.DealInfo, error) {
 	// There should always been deals in the PieceInfo, but check just in case
-	if len(pieceInfo.Deals) == 0 {
-		return nil, fmt.Errorf("there are no deals containing piece %s: %w", pieceInfo.PieceCID, ErrNotFound)
+	if len(pieceDeals) == 0 {
+		return nil, fmt.Errorf("there are no deals containing piece %s: %w", pieceCid, ErrNotFound)
 	}
 
 	// The same piece can be in many deals. Find the first unsealed deal.
 	sealedCount := 0
 	var allErr error
-	for _, di := range pieceInfo.Deals {
-		isUnsealed, err := s.api.IsUnsealed(ctx, di.SectorID, di.Offset.Unpadded(), di.Length.Unpadded())
+	for _, di := range pieceDeals {
+		isUnsealed, err := s.api.IsUnsealed(ctx, di.SectorID, di.PieceOffset.Unpadded(), di.PieceLength.Unpadded())
 		if err != nil {
 			allErr = multierror.Append(allErr, err)
 			continue
@@ -526,29 +465,29 @@ func (s *HttpServer) unsealedDeal(ctx context.Context, pieceInfo piecestore.Piec
 
 	// It wasn't possible to find a deal with the piece cid that is unsealed.
 	// Try to return an error message with as much useful information as possible
-	dealSectors := make([]string, 0, len(pieceInfo.Deals))
-	for _, di := range pieceInfo.Deals {
-		dealSectors = append(dealSectors, fmt.Sprintf("Deal %d: Sector %d", di.DealID, di.SectorID))
+	dealSectors := make([]string, 0, len(pieceDeals))
+	for _, di := range pieceDeals {
+		dealSectors = append(dealSectors, fmt.Sprintf("Deal %d: Sector %d", di.ChainDealID, di.SectorID))
 	}
 
 	if allErr == nil {
 		dealSectorsErr := fmt.Errorf("%s: %w", strings.Join(dealSectors, ", "), ErrNotFound)
 		return nil, fmt.Errorf("checked unsealed status of %d deals containing piece %s: none are unsealed: %w",
-			len(pieceInfo.Deals), pieceInfo.PieceCID, dealSectorsErr)
+			len(pieceDeals), pieceCid, dealSectorsErr)
 	}
 
-	if len(pieceInfo.Deals) == 1 {
+	if len(pieceDeals) == 1 {
 		return nil, fmt.Errorf("checking unsealed status of deal %d (sector %d) containing piece %s: %w",
-			pieceInfo.Deals[0].DealID, pieceInfo.Deals[0].SectorID, pieceInfo.PieceCID, allErr)
+			pieceDeals[0].ChainDealID, pieceDeals[0].SectorID, pieceCid, allErr)
 	}
 
 	if sealedCount == 0 {
 		return nil, fmt.Errorf("checking unsealed status of %d deals containing piece %s: %s: %w",
-			len(pieceInfo.Deals), pieceInfo.PieceCID, dealSectors, allErr)
+			len(pieceDeals), pieceCid, dealSectors, allErr)
 	}
 
 	return nil, fmt.Errorf("checking unsealed status of %d deals containing piece %s - %d are sealed, %d had errors: %s: %w",
-		len(pieceInfo.Deals), pieceInfo.PieceCID, sealedCount, len(pieceInfo.Deals)-sealedCount, dealSectors, allErr)
+		len(pieceDeals), pieceCid, sealedCount, len(pieceDeals)-sealedCount, dealSectors, allErr)
 }
 
 // writeErrorWatcher calls onError if there is an error writing to the writer
@@ -565,20 +504,6 @@ func (w *writeErrorWatcher) Write(bz []byte) (int, error) {
 	}
 	w.count += uint64(count)
 	return count, err
-}
-
-// countReader just counts the number of bytes read
-type countReader struct {
-	r     *bufio.Reader
-	count uint64
-}
-
-func (c *countReader) ReadByte() (byte, error) {
-	b, err := c.r.ReadByte()
-	if err == nil {
-		c.count++
-	}
-	return b, err
 }
 
 const timeFmt = "2006-01-02T15:04:05.000Z0700"
