@@ -1,8 +1,10 @@
 package svc
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -13,10 +15,11 @@ import (
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 )
 
-func XTestCouchbaseService(t *testing.T) {
+func TestCouchbaseService(t *testing.T) {
 	removeContainer := setupCouchbase(t)
 	defer removeContainer()
 
@@ -95,15 +98,40 @@ func setupCouchbase(t *testing.T) func() {
 		t.Fatal(err)
 	}
 
+	time.Sleep(time.Duration(10) * time.Second)
+
+	err = initializeCouchbaseCluster()
+	require.NoError(t, err)
+
+	// Wait for couchbase services to start
+	time.Sleep(time.Duration(10) * time.Second)
+
 	cleanup := func() {
 		err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-
-	// TODO: setup admin password
-	// TODO: create bucket -- see: https://docs.couchbase.com/server/current/manage/manage-buckets/create-bucket.html
-
 	return cleanup
+}
+
+func initializeCouchbaseCluster() error {
+	setupCommand := "curl -X POST http://127.0.0.1:8091/nodes/self/controller/settings -d 'data_path=%2Fopt%2Fcouchbase%2Fvar%2Flib%2Fcouchbase%2Fdata&' -d 'index_path=%2Fopt%2Fcouchbase%2Fvar%2Flib%2Fcouchbase%2Fidata&' -d 'cbas_path=%2Fopt%2Fcouchbase%2Fvar%2Flib%2Fcouchbase%2Fadata&' -d 'eventing_path=%2Fopt%2Fcouchbase%2Fvar%2Flib%2Fcouchbase%2Fedata&'"
+	renameNodeCommand := "curl -u Administrator:password -X POST http://127.0.01:8091/node/controller/rename -d hostname=127.0.0.1"
+	startServicesCommand := "curl -u 'Administrator:password' -X POST http://127.0.0.1:8091/node/controller/setupServices -d services=kv%2Cn1ql%2Cindex%2Ceventing"
+	setBucketMemoryQuotaCommand := "curl -u 'Administrator:password' -X POST http://127.0.0.1:8091/pools/default -d memoryQuota=512 -d indexMemoryQuota=512 -d ftsMemoryQuota=512"
+	createAdminUserCommand := "curl -u 'Administrator:password' -X POST http://127.0.0.1:8091/settings/web -d port=8091 -d username=Administrator -d password=boostdemo"
+	setIndexStorageModeCommand := "curl -u 'Administrator:boostdemo' -X POST http://127.0.0.1:8091/settings/indexes -d storageMode=plasma"
+	var commands []string
+	commands = append(commands, setupCommand, renameNodeCommand, startServicesCommand, setBucketMemoryQuotaCommand, createAdminUserCommand, setIndexStorageModeCommand)
+	for _, v := range commands {
+		output, err := exec.Command("/bin/bash", "-c", v).CombinedOutput()
+		if err != nil {
+			return err
+			fmt.Println(string(output))
+		}
+	}
+	// Sleep to give enough time for service to start or bucket creation will fail
+	time.Sleep(time.Duration(10) * time.Second)
+	return nil
 }

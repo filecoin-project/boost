@@ -466,6 +466,14 @@ Set this value to zero to disable the embedded piece directory service
 			Comment: `The connect string for the piece directory service RPC API
 Set this value to "" if the piece directory service is embedded.`,
 		},
+		{
+			Name: "PieceDirectoryGCInterval",
+			Type: "int",
+
+			Comment: `GC deals from piece directory after their completion at every
+PieceDirectoryGCInterval hour. Please keep this value higher than 6 hours
+to avoid congesting piece directory operations`,
+		},
 	},
 	"PieceDirectoryCouchbaseBucketConfig": []DocField{
 		{
