@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
@@ -243,11 +242,8 @@ func (s *HttpServer) handleBlockRequest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	utf8Name := url.PathEscape(blockCidStr)
-	asciiName := url.PathEscape(regexp.MustCompile("[[:^ascii:]]").ReplaceAllLiteralString(blockCidStr, "_"))
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", asciiName, utf8Name))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", blockCid.String(), blockCid.String()))
 	w.Header().Set("X-Content-Type-Options", "nosniff") // no funny business in the browsers :^)
-
 	b := bytes.NewReader(data)
 
 	serveContent(w, r, b, "application/vnd.ipld.raw")
