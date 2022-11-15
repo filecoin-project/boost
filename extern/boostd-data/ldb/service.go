@@ -110,7 +110,7 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error {
 	log.Debugw("handle.mark-piece-index-errored", "piece-cid", pieceCid, "err", err)
 
-	ctx, span := tracing.Tracer.Start(context.Background(), "store.mark-piece-index-errored")
+	ctx, span := tracing.Tracer.Start(ctx, "store.mark-piece-index-errored")
 	defer span.End()
 
 	defer func(now time.Time) {
