@@ -459,7 +459,9 @@ func (p *Provider) Start() error {
 	}
 
 	// Start piece directory GC
-	go p.dealGC(p.ctx, p.config.PieceDirectoryGCInterval)
+	if p.config.PieceDirectoryGCInterval > 0 {
+		go p.dealGC(p.ctx, p.config.PieceDirectoryGCInterval)
+	}
 
 	log.Infow("storage provider: started")
 	return nil

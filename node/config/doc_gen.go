@@ -472,7 +472,7 @@ Set this value to "" if the piece directory service is embedded.`,
 
 			Comment: `GC deals from piece directory after their completion at every
 PieceDirectoryGCInterval hour. Please keep this value higher than 6 hours
-to avoid congesting piece directory operations`,
+to avoid congesting piece directory operations. Set to "0" to disable.`,
 		},
 	},
 	"PieceDirectoryCouchbaseBucketConfig": []DocField{
