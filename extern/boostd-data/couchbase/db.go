@@ -639,7 +639,7 @@ func (db *DB) RemoveIndexes(ctx context.Context, pieceCid cid.Cid, recordCount i
 		}
 
 		// Get each value in the map
-		for mhStr, _ := range recMap {
+		for mhStr := range recMap {
 			cbKey := toCouchKey(mhStr)
 			getResult, err := db.mhToPieces.Get(cbKey, &gocb.GetOptions{Context: ctx})
 			if err != nil {

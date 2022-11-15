@@ -131,7 +131,7 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 	return s.client.GetOffsetSize(ctx, pieceCid, hash)
 }
 
-func (s *Store) RemoveDeal(ctx context.Context, pieceCid cid.Cid, dealId uuid.UUID) error {
+func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId uuid.UUID) error {
 	return s.client.RemoveDealForPiece(ctx, pieceCid, dealId)
 }
 
@@ -139,6 +139,6 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 	return s.client.RemovePieceMetadata(ctx, pieceCid)
 }
 
-func (s *Store) RemoveMultihashes(ctx context.Context, pieceCid cid.Cid) error {
+func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	return s.client.RemoveIndexes(ctx, pieceCid)
 }

@@ -1,7 +1,6 @@
 package svc
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -10,7 +9,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	cl "github.com/docker/docker/client"
+	dcl "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
@@ -52,7 +51,7 @@ func TestCouchbaseService(t *testing.T) {
 
 func setupCouchbase(t *testing.T) func() {
 	ctx := context.Background()
-	cli, err := cl.NewEnvClient()
+	cli, err := dcl.NewClientWithOpts(dcl.FromEnv)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +62,8 @@ func setupCouchbase(t *testing.T) func() {
 	if err != nil {
 		t.Fatal(err)
 	}
-	io.Copy(os.Stdout, out)
+	_, err = io.Copy(os.Stdout, out)
+	require.NoError(t, err)
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: imageName,
@@ -125,10 +125,9 @@ func initializeCouchbaseCluster() error {
 	var commands []string
 	commands = append(commands, setupCommand, renameNodeCommand, startServicesCommand, setBucketMemoryQuotaCommand, createAdminUserCommand, setIndexStorageModeCommand)
 	for _, v := range commands {
-		output, err := exec.Command("/bin/bash", "-c", v).CombinedOutput()
+		_, err := exec.Command("/bin/bash", "-c", v).CombinedOutput()
 		if err != nil {
 			return err
-			fmt.Println(string(output))
 		}
 	}
 	// Sleep to give enough time for service to start or bucket creation will fail

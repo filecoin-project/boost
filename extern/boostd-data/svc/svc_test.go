@@ -452,7 +452,7 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 	require.NoError(t, err)
 	require.True(t, ok)
 
-	err = cl.RemoveDeal(ctx, pieceCid, di.DealUuid)
+	err = cl.RemoveDealForPiece(ctx, pieceCid, di.DealUuid)
 	require.NoError(t, err)
 
 	dis, err = cl.GetPieceDeals(ctx, pieceCid)

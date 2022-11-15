@@ -12,6 +12,7 @@ import (
 	model "github.com/filecoin-project/boostd-data/model"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	gomock "github.com/golang/mock/gomock"
+	uuid "github.com/google/uuid"
 	cid "github.com/ipfs/go-cid"
 	index "github.com/ipld/go-car/v2/index"
 	multihash "github.com/multiformats/go-multihash"
