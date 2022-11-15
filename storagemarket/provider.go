@@ -61,6 +61,8 @@ type Config struct {
 	TransferLimiter         TransferLimiterConfig
 	// Cleanup deal logs from DB older than this many number of days
 	DealLogDurationDays int
+	// GC deals from piece directory after their completion at every PieceDirectoryGCInterval hour
+	PieceDirectoryGCInterval int
 }
 
 var log = logging.Logger("boost-provider")
@@ -456,6 +458,9 @@ func (p *Provider) Start() error {
 		go p.dealLogger.LogCleanup(p.ctx, p.config.DealLogDurationDays)
 	}
 
+	// Start piece directory GC
+	go p.dealGC(p.ctx, p.config.PieceDirectoryGCInterval)
+
 	log.Infow("storage provider: started")
 	return nil
 }
@@ -631,4 +636,32 @@ func (p *Provider) GetBalance(ctx context.Context, addr address.Address, encoded
 	}
 
 	return utils.ToSharedBalance(bal), nil
+}
+
+func (p *Provider) dealGC(ctx context.Context, PieceDirectoryGCInterval int) {
+	// Create a ticker with PieceDirectoryGCInterval hour tick
+	ticker := time.NewTicker(time.Duration(PieceDirectoryGCInterval) * time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			log.Info("cleaning expired deals from piece directory")
+			deals, err := p.dealsDB.ListCompleted(ctx)
+			if err != nil {
+				log.Errorf("failed to cleanup expired deals from piece directory: %s", err)
+			}
+			if len(deals) > 0 {
+				for _, deal := range deals {
+					err := p.pieceMeta.DeleteDealForPiece(ctx, deal.ClientDealProposal.Proposal.PieceCID, deal.DealUuid)
+					if err != nil {
+						log.Errorf("failed to cleanup deals from piece directory: %s", err)
+					}
+				}
+			}
+			log.Infof("completed cleaning up %d expired deals from piece directory", len(deals))
+		case <-ctx.Done():
+			return
+		}
+	}
 }

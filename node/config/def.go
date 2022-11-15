@@ -81,9 +81,10 @@ func DefaultBoost() *Boost {
 				MultihashToPiecesBucket: PieceDirectoryCouchbaseBucketConfig{},
 				PieceOffsetsBucket:      PieceDirectoryCouchbaseBucketConfig{},
 			},
-			ParallelAddIndexLimit: 4,
-			EmbeddedServicePort:   8042,
-			ServiceApiInfo:        "",
+			ParallelAddIndexLimit:    4,
+			EmbeddedServicePort:      8042,
+			ServiceApiInfo:           "",
+			PieceDirectoryGCInterval: 6,
 		},
 
 		Dealmaking: DealmakingConfig{

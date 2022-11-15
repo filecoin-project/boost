@@ -55,6 +55,9 @@ type Store interface {
 	SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error
 	PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error)
 	MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error
+	RemoveDealForPiece(context.Context, cid.Cid, uuid.UUID) error
+	RemovePieceMetadata(context.Context, cid.Cid) error
+	RemoveIndexes(context.Context, cid.Cid) error
 
 	//Delete(ctx context.Context, pieceCid cid.Cid) error
 	//DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid uuid.UUID) (bool, error)
@@ -323,24 +326,15 @@ func (ps *PieceMeta) buildIndexForPiece(ctx context.Context, pieceCid cid.Cid) e
 }
 
 func (ps *PieceMeta) DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid uuid.UUID) error {
-	// ctx, span := tracing.Tracer.Start(ctx, "pm.delete_deal_for_piece")
-	// defer span.End()
+	ctx, span := tracing.Tracer.Start(ctx, "pm.delete_deal_for_piece")
+	defer span.End()
 
-	// Delete deal from list of deals for this piece
-	//wasLast, err := ps.dealStore.Delete(pieceCid, dealUuid)
-	//if err != nil {
-	//return fmt.Errorf("deleting deal %s from store: %w", dealUuid, err)
-	//}
-
-	//if !wasLast {
-	//return nil
-	//}
-
-	//// Remove piece indexes
-	//if err := ps.deleteIndexForPiece(pieceCid); err != nil {
-	//return fmt.Errorf("deleting index for piece %s: %w", pieceCid, err)
-	//}
-
+	//Delete deal from list of deals for this piece
+	//It removes metadata and indexes if []deal is empty
+	err := ps.store.RemoveDealForPiece(ctx, pieceCid, dealUuid)
+	if err != nil {
+		return fmt.Errorf("deleting deal from piece metadata: %w", err)
+	}
 	return nil
 }
 
