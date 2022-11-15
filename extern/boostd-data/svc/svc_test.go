@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -47,7 +46,7 @@ var testCouchSettings = couchbase.DBSettings{
 }
 
 func TestService(t *testing.T) {
-	logging.SetLogLevel("*", "debug")
+	_ = logging.SetLogLevel("*", "debug")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -147,7 +146,7 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 
 func TestServiceFuzz(t *testing.T) {
 	t.Skip()
-	logging.SetLogLevel("*", "info")
+	_ = logging.SetLogLevel("*", "info")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -230,7 +229,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service, port int
 
 					mhash := c.Hash()
 					var err error
-					idx.GetAll(c, func(expected uint64) bool {
+					err1 := idx.GetAll(c, func(expected uint64) bool {
 						var offsetSize *model.OffsetSize
 						offsetSize, err = cl.GetOffsetSize(ctx, pieceCid, mhash)
 						if err != nil {
@@ -244,6 +243,9 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service, port int
 					})
 					if err != nil {
 						return err
+					}
+					if err1 != nil {
+						return err1
 					}
 
 					pcids, err := cl.PiecesContainingMultihash(ctx, mhash)
@@ -293,7 +295,7 @@ func createCarIndex(t *testing.T, size int, rseed int) index.Index {
 
 func loadIndex(path string) (index.Index, error) {
 	defer func(now time.Time) {
-		log.Debugw("loadindex", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("loadindex", "took", time.Since(now).String())
 	}(time.Now())
 
 	idxf, err := os.Open(path)
@@ -333,7 +335,7 @@ func getRecords(subject index.Index) ([]model.Record, error) {
 			return nil, err
 		}
 	default:
-		return nil, errors.New(fmt.Sprintf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec()))
+		return nil, fmt.Errorf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec())
 	}
 	return records, nil
 }
@@ -342,12 +344,18 @@ func compareIndices(subject, subjectDb index.Index) (bool, error) {
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
 
-	subject.Marshal(w)
+	_, err := subject.Marshal(w)
+	if err != nil {
+		return false, err
+	}
 
 	var b2 bytes.Buffer
 	w2 := bufio.NewWriter(&b2)
 
-	subjectDb.Marshal(w2)
+	_, err = subjectDb.Marshal(w2)
+	if err != nil {
+		return false, err
+	}
 
 	res := bytes.Compare(b.Bytes(), b2.Bytes())
 
@@ -355,7 +363,7 @@ func compareIndices(subject, subjectDb index.Index) (bool, error) {
 }
 
 func TestCleanup(t *testing.T) {
-	logging.SetLogLevel("*", "debug")
+	_ = logging.SetLogLevel("*", "debug")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -455,12 +463,12 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 	err = cl.RemoveDealForPiece(ctx, pieceCid, di.DealUuid)
 	require.NoError(t, err)
 
-	dis, err = cl.GetPieceDeals(ctx, pieceCid)
+	_, err = cl.GetPieceDeals(ctx, pieceCid)
 	require.ErrorContains(t, err, "not found")
 
-	offset, err = cl.GetOffsetSize(ctx, pieceCid, mhash)
+	_, err = cl.GetOffsetSize(ctx, pieceCid, mhash)
 	require.ErrorContains(t, err, "not found")
 
-	recs, err = cl.GetRecords(ctx, pieceCid)
+	_, err = cl.GetRecords(ctx, pieceCid)
 	require.ErrorContains(t, err, "not found")
 }

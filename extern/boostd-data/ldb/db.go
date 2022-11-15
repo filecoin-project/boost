@@ -310,7 +310,7 @@ func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, er
 		kcid := cid.NewCidV1(cid.Raw, m)
 
 		offset, n := binary.Uvarint(r.Value)
-		size, n := binary.Uvarint(r.Value[n:])
+		size, _ := binary.Uvarint(r.Value[n:])
 
 		records = append(records, model.Record{
 			Cid: kcid,
@@ -351,7 +351,7 @@ func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihas
 	}
 
 	offset, n := binary.Uvarint(b)
-	size, n := binary.Uvarint(b[n:])
+	size, _ := binary.Uvarint(b[n:])
 	return &model.OffsetSize{
 		Offset: offset,
 		Size:   size,

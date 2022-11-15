@@ -50,11 +50,11 @@ func (s *Store) Start(ctx context.Context) error {
 func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	log.Debugw("handle.add-deal-for-piece", "piece-cid", pieceCid)
 
-	ctx, span := tracing.Tracer.Start(context.Background(), "store.add_deal_for_piece")
+	ctx, span := tracing.Tracer.Start(ctx, "store.add_deal_for_piece")
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.add-deal-for-piece", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.add-deal-for-piece", "took", time.Since(now).String())
 	}(time.Now())
 
 	return s.db.AddDealForPiece(ctx, pieceCid, dealInfo)
@@ -81,7 +81,7 @@ func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err erro
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.mark-piece-index-errored", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.mark-piece-index-errored", "took", time.Since(now).String())
 	}(time.Now())
 
 	err = s.db.MarkIndexErrored(ctx, pieceCid, err)
@@ -95,7 +95,7 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-offset-size", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-offset-size", "took", time.Since(now).String())
 	}(time.Now())
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -115,7 +115,7 @@ func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.M
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-piece-metadata", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-piece-metadata", "took", time.Since(now).String())
 	}(time.Now())
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -134,7 +134,7 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-piece-deals", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-piece-deals", "took", time.Since(now).String())
 	}(time.Now())
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -154,7 +154,7 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.pieces-containing-mh", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.pieces-containing-mh", "took", time.Since(now).String())
 	}(time.Now())
 
 	pcids, err := s.db.GetPieceCidsByMultihash(ctx, m)
@@ -168,7 +168,7 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-index", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-index", "took", time.Since(now).String())
 	}(time.Now())
 
 	s.pieceLocks[toStripedLockIndex(pieceCid)].RLock()
@@ -266,7 +266,7 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.indexed-at", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.indexed-at", "took", time.Since(now).String())
 	}(time.Now())
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -285,7 +285,7 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUu
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.remove-deal-for-piece", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.remove-deal-for-piece", "took", time.Since(now).String())
 	}(time.Now())
 
 	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
@@ -329,7 +329,7 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.remove-piece-metadata", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.remove-piece-metadata", "took", time.Since(now).String())
 	}(time.Now())
 
 	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
@@ -352,7 +352,7 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handle.remove-indexes", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handle.remove-indexes", "took", time.Since(now).String())
 	}(time.Now())
 
 	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()

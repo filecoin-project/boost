@@ -415,7 +415,7 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (Couc
 // GetOffsetSize gets the offset and size of the multihash in the given piece.
 // Note that recordCount is needed in order to determine which shard the multihash is in.
 func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash multihash.Multihash, recordCount int) (*model.OffsetSize, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "db.get_offset_size")
+	_, span := tracing.Tracer.Start(ctx, "db.get_offset_size")
 	defer span.End()
 
 	// Get the prefix for the shard that the multihash is in
@@ -449,7 +449,7 @@ func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash multihas
 // Note that recordCount is needed in order to determine the shard structure.
 func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid, recordCount int) ([]model.Record, error) {
 	// Implementation not complete
-	ctx, span := tracing.Tracer.Start(ctx, "db.all_records")
+	_, span := tracing.Tracer.Start(ctx, "db.all_records")
 	defer span.End()
 
 	recs := make([]model.Record, 0, recordCount)
@@ -598,12 +598,15 @@ func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
 
 	k := toCouchKey(pieceCid.String())
 	metadata, err := db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return fmt.Errorf("getting piece %s metadata: %w", pieceCid, err)
+	}
 
 	// Remove all multihashes before, as without Metadata, they are useless
 	// This order is important as metadata.Cursor is required in case RemoveAllRecords fails
 	// and needs to be run manually
 	if err = db.RemoveIndexes(ctx, pieceCid, metadata.BlockCount); err != nil {
-		return err
+		return fmt.Errorf("failed removing index for piece %s: %w", pieceCid, err)
 	}
 
 	_, err = db.pcidToMeta.Remove(k, &gocb.RemoveOptions{Context: ctx})
@@ -635,7 +638,7 @@ func (db *DB) RemoveIndexes(ctx context.Context, pieceCid cid.Cid, recordCount i
 				// If there are no records in a particular shard just skip the shard
 				continue
 			}
-			fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
+			return fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
 		}
 
 		// Get each value in the map
