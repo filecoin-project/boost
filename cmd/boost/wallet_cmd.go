@@ -207,6 +207,9 @@ var walletList = &cli.Command{
 					}
 				} else {
 					wallet[dataCapKey] = "n/a"
+					if cctx.Bool("json") {
+						wallet[dataCapKey] = nil
+					}
 				}
 
 				wallets = append(wallets, wallet)
