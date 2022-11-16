@@ -67,7 +67,7 @@ func NewHttpServer(path string, port int, allowIndexing bool, api HttpServerApi)
 }
 
 func (s *HttpServer) pieceBasePath() string {
-	return s.path + "/piece/"
+	return s.path + "/piece"
 }
 
 func (s *HttpServer) Start(ctx context.Context) {
