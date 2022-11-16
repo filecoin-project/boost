@@ -107,8 +107,25 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	return nil
 }
 
-func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error {
-	log.Debugw("handle.mark-piece-index-errored", "piece-cid", pieceCid, "err", err)
+func (s *Store) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
+	log.Debugw("handle.set-car-size", "piece-cid", pieceCid, "size", size)
+
+	ctx, span := tracing.Tracer.Start(context.Background(), "store.set-car-size")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.set-car-size", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
+
+	err := s.db.SetCarSize(ctx, pieceCid, size)
+	return normalizePieceCidError(pieceCid, err)
+}
+
+func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr error) error {
+	log.Debugw("handle.mark-piece-index-errored", "piece-cid", pieceCid, "err", idxErr)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.mark-piece-index-errored")
 	defer span.End()
@@ -120,7 +137,8 @@ func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err erro
 	s.Lock()
 	defer s.Unlock()
 
-	return normalizePieceCidError(pieceCid, s.db.MarkIndexErrored(ctx, pieceCid, err))
+	err := s.db.MarkIndexErrored(ctx, pieceCid, idxErr)
+	return normalizePieceCidError(pieceCid, err)
 }
 
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {

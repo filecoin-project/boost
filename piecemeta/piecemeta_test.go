@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-commp-utils/writer"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -81,6 +82,10 @@ func testPieceMeta(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
 	t.Run("imported index", func(t *testing.T) {
 		testImportedIndex(ctx, t, cl)
 	})
+
+	t.Run("car file size", func(t *testing.T) {
+		testCarFileSize(ctx, t, cl)
+	})
 }
 
 func testPieceMetaNotFound(ctx context.Context, t *testing.T, cl *client.Store) {
@@ -126,17 +131,11 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 	carv1Reader, err := carReader.DataReader()
 	require.NoError(t, err)
 
-	ctrl := gomock.NewController(t)
-	pr := mock_piecemeta.NewMockPieceReader(ctrl)
-
-	pieceCid := calculateCommp(t, carv1Reader)
-
 	// Any calls to get a reader over data should return a reader over the random CAR file
-	_, err = carv1Reader.Seek(0, io.SeekStart)
-	require.NoError(t, err)
-	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(carv1Reader, nil)
+	pr := createMockPieceReader(t, carv1Reader)
 
 	pm := piecemeta.NewPieceMeta(cl, pr, 1)
+	pieceCid := calculateCommp(t, carv1Reader).PieceCID
 
 	// Add deal info for the piece - it doesn't matter what it is, the piece
 	// just needs to have at least one deal associated with it
@@ -164,7 +163,7 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 	require.NoError(t, err)
 
 	// Get the index (offset and size information)
-	recs := getRecords(t, carFilePath)
+	recs := getRecords(t, carv1Reader)
 
 	// Verify that blockstore has, get and get size work
 	for _, rec := range recs {
@@ -201,17 +200,11 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	carv1Reader, err := carReader.DataReader()
 	require.NoError(t, err)
 
-	ctrl := gomock.NewController(t)
-	pr := mock_piecemeta.NewMockPieceReader(ctrl)
-
-	pieceCid := calculateCommp(t, carv1Reader)
-
 	// Any calls to get a reader over data should return a reader over the random CAR file
-	_, err = carv1Reader.Seek(0, io.SeekStart)
-	require.NoError(t, err)
-	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(carv1Reader, nil)
+	pr := createMockPieceReader(t, carv1Reader)
 
-	recs := getRecords(t, carFilePath)
+	recs := getRecords(t, carv1Reader)
+	pieceCid := calculateCommp(t, carv1Reader).PieceCID
 	err = cl.AddIndex(ctx, pieceCid, recs)
 	require.NoError(t, err)
 
@@ -272,11 +265,69 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.Equal(t, len(blk.RawData()), sz)
 }
 
-// Get the index records from the CAR file
-func getRecords(t *testing.T, carFilePath string) []model.Record {
-	reader, err := os.Open(carFilePath)
+// Verify that if the deal info has been imported from the DAG store, meaning
+// it does not have CAR size information, GetCarSize will correctly calculate
+// the CAR size from the index + piece data
+func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
+	// Create a random CAR file
+	carFilePath := createCarFile(t)
+	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
-	defer reader.Close()
+	defer carFile.Close()
+
+	carReader, err := car.OpenReader(carFilePath)
+	require.NoError(t, err)
+	defer carReader.Close()
+	carv1Reader, err := carReader.DataReader()
+	require.NoError(t, err)
+
+	// Read the CAR bytes
+	carBytes, err := io.ReadAll(carv1Reader)
+	require.NoError(t, err)
+
+	// Any calls to get a reader over data should return a reader over the random CAR file
+	pr := createMockPieceReader(t, carv1Reader)
+
+	recs := getRecords(t, carv1Reader)
+	commpCalc := calculateCommp(t, carv1Reader)
+	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs)
+	require.NoError(t, err)
+
+	// Add deal info for the piece without a CAR file
+	di := model.DealInfo{
+		DealUuid:    uuid.New(),
+		ChainDealID: 1,
+		SectorID:    1,
+		PieceOffset: 0,
+		PieceLength: commpCalc.PieceSize,
+	}
+	err = cl.AddDealForPiece(ctx, commpCalc.PieceCID, di)
+	require.NoError(t, err)
+
+	// Verify that getting the size of the CAR file works correctly:
+	// There is no CAR size information in the deal info, so the piece
+	// directory should work it out from the index and piece data.
+	pm := piecemeta.NewPieceMeta(cl, pr, 1)
+	size, err := pm.GetCarSize(ctx, commpCalc.PieceCID)
+	require.NoError(t, err)
+	require.Equal(t, len(carBytes), int(size))
+}
+
+func createMockPieceReader(t *testing.T, reader car.SectionReader) *mock_piecemeta.MockPieceReader {
+	ctrl := gomock.NewController(t)
+	pr := mock_piecemeta.NewMockPieceReader(ctrl)
+	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
+		func(_ context.Context, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (piecemeta.SectionReader, error) {
+			_, err := reader.Seek(0, io.SeekStart)
+			return reader, err
+		})
+	return pr
+}
+
+// Get the index records from the CAR file
+func getRecords(t *testing.T, reader car.SectionReader) []model.Record {
+	_, err := reader.Seek(0, io.SeekStart)
+	require.NoError(t, err)
 
 	blockReader, err := car.NewBlockReader(reader)
 	require.NoError(t, err)
@@ -308,7 +359,7 @@ func createCarFile(t *testing.T) string {
 	return carFilePath
 }
 
-func calculateCommp(t *testing.T, rdr io.ReadSeeker) cid.Cid {
+func calculateCommp(t *testing.T, rdr io.ReadSeeker) writer.DataCIDSize {
 	_, err := rdr.Seek(0, io.SeekStart)
 	require.NoError(t, err)
 
@@ -319,5 +370,5 @@ func calculateCommp(t *testing.T, rdr io.ReadSeeker) cid.Cid {
 	commp, err := w.Sum()
 	require.NoError(t, err)
 
-	return commp.PieceCID
+	return commp
 }

@@ -3,6 +3,7 @@ package piecemeta
 import (
 	"bufio"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"github.com/ipfs/go-cid"
 	bstore "github.com/ipfs/go-ipfs-blockstore"
 	format "github.com/ipfs/go-ipld-format"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car/util"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
@@ -25,6 +27,8 @@ import (
 	carindex "github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
 )
+
+var log = logging.Logger("piecemeta")
 
 //go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecemeta.go -package=mock_piecemeta . SectionReader,PieceReader,Store
 
@@ -47,6 +51,7 @@ type Store interface {
 	GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error)
 	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
 	GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error)
+	SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error
 	PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error)
 	MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error
 
@@ -111,6 +116,84 @@ func (ps *PieceMeta) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash m
 	defer span.End()
 
 	return ps.store.GetOffsetSize(ctx, pieceCid, hash)
+}
+
+func (ps *PieceMeta) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
+	// Get the deals for the piece
+	dls, err := ps.GetPieceDeals(ctx, pieceCid)
+	if err != nil {
+		return 0, fmt.Errorf("getting piece deals for piece %s: %w", pieceCid, err)
+	}
+
+	if len(dls) == 0 {
+		return 0, fmt.Errorf("no deals for piece %s in index: piece not found", pieceCid)
+	}
+
+	// The size of the CAR should be the same for any deal, so just return the
+	// first non-zero CAR size
+	for _, dl := range dls {
+		if dl.CarLength > 0 {
+			return dl.CarLength, nil
+		}
+	}
+
+	// There are no deals with a non-zero CAR size.
+	// The CAR size is zero if it's been imported from the dagstore (the
+	// dagstore doesn't store CAR size information). So instead work out the
+	// size of the CAR by getting the offset of the last section in the CAR
+	// file, then reading the section information.
+
+	// Get the offset of the last section in the CAR file from the index.
+	var lastSectionOffset uint64
+	idx, err := ps.GetIterableIndex(ctx, pieceCid)
+	if err != nil {
+		return 0, fmt.Errorf("getting index for piece %s: %w", pieceCid, err)
+	}
+	err = idx.ForEach(func(_ mh.Multihash, offset uint64) error {
+		if offset > lastSectionOffset {
+			lastSectionOffset = offset
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("iterating index for piece %s: %w", pieceCid, err)
+	}
+
+	// Get a reader over the piece
+	pieceReader, err := ps.GetPieceReader(ctx, pieceCid)
+	if err != nil {
+		return 0, fmt.Errorf("getting piece reader for piece %s: %w", pieceCid, err)
+	}
+
+	// Seek to the last section
+	_, err = pieceReader.Seek(int64(lastSectionOffset), io.SeekStart)
+	if err != nil {
+		return 0, fmt.Errorf("seeking to offset %d in piece data: %w", lastSectionOffset, err)
+	}
+
+	// A section consists of
+	// <size of cid+block><cid><block>
+
+	// Get <size of cid+block>
+	cr := &countReader{r: bufio.NewReader(pieceReader)}
+	dataLength, err := binary.ReadUvarint(cr)
+	if err != nil {
+		return 0, fmt.Errorf("reading CAR section length: %w", err)
+	}
+
+	// The number of bytes in the uvarint that records <size of cid+block>
+	dataLengthUvarSize := cr.count
+
+	// Get the size of the (unpadded) CAR file
+	unpaddedCarSize := lastSectionOffset + dataLengthUvarSize + dataLength
+
+	// Write the CAR size back to the store so that it's cached for next time
+	err = ps.store.SetCarSize(ctx, pieceCid, unpaddedCarSize)
+	if err != nil {
+		log.Errorw("writing CAR size to piece directory store", "pieceCid", pieceCid, "err", err)
+	}
+
+	return unpaddedCarSize, nil
 }
 
 func (ps *PieceMeta) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
@@ -332,7 +415,7 @@ func (ps *PieceMeta) GetIterableIndex(ctx context.Context, pieceCid cid.Cid) (ca
 	case carindex.IterableIndex:
 		return concrete, nil
 	default:
-		panic("expected MultihashIndexSorted idx")
+		return nil, fmt.Errorf("expected index to be MultihashIndexSorted but got %T", idx)
 	}
 }
 
@@ -478,4 +561,18 @@ func (ps *PieceMeta) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (bstor
 	}
 
 	return bs, nil
+}
+
+// countReader just counts the number of bytes read
+type countReader struct {
+	r     *bufio.Reader
+	count uint64
+}
+
+func (c *countReader) ReadByte() (byte, error) {
+	b, err := c.r.ReadByte()
+	if err == nil {
+		c.count++
+	}
+	return b, err
 }

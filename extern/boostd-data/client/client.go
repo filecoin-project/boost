@@ -24,6 +24,7 @@ type Store struct {
 		GetOffsetSize             func(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
 		GetPieceMetadata          func(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
 		GetPieceDeals             func(context.Context, cid.Cid) ([]model.DealInfo, error)
+		SetCarSize                func(ctx context.Context, pieceCid cid.Cid, size uint64) error
 		MarkIndexErrored          func(context.Context, cid.Cid, error) error
 		IndexedAt                 func(context.Context, cid.Cid) (time.Time, error)
 		PiecesContainingMultihash func(context.Context, mh.Multihash) ([]cid.Cid, error)
@@ -102,6 +103,10 @@ func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err erro
 
 func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	return s.client.AddDealForPiece(ctx, pieceCid, dealInfo)
+}
+
+func (s *Store) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
+	return s.client.SetCarSize(ctx, pieceCid, size)
 }
 
 func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error {

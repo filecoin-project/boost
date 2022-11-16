@@ -264,6 +264,43 @@ func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md Co
 	return nil
 }
 
+func (db *DB) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.set_car_size")
+	defer span.End()
+
+	return db.withCasRetry("set-car-size", func() error {
+		// Get the metadata from the db
+		var getResult *gocb.GetResult
+		k := toCouchKey(pieceCid.String())
+		getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
+		if err != nil {
+			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
+		}
+
+		var metadata CouchbaseMetadata
+		err = getResult.Content(&metadata)
+		if err != nil {
+			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
+		}
+
+		// Set the car size on each deal (should be the same for all deals)
+		for _, dl := range metadata.Deals {
+			dl.CarLength = size
+		}
+
+		// Update the metadata in the db
+		_, err = db.pcidToMeta.Replace(k, metadata, &gocb.ReplaceOptions{
+			Context: ctx,
+			Cas:     getResult.Cas(),
+		})
+		if err != nil {
+			return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
+		}
+
+		return nil
+	})
+}
+
 func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr error) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
 	defer span.End()
