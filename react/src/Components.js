@@ -26,3 +26,13 @@ export function ShortClientAddress(props) {
     const shortAddr = props.address.substring(0, 8) + '…'
     return <div>{shortAddr}</div>
 }
+
+export function ShortPeerID(props) {
+    const shortPeerId = props.peerId.substring(0, 8) + '…'
+    return <div>{shortPeerId}</div>
+}
+
+export function ShortCID(props) {
+    const cid = props.cid.substring(0, 8) + '…'
+    return <div>{cid}</div>
+}

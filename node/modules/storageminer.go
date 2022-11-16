@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"path"
 	"time"
 
@@ -485,13 +486,13 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 	}
 }
 
-func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, pieceMeta *piecemeta.PieceMeta, fullNode v1api.FullNode) *gql.Server {
-	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
+func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, pieceMeta *piecemeta.PieceMeta, fullNode v1api.FullNode) *gql.Server {
+	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
 		storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API,
 		legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer,
 		ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, pieceMeta *piecemeta.PieceMeta, fullNode v1api.FullNode) *gql.Server {
 
-		resolver := gql.NewResolver(cfg, r, h, dealsDB, logsDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyProv, legacyDT, ps, sa, pieceMeta, publisher, fullNode)
+		resolver := gql.NewResolver(cfg, r, h, dealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyProv, legacyDT, ps, sa, pieceMeta, publisher, fullNode)
 		server := gql.NewServer(resolver)
 
 		lc.Append(fx.Hook{
