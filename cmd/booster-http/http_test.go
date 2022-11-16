@@ -75,12 +75,7 @@ func TestHttpGzipResponse(t *testing.T) {
 	mockHttpServer.EXPECT().PiecesContainingMultihash(gomock.Any(), gomock.Any()).AnyTimes().Return(cids, nil)
 	mockHttpServer.EXPECT().GetPieceInfo(gomock.Any()).AnyTimes().Return(&pieceInfo, nil)
 
-	// Create a client and make request with Encoding header
-	//client := &http.Client{
-	//	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-	//		return http.ErrUseLastResponse
-	//	},
-	//}
+	//Create a client and make request with Encoding header
 	client := new(http.Client)
 	request, err := http.NewRequest("GET", "http://localhost:7777/piece?payloadCid=bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi&format=piece", nil)
 	require.NoError(t, err)
@@ -144,7 +139,7 @@ func TestHttpResponseRedirects(t *testing.T) {
 	mockHttpServer.EXPECT().PiecesContainingMultihash(gomock.Any(), gomock.Any()).AnyTimes().Return(cids, nil)
 	mockHttpServer.EXPECT().GetPieceInfo(gomock.Any()).AnyTimes().Return(&pieceInfo, nil)
 
-	//Create a client and make request with Encoding header
+	// Create a client with check against redirects
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
