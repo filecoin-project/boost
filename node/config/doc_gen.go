@@ -222,6 +222,12 @@ Set this value to 0 to indicate there is no limit per host.`,
 			Comment: `The amount of time to keep deal proposal logs for before cleaning them up.`,
 		},
 		{
+			Name: "RetrievalLogDuration",
+			Type: "Duration",
+
+			Comment: `The amount of time to keep retrieval deal logs for before cleaning them up.`,
+		},
+		{
 			Name: "Filter",
 			Type: "string",
 

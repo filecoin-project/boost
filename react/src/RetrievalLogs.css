@@ -1,0 +1,89 @@
+.retrieval-logs {
+    position: relative;
+}
+
+.retrieval-logs table {
+    font-size: 1em;
+    width: 100%;
+}
+
+.retrieval-logs td, .retrieval-logs th {
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
+
+.retrieval-logs th {
+    white-space: nowrap;
+    text-align: left;
+    opacity: 0.6;
+}
+
+.retrieval-logs td.start, .retrieval-logs th.start {
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.retrieval-logs td.sent {
+    width: 5em;
+    white-space: nowrap;
+}
+
+.retrieval-logs td.peer-id {
+    min-width: 8em;
+}
+
+.retrieval-logs td.deal-id {
+    min-width: 7em;
+}
+
+.retrieval-logs td.message {
+    width: 100%;
+}
+
+.retrieval-logs .popup {
+    display: none;
+    position: absolute;
+    font-size: 1em;
+    top: -4em;
+    text-align: center;
+    width: 100%;
+}
+.retrieval-logs .popup.showing {
+    display: inline-block;
+}
+
+.retrieval-logs .popup .message {
+    display: inline-block;
+    color: #777777;
+    background-color: #fff;
+    border: 1px solid #aaa;
+    border-radius: 0.2em;
+    padding: 0.5em;
+    font-size: 0.8em;
+    margin-top: 0.8em;
+}
+
+.retrieval-logs .peer-id > *, .retrieval-logs .deal-id > *, .retrieval-logs .payload-cid > * {
+    display: inline-block;
+}
+
+.retrieval-logs .copy {
+    display: inline-block;
+    vertical-align: text-top;
+    width: 0.8em;
+    height: 0.8em;
+    margin-right: 0.5em;
+    margin-top: 0.1em;
+    cursor: pointer;
+    background: url("./bootstrap-icons/icons/clipboard.svg");
+    background-size: cover;
+}
+
+.retrieval-logs .copy.copied {
+    animation: rotate 0.5s infinite;
+}
+
+@keyframes rotate {
+    from{ transform: rotate(0deg); }
+    to{ transform: rotate(360deg); }
+}

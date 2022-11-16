@@ -192,6 +192,36 @@ type ProposalLogsCount {
   Period: Uint64!
 }
 
+type RetrievalState {
+  CreatedAt: Time!
+  UpdatedAt: Time!
+  PeerID: String!
+  TransferID: Uint64!
+  DealID: Uint64!
+  PayloadCID: String!
+  PieceCID: String!
+  PaymentInterval: Uint64!
+  PaymentIntervalIncrease: Uint64!
+  PricePerByte: BigInt!
+  UnsealPrice: BigInt!
+  Status: String!
+  Message: String!
+  TotalSent: Uint64!
+  DTStatus: String!
+  DTMessage: String!
+}
+
+type RetrievalStateList {
+  totalCount: Int!
+  logs: [RetrievalState]!
+  more: Boolean!
+}
+
+type RetrievalStatesCount {
+  Count: Int!
+  Period: Uint64!
+}
+
 type Storage {
   Staged: Uint64!
   Transferred: Uint64!
@@ -364,6 +394,12 @@ type RootQuery {
 
   """Get the number of accepted and rejected deal proposal logs"""
   proposalLogsCount: ProposalLogsCount!
+
+  """Get retrieval logs"""
+  retrievalLogs(cursor: BigInt, offset: Int, limit: Int): RetrievalStateList!
+
+  """Get the number of retrieval logs"""
+  retrievalLogsCount: RetrievalStatesCount!
 
   """Get information about a piece from the piece store, DAG store and database"""
   pieceStatus(pieceCid: String!): PieceStatus!

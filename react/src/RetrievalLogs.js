@@ -1,30 +1,29 @@
 /* global BigInt */
 import {useQuery} from "@apollo/react-hooks";
 import {
-    ProposalLogsCountQuery,
-    ProposalLogsListQuery,
+    RetrievalLogsCountQuery, RetrievalLogsListQuery,
 } from "./gql";
 import moment from "moment";
 import React, {useState} from "react";
-import {PageContainer, ShortClientAddress, ShortDealID, ShortDealLink} from "./Components";
+import {PageContainer, ShortCID, ShortDealID, ShortDealLink, ShortPeerID} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat, durationNanoToString} from "./util-date";
 import {TimestampFormat} from "./timestamp";
-import './ProposalLogs.css'
+import './RetrievalLogs.css'
 import {Pagination} from "./Pagination";
 import {humanFileSize} from "./util";
 import {addClassFor} from "./util-ui";
 import listCheckImg from "./bootstrap-icons/icons/list-check.svg";
 
-const basePath = '/proposal-logs'
+const basePath = '/retrieval-logs'
 
-export function ProposalLogsPage(props) {
-    return <PageContainer pageType="proposal-logs" title="Deal Proposal Accept Logs">
-        <ProposalLogsContent />
+export function RetrievalLogsPage(props) {
+    return <PageContainer pageType="retrieval-logs" title="Retrieval Deals">
+        <RetrievalLogsContent />
     </PageContainer>
 }
 
-function ProposalLogsContent(props) {
+function RetrievalLogsContent(props) {
     const navigate = useNavigate()
     const params = useParams()
     const pageNum = (params.pageNum && parseInt(params.pageNum)) || 1
@@ -52,7 +51,7 @@ function ProposalLogsContent(props) {
             queryCursor = BigInt(params.cursor)
         } catch {}
     }
-    const {loading, error, data} = useQuery(ProposalLogsListQuery, {
+    const {loading, error, data} = useQuery(RetrievalLogsListQuery, {
         pollInterval: 1000,
         variables: {
             cursor: queryCursor,
@@ -65,7 +64,7 @@ function ProposalLogsContent(props) {
     if (error) return <div>Error: {error.message + " - check connection to Boost server"}</div>
     if (loading) return <div>Loading...</div>
 
-    var res = data.proposalLogs
+    var res = data.retrievalLogs
     var logs = res.logs
     if (pageNum === 1) {
         logs.sort((a, b) => b.CreatedAt.getTime() - a.CreatedAt.getTime())
@@ -75,7 +74,7 @@ function ProposalLogsContent(props) {
 
     var cursor = params.cursor
     if (pageNum === 1 && logs.length) {
-        cursor = logs[0].DealUUID
+        cursor = logs[0].CreatedAt
     }
 
     var toggleTimestampFormat = () => saveTimestampFormat(!timestampFormat)
@@ -87,7 +86,7 @@ function ProposalLogsContent(props) {
         onLinkClick: scrollTop,
     }
 
-    return <div className="logs">
+    return <div className="retrieval-logs">
         <div className="popup">
             <div className="message"></div>
         </div>
@@ -95,16 +94,18 @@ function ProposalLogsContent(props) {
             <tbody>
             <tr>
                 <th onClick={toggleTimestampFormat} className="start">Start</th>
+                <th>Peer ID</th>
                 <th>Deal ID</th>
-                <th>Piece Size</th>
-                <th>Client</th>
+                <th>Payload CID</th>
+                <th>Size</th>
                 <th>Status</th>
+                <th>Message</th>
             </tr>
 
-            {logs.map(log => (
-                <LogRow
-                    key={log.DealUUID}
-                    log={log}
+            {logs.map(row => (
+                <TableRow
+                    key={row.CreatedAt}
+                    row={row}
                     timestampFormat={timestampFormat}
                     toggleTimestampFormat={toggleTimestampFormat}
                 />
@@ -119,19 +120,19 @@ function ProposalLogsContent(props) {
 var popupTimeout
 function showPopup(msg) {
     clearTimeout(popupTimeout)
-    const el = document.body.querySelector('.logs .popup')
+    const el = document.body.querySelector('.retrieval-logs .popup')
     popupTimeout = addClassFor(el, 'showing', 2000)
-    const msgEl = document.body.querySelector('.logs .popup .message')
+    const msgEl = document.body.querySelector('.retrieval-logs .popup .message')
     msgEl.textContent = msg
 }
 
-function LogRow(props) {
-    var log = props.log
-    var start = moment(log.CreatedAt).format(dateFormat)
+function TableRow(props) {
+    var row = props.row
+    var start = moment(row.CreatedAt).format(dateFormat)
     if (props.timestampFormat !== TimestampFormat.DateTime) {
         start = '1m'
-        if (new Date().getTime() - log.CreatedAt.getTime() > 60 * 1000) {
-            start = moment(log.CreatedAt).fromNow()
+        if (new Date().getTime() - row.CreatedAt.getTime() > 60 * 1000) {
+            start = moment(row.CreatedAt).fromNow()
         }
     }
 
@@ -142,36 +143,55 @@ function LogRow(props) {
         showPopup("Copied " + fieldValue + " to clipboard")
     }
 
-    const copyId = "copy-"+log.DealUUID
-    const dealIDToClipboard = () => fieldToClipboard(log.DealUUID, copyId)
-    const clientCopyId = "client-addr-"+log.DealUUID
-    const clientAddrToClipboard = () => fieldToClipboard(log.ClientAddress, clientCopyId)
+    const copyPeerId = "copy-"+row.CreatedAt+row.PeerID
+    const peerIDToClipboard = () => fieldToClipboard(row.PeerID, copyPeerId)
+    const copyDealId = "copy-"+row.CreatedAt+row.DealID
+    const dealIDToClipboard = () => fieldToClipboard(row.DealID, copyPeerId)
 
+    var status = row.Status.replace('DealStatus', '')
+    if (row.DTStatus != status) {
+        status += ": " + row.DTStatus
+    }
+    var msg = row.Message
+    if (row.DTMessage != '') {
+        if (msg != '') {
+            msg += ' - '
+        }
+        msg += row.DTMessage
+    }
     return (
-        <tr className={log.Accepted ? 'accepted' : 'rejected'}>
+        <tr>
             <td className="start" onClick={props.toggleTimestampFormat}>
                 {start}
             </td>
+            <td className="peer-id">
+                <span id={copyPeerId} className="copy" onClick={peerIDToClipboard} title="Copy peer ID to clipboard"></span>
+                <ShortPeerID peerId={row.PeerID} />
+            </td>
             <td className="deal-id">
-                <span id={copyId} className="copy" onClick={dealIDToClipboard} title="Copy deal uuid to clipboard"></span>
-                {log.Accepted ? <ShortDealLink id={log.DealUUID} /> : <ShortDealID id={log.DealUUID} />}
+                <span id={copyDealId} className="copy" onClick={dealIDToClipboard} title="Copy deal ID to clipboard"></span>
+                {'…'+(row.DealID+'').slice(-8)}
             </td>
-            <td className="size">
-                {humanFileSize(log.PieceSize)}
+            <td className="payload-cid">
+                <Link to={'/inspect/'+row.PayloadCID}>
+                    <ShortCID cid={row.PayloadCID} />
+                </Link>
             </td>
-            <td className="client">
-                <span id={clientCopyId} className="copy" onClick={clientAddrToClipboard} title="Copy client address to clipboard"></span>
-                <ShortClientAddress address={log.ClientAddress} />
+            <td className="sent">
+                {humanFileSize(row.TotalSent)}
             </td>
-            <td className="reason">
-                {log.Accepted ? 'Accepted' : log.Reason || 'Rejected'}
+            <td className="status">
+                {status}
+            </td>
+            <td className="message">
+                {msg}
             </td>
         </tr>
     )
 }
 
-export function ProposalLogsMenuItem(props) {
-    const {data} = useQuery(ProposalLogsCountQuery, {
+export function RetrievalLogsMenuItem(props) {
+    const {data} = useQuery(RetrievalLogsCountQuery, {
         pollInterval: 5000,
         fetchPolicy: 'network-only',
         variables: {
@@ -180,12 +200,10 @@ export function ProposalLogsMenuItem(props) {
     })
 
     var durationDisplay = ''
-    var acceptCount = 0
-    var rejectCount = 0
-    if (data && data.proposalLogsCount) {
-        const plc = data.proposalLogsCount
-        acceptCount = plc.Accepted
-        rejectCount = plc.Rejected
+    var count = 0
+    if (data && data.retrievalStatesCount) {
+        const plc = data.retrievalStatesCount
+        count = plc.Count
         durationDisplay = durationNanoToString(plc.Period)
     }
 
@@ -193,12 +211,9 @@ export function ProposalLogsMenuItem(props) {
         <div className="menu-item" >
             <img className="icon" alt="" src={listCheckImg} />
             <Link key="proposal-logs" to={basePath}>
-                <h3>Deal Proposals {durationDisplay && '('+durationDisplay+')'}</h3>
+                <h3>Retrieval Deals {durationDisplay && '('+durationDisplay+')'}</h3>
                 <div className="menu-desc">
-                    <b>{acceptCount}</b> accepted
-                </div>
-                <div className="menu-desc">
-                    <b>{rejectCount}</b> rejected
+                    <b>{count}</b> retrievals
                 </div>
             </Link>
         </div>
@@ -212,7 +227,7 @@ function scrollTop() {
 const RowsPerPage = {
     Default: 10,
 
-    settingsKey: "settings.proposal-logs.per-page",
+    settingsKey: "settings.retrieval-logs.per-page",
 
     load: () => {
         const saved = localStorage.getItem(RowsPerPage.settingsKey)

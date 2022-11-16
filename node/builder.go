@@ -20,6 +20,7 @@ import (
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
+	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -141,6 +142,8 @@ const (
 	GetParamsKey
 	HandleMigrateProviderFundsKey
 	HandleDealsKey
+	HandleCreateRetrievalTablesKey
+	HandleRetrievalEventsKey
 	HandleRetrievalKey
 	HandleRetrievalTransportsKey
 	HandleProtocolProxyKey
@@ -404,10 +407,13 @@ var BoostNode = Options(
 	Override(new(lotus_dtypes.NetworkName), lotus_modules.StorageNetworkName),
 	Override(new(*sql.DB), modules.NewBoostDB),
 	Override(new(*modules.LogSqlDB), modules.NewLogsSqlDB),
+	Override(new(*modules.RetrievalSqlDB), modules.NewRetrievalSqlDB),
+	Override(HandleCreateRetrievalTablesKey, modules.CreateRetrievalTables),
 	Override(new(*db.DealsDB), modules.NewDealsDB),
 	Override(new(*db.LogsDB), modules.NewLogsDB),
 	Override(new(*db.ProposalLogsDB), modules.NewProposalLogsDB),
 	Override(new(*db.FundsDB), modules.NewFundsDB),
+	Override(new(*rtvllog.RetrievalLogDB), modules.NewRetrievalLogDB),
 )
 
 func ConfigBoost(cfg *config.Boost) Option {
@@ -525,6 +531,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
 		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
+		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Dealmaking.RetrievalLogDuration))),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
 		Override(new(*protocolproxy.ProtocolProxy), modules.NewProtocolProxy(cfg)),
