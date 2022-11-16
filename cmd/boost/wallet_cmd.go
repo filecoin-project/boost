@@ -9,9 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/filecoin-project/boost/cmd"
-
 	"github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/api"
@@ -121,6 +120,7 @@ var walletList = &cli.Command{
 		nonceKey := "Nonce"
 		defaultKey := "Default"
 		errorKey := "Error"
+		dataCapKey := "DataCap"
 
 		// One-to-one mapping between tablewriter keys and JSON keys
 		tableKeysToJsonKeys := map[string]string{
@@ -131,6 +131,7 @@ var walletList = &cli.Command{
 			nonceKey:   strings.ToLower(nonceKey),
 			defaultKey: strings.ToLower(defaultKey),
 			errorKey:   strings.ToLower(errorKey),
+			dataCapKey: strings.ToLower(dataCapKey),
 		}
 
 		// List of Maps whose keys are defined above. One row = one list element = one wallet
@@ -198,6 +199,16 @@ var walletList = &cli.Command{
 						wallet[marketLockedKey] = marketLockedValue
 					}
 				}
+				dcap, err := api.StateVerifiedClientStatus(ctx, addr, types.EmptyTSK)
+				if err == nil {
+					wallet[dataCapKey] = dcap
+					if !cctx.Bool("json") && dcap == nil {
+						wallet[dataCapKey] = "X"
+					}
+				} else {
+					wallet[dataCapKey] = "n/a"
+				}
+
 				wallets = append(wallets, wallet)
 			}
 		}
