@@ -8,8 +8,9 @@ import (
 	"os"
 	"testing"
 
-	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
 	"github.com/filecoin-project/boostd-data/model"
+
+	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
 	"github.com/golang/mock/gomock"
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
@@ -95,4 +96,34 @@ func TestHttpGzipResponse(t *testing.T) {
 	// Stop the server
 	err = httpServer.Stop()
 	require.NoError(t, err)
+}
+
+func TestBlockRetrieval(t *testing.T) {
+	//Create a new mock Http server with custom functions
+	ctrl := gomock.NewController(t)
+	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
+	httpServer := NewHttpServer("", 7777, mockHttpServer)
+	httpServer.Start(context.Background())
+
+	data := []byte("Hello World!")
+
+	mockHttpServer.EXPECT().GetBlockByCid(gomock.Any(), gomock.Any()).AnyTimes().Return(data, nil)
+
+	// Create a client and make request with Encoding header
+	client := new(http.Client)
+	request, err := http.NewRequest("GET", "http://localhost:7777/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
+	require.NoError(t, err)
+
+	response, err := client.Do(request)
+	require.NoError(t, err)
+	defer response.Body.Close()
+	require.Equal(t, "nosniff", response.Header.Get("X-Content-Type-Options"))
+	require.Equal(t, "application/vnd.ipld.raw", response.Header.Get("Content-Type"))
+	require.Equal(t, "attachment; filename=\"bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi\"; filename*=UTF-8''bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", response.Header.Get("Content-Disposition"))
+
+	out, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+
+	require.Equal(t, data, out)
+
 }

@@ -39,6 +39,21 @@ func (m *MockHttpServerApi) EXPECT() *MockHttpServerApiMockRecorder {
 	return m.recorder
 }
 
+// GetBlockByCid mocks base method.
+func (m *MockHttpServerApi) GetBlockByCid(ctx context.Context, blockCid cid.Cid) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlockByCid", ctx, blockCid)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlockByCid indicates an expected call of GetBlockByCid.
+func (mr *MockHttpServerApiMockRecorder) GetBlockByCid(ctx, blockCid interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockByCid", reflect.TypeOf((*MockHttpServerApi)(nil).GetBlockByCid), ctx, blockCid)
+}
+
 // GetCarSize mocks base method.
 func (m *MockHttpServerApi) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
 	m.ctrl.T.Helper()
