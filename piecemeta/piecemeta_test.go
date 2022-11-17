@@ -313,13 +313,19 @@ func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.Equal(t, len(carBytes), int(size))
 }
 
+type MockSectionReader struct {
+	car.SectionReader
+}
+
+func (MockSectionReader) Close() error { return nil }
+
 func createMockPieceReader(t *testing.T, reader car.SectionReader) *mock_piecemeta.MockPieceReader {
 	ctrl := gomock.NewController(t)
 	pr := mock_piecemeta.NewMockPieceReader(ctrl)
 	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
 		func(_ context.Context, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (piecemeta.SectionReader, error) {
 			_, err := reader.Seek(0, io.SeekStart)
-			return reader, err
+			return MockSectionReader{reader}, err
 		})
 	return pr
 }
