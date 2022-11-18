@@ -21,6 +21,7 @@ import {PieceMetaDetail, PieceMetaPage} from "./PieceMeta";
 import {ProposalLogsPage} from "./ProposalLogs";
 import {InspectPage} from "./Inspect";
 import {RetrievalLogsPage} from "./RetrievalLogs";
+import {RetrievalLogDetail} from "./RetrievalLogDetail";
 
 function App(props) {
     return (
@@ -43,6 +44,7 @@ function App(props) {
                                         <Route path="/proposal-logs/from/:cursor/page/:pageNum" element={<ProposalLogsPage />} />
                                         <Route path="/retrieval-logs" element={<RetrievalLogsPage />} />
                                         <Route path="/retrieval-logs/from/:cursor/page/:pageNum" element={<RetrievalLogsPage />} />
+                                        <Route path="/retrieval-logs/:peerID/:dealID" element={<RetrievalLogDetail />} />
                                         <Route path="/storage-space" element={<StorageSpacePage />} />
                                         <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
                                         <Route path="/funds" element={<FundsPage />} />

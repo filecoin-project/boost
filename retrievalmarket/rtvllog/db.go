@@ -74,7 +74,7 @@ func (d *RetrievalLogDB) Insert(ctx context.Context, l *RetrievalDealState) erro
 		"DTStatus, " +
 		"DTMessage" +
 		") "
-	qry += "VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '', '')"
+	qry += "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '', '')"
 
 	pieceCid := ""
 	if l.PieceCID != nil {
@@ -85,7 +85,8 @@ func (d *RetrievalLogDB) Insert(ctx context.Context, l *RetrievalDealState) erro
 	values := []interface{}{
 		now,
 		now,
-		l.PeerID,
+		l.LocalPeerID.String(),
+		l.PeerID.String(),
 		l.DealID,
 		l.TransferID,
 		l.PayloadCID.String(),
@@ -99,6 +100,17 @@ func (d *RetrievalLogDB) Insert(ctx context.Context, l *RetrievalDealState) erro
 	}
 	_, err := d.db.ExecContext(ctx, qry, values...)
 	return err
+}
+
+func (d *RetrievalLogDB) Get(ctx context.Context, peerID string, dealID uint64) (*RetrievalDealState, error) {
+	rows, err := d.list(ctx, 0, 0, "PeerID = ? AND DealID = ?", peerID, dealID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no retrieval found with peer ID %s and deal ID %d", peerID, dealID)
+	}
+	return &rows[0], nil
 }
 
 func (d *RetrievalLogDB) List(ctx context.Context, cursor *time.Time, offset int, limit int) ([]RetrievalDealState, error) {
@@ -160,13 +172,15 @@ func (d *RetrievalLogDB) list(ctx context.Context, offset int, limit int, where 
 		var pieceCid sql.NullString
 		var pricePerByte sql.NullString
 		var unsealPrice sql.NullString
+		var localPeerID sql.NullString
+		var peerID sql.NullString
 
 		var dealState RetrievalDealState
 		err := rows.Scan(
 			&dealState.CreatedAt,
 			&dealState.UpdatedAt,
-			&dealState.LocalPeerID,
-			&dealState.PeerID,
+			&localPeerID,
+			&peerID,
 			&dealState.DealID,
 			&dealState.TransferID,
 			&payloadCid,
@@ -183,6 +197,19 @@ func (d *RetrievalLogDB) list(ctx context.Context, offset int, limit int, where 
 		)
 		if err != nil {
 			return nil, err
+		}
+
+		if localPeerID.String != "" {
+			dealState.LocalPeerID, err = peer.Decode(localPeerID.String)
+			if err != nil {
+				return nil, fmt.Errorf("parsing local peer ID '%s': %w", localPeerID.String, err)
+			}
+		}
+		if peerID.String != "" {
+			dealState.PeerID, err = peer.Decode(peerID.String)
+			if err != nil {
+				return nil, fmt.Errorf("parsing peer ID '%s': %w", peerID.String, err)
+			}
 		}
 
 		dealState.PayloadCID, err = cid.Parse(payloadCid.String)
@@ -230,19 +257,25 @@ func (d *RetrievalLogDB) Update(ctx context.Context, state retrievalmarket.Provi
 	}
 	if state.ChannelID != nil {
 		fields["TransferID"] = state.ChannelID.ID
-		fields["LocalPeerID"] = state.ChannelID.Responder
+		fields["LocalPeerID"] = state.ChannelID.Responder.String()
 	}
 
-	return d.update(ctx, fields, "PeerID = ? AND DealID = ?", state.Receiver, state.DealProposal.ID)
+	return d.update(ctx, fields, "PeerID = ? AND DealID = ?", state.Receiver.String(), state.DealProposal.ID)
 }
 
-func (d *RetrievalLogDB) UpdateDataTransferState(ctx context.Context, state datatransfer.ChannelState) error {
+func (d *RetrievalLogDB) UpdateDataTransferState(ctx context.Context, event datatransfer.Event, state datatransfer.ChannelState) error {
+	peerID := state.OtherPeer().String()
+	transferID := state.TransferID()
+	if err := d.insertDTEvent(ctx, peerID, transferID, event); err != nil {
+		return err
+	}
+
 	fields := map[string]interface{}{
 		"DTStatus":  datatransfer.Statuses[state.Status()],
 		"DTMessage": state.Message(),
 		"UpdatedAt": time.Now(),
 	}
-	return d.update(ctx, fields, "PeerID = ? AND TransferID = ?", state.OtherPeer(), state.TransferID())
+	return d.update(ctx, fields, "PeerID = ? AND TransferID = ?", peerID, transferID)
 }
 
 func (d *RetrievalLogDB) update(ctx context.Context, fields map[string]interface{}, where string, whereArgs ...interface{}) error {
@@ -257,6 +290,52 @@ func (d *RetrievalLogDB) update(ctx context.Context, fields map[string]interface
 	qry := "UPDATE RetrievalDealStates SET " + set + " WHERE " + where
 	_, err := d.db.ExecContext(ctx, qry, append(values, whereArgs...)...)
 	return err
+}
+
+func (d *RetrievalLogDB) insertDTEvent(ctx context.Context, peerID string, transferID datatransfer.TransferID, event datatransfer.Event) error {
+	qry := "INSERT INTO RetrievalDataTransferEvents (PeerID, TransferID, CreatedAt, Name, Message) " +
+		"VALUES (?, ?, ?, ?, ?)"
+	_, err := d.db.ExecContext(ctx, qry, peerID, transferID, event.Timestamp, datatransfer.Events[event.Code], event.Message)
+	return err
+}
+
+type DTEvent struct {
+	CreatedAt time.Time
+	Name      string
+	Message   string
+}
+
+func (d *RetrievalLogDB) ListDTEvents(ctx context.Context, peerID string, transferID datatransfer.TransferID) ([]DTEvent, error) {
+	qry := "SELECT CreatedAt, Name, Message " +
+		"FROM RetrievalDataTransferEvents " +
+		"WHERE PeerID = ? AND TransferID = ? " +
+		"ORDER BY CreatedAt desc"
+
+	rows, err := d.db.QueryContext(ctx, qry, peerID, transferID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	dtEvents := make([]DTEvent, 0, 16)
+	for rows.Next() {
+		var dtEvent DTEvent
+		err := rows.Scan(
+			&dtEvent.CreatedAt,
+			&dtEvent.Name,
+			&dtEvent.Message,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		dtEvents = append(dtEvents, dtEvent)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return dtEvents, nil
 }
 
 func (d *RetrievalLogDB) DeleteOlderThan(ctx context.Context, at time.Time) (int64, error) {

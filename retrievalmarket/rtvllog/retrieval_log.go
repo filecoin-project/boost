@@ -19,6 +19,7 @@ type RetrievalLog struct {
 
 	lastUpdateLk sync.Mutex
 	lastUpdate   map[string]time.Time
+	lastUpdateDT map[string]time.Time
 }
 
 func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration) *RetrievalLog {
@@ -88,20 +89,27 @@ func (r *RetrievalLog) OnDataTransferEvent(event datatransfer.Event, state datat
 	}
 
 	switch event.Code {
-	case datatransfer.DataQueued, datatransfer.DataQueuedProgress,
-		datatransfer.DataSent, datatransfer.DataSentProgress,
+	case datatransfer.DataQueued, datatransfer.DataQueuedProgress, datatransfer.DataSentProgress,
 		datatransfer.DataReceived, datatransfer.DataReceivedProgress:
 		return
+	case datatransfer.DataSent:
+		// To prevent too frequent updates, only allow data sent updates if it's
+		// been more than half a second since the last one
+		if !r.allowUpdate(state.ChannelID().String()) {
+			return
+		}
 	}
 
-	err := r.db.UpdateDataTransferState(r.ctx, state)
+	err := r.db.UpdateDataTransferState(r.ctx, event, state)
 	if err != nil {
 		log.Errorw("failed to update retrieval deal logger db dt state", "err", err)
 	}
 }
 
 func (r *RetrievalLog) OnRetrievalEvent(event retrievalmarket.ProviderEvent, state retrievalmarket.ProviderDealState) {
-	if !r.allowUpdate(event, state) {
+	// To prevent too frequent updates, only allow block sent updates if it's
+	// been more than half a second since the last one
+	if event == retrievalmarket.ProviderEventBlockSent && !r.allowUpdate(state.ChannelID.String()) {
 		return
 	}
 
@@ -141,25 +149,20 @@ func (r *RetrievalLog) OnRetrievalEvent(event retrievalmarket.ProviderEvent, sta
 	}
 }
 
-// The block sent event may be very frequent, so limit it to one event per second per retrieval deal
-func (r *RetrievalLog) allowUpdate(event retrievalmarket.ProviderEvent, state retrievalmarket.ProviderDealState) bool {
-	if event != retrievalmarket.ProviderEventBlockSent {
-		return true
-	}
-
+// Some events may be very frequent, so limit events to two per second per retrieval deal
+func (r *RetrievalLog) allowUpdate(key string) bool {
 	now := time.Now()
-	ch := state.ChannelID.String()
 
 	r.lastUpdateLk.Lock()
 	defer r.lastUpdateLk.Unlock()
 
-	lastAt, ok := r.lastUpdate[ch]
+	lastAt, ok := r.lastUpdate[key]
 	if !ok {
-		r.lastUpdate[ch] = now
+		r.lastUpdate[key] = now
 		return true
 	}
-	if now.Sub(lastAt) > time.Second {
-		r.lastUpdate[ch] = now
+	if now.Sub(lastAt) > 500*time.Millisecond {
+		r.lastUpdate[key] = now
 		return true
 	}
 

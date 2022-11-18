@@ -20,3 +20,13 @@ CREATE TABLE IF NOT EXISTS RetrievalDealStates (
 
 CREATE INDEX IF NOT EXISTS index_retrieval_states_created_at on RetrievalDealStates(CreatedAt);
 CREATE INDEX IF NOT EXISTS index_retrieval_states_deal_id on RetrievalDealStates(DealID);
+
+CREATE TABLE IF NOT EXISTS RetrievalDataTransferEvents (
+    PeerID TEXT,
+    TransferID INT,
+    CreatedAt DateTime,
+    Name TEXT,
+    Message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS index_retrieval_dt_evts_peer_transfer on RetrievalDataTransferEvents(PeerID, TransferID);
