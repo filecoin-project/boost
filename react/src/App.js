@@ -21,10 +21,7 @@ import {PieceMetaDetail, PieceMetaPage} from "./PieceMeta";
 import {ProposalLogsPage} from "./ProposalLogs";
 import {InspectPage} from "./Inspect";
 import {RetrievalLogsPage} from "./RetrievalLogs";
-<<<<<<< HEAD
 import {RetrievalLogDetail} from "./RetrievalLogDetail";
-=======
->>>>>>> feat: retrieval logs
 
 function App(props) {
     return (
@@ -47,10 +44,7 @@ function App(props) {
                                         <Route path="/proposal-logs/from/:cursor/page/:pageNum" element={<ProposalLogsPage />} />
                                         <Route path="/retrieval-logs" element={<RetrievalLogsPage />} />
                                         <Route path="/retrieval-logs/from/:cursor/page/:pageNum" element={<RetrievalLogsPage />} />
-<<<<<<< HEAD
                                         <Route path="/retrieval-logs/:peerID/:dealID" element={<RetrievalLogDetail />} />
-=======
->>>>>>> feat: retrieval logs
                                         <Route path="/storage-space" element={<StorageSpacePage />} />
                                         <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
                                         <Route path="/funds" element={<FundsPage />} />
