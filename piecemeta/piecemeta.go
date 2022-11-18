@@ -36,6 +36,7 @@ type SectionReader interface {
 	io.Reader
 	io.ReaderAt
 	io.Seeker
+	io.Closer
 }
 
 type PieceReader interface {
@@ -443,6 +444,7 @@ func (ps *PieceMeta) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, erro
 			if err != nil {
 				return nil, fmt.Errorf("getting piece reader: %w", err)
 			}
+			defer reader.Close()
 
 			// Get the offset of the block within the piece (CAR file)
 			offsetSize, err := ps.GetOffsetSize(ctx, pieceCid, c.Hash())
