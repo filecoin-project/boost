@@ -192,6 +192,12 @@ type ProposalLogsCount {
   Period: Uint64!
 }
 
+type DTEvent {
+  CreatedAt: Time!
+  Name: String!
+  Message: String!
+}
+
 type RetrievalState {
   CreatedAt: Time!
   UpdatedAt: Time!
@@ -209,6 +215,7 @@ type RetrievalState {
   TotalSent: Uint64!
   DTStatus: String!
   DTMessage: String!
+  DTEvents: [DTEvent]!
 }
 
 type RetrievalStateList {
@@ -394,6 +401,9 @@ type RootQuery {
 
   """Get the number of accepted and rejected deal proposal logs"""
   proposalLogsCount: ProposalLogsCount!
+
+  """Get individual retrieval log"""
+  retrievalLog(peerID: String!, dealID: Uint64!): RetrievalState
 
   """Get retrieval logs"""
   retrievalLogs(cursor: BigInt, offset: Int, limit: Int): RetrievalStateList!

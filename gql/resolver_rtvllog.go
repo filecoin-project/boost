@@ -2,15 +2,16 @@ package gql
 
 import (
 	"context"
-	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"time"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/graph-gophers/graphql-go"
 )
 
 type retrievalStateResolver struct {
 	rtvllog.RetrievalDealState
+	db *rtvllog.RetrievalLogDB
 }
 
 func (r *retrievalStateResolver) CreatedAt() graphql.Time {
@@ -64,10 +65,51 @@ func (r *retrievalStateResolver) TotalSent() gqltypes.Uint64 {
 	return gqltypes.Uint64(r.RetrievalDealState.TotalSent)
 }
 
+func (r *retrievalStateResolver) DTEvents(ctx context.Context) ([]*retrievalDTEventResolver, error) {
+	if r.RetrievalDealState.TransferID == 0 || r.RetrievalDealState.LocalPeerID == "" {
+		return nil, nil
+	}
+
+	pid := r.RetrievalDealState.PeerID.String()
+	evts, err := r.db.ListDTEvents(ctx, pid, r.RetrievalDealState.TransferID)
+	if err != nil {
+		log.Warnw("getting data-transfer events for retrieval %s/%d: %s", pid, r.RetrievalDealState.TransferID, err)
+		return nil, nil
+	}
+
+	evtResolvers := make([]*retrievalDTEventResolver, 0, len(evts))
+	for _, evt := range evts {
+		evtResolvers = append(evtResolvers, &retrievalDTEventResolver{DTEvent: evt})
+	}
+	return evtResolvers, nil
+}
+
+type retrievalDTEventResolver struct {
+	rtvllog.DTEvent
+}
+
+func (r *retrievalDTEventResolver) CreatedAt() graphql.Time {
+	return graphql.Time{Time: r.DTEvent.CreatedAt}
+}
+
 type retrievalStateListResolver struct {
 	TotalCount int32
 	Logs       []*retrievalStateResolver
 	More       bool
+}
+
+type retLogArgs struct {
+	PeerID string
+	DealID gqltypes.Uint64
+}
+
+func (r *resolver) RetrievalLog(ctx context.Context, args retLogArgs) (*retrievalStateResolver, error) {
+	st, err := r.retDB.Get(ctx, args.PeerID, uint64(args.DealID))
+	if err != nil {
+		return nil, err
+	}
+
+	return &retrievalStateResolver{RetrievalDealState: *st, db: r.retDB}, nil
 }
 
 type retrievalStatesArgs struct {
@@ -113,7 +155,7 @@ func (r *resolver) RetrievalLogs(ctx context.Context, args retrievalStatesArgs) 
 
 	resolvers := make([]*retrievalStateResolver, 0, len(rows))
 	for _, row := range rows {
-		resolvers = append(resolvers, &retrievalStateResolver{RetrievalDealState: row})
+		resolvers = append(resolvers, &retrievalStateResolver{RetrievalDealState: row, db: r.retDB})
 	}
 
 	return &retrievalStateListResolver{

@@ -217,6 +217,34 @@ const ProposalLogsCountQuery = gql`
     }
 `;
 
+const RetrievalLogQuery = gql`
+    query AppRetrievalLogQuery($peerID: String!, $dealID: Uint64!) {
+        retrievalLog(peerID: $peerID, dealID: $dealID) {
+            CreatedAt
+            UpdatedAt
+            PeerID
+            TransferID
+            DealID
+            PayloadCID
+            PieceCID
+            PaymentInterval
+            PaymentIntervalIncrease
+            PricePerByte
+            UnsealPrice
+            Status
+            Message
+            TotalSent
+            DTStatus
+            DTMessage
+            DTEvents {
+                CreatedAt
+                Name
+                Message
+            }
+        }
+    }
+`;
+
 const RetrievalLogsListQuery = gql`
     query AppRetrievalLogsListQuery($cursor: BigInt, $offset: Int, $limit: Int) {
         retrievalLogs(cursor: $cursor, offset: $offset, limit: $limit) {
@@ -623,6 +651,7 @@ export {
     NewDealsSubscription,
     ProposalLogsListQuery,
     ProposalLogsCountQuery,
+    RetrievalLogQuery,
     RetrievalLogsListQuery,
     RetrievalLogsCountQuery,
     PiecesWithPayloadCidQuery,

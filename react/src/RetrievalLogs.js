@@ -5,7 +5,7 @@ import {
 } from "./gql";
 import moment from "moment";
 import React, {useState} from "react";
-import {PageContainer, ShortCID, ShortDealID, ShortDealLink, ShortPeerID} from "./Components";
+import {PageContainer, ShortCID, ShortPeerID} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat, durationNanoToString} from "./util-date";
 import {TimestampFormat} from "./timestamp";
@@ -18,7 +18,7 @@ import listCheckImg from "./bootstrap-icons/icons/list-check.svg";
 const basePath = '/retrieval-logs'
 
 export function RetrievalLogsPage(props) {
-    return <PageContainer pageType="retrieval-logs" title="Retrieval Deals">
+    return <PageContainer pageType="retrieval-logs" title="Graphsync Retrievals">
         <RetrievalLogsContent />
     </PageContainer>
 }
@@ -97,7 +97,7 @@ function RetrievalLogsContent(props) {
                 <th>Peer ID</th>
                 <th>Deal ID</th>
                 <th>Payload CID</th>
-                <th>Size</th>
+                <th>Sent</th>
                 <th>Status</th>
                 <th>Message</th>
             </tr>
@@ -149,7 +149,7 @@ function TableRow(props) {
     const dealIDToClipboard = () => fieldToClipboard(row.DealID, copyPeerId)
 
     var status = row.Status.replace('DealStatus', '')
-    if (row.DTStatus != status) {
+    if (row.DTStatus != status && row.DTStatus != '') {
         status += ": " + row.DTStatus
     }
     var msg = row.Message
@@ -170,7 +170,9 @@ function TableRow(props) {
             </td>
             <td className="deal-id">
                 <span id={copyDealId} className="copy" onClick={dealIDToClipboard} title="Copy deal ID to clipboard"></span>
-                {'…'+(row.DealID+'').slice(-8)}
+                <Link to={basePath+'/'+row.PeerID+'/'+row.DealID}>
+                    {'…'+(row.DealID+'').slice(-8)}
+                </Link>
             </td>
             <td className="payload-cid">
                 <Link to={'/inspect/'+row.PayloadCID}>
@@ -201,8 +203,8 @@ export function RetrievalLogsMenuItem(props) {
 
     var durationDisplay = ''
     var count = 0
-    if (data && data.retrievalStatesCount) {
-        const plc = data.retrievalStatesCount
+    if (data && data.retrievalLogsCount) {
+        const plc = data.retrievalLogsCount
         count = plc.Count
         durationDisplay = durationNanoToString(plc.Period)
     }
@@ -211,7 +213,7 @@ export function RetrievalLogsMenuItem(props) {
         <div className="menu-item" >
             <img className="icon" alt="" src={listCheckImg} />
             <Link key="proposal-logs" to={basePath}>
-                <h3>Retrieval Deals {durationDisplay && '('+durationDisplay+')'}</h3>
+                <h3>Retrievals {durationDisplay && '('+durationDisplay+')'}</h3>
                 <div className="menu-desc">
                     <b>{count}</b> retrievals
                 </div>
