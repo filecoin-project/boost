@@ -57,7 +57,7 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 				for _, addrString := range cfg.Dealmaking.BitswapPublicAddresses {
 					addr, err := multiaddr.NewMultiaddr(addrString)
 					if err != nil {
-						return nil, fmt.Errorf("Could not parse bitswap address '%s' as multiaddr: %w", addrString, addr)
+						return nil, fmt.Errorf("Could not parse bitswap address '%s' as multiaddr: %w", addrString, err)
 					}
 					addrs = append(addrs, addr)
 				}
