@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 
 	"github.com/filecoin-project/lotus/node/repo"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	host "github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/fx"
 
 	dst "github.com/filecoin-project/dagstore"
@@ -23,6 +26,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/index-provider/engine/xproviders"
 	"github.com/filecoin-project/index-provider/metadata"
 
 	"github.com/filecoin-project/boost/db"
@@ -36,53 +40,105 @@ var shardRegMarker = ".boost-shard-registration-complete"
 var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
-	cfg            lotus_config.DAGStoreConfig
-	enabled        bool
-	dealsDB        *db.DealsDB
-	legacyProv     lotus_storagemarket.StorageProvider
-	prov           provider.Interface
-	dagStore       *dagstore.Wrapper
-	meshCreator    idxprov.MeshCreator
-	bitswapEnabled bool
+	cfg               lotus_config.DAGStoreConfig
+	enabled           bool
+	dealsDB           *db.DealsDB
+	legacyProv        lotus_storagemarket.StorageProvider
+	prov              provider.Interface
+	dagStore          *dagstore.Wrapper
+	meshCreator       idxprov.MeshCreator
+	h                 host.Host
+	extendedProviders []xproviders.Info
 }
 
-func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
+func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
 	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
-	meshCreator idxprov.MeshCreator) *Wrapper {
+	meshCreator idxprov.MeshCreator) (*Wrapper, error) {
 
-	return func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
+	return func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
 		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
-		meshCreator idxprov.MeshCreator) *Wrapper {
+		meshCreator idxprov.MeshCreator) (*Wrapper, error) {
 		if cfg.DAGStore.RootDir == "" {
 			cfg.DAGStore.RootDir = filepath.Join(r.Path(), defaultDagStoreDir)
 		}
 
 		_, isDisabled := prov.(*DisabledIndexProvider)
+
+		var eps []xproviders.Info
+
+		// add bitswap extended provider as needed
+		if cfg.Dealmaking.BitswapPeerID != "" {
+			meta := metadata.Default.New(metadata.Bitswap{})
+			mbytes, err := meta.MarshalBinary()
+			if err != nil {
+				return nil, err
+			}
+			if len(cfg.Dealmaking.BitswapPublicAddresses) > 0 {
+				keyFile, err := os.ReadFile(cfg.Dealmaking.BitswapPrivKeyFile)
+				if err != nil {
+					return nil, err
+				}
+				privKey, err := crypto.UnmarshalPrivateKey(keyFile)
+				if err != nil {
+					return nil, err
+				}
+				eps = append(eps, xproviders.Info{
+					ID:       cfg.Dealmaking.BitswapPeerID,
+					Addrs:    cfg.Dealmaking.BitswapPublicAddresses,
+					Priv:     privKey,
+					Metadata: mbytes,
+				})
+			} else {
+				eps = append(eps, xproviders.NewInfo(h.ID(), h.Peerstore().PrivKey(h.ID()), mbytes, h.Addrs()))
+			}
+		}
+
 		w := &Wrapper{
-			dealsDB:        dealsDB,
-			legacyProv:     legacyProv,
-			prov:           prov,
-			dagStore:       dagStore,
-			meshCreator:    meshCreator,
-			cfg:            cfg.DAGStore,
-			bitswapEnabled: cfg.Dealmaking.BitswapPeerID != "",
-			enabled:        !isDisabled,
+			dealsDB:           dealsDB,
+			legacyProv:        legacyProv,
+			prov:              prov,
+			dagStore:          dagStore,
+			meshCreator:       meshCreator,
+			cfg:               cfg.DAGStore,
+			extendedProviders: eps,
+
+			enabled: !isDisabled,
 		}
 		// announce all deals on startup in case of a config change
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				go func() {
-					_ = w.IndexerAnnounceAllDeals(ctx)
+					_ = w.AnnounceExtendedProviders(ctx)
 				}()
 				return nil
 			},
 		})
-		return w
+		return w, nil
 	}
 }
 
 func (w *Wrapper) Enabled() bool {
 	return w.enabled
+}
+
+func (w *Wrapper) AnnounceExtendedProviders(ctx context.Context) error {
+
+	if len(w.extendedProviders) == 0 {
+		return nil
+	}
+	adBuilder := xproviders.NewAdBuilder(w.h.ID(), w.h.Peerstore().PrivKey(w.h.ID()), w.h.Addrs())
+	adBuilder.WithExtendedProviders(w.extendedProviders...)
+	last, _, err := w.prov.GetLatestAdv(ctx)
+	if err != nil {
+		return err
+	}
+	adBuilder.WithLastAdID(last)
+	ad, err := adBuilder.BuildAndSign()
+	if err != nil {
+		return err
+	}
+	_, err = w.prov.Publish(ctx, *ad)
+	return err
 }
 
 func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
@@ -139,7 +195,7 @@ func (w *Wrapper) Start(ctx context.Context) {
 		log.Errorw("failed to migrate dagstore indices for Boost deals", "err", err)
 	}
 
-	w.prov.RegisterMultihashLister(func(ctx context.Context, contextID []byte) (provider.MultihashIterator, error) {
+	w.prov.RegisterMultihashLister(func(ctx context.Context, pid peer.ID, contextID []byte) (provider.MultihashIterator, error) {
 		provideF := func(pieceCid cid.Cid) (provider.MultihashIterator, error) {
 			ii, err := w.dagStore.GetIterableIndexForPiece(pieceCid)
 			if err != nil {
@@ -190,11 +246,8 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDeal
 			VerifiedDeal:  pds.ClientDealProposal.Proposal.VerifiedDeal,
 		},
 	}
-	if w.bitswapEnabled {
-		protocols = append(protocols, metadata.Bitswap{})
-	}
 
-	fm := metadata.New(protocols...)
+	fm := metadata.Default.New(protocols...)
 
 	// ensure we have a connection with the full node host so that the index provider gossip sub announcements make their
 	// way to the filecoin bootstrapper network
@@ -207,7 +260,7 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDeal
 		return cid.Undef, fmt.Errorf("failed to get proposal cid from deal: %w", err)
 	}
 
-	annCid, err := w.prov.NotifyPut(ctx, propCid.Bytes(), fm)
+	annCid, err := w.prov.NotifyPut(ctx, nil, propCid.Bytes(), fm)
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to announce deal to index provider: %w", err)
 	}

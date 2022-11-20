@@ -51,9 +51,20 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 			})
 		}
 		if cfg.Dealmaking.BitswapPeerID != "" {
+			addrs := h.Addrs()
+			if len(cfg.Dealmaking.BitswapPublicAddresses) > 0 {
+				addrs = nil
+				for _, addrString := range cfg.Dealmaking.BitswapPublicAddresses {
+					addr, err := multiaddr.NewMultiaddr(addrString)
+					if err != nil {
+						return nil, fmt.Errorf("Could not parse bitswap address '%s' as multiaddr: %w", addrString, addr)
+					}
+					addrs = append(addrs, addr)
+				}
+			}
 			protos = append(protos, types.Protocol{
 				Name:      "bitswap",
-				Addresses: h.Addrs(),
+				Addresses: addrs,
 			})
 		}
 
@@ -132,7 +143,8 @@ func HandleRetrievalGraphsyncUpdates(duration time.Duration) func(lc fx.Lifecycl
 func NewProtocolProxy(cfg *config.Boost) func(h host.Host) (*protocolproxy.ProtocolProxy, error) {
 	return func(h host.Host) (*protocolproxy.ProtocolProxy, error) {
 		peerConfig := map[peer.ID][]protocol.ID{}
-		if cfg.Dealmaking.BitswapPeerID != "" {
+		// add bitswap if a peer id is set AND the peer is only private
+		if cfg.Dealmaking.BitswapPeerID != "" && len(cfg.Dealmaking.BitswapPublicAddresses) == 0 {
 			bsPeerID, err := peer.Decode(cfg.Dealmaking.BitswapPeerID)
 			if err != nil {
 				return nil, err
