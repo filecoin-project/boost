@@ -6,6 +6,8 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
 replace github.com/filecoin-project/boostd-data => ./extern/boostd-data
 
+replace github.com/filecoin-project/go-jsonrpc => github.com/nonsense/go-jsonrpc v0.0.0-20221118154859-f3f8e9b1cb11
+
 //replace github.com/filecoin-project/lotus => ../lotus
 
 //replace github.com/filecoin-project/go-fil-markets => ../go-fil-markets
