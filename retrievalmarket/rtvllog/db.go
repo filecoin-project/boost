@@ -339,9 +339,15 @@ func (d *RetrievalLogDB) ListDTEvents(ctx context.Context, peerID string, transf
 }
 
 func (d *RetrievalLogDB) DeleteOlderThan(ctx context.Context, at time.Time) (int64, error) {
+	_, err := d.db.ExecContext(ctx, "DELETE FROM RetrievalDataTransferEvents WHERE CreatedAt < ?", at)
+	if err != nil {
+		return 0, err
+	}
+
 	res, err := d.db.ExecContext(ctx, "DELETE FROM RetrievalDealStates WHERE CreatedAt < ?", at)
 	if err != nil {
 		return 0, err
 	}
+
 	return res.RowsAffected()
 }
