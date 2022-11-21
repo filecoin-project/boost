@@ -29,4 +29,5 @@ CREATE TABLE IF NOT EXISTS RetrievalDataTransferEvents (
     Message TEXT
 );
 
+CREATE INDEX IF NOT EXISTS index_retrieval_dt_evts_created_at on RetrievalDataTransferEvents(CreatedAt);
 CREATE INDEX IF NOT EXISTS index_retrieval_dt_evts_peer_transfer on RetrievalDataTransferEvents(PeerID, TransferID);
