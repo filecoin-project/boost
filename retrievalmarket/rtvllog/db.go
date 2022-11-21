@@ -338,8 +338,73 @@ func (d *RetrievalLogDB) ListDTEvents(ctx context.Context, peerID string, transf
 	return dtEvents, nil
 }
 
+func (d *RetrievalLogDB) InsertMarketsEvent(ctx context.Context, event retrievalmarket.ProviderEvent, state retrievalmarket.ProviderDealState) error {
+	// Ignore block sent events as we are recording the equivalent event for
+	// data-transfer, and it's a high-frequency event
+	if event == retrievalmarket.ProviderEventBlockSent {
+		return nil
+	}
+
+	qry := "INSERT INTO RetrievalMarketEvents (PeerID, DealID, CreatedAt, Name, Status, Message) " +
+		"VALUES (?, ?, ?, ?, ?, ?)"
+	_, err := d.db.ExecContext(ctx, qry,
+		state.Receiver.String(),
+		state.ID,
+		time.Now(),
+		retrievalmarket.ProviderEvents[event],
+		state.Status.String(),
+		state.Message)
+	return err
+}
+
+type MarketEvent struct {
+	CreatedAt time.Time
+	Name      string
+	Status    string
+	Message   string
+}
+
+func (d *RetrievalLogDB) ListMarketEvents(ctx context.Context, peerID string, dealID retrievalmarket.DealID) ([]MarketEvent, error) {
+	qry := "SELECT CreatedAt, Name, Status, Message " +
+		"FROM RetrievalMarketEvents " +
+		"WHERE PeerID = ? AND DealID = ? " +
+		"ORDER BY CreatedAt desc"
+
+	rows, err := d.db.QueryContext(ctx, qry, peerID, dealID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	evts := make([]MarketEvent, 0, 16)
+	for rows.Next() {
+		var evt MarketEvent
+		err := rows.Scan(
+			&evt.CreatedAt,
+			&evt.Name,
+			&evt.Status,
+			&evt.Message,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		evts = append(evts, evt)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return evts, nil
+}
+
 func (d *RetrievalLogDB) DeleteOlderThan(ctx context.Context, at time.Time) (int64, error) {
-	_, err := d.db.ExecContext(ctx, "DELETE FROM RetrievalDataTransferEvents WHERE CreatedAt < ?", at)
+	_, err := d.db.ExecContext(ctx, "DELETE FROM RetrievalMarketEvents WHERE CreatedAt < ?", at)
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = d.db.ExecContext(ctx, "DELETE FROM RetrievalDataTransferEvents WHERE CreatedAt < ?", at)
 	if err != nil {
 		return 0, err
 	}

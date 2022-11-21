@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"path"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/piecemeta"
 	brm "github.com/filecoin-project/boost/retrievalmarket/lib"
+	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"

@@ -241,6 +241,12 @@ const RetrievalLogQuery = gql`
                 Name
                 Message
             }
+            MarketEvents {
+                CreatedAt
+                Name
+                Status
+                Message
+            }
         }
     }
 `;

@@ -19,7 +19,6 @@ type RetrievalLog struct {
 
 	lastUpdateLk sync.Mutex
 	lastUpdate   map[string]time.Time
-	lastUpdateDT map[string]time.Time
 }
 
 func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration) *RetrievalLog {
@@ -36,6 +35,7 @@ func (r *RetrievalLog) Start(ctx context.Context) {
 	go r.gcDatabase(ctx)
 }
 
+// Called when there is a retrieval ask query
 func (r *RetrievalLog) OnQueryEvent(evt retrievalmarket.ProviderQueryEvent) {
 	log.Debugw("query-event",
 		"status", evt.Response.Status,
@@ -43,13 +43,20 @@ func (r *RetrievalLog) OnQueryEvent(evt retrievalmarket.ProviderQueryEvent) {
 		"err", evt.Error)
 }
 
+// Called when there is a validation event.
+// This occurs when the client makes a graphsync retrieval request, and the
+// Storage Provider validates the request (eg checking its parameters for
+// validity, checking for acceptance against the retrieval filter, etc)
 func (r *RetrievalLog) OnValidationEvent(evt retrievalmarket.ProviderValidationEvent) {
 	log.Debugw("validation-event", "id", evt.Response.ID, "status", evt.Response.Status, "msg", evt.Response.Message, "err", evt.Error)
 
+	// Ignore ErrPause and ErrResume because they are signalling errors, not
+	// actual errors because of incorrect behaviour.
 	if evt.Error == nil || evt.Error == datatransfer.ErrPause || evt.Error == datatransfer.ErrResume {
 		return
 	}
 
+	// Log any other error as a retrieval event
 	st := &RetrievalDealState{
 		PeerID:     evt.Receiver,
 		PayloadCID: evt.BaseCid,
@@ -76,6 +83,7 @@ func (r *RetrievalLog) OnValidationEvent(evt retrievalmarket.ProviderValidationE
 	}
 }
 
+// Called when there is an event from the data-transfer subsystem
 func (r *RetrievalLog) OnDataTransferEvent(event datatransfer.Event, state datatransfer.ChannelState) {
 	log.Debugw("dt-event",
 		"evt", datatransfer.Events[event.Code],
@@ -106,6 +114,7 @@ func (r *RetrievalLog) OnDataTransferEvent(event datatransfer.Event, state datat
 	}
 }
 
+// Called when there is a markets event
 func (r *RetrievalLog) OnRetrievalEvent(event retrievalmarket.ProviderEvent, state retrievalmarket.ProviderDealState) {
 	// To prevent too frequent updates, only allow block sent updates if it's
 	// been more than half a second since the last one
@@ -145,7 +154,12 @@ func (r *RetrievalLog) OnRetrievalEvent(event retrievalmarket.ProviderEvent, sta
 	}
 
 	if err != nil {
-		log.Errorw("failed to update retrieval deal logger db", "err", err)
+		log.Errorw("failed to update state in retrieval deal logger db", "err", err)
+	}
+
+	err = r.db.InsertMarketsEvent(r.ctx, event, state)
+	if err != nil {
+		log.Errorw("failed to insert market event into retrieval deal logger db", "err", err)
 	}
 }
 

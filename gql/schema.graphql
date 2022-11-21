@@ -198,6 +198,13 @@ type DTEvent {
   Message: String!
 }
 
+type MarketEvent {
+  CreatedAt: Time!
+  Name: String!
+  Status: String!
+  Message: String!
+}
+
 type RetrievalState {
   CreatedAt: Time!
   UpdatedAt: Time!
@@ -216,6 +223,7 @@ type RetrievalState {
   DTStatus: String!
   DTMessage: String!
   DTEvents: [DTEvent]!
+  MarketEvents: [MarketEvent]!
 }
 
 type RetrievalStateList {
