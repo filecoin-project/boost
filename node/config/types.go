@@ -271,8 +271,4 @@ type PieceDirectoryConfig struct {
 	// The connect string for the piece directory service RPC API
 	// Set this value to "" if the piece directory service is embedded.
 	ServiceApiInfo string
-	// GC deals from piece directory after their completion at every
-	// PieceDirectoryGCInterval hour. Please keep this value higher than 6 hours
-	// to avoid congesting piece directory operations. Set to "0" to disable.
-	PieceDirectoryGCInterval int
 }

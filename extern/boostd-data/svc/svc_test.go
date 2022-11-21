@@ -48,7 +48,7 @@ var testCouchSettings = couchbase.DBSettings{
 func TestService(t *testing.T) {
 	_ = logging.SetLogLevel("*", "debug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	t.Run("level db", func(t *testing.T) {
@@ -149,7 +149,7 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 func TestServiceFuzz(t *testing.T) {
 	t.Skip()
 	_ = logging.SetLogLevel("*", "info")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	t.Run("level db", func(t *testing.T) {
@@ -367,7 +367,7 @@ func compareIndices(subject, subjectDb index.Index) (bool, error) {
 func TestCleanup(t *testing.T) {
 	_ = logging.SetLogLevel("*", "debug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	t.Run("level db", func(t *testing.T) {

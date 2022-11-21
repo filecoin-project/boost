@@ -73,7 +73,7 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.add-deal-for-piece", "took", time.Since(now).String())
+		log.Debugw("handled.add-deal-for-piece", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	s.Lock()
@@ -132,7 +132,7 @@ func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr e
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.mark-piece-index-errored", "took", time.Since(now).String())
+		log.Debugw("handled.mark-piece-index-errored", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	s.Lock()
@@ -149,7 +149,7 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-offset-size", "took", time.Since(now).String())
+		log.Debugw("handled.get-offset-size", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	s.Lock()
@@ -170,7 +170,7 @@ func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.M
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-piece-metadata", "took", time.Since(now).String())
+		log.Debugw("handled.get-piece-metadata", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -189,7 +189,7 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-piece-deals", "took", time.Since(now).String())
+		log.Debugw("handled.get-piece-deals", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	s.Lock()
@@ -212,7 +212,7 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.pieces-containing-mh", "took", time.Since(now).String())
+		log.Debugw("handled.pieces-containing-mh", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	s.Lock()
@@ -229,7 +229,7 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Warnw("handled.get-index", "took", time.Since(now).String())
+		log.Warnw("handled.get-index", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	s.Lock()
@@ -266,7 +266,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.add-index", "took", time.Since(now).String())
+		log.Debugw("handled.add-index", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	s.Lock()
@@ -339,7 +339,7 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.indexed-at", "took", time.Since(now).String())
+		log.Debugw("handled.indexed-at", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	s.Lock()
@@ -351,6 +351,26 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	}
 
 	return md.IndexedAt, nil
+}
+
+func normalizePieceCidError(pieceCid cid.Cid, err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, ds.ErrNotFound) {
+		return fmt.Errorf("piece %s: %s", pieceCid, types.ErrNotFound)
+	}
+	return err
+}
+
+func normalizeMultihashError(m mh.Multihash, err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, ds.ErrNotFound) {
+		return fmt.Errorf("multihash %s: %s", m, types.ErrNotFound)
+	}
+	return err
 }
 
 // Remove Single deal for pieceCID. If []Deals is empty then Metadata is removed as well
@@ -369,6 +389,9 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUu
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
+		if errors.Is(err, ds.ErrNotFound) {
+			return nil
+		}
 		return err
 	}
 
@@ -383,7 +406,7 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUu
 	if len(md.Deals) == 0 {
 		// Remove Metadata if removed deal was last one. Don't fail even if error is returned
 		if err := s.db.RemoveMetadata(ctx, pieceCid); err != nil {
-			log.Errorf("Failed to remove the Metadata after removing the last deal: %w", err)
+			return fmt.Errorf("Failed to remove the Metadata after removing the last deal: %w", err)
 		}
 		return nil
 	}
@@ -443,24 +466,4 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	}
 
 	return nil
-}
-
-func normalizePieceCidError(pieceCid cid.Cid, err error) error {
-	if err == nil {
-		return nil
-	}
-	if errors.Is(err, ds.ErrNotFound) {
-		return fmt.Errorf("piece %s: %s", pieceCid, types.ErrNotFound)
-	}
-	return err
-}
-
-func normalizeMultihashError(m mh.Multihash, err error) error {
-	if err == nil {
-		return nil
-	}
-	if errors.Is(err, ds.ErrNotFound) {
-		return fmt.Errorf("multihash %s: %s", m, types.ErrNotFound)
-	}
-	return err
 }

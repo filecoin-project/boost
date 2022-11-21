@@ -310,7 +310,7 @@ func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, er
 		kcid := cid.NewCidV1(cid.Raw, m)
 
 		offset, n := binary.Uvarint(r.Value)
-		size, _ := binary.Uvarint(r.Value[n:])
+		size, n := binary.Uvarint(r.Value[n:])
 
 		records = append(records, model.Record{
 			Cid: kcid,
@@ -351,14 +351,23 @@ func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihas
 	}
 
 	offset, n := binary.Uvarint(b)
-	size, _ := binary.Uvarint(b[n:])
+	size, n := binary.Uvarint(b[n:])
 	return &model.OffsetSize{
 		Offset: offset,
 		Size:   size,
 	}, nil
 }
 
-// RemoveAllMetadataForPieceCid
+func has(list []cid.Cid, v cid.Cid) bool {
+	for _, l := range list {
+		if l.Equals(v) {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveMetadata
 func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.remove_metadata")
 	defer span.End()
@@ -392,7 +401,7 @@ func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
 	return nil
 }
 
-// RemoveAllRecords
+// RemoveIndexes
 // It removes multihash -> pieceCid and if empty record is left then multihash -> offset
 // entry is also removed
 func (db *DB) RemoveIndexes(ctx context.Context, cursor uint64, pieceCid cid.Cid) error {
@@ -430,7 +439,7 @@ func (db *DB) RemoveIndexes(ctx context.Context, cursor uint64, pieceCid cid.Cid
 				return fmt.Errorf("failed to get value for multihash %s, err: %w", m, err)
 			}
 
-			if err == ds.ErrNotFound {
+			if errors.Is(err, ds.ErrNotFound) {
 				return nil
 			}
 
@@ -455,7 +464,6 @@ func (db *DB) RemoveIndexes(ctx context.Context, cursor uint64, pieceCid cid.Cid
 			for i, v := range pcids {
 				if v == pieceCid {
 					pcids[i] = pcids[len(pcids)-1]
-					pcids[len(pcids)-1] = cid.Undef
 					pcids = pcids[:len(pcids)-1]
 				}
 			}
@@ -485,13 +493,4 @@ func (db *DB) RemoveIndexes(ctx context.Context, cursor uint64, pieceCid cid.Cid
 	}
 
 	return nil
-}
-
-func has(list []cid.Cid, v cid.Cid) bool {
-	for _, l := range list {
-		if l.Equals(v) {
-			return true
-		}
-	}
-	return false
 }

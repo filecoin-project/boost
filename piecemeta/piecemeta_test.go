@@ -6,14 +6,9 @@ import (
 	"io"
 	"math/rand"
 	"os"
-	"os/exec"
 	"testing"
 	"time"
 
-	dtypes "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	dcl "github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
 	"github.com/filecoin-project/boost/piecemeta"
 	mock_piecemeta "github.com/filecoin-project/boost/piecemeta/mocks"
 	"github.com/filecoin-project/boost/testutil"
@@ -50,24 +45,25 @@ var testCouchSettings = couchbase.DBSettings{
 }
 
 func TestPieceMeta(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	t.Run("level db", func(t *testing.T) {
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
-		testPieceMeta(ctx, t, bdsvc, 8042)
+		testPieceMeta(ctx, t, bdsvc)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		removeContainer := setupCouchbase(t)
-		defer removeContainer()
+		// TODO: Unskip this test once the couchbase instance can be created
+		//  from a docker container as part of the test
+		t.Skip()
 		bdsvc := svc.NewCouchbase(testCouchSettings)
-		testPieceMeta(ctx, t, bdsvc, 8043)
+		testPieceMeta(ctx, t, bdsvc)
 	})
 }
 
-func testPieceMeta(ctx context.Context, t *testing.T, bdsvc *svc.Service, port int) {
-	err := bdsvc.Start(ctx, port)
+func testPieceMeta(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
+	err := bdsvc.Start(ctx, 8042)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
@@ -381,90 +377,4 @@ func calculateCommp(t *testing.T, rdr io.ReadSeeker) writer.DataCIDSize {
 	require.NoError(t, err)
 
 	return commp
-}
-
-func setupCouchbase(t *testing.T) func() {
-	ctx := context.Background()
-	cli, err := dcl.NewClientWithOpts(dcl.FromEnv)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	imageName := "couchbase"
-
-	out, err := cli.ImagePull(ctx, imageName, dtypes.ImagePullOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = io.Copy(os.Stdout, out)
-	require.NoError(t, err)
-
-	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: imageName,
-		ExposedPorts: nat.PortSet{
-			"8091":  struct{}{},
-			"8092":  struct{}{},
-			"8093":  struct{}{},
-			"8094":  struct{}{},
-			"8095":  struct{}{},
-			"8096":  struct{}{},
-			"11210": struct{}{},
-			"11211": struct{}{},
-		},
-	}, &container.HostConfig{
-		PortBindings: map[nat.Port][]nat.PortBinding{
-			nat.Port("8091"):  {{HostIP: "127.0.0.1", HostPort: "8091"}},
-			nat.Port("8092"):  {{HostIP: "127.0.0.1", HostPort: "8092"}},
-			nat.Port("8093"):  {{HostIP: "127.0.0.1", HostPort: "8093"}},
-			nat.Port("8094"):  {{HostIP: "127.0.0.1", HostPort: "8094"}},
-			nat.Port("8095"):  {{HostIP: "127.0.0.1", HostPort: "8095"}},
-			nat.Port("8096"):  {{HostIP: "127.0.0.1", HostPort: "8096"}},
-			nat.Port("11210"): {{HostIP: "127.0.0.1", HostPort: "11210"}},
-			nat.Port("11211"): {{HostIP: "127.0.0.1", HostPort: "11211"}},
-		},
-	}, nil, nil, "")
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := cli.ContainerStart(ctx, resp.ID, dtypes.ContainerStartOptions{}); err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(time.Duration(10) * time.Second)
-
-	err = initializeCouchbaseCluster()
-	require.NoError(t, err)
-
-	// Wait for couchbase services to start
-	time.Sleep(time.Duration(10) * time.Second)
-
-	cleanup := func() {
-		err := cli.ContainerRemove(ctx, resp.ID, dtypes.ContainerRemoveOptions{Force: true})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	return cleanup
-}
-
-func initializeCouchbaseCluster() error {
-	setupCommand := "curl -X POST http://127.0.0.1:8091/nodes/self/controller/settings -d 'data_path=%2Fopt%2Fcouchbase%2Fvar%2Flib%2Fcouchbase%2Fdata&' -d 'index_path=%2Fopt%2Fcouchbase%2Fvar%2Flib%2Fcouchbase%2Fidata&' -d 'cbas_path=%2Fopt%2Fcouchbase%2Fvar%2Flib%2Fcouchbase%2Fadata&' -d 'eventing_path=%2Fopt%2Fcouchbase%2Fvar%2Flib%2Fcouchbase%2Fedata&'"
-	renameNodeCommand := "curl -u Administrator:password -X POST http://127.0.01:8091/node/controller/rename -d hostname=127.0.0.1"
-	startServicesCommand := "curl -u 'Administrator:password' -X POST http://127.0.0.1:8091/node/controller/setupServices -d services=kv%2Cn1ql%2Cindex%2Ceventing"
-	setBucketMemoryQuotaCommand := "curl -u 'Administrator:password' -X POST http://127.0.0.1:8091/pools/default -d memoryQuota=512 -d indexMemoryQuota=512 -d ftsMemoryQuota=512"
-	createAdminUserCommand := "curl -u 'Administrator:password' -X POST http://127.0.0.1:8091/settings/web -d port=8091 -d username=Administrator -d password=boostdemo"
-	setIndexStorageModeCommand := "curl -u 'Administrator:boostdemo' -X POST http://127.0.0.1:8091/settings/indexes -d storageMode=plasma"
-	var commands []string
-	commands = append(commands, setupCommand, renameNodeCommand, startServicesCommand, setBucketMemoryQuotaCommand, createAdminUserCommand, setIndexStorageModeCommand)
-	for _, v := range commands {
-		_, err := exec.Command("/bin/bash", "-c", v).CombinedOutput()
-		if err != nil {
-			return err
-		}
-	}
-	// Sleep to give enough time for service to start or bucket creation will fail
-	time.Sleep(time.Duration(10) * time.Second)
-	return nil
 }
