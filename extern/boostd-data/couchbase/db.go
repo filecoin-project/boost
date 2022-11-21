@@ -284,9 +284,13 @@ func (db *DB) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) err
 		}
 
 		// Set the car size on each deal (should be the same for all deals)
+		var deals []model.DealInfo
 		for _, dl := range metadata.Deals {
 			dl.CarLength = size
+
+			deals = append(deals, dl)
 		}
+		metadata.Deals = deals
 
 		// Update the metadata in the db
 		_, err = db.pcidToMeta.Replace(k, metadata, &gocb.ReplaceOptions{
