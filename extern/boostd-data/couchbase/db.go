@@ -455,6 +455,8 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid, recordCount int)
 
 	// Get the number of shards
 	_, totalShards := getShardPrefixBitCount(recordCount)
+
+	span.SetAttributes(attribute.Int("shards", totalShards))
 	for i := 0; i < totalShards; i++ {
 		// Get the map of multihash -> offset/size for the shard
 		shardPrefix, err := getShardPrefix(i)
@@ -463,7 +465,10 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid, recordCount int)
 		}
 		cbKey := toCouchKey(pieceCid.String() + shardPrefix)
 		cbMap := db.pieceOffsets.Map(cbKey)
+
+		_, spanIter := tracing.Tracer.Start(ctx, "db.iter")
 		recMap, err := cbMap.Iterator()
+		spanIter.End()
 		if err != nil {
 			if isNotFoundErr(err) {
 				// If there are no records in a particular shard just skip the shard
@@ -471,6 +476,10 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid, recordCount int)
 			}
 			return nil, fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
 		}
+
+		span.SetAttributes(attribute.Int(fmt.Sprintf("map_%d", i), len(recMap)))
+
+		_, spanMap := tracing.Tracer.Start(ctx, "db.recMap")
 
 		// Get each value in the map
 		for mhStr, offsetSizeIfce := range recMap {
@@ -492,6 +501,8 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid, recordCount int)
 
 			recs = append(recs, model.Record{Cid: cid.NewCidV1(cid.Raw, mh), OffsetSize: ofsz})
 		}
+
+		spanMap.End()
 	}
 
 	return recs, nil
