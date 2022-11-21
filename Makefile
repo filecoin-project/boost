@@ -200,7 +200,7 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=1.17.2-rc2
+lotus_version?=1.19.0-rc1
 lotus_src_dir?=
 ffi_from_source?=0
 ifeq ($(lotus_src_dir),)
