@@ -92,6 +92,33 @@ func (r *retrievalDTEventResolver) CreatedAt() graphql.Time {
 	return graphql.Time{Time: r.DTEvent.CreatedAt}
 }
 
+func (r *retrievalStateResolver) MarketEvents(ctx context.Context) ([]*retrievalMarketEventResolver, error) {
+	if r.RetrievalDealState.DealID == 0 || r.RetrievalDealState.LocalPeerID == "" {
+		return nil, nil
+	}
+
+	pid := r.RetrievalDealState.PeerID.String()
+	evts, err := r.db.ListMarketEvents(ctx, pid, r.RetrievalDealState.DealID)
+	if err != nil {
+		log.Warnw("getting market events for retrieval %s/%d: %s", pid, r.RetrievalDealState.DealID, err)
+		return nil, nil
+	}
+
+	evtResolvers := make([]*retrievalMarketEventResolver, 0, len(evts))
+	for _, evt := range evts {
+		evtResolvers = append(evtResolvers, &retrievalMarketEventResolver{MarketEvent: evt})
+	}
+	return evtResolvers, nil
+}
+
+type retrievalMarketEventResolver struct {
+	rtvllog.MarketEvent
+}
+
+func (r *retrievalMarketEventResolver) CreatedAt() graphql.Time {
+	return graphql.Time{Time: r.MarketEvent.CreatedAt}
+}
+
 type retrievalStateListResolver struct {
 	TotalCount int32
 	Logs       []*retrievalStateResolver

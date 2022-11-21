@@ -81,27 +81,22 @@
     margin-top: 2em;
 }
 
-.retrieval-log-detail .retrieval-stages .retrieval-stage-log.since-s td {
+.retrieval-log-detail .retrieval-event.since-s td {
     padding-top: 2em;
 }
 
-.retrieval-log-detail .retrieval-stages .retrieval-stage-log.since-multi-s td {
+.retrieval-log-detail retrieval-event.since-multi-s td {
     padding-top: 4em;
 }
 
-.retrieval-log-detail .retrieval-stages .at {
+.retrieval-log-detail .retrieval-event .at {
     white-space: nowrap;
 }
 
-.retrieval-log-detail .retrieval-stages td {
+.retrieval-log-detail .retrieval-event td {
     vertical-align: top;
 }
 
-.retrieval-log-detail .retrieval-stages .retrieval-stage-log {
-    position: relative;
-    color: #777777;
-}
-
-.retrieval-log-detail .retrieval-stages .retrieval-stage-log .log-line {
-    padding-left: 2em;
+.retrieval-log-detail .retrieval-event .event.data-transfer {
+    color: #3399ff;
 }

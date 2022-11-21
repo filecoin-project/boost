@@ -14,6 +14,7 @@ import {Pagination} from "./Pagination";
 import {humanFileSize} from "./util";
 import {addClassFor} from "./util-ui";
 import listCheckImg from "./bootstrap-icons/icons/list-check.svg";
+import {getDealStatus} from "./RetrievalLogDetail";
 
 const basePath = '/retrieval-logs'
 
@@ -148,7 +149,7 @@ function TableRow(props) {
     const copyDealId = "copy-"+row.CreatedAt+row.DealID
     const dealIDToClipboard = () => fieldToClipboard(row.DealID, copyPeerId)
 
-    var status = row.Status.replace('DealStatus', '')
+    var status = getDealStatus(row.DTStatus)
     if (row.DTStatus != status && row.DTStatus != '') {
         status += ": " + row.DTStatus
     }

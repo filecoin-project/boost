@@ -1,20 +1,12 @@
-/* global BigInt */
-
-import React, {useEffect, useState} from "react";
-import {useMutation, useQuery} from "@apollo/react-hooks";
-import {
-    DealCancelMutation,
-    DealFailPausedMutation,
-    DealRetryPausedMutation,
-    RetrievalLogQuery,
-} from "./gql";
+import React, {useEffect} from "react";
+import {useQuery} from "@apollo/react-hooks";
+import { RetrievalLogQuery } from "./gql";
 import {useNavigate, useParams, Link} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";
 import {addCommas, humanFIL, humanFileSize} from "./util";
 import './RetrievalLogDetail.css'
 import closeImg from './bootstrap-icons/icons/x-circle.svg'
-import {Info} from "./Info";
 import {addClassFor} from "./util-ui";
 
 export function RetrievalLogDetail(props) {
@@ -66,10 +58,12 @@ export function RetrievalLogDetail(props) {
     var retrieval = data.retrievalLog
 
     var evtRowData = []
-    var evts = (retrieval.DTEvents || []).sort((a, b) => a.CreatedAt.getTime() - b.CreatedAt.getTime())
+    const dtEvts = (retrieval.DTEvents || []).map(e => Object.assign({}, e, {EventType: 'data-transfer'}))
+    const mktEvts = (retrieval.MarketEvents || []).map(e => Object.assign({}, e, {EventType: 'market'}))
+    const evts = [...dtEvts, ...mktEvts].sort((a, b) => a.CreatedAt.getTime() - b.CreatedAt.getTime())
     for (var i = 0; i < evts.length; i++) {
-        var evt = retrieval.DTEvents[i]
-        var prev = i === 0 ? null : retrieval.DTEvents[i - 1]
+        var evt = evts[i]
+        var prev = i === 0 ? null : evts[i - 1]
         evtRowData.push({evt: evt, prev: prev})
     }
 
@@ -146,25 +140,27 @@ export function RetrievalLogDetail(props) {
                 <tr>
                     <th>Status</th>
                     <td>
-                        {retrieval.Status + (retrieval.Message ? ': '+ retrieval.Message : '')}
+                        {getDealStatus(retrieval.Status) + (retrieval.Message ? ': '+ retrieval.Message : '')}
                     </td>
                 </tr>
 
                 </tbody>
             </table>
 
-            <h3>Data Transfer Logs</h3>
+            <h3>Event Logs</h3>
 
-            <table className="retrieval-stages">
+            <table className="retrieval-events">
                 <tbody>
-                {evtRowData.map((l, i) => <RetrievalDTEvent key={i} evt={l.evt} prev={l.prev}/>)}
+                {evtRowData.map((l, i) => {
+                    return <RetrievalEvent key={l.evt.EventType+l.evt.CreatedAt.getTime()} evt={l.evt} prev={l.prev}/>
+                })}
                 </tbody>
             </table>
         </div>
     </div>
 }
 
-function RetrievalDTEvent(props) {
+function RetrievalEvent(props) {
     var prev = props.prev
     var evt = props.evt
     var sinceLast = ''
@@ -173,6 +169,9 @@ function RetrievalDTEvent(props) {
         var logMs = evt.CreatedAt.getTime()
         var prevMs = prev.CreatedAt.getTime()
         var deltaMillis = logMs - prevMs
+        if (deltaMillis < 0) {
+            console.log(deltaMillis, 'prv', prev, 'evt', evt)
+        }
         if (deltaMillis < 1000) {
             sinceScale = 'since-ms'
             sinceLast = (logMs - prevMs) + 'ms'
@@ -187,12 +186,23 @@ function RetrievalDTEvent(props) {
     }
 
     return <>
-        <tr className={'retrieval-dt-event ' + sinceScale}>
+        <tr className={'retrieval-event ' + sinceScale}>
             <td className="at">{moment(evt.CreatedAt).format(dateFormat)}</td>
             <td className="since-last">{sinceLast}</td>
-            <td className="log-line">
-                {evt.Name}{evt.Message ? ':' + evt.Message : null}
+            <td className={"event " + evt.EventType}>
+                {evt.EventType == 'data-transfer' ? 'DT:' : null}
+                {getEventName(evt.Name)}
             </td>
+            <td className="status">{getDealStatus(evt.Status)}</td>
+            <td className="message">{evt.Message}</td>
         </tr>
     </>
+}
+
+export function getDealStatus(dealStatus) {
+    return (dealStatus || '').replace('DealStatus', '')
+}
+
+export function getEventName(evtName) {
+    return (evtName || '').replace('ProviderEvent', '')
 }
