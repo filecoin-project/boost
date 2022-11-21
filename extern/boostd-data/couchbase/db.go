@@ -455,47 +455,78 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid, recordCount int)
 	ctx, span := tracing.Tracer.Start(ctx, "db.all_records")
 	defer span.End()
 
-	recs := make([]model.Record, 0, recordCount)
-
 	// Get the number of shards
 	_, totalShards := getShardPrefixBitCount(recordCount)
+
+	recs := make([]model.Record, 0, recordCount)
+	recsShard := make([][]model.Record, totalShards)
+
+	var eg errgroup.Group
+
+	span.SetAttributes(attribute.Int("shards", totalShards))
+	span.SetAttributes(attribute.Int("recs", recordCount))
 	for i := 0; i < totalShards; i++ {
-		// Get the map of multihash -> offset/size for the shard
-		shardPrefix, err := getShardPrefix(i)
-		if err != nil {
-			return nil, err
-		}
-		cbKey := toCouchKey(pieceCid.String() + shardPrefix)
-		cbMap := db.pieceOffsets.Map(cbKey)
-		recMap, err := cbMap.Iterator()
-		if err != nil {
-			if isNotFoundErr(err) {
-				// If there are no records in a particular shard just skip the shard
-				continue
-			}
-			return nil, fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
-		}
-
-		// Get each value in the map
-		for mhStr, offsetSizeIfce := range recMap {
-			mh, err := multihash.FromHexString(mhStr)
+		i := i
+		recsShard[i] = make([]model.Record, 0, recordCount)
+		eg.Go(func() error {
+			// Get the map of multihash -> offset/size for the shard
+			shardPrefix, err := getShardPrefix(i)
 			if err != nil {
-				return nil, fmt.Errorf("parsing piece cid %s multihash value '%s': %w", pieceCid, mhStr, err)
+				return err
 			}
+			cbKey := toCouchKey(pieceCid.String() + shardPrefix)
+			cbMap := db.pieceOffsets.Map(cbKey)
 
-			val, ok := offsetSizeIfce.(string)
-			if !ok {
-				return nil, fmt.Errorf("unexpected type for piece cid %s offset/size value: %T", pieceCid, offsetSizeIfce)
-			}
-
-			var ofsz model.OffsetSize
-			err = ofsz.UnmarshallBase64(val)
+			_, spanIter := tracing.Tracer.Start(ctx, "db.iter")
+			recMap, err := cbMap.Iterator()
+			spanIter.End()
 			if err != nil {
-				return nil, fmt.Errorf("parsing piece %s offset / size value '%s': %w", pieceCid, val, err)
+				if isNotFoundErr(err) {
+					// If there are no records in a particular shard just skip the shard
+					return nil
+				}
+				return fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
 			}
 
-			recs = append(recs, model.Record{Cid: cid.NewCidV1(cid.Raw, mh), OffsetSize: ofsz})
-		}
+			span.SetAttributes(attribute.Int(fmt.Sprintf("map_%d", i), len(recMap)))
+
+			_, spanMap := tracing.Tracer.Start(ctx, "db.recMap")
+
+			// Get each value in the map
+			for mhStr, offsetSizeIfce := range recMap {
+				mh, err := multihash.FromHexString(mhStr)
+				if err != nil {
+					return fmt.Errorf("parsing piece cid %s multihash value '%s': %w", pieceCid, mhStr, err)
+				}
+
+				val, ok := offsetSizeIfce.(string)
+				if !ok {
+					return fmt.Errorf("unexpected type for piece cid %s offset/size value: %T", pieceCid, offsetSizeIfce)
+				}
+
+				var ofsz model.OffsetSize
+				err = ofsz.UnmarshallBase64(val)
+				if err != nil {
+					return fmt.Errorf("parsing piece %s offset / size value '%s': %w", pieceCid, val, err)
+				}
+
+				recsShard[i] = append(recsShard[i], model.Record{Cid: cid.NewCidV1(cid.Raw, mh), OffsetSize: ofsz})
+			}
+
+			spanMap.End()
+
+			return nil
+		})
+
+	}
+
+	err := eg.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < totalShards; i++ {
+		recs = append(recs, recsShard[i]...)
 	}
 
 	return recs, nil
