@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -24,10 +23,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	"github.com/ipld/go-car/v2"
-	"github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
-	"github.com/multiformats/go-varint"
 	"go.opencensus.io/stats"
 )
 
@@ -39,10 +35,6 @@ var ErrNotFound = errors.New("not found")
 // (eg pieces identified by a piece CID) send a cache header with a constant,
 // non-zero last modified time.
 var lastModified = time.UnixMilli(1)
-
-const carSuffix = ".car"
-const pieceCidParam = "pieceCid"
-const payloadCidParam = "payloadCid"
 
 type apiVersion struct {
 	Version string `json:"Version"`
@@ -320,90 +312,6 @@ func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.
 	return pieceReader, nil
 }
 
-func (s *HttpServer) getCarContent(pieceCid cid.Cid, pieceReader io.ReadSeeker) (io.ReadSeeker, error) {
-	maxOffset, err := s.api.GetMaxPieceOffset(pieceCid)
-	if err != nil {
-		if s.allowIndexing {
-			// If it's not possible to get the max piece offset it may be because
-			// the CAR file hasn't been indexed yet. So try to index it in real time.
-			alog("%s\tbuilding index for %s", color.New(color.FgBlue).Sprintf("INFO"), pieceCid)
-			maxOffset, err = getMaxPieceOffset(pieceReader)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("getting max offset for piece %s: %w", pieceCid, err)
-		}
-	}
-
-	// Seek to the max offset
-	_, err = pieceReader.Seek(int64(maxOffset), io.SeekStart)
-	if err != nil {
-		return nil, fmt.Errorf("seeking to offset %d in piece data: %w", maxOffset, err)
-	}
-
-	// A section consists of
-	// <size of cid+block><cid><block>
-
-	// Get <size of cid+block>
-	cr := &countReader{r: bufio.NewReader(pieceReader)}
-	dataLength, err := varint.ReadUvarint(cr)
-	if err != nil {
-		return nil, fmt.Errorf("reading CAR section length: %w", err)
-	}
-
-	// The number of bytes in the uvarint that records <size of cid+block>
-	dataLengthUvarSize := cr.count
-
-	// Get the size of the (unpadded) CAR file
-	unpaddedCarSize := maxOffset + dataLengthUvarSize + dataLength
-
-	// Seek to the end of the CAR to get its (padded) size
-	paddedCarSize, err := pieceReader.Seek(0, io.SeekEnd)
-	if err != nil {
-		return nil, fmt.Errorf("seeking to end of CAR: %w", err)
-	}
-
-	// Seek back to the start of the CAR
-	_, err = pieceReader.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, fmt.Errorf("seeking to start of CAR: %w", err)
-	}
-
-	lr := &limitSeekReader{
-		Reader:       io.LimitReader(pieceReader, int64(unpaddedCarSize)),
-		readSeeker:   pieceReader,
-		unpaddedSize: int64(unpaddedCarSize),
-		paddedSize:   paddedCarSize,
-	}
-	return lr, nil
-}
-
-// getMaxPieceOffset generates a CAR file index from the reader, and returns
-// the maximum offset in the index
-func getMaxPieceOffset(reader io.ReadSeeker) (uint64, error) {
-	idx, err := car.GenerateIndex(reader, car.ZeroLengthSectionAsEOF(true), car.StoreIdentityCIDs(true))
-	if err != nil {
-		return 0, fmt.Errorf("generating CAR index: %w", err)
-	}
-
-	itidx, ok := idx.(index.IterableIndex)
-	if !ok {
-		return 0, fmt.Errorf("could not cast CAR file index %t to an IterableIndex", idx)
-	}
-
-	var maxOffset uint64
-	err = itidx.ForEach(func(m multihash.Multihash, offset uint64) error {
-		if offset > maxOffset {
-			maxOffset = offset
-		}
-		return nil
-	})
-	if err != nil {
-		return 0, fmt.Errorf("getting max offset: %w", err)
-	}
-
-	return maxOffset, nil
-}
-
 type limitSeekReader struct {
 	io.Reader
 	readSeeker   io.ReadSeeker
@@ -483,20 +391,6 @@ func (w *writeErrorWatcher) Write(bz []byte) (int, error) {
 	}
 	w.count += uint64(count)
 	return count, err
-}
-
-// countReader just counts the number of bytes read
-type countReader struct {
-	r     *bufio.Reader
-	count uint64
-}
-
-func (c *countReader) ReadByte() (byte, error) {
-	b, err := c.r.ReadByte()
-	if err == nil {
-		c.count++
-	}
-	return b, err
 }
 
 const timeFmt = "2006-01-02T15:04:05.000Z0700"
