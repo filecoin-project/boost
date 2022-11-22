@@ -56,6 +56,7 @@ var dealFlags = []cli.Flag{
 	&cli.IntFlag{
 		Name:  "start-epoch",
 		Usage: "start epoch by when the deal should be proved by provider on-chain",
+		DefaultText: "current chain head + 2 days",
 	},
 	&cli.IntFlag{
 		Name:  "duration",
