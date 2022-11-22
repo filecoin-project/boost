@@ -92,7 +92,7 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service) {
 	require.NoError(t, err)
 
 	di := model.DealInfo{
-		DealUuid:    randomuuid,
+		DealUuid:    randomuuid.String(),
 		SectorID:    abi.SectorNumber(1),
 		PieceOffset: 1,
 		PieceLength: 2,
@@ -191,7 +191,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service) {
 			require.NoError(t, err)
 
 			di := model.DealInfo{
-				DealUuid:    randomuuid,
+				DealUuid:    randomuuid.String(),
 				SectorID:    abi.SectorNumber(1),
 				PieceOffset: 1,
 				PieceLength: 2,

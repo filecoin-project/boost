@@ -14,10 +14,15 @@ import (
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
+	"github.com/filecoin-project/go-address"
+	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
 	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-statemachine/fsm"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/backupds"
+	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -325,10 +330,40 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 	logger.Infof("migrating piece store deal information to Piece Directory")
 	start := time.Now()
 
-	// Open the piece store in the existing repo
-	ps, err := newPieceStore(repoDir)
+	// Open the datastore in the existing repo
+	ds, err := openDataStore(repoDir)
 	if err != nil {
 		return 0, fmt.Errorf("creating piece store from repo %s: %w", repoDir, err)
+	}
+
+	// Get the miner address
+	maddr, err := modules.MinerAddress(ds)
+	if err != nil {
+		return 0, fmt.Errorf("getting miner address from repo %s: %w", repoDir, err)
+	}
+
+	// Get the deals FSM
+	provDS := namespace.Wrap(ds, datastore.NewKey("/deals/provider"))
+	deals, _, err := vfsm.NewVersionedFSM(provDS, fsm.Parameters{
+		StateType:     storagemarket.MinerDeal{},
+		StateKeyField: "State",
+	}, nil, "2")
+	if err != nil {
+		return 0, fmt.Errorf("reading legacy deals from datastore in repo %s: %w", repoDir, err)
+	}
+
+	// Create a mapping of on-chain deal ID to deal proposal cid.
+	// This is needed below so that we can map from the legacy piece store
+	// info to a legacy deal.
+	propCidByChainDealID, err := getPropCidByChainDealID(deals)
+	if err != nil {
+		return 0, fmt.Errorf("building chain deal id -> proposal cid map: %w", err)
+	}
+
+	// Open the piece store
+	ps, err := piecestoreimpl.NewPieceStore(namespace.Wrap(ds, datastore.NewKey("/storagemarket")))
+	if err != nil {
+		return 0, fmt.Errorf("creating piece store from datastore in repo %s: %w", repoDir, err)
 	}
 
 	// Wait for the piece store to be ready
@@ -352,6 +387,7 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 		return 0, fmt.Errorf("getting piece store keys: %w", err)
 	}
 
+	// Ensure the same order in case the import is stopped and restarted
 	sort.Slice(pcids, func(i, j int) bool {
 		return pcids[0].String() < pcids[1].String()
 	})
@@ -376,8 +412,19 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 
 		var addedDeals bool
 		for _, d := range pi.Deals {
+			// Find the deal corresponding to the deal info's DealID
+			proposalCid, ok := propCidByChainDealID[d.DealID]
+			if !ok {
+				logger.Errorw("cant find deal for piece",
+					"pcid", pcid, "chain-deal-id", d.DealID, "err", err)
+				continue
+			}
+
 			dealInfo := model.DealInfo{
+				DealUuid:    proposalCid.String(),
+				IsLegacy:    true,
 				ChainDealID: d.DealID,
+				MinerAddr:   address.Address(maddr),
 				SectorID:    d.SectorID,
 				PieceOffset: d.Offset,
 				PieceLength: d.Length,
@@ -387,7 +434,7 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 			if err == nil {
 				addedDeals = true
 			} else {
-				logger.Errorw("cant add deal for piece", "pcid", pcid, "chain-deal-id", d.DealID, "err", err)
+				logger.Errorw("cant add deal info for piece", "pcid", pcid, "chain-deal-id", d.DealID, "err", err)
 			}
 		}
 
@@ -411,7 +458,23 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 	return errorCount, nil
 }
 
-func newPieceStore(path string) (piecestore.PieceStore, error) {
+func getPropCidByChainDealID(deals fsm.Group) (map[abi.DealID]cid.Cid, error) {
+	var list []storagemarket.MinerDeal
+	if err := deals.List(&list); err != nil {
+		return nil, err
+	}
+
+	byChainDealID := make(map[abi.DealID]cid.Cid, len(list))
+	for _, d := range list {
+		if d.DealID != 0 {
+			byChainDealID[d.DealID] = d.ProposalCid
+		}
+	}
+
+	return byChainDealID, nil
+}
+
+func openDataStore(path string) (*backupds.Datastore, error) {
 	ctx := context.Background()
 
 	rpo, err := repo.NewFS(path)
@@ -442,12 +505,7 @@ func newPieceStore(path string) (piecestore.PieceStore, error) {
 		return nil, fmt.Errorf("opening backupds: %w", err)
 	}
 
-	ps, err := piecestoreimpl.NewPieceStore(namespace.Wrap(bds, datastore.NewKey("/storagemarket")))
-	if err != nil {
-		return nil, fmt.Errorf("creating piece store: %w", err)
-	}
-
-	return ps, nil
+	return bds, nil
 }
 
 func getRecords(subject index.Index) ([]model.Record, error) {

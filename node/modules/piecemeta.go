@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/shard"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
@@ -20,7 +21,6 @@ import (
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
-	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	bstore "github.com/ipfs/go-ipfs-blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
@@ -110,12 +110,13 @@ func NewPieceMeta(cfg *config.Boost) func(maddr dtypes.MinerAddress, store piece
 	}
 }
 
-func NewPieceStore(pm *piecemeta.PieceMeta) piecestore.PieceStore {
-	return &boostPieceStoreWrapper{pieceMeta: pm}
+func NewPieceStore(pm *piecemeta.PieceMeta, maddr address.Address) piecestore.PieceStore {
+	return &boostPieceStoreWrapper{pieceMeta: pm, maddr: maddr}
 }
 
 type boostPieceStoreWrapper struct {
 	pieceMeta *piecemeta.PieceMeta
+	maddr     address.Address
 }
 
 func (pw *boostPieceStoreWrapper) Start(ctx context.Context) error {
@@ -126,10 +127,12 @@ func (pw *boostPieceStoreWrapper) OnReady(ready shared.ReadyFunc) {
 	go ready(nil)
 }
 
-func (pw *boostPieceStoreWrapper) AddDealForPiece(pieceCID cid.Cid, dealInfo piecestore.DealInfo) error {
+func (pw *boostPieceStoreWrapper) AddDealForPiece(pieceCID cid.Cid, proposalCid cid.Cid, dealInfo piecestore.DealInfo) error {
 	di := model.DealInfo{
-		DealUuid:    uuid.New(),
+		DealUuid:    proposalCid.String(),
+		IsLegacy:    true,
 		ChainDealID: dealInfo.DealID,
+		MinerAddr:   pw.maddr,
 		SectorID:    dealInfo.SectorID,
 		PieceOffset: dealInfo.Offset,
 		PieceLength: dealInfo.Length,
