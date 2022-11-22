@@ -212,6 +212,11 @@ Note also that the provider address is `t01000` and you will need to supply an a
 make docker/all
 ```
 
+On ARM-based systems (*Apple M1/M2*) you need to force building Filecoin's Rust libraries from the source
+```
+make docker/all ffi_from_source=1 
+```
+
 If you need to build containers using a specific version of lotus then provide the version as a parameter, e.g. `make docker/all lotus_version=1.17.0`. The version must be a tag name of [Lotus git repo](https://github.com/filecoin-project/lotus/tags) without `v` prefix. Or you can build using a local source of lotus - `make docker/all lotus_src_dir=<path of lotus source>`. Also, before starting devnet, you need to update versions in the [.env](docker/devnet/.env) file.
 
 ### Start devnet docker stack
