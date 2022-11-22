@@ -96,7 +96,7 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 	}
 
 	// Get piece info from piece directory
-	pieceInfo, err := r.pieceMeta.GetPieceMetadata(ctx, pieceCid)
+	pieceInfo, err := r.piecedirectory.GetPieceMetadata(ctx, pieceCid)
 	if err != nil && !types.IsNotFound(err) {
 		return nil, err
 	}
@@ -238,7 +238,7 @@ func (r *resolver) getIndexStatus(ctx context.Context, pieceCid cid.Cid, deals [
 	var idxst IndexStatus
 	idxerr := ""
 
-	md, err := r.pieceMeta.GetPieceMetadata(ctx, pieceCid)
+	md, err := r.piecedirectory.GetPieceMetadata(ctx, pieceCid)
 	switch {
 	case err != nil && types.IsNotFound(err):
 		idxst = IndexStatusNotFound
@@ -263,7 +263,7 @@ func (r *resolver) getIndexStatus(ctx context.Context, pieceCid cid.Cid, deals [
 			// This should never happen, but check just in case
 			return nil, fmt.Errorf("parsing retrieved deal data root cid %s: %w", cidstr, err)
 		}
-		pieces, err := r.pieceMeta.PiecesContainingMultihash(ctx, c.Hash())
+		pieces, err := r.piecedirectory.PiecesContainingMultihash(ctx, c.Hash())
 		if err != nil || len(pieces) == 0 {
 			idxst = IndexStatusFailed
 			idxerr = fmt.Sprintf("unable to resolve piece's root payload cid %s to piece cid", cidstr)

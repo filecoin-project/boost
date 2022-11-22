@@ -3,8 +3,9 @@ package modules
 import (
 	"context"
 	"fmt"
+
 	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
@@ -27,9 +28,9 @@ import (
 	"go.uber.org/fx"
 )
 
-func NewPieceMetaStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) piecemeta.Store {
-	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) piecemeta.Store {
-		client := piecemeta.NewStore()
+func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) piecedirectory.Store {
+	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) piecedirectory.Store {
+		client := piecedirectory.NewStore()
 
 		var cancel context.CancelFunc
 		var svcCtx context.Context
@@ -102,21 +103,21 @@ func NewPieceMetaStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.Loc
 	}
 }
 
-func NewPieceMeta(cfg *config.Boost) func(maddr dtypes.MinerAddress, store piecemeta.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecemeta.PieceMeta {
-	return func(maddr dtypes.MinerAddress, store piecemeta.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecemeta.PieceMeta {
+func NewPieceDirectory(cfg *config.Boost) func(maddr dtypes.MinerAddress, store piecedirectory.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
+	return func(maddr dtypes.MinerAddress, store piecedirectory.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
 		sa := sectoraccessor.NewSectorAccessor(maddr, secb, pp, full)
-		pr := &piecemeta.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		return piecemeta.NewPieceMeta(store, pr, cfg.PieceDirectory.ParallelAddIndexLimit)
+		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
+		return piecedirectory.NewPieceDirectory(store, pr, cfg.PieceDirectory.ParallelAddIndexLimit)
 	}
 }
 
-func NewPieceStore(pm *piecemeta.PieceMeta, maddr address.Address) piecestore.PieceStore {
-	return &boostPieceStoreWrapper{pieceMeta: pm, maddr: maddr}
+func NewPieceStore(pm *piecedirectory.PieceDirectory, maddr address.Address) piecestore.PieceStore {
+	return &boostPieceStoreWrapper{piecedirectory: pm, maddr: maddr}
 }
 
 type boostPieceStoreWrapper struct {
-	pieceMeta *piecemeta.PieceMeta
-	maddr     address.Address
+	piecedirectory *piecedirectory.PieceDirectory
+	maddr          address.Address
 }
 
 func (pw *boostPieceStoreWrapper) Start(ctx context.Context) error {
@@ -141,7 +142,7 @@ func (pw *boostPieceStoreWrapper) AddDealForPiece(pieceCID cid.Cid, proposalCid 
 		// markets without having access to the piece data itself)
 		CarLength: 0,
 	}
-	return pw.pieceMeta.AddDealForPiece(context.Background(), pieceCID, di)
+	return pw.piecedirectory.AddDealForPiece(context.Background(), pieceCID, di)
 }
 
 func (pw *boostPieceStoreWrapper) AddPieceBlockLocations(pieceCID cid.Cid, blockLocations map[cid.Cid]piecestore.BlockLocation) error {
@@ -150,7 +151,7 @@ func (pw *boostPieceStoreWrapper) AddPieceBlockLocations(pieceCID cid.Cid, block
 }
 
 func (pw *boostPieceStoreWrapper) GetPieceInfo(pieceCID cid.Cid) (piecestore.PieceInfo, error) {
-	pieceDeals, err := pw.pieceMeta.GetPieceDeals(context.TODO(), pieceCID)
+	pieceDeals, err := pw.piecedirectory.GetPieceDeals(context.TODO(), pieceCID)
 	if err != nil {
 		return piecestore.PieceInfo{}, fmt.Errorf("getting piece deals from piece metadata store: %w", err)
 	}
@@ -185,15 +186,15 @@ func (pw *boostPieceStoreWrapper) ListPieceInfoKeys() ([]cid.Cid, error) {
 	return nil, nil
 }
 
-func NewDAGStoreWrapper(pm *piecemeta.PieceMeta) stores.DAGStoreWrapper {
+func NewDAGStoreWrapper(pm *piecedirectory.PieceDirectory) stores.DAGStoreWrapper {
 	// TODO: lotus_modules.NewStorageMarketProvider and lotus_modules.RetrievalProvider
 	// take a concrete *dagstore.Wrapper as a parameter. Create boost versions of these
 	// that instead take a stores.DAGStoreWrapper parameter
-	return &boostDAGStoreWrapper{pieceMeta: pm}
+	return &boostDAGStoreWrapper{piecedirectory: pm}
 }
 
 type boostDAGStoreWrapper struct {
-	pieceMeta *piecemeta.PieceMeta
+	piecedirectory *piecedirectory.PieceDirectory
 }
 
 func (dw *boostDAGStoreWrapper) DestroyShard(ctx context.Context, pieceCid cid.Cid, resch chan dagstore.ShardResult) error {
@@ -219,7 +220,7 @@ func (dw *boostDAGStoreWrapper) RegisterShard(ctx context.Context, pieceCid cid.
 }
 
 func (dw *boostDAGStoreWrapper) LoadShard(ctx context.Context, pieceCid cid.Cid) (stores.ClosableBlockstore, error) {
-	bs, err := dw.pieceMeta.GetBlockstore(ctx, pieceCid)
+	bs, err := dw.piecedirectory.GetBlockstore(ctx, pieceCid)
 	if err != nil {
 		return nil, fmt.Errorf("getting blockstore in LoadShard: %w", err)
 	}
@@ -232,11 +233,11 @@ func (dw *boostDAGStoreWrapper) MigrateDeals(ctx context.Context, deals []storag
 }
 
 func (dw *boostDAGStoreWrapper) GetPiecesContainingBlock(blockCID cid.Cid) ([]cid.Cid, error) {
-	return dw.pieceMeta.PiecesContainingMultihash(context.TODO(), blockCID.Hash())
+	return dw.piecedirectory.PiecesContainingMultihash(context.TODO(), blockCID.Hash())
 }
 
 func (dw *boostDAGStoreWrapper) GetIterableIndexForPiece(pieceCid cid.Cid) (carindex.IterableIndex, error) {
-	return dw.pieceMeta.GetIterableIndex(context.TODO(), pieceCid)
+	return dw.piecedirectory.GetIterableIndex(context.TODO(), pieceCid)
 }
 
 func (dw *boostDAGStoreWrapper) Close() error {

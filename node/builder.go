@@ -18,7 +18,7 @@ import (
 	"github.com/filecoin-project/boost/node/impl/common"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -528,8 +528,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*dagstore.DAGStore), func() *dagstore.DAGStore { return nil }),
 		Override(new(*mktsdagstore.Wrapper), func() *mktsdagstore.Wrapper { return nil }),
 
-		Override(new(piecemeta.Store), modules.NewPieceMetaStore(cfg)),
-		Override(new(*piecemeta.PieceMeta), modules.NewPieceMeta(cfg)),
+		Override(new(piecedirectory.Store), modules.NewPieceDirectoryStore(cfg)),
+		Override(new(*piecedirectory.PieceDirectory), modules.NewPieceDirectory(cfg)),
 		Override(DAGStoreKey, modules.NewDAGStoreWrapper),
 		//Override(new(mktsdagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
 		//Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
