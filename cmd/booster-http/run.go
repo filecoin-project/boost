@@ -29,7 +29,6 @@ import (
 	"github.com/filecoin-project/lotus/storage/paths"
 	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/ipfs/go-cid"
-	"github.com/multiformats/go-multihash"
 	"github.com/urfave/cli/v2"
 )
 
@@ -226,14 +225,6 @@ type serverApi struct {
 }
 
 var _ HttpServerApi = (*serverApi)(nil)
-
-func (s serverApi) PiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
-	return s.bapi.BoostDagstorePiecesContainingMultihash(ctx, mh)
-}
-
-func (s serverApi) GetMaxPieceOffset(pieceCid cid.Cid) (uint64, error) {
-	return s.bapi.PiecesGetMaxOffset(s.ctx, pieceCid)
-}
 
 func (s serverApi) GetPieceInfo(pieceCID cid.Cid) (*piecestore.PieceInfo, error) {
 	return s.bapi.PiecesGetPieceInfo(s.ctx, pieceCID)
