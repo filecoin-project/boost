@@ -147,6 +147,34 @@ func (mr *MockRetrievalProviderMockRecorder) SubscribeToEvents(arg0 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeToEvents", reflect.TypeOf((*MockRetrievalProvider)(nil).SubscribeToEvents), arg0)
 }
 
+// SubscribeToQueryEvents mocks base method.
+func (m *MockRetrievalProvider) SubscribeToQueryEvents(arg0 retrievalmarket.ProviderQueryEventSubscriber) retrievalmarket.Unsubscribe {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubscribeToQueryEvents", arg0)
+	ret0, _ := ret[0].(retrievalmarket.Unsubscribe)
+	return ret0
+}
+
+// SubscribeToQueryEvents indicates an expected call of SubscribeToQueryEvents.
+func (mr *MockRetrievalProviderMockRecorder) SubscribeToQueryEvents(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeToQueryEvents", reflect.TypeOf((*MockRetrievalProvider)(nil).SubscribeToQueryEvents), arg0)
+}
+
+// SubscribeToValidationEvents mocks base method.
+func (m *MockRetrievalProvider) SubscribeToValidationEvents(arg0 retrievalmarket.ProviderValidationSubscriber) retrievalmarket.Unsubscribe {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubscribeToValidationEvents", arg0)
+	ret0, _ := ret[0].(retrievalmarket.Unsubscribe)
+	return ret0
+}
+
+// SubscribeToValidationEvents indicates an expected call of SubscribeToValidationEvents.
+func (mr *MockRetrievalProviderMockRecorder) SubscribeToValidationEvents(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeToValidationEvents", reflect.TypeOf((*MockRetrievalProvider)(nil).SubscribeToValidationEvents), arg0)
+}
+
 // MockSectorAccessor is a mock of SectorAccessor interface.
 type MockSectorAccessor struct {
 	ctrl     *gomock.Controller
