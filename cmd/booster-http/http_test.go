@@ -73,7 +73,6 @@ func TestHttpGzipResponse(t *testing.T) {
 
 	mockHttpServer.EXPECT().UnsealSectorAt(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(f, nil)
 	mockHttpServer.EXPECT().IsUnsealed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(true, nil)
-	mockHttpServer.EXPECT().PiecesContainingMultihash(gomock.Any(), gomock.Any()).AnyTimes().Return(cids, nil)
 	mockHttpServer.EXPECT().GetPieceInfo(gomock.Any()).AnyTimes().Return(&pieceInfo, nil)
 
 	//Create a client and make request with Encoding header
