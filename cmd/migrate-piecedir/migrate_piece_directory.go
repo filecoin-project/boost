@@ -327,9 +327,6 @@ func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi) (
 }
 
 func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store StoreMigrationApi) (int, error) {
-	logger.Infof("migrating piece store deal information to Piece Directory")
-	start := time.Now()
-
 	// Open the datastore in the existing repo
 	ds, err := openDataStore(repoDir)
 	if err != nil {
@@ -342,14 +339,22 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 		return 0, fmt.Errorf("getting miner address from repo %s: %w", repoDir, err)
 	}
 
+	logger.Infof("migrating piece store deal information to Piece Directory for miner %s", address.Address(maddr).String())
+	start := time.Now()
+
 	// Get the deals FSM
 	provDS := namespace.Wrap(ds, datastore.NewKey("/deals/provider"))
-	deals, _, err := vfsm.NewVersionedFSM(provDS, fsm.Parameters{
+	deals, migrate, err := vfsm.NewVersionedFSM(provDS, fsm.Parameters{
 		StateType:     storagemarket.MinerDeal{},
 		StateKeyField: "State",
 	}, nil, "2")
 	if err != nil {
 		return 0, fmt.Errorf("reading legacy deals from datastore in repo %s: %w", repoDir, err)
+	}
+
+	err = migrate(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("running provider fsm migration script: %w", err)
 	}
 
 	// Create a mapping of on-chain deal ID to deal proposal cid.
