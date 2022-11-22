@@ -52,10 +52,8 @@ func TestHttpGzipResponse(t *testing.T) {
 	defer f.Close()
 
 	//Create CID
-	var cids []cid.Cid
 	cid, err := cid.Parse("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi")
 	require.NoError(t, err)
-	cids = append(cids, cid)
 
 	// Crate pieceInfo
 	deal := piecestore.DealInfo{
