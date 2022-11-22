@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -43,6 +44,10 @@ const carSuffix = ".car"
 const pieceCidParam = "pieceCid"
 const payloadCidParam = "payloadCid"
 
+type apiVersion struct {
+	Version string `json:"Version"`
+}
+
 type HttpServer struct {
 	path          string
 	port          int
@@ -78,6 +83,7 @@ func (s *HttpServer) Start(ctx context.Context) {
 	handler.HandleFunc(s.pieceBasePath(), s.handlePieceRequest)
 	handler.HandleFunc("/", s.handleIndex)
 	handler.HandleFunc("/index.html", s.handleIndex)
+	handler.HandleFunc("/info", s.handleInfo)
 	handler.Handle("/metrics", metrics.Exporter("booster_http")) // metrics
 	s.server = &http.Server{
 		Addr:    listenAddr,
@@ -197,6 +203,15 @@ func (s *HttpServer) handlePieceRequest(w http.ResponseWriter, r *http.Request) 
 	} else {
 		writeError(w, r, http.StatusBadRequest, "unsupported query")
 	}
+}
+
+func (s *HttpServer) handleInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	v := apiVersion{
+		Version: "0.2.0",
+	}
+	json.NewEncoder(w).Encode(v) //nolint:errcheck
 }
 
 func (s *HttpServer) handleByPayloadCid(payloadCid cid.Cid, isCar bool, w http.ResponseWriter, r *http.Request) {

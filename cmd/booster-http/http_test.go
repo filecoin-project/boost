@@ -3,6 +3,7 @@ package main
 import (
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -155,4 +156,25 @@ func TestHttpResponseRedirects(t *testing.T) {
 	// Stop the server
 	err = httpServer.Stop()
 	require.NoError(t, err)
+}
+
+func TestHttpInfo(t *testing.T) {
+	var v apiVersion
+
+	// Create a new mock Http server
+	ctrl := gomock.NewController(t)
+	httpServer := NewHttpServer("", 7777, false, mocks_booster_http.NewMockHttpServerApi(ctrl))
+	httpServer.Start(context.Background())
+
+	response, err := http.Get("http://localhost:7777/info")
+	require.NoError(t, err)
+	defer response.Body.Close()
+
+	json.NewDecoder(response.Body).Decode(&v) //nolint:errcheck
+	require.Equal(t, "0.2.0", v.Version)
+
+	// Stop the server
+	err = httpServer.Stop()
+	require.NoError(t, err)
+
 }
