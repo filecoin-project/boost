@@ -1,0 +1,102 @@
+.retrieval-log-detail {
+    padding-top: 1em;
+    margin: auto;
+}
+
+.retrieval-log-detail .title {
+    margin:  1em auto;
+    text-align: center;
+    font-size: 1.25em;
+    color: #a61e4d;
+}
+
+.retrieval-log-detail .title .copy.copied {
+    animation: rotate 0.5s infinite;
+}
+
+@keyframes rotate {
+    from{ transform: rotate(0deg); }
+    to{ transform: rotate(360deg); }
+}
+
+.retrieval-log-detail .popup {
+    display: none;
+    position: absolute;
+    font-size: 1em;
+    top: -3em;
+    text-align: center;
+    width: 100%;
+}
+.retrieval-log-detail .popup.showing {
+    display: inline-block;
+}
+
+.retrieval-log-detail .popup .message {
+    display: inline-block;
+    color: #777777;
+    border: 1px solid #aaa;
+    border-radius: 0.2em;
+    padding: 0.5em;
+    font-size: 0.8em;
+    margin-top: 0.8em;
+}
+
+.retrieval-log-detail table {
+    font-size: 1em;
+}
+
+.retrieval-log-detail table.retrieval-fields {
+    margin-bottom: 1em;
+}
+
+.retrieval-log-detail table.retrieval-fields tr td:first-child {
+    width: 8em;
+}
+.retrieval-log-detail table.retrieval-fields tr td:last-child {
+    line-break: anywhere;
+}
+
+.retrieval-log-detail table.retrieval-fields th {
+    text-align: left;
+}
+
+.retrieval-log-detail td, .retrieval-log-detail th {
+    padding: 0.5em 1em;
+}
+
+.retrieval-log-detail .since-last, .aux {
+    color: #999;
+}
+
+.retrieval-log-detail .buttons {
+    display: inline-block;
+    float: right;
+}
+
+.retrieval-log-detail .buttons .button {
+    display: inline-block;
+}
+
+.retrieval-log-detail h3 {
+    margin-top: 2em;
+}
+
+.retrieval-log-detail .retrieval-event.since-s td {
+    padding-top: 2em;
+}
+
+.retrieval-log-detail retrieval-event.since-multi-s td {
+    padding-top: 4em;
+}
+
+.retrieval-log-detail .retrieval-event .at {
+    white-space: nowrap;
+}
+
+.retrieval-log-detail .retrieval-event td {
+    vertical-align: top;
+}
+
+.retrieval-log-detail .retrieval-event .event.data-transfer {
+    color: #3399ff;
+}

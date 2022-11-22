@@ -11,6 +11,7 @@ import (
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -45,6 +46,7 @@ type resolver struct {
 	h          host.Host
 	dealsDB    *db.DealsDB
 	logsDB     *db.LogsDB
+	retDB      *rtvllog.RetrievalLogDB
 	plDB       *db.ProposalLogsDB
 	fundsDB    *db.FundsDB
 	fundMgr    *fundmanager.FundManager
@@ -60,13 +62,14 @@ type resolver struct {
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, pieceMeta *piecemeta.PieceMeta, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, pieceMeta *piecemeta.PieceMeta, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		cfg:        cfg,
 		repo:       r,
 		h:          h,
 		dealsDB:    dealsDB,
 		logsDB:     logsDB,
+		retDB:      retDB,
 		plDB:       plDB,
 		fundsDB:    fundsDB,
 		fundMgr:    fundMgr,
