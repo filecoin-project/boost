@@ -8,7 +8,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -111,7 +110,7 @@ const idxPage = `
           Download a raw piece by its piece CID
         </td>
         <td>
-          <a href="/piece/bafySomePieceCid?format=piece" > /piece/<piece cid>?format=piece</a>
+          <a href="/piece/bafySomePieceCid" > /piece/<piece cid></a>
         </td>
       </tbody>
     </table>
@@ -138,24 +137,6 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	ctx, span := tracing.Tracer.Start(r.Context(), "http.piece_cid")
 	defer span.End()
 	stats.Record(ctx, metrics.HttpPieceByCidRequestCount.M(1))
-
-	q, err := url.ParseQuery(r.URL.RawQuery)
-	if err != nil {
-		msg := fmt.Sprintf("parsing query: %s", err.Error())
-		writeError(w, r, http.StatusBadRequest, msg)
-		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
-		return
-	}
-
-	if len(q["format"]) > 1 {
-		writeError(w, r, http.StatusBadRequest, "single `format` query parameter is allowed")
-		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
-		return
-	} else if (len(q["format"]) == 1) && (q["format"][0] != "piece") {
-		writeError(w, r, http.StatusBadRequest, "incorrect `format` query parameter")
-		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
-		return
-	}
 
 	// Remove the path up to the piece cid
 	prefixLen := len(s.pieceBasePath())
@@ -194,26 +175,16 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	etag := pieceCid.String()
 	w.Header().Set("Etag", etag)
 
-	// Keeping isCar and contentType in serverContent for future use case
-	isCar := false
-
-	serveContent(w, r, content, getContentType(isCar))
+	serveContent(w, r, content)
 
 	stats.Record(ctx, metrics.HttpPieceByCid200ResponseCount.M(1))
 	stats.Record(ctx, metrics.HttpPieceByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
 
-func getContentType(isCar bool) string {
-	if isCar {
-		return "application/vnd.ipld.car"
-	}
-	return "application/piece"
-}
-
-func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker, contentType string) {
+func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker) {
 	// Set the Content-Type header explicitly so that http.ServeContent doesn't
 	// try to do it implicitly
-	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Type", "application/piece")
 
 	var writer http.ResponseWriter
 
