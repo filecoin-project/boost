@@ -34,10 +34,10 @@ require (
 	github.com/filecoin-project/go-legs v0.4.9
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.9.1
+	github.com/filecoin-project/go-state-types v0.9.9
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/index-provider v0.8.1
-	github.com/filecoin-project/lotus v1.18.0-rc3
+	github.com/filecoin-project/lotus v1.19.0-rc1
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-storage v0.4.1
 	github.com/filecoin-project/storetheindex v0.4.17
@@ -130,8 +130,10 @@ require (
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/akavel/rsrc v0.8.0 // indirect
 	github.com/alecthomas/units v0.0.0-20210927113745-59d0afb8317a // indirect
+	github.com/armon/go-metrics v0.3.9 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.0 // indirect
+	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cheekybits/genny v1.0.0 // indirect
@@ -203,7 +205,12 @@ require (
 	github.com/hannahhoward/cbor-gen-for v0.0.0-20200817222906-ea96cece81f1 // indirect
 	github.com/hannahhoward/go-pubsub v0.0.0-20200423002714-8d62886cc36e // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/hashicorp/go-hclog v0.16.2 // indirect
+	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
+	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
+	github.com/hashicorp/raft v1.1.1 // indirect
+	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
 	github.com/iancoleman/orderedmap v0.1.0 // indirect
 	github.com/icza/backscanner v0.0.0-20210726202459-ac2ffc679f94 // indirect
@@ -245,10 +252,13 @@ require (
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-connmgr v0.4.0 // indirect
+	github.com/libp2p/go-libp2p-consensus v0.0.1 // indirect
 	github.com/libp2p/go-libp2p-core v0.20.0 // indirect
+	github.com/libp2p/go-libp2p-gorpc v0.4.0 // indirect
 	github.com/libp2p/go-libp2p-kbucket v0.5.0 // indirect
 	github.com/libp2p/go-libp2p-noise v0.5.0 // indirect
 	github.com/libp2p/go-libp2p-peerstore v0.8.0 // indirect
+	github.com/libp2p/go-libp2p-raft v0.1.8 // indirect
 	github.com/libp2p/go-libp2p-routing-helpers v0.2.3 // indirect
 	github.com/libp2p/go-libp2p-tls v0.5.0 // indirect
 	github.com/libp2p/go-maddr-filter v0.1.0 // indirect
@@ -307,6 +317,7 @@ require (
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
+	github.com/ugorji/go/codec v1.2.6 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.0.1 // indirect
 	github.com/whyrusleeping/bencher v0.0.0-20190829221104-bb6607aa8bba // indirect
@@ -317,7 +328,7 @@ require (
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
-	github.com/zondax/hid v0.9.0 // indirect
+	github.com/zondax/hid v0.9.1-0.20220302062450-5552068d2266 // indirect
 	github.com/zondax/ledger-go v0.12.1 // indirect
 	go.opentelemetry.io/otel/metric v0.31.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v0.31.0 // indirect
