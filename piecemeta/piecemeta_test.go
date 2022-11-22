@@ -140,7 +140,7 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 	// Add deal info for the piece - it doesn't matter what it is, the piece
 	// just needs to have at least one deal associated with it
 	di := model.DealInfo{
-		DealUuid:    uuid.New(),
+		DealUuid:    uuid.New().String(),
 		ChainDealID: 1,
 		SectorID:    2,
 		PieceOffset: 0,
@@ -211,7 +211,7 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Add deal info for the piece - it doesn't matter what it is, the piece
 	// just needs to have at least one deal associated with it
 	di := model.DealInfo{
-		DealUuid:    uuid.New(),
+		DealUuid:    uuid.New().String(),
 		ChainDealID: 1,
 		SectorID:    2,
 		PieceOffset: 0,
@@ -295,7 +295,7 @@ func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
 
 	// Add deal info for the piece without a CAR file
 	di := model.DealInfo{
-		DealUuid:    uuid.New(),
+		DealUuid:    uuid.New().String(),
 		ChainDealID: 1,
 		SectorID:    1,
 		PieceOffset: 0,
