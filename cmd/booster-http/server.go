@@ -108,10 +108,10 @@ const idxPage = `
       <tbody>
       <tr>
         <td>
-          Download a raw piece by payload CID
+          Download a raw piece by its piece CID
         </td>
         <td>
-          <a href="/piece/bafySomePayloadCid?format=piece" > /piece/<payload cid>?format=piece</a>
+          <a href="/piece/bafySomePieceCid?format=piece" > /piece/<piece cid>?format=piece</a>
         </td>
       </tbody>
     </table>
@@ -143,26 +143,26 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		msg := fmt.Sprintf("parsing query: %s", err.Error())
 		writeError(w, r, http.StatusBadRequest, msg)
-		stats.Record(ctx, metrics.HttpPayloadByCid400ResponseCount.M(1))
+		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
 		return
 	}
 
 	if len(q["format"]) > 1 {
 		writeError(w, r, http.StatusBadRequest, "single `format` query parameter is allowed")
-		stats.Record(ctx, metrics.HttpPayloadByCid400ResponseCount.M(1))
+		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
 		return
 	} else if (len(q["format"]) == 1) && (q["format"][0] != "piece") {
 		writeError(w, r, http.StatusBadRequest, "incorrect `format` query parameter")
-		stats.Record(ctx, metrics.HttpPayloadByCid400ResponseCount.M(1))
+		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
 		return
 	}
 
-	// Remove the path up to the payload cid
+	// Remove the path up to the piece cid
 	prefixLen := len(s.pieceBasePath())
 	if len(r.URL.Path) <= prefixLen {
 		msg := fmt.Sprintf("path '%s' is missing piece CID", r.URL.Path)
 		writeError(w, r, http.StatusBadRequest, msg)
-		stats.Record(ctx, metrics.HttpPayloadByCid400ResponseCount.M(1))
+		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
 		return
 	}
 
@@ -171,7 +171,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		msg := fmt.Sprintf("parsing piece CID '%s': %s", pieceCidStr, err.Error())
 		writeError(w, r, http.StatusBadRequest, msg)
-		stats.Record(ctx, metrics.HttpPayloadByCid400ResponseCount.M(1))
+		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
 		return
 	}
 
