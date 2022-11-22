@@ -7,11 +7,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"

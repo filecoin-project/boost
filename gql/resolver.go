@@ -10,7 +10,7 @@ import (
 	"github.com/filecoin-project/boost/fundmanager"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
@@ -41,48 +41,48 @@ type dealListResolver struct {
 // resolver translates from a request for a graphql field to the data for
 // that field
 type resolver struct {
-	cfg        *config.Boost
-	repo       lotus_repo.LockedRepo
-	h          host.Host
-	dealsDB    *db.DealsDB
-	logsDB     *db.LogsDB
-	retDB      *rtvllog.RetrievalLogDB
-	plDB       *db.ProposalLogsDB
-	fundsDB    *db.FundsDB
-	fundMgr    *fundmanager.FundManager
-	storageMgr *storagemanager.StorageManager
-	provider   *storagemarket.Provider
-	legacyProv lotus_storagemarket.StorageProvider
-	legacyDT   lotus_dtypes.ProviderDataTransfer
-	ps         piecestore.PieceStore
-	sa         retrievalmarket.SectorAccessor
-	pieceMeta  *piecemeta.PieceMeta
-	publisher  *storageadapter.DealPublisher
-	spApi      sealingpipeline.API
-	fullNode   v1api.FullNode
+	cfg            *config.Boost
+	repo           lotus_repo.LockedRepo
+	h              host.Host
+	dealsDB        *db.DealsDB
+	logsDB         *db.LogsDB
+	retDB          *rtvllog.RetrievalLogDB
+	plDB           *db.ProposalLogsDB
+	fundsDB        *db.FundsDB
+	fundMgr        *fundmanager.FundManager
+	storageMgr     *storagemanager.StorageManager
+	provider       *storagemarket.Provider
+	legacyProv     lotus_storagemarket.StorageProvider
+	legacyDT       lotus_dtypes.ProviderDataTransfer
+	ps             piecestore.PieceStore
+	sa             retrievalmarket.SectorAccessor
+	piecedirectory *piecedirectory.PieceDirectory
+	publisher      *storageadapter.DealPublisher
+	spApi          sealingpipeline.API
+	fullNode       v1api.FullNode
 }
 
-func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, pieceMeta *piecemeta.PieceMeta, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
-		cfg:        cfg,
-		repo:       r,
-		h:          h,
-		dealsDB:    dealsDB,
-		logsDB:     logsDB,
-		retDB:      retDB,
-		plDB:       plDB,
-		fundsDB:    fundsDB,
-		fundMgr:    fundMgr,
-		storageMgr: storageMgr,
-		provider:   provider,
-		legacyProv: legacyProv,
-		legacyDT:   legacyDT,
-		ps:         ps,
-		sa:         sa,
-		pieceMeta:  pieceMeta,
-		publisher:  publisher,
-		spApi:      spApi,
-		fullNode:   fullNode,
+		cfg:            cfg,
+		repo:           r,
+		h:              h,
+		dealsDB:        dealsDB,
+		logsDB:         logsDB,
+		retDB:          retDB,
+		plDB:           plDB,
+		fundsDB:        fundsDB,
+		fundMgr:        fundMgr,
+		storageMgr:     storageMgr,
+		provider:       provider,
+		legacyProv:     legacyProv,
+		legacyDT:       legacyDT,
+		ps:             ps,
+		sa:             sa,
+		piecedirectory: piecedirectory,
+		publisher:      publisher,
+		spApi:          spApi,
+		fullNode:       fullNode,
 	}
 }
 

@@ -2,18 +2,19 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/blockfilter"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/metrics"
-	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/tracing"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
-	"net/http"
-	_ "net/http/pprof"
 )
 
 var runCmd = &cli.Command{
@@ -118,7 +119,7 @@ var runCmd = &cli.Command{
 		defer storageCloser()
 
 		// Connect to the piece directory service
-		pdClient := piecemeta.NewStore()
+		pdClient := piecedirectory.NewStore()
 		defer pdClient.Close(ctx)
 		err = pdClient.Dial(ctx, cctx.String("api-piece-directory"))
 		if err != nil {
@@ -142,9 +143,9 @@ var runCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)
 		}
-		pr := &piecemeta.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		pieceMeta := piecemeta.NewPieceMeta(pdClient, pr, cctx.Int("add-index-throttle"))
-		remoteStore := remoteblockstore.NewRemoteBlockstore(pieceMeta)
+		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
+		piecedirectory := piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
+		remoteStore := remoteblockstore.NewRemoteBlockstore(piecedirectory)
 		server := NewBitswapServer(remoteStore, host, blockFilter)
 
 		var proxyAddrInfo *peer.AddrInfo

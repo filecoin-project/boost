@@ -10,18 +10,18 @@ import {Link} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import xImg from './bootstrap-icons/icons/x-lg.svg'
-import './PieceMeta.css'
+import './PieceDirectory.css'
 import {addCommas} from "./util";
 
 const piecesBasePath = '/pieces'
 
-export function PieceMetaPage(props) {
+export function PieceDirectoryPage(props) {
     return <PageContainer title="Piece Metadata">
-        <PieceMetaContent />
+        <PieceDirectoryContent />
     </PageContainer>
 }
 
-function PieceMetaContent(props) {
+function PieceDirectoryContent(props) {
     const [searchQuery, setSearchQuery] = useState('')
     const handleSearchQueryChange = (event) => {
         setSearchQuery(event.target.value)
@@ -44,16 +44,16 @@ function PieceMetaContent(props) {
     const showPieces = !!pieceRes.data.piece
     const showPayload = !!payloadRes.data.payload.Pieces.length
     const showInstructions = !showPieces && !showPayload
-    return <div className="piece-meta">
+    return <div className="piece-directory">
         <SearchBox value={searchQuery} clearSearchBox={clearSearchBox} onChange={handleSearchQueryChange} />
 
-        { showPieces ? <PieceMetaDetail piece={pieceRes.data.piece} /> : null }
+        { showPieces ? <PieceDirectoryDetail piece={pieceRes.data.piece} /> : null }
         { showPayload ? <PayloadMetaDetail payload={payloadRes.data.payload} /> : null }
         { showInstructions ? <p>Enter the piece CID or payload CID into the Search Box</p> : null }
     </div>
 }
 
-export function PieceMetaDetail({piece}) {
+export function PieceDirectoryDetail({piece}) {
     if (!piece) {
         return <div>No piece found with piece CID {piece.PieceCid}</div>
     }
@@ -117,7 +117,7 @@ export function PayloadMetaDetail({payload}) {
 
     return <div>
         <div class="title">Pieces containing payload CID {payload.RootCid}</div>
-        {payload.Pieces.map(piece => <PieceMetaDetail key={piece.PieceCid} piece={piece} />)}
+        {payload.Pieces.map(piece => <PieceDirectoryDetail key={piece.PieceCid} piece={piece} />)}
     </div>
 }
 

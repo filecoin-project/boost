@@ -20,8 +20,8 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
-	"github.com/filecoin-project/boost/piecemeta"
-	mock_piecemeta "github.com/filecoin-project/boost/piecemeta/mocks"
+	"github.com/filecoin-project/boost/piecedirectory"
+	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/mocks"
 	mock_sealingpipeline "github.com/filecoin-project/boost/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -1503,11 +1503,11 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	askStore := &mockAskStore{}
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
-	store := mock_piecemeta.NewMockStore(ctrl)
+	store := mock_piecedirectory.NewMockStore(ctrl)
 	store.EXPECT().IsIndexed(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	store.EXPECT().AddDealForPiece(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
-	pm := piecemeta.NewPieceMeta(store, nil, 1)
+	pm := piecedirectory.NewPieceDirectory(store, nil, 1)
 
 	prvCfg := Config{
 		MaxTransferDuration: time.Hour,
@@ -1574,7 +1574,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	// construct a new provider with pre-existing state
 	prov, err := NewProvider(h.Provider.config, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
-		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.pieceMeta, &NoOpIndexProvider{}, h.Provider.askGetter,
+		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.piecedirectory, &NoOpIndexProvider{}, h.Provider.askGetter,
 		h.Provider.sigVerifier, h.Provider.dealLogger, h.Provider.Transport)
 
 	require.NoError(t, err)

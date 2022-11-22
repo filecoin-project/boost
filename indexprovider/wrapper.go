@@ -8,7 +8,7 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
@@ -34,18 +34,18 @@ type Wrapper struct {
 	legacyProv     lotus_storagemarket.StorageProvider
 	prov           provider.Interface
 	dagStore       *dagstore.Wrapper
-	pieceMeta      *piecemeta.PieceMeta
+	piecedirectory *piecedirectory.PieceDirectory
 	meshCreator    idxprov.MeshCreator
 	bitswapEnabled bool
 }
 
 func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
 	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
-	pieceMeta *piecemeta.PieceMeta, meshCreator idxprov.MeshCreator) *Wrapper {
+	piecedirectory *piecedirectory.PieceDirectory, meshCreator idxprov.MeshCreator) *Wrapper {
 
 	return func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
 		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface,
-		dagStore *dagstore.Wrapper, pieceMeta *piecemeta.PieceMeta,
+		dagStore *dagstore.Wrapper, piecedirectory *piecedirectory.PieceDirectory,
 		meshCreator idxprov.MeshCreator) *Wrapper {
 
 		if cfg.DAGStore.RootDir == "" {
@@ -62,7 +62,7 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, deal
 			cfg:            cfg.DAGStore,
 			bitswapEnabled: cfg.Dealmaking.BitswapPeerID != "",
 			enabled:        !isDisabled,
-			pieceMeta:      pieceMeta,
+			piecedirectory: piecedirectory,
 		}
 		// announce all deals on startup in case of a config change
 		lc.Append(fx.Hook{
@@ -132,7 +132,7 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 func (w *Wrapper) Start(ctx context.Context) {
 	w.prov.RegisterMultihashLister(func(ctx context.Context, contextID []byte) (provider.MultihashIterator, error) {
 		provideF := func(pieceCid cid.Cid) (provider.MultihashIterator, error) {
-			ii, err := w.pieceMeta.GetIterableIndex(ctx, pieceCid)
+			ii, err := w.piecedirectory.GetIterableIndex(ctx, pieceCid)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get iterable index: %w", err)
 			}

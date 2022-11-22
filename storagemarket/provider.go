@@ -16,7 +16,7 @@ import (
 	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -116,16 +116,16 @@ type Provider struct {
 
 	dealLogger *logs.DealLogger
 
-	pieceMeta   *piecemeta.PieceMeta
-	ip          types.IndexProvider
-	askGetter   types.AskGetter
-	sigVerifier types.SignatureVerifier
+	piecedirectory *piecedirectory.PieceDirectory
+	ip             types.IndexProvider
+	askGetter      types.AskGetter
+	sigVerifier    types.SignatureVerifier
 }
 
 func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
 	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, commpCalc smtypes.CommpCalculator,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
-	pieceMeta *piecemeta.PieceMeta, ip types.IndexProvider, askGetter types.AskGetter,
+	piecedirectory *piecedirectory.PieceDirectory, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
 
 	xferLimiter, err := newTransferLimiter(cfg.TransferLimiter)
@@ -180,10 +180,10 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		dealLogger: dl,
 		logsDB:     logsDB,
 
-		pieceMeta:   pieceMeta,
-		ip:          ip,
-		askGetter:   askGetter,
-		sigVerifier: sigVerifier,
+		piecedirectory: piecedirectory,
+		ip:             ip,
+		askGetter:      askGetter,
+		sigVerifier:    sigVerifier,
 	}, nil
 }
 
