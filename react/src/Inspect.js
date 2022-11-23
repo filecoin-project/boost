@@ -83,7 +83,7 @@ function InspectContent(props) {
         skip: !pieceCid
     })
 
-    if ((pieceRes || {}).loading || payloadRes.loading) {
+    if ((pieceRes || {}).loading || (payloadRes || {}).loading || (rootPayloadRes || {}).loading) {
         return <div>Loading ...</div>
     }
 
