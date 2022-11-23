@@ -15,13 +15,13 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
-type BlockFilter interface {
-	IsFiltered(c cid.Cid) (bool, error)
+type Filter interface {
+	FulfillRequest(p peer.ID, c cid.Cid) (bool, error)
 }
 
 type BitswapServer struct {
 	remoteStore blockstore.Blockstore
-	blockFilter BlockFilter
+	filter      Filter
 	ctx         context.Context
 	cancel      context.CancelFunc
 	proxy       *peer.AddrInfo
@@ -29,8 +29,8 @@ type BitswapServer struct {
 	host        host.Host
 }
 
-func NewBitswapServer(remoteStore blockstore.Blockstore, host host.Host, blockFilter BlockFilter) *BitswapServer {
-	return &BitswapServer{remoteStore: remoteStore, host: host, blockFilter: blockFilter}
+func NewBitswapServer(remoteStore blockstore.Blockstore, host host.Host, blockFilter Filter) *BitswapServer {
+	return &BitswapServer{remoteStore: remoteStore, host: host, filter: blockFilter}
 }
 
 const protectTag = "bitswap-server-to-proxy"
@@ -59,10 +59,10 @@ func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo) error {
 		return err
 	}
 	bsopts := []server.Option{server.MaxOutstandingBytesPerPeer(1 << 20), server.WithPeerBlockRequestFilter(func(p peer.ID, c cid.Cid) bool {
-		filtered, err := s.blockFilter.IsFiltered(c)
+		fulfill, err := s.filter.FulfillRequest(p, c)
 		// peer request block filter expects a true if the request should be fulfilled, so
 		// we only return true for cids that aren't filtered and have no errors
-		return !filtered && err == nil
+		return fulfill && err == nil
 	})}
 	net := bsnetwork.NewFromIpfsHost(host, nilRouter)
 	s.server = server.New(s.ctx, net, s.remoteStore, bsopts...)
