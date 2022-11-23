@@ -90,3 +90,7 @@
 .inspect .payload-cid {
     padding: 0.5em 1em;
 }
+
+.inspect > p {
+    padding: 2em 1em;
+}
