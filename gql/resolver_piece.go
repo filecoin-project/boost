@@ -59,9 +59,30 @@ func (r *resolver) PiecesWithPayloadCid(ctx context.Context, args struct{ Payloa
 		return nil, fmt.Errorf("%s is not a valid payload cid", args.PayloadCid)
 	}
 
+	pieces, err := r.piecedirectory.PiecesContainingMultihash(ctx, payloadCid.Hash())
+	if err != nil {
+		if types.IsNotFound(err) {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("getting shards containing cid %s: %w", payloadCid, err)
+	}
+
+	pieceCids := make([]string, 0, len(pieces))
+	for _, piece := range pieces {
+		pieceCids = append(pieceCids, piece.String())
+	}
+	return pieceCids, nil
+}
+
+func (r *resolver) PiecesWithRootPayloadCid(ctx context.Context, args struct{ PayloadCid string }) ([]string, error) {
+	payloadCid, err := cid.Parse(args.PayloadCid)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not a valid payload cid", args.PayloadCid)
+	}
+
 	var pieceCidSet = make(map[string]struct{})
 
-	// Get boost deals by piece Cid
+	// Get boost deals by payload cid
 	boostDeals, err := r.dealsDB.ByRootPayloadCID(ctx, payloadCid)
 	if err != nil {
 		return nil, err
@@ -70,7 +91,7 @@ func (r *resolver) PiecesWithPayloadCid(ctx context.Context, args struct{ Payloa
 		pieceCidSet[dl.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
 	}
 
-	// Get legacy markets deals by payload Cid
+	// Get legacy markets deals by payload cid
 	// TODO: add method to markets to filter deals by payload CID
 	allLegacyDeals, err := r.legacyProv.ListLocalDeals()
 	if err != nil {
