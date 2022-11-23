@@ -1,6 +1,6 @@
 import {useQuery} from "@apollo/react-hooks";
 import {
-    PieceStatusQuery, PiecesWithPayloadCidQuery
+    PieceStatusQuery, PiecesWithPayloadCidQuery, PiecesWithRootPayloadCidQuery
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
@@ -46,11 +46,23 @@ function InspectContent(props) {
         skip: !searchQuery
     })
 
-    // If the request for a payload CID has completed
+    // Look up pieces by root payload cid
+    const rootPayloadRes = useQuery(PiecesWithRootPayloadCidQuery, {
+        variables: {
+            payloadCid: searchQuery
+        },
+        // Don't do this query if the search query is empty
+        skip: !searchQuery
+    })
+
+    // If the requests for payload CID & root payload CID have completed
     var pieceCid = null
     var pieceCids = []
-    if (payloadRes && payloadRes.data) {
-        pieceCids = payloadRes.data.piecesWithPayloadCid
+    if ((payloadRes || {}).data && (rootPayloadRes || {}).data) {
+        pieceCids = [...new Set([
+            ...payloadRes.data.piecesWithPayloadCid,
+            ...rootPayloadRes.data.piecesWithRootPayloadCid
+        ])]
         if (pieceCids.length === 0) {
             // If there were no results for the lookup by payload CID, use the search
             // query for a lookup by piece CID
@@ -81,14 +93,31 @@ function InspectContent(props) {
     }
 
     const pieceStatus = ((pieceRes || {}).data || {}).pieceStatus
+    var showPieceStats = false
+    if (pieceStatus) {
+        const hasPieceDeals = (pieceStatus.Deals || []).length
+        const hasPieceInfos = (pieceStatus.PieceInfoDeals || []).length
+        const indexStatus = ((pieceStatus || {}).IndexStatus || {}).Status
+        const hasIndexInfo = indexStatus !== 'NotFound'
+        showPieceStats = hasPieceDeals || hasPieceInfos || hasIndexInfo
+    }
+
     const showPayload = pieceCids.length > 1
-    const showInstructions = !errorMsg && !pieceStatus && !showPayload
+    var content = null
+    if (!errorMsg && !pieceStatus && !showPayload) {
+        content = <p>Enter piece CID or payload CID into the search box</p>
+    } else if (!showPayload && !showPieceStats) {
+        content = <p>No piece found with piece CID or payload CID {pieceCid}</p>
+    } else {
+        content = <>
+            { pieceStatus ? <PieceStatus pieceCid={pieceCid} pieceStatus={pieceStatus} searchQuery={searchQuery} /> : null }
+            { showPayload ? <PiecesWithPayload payloadCid={searchQuery} pieceCids={pieceCids} setSearchQuery={setSearchQuery} /> : null }
+        </>
+    }
     return <div className="inspect">
         <SearchBox value={searchQuery} clearSearchBox={clearSearchBox} onChange={handleSearchQueryChange} />
         { errorMsg ? <div>Error: {errorMsg}</div>  : null}
-        { pieceStatus ? <PieceStatus pieceCid={pieceCid} pieceStatus={pieceStatus} /> : null }
-        { showPayload ? <PiecesWithPayload payloadCid={searchQuery} pieceCids={pieceCids} setSearchQuery={setSearchQuery} /> : null }
-        { showInstructions ? <p>Enter piece CID or payload CID into the search box</p> : null }
+        { content }
     </div>
 }
 
@@ -103,27 +132,34 @@ function PiecesWithPayload({payloadCid, pieceCids, setSearchQuery}) {
     </div>
 }
 
-function PieceStatus({pieceCid, pieceStatus}) {
+function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
     if (!pieceStatus) {
         return <div>No piece found with piece CID {pieceCid}</div>
     }
 
     const rootCid = pieceStatus.Deals.length ? pieceStatus.Deals[0].Deal.DealDataRoot : null
+    const searchIsPayloadCid = searchQuery && searchQuery != pieceCid && searchQuery != rootCid
 
     return <div className="piece-detail" id={pieceCid}>
         <div className="content">
             <table className="piece-fields">
                 <tbody>
-                <tr key="piece cid">
-                    <th>Piece CID</th>
-                    <td>{pieceCid}</td>
-                </tr>
+                {searchIsPayloadCid ? (
+                    <tr key="payload cid">
+                        <th>Searched CID (non-root)</th>
+                        <td>{searchQuery}</td>
+                    </tr>
+                ) : null}
                 {rootCid ? (
                     <tr key="data root cid">
                         <th>Data Root CID</th>
                         <td>{rootCid}</td>
                     </tr>
                 ) : null}
+                <tr key="piece cid">
+                    <th>Piece CID</th>
+                    <td>{pieceCid}</td>
+                </tr>
                 <tr key="index status">
                     <th>Index Status</th>
                     <td>{pieceStatus.IndexStatus.Status}</td>
