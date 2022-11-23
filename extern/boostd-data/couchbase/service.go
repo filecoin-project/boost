@@ -2,9 +2,7 @@ package couchbase
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/filecoin-project/boost/tracing"
@@ -22,12 +20,9 @@ type CouchbaseMetadata struct {
 	BlockCount int `json:"b"`
 }
 
-const stripedLockSize = 1024
-
 type Store struct {
-	settings   DBSettings
-	db         *DB
-	pieceLocks [stripedLockSize]sync.RWMutex
+	settings DBSettings
+	db       *DB
 }
 
 var _ types.ServiceImpl = (*Store)(nil)
@@ -170,9 +165,6 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 		log.Debugw("handled.get-index", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	s.pieceLocks[toStripedLockIndex(pieceCid)].RLock()
-	defer s.pieceLocks[toStripedLockIndex(pieceCid)].RUnlock()
-
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
 		err = normalizePieceCidError(pieceCid, err)
@@ -207,9 +199,6 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 	start := time.Now()
 	defer func() { log.Debugw("handled.add-index", "took", time.Since(start).String()) }()
 
-	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
-	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
-
 	// Add a mapping from multihash -> piece cid so that clients can look up
 	// which pieces contain a multihash
 	mhs := make([]mh.Multihash, 0, len(records))
@@ -232,30 +221,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 	}
 	log.Debugw("handled.add-index AddIndexRecords", "took", time.Since(addOffsetsStart).String())
 
-	// get the metadata for the piece
-	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil {
-		if !isNotFoundErr(err) {
-			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
-		}
-		// there isn't yet any metadata, so create new metadata
-		md = CouchbaseMetadata{}
-	}
-
-	// Mark indexing as complete
-	md.IndexedAt = time.Now()
-	md.BlockCount = len(records)
-	if md.Deals == nil {
-		md.Deals = []model.DealInfo{}
-	}
-
-	// store the metadata for the piece
-	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.db.MarkIndexingComplete(ctx, pieceCid, len(records))
 }
 
 func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, error) {
@@ -274,11 +240,6 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	}
 
 	return md.IndexedAt, nil
-}
-
-func toStripedLockIndex(pieceCid cid.Cid) uint16 {
-	bz := pieceCid.Bytes()
-	return binary.BigEndian.Uint16(bz[len(bz)-2:]) % stripedLockSize
 }
 
 func normalizePieceCidError(pieceCid cid.Cid, err error) error {

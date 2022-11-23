@@ -250,39 +250,11 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, mhs []multihash.Mult
 	return eg.Wait()
 }
 
-// SetPieceCidToMetadata
-func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md CouchbaseMetadata) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.set_piece_cid_to_metadata")
-	defer span.End()
-
-	k := toCouchKey(pieceCid.String())
-	_, err := db.pcidToMeta.Upsert(k, md, &gocb.UpsertOptions{Context: ctx})
-	if err != nil {
-		return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
-	}
-
-	return nil
-}
-
 func (db *DB) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.set_car_size")
 	defer span.End()
 
-	return db.withCasRetry("set-car-size", func() error {
-		// Get the metadata from the db
-		var getResult *gocb.GetResult
-		k := toCouchKey(pieceCid.String())
-		getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
-		if err != nil {
-			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
-		}
-
-		var metadata CouchbaseMetadata
-		err = getResult.Content(&metadata)
-		if err != nil {
-			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
-		}
-
+	return db.mutatePieceMetadata(ctx, pieceCid, "set-car-size", func(metadata CouchbaseMetadata) *CouchbaseMetadata {
 		// Set the car size on each deal (should be the same for all deals)
 		var deals []model.DealInfo
 		for _, dl := range metadata.Deals {
@@ -291,17 +263,7 @@ func (db *DB) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) err
 			deals = append(deals, dl)
 		}
 		metadata.Deals = deals
-
-		// Update the metadata in the db
-		_, err = db.pcidToMeta.Replace(k, metadata, &gocb.ReplaceOptions{
-			Context: ctx,
-			Cas:     getResult.Cas(),
-		})
-		if err != nil {
-			return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
-		}
-
-		return nil
+		return &metadata
 	})
 }
 
@@ -309,21 +271,7 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr err
 	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
 	defer span.End()
 
-	return db.withCasRetry("mark-index-errored", func() error {
-		// Get the metadata from the db
-		var getResult *gocb.GetResult
-		k := toCouchKey(pieceCid.String())
-		getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
-		if err != nil {
-			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
-		}
-
-		var metadata CouchbaseMetadata
-		err = getResult.Content(&metadata)
-		if err != nil {
-			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
-		}
-
+	return db.mutatePieceMetadata(ctx, pieceCid, "mark-index-errored", func(metadata CouchbaseMetadata) *CouchbaseMetadata {
 		if metadata.Error != "" {
 			// If the error state has already been set, don't over-write the existing error
 			return nil
@@ -333,8 +281,52 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr err
 		metadata.Error = idxErr.Error()
 		metadata.ErrorType = fmt.Sprintf(idxErr.Error(), "%T")
 
+		return &metadata
+	})
+}
+
+func (db *DB) MarkIndexingComplete(ctx context.Context, pieceCid cid.Cid, blockCount int) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.mark_indexing_complete")
+	defer span.End()
+
+	return db.mutatePieceMetadata(ctx, pieceCid, "mark-indexing-complete", func(metadata CouchbaseMetadata) *CouchbaseMetadata {
+		// Mark indexing as complete
+		metadata.IndexedAt = time.Now()
+		metadata.BlockCount = blockCount
+		if metadata.Deals == nil {
+			metadata.Deals = []model.DealInfo{}
+		}
+		return &metadata
+	})
+}
+
+type mutateMetadata func(CouchbaseMetadata) *CouchbaseMetadata
+
+func (db *DB) mutatePieceMetadata(ctx context.Context, pieceCid cid.Cid, opName string, mutate mutateMetadata) error {
+	return db.withCasRetry(opName, func() error {
+		// Get the metadata from the db
+		var getResult *gocb.GetResult
+		k := toCouchKey(pieceCid.String())
+		getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
+		if err != nil {
+			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
+		}
+
+		var metadata CouchbaseMetadata
+		err = getResult.Content(&metadata)
+		if err != nil {
+			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
+		}
+
+		// Apply the mutation to the metadata
+		newMetadata := mutate(metadata)
+		if newMetadata == nil {
+			// If there was no mutation applied, just return immediately
+			return nil
+		}
+
 		// Update the metadata in the db
-		_, err = db.pcidToMeta.Replace(k, metadata, &gocb.ReplaceOptions{
+		_, err = db.pcidToMeta.Replace(k, *newMetadata, &gocb.ReplaceOptions{
 			Context: ctx,
 			Cas:     getResult.Cas(),
 		})
