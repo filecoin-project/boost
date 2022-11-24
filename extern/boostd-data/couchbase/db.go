@@ -272,6 +272,7 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr err
 	defer span.End()
 
 	return db.mutatePieceMetadata(ctx, pieceCid, "mark-index-errored", func(metadata CouchbaseMetadata) *CouchbaseMetadata {
+		// If the error was already set, don't overwrite it
 		if metadata.Error != "" {
 			// If the error state has already been set, don't over-write the existing error
 			return nil
@@ -279,7 +280,7 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr err
 
 		// Set the error state
 		metadata.Error = idxErr.Error()
-		metadata.ErrorType = fmt.Sprintf(idxErr.Error(), "%T")
+		metadata.ErrorType = fmt.Sprintf("%T", idxErr)
 
 		return &metadata
 	})
