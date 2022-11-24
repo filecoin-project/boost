@@ -627,6 +627,10 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 			require.NoError(t, err)
 			dh := harness.Provider.getDealHandler(td.params.DealUUID)
 			require.NotNil(t, dh)
+
+			//Check for fast retrieval
+			require.False(t, td.params.FastRetrieval)
+
 			sub, err := dh.subscribeUpdates()
 			require.NoError(t, err)
 			td.sub = sub
@@ -1792,6 +1796,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 			Params: xferParams,
 			Size:   uint64(carv2Fileinfo.Size()),
 		},
+		FastRetrieval: false,
 	}
 
 	td := &testDeal{

@@ -3,12 +3,13 @@ package migrations_tests
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestStorageTaggedSetHost(t *testing.T) {
@@ -25,6 +26,11 @@ func TestStorageTaggedSetHost(t *testing.T) {
 
 	// Generate 2 deals
 	dealsDB := db.NewDealsDB(sqldb)
+
+	// Add FastRetrieval to allow tests to works
+	_, err := sqldb.Exec(`ALTER TABLE Deals ADD FastRetrieval BOOL`)
+	require.NoError(t, err)
+
 	deals, err := db.GenerateNDeals(2)
 	req.NoError(err)
 
