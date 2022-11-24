@@ -301,49 +301,30 @@ func (db *DB) MarkIndexingComplete(ctx context.Context, pieceCid cid.Cid, blockC
 	})
 }
 
-type mutateMetadata func(CouchbaseMetadata) *CouchbaseMetadata
-
-func (db *DB) mutatePieceMetadata(ctx context.Context, pieceCid cid.Cid, opName string, mutate mutateMetadata) error {
-	return db.withCasRetry(opName, func() error {
-		// Get the metadata from the db
-		var getResult *gocb.GetResult
-		k := toCouchKey(pieceCid.String())
-		getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
-		if err != nil {
-			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
-		}
-
-		var metadata CouchbaseMetadata
-		err = getResult.Content(&metadata)
-		if err != nil {
-			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
-		}
-
-		// Apply the mutation to the metadata
-		newMetadata := mutate(metadata)
-		if newMetadata == nil {
-			// If there was no mutation applied, just return immediately
-			return nil
-		}
-
-		// Update the metadata in the db
-		_, err = db.pcidToMeta.Replace(k, *newMetadata, &gocb.ReplaceOptions{
-			Context: ctx,
-			Cas:     getResult.Cas(),
-		})
-		if err != nil {
-			return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
-		}
-
-		return nil
-	})
-}
-
 func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.add_deal_for_piece")
 	defer span.End()
 
-	return db.withCasRetry("add-deal-for-piece", func() error {
+	return db.mutatePieceMetadata(ctx, pieceCid, "add-deal-for-piece", func(md CouchbaseMetadata) *CouchbaseMetadata {
+		// Check if the deal has already been added
+		for _, dl := range md.Deals {
+			if dl == dealInfo {
+				return nil
+			}
+		}
+
+		// Add the deal to the list.
+		// Note: we can't use ArrayAddUniqueSpec here because it only works
+		// with primitives, not objects.
+		md.Deals = append(md.Deals, dealInfo)
+		return &md
+	})
+}
+
+type mutateMetadata func(CouchbaseMetadata) *CouchbaseMetadata
+
+func (db *DB) mutatePieceMetadata(ctx context.Context, pieceCid cid.Cid, opName string, mutate mutateMetadata) error {
+	return db.withCasRetry(opName, func() error {
 		// Get the piece metadata from the db
 		var md CouchbaseMetadata
 		var pieceMetaExists bool
@@ -359,26 +340,21 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
 		}
 
-		// Check if the deal has already been added
-		for _, dl := range md.Deals {
-			if dl == dealInfo {
-				return nil
-			}
+		// Apply the mutation to the metadata
+		newMetadata := mutate(md)
+		if newMetadata == nil {
+			// If there was no mutation applied, just return immediately
+			return nil
 		}
-
-		// Add the deal to the list.
-		// Note: we can't use ArrayAddUniqueSpec here because it only works
-		// with primitives, not objects.
-		md.Deals = append(md.Deals, dealInfo)
 
 		// Write the piece metadata back to the db
 		if pieceMetaExists {
-			_, err = db.pcidToMeta.Replace(cbKey, md, &gocb.ReplaceOptions{
+			_, err = db.pcidToMeta.Replace(cbKey, newMetadata, &gocb.ReplaceOptions{
 				Context: ctx,
 				Cas:     getResult.Cas(),
 			})
 		} else {
-			_, err = db.pcidToMeta.Insert(cbKey, md, &gocb.InsertOptions{Context: ctx})
+			_, err = db.pcidToMeta.Insert(cbKey, newMetadata, &gocb.InsertOptions{Context: ctx})
 		}
 		if err != nil {
 			return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
