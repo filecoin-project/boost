@@ -20,9 +20,6 @@ func TestDealsLabelv8(t *testing.T) {
 	require.NoError(t, migrations.Migrate(sqldb))
 
 	dealsDB := db.NewDealsDB(sqldb)
-	// Add FastRetrieval to allow tests to works
-	_, err := sqldb.Exec(`ALTER TABLE Deals ADD FastRetrieval BOOL`)
-	require.NoError(t, err)
 	deals, err := db.GenerateDeals()
 	req.NoError(err)
 
