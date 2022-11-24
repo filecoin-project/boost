@@ -83,6 +83,7 @@ type DealParams struct {
 	ClientDealProposal market.ClientDealProposal
 	DealDataRoot       cid.Cid
 	Transfer           Transfer // Transfer params will be the zero value if this is an offline deal
+	FastRetrieval      bool
 }
 
 type DealFilterParams struct {

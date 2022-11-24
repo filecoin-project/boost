@@ -58,6 +58,9 @@ type ProviderDealState struct {
 
 	// NBytesReceived is the number of bytes Received for this deal
 	NBytesReceived int64
+
+	// Keep unsealed copy of the data
+	FastRetrieval bool
 }
 
 func (d *ProviderDealState) String() string {

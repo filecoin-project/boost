@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -295,34 +294,6 @@ type InvocResult struct {
 type MethodCall struct {
 	types.MessageReceipt
 	Error string
-}
-
-type StartDealParams struct {
-	Data               *storagemarket.DataRef
-	Wallet             address.Address
-	Miner              address.Address
-	EpochPrice         types.BigInt
-	MinBlocksDuration  uint64
-	ProviderCollateral big.Int
-	DealStartEpoch     abi.ChainEpoch
-	FastRetrieval      bool
-	VerifiedDeal       bool
-}
-
-func (s *StartDealParams) UnmarshalJSON(raw []byte) (err error) {
-	type sdpAlias StartDealParams
-
-	sdp := sdpAlias{
-		FastRetrieval: true,
-	}
-
-	if err := json.Unmarshal(raw, &sdp); err != nil {
-		return err
-	}
-
-	*s = StartDealParams(sdp)
-
-	return nil
 }
 
 type IpldObject struct {
