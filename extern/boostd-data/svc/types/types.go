@@ -27,6 +27,7 @@ type Service interface {
 	GetIndex(context.Context, cid.Cid) ([]model.Record, error)
 	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
 	GetOffsetSize(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
+	ListPieces(ctx context.Context) ([]cid.Cid, error)
 	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
 	GetPieceDeals(context.Context, cid.Cid) ([]model.DealInfo, error)
 	SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error
