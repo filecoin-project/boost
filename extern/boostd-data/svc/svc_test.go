@@ -130,6 +130,11 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service) {
 	require.Len(t, pcids, 1)
 	require.Equal(t, pieceCid, pcids[0])
 
+	allPieceCids, err := cl.ListPieces(ctx)
+	require.NoError(t, err)
+	require.Len(t, allPieceCids, 1)
+	require.Equal(t, pieceCid, allPieceCids[0])
+
 	indexed, err := cl.IsIndexed(ctx, pieceCid)
 	require.NoError(t, err)
 	require.True(t, indexed)

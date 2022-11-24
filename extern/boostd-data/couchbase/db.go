@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/couchbase/gocb/v2"
@@ -594,6 +595,44 @@ func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []mode
 	return nil
 }
 
+func (db *DB) ListPieces(ctx context.Context) ([]cid.Cid, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.list_pieces")
+	defer span.End()
+
+	res, err := db.cluster.Query("SELECT META().id FROM `"+pieceCidToMetadataBucket+"`", &gocb.QueryOptions{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("getting keys from %s: %w", pieceCidToMetadataBucket, err)
+	}
+
+	var pieceCids []cid.Cid
+	var rowData map[string]string
+	for res.Next() {
+		err := res.Row(&rowData)
+		if err != nil {
+			return nil, fmt.Errorf("reading row from %s: %w", pieceCidToMetadataBucket, err)
+		}
+
+		couchKey, ok := rowData["id"]
+		if !ok {
+			return nil, fmt.Errorf("unexpected row data %s reading row from %s", rowData, pieceCidToMetadataBucket)
+		}
+
+		c, err := cid.Parse(fromCouchKey(couchKey))
+		if err != nil {
+			return nil, fmt.Errorf("parsing piece cid from couchbase key '%s': %w", couchKey, err)
+		}
+
+		pieceCids = append(pieceCids, c)
+	}
+
+	err = res.Err()
+	if err != nil {
+		return nil, fmt.Errorf("reading last result from %s: %w", pieceCidToMetadataBucket, err)
+	}
+
+	return pieceCids, nil
+}
+
 // Attempt to perform an update operation. If the operation fails due to a
 // cas mismatch, or inserting a document at a key that already exists, retry
 // several times before giving up.
@@ -627,6 +666,13 @@ func toCouchKey(key string) string {
 		k = k[:maxCouchKeyLen/2] + k[len(k)-maxCouchKeyLen/2:]
 	}
 	return k
+}
+
+func fromCouchKey(couchKey string) string {
+	if strings.HasPrefix(couchKey, "u:") {
+		return couchKey[2:]
+	}
+	return couchKey
 }
 
 func isNotFoundErr(err error) bool {
