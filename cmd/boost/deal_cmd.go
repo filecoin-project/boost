@@ -54,8 +54,8 @@ var dealFlags = []cli.Flag{
 		Required: true,
 	},
 	&cli.IntFlag{
-		Name:  "start-epoch",
-		Usage: "start epoch by when the deal should be proved by provider on-chain",
+		Name:        "start-epoch",
+		Usage:       "start epoch by when the deal should be proved by provider on-chain",
 		DefaultText: "current chain head + 2 days",
 	},
 	&cli.IntFlag{
@@ -75,6 +75,11 @@ var dealFlags = []cli.Flag{
 	&cli.BoolFlag{
 		Name:  "verified",
 		Usage: "whether the deal funds should come from verified client data-cap",
+		Value: true,
+	},
+	&cli.BoolFlag{
+		Name:  "fast-retrieval",
+		Usage: "indicates that data should be available for fast retrieval",
 		Value: true,
 	},
 	&cli.StringFlag{
@@ -251,6 +256,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		DealDataRoot:       rootCid,
 		IsOffline:          !isOnline,
 		Transfer:           transfer,
+		FastRetrieval:      cctx.Bool("fast-retrieval"),
 	}
 
 	log.Debugw("about to submit deal proposal", "uuid", dealUuid.String())
