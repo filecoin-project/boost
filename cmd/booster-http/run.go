@@ -151,6 +151,12 @@ var runCmd = &cli.Command{
 		}
 		defer lr.Close()
 
+		if err := lr.SetStorage(func(sc *paths.StorageConfig) {
+			sc.StoragePaths = []paths.LocalPath{}
+		}); err != nil {
+			return fmt.Errorf("set storage config: %w", err)
+		}
+
 		// Create the store interface
 		var urls []string
 		lstor, err := paths.NewLocal(ctx, lr, storageService, urls)
