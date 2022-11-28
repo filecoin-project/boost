@@ -142,7 +142,10 @@ var runCmd = &cli.Command{
 		// of a real repo, we just need to supply something that satisfies
 		// the LocalStorage interface to the store
 		memRepo := repo.NewMemory(nil)
-		lr, err := memRepo.Lock(repo.StorageMiner)
+
+		// passing FullNode, so that we don't pass StorageMiner or Worker and
+		// skip initializing of sectorstore.json with random local storage ID
+		lr, err := memRepo.Lock(repo.FullNode)
 		if err != nil {
 			return fmt.Errorf("locking mem repo: %w", err)
 		}
