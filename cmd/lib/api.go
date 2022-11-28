@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/filecoin-project/boost/api"
-	"github.com/filecoin-project/boost/cli/util"
+	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/go-jsonrpc"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
@@ -106,11 +106,20 @@ func CreateSectorAccessor(ctx context.Context, storageApiInfo string, fullnodeAp
 	// of a real repo, we just need to supply something that satisfies
 	// the LocalStorage interface to the store
 	memRepo := repo.NewMemory(nil)
-	lr, err := memRepo.Lock(repo.StorageMiner)
+
+	// passing FullNode, so that we don't pass StorageMiner or Worker and
+	// skip initializing of sectorstore.json with random local storage ID
+	lr, err := memRepo.Lock(repo.FullNode)
 	if err != nil {
 		return nil, nil, fmt.Errorf("locking mem repo: %w", err)
 	}
 	defer lr.Close()
+
+	if err := lr.SetStorage(func(sc *paths.StorageConfig) {
+		sc.StoragePaths = []paths.LocalPath{}
+	}); err != nil {
+		return nil, nil, fmt.Errorf("set storage config: %w", err)
+	}
 
 	// Create the store interface
 	var urls []string
