@@ -21,13 +21,14 @@ var indexProvAnnounceAllCmd = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
-		// announce markets and boost deals
+		// get boost api
 		napi, closer, err := bcli.GetBoostAPI(cctx)
 		if err != nil {
 			return err
 		}
 		defer closer()
 
+		// announce markets and boost deals
 		return napi.BoostIndexerAnnounceAllDeals(ctx)
 	},
 }
