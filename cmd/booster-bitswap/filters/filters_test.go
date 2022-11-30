@@ -1,4 +1,4 @@
-package filters
+package filters_test
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
@@ -41,16 +42,16 @@ func TestMultiFilter(t *testing.T) {
 	defer cancel()
 	cfgDir, err := os.MkdirTemp("", "filters")
 	require.NoError(t, err)
-	mf := newMultiFilter(cfgDir, []*filter{
+	mf := filters.NewMultiFilterWithConfigs(cfgDir, []filters.FilterConfig{
 		{
-			cacheFile: filepath.Join(cfgDir, "denylist.json"),
-			fetcher:   fbf.fetchDenyList,
-			handler:   NewBlockFilter(),
+			CacheFile: filepath.Join(cfgDir, "denylist.json"),
+			Fetcher:   fbf.fetchDenyList,
+			Handler:   filters.NewBlockFilter(),
 		},
 		{
-			cacheFile: filepath.Join(cfgDir, "peerlist.json"),
-			fetcher:   fpf.fetchList,
-			handler:   NewPeerFilter(),
+			CacheFile: filepath.Join(cfgDir, "peerlist.json"),
+			Fetcher:   fpf.fetchList,
+			Handler:   filters.NewPeerFilter(&testBandwidthMeasure{}),
 		},
 	}, clock, onTick)
 	err = mf.Start(ctx)
@@ -69,20 +70,21 @@ func TestMultiFilter(t *testing.T) {
 				"PeerIDs": ["Qma9T5YraSnpRDZqRR4krcSJabThc8nwZuJV3LercPHufi", "QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N"]
 		}
 	}`, string(cache))
+	ss := filters.ServerState{}
 	// blockedCid1 is blocked, do not fulfill
-	fulfillRequest, err := mf.FulfillRequest(peer1, blockedCid1)
+	fulfillRequest, err := mf.FulfillRequest(peer1, blockedCid1, ss)
 	require.NoError(t, err)
 	require.False(t, fulfillRequest)
 	// blockedCid2 is not blocked, peer1 is allowed, fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer1, blockedCid2)
+	fulfillRequest, err = mf.FulfillRequest(peer1, blockedCid2, ss)
 	require.NoError(t, err)
 	require.True(t, fulfillRequest)
 	// blockedCid2 is not blocked, peer2 is allowed, fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer2, blockedCid2)
+	fulfillRequest, err = mf.FulfillRequest(peer2, blockedCid2, ss)
 	require.NoError(t, err)
 	require.True(t, fulfillRequest)
 	// blockedCid2 is not blocked, peer3 is not allowed, do not fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid2)
+	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid2, ss)
 	require.NoError(t, err)
 	require.False(t, fulfillRequest)
 	select {
@@ -90,52 +92,52 @@ func TestMultiFilter(t *testing.T) {
 		t.Fatal("should have updated list but didn't")
 	case <-tickChan:
 	}
-	clock.Add(UpdateInterval)
+	clock.Add(filters.UpdateInterval)
 	select {
 	case <-ctx.Done():
 		t.Fatal("should have updated list but didn't")
 	case <-tickChan:
 	}
 	// blockedCid1 is blocked, do not fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer1, blockedCid1)
+	fulfillRequest, err = mf.FulfillRequest(peer1, blockedCid1, ss)
 	require.NoError(t, err)
 	require.False(t, fulfillRequest)
 	// blockedCid2 is not blocked, peer1 is allowed, fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer1, blockedCid2)
+	fulfillRequest, err = mf.FulfillRequest(peer1, blockedCid2, ss)
 	require.NoError(t, err)
 	require.True(t, fulfillRequest)
 	// blockedCid2 is not blocked, peer2 is allowed, fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer2, blockedCid2)
+	fulfillRequest, err = mf.FulfillRequest(peer2, blockedCid2, ss)
 	require.NoError(t, err)
 	require.True(t, fulfillRequest)
 	// blockedCid2 is not blocked, peer3 is not allowed, do not fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid2)
+	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid2, ss)
 	require.NoError(t, err)
 	require.False(t, fulfillRequest)
-	clock.Add(UpdateInterval)
+	clock.Add(filters.UpdateInterval)
 	select {
 	case <-ctx.Done():
 		t.Fatal("should have updated list but didn't")
 	case <-tickChan:
 	}
 	// blockedCid1 is blocked, do not fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid1)
+	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid1, ss)
 	require.NoError(t, err)
 	require.False(t, fulfillRequest)
 	// blockedCid2 is now blocked, do not fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid2)
+	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid2, ss)
 	require.NoError(t, err)
 	require.False(t, fulfillRequest)
 	// notBlockedCid is not blocked, peer3 is not denied, fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer3, notBlockedCid)
+	fulfillRequest, err = mf.FulfillRequest(peer3, notBlockedCid, ss)
 	require.NoError(t, err)
 	require.True(t, fulfillRequest)
 	// notBlockedCid is not blocked, peer1 is denied, do not fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer1, notBlockedCid)
+	fulfillRequest, err = mf.FulfillRequest(peer1, notBlockedCid, ss)
 	require.NoError(t, err)
 	require.False(t, fulfillRequest)
 	// notBlockedCid is not blocked, peer2 is denied, do not fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer2, notBlockedCid)
+	fulfillRequest, err = mf.FulfillRequest(peer2, notBlockedCid, ss)
 	require.NoError(t, err)
 	require.False(t, fulfillRequest)
 	cache, err = os.ReadFile(filepath.Join(cfgDir, "denylist.json"))
@@ -157,40 +159,40 @@ func TestMultiFilter(t *testing.T) {
 	// now restart a new instance, with a fetcher that always errors,
 	// and verify disk cache works
 	mf.Close()
-	mf = newMultiFilter(cfgDir, []*filter{
+	mf = filters.NewMultiFilterWithConfigs(cfgDir, []filters.FilterConfig{
 		{
-			cacheFile: filepath.Join(cfgDir, "denylist.json"),
-			fetcher: func(time.Time) (bool, io.ReadCloser, error) {
+			CacheFile: filepath.Join(cfgDir, "denylist.json"),
+			Fetcher: func(time.Time) (bool, io.ReadCloser, error) {
 				return false, nil, errors.New("something went wrong")
 			},
-			handler: NewBlockFilter(),
+			Handler: filters.NewBlockFilter(),
 		},
 		{
-			cacheFile: filepath.Join(cfgDir, "peerlist.json"),
-			fetcher:   fpf.fetchList,
-			handler:   NewPeerFilter(),
+			CacheFile: filepath.Join(cfgDir, "peerlist.json"),
+			Fetcher:   fpf.fetchList,
+			Handler:   filters.NewPeerFilter(&testBandwidthMeasure{}),
 		},
 	}, clock, onTick)
 	err = mf.Start(ctx)
 	require.NoError(t, err)
 	// blockedCid1 is blocked, do not fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid1)
+	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid1, ss)
 	require.NoError(t, err)
 	require.False(t, fulfillRequest)
 	// blockedCid2 is now blocked, do not fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid2)
+	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid2, ss)
 	require.NoError(t, err)
 	require.False(t, fulfillRequest)
 	// notBlockedCid is not blocked, peer3 is not denied, fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer3, notBlockedCid)
+	fulfillRequest, err = mf.FulfillRequest(peer3, notBlockedCid, ss)
 	require.NoError(t, err)
 	require.True(t, fulfillRequest)
 	// notBlockedCid is not blocked, peer1 is denied, do not fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer1, notBlockedCid)
+	fulfillRequest, err = mf.FulfillRequest(peer1, notBlockedCid, ss)
 	require.NoError(t, err)
 	require.False(t, fulfillRequest)
 	// notBlockedCid is not blocked, peer2 is denied, do not fulfill
-	fulfillRequest, err = mf.FulfillRequest(peer2, notBlockedCid)
+	fulfillRequest, err = mf.FulfillRequest(peer2, notBlockedCid, ss)
 	require.NoError(t, err)
 	require.False(t, fulfillRequest)
 }

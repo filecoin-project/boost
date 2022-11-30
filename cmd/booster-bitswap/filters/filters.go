@@ -51,24 +51,33 @@ func FetcherForHTTPEndpoint(endpoint string) Fetcher {
 	}
 }
 
+type ServerState struct {
+	TotalRequestsInProgress   uint64
+	RequestsInProgressForPeer uint64
+}
+
 type Handler interface {
 	ParseUpdate(io.Reader) error
 	// FulfillRequest returns true if a request should be fulfilled
 	// error indicates an error in processing
-	FulfillRequest(p peer.ID, c cid.Cid) (bool, error)
+	FulfillRequest(p peer.ID, c cid.Cid, s ServerState) (bool, error)
+}
+
+type FilterConfig struct {
+	Fetcher   Fetcher
+	Handler   Handler
+	CacheFile string
 }
 
 type filter struct {
-	cacheFile   string
+	FilterConfig
 	lastUpdated time.Time
-	fetcher     Fetcher
-	handler     Handler
 }
 
 // update updates a filter from an endpoint
 func (f *filter) update() error {
 	fetchTime := time.Now()
-	updated, stream, err := f.fetcher(f.lastUpdated)
+	updated, stream, err := f.Fetcher(f.lastUpdated)
 	if err != nil {
 		return fmt.Errorf("fetching endpoint: %w", err)
 
@@ -78,14 +87,14 @@ func (f *filter) update() error {
 	}
 	defer stream.Close()
 	// open the cache file
-	cache, err := os.OpenFile(f.cacheFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	cache, err := os.OpenFile(f.CacheFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("opening cache file: %w", err)
 	}
 	defer cache.Close()
 	forkedStream := io.TeeReader(stream, cache)
 	f.lastUpdated = fetchTime
-	err = f.handler.ParseUpdate(forkedStream)
+	err = f.Handler.ParseUpdate(forkedStream)
 	if err != nil {
 		return fmt.Errorf("parsing endpoint update: %w", err)
 	}
@@ -101,7 +110,11 @@ type MultiFilter struct {
 	cancel  context.CancelFunc
 }
 
-func newMultiFilter(cfgDir string, filters []*filter, clock clock.Clock, onTick func()) *MultiFilter {
+func NewMultiFilterWithConfigs(cfgDir string, filterConfigs []FilterConfig, clock clock.Clock, onTick func()) *MultiFilter {
+	filters := make([]*filter, 0, len(filterConfigs))
+	for _, filterConfig := range filterConfigs {
+		filters = append(filters, &filter{FilterConfig: filterConfig})
+	}
 	return &MultiFilter{
 		cfgDir:  cfgDir,
 		filters: filters,
@@ -110,22 +123,22 @@ func newMultiFilter(cfgDir string, filters []*filter, clock clock.Clock, onTick 
 	}
 }
 
-func NewMultiFilter(cfgDir string, peerFilterEndpoint string) *MultiFilter {
-	filters := []*filter{
+func NewMultiFilter(cfgDir string, bandwidthMeasure BandwidthMeasure, peerFilterEndpoint string) *MultiFilter {
+	filters := []FilterConfig{
 		{
-			cacheFile: filepath.Join(cfgDir, "denylist.json"),
-			fetcher:   FetcherForHTTPEndpoint(BadBitsDenyList),
-			handler:   NewBlockFilter(),
+			CacheFile: filepath.Join(cfgDir, "denylist.json"),
+			Fetcher:   FetcherForHTTPEndpoint(BadBitsDenyList),
+			Handler:   NewBlockFilter(),
 		},
 	}
 	if peerFilterEndpoint != "" {
-		filters = append(filters, &filter{
-			cacheFile: filepath.Join(cfgDir, "peerlist.json"),
-			fetcher:   FetcherForHTTPEndpoint(peerFilterEndpoint),
-			handler:   NewPeerFilter(),
+		filters = append(filters, FilterConfig{
+			CacheFile: filepath.Join(cfgDir, "peerlist.json"),
+			Fetcher:   FetcherForHTTPEndpoint(peerFilterEndpoint),
+			Handler:   NewPeerFilter(bandwidthMeasure),
 		})
 	}
-	return newMultiFilter(cfgDir, filters, clock.New(), nil)
+	return NewMultiFilterWithConfigs(cfgDir, filters, clock.New(), nil)
 }
 
 // Start initializes asynchronous updates to the filter configs
@@ -135,7 +148,7 @@ func (mf *MultiFilter) Start(ctx context.Context) error {
 	var cachedCopies []bool
 	for _, f := range mf.filters {
 		// open the cache file if it eixsts
-		cache, err := os.Open(f.cacheFile)
+		cache, err := os.Open(f.CacheFile)
 		// if the file does not exist, synchronously fetch the list
 		if err != nil {
 			if !os.IsNotExist(err) {
@@ -149,7 +162,7 @@ func (mf *MultiFilter) Start(ctx context.Context) error {
 		} else {
 			defer cache.Close()
 			// otherwise, read the file and fetch the list asynchronously
-			err = f.handler.ParseUpdate(cache)
+			err = f.Handler.ParseUpdate(cache)
 			if err != nil {
 				return err
 			}
@@ -167,9 +180,9 @@ func (mf *MultiFilter) Close() {
 
 // FulfillRequest returns true if a request should be fulfilled
 // error indicates an error in processing
-func (mf *MultiFilter) FulfillRequest(p peer.ID, c cid.Cid) (bool, error) {
+func (mf *MultiFilter) FulfillRequest(p peer.ID, c cid.Cid, s ServerState) (bool, error) {
 	for _, f := range mf.filters {
-		has, err := f.handler.FulfillRequest(p, c)
+		has, err := f.Handler.FulfillRequest(p, c, s)
 		if !has || err != nil {
 			return has, err
 		}
