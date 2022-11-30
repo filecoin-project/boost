@@ -93,20 +93,20 @@ func (f *filter) update() error {
 }
 
 type MultiFilter struct {
-	cfgDir     string
-	filters    []*filter
-	clock      clock.Clock
-	onTimerSet func()
-	ctx        context.Context
-	cancel     context.CancelFunc
+	cfgDir  string
+	filters []*filter
+	clock   clock.Clock
+	onTick  func()
+	ctx     context.Context
+	cancel  context.CancelFunc
 }
 
-func newMultiFilter(cfgDir string, filters []*filter, clock clock.Clock, onTimerSet func()) *MultiFilter {
+func newMultiFilter(cfgDir string, filters []*filter, clock clock.Clock, onTick func()) *MultiFilter {
 	return &MultiFilter{
-		cfgDir:     cfgDir,
-		filters:    filters,
-		clock:      clock,
-		onTimerSet: onTimerSet,
+		cfgDir:  cfgDir,
+		filters: filters,
+		clock:   clock,
+		onTick:  onTick,
 	}
 }
 
@@ -189,10 +189,10 @@ func (mf *MultiFilter) run(cachedCopies []bool) {
 		}
 	}
 	updater := mf.clock.Ticker(UpdateInterval)
-        defer updater.Stop()
+	defer updater.Stop()
 	// call the callback if set
-	if mf.onTimerSet != nil {
-		mf.onTimerSet()
+	if mf.onTick != nil {
+		mf.onTick()
 	}
 	for {
 		select {
@@ -207,8 +207,8 @@ func (mf *MultiFilter) run(cachedCopies []bool) {
 				}
 			}
 			// call the callback if set
-			if mf.onTimerSet != nil {
-				mf.onTimerSet()
+			if mf.onTick != nil {
+				mf.onTick()
 			}
 		}
 	}

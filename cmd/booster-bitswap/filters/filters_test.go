@@ -30,9 +30,9 @@ func TestMultiFilter(t *testing.T) {
 	require.NoError(t, err)
 	notBlockedCid, err := cid.Parse("QmajLDwZLH6bKTzd8jkq913ZbxaB2nFGRrkDAuygYNNv39")
 	require.NoError(t, err)
-	timerSetChan := make(chan struct{}, 1)
-	onTimerSet := func() {
-		timerSetChan <- struct{}{}
+	tickChan := make(chan struct{}, 1)
+	onTick := func() {
+		tickChan <- struct{}{}
 	}
 	fbf := &fakeBlockFetcher{}
 	fpf := &fakePeerFetcher{}
@@ -52,7 +52,7 @@ func TestMultiFilter(t *testing.T) {
 			fetcher:   fpf.fetchList,
 			handler:   NewPeerFilter(),
 		},
-	}, clock, onTimerSet)
+	}, clock, onTick)
 	err = mf.Start(ctx)
 	require.NoError(t, err)
 	cache, err := os.ReadFile(filepath.Join(cfgDir, "denylist.json"))
@@ -88,13 +88,13 @@ func TestMultiFilter(t *testing.T) {
 	select {
 	case <-ctx.Done():
 		t.Fatal("should have updated list but didn't")
-	case <-timerSetChan:
+	case <-tickChan:
 	}
 	clock.Add(UpdateInterval)
 	select {
 	case <-ctx.Done():
 		t.Fatal("should have updated list but didn't")
-	case <-timerSetChan:
+	case <-tickChan:
 	}
 	// blockedCid1 is blocked, do not fulfill
 	fulfillRequest, err = mf.FulfillRequest(peer1, blockedCid1)
@@ -116,7 +116,7 @@ func TestMultiFilter(t *testing.T) {
 	select {
 	case <-ctx.Done():
 		t.Fatal("should have updated list but didn't")
-	case <-timerSetChan:
+	case <-tickChan:
 	}
 	// blockedCid1 is blocked, do not fulfill
 	fulfillRequest, err = mf.FulfillRequest(peer3, blockedCid1)
@@ -170,7 +170,7 @@ func TestMultiFilter(t *testing.T) {
 			fetcher:   fpf.fetchList,
 			handler:   NewPeerFilter(),
 		},
-	}, clock, onTimerSet)
+	}, clock, onTick)
 	err = mf.Start(ctx)
 	require.NoError(t, err)
 	// blockedCid1 is blocked, do not fulfill
