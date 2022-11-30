@@ -49,7 +49,7 @@ require (
 	github.com/graph-gophers/graphql-transport-ws v0.0.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hnlq715/golang-lru v0.3.0
-	github.com/ipfs/go-bitswap v0.10.2
+	github.com/ipfs/go-bitswap v0.10.3-0.20221130010825-b542a89d29b3
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-blockservice v0.4.0
 	github.com/ipfs/go-cid v0.2.0

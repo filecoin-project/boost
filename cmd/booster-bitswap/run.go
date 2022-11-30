@@ -7,10 +7,12 @@ import (
 	_ "net/http/pprof"
 	"strings"
 
+	"github.com/benbjohnson/clock"
 	"github.com/filecoin-project/boost/api"
 	bclient "github.com/filecoin-project/boost/api/client"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters/bandwidthmeasure"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/tracing"
@@ -112,12 +114,13 @@ var runCmd = &cli.Command{
 		}
 
 		// Create the bitswap server
-		multiFilter := filters.NewMultiFilter(repoDir, cctx.String("peer-filter-endpoint"))
+		bandwidthMeasure := bandwidthmeasure.NewBandwidthMeasure(bandwidthmeasure.DefaultBandwidthSamplePeriod, clock.New())
+		multiFilter := filters.NewMultiFilter(repoDir, bandwidthMeasure, cctx.String("peer-filter-endpoint"))
 		err = multiFilter.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)
 		}
-		server := NewBitswapServer(remoteStore, host, multiFilter)
+		server := NewBitswapServer(remoteStore, host, multiFilter, bandwidthMeasure)
 
 		var proxyAddrInfo *peer.AddrInfo
 		if cctx.IsSet("proxy") {
