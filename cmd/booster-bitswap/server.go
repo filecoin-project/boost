@@ -60,8 +60,8 @@ func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo) error {
 	}
 	bsopts := []server.Option{server.MaxOutstandingBytesPerPeer(1 << 20), server.WithPeerBlockRequestFilter(func(p peer.ID, c cid.Cid) bool {
 		fulfill, err := s.filter.FulfillRequest(p, c)
-		// peer request block filter expects a true if the request should be fulfilled, so
-		// we only return true for cids that aren't filtered and have no errors
+		// peer request filter expects a true if the request should be fulfilled, so
+		// we only return true for requests that aren't filtered and have no errors
 		return fulfill && err == nil
 	})}
 	net := bsnetwork.NewFromIpfsHost(host, nilRouter)

@@ -139,7 +139,7 @@ func (mf *MultiFilter) Start(ctx context.Context) error {
 		// if the file does not exist, synchronously fetch the list
 		if err != nil {
 			if !os.IsNotExist(err) {
-				return fmt.Errorf("fetching badbits list: %w", err)
+				return fmt.Errorf("fetching filter list: %w", err)
 			}
 			err = f.update()
 			if err != nil {
@@ -189,6 +189,7 @@ func (mf *MultiFilter) run(cachedCopies []bool) {
 		}
 	}
 	updater := mf.clock.Ticker(UpdateInterval)
+        defer updater.Stop()
 	// call the callback if set
 	if mf.onTimerSet != nil {
 		mf.onTimerSet()
@@ -198,7 +199,7 @@ func (mf *MultiFilter) run(cachedCopies []bool) {
 		case <-mf.ctx.Done():
 			return
 		case <-updater.C:
-			// when timer expires, update deny list
+			// when timer expires, update filters
 			for _, f := range mf.filters {
 				err := f.update()
 				if err != nil {
