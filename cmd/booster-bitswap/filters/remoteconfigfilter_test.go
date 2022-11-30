@@ -158,7 +158,7 @@ func TestPeerFilter(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			tbm := &testBandwidthMeasure{avgBandwidthPerSecond}
-			pf := filters.NewPeerFilter(tbm)
+			pf := filters.NewRemoteConfigFilter(tbm)
 			err := pf.ParseUpdate(strings.NewReader(testCase.response))
 			if testCase.expectedParseError == nil {
 				require.NoError(t, err)

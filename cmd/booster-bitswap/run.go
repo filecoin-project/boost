@@ -66,8 +66,8 @@ var runCmd = &cli.Command{
 			Value: "http://tempo:14268/api/traces",
 		},
 		&cli.StringFlag{
-			Name:  "peer-filter-endpoint",
-			Usage: "the endpoint to use for filtering peers for bitswap requests",
+			Name:  "api-filter-endpoint",
+			Usage: "the endpoint to use for fetching a remote retrieval configuration for bitswap requests",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -115,7 +115,7 @@ var runCmd = &cli.Command{
 
 		// Create the bitswap server
 		bandwidthMeasure := bandwidthmeasure.NewBandwidthMeasure(bandwidthmeasure.DefaultBandwidthSamplePeriod, clock.New())
-		multiFilter := filters.NewMultiFilter(repoDir, bandwidthMeasure, cctx.String("peer-filter-endpoint"))
+		multiFilter := filters.NewMultiFilter(repoDir, bandwidthMeasure, cctx.String("api-filter-endpoint"))
 		err = multiFilter.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)

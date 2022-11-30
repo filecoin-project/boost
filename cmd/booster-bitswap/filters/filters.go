@@ -123,7 +123,7 @@ func NewMultiFilterWithConfigs(cfgDir string, filterConfigs []FilterConfig, cloc
 	}
 }
 
-func NewMultiFilter(cfgDir string, bandwidthMeasure BandwidthMeasure, peerFilterEndpoint string) *MultiFilter {
+func NewMultiFilter(cfgDir string, bandwidthMeasure BandwidthMeasure, apiFilterEndpoint string) *MultiFilter {
 	filters := []FilterConfig{
 		{
 			CacheFile: filepath.Join(cfgDir, "denylist.json"),
@@ -131,11 +131,11 @@ func NewMultiFilter(cfgDir string, bandwidthMeasure BandwidthMeasure, peerFilter
 			Handler:   NewBlockFilter(),
 		},
 	}
-	if peerFilterEndpoint != "" {
+	if apiFilterEndpoint != "" {
 		filters = append(filters, FilterConfig{
-			CacheFile: filepath.Join(cfgDir, "peerlist.json"),
-			Fetcher:   FetcherForHTTPEndpoint(peerFilterEndpoint),
-			Handler:   NewPeerFilter(bandwidthMeasure),
+			CacheFile: filepath.Join(cfgDir, "remoteconfig.json"),
+			Fetcher:   FetcherForHTTPEndpoint(apiFilterEndpoint),
+			Handler:   NewRemoteConfigFilter(bandwidthMeasure),
 		})
 	}
 	return NewMultiFilterWithConfigs(cfgDir, filters, clock.New(), nil)
