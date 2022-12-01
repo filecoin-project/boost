@@ -71,12 +71,6 @@ type Boost interface {
 	MarketPendingDeals(ctx context.Context) (lapi.PendingDealInfo, error)                                                                                                                //perm:write
 	SectorsRefs(context.Context) (map[string][]lapi.SealedRef, error)                                                                                                                    //perm:read
 
-	//PiecesListPieces(ctx context.Context) ([]cid.Cid, error)                                 //perm:read
-	//PiecesListCidInfos(ctx context.Context) ([]cid.Cid, error)                               //perm:read
-	//PiecesGetPieceInfo(ctx context.Context, pieceCid cid.Cid) (*piecestore.PieceInfo, error) //perm:read
-	//PiecesGetCIDInfo(ctx context.Context, payloadCid cid.Cid) (*piecestore.CIDInfo, error)   //perm:read
-	//PiecesGetMaxOffset(ctx context.Context, pieceCid cid.Cid) (uint64, error)                //perm:read
-
 	// MethodGroup: Actor
 	ActorSectorSize(context.Context, address.Address) (abi.SectorSize, error) //perm:read
 
