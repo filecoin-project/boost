@@ -304,7 +304,7 @@ func normalizeMultihashError(m mh.Multihash, err error) error {
 
 // Remove Single deal for pieceCID. If []Deals is empty then Metadata is removed as well
 func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid uuid.UUID) error {
-	log.Debugw("handle.remove-deal-for-piece", "piece-cid", pieceCid)
+	log.Debugw("handle.remove-deal-for-piece", "piece-cid", pieceCid, "deal-uuid", dealUuid)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
 	defer span.End()

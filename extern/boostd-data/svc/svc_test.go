@@ -471,4 +471,11 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 
 	_, err = cl.GetRecords(ctx, pieceCid)
 	require.ErrorContains(t, err, "not found")
+
+	_, err = cl.PiecesContainingMultihash(ctx, mhash)
+	require.ErrorContains(t, err, "not found")
+
+	indexed, err = cl.IsIndexed(ctx, pieceCid)
+	require.NoError(t, err)
+	require.False(t, indexed)
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/couchbase/gocb/v2"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
@@ -671,28 +672,36 @@ func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.remove_metadata")
 	defer span.End()
 
-	k := toCouchKey(pieceCid.String())
-	metadata, err := db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil {
-		if errors.Is(err, gocb.ErrDocumentNotFound) {
-			return nil
+	return db.withCasRetry("remove-metadata-for-piece", func() error {
+		var getResult *gocb.GetResult
+		k := toCouchKey(pieceCid.String())
+		getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
+		if err != nil {
+			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
 		}
-		return fmt.Errorf("getting piece %s metadata: %w", pieceCid, err)
-	}
 
-	// Remove all multihashes first, as without Metadata, they cannot be removed.
-	// This order is important as metadata.BlockCount is required in case RemoveIndexes fails
-	// and needs to be run manually
-	if err = db.RemoveIndexes(ctx, pieceCid, metadata.BlockCount); err != nil {
-		return fmt.Errorf("failed removing index for piece %s: %w", pieceCid, err)
-	}
+		var metadata CouchbaseMetadata
+		err = getResult.Content(&metadata)
+		if err != nil {
+			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
+		}
 
-	_, err = db.pcidToMeta.Remove(k, &gocb.RemoveOptions{Context: ctx})
-	if err != nil {
-		return fmt.Errorf("removing piece %s metadata: %w", pieceCid, err)
-	}
+		// Remove all multihashes first, as without Metadata, they cannot be removed.
+		// This order is important as metadata.BlockCount is required in case RemoveIndexes fails
+		// and needs to be run manually
+		if err = db.RemoveIndexes(ctx, pieceCid, metadata.BlockCount); err != nil {
+			return fmt.Errorf("failed removing index for piece %s: %w", pieceCid, err)
+		}
 
-	return nil
+		_, err = db.pcidToMeta.Remove(k, &gocb.RemoveOptions{
+			Context: ctx,
+			Cas:     getResult.Cas(),
+		})
+		if err != nil {
+			return fmt.Errorf("removing piece %s metadata: %w", pieceCid, err)
+		}
+		return nil
+	})
 }
 
 // RemoveIndexes
@@ -722,36 +731,90 @@ func (db *DB) RemoveIndexes(ctx context.Context, pieceCid cid.Cid, recordCount i
 		// Get each value in the map
 		for mhStr := range recMap {
 			cbKey := toCouchKey(mhStr)
-			getResult, err := db.mhToPieces.Get(cbKey, &gocb.GetOptions{Context: ctx})
-			if err != nil {
+			err = db.withCasRetry("remove-piece", func() error {
+				getResult, err := db.mhToPieces.Get(cbKey, &gocb.GetOptions{Context: ctx})
+				if err != nil {
+					return nil
+				}
+				var cidStrs []string
+				err = getResult.Content(&cidStrs)
+				if err != nil {
+					return err
+				}
+
+				// Remove multihash -> pieceCId (value only)
+				for i, v := range cidStrs {
+					if v == pieceCid.String() {
+						cidStrs[i] = cidStrs[len(cidStrs)-1]
+						cidStrs[len(cidStrs)-1] = ""
+						cidStrs = cidStrs[:len(cidStrs)-1]
+					}
+				}
+
+				_, err = db.mhToPieces.Replace(cbKey, cidStrs, &gocb.ReplaceOptions{
+					Context: ctx,
+					Cas:     getResult.Cas(),
+				})
+				if err != nil {
+					return fmt.Errorf("removing multihash %s to piece %s: update doc: %w", mhStr, pieceCid, err)
+				}
 				return nil
-			}
-			var cidStrs []string
-			err = getResult.Content(&cidStrs)
+			})
 			if err != nil {
 				return err
 			}
-
-			// Remove multihash -> pieceCId (value only)
-			for i, v := range cidStrs {
-				if v == pieceCid.String() {
-					cidStrs[i] = cidStrs[len(cidStrs)-1]
-					cidStrs[len(cidStrs)-1] = ""
-					cidStrs = cidStrs[:len(cidStrs)-1]
-				}
-			}
-
-			_, err = db.mhToPieces.Replace(cbKey, cidStrs, &gocb.ReplaceOptions{Context: ctx})
+			_, err = db.pieceOffsets.Remove(cbKey, &gocb.RemoveOptions{
+				Context: ctx,
+			})
 			if err != nil {
-				return fmt.Errorf("removing multihash %s to piece %s: update doc: %w", mhStr, pieceCid, err)
+				return err
 			}
-		}
-
-		_, err = db.pieceOffsets.Remove(cbKey, &gocb.RemoveOptions{Context: ctx})
-		if err != nil {
-			return err
 		}
 	}
-
 	return nil
+}
+
+func (db *DB) RemoveDeals(ctx context.Context, dealUuid uuid.UUID, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.remove_deals")
+	defer span.End()
+
+	return db.withCasRetry("remove-deal-for-piece", func() error {
+		var getResult *gocb.GetResult
+		k := toCouchKey(pieceCid.String())
+		getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
+		if err != nil {
+			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
+		}
+
+		var metadata CouchbaseMetadata
+		err = getResult.Content(&metadata)
+		if err != nil {
+			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
+		}
+
+		for i, v := range metadata.Deals {
+			if v.DealUuid == dealUuid {
+				metadata.Deals[i] = metadata.Deals[len(metadata.Deals)-1]
+				metadata.Deals = metadata.Deals[:len(metadata.Deals)-1]
+				break
+			}
+		}
+		// Remove Metadata if removed deal was last one
+		if len(metadata.Deals) == 0 {
+			if err := db.RemoveMetadata(ctx, pieceCid); err != nil {
+				fmt.Errorf("Failed to remove the Metadata after removing the last deal: %w", err)
+			}
+			return nil
+		}
+
+		_, err = db.pcidToMeta.Replace(k, metadata, &gocb.ReplaceOptions{
+			Context: ctx,
+			Cas:     getResult.Cas(),
+		})
+		if err != nil {
+			return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
+		}
+
+		return nil
+	})
 }
