@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	_ "net/http/pprof"
@@ -119,6 +120,9 @@ var genindexCmd = &cli.Command{
 
 			sr, err := pd.GetPieceReader(ctx, piececid)
 			if err != nil {
+				if errors.Is(err, piecedirectory.ErrNoUnsealedPieceAvailable) {
+					return fmt.Errorf("piece reader could not find unsealed piece for cid %s: %w", piececid, err)
+				}
 				return fmt.Errorf("error while getting piece reader: %w", err)
 			}
 

@@ -30,6 +30,10 @@ import (
 
 var log = logging.Logger("piecedirectory")
 
+var (
+	ErrNoUnsealedPieceAvailable = errors.New("no unsealed piece available")
+)
+
 //go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecedirectory.go -package=mock_piecedirectory . SectionReader,PieceReader,Store
 
 type SectionReader interface {
@@ -107,6 +111,11 @@ func (ps *PieceDirectory) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) (
 	deals, err := ps.store.GetPieceDeals(ctx, pieceCid)
 	if err != nil {
 		return nil, fmt.Errorf("listing deals for piece %s: %w", pieceCid, err)
+	}
+
+	//TODO: confirm this change in behaviour is ok
+	if len(deals) == 0 {
+		return nil, ErrNoUnsealedPieceAvailable
 	}
 
 	return deals, nil
@@ -368,7 +377,7 @@ func (ps *PieceDirectory) DeleteDealForPiece(ctx context.Context, pieceCid cid.C
 //return nil
 //}
 
-// Used internally, and also by HTTP retrieval
+// Used internally, and also by HTTP retrieval, and also by genindex
 func (ps *PieceDirectory) GetPieceReader(ctx context.Context, pieceCid cid.Cid) (SectionReader, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_reader")
 	defer span.End()
