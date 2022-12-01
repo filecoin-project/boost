@@ -222,6 +222,13 @@ func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid,
 	return nil
 }
 
+func (ps *PieceDirectory) AddIndex(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
+	ctx, span := tracing.Tracer.Start(ctx, "pm.add_index")
+	defer span.End()
+
+	return ps.store.AddIndex(ctx, pieceCid, recs)
+}
+
 type addIndexOperation struct {
 	done chan struct{}
 	err  error

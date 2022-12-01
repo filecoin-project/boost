@@ -34,38 +34,48 @@ var genindexCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:     "api-fullnode",
 			Usage:    "the endpoint for the full node API",
-			Required: true,
+			Required: false,
 		},
 		&cli.StringFlag{
 			Name:     "api-storage",
 			Usage:    "the endpoint for the storage node API",
-			Required: true,
+			Required: false,
 		},
 		&cli.StringFlag{
 			Name:     "api-piece-directory",
 			Usage:    "the endpoint for the piece directory API",
-			Required: true,
+			Required: false,
+		},
+		&cli.StringFlag{
+			Name:     "piececid",
+			Usage:    "piececid to index",
+			Required: false,
+		},
+		&cli.StringFlag{
+			Name:     "filepath",
+			Usage:    "the path to the car",
+			Required: false,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
 
-		if !cctx.Args().Present() {
-			return lcli.ShowHelp(cctx, fmt.Errorf("must specify piece cid"))
-		}
-
-		piececid, err := cid.Decode(cctx.Args().First())
+		// parse piececid
+		piececid, err := cid.Decode(cctx.String("piececid"))
 		if err != nil {
 			return err
 		}
+		fmt.Println("piececid to index: ", piececid)
 
-		fmt.Println("piececid to fetch from lotus: ", piececid)
+		// connect to the piece directory service
+		pdClient := piecedirectory.NewStore()
+		defer pdClient.Close(ctx)
+		err = pdClient.Dial(ctx, cctx.String("api-piece-directory"))
+		if err != nil {
+			return fmt.Errorf("error while connecting to piece directory service: %w", err)
+		}
 
-		filename := piececid.String()
-
-		fmt.Println("filename to read: ", filename)
-
-		// Connect to the full node API
+		// connect to the full node
 		fnApiInfo := cctx.String("api-fullnode")
 		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log)
 		if err != nil {
@@ -73,7 +83,7 @@ var genindexCmd = &cli.Command{
 		}
 		defer ncloser()
 
-		// Connect to the storage API and create a sector accessor
+		// connect to the storage API and create a sector accessor
 		storageApiInfo := cctx.String("api-storage")
 		sa, storageCloser, err := lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
 		if err != nil {
@@ -83,53 +93,58 @@ var genindexCmd = &cli.Command{
 
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
 
-		// Connect to the piece directory service
-		pdClient := piecedirectory.NewStore()
-		defer pdClient.Close(ctx)
-		err = pdClient.Dial(ctx, cctx.String("api-piece-directory"))
-		if err != nil {
-			return fmt.Errorf("connecting to piece directory service: %w", err)
-		}
+		pd := piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
 
-		piecedirectory := piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
+		var r *carv2.Reader
+		var headerDataSize uint64
 
-		_ = piecedirectory
+		if filepath := cctx.String("filepath"); filepath != "" {
+			fmt.Println("fetching piececid from car file: ", filepath)
 
-		// Load the index file and store in Piece Directory similar to how we migrate indices
-		{
-			//TODO: idealy store is something generic for leveldb or couchbase
-			//store := couchbase.NewStore(settings)
-
-			// gen index
-			err := IndexCar(filename)
+			r, err = carv2.OpenReader(filepath)
 			if err != nil {
-				panic(err)
+				return fmt.Errorf("open reader: %w", err)
+			}
+			defer r.Close()
+
+			if r.Version == 1 {
+				fi, err := os.Stat(filepath)
+				if err != nil {
+					return fmt.Errorf("os.stat err: %w", err)
+				}
+				headerDataSize = uint64(fi.Size())
+			}
+		} else {
+			fmt.Println("no car file specified, fetching piececid from the storage api")
+
+			sr, err := pd.GetPieceReader(ctx, piececid)
+			if err != nil {
+				return fmt.Errorf("error while getting piece reader: %w", err)
 			}
 
-			//idx, err := car.ReadOrGenerateIndex(reader, car.ZeroLengthSectionAsEOF(true), car.StoreIdentityCIDs(true))
-			//if err != nil {
-			//return err
-			//}
-
-			//itidx, ok := idx.(index.IterableIndex)
-			//if !ok {
-			//return fmt.Errorf("index is not iterable for piece %s", piececid)
-			//}
-
-			//// Convert from IterableIndex to an array of records
-			//records, err := getRecords(itidx)
-			//if err != nil {
-			//return fmt.Errorf("getting records for index: %w", err)
-			//}
-
-			//// Add the index to the store
-			//addStart := time.Now()
-			//err = store.AddIndex(ctx, pieceCid, records)
-			//if err != nil {
-			//return fmt.Errorf("adding index to store: %w", err)
-			//}
-			//log.Debugw("AddIndex", "took", time.Since(addStart).String())
+			r, err = carv2.NewReader(sr)
+			if err != nil {
+				return err
+			}
 		}
+
+		// gen index
+		recs, err := GetRecords(r, headerDataSize)
+		if err != nil {
+			panic(err)
+		}
+
+		addStart := time.Now()
+
+		err = pd.AddIndex(ctx, piececid, recs)
+		if err != nil {
+			panic(err)
+		}
+
+		//TODO: maybe set car size?
+		//SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error
+
+		log.Debugw("AddIndex", "took", time.Since(addStart).String())
 
 		return nil
 	},
@@ -182,108 +197,29 @@ func getRecords(subject index.Index) ([]model.Record, error) {
 	return records, nil
 }
 
-// IndexCar is a command to add an index to a car
-func IndexCar(filename string) error {
-	r, err := carv2.OpenReader(filename)
-	if err != nil {
-		return fmt.Errorf("open reader: %w", err)
-	}
-	defer r.Close()
-
-	//if c.Int("version") == 1 {
-	//if c.IsSet("codec") && c.String("codec") != "none" {
-	//return fmt.Errorf("'none' is the only supported codec for a v1 car")
-	//}
-	//outStream := os.Stdout
-	//if c.Args().Len() >= 2 {
-	//outStream, err = os.Create(c.Args().Get(1))
-	//if err != nil {
-	//return err
-	//}
-	//}
-	//defer outStream.Close()
-
-	//dr, err := r.DataReader()
-	//if err != nil {
-	//return err
-	//}
-	//_, err = io.Copy(outStream, dr)
-	//return err
-	//}
-
-	//if c.Int("version") != 2 {
-	//return fmt.Errorf("invalid CAR version %d", c.Int("version"))
-	//}
-
-	codec := "car-multihash-index-sorted"
-	var idx index.Index
-	var mc multicodec.Code
-	if err := mc.Set(codec); err != nil {
-		return err
-	}
-	idx, err = index.New(mc)
-	if err != nil {
-		return err
-	}
-
-	//outStream := os.Stdout
-	//if c.Args().Len() >= 2 {
-	//outStream, err = os.Create(c.Args().Get(1))
-	//if err != nil {
-	//return err
-	//}
-	//}
-	//defer outStream.Close()
-
+func GetRecords(r *carv2.Reader, headerDataSize uint64) ([]model.Record, error) {
 	v1r, err := r.DataReader()
 	if err != nil {
-		return fmt.Errorf("data reader: %w", err)
+		return nil, fmt.Errorf("data reader: %w", err)
 	}
 
 	if r.Version == 1 {
-		fi, err := os.Stat(filename)
-		if err != nil {
-			return fmt.Errorf("os.stat err: %w", err)
-		}
-		r.Header.DataSize = uint64(fi.Size())
+		r.Header.DataSize = headerDataSize
 	}
 	v2Header := carv2.NewHeader(r.Header.DataSize)
-	//if c.String("codec") == "none" {
 	v2Header.IndexOffset = 0
-	//if _, err := outStream.Write(carv2.Pragma); err != nil {
-	//return err
-	//}
-	//if _, err := v2Header.WriteTo(outStream); err != nil {
-	//return err
-	//}
-	//if _, err := io.Copy(outStream, v1r); err != nil {
-	//return err
-	//}
-	//return nil
-	//}
-
-	//if _, err := outStream.Write(carv2.Pragma); err != nil {
-	//return err
-	//}
-	//if _, err := v2Header.WriteTo(outStream); err != nil {
-	//return err
-	//}
 
 	// collect records as we go through the v1r
 	br := bufio.NewReader(v1r)
-	hdr, err := carv1.ReadHeader(br)
+	_, err = carv1.ReadHeader(br)
 	if err != nil {
-		return fmt.Errorf("error reading car header: %w", err)
+		return nil, fmt.Errorf("error reading car header: %w", err)
 	}
-	_ = hdr
-	//if err := carv1.WriteHeader(hdr, outStream); err != nil {
-	//return err
-	//}
 
-	records := make([]index.Record, 0)
+	var records []model.Record
 	var sectionOffset int64
 	if sectionOffset, err = v1r.Seek(0, io.SeekCurrent); err != nil {
-		return err
+		return nil, err
 	}
 	sectionOffset -= int64(br.Buffered())
 
@@ -294,47 +230,35 @@ func IndexCar(filename string) error {
 			if err == io.EOF {
 				break
 			}
-			return fmt.Errorf("reading uvarint: %w", err)
+			return nil, fmt.Errorf("reading uvarint: %w", err)
 		}
-		//if _, err := outStream.Write(varint.ToUvarint(sectionLen)); err != nil {
-		//return err
-		//}
-
-		// Null padding; by default it's an error.
-		// TODO: integrate corresponding ReadOption
 		if sectionLen == 0 {
-			// TODO: pad writer to expected length.
 			break
 		}
 
 		// Read the CID.
 		cidLen, c, err := cid.CidFromReader(br)
 		if err != nil {
-			return fmt.Errorf("cidfromreader err: %w", err)
+			return nil, fmt.Errorf("cidfromreader err: %w", err)
 		}
-		records = append(records, index.Record{Cid: c, Offset: uint64(sectionOffset)})
-		//if _, err := c.WriteBytes(outStream); err != nil {
-		//return err
-		//}
 
 		// Seek to the next section by skipping the block.
 		// The section length includes the CID, so subtract it.
 		remainingSectionLen := int64(sectionLen) - int64(cidLen)
 		if _, err := io.CopyN(io.Discard, br, remainingSectionLen); err != nil {
-			return err
+			return nil, err
 		}
 
+		records = append(records, model.Record{
+			Cid: c,
+			OffsetSize: model.OffsetSize{
+				Offset: uint64(sectionOffset),
+				Size:   uint64(remainingSectionLen), // TODO: must confirm this field is correct
+			},
+		})
+
 		sectionOffset += int64(sectionLen) + int64(varint.UvarintSize(sectionLen))
-
-		fmt.Println("record: ", c, sectionOffset)
 	}
 
-	if err := idx.Load(records); err != nil {
-		return fmt.Errorf("loading records: %w", err)
-	}
-
-	//_, err = index.WriteTo(idx, outStream)
-	//return err
-
-	return nil
+	return records, nil
 }
