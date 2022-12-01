@@ -28,6 +28,7 @@ export function Menu(props) {
             <DealPublishMenuItem />
             <DealTransfersMenuItem />
             <InspectMenuItem />
+            <PiecesMenuItem />
             <Link key="mpool" className="menu-item" to="/mpool">
                 <img className="icon" alt="" src={gridImg} />
                 <h3>Message Pool</h3>
