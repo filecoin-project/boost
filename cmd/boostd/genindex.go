@@ -131,22 +131,23 @@ var genindexCmd = &cli.Command{
 		// gen index
 		recs, err := GetRecords(r, headerDataSize)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		addStart := time.Now()
 
+		fmt.Printf("about to add %d records for piececid %s to the piece directory\n", len(recs), piececid)
 		err = pd.AddIndex(ctx, piececid, recs)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		//TODO: maybe set car size?
 		//SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error
 
-		log.Debugw("AddIndex", "took", time.Since(addStart).String())
+		fmt.Println("adding index took", time.Since(addStart).String())
 
-		fmt.Printf("successfully added index for piececid %s to the piece directory\n", piececid)
+		fmt.Printf("successfully added index (%d records) for piececid %s to the piece directory\n", len(recs), piececid)
 
 		return nil
 	},
