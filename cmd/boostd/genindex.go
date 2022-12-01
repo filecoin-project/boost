@@ -16,9 +16,6 @@ import (
 	"github.com/ipfs/go-cid"
 	carv1 "github.com/ipld/go-car"
 	carv2 "github.com/ipld/go-car/v2"
-	"github.com/ipld/go-car/v2/index"
-	"github.com/multiformats/go-multicodec"
-	"github.com/multiformats/go-multihash"
 	"github.com/multiformats/go-varint"
 	"github.com/urfave/cli/v2"
 )
@@ -155,53 +152,6 @@ var genindexCmd = &cli.Command{
 
 		return nil
 	},
-}
-
-func loadIndex(path string) (index.Index, error) {
-	defer func(now time.Time) {
-		log.Debugw("loadindex", "took", time.Since(now))
-	}(time.Now())
-
-	idxf, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer idxf.Close()
-
-	subject, err := index.ReadFrom(idxf)
-	if err != nil {
-		return nil, err
-	}
-
-	return subject, nil
-}
-
-func getRecords(subject index.Index) ([]model.Record, error) {
-	records := make([]model.Record, 0)
-
-	switch idx := subject.(type) {
-	case index.IterableIndex:
-		err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
-
-			cid := cid.NewCidV1(cid.Raw, m)
-
-			records = append(records, model.Record{
-				Cid: cid,
-				OffsetSize: model.OffsetSize{
-					Offset: offset,
-					Size:   0,
-				},
-			})
-
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec())
-	}
-	return records, nil
 }
 
 func GetRecords(r *carv2.Reader, headerDataSize uint64) ([]model.Record, error) {
