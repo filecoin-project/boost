@@ -142,8 +142,6 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
     const searchIsPieceCid = searchQuery && searchQuery == pieceCid
     const searchIsRootCid = searchQuery && searchQuery == rootCid
 
-    alert(searchIsPieceCid);
-
     return <div className="piece-detail" id={pieceCid}>
         <div className="content">
             <table className="piece-fields">
@@ -168,7 +166,6 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                 ) : null}
                 <tr key="piece cid">
                     <th>Piece CID</th>
-                    <td>{pieceCid}</td>
                     {searchIsPieceCid ? (
                       <td><strong>{pieceCid}</strong></td>
                     ) : (
