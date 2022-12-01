@@ -146,6 +146,8 @@ var genindexCmd = &cli.Command{
 
 		log.Debugw("AddIndex", "took", time.Since(addStart).String())
 
+		fmt.Printf("successfully added index for piececid %s to the piece directory\n", piececid)
+
 		return nil
 	},
 }
