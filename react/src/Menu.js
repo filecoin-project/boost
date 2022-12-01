@@ -9,6 +9,7 @@ import gridImg from './bootstrap-icons/icons/grid-3x3-gap.svg'
 import './Menu.css'
 import {SettingsMenuItem} from "./Settings";
 import {InspectMenuItem} from "./Inspect";
+import {PiecesMenuItem} from "./PieceDirectory";
 import {ProposalLogsMenuItem} from "./ProposalLogs";
 import {RetrievalLogsMenuItem} from "./RetrievalLogs";
 
