@@ -19,6 +19,7 @@ import (
 	"github.com/filecoin-project/go-jsonrpc"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 )
 
@@ -107,7 +108,10 @@ var runCmd = &cli.Command{
 		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi)
 		// Create the server API
 		port := cctx.Int("port")
-		repoDir := cctx.String(FlagRepo.Name)
+		repoDir, err := homedir.Expand(cctx.String(FlagRepo.Name))
+		if err != nil {
+			return fmt.Errorf("expanding repo file path: %w", err)
+		}
 		host, err := setupHost(repoDir, port)
 		if err != nil {
 			return fmt.Errorf("setting up libp2p host: %w", err)
