@@ -34,16 +34,16 @@ type remoteConfig struct {
 	maxBandwidth                   uint64
 }
 
-// RemoteConfigFilter manages filtering based on a remotely fetched retrieval configuration
-type RemoteConfigFilter struct {
+// ConfigFilter manages filtering based on a remotely fetched retrieval configuration
+type ConfigFilter struct {
 	remoteConfigLk   sync.RWMutex
 	bandwidthMeasure BandwidthMeasure
 	remoteConfig     remoteConfig
 }
 
-// NewRemoteConfigFilter constructs a new peer filter
-func NewRemoteConfigFilter(bandwidthMeasure BandwidthMeasure) *RemoteConfigFilter {
-	return &RemoteConfigFilter{
+// NewConfigFilter constructs a new peer filter
+func NewConfigFilter(bandwidthMeasure BandwidthMeasure) *ConfigFilter {
+	return &ConfigFilter{
 		bandwidthMeasure: bandwidthMeasure,
 		remoteConfig: remoteConfig{
 			peerListType:                   DenyList,
@@ -58,28 +58,28 @@ func NewRemoteConfigFilter(bandwidthMeasure BandwidthMeasure) *RemoteConfigFilte
 
 // FulfillRequest checks if a given peer is in the allow/deny list and decides
 // whether to fulfill the request
-func (rcf *RemoteConfigFilter) FulfillRequest(p peer.ID, c cid.Cid, s ServerState) (bool, error) {
-	rcf.remoteConfigLk.RLock()
-	defer rcf.remoteConfigLk.RUnlock()
+func (cf *ConfigFilter) FulfillRequest(p peer.ID, c cid.Cid, s ServerState) (bool, error) {
+	cf.remoteConfigLk.RLock()
+	defer cf.remoteConfigLk.RUnlock()
 	// don't fulfill requests under maintainence
-	if rcf.remoteConfig.underMaintenance {
+	if cf.remoteConfig.underMaintenance {
 		return false, nil
 	}
 	// don't fulfill requests for peers on deny list or not on an allowlist
-	_, has := rcf.remoteConfig.peerList[p]
-	if (rcf.remoteConfig.peerListType == DenyList) == has {
+	_, has := cf.remoteConfig.peerList[p]
+	if (cf.remoteConfig.peerListType == DenyList) == has {
 		return false, nil
 	}
 	// don't fulfill requests when over maxbandwidth
-	if rcf.remoteConfig.maxBandwidth > 0 && rcf.bandwidthMeasure.AvgBytesPerSecond() > rcf.remoteConfig.maxBandwidth {
+	if cf.remoteConfig.maxBandwidth > 0 && cf.bandwidthMeasure.AvgBytesPerSecond() > cf.remoteConfig.maxBandwidth {
 		return false, nil
 	}
 	// don't fulfill requests when there are too many simultaneous requests over all
-	if rcf.remoteConfig.maxSimultaneousRequests > 0 && s.TotalRequestsInProgress >= rcf.remoteConfig.maxSimultaneousRequests {
+	if cf.remoteConfig.maxSimultaneousRequests > 0 && s.TotalRequestsInProgress >= cf.remoteConfig.maxSimultaneousRequests {
 		return false, nil
 	}
 	// don't fulfill requests when there are too many simultaneous requests for this peer
-	if rcf.remoteConfig.maxSimultaneousRequestsPerPeer > 0 && s.RequestsInProgressForPeer >= rcf.remoteConfig.maxSimultaneousRequestsPerPeer {
+	if cf.remoteConfig.maxSimultaneousRequestsPerPeer > 0 && s.RequestsInProgressForPeer >= cf.remoteConfig.maxSimultaneousRequestsPerPeer {
 		return false, nil
 	}
 	// all filters passed, fulfill
@@ -88,7 +88,7 @@ func (rcf *RemoteConfigFilter) FulfillRequest(p peer.ID, c cid.Cid, s ServerStat
 
 // parse a response from the peer filter endpoint to get a new set of allowed/denied peers
 // and other configs
-func (rcf *RemoteConfigFilter) parseRemoteConfig(response io.Reader) (remoteConfig, error) {
+func (cf *ConfigFilter) parseRemoteConfig(response io.Reader) (remoteConfig, error) {
 	type allowDenyList struct {
 		Type    string   `json:"Type"`
 		PeerIDs []string `json:"PeerIDs"`
@@ -154,13 +154,13 @@ func (rcf *RemoteConfigFilter) parseRemoteConfig(response io.Reader) (remoteConf
 }
 
 // ParseUpdate parses and updates the Peer filter list based on an endpoint response
-func (rcf *RemoteConfigFilter) ParseUpdate(stream io.Reader) error {
-	remoteConfig, err := rcf.parseRemoteConfig(stream)
+func (cf *ConfigFilter) ParseUpdate(stream io.Reader) error {
+	remoteConfig, err := cf.parseRemoteConfig(stream)
 	if err != nil {
 		return err
 	}
-	rcf.remoteConfigLk.Lock()
-	rcf.remoteConfig = remoteConfig
-	rcf.remoteConfigLk.Unlock()
+	cf.remoteConfigLk.Lock()
+	cf.remoteConfig = remoteConfig
+	cf.remoteConfigLk.Unlock()
 	return nil
 }

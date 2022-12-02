@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPeerFilter(t *testing.T) {
+func TestConfigFilter(t *testing.T) {
 	peer1, err := peer.Decode("Qma9T5YraSnpRDZqRR4krcSJabThc8nwZuJV3LercPHufi")
 	require.NoError(t, err)
 	peer2, err := peer.Decode("QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N")
@@ -158,7 +158,7 @@ func TestPeerFilter(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			tbm := &testBandwidthMeasure{avgBandwidthPerSecond}
-			pf := filters.NewRemoteConfigFilter(tbm)
+			pf := filters.NewConfigFilter(tbm)
 			err := pf.ParseUpdate(strings.NewReader(testCase.response))
 			if testCase.expectedParseError == nil {
 				require.NoError(t, err)

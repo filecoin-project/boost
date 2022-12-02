@@ -63,19 +63,23 @@ type Handler interface {
 	FulfillRequest(p peer.ID, c cid.Cid, s ServerState) (bool, error)
 }
 
-type FilterConfig struct {
+type FilterDefinition struct {
 	Fetcher   Fetcher
 	Handler   Handler
 	CacheFile string
 }
 
 type filter struct {
-	FilterConfig
+	FilterDefinition
 	lastUpdated time.Time
 }
 
 // update updates a filter from an endpoint
 func (f *filter) update() error {
+	if f.Fetcher == nil {
+		// if there's no fetcher, there's no update
+		return nil
+	}
 	fetchTime := time.Now()
 	updated, stream, err := f.Fetcher(f.lastUpdated)
 	if err != nil {
@@ -110,10 +114,10 @@ type MultiFilter struct {
 	cancel  context.CancelFunc
 }
 
-func NewMultiFilterWithConfigs(cfgDir string, filterConfigs []FilterConfig, clock clock.Clock, onTick func()) *MultiFilter {
-	filters := make([]*filter, 0, len(filterConfigs))
-	for _, filterConfig := range filterConfigs {
-		filters = append(filters, &filter{FilterConfig: filterConfig})
+func NewMultiFilterWithConfigs(cfgDir string, filterDefinitions []FilterDefinition, clock clock.Clock, onTick func()) *MultiFilter {
+	filters := make([]*filter, 0, len(filterDefinitions))
+	for _, filterDefinition := range filterDefinitions {
+		filters = append(filters, &filter{FilterDefinition: filterDefinition})
 	}
 	return &MultiFilter{
 		cfgDir:  cfgDir,
@@ -124,20 +128,22 @@ func NewMultiFilterWithConfigs(cfgDir string, filterConfigs []FilterConfig, cloc
 }
 
 func NewMultiFilter(cfgDir string, bandwidthMeasure BandwidthMeasure, apiFilterEndpoint string) *MultiFilter {
-	filters := []FilterConfig{
+	filters := []FilterDefinition{
 		{
 			CacheFile: filepath.Join(cfgDir, "denylist.json"),
 			Fetcher:   FetcherForHTTPEndpoint(BadBitsDenyList),
 			Handler:   NewBlockFilter(),
 		},
 	}
+	var configFetcher Fetcher
 	if apiFilterEndpoint != "" {
-		filters = append(filters, FilterConfig{
-			CacheFile: filepath.Join(cfgDir, "remoteconfig.json"),
-			Fetcher:   FetcherForHTTPEndpoint(apiFilterEndpoint),
-			Handler:   NewRemoteConfigFilter(bandwidthMeasure),
-		})
+		configFetcher = FetcherForHTTPEndpoint(apiFilterEndpoint)
 	}
+	filters = append(filters, FilterDefinition{
+		CacheFile: filepath.Join(cfgDir, "remoteconfig.json"),
+		Fetcher:   configFetcher,
+		Handler:   NewConfigFilter(bandwidthMeasure),
+	})
 	return NewMultiFilterWithConfigs(cfgDir, filters, clock.New(), nil)
 }
 

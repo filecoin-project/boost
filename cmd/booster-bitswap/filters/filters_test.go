@@ -42,7 +42,7 @@ func TestMultiFilter(t *testing.T) {
 	defer cancel()
 	cfgDir, err := os.MkdirTemp("", "filters")
 	require.NoError(t, err)
-	mf := filters.NewMultiFilterWithConfigs(cfgDir, []filters.FilterConfig{
+	mf := filters.NewMultiFilterWithConfigs(cfgDir, []filters.FilterDefinition{
 		{
 			CacheFile: filepath.Join(cfgDir, "denylist.json"),
 			Fetcher:   fbf.fetchDenyList,
@@ -51,7 +51,7 @@ func TestMultiFilter(t *testing.T) {
 		{
 			CacheFile: filepath.Join(cfgDir, "remoteconfig.json"),
 			Fetcher:   fpf.fetchList,
-			Handler:   filters.NewRemoteConfigFilter(&testBandwidthMeasure{}),
+			Handler:   filters.NewConfigFilter(&testBandwidthMeasure{}),
 		},
 	}, clock, onTick)
 	err = mf.Start(ctx)
@@ -159,7 +159,7 @@ func TestMultiFilter(t *testing.T) {
 	// now restart a new instance, with a fetcher that always errors,
 	// and verify disk cache works
 	mf.Close()
-	mf = filters.NewMultiFilterWithConfigs(cfgDir, []filters.FilterConfig{
+	mf = filters.NewMultiFilterWithConfigs(cfgDir, []filters.FilterDefinition{
 		{
 			CacheFile: filepath.Join(cfgDir, "denylist.json"),
 			Fetcher: func(time.Time) (bool, io.ReadCloser, error) {
@@ -170,7 +170,7 @@ func TestMultiFilter(t *testing.T) {
 		{
 			CacheFile: filepath.Join(cfgDir, "remoteconfig.json"),
 			Fetcher:   fpf.fetchList,
-			Handler:   filters.NewRemoteConfigFilter(&testBandwidthMeasure{}),
+			Handler:   filters.NewConfigFilter(&testBandwidthMeasure{}),
 		},
 	}, clock, onTick)
 	err = mf.Start(ctx)
