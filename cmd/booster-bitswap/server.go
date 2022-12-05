@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
 	"github.com/filecoin-project/boost/protocolproxy"
 	bsnetwork "github.com/ipfs/go-bitswap/network"
 	"github.com/ipfs/go-bitswap/server"
@@ -15,22 +16,27 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
-type BlockFilter interface {
-	IsFiltered(c cid.Cid) (bool, error)
+type Filter interface {
+	FulfillRequest(p peer.ID, c cid.Cid, ss filters.ServerState) (bool, error)
+}
+
+type BandwidthMeasure interface {
+	RecordBytesSent(sent uint64)
 }
 
 type BitswapServer struct {
-	remoteStore blockstore.Blockstore
-	blockFilter BlockFilter
-	ctx         context.Context
-	cancel      context.CancelFunc
-	proxy       *peer.AddrInfo
-	server      *server.Server
-	host        host.Host
+	remoteStore      blockstore.Blockstore
+	filter           Filter
+	bandwidthMeasure BandwidthMeasure
+	ctx              context.Context
+	cancel           context.CancelFunc
+	proxy            *peer.AddrInfo
+	server           *server.Server
+	host             host.Host
 }
 
-func NewBitswapServer(remoteStore blockstore.Blockstore, host host.Host, blockFilter BlockFilter) *BitswapServer {
-	return &BitswapServer{remoteStore: remoteStore, host: host, blockFilter: blockFilter}
+func NewBitswapServer(remoteStore blockstore.Blockstore, host host.Host, filter Filter, bandwidthMeasure BandwidthMeasure) *BitswapServer {
+	return &BitswapServer{remoteStore: remoteStore, host: host, filter: filter, bandwidthMeasure: bandwidthMeasure}
 }
 
 const protectTag = "bitswap-server-to-proxy"
@@ -58,12 +64,26 @@ func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo) error {
 	if err != nil {
 		return err
 	}
-	bsopts := []server.Option{server.MaxOutstandingBytesPerPeer(1 << 20), server.WithPeerBlockRequestFilter(func(p peer.ID, c cid.Cid) bool {
-		filtered, err := s.blockFilter.IsFiltered(c)
-		// peer request block filter expects a true if the request should be fulfilled, so
-		// we only return true for cids that aren't filtered and have no errors
-		return !filtered && err == nil
-	})}
+	bsopts := []server.Option{
+		server.MaxOutstandingBytesPerPeer(1 << 20),
+		server.WithPeerBlockRequestFilter(func(p peer.ID, c cid.Cid) bool {
+			ss := filters.ServerState{}
+			// TODO: this really isn't ideal - we should find a way to get these values passed into the peer filter directly
+			if s.server != nil {
+				ss = filters.ServerState{
+					TotalRequestsInProgress:   s.server.TotalWants(),
+					RequestsInProgressForPeer: s.server.WantCountForPeer(p),
+				}
+			}
+			fulfill, err := s.filter.FulfillRequest(p, c, ss)
+			// peer request filter expects a true if the request should be fulfilled, so
+			// we only return true for requests that aren't filtered and have no errors
+			return fulfill && err == nil
+		}),
+		server.WithOnDataSentListener(func(p peer.ID, dataSentTotal uint64, blockSentTotal uint64) {
+			s.bandwidthMeasure.RecordBytesSent(dataSentTotal)
+		}),
+	}
 	net := bsnetwork.NewFromIpfsHost(host, nilRouter)
 	s.server = server.New(s.ctx, net, s.remoteStore, bsopts...)
 	net.Start(s.server)
