@@ -443,11 +443,8 @@ func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.
 					VerifiedDeal:  deal.Proposal.VerifiedDeal,
 				},
 			}
-			if cfg.Dealmaking.BitswapPeerID != "" {
-				protocols = append(protocols, metadata.Bitswap{})
-			}
 
-			return metadata.New(protocols...)
+			return metadata.Default.New(protocols...)
 
 		}))
 		return p, nil

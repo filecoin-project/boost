@@ -1,10 +1,12 @@
 package config
 
-import "github.com/filecoin-project/lotus/storage/sealer"
+import (
+	lotus_config "github.com/filecoin-project/lotus/node/config"
+)
 
 // StorageManager convert boost config to sealer.Config
-func (c *Boost) StorageManager() sealer.Config {
-	return sealer.Config{
+func (c *Boost) StorageManager() lotus_config.SealerConfig {
+	return lotus_config.SealerConfig{
 		ParallelFetchLimit: c.Storage.ParallelFetchLimit,
 	}
 }
