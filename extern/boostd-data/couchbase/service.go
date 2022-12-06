@@ -316,33 +316,7 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUu
 	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
 	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
 
-	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil {
-		return err
-	}
-
-	for i, v := range md.Deals {
-		if v.DealUuid == dealUuid {
-			md.Deals[i] = md.Deals[len(md.Deals)-1]
-			md.Deals = md.Deals[:len(md.Deals)-1]
-			break
-		}
-	}
-
-	// Remove Metadata if removed deal was last one
-	if len(md.Deals) == 0 {
-		if err := s.db.RemoveMetadata(ctx, pieceCid); err != nil {
-			fmt.Errorf("Failed to remove the Metadata after removing the last deal: %w", err)
-		}
-		return nil
-	}
-
-	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.RemoveDealForPiece(ctx, pieceCid, dealUuid)
 }
 
 // Remove all Metadata for pieceCID. To be used manually in case of failure

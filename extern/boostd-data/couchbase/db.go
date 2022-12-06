@@ -677,6 +677,9 @@ func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
 		k := toCouchKey(pieceCid.String())
 		getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
 		if err != nil {
+			if isNotFoundErr(err) {
+				return nil
+			}
 			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
 		}
 
@@ -734,7 +737,7 @@ func (db *DB) RemoveIndexes(ctx context.Context, pieceCid cid.Cid, recordCount i
 			err = db.withCasRetry("remove-piece", func() error {
 				getResult, err := db.mhToPieces.Get(cbKey, &gocb.GetOptions{Context: ctx})
 				if err != nil {
-					return nil
+					return err
 				}
 				var cidStrs []string
 				err = getResult.Content(&cidStrs)
@@ -761,6 +764,9 @@ func (db *DB) RemoveIndexes(ctx context.Context, pieceCid cid.Cid, recordCount i
 				return nil
 			})
 			if err != nil {
+				if isNotFoundErr(err) {
+					continue
+				}
 				return err
 			}
 			_, err = db.pieceOffsets.Remove(cbKey, &gocb.RemoveOptions{
