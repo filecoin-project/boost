@@ -6,7 +6,6 @@ import (
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -53,6 +52,9 @@ type Boost interface {
 	BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error)    //perm:read
 	BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) //perm:read
 
+	// MethodGroup: PieceDirectory
+	PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Cid) error //perm:admin
+
 	// RuntimeSubsystems returns the subsystems that are enabled
 	// in this instance.
 	RuntimeSubsystems(ctx context.Context) (lapi.MinerSubsystems, error) //perm:read
@@ -71,12 +73,6 @@ type Boost interface {
 	MarketListIncompleteDeals(ctx context.Context) ([]storagemarket.MinerDeal, error)                                                                                                    //perm:read
 	MarketPendingDeals(ctx context.Context) (lapi.PendingDealInfo, error)                                                                                                                //perm:write
 	SectorsRefs(context.Context) (map[string][]lapi.SealedRef, error)                                                                                                                    //perm:read
-
-	PiecesListPieces(ctx context.Context) ([]cid.Cid, error)                                 //perm:read
-	PiecesListCidInfos(ctx context.Context) ([]cid.Cid, error)                               //perm:read
-	PiecesGetPieceInfo(ctx context.Context, pieceCid cid.Cid) (*piecestore.PieceInfo, error) //perm:read
-	PiecesGetCIDInfo(ctx context.Context, payloadCid cid.Cid) (*piecestore.CIDInfo, error)   //perm:read
-	PiecesGetMaxOffset(ctx context.Context, pieceCid cid.Cid) (uint64, error)                //perm:read
 
 	// MethodGroup: Actor
 	ActorSectorSize(context.Context, address.Address) (abi.SectorSize, error) //perm:read

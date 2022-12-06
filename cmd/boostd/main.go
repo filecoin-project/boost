@@ -48,8 +48,8 @@ func main() {
 			importDataCmd,
 			logCmd,
 			dagstoreCmd,
-			piecesCmd,
 			netCmd,
+			genindexCmd,
 		},
 	}
 	app.Setup()

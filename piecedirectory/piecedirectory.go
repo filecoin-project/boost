@@ -304,7 +304,10 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	return nil
 }
 
-func (ps *PieceDirectory) buildIndexForPiece(ctx context.Context, pieceCid cid.Cid) error {
+func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "pm.build_index_for_piece")
+	defer span.End()
+
 	dls, err := ps.GetPieceDeals(ctx, pieceCid)
 	if err != nil {
 		return fmt.Errorf("getting piece deals: %w", err)
@@ -504,7 +507,7 @@ func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int
 	// (they only have offset information). If the block has no size
 	// information, rebuild the index from the piece data
 	if offsetSize.Size == 0 {
-		err = ps.buildIndexForPiece(ctx, pieces[0])
+		err = ps.BuildIndexForPiece(ctx, pieces[0])
 		if err != nil {
 			return 0, fmt.Errorf("re-building index for piece %s: %w", pieces[0], err)
 		}

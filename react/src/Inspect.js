@@ -138,27 +138,35 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
     }
 
     const rootCid = pieceStatus.Deals.length ? pieceStatus.Deals[0].Deal.DealDataRoot : null
-    const searchIsPayloadCid = searchQuery && searchQuery != pieceCid && searchQuery != rootCid
+    const searchIsAnyCid = searchQuery && searchQuery != pieceCid && searchQuery != rootCid
+    const searchIsPieceCid = searchQuery && searchQuery == pieceCid
+    const searchIsRootCid = searchQuery && searchQuery == rootCid
 
     return <div className="piece-detail" id={pieceCid}>
         <div className="content">
             <table className="piece-fields">
                 <tbody>
-                {searchIsPayloadCid ? (
+                {searchIsAnyCid ? (
                     <tr key="payload cid">
                         <th>Searched CID (non-root)</th>
-                        <td>{searchQuery}</td>
+                        <td><strong>{searchQuery}</strong></td>
                     </tr>
                 ) : null}
                 {rootCid ? (
                     <tr key="data root cid">
                         <th>Data Root CID</th>
-                        <td>{rootCid}</td>
+                        <td>
+                            { searchIsRootCid ? <strong>{rootCid}</strong> : rootCid }
+                        </td>
                     </tr>
                 ) : null}
                 <tr key="piece cid">
                     <th>Piece CID</th>
-                    <td>{pieceCid}</td>
+                    {searchIsPieceCid ? (
+                      <td><strong>{pieceCid}</strong></td>
+                    ) : (
+                      <td>{pieceCid}</td>
+                    )}
                 </tr>
                 <tr key="index status">
                     <th>Index Status</th>
