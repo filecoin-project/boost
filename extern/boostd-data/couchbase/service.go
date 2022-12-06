@@ -316,7 +316,7 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUu
 	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
 	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
 
-	return s.RemoveDealForPiece(ctx, pieceCid, dealUuid)
+	return s.db.RemoveDeals(ctx, dealUuid, pieceCid)
 }
 
 // Remove all Metadata for pieceCID. To be used manually in case of failure
