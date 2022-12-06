@@ -121,6 +121,8 @@ type BoostStruct struct {
 
 		MarketSetRetrievalAsk func(p0 context.Context, p1 *retrievalmarket.Ask) error `perm:"admin"`
 
+		PdBuildIndexForPieceCid func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
+
 		RuntimeSubsystems func(p0 context.Context) (lapi.MinerSubsystems, error) `perm:"read"`
 
 		SectorsRefs func(p0 context.Context) (map[string][]lapi.SealedRef, error) `perm:"read"`
@@ -720,6 +722,17 @@ func (s *BoostStruct) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmar
 }
 
 func (s *BoostStub) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmarket.Ask) error {
+	return ErrNotSupported
+}
+
+func (s *BoostStruct) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) error {
+	if s.Internal.PdBuildIndexForPieceCid == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.PdBuildIndexForPieceCid(p0, p1)
+}
+
+func (s *BoostStub) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) error {
 	return ErrNotSupported
 }
 

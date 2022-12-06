@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/filecoin-project/boost/piecedirectory"
 	tracing "github.com/filecoin-project/boost/tracing"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
@@ -71,6 +72,9 @@ type BoostAPI struct {
 
 	// Sealing Pipeline API
 	Sps sealingpipeline.API
+
+	// Piece Directory
+	Pd *piecedirectory.PieceDirectory
 
 	// GraphSQL server
 	GraphqlServer *gql.Server
@@ -498,4 +502,12 @@ func (sm *BoostAPI) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) 
 
 func (sm *BoostAPI) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) {
 	return sm.IndexBackedBlockstore.GetSize(ctx, c)
+}
+
+func (sm *BoostAPI) PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "Boost.PdBuildIndexForPieceCid")
+	span.SetAttributes(attribute.String("piececid", piececid.String()))
+	defer span.End()
+
+	return sm.Pd.BuildIndexForPiece(ctx, piececid)
 }

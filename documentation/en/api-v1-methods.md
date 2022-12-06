@@ -79,6 +79,8 @@
   * [NetPubsubScores](#netpubsubscores)
   * [NetSetLimit](#netsetlimit)
   * [NetStat](#netstat)
+* [Pd](#pd)
+  * [PdBuildIndexForPieceCid](#pdbuildindexforpiececid)
 * [Runtime](#runtime)
   * [RuntimeSubsystems](#runtimesubsystems)
 * [Sectors](#sectors)
@@ -1636,6 +1638,25 @@ Response:
   }
 }
 ```
+
+## Pd
+
+
+### PdBuildIndexForPieceCid
+There are not yet any comments for this method.
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
+Response: `{}`
 
 ## Runtime
 

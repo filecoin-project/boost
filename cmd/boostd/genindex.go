@@ -5,8 +5,7 @@ import (
 	_ "net/http/pprof"
 	"time"
 
-	"github.com/filecoin-project/boost/cmd/lib"
-	"github.com/filecoin-project/boost/piecedirectory"
+	bcli "github.com/filecoin-project/boost/cli"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
@@ -52,38 +51,16 @@ var genindexCmd = &cli.Command{
 		}
 		fmt.Println("piece-cid to index: ", piececid)
 
-		// connect to the piece directory service
-		pdClient := piecedirectory.NewStore()
-		defer pdClient.Close(ctx)
-		err = pdClient.Dial(ctx, cctx.String("api-piece-directory"))
+		boostApi, ncloser, err := bcli.GetBoostAPI(cctx)
 		if err != nil {
-			return fmt.Errorf("error while connecting to piece directory service: %w", err)
-		}
-
-		// connect to the full node
-		fnApiInfo := cctx.String("api-fullnode")
-		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log)
-		if err != nil {
-			return fmt.Errorf("getting full node API: %w", err)
+			return fmt.Errorf("getting boost api: %w", err)
 		}
 		defer ncloser()
-
-		// connect to the storage API and create a sector accessor
-		storageApiInfo := cctx.String("api-storage")
-		sa, storageCloser, err := lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
-		if err != nil {
-			return err
-		}
-		defer storageCloser()
-
-		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-
-		pd := piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
 
 		addStart := time.Now()
 
 		fmt.Printf("about to generate and add index for piece-cid %s to the piece directory\n", piececid)
-		err = pd.BuildIndexForPiece(ctx, piececid)
+		err = boostApi.PdBuildIndexForPieceCid(ctx, piececid)
 		if err != nil {
 			return err
 		}

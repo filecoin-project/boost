@@ -52,6 +52,9 @@ type Boost interface {
 	BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error)    //perm:read
 	BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) //perm:read
 
+	// MethodGroup: PieceDirectory
+	PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Cid) error //perm:admin
+
 	// RuntimeSubsystems returns the subsystems that are enabled
 	// in this instance.
 	RuntimeSubsystems(ctx context.Context) (lapi.MinerSubsystems, error) //perm:read
