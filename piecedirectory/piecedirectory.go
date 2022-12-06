@@ -364,7 +364,7 @@ func (ps *PieceDirectory) DeleteDealForPiece(ctx context.Context, pieceCid cid.C
 //return nil
 //}
 
-// Used internally, and also by HTTP retrieval, and also by genindex
+// Used internally, and also by HTTP retrieval
 func (ps *PieceDirectory) GetPieceReader(ctx context.Context, pieceCid cid.Cid) (SectionReader, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_reader")
 	defer span.End()
