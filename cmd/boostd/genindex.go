@@ -1,20 +1,14 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"io"
 	_ "net/http/pprof"
 	"time"
 
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/piecedirectory"
-	"github.com/filecoin-project/boostd-data/model"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-cid"
-	carv1 "github.com/ipld/go-car"
-	carv2 "github.com/ipld/go-car/v2"
-	"github.com/multiformats/go-varint"
 	"github.com/urfave/cli/v2"
 )
 
@@ -94,79 +88,10 @@ var genindexCmd = &cli.Command{
 			return err
 		}
 
-		//TODO: maybe set car size?
-		//SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error
-
 		fmt.Println("adding index took", time.Since(addStart).String())
 
 		fmt.Printf("successfully generated and added index for piece-cid %s to the piece directory\n", piececid)
 
 		return nil
 	},
-}
-
-func GetRecords(r *carv2.Reader, headerDataSize uint64) ([]model.Record, error) {
-	v1r, err := r.DataReader()
-	if err != nil {
-		return nil, fmt.Errorf("data reader: %w", err)
-	}
-
-	if r.Version == 1 {
-		r.Header.DataSize = headerDataSize
-	}
-	v2Header := carv2.NewHeader(r.Header.DataSize)
-	v2Header.IndexOffset = 0
-
-	// collect records as we go through the v1r
-	br := bufio.NewReader(v1r)
-	_, err = carv1.ReadHeader(br)
-	if err != nil {
-		return nil, fmt.Errorf("error reading car header: %w", err)
-	}
-
-	var records []model.Record
-	var sectionOffset int64
-	if sectionOffset, err = v1r.Seek(0, io.SeekCurrent); err != nil {
-		return nil, err
-	}
-	sectionOffset -= int64(br.Buffered())
-
-	for {
-		// Read the section's length.
-		sectionLen, err := varint.ReadUvarint(br)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, fmt.Errorf("reading uvarint: %w", err)
-		}
-		if sectionLen == 0 {
-			break
-		}
-
-		// Read the CID.
-		cidLen, c, err := cid.CidFromReader(br)
-		if err != nil {
-			return nil, fmt.Errorf("cidfromreader err: %w", err)
-		}
-
-		// Seek to the next section by skipping the block.
-		// The section length includes the CID, so subtract it.
-		remainingSectionLen := int64(sectionLen) - int64(cidLen)
-		if _, err := io.CopyN(io.Discard, br, remainingSectionLen); err != nil {
-			return nil, err
-		}
-
-		records = append(records, model.Record{
-			Cid: c,
-			OffsetSize: model.OffsetSize{
-				Offset: uint64(sectionOffset),
-				Size:   uint64(remainingSectionLen), // TODO: must confirm this field is correct
-			},
-		})
-
-		sectionOffset += int64(sectionLen) + int64(varint.UvarintSize(sectionLen))
-	}
-
-	return records, nil
 }
