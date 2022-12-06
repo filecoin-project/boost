@@ -20,6 +20,7 @@ const pieceDirBucketPrefix = "piece-dir."
 const pieceCidToMetadataBucket = pieceDirBucketPrefix + "piece-metadata"
 const multihashToPiecesBucket = pieceDirBucketPrefix + "mh-to-pieces"
 const pieceOffsetsBucket = pieceDirBucketPrefix + "piece-offsets"
+const metaBucket = pieceDirBucketPrefix + "metadata"
 
 // The maximum length for a couchbase key is 250 bytes, but we don't need a
 // key that long, 128 bytes is more than enough
@@ -83,20 +84,65 @@ func newDB(ctx context.Context, settings DBSettings) (*DB, error) {
 
 	// Set up the buckets
 	db := &DB{cluster: cluster}
-	db.pcidToMeta, err = createBucket(ctx, cluster, pieceCidToMetadataBucket, settings.PieceMetadataBucket.RAMQuotaMB)
+	pcidToMeta, err := createBucket(ctx, cluster, pieceCidToMetadataBucket, settings.PieceMetadataBucket.RAMQuotaMB)
 	if err != nil {
 		return nil, fmt.Errorf("Creating bucket %s for couchbase server %s: %w", pieceCidToMetadataBucket, settings.ConnectString, err)
 	}
-	db.mhToPieces, err = createBucket(ctx, cluster, multihashToPiecesBucket, settings.MultihashToPiecesBucket.RAMQuotaMB)
+	db.pcidToMeta = pcidToMeta.DefaultCollection()
+
+	mhToPieces, err := createBucket(ctx, cluster, multihashToPiecesBucket, settings.MultihashToPiecesBucket.RAMQuotaMB)
 	if err != nil {
 		return nil, fmt.Errorf("Creating bucket %s for couchbase server %s: %w", multihashToPiecesBucket, settings.ConnectString, err)
 	}
-	db.pieceOffsets, err = createBucket(ctx, cluster, pieceOffsetsBucket, settings.PieceOffsetsBucket.RAMQuotaMB)
+	db.mhToPieces = mhToPieces.DefaultCollection()
+
+	pieceOffsets, err := createBucket(ctx, cluster, pieceOffsetsBucket, settings.PieceOffsetsBucket.RAMQuotaMB)
 	if err != nil {
 		return nil, fmt.Errorf("Creating bucket %s for couchbase server %s: %w", pieceOffsetsBucket, settings.ConnectString, err)
 	}
+	db.pieceOffsets = pieceOffsets.DefaultCollection()
+
+	meta, err := createBucket(ctx, cluster, metaBucket, 156)
+	if err != nil {
+		return nil, fmt.Errorf("Creating bucket %s for couchbase server %s: %w", metaBucket, settings.ConnectString, err)
+	}
+
+	err = createCollection(ctx, cluster, meta, "piece-tracker")
+	if err != nil {
+		return nil, err
+	}
+	err = createCollection(ctx, cluster, meta, "piece-flagged")
+	if err != nil {
+		return nil, err
+	}
 
 	return db, nil
+}
+
+func createCollection(ctx context.Context, cluster *gocb.Cluster, bucket *gocb.Bucket, collName string) error {
+	err := bucket.Collections().CreateCollection(gocb.CollectionSpec{
+		Name:      collName,
+		ScopeName: bucket.DefaultScope().Name(),
+	}, &gocb.CreateCollectionOptions{Context: ctx})
+	if err != nil {
+		if !errors.Is(err, gocb.ErrCollectionExists) {
+			return fmt.Errorf("Creating %s collection: %w", collName, err)
+		}
+	}
+
+	time.Sleep(time.Second)
+
+	err = cluster.QueryIndexes().CreatePrimaryIndex(bucket.Name(), &gocb.CreatePrimaryQueryIndexOptions{
+		Context:        ctx,
+		ScopeName:      bucket.DefaultScope().Name(),
+		CollectionName: collName,
+		IgnoreIfExists: true,
+	})
+	if err != nil {
+		return fmt.Errorf("creating primary index on %s.%s: %w", bucket.Name(), collName, err)
+	}
+
+	return nil
 }
 
 func pingCluster(ctx context.Context, cluster *gocb.Cluster, connectString string) error {
@@ -121,7 +167,7 @@ func pingCluster(ctx context.Context, cluster *gocb.Cluster, connectString strin
 	return nil
 }
 
-func createBucket(ctx context.Context, cluster *gocb.Cluster, bucketName string, ramMb uint64) (*gocb.Collection, error) {
+func createBucket(ctx context.Context, cluster *gocb.Cluster, bucketName string, ramMb uint64) (*gocb.Bucket, error) {
 	_, err := cluster.Buckets().GetBucket(bucketName, &gocb.GetBucketOptions{Context: ctx, Timeout: connectTimeout})
 	if err != nil {
 		if !errors.Is(err, gocb.ErrBucketNotFound) {
@@ -163,7 +209,7 @@ func createBucket(ctx context.Context, cluster *gocb.Cluster, bucketName string,
 		return nil, fmt.Errorf("waiting for couchbase bucket to be ready: %w", err)
 	}
 
-	return bucket.DefaultCollection(), nil
+	return bucket, nil
 }
 
 // GetPieceCidsByMultihash
@@ -604,6 +650,141 @@ func (db *DB) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 		return nil, fmt.Errorf("getting keys from %s: %w", pieceCidToMetadataBucket, err)
 	}
 
+	return db.listPieces(res)
+}
+
+const piecesToTrackerBatchSize = 1024
+const trackerCheckBatchSize = 1024
+
+func (db *DB) NextPiecesToCheck(ctx context.Context, olderThanMillis int64) ([]cid.Cid, error) {
+	keepInserting := true
+	for keepInserting {
+		// Add any new pieces into the piece status tracking table
+		qry := "INSERT INTO `" + metaBucket + "`._default.`piece-tracker` (KEY k, VALUE v) "
+		qry += "SELECT "
+		qry += "  META(pieceMeta).id AS k, "
+		qry += "  {'CreatedAt': NOW_LOCAL(), 'UpdatedAt': NOW_LOCAL()} AS v "
+		qry += "FROM `" + pieceCidToMetadataBucket + "` AS pieceMeta "
+		qry += "WHERE META(pieceMeta).id NOT IN ("
+		qry += "  SELECT RAW META(pieceTracker).id FROM `" + metaBucket + "`._default.`piece-tracker` AS pieceTracker"
+		qry += ") "
+		qry += fmt.Sprintf("LIMIT %d", piecesToTrackerBatchSize)
+		fmt.Println(qry)
+		res, err := db.cluster.Query(qry, &gocb.QueryOptions{Context: ctx})
+		if err != nil {
+			return nil, fmt.Errorf("adding piece meta info to piece tracker table: %w", err)
+		}
+		// We have to drain the results in order to close the stream
+		for res.Next() {
+		}
+		err = res.Err()
+		if err != nil {
+			return nil, fmt.Errorf("closing piece meta info result stream: %w", err)
+		}
+
+		// If there were enough remaining rows to fill an entire batch,
+		// keep inserting a new batch of rows
+		queryMeta, err := res.MetaData()
+		if err != nil {
+			return nil, fmt.Errorf("getting query metadata: %w", err)
+		}
+		keepInserting = queryMeta.Metrics.MutationCount == piecesToTrackerBatchSize
+	}
+
+	qry := "UPDATE `" + metaBucket + "`._default.`piece-tracker` as outerPT "
+	qry += "SET UpdatedAt = NOW_LOCAL() "
+	qry += "WHERE META(outerPT).id IN ("
+	qry += "  SELECT RAW META(innerPT).id FROM `" + metaBucket + "`._default.`piece-tracker` AS innerPT "
+	qry += "  WHERE innerPT.UpdatedAt <= DATE_ADD_STR(NOW_LOCAL(), ?, 'millisecond') "
+	qry += fmt.Sprintf("LIMIT %d", trackerCheckBatchSize)
+	qry += ") "
+	qry += "RETURNING META().id"
+	fmt.Println(qry)
+	res, err := db.cluster.Query(qry, &gocb.QueryOptions{
+		Context:              ctx,
+		PositionalParameters: []interface{}{-olderThanMillis},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("adding piece meta info to piece tracker table: %w", err)
+	}
+
+	return db.listPieces(res)
+}
+
+func (db *DB) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	qry := "UPSERT INTO `" + metaBucket + "`._default.`piece-flagged` (KEY, VALUE) "
+	qry += "VALUES (?, { 'UpdatedAt': NOW_LOCAL() })"
+	_, err := db.cluster.Query(qry, &gocb.QueryOptions{
+		Context:              ctx,
+		PositionalParameters: []interface{}{toCouchKey(pieceCid.String())},
+	})
+	if err != nil {
+		return fmt.Errorf("flagging piece %s: %w", pieceCid, err)
+	}
+	return nil
+}
+
+func (db *DB) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	qry := "DELETE FROM `" + metaBucket + "`._default.`piece-flagged` WHERE META().id = ?"
+	_, err := db.cluster.Query(qry, &gocb.QueryOptions{
+		Context:              ctx,
+		PositionalParameters: []interface{}{toCouchKey(pieceCid.String())},
+	})
+	if err != nil {
+		return fmt.Errorf("unflagging piece %s: %w", pieceCid, err)
+	}
+	return nil
+}
+
+func (db *DB) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]cid.Cid, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.list_flagged_pieces")
+	defer span.End()
+
+	args := []interface{}{}
+	tableName := "`" + metaBucket + "`._default.`piece-flagged`"
+	qry := "SELECT META().id FROM " + tableName + " "
+	if cursor != nil {
+		qry += "WHERE Created < ? "
+		args = append(args, cursor)
+	}
+	qry += "ORDER BY CreatedAt desc "
+	qry += "LIMIT ? OFFSET ?"
+	res, err := db.cluster.Query(qry, &gocb.QueryOptions{
+		Context:              ctx,
+		PositionalParameters: append(args, limit, offset),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("getting keys from %s: %w", tableName, err)
+	}
+
+	return db.listPieces(res)
+}
+
+func (db *DB) FlaggedPiecesCount(ctx context.Context) (int, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.count_flagged_pieces")
+	defer span.End()
+
+	tableName := "`" + metaBucket + "`._default.`piece-flagged`"
+	qry := "SELECT COUNT(*) as cnt FROM " + tableName
+	res, err := db.cluster.Query(qry, &gocb.QueryOptions{Context: ctx})
+	if err != nil {
+		return 0, fmt.Errorf("getting count of flagged pieces: %w", err)
+	}
+
+	var m map[string]int
+	err = res.One(&m)
+	if err != nil {
+		return 0, fmt.Errorf("getting count of flagged pieces from result: %w", err)
+	}
+	count, ok := m["cnt"]
+	if !ok {
+		return 0, fmt.Errorf("missing expected result column in count query")
+	}
+
+	return count, err
+}
+
+func (db *DB) listPieces(res *gocb.QueryResult) ([]cid.Cid, error) {
 	var pieceCids []cid.Cid
 	var rowData map[string]string
 	for res.Next() {
@@ -625,9 +806,9 @@ func (db *DB) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 		pieceCids = append(pieceCids, c)
 	}
 
-	err = res.Err()
+	err := res.Err()
 	if err != nil {
-		return nil, fmt.Errorf("reading last result from %s: %w", pieceCidToMetadataBucket, err)
+		return nil, fmt.Errorf("reading stream from %s: %w", pieceCidToMetadataBucket, err)
 	}
 
 	return pieceCids, nil

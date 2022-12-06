@@ -141,6 +141,7 @@ const (
 
 	// miner
 	GetParamsKey
+	StartPieceDoctorKey
 	HandleMigrateProviderFundsKey
 	HandleDealsKey
 	HandleCreateRetrievalTablesKey
@@ -509,6 +510,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(lotus_dtypes.StagingBlockstore), lotus_modules.StagingBlockstore),
 		Override(new(lotus_dtypes.StagingGraphsync), lotus_modules.StagingGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
 		Override(new(lotus_dtypes.ProviderPieceStore), modules.NewProviderPieceStore),
+		Override(StartPieceDoctorKey, modules.NewPieceDoctor),
 
 		// Lotus Markets (retrieval deps)
 		Override(new(sealer.PieceProvider), sealer.NewPieceProvider),

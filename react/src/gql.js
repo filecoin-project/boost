@@ -389,6 +389,34 @@ const PiecesWithPayloadCidQuery = gql`
     }
 `;
 
+const FlaggedPiecesQuery = gql`
+    query AppFlaggedPiecesQuery($cursor: BigInt, $offset: Int, $limit: Int) {
+        piecesFlagged(cursor: $cursor, offset: $offset, limit: $limit) {
+            pieces {
+                PieceCid
+                IndexStatus {
+                    Status
+                    Error
+                }
+                Deals {
+                    SealStatus {
+                        IsUnsealed
+                        Error
+                    }
+                    Deal {
+                        ID
+                        IsLegacy
+                        CreatedAt
+                        DealDataRoot
+                    }
+                }
+            }
+            totalCount
+            more
+        }
+    }
+`;
+
 const PieceStatusQuery = gql`
     query AppPieceStatusQuery($pieceCid: String!) {
         pieceStatus(pieceCid: $pieceCid) {
@@ -669,6 +697,7 @@ export {
     PiecesWithRootPayloadCidQuery,
     PiecesWithPayloadCidQuery,
     PieceStatusQuery,
+    FlaggedPiecesQuery,
     StorageQuery,
     LegacyStorageQuery,
     FundsQuery,

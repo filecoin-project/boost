@@ -3,6 +3,7 @@ package modules
 import (
 	"context"
 	"fmt"
+	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
@@ -113,6 +114,22 @@ func NewPieceDirectory(cfg *config.Boost) func(maddr dtypes.MinerAddress, store 
 
 func NewPieceStore(pm *piecedirectory.PieceDirectory, maddr address.Address) piecestore.PieceStore {
 	return &boostPieceStoreWrapper{piecedirectory: pm, maddr: maddr}
+}
+
+func NewPieceDoctor(lc fx.Lifecycle, store piecedirectory.Store, sapi mktsdagstore.SectorAccessor) *piecedirectory.Doctor {
+	doc := piecedirectory.NewDoctor(store, sapi)
+	docctx, cancel := context.WithCancel(context.Background())
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			go doc.Run(docctx)
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			cancel()
+			return nil
+		},
+	})
+	return doc
 }
 
 type boostPieceStoreWrapper struct {

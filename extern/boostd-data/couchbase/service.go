@@ -255,6 +255,29 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	return s.db.ListPieces(ctx)
 }
 
+//const pieceCheckFrequencyMillis = 60 * 60 * 1000
+const pieceCheckFrequencyMillis = 1000
+
+func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
+	return s.db.NextPiecesToCheck(ctx, pieceCheckFrequencyMillis)
+}
+
+func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	return s.db.FlagPiece(ctx, pieceCid)
+}
+
+func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	return s.db.UnflagPiece(ctx, pieceCid)
+}
+
+func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]cid.Cid, error) {
+	return s.db.FlaggedPiecesList(ctx, cursor, offset, limit)
+}
+
+func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
+	return s.db.FlaggedPiecesCount(ctx)
+}
+
 func normalizePieceCidError(pieceCid cid.Cid, err error) error {
 	if err == nil {
 		return nil

@@ -365,6 +365,31 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	return s.db.ListPieces(ctx)
 }
 
+func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
+	//TODO implement me
+	return nil, fmt.Errorf("unimplemented")
+}
+
+func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	//TODO implement me
+	return fmt.Errorf("unimplemented")
+}
+
+func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	//TODO implement me
+	return fmt.Errorf("unimplemented")
+}
+
+func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]cid.Cid, error) {
+	//TODO implement me
+	return nil, fmt.Errorf("unimplemented")
+}
+
+func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
+	//TODO implement me
+	return 0, fmt.Errorf("unimplemented")
+}
+
 func normalizePieceCidError(pieceCid cid.Cid, err error) error {
 	if err == nil {
 		return nil

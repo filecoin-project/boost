@@ -1,20 +1,24 @@
 import {useQuery} from "@apollo/react-hooks";
 import {
+    DealsListQuery, FlaggedPiecesQuery,
     PieceStatusQuery, PiecesWithPayloadCidQuery, PiecesWithRootPayloadCidQuery
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
 import React, {useState} from "react";
 import {PageContainer, ShortDealLink} from "./Components";
-import {Link, useParams} from "react-router-dom";
+import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import xImg from './bootstrap-icons/icons/x-lg.svg'
 import inspectImg from './bootstrap-icons/icons/wrench.svg'
 import './Inspect.css'
+import {Pagination} from "./Pagination";
+
+var inspectBasePath = '/inspect'
 
 export function InspectMenuItem(props) {
     return (
-        <Link key="inspect" className="menu-item" to="/inspect">
+        <Link key="inspect" className="menu-item" to={inspectBasePath}>
             <img className="icon" alt="" src={inspectImg} />
             <h3>Inspect</h3>
         </Link>
@@ -27,9 +31,117 @@ export function InspectPage(props) {
     </PageContainer>
 }
 
-function InspectContent(props) {
+function InspectContent() {
     const params = useParams()
     const [searchQuery, setSearchQuery] = useState(params.query)
+
+    return <div className="inspect-content">
+        <SearchResults searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+        { searchQuery ? null : <FlaggedPieces setSearchQuery={setSearchQuery}  /> }
+    </div>
+}
+
+function FlaggedPieces({setSearchQuery}) {
+    const navigate = useNavigate()
+    const params = useParams()
+    const pageNum = (params.pageNum && parseInt(params.pageNum)) || 1
+
+    var [rowsPerPage, setRowsPerPage] = useState(RowsPerPage.load)
+    const onRowsPerPageChange = (e) => {
+        const val = parseInt(e.target.value)
+        RowsPerPage.save(val)
+        setRowsPerPage(val)
+        navigate(inspectBasePath)
+        scrollTop()
+    }
+
+    // Fetch rows on this page
+    const listOffset = (pageNum-1) * rowsPerPage
+    const queryCursor = (pageNum === 1) ? null : params.cursor
+    const {loading, error, data} = useQuery(FlaggedPiecesQuery, {
+        pollInterval: 1000,
+        variables: {
+            cursor: queryCursor,
+            offset: listOffset,
+            limit: rowsPerPage,
+        },
+        fetchPolicy: 'network-only',
+    })
+
+    if (error) return <div>Error: {error.message + " - check connection to Boost server"}</div>
+    if (loading) return <div>Loading...</div>
+
+    var res = data.piecesFlagged
+    var rows = res.pieces
+    const totalCount = data.piecesFlagged.totalCount
+    const moreDeals = data.piecesFlagged.more
+
+    if (!totalCount) {
+        return <div className="flagged-pieces-none">
+            Boost doctor did not find any pieces with errors
+        </div>
+    }
+
+    var cursor = params.cursor
+    if (pageNum === 1 && rows.length) {
+        cursor = rows[0].ID
+    }
+
+    const paginationParams = {
+        basePath: inspectBasePath,
+        cursor, pageNum, totalCount,
+        rowsPerPage: rowsPerPage,
+        moreRows: moreDeals,
+        onRowsPerPageChange: onRowsPerPageChange,
+        onLinkClick: scrollTop,
+    }
+
+    return <div className="flagged-pieces">
+        <h3>Flagged pieces</h3>
+
+        <table>
+            <tbody>
+            <tr>
+                <th>Piece CID</th>
+                <th>Index</th>
+                <th>Unsealed Copy</th>
+                <th>Deals</th>
+            </tr>
+
+            {rows.map(piece => (
+                <FlaggedPieceRow
+                    key={piece.PieceCid}
+                    piece={piece}
+                    setSearchQuery={setSearchQuery}
+                />
+            ))}
+            </tbody>
+        </table>
+
+        <Pagination {...paginationParams} />
+    </div>
+}
+
+function FlaggedPieceRow({piece, setSearchQuery}) {
+    var isUnsealed = false
+    for (var dl of piece.Deals) {
+        if (dl.IsUnsealed) {
+            isUnsealed = true
+        }
+    }
+    return <tr>
+        <td>
+            <Link onClick={() => setSearchQuery(piece.PieceCid)} to={"/inspect/"+piece.PieceCid}>
+                {piece.PieceCid}
+            </Link>
+        </td>
+        <td>{piece.IndexStatus.Status}</td>
+        <td>{isUnsealed ? 'Yes' : 'No'}</td>
+        <td>{piece.Deals.length}</td>
+    </tr>
+}
+
+function SearchResults({searchQuery, setSearchQuery}) {
     const handleSearchQueryChange = (event) => {
         setSearchQuery(event.target.value)
     }
@@ -252,4 +364,23 @@ function SearchBox(props) {
             onChange={props.onChange} />
         { props.value ? <img alt="clear" className="clear-text" onClick={props.clearSearchBox} src={xImg} /> : null }
     </div>
+}
+
+const RowsPerPage = {
+    Default: 10,
+
+    settingsKey: "settings.flagged-pieces.per-page",
+
+    load: () => {
+        const saved = localStorage.getItem(RowsPerPage.settingsKey)
+        return JSON.parse(saved) || RowsPerPage.Default
+    },
+
+    save: (val) => {
+        localStorage.setItem(RowsPerPage.settingsKey, JSON.stringify(val));
+    }
+}
+
+function scrollTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" })
 }

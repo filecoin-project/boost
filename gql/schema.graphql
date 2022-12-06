@@ -171,6 +171,12 @@ type PieceStatus {
   PieceInfoDeals: [PieceInfoDeal]!
 }
 
+type FlaggedPiecesList {
+  totalCount: Int!
+  pieces: [PieceStatus]!
+  more: Boolean!
+}
+
 type ProposalLog {
   DealUUID: ID!
   Accepted: Boolean!
@@ -418,6 +424,9 @@ type RootQuery {
 
   """Get the number of retrieval logs"""
   retrievalLogsCount: RetrievalStatesCount!
+
+  """Get a list of pieces that have been flagged as having problems"""
+  piecesFlagged(cursor: BigInt, offset: Int, limit: Int): FlaggedPiecesList!
 
   """Get information about a piece from the piece store, DAG store and database"""
   pieceStatus(pieceCid: String!): PieceStatus!

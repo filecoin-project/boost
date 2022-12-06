@@ -1,14 +1,14 @@
-.inspect table {
+.inspect-content table {
     font-size: 1em;
     width: 100%;
 }
 
-.inspect td, .inspect th {
+.inspect-content td, .inspect-content th {
     padding: 0.5em 1em;
     font-weight: normal;
 }
 
-.inspect th {
+.inspect-content th {
     white-space: nowrap;
     text-align: left;
     opacity: 0.6;
@@ -82,7 +82,7 @@
     padding: 0.5em 1em;
 }
 
-.inspect .title {
+.inspect-content .title {
     font-size: 1.25em;
     margin: 2em 0.8em 1em 0.8em;
 }
@@ -93,4 +93,8 @@
 
 .inspect > p {
     padding: 2em 1em;
+}
+
+.flagged-pieces-none {
+    padding: 1em 1em 4em 1em;
 }
