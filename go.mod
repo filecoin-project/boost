@@ -6,6 +6,8 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
 replace github.com/filecoin-project/boostd-data => ./extern/boostd-data
 
+replace github.com/filecoin-project/go-jsonrpc => github.com/nonsense/go-jsonrpc v0.0.0-20221118154859-f3f8e9b1cb11
+
 //replace github.com/filecoin-project/lotus => ../lotus
 
 //replace github.com/filecoin-project/go-fil-markets => ../go-fil-markets
@@ -31,7 +33,7 @@ require (
 	github.com/filecoin-project/go-data-transfer v1.15.2
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
-	github.com/filecoin-project/go-fil-markets v1.24.3
+	github.com/filecoin-project/go-fil-markets v1.25.2-0.20221122140408-7d9e74438cd2
 	github.com/filecoin-project/go-jsonrpc v0.1.8
 	github.com/filecoin-project/go-legs v0.4.9
 	github.com/filecoin-project/go-padreader v0.0.1
@@ -164,11 +166,11 @@ require (
 	github.com/filecoin-project/go-amt-ipld/v4 v4.0.0 // indirect
 	github.com/filecoin-project/go-commp-utils/nonffi v0.0.0-20220905160352-62059082a837 // indirect
 	github.com/filecoin-project/go-crypto v0.0.1 // indirect
-	github.com/filecoin-project/go-ds-versioning v0.1.1 // indirect
+	github.com/filecoin-project/go-ds-versioning v0.1.1
 	github.com/filecoin-project/go-hamt-ipld v0.1.5 // indirect
 	github.com/filecoin-project/go-hamt-ipld/v2 v2.0.0 // indirect
 	github.com/filecoin-project/go-hamt-ipld/v3 v3.1.0 // indirect
-	github.com/filecoin-project/go-statemachine v1.0.2 // indirect
+	github.com/filecoin-project/go-statemachine v1.0.2
 	github.com/filecoin-project/go-storedcounter v0.1.0 // indirect
 	github.com/filecoin-project/pubsub v1.0.0 // indirect
 	github.com/filecoin-project/specs-actors/v2 v2.3.6 // indirect

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 )
 
@@ -18,8 +18,10 @@ import (
 // Piece          ......[            ]......
 // CAR            ......[      ]............
 type DealInfo struct {
-	DealUuid    uuid.UUID           `json:"u"`
+	DealUuid    string              `json:"u"`
+	IsLegacy    bool                `json:"y"`
 	ChainDealID abi.DealID          `json:"i"`
+	MinerAddr   address.Address     `json:"m"`
 	SectorID    abi.SectorNumber    `json:"s"`
 	PieceOffset abi.PaddedPieceSize `json:"o"`
 	PieceLength abi.PaddedPieceSize `json:"l"`

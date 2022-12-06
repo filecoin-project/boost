@@ -7,7 +7,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/filecoin-project/boost/cmd/lib"
-	"github.com/filecoin-project/boost/piecemeta"
+	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/dagstore/mount"
@@ -76,7 +76,7 @@ var runCmd = &cli.Command{
 
 		// Connect to the piece directory service
 		ctx := lcli.ReqContext(cctx)
-		pdClient := piecemeta.NewStore()
+		pdClient := piecedirectory.NewStore()
 		defer pdClient.Close(ctx)
 		err := pdClient.Dial(ctx, cctx.String("api-piece-directory"))
 		if err != nil {
@@ -111,9 +111,9 @@ var runCmd = &cli.Command{
 		}
 
 		// Create the server API
-		pr := &piecemeta.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		pieceMeta := piecemeta.NewPieceMeta(pdClient, pr, cctx.Int("add-index-throttle"))
-		sapi := serverApi{ctx: ctx, pieceMeta: pieceMeta, sa: sa}
+		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
+		piecedirectory := piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
+		sapi := serverApi{ctx: ctx, piecedirectory: piecedirectory, sa: sa}
 		server := NewHttpServer(
 			cctx.String("base-path"),
 			cctx.Int("port"),
@@ -151,23 +151,23 @@ var runCmd = &cli.Command{
 }
 
 type serverApi struct {
-	ctx       context.Context
-	pieceMeta *piecemeta.PieceMeta
-	sa        dagstore.SectorAccessor
+	ctx            context.Context
+	piecedirectory *piecedirectory.PieceDirectory
+	sa             dagstore.SectorAccessor
 }
 
 var _ HttpServerApi = (*serverApi)(nil)
 
 func (s serverApi) PiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
-	return s.pieceMeta.PiecesContainingMultihash(ctx, mh)
+	return s.piecedirectory.PiecesContainingMultihash(ctx, mh)
 }
 
 func (s serverApi) GetPieceDeals(ctx context.Context, pieceCID cid.Cid) ([]model.DealInfo, error) {
-	return s.pieceMeta.GetPieceDeals(ctx, pieceCID)
+	return s.piecedirectory.GetPieceDeals(ctx, pieceCID)
 }
 
 func (s serverApi) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
-	return s.pieceMeta.GetCarSize(ctx, pieceCid)
+	return s.piecedirectory.GetCarSize(ctx, pieceCid)
 }
 
 func (s serverApi) IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error) {
@@ -179,5 +179,5 @@ func (s serverApi) UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber
 }
 
 func (s serverApi) GetBlockByCid(ctx context.Context, blockCid cid.Cid) ([]byte, error) {
-	return s.pieceMeta.BlockstoreGet(ctx, blockCid)
+	return s.piecedirectory.BlockstoreGet(ctx, blockCid)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/couchbase/gocb/v2"
@@ -251,54 +252,20 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, mhs []multihash.Mult
 	return eg.Wait()
 }
 
-// SetPieceCidToMetadata
-func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md CouchbaseMetadata) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.set_piece_cid_to_metadata")
-	defer span.End()
-
-	k := toCouchKey(pieceCid.String())
-	_, err := db.pcidToMeta.Upsert(k, md, &gocb.UpsertOptions{Context: ctx})
-	if err != nil {
-		return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
-	}
-
-	return nil
-}
-
 func (db *DB) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.set_car_size")
 	defer span.End()
 
-	return db.withCasRetry("set-car-size", func() error {
-		// Get the metadata from the db
-		var getResult *gocb.GetResult
-		k := toCouchKey(pieceCid.String())
-		getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
-		if err != nil {
-			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
-		}
-
-		var metadata CouchbaseMetadata
-		err = getResult.Content(&metadata)
-		if err != nil {
-			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
-		}
-
+	return db.mutatePieceMetadata(ctx, pieceCid, "set-car-size", func(metadata CouchbaseMetadata) *CouchbaseMetadata {
 		// Set the car size on each deal (should be the same for all deals)
+		var deals []model.DealInfo
 		for _, dl := range metadata.Deals {
 			dl.CarLength = size
-		}
 
-		// Update the metadata in the db
-		_, err = db.pcidToMeta.Replace(k, metadata, &gocb.ReplaceOptions{
-			Context: ctx,
-			Cas:     getResult.Cas(),
-		})
-		if err != nil {
-			return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
+			deals = append(deals, dl)
 		}
-
-		return nil
+		metadata.Deals = deals
+		return &metadata
 	})
 }
 
@@ -306,21 +273,8 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr err
 	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
 	defer span.End()
 
-	return db.withCasRetry("mark-index-errored", func() error {
-		// Get the metadata from the db
-		var getResult *gocb.GetResult
-		k := toCouchKey(pieceCid.String())
-		getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
-		if err != nil {
-			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
-		}
-
-		var metadata CouchbaseMetadata
-		err = getResult.Content(&metadata)
-		if err != nil {
-			return fmt.Errorf("getting piece cid to metadata content for piece %s: %w", pieceCid, err)
-		}
-
+	return db.mutatePieceMetadata(ctx, pieceCid, "mark-index-errored", func(metadata CouchbaseMetadata) *CouchbaseMetadata {
+		// If the error was already set, don't overwrite it
 		if metadata.Error != "" {
 			// If the error state has already been set, don't over-write the existing error
 			return nil
@@ -328,18 +282,24 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr err
 
 		// Set the error state
 		metadata.Error = idxErr.Error()
-		metadata.ErrorType = fmt.Sprintf(idxErr.Error(), "%T")
+		metadata.ErrorType = fmt.Sprintf("%T", idxErr)
 
-		// Update the metadata in the db
-		_, err = db.pcidToMeta.Replace(k, metadata, &gocb.ReplaceOptions{
-			Context: ctx,
-			Cas:     getResult.Cas(),
-		})
-		if err != nil {
-			return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
+		return &metadata
+	})
+}
+
+func (db *DB) MarkIndexingComplete(ctx context.Context, pieceCid cid.Cid, blockCount int) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.mark_indexing_complete")
+	defer span.End()
+
+	return db.mutatePieceMetadata(ctx, pieceCid, "mark-indexing-complete", func(metadata CouchbaseMetadata) *CouchbaseMetadata {
+		// Mark indexing as complete
+		metadata.IndexedAt = time.Now()
+		metadata.BlockCount = blockCount
+		if metadata.Deals == nil {
+			metadata.Deals = []model.DealInfo{}
 		}
-
-		return nil
+		return &metadata
 	})
 }
 
@@ -347,7 +307,26 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 	ctx, span := tracing.Tracer.Start(ctx, "db.add_deal_for_piece")
 	defer span.End()
 
-	return db.withCasRetry("add-deal-for-piece", func() error {
+	return db.mutatePieceMetadata(ctx, pieceCid, "add-deal-for-piece", func(md CouchbaseMetadata) *CouchbaseMetadata {
+		// Check if the deal has already been added
+		for _, dl := range md.Deals {
+			if dl == dealInfo {
+				return nil
+			}
+		}
+
+		// Add the deal to the list.
+		// Note: we can't use ArrayAddUniqueSpec here because it only works
+		// with primitives, not objects.
+		md.Deals = append(md.Deals, dealInfo)
+		return &md
+	})
+}
+
+type mutateMetadata func(CouchbaseMetadata) *CouchbaseMetadata
+
+func (db *DB) mutatePieceMetadata(ctx context.Context, pieceCid cid.Cid, opName string, mutate mutateMetadata) error {
+	return db.withCasRetry(opName, func() error {
 		// Get the piece metadata from the db
 		var md CouchbaseMetadata
 		var pieceMetaExists bool
@@ -363,26 +342,21 @@ func (db *DB) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo mo
 			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
 		}
 
-		// Check if the deal has already been added
-		for _, dl := range md.Deals {
-			if dl == dealInfo {
-				return nil
-			}
+		// Apply the mutation to the metadata
+		newMetadata := mutate(md)
+		if newMetadata == nil {
+			// If there was no mutation applied, just return immediately
+			return nil
 		}
-
-		// Add the deal to the list.
-		// Note: we can't use ArrayAddUniqueSpec here because it only works
-		// with primitives, not objects.
-		md.Deals = append(md.Deals, dealInfo)
 
 		// Write the piece metadata back to the db
 		if pieceMetaExists {
-			_, err = db.pcidToMeta.Replace(cbKey, md, &gocb.ReplaceOptions{
+			_, err = db.pcidToMeta.Replace(cbKey, newMetadata, &gocb.ReplaceOptions{
 				Context: ctx,
 				Cas:     getResult.Cas(),
 			})
 		} else {
-			_, err = db.pcidToMeta.Insert(cbKey, md, &gocb.InsertOptions{Context: ctx})
+			_, err = db.pcidToMeta.Insert(cbKey, newMetadata, &gocb.InsertOptions{Context: ctx})
 		}
 		if err != nil {
 			return fmt.Errorf("setting piece %s metadata: %w", pieceCid, err)
@@ -452,47 +426,78 @@ func (db *DB) AllRecords(ctx context.Context, pieceCid cid.Cid, recordCount int)
 	ctx, span := tracing.Tracer.Start(ctx, "db.all_records")
 	defer span.End()
 
-	recs := make([]model.Record, 0, recordCount)
-
 	// Get the number of shards
 	_, totalShards := getShardPrefixBitCount(recordCount)
+
+	recs := make([]model.Record, 0, recordCount)
+	recsShard := make([][]model.Record, totalShards)
+
+	var eg errgroup.Group
+
+	span.SetAttributes(attribute.Int("shards", totalShards))
+	span.SetAttributes(attribute.Int("recs", recordCount))
 	for i := 0; i < totalShards; i++ {
-		// Get the map of multihash -> offset/size for the shard
-		shardPrefix, err := getShardPrefix(i)
-		if err != nil {
-			return nil, err
-		}
-		cbKey := toCouchKey(pieceCid.String() + shardPrefix)
-		cbMap := db.pieceOffsets.Map(cbKey)
-		recMap, err := cbMap.Iterator()
-		if err != nil {
-			if isNotFoundErr(err) {
-				// If there are no records in a particular shard just skip the shard
-				continue
-			}
-			return nil, fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
-		}
-
-		// Get each value in the map
-		for mhStr, offsetSizeIfce := range recMap {
-			mh, err := multihash.FromHexString(mhStr)
+		i := i
+		recsShard[i] = make([]model.Record, 0, recordCount)
+		eg.Go(func() error {
+			// Get the map of multihash -> offset/size for the shard
+			shardPrefix, err := getShardPrefix(i)
 			if err != nil {
-				return nil, fmt.Errorf("parsing piece cid %s multihash value '%s': %w", pieceCid, mhStr, err)
+				return err
 			}
+			cbKey := toCouchKey(pieceCid.String() + shardPrefix)
+			cbMap := db.pieceOffsets.Map(cbKey)
 
-			val, ok := offsetSizeIfce.(string)
-			if !ok {
-				return nil, fmt.Errorf("unexpected type for piece cid %s offset/size value: %T", pieceCid, offsetSizeIfce)
-			}
-
-			var ofsz model.OffsetSize
-			err = ofsz.UnmarshallBase64(val)
+			_, spanIter := tracing.Tracer.Start(ctx, "db.iter")
+			recMap, err := cbMap.Iterator()
+			spanIter.End()
 			if err != nil {
-				return nil, fmt.Errorf("parsing piece %s offset / size value '%s': %w", pieceCid, val, err)
+				if isNotFoundErr(err) {
+					// If there are no records in a particular shard just skip the shard
+					return nil
+				}
+				return fmt.Errorf("getting all records for piece %s: %w", pieceCid, err)
 			}
 
-			recs = append(recs, model.Record{Cid: cid.NewCidV1(cid.Raw, mh), OffsetSize: ofsz})
-		}
+			span.SetAttributes(attribute.Int(fmt.Sprintf("map_%d", i), len(recMap)))
+
+			_, spanMap := tracing.Tracer.Start(ctx, "db.recMap")
+
+			// Get each value in the map
+			for mhStr, offsetSizeIfce := range recMap {
+				mh, err := multihash.FromHexString(mhStr)
+				if err != nil {
+					return fmt.Errorf("parsing piece cid %s multihash value '%s': %w", pieceCid, mhStr, err)
+				}
+
+				val, ok := offsetSizeIfce.(string)
+				if !ok {
+					return fmt.Errorf("unexpected type for piece cid %s offset/size value: %T", pieceCid, offsetSizeIfce)
+				}
+
+				var ofsz model.OffsetSize
+				err = ofsz.UnmarshallBase64(val)
+				if err != nil {
+					return fmt.Errorf("parsing piece %s offset / size value '%s': %w", pieceCid, val, err)
+				}
+
+				recsShard[i] = append(recsShard[i], model.Record{Cid: cid.NewCidV1(cid.Raw, mh), OffsetSize: ofsz})
+			}
+
+			spanMap.End()
+
+			return nil
+		})
+
+	}
+
+	err := eg.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < totalShards; i++ {
+		recs = append(recs, recsShard[i]...)
 	}
 
 	return recs, nil
@@ -591,6 +596,44 @@ func (db *DB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []mode
 	return nil
 }
 
+func (db *DB) ListPieces(ctx context.Context) ([]cid.Cid, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.list_pieces")
+	defer span.End()
+
+	res, err := db.cluster.Query("SELECT META().id FROM `"+pieceCidToMetadataBucket+"`", &gocb.QueryOptions{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("getting keys from %s: %w", pieceCidToMetadataBucket, err)
+	}
+
+	var pieceCids []cid.Cid
+	var rowData map[string]string
+	for res.Next() {
+		err := res.Row(&rowData)
+		if err != nil {
+			return nil, fmt.Errorf("reading row from %s: %w", pieceCidToMetadataBucket, err)
+		}
+
+		couchKey, ok := rowData["id"]
+		if !ok {
+			return nil, fmt.Errorf("unexpected row data %s reading row from %s", rowData, pieceCidToMetadataBucket)
+		}
+
+		c, err := cid.Parse(fromCouchKey(couchKey))
+		if err != nil {
+			return nil, fmt.Errorf("parsing piece cid from couchbase key '%s': %w", couchKey, err)
+		}
+
+		pieceCids = append(pieceCids, c)
+	}
+
+	err = res.Err()
+	if err != nil {
+		return nil, fmt.Errorf("reading last result from %s: %w", pieceCidToMetadataBucket, err)
+	}
+
+	return pieceCids, nil
+}
+
 // Attempt to perform an update operation. If the operation fails due to a
 // cas mismatch, or inserting a document at a key that already exists, retry
 // several times before giving up.
@@ -624,6 +667,13 @@ func toCouchKey(key string) string {
 		k = k[:maxCouchKeyLen/2] + k[len(k)-maxCouchKeyLen/2:]
 	}
 	return k
+}
+
+func fromCouchKey(couchKey string) string {
+	if strings.HasPrefix(couchKey, "u:") {
+		return couchKey[2:]
+	}
+	return couchKey
 }
 
 func isNotFoundErr(err error) bool {

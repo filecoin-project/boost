@@ -3,7 +3,6 @@ package gql
 import (
 	"context"
 	"fmt"
-
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boostd-data/svc/types"
@@ -59,9 +58,29 @@ func (r *resolver) PiecesWithPayloadCid(ctx context.Context, args struct{ Payloa
 		return nil, fmt.Errorf("%s is not a valid payload cid", args.PayloadCid)
 	}
 
+	pieces, err := r.piecedirectory.PiecesContainingMultihash(ctx, payloadCid.Hash())
+	if err != nil {
+		if types.IsNotFound(err) {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("getting shards containing cid %s: %w", payloadCid, err)
+	}
+
+	pieceCids := make([]string, 0, len(pieces))
+	for _, piece := range pieces {
+		pieceCids = append(pieceCids, piece.String())
+	}
+	return pieceCids, nil
+}
+
+func (r *resolver) PiecesWithRootPayloadCid(ctx context.Context, args struct{ PayloadCid string }) ([]string, error) {
+	payloadCid, err := cid.Parse(args.PayloadCid)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not a valid payload cid", args.PayloadCid)
+	}
 	var pieceCidSet = make(map[string]struct{})
 
-	// Get boost deals by piece Cid
+	// Get boost deals by payload cid
 	boostDeals, err := r.dealsDB.ByRootPayloadCID(ctx, payloadCid)
 	if err != nil {
 		return nil, err
@@ -70,7 +89,7 @@ func (r *resolver) PiecesWithPayloadCid(ctx context.Context, args struct{ Payloa
 		pieceCidSet[dl.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
 	}
 
-	// Get legacy markets deals by payload Cid
+	// Get legacy markets deals by payload cid
 	// TODO: add method to markets to filter deals by payload CID
 	allLegacyDeals, err := r.legacyProv.ListLocalDeals()
 	if err != nil {
@@ -96,7 +115,7 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 	}
 
 	// Get piece info from piece directory
-	pieceInfo, err := r.pieceMeta.GetPieceMetadata(ctx, pieceCid)
+	pieceInfo, err := r.piecedirectory.GetPieceMetadata(ctx, pieceCid)
 	if err != nil && !types.IsNotFound(err) {
 		return nil, err
 	}
@@ -238,7 +257,7 @@ func (r *resolver) getIndexStatus(ctx context.Context, pieceCid cid.Cid, deals [
 	var idxst IndexStatus
 	idxerr := ""
 
-	md, err := r.pieceMeta.GetPieceMetadata(ctx, pieceCid)
+	md, err := r.piecedirectory.GetPieceMetadata(ctx, pieceCid)
 	switch {
 	case err != nil && types.IsNotFound(err):
 		idxst = IndexStatusNotFound
@@ -263,7 +282,7 @@ func (r *resolver) getIndexStatus(ctx context.Context, pieceCid cid.Cid, deals [
 			// This should never happen, but check just in case
 			return nil, fmt.Errorf("parsing retrieved deal data root cid %s: %w", cidstr, err)
 		}
-		pieces, err := r.pieceMeta.PiecesContainingMultihash(ctx, c.Hash())
+		pieces, err := r.piecedirectory.PiecesContainingMultihash(ctx, c.Hash())
 		if err != nil || len(pieces) == 0 {
 			idxst = IndexStatusFailed
 			idxerr = fmt.Sprintf("unable to resolve piece's root payload cid %s to piece cid", cidstr)

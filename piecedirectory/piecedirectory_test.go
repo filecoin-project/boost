@@ -1,4 +1,4 @@
-package piecemeta_test
+package piecedirectory_test
 
 import (
 	"bytes"
@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/piecemeta"
-	mock_piecemeta "github.com/filecoin-project/boost/piecemeta/mocks"
+	"github.com/filecoin-project/boost/piecedirectory"
+	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/mocks"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/couchbase"
@@ -44,25 +44,25 @@ var testCouchSettings = couchbase.DBSettings{
 	},
 }
 
-func TestPieceMeta(t *testing.T) {
+func TestPieceDirectory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	t.Run("level db", func(t *testing.T) {
+	t.Run("leveldb", func(t *testing.T) {
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
-		testPieceMeta(ctx, t, bdsvc)
+		testPieceDirectory(ctx, t, bdsvc)
 	})
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container as part of the test
 		t.Skip()
 		bdsvc := svc.NewCouchbase(testCouchSettings)
-		testPieceMeta(ctx, t, bdsvc)
+		testPieceDirectory(ctx, t, bdsvc)
 	})
 }
 
-func testPieceMeta(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
+func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
 	err := bdsvc.Start(ctx, 8042)
 	require.NoError(t, err)
 
@@ -72,7 +72,7 @@ func testPieceMeta(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
 	defer cl.Close(ctx)
 
 	t.Run("not found", func(t *testing.T) {
-		testPieceMetaNotFound(ctx, t, cl)
+		testPieceDirectoryNotFound(ctx, t, cl)
 	})
 
 	t.Run("basic blockstore", func(t *testing.T) {
@@ -88,10 +88,10 @@ func testPieceMeta(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
 	})
 }
 
-func testPieceMetaNotFound(ctx context.Context, t *testing.T, cl *client.Store) {
+func testPieceDirectoryNotFound(ctx context.Context, t *testing.T, cl *client.Store) {
 	ctrl := gomock.NewController(t)
-	pr := mock_piecemeta.NewMockPieceReader(ctrl)
-	pm := piecemeta.NewPieceMeta(cl, pr, 1)
+	pr := mock_piecedirectory.NewMockPieceReader(ctrl)
+	pm := piecedirectory.NewPieceDirectory(cl, pr, 1)
 
 	nonExistentPieceCid, err := cid.Parse("bafkqaaa")
 	require.NoError(t, err)
@@ -134,13 +134,13 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 	// Any calls to get a reader over data should return a reader over the random CAR file
 	pr := createMockPieceReader(t, carv1Reader)
 
-	pm := piecemeta.NewPieceMeta(cl, pr, 1)
+	pm := piecedirectory.NewPieceDirectory(cl, pr, 1)
 	pieceCid := calculateCommp(t, carv1Reader).PieceCID
 
 	// Add deal info for the piece - it doesn't matter what it is, the piece
 	// just needs to have at least one deal associated with it
 	di := model.DealInfo{
-		DealUuid:    uuid.New(),
+		DealUuid:    uuid.New().String(),
 		ChainDealID: 1,
 		SectorID:    2,
 		PieceOffset: 0,
@@ -211,7 +211,7 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Add deal info for the piece - it doesn't matter what it is, the piece
 	// just needs to have at least one deal associated with it
 	di := model.DealInfo{
-		DealUuid:    uuid.New(),
+		DealUuid:    uuid.New().String(),
 		ChainDealID: 1,
 		SectorID:    2,
 		PieceOffset: 0,
@@ -259,7 +259,7 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Verify that getting the size of a block works correctly:
 	// There is no size information in the index so the piece
 	// directory should re-build the index and then return the size.
-	pm := piecemeta.NewPieceMeta(cl, pr, 1)
+	pm := piecedirectory.NewPieceDirectory(cl, pr, 1)
 	sz, err := pm.BlockstoreGetSize(ctx, rec.Cid)
 	require.NoError(t, err)
 	require.Equal(t, len(blk.RawData()), sz)
@@ -295,7 +295,7 @@ func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
 
 	// Add deal info for the piece without a CAR file
 	di := model.DealInfo{
-		DealUuid:    uuid.New(),
+		DealUuid:    uuid.New().String(),
 		ChainDealID: 1,
 		SectorID:    1,
 		PieceOffset: 0,
@@ -307,7 +307,7 @@ func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Verify that getting the size of the CAR file works correctly:
 	// There is no CAR size information in the deal info, so the piece
 	// directory should work it out from the index and piece data.
-	pm := piecemeta.NewPieceMeta(cl, pr, 1)
+	pm := piecedirectory.NewPieceDirectory(cl, pr, 1)
 	size, err := pm.GetCarSize(ctx, commpCalc.PieceCID)
 	require.NoError(t, err)
 	require.Equal(t, len(carBytes), int(size))
@@ -319,11 +319,11 @@ type MockSectionReader struct {
 
 func (MockSectionReader) Close() error { return nil }
 
-func createMockPieceReader(t *testing.T, reader car.SectionReader) *mock_piecemeta.MockPieceReader {
+func createMockPieceReader(t *testing.T, reader car.SectionReader) *mock_piecedirectory.MockPieceReader {
 	ctrl := gomock.NewController(t)
-	pr := mock_piecemeta.NewMockPieceReader(ctrl)
+	pr := mock_piecedirectory.NewMockPieceReader(ctrl)
 	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
-		func(_ context.Context, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (piecemeta.SectionReader, error) {
+		func(_ context.Context, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (piecedirectory.SectionReader, error) {
 			_, err := reader.Seek(0, io.SeekStart)
 			return MockSectionReader{reader}, err
 		})

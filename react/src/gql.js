@@ -217,6 +217,77 @@ const ProposalLogsCountQuery = gql`
     }
 `;
 
+const RetrievalLogQuery = gql`
+    query AppRetrievalLogQuery($peerID: String!, $dealID: Uint64!) {
+        retrievalLog(peerID: $peerID, dealID: $dealID) {
+            CreatedAt
+            UpdatedAt
+            PeerID
+            TransferID
+            DealID
+            PayloadCID
+            PieceCID
+            PaymentInterval
+            PaymentIntervalIncrease
+            PricePerByte
+            UnsealPrice
+            Status
+            Message
+            TotalSent
+            DTStatus
+            DTMessage
+            DTEvents {
+                CreatedAt
+                Name
+                Message
+            }
+            MarketEvents {
+                CreatedAt
+                Name
+                Status
+                Message
+            }
+        }
+    }
+`;
+
+const RetrievalLogsListQuery = gql`
+    query AppRetrievalLogsListQuery($cursor: BigInt, $offset: Int, $limit: Int) {
+        retrievalLogs(cursor: $cursor, offset: $offset, limit: $limit) {
+            logs {
+                CreatedAt
+                UpdatedAt
+                PeerID
+                TransferID
+                DealID
+                PayloadCID
+                PieceCID
+                PaymentInterval
+                PaymentIntervalIncrease
+                PricePerByte
+                UnsealPrice
+                Status
+                Message
+                TotalSent
+                DTStatus
+                DTMessage
+            }
+            totalCount
+            more
+        }
+    }
+`;
+
+const RetrievalLogsCountQuery = gql`
+    query AppRetrievalLogsCountQuery {
+        retrievalLogsCount {
+            Count
+            Period
+        }
+    }
+`;
+
+
 const DealCancelMutation = gql`
     mutation AppDealCancelMutation($id: ID!) {
         dealCancel(id: $id)
@@ -303,6 +374,12 @@ const LegacyDealQuery = gql`
             InboundCARPath
             AvailableForRetrieval
         }
+    }
+`;
+
+const PiecesWithRootPayloadCidQuery = gql`
+    query AppPiecesWithRootPayloadCidQuery($payloadCid: String!) {
+        piecesWithRootPayloadCid(payloadCid: $payloadCid)
     }
 `;
 
@@ -586,6 +663,10 @@ export {
     NewDealsSubscription,
     ProposalLogsListQuery,
     ProposalLogsCountQuery,
+    RetrievalLogQuery,
+    RetrievalLogsListQuery,
+    RetrievalLogsCountQuery,
+    PiecesWithRootPayloadCidQuery,
     PiecesWithPayloadCidQuery,
     PieceStatusQuery,
     StorageQuery,

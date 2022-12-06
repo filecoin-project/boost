@@ -10,6 +10,7 @@ import './Menu.css'
 import {SettingsMenuItem} from "./Settings";
 import {InspectMenuItem} from "./Inspect";
 import {ProposalLogsMenuItem} from "./ProposalLogs";
+import {RetrievalLogsMenuItem} from "./RetrievalLogs";
 
 export function Menu(props) {
     function scrollToTop() {
@@ -20,6 +21,7 @@ export function Menu(props) {
         <td onClick={scrollToTop} className="menu">
             <StorageDealsMenuItem />
             <ProposalLogsMenuItem />
+            <RetrievalLogsMenuItem />
             <StorageSpaceMenuItem />
             <SealingPipelineMenuItem />
             <FundsMenuItem />

@@ -2,18 +2,25 @@ package modules
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
-
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/bitswap"
+	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
+	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
+	lotus_retrievalmarket "github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/fx"
+	"path"
+	"time"
 )
 
 func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.TransportsListener, error) {
@@ -67,6 +74,59 @@ func HandleRetrievalTransports(lc fx.Lifecycle, l *lp2pimpl.TransportsListener) 
 			return nil
 		},
 	})
+}
+
+type RetrievalSqlDB struct {
+	db *sql.DB
+}
+
+func NewRetrievalSqlDB(r repo.LockedRepo) (*RetrievalSqlDB, error) {
+	dbPath := path.Join(r.Path(), "boost.retrieval.db?cache=shared")
+	d, err := db.SqlDB(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	return &RetrievalSqlDB{d}, nil
+}
+
+func CreateRetrievalTables(lc fx.Lifecycle, db *RetrievalSqlDB) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return rtvllog.CreateTables(ctx, db.db)
+		},
+	})
+}
+
+func NewRetrievalLogDB(db *RetrievalSqlDB) *rtvllog.RetrievalLogDB {
+	return rtvllog.NewRetrievalLogDB(db.db)
+}
+
+// Write graphsync retrieval updates to the database
+func HandleRetrievalGraphsyncUpdates(duration time.Duration) func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt lotus_dtypes.ProviderDataTransfer) {
+	return func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt lotus_dtypes.ProviderDataTransfer) {
+		rel := rtvllog.NewRetrievalLog(db, duration)
+
+		relctx, cancel := context.WithCancel(context.Background())
+		type unsubFn func()
+		var unsubs []unsubFn
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				unsubs = append(unsubs, unsubFn(m.SubscribeToEvents(rel.OnRetrievalEvent)))
+				unsubs = append(unsubs, unsubFn(m.SubscribeToQueryEvents(rel.OnQueryEvent)))
+				unsubs = append(unsubs, unsubFn(m.SubscribeToValidationEvents(rel.OnValidationEvent)))
+				unsubs = append(unsubs, unsubFn(dt.SubscribeToEvents(rel.OnDataTransferEvent)))
+				rel.Start(relctx)
+				return nil
+			},
+			OnStop: func(context.Context) error {
+				cancel()
+				for _, unsub := range unsubs {
+					unsub()
+				}
+				return nil
+			},
+		})
+	}
 }
 
 func NewProtocolProxy(cfg *config.Boost) func(h host.Host) (*protocolproxy.ProtocolProxy, error) {

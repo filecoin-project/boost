@@ -213,7 +213,7 @@ func (db *DB) SetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid, md Le
 		return err
 	}
 
-	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
+	key := datastore.NewKey(fmt.Sprintf("%s/%s", sprefixPieceCidToCursor, pieceCid.String()))
 
 	return db.Put(ctx, key, b)
 }
@@ -225,7 +225,7 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (Leve
 
 	var metadata LeveldbMetadata
 
-	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
+	key := datastore.NewKey(fmt.Sprintf("%s/%s", sprefixPieceCidToCursor, pieceCid.String()))
 
 	b, err := db.Get(ctx, key)
 	if err != nil {
@@ -356,6 +356,38 @@ func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihas
 		Offset: offset,
 		Size:   size,
 	}, nil
+}
+
+func (db *DB) ListPieces(ctx context.Context) ([]cid.Cid, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.list_pieces")
+	defer span.End()
+
+	q := query.Query{
+		Prefix:   "/" + sprefixPieceCidToCursor + "/",
+		KeysOnly: true,
+	}
+	results, err := db.Query(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("listing pieces in database: %w", err)
+	}
+
+	var pieceCids []cid.Cid
+	for {
+		r, ok := results.NextSync()
+		if !ok {
+			break
+		}
+
+		k := r.Key[len(q.Prefix):]
+		pieceCid, err := cid.Parse(k)
+		if err != nil {
+			return nil, fmt.Errorf("parsing piece cid '%s': %w", k, err)
+		}
+
+		pieceCids = append(pieceCids, pieceCid)
+	}
+
+	return pieceCids, nil
 }
 
 func has(list []cid.Cid, v cid.Cid) bool {

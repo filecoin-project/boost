@@ -93,7 +93,7 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 	require.NoError(t, err)
 
 	di := model.DealInfo{
-		DealUuid:    randomuuid,
+		DealUuid:    randomuuid.String(),
 		SectorID:    abi.SectorNumber(1),
 		PieceOffset: 1,
 		PieceLength: 2,
@@ -129,6 +129,11 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 	require.NoError(t, err)
 	require.Len(t, pcids, 1)
 	require.Equal(t, pieceCid, pcids[0])
+
+	allPieceCids, err := cl.ListPieces(ctx)
+	require.NoError(t, err)
+	require.Len(t, allPieceCids, 1)
+	require.Equal(t, pieceCid, allPieceCids[0])
 
 	indexed, err := cl.IsIndexed(ctx, pieceCid)
 	require.NoError(t, err)
@@ -194,7 +199,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service, port int
 			require.NoError(t, err)
 
 			di := model.DealInfo{
-				DealUuid:    randomuuid,
+				DealUuid:    randomuuid.String(),
 				SectorID:    abi.SectorNumber(1),
 				PieceOffset: 1,
 				PieceLength: 2,

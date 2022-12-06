@@ -1,4 +1,4 @@
-package piecemeta
+package piecedirectory
 
 import (
 	"bufio"
@@ -28,9 +28,9 @@ import (
 	mh "github.com/multiformats/go-multihash"
 )
 
-var log = logging.Logger("piecemeta")
+var log = logging.Logger("piecedirectory")
 
-//go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecemeta.go -package=mock_piecemeta . SectionReader,PieceReader,Store
+//go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecedirectory.go -package=mock_piecedirectory . SectionReader,PieceReader,Store
 
 type SectionReader interface {
 	io.Reader
@@ -63,7 +63,7 @@ type Store interface {
 	//DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid uuid.UUID) (bool, error)
 }
 
-type PieceMeta struct {
+type PieceDirectory struct {
 	store       Store
 	pieceReader PieceReader
 
@@ -75,8 +75,8 @@ func NewStore() *client.Store {
 	return client.NewStore()
 }
 
-func NewPieceMeta(store Store, pr PieceReader, addIndexThrottleSize int) *PieceMeta {
-	return &PieceMeta{
+func NewPieceDirectory(store Store, pr PieceReader, addIndexThrottleSize int) *PieceDirectory {
+	return &PieceDirectory{
 		store:          store,
 		pieceReader:    pr,
 		addIdxThrottle: make(chan struct{}, addIndexThrottleSize),
@@ -95,7 +95,7 @@ func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, id abi.Sect
 }
 
 // Get all metadata about a particular piece
-func (ps *PieceMeta) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+func (ps *PieceDirectory) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_metadata")
 	defer span.End()
 
@@ -103,7 +103,7 @@ func (ps *PieceMeta) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (mo
 }
 
 // Get the list of deals (and the sector the data is in) for a particular piece
-func (ps *PieceMeta) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
+func (ps *PieceDirectory) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_deals")
 	defer span.End()
 
@@ -115,14 +115,14 @@ func (ps *PieceMeta) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]mod
 	return deals, nil
 }
 
-func (ps *PieceMeta) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
+func (ps *PieceDirectory) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_offset")
 	defer span.End()
 
 	return ps.store.GetOffsetSize(ctx, pieceCid, hash)
 }
 
-func (ps *PieceMeta) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
+func (ps *PieceDirectory) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
 	// Get the deals for the piece
 	dls, err := ps.GetPieceDeals(ctx, pieceCid)
 	if err != nil {
@@ -200,7 +200,7 @@ func (ps *PieceMeta) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, 
 	return unpaddedCarSize, nil
 }
 
-func (ps *PieceMeta) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.add_deal_for_piece")
 	defer span.End()
 
@@ -230,7 +230,7 @@ type addIndexOperation struct {
 	err  error
 }
 
-func (ps *PieceMeta) addIndexForPieceThrottled(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (ps *PieceDirectory) addIndexForPieceThrottled(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	// Check if there is already an add index operation in progress for the
 	// given piece cid. If not, create a new one.
 	opi, loaded := ps.addIdxOpByCid.LoadOrStore(pieceCid, &addIndexOperation{
@@ -267,7 +267,7 @@ func (ps *PieceMeta) addIndexForPieceThrottled(ctx context.Context, pieceCid cid
 	return op.err
 }
 
-func (ps *PieceMeta) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	// Get a reader over the piece data
 	reader, err := ps.pieceReader.GetReader(ctx, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
 	if err != nil {
@@ -307,7 +307,10 @@ func (ps *PieceMeta) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dea
 	return nil
 }
 
-func (ps *PieceMeta) buildIndexForPiece(ctx context.Context, pieceCid cid.Cid) error {
+func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "pm.build_index_for_piece")
+	defer span.End()
+
 	dls, err := ps.GetPieceDeals(ctx, pieceCid)
 	if err != nil {
 		return fmt.Errorf("getting piece deals: %w", err)
@@ -325,7 +328,7 @@ func (ps *PieceMeta) buildIndexForPiece(ctx context.Context, pieceCid cid.Cid) e
 	return nil
 }
 
-func (ps *PieceMeta) DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid uuid.UUID) error {
+func (ps *PieceDirectory) DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid uuid.UUID) error {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.delete_deal_for_piece")
 	defer span.End()
 
@@ -338,7 +341,7 @@ func (ps *PieceMeta) DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, d
 	return nil
 }
 
-//func (ps *PieceMeta) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
+//func (ps *piecedirectory) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
 // TODO: Maybe mark for GC instead of deleting immediately
 
 // Delete mh => offset index from store
@@ -356,7 +359,7 @@ func (ps *PieceMeta) DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, d
 //}
 
 // Used internally, and also by HTTP retrieval
-func (ps *PieceMeta) GetPieceReader(ctx context.Context, pieceCid cid.Cid) (SectionReader, error) {
+func (ps *PieceDirectory) GetPieceReader(ctx context.Context, pieceCid cid.Cid) (SectionReader, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_reader")
 	defer span.End()
 
@@ -390,14 +393,14 @@ func (ps *PieceMeta) GetPieceReader(ctx context.Context, pieceCid cid.Cid) (Sect
 }
 
 // Get all pieces that contain a multihash (used when retrieving by payload CID)
-func (ps *PieceMeta) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
+func (ps *PieceDirectory) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.pieces_containing_multihash")
 	defer span.End()
 
 	return ps.store.PiecesContainingMultihash(ctx, m)
 }
 
-func (ps *PieceMeta) GetIterableIndex(ctx context.Context, pieceCid cid.Cid) (carindex.IterableIndex, error) {
+func (ps *PieceDirectory) GetIterableIndex(ctx context.Context, pieceCid cid.Cid) (carindex.IterableIndex, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_iterable_index")
 	defer span.End()
 
@@ -415,7 +418,7 @@ func (ps *PieceMeta) GetIterableIndex(ctx context.Context, pieceCid cid.Cid) (ca
 }
 
 // Get a block (used by Bitswap retrieval)
-func (ps *PieceMeta) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error) {
+func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error) {
 	// TODO: use caching to make this efficient for repeated Gets against the same piece
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_block")
 	defer span.End()
@@ -471,7 +474,7 @@ func (ps *PieceMeta) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, erro
 	return nil, merr
 }
 
-func (ps *PieceMeta) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) {
+func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_block_size")
 	defer span.End()
 
@@ -498,7 +501,7 @@ func (ps *PieceMeta) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, err
 	// (they only have offset information). If the block has no size
 	// information, rebuild the index from the piece data
 	if offsetSize.Size == 0 {
-		err = ps.buildIndexForPiece(ctx, pieces[0])
+		err = ps.BuildIndexForPiece(ctx, pieces[0])
 		if err != nil {
 			return 0, fmt.Errorf("re-building index for piece %s: %w", pieces[0], err)
 		}
@@ -520,7 +523,7 @@ func (ps *PieceMeta) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, err
 	return int(offsetSize.Size), nil
 }
 
-func (ps *PieceMeta) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) {
+func (ps *PieceDirectory) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.has_block")
 	defer span.End()
 
@@ -533,7 +536,7 @@ func (ps *PieceMeta) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error)
 }
 
 // Get a blockstore over a piece (used by Graphsync retrieval)
-func (ps *PieceMeta) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (bstore.Blockstore, error) {
+func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (bstore.Blockstore, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_blockstore")
 	defer span.End()
 

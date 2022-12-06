@@ -17,9 +17,11 @@ import {Epoch} from "./Epoch";
 import {LegacyDealDetail} from "./LegacyDealDetail"
 import {SettingsPage} from "./Settings";
 import {Banner} from "./Banner";
-import {PieceMetaDetail, PieceMetaPage} from "./PieceMeta";
+import {PieceDirectoryDetail, PieceDirectoryPage} from "./PieceDirectory";
 import {ProposalLogsPage} from "./ProposalLogs";
 import {InspectPage} from "./Inspect";
+import {RetrievalLogsPage} from "./RetrievalLogs";
+import {RetrievalLogDetail} from "./RetrievalLogDetail";
 
 function App(props) {
     return (
@@ -40,6 +42,9 @@ function App(props) {
                                         <Route path="/legacy-storage-deals/from/:cursor/page/:pageNum" element={<LegacyStorageDealsPage />} />
                                         <Route path="/proposal-logs" element={<ProposalLogsPage />} />
                                         <Route path="/proposal-logs/from/:cursor/page/:pageNum" element={<ProposalLogsPage />} />
+                                        <Route path="/retrieval-logs" element={<RetrievalLogsPage />} />
+                                        <Route path="/retrieval-logs/from/:cursor/page/:pageNum" element={<RetrievalLogsPage />} />
+                                        <Route path="/retrieval-logs/:peerID/:dealID" element={<RetrievalLogDetail />} />
                                         <Route path="/storage-space" element={<StorageSpacePage />} />
                                         <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
                                         <Route path="/funds" element={<FundsPage />} />
@@ -48,7 +53,7 @@ function App(props) {
                                         <Route path="/deal-transfers" element={<DealTransfersPage />} />
                                         <Route path="/mpool" element={<MpoolPage />} />
                                         <Route path="/settings" element={<SettingsPage />} />
-                                        <Route path="/piece-meta" element={<PieceMetaPage />} />
+                                        <Route path="/piece-directory" element={<PieceDirectoryPage />} />
                                         <Route path="/deals/:dealID" element={<DealDetail />} />
                                         <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
                                         <Route path="/inspect" element={<InspectPage />} />
