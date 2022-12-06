@@ -406,7 +406,7 @@ func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
 
 	var metadata LeveldbMetadata
 
-	key := datastore.NewKey(fmt.Sprintf("%s%s", sprefixPieceCidToCursor, pieceCid.String()))
+	key := datastore.NewKey(fmt.Sprintf("%s/%s", sprefixPieceCidToCursor, pieceCid.String()))
 
 	piece, err := db.Get(ctx, key)
 	if err != nil {
