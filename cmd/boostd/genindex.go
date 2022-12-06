@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	_ "net/http/pprof"
-	"os"
 	"time"
 
 	"github.com/filecoin-project/boost/cmd/lib"
@@ -48,11 +47,6 @@ var genindexCmd = &cli.Command{
 			Name:     "piece-cid",
 			Usage:    "piece-cid to index",
 			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "filepath",
-			Usage:    "the path to the car",
-			Required: false,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -96,37 +90,19 @@ var genindexCmd = &cli.Command{
 		var r *carv2.Reader
 		var headerDataSize uint64
 
-		if filepath := cctx.String("filepath"); filepath != "" {
-			fmt.Println("fetching piece-cid from car file: ", filepath)
+		fmt.Println("fetching piece-cid from the storage api")
 
-			r, err = carv2.OpenReader(filepath)
-			if err != nil {
-				return fmt.Errorf("open reader: %w", err)
+		sr, err := pd.GetPieceReader(ctx, piececid)
+		if err != nil {
+			if errors.Is(err, piecedirectory.ErrNoUnsealedPieceAvailable) {
+				return fmt.Errorf("piece reader could not find unsealed piece for cid %s: %w", piececid, err)
 			}
-			defer r.Close()
+			return fmt.Errorf("error while getting piece reader: %w", err)
+		}
 
-			if r.Version == 1 {
-				fi, err := os.Stat(filepath)
-				if err != nil {
-					return fmt.Errorf("os.stat err: %w", err)
-				}
-				headerDataSize = uint64(fi.Size())
-			}
-		} else {
-			fmt.Println("no car file specified, fetching piece-cid from the storage api")
-
-			sr, err := pd.GetPieceReader(ctx, piececid)
-			if err != nil {
-				if errors.Is(err, piecedirectory.ErrNoUnsealedPieceAvailable) {
-					return fmt.Errorf("piece reader could not find unsealed piece for cid %s: %w", piececid, err)
-				}
-				return fmt.Errorf("error while getting piece reader: %w", err)
-			}
-
-			r, err = carv2.NewReader(sr)
-			if err != nil {
-				return err
-			}
+		r, err = carv2.NewReader(sr)
+		if err != nil {
+			return err
 		}
 
 		// gen index
