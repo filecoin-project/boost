@@ -12,7 +12,6 @@ import (
 	model "github.com/filecoin-project/boostd-data/model"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	gomock "github.com/golang/mock/gomock"
-	uuid "github.com/google/uuid"
 	cid "github.com/ipfs/go-cid"
 	index "github.com/ipld/go-car/v2/index"
 	multihash "github.com/multiformats/go-multihash"
@@ -294,7 +293,7 @@ func (mr *MockStoreMockRecorder) PiecesContainingMultihash(arg0, arg1 interface{
 }
 
 // RemoveDealForPiece mocks base method.
-func (m *MockStore) RemoveDealForPiece(arg0 context.Context, arg1 cid.Cid, arg2 uuid.UUID) error {
+func (m *MockStore) RemoveDealForPiece(arg0 context.Context, arg1 cid.Cid, arg2 string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RemoveDealForPiece", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)

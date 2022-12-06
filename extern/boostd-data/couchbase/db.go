@@ -10,7 +10,6 @@ import (
 	"github.com/couchbase/gocb/v2"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
-	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
@@ -792,6 +791,9 @@ func (db *DB) RemoveIndexes(ctx context.Context, pieceCid cid.Cid, recordCount i
 				var cidStrs []string
 				err = getResult.Content(&cidStrs)
 				if err != nil {
+					if isNotFoundErr(err) {
+						return nil
+					}
 					return err
 				}
 
@@ -814,15 +816,15 @@ func (db *DB) RemoveIndexes(ctx context.Context, pieceCid cid.Cid, recordCount i
 				return nil
 			})
 			if err != nil {
-				if isNotFoundErr(err) {
-					continue
-				}
 				return err
 			}
 			_, err = db.pieceOffsets.Remove(cbKey, &gocb.RemoveOptions{
 				Context: ctx,
 			})
 			if err != nil {
+				if isNotFoundErr(err) {
+					return nil
+				}
 				return err
 			}
 		}
@@ -830,7 +832,7 @@ func (db *DB) RemoveIndexes(ctx context.Context, pieceCid cid.Cid, recordCount i
 	return nil
 }
 
-func (db *DB) RemoveDeals(ctx context.Context, dealUuid uuid.UUID, pieceCid cid.Cid) error {
+func (db *DB) RemoveDeals(ctx context.Context, dealId string, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.remove_deals")
 	defer span.End()
 
@@ -849,7 +851,7 @@ func (db *DB) RemoveDeals(ctx context.Context, dealUuid uuid.UUID, pieceCid cid.
 		}
 
 		for i, v := range metadata.Deals {
-			if v.DealUuid == dealUuid {
+			if v.DealUuid == dealId {
 				metadata.Deals[i] = metadata.Deals[len(metadata.Deals)-1]
 				metadata.Deals = metadata.Deals[:len(metadata.Deals)-1]
 				break

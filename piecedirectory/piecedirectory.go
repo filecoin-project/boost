@@ -14,7 +14,6 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/markets/dagstore"
-	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	bstore "github.com/ipfs/go-ipfs-blockstore"
@@ -55,7 +54,7 @@ type Store interface {
 	SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error
 	PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error)
 	MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error
-	RemoveDealForPiece(context.Context, cid.Cid, uuid.UUID) error
+	RemoveDealForPiece(context.Context, cid.Cid, string) error
 	RemovePieceMetadata(context.Context, cid.Cid) error
 	RemoveIndexes(context.Context, cid.Cid) error
 
@@ -328,7 +327,7 @@ func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.C
 	return nil
 }
 
-func (ps *PieceDirectory) DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid uuid.UUID) error {
+func (ps *PieceDirectory) DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid string) error {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.delete_deal_for_piece")
 	defer span.End()
 

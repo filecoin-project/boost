@@ -8,7 +8,6 @@ import (
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc/types"
-	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	mh "github.com/multiformats/go-multihash"
@@ -277,8 +276,8 @@ func normalizeMultihashError(m mh.Multihash, err error) error {
 }
 
 // Remove Single deal for pieceCID. If []Deals is empty then Metadata is removed as well
-func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid uuid.UUID) error {
-	log.Debugw("handle.remove-deal-for-piece", "piece-cid", pieceCid, "deal-uuid", dealUuid)
+func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId string) error {
+	log.Debugw("handle.remove-deal-for-piece", "piece-cid", pieceCid, "deal-uuid", dealId)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
 	defer span.End()
@@ -287,10 +286,7 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUu
 		log.Debugw("handled.remove-deal-for-piece", "took", time.Since(now).String())
 	}(time.Now())
 
-	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
-	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
-
-	return s.db.RemoveDeals(ctx, dealUuid, pieceCid)
+	return s.db.RemoveDeals(ctx, dealId, pieceCid)
 }
 
 // Remove all Metadata for pieceCID. To be used manually in case of failure
@@ -304,9 +300,6 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 	defer func(now time.Time) {
 		log.Debugw("handled.remove-piece-metadata", "took", time.Since(now).String())
 	}(time.Now())
-
-	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
-	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
 
 	if err := s.db.RemoveMetadata(ctx, pieceCid); err != nil {
 		return err
@@ -327,9 +320,6 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	defer func(now time.Time) {
 		log.Debugw("handle.remove-indexes", "took", time.Since(now).String())
 	}(time.Now())
-
-	s.pieceLocks[toStripedLockIndex(pieceCid)].Lock()
-	defer s.pieceLocks[toStripedLockIndex(pieceCid)].Unlock()
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {

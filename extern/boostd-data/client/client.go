@@ -7,7 +7,6 @@ import (
 
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-jsonrpc"
-	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	logger "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car/v2/index"
@@ -30,7 +29,7 @@ type Store struct {
 		MarkIndexErrored          func(context.Context, cid.Cid, error) error
 		IndexedAt                 func(context.Context, cid.Cid) (time.Time, error)
 		PiecesContainingMultihash func(context.Context, mh.Multihash) ([]cid.Cid, error)
-		RemoveDealForPiece        func(context.Context, cid.Cid, uuid.UUID) error
+		RemoveDealForPiece        func(context.Context, cid.Cid, string) error
 		RemovePieceMetadata       func(context.Context, cid.Cid) error
 		RemoveIndexes             func(context.Context, cid.Cid) error
 	}
@@ -132,7 +131,7 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 	return s.client.GetOffsetSize(ctx, pieceCid, hash)
 }
 
-func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId uuid.UUID) error {
+func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId string) error {
 	return s.client.RemoveDealForPiece(ctx, pieceCid, dealId)
 }
 
