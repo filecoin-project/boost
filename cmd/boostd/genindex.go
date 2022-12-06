@@ -22,7 +22,7 @@ import (
 
 var genindexCmd = &cli.Command{
 	Name:  "genindex",
-	Usage: "Generate index for a given piececid and store in the piece directory",
+	Usage: "Generate index for a given piececid and store it in the piece directory",
 	Flags: []cli.Flag{
 		&cli.IntFlag{
 			Name:  "add-index-throttle",
@@ -45,9 +45,9 @@ var genindexCmd = &cli.Command{
 			Required: false,
 		},
 		&cli.StringFlag{
-			Name:     "piececid",
-			Usage:    "piececid to index",
-			Required: false,
+			Name:     "piece-cid",
+			Usage:    "piece-cid to index",
+			Required: true,
 		},
 		&cli.StringFlag{
 			Name:     "filepath",
@@ -59,11 +59,11 @@ var genindexCmd = &cli.Command{
 		ctx := lcli.ReqContext(cctx)
 
 		// parse piececid
-		piececid, err := cid.Decode(cctx.String("piececid"))
+		piececid, err := cid.Decode(cctx.String("piece-cid"))
 		if err != nil {
 			return err
 		}
-		fmt.Println("piececid to index: ", piececid)
+		fmt.Println("piece-cid to index: ", piececid)
 
 		// connect to the piece directory service
 		pdClient := piecedirectory.NewStore()
@@ -97,7 +97,7 @@ var genindexCmd = &cli.Command{
 		var headerDataSize uint64
 
 		if filepath := cctx.String("filepath"); filepath != "" {
-			fmt.Println("fetching piececid from car file: ", filepath)
+			fmt.Println("fetching piece-cid from car file: ", filepath)
 
 			r, err = carv2.OpenReader(filepath)
 			if err != nil {
@@ -113,7 +113,7 @@ var genindexCmd = &cli.Command{
 				headerDataSize = uint64(fi.Size())
 			}
 		} else {
-			fmt.Println("no car file specified, fetching piececid from the storage api")
+			fmt.Println("no car file specified, fetching piece-cid from the storage api")
 
 			sr, err := pd.GetPieceReader(ctx, piececid)
 			if err != nil {
@@ -137,7 +137,7 @@ var genindexCmd = &cli.Command{
 
 		addStart := time.Now()
 
-		fmt.Printf("about to add %d records for piececid %s to the piece directory\n", len(recs), piececid)
+		fmt.Printf("about to add %d records for piece-cid %s to the piece directory\n", len(recs), piececid)
 		err = pd.AddIndex(ctx, piececid, recs)
 		if err != nil {
 			return err
@@ -148,7 +148,7 @@ var genindexCmd = &cli.Command{
 
 		fmt.Println("adding index took", time.Since(addStart).String())
 
-		fmt.Printf("successfully added index (%d records) for piececid %s to the piece directory\n", len(recs), piececid)
+		fmt.Printf("successfully added index (%d records) for piece-cid %s to the piece directory\n", len(recs), piececid)
 
 		return nil
 	},
