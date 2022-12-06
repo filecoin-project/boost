@@ -95,7 +95,7 @@ require (
 	github.com/multiformats/go-multibase v0.1.1
 	github.com/multiformats/go-multicodec v0.6.0
 	github.com/multiformats/go-multihash v0.2.1
-	github.com/multiformats/go-varint v0.0.6
+	github.com/multiformats/go-varint v0.0.6 // indirect
 	github.com/open-rpc/meta-schema v0.0.0-20201029221707-1b72ef2ea333
 	github.com/pressly/goose/v3 v3.5.3
 	github.com/prometheus/client_golang v1.13.0
