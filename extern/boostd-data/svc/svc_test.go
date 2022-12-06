@@ -417,7 +417,7 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 	require.NoError(t, err)
 
 	di := model.DealInfo{
-		DealUuid:    randomuuid,
+		DealUuid:    randomuuid.String(),
 		SectorID:    abi.SectorNumber(1),
 		PieceOffset: 1,
 		PieceLength: 2,
