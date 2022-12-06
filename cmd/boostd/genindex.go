@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	_ "net/http/pprof"
@@ -87,34 +86,10 @@ var genindexCmd = &cli.Command{
 
 		pd := piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
 
-		var r *carv2.Reader
-		var headerDataSize uint64
-
-		fmt.Println("fetching piece-cid from the storage api")
-
-		sr, err := pd.GetPieceReader(ctx, piececid)
-		if err != nil {
-			if errors.Is(err, piecedirectory.ErrNoUnsealedPieceAvailable) {
-				return fmt.Errorf("piece reader could not find unsealed piece for cid %s: %w", piececid, err)
-			}
-			return fmt.Errorf("error while getting piece reader: %w", err)
-		}
-
-		r, err = carv2.NewReader(sr)
-		if err != nil {
-			return err
-		}
-
-		// gen index
-		recs, err := GetRecords(r, headerDataSize)
-		if err != nil {
-			return err
-		}
-
 		addStart := time.Now()
 
-		fmt.Printf("about to add %d records for piece-cid %s to the piece directory\n", len(recs), piececid)
-		err = pd.AddIndex(ctx, piececid, recs)
+		fmt.Printf("about to generate and add index for piece-cid %s to the piece directory\n", piececid)
+		err = pd.BuildIndexForPiece(ctx, piececid)
 		if err != nil {
 			return err
 		}
@@ -124,7 +99,7 @@ var genindexCmd = &cli.Command{
 
 		fmt.Println("adding index took", time.Since(addStart).String())
 
-		fmt.Printf("successfully added index (%d records) for piece-cid %s to the piece directory\n", len(recs), piececid)
+		fmt.Printf("successfully generated and added index for piece-cid %s to the piece directory\n", piececid)
 
 		return nil
 	},
