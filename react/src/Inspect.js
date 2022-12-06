@@ -152,16 +152,12 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                         <td><strong>{searchQuery}</strong></td>
                     </tr>
                 ) : null}
-                {rootCid && searchIsRootCid ? (
+                {rootCid ? (
                     <tr key="data root cid">
                         <th>Data Root CID</th>
-                        <td><strong>{rootCid}</strong></td>
-                    </tr>
-                ) : null}
-                {rootCid && !searchIsRootCid ? (
-                    <tr key="data root cid">
-                        <th>Data Root CID</th>
-                        <td>{rootCid}</td>
+                        <td>
+                            { searchIsRootCid ? <strong>{rootCid}</strong> : rootCid }
+                        </td>
                     </tr>
                 ) : null}
                 <tr key="piece cid">
