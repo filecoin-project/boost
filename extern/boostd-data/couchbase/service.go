@@ -286,7 +286,7 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId
 		log.Debugw("handled.remove-deal-for-piece", "took", time.Since(now).String())
 	}(time.Now())
 
-	return s.db.RemoveDeals(ctx, dealId, pieceCid)
+	return s.db.RemoveDealForPiece(ctx, dealId, pieceCid)
 }
 
 // Remove all Metadata for pieceCID. To be used manually in case of failure
@@ -301,7 +301,7 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 		log.Debugw("handled.remove-piece-metadata", "took", time.Since(now).String())
 	}(time.Now())
 
-	if err := s.db.RemoveMetadata(ctx, pieceCid); err != nil {
+	if err := s.db.RemovePieceMetadata(ctx, pieceCid); err != nil {
 		return err
 	}
 

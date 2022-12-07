@@ -417,7 +417,7 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUu
 
 	if len(md.Deals) == 0 {
 		// Remove Metadata if removed deal was last one
-		if err := s.db.RemoveMetadata(ctx, pieceCid); err != nil {
+		if err := s.db.RemovePieceMetadata(ctx, pieceCid); err != nil {
 			return fmt.Errorf("Failed to remove the Metadata after removing the last deal: %w", err)
 		}
 		return nil
@@ -445,7 +445,7 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 	s.Lock()
 	defer s.Unlock()
 
-	if err := s.db.RemoveMetadata(ctx, pieceCid); err != nil {
+	if err := s.db.RemovePieceMetadata(ctx, pieceCid); err != nil {
 		return err
 	}
 

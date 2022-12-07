@@ -400,8 +400,8 @@ func has(list []cid.Cid, v cid.Cid) bool {
 }
 
 // RemoveMetadata
-func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.remove_metadata")
+func (db *DB) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.remove_piece_metadata")
 	defer span.End()
 
 	var metadata LeveldbMetadata

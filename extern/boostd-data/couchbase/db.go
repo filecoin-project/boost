@@ -717,8 +717,8 @@ func serviceName(svc gocb.ServiceType) string {
 }
 
 // RemoveMetadata
-func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.remove_metadata")
+func (db *DB) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.remove_piece_metadata")
 	defer span.End()
 
 	return db.withCasRetry("remove-metadata-for-piece", func() error {
@@ -750,6 +750,9 @@ func (db *DB) RemoveMetadata(ctx context.Context, pieceCid cid.Cid) error {
 			Cas:     getResult.Cas(),
 		})
 		if err != nil {
+			if isNotFoundErr(err) {
+				return nil
+			}
 			return fmt.Errorf("removing piece %s metadata: %w", pieceCid, err)
 		}
 		return nil
@@ -786,14 +789,14 @@ func (db *DB) RemoveIndexes(ctx context.Context, pieceCid cid.Cid, recordCount i
 			err = db.withCasRetry("remove-piece", func() error {
 				getResult, err := db.mhToPieces.Get(cbKey, &gocb.GetOptions{Context: ctx})
 				if err != nil {
+					if isNotFoundErr(err) {
+						return nil
+					}
 					return err
 				}
 				var cidStrs []string
 				err = getResult.Content(&cidStrs)
 				if err != nil {
-					if isNotFoundErr(err) {
-						return nil
-					}
 					return err
 				}
 
@@ -832,8 +835,8 @@ func (db *DB) RemoveIndexes(ctx context.Context, pieceCid cid.Cid, recordCount i
 	return nil
 }
 
-func (db *DB) RemoveDeals(ctx context.Context, dealId string, pieceCid cid.Cid) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.remove_deals")
+func (db *DB) RemoveDealForPiece(ctx context.Context, dealId string, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.remove_deal_for_piece")
 	defer span.End()
 
 	return db.withCasRetry("remove-deal-for-piece", func() error {
@@ -859,7 +862,7 @@ func (db *DB) RemoveDeals(ctx context.Context, dealId string, pieceCid cid.Cid) 
 		}
 		// Remove Metadata if removed deal was last one
 		if len(metadata.Deals) == 0 {
-			if err := db.RemoveMetadata(ctx, pieceCid); err != nil {
+			if err := db.RemovePieceMetadata(ctx, pieceCid); err != nil {
 				fmt.Errorf("Failed to remove the Metadata after removing the last deal: %w", err)
 			}
 			return nil

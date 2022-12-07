@@ -327,7 +327,7 @@ func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.C
 	return nil
 }
 
-func (ps *PieceDirectory) DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid string) error {
+func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid string) error {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.delete_deal_for_piece")
 	defer span.End()
 
