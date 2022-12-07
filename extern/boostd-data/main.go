@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/filecoin-project/boostd-data/svc"
-	logging "github.com/ipfs/go-log/v2"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/filecoin-project/boostd-data/svc"
+	logging "github.com/ipfs/go-log/v2"
 )
 
 var (
@@ -19,7 +20,7 @@ var (
 )
 
 func init() {
-	logging.SetLogLevel("*", "debug")
+	_ = logging.SetLogLevel("*", "debug")
 
 	flag.StringVar(&db, "db", "", "db type for piece directory (couchbase or ldb)")
 	flag.StringVar(&repopath, "repopath", "", "path for repo")
@@ -42,9 +43,10 @@ func main() {
 	// setup a signal handler to cancel the context
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, syscall.SIGTERM, syscall.SIGINT)
-	select {
-	case <-interrupt:
-		cancel()
-		log.Debugw("got os signal interrupt")
-	}
+
+	<-interrupt
+
+	cancel()
+	log.Debugw("got os signal interrupt")
+
 }

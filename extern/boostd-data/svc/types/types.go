@@ -33,6 +33,9 @@ type Service interface {
 	SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error
 	IndexedAt(context.Context, cid.Cid) (time.Time, error)
 	PiecesContainingMultihash(context.Context, mh.Multihash) ([]cid.Cid, error)
+	RemoveDealForPiece(context.Context, cid.Cid, string) error
+	RemovePieceMetadata(context.Context, cid.Cid) error
+	RemoveIndexes(context.Context, cid.Cid) error
 }
 
 type ServiceImpl interface {

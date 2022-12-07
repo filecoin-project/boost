@@ -29,6 +29,9 @@ type Store struct {
 		MarkIndexErrored          func(context.Context, cid.Cid, error) error
 		IndexedAt                 func(context.Context, cid.Cid) (time.Time, error)
 		PiecesContainingMultihash func(context.Context, mh.Multihash) ([]cid.Cid, error)
+		RemoveDealForPiece        func(context.Context, cid.Cid, string) error
+		RemovePieceMetadata       func(context.Context, cid.Cid) error
+		RemoveIndexes             func(context.Context, cid.Cid) error
 	}
 	closer jsonrpc.ClientCloser
 }
@@ -126,6 +129,18 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
 	return s.client.GetOffsetSize(ctx, pieceCid, hash)
+}
+
+func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId string) error {
+	return s.client.RemoveDealForPiece(ctx, pieceCid, dealId)
+}
+
+func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
+	return s.client.RemovePieceMetadata(ctx, pieceCid)
+}
+
+func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
+	return s.client.RemoveIndexes(ctx, pieceCid)
 }
 
 func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {

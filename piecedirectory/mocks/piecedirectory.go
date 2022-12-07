@@ -40,6 +40,20 @@ func (m *MockSectionReader) EXPECT() *MockSectionReaderMockRecorder {
 	return m.recorder
 }
 
+// Close mocks base method.
+func (m *MockSectionReader) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockSectionReaderMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockSectionReader)(nil).Close))
+}
+
 // Read mocks base method.
 func (m *MockSectionReader) Read(arg0 []byte) (int, error) {
 	m.ctrl.T.Helper()
@@ -276,6 +290,48 @@ func (m *MockStore) PiecesContainingMultihash(arg0 context.Context, arg1 multiha
 func (mr *MockStoreMockRecorder) PiecesContainingMultihash(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PiecesContainingMultihash", reflect.TypeOf((*MockStore)(nil).PiecesContainingMultihash), arg0, arg1)
+}
+
+// RemoveDealForPiece mocks base method.
+func (m *MockStore) RemoveDealForPiece(arg0 context.Context, arg1 cid.Cid, arg2 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveDealForPiece", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveDealForPiece indicates an expected call of RemoveDealForPiece.
+func (mr *MockStoreMockRecorder) RemoveDealForPiece(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveDealForPiece", reflect.TypeOf((*MockStore)(nil).RemoveDealForPiece), arg0, arg1, arg2)
+}
+
+// RemoveIndexes mocks base method.
+func (m *MockStore) RemoveIndexes(arg0 context.Context, arg1 cid.Cid) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveIndexes", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveIndexes indicates an expected call of RemoveIndexes.
+func (mr *MockStoreMockRecorder) RemoveIndexes(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveIndexes", reflect.TypeOf((*MockStore)(nil).RemoveIndexes), arg0, arg1)
+}
+
+// RemovePieceMetadata mocks base method.
+func (m *MockStore) RemovePieceMetadata(arg0 context.Context, arg1 cid.Cid) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemovePieceMetadata", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemovePieceMetadata indicates an expected call of RemovePieceMetadata.
+func (mr *MockStoreMockRecorder) RemovePieceMetadata(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemovePieceMetadata", reflect.TypeOf((*MockStore)(nil).RemovePieceMetadata), arg0, arg1)
 }
 
 // SetCarSize mocks base method.

@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -47,7 +46,7 @@ var testCouchSettings = couchbase.DBSettings{
 }
 
 func TestService(t *testing.T) {
-	logging.SetLogLevel("*", "debug")
+	_ = logging.SetLogLevel("*", "debug")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -55,19 +54,20 @@ func TestService(t *testing.T) {
 	t.Run("level db", func(t *testing.T) {
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
-		testService(ctx, t, bdsvc)
+		testService(ctx, t, bdsvc, 8042)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		// TODO: Unskip this test once the couchbase instance can be created
-		//  from a docker container as part of the test
-		t.Skip()
+		// Enable it back once SB tests are working on CI
+		t.Skip(t)
+		removeContainer := setupCouchbase(t)
+		defer removeContainer()
 		bdsvc := NewCouchbase(testCouchSettings)
-		testService(ctx, t, bdsvc)
+		testService(ctx, t, bdsvc, 8043)
 	})
 }
 
-func testService(ctx context.Context, t *testing.T, bdsvc *Service) {
-	err := bdsvc.Start(ctx, 8042)
+func testService(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
+	err := bdsvc.Start(ctx, port)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
@@ -153,23 +153,25 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service) {
 
 func TestServiceFuzz(t *testing.T) {
 	t.Skip()
-	logging.SetLogLevel("*", "info")
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	_ = logging.SetLogLevel("*", "info")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	t.Run("level db", func(t *testing.T) {
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
-		testServiceFuzz(ctx, t, bdsvc)
+		testServiceFuzz(ctx, t, bdsvc, 8042)
 	})
 	t.Run("couchbase", func(t *testing.T) {
+		removeContainer := setupCouchbase(t)
+		defer removeContainer()
 		bdsvc := NewCouchbase(testCouchSettings)
-		testServiceFuzz(ctx, t, bdsvc)
+		testServiceFuzz(ctx, t, bdsvc, 8043)
 	})
 }
 
-func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service) {
-	err := bdsvc.Start(ctx, 8042)
+func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
+	err := bdsvc.Start(ctx, port)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
@@ -234,7 +236,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service) {
 
 					mhash := c.Hash()
 					var err error
-					idx.GetAll(c, func(expected uint64) bool {
+					err1 := idx.GetAll(c, func(expected uint64) bool {
 						var offsetSize *model.OffsetSize
 						offsetSize, err = cl.GetOffsetSize(ctx, pieceCid, mhash)
 						if err != nil {
@@ -248,6 +250,9 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service) {
 					})
 					if err != nil {
 						return err
+					}
+					if err1 != nil {
+						return err1
 					}
 
 					pcids, err := cl.PiecesContainingMultihash(ctx, mhash)
@@ -297,7 +302,7 @@ func createCarIndex(t *testing.T, size int, rseed int) index.Index {
 
 func loadIndex(path string) (index.Index, error) {
 	defer func(now time.Time) {
-		log.Debugw("loadindex", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("loadindex", "took", time.Since(now).String())
 	}(time.Now())
 
 	idxf, err := os.Open(path)
@@ -337,7 +342,7 @@ func getRecords(subject index.Index) ([]model.Record, error) {
 			return nil, err
 		}
 	default:
-		return nil, errors.New(fmt.Sprintf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec()))
+		return nil, fmt.Errorf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec())
 	}
 	return records, nil
 }
@@ -346,14 +351,136 @@ func compareIndices(subject, subjectDb index.Index) (bool, error) {
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
 
-	subject.Marshal(w)
+	_, err := subject.Marshal(w)
+	if err != nil {
+		return false, err
+	}
 
 	var b2 bytes.Buffer
 	w2 := bufio.NewWriter(&b2)
 
-	subjectDb.Marshal(w2)
+	_, err = subjectDb.Marshal(w2)
+	if err != nil {
+		return false, err
+	}
 
 	res := bytes.Compare(b.Bytes(), b2.Bytes())
 
 	return res == 0, nil
+}
+
+func TestCleanup(t *testing.T) {
+	_ = logging.SetLogLevel("*", "debug")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	t.Run("level db", func(t *testing.T) {
+		bdsvc, err := NewLevelDB("")
+		require.NoError(t, err)
+		testCleanup(ctx, t, bdsvc, 8042)
+	})
+	t.Run("couchbase", func(t *testing.T) {
+		// Enable it back once SB tests are working on CI
+		t.Skip(t)
+		removeContainer := setupCouchbase(t)
+		defer removeContainer()
+		bdsvc := NewCouchbase(testCouchSettings)
+		testCleanup(ctx, t, bdsvc, 8043)
+	})
+}
+
+func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
+	err := bdsvc.Start(ctx, port)
+	require.NoError(t, err)
+
+	cl := client.NewStore()
+	err = cl.Dial(context.Background(), "http://localhost:8042")
+	require.NoError(t, err)
+	defer cl.Close(ctx)
+
+	sampleidx := "fixtures/baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka.full.idx"
+
+	pieceCid, err := cid.Parse("baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka")
+	require.NoError(t, err)
+
+	subject, err := loadIndex(sampleidx)
+	require.NoError(t, err)
+
+	records, err := getRecords(subject)
+	require.NoError(t, err)
+
+	randomuuid, err := uuid.Parse("4d8f5ce6-dbfd-40dc-8b03-29308e97357b")
+	require.NoError(t, err)
+
+	err = cl.AddIndex(ctx, pieceCid, records)
+	require.NoError(t, err)
+
+	di := model.DealInfo{
+		DealUuid:    randomuuid.String(),
+		SectorID:    abi.SectorNumber(1),
+		PieceOffset: 1,
+		PieceLength: 2,
+		CarLength:   3,
+	}
+
+	// Add a deal for the piece
+	err = cl.AddDealForPiece(ctx, pieceCid, di)
+	require.NoError(t, err)
+
+	// There should only be one deal
+	dis, err := cl.GetPieceDeals(ctx, pieceCid)
+	require.NoError(t, err)
+	require.Len(t, dis, 1)
+	require.Equal(t, di, dis[0])
+
+	b, err := hex.DecodeString("1220ff63d7689e2d9567d1a90a7a68425f430137142e1fbc28fe4780b9ee8a5ef842")
+	require.NoError(t, err)
+
+	mhash, err := multihash.Cast(b)
+	require.NoError(t, err)
+
+	offset, err := cl.GetOffsetSize(ctx, pieceCid, mhash)
+	require.NoError(t, err)
+	require.EqualValues(t, 3039040395, offset.Offset)
+	require.EqualValues(t, 0, offset.Size)
+
+	pcids, err := cl.PiecesContainingMultihash(ctx, mhash)
+	require.NoError(t, err)
+	require.Len(t, pcids, 1)
+	require.Equal(t, pieceCid, pcids[0])
+
+	indexed, err := cl.IsIndexed(ctx, pieceCid)
+	require.NoError(t, err)
+	require.True(t, indexed)
+
+	recs, err := cl.GetRecords(ctx, pieceCid)
+	require.NoError(t, err)
+	require.Equal(t, len(records), len(recs))
+
+	loadedSubject, err := cl.GetIndex(ctx, pieceCid)
+	require.NoError(t, err)
+
+	ok, err := compareIndices(subject, loadedSubject)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	err = cl.RemoveDealForPiece(ctx, pieceCid, di.DealUuid)
+	require.NoError(t, err)
+
+	_, err = cl.GetPieceDeals(ctx, pieceCid)
+	require.ErrorContains(t, err, "not found")
+
+	_, err = cl.GetOffsetSize(ctx, pieceCid, mhash)
+	require.ErrorContains(t, err, "not found")
+
+	_, err = cl.GetRecords(ctx, pieceCid)
+	require.ErrorContains(t, err, "not found")
+
+	_, err = cl.PiecesContainingMultihash(ctx, mhash)
+	require.ErrorContains(t, err, "not found")
+
+	indexed, err = cl.IsIndexed(ctx, pieceCid)
+	require.NoError(t, err)
+	require.False(t, indexed)
 }

@@ -384,3 +384,102 @@ func normalizeMultihashError(m mh.Multihash, err error) error {
 	}
 	return err
 }
+
+// RemoveDealForPiece remove Single deal for pieceCID. If []Deals is empty then Metadata is removed as well
+func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid string) error {
+	log.Debugw("handle.remove-deal-for-piece", "piece-cid", pieceCid, "deal-uuid", dealUuid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.remove-deal-for-piece", "took", time.Since(now).String())
+	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		if errors.Is(err, ds.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	for i, v := range md.Deals {
+		if v.DealUuid == dealUuid {
+			md.Deals[i] = md.Deals[len(md.Deals)-1]
+			md.Deals = md.Deals[:len(md.Deals)-1]
+			break
+		}
+	}
+
+	if len(md.Deals) == 0 {
+		// Remove Metadata if removed deal was last one
+		if err := s.db.RemovePieceMetadata(ctx, pieceCid); err != nil {
+			return fmt.Errorf("Failed to remove the Metadata after removing the last deal: %w", err)
+		}
+		return nil
+	}
+
+	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemovePieceMetadata remove all Metadata for pieceCID
+func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
+	log.Debugw("handle.remove-piece-metadata", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.remove_piece_metadata")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.remove-piece-metadata", "took", time.Since(now).String())
+	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
+
+	if err := s.db.RemovePieceMetadata(ctx, pieceCid); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemoveIndexes removes all MultiHashes for pieceCID. To be used manually in case of failure
+// in RemoveDealForPiece or RemovePieceMetadata. Metadata for the piece must be
+// present in the database
+func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
+	log.Debugw("handle.remove-indexes", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.remove_indexes")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.remove-indexes", "took", time.Since(now).String())
+	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return err
+	}
+
+	if err := s.db.RemoveIndexes(ctx, md.Cursor, pieceCid); err != nil {
+		return err
+	}
+
+	md.IndexedAt = time.Time{}
+
+	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
+
+	return nil
+}

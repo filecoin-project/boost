@@ -274,3 +274,61 @@ func normalizeMultihashError(m mh.Multihash, err error) error {
 	}
 	return err
 }
+
+// RemoveDealForPiece removes Single deal for pieceCID. If []Deals is empty then Metadata is removed as well
+func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId string) error {
+	log.Debugw("handle.remove-deal-for-piece", "piece-cid", pieceCid, "deal-uuid", dealId)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.remove-deal-for-piece", "took", time.Since(now).String())
+	}(time.Now())
+
+	return s.db.RemoveDealForPiece(ctx, dealId, pieceCid)
+}
+
+// RemovePieceMetadata removes all Metadata for pieceCID. To be used manually in case of failure
+// in RemoveDealForPiece
+func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
+	log.Debugw("handle.remove-piece-metadata", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.remove_piece_metadata")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.remove-piece-metadata", "took", time.Since(now).String())
+	}(time.Now())
+
+	if err := s.db.RemovePieceMetadata(ctx, pieceCid); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemoveIndexes removes all MultiHashes for pieceCID. To be used manually in case of failure
+// in RemoveDealForPiece or RemovePieceMetadata. Metadata for the piece must be
+// present in the database
+func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
+	log.Debugw("handle.remove-indexes", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.remove_indexes")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handle.remove-indexes", "took", time.Since(now).String())
+	}(time.Now())
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return err
+	}
+
+	if err := s.db.RemoveIndexes(ctx, pieceCid, md.BlockCount); err != nil {
+		return err
+	}
+
+	return nil
+}
