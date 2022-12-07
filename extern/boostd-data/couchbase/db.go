@@ -844,6 +844,9 @@ func (db *DB) RemoveDealForPiece(ctx context.Context, dealId string, pieceCid ci
 		k := toCouchKey(pieceCid.String())
 		getResult, err := db.pcidToMeta.Get(k, &gocb.GetOptions{Context: ctx})
 		if err != nil {
+			if isNotFoundErr(err) {
+				return nil
+			}
 			return fmt.Errorf("getting piece cid to metadata for piece %s: %w", pieceCid, err)
 		}
 

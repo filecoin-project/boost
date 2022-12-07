@@ -275,7 +275,7 @@ func normalizeMultihashError(m mh.Multihash, err error) error {
 	return err
 }
 
-// Remove Single deal for pieceCID. If []Deals is empty then Metadata is removed as well
+// RemoveDealForPiece removes Single deal for pieceCID. If []Deals is empty then Metadata is removed as well
 func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId string) error {
 	log.Debugw("handle.remove-deal-for-piece", "piece-cid", pieceCid, "deal-uuid", dealId)
 
@@ -289,7 +289,7 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId
 	return s.db.RemoveDealForPiece(ctx, dealId, pieceCid)
 }
 
-// Remove all Metadata for pieceCID. To be used manually in case of failure
+// RemovePieceMetadata removes all Metadata for pieceCID. To be used manually in case of failure
 // in RemoveDealForPiece
 func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
 	log.Debugw("handle.remove-piece-metadata", "piece-cid", pieceCid)
@@ -308,7 +308,7 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 	return nil
 }
 
-// Removes all MultiHashes for pieceCID. To be used manually in case of failure
+// RemoveIndexes removes all MultiHashes for pieceCID. To be used manually in case of failure
 // in RemoveDealForPiece or RemovePieceMetadata. Metadata for the piece must be
 // present in the database
 func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
