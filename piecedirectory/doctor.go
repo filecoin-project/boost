@@ -26,12 +26,11 @@ type SealingApi interface {
 type Doctor struct {
 	store Store
 	sapi  SealingApi
-	queue chan cid.Cid
 }
 
 func NewDoctor(store Store, sapi SealingApi) *Doctor {
 	// TODO: remove
-	logging.SetLogLevel("piecedoc", "debug")
+	_ = logging.SetLogLevel("piecedoc", "debug")
 
 	return &Doctor{store: store, sapi: sapi}
 }
@@ -96,7 +95,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 	if !isIndexed {
 		err = d.store.FlagPiece(ctx, pieceCid)
 		if err != nil {
-			return fmt.Errorf("failed to flag unindexed piece %s: %w", err)
+			return fmt.Errorf("failed to flag unindexed piece %s: %w", pieceCid, err)
 		}
 		doclog.Infow("flagging piece as unindexed", "piece", pieceCid)
 		return nil

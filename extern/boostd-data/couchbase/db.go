@@ -31,6 +31,7 @@ const maxCouchKeyLen = 128
 const maxCasRetries = 10
 
 type DB struct {
+	settings     DBSettings
 	cluster      *gocb.Cluster
 	pcidToMeta   *gocb.Collection
 	mhToPieces   *gocb.Collection
@@ -52,6 +53,7 @@ type DBSettings struct {
 	PieceMetadataBucket     DBSettingsBucket
 	MultihashToPiecesBucket DBSettingsBucket
 	PieceOffsetsBucket      DBSettingsBucket
+	TestMode                bool
 }
 
 const connectTimeout = 5 * time.Second
@@ -83,7 +85,7 @@ func newDB(ctx context.Context, settings DBSettings) (*DB, error) {
 		"max-service-latency", time.Since(pingStart).String())
 
 	// Set up the buckets
-	db := &DB{cluster: cluster}
+	db := &DB{settings: settings, cluster: cluster}
 	pcidToMeta, err := createBucket(ctx, cluster, pieceCidToMetadataBucket, settings.PieceMetadataBucket.RAMQuotaMB)
 	if err != nil {
 		return nil, fmt.Errorf("Creating bucket %s for couchbase server %s: %w", pieceCidToMetadataBucket, settings.ConnectString, err)
@@ -645,7 +647,7 @@ func (db *DB) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.list_pieces")
 	defer span.End()
 
-	res, err := db.cluster.Query("SELECT META().id FROM `"+pieceCidToMetadataBucket+"`", &gocb.QueryOptions{Context: ctx})
+	res, err := db.query(ctx, "SELECT META().id FROM `"+pieceCidToMetadataBucket+"`")
 	if err != nil {
 		return nil, fmt.Errorf("getting keys from %s: %w", pieceCidToMetadataBucket, err)
 	}
@@ -669,17 +671,10 @@ func (db *DB) NextPiecesToCheck(ctx context.Context, olderThanMillis int64) ([]c
 		qry += "  SELECT RAW META(pieceTracker).id FROM `" + metaBucket + "`._default.`piece-tracker` AS pieceTracker"
 		qry += ") "
 		qry += fmt.Sprintf("LIMIT %d", piecesToTrackerBatchSize)
-		fmt.Println(qry)
-		res, err := db.cluster.Query(qry, &gocb.QueryOptions{Context: ctx})
+
+		res, err := db.mutate(ctx, qry)
 		if err != nil {
-			return nil, fmt.Errorf("adding piece meta info to piece tracker table: %w", err)
-		}
-		// We have to drain the results in order to close the stream
-		for res.Next() {
-		}
-		err = res.Err()
-		if err != nil {
-			return nil, fmt.Errorf("closing piece meta info result stream: %w", err)
+			return nil, fmt.Errorf("executing insert into piece-tracker: %w", err)
 		}
 
 		// If there were enough remaining rows to fill an entire batch,
@@ -699,11 +694,8 @@ func (db *DB) NextPiecesToCheck(ctx context.Context, olderThanMillis int64) ([]c
 	qry += fmt.Sprintf("LIMIT %d", trackerCheckBatchSize)
 	qry += ") "
 	qry += "RETURNING META().id"
-	fmt.Println(qry)
-	res, err := db.cluster.Query(qry, &gocb.QueryOptions{
-		Context:              ctx,
-		PositionalParameters: []interface{}{-olderThanMillis},
-	})
+
+	res, err := db.query(ctx, qry, -olderThanMillis)
 	if err != nil {
 		return nil, fmt.Errorf("adding piece meta info to piece tracker table: %w", err)
 	}
@@ -714,22 +706,16 @@ func (db *DB) NextPiecesToCheck(ctx context.Context, olderThanMillis int64) ([]c
 func (db *DB) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	qry := "UPSERT INTO `" + metaBucket + "`._default.`piece-flagged` (KEY, VALUE) "
 	qry += "VALUES (?, { 'UpdatedAt': NOW_LOCAL() })"
-	_, err := db.cluster.Query(qry, &gocb.QueryOptions{
-		Context:              ctx,
-		PositionalParameters: []interface{}{toCouchKey(pieceCid.String())},
-	})
+	_, err := db.mutate(ctx, qry, toCouchKey(pieceCid.String()))
 	if err != nil {
-		return fmt.Errorf("flagging piece %s: %w", pieceCid, err)
+		return fmt.Errorf("flagging piece %s: inserting row: %w", pieceCid, err)
 	}
 	return nil
 }
 
 func (db *DB) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	qry := "DELETE FROM `" + metaBucket + "`._default.`piece-flagged` WHERE META().id = ?"
-	_, err := db.cluster.Query(qry, &gocb.QueryOptions{
-		Context:              ctx,
-		PositionalParameters: []interface{}{toCouchKey(pieceCid.String())},
-	})
+	_, err := db.mutate(ctx, qry, toCouchKey(pieceCid.String()))
 	if err != nil {
 		return fmt.Errorf("unflagging piece %s: %w", pieceCid, err)
 	}
@@ -742,17 +728,17 @@ func (db *DB) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset i
 
 	args := []interface{}{}
 	tableName := "`" + metaBucket + "`._default.`piece-flagged`"
-	qry := "SELECT META().id FROM " + tableName + " "
+	qry := "SELECT META(pieceFlagged).id FROM " + tableName + " AS pieceFlagged "
 	if cursor != nil {
 		qry += "WHERE Created < ? "
 		args = append(args, cursor)
 	}
 	qry += "ORDER BY CreatedAt desc "
+
 	qry += "LIMIT ? OFFSET ?"
-	res, err := db.cluster.Query(qry, &gocb.QueryOptions{
-		Context:              ctx,
-		PositionalParameters: append(args, limit, offset),
-	})
+	args = append(args, limit, offset)
+
+	res, err := db.query(ctx, qry, args...)
 	if err != nil {
 		return nil, fmt.Errorf("getting keys from %s: %w", tableName, err)
 	}
@@ -766,7 +752,8 @@ func (db *DB) FlaggedPiecesCount(ctx context.Context) (int, error) {
 
 	tableName := "`" + metaBucket + "`._default.`piece-flagged`"
 	qry := "SELECT COUNT(*) as cnt FROM " + tableName
-	res, err := db.cluster.Query(qry, &gocb.QueryOptions{Context: ctx})
+
+	res, err := db.query(ctx, qry)
 	if err != nil {
 		return 0, fmt.Errorf("getting count of flagged pieces: %w", err)
 	}
@@ -812,6 +799,40 @@ func (db *DB) listPieces(res *gocb.QueryResult) ([]cid.Cid, error) {
 	}
 
 	return pieceCids, nil
+}
+
+func (db *DB) query(ctx context.Context, qry string, args ...interface{}) (*gocb.QueryResult, error) {
+	opts := &gocb.QueryOptions{
+		Context:              ctx,
+		PositionalParameters: args,
+	}
+	if db.settings.TestMode {
+		// In test mode, require immediate consistency for reads
+		opts.ScanConsistency = gocb.QueryScanConsistencyRequestPlus
+	}
+	return db.cluster.Query(qry, opts)
+}
+
+func (db *DB) mutate(ctx context.Context, qry string, args ...interface{}) (*gocb.QueryResult, error) {
+	// Execute the query
+	opts := &gocb.QueryOptions{
+		Context:              ctx,
+		PositionalParameters: args,
+	}
+	res, err := db.cluster.Query(qry, opts)
+	if err != nil {
+		return nil, fmt.Errorf("executing mutate query: %w", err)
+	}
+
+	// We have to drain the results in order to close the stream
+	for res.Next() {
+	}
+	err = res.Err()
+	if err != nil {
+		return nil, fmt.Errorf("draining query stream: %w", err)
+	}
+
+	return res, nil
 }
 
 // Attempt to perform an update operation. If the operation fails due to a

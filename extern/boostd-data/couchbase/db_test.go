@@ -106,6 +106,7 @@ var testCouchSettings = DBSettings{
 	PieceOffsetsBucket: DBSettingsBucket{
 		RAMQuotaMB: 128,
 	},
+	TestMode: true,
 }
 
 func TestSharding(t *testing.T) {

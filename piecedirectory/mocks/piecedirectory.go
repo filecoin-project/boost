@@ -7,6 +7,7 @@ package mock_piecedirectory
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	piecedirectory "github.com/filecoin-project/boost/piecedirectory"
 	model "github.com/filecoin-project/boostd-data/model"
@@ -188,6 +189,50 @@ func (mr *MockStoreMockRecorder) AddIndex(arg0, arg1, arg2 interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddIndex", reflect.TypeOf((*MockStore)(nil).AddIndex), arg0, arg1, arg2)
 }
 
+// FlagPiece mocks base method.
+func (m *MockStore) FlagPiece(arg0 context.Context, arg1 cid.Cid) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FlagPiece", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// FlagPiece indicates an expected call of FlagPiece.
+func (mr *MockStoreMockRecorder) FlagPiece(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FlagPiece", reflect.TypeOf((*MockStore)(nil).FlagPiece), arg0, arg1)
+}
+
+// FlaggedPiecesCount mocks base method.
+func (m *MockStore) FlaggedPiecesCount(arg0 context.Context) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FlaggedPiecesCount", arg0)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FlaggedPiecesCount indicates an expected call of FlaggedPiecesCount.
+func (mr *MockStoreMockRecorder) FlaggedPiecesCount(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FlaggedPiecesCount", reflect.TypeOf((*MockStore)(nil).FlaggedPiecesCount), arg0)
+}
+
+// FlaggedPiecesList mocks base method.
+func (m *MockStore) FlaggedPiecesList(arg0 context.Context, arg1 *time.Time, arg2, arg3 int) ([]cid.Cid, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FlaggedPiecesList", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].([]cid.Cid)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FlaggedPiecesList indicates an expected call of FlaggedPiecesList.
+func (mr *MockStoreMockRecorder) FlaggedPiecesList(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FlaggedPiecesList", reflect.TypeOf((*MockStore)(nil).FlaggedPiecesList), arg0, arg1, arg2, arg3)
+}
+
 // GetIndex mocks base method.
 func (m *MockStore) GetIndex(arg0 context.Context, arg1 cid.Cid) (index.Index, error) {
 	m.ctrl.T.Helper()
@@ -263,6 +308,21 @@ func (mr *MockStoreMockRecorder) IsIndexed(arg0, arg1 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsIndexed", reflect.TypeOf((*MockStore)(nil).IsIndexed), arg0, arg1)
 }
 
+// ListPieces mocks base method.
+func (m *MockStore) ListPieces(arg0 context.Context) ([]cid.Cid, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPieces", arg0)
+	ret0, _ := ret[0].([]cid.Cid)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPieces indicates an expected call of ListPieces.
+func (mr *MockStoreMockRecorder) ListPieces(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPieces", reflect.TypeOf((*MockStore)(nil).ListPieces), arg0)
+}
+
 // MarkIndexErrored mocks base method.
 func (m *MockStore) MarkIndexErrored(arg0 context.Context, arg1 cid.Cid, arg2 error) error {
 	m.ctrl.T.Helper()
@@ -275,6 +335,21 @@ func (m *MockStore) MarkIndexErrored(arg0 context.Context, arg1 cid.Cid, arg2 er
 func (mr *MockStoreMockRecorder) MarkIndexErrored(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkIndexErrored", reflect.TypeOf((*MockStore)(nil).MarkIndexErrored), arg0, arg1, arg2)
+}
+
+// NextPiecesToCheck mocks base method.
+func (m *MockStore) NextPiecesToCheck(arg0 context.Context) ([]cid.Cid, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NextPiecesToCheck", arg0)
+	ret0, _ := ret[0].([]cid.Cid)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NextPiecesToCheck indicates an expected call of NextPiecesToCheck.
+func (mr *MockStoreMockRecorder) NextPiecesToCheck(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NextPiecesToCheck", reflect.TypeOf((*MockStore)(nil).NextPiecesToCheck), arg0)
 }
 
 // PiecesContainingMultihash mocks base method.
@@ -346,4 +421,18 @@ func (m *MockStore) SetCarSize(arg0 context.Context, arg1 cid.Cid, arg2 uint64) 
 func (mr *MockStoreMockRecorder) SetCarSize(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCarSize", reflect.TypeOf((*MockStore)(nil).SetCarSize), arg0, arg1, arg2)
+}
+
+// UnflagPiece mocks base method.
+func (m *MockStore) UnflagPiece(arg0 context.Context, arg1 cid.Cid) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnflagPiece", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnflagPiece indicates an expected call of UnflagPiece.
+func (mr *MockStoreMockRecorder) UnflagPiece(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnflagPiece", reflect.TypeOf((*MockStore)(nil).UnflagPiece), arg0, arg1)
 }

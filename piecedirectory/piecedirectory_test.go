@@ -42,10 +42,11 @@ var testCouchSettings = couchbase.DBSettings{
 	PieceOffsetsBucket: couchbase.DBSettingsBucket{
 		RAMQuotaMB: 128,
 	},
+	TestMode: true,
 }
 
 func TestPieceDirectory(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	t.Run("leveldb", func(t *testing.T) {
@@ -85,6 +86,10 @@ func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
 
 	t.Run("car file size", func(t *testing.T) {
 		testCarFileSize(ctx, t, cl)
+	})
+
+	t.Run("flagging pieces", func(t *testing.T) {
+		testFlaggingPieces(ctx, t, cl)
 	})
 }
 
@@ -311,6 +316,71 @@ func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
 	size, err := pm.GetCarSize(ctx, commpCalc.PieceCID)
 	require.NoError(t, err)
 	require.Equal(t, len(carBytes), int(size))
+}
+
+func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
+	// Create a random CAR file
+	carFilePath := createCarFile(t)
+	carFile, err := os.Open(carFilePath)
+	require.NoError(t, err)
+	defer carFile.Close()
+
+	carReader, err := car.OpenReader(carFilePath)
+	require.NoError(t, err)
+	defer carReader.Close()
+	carv1Reader, err := carReader.DataReader()
+	require.NoError(t, err)
+
+	recs := getRecords(t, carv1Reader)
+	commpCalc := calculateCommp(t, carv1Reader)
+	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs)
+	require.NoError(t, err)
+
+	// Add deal info for the piece
+	di := model.DealInfo{
+		DealUuid:    uuid.New().String(),
+		ChainDealID: 1,
+		SectorID:    1,
+		PieceOffset: 0,
+		PieceLength: commpCalc.PieceSize,
+	}
+	err = cl.AddDealForPiece(ctx, commpCalc.PieceCID, di)
+	require.NoError(t, err)
+
+	// No pieces flagged, count and list of pieces should be empty
+	count, err := cl.FlaggedPiecesCount(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	pcids, err := cl.FlaggedPiecesList(ctx, nil, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(pcids))
+
+	// Flag a piece
+	err = cl.FlagPiece(ctx, commpCalc.PieceCID)
+	require.NoError(t, err)
+
+	// Count and list of pieces should contain one piece
+	count, err = cl.FlaggedPiecesCount(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	pcids, err = cl.FlaggedPiecesList(ctx, nil, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(pcids))
+
+	// Unflag the piece
+	err = cl.UnflagPiece(ctx, commpCalc.PieceCID)
+	require.NoError(t, err)
+
+	// Count and list of pieces should be empty
+	count, err = cl.FlaggedPiecesCount(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	pcids, err = cl.FlaggedPiecesList(ctx, nil, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(pcids))
 }
 
 type MockSectionReader struct {
