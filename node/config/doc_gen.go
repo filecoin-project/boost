@@ -310,17 +310,17 @@ to booster bitswap
 			Name: "BitswapPublicAddresses",
 			Type: "[]string",
 
-			Comment: `Public multiaddresses for booster-bitswap
-If empty, booster-bitswap is assumed to be running privately
-Boost will listen on bitswap protocols on its own peer id and forward them to booster bitswap via the protocol proxy
-If public addresses are set, Boost will announce the booster bitswap peer id directly to the indexer as an extended provider`,
+			Comment: `Public multiaddresses for booster-bitswap.
+If empty, booster-bitswap is assumed to be running privately.
+Boost will listen on bitswap protocols on its own peer id and forward them to booster-bitswap via the protocol proxy.
+If public addresses are set, Boost will announce the booster-bitswap peer id directly to the indexer as an extended provider.`,
 		},
 		{
 			Name: "BitswapPrivKeyFile",
 			Type: "string",
 
-			Comment: `If operating in public mode, in order to announce Booster-Bitswap as an extended provder, this value must point to a
-a file containing the booster bitswap peer id's private key. Can be left blank when operating with protocol proxy`,
+			Comment: `If operating in public mode, in order to announce booster-bitswap as an extended provider, this value must point to a
+a file containing the booster-bitswap peer id's private key. Can be left blank when operating with protocol proxy.`,
 		},
 		{
 			Name: "DealLogDurationDays",
