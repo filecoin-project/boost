@@ -82,7 +82,10 @@ func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo) error {
 			fulfill, err := s.filter.FulfillRequest(p, c)
 			// peer request filter expects a true if the request should be fulfilled, so
 			// we only return true for requests that aren't filtered and have no errors
-			fulfill = fulfill && err == nil
+			if err != nil {
+				log.Errorf("error running bitswap filter: %s", err.Error())
+				return false
+			}
 			if fulfill {
 				s.requestCounter.AddRequest(p, c)
 			}
