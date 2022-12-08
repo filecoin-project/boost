@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters/bandwidthmeasure"
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/bandwidthmeasure"
 	"github.com/stretchr/testify/require"
 )
 

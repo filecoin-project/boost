@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/requestcounter"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
@@ -21,10 +22,14 @@ func TestConfigFilter(t *testing.T) {
 	c, err := cid.Parse("QmWATWQ7fVPP2EFGu71UkfnqhYXDYH566qy47CnJDgvs8u")
 	require.NoError(t, err)
 	megabyte := uint64(1 << 20)
-	totalRequestsInProgress := uint64(10)
-	requestsInProgressForPeer1 := uint64(3)
-	requestsInProgressForPeer2 := uint64(4)
-	requestsInProgressForPeer3 := uint64(5)
+	trc := &testRequestCounter{
+		totalRequestsInProgress: 10,
+		peerRequestsInProgress: map[peer.ID]uint64{
+			peer1: 3,
+			peer2: 4,
+			peer3: 5,
+		},
+	}
 	avgBandwidthPerSecond := 11 * megabyte
 	testCases := []struct {
 		name               string
@@ -158,26 +163,18 @@ func TestConfigFilter(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			tbm := &testBandwidthMeasure{avgBandwidthPerSecond}
-			pf := filters.NewConfigFilter(tbm)
+
+			pf := filters.NewConfigFilter(tbm, trc)
 			err := pf.ParseUpdate(strings.NewReader(testCase.response))
 			if testCase.expectedParseError == nil {
 				require.NoError(t, err)
-				fulfilled, err := pf.FulfillRequest(peer1, c, filters.ServerState{
-					TotalRequestsInProgress:   totalRequestsInProgress,
-					RequestsInProgressForPeer: requestsInProgressForPeer1,
-				})
+				fulfilled, err := pf.FulfillRequest(peer1, c)
 				require.NoError(t, err)
 				require.Equal(t, testCase.fulfillPeer1, fulfilled)
-				fulfilled, err = pf.FulfillRequest(peer2, c, filters.ServerState{
-					TotalRequestsInProgress:   totalRequestsInProgress,
-					RequestsInProgressForPeer: requestsInProgressForPeer2,
-				})
+				fulfilled, err = pf.FulfillRequest(peer2, c)
 				require.NoError(t, err)
 				require.Equal(t, testCase.fulfillPeer2, fulfilled)
-				fulfilled, err = pf.FulfillRequest(peer3, c, filters.ServerState{
-					TotalRequestsInProgress:   totalRequestsInProgress,
-					RequestsInProgressForPeer: requestsInProgressForPeer3,
-				})
+				fulfilled, err = pf.FulfillRequest(peer3, c)
 				require.NoError(t, err)
 				require.Equal(t, testCase.fulfillPeer3, fulfilled)
 			} else {
@@ -193,4 +190,16 @@ type testBandwidthMeasure struct {
 
 func (tbm *testBandwidthMeasure) AvgBytesPerSecond() uint64 {
 	return tbm.avgBytesPerSecond
+}
+
+type testRequestCounter struct {
+	totalRequestsInProgress uint64
+	peerRequestsInProgress  map[peer.ID]uint64
+}
+
+func (trc *testRequestCounter) StateForPeer(p peer.ID) requestcounter.ServerState {
+	return requestcounter.ServerState{
+		TotalRequestsInProgress:   trc.totalRequestsInProgress,
+		RequestsInProgressForPeer: trc.peerRequestsInProgress[p],
+	}
 }
