@@ -144,7 +144,7 @@ func NewMultiFilter(
 		configFetcher = FetcherForHTTPEndpoint(apiFilterEndpoint, apiFilterAuth)
 	}
 	filters = append(filters, FilterDefinition{
-		CacheFile: filepath.Join(cfgDir, "remoteconfig.json"),
+		CacheFile: filepath.Join(cfgDir, "retrievalconfig.json"),
 		Fetcher:   configFetcher,
 		Handler:   NewConfigFilter(bandwidthMeasure, requestCounter),
 	})

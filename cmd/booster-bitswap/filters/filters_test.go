@@ -49,7 +49,7 @@ func TestMultiFilter(t *testing.T) {
 			Handler:   filters.NewBlockFilter(),
 		},
 		{
-			CacheFile: filepath.Join(cfgDir, "remoteconfig.json"),
+			CacheFile: filepath.Join(cfgDir, "retrievalconfig.json"),
 			Fetcher:   fpf.fetchList,
 			Handler:   filters.NewConfigFilter(&testBandwidthMeasure{}, &testRequestCounter{}),
 		},
@@ -62,7 +62,7 @@ func TestMultiFilter(t *testing.T) {
 		{ "anchor": "09770fe7ec3124653c1d8f6917e3cd72cbd58a3e24a734bc362f656844c4ee7d"}
 	]
 	`, string(cache))
-	cache, err = os.ReadFile(filepath.Join(cfgDir, "remoteconfig.json"))
+	cache, err = os.ReadFile(filepath.Join(cfgDir, "retrievalconfig.json"))
 	require.NoError(t, err)
 	require.Equal(t, `{
 		"AllowDenyList": {
@@ -146,7 +146,7 @@ func TestMultiFilter(t *testing.T) {
 			{ "anchor": "6a98dfc49e852da7eee32d7df49801cb3ae7a432aa73200cd652ba149272481a"}
 		]
 		`, string(cache))
-	cache, err = os.ReadFile(filepath.Join(cfgDir, "remoteconfig.json"))
+	cache, err = os.ReadFile(filepath.Join(cfgDir, "retrievalconfig.json"))
 	require.NoError(t, err)
 	require.Equal(t, `{
 			"AllowDenyList": {
@@ -167,7 +167,7 @@ func TestMultiFilter(t *testing.T) {
 			Handler: filters.NewBlockFilter(),
 		},
 		{
-			CacheFile: filepath.Join(cfgDir, "remoteconfig.json"),
+			CacheFile: filepath.Join(cfgDir, "retrievalconfig.json"),
 			Fetcher:   fpf.fetchList,
 			Handler:   filters.NewConfigFilter(&testBandwidthMeasure{}, &testRequestCounter{}),
 		},
