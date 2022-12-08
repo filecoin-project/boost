@@ -52,6 +52,11 @@ type pieceResolver struct {
 	PieceInfoDeals []*pieceInfoDeal
 }
 
+type flaggedPieceResolver struct {
+	Piece     *pieceResolver
+	CreatedAt graphql.Time
+}
+
 type piecesFlaggedArgs struct {
 	Cursor *gqltypes.BigInt // CreatedAt in milli-seconds
 	Offset graphql.NullInt
@@ -60,7 +65,7 @@ type piecesFlaggedArgs struct {
 
 type flaggedPieceListResolver struct {
 	TotalCount int32
-	Pieces     []*pieceResolver
+	Pieces     []*flaggedPieceResolver
 	More       bool
 }
 
@@ -78,14 +83,14 @@ func (r *resolver) PiecesFlagged(ctx context.Context, args piecesFlaggedArgs) (*
 	// Fetch one extra row so that we can check if there are more rows
 	// beyond the limit
 	cursor := bigIntToTime(args.Cursor)
-	pcids, err := r.piecedirectory.FlaggedPiecesList(ctx, cursor, offset, limit+1)
+	flaggedPieces, err := r.piecedirectory.FlaggedPiecesList(ctx, cursor, offset, limit+1)
 	if err != nil {
 		return nil, err
 	}
-	more := len(pcids) > limit
+	more := len(flaggedPieces) > limit
 	if more {
 		// Truncate list to limit
-		pcids = pcids[:limit]
+		flaggedPieces = flaggedPieces[:limit]
 	}
 
 	// Get the total row count
@@ -99,18 +104,21 @@ func (r *resolver) PiecesFlagged(ctx context.Context, args piecesFlaggedArgs) (*
 		return nil, err
 	}
 
-	pieceResolvers := make([]*pieceResolver, 0, len(pcids))
-	for _, pcid := range pcids {
-		pieceResolver, err := r.pieceStatus(ctx, pcid, allLegacyDeals)
+	flaggedPieceResolvers := make([]*flaggedPieceResolver, 0, len(flaggedPieces))
+	for _, flaggedPiece := range flaggedPieces {
+		pieceResolver, err := r.pieceStatus(ctx, flaggedPiece.PieceCid, allLegacyDeals)
 		if err != nil {
 			return nil, err
 		}
-		pieceResolvers = append(pieceResolvers, pieceResolver)
+		flaggedPieceResolvers = append(flaggedPieceResolvers, &flaggedPieceResolver{
+			Piece:     pieceResolver,
+			CreatedAt: graphql.Time{Time: flaggedPiece.CreatedAt},
+		})
 	}
 
 	return &flaggedPieceListResolver{
 		TotalCount: int32(count),
-		Pieces:     pieceResolvers,
+		Pieces:     flaggedPieceResolvers,
 		More:       more,
 	}, nil
 }

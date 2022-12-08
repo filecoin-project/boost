@@ -1,24 +1,18 @@
-package piecedirectory_test
+package piecedirectory
 
 import (
 	"bytes"
 	"context"
 	"io"
-	"math/rand"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/piecedirectory"
-	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/mocks"
-	"github.com/filecoin-project/boost/testutil"
+	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	"github.com/filecoin-project/boostd-data/client"
-	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/boostd-data/svc/types"
-	"github.com/filecoin-project/go-commp-utils/writer"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -26,24 +20,6 @@ import (
 	"github.com/ipld/go-car/v2/blockstore"
 	"github.com/stretchr/testify/require"
 )
-
-var testCouchSettings = couchbase.DBSettings{
-	ConnectString: "couchbase://127.0.0.1",
-	Auth: couchbase.DBSettingsAuth{
-		Username: "Administrator",
-		Password: "boostdemo",
-	},
-	PieceMetadataBucket: couchbase.DBSettingsBucket{
-		RAMQuotaMB: 128,
-	},
-	MultihashToPiecesBucket: couchbase.DBSettingsBucket{
-		RAMQuotaMB: 128,
-	},
-	PieceOffsetsBucket: couchbase.DBSettingsBucket{
-		RAMQuotaMB: 128,
-	},
-	TestMode: true,
-}
 
 func TestPieceDirectory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -58,7 +34,7 @@ func TestPieceDirectory(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container as part of the test
 		t.Skip()
-		bdsvc := svc.NewCouchbase(testCouchSettings)
+		bdsvc := svc.NewCouchbase(TestCouchSettings)
 		testPieceDirectory(ctx, t, bdsvc)
 	})
 }
@@ -96,7 +72,7 @@ func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
 func testPieceDirectoryNotFound(ctx context.Context, t *testing.T, cl *client.Store) {
 	ctrl := gomock.NewController(t)
 	pr := mock_piecedirectory.NewMockPieceReader(ctrl)
-	pm := piecedirectory.NewPieceDirectory(cl, pr, 1)
+	pm := NewPieceDirectory(cl, pr, 1)
 
 	nonExistentPieceCid, err := cid.Parse("bafkqaaa")
 	require.NoError(t, err)
@@ -124,7 +100,7 @@ func testPieceDirectoryNotFound(ctx context.Context, t *testing.T, cl *client.St
 
 // Verify that Has, GetSize and Get block work
 func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.Store) {
-	carFilePath := createCarFile(t)
+	carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()
@@ -137,10 +113,10 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 	require.NoError(t, err)
 
 	// Any calls to get a reader over data should return a reader over the random CAR file
-	pr := createMockPieceReader(t, carv1Reader)
+	pr := CreateMockPieceReader(t, carv1Reader)
 
-	pm := piecedirectory.NewPieceDirectory(cl, pr, 1)
-	pieceCid := calculateCommp(t, carv1Reader).PieceCID
+	pm := NewPieceDirectory(cl, pr, 1)
+	pieceCid := CalculateCommp(t, carv1Reader).PieceCID
 
 	// Add deal info for the piece - it doesn't matter what it is, the piece
 	// just needs to have at least one deal associated with it
@@ -168,7 +144,7 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 	require.NoError(t, err)
 
 	// Get the index (offset and size information)
-	recs := getRecords(t, carv1Reader)
+	recs := GetRecords(t, carv1Reader)
 
 	// Verify that blockstore has, get and get size work
 	for _, rec := range recs {
@@ -194,7 +170,7 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 // will re-build the index
 func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Create a random CAR file
-	carFilePath := createCarFile(t)
+	carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()
@@ -206,10 +182,10 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// Any calls to get a reader over data should return a reader over the random CAR file
-	pr := createMockPieceReader(t, carv1Reader)
+	pr := CreateMockPieceReader(t, carv1Reader)
 
-	recs := getRecords(t, carv1Reader)
-	pieceCid := calculateCommp(t, carv1Reader).PieceCID
+	recs := GetRecords(t, carv1Reader)
+	pieceCid := CalculateCommp(t, carv1Reader).PieceCID
 	err = cl.AddIndex(ctx, pieceCid, recs)
 	require.NoError(t, err)
 
@@ -264,7 +240,7 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Verify that getting the size of a block works correctly:
 	// There is no size information in the index so the piece
 	// directory should re-build the index and then return the size.
-	pm := piecedirectory.NewPieceDirectory(cl, pr, 1)
+	pm := NewPieceDirectory(cl, pr, 1)
 	sz, err := pm.BlockstoreGetSize(ctx, rec.Cid)
 	require.NoError(t, err)
 	require.Equal(t, len(blk.RawData()), sz)
@@ -275,7 +251,7 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 // the CAR size from the index + piece data
 func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Create a random CAR file
-	carFilePath := createCarFile(t)
+	carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()
@@ -291,10 +267,10 @@ func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// Any calls to get a reader over data should return a reader over the random CAR file
-	pr := createMockPieceReader(t, carv1Reader)
+	pr := CreateMockPieceReader(t, carv1Reader)
 
-	recs := getRecords(t, carv1Reader)
-	commpCalc := calculateCommp(t, carv1Reader)
+	recs := GetRecords(t, carv1Reader)
+	commpCalc := CalculateCommp(t, carv1Reader)
 	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs)
 	require.NoError(t, err)
 
@@ -312,7 +288,7 @@ func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Verify that getting the size of the CAR file works correctly:
 	// There is no CAR size information in the deal info, so the piece
 	// directory should work it out from the index and piece data.
-	pm := piecedirectory.NewPieceDirectory(cl, pr, 1)
+	pm := NewPieceDirectory(cl, pr, 1)
 	size, err := pm.GetCarSize(ctx, commpCalc.PieceCID)
 	require.NoError(t, err)
 	require.Equal(t, len(carBytes), int(size))
@@ -320,7 +296,7 @@ func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
 
 func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Create a random CAR file
-	carFilePath := createCarFile(t)
+	carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()
@@ -331,8 +307,8 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	carv1Reader, err := carReader.DataReader()
 	require.NoError(t, err)
 
-	recs := getRecords(t, carv1Reader)
-	commpCalc := calculateCommp(t, carv1Reader)
+	recs := GetRecords(t, carv1Reader)
+	commpCalc := CalculateCommp(t, carv1Reader)
 	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs)
 	require.NoError(t, err)
 
@@ -381,70 +357,4 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	pcids, err = cl.FlaggedPiecesList(ctx, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pcids))
-}
-
-type MockSectionReader struct {
-	car.SectionReader
-}
-
-func (MockSectionReader) Close() error { return nil }
-
-func createMockPieceReader(t *testing.T, reader car.SectionReader) *mock_piecedirectory.MockPieceReader {
-	ctrl := gomock.NewController(t)
-	pr := mock_piecedirectory.NewMockPieceReader(ctrl)
-	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
-		func(_ context.Context, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (piecedirectory.SectionReader, error) {
-			_, err := reader.Seek(0, io.SeekStart)
-			return MockSectionReader{reader}, err
-		})
-	return pr
-}
-
-// Get the index records from the CAR file
-func getRecords(t *testing.T, reader car.SectionReader) []model.Record {
-	_, err := reader.Seek(0, io.SeekStart)
-	require.NoError(t, err)
-
-	blockReader, err := car.NewBlockReader(reader)
-	require.NoError(t, err)
-
-	var recs []model.Record
-	blockMetadata, err := blockReader.SkipNext()
-	for err == nil {
-		recs = append(recs, model.Record{
-			Cid: blockMetadata.Cid,
-			OffsetSize: model.OffsetSize{
-				Offset: blockMetadata.Offset,
-				Size:   blockMetadata.Size,
-			},
-		})
-
-		blockMetadata, err = blockReader.SkipNext()
-	}
-	require.ErrorIs(t, err, io.EOF)
-
-	return recs
-}
-
-func createCarFile(t *testing.T) string {
-	rseed := rand.Int()
-	randomFilePath, err := testutil.CreateRandomFile(t.TempDir(), rseed, 64*1024)
-	require.NoError(t, err)
-	_, carFilePath, err := testutil.CreateDenseCARv2(t.TempDir(), randomFilePath)
-	require.NoError(t, err)
-	return carFilePath
-}
-
-func calculateCommp(t *testing.T, rdr io.ReadSeeker) writer.DataCIDSize {
-	_, err := rdr.Seek(0, io.SeekStart)
-	require.NoError(t, err)
-
-	w := &writer.Writer{}
-	_, err = io.CopyBuffer(w, rdr, make([]byte, writer.CommPBuf))
-	require.NoError(t, err)
-
-	commp, err := w.Sum()
-	require.NoError(t, err)
-
-	return commp
 }

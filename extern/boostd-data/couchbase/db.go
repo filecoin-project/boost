@@ -53,7 +53,9 @@ type DBSettings struct {
 	PieceMetadataBucket     DBSettingsBucket
 	MultihashToPiecesBucket DBSettingsBucket
 	PieceOffsetsBucket      DBSettingsBucket
-	TestMode                bool
+	// Period between checking each piece in the database for problems (eg missing index)
+	PieceCheckPeriod time.Duration
+	TestMode         bool
 }
 
 const connectTimeout = 5 * time.Second
@@ -658,20 +660,21 @@ func (db *DB) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 const piecesToTrackerBatchSize = 1024
 const trackerCheckBatchSize = 1024
 
-func (db *DB) NextPiecesToCheck(ctx context.Context, olderThanMillis int64) ([]cid.Cid, error) {
+func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 	keepInserting := true
 	for keepInserting {
 		// Add any new pieces into the piece status tracking table
 		qry := "INSERT INTO `" + metaBucket + "`._default.`piece-tracker` (KEY k, VALUE v) "
 		qry += "SELECT "
 		qry += "  META(pieceMeta).id AS k, "
-		qry += "  {'CreatedAt': NOW_LOCAL(), 'UpdatedAt': NOW_LOCAL()} AS v "
+		qry += "  {'CreatedAt': NOW_LOCAL(), 'UpdatedAt': null} AS v "
 		qry += "FROM `" + pieceCidToMetadataBucket + "` AS pieceMeta "
 		qry += "WHERE META(pieceMeta).id NOT IN ("
 		qry += "  SELECT RAW META(pieceTracker).id FROM `" + metaBucket + "`._default.`piece-tracker` AS pieceTracker"
 		qry += ") "
 		qry += fmt.Sprintf("LIMIT %d", piecesToTrackerBatchSize)
 
+		fmt.Println(qry)
 		res, err := db.mutate(ctx, qry)
 		if err != nil {
 			return nil, fmt.Errorf("executing insert into piece-tracker: %w", err)
@@ -686,29 +689,56 @@ func (db *DB) NextPiecesToCheck(ctx context.Context, olderThanMillis int64) ([]c
 		keepInserting = queryMeta.Metrics.MutationCount == piecesToTrackerBatchSize
 	}
 
+	// Get all pieces from the piece tracker table that have not been updated
+	// since the last piece check period.
+	// Simultaneously set the UpdatedAt field so that these pieces are marked
+	// as checked (and will not be returned until the next piece check period
+	// elapses again).
 	qry := "UPDATE `" + metaBucket + "`._default.`piece-tracker` as outerPT "
 	qry += "SET UpdatedAt = NOW_LOCAL() "
 	qry += "WHERE META(outerPT).id IN ("
 	qry += "  SELECT RAW META(innerPT).id FROM `" + metaBucket + "`._default.`piece-tracker` AS innerPT "
-	qry += "  WHERE innerPT.UpdatedAt <= DATE_ADD_STR(NOW_LOCAL(), ?, 'millisecond') "
+	qry += "  WHERE "
+	qry += "    innerPT.UpdatedAt IS NULL OR"
+	qry += "    innerPT.UpdatedAt <= DATE_ADD_STR(NOW_LOCAL(), ?, 'millisecond') "
 	qry += fmt.Sprintf("LIMIT %d", trackerCheckBatchSize)
 	qry += ") "
 	qry += "RETURNING META().id"
 
-	res, err := db.query(ctx, qry, -olderThanMillis)
+	fmt.Println(qry, -db.settings.PieceCheckPeriod.Milliseconds())
+	res, err := db.query(ctx, qry, -db.settings.PieceCheckPeriod.Milliseconds())
 	if err != nil {
 		return nil, fmt.Errorf("adding piece meta info to piece tracker table: %w", err)
 	}
 
-	return db.listPieces(res)
+	pcids, err := db.listPieces(res)
+	if err != nil {
+		queryMeta, err := res.MetaData()
+		if err != nil {
+			return nil, err
+		}
+		fmt.Printf("updated/got %d rows in piece-tracker\n", queryMeta.Metrics.MutationCount)
+	}
+
+	return pcids, err
 }
 
 func (db *DB) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
-	qry := "UPSERT INTO `" + metaBucket + "`._default.`piece-flagged` (KEY, VALUE) "
-	qry += "VALUES (?, { 'UpdatedAt': NOW_LOCAL() })"
+	qry := "INSERT INTO `" + metaBucket + "`._default.`piece-flagged` (KEY, VALUE) "
+	qry += "VALUES (?, { 'CreatedAt': NOW_LOCAL(), 'UpdatedAt': NOW_LOCAL() })"
 	_, err := db.mutate(ctx, qry, toCouchKey(pieceCid.String()))
 	if err != nil {
-		return fmt.Errorf("flagging piece %s: inserting row: %w", pieceCid, err)
+		if !errors.Is(err, gocb.ErrDocumentExists) {
+			return fmt.Errorf("flagging piece %s: inserting row: %w", pieceCid, err)
+		}
+
+		qry := "UPDATE `" + metaBucket + "`._default.`piece-flagged` "
+		qry += "SET UpdatedAt = NOW_LOCAL() "
+		qry += "WHERE META(id) = ?"
+		_, err = db.mutate(ctx, qry, toCouchKey(pieceCid.String()))
+		if err != nil {
+			return fmt.Errorf("flagging piece %s: updating row: %w", pieceCid, err)
+		}
 	}
 	return nil
 }
@@ -722,15 +752,15 @@ func (db *DB) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	return nil
 }
 
-func (db *DB) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]cid.Cid, error) {
+func (db *DB) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.list_flagged_pieces")
 	defer span.End()
 
 	args := []interface{}{}
 	tableName := "`" + metaBucket + "`._default.`piece-flagged`"
-	qry := "SELECT META(pieceFlagged).id FROM " + tableName + " AS pieceFlagged "
+	qry := "SELECT META(pieceFlagged).id, CreatedAt FROM " + tableName + " AS pieceFlagged "
 	if cursor != nil {
-		qry += "WHERE Created < ? "
+		qry += "WHERE CreatedAt < ? "
 		args = append(args, cursor)
 	}
 	qry += "ORDER BY CreatedAt desc "
@@ -743,7 +773,45 @@ func (db *DB) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset i
 		return nil, fmt.Errorf("getting keys from %s: %w", tableName, err)
 	}
 
-	return db.listPieces(res)
+	var pieces []model.FlaggedPiece
+	var rowData map[string]string
+	for res.Next() {
+		err := res.Row(&rowData)
+		if err != nil {
+			return nil, fmt.Errorf("reading row from %s: %w", pieceCidToMetadataBucket, err)
+		}
+
+		couchKey, ok := rowData["id"]
+		if !ok {
+			return nil, fmt.Errorf("unexpected row data %s reading row from %s: missing id", rowData, pieceCidToMetadataBucket)
+		}
+
+		c, err := cid.Parse(fromCouchKey(couchKey))
+		if err != nil {
+			return nil, fmt.Errorf("parsing piece cid from couchbase key '%s': %w", couchKey, err)
+		}
+
+		createdAtStr, ok := rowData["CreatedAt"]
+		if !ok {
+			return nil, fmt.Errorf("unexpected row data %s reading row from %s: missing CreatedAt", rowData, pieceCidToMetadataBucket)
+		}
+		createdAt, err := time.Parse(time.RFC3339, createdAtStr)
+		if err != nil {
+			return nil, fmt.Errorf("parsing flagged piece CreatedAt from '%s': %w", couchKey, err)
+		}
+
+		pieces = append(pieces, model.FlaggedPiece{
+			CreatedAt: createdAt,
+			PieceCid:  c,
+		})
+	}
+
+	err = res.Err()
+	if err != nil {
+		return nil, fmt.Errorf("reading stream from %s: %w", pieceCidToMetadataBucket, err)
+	}
+
+	return pieces, nil
 }
 
 func (db *DB) FlaggedPiecesCount(ctx context.Context) (int, error) {
@@ -807,7 +875,9 @@ func (db *DB) query(ctx context.Context, qry string, args ...interface{}) (*gocb
 		PositionalParameters: args,
 	}
 	if db.settings.TestMode {
-		// In test mode, require immediate consistency for reads
+		// In test mode, require immediate consistency for reads:
+		// wait for all documents to complete updating before performing
+		// the query
 		opts.ScanConsistency = gocb.QueryScanConsistencyRequestPlus
 	}
 	return db.cluster.Query(qry, opts)

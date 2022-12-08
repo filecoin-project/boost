@@ -393,21 +393,24 @@ const FlaggedPiecesQuery = gql`
     query AppFlaggedPiecesQuery($cursor: BigInt, $offset: Int, $limit: Int) {
         piecesFlagged(cursor: $cursor, offset: $offset, limit: $limit) {
             pieces {
-                PieceCid
-                IndexStatus {
-                    Status
-                    Error
-                }
-                Deals {
-                    SealStatus {
-                        IsUnsealed
+                CreatedAt
+                Piece {
+                    PieceCid
+                    IndexStatus {
+                        Status
                         Error
                     }
-                    Deal {
-                        ID
-                        IsLegacy
-                        CreatedAt
-                        DealDataRoot
+                    Deals {
+                        SealStatus {
+                            IsUnsealed
+                            Error
+                        }
+                        Deal {
+                            ID
+                            IsLegacy
+                            CreatedAt
+                            DealDataRoot
+                        }
                     }
                 }
             }

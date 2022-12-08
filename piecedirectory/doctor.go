@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -24,14 +25,11 @@ type SealingApi interface {
 // Note that multiple Doctor processes can run in parallel. The logic for which
 // pieces to give to the Doctor to check is in the piece directory.
 type Doctor struct {
-	store Store
+	store types.Store
 	sapi  SealingApi
 }
 
-func NewDoctor(store Store, sapi SealingApi) *Doctor {
-	// TODO: remove
-	_ = logging.SetLogLevel("piecedoc", "debug")
-
+func NewDoctor(store types.Store, sapi SealingApi) *Doctor {
 	return &Doctor{store: store, sapi: sapi}
 }
 
@@ -82,7 +80,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 		if err != nil {
 			return fmt.Errorf("failed to flag piece in error state %s: %w", pieceCid, err)
 		}
-		doclog.Infow("piece is in error state", "err", md.Error)
+		doclog.Debugw("piece is in error state", "err", md.Error)
 		return nil
 	}
 
@@ -97,7 +95,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 		if err != nil {
 			return fmt.Errorf("failed to flag unindexed piece %s: %w", pieceCid, err)
 		}
-		doclog.Infow("flagging piece as unindexed", "piece", pieceCid)
+		doclog.Debugw("flagging piece as unindexed", "piece", pieceCid)
 		return nil
 	}
 
@@ -124,7 +122,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 			return fmt.Errorf("failed to flag piece %s with no unsealed deal: %w", pieceCid, err)
 		}
 
-		doclog.Infow("flagging piece as having no unsealed copy", "piece", pieceCid)
+		doclog.Debugw("flagging piece as having no unsealed copy", "piece", pieceCid)
 		return nil
 	}
 

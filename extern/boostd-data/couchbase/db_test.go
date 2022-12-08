@@ -106,7 +106,8 @@ var testCouchSettings = DBSettings{
 	PieceOffsetsBucket: DBSettingsBucket{
 		RAMQuotaMB: 128,
 	},
-	TestMode: true,
+	PieceCheckPeriod: 0,
+	TestMode:         true,
 }
 
 func TestSharding(t *testing.T) {
@@ -179,65 +180,4 @@ func TestSharding(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(recs), len(allRecs))
 	require.ElementsMatch(t, recs, allRecs)
-}
-
-func TestFlagging(t *testing.T) {
-	// Skip until the tests are refactored such that we can create a couchbase
-	// instance from docker
-	//t.Skip()
-
-	fileSize := 2 * 1024 * 1024
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5000*time.Second)
-	defer cancel()
-
-	// Create a new couchbase db
-	db, err := newDB(context.Background(), testCouchSettings)
-	require.NoError(t, err)
-
-	//_, err = db.cluster.Query("DELETE FROM `"+metaBucket+"`._default.`piece-tracker`", &gocb.QueryOptions{Context: ctx})
-	//require.NoError(t, err)
-	//_, err = db.cluster.Query("DELETE FROM `"+metaBucket+"`._default.`piece-flagged`", &gocb.QueryOptions{Context: ctx})
-	//require.NoError(t, err)
-
-	// Create a CAR file
-	randomFilePath, err := testutil.CreateRandomFile(t.TempDir(), 1, fileSize)
-	require.NoError(t, err)
-	_, carFilePath, err := testutil.CreateDenseCARv2(t.TempDir(), randomFilePath)
-	require.NoError(t, err)
-	carFile, err := os.Open(carFilePath)
-	require.NoError(t, err)
-	defer carFile.Close()
-	idx, err := car.ReadOrGenerateIndex(carFile)
-	require.NoError(t, err)
-
-	// Get the records from the CAR file
-	pieceCid, err := cid.Parse("baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka")
-	require.NoError(t, err)
-
-	var recs []model.Record
-	err = idx.(index.IterableIndex).ForEach(func(m multihash.Multihash, offset uint64) error {
-		cid := cid.NewCidV1(cid.Raw, m)
-
-		recs = append(recs, model.Record{
-			Cid: cid,
-			OffsetSize: model.OffsetSize{
-				Offset: offset,
-				Size:   0,
-			},
-		})
-
-		return nil
-	})
-	require.NoError(t, err)
-
-	// Add the records to the db
-	err = db.AddIndexRecords(ctx, pieceCid, recs)
-	require.NoError(t, err)
-
-	time.Sleep(2 * time.Millisecond)
-
-	pcids, err := db.NextPiecesToCheck(ctx, 0)
-	require.NoError(t, err)
-	require.Len(t, pcids, 1)
 }

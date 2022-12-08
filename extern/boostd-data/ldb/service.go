@@ -138,7 +138,11 @@ func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr e
 	defer s.Unlock()
 
 	err := s.db.MarkIndexErrored(ctx, pieceCid, idxErr)
-	return normalizePieceCidError(pieceCid, err)
+	if err != nil {
+		return normalizePieceCidError(pieceCid, err)
+	}
+
+	return s.FlagPiece(ctx, pieceCid)
 }
 
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
@@ -380,7 +384,7 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	return fmt.Errorf("unimplemented")
 }
 
-func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]cid.Cid, error) {
+func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
 	//TODO implement me
 	return nil, fmt.Errorf("unimplemented")
 }

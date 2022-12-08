@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -38,7 +39,7 @@ type Service interface {
 	NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error)
 	FlagPiece(ctx context.Context, pieceCid cid.Cid) error
 	UnflagPiece(ctx context.Context, pieceCid cid.Cid) error
-	FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]cid.Cid, error)
+	FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)
 	FlaggedPiecesCount(ctx context.Context) (int, error)
 }
 

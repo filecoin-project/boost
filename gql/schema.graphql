@@ -171,9 +171,14 @@ type PieceStatus {
   PieceInfoDeals: [PieceInfoDeal]!
 }
 
+type FlaggedPieceStatus {
+  CreatedAt: Time!
+  Piece: PieceStatus!
+}
+
 type FlaggedPiecesList {
   totalCount: Int!
-  pieces: [PieceStatus]!
+  pieces: [FlaggedPieceStatus]!
   more: Boolean!
 }
 

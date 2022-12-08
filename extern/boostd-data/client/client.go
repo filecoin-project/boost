@@ -3,11 +3,11 @@ package client
 import (
 	"context"
 	"fmt"
-	cid "github.com/ipfs/go-cid/_rsrch/cidiface"
-	"net/rpc/jsonrpc"
 	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/go-jsonrpc"
+	"github.com/ipfs/go-cid"
 	logger "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
@@ -35,7 +35,7 @@ type Store struct {
 		NextPiecesToCheck         func(ctx context.Context) ([]cid.Cid, error)
 		FlagPiece                 func(ctx context.Context, pieceCid cid.Cid) error
 		UnflagPiece               func(ctx context.Context, pieceCid cid.Cid) error
-		FlaggedPiecesList         func(ctx context.Context, cursor *time.Time, offset int, limit int) ([]cid.Cid, error)
+		FlaggedPiecesList         func(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)
 		FlaggedPiecesCount        func(ctx context.Context) (int, error)
 	}
 	closer jsonrpc.ClientCloser
@@ -164,7 +164,7 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	return s.client.UnflagPiece(ctx, pieceCid)
 }
 
-func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]cid.Cid, error) {
+func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
 	return s.client.FlaggedPiecesList(ctx, cursor, offset, limit)
 }
 

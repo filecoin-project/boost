@@ -31,6 +31,20 @@ export function InspectPage(props) {
     </PageContainer>
 }
 
+export function InspectPiecePage(props) {
+    return <PageContainer title="Inspect Piece metadata">
+        <InspectPieceContent />
+    </PageContainer>
+}
+
+function InspectPieceContent() {
+    const params = useParams()
+
+    return <div className="inspect-content">
+        <SearchResults searchQuery={params.pieceCID} />
+    </div>
+}
+
 function InspectContent() {
     const params = useParams()
     const [searchQuery, setSearchQuery] = useState(params.query)
@@ -74,7 +88,7 @@ function FlaggedPieces({setSearchQuery}) {
     var res = data.piecesFlagged
     var rows = res.pieces
     const totalCount = data.piecesFlagged.totalCount
-    const moreDeals = data.piecesFlagged.more
+    const moreRows = data.piecesFlagged.more
 
     if (!totalCount) {
         return <div className="flagged-pieces-none">
@@ -84,14 +98,14 @@ function FlaggedPieces({setSearchQuery}) {
 
     var cursor = params.cursor
     if (pageNum === 1 && rows.length) {
-        cursor = rows[0].ID
+        cursor = rows[0].CreatedAt.getTime()
     }
 
     const paginationParams = {
         basePath: inspectBasePath,
         cursor, pageNum, totalCount,
         rowsPerPage: rowsPerPage,
-        moreRows: moreDeals,
+        moreRows: moreRows,
         onRowsPerPageChange: onRowsPerPageChange,
         onLinkClick: scrollTop,
     }
@@ -110,8 +124,8 @@ function FlaggedPieces({setSearchQuery}) {
 
             {rows.map(piece => (
                 <FlaggedPieceRow
-                    key={piece.PieceCid}
-                    piece={piece}
+                    key={piece.Piece.PieceCid}
+                    piece={piece.Piece}
                     setSearchQuery={setSearchQuery}
                 />
             ))}
@@ -131,7 +145,7 @@ function FlaggedPieceRow({piece, setSearchQuery}) {
     }
     return <tr>
         <td>
-            <Link onClick={() => setSearchQuery(piece.PieceCid)} to={"/inspect/"+piece.PieceCid}>
+            <Link to={"/inspect/piece/"+piece.PieceCid}>
                 {piece.PieceCid}
             </Link>
         </td>
@@ -227,7 +241,9 @@ function SearchResults({searchQuery, setSearchQuery}) {
         </>
     }
     return <div className="inspect">
-        <SearchBox value={searchQuery} clearSearchBox={clearSearchBox} onChange={handleSearchQueryChange} />
+        { setSearchQuery ? (
+            <SearchBox value={searchQuery} clearSearchBox={clearSearchBox} onChange={handleSearchQueryChange} />
+        ) : null }
         { errorMsg ? <div>Error: {errorMsg}</div>  : null}
         { content }
     </div>
