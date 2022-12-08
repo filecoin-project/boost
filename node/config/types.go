@@ -224,8 +224,8 @@ type DealmakingConfig struct {
 	// If public addresses are set, Boost will announce the booster-bitswap peer id directly to the indexer as an extended provider.
 	BitswapPublicAddresses []string
 
-	// If operating in public mode, in order to announce Booster-Bitswap as an extended provder, this value must point to a
-	// a file containing the booster bitswap peer id's private key. Can be left blank when operating with protocol proxy
+	// If operating in public mode, in order to announce booster-bitswap as an extended provider, this value must point to a
+	// a file containing the booster-bitswap peer id's private key. Can be left blank when operating with protocol proxy.
 	BitswapPrivKeyFile string
 
 	// The deal logs older than DealLogDurationDays are deleted from the logsDB
