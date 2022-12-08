@@ -26,9 +26,12 @@ type Fetcher func(lastFetchTime time.Time) (bool, io.ReadCloser, error)
 const expectedListGrowth = 128
 
 // FetcherForHTTPEndpoint makes an fetcher that reads from an HTTP endpoint
-func FetcherForHTTPEndpoint(endpoint string) Fetcher {
+func FetcherForHTTPEndpoint(endpoint string, authHeader string) Fetcher {
 	return func(ifModifiedSince time.Time) (bool, io.ReadCloser, error) {
 		req, err := http.NewRequest("GET", endpoint, nil)
+		if authHeader != "" {
+			req.Header.Set("Authorization", authHeader)
+		}
 		if err != nil {
 			return false, nil, err
 		}
@@ -122,17 +125,23 @@ func NewMultiFilterWithConfigs(cfgDir string, filterDefinitions []FilterDefiniti
 	}
 }
 
-func NewMultiFilter(cfgDir string, bandwidthMeasure BandwidthMeasure, requestCounter RequestCounter, apiFilterEndpoint string) *MultiFilter {
+func NewMultiFilter(
+	cfgDir string,
+	bandwidthMeasure BandwidthMeasure,
+	requestCounter RequestCounter,
+	apiFilterEndpoint string,
+	apiFilterAuth string,
+) *MultiFilter {
 	filters := []FilterDefinition{
 		{
 			CacheFile: filepath.Join(cfgDir, "denylist.json"),
-			Fetcher:   FetcherForHTTPEndpoint(BadBitsDenyList),
+			Fetcher:   FetcherForHTTPEndpoint(BadBitsDenyList, ""),
 			Handler:   NewBlockFilter(),
 		},
 	}
 	var configFetcher Fetcher
 	if apiFilterEndpoint != "" {
-		configFetcher = FetcherForHTTPEndpoint(apiFilterEndpoint)
+		configFetcher = FetcherForHTTPEndpoint(apiFilterEndpoint, apiFilterAuth)
 	}
 	filters = append(filters, FilterDefinition{
 		CacheFile: filepath.Join(cfgDir, "remoteconfig.json"),
