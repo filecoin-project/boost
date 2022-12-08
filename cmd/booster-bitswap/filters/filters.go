@@ -26,9 +26,12 @@ type Fetcher func(lastFetchTime time.Time) (bool, io.ReadCloser, error)
 const expectedListGrowth = 128
 
 // FetcherForHTTPEndpoint makes an fetcher that reads from an HTTP endpoint
-func FetcherForHTTPEndpoint(endpoint string) Fetcher {
+func FetcherForHTTPEndpoint(endpoint string, authHeader string) Fetcher {
 	return func(ifModifiedSince time.Time) (bool, io.ReadCloser, error) {
 		req, err := http.NewRequest("GET", endpoint, nil)
+		if authHeader != "" {
+			req.Header.Set("Authorization", authHeader)
+		}
 		if err != nil {
 			return false, nil, err
 		}
@@ -51,16 +54,11 @@ func FetcherForHTTPEndpoint(endpoint string) Fetcher {
 	}
 }
 
-type ServerState struct {
-	TotalRequestsInProgress   uint64
-	RequestsInProgressForPeer uint64
-}
-
 type Handler interface {
 	ParseUpdate(io.Reader) error
 	// FulfillRequest returns true if a request should be fulfilled
 	// error indicates an error in processing
-	FulfillRequest(p peer.ID, c cid.Cid, s ServerState) (bool, error)
+	FulfillRequest(p peer.ID, c cid.Cid) (bool, error)
 }
 
 type FilterDefinition struct {
@@ -127,22 +125,28 @@ func NewMultiFilterWithConfigs(cfgDir string, filterDefinitions []FilterDefiniti
 	}
 }
 
-func NewMultiFilter(cfgDir string, bandwidthMeasure BandwidthMeasure, apiFilterEndpoint string) *MultiFilter {
+func NewMultiFilter(
+	cfgDir string,
+	bandwidthMeasure BandwidthMeasure,
+	requestCounter RequestCounter,
+	apiFilterEndpoint string,
+	apiFilterAuth string,
+) *MultiFilter {
 	filters := []FilterDefinition{
 		{
 			CacheFile: filepath.Join(cfgDir, "denylist.json"),
-			Fetcher:   FetcherForHTTPEndpoint(BadBitsDenyList),
+			Fetcher:   FetcherForHTTPEndpoint(BadBitsDenyList, ""),
 			Handler:   NewBlockFilter(),
 		},
 	}
 	var configFetcher Fetcher
 	if apiFilterEndpoint != "" {
-		configFetcher = FetcherForHTTPEndpoint(apiFilterEndpoint)
+		configFetcher = FetcherForHTTPEndpoint(apiFilterEndpoint, apiFilterAuth)
 	}
 	filters = append(filters, FilterDefinition{
 		CacheFile: filepath.Join(cfgDir, "remoteconfig.json"),
 		Fetcher:   configFetcher,
-		Handler:   NewConfigFilter(bandwidthMeasure),
+		Handler:   NewConfigFilter(bandwidthMeasure, requestCounter),
 	})
 	return NewMultiFilterWithConfigs(cfgDir, filters, clock.New(), nil)
 }
@@ -186,9 +190,9 @@ func (mf *MultiFilter) Close() {
 
 // FulfillRequest returns true if a request should be fulfilled
 // error indicates an error in processing
-func (mf *MultiFilter) FulfillRequest(p peer.ID, c cid.Cid, s ServerState) (bool, error) {
+func (mf *MultiFilter) FulfillRequest(p peer.ID, c cid.Cid) (bool, error) {
 	for _, f := range mf.filters {
-		has, err := f.Handler.FulfillRequest(p, c, s)
+		has, err := f.Handler.FulfillRequest(p, c)
 		if !has || err != nil {
 			return has, err
 		}

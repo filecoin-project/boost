@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/dustin/go-humanize"
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/requestcounter"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 )
@@ -25,6 +26,10 @@ type BandwidthMeasure interface {
 	AvgBytesPerSecond() uint64
 }
 
+type RequestCounter interface {
+	StateForPeer(p peer.ID) requestcounter.ServerState
+}
+
 type remoteConfig struct {
 	peerListType                   PeerListType
 	peerList                       map[peer.ID]struct{}
@@ -38,13 +43,15 @@ type remoteConfig struct {
 type ConfigFilter struct {
 	remoteConfigLk   sync.RWMutex
 	bandwidthMeasure BandwidthMeasure
+	requestCounter   RequestCounter
 	remoteConfig     remoteConfig
 }
 
 // NewConfigFilter constructs a new peer filter
-func NewConfigFilter(bandwidthMeasure BandwidthMeasure) *ConfigFilter {
+func NewConfigFilter(bandwidthMeasure BandwidthMeasure, requestCounter RequestCounter) *ConfigFilter {
 	return &ConfigFilter{
 		bandwidthMeasure: bandwidthMeasure,
+		requestCounter:   requestCounter,
 		remoteConfig: remoteConfig{
 			peerListType:                   DenyList,
 			peerList:                       make(map[peer.ID]struct{}),
@@ -58,7 +65,7 @@ func NewConfigFilter(bandwidthMeasure BandwidthMeasure) *ConfigFilter {
 
 // FulfillRequest checks if a given peer is in the allow/deny list and decides
 // whether to fulfill the request
-func (cf *ConfigFilter) FulfillRequest(p peer.ID, c cid.Cid, s ServerState) (bool, error) {
+func (cf *ConfigFilter) FulfillRequest(p peer.ID, c cid.Cid) (bool, error) {
 	cf.remoteConfigLk.RLock()
 	defer cf.remoteConfigLk.RUnlock()
 	// don't fulfill requests under maintainence
@@ -74,6 +81,7 @@ func (cf *ConfigFilter) FulfillRequest(p peer.ID, c cid.Cid, s ServerState) (boo
 	if cf.remoteConfig.maxBandwidth > 0 && cf.bandwidthMeasure.AvgBytesPerSecond() > cf.remoteConfig.maxBandwidth {
 		return false, nil
 	}
+	s := cf.requestCounter.StateForPeer(p)
 	// don't fulfill requests when there are too many simultaneous requests over all
 	if cf.remoteConfig.maxSimultaneousRequests > 0 && s.TotalRequestsInProgress >= cf.remoteConfig.maxSimultaneousRequests {
 		return false, nil

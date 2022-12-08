@@ -33,7 +33,7 @@ func NewBlockFilter() *BlockFilter {
 
 // FulfillRequest checks if a given CID is in the deny list, per the rules
 // of hashing cids (convert to base32, add "/" to path, then sha256 hash)
-func (bf *BlockFilter) FulfillRequest(p peer.ID, c cid.Cid, s ServerState) (bool, error) {
+func (bf *BlockFilter) FulfillRequest(p peer.ID, c cid.Cid) (bool, error) {
 	// convert CIDv0 to CIDv1
 	if c.Version() == 0 {
 		c = cid.NewCidV1(cid.DagProtobuf, c.Hash())

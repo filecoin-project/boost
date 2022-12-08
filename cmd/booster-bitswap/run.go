@@ -11,9 +11,10 @@ import (
 	"github.com/filecoin-project/boost/api"
 	bclient "github.com/filecoin-project/boost/api/client"
 	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/bandwidthmeasure"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
-	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters/bandwidthmeasure"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/requestcounter"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/go-jsonrpc"
@@ -70,6 +71,10 @@ var runCmd = &cli.Command{
 			Name:  "api-filter-endpoint",
 			Usage: "the endpoint to use for fetching a remote retrieval configuration for bitswap requests",
 		},
+		&cli.StringFlag{
+			Name:  "api-filter-auth",
+			Usage: "value to pass in the authorization header when sending a request to the API filter endpoint (e.g. 'Basic ~base64 encoded user/pass~'",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -119,12 +124,13 @@ var runCmd = &cli.Command{
 
 		// Create the bitswap server
 		bandwidthMeasure := bandwidthmeasure.NewBandwidthMeasure(bandwidthmeasure.DefaultBandwidthSamplePeriod, clock.New())
-		multiFilter := filters.NewMultiFilter(repoDir, bandwidthMeasure, cctx.String("api-filter-endpoint"))
+		requestCounter := requestcounter.NewRequestCounter()
+		multiFilter := filters.NewMultiFilter(repoDir, bandwidthMeasure, requestCounter, cctx.String("api-filter-endpoint"), cctx.String("api-filter-auth"))
 		err = multiFilter.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)
 		}
-		server := NewBitswapServer(remoteStore, host, multiFilter, bandwidthMeasure)
+		server := NewBitswapServer(remoteStore, host, multiFilter, bandwidthMeasure, requestCounter)
 
 		var proxyAddrInfo *peer.AddrInfo
 		if cctx.IsSet("proxy") {
