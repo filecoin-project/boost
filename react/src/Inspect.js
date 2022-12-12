@@ -1,6 +1,7 @@
-import {useQuery} from "@apollo/react-hooks";
+import {useMutation, useQuery} from "@apollo/react-hooks";
 import {
-    DealsListQuery, FlaggedPiecesQuery,
+    DealCancelMutation,
+    DealsListQuery, FlaggedPiecesQuery, PieceBuildIndexMutation,
     PieceStatusQuery, PiecesWithPayloadCidQuery, PiecesWithRootPayloadCidQuery
 } from "./gql";
 import moment from "moment";
@@ -25,33 +26,23 @@ export function InspectMenuItem(props) {
     )
 }
 
+// Main page with flagged pieces
 export function InspectPage(props) {
     return <PageContainer title="Inspect Piece metadata">
         <InspectContent />
     </PageContainer>
 }
 
-export function InspectPiecePage(props) {
-    return <PageContainer title="Inspect Piece metadata">
-        <InspectPieceContent />
-    </PageContainer>
-}
-
-function InspectPieceContent() {
-    const params = useParams()
-
-    return <div className="inspect-content">
-        <SearchResults searchQuery={params.pieceCID} />
-    </div>
-}
-
 function InspectContent() {
     const params = useParams()
     const [searchQuery, setSearchQuery] = useState(params.query)
 
+    const flaggedPiecesContent = searchQuery ? null : <FlaggedPieces setSearchQuery={setSearchQuery}  />
+
+    const showSearchPrompt = flaggedPiecesContent == null
     return <div className="inspect-content">
-        <SearchResults searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-        { searchQuery ? null : <FlaggedPieces setSearchQuery={setSearchQuery}  /> }
+        { <SearchResults searchQuery={searchQuery} setSearchQuery={setSearchQuery} showSearchPrompt={showSearchPrompt} /> }
+        { flaggedPiecesContent }
     </div>
 }
 
@@ -139,7 +130,7 @@ function FlaggedPieces({setSearchQuery}) {
 function FlaggedPieceRow({piece, setSearchQuery}) {
     var isUnsealed = false
     for (var dl of piece.Deals) {
-        if (dl.IsUnsealed) {
+        if (dl.SealStatus.IsUnsealed) {
             isUnsealed = true
         }
     }
@@ -155,7 +146,18 @@ function FlaggedPieceRow({piece, setSearchQuery}) {
     </tr>
 }
 
-function SearchResults({searchQuery, setSearchQuery}) {
+// Page showing information about a particular piece
+export function InspectPiecePage(props) {
+    const params = useParams()
+
+    return <PageContainer title="Inspect Piece metadata">
+        <div className="inspect-content">
+            <SearchResults searchQuery={params.pieceCID} />
+        </div>
+    </PageContainer>
+}
+
+function SearchResults({searchQuery, setSearchQuery, showSearchPrompt}) {
     const handleSearchQueryChange = (event) => {
         setSearchQuery(event.target.value)
     }
@@ -202,6 +204,7 @@ function SearchResults({searchQuery, setSearchQuery}) {
 
     // Lookup a piece by piece CID
     const pieceRes = useQuery(PieceStatusQuery, {
+        pollInterval: 1000,
         variables: {
             pieceCid: pieceCid,
         },
@@ -231,7 +234,9 @@ function SearchResults({searchQuery, setSearchQuery}) {
     const showPayload = pieceCids.length > 1
     var content = null
     if (!errorMsg && !pieceStatus && !showPayload) {
-        content = <p>Enter piece CID or payload CID into the search box</p>
+        if (showSearchPrompt) {
+            content = <p>Enter piece CID or payload CID into the search box</p>
+        }
     } else if (!showPayload && !showPieceStats) {
         content = <p>No piece found with piece CID or payload CID {pieceCid}</p>
     } else {
@@ -261,6 +266,12 @@ function PiecesWithPayload({payloadCid, pieceCids, setSearchQuery}) {
 }
 
 function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
+    // Re-build index
+    const [buildIndex] = useMutation(PieceBuildIndexMutation, {
+        // refetchQueries: props.refetchQueries,
+        variables: {pieceCid: pieceCid}
+    })
+
     if (!pieceStatus) {
         return <div>No piece found with piece CID {pieceCid}</div>
     }
@@ -269,6 +280,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
     const searchIsAnyCid = searchQuery && searchQuery != pieceCid && searchQuery != rootCid
     const searchIsPieceCid = searchQuery && searchQuery == pieceCid
     const searchIsRootCid = searchQuery && searchQuery == rootCid
+    const indexFailed = pieceStatus.IndexStatus.Status === 'Failed'
 
     return <div className="piece-detail" id={pieceCid}>
         <div className="content">
@@ -298,7 +310,18 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                 </tr>
                 <tr key="index status">
                     <th>Index Status</th>
-                    <td>{pieceStatus.IndexStatus.Status}</td>
+                    <td>
+                        <span>
+                            {pieceStatus.IndexStatus.Status}
+                            {indexFailed && pieceStatus.IndexStatus.Error ? ': ' + pieceStatus.IndexStatus.Error : '' }
+                        </span>
+                        <br/>
+                        {indexFailed ? (
+                            <div className="button build-index" title="Re-build index" onClick={buildIndex}>
+                                Re-index
+                            </div>
+                        ) : null}
+                    </td>
                 </tr>
                 </tbody>
             </table>

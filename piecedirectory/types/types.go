@@ -37,7 +37,7 @@ type Store interface {
 	GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error)
 	SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error
 	PiecesContainingMultihash(ctx context.Context, m multihash.Multihash) ([]cid.Cid, error)
-	MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error
+	MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err string) error
 	RemoveDealForPiece(context.Context, cid.Cid, string) error
 	RemovePieceMetadata(context.Context, cid.Cid) error
 	RemoveIndexes(context.Context, cid.Cid) error
@@ -46,4 +46,11 @@ type Store interface {
 	UnflagPiece(ctx context.Context, pieceCid cid.Cid) error
 	FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)
 	FlaggedPiecesCount(ctx context.Context) (int, error)
+}
+
+// PieceDirMetadata has the db metadata info and a flag to indicate if this
+// process is currently indexing the piece
+type PieceDirMetadata struct {
+	model.Metadata
+	Indexing bool
 }

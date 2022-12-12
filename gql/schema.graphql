@@ -489,6 +489,9 @@ type RootMutation {
   """Publish all pending deals now"""
   dealPublishNow: Boolean!
 
+  """Explicitly load the piece data from the sealing subsystem and index it"""
+  pieceBuildIndex(pieceCid: String!): Boolean!
+
   """Top-up the available deal collateral in escrow for deal publishing"""
   fundsMoveToEscrow(amount: BigInt!): Boolean!
 

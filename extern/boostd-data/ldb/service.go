@@ -129,7 +129,7 @@ func (s *Store) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) e
 	return normalizePieceCidError(pieceCid, err)
 }
 
-func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr error) error {
+func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr string) error {
 	log.Debugw("handle.mark-piece-index-errored", "piece-cid", pieceCid, "err", idxErr)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.mark-piece-index-errored")
@@ -142,7 +142,7 @@ func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr e
 	s.Lock()
 	defer s.Unlock()
 
-	err := s.db.MarkIndexErrored(ctx, pieceCid, idxErr)
+	err := s.db.MarkIndexErrored(ctx, pieceCid, errors.New(idxErr))
 	if err != nil {
 		return normalizePieceCidError(pieceCid, err)
 	}

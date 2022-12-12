@@ -70,11 +70,24 @@ func (ps *PieceDirectory) FlaggedPiecesCount(ctx context.Context) (int, error) {
 }
 
 // Get all metadata about a particular piece
-func (ps *PieceDirectory) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+func (ps *PieceDirectory) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (types.PieceDirMetadata, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_metadata")
 	defer span.End()
 
-	return ps.store.GetPieceMetadata(ctx, pieceCid)
+	// Get the piece metadata from the DB
+	md, err := ps.store.GetPieceMetadata(ctx, pieceCid)
+	if err != nil {
+		return types.PieceDirMetadata{}, err
+	}
+
+	// Check if this process is currently indexing the piece
+	_, indexing := ps.addIdxOpByCid.Load(pieceCid)
+
+	// Return the db piece metadata along with the indexing flag
+	return types.PieceDirMetadata{
+		Metadata: md,
+		Indexing: indexing,
+	}, nil
 }
 
 // Get the list of deals (and the sector the data is in) for a particular piece
@@ -316,6 +329,10 @@ func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.C
 	return nil
 }
 
+func (ps *PieceDirectory) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err string) error {
+	return ps.store.MarkIndexErrored(ctx, pieceCid, err)
+}
+
 //func (ps *piecedirectory) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
 // TODO: Maybe mark for GC instead of deleting immediately
 
@@ -487,7 +504,7 @@ func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int
 		}
 		if offsetSize.Size == 0 {
 			zeroSizeErr := fmt.Errorf("bad index: size of block %s is zero", c)
-			err = ps.store.MarkIndexErrored(ctx, pieces[0], zeroSizeErr)
+			err = ps.store.MarkIndexErrored(ctx, pieces[0], zeroSizeErr.Error())
 			if err != nil {
 				return 0, fmt.Errorf("setting index for piece %s to error state (%s): %w", pieces[0], zeroSizeErr, err)
 			}

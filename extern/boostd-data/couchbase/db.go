@@ -345,6 +345,8 @@ func (db *DB) MarkIndexingComplete(ctx context.Context, pieceCid cid.Cid, blockC
 		// Mark indexing as complete
 		metadata.IndexedAt = time.Now()
 		metadata.BlockCount = blockCount
+		metadata.Error = ""
+		metadata.ErrorType = ""
 		if metadata.Deals == nil {
 			metadata.Deals = []model.DealInfo{}
 		}

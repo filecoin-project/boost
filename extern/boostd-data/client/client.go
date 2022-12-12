@@ -26,7 +26,7 @@ type Store struct {
 		GetPieceMetadata          func(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
 		GetPieceDeals             func(context.Context, cid.Cid) ([]model.DealInfo, error)
 		SetCarSize                func(ctx context.Context, pieceCid cid.Cid, size uint64) error
-		MarkIndexErrored          func(context.Context, cid.Cid, error) error
+		MarkIndexErrored          func(context.Context, cid.Cid, string) error
 		IndexedAt                 func(context.Context, cid.Cid) (time.Time, error)
 		PiecesContainingMultihash func(context.Context, mh.Multihash) ([]cid.Cid, error)
 		RemoveDealForPiece        func(context.Context, cid.Cid, string) error
@@ -106,7 +106,7 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	return s.client.PiecesContainingMultihash(ctx, m)
 }
 
-func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error {
+func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err string) error {
 	return s.client.MarkIndexErrored(ctx, pieceCid, err)
 }
 
