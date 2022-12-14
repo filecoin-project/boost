@@ -29,7 +29,7 @@ import (
 )
 
 var testCouchSettings = couchbase.DBSettings{
-	ConnectString: "couchbase://127.0.0.1",
+	ConnectString: "couchbase://localhost",
 	Auth: couchbase.DBSettingsAuth{
 		Username: "Administrator",
 		Password: "boostdemo",
@@ -49,19 +49,19 @@ var testCouchSettings = couchbase.DBSettings{
 func TestService(t *testing.T) {
 	_ = logging.SetLogLevel("*", "debug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	t.Run("level db", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
 		testService(ctx, t, bdsvc, 8042)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		// Enable it back once SB tests are working on CI
-		t.Skip(t)
-		removeContainer := setupCouchbase(t)
-		defer removeContainer()
+		// Running couchbase tests may require download the docker container
+		// so set a high timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		setupCouchbase(t)
 		bdsvc := NewCouchbase(testCouchSettings)
 		testService(ctx, t, bdsvc, 8043)
 	})
@@ -72,7 +72,7 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), "http://localhost:8042")
+	err = cl.Dial(context.Background(), fmt.Sprintf("http://localhost:%d", port))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
@@ -164,8 +164,7 @@ func TestServiceFuzz(t *testing.T) {
 		testServiceFuzz(ctx, t, bdsvc, 8042)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		removeContainer := setupCouchbase(t)
-		defer removeContainer()
+		setupCouchbase(t)
 		bdsvc := NewCouchbase(testCouchSettings)
 		testServiceFuzz(ctx, t, bdsvc, 8043)
 	})
@@ -384,8 +383,7 @@ func TestCleanup(t *testing.T) {
 	t.Run("couchbase", func(t *testing.T) {
 		// Enable it back once SB tests are working on CI
 		t.Skip(t)
-		removeContainer := setupCouchbase(t)
-		defer removeContainer()
+		setupCouchbase(t)
 		bdsvc := NewCouchbase(testCouchSettings)
 		testCleanup(ctx, t, bdsvc, 8043)
 	})
@@ -396,7 +394,7 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), "http://localhost:8042")
+	err = cl.Dial(context.Background(), fmt.Sprintf("http://localhost:%d", port))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 

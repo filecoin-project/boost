@@ -88,25 +88,25 @@ func newDB(ctx context.Context, settings DBSettings) (*DB, error) {
 
 	// Set up the buckets
 	db := &DB{settings: settings, cluster: cluster}
-	pcidToMeta, err := createBucket(ctx, cluster, pieceCidToMetadataBucket, settings.PieceMetadataBucket.RAMQuotaMB)
+	pcidToMeta, err := CreateBucket(ctx, cluster, pieceCidToMetadataBucket, settings.PieceMetadataBucket.RAMQuotaMB)
 	if err != nil {
 		return nil, fmt.Errorf("Creating bucket %s for couchbase server %s: %w", pieceCidToMetadataBucket, settings.ConnectString, err)
 	}
 	db.pcidToMeta = pcidToMeta.DefaultCollection()
 
-	mhToPieces, err := createBucket(ctx, cluster, multihashToPiecesBucket, settings.MultihashToPiecesBucket.RAMQuotaMB)
+	mhToPieces, err := CreateBucket(ctx, cluster, multihashToPiecesBucket, settings.MultihashToPiecesBucket.RAMQuotaMB)
 	if err != nil {
 		return nil, fmt.Errorf("Creating bucket %s for couchbase server %s: %w", multihashToPiecesBucket, settings.ConnectString, err)
 	}
 	db.mhToPieces = mhToPieces.DefaultCollection()
 
-	pieceOffsets, err := createBucket(ctx, cluster, pieceOffsetsBucket, settings.PieceOffsetsBucket.RAMQuotaMB)
+	pieceOffsets, err := CreateBucket(ctx, cluster, pieceOffsetsBucket, settings.PieceOffsetsBucket.RAMQuotaMB)
 	if err != nil {
 		return nil, fmt.Errorf("Creating bucket %s for couchbase server %s: %w", pieceOffsetsBucket, settings.ConnectString, err)
 	}
 	db.pieceOffsets = pieceOffsets.DefaultCollection()
 
-	meta, err := createBucket(ctx, cluster, metaBucket, 156)
+	meta, err := CreateBucket(ctx, cluster, metaBucket, 156)
 	if err != nil {
 		return nil, fmt.Errorf("Creating bucket %s for couchbase server %s: %w", metaBucket, settings.ConnectString, err)
 	}
@@ -157,7 +157,7 @@ func pingCluster(ctx context.Context, cluster *gocb.Cluster, connectString strin
 	if err == nil {
 		for svc, png := range res.Services {
 			if len(png) > 0 && png[0].State != gocb.PingStateOk {
-				err = fmt.Errorf("connecting to %s service", serviceName(svc))
+				err = fmt.Errorf("connecting to %s service", ServiceName(svc))
 				break
 			}
 		}
@@ -171,7 +171,7 @@ func pingCluster(ctx context.Context, cluster *gocb.Cluster, connectString strin
 	return nil
 }
 
-func createBucket(ctx context.Context, cluster *gocb.Cluster, bucketName string, ramMb uint64) (*gocb.Bucket, error) {
+func CreateBucket(ctx context.Context, cluster *gocb.Cluster, bucketName string, ramMb uint64) (*gocb.Bucket, error) {
 	_, err := cluster.Buckets().GetBucket(bucketName, &gocb.GetBucketOptions{Context: ctx, Timeout: connectTimeout})
 	if err != nil {
 		if !errors.Is(err, gocb.ErrBucketNotFound) {
@@ -970,7 +970,7 @@ func hashToShardPrefix(hash multihash.Multihash, mask [2]byte) string {
 	})
 }
 
-func serviceName(svc gocb.ServiceType) string {
+func ServiceName(svc gocb.ServiceType) string {
 	switch svc {
 	case gocb.ServiceTypeManagement:
 		return "mgmt"
@@ -986,6 +986,20 @@ func serviceName(svc gocb.ServiceType) string {
 		return "analytics"
 	}
 	return "unknown"
+}
+
+func EndpointStateName(state gocb.EndpointState) string {
+	switch state {
+	case gocb.EndpointStateDisconnected:
+		return "disconnected"
+	case gocb.EndpointStateConnecting:
+		return "connecting"
+	case gocb.EndpointStateConnected:
+		return "connected"
+	case gocb.EndpointStateDisconnecting:
+		return "disconnecting"
+	}
+	return ""
 }
 
 // RemoveMetadata
