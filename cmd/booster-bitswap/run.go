@@ -75,6 +75,10 @@ var runCmd = &cli.Command{
 			Name:  "api-filter-auth",
 			Usage: "value to pass in the authorization header when sending a request to the API filter endpoint (e.g. 'Basic ~base64 encoded user/pass~'",
 		},
+		&cli.StringFlag{
+			Name:  "badbits-denylist",
+			Usage: "the endpoint for fetching a custom BadBits list in addition to the default one at https://badbits.dwebops.pub/denylist.json",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -125,7 +129,7 @@ var runCmd = &cli.Command{
 		// Create the bitswap server
 		bandwidthMeasure := bandwidthmeasure.NewBandwidthMeasure(bandwidthmeasure.DefaultBandwidthSamplePeriod, clock.New())
 		requestCounter := requestcounter.NewRequestCounter()
-		multiFilter := filters.NewMultiFilter(repoDir, bandwidthMeasure, requestCounter, cctx.String("api-filter-endpoint"), cctx.String("api-filter-auth"))
+		multiFilter := filters.NewMultiFilter(repoDir, bandwidthMeasure, requestCounter, cctx.String("api-filter-endpoint"), cctx.String("api-filter-auth"), cctx.String("badbits-denylist"))
 		err = multiFilter.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)

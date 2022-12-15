@@ -13,7 +13,7 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	nilrouting "github.com/ipfs/go-ipfs-routing/none"
 	"github.com/libp2p/go-libp2p/core/host"
-	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type Filter interface {
@@ -30,15 +30,16 @@ type BandwidthMeasure interface {
 }
 
 type BitswapServer struct {
-	remoteStore      blockstore.Blockstore
-	filter           Filter
-	requestCounter   RequestCounter
-	bandwidthMeasure BandwidthMeasure
-	ctx              context.Context
-	cancel           context.CancelFunc
-	proxy            *peer.AddrInfo
-	server           *server.Server
-	host             host.Host
+	remoteStore         blockstore.Blockstore
+	filter              Filter
+	requestCounter      RequestCounter
+	bandwidthMeasure    BandwidthMeasure
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	proxy               *peer.AddrInfo
+	server              *server.Server
+	host                host.Host
+	customBadbitsFilter string
 }
 
 func NewBitswapServer(

@@ -11,7 +11,7 @@ import (
 
 	"github.com/benbjohnson/clock"
 	"github.com/ipfs/go-cid"
-	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // UpdateInterval is the default interval at which the public list is refected and updated
@@ -131,11 +131,17 @@ func NewMultiFilter(
 	requestCounter RequestCounter,
 	apiFilterEndpoint string,
 	apiFilterAuth string,
+	customBadBitsDenyList string,
 ) *MultiFilter {
 	filters := []FilterDefinition{
 		{
 			CacheFile: filepath.Join(cfgDir, "denylist.json"),
 			Fetcher:   FetcherForHTTPEndpoint(BadBitsDenyList, ""),
+			Handler:   NewBlockFilter(),
+		},
+		{
+			CacheFile: filepath.Join(cfgDir, "customdenylist.json"),
+			Fetcher:   FetcherForHTTPEndpoint(customBadBitsDenyList, ""),
 			Handler:   NewBlockFilter(),
 		},
 	}
