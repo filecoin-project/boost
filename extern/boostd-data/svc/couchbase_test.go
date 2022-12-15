@@ -84,7 +84,7 @@ func setupCouchbase(t *testing.T) {
 	})
 
 	tlog.Info("wait for couchbase start...")
-	awaitCouchbaseUp(t, time.Minute)
+	awaitCouchbaseUp(t, 10*time.Minute)
 	tlog.Info("couchbase started")
 
 	tlog.Info("couchbase initialize cluster...")
