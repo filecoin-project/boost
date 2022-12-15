@@ -77,7 +77,8 @@ var runCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "badbits-denylist",
-			Usage: "the endpoint for fetching a custom BadBits list in addition to the default one at https://badbits.dwebops.pub/denylist.json",
+			Usage: "the endpoint for fetching a custom BadBits list instead of the default one at https://badbits.dwebops.pub/denylist.json",
+			Value: "https://badbits.dwebops.pub/denylist.json",
 		},
 	},
 	Action: func(cctx *cli.Context) error {

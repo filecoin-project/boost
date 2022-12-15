@@ -16,9 +16,6 @@ import (
 
 var log = logging.Logger("booster-bitswap")
 
-// BadBitsDenyList is the URL for well known bad bits list
-const BadBitsDenyList string = "https://badbits.dwebops.pub/denylist.json"
-
 // BlockFilter manages updating a deny list and checking for CID inclusion in that list
 type BlockFilter struct {
 	filteredHashesLk sync.RWMutex

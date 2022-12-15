@@ -28,6 +28,7 @@ const expectedListGrowth = 128
 // FetcherForHTTPEndpoint makes an fetcher that reads from an HTTP endpoint
 func FetcherForHTTPEndpoint(endpoint string, authHeader string) Fetcher {
 	return func(ifModifiedSince time.Time) (bool, io.ReadCloser, error) {
+		// Allow empty badbits list
 		if endpoint == "" {
 			return false, nil, nil
 		}
@@ -134,17 +135,12 @@ func NewMultiFilter(
 	requestCounter RequestCounter,
 	apiFilterEndpoint string,
 	apiFilterAuth string,
-	customBadBitsDenyList string,
+	BadBitsDenyList string,
 ) *MultiFilter {
 	filters := []FilterDefinition{
 		{
 			CacheFile: filepath.Join(cfgDir, "denylist.json"),
 			Fetcher:   FetcherForHTTPEndpoint(BadBitsDenyList, ""),
-			Handler:   NewBlockFilter(),
-		},
-		{
-			CacheFile: filepath.Join(cfgDir, "customdenylist.json"),
-			Fetcher:   FetcherForHTTPEndpoint(customBadBitsDenyList, ""),
 			Handler:   NewBlockFilter(),
 		},
 	}
