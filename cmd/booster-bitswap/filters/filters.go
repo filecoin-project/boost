@@ -135,14 +135,17 @@ func NewMultiFilter(
 	requestCounter RequestCounter,
 	apiFilterEndpoint string,
 	apiFilterAuth string,
-	BadBitsDenyList string,
+	BadBitsDenyList []string,
 ) *MultiFilter {
-	filters := []FilterDefinition{
-		{
-			CacheFile: filepath.Join(cfgDir, "denylist.json"),
-			Fetcher:   FetcherForHTTPEndpoint(BadBitsDenyList, ""),
-			Handler:   NewBlockFilter(),
-		},
+	var filters []FilterDefinition
+	if len(BadBitsDenyList) > 0 {
+		for _, f := range BadBitsDenyList {
+			filters = append(filters, FilterDefinition{
+				CacheFile: filepath.Join(cfgDir, f),
+				Fetcher:   FetcherForHTTPEndpoint(f, ""),
+				Handler:   NewBlockFilter(),
+			})
+		}
 	}
 	var configFetcher Fetcher
 	if apiFilterEndpoint != "" {
