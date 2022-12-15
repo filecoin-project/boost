@@ -28,6 +28,9 @@ const expectedListGrowth = 128
 // FetcherForHTTPEndpoint makes an fetcher that reads from an HTTP endpoint
 func FetcherForHTTPEndpoint(endpoint string, authHeader string) Fetcher {
 	return func(ifModifiedSince time.Time) (bool, io.ReadCloser, error) {
+		if endpoint == "" {
+			return false, nil, nil
+		}
 		req, err := http.NewRequest("GET", endpoint, nil)
 		if authHeader != "" {
 			req.Header.Set("Authorization", authHeader)
