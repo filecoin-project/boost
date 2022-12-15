@@ -2,6 +2,7 @@ package piecedirectory
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -21,7 +22,7 @@ func TestPieceDoctor(t *testing.T) {
 	t.Run("leveldb", func(t *testing.T) {
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
-		testPieceDoctor(ctx, t, bdsvc)
+		testPieceDoctor(ctx, t, bdsvc, 8050)
 	})
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
@@ -29,16 +30,16 @@ func TestPieceDoctor(t *testing.T) {
 		t.Skip()
 		svc.SetupCouchbase(t, testCouchSettings)
 		bdsvc := svc.NewCouchbase(testCouchSettings)
-		testPieceDoctor(ctx, t, bdsvc)
+		testPieceDoctor(ctx, t, bdsvc, 8051)
 	})
 }
 
-func testPieceDoctor(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
-	err := bdsvc.Start(ctx, 8042)
+func testPieceDoctor(ctx context.Context, t *testing.T, bdsvc *svc.Service, port int) {
+	err := bdsvc.Start(ctx, port)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(ctx, "http://localhost:8042")
+	err = cl.Dial(ctx, fmt.Sprintf("http://localhost:%d", port))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
