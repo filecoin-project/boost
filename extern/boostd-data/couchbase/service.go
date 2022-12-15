@@ -11,6 +11,7 @@ import (
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	mh "github.com/multiformats/go-multihash"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 var log = logging.Logger("boostd-data-cb")
@@ -79,7 +80,11 @@ func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err erro
 	}(time.Now())
 
 	err = s.db.MarkIndexErrored(ctx, pieceCid, err)
-	return normalizePieceCidError(pieceCid, err)
+	if err != nil {
+		return normalizePieceCidError(pieceCid, err)
+	}
+
+	return s.FlagPiece(ctx, pieceCid)
 }
 
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
@@ -255,24 +260,51 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	return s.db.ListPieces(ctx)
 }
 
-func normalizePieceCidError(pieceCid cid.Cid, err error) error {
-	if err == nil {
-		return nil
-	}
-	if isNotFoundErr(err) {
-		return fmt.Errorf("piece %s: %s", pieceCid, types.ErrNotFound)
-	}
-	return err
+//const pieceCheckFrequencyMillis = 60 * 60 * 1000
+const pieceCheckFrequencyMillis = 1000
+
+func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "store.next_pieces_to_check")
+	defer span.End()
+
+	return s.db.NextPiecesToCheck(ctx)
 }
 
-func normalizeMultihashError(m mh.Multihash, err error) error {
-	if err == nil {
-		return nil
+func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
+	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
+	defer span.End()
+
+	return s.db.FlagPiece(ctx, pieceCid)
+}
+
+func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "store.unflag_piece")
+	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
+	defer span.End()
+
+	return s.db.UnflagPiece(ctx, pieceCid)
+}
+
+func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces")
+	var spanCursor int
+	if cursor != nil {
+		spanCursor = int(cursor.UnixMilli())
 	}
-	if isNotFoundErr(err) {
-		return fmt.Errorf("multihash %s: %s", m, types.ErrNotFound)
-	}
-	return err
+	span.SetAttributes(attribute.Int("cursor", spanCursor))
+	span.SetAttributes(attribute.Int("offset", offset))
+	span.SetAttributes(attribute.Int("limit", limit))
+	defer span.End()
+
+	return s.db.FlaggedPiecesList(ctx, cursor, offset, limit)
+}
+
+func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_count")
+	defer span.End()
+
+	return s.db.FlaggedPiecesCount(ctx)
 }
 
 // RemoveDealForPiece removes Single deal for pieceCID. If []Deals is empty then Metadata is removed as well
@@ -331,4 +363,24 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	}
 
 	return nil
+}
+
+func normalizePieceCidError(pieceCid cid.Cid, err error) error {
+	if err == nil {
+		return nil
+	}
+	if isNotFoundErr(err) {
+		return fmt.Errorf("piece %s: %s", pieceCid, types.ErrNotFound)
+	}
+	return err
+}
+
+func normalizeMultihashError(m mh.Multihash, err error) error {
+	if err == nil {
+		return nil
+	}
+	if isNotFoundErr(err) {
+		return fmt.Errorf("multihash %s: %s", m, types.ErrNotFound)
+	}
+	return err
 }

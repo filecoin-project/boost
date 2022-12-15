@@ -2,8 +2,6 @@ package gql
 
 import (
 	"context"
-	"time"
-
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/graph-gophers/graphql-go"
@@ -158,12 +156,7 @@ func (r *resolver) RetrievalLogs(ctx context.Context, args retrievalStatesArgs) 
 
 	// Fetch one extra row so that we can check if there are more rows
 	// beyond the limit
-	var cursor *time.Time
-	if args.Cursor != nil {
-		val := (*args.Cursor).Int64()
-		asTime := time.Unix(val/1000, (val%1000)*1e6)
-		cursor = &asTime
-	}
+	cursor := bigIntToTime(args.Cursor)
 	rows, err := r.retDB.List(ctx, cursor, offset, limit+1)
 	if err != nil {
 		return nil, err

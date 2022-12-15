@@ -19,6 +19,7 @@ import (
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/piecedirectory"
+	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -141,6 +142,7 @@ const (
 
 	// miner
 	GetParamsKey
+	StartPieceDoctorKey
 	HandleMigrateProviderFundsKey
 	HandleDealsKey
 	HandleCreateRetrievalTablesKey
@@ -509,6 +511,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(lotus_dtypes.StagingBlockstore), lotus_modules.StagingBlockstore),
 		Override(new(lotus_dtypes.StagingGraphsync), lotus_modules.StagingGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
 		Override(new(lotus_dtypes.ProviderPieceStore), modules.NewProviderPieceStore),
+		Override(StartPieceDoctorKey, modules.NewPieceDoctor),
 
 		// Lotus Markets (retrieval deps)
 		Override(new(sealer.PieceProvider), sealer.NewPieceProvider),
@@ -528,7 +531,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*dagstore.DAGStore), func() *dagstore.DAGStore { return nil }),
 		Override(new(*mktsdagstore.Wrapper), func() *mktsdagstore.Wrapper { return nil }),
 
-		Override(new(piecedirectory.Store), modules.NewPieceDirectoryStore(cfg)),
+		Override(new(pdtypes.Store), modules.NewPieceDirectoryStore(cfg)),
 		Override(new(*piecedirectory.PieceDirectory), modules.NewPieceDirectory(cfg)),
 		Override(DAGStoreKey, modules.NewDAGStoreWrapper),
 		//Override(new(mktsdagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),

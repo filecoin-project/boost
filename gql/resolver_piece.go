@@ -52,6 +52,77 @@ type pieceResolver struct {
 	PieceInfoDeals []*pieceInfoDeal
 }
 
+type flaggedPieceResolver struct {
+	Piece     *pieceResolver
+	CreatedAt graphql.Time
+}
+
+type piecesFlaggedArgs struct {
+	Cursor *gqltypes.BigInt // CreatedAt in milli-seconds
+	Offset graphql.NullInt
+	Limit  graphql.NullInt
+}
+
+type flaggedPieceListResolver struct {
+	TotalCount int32
+	Pieces     []*flaggedPieceResolver
+	More       bool
+}
+
+func (r *resolver) PiecesFlagged(ctx context.Context, args piecesFlaggedArgs) (*flaggedPieceListResolver, error) {
+	offset := 0
+	if args.Offset.Set && args.Offset.Value != nil && *args.Offset.Value > 0 {
+		offset = int(*args.Offset.Value)
+	}
+
+	limit := 10
+	if args.Limit.Set && args.Limit.Value != nil && *args.Limit.Value > 0 {
+		limit = int(*args.Limit.Value)
+	}
+
+	// Fetch one extra row so that we can check if there are more rows
+	// beyond the limit
+	cursor := bigIntToTime(args.Cursor)
+	flaggedPieces, err := r.piecedirectory.FlaggedPiecesList(ctx, cursor, offset, limit+1)
+	if err != nil {
+		return nil, err
+	}
+	more := len(flaggedPieces) > limit
+	if more {
+		// Truncate list to limit
+		flaggedPieces = flaggedPieces[:limit]
+	}
+
+	// Get the total row count
+	count, err := r.piecedirectory.FlaggedPiecesCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	allLegacyDeals, err := r.legacyProv.ListLocalDeals()
+	if err != nil {
+		return nil, err
+	}
+
+	flaggedPieceResolvers := make([]*flaggedPieceResolver, 0, len(flaggedPieces))
+	for _, flaggedPiece := range flaggedPieces {
+		pieceResolver, err := r.pieceStatus(ctx, flaggedPiece.PieceCid, allLegacyDeals)
+		if err != nil {
+			return nil, err
+		}
+		flaggedPieceResolvers = append(flaggedPieceResolvers, &flaggedPieceResolver{
+			Piece:     pieceResolver,
+			CreatedAt: graphql.Time{Time: flaggedPiece.CreatedAt},
+		})
+	}
+
+	return &flaggedPieceListResolver{
+		TotalCount: int32(count),
+		Pieces:     flaggedPieceResolvers,
+		More:       more,
+	}, nil
+}
+
 func (r *resolver) PiecesWithPayloadCid(ctx context.Context, args struct{ PayloadCid string }) ([]string, error) {
 	payloadCid, err := cid.Parse(args.PayloadCid)
 	if err != nil {
@@ -114,6 +185,15 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 		return nil, fmt.Errorf("%s is not a valid piece cid", args.PieceCid)
 	}
 
+	allLegacyDeals, err := r.legacyProv.ListLocalDeals()
+	if err != nil {
+		return nil, err
+	}
+
+	return r.pieceStatus(ctx, pieceCid, allLegacyDeals)
+}
+
+func (r *resolver) pieceStatus(ctx context.Context, pieceCid cid.Cid, allLegacyDeals []storagemarket.MinerDeal) (*pieceResolver, error) {
 	// Get piece info from piece directory
 	pieceInfo, err := r.piecedirectory.GetPieceMetadata(ctx, pieceCid)
 	if err != nil && !types.IsNotFound(err) {
@@ -127,11 +207,6 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 	}
 
 	// Get legacy markets deals by piece Cid
-	// TODO: add method to markets to filter deals by piece CID
-	allLegacyDeals, err := r.legacyProv.ListLocalDeals()
-	if err != nil {
-		return nil, err
-	}
 	var legacyDeals []storagemarket.MinerDeal
 	for _, dl := range allLegacyDeals {
 		if dl.Ref.PieceCid != nil && *dl.Ref.PieceCid == pieceCid {
@@ -224,8 +299,8 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 		} else {
 			secID := abi.SectorNumber(sector.ID)
 			offset := abi.PaddedPieceSize(sector.Offset).Unpadded()
-			len := abi.PaddedPieceSize(sector.Length).Unpadded()
-			isUnsealed, err := r.sa.IsUnsealed(ctx, secID, offset, len)
+			size := abi.PaddedPieceSize(sector.Length).Unpadded()
+			isUnsealed, err := r.sa.IsUnsealed(ctx, secID, offset, size)
 			st = &sealStatus{IsUnsealed: isUnsealed}
 			if err != nil {
 				st.Error = err.Error()
@@ -246,7 +321,7 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 	}
 
 	return &pieceResolver{
-		PieceCid:       args.PieceCid,
+		PieceCid:       pieceCid.String(),
 		IndexStatus:    idxStatus,
 		PieceInfoDeals: pids,
 		Deals:          deals,

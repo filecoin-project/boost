@@ -6,6 +6,7 @@ import (
 
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
@@ -17,6 +18,7 @@ import (
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/lotus/api/v1api"
+	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/markets/sectoraccessor"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
@@ -28,8 +30,8 @@ import (
 	"go.uber.org/fx"
 )
 
-func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) piecedirectory.Store {
-	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) piecedirectory.Store {
+func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) types.Store {
+	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) types.Store {
 		client := piecedirectory.NewStore()
 
 		var cancel context.CancelFunc
@@ -103,8 +105,8 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 	}
 }
 
-func NewPieceDirectory(cfg *config.Boost) func(maddr dtypes.MinerAddress, store piecedirectory.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
-	return func(maddr dtypes.MinerAddress, store piecedirectory.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
+func NewPieceDirectory(cfg *config.Boost) func(maddr dtypes.MinerAddress, store types.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
+	return func(maddr dtypes.MinerAddress, store types.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
 		sa := sectoraccessor.NewSectorAccessor(maddr, secb, pp, full)
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
 		return piecedirectory.NewPieceDirectory(store, pr, cfg.PieceDirectory.ParallelAddIndexLimit)
@@ -113,6 +115,22 @@ func NewPieceDirectory(cfg *config.Boost) func(maddr dtypes.MinerAddress, store 
 
 func NewPieceStore(pm *piecedirectory.PieceDirectory, maddr address.Address) piecestore.PieceStore {
 	return &boostPieceStoreWrapper{piecedirectory: pm, maddr: maddr}
+}
+
+func NewPieceDoctor(lc fx.Lifecycle, store types.Store, sapi mktsdagstore.SectorAccessor) *piecedirectory.Doctor {
+	doc := piecedirectory.NewDoctor(store, sapi)
+	docctx, cancel := context.WithCancel(context.Background())
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			go doc.Run(docctx)
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			cancel()
+			return nil
+		},
+	})
+	return doc
 }
 
 type boostPieceStoreWrapper struct {

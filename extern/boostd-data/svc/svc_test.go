@@ -43,6 +43,7 @@ var testCouchSettings = couchbase.DBSettings{
 	PieceOffsetsBucket: couchbase.DBSettingsBucket{
 		RAMQuotaMB: 128,
 	},
+	TestMode: true,
 }
 
 func TestService(t *testing.T) {

@@ -138,7 +138,11 @@ func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr e
 	defer s.Unlock()
 
 	err := s.db.MarkIndexErrored(ctx, pieceCid, idxErr)
-	return normalizePieceCidError(pieceCid, err)
+	if err != nil {
+		return normalizePieceCidError(pieceCid, err)
+	}
+
+	return s.FlagPiece(ctx, pieceCid)
 }
 
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
@@ -363,6 +367,31 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	}(time.Now())
 
 	return s.db.ListPieces(ctx)
+}
+
+func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
+	//TODO implement me
+	return nil, fmt.Errorf("unimplemented")
+}
+
+func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	//TODO implement me
+	return fmt.Errorf("unimplemented")
+}
+
+func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	//TODO implement me
+	return fmt.Errorf("unimplemented")
+}
+
+func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+	//TODO implement me
+	return nil, fmt.Errorf("unimplemented")
+}
+
+func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
+	//TODO implement me
+	return 0, fmt.Errorf("unimplemented")
 }
 
 func normalizePieceCidError(pieceCid cid.Cid, err error) error {

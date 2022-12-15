@@ -76,3 +76,10 @@ func (ofsz *OffsetSize) UnmarshallBase64(str string) error {
 
 	return nil
 }
+
+// FlaggedPiece is a piece that has been flagged for the user's attention
+// (eg because the index is missing)
+type FlaggedPiece struct {
+	CreatedAt time.Time
+	PieceCid  cid.Cid
+}

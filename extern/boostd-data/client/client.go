@@ -32,6 +32,11 @@ type Store struct {
 		RemoveDealForPiece        func(context.Context, cid.Cid, string) error
 		RemovePieceMetadata       func(context.Context, cid.Cid) error
 		RemoveIndexes             func(context.Context, cid.Cid) error
+		NextPiecesToCheck         func(ctx context.Context) ([]cid.Cid, error)
+		FlagPiece                 func(ctx context.Context, pieceCid cid.Cid) error
+		UnflagPiece               func(ctx context.Context, pieceCid cid.Cid) error
+		FlaggedPiecesList         func(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)
+		FlaggedPiecesCount        func(ctx context.Context) (int, error)
 	}
 	closer jsonrpc.ClientCloser
 }
@@ -145,4 +150,24 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 
 func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	return s.client.ListPieces(ctx)
+}
+
+func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
+	return s.client.NextPiecesToCheck(ctx)
+}
+
+func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	return s.client.FlagPiece(ctx, pieceCid)
+}
+
+func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	return s.client.UnflagPiece(ctx, pieceCid)
+}
+
+func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+	return s.client.FlaggedPiecesList(ctx, cursor, offset, limit)
+}
+
+func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
+	return s.client.FlaggedPiecesCount(ctx)
 }

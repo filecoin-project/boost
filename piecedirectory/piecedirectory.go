@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
+	"github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
@@ -22,49 +24,15 @@ import (
 	"github.com/ipld/go-car/util"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
-	"github.com/ipld/go-car/v2/index"
 	carindex "github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
 )
 
 var log = logging.Logger("piecedirectory")
 
-//go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecedirectory.go -package=mock_piecedirectory . SectionReader,PieceReader,Store
-
-type SectionReader interface {
-	io.Reader
-	io.ReaderAt
-	io.Seeker
-	io.Closer
-}
-
-type PieceReader interface {
-	// GetReader returns a reader over a piece. If there is no unsealed copy, returns ErrSealed.
-	GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error)
-}
-
-type Store interface {
-	AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error
-	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error
-	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
-	GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, error)
-	GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error)
-	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
-	GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error)
-	SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error
-	PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error)
-	MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error
-	RemoveDealForPiece(context.Context, cid.Cid, string) error
-	RemovePieceMetadata(context.Context, cid.Cid) error
-	RemoveIndexes(context.Context, cid.Cid) error
-
-	//Delete(ctx context.Context, pieceCid cid.Cid) error
-	//DeleteDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid uuid.UUID) (bool, error)
-}
-
 type PieceDirectory struct {
-	store       Store
-	pieceReader PieceReader
+	store       types.Store
+	pieceReader types.PieceReader
 
 	addIdxThrottle chan struct{}
 	addIdxOpByCid  sync.Map
@@ -74,7 +42,7 @@ func NewStore() *client.Store {
 	return client.NewStore()
 }
 
-func NewPieceDirectory(store Store, pr PieceReader, addIndexThrottleSize int) *PieceDirectory {
+func NewPieceDirectory(store types.Store, pr types.PieceReader, addIndexThrottleSize int) *PieceDirectory {
 	return &PieceDirectory{
 		store:          store,
 		pieceReader:    pr,
@@ -86,11 +54,19 @@ type SectorAccessorAsPieceReader struct {
 	dagstore.SectorAccessor
 }
 
-func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error) {
+func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (types.SectionReader, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "sealer.get_reader")
 	defer span.End()
 
 	return s.SectorAccessor.UnsealSectorAt(ctx, id, offset.Unpadded(), length.Unpadded())
+}
+
+func (ps *PieceDirectory) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+	return ps.store.FlaggedPiecesList(ctx, cursor, offset, limit)
+}
+
+func (ps *PieceDirectory) FlaggedPiecesCount(ctx context.Context) (int, error) {
+	return ps.store.FlaggedPiecesCount(ctx)
 }
 
 // Get all metadata about a particular piece
@@ -358,7 +334,7 @@ func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.C
 //}
 
 // Used internally, and also by HTTP retrieval
-func (ps *PieceDirectory) GetPieceReader(ctx context.Context, pieceCid cid.Cid) (SectionReader, error) {
+func (ps *PieceDirectory) GetPieceReader(ctx context.Context, pieceCid cid.Cid) (types.SectionReader, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_reader")
 	defer span.End()
 

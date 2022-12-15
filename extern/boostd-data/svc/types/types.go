@@ -36,6 +36,11 @@ type Service interface {
 	RemoveDealForPiece(context.Context, cid.Cid, string) error
 	RemovePieceMetadata(context.Context, cid.Cid) error
 	RemoveIndexes(context.Context, cid.Cid) error
+	NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error)
+	FlagPiece(ctx context.Context, pieceCid cid.Cid) error
+	UnflagPiece(ctx context.Context, pieceCid cid.Cid) error
+	FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)
+	FlaggedPiecesCount(ctx context.Context) (int, error)
 }
 
 type ServiceImpl interface {

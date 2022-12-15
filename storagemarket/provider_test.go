@@ -21,7 +21,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/piecedirectory"
-	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/mocks"
+	"github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	mock_sealingpipeline "github.com/filecoin-project/boost/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/logs"
