@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/benbjohnson/clock"
@@ -139,9 +140,9 @@ func NewMultiFilter(
 ) *MultiFilter {
 	var filters []FilterDefinition
 	if len(BadBitsDenyList) > 0 {
-		for _, f := range BadBitsDenyList {
+		for i, f := range BadBitsDenyList {
 			filters = append(filters, FilterDefinition{
-				CacheFile: filepath.Join(cfgDir, f),
+				CacheFile: filepath.Join(cfgDir, "denylist"+strconv.Itoa(i)+".json"),
 				Fetcher:   FetcherForHTTPEndpoint(f, ""),
 				Handler:   NewBlockFilter(),
 			})
