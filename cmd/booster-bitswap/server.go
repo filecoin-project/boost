@@ -30,16 +30,15 @@ type BandwidthMeasure interface {
 }
 
 type BitswapServer struct {
-	remoteStore         blockstore.Blockstore
-	filter              Filter
-	requestCounter      RequestCounter
-	bandwidthMeasure    BandwidthMeasure
-	ctx                 context.Context
-	cancel              context.CancelFunc
-	proxy               *peer.AddrInfo
-	server              *server.Server
-	host                host.Host
-	customBadbitsFilter string
+	remoteStore      blockstore.Blockstore
+	filter           Filter
+	requestCounter   RequestCounter
+	bandwidthMeasure BandwidthMeasure
+	ctx              context.Context
+	cancel           context.CancelFunc
+	proxy            *peer.AddrInfo
+	server           *server.Server
+	host             host.Host
 }
 
 func NewBitswapServer(
