@@ -375,9 +375,7 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 }
 
 func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
-	//TODO implement me
 	return s.ListPieces(ctx)
-	//return nil, fmt.Errorf("unimplemented")
 }
 
 func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
@@ -446,7 +444,6 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset
 		log.Debugw("handled.flagged-pieces-list", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	//TODO: use cursor, offset, limit
 	return s.db.ListFlaggedPieces(ctx)
 }
 
@@ -457,7 +454,7 @@ func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.flagged-pieces-list", "count", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.flagged-pieces-count", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
 	return s.db.FlaggedPiecesCount(ctx)
