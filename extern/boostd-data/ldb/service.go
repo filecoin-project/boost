@@ -21,6 +21,11 @@ import (
 
 var log = logging.Logger("boostd-data-ldb")
 
+type LeveldbFlaggedMetadata struct {
+	CreatedAt time.Time `json:"c"`
+	UpdatedAt time.Time `json:"u"`
+}
+
 type LeveldbMetadata struct {
 	model.Metadata
 	Cursor uint64 `json:"c"`
@@ -371,27 +376,91 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 
 func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 	//TODO implement me
-	return nil, fmt.Errorf("unimplemented")
+	return s.ListPieces(ctx)
+	//return nil, fmt.Errorf("unimplemented")
 }
 
 func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
-	//TODO implement me
-	return fmt.Errorf("unimplemented")
+	log.Debugw("handle.flag-piece", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.flag-piece", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
+
+	now := time.Now()
+
+	// Get the existing deals for the piece
+	fm, err := s.db.GetPieceCidToFlagged(ctx, pieceCid)
+	if err != nil {
+		if !errors.Is(err, ds.ErrNotFound) {
+			return fmt.Errorf("getting piece cid flagged metadata for piece %s: %w", pieceCid, err)
+		}
+		// there isn't yet any flagged metadata, so create new metadata
+		fm = LeveldbFlaggedMetadata{CreatedAt: now}
+	}
+
+	fm.UpdatedAt = now
+
+	// Write the piece metadata back to the db
+	err = s.db.SetPieceCidToFlagged(ctx, pieceCid, fm)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
-	//TODO implement me
-	return fmt.Errorf("unimplemented")
+	log.Debugw("handle.unflag-piece", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.unflag_piece")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.unflag-piece", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
+
+	err := s.db.DeletePieceCidToFlagged(ctx, pieceCid)
+	if err != nil {
+		return fmt.Errorf("deleting piece cid flagged metadata for piece %s: %w", pieceCid, err)
+	}
+	return nil
 }
 
 func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
-	//TODO implement me
-	return nil, fmt.Errorf("unimplemented")
+	log.Debugw("handle.flagged-pieces-list")
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_list")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.flagged-pieces-list", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	//TODO: use cursor, offset, limit
+	return s.db.ListFlaggedPieces(ctx)
 }
 
 func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
-	//TODO implement me
-	return 0, fmt.Errorf("unimplemented")
+	log.Debugw("handle.flagged-pieces-count")
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_count")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.flagged-pieces-list", "count", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	return s.db.FlaggedPiecesCount(ctx)
 }
 
 func normalizePieceCidError(pieceCid cid.Cid, err error) error {

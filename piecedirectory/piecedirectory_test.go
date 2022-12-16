@@ -25,15 +25,12 @@ func TestPieceDirectory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
-	//t.Run("leveldb", func(t *testing.T) {
-	//bdsvc, err := svc.NewLevelDB("")
-	//require.NoError(t, err)
-	//testPieceDirectory(ctx, t, bdsvc)
-	//})
+	t.Run("leveldb", func(t *testing.T) {
+		bdsvc, err := svc.NewLevelDB("")
+		require.NoError(t, err)
+		testPieceDirectory(ctx, t, bdsvc)
+	})
 	t.Run("couchbase", func(t *testing.T) {
-		// TODO: Unskip this test once the couchbase instance can be created
-		//  from a docker container as part of the test
-		//t.Skip()
 		setupCouchbase(t)
 		bdsvc := svc.NewCouchbase(testCouchSettings)
 		testPieceDirectory(ctx, t, bdsvc)
@@ -41,11 +38,11 @@ func TestPieceDirectory(t *testing.T) {
 }
 
 func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
-	err := bdsvc.Start(ctx, 8042)
+	err := bdsvc.Start(ctx, 8044)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(ctx, "http://localhost:8042")
+	err = cl.Dial(ctx, "http://localhost:8044")
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 

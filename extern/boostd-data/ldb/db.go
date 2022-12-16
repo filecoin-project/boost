@@ -34,6 +34,14 @@ var (
 	// LevelDB keys will be built by concatenating Multihash to this prefix.
 	prefixMhtoPieceCids  uint64 = 2
 	sprefixMhtoPieceCids string
+
+	// LevelDB key prefix for Flagged pieces table.
+	// LevelDB keys will be built by concatenating PieceCid to this prefix.
+	prefixPieceCidToFlagged  uint64 = 3
+	sprefixPieceCidToFlagged string
+
+	/////////////////////////////////////////
+	// Prefixes up to 100 are system prefixes
 )
 
 func init() {
@@ -48,6 +56,10 @@ func init() {
 	buf = make([]byte, binary.MaxVarintLen64)
 	binary.PutUvarint(buf, prefixMhtoPieceCids)
 	sprefixMhtoPieceCids = string(buf)
+
+	buf = make([]byte, binary.MaxVarintLen64)
+	binary.PutUvarint(buf, prefixPieceCidToFlagged)
+	sprefixPieceCidToFlagged = string(buf)
 }
 
 type DB struct {
@@ -201,6 +213,43 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, recs []carindex.Reco
 	}
 
 	return nil
+}
+
+// SetPieceCidToFlagged
+func (db *DB) SetPieceCidToFlagged(ctx context.Context, pieceCid cid.Cid, fm LeveldbFlaggedMetadata) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.set_piece_cid_to_flagged")
+	defer span.End()
+
+	b, err := json.Marshal(fm)
+	if err != nil {
+		return err
+	}
+
+	key := datastore.NewKey(fmt.Sprintf("%s/%s", sprefixPieceCidToFlagged, pieceCid.String()))
+
+	return db.Put(ctx, key, b)
+}
+
+// GetPieceCidToFlagged
+func (db *DB) GetPieceCidToFlagged(ctx context.Context, pieceCid cid.Cid) (LeveldbFlaggedMetadata, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.get_piece_cid_to_flagged")
+	defer span.End()
+
+	var metadata LeveldbFlaggedMetadata
+
+	key := datastore.NewKey(fmt.Sprintf("%s/%s", sprefixPieceCidToFlagged, pieceCid.String()))
+
+	b, err := db.Get(ctx, key)
+	if err != nil {
+		return metadata, fmt.Errorf("getting flagged metadata for piece %s: %w", pieceCid, err)
+	}
+
+	err = json.Unmarshal(b, &metadata)
+	if err != nil {
+		return metadata, fmt.Errorf("unmarshaling flagged metadata for piece %s: %w", pieceCid, err)
+	}
+
+	return metadata, nil
 }
 
 // SetPieceCidToMetadata
@@ -525,4 +574,79 @@ func (db *DB) RemoveIndexes(ctx context.Context, cursor uint64, pieceCid cid.Cid
 	}
 
 	return nil
+}
+
+func (db *DB) ListFlaggedPieces(ctx context.Context) ([]model.FlaggedPiece, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.list_flagged_pieces")
+	defer span.End()
+
+	q := query.Query{
+		Prefix:   "/" + sprefixPieceCidToFlagged + "/",
+		KeysOnly: true,
+	}
+	results, err := db.Query(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("listing flagged pieces in database: %w", err)
+	}
+
+	var records []model.FlaggedPiece
+	for {
+		r, ok := results.NextSync()
+		if !ok {
+			break
+		}
+
+		k := r.Key[len(q.Prefix):]
+		pieceCid, err := cid.Parse(k)
+		if err != nil {
+			return nil, fmt.Errorf("parsing piece cid '%s': %w", k, err)
+		}
+
+		var v LeveldbFlaggedMetadata
+		err = json.Unmarshal(r.Value, &v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal pieceCids slice: %w", err)
+		}
+
+		records = append(records, model.FlaggedPiece{CreatedAt: v.CreatedAt, PieceCid: pieceCid})
+	}
+
+	return records, nil
+}
+
+func (db *DB) FlaggedPiecesCount(ctx context.Context) (int, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.flagged_pieces_count")
+	defer span.End()
+
+	q := query.Query{
+		Prefix:   "/" + sprefixPieceCidToFlagged + "/",
+		KeysOnly: true,
+	}
+	results, err := db.Query(ctx, q)
+	if err != nil {
+		return -1, fmt.Errorf("listing flagged pieces in database: %w", err)
+	}
+
+	var i int
+	for {
+		_, ok := results.NextSync()
+		if !ok {
+			break
+		}
+
+		i++
+	}
+
+	return i, nil
+}
+
+// DeletePieceCidToFlagged
+func (db *DB) DeletePieceCidToFlagged(ctx context.Context, pieceCid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.delete_piece_flagged_metadata")
+	defer span.End()
+
+	key := datastore.NewKey(fmt.Sprintf("%s/%s", sprefixPieceCidToFlagged, pieceCid.String()))
+
+	// TODO: Requires DB compaction for removing the key
+	return db.Delete(ctx, key)
 }
