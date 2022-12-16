@@ -26,9 +26,7 @@ func TestPieceDoctor(t *testing.T) {
 		testPieceDoctor(ctx, t, bdsvc)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		// TODO: Unskip this test once the couchbase instance can be created
-		//  from a docker container as part of the test
-		//t.Skip()
+		setupCouchbase(t)
 		bdsvc := svc.NewCouchbase(testCouchSettings)
 		testPieceDoctor(ctx, t, bdsvc)
 	})

@@ -56,15 +56,15 @@ func TestService(t *testing.T) {
 		require.NoError(t, err)
 		testService(ctx, t, bdsvc, 8042)
 	})
-	t.Run("couchbase", func(t *testing.T) {
-		// Running couchbase tests may require download the docker container
-		// so set a high timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		defer cancel()
-		setupCouchbase(t)
-		bdsvc := NewCouchbase(testCouchSettings)
-		testService(ctx, t, bdsvc, 8043)
-	})
+	//t.Run("couchbase", func(t *testing.T) {
+	//// Running couchbase tests may require download the docker container
+	//// so set a high timeout
+	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	//defer cancel()
+	//setupCouchbase(t)
+	//bdsvc := NewCouchbase(testCouchSettings)
+	//testService(ctx, t, bdsvc, 8043)
+	//})
 }
 
 func testService(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
