@@ -29,7 +29,7 @@ func TestPieceDoctor(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container as part of the test
 		//t.Skip()
-		bdsvc := svc.NewCouchbase(TestCouchSettings)
+		bdsvc := svc.NewCouchbase(testCouchSettings)
 		testPieceDoctor(ctx, t, bdsvc)
 	})
 }
@@ -70,7 +70,7 @@ func testNextPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// Sleep for half the piece check period
-	time.Sleep(TestCouchSettings.PieceCheckPeriod / 2)
+	time.Sleep(testCouchSettings.PieceCheckPeriod / 2)
 
 	// NextPiecesToCheck should return the piece (because it hasn't been checked yet)
 	pcids, err := cl.NextPiecesToCheck(ctx)
@@ -84,7 +84,7 @@ func testNextPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NotContains(t, pcids, pieceCid)
 
 	// Sleep for at least the piece check period
-	time.Sleep(2 * TestCouchSettings.PieceCheckPeriod)
+	time.Sleep(2 * testCouchSettings.PieceCheckPeriod)
 
 	// Calling NextPiecesToCheck should return the piece, because it has not
 	// been checked for at least one piece check period

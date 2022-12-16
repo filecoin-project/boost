@@ -22,7 +22,7 @@ import (
 )
 
 func TestPieceDirectory(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
 	//t.Run("leveldb", func(t *testing.T) {
@@ -35,7 +35,7 @@ func TestPieceDirectory(t *testing.T) {
 		//  from a docker container as part of the test
 		//t.Skip()
 		setupCouchbase(t)
-		bdsvc := svc.NewCouchbase(TestCouchSettings)
+		bdsvc := svc.NewCouchbase(testCouchSettings)
 		testPieceDirectory(ctx, t, bdsvc)
 	})
 }

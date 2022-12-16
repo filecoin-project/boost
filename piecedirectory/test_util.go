@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var TestCouchSettings = couchbase.DBSettings{
+var testCouchSettings = couchbase.DBSettings{
 	ConnectString: "couchbase://localhost",
 	Auth: couchbase.DBSettingsAuth{
 		Username: "Administrator",
@@ -36,8 +36,6 @@ var TestCouchSettings = couchbase.DBSettings{
 	PieceCheckPeriod: 1000 * time.Millisecond,
 	TestMode:         true,
 }
-
-var testCouchSettings = TestCouchSettings
 
 // Get the index records from the CAR file
 func GetRecords(t *testing.T, reader car.SectionReader) []model.Record {

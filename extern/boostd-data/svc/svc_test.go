@@ -49,7 +49,7 @@ var testCouchSettings = couchbase.DBSettings{
 func TestService(t *testing.T) {
 	_ = logging.SetLogLevel("*", "debug")
 
-	t.Run("level db", func(t *testing.T) {
+	t.Run("leveldb", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		bdsvc, err := NewLevelDB("")
