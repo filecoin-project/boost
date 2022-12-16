@@ -25,15 +25,16 @@ func TestPieceDirectory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	t.Run("leveldb", func(t *testing.T) {
-		bdsvc, err := svc.NewLevelDB("")
-		require.NoError(t, err)
-		testPieceDirectory(ctx, t, bdsvc)
-	})
+	//t.Run("leveldb", func(t *testing.T) {
+	//bdsvc, err := svc.NewLevelDB("")
+	//require.NoError(t, err)
+	//testPieceDirectory(ctx, t, bdsvc)
+	//})
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container as part of the test
-		t.Skip()
+		//t.Skip()
+		setupCouchbase(t)
 		bdsvc := svc.NewCouchbase(TestCouchSettings)
 		testPieceDirectory(ctx, t, bdsvc)
 	})

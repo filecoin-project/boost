@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/piecedirectory/types"
-	"github.com/filecoin-project/boost/piecedirectory/types/mocks"
+	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
@@ -19,7 +19,7 @@ import (
 )
 
 var TestCouchSettings = couchbase.DBSettings{
-	ConnectString: "couchbase://127.0.0.1",
+	ConnectString: "couchbase://localhost",
 	Auth: couchbase.DBSettingsAuth{
 		Username: "Administrator",
 		Password: "boostdemo",
@@ -36,6 +36,8 @@ var TestCouchSettings = couchbase.DBSettings{
 	PieceCheckPeriod: 1000 * time.Millisecond,
 	TestMode:         true,
 }
+
+var testCouchSettings = TestCouchSettings
 
 // Get the index records from the CAR file
 func GetRecords(t *testing.T, reader car.SectionReader) []model.Record {
