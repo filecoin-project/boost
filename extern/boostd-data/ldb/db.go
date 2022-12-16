@@ -582,7 +582,7 @@ func (db *DB) ListFlaggedPieces(ctx context.Context) ([]model.FlaggedPiece, erro
 
 	q := query.Query{
 		Prefix:   "/" + sprefixPieceCidToFlagged + "/",
-		KeysOnly: true,
+		KeysOnly: false,
 	}
 	results, err := db.Query(ctx, q)
 	if err != nil {
@@ -605,7 +605,7 @@ func (db *DB) ListFlaggedPieces(ctx context.Context) ([]model.FlaggedPiece, erro
 		var v LeveldbFlaggedMetadata
 		err = json.Unmarshal(r.Value, &v)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal pieceCids slice: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal LeveldbFlaggedMetadata: %w; %v", err, r.Value)
 		}
 
 		records = append(records, model.FlaggedPiece{CreatedAt: v.CreatedAt, PieceCid: pieceCid})
