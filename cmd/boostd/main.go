@@ -44,6 +44,7 @@ func main() {
 			dummydealCmd,
 			dataTransfersCmd,
 			retrievalDealsCmd,
+			storageDealsCmd,
 			indexProvCmd,
 			importDataCmd,
 			logCmd,
