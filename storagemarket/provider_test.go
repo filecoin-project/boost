@@ -1155,7 +1155,7 @@ func (h *ProviderHarness) AssertPublishConfirmed(t *testing.T, ctx context.Conte
 
 func (h *ProviderHarness) AssertPieceAdded(t *testing.T, ctx context.Context, dp *types.DealParams, so *smtestutil.StubbedMinerOutput, carv2FilePath string) {
 	h.AssertEventuallyDealCleanedup(t, ctx, dp)
-	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.IndexedAndAnnounced, so.SectorID, so.Offset, dp.ClientDealProposal.Proposal.PieceSize.Unpadded().Padded(), "")
+	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.Indexed, so.SectorID, so.Offset, dp.ClientDealProposal.Proposal.PieceSize.Unpadded().Padded(), "")
 	// Assert that the original file data we sent matches what was sent to the sealer
 	h.AssertSealedContents(t, carv2FilePath, *so.SealedBytes)
 	// assert that dagstore and piecestore have this deal
