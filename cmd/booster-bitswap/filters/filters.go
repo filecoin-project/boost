@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/benbjohnson/clock"
 	"github.com/ipfs/go-cid"
-	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // UpdateInterval is the default interval at which the public list is refected and updated
@@ -28,6 +29,10 @@ const expectedListGrowth = 128
 // FetcherForHTTPEndpoint makes an fetcher that reads from an HTTP endpoint
 func FetcherForHTTPEndpoint(endpoint string, authHeader string) Fetcher {
 	return func(ifModifiedSince time.Time) (bool, io.ReadCloser, error) {
+		// Allow empty badbits list
+		if endpoint == "" {
+			return false, nil, nil
+		}
 		req, err := http.NewRequest("GET", endpoint, nil)
 		if authHeader != "" {
 			req.Header.Set("Authorization", authHeader)
@@ -131,13 +136,17 @@ func NewMultiFilter(
 	requestCounter RequestCounter,
 	apiFilterEndpoint string,
 	apiFilterAuth string,
+	BadBitsDenyList []string,
 ) *MultiFilter {
-	filters := []FilterDefinition{
-		{
-			CacheFile: filepath.Join(cfgDir, "denylist.json"),
-			Fetcher:   FetcherForHTTPEndpoint(BadBitsDenyList, ""),
-			Handler:   NewBlockFilter(),
-		},
+	var filters []FilterDefinition
+	if len(BadBitsDenyList) > 0 {
+		for i, f := range BadBitsDenyList {
+			filters = append(filters, FilterDefinition{
+				CacheFile: filepath.Join(cfgDir, "denylist"+strconv.Itoa(i)+".json"),
+				Fetcher:   FetcherForHTTPEndpoint(f, ""),
+				Handler:   NewBlockFilter(),
+			})
+		}
 	}
 	var configFetcher Fetcher
 	if apiFilterEndpoint != "" {
