@@ -529,6 +529,8 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 		return "Adding to Sector"
 	case dealcheckpoints.AddedPiece:
 		return "Announcing"
+	case dealcheckpoints.Indexed:
+		return dr.sealingState(ctx)
 	case dealcheckpoints.IndexedAndAnnounced:
 		return dr.sealingState(ctx)
 	case dealcheckpoints.Complete:

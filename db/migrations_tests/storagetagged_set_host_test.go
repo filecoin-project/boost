@@ -31,6 +31,10 @@ func TestStorageTaggedSetHost(t *testing.T) {
 	_, err := sqldb.Exec(`ALTER TABLE Deals ADD FastRetrieval BOOL`)
 	require.NoError(t, err)
 
+	// Add AnnounceToIPNI to allow tests to works
+	_, err = sqldb.Exec(`ALTER TABLE Deals ADD AnnounceToIPNI BOOL`)
+	require.NoError(t, err)
+
 	deals, err := db.GenerateNDeals(2)
 	req.NoError(err)
 

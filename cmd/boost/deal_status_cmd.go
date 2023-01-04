@@ -175,6 +175,11 @@ func statusMessage(resp *types.DealStatusResponse) string {
 		return "Adding to Sector"
 	case dealcheckpoints.AddedPiece.String():
 		return "Announcing"
+	case dealcheckpoints.Indexed.String():
+		if resp.DealStatus.SealingStatus != "" {
+			return "Sealing: " + resp.DealStatus.SealingStatus
+		}
+		return "Sealing"
 	case dealcheckpoints.IndexedAndAnnounced.String():
 		if resp.DealStatus.SealingStatus != "" {
 			return "Sealing: " + resp.DealStatus.SealingStatus

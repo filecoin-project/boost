@@ -631,6 +631,9 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 			//Check for fast retrieval
 			require.False(t, td.params.FastRetrieval)
 
+			//Check for AnnounceToINPI
+			require.False(t, td.params.AnnounceToIPNI)
+
 			sub, err := dh.subscribeUpdates()
 			require.NoError(t, err)
 			td.sub = sub

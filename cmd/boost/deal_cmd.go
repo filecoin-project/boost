@@ -86,6 +86,11 @@ var dealFlags = []cli.Flag{
 		Name:  "wallet",
 		Usage: "wallet address to be used to initiate the deal",
 	},
+	&cli.BoolFlag{
+		Name:  "AnnounceToIPNI",
+		Usage: "indicates that deal index should be announced to the IPNI(Network Indexer)",
+		Value: true,
+	},
 }
 
 var dealCmd = &cli.Command{
@@ -257,6 +262,7 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		IsOffline:          !isOnline,
 		Transfer:           transfer,
 		FastRetrieval:      cctx.Bool("fast-retrieval"),
+		AnnounceToIPNI:     cctx.Bool("AnnounceToIPNI"),
 	}
 
 	log.Debugw("about to submit deal proposal", "uuid", dealUuid.String())

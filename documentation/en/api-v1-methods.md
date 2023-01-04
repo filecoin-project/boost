@@ -398,7 +398,8 @@ Response:
   "Err": "string value",
   "Retry": "auto",
   "NBytesReceived": 9,
-  "FastRetrieval": true
+  "FastRetrieval": true,
+  "AnnounceToIPNI": true
 }
 ```
 
@@ -464,7 +465,8 @@ Response:
   "Err": "string value",
   "Retry": "auto",
   "NBytesReceived": 9,
-  "FastRetrieval": true
+  "FastRetrieval": true,
+  "AnnounceToIPNI": true
 }
 ```
 
@@ -509,7 +511,8 @@ Inputs:
       "Params": "Ynl0ZSBhcnJheQ==",
       "Size": 42
     },
-    "FastRetrieval": true
+    "FastRetrieval": true,
+    "AnnounceToIPNI": true
   }
 ]
 ```

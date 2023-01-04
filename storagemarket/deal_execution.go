@@ -219,12 +219,16 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 	}
 
 	// Index deal in DAGStore and Announce deal
-	if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
+	if deal.Checkpoint < dealcheckpoints.Indexed {
 		if err := p.indexAndAnnounce(ctx, pub, deal); err != nil {
 			err.error = fmt.Errorf("failed to add index and announce deal: %w", err.error)
 			return err
 		}
-		p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed and announced")
+		if deal.AnnounceToIPNI {
+			p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed and announced")
+		} else {
+			p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed")
+		}
 	} else {
 		p.dealLogger.Infow(deal.DealUuid, "deal has already been indexed and announced")
 	}
@@ -596,21 +600,31 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 
 	// if the index provider is enabled
 	if p.ip.Enabled() {
-		// announce to the network indexer but do not fail the deal if the announcement fails
-		annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
-		if err != nil {
-			return &dealMakingError{
-				retry: types.DealRetryAuto,
-				error: fmt.Errorf("failed to announce deal to network indexer: %w", err),
+		if deal.AnnounceToIPNI {
+			// announce to the network indexer but do not fail the deal if the announcement fails
+			annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
+			if err != nil {
+				return &dealMakingError{
+					retry: types.DealRetryAuto,
+					error: fmt.Errorf("failed to announce deal to network indexer: %w", err),
+				}
 			}
+			p.dealLogger.Infow(deal.DealUuid, "announced deal to network indexer", "announcement-cid", annCid)
+		} else {
+			p.dealLogger.Infow(deal.DealUuid, "didn't announce deal as requested in the deal proposal")
 		}
-		p.dealLogger.Infow(deal.DealUuid, "announced deal to network indexer", "announcement-cid", annCid)
 	} else {
 		p.dealLogger.Infow(deal.DealUuid, "didn't announce deal because network indexer is disabled")
 	}
 
-	if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced); derr != nil {
-		return derr
+	if deal.AnnounceToIPNI {
+		if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced); derr != nil {
+			return derr
+		}
+	} else {
+		if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.Indexed); derr != nil {
+			return derr
+		}
 	}
 
 	return nil

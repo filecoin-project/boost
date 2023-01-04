@@ -228,7 +228,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 
 	cw := cbg.NewCborWriter(w)
 
-	if _, err := cw.Write([]byte{166}); err != nil {
+	if _, err := cw.Write([]byte{167}); err != nil {
 		return err
 	}
 
@@ -333,6 +333,22 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	}
 
 	if err := cbg.WriteBool(w, t.FastRetrieval); err != nil {
+		return err
+	}
+
+	// t.AnnounceToIPNI (bool) (bool)
+	if len("AnnounceToIPNI") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"AnnounceToIPNI\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("AnnounceToIPNI"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("AnnounceToIPNI")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteBool(w, t.AnnounceToIPNI); err != nil {
 		return err
 	}
 	return nil
@@ -466,6 +482,24 @@ func (t *DealParams) UnmarshalCBOR(r io.Reader) (err error) {
 				t.FastRetrieval = false
 			case 21:
 				t.FastRetrieval = true
+			default:
+				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
+			}
+			// t.AnnounceToIPNI (bool) (bool)
+		case "AnnounceToIPNI":
+
+			maj, extra, err = cr.ReadHeader()
+			if err != nil {
+				return err
+			}
+			if maj != cbg.MajOther {
+				return fmt.Errorf("booleans must be major type 7")
+			}
+			switch extra {
+			case 20:
+				t.AnnounceToIPNI = false
+			case 21:
+				t.AnnounceToIPNI = true
 			default:
 				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
 			}

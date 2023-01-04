@@ -278,6 +278,7 @@ func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, client
 		IsOffline:          dp.IsOffline,
 		Retry:              smtypes.DealRetryAuto,
 		FastRetrieval:      dp.FastRetrieval,
+		AnnounceToIPNI:     dp.AnnounceToIPNI,
 	}
 	// validate the deal proposal
 	if err := p.validateDealProposal(ds); err != nil {
@@ -398,10 +399,10 @@ func (p *Provider) Start() error {
 
 	// cleanup all deals that have finished successfully
 	for _, deal := range activeDeals {
-		// Make sure that deals that have reached the index and announce stage
+		// Make sure that deals that have reached the Indexed or IndexedAndAnnounced stage
 		// have their resources untagged
 		// TODO Update this once we start listening for expired/slashed deals etc
-		if deal.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
+		if deal.Checkpoint >= dealcheckpoints.Indexed {
 			// cleanup if cleanup didn't finish before we restarted
 			p.cleanupDealOnRestart(deal)
 		}
@@ -410,7 +411,7 @@ func (p *Provider) Start() error {
 	// Restart active deals
 	for _, deal := range activeDeals {
 		// Check if deal is already proving
-		if deal.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
+		if deal.Checkpoint >= dealcheckpoints.Indexed {
 			si, err := p.sps.SectorsStatus(p.ctx, deal.SectorID, false)
 			if err != nil || isFinalSealingState(si.State) {
 				continue

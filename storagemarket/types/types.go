@@ -84,6 +84,7 @@ type DealParams struct {
 	DealDataRoot       cid.Cid
 	Transfer           Transfer // Transfer params will be the zero value if this is an offline deal
 	FastRetrieval      bool
+	AnnounceToIPNI     bool
 }
 
 type DealFilterParams struct {
