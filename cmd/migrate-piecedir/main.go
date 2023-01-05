@@ -42,6 +42,7 @@ func main() {
 		Commands: []*cli.Command{
 			migrateLevelDBCmd,
 			migrateCouchDBCmd,
+			migrateReverseCmd,
 		},
 	}
 	app.Setup()
