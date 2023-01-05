@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/piecedirectory/types"
-	"github.com/filecoin-project/boost/piecedirectory/types/mocks"
+	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var TestCouchSettings = couchbase.DBSettings{
-	ConnectString: "couchbase://127.0.0.1",
+var testCouchSettings = couchbase.DBSettings{
+	ConnectString: "couchbase://localhost",
 	Auth: couchbase.DBSettingsAuth{
 		Username: "Administrator",
 		Password: "boostdemo",

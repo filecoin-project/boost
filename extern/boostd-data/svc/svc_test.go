@@ -49,7 +49,7 @@ var testCouchSettings = couchbase.DBSettings{
 func TestService(t *testing.T) {
 	_ = logging.SetLogLevel("*", "debug")
 
-	t.Run("level db", func(t *testing.T) {
+	t.Run("leveldb", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		bdsvc, err := NewLevelDB("")
@@ -57,11 +57,14 @@ func TestService(t *testing.T) {
 		testService(ctx, t, bdsvc, 8042)
 	})
 	t.Run("couchbase", func(t *testing.T) {
+		// TODO: Unskip this test once the couchbase instance can be created
+		//  from a docker container in CI as part of the test
+		t.Skip()
 		// Running couchbase tests may require download the docker container
 		// so set a high timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-		setupCouchbase(t)
+		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
 		testService(ctx, t, bdsvc, 8043)
 	})
@@ -164,7 +167,10 @@ func TestServiceFuzz(t *testing.T) {
 		testServiceFuzz(ctx, t, bdsvc, 8042)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		setupCouchbase(t)
+		// TODO: Unskip this test once the couchbase instance can be created
+		//  from a docker container in CI as part of the test
+		t.Skip()
+		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
 		testServiceFuzz(ctx, t, bdsvc, 8043)
 	})
@@ -381,9 +387,10 @@ func TestCleanup(t *testing.T) {
 		testCleanup(ctx, t, bdsvc, 8042)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		// Enable it back once SB tests are working on CI
-		t.Skip(t)
-		setupCouchbase(t)
+		// TODO: Unskip this test once the couchbase instance can be created
+		//  from a docker container in CI as part of the test
+		t.Skip()
+		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
 		testCleanup(ctx, t, bdsvc, 8043)
 	})

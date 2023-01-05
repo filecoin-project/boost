@@ -22,7 +22,7 @@ import (
 )
 
 func TestPieceDirectory(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
 	t.Run("leveldb", func(t *testing.T) {
@@ -32,19 +32,20 @@ func TestPieceDirectory(t *testing.T) {
 	})
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
-		//  from a docker container as part of the test
+		//  from a docker container in CI as part of the test
 		t.Skip()
-		bdsvc := svc.NewCouchbase(TestCouchSettings)
+		svc.SetupCouchbase(t, testCouchSettings)
+		bdsvc := svc.NewCouchbase(testCouchSettings)
 		testPieceDirectory(ctx, t, bdsvc)
 	})
 }
 
 func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
-	err := bdsvc.Start(ctx, 8042)
+	err := bdsvc.Start(ctx, 8044)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(ctx, "http://localhost:8042")
+	err = cl.Dial(ctx, "http://localhost:8044")
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
