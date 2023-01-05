@@ -31,7 +31,10 @@ func TestPieceDirectory(t *testing.T) {
 		testPieceDirectory(ctx, t, bdsvc)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		setupCouchbase(t)
+		// TODO: Unskip this test once the couchbase instance can be created
+		//  from a docker container in CI as part of the test
+		t.Skip()
+		svc.SetupCouchbase(t, testCouchSettings)
 		bdsvc := svc.NewCouchbase(testCouchSettings)
 		testPieceDirectory(ctx, t, bdsvc)
 	})

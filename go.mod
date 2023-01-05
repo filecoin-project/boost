@@ -327,7 +327,7 @@ require (
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
-	golang.org/x/net v0.0.0-20220920183852-bf014ff85ad5
+	golang.org/x/net v0.0.0-20220920183852-bf014ff85ad5 // indirect
 	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261 // indirect
 	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
@@ -341,9 +341,6 @@ require (
 )
 
 require (
-	github.com/couchbase/gocb/v2 v2.5.0
-	github.com/docker/docker v20.10.7+incompatible
-	github.com/docker/go-connections v0.4.0
 	github.com/filecoin-project/boostd-data v0.0.0-00010101000000-000000000000
 	github.com/schollz/progressbar/v3 v3.11.0
 )
@@ -351,8 +348,11 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/containerd/containerd v1.6.10 // indirect
+	github.com/couchbase/gocb/v2 v2.5.0 // indirect
 	github.com/couchbase/gocbcore/v10 v10.1.2 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
+	github.com/docker/docker v20.10.7+incompatible // indirect
+	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.0 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/onsi/gomega v1.17.0 // indirect

@@ -1,4 +1,4 @@
-package piecedirectory
+package svc
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/couchbase/gocb/v2"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockercl "github.com/docker/docker/client"
@@ -20,13 +21,13 @@ import (
 	"golang.org/x/net/context"
 )
 
-var tlog = logging.Logger("pdtest")
+var tlog = logging.Logger("cbtest")
 
 func init() {
-	logging.SetLogLevel("pdtest", "debug")
+	logging.SetLogLevel("cbtest", "debug")
 }
 
-func setupCouchbase(t *testing.T) {
+func SetupCouchbase(t *testing.T, dbSettings couchbase.DBSettings) {
 	ctx := context.Background()
 	cli, err := dockercl.NewClientWithOpts(dockercl.FromEnv)
 	require.NoError(t, err)
@@ -73,8 +74,7 @@ func setupCouchbase(t *testing.T) {
 
 	inspect, err := cli.ContainerInspect(ctx, resp.ID)
 	require.NoError(t, err)
-	//spew.Dump(inspect)
-	_ = inspect
+	spew.Dump(inspect)
 
 	t.Cleanup(func() {
 		tlog.Info("couchbase docker container remove...")
@@ -88,12 +88,12 @@ func setupCouchbase(t *testing.T) {
 	tlog.Info("couchbase started")
 
 	tlog.Info("couchbase initialize cluster...")
-	err = initializeCouchbaseCluster(t)
+	err = initializeCouchbaseCluster(t, dbSettings)
 	require.NoError(t, err)
 	tlog.Info("couchbase initialized cluster")
 }
 
-func initializeCouchbaseCluster(t *testing.T) error {
+func initializeCouchbaseCluster(t *testing.T, settings couchbase.DBSettings) error {
 	couchDir := "/opt/couchbase/var/lib/couchbase"
 	apiCall(t, "/nodes/self/controller/settings", url.Values{
 		"data_path":     {couchDir + "/data"},
@@ -121,25 +121,25 @@ func initializeCouchbaseCluster(t *testing.T) error {
 	})
 
 	tlog.Info("wait for services start...")
-	awaitServicesReady(t, time.Minute)
+	awaitServicesReady(t, settings, time.Minute)
 	tlog.Info("services started")
 
 	apiCall(t, "/settings/web", url.Values{
 		"port":     {"8091"},
-		"username": {testCouchSettings.Auth.Username},
-		"password": {testCouchSettings.Auth.Password},
+		"username": {settings.Auth.Username},
+		"password": {settings.Auth.Password},
 	})
 
 	tlog.Info("wait for bucket creation and indexing...")
-	awaitBucketCreationReady(t, 5*time.Minute)
+	awaitBucketCreationReady(t, settings, 5*time.Minute)
 	tlog.Info("bucket creation and indexing started")
 
 	return nil
 }
 
-func awaitServicesReady(t *testing.T, duration time.Duration) {
+func awaitServicesReady(t *testing.T, settings couchbase.DBSettings, duration time.Duration) {
 	start := time.Now()
-	cluster, err := gocb.Connect(testCouchSettings.ConnectString, gocb.ClusterOptions{
+	cluster, err := gocb.Connect(settings.ConnectString, gocb.ClusterOptions{
 		TimeoutsConfig: gocb.TimeoutsConfig{
 			ConnectTimeout: duration,
 		},
@@ -174,15 +174,15 @@ func awaitServicesReady(t *testing.T, duration time.Duration) {
 	}
 }
 
-func awaitBucketCreationReady(t *testing.T, duration time.Duration) {
+func awaitBucketCreationReady(t *testing.T, settings couchbase.DBSettings, duration time.Duration) {
 	start := time.Now()
-	cluster, err := gocb.Connect(testCouchSettings.ConnectString, gocb.ClusterOptions{
+	cluster, err := gocb.Connect(settings.ConnectString, gocb.ClusterOptions{
 		TimeoutsConfig: gocb.TimeoutsConfig{
 			ConnectTimeout: time.Minute,
 		},
 		Authenticator: gocb.PasswordAuthenticator{
-			Username: testCouchSettings.Auth.Username,
-			Password: testCouchSettings.Auth.Password,
+			Username: settings.Auth.Username,
+			Password: settings.Auth.Password,
 		},
 	})
 	require.NoError(t, err)
