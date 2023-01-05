@@ -33,6 +33,9 @@ func NewDoctor(store types.Store, sapi SealingApi) *Doctor {
 	return &Doctor{store: store, sapi: sapi}
 }
 
+// The average interval between calls to NextPiecesToCheck
+const avgCheckInterval = 5 * time.Second
+
 func (d *Doctor) Run(ctx context.Context) {
 	timer := time.NewTimer(0)
 	defer timer.Stop()
@@ -69,11 +72,10 @@ func (d *Doctor) Run(ctx context.Context) {
 		}
 		doclog.Debugw("piece doctor: completed checking pieces", "count", len(pcids))
 
-		// Sleep for about 10 seconds between ticks.
+		// Sleep for a few seconds between ticks.
 		// The time to sleep is randomized, so that if there are multiple doctor
 		// processes they will each process some pieces some of the time.
-		//sleepTime := time.Duration(5000+rand.Intn(10000)) * time.Millisecond
-		sleepTime := time.Duration(500+rand.Intn(1000)) * time.Millisecond
+		sleepTime := avgCheckInterval/2 + time.Duration(rand.Intn(int(avgCheckInterval)))*time.Millisecond
 		timer.Reset(sleepTime)
 	}
 }
