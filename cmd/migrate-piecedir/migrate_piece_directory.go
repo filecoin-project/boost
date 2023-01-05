@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -16,7 +17,9 @@ import (
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/go-address"
 	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
+	"github.com/filecoin-project/go-fil-markets/piecestore"
 	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-statemachine/fsm"
@@ -42,6 +45,8 @@ type StoreMigrationApi interface {
 	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
 	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error
 	AddDealForPiece(ctx context.Context, pcid cid.Cid, info model.DealInfo) error
+	ListPieces(ctx context.Context) ([]cid.Cid, error)
+	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
 }
 
 var desc = "It is recommended to do the dagstore migration while boost is running. " +
@@ -172,14 +177,10 @@ func migrate(cctx *cli.Context, dbType string, store StoreMigrationApi, migrateT
 	// Create a logger for the migration that outputs to a file in the
 	// current working directory
 	logPath := "migrate-" + dbType + ".log"
-	logCfg := zap.NewDevelopmentConfig()
-	logCfg.OutputPaths = []string{logPath}
-	zl, err := logCfg.Build()
+	logger, err := createLogger(logPath)
 	if err != nil {
 		return err
 	}
-	defer zl.Sync() //nolint:errcheck
-	logger := zl.Sugar()
 
 	repoDir, err := homedir.Expand(cctx.String(FlagBoostRepo))
 	if err != nil {
@@ -342,49 +343,17 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 	logger.Infof("migrating piece store deal information to Piece Directory for miner %s", address.Address(maddr).String())
 	start := time.Now()
 
-	// Get the deals FSM
-	provDS := namespace.Wrap(ds, datastore.NewKey("/deals/provider"))
-	deals, migrate, err := vfsm.NewVersionedFSM(provDS, fsm.Parameters{
-		StateType:     storagemarket.MinerDeal{},
-		StateKeyField: "State",
-	}, nil, "2")
-	if err != nil {
-		return 0, fmt.Errorf("reading legacy deals from datastore in repo %s: %w", repoDir, err)
-	}
-
-	err = migrate(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("running provider fsm migration script: %w", err)
-	}
-
 	// Create a mapping of on-chain deal ID to deal proposal cid.
 	// This is needed below so that we can map from the legacy piece store
 	// info to a legacy deal.
-	propCidByChainDealID, err := getPropCidByChainDealID(deals)
+	propCidByChainDealID, err := getPropCidByChainDealID(ctx, ds)
 	if err != nil {
 		return 0, fmt.Errorf("building chain deal id -> proposal cid map: %w", err)
 	}
 
-	// Open the piece store
-	ps, err := piecestoreimpl.NewPieceStore(namespace.Wrap(ds, datastore.NewKey("/storagemarket")))
+	ps, err := openPieceStore(ctx, ds)
 	if err != nil {
-		return 0, fmt.Errorf("creating piece store from datastore in repo %s: %w", repoDir, err)
-	}
-
-	// Wait for the piece store to be ready
-	ch := make(chan error, 1)
-	ps.OnReady(func(e error) {
-		ch <- e
-	})
-
-	err = ps.Start(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("starting piece store: %w", err)
-	}
-
-	err = <-ch
-	if err != nil {
-		return 0, fmt.Errorf("waiting for piece store to be ready: %w", err)
+		return 0, fmt.Errorf("opening piece store: %w", err)
 	}
 
 	pcids, err := ps.ListPieceInfoKeys()
@@ -463,7 +432,13 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 	return errorCount, nil
 }
 
-func getPropCidByChainDealID(deals fsm.Group) (map[abi.DealID]cid.Cid, error) {
+func getPropCidByChainDealID(ctx context.Context, ds *backupds.Datastore) (map[abi.DealID]cid.Cid, error) {
+	deals, err := getLegacyDealsFSM(ctx, ds)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build a mapping of chain deal ID to proposal CID
 	var list []storagemarket.MinerDeal
 	if err := deals.List(&list); err != nil {
 		return nil, err
@@ -477,6 +452,25 @@ func getPropCidByChainDealID(deals fsm.Group) (map[abi.DealID]cid.Cid, error) {
 	}
 
 	return byChainDealID, nil
+}
+
+func getLegacyDealsFSM(ctx context.Context, ds *backupds.Datastore) (fsm.Group, error) {
+	// Get the deals FSM
+	provDS := namespace.Wrap(ds, datastore.NewKey("/deals/provider"))
+	deals, migrate, err := vfsm.NewVersionedFSM(provDS, fsm.Parameters{
+		StateType:     storagemarket.MinerDeal{},
+		StateKeyField: "State",
+	}, nil, "2")
+	if err != nil {
+		return nil, fmt.Errorf("reading legacy deals from datastore: %w", err)
+	}
+
+	err = migrate(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("running provider fsm migration script: %w", err)
+	}
+
+	return deals, err
 }
 
 func openDataStore(path string) (*backupds.Datastore, error) {
@@ -587,4 +581,240 @@ func loadIndex(path string) (index.Index, error) {
 	}
 
 	return subject, nil
+}
+
+var migrateReverseCmd = &cli.Command{
+	Name:  "reverse",
+	Usage: "Do a reverse migration from the piece directory back to the legacy format",
+	Subcommands: []*cli.Command{
+		migrateReverseLeveldbCmd,
+		migrateReverseCouchbaseCmd,
+	},
+}
+
+var migrateReverseLeveldbCmd = &cli.Command{
+	Name:   "leveldb",
+	Usage:  "Reverse migrate a leveldb piece directory",
+	Before: before,
+	Action: func(cctx *cli.Context) error {
+		return migrateReverse(cctx, "leveldb")
+	},
+}
+
+var migrateReverseCouchbaseCmd = &cli.Command{
+	Name:   "couchbase",
+	Usage:  "Reverse migrate a couchbase piece directory",
+	Before: before,
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "connect-string",
+			Usage:    "couchbase connect string eg 'couchbase://127.0.0.1'",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "username",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "password",
+			Required: true,
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		return migrateReverse(cctx, "couchbase")
+	},
+}
+
+func migrateReverse(cctx *cli.Context, dbType string) error {
+	// Create a logger for the migration that outputs to a file in the
+	// current working directory
+	logPath := "reverse-migrate-" + dbType + ".log"
+	logger, err := createLogger(logPath)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Performing %s reverse migration with logs at %s\n", dbType, logPath)
+
+	repoDir, err := homedir.Expand(cctx.String(FlagBoostRepo))
+	if err != nil {
+		return err
+	}
+
+	// Get a leveldb / couchbase store
+	var store StoreMigrationApi
+	if dbType == "leveldb" {
+		// Create a connection to the leveldb store
+		ldbRepoPath, err := svc.MakeLevelDBDir(repoDir)
+		if err != nil {
+			return err
+		}
+		store = ldb.NewStore(ldbRepoPath)
+	} else {
+		// Create a connection to the couchbase piece directory
+		settings := couchbase.DBSettings{
+			ConnectString: cctx.String("connect-string"),
+			Auth: couchbase.DBSettingsAuth{
+				Username: cctx.String("username"),
+				Password: cctx.String("password"),
+			},
+		}
+
+		store = couchbase.NewStore(settings)
+	}
+
+	// Perform the reverse migration
+	err = migrateDBReverse(cctx, repoDir, dbType, store, logger)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Reverse migration complete")
+	return nil
+}
+
+func migrateDBReverse(cctx *cli.Context, repoDir string, dbType string, pieceDir StoreMigrationApi, logger *zap.SugaredLogger) error {
+	ctx := lcli.ReqContext(cctx)
+	start := time.Now()
+
+	svcCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	err := pieceDir.Start(svcCtx)
+	if err != nil {
+		return fmt.Errorf("starting "+dbType+" store: %w", err)
+	}
+
+	pcids, err := pieceDir.ListPieces(ctx)
+	if err != nil {
+		return fmt.Errorf("listing piece directory pieces: %w", err)
+	}
+
+	logger.Infof("starting migration of %d piece infos from %s piece directory to piece store", len(pcids), dbType)
+
+	// Open the datastore
+	ds, err := openDataStore(repoDir)
+	if err != nil {
+		return fmt.Errorf("creating datastore from repo %s: %w", repoDir, err)
+	}
+
+	// Open the Piece Store
+	ps, err := openPieceStore(ctx, ds)
+	if err != nil {
+		return fmt.Errorf("opening piece store: %w", err)
+	}
+
+	// For each piece in the piece directory
+	var errorCount int
+	for i, pieceCid := range pcids {
+		// Reverse migrate the piece
+		migrated, err := migrateReversePiece(ctx, pieceCid, pieceDir, ps)
+		if err != nil {
+			errorCount++
+			logger.Errorw("failed to reverse migrate piece", "pieceCid", pieceCid, "index", i, "total", len(pcids), "error", err)
+		} else if migrated > 0 {
+			logger.Infow("reverse migrated piece", "pieceCid", pieceCid, "index", i, "total", len(pcids), "migrated-deals", migrated)
+		} else {
+			logger.Infow("no deals to migrate for piece", "pieceCid", pieceCid, "index", i, "total", len(pcids))
+		}
+	}
+
+	logger.Infow("reverse migration complete", "count", len(pcids), "errors", errorCount, "took", time.Since(start))
+	return nil
+}
+
+func migrateReversePiece(ctx context.Context, pieceCid cid.Cid, pieceDir StoreMigrationApi, ps piecestore.PieceStore) (int, error) {
+	// Get the piece metadata from the piece directory
+	pieceDirPieceInfo, err := pieceDir.GetPieceMetadata(ctx, pieceCid)
+	if err != nil {
+		return 0, fmt.Errorf("getting piece metadata for piece %s", pieceCid)
+	}
+
+	// Get the deals from the piece metadata
+	var pieceStoreDeals []piecestore.DealInfo
+	pieceStorePieceInfo, err := ps.GetPieceInfo(pieceCid)
+	if err != nil {
+		if !errors.Is(err, retrievalmarket.ErrNotFound) {
+			return 0, fmt.Errorf("getting piece info from piece store for piece %s", pieceCid)
+		}
+	} else {
+		pieceStoreDeals = pieceStorePieceInfo.Deals
+	}
+
+	// Iterate over each piece directory deal and add it to the piece store
+	// if it's not there already
+	var migrated int
+	for _, pieceDirDeal := range pieceDirPieceInfo.Deals {
+		// Check if the piece directory deal is already in the piece store
+		var has bool
+		for _, pieceStoreDeal := range pieceStoreDeals {
+			if pieceStoreDeal.SectorID == pieceDirDeal.SectorID &&
+				pieceStoreDeal.Offset == pieceDirDeal.PieceOffset &&
+				pieceStoreDeal.Length == pieceDirDeal.PieceLength {
+
+				has = true
+			}
+		}
+		if has {
+			continue
+		}
+
+		// The piece store doesn't yet have the deal, so add it
+		newDealInfo := piecestore.DealInfo{
+			DealID:   pieceDirDeal.ChainDealID,
+			SectorID: pieceDirDeal.SectorID,
+			Offset:   pieceDirDeal.PieceOffset,
+			Length:   pieceDirDeal.PieceLength,
+		}
+
+		// Note: the second parameter is ignored by the piece store
+		// implementation
+		err = ps.AddDealForPiece(pieceCid, cid.Undef, newDealInfo)
+		if err != nil {
+			return 0, fmt.Errorf("adding deal to piece store for piece %s: %w", pieceCid, err)
+		}
+
+		migrated++
+	}
+
+	return migrated, nil
+}
+
+func openPieceStore(ctx context.Context, ds *backupds.Datastore) (piecestore.PieceStore, error) {
+	// Open the piece store
+	ps, err := piecestoreimpl.NewPieceStore(namespace.Wrap(ds, datastore.NewKey("/storagemarket")))
+	if err != nil {
+		return nil, fmt.Errorf("creating piece store from datastore : %w", err)
+	}
+
+	// Wait for the piece store to be ready
+	ch := make(chan error, 1)
+	ps.OnReady(func(e error) {
+		ch <- e
+	})
+
+	err = ps.Start(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("starting piece store: %w", err)
+	}
+
+	select {
+	case err = <-ch:
+		if err != nil {
+			return nil, fmt.Errorf("waiting for piece store to be ready: %w", err)
+		}
+	case <-ctx.Done():
+		return nil, errors.New("cancelled while waiting for piece store to be ready")
+	}
+
+	return ps, nil
+}
+
+func createLogger(logPath string) (*zap.SugaredLogger, error) {
+	logCfg := zap.NewDevelopmentConfig()
+	logCfg.OutputPaths = []string{logPath}
+	zl, err := logCfg.Build()
+	if err != nil {
+		return nil, err
+	}
+	defer zl.Sync() //nolint:errcheck
+	return zl.Sugar(), err
 }
