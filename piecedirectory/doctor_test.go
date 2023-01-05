@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boostd-data/client"
+	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/google/uuid"
@@ -22,7 +23,7 @@ func TestPieceDoctor(t *testing.T) {
 	t.Run("leveldb", func(t *testing.T) {
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
-		testPieceDoctor(ctx, t, bdsvc, 8050)
+		testPieceDoctor(ctx, t, bdsvc, 8050, time.Second)
 	})
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
@@ -30,11 +31,11 @@ func TestPieceDoctor(t *testing.T) {
 		t.Skip()
 		svc.SetupCouchbase(t, testCouchSettings)
 		bdsvc := svc.NewCouchbase(testCouchSettings)
-		testPieceDoctor(ctx, t, bdsvc, 8051)
+		testPieceDoctor(ctx, t, bdsvc, 8051, couchbase.MinPieceCheckPeriod)
 	})
 }
 
-func testPieceDoctor(ctx context.Context, t *testing.T, bdsvc *svc.Service, port int) {
+func testPieceDoctor(ctx context.Context, t *testing.T, bdsvc *svc.Service, port int, pieceCheckPeriod time.Duration) {
 	err := bdsvc.Start(ctx, port)
 	require.NoError(t, err)
 
@@ -47,16 +48,16 @@ func testPieceDoctor(ctx context.Context, t *testing.T, bdsvc *svc.Service, port
 		testCheckPieces(ctx, t, cl)
 	})
 
-	t.Run("next pieces", func(t *testing.T) {
-		// TODO: uncomment once the leveldb implementation is complete
-		//testNextPieces(ctx, t, cl)
-	})
+	// TODO: uncomment once the leveldb implementation is complete
+	//t.Run("next pieces", func(t *testing.T) {
+	//	testNextPieces(ctx, t, cl, pieceCheckPeriod)
+	//})
 }
 
 // Verify that after a new piece is added
 // - NextPiecesToCheck immediately returns the piece
-// - NextPiecesToCheck returns the piece every PieceCheckPeriod
-//func testNextPieces(ctx context.Context, t *testing.T, cl *client.Store) {
+// - NextPiecesToCheck returns the piece every pieceCheckPeriod
+//func testNextPieces(ctx context.Context, t *testing.T, cl *client.Store, pieceCheckPeriod time.Duration) {
 //	// Add a new piece
 //	pieceCid := blocks.NewBlock([]byte(fmt.Sprintf("%d", time.Now().UnixMilli()))).Cid()
 //	fmt.Println(pieceCid)
@@ -71,7 +72,7 @@ func testPieceDoctor(ctx context.Context, t *testing.T, bdsvc *svc.Service, port
 //	require.NoError(t, err)
 //
 //	// Sleep for half the piece check period
-//	time.Sleep(testCouchSettings.PieceCheckPeriod / 2)
+//	time.Sleep(pieceCheckPeriod / 2)
 //
 //	// NextPiecesToCheck should return the piece (because it hasn't been checked yet)
 //	pcids, err := cl.NextPiecesToCheck(ctx)
@@ -85,7 +86,7 @@ func testPieceDoctor(ctx context.Context, t *testing.T, bdsvc *svc.Service, port
 //	require.NotContains(t, pcids, pieceCid)
 //
 //	// Sleep for at least the piece check period
-//	time.Sleep(2 * testCouchSettings.PieceCheckPeriod)
+//	time.Sleep(2 * pieceCheckPeriod)
 //
 //	// Calling NextPiecesToCheck should return the piece, because it has not
 //	// been checked for at least one piece check period

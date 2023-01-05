@@ -53,9 +53,7 @@ type DBSettings struct {
 	PieceMetadataBucket     DBSettingsBucket
 	MultihashToPiecesBucket DBSettingsBucket
 	PieceOffsetsBucket      DBSettingsBucket
-	// Period between checking each piece in the database for problems (eg missing index)
-	PieceCheckPeriod time.Duration
-	TestMode         bool
+	TestMode                bool
 }
 
 const connectTimeout = 5 * time.Second
@@ -676,7 +674,6 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 		qry += ") "
 		qry += fmt.Sprintf("LIMIT %d", piecesToTrackerBatchSize)
 
-		fmt.Println(qry)
 		res, err := db.mutate(ctx, qry)
 		if err != nil {
 			return nil, fmt.Errorf("executing insert into piece-tracker: %w", err)
@@ -691,11 +688,24 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 		keepInserting = queryMeta.Metrics.MutationCount == piecesToTrackerBatchSize
 	}
 
+	// Work out how frequently to check each piece, based on how many pieces
+	// there are.
+	// Any pieces that have not been checked in the last pieceCheckPeriod
+	// will be checked now (eg check all pieces that haven't been checked
+	// for 10s)
+	pieceCheckPeriod, err := db.getPieceCheckPeriod(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting piece check period: %w", err)
+	}
+
 	// Get all pieces from the piece tracker table that have not been updated
 	// since the last piece check period.
 	// Simultaneously set the UpdatedAt field so that these pieces are marked
 	// as checked (and will not be returned until the next piece check period
 	// elapses again).
+	// Note that we limit the number of rows to fetch so as not to overload the
+	// system. Any rows beyond the limit will be fetched the next time
+	// NextPiecesToCheck is called.
 	qry := "UPDATE `" + metaBucket + "`._default.`piece-tracker` as outerPT "
 	qry += "SET UpdatedAt = NOW_LOCAL() "
 	qry += "WHERE META(outerPT).id IN ("
@@ -707,22 +717,46 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 	qry += ") "
 	qry += "RETURNING META().id"
 
-	fmt.Println(qry, -db.settings.PieceCheckPeriod.Milliseconds())
-	res, err := db.query(ctx, qry, -db.settings.PieceCheckPeriod.Milliseconds())
+	res, err := db.query(ctx, qry, -pieceCheckPeriod.Milliseconds())
 	if err != nil {
 		return nil, fmt.Errorf("adding piece meta info to piece tracker table: %w", err)
 	}
 
-	pcids, err := db.listPieces(res)
+	return db.listPieces(res)
+}
+
+// The minimum frequency with which to check pieces for errors (eg bad index)
+const MinPieceCheckPeriod = time.Second
+
+// Work out how frequently to check each piece, based on how many pieces
+// there are: if there are many pieces, each piece will be checked
+// less frequently
+func (db *DB) getPieceCheckPeriod(ctx context.Context) (time.Duration, error) {
+	countRes, err := db.query(ctx, "SELECT COUNT(*) AS c FROM `"+metaBucket+"`._default.`piece-tracker`")
 	if err != nil {
-		queryMeta, err := res.MetaData()
-		if err != nil {
-			return nil, err
-		}
-		fmt.Printf("updated/got %d rows in piece-tracker\n", queryMeta.Metrics.MutationCount)
+		return 0, fmt.Errorf("reading row from %s: %w", metaBucket, err)
 	}
 
-	return pcids, err
+	var countRowData map[string]int
+	err = countRes.One(&countRowData)
+	if err != nil {
+		return 0, fmt.Errorf("reading row data from %s: %w", metaBucket, err)
+	}
+	count, ok := countRowData["c"]
+	if !ok {
+		return 0, fmt.Errorf("unexpected row data reading count: missing count column")
+	}
+
+	// Check period:
+	// - 1k pieces;   every 10s
+	// - 100k pieces; every 15m
+	// - 1m pieces;   every 2 hours
+	period := time.Duration(count*10) * time.Millisecond
+	if period < MinPieceCheckPeriod {
+		period = MinPieceCheckPeriod
+	}
+
+	return period, nil
 }
 
 func (db *DB) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
@@ -847,12 +881,12 @@ func (db *DB) listPieces(res *gocb.QueryResult) ([]cid.Cid, error) {
 	for res.Next() {
 		err := res.Row(&rowData)
 		if err != nil {
-			return nil, fmt.Errorf("reading row from %s: %w", pieceCidToMetadataBucket, err)
+			return nil, fmt.Errorf("reading row: %w", err)
 		}
 
 		couchKey, ok := rowData["id"]
 		if !ok {
-			return nil, fmt.Errorf("unexpected row data %s reading row from %s", rowData, pieceCidToMetadataBucket)
+			return nil, fmt.Errorf("unexpected row data %s reading piece list row", rowData)
 		}
 
 		c, err := cid.Parse(fromCouchKey(couchKey))
@@ -865,7 +899,7 @@ func (db *DB) listPieces(res *gocb.QueryResult) ([]cid.Cid, error) {
 
 	err := res.Err()
 	if err != nil {
-		return nil, fmt.Errorf("reading stream from %s: %w", pieceCidToMetadataBucket, err)
+		return nil, fmt.Errorf("reading stream from piece list data: %w", err)
 	}
 
 	return pieceCids, nil

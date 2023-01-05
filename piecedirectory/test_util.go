@@ -33,8 +33,7 @@ var testCouchSettings = couchbase.DBSettings{
 	PieceOffsetsBucket: couchbase.DBSettingsBucket{
 		RAMQuotaMB: 128,
 	},
-	PieceCheckPeriod: 1000 * time.Millisecond,
-	TestMode:         true,
+	TestMode: true,
 }
 
 // Get the index records from the CAR file

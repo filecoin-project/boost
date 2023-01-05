@@ -261,9 +261,6 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	return s.db.ListPieces(ctx)
 }
 
-//const pieceCheckFrequencyMillis = 60 * 60 * 1000
-const pieceCheckFrequencyMillis = 1000
-
 func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.next_pieces_to_check")
 	defer span.End()
