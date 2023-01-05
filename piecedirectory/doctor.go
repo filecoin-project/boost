@@ -34,7 +34,16 @@ func NewDoctor(store types.Store, sapi SealingApi) *Doctor {
 }
 
 func (d *Doctor) Run(ctx context.Context) {
-	for ctx.Err() == nil {
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
+
 		// Get the next pieces to check (eg pieces that haven't been checked
 		// for a while) from the piece directory
 		pcids, err := d.store.NextPiecesToCheck(ctx)
@@ -60,11 +69,12 @@ func (d *Doctor) Run(ctx context.Context) {
 		}
 		doclog.Debugw("piece doctor: completed checking pieces", "count", len(pcids))
 
-		// Sleep for about 10 seconds. The time to sleep is randomized, so that
-		// if there are multiple doctor processes they will each process some
-		// pieces some of the time.
-		//time.Sleep(time.Duration(5000+rand.Intn(10000)) * time.Millisecond)
-		time.Sleep(time.Duration(500+rand.Intn(1000)) * time.Millisecond)
+		// Sleep for about 10 seconds between ticks.
+		// The time to sleep is randomized, so that if there are multiple doctor
+		// processes they will each process some pieces some of the time.
+		//sleepTime := time.Duration(5000+rand.Intn(10000)) * time.Millisecond
+		sleepTime := time.Duration(500+rand.Intn(1000)) * time.Millisecond
+		timer.Reset(sleepTime)
 	}
 }
 
@@ -105,9 +115,8 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 	for _, dl := range dls {
 		isUnsealed, err := d.sapi.IsUnsealed(ctx, dl.SectorID, dl.PieceOffset.Unpadded(), dl.PieceLength.Unpadded())
 		if err != nil {
-			isUnsealed = false
-			//return fmt.Errorf("failed to check unsealed status of piece %s (sector %d, offset %d, length %d): %w",
-			//	pieceCid, dl.SectorID, dl.PieceOffset.Unpadded(), dl.PieceLength.Unpadded(), err)
+			return fmt.Errorf("failed to check unsealed status of piece %s (sector %d, offset %d, length %d): %w",
+				pieceCid, dl.SectorID, dl.PieceOffset.Unpadded(), dl.PieceLength.Unpadded(), err)
 		}
 
 		if isUnsealed {
