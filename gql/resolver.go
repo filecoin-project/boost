@@ -372,6 +372,14 @@ func (dr *dealResolver) IsVerified() bool {
 	return dr.ProviderDealState.ClientDealProposal.Proposal.VerifiedDeal
 }
 
+func (dr *dealResolver) KeepUnsealedCopy() bool {
+	return dr.ProviderDealState.FastRetrieval
+}
+
+func (dr *dealResolver) AnnounceToIPNI() bool {
+	return dr.ProviderDealState.AnnounceToIPNI
+}
+
 func (dr *dealResolver) ProposalLabel() (string, error) {
 	l := dr.ProviderDealState.ClientDealProposal.Proposal.Label
 	if l.IsString() {
@@ -529,8 +537,6 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 		return "Adding to Sector"
 	case dealcheckpoints.AddedPiece:
 		return "Announcing"
-	case dealcheckpoints.Indexed:
-		return dr.sealingState(ctx)
 	case dealcheckpoints.IndexedAndAnnounced:
 		return dr.sealingState(ctx)
 	case dealcheckpoints.Complete:

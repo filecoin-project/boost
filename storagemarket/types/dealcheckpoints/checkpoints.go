@@ -10,7 +10,6 @@ const (
 	Published
 	PublishConfirmed
 	AddedPiece
-	Indexed
 	IndexedAndAnnounced
 	Complete
 )
@@ -21,8 +20,7 @@ var names = map[Checkpoint]string{
 	Published:           "Published",
 	PublishConfirmed:    "PublishConfirmed",
 	AddedPiece:          "AddedPiece",
-	Indexed:             "Indexed",
-	IndexedAndAnnounced: "IndexedAndAnnounced",
+	IndexedAndAnnounced: "Indexed",
 	Complete:            "Complete",
 }
 

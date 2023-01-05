@@ -219,7 +219,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 	}
 
 	// Index deal in DAGStore and Announce deal
-	if deal.Checkpoint < dealcheckpoints.Indexed {
+	if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
 		if err := p.indexAndAnnounce(ctx, pub, deal); err != nil {
 			err.error = fmt.Errorf("failed to add index and announce deal: %w", err.error)
 			return err
@@ -617,14 +617,8 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 		p.dealLogger.Infow(deal.DealUuid, "didn't announce deal because network indexer is disabled")
 	}
 
-	if deal.AnnounceToIPNI {
-		if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced); derr != nil {
-			return derr
-		}
-	} else {
-		if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.Indexed); derr != nil {
-			return derr
-		}
+	if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced); derr != nil {
+		return derr
 	}
 
 	return nil

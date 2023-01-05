@@ -512,7 +512,7 @@ Inputs:
       "Size": 42
     },
     "FastRetrieval": true,
-    "AnnounceToIPNI": true
+    "SkipAnnounceToIPNI": true
   }
 ]
 ```

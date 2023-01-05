@@ -631,9 +631,6 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 			//Check for fast retrieval
 			require.False(t, td.params.FastRetrieval)
 
-			//Check for AnnounceToINPI
-			require.False(t, td.params.AnnounceToIPNI)
-
 			sub, err := dh.subscribeUpdates()
 			require.NoError(t, err)
 			td.sub = sub
@@ -1106,6 +1103,61 @@ func TestDealVerification(t *testing.T) {
 	}
 }
 
+func TestIPNIAnnounce(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("announce", func(t *testing.T) {
+		// setup the provider test harness
+		harness := NewHarness(t)
+		// start the provider test harness
+		harness.Start(t, ctx)
+		defer harness.Stop()
+
+		td := harness.newDealBuilder(t, 1).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
+		td.params.SkipAnnounceToIPNI = false
+		require.NoError(t, td.executeAndSubscribe())
+
+		td.waitForAndAssert(t, ctx, dealcheckpoints.IndexedAndAnnounced)
+		dlogs, err := harness.Provider.logsDB.Logs(ctx, td.params.DealUUID)
+		require.NoError(t, err)
+		check := false
+		for _, m := range dlogs {
+			if strings.Contains(m.LogParams, "announcement-cid") {
+				check = true
+				break
+			} else {
+				continue
+			}
+		}
+		require.True(t, check)
+	})
+
+	t.Run("don't announce", func(t *testing.T) {
+		// setup the provider test harness
+		harness := NewHarness(t)
+		// start the provider test harness
+		harness.Start(t, ctx)
+		defer harness.Stop()
+		td := harness.newDealBuilder(t, 2).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
+		td.params.SkipAnnounceToIPNI = true
+		require.NoError(t, td.executeAndSubscribe())
+
+		td.waitForAndAssert(t, ctx, dealcheckpoints.IndexedAndAnnounced)
+		dlogs, err := harness.Provider.logsDB.Logs(ctx, td.params.DealUUID)
+		require.NoError(t, err)
+		check1 := false
+		for _, m := range dlogs {
+			if strings.Contains(m.LogParams, "announcement-cid") {
+				check1 = true
+				break
+			} else {
+				continue
+			}
+		}
+		require.False(t, check1)
+	})
+}
+
 func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals int,
 	buildDeal func(i int) *testDeal, waitF func(i int, td *testDeal) error) []*testDeal {
 	tds := make([]*testDeal, 0, nDeals)
@@ -1155,7 +1207,7 @@ func (h *ProviderHarness) AssertPublishConfirmed(t *testing.T, ctx context.Conte
 
 func (h *ProviderHarness) AssertPieceAdded(t *testing.T, ctx context.Context, dp *types.DealParams, so *smtestutil.StubbedMinerOutput, carv2FilePath string) {
 	h.AssertEventuallyDealCleanedup(t, ctx, dp)
-	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.Indexed, so.SectorID, so.Offset, dp.ClientDealProposal.Proposal.PieceSize.Unpadded().Padded(), "")
+	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.IndexedAndAnnounced, so.SectorID, so.Offset, dp.ClientDealProposal.Proposal.PieceSize.Unpadded().Padded(), "")
 	// Assert that the original file data we sent matches what was sent to the sealer
 	h.AssertSealedContents(t, carv2FilePath, *so.SealedBytes)
 	// assert that dagstore and piecestore have this deal
@@ -1165,6 +1217,11 @@ func (h *ProviderHarness) AssertPieceAdded(t *testing.T, ctx context.Context, dp
 	require.True(t, ok)
 	require.True(t, rg.EagerInit)
 	require.Empty(t, rg.CarPath)
+}
+
+func (h *ProviderHarness) AssertDealIndexed(t *testing.T, ctx context.Context, dp *types.DealParams, so *smtestutil.StubbedMinerOutput) {
+	h.AssertEventuallyDealCleanedup(t, ctx, dp)
+	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.IndexedAndAnnounced, so.SectorID, so.Offset, dp.ClientDealProposal.Proposal.PieceSize.Unpadded().Padded(), "")
 }
 
 func (h *ProviderHarness) EventuallyAssertNoTagged(t *testing.T, ctx context.Context) {
@@ -1836,6 +1893,7 @@ type testDealBuilder struct {
 	msPublish        *minerStubCall
 	msPublishConfirm *minerStubCall
 	msAddPiece       *minerStubCall
+	msAnnounce       bool
 }
 
 func (tbuilder *testDealBuilder) withPublishFailing(err error) *testDealBuilder {
@@ -1950,7 +2008,7 @@ func (tbuilder *testDealBuilder) build() *testDeal {
 	if tbuilder.msNoOp {
 		tbuilder.ms.SetupNoOp()
 	} else {
-		tbuilder.buildCommp().buildPublish().buildPublishConfirm().buildAddPiece()
+		tbuilder.buildCommp().buildPublish().buildPublishConfirm().buildAddPiece().buildAnnounce()
 	}
 
 	testDeal := tbuilder.td
@@ -2004,6 +2062,13 @@ func (tbuilder *testDealBuilder) buildAddPiece() *testDealBuilder {
 		}
 	}
 
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) buildAnnounce() *testDealBuilder {
+	if tbuilder.msAnnounce {
+		tbuilder.ms.SetupAnnounce()
+	}
 	return tbuilder
 }
 
@@ -2151,6 +2216,8 @@ func (td *testDeal) waitForAndAssert(t *testing.T, ctx context.Context, cp dealc
 		td.ph.AssertPublishConfirmed(t, ctx, td.params, td.stubOutput)
 	case dealcheckpoints.AddedPiece:
 		td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2FilePath)
+	case dealcheckpoints.IndexedAndAnnounced:
+		td.ph.AssertDealIndexed(t, ctx, td.params, td.stubOutput)
 	default:
 		t.Fail()
 	}

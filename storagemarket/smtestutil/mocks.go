@@ -23,6 +23,7 @@ type MinerStub struct {
 	*mock_types.MockChainDealManager
 	*mock_types.MockPieceAdder
 	*mock_types.MockCommpCalculator
+	*mock_types.MockIndexProvider
 
 	lk                    sync.Mutex
 	unblockCommp          map[uuid.UUID]chan struct{}
@@ -306,6 +307,11 @@ func (mb *MinerStubBuilder) SetupAddPieceFailure(err error) {
 	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 		return abi.SectorNumber(0), abi.PaddedPieceSize(0), err
 	})
+}
+
+func (mb *MinerStubBuilder) SetupAnnounce() *MinerStubBuilder {
+	mb.stub.MockIndexProvider.EXPECT().AnnounceBoostDeal(gomock.Any(), gomock.Any())
+	return mb
 }
 
 func (mb *MinerStubBuilder) Output() *StubbedMinerOutput {
