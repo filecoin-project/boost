@@ -2,6 +2,7 @@ package couchbase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -69,8 +70,8 @@ func (s *Store) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) e
 	return normalizePieceCidError(pieceCid, err)
 }
 
-func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error {
-	log.Debugw("handle.mark-piece-index-errored", "piece-cid", pieceCid, "err", err)
+func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr string) error {
+	log.Debugw("handle.mark-piece-index-errored", "piece-cid", pieceCid, "err", idxErr)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.mark-piece-index-errored")
 	defer span.End()
@@ -79,7 +80,7 @@ func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err erro
 		log.Debugw("handled.mark-piece-index-errored", "took", fmt.Sprintf("%s", time.Since(now)))
 	}(time.Now())
 
-	err = s.db.MarkIndexErrored(ctx, pieceCid, err)
+	err := s.db.MarkIndexErrored(ctx, pieceCid, errors.New(idxErr))
 	if err != nil {
 		return normalizePieceCidError(pieceCid, err)
 	}

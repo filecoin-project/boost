@@ -19,6 +19,7 @@ const (
 	IndexStatusUnknown    IndexStatus = ""
 	IndexStatusNotFound   IndexStatus = "NotFound"
 	IndexStatusRegistered IndexStatus = "Registered"
+	IndexStatusIndexing   IndexStatus = "Indexing"
 	IndexStatusComplete   IndexStatus = "Complete"
 	IndexStatusFailed     IndexStatus = "Failed"
 )
@@ -177,6 +178,19 @@ func (r *resolver) PiecesWithRootPayloadCid(ctx context.Context, args struct{ Pa
 		pieceCids = append(pieceCids, pieceCid)
 	}
 	return pieceCids, nil
+}
+
+func (r *resolver) PieceBuildIndex(ctx context.Context, args struct{ PieceCid string }) (bool, error) {
+	pieceCid, err := cid.Parse(args.PieceCid)
+	if err != nil {
+		return false, fmt.Errorf("%s is not a valid piece cid", args.PieceCid)
+	}
+
+	err = r.piecedirectory.BuildIndexForPiece(ctx, pieceCid)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string }) (*pieceResolver, error) {
@@ -339,9 +353,11 @@ func (r *resolver) getIndexStatus(ctx context.Context, pieceCid cid.Cid, deals [
 	case err != nil:
 		idxst = IndexStatusFailed
 		idxerr = err.Error()
+	case md.Indexing:
+		idxst = IndexStatusIndexing
 	case md.Error != "":
 		idxst = IndexStatusFailed
-		idxerr = md.ErrorType + ": " + md.Error
+		idxerr = md.Error
 	case md.IndexedAt.IsZero():
 		idxst = IndexStatusRegistered
 	default:

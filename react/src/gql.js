@@ -420,6 +420,12 @@ const FlaggedPiecesQuery = gql`
     }
 `;
 
+const PieceBuildIndexMutation = gql`
+    mutation AppPieceBuildIndexMutation($pieceCid: String!) {
+        pieceBuildIndex(pieceCid: $pieceCid)
+    }
+`;
+
 const PieceStatusQuery = gql`
     query AppPieceStatusQuery($pieceCid: String!) {
         pieceStatus(pieceCid: $pieceCid) {
@@ -699,6 +705,7 @@ export {
     RetrievalLogsCountQuery,
     PiecesWithRootPayloadCidQuery,
     PiecesWithPayloadCidQuery,
+    PieceBuildIndexMutation,
     PieceStatusQuery,
     FlaggedPiecesQuery,
     StorageQuery,

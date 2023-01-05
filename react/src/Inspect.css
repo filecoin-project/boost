@@ -72,6 +72,7 @@
 
 .piece-detail table th {
     text-align: left;
+    vertical-align: top;
 }
 
 .piece-detail table.deals .param {
@@ -97,4 +98,9 @@
 
 .flagged-pieces-none {
     padding: 1em 1em 4em 1em;
+}
+
+.button.build-index {
+    display: inline-block;
+    margin: 1em 0;
 }
