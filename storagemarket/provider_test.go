@@ -535,7 +535,7 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 			require.NotNil(t, dh)
 
 			//Check for fast retrieval
-			require.False(t, td.params.FastRetrieval)
+			require.False(t, !td.params.RemoveUnsealedCopy)
 
 			sub, err := dh.subscribeUpdates()
 			require.NoError(t, err)
@@ -1732,7 +1732,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 			Params: xferParams,
 			Size:   uint64(carv2Fileinfo.Size()),
 		},
-		FastRetrieval: false,
+		RemoveUnsealedCopy: true,
 	}
 
 	td := &testDeal{
@@ -1892,7 +1892,7 @@ func (tbuilder *testDealBuilder) setTransferParams(serverURL string) {
 }
 
 func (tbuilder *testDealBuilder) withDealParamAnnounce(announce bool) *testDealBuilder {
-	tbuilder.td.params.SkipAnnounceToIPNI = !announce
+	tbuilder.td.params.SkipIPNIAnnounce = !announce
 	return tbuilder
 }
 
@@ -1960,7 +1960,7 @@ func (tbuilder *testDealBuilder) buildAddPiece() *testDealBuilder {
 
 func (tbuilder *testDealBuilder) buildAnnounce() *testDealBuilder {
 	if tbuilder.msAnnounce != nil {
-		tbuilder.ms.SetupAnnounce(tbuilder.msAnnounce.blocking, !tbuilder.td.params.SkipAnnounceToIPNI)
+		tbuilder.ms.SetupAnnounce(tbuilder.msAnnounce.blocking, !tbuilder.td.params.SkipIPNIAnnounce)
 	}
 	return tbuilder
 }

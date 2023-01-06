@@ -78,6 +78,8 @@ const DealsListQuery = gql`
                 ClientAddress
                 Checkpoint
                 CheckpointAt
+                AnnouncedToIPNI
+                KeepUnsealedCopy
                 IsOffline
                 Err
                 Retry
@@ -166,6 +168,8 @@ const DealSubscription = gql`
             IsOffline
             Checkpoint
             CheckpointAt
+            AnnouncedToIPNI
+            KeepUnsealedCopy
             Retry
             Err
             Message
@@ -314,6 +318,8 @@ const NewDealsSubscription = gql`
                 CreatedAt
                 PieceCid
                 PieceSize
+                AnnouncedToIPNI
+                KeepUnsealedCopy
                 ClientAddress
                 StartEpoch
                 EndEpoch

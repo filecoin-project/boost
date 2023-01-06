@@ -263,7 +263,7 @@ func (mb *MinerStubBuilder) SetupAddPiece(blocking bool) *MinerStubBuilder {
 			StartEpoch: mb.dp.ClientDealProposal.Proposal.StartEpoch,
 			EndEpoch:   mb.dp.ClientDealProposal.Proposal.EndEpoch,
 		},
-		KeepUnsealed: mb.dp.FastRetrieval,
+		KeepUnsealed: !mb.dp.RemoveUnsealedCopy,
 	}
 
 	var readBytes []byte
@@ -301,7 +301,7 @@ func (mb *MinerStubBuilder) SetupAddPieceFailure(err error) {
 			StartEpoch: mb.dp.ClientDealProposal.Proposal.StartEpoch,
 			EndEpoch:   mb.dp.ClientDealProposal.Proposal.EndEpoch,
 		},
-		KeepUnsealed: mb.dp.FastRetrieval,
+		KeepUnsealed: !mb.dp.RemoveUnsealedCopy,
 	}
 
 	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {

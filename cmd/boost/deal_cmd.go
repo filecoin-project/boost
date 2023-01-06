@@ -78,8 +78,8 @@ var dealFlags = []cli.Flag{
 		Value: true,
 	},
 	&cli.BoolFlag{
-		Name:  "fast-retrieval",
-		Usage: "indicates that data should be available for fast retrieval",
+		Name:  "keep-unsealed-copy",
+		Usage: "indicates that an unsealed copy of the sector should be available for fast retrieval",
 		Value: true,
 	},
 	&cli.StringFlag{
@@ -87,7 +87,7 @@ var dealFlags = []cli.Flag{
 		Usage: "wallet address to be used to initiate the deal",
 	},
 	&cli.BoolFlag{
-		Name:  "announce-to-IPNI",
+		Name:  "announce-to-ipni",
 		Usage: "indicates that deal index should be announced to the IPNI(Network Indexer)",
 		Value: true,
 	},
@@ -261,8 +261,8 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		DealDataRoot:       rootCid,
 		IsOffline:          !isOnline,
 		Transfer:           transfer,
-		FastRetrieval:      cctx.Bool("fast-retrieval"),
-		SkipAnnounceToIPNI: !cctx.Bool("skip-announce-to-IPNI"),
+		RemoveUnsealedCopy: !cctx.Bool("keep-unsealed-copy"),
+		SkipIPNIAnnounce:   !cctx.Bool("announce-to-ipni"),
 	}
 
 	log.Debugw("about to submit deal proposal", "uuid", dealUuid.String())

@@ -320,35 +320,35 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	// t.FastRetrieval (bool) (bool)
-	if len("FastRetrieval") > cbg.MaxLength {
-		return xerrors.Errorf("Value in field \"FastRetrieval\" was too long")
+	// t.RemoveUnsealedCopy (bool) (bool)
+	if len("RemoveUnsealedCopy") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"RemoveUnsealedCopy\" was too long")
 	}
 
-	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("FastRetrieval"))); err != nil {
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("RemoveUnsealedCopy"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("FastRetrieval")); err != nil {
-		return err
-	}
-
-	if err := cbg.WriteBool(w, t.FastRetrieval); err != nil {
+	if _, err := io.WriteString(w, string("RemoveUnsealedCopy")); err != nil {
 		return err
 	}
 
-	// t.SkipAnnounceToIPNI (bool) (bool)
-	if len("SkipAnnounceToIPNI") > cbg.MaxLength {
-		return xerrors.Errorf("Value in field \"SkipAnnounceToIPNI\" was too long")
-	}
-
-	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("SkipAnnounceToIPNI"))); err != nil {
-		return err
-	}
-	if _, err := io.WriteString(w, string("SkipAnnounceToIPNI")); err != nil {
+	if err := cbg.WriteBool(w, t.RemoveUnsealedCopy); err != nil {
 		return err
 	}
 
-	if err := cbg.WriteBool(w, t.SkipAnnounceToIPNI); err != nil {
+	// t.SkipIPNIAnnounce (bool) (bool)
+	if len("SkipIPNIAnnounce") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"SkipIPNIAnnounce\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("SkipIPNIAnnounce"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("SkipIPNIAnnounce")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteBool(w, t.SkipIPNIAnnounce); err != nil {
 		return err
 	}
 	return nil
@@ -467,8 +467,8 @@ func (t *DealParams) UnmarshalCBOR(r io.Reader) (err error) {
 				}
 
 			}
-			// t.FastRetrieval (bool) (bool)
-		case "FastRetrieval":
+			// t.RemoveUnsealedCopy (bool) (bool)
+		case "RemoveUnsealedCopy":
 
 			maj, extra, err = cr.ReadHeader()
 			if err != nil {
@@ -479,14 +479,14 @@ func (t *DealParams) UnmarshalCBOR(r io.Reader) (err error) {
 			}
 			switch extra {
 			case 20:
-				t.FastRetrieval = false
+				t.RemoveUnsealedCopy = false
 			case 21:
-				t.FastRetrieval = true
+				t.RemoveUnsealedCopy = true
 			default:
 				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
 			}
-			// t.SkipAnnounceToIPNI (bool) (bool)
-		case "SkipAnnounceToIPNI":
+			// t.SkipIPNIAnnounce (bool) (bool)
+		case "SkipIPNIAnnounce":
 
 			maj, extra, err = cr.ReadHeader()
 			if err != nil {
@@ -497,9 +497,9 @@ func (t *DealParams) UnmarshalCBOR(r io.Reader) (err error) {
 			}
 			switch extra {
 			case 20:
-				t.SkipAnnounceToIPNI = false
+				t.SkipIPNIAnnounce = false
 			case 21:
-				t.SkipAnnounceToIPNI = true
+				t.SkipIPNIAnnounce = true
 			default:
 				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
 			}

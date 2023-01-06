@@ -277,8 +277,8 @@ func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, client
 		Transfer:           dp.Transfer,
 		IsOffline:          dp.IsOffline,
 		Retry:              smtypes.DealRetryAuto,
-		FastRetrieval:      dp.FastRetrieval,
-		AnnounceToIPNI:     !dp.SkipAnnounceToIPNI,
+		FastRetrieval:      !dp.RemoveUnsealedCopy,
+		AnnounceToIPNI:     !dp.SkipIPNIAnnounce,
 	}
 	// validate the deal proposal
 	if err := p.validateDealProposal(ds); err != nil {

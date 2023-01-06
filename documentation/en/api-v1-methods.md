@@ -511,8 +511,8 @@ Inputs:
       "Params": "Ynl0ZSBhcnJheQ==",
       "Size": 42
     },
-    "FastRetrieval": true,
-    "SkipAnnounceToIPNI": true
+    "RemoveUnsealedCopy": true,
+    "SkipIPNIAnnounce": true
   }
 ]
 ```
