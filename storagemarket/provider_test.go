@@ -535,7 +535,7 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 			require.NotNil(t, dh)
 
 			//Check for fast retrieval
-			require.False(t, !td.params.RemoveUnsealedCopy)
+			require.True(t, td.params.RemoveUnsealedCopy)
 
 			sub, err := dh.subscribeUpdates()
 			require.NoError(t, err)
