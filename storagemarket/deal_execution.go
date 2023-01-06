@@ -601,7 +601,8 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	// if the index provider is enabled
 	if p.ip.Enabled() {
 		if deal.AnnounceToIPNI {
-			// announce to the network indexer but do not fail the deal if the announcement fails
+			// announce to the network indexer but do not fail the deal if the announcement fails,
+			// just retry the next time boost restarts
 			annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
 			if err != nil {
 				return &dealMakingError{
