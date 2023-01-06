@@ -2140,10 +2140,6 @@ func (td *testDeal) assertPieceAdded(t *testing.T, ctx context.Context) {
 	td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2FilePath)
 }
 
-func (td *testDeal) assertDealPublished(t *testing.T, ctx context.Context) {
-	td.ph.AssertPublished(t, ctx, td.params, td.stubOutput)
-}
-
 func (td *testDeal) assertDealFailedTransferNonRecoverable(t *testing.T, ctx context.Context, errStr string) {
 	td.ph.AssertDealFailedTransferNonRecoverable(t, ctx, td.params, errStr)
 }
