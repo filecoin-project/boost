@@ -45,7 +45,7 @@ type Deal {
   PieceCid: String!
   PieceSize: Uint64!
   IsVerified: Boolean!
-  AnnouncedToIPNI: Boolean!
+  AnnounceToIPNI: Boolean!
   KeepUnsealedCopy: Boolean!
   ProposalLabel: String!
   ProviderCollateral: Uint64!
