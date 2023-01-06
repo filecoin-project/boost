@@ -20,7 +20,7 @@ var names = map[Checkpoint]string{
 	Published:           "Published",
 	PublishConfirmed:    "PublishConfirmed",
 	AddedPiece:          "AddedPiece",
-	IndexedAndAnnounced: "Indexed",
+	IndexedAndAnnounced: "IndexedAndAnnounced",
 	Complete:            "Complete",
 }
 
