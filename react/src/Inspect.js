@@ -14,6 +14,7 @@ import xImg from './bootstrap-icons/icons/x-lg.svg'
 import inspectImg from './bootstrap-icons/icons/wrench.svg'
 import './Inspect.css'
 import {Pagination} from "./Pagination";
+import {Info, InfoListItem} from "./Info";
 
 var inspectBasePath = '/inspect'
 
@@ -64,7 +65,7 @@ function FlaggedPieces({setSearchQuery}) {
     const listOffset = (pageNum-1) * rowsPerPage
     const queryCursor = (pageNum === 1) ? null : params.cursor
     const {loading, error, data} = useQuery(FlaggedPiecesQuery, {
-        pollInterval: 1000,
+        pollInterval: 10000,
         variables: {
             cursor: queryCursor,
             offset: listOffset,
@@ -281,6 +282,8 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
     const searchIsPieceCid = searchQuery && searchQuery == pieceCid
     const searchIsRootCid = searchQuery && searchQuery == rootCid
     const indexFailed = pieceStatus.IndexStatus.Status === 'Failed'
+    const indexRegistered = pieceStatus.IndexStatus.Status === 'Registered'
+    const canReIndex = indexFailed || indexRegistered
 
     return <div className="piece-detail" id={pieceCid}>
         <div className="content">
@@ -314,9 +317,10 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                         <span>
                             {pieceStatus.IndexStatus.Status}
                             {indexFailed && pieceStatus.IndexStatus.Error ? ': ' + pieceStatus.IndexStatus.Error : '' }
+                            <IndexStatusInfo />
                         </span>
                         <br/>
-                        {indexFailed ? (
+                        {canReIndex ? (
                             <div className="button build-index" title="Re-build index" onClick={buildIndex}>
                                 Re-index
                             </div>
@@ -403,6 +407,26 @@ function SearchBox(props) {
             onChange={props.onChange} />
         { props.value ? <img alt="clear" className="clear-text" onClick={props.clearSearchBox} src={xImg} /> : null }
     </div>
+}
+
+function IndexStatusInfo() {
+    return <Info>
+        <InfoListItem title="NotFound">
+            There was no information found for this piece CID in the Piece Directory.
+        </InfoListItem>
+        <InfoListItem title="Registered">
+            The piece has been added to the Piece Directory but has not yet been indexed.
+        </InfoListItem>
+        <InfoListItem title="Indexing">
+            The piece is currently being indexed.
+        </InfoListItem>
+        <InfoListItem title="Complete">
+            The piece has been indexed successfully.
+        </InfoListItem>
+        <InfoListItem title="Failed">
+            There was an error indexing the piece.
+        </InfoListItem>
+    </Info>
 }
 
 const RowsPerPage = {
