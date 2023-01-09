@@ -394,7 +394,8 @@ Response:
   "CheckpointAt": "0001-01-01T00:00:00Z",
   "Err": "string value",
   "Retry": "auto",
-  "NBytesReceived": 9
+  "NBytesReceived": 9,
+  "FastRetrieval": true
 }
 ```
 
@@ -459,7 +460,8 @@ Response:
   "CheckpointAt": "0001-01-01T00:00:00Z",
   "Err": "string value",
   "Retry": "auto",
-  "NBytesReceived": 9
+  "NBytesReceived": 9,
+  "FastRetrieval": true
 }
 ```
 
@@ -503,7 +505,8 @@ Inputs:
       "ClientID": "string value",
       "Params": "Ynl0ZSBhcnJheQ==",
       "Size": 42
-    }
+    },
+    "FastRetrieval": true
   }
 ]
 ```

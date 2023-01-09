@@ -1,7 +1,6 @@
 import {useMutation, useQuery} from "@apollo/react-hooks";
 import {
-    DealCancelMutation,
-    DealsListQuery, FlaggedPiecesQuery, PieceBuildIndexMutation,
+    FlaggedPiecesQuery, PieceBuildIndexMutation,
     PieceStatusQuery, PiecesWithPayloadCidQuery, PiecesWithRootPayloadCidQuery
 } from "./gql";
 import moment from "moment";

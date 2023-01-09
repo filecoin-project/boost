@@ -3,6 +3,7 @@ package main
 import (
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -12,7 +13,6 @@ import (
 
 	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
 	"github.com/golang/mock/gomock"
-	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -51,12 +51,6 @@ func TestHttpGzipResponse(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	//Create CID
-	var cids []cid.Cid
-	cid, err := cid.Parse("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi")
-	require.NoError(t, err)
-	cids = append(cids, cid)
-
 	// Crate pieceInfo
 	deal := model.DealInfo{
 		ChainDealID: 1234567,
@@ -68,12 +62,11 @@ func TestHttpGzipResponse(t *testing.T) {
 
 	mockHttpServer.EXPECT().UnsealSectorAt(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(f, nil)
 	mockHttpServer.EXPECT().IsUnsealed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(true, nil)
-	mockHttpServer.EXPECT().PiecesContainingMultihash(gomock.Any(), gomock.Any()).AnyTimes().Return(cids, nil)
 	mockHttpServer.EXPECT().GetPieceDeals(gomock.Any(), gomock.Any()).AnyTimes().Return(deals, nil)
 
-	// Create a client and make request with Encoding header
+	//Create a client and make request with Encoding header
 	client := new(http.Client)
-	request, err := http.NewRequest("GET", "http://localhost:7777/piece?payloadCid=bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi&format=piece", nil)
+	request, err := http.NewRequest("GET", "http://localhost:7777/piece/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
 	require.NoError(t, err)
 	request.Header.Add("Accept-Encoding", "gzip")
 
@@ -125,5 +118,24 @@ func TestBlockRetrieval(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, data, out)
+}
 
+func TestHttpInfo(t *testing.T) {
+	var v apiVersion
+
+	// Create a new mock Http server
+	ctrl := gomock.NewController(t)
+	httpServer := NewHttpServer("", 7777, mocks_booster_http.NewMockHttpServerApi(ctrl))
+	httpServer.Start(context.Background())
+
+	response, err := http.Get("http://localhost:7777/info")
+	require.NoError(t, err)
+	defer response.Body.Close()
+
+	json.NewDecoder(response.Body).Decode(&v) //nolint:errcheck
+	require.Equal(t, "0.2.0", v.Version)
+
+	// Stop the server
+	err = httpServer.Stop()
+	require.NoError(t, err)
 }

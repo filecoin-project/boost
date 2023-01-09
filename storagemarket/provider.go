@@ -272,6 +272,7 @@ func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, client
 		Transfer:           dp.Transfer,
 		IsOffline:          dp.IsOffline,
 		Retry:              smtypes.DealRetryAuto,
+		FastRetrieval:      dp.FastRetrieval,
 	}
 	// validate the deal proposal
 	if err := p.validateDealProposal(ds); err != nil {
@@ -581,10 +582,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 			StartEpoch: deal.ClientDealProposal.Proposal.StartEpoch,
 			EndEpoch:   deal.ClientDealProposal.Proposal.EndEpoch,
 		},
-		// Assume that it doesn't make sense for a miner not to keep an
-		// unsealed copy. TODO: Check that's a valid assumption.
-		//KeepUnsealed: deal.FastRetrieval,
-		KeepUnsealed: true,
+		KeepUnsealed: deal.FastRetrieval,
 	}
 
 	// Attempt to add the piece to a sector (repeatedly if necessary)

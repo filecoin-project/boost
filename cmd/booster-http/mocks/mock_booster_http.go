@@ -13,7 +13,6 @@ import (
 	abi "github.com/filecoin-project/go-state-types/abi"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"
-	multihash "github.com/multiformats/go-multihash"
 )
 
 // MockHttpServerApi is a mock of HttpServerApi interface.
@@ -54,21 +53,6 @@ func (mr *MockHttpServerApiMockRecorder) GetBlockByCid(ctx, blockCid interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockByCid", reflect.TypeOf((*MockHttpServerApi)(nil).GetBlockByCid), ctx, blockCid)
 }
 
-// GetCarSize mocks base method.
-func (m *MockHttpServerApi) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCarSize", ctx, pieceCid)
-	ret0, _ := ret[0].(uint64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetCarSize indicates an expected call of GetCarSize.
-func (mr *MockHttpServerApiMockRecorder) GetCarSize(ctx, pieceCid interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCarSize", reflect.TypeOf((*MockHttpServerApi)(nil).GetCarSize), ctx, pieceCid)
-}
-
 // GetPieceDeals mocks base method.
 func (m *MockHttpServerApi) GetPieceDeals(ctx context.Context, pieceCID cid.Cid) ([]model.DealInfo, error) {
 	m.ctrl.T.Helper()
@@ -97,21 +81,6 @@ func (m *MockHttpServerApi) IsUnsealed(ctx context.Context, sectorID abi.SectorN
 func (mr *MockHttpServerApiMockRecorder) IsUnsealed(ctx, sectorID, offset, length interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsUnsealed", reflect.TypeOf((*MockHttpServerApi)(nil).IsUnsealed), ctx, sectorID, offset, length)
-}
-
-// PiecesContainingMultihash mocks base method.
-func (m *MockHttpServerApi) PiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PiecesContainingMultihash", ctx, mh)
-	ret0, _ := ret[0].([]cid.Cid)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PiecesContainingMultihash indicates an expected call of PiecesContainingMultihash.
-func (mr *MockHttpServerApiMockRecorder) PiecesContainingMultihash(ctx, mh interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PiecesContainingMultihash", reflect.TypeOf((*MockHttpServerApi)(nil).PiecesContainingMultihash), ctx, mh)
 }
 
 // UnsealSectorAt mocks base method.

@@ -48,8 +48,6 @@ func (r *RetrievalLog) OnQueryEvent(evt retrievalmarket.ProviderQueryEvent) {
 // Storage Provider validates the request (eg checking its parameters for
 // validity, checking for acceptance against the retrieval filter, etc)
 func (r *RetrievalLog) OnValidationEvent(evt retrievalmarket.ProviderValidationEvent) {
-	log.Debugw("validation-event", "id", evt.Response.ID, "status", evt.Response.Status, "msg", evt.Response.Message, "err", evt.Error)
-
 	// Ignore ErrPause and ErrResume because they are signalling errors, not
 	// actual errors because of incorrect behaviour.
 	if evt.Error == nil || evt.Error == datatransfer.ErrPause || evt.Error == datatransfer.ErrResume {
@@ -64,6 +62,8 @@ func (r *RetrievalLog) OnValidationEvent(evt retrievalmarket.ProviderValidationE
 		Message:    evt.Error.Error(),
 	}
 	if evt.Response != nil {
+		log.Debugw("validation-event", "id", evt.Response.ID, "status", evt.Response.Status, "msg", evt.Response.Message, "err", evt.Error)
+
 		st.DealID = evt.Response.ID
 		st.Status = evt.Response.Status.String()
 		if evt.Response.Message != "" {

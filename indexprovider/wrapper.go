@@ -177,7 +177,7 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDeal
 	protocols := []metadata.Protocol{
 		&metadata.GraphsyncFilecoinV1{
 			PieceCID:      pds.ClientDealProposal.Proposal.PieceCID,
-			FastRetrieval: true,
+			FastRetrieval: pds.FastRetrieval,
 			VerifiedDeal:  pds.ClientDealProposal.Proposal.VerifiedDeal,
 		},
 	}

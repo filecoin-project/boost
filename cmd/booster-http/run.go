@@ -15,7 +15,6 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/ipfs/go-cid"
-	"github.com/multiformats/go-multihash"
 	"github.com/urfave/cli/v2"
 )
 
@@ -158,16 +157,8 @@ type serverApi struct {
 
 var _ HttpServerApi = (*serverApi)(nil)
 
-func (s serverApi) PiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
-	return s.piecedirectory.PiecesContainingMultihash(ctx, mh)
-}
-
 func (s serverApi) GetPieceDeals(ctx context.Context, pieceCID cid.Cid) ([]model.DealInfo, error) {
 	return s.piecedirectory.GetPieceDeals(ctx, pieceCID)
-}
-
-func (s serverApi) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
-	return s.piecedirectory.GetCarSize(ctx, pieceCid)
 }
 
 func (s serverApi) IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error) {

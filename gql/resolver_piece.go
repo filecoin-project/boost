@@ -3,6 +3,7 @@ package gql
 import (
 	"context"
 	"fmt"
+
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boostd-data/svc/types"
@@ -150,6 +151,7 @@ func (r *resolver) PiecesWithRootPayloadCid(ctx context.Context, args struct{ Pa
 	if err != nil {
 		return nil, fmt.Errorf("%s is not a valid payload cid", args.PayloadCid)
 	}
+
 	var pieceCidSet = make(map[string]struct{})
 
 	// Get boost deals by payload cid

@@ -3,12 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	"github.com/multiformats/go-multihash"
 	"go.opencensus.io/stats"
 )
 
@@ -36,9 +35,9 @@ var ErrNotFound = errors.New("not found")
 // non-zero last modified time.
 var lastModified = time.UnixMilli(1)
 
-const carSuffix = ".car"
-const pieceCidParam = "pieceCid"
-const payloadCidParam = "payloadCid"
+type apiVersion struct {
+	Version string `json:"Version"`
+}
 
 type HttpServer struct {
 	path string
@@ -51,8 +50,6 @@ type HttpServer struct {
 }
 
 type HttpServerApi interface {
-	PiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error)
-	GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error)
 	GetPieceDeals(ctx context.Context, pieceCID cid.Cid) ([]model.DealInfo, error)
 	IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error)
 	UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error)
@@ -76,10 +73,11 @@ func (s *HttpServer) Start(ctx context.Context) {
 
 	listenAddr := fmt.Sprintf(":%d", s.port)
 	handler := http.NewServeMux()
-	handler.HandleFunc(s.pieceBasePath(), s.handlePieceRequest)
+	handler.HandleFunc(s.pieceBasePath(), s.handleByPieceCid)
 	handler.HandleFunc(s.blockBasePath(), s.handleBlockRequest)
 	handler.HandleFunc("/", s.handleIndex)
 	handler.HandleFunc("/index.html", s.handleIndex)
+	handler.HandleFunc("/info", s.handleInfo)
 	handler.Handle("/metrics", metrics.Exporter("booster_http")) // metrics
 	s.server = &http.Server{
 		Addr:    listenAddr,
@@ -112,34 +110,10 @@ const idxPage = `
       <tbody>
       <tr>
         <td>
-          Download a raw piece by payload CID
+          Download a raw piece by its piece CID
         </td>
         <td>
-          <a href="/piece?payloadCid=bafySomePayloadCid&format=piece" > /piece?payloadCid=<payload cid>&format=piece</a>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          Download a CAR file by payload CID
-        </td>
-        <td>
-          <a href="/piece?payloadCid=bafySomePayloadCid&format=car" > /piece?payloadCid=<payload cid>&format=car</a>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          Download a raw piece by piece CID
-        </td>
-        <td>
-          <a href="/piece?pieceCid=bagaSomePieceCID&format=piece" > /piece?pieceCid=<piece cid>&format=piece</a>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          Download a CAR file by piece CID
-        </td>
-        <td>
-          <a href="/piece?pieceCid=bagaSomePieceCID&format=car" > /piece?payloadCid=<piece cid>&format=car</a>
+          <a href="/piece/bafySomePieceCid" > /piece/<piece cid></a>
         </td>
       </tr>
       <tr>
@@ -161,52 +135,13 @@ func (s *HttpServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(idxPage)) //nolint:errcheck
 }
 
-func (s *HttpServer) handlePieceRequest(w http.ResponseWriter, r *http.Request) {
-	q, err := url.ParseQuery(r.URL.RawQuery)
-	if err != nil {
-		msg := fmt.Sprintf("parsing query: %s", err.Error())
-		writeError(w, r, http.StatusBadRequest, msg)
-		return
+func (s *HttpServer) handleInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	v := apiVersion{
+		Version: "0.2.0",
 	}
-
-	isCar := false
-
-	if len(q["format"]) == 1 {
-		if q["format"][0] == "car" { // Check if format value is car
-			isCar = true
-		} else if q["format"][0] != "piece" { // Check if format value is not piece
-			writeError(w, r, http.StatusBadRequest, "incorrect `format` query parameter")
-			return
-		}
-	} else if len(q["format"]) == 0 {
-		isCar = false
-	} else { // Error if more than 1 format value
-		writeError(w, r, http.StatusBadRequest, "single `format` query parameter is allowed")
-		return
-	}
-
-	// Check provided cid and format and redirect the request appropriately
-	if len(q[payloadCidParam]) == 1 {
-		payloadCid, err := cid.Parse(q[payloadCidParam][0])
-		if err != nil {
-			msg := fmt.Sprintf("parsing payload CID '%s': %s", q[payloadCidParam][0], err.Error())
-			writeError(w, r, http.StatusBadRequest, msg)
-			stats.Record(r.Context(), metrics.HttpPayloadByCidRequestCount.M(1))
-			return
-		}
-		s.handleByPayloadCid(payloadCid, isCar, w, r)
-	} else if len(q[pieceCidParam]) == 1 {
-		pieceCid, err := cid.Parse(q[pieceCidParam][0])
-		if err != nil {
-			msg := fmt.Sprintf("parsing piece CID '%s': %s", q[pieceCidParam][0], err.Error())
-			writeError(w, r, http.StatusBadRequest, msg)
-			stats.Record(r.Context(), metrics.HttpPieceByCidRequestCount.M(1))
-			return
-		}
-		s.handleByPieceCid(pieceCid, isCar, w, r)
-	} else {
-		writeError(w, r, http.StatusBadRequest, "unsupported query")
-	}
+	json.NewEncoder(w).Encode(v) //nolint:errcheck
 }
 
 func (s *HttpServer) handleBlockRequest(w http.ResponseWriter, r *http.Request) {
@@ -246,79 +181,37 @@ func (s *HttpServer) handleBlockRequest(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("X-Content-Type-Options", "nosniff") // no funny business in the browsers :^)
 	b := bytes.NewReader(data)
 
-	serveContent(w, r, b, "application/vnd.ipld.raw")
+	serveContent(w, r, b)
 	stats.Record(ctx, metrics.HttpBlockByCid200ResponseCount.M(1))
 	stats.Record(ctx, metrics.HttpBlockByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
 
-func (s *HttpServer) handleByPayloadCid(payloadCid cid.Cid, isCar bool, w http.ResponseWriter, r *http.Request) {
-	startTime := time.Now()
-	ctx, span := tracing.Tracer.Start(r.Context(), "http.payload_cid")
-	defer span.End()
-
-	stats.Record(ctx, metrics.HttpPayloadByCidRequestCount.M(1))
-
-	// Find all the pieces that contain the payload cid
-	pieces, err := s.api.PiecesContainingMultihash(ctx, payloadCid.Hash())
-	if err != nil {
-		if isNotFoundError(err) {
-			msg := fmt.Sprintf("getting piece that contains payload CID '%s': %s", payloadCid, err.Error())
-			writeError(w, r, http.StatusNotFound, msg)
-			stats.Record(ctx, metrics.HttpPayloadByCid404ResponseCount.M(1))
-			return
-		}
-		log.Errorf("getting piece that contains payload CID '%s': %s", payloadCid, err)
-		msg := fmt.Sprintf("server error getting piece that contains payload CID '%s'", payloadCid)
-		writeError(w, r, http.StatusInternalServerError, msg)
-		stats.Record(ctx, metrics.HttpPayloadByCid500ResponseCount.M(1))
-		return
-	}
-
-	// Just get the content of the first piece returned (if the client wants a
-	// different piece they can just call the /piece endpoint)
-	pieceCid := pieces[0]
-	content, err := s.getPieceContent(ctx, pieceCid)
-	if err == nil && isCar {
-		content, err = s.getCarContent(ctx, pieceCid, content)
-	}
-	if err != nil {
-		if isNotFoundError(err) {
-			msg := fmt.Sprintf("getting content for payload CID %s in piece %s: %s", payloadCid, pieceCid, err)
-			writeError(w, r, http.StatusNotFound, msg)
-			stats.Record(ctx, metrics.HttpPayloadByCid404ResponseCount.M(1))
-			return
-		}
-		log.Errorf("getting content for payload CID %s in piece %s: %s", payloadCid, pieceCid, err)
-		msg := fmt.Sprintf("server error getting content for payload CID %s in piece %s", payloadCid, pieceCid)
-		writeError(w, r, http.StatusInternalServerError, msg)
-		stats.Record(ctx, metrics.HttpPayloadByCid500ResponseCount.M(1))
-		return
-	}
-
-	// Set an Etag based on the piece cid
-	etag := pieceCid.String()
-	if isCar {
-		etag += carSuffix
-	}
-	w.Header().Set("Etag", etag)
-
-	serveContent(w, r, content, getContentType(isCar))
-
-	stats.Record(ctx, metrics.HttpPayloadByCid200ResponseCount.M(1))
-	stats.Record(ctx, metrics.HttpPayloadByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
-}
-
-func (s *HttpServer) handleByPieceCid(pieceCid cid.Cid, isCar bool, w http.ResponseWriter, r *http.Request) {
+func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 	ctx, span := tracing.Tracer.Start(r.Context(), "http.piece_cid")
 	defer span.End()
 	stats.Record(ctx, metrics.HttpPieceByCidRequestCount.M(1))
 
+	// Remove the path up to the piece cid
+	prefixLen := len(s.pieceBasePath())
+	if len(r.URL.Path) <= prefixLen {
+		msg := fmt.Sprintf("path '%s' is missing piece CID", r.URL.Path)
+		writeError(w, r, http.StatusBadRequest, msg)
+		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
+		return
+	}
+
+	pieceCidStr := r.URL.Path[prefixLen:]
+	pieceCid, err := cid.Parse(pieceCidStr)
+	if err != nil {
+		msg := fmt.Sprintf("parsing piece CID '%s': %s", pieceCidStr, err.Error())
+		writeError(w, r, http.StatusBadRequest, msg)
+		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
+		return
+	}
+
 	// Get a reader over the piece
 	content, err := s.getPieceContent(ctx, pieceCid)
-	if err == nil && isCar {
-		content, err = s.getCarContent(ctx, pieceCid, content)
-	}
 	if err != nil {
 		if isNotFoundError(err) {
 			writeError(w, r, http.StatusNotFound, err.Error())
@@ -334,28 +227,18 @@ func (s *HttpServer) handleByPieceCid(pieceCid cid.Cid, isCar bool, w http.Respo
 
 	// Set an Etag based on the piece cid
 	etag := pieceCid.String()
-	if isCar {
-		etag += carSuffix
-	}
 	w.Header().Set("Etag", etag)
 
-	serveContent(w, r, content, getContentType(isCar))
+	serveContent(w, r, content)
 
 	stats.Record(ctx, metrics.HttpPieceByCid200ResponseCount.M(1))
 	stats.Record(ctx, metrics.HttpPieceByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
 
-func getContentType(isCar bool) string {
-	if isCar {
-		return "application/vnd.ipld.car"
-	}
-	return "application/piece"
-}
-
-func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker, contentType string) {
+func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker) {
 	// Set the Content-Type header explicitly so that http.ServeContent doesn't
 	// try to do it implicitly
-	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Type", "application/piece")
 
 	var writer http.ResponseWriter
 
@@ -452,34 +335,6 @@ func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.
 	}
 
 	return pieceReader, nil
-}
-
-func (s *HttpServer) getCarContent(ctx context.Context, pieceCid cid.Cid, pieceReader io.ReadSeeker) (io.ReadSeeker, error) {
-	// Get the CAR size from the piece directory
-	unpaddedCarSize, err := s.api.GetCarSize(ctx, pieceCid)
-	if err != nil {
-		return nil, fmt.Errorf("getting unpadded CAR size: %w", err)
-	}
-
-	// Seek to the end of the CAR to get its (padded) size
-	paddedCarSize, err := pieceReader.Seek(0, io.SeekEnd)
-	if err != nil {
-		return nil, fmt.Errorf("seeking to end of CAR: %w", err)
-	}
-
-	// Seek back to the start of the CAR
-	_, err = pieceReader.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, fmt.Errorf("seeking to start of CAR: %w", err)
-	}
-
-	lr := &limitSeekReader{
-		Reader:       io.LimitReader(pieceReader, int64(unpaddedCarSize)),
-		readSeeker:   pieceReader,
-		unpaddedSize: int64(unpaddedCarSize),
-		paddedSize:   paddedCarSize,
-	}
-	return lr, nil
 }
 
 type limitSeekReader struct {
