@@ -40,7 +40,7 @@ func TestHttpGzipResponse(t *testing.T) {
 	// Create a new mock Http server with custom functions
 	ctrl := gomock.NewController(t)
 	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
-	httpServer := NewHttpServer("", 7777, mockHttpServer)
+	httpServer := NewHttpServer("", 7778, mockHttpServer)
 	httpServer.Start(context.Background())
 
 	// Create mock unsealed file for piece/car
@@ -66,7 +66,7 @@ func TestHttpGzipResponse(t *testing.T) {
 
 	//Create a client and make request with Encoding header
 	client := new(http.Client)
-	request, err := http.NewRequest("GET", "http://localhost:7777/piece/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
+	request, err := http.NewRequest("GET", "http://localhost:7778/piece/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
 	require.NoError(t, err)
 	request.Header.Add("Accept-Encoding", "gzip")
 
@@ -95,7 +95,7 @@ func TestBlockRetrieval(t *testing.T) {
 	//Create a new mock Http server with custom functions
 	ctrl := gomock.NewController(t)
 	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
-	httpServer := NewHttpServer("", 7777, mockHttpServer)
+	httpServer := NewHttpServer("", 7779, mockHttpServer)
 	httpServer.Start(context.Background())
 
 	data := []byte("Hello World!")
@@ -104,7 +104,7 @@ func TestBlockRetrieval(t *testing.T) {
 
 	// Create a client and make request with Encoding header
 	client := new(http.Client)
-	request, err := http.NewRequest("GET", "http://localhost:7777/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
+	request, err := http.NewRequest("GET", "http://localhost:7779/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
 	require.NoError(t, err)
 
 	response, err := client.Do(request)
@@ -125,10 +125,10 @@ func TestHttpInfo(t *testing.T) {
 
 	// Create a new mock Http server
 	ctrl := gomock.NewController(t)
-	httpServer := NewHttpServer("", 7777, mocks_booster_http.NewMockHttpServerApi(ctrl))
+	httpServer := NewHttpServer("", 7780, mocks_booster_http.NewMockHttpServerApi(ctrl))
 	httpServer.Start(context.Background())
 
-	response, err := http.Get("http://localhost:7777/info")
+	response, err := http.Get("http://localhost:7780/info")
 	require.NoError(t, err)
 	defer response.Body.Close()
 
