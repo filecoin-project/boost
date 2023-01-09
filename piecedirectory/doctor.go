@@ -34,7 +34,7 @@ func NewDoctor(store types.Store, sapi SealingApi) *Doctor {
 }
 
 // The average interval between calls to NextPiecesToCheck
-const avgCheckInterval = 5 * time.Second
+const avgCheckInterval = 30 * time.Second
 
 func (d *Doctor) Run(ctx context.Context) {
 	timer := time.NewTimer(0)

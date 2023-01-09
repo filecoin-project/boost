@@ -9,9 +9,11 @@ import (
 
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/couchbase"
+	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/google/uuid"
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipld/go-car/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -21,17 +23,29 @@ func TestPieceDoctor(t *testing.T) {
 	defer cancel()
 
 	t.Run("leveldb", func(t *testing.T) {
+		prev := ldb.MinPieceCheckPeriod
+		ldb.MinPieceCheckPeriod = 1 * time.Second
+
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
-		testPieceDoctor(ctx, t, bdsvc, 8050, time.Second)
+
+		testPieceDoctor(ctx, t, bdsvc, 8050, ldb.MinPieceCheckPeriod)
+
+		ldb.MinPieceCheckPeriod = prev
 	})
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container in CI
 		t.Skip()
+
+		prev := couchbase.MinPieceCheckPeriod
+		couchbase.MinPieceCheckPeriod = 1 * time.Second
+
 		svc.SetupCouchbase(t, testCouchSettings)
 		bdsvc := svc.NewCouchbase(testCouchSettings)
 		testPieceDoctor(ctx, t, bdsvc, 8051, couchbase.MinPieceCheckPeriod)
+
+		couchbase.MinPieceCheckPeriod = prev
 	})
 }
 
@@ -48,52 +62,51 @@ func testPieceDoctor(ctx context.Context, t *testing.T, bdsvc *svc.Service, port
 		testCheckPieces(ctx, t, cl)
 	})
 
-	// TODO: uncomment once the leveldb implementation is complete
-	//t.Run("next pieces", func(t *testing.T) {
-	//	testNextPieces(ctx, t, cl, pieceCheckPeriod)
-	//})
+	t.Run("next pieces", func(t *testing.T) {
+		testNextPieces(ctx, t, cl, pieceCheckPeriod)
+	})
 }
 
 // Verify that after a new piece is added
 // - NextPiecesToCheck immediately returns the piece
 // - NextPiecesToCheck returns the piece every pieceCheckPeriod
-//func testNextPieces(ctx context.Context, t *testing.T, cl *client.Store, pieceCheckPeriod time.Duration) {
-//	// Add a new piece
-//	pieceCid := blocks.NewBlock([]byte(fmt.Sprintf("%d", time.Now().UnixMilli()))).Cid()
-//	fmt.Println(pieceCid)
-//	di := model.DealInfo{
-//		DealUuid:    uuid.New().String(),
-//		ChainDealID: 1,
-//		SectorID:    1,
-//		PieceOffset: 0,
-//		PieceLength: 2048,
-//	}
-//	err := cl.AddDealForPiece(ctx, pieceCid, di)
-//	require.NoError(t, err)
-//
-//	// Sleep for half the piece check period
-//	time.Sleep(pieceCheckPeriod / 2)
-//
-//	// NextPiecesToCheck should return the piece (because it hasn't been checked yet)
-//	pcids, err := cl.NextPiecesToCheck(ctx)
-//	require.NoError(t, err)
-//	require.Contains(t, pcids, pieceCid)
-//
-//	// Calling NextPiecesToCheck again should return nothing, because the piece
-//	// was just checked
-//	pcids, err = cl.NextPiecesToCheck(ctx)
-//	require.NoError(t, err)
-//	require.NotContains(t, pcids, pieceCid)
-//
-//	// Sleep for at least the piece check period
-//	time.Sleep(2 * pieceCheckPeriod)
-//
-//	// Calling NextPiecesToCheck should return the piece, because it has not
-//	// been checked for at least one piece check period
-//	pcids, err = cl.NextPiecesToCheck(ctx)
-//	require.NoError(t, err)
-//	require.Contains(t, pcids, pieceCid)
-//}
+func testNextPieces(ctx context.Context, t *testing.T, cl *client.Store, pieceCheckPeriod time.Duration) {
+	// Add a new piece
+	pieceCid := blocks.NewBlock([]byte(fmt.Sprintf("%d", time.Now().UnixMilli()))).Cid()
+	fmt.Println(pieceCid)
+	di := model.DealInfo{
+		DealUuid:    uuid.New().String(),
+		ChainDealID: 1,
+		SectorID:    1,
+		PieceOffset: 0,
+		PieceLength: 2048,
+	}
+	err := cl.AddDealForPiece(ctx, pieceCid, di)
+	require.NoError(t, err)
+
+	// Sleep for half the piece check period
+	time.Sleep(pieceCheckPeriod / 2)
+
+	// NextPiecesToCheck should return the piece (because it hasn't been checked yet)
+	pcids, err := cl.NextPiecesToCheck(ctx)
+	require.NoError(t, err)
+	require.Contains(t, pcids, pieceCid)
+
+	// Calling NextPiecesToCheck again should return nothing, because the piece
+	// was just checked
+	pcids, err = cl.NextPiecesToCheck(ctx)
+	require.NoError(t, err)
+	require.NotContains(t, pcids, pieceCid)
+
+	// Sleep for at least the piece check period
+	time.Sleep(2 * pieceCheckPeriod)
+
+	// Calling NextPiecesToCheck should return the piece, because it has not
+	// been checked for at least one piece check period
+	pcids, err = cl.NextPiecesToCheck(ctx)
+	require.NoError(t, err)
+	require.Contains(t, pcids, pieceCid)
+}
 
 func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Create a random CAR file

@@ -375,7 +375,14 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 }
 
 func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
-	return s.ListPieces(ctx)
+	ctx, span := tracing.Tracer.Start(ctx, "store.next_pieces_to_check")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.next-pieces-to-check", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	return s.db.NextPiecesToCheck(ctx)
 }
 
 func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
