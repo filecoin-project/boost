@@ -26,3 +26,12 @@ function InfoBox(props) {
         </div>
     )
 }
+
+export function InfoListItem(props) {
+    return <div className="info-item">
+        <div className="info-title">{props.title}</div>
+        <div className="item-content">
+            {props.children}
+        </div>
+    </div>
+}
