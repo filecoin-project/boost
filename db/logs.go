@@ -77,7 +77,7 @@ func (d *LogsDB) CleanupLogs(ctx context.Context, daysOld int) error {
 	}
 
 	// Vacuum DealLogs to reduce the log file size. This OP requires free space of "2 * current file size" to succeed
-	qry = "VACUUM DealLogs"
-	_, err = d.db.ExecContext(ctx, qry, td)
+	qry = "VACUUM"
+	_, err = d.db.ExecContext(ctx, qry)
 	return err
 }
