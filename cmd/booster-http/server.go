@@ -181,7 +181,7 @@ func (s *HttpServer) handleBlockRequest(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("X-Content-Type-Options", "nosniff") // no funny business in the browsers :^)
 	b := bytes.NewReader(data)
 
-	serveContent(w, r, b)
+	serveContent(w, r, b, "application/vnd.ipld.raw")
 	stats.Record(ctx, metrics.HttpBlockByCid200ResponseCount.M(1))
 	stats.Record(ctx, metrics.HttpBlockByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
@@ -229,16 +229,16 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	etag := pieceCid.String()
 	w.Header().Set("Etag", etag)
 
-	serveContent(w, r, content)
+	serveContent(w, r, content, "application/piece")
 
 	stats.Record(ctx, metrics.HttpPieceByCid200ResponseCount.M(1))
 	stats.Record(ctx, metrics.HttpPieceByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
 
-func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker) {
+func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker, contentType string) {
 	// Set the Content-Type header explicitly so that http.ServeContent doesn't
 	// try to do it implicitly
-	w.Header().Set("Content-Type", "application/piece")
+	w.Header().Set("Content-Type", contentType)
 
 	var writer http.ResponseWriter
 
