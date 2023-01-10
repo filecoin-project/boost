@@ -408,17 +408,18 @@ func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihas
 	}, nil
 }
 
-const piecesToTrackerBatchSize = 1024
-
 var (
 	// The minimum frequency with which to check pieces for errors (eg bad index)
 	MinPieceCheckPeriod = 30 * time.Second
 
 	// in-memory cursor to the position we reached in the leveldb table with respect to piece cids to process for errors with the doctor
-	cursor string
+	offset int
 
 	// checked keeps track in memory when was the last time we processed a given piece cid
 	checked map[string]time.Time
+
+	// batch limit for each NextPiecesToCheck call
+	piecesToTrackerBatchSize = 2
 )
 
 func init() {
@@ -430,10 +431,12 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 	defer span.End()
 
 	q := query.Query{
-		Prefix:   "/" + sprefixPieceCidToCursor + "/" + cursor,
+		Prefix:   "/" + sprefixPieceCidToCursor + "/",
 		KeysOnly: true,
 		Limit:    piecesToTrackerBatchSize,
+		Offset:   offset,
 	}
+	fmt.Println("calling query with offset:", offset)
 	results, err := db.Query(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("listing pieces in database: %w", err)
@@ -443,13 +446,16 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 
 	now := time.Now()
 
+	var i int
 	for {
 		r, ok := results.NextSync()
 		if !ok {
 			break
 		}
+		i++
 
 		k := r.Key[len(q.Prefix):]
+		fmt.Println("got k:", k)
 		if t, ok := checked[k]; ok {
 			alreadyChecked := t.After(now.Add(-MinPieceCheckPeriod))
 
@@ -465,17 +471,16 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 		}
 
 		pieceCids = append(pieceCids, pieceCid)
-
-		cursor = k
 	}
+	offset += i
 
 	// if we got less pieces than the specified limit, we must be at the end of the table,
 	// so reset the cursor
 	if len(pieceCids) < piecesToTrackerBatchSize {
-		cursor = ""
+		offset = 0
 	}
 
-	log.Debugw("NextPiecesToCheck: returning piececids", "len", len(pieceCids), "cursor", cursor)
+	log.Warnw("NextPiecesToCheck: returning piececids", "len", len(pieceCids), "offset", offset)
 
 	return pieceCids, nil
 }

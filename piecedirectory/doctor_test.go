@@ -7,13 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	blocks "github.com/ipfs/go-block-format"
+	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -65,6 +68,10 @@ func testPieceDoctor(ctx context.Context, t *testing.T, bdsvc *svc.Service, port
 	t.Run("next pieces", func(t *testing.T) {
 		testNextPieces(ctx, t, cl, pieceCheckPeriod)
 	})
+	t.Run("next pieces pagination", func(t *testing.T) {
+		testNextPiecesPagination(ctx, t, cl, pieceCheckPeriod)
+	})
+
 }
 
 // Verify that after a new piece is added
@@ -106,6 +113,46 @@ func testNextPieces(ctx context.Context, t *testing.T, cl *client.Store, pieceCh
 	pcids, err = cl.NextPiecesToCheck(ctx)
 	require.NoError(t, err)
 	require.Contains(t, pcids, pieceCid)
+}
+
+func testNextPiecesPagination(ctx context.Context, t *testing.T, cl *client.Store, pieceCheckPeriod time.Duration) {
+	// Add 7 pieces
+	var pcids []cid.Cid
+	for i := 1; i <= 7; i++ {
+		pieceCid := blocks.NewBlock([]byte(fmt.Sprintf("%d%d", time.Now().UnixMilli(), i))).Cid()
+		fmt.Println(pieceCid)
+		di := model.DealInfo{
+			DealUuid:    uuid.New().String(),
+			ChainDealID: abi.DealID(i),
+			SectorID:    abi.SectorNumber(i),
+			PieceOffset: 0,
+			PieceLength: 2048,
+		}
+		err := cl.AddDealForPiece(ctx, pieceCid, di)
+		require.NoError(t, err)
+
+		pcids = append(pcids, pieceCid)
+	}
+
+	pcids1, err := cl.NextPiecesToCheck(ctx)
+	require.NoError(t, err)
+
+	spew.Dump("pcids1", pcids1)
+
+	pcids2, err := cl.NextPiecesToCheck(ctx)
+	require.NoError(t, err)
+
+	spew.Dump("pcids2", pcids2)
+
+	pcids3, err := cl.NextPiecesToCheck(ctx)
+	require.NoError(t, err)
+
+	spew.Dump("pcids3", pcids3)
+
+	pcids4, err := cl.NextPiecesToCheck(ctx)
+	require.NoError(t, err)
+
+	spew.Dump("pcids4", pcids4)
 }
 
 func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
