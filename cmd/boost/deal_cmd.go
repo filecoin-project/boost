@@ -80,6 +80,7 @@ var dealFlags = []cli.Flag{
 	&cli.BoolFlag{
 		Name:  "remove-unsealed-copy",
 		Usage: "indicates that an unsealed copy of the sector in not required for fast retrieval",
+		Value: false,
 	},
 	&cli.StringFlag{
 		Name:  "wallet",
@@ -88,6 +89,7 @@ var dealFlags = []cli.Flag{
 	&cli.BoolFlag{
 		Name:  "skip-ipni-announce",
 		Usage: "indicates that deal index should not be announced to the IPNI(Network Indexer)",
+		Value: false,
 	},
 }
 
