@@ -22,25 +22,41 @@ func TestDealFastRetrieval(t *testing.T) {
 	req.NoError(goose.SetDialect("sqlite3"))
 	req.NoError(goose.UpTo(sqldb, ".", 20221124191002))
 
-	// Generate 2 deals
-	dealsDB := db.NewDealsDB(sqldb)
+	// Generate 1 deal
 	deals, err := db.GenerateNDeals(1)
 	req.NoError(err)
 
-	// Insert the deals in DB
-	err = dealsDB.Insert(ctx, &deals[0])
-	require.NoError(t, err)
+	deal := deals[0]
 
-	// Get deal state
-	dealState, err := dealsDB.ByID(ctx, deals[0].DealUuid)
+	_, err = sqldb.Exec(`INSERT INTO Deals ("ID", "CreatedAt", "DealProposalSignature", "PieceCID", "PieceSize",
+                   "VerifiedDeal", "IsOffline", "ClientAddress", "ProviderAddress","Label", "StartEpoch", "EndEpoch",
+                   "StoragePricePerEpoch", "ProviderCollateral", "ClientCollateral", "ClientPeerID", "DealDataRoot",
+                   "InboundFilePath", "TransferType", "TransferParams", "TransferSize", "ChainDealID", "PublishCID",
+                   "SectorID", "Offset", "Length", "Checkpoint", "CheckpointAt", "Error", "Retry", "SignedProposalCID") 
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		deal.DealUuid, deal.CreatedAt, []byte("test"), deal.ClientDealProposal.Proposal.PieceCID.String(),
+		deal.ClientDealProposal.Proposal.PieceSize, deal.ClientDealProposal.Proposal.VerifiedDeal, deal.IsOffline,
+		deal.ClientDealProposal.Proposal.Client.String(), deal.ClientDealProposal.Proposal.Provider.String(), "test",
+		deal.ClientDealProposal.Proposal.StartEpoch, deal.ClientDealProposal.Proposal.EndEpoch, deal.ClientDealProposal.Proposal.StoragePricePerEpoch.Uint64(),
+		deal.ClientDealProposal.Proposal.ProviderCollateral.Int64(), deal.ClientDealProposal.Proposal.ClientCollateral.Uint64(), deal.ClientPeerID.String(),
+		deal.DealDataRoot.String(), deal.InboundFilePath, deal.Transfer.Type, deal.Transfer.Params, deal.Transfer.Size, deal.ChainDealID,
+		deal.PublishCID.String(), deal.SectorID, deal.Offset, deal.Length, deal.Checkpoint, deal.CheckpointAt, deal.Err, deal.Retry, []byte("test"))
+
 	require.NoError(t, err)
-	require.False(t, dealState.FastRetrieval)
 
 	//Run migration
 	req.NoError(goose.UpByOne(sqldb, "."))
 
-	// Check the deal state again
-	dealState, err = dealsDB.ByID(ctx, deals[0].DealUuid)
+	rows, err := sqldb.Query("SELECT FastRetrieval FROM Deals WHERE ID =?", deal.DealUuid)
 	require.NoError(t, err)
-	require.True(t, dealState.FastRetrieval)
+	defer rows.Close()
+
+	for rows.Next() {
+
+		var ft bool
+
+		err = rows.Scan(&ft)
+		require.NoError(t, err)
+		require.True(t, ft)
+	}
 }

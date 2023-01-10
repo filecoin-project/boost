@@ -541,7 +541,8 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 			Params: transferParamsJSON,
 			Size:   uint64(carFileinfo.Size()),
 		},
-		FastRetrieval: true,
+		RemoveUnsealedCopy: false,
+		SkipIPNIAnnounce:   false,
 	}
 
 	return f.Client.StorageDeal(f.ctx, dealParams, peerID)
