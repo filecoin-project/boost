@@ -42,13 +42,13 @@ commands:
       - restore_cache:
           name: Restore parameters cache
           keys:
-            - 'v25-8mb-lotus-params'
+            - 'v28-8mb-lotus-params'
           paths:
             - /var/tmp/filecoin-proof-parameters/
       - run:  ./boostci fetch-params 8388608
       - save_cache:
           name: Save parameters cache
-          key: 'v25-8mb-lotus-params'
+          key: 'v28-8mb-lotus-params'
           paths:
             - /var/tmp/filecoin-proof-parameters/
   git_fetch_all_tags:
