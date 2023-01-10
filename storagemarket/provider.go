@@ -376,7 +376,7 @@ func (p *Provider) Start() error {
 	// De-fragment the logs DB
 	_, err = p.logsSqlDB.Exec("Vacuum")
 	if err != nil {
-		return fmt.Errorf("failed to de-fragment the logs db: %w", err)
+		log.Errorf("failed to de-fragment the logs db: %w", err)
 	}
 
 	log.Infow("db: initialized")
