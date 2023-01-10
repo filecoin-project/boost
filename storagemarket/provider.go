@@ -373,6 +373,12 @@ func (p *Provider) Start() error {
 		return fmt.Errorf("failed to migrate db: %w", err)
 	}
 
+	// De-fragment the logs DB
+	_, err = p.logsSqlDB.Exec("Vacuum")
+	if err != nil {
+		return fmt.Errorf("failed to de-fragment the logs db: %w", err)
+	}
+
 	log.Infow("db: initialized")
 
 	// cleanup all completed deals in case Boost resumed before they were cleanedup

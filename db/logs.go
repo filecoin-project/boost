@@ -72,12 +72,5 @@ func (d *LogsDB) CleanupLogs(ctx context.Context, daysOld int) error {
 	qry := "DELETE from DealLogs WHERE DealUUID IN (SELECT DISTINCT DealUUID FROM DealLogs WHERE CreatedAt < ?)"
 
 	_, err := d.db.ExecContext(ctx, qry, td)
-	if err != nil {
-		return err
-	}
-
-	// Vacuum DealLogs to reduce the log file size. This OP requires free space of "2 * current file size" to succeed
-	qry = "VACUUM"
-	_, err = d.db.ExecContext(ctx, qry)
 	return err
 }
