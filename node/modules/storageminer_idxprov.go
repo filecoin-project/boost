@@ -2,10 +2,10 @@ package modules
 
 import (
 	"github.com/filecoin-project/boost/indexprovider"
-	provider "github.com/filecoin-project/index-provider"
 	"github.com/filecoin-project/lotus/node/config"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	provider "github.com/ipni/index-provider"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 )
