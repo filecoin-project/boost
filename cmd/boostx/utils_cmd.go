@@ -361,7 +361,7 @@ func signAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway,
 		msg.GasFeeCap = newGasFeeCap
 	}
 
-	smsg, err := messagesigner.SignMessage(ctx, msg, nil, func(*types.SignedMessage) error { return nil })
+	smsg, err := messagesigner.SignMessage(ctx, msg, func(*types.SignedMessage) error { return nil })
 	if err != nil {
 		return
 	}

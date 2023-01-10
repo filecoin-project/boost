@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"path/filepath"
 
 	"github.com/filecoin-project/boost/db"
@@ -22,6 +20,8 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/metadata"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/fx"
 )
 
