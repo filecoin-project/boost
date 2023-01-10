@@ -204,7 +204,7 @@ function SearchResults({searchQuery, setSearchQuery, showSearchPrompt}) {
 
     // Lookup a piece by piece CID
     const pieceRes = useQuery(PieceStatusQuery, {
-        pollInterval: 1000,
+        pollInterval: 3000,
         variables: {
             pieceCid: pieceCid,
         },

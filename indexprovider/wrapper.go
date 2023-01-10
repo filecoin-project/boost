@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"path/filepath"
 
 	"github.com/filecoin-project/boost/db"
@@ -12,15 +14,14 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
-	provider "github.com/filecoin-project/index-provider"
-	"github.com/filecoin-project/index-provider/metadata"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/markets/idxprov"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
+	provider "github.com/ipni/index-provider"
+	"github.com/ipni/index-provider/metadata"
 	"go.uber.org/fx"
 )
 
@@ -28,24 +29,24 @@ var log = logging.Logger("index-provider-wrapper")
 var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
+	marketsHost    host.Host
 	cfg            lotus_config.DAGStoreConfig
 	enabled        bool
 	dealsDB        *db.DealsDB
 	legacyProv     lotus_storagemarket.StorageProvider
 	prov           provider.Interface
-	dagStore       *dagstore.Wrapper
 	piecedirectory *piecedirectory.PieceDirectory
 	meshCreator    idxprov.MeshCreator
 	bitswapEnabled bool
 }
 
-func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
-	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
+func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, marketsHost host.Host, dealsDB *db.DealsDB,
+	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface,
 	piecedirectory *piecedirectory.PieceDirectory, meshCreator idxprov.MeshCreator) *Wrapper {
 
-	return func(lc fx.Lifecycle, r repo.LockedRepo, dealsDB *db.DealsDB,
+	return func(lc fx.Lifecycle, r repo.LockedRepo, marketsHost host.Host, dealsDB *db.DealsDB,
 		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface,
-		dagStore *dagstore.Wrapper, piecedirectory *piecedirectory.PieceDirectory,
+		piecedirectory *piecedirectory.PieceDirectory,
 		meshCreator idxprov.MeshCreator) *Wrapper {
 
 		if cfg.DAGStore.RootDir == "" {
@@ -54,10 +55,10 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, deal
 
 		_, isDisabled := prov.(*DisabledIndexProvider)
 		w := &Wrapper{
+			marketsHost:    marketsHost,
 			dealsDB:        dealsDB,
 			legacyProv:     legacyProv,
 			prov:           prov,
-			dagStore:       dagStore,
 			meshCreator:    meshCreator,
 			cfg:            cfg.DAGStore,
 			bitswapEnabled: cfg.Dealmaking.BitswapPeerID != "",
@@ -130,7 +131,7 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 }
 
 func (w *Wrapper) Start(ctx context.Context) {
-	w.prov.RegisterMultihashLister(func(ctx context.Context, contextID []byte) (provider.MultihashIterator, error) {
+	w.prov.RegisterMultihashLister(func(ctx context.Context, prov peer.ID, contextID []byte) (provider.MultihashIterator, error) {
 		provideF := func(pieceCid cid.Cid) (provider.MultihashIterator, error) {
 			ii, err := w.piecedirectory.GetIterableIndex(ctx, pieceCid)
 			if err != nil {
@@ -185,7 +186,7 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDeal
 		protocols = append(protocols, metadata.Bitswap{})
 	}
 
-	fm := metadata.New(protocols...)
+	fm := metadata.Default.New(protocols...)
 
 	// ensure we have a connection with the full node host so that the index provider gossip sub announcements make their
 	// way to the filecoin bootstrapper network
@@ -198,7 +199,11 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDeal
 		return cid.Undef, fmt.Errorf("failed to get proposal cid from deal: %w", err)
 	}
 
-	annCid, err := w.prov.NotifyPut(ctx, propCid.Bytes(), fm)
+	addrInfo := &peer.AddrInfo{
+		ID:    w.marketsHost.ID(),
+		Addrs: w.marketsHost.Addrs(),
+	}
+	annCid, err := w.prov.NotifyPut(ctx, addrInfo, propCid.Bytes(), fm)
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to announce deal to index provider: %w", err)
 	}

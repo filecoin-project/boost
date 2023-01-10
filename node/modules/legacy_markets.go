@@ -14,13 +14,13 @@ import (
 	smnet "github.com/filecoin-project/go-fil-markets/storagemarket/network"
 	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-state-types/big"
-	provider "github.com/filecoin-project/index-provider"
 	"github.com/filecoin-project/lotus/markets/idxprov"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
+	provider "github.com/ipni/index-provider"
 	"github.com/libp2p/go-libp2p/core/host"
 )
 
