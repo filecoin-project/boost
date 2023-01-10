@@ -199,11 +199,7 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDeal
 		return cid.Undef, fmt.Errorf("failed to get proposal cid from deal: %w", err)
 	}
 
-	addrInfo := &peer.AddrInfo{
-		ID:    w.marketsHost.ID(),
-		Addrs: w.marketsHost.Addrs(),
-	}
-	annCid, err := w.prov.NotifyPut(ctx, addrInfo, propCid.Bytes(), fm)
+	annCid, err := w.prov.NotifyPut(ctx, nil, propCid.Bytes(), fm)
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to announce deal to index provider: %w", err)
 	}
