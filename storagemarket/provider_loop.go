@@ -70,26 +70,7 @@ type acceptError struct {
 	reason string
 }
 
-func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptError {
-	host, err := deal.Transfer.Host()
-	if err != nil {
-		return &acceptError{
-			error:         fmt.Errorf("failed to get deal transfer host: %w", err),
-			reason:        fmt.Sprintf("server error: get deal transfer host: %s", err),
-			isSevereError: false,
-		}
-	}
-
-	// Check that the deal proposal is unique
-	if aerr := p.checkDealPropUnique(deal); aerr != nil {
-		return aerr
-	}
-
-	// Check that the deal uuid is unique
-	if aerr := p.checkDealUuidUnique(deal); aerr != nil {
-		return aerr
-	}
-
+func (p *Provider) runDealFilters(deal *types.ProviderDealState) *acceptError {
 	// get current sealing pipeline status
 	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
 	if err != nil {
@@ -127,6 +108,33 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 			reason:        reason,
 			isSevereError: false,
 		}
+	}
+	return nil
+}
+
+func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptError {
+	host, err := deal.Transfer.Host()
+	if err != nil {
+		return &acceptError{
+			error:         fmt.Errorf("failed to get deal transfer host: %w", err),
+			reason:        fmt.Sprintf("server error: get deal transfer host: %s", err),
+			isSevereError: false,
+		}
+	}
+
+	// Check that the deal proposal is unique
+	if aerr := p.checkDealPropUnique(deal); aerr != nil {
+		return aerr
+	}
+
+	// Check that the deal uuid is unique
+	if aerr := p.checkDealUuidUnique(deal); aerr != nil {
+		return aerr
+	}
+
+	// Run deal through the filter
+	if aerr := p.runDealFilters(deal); aerr != nil {
+		return aerr
 	}
 
 	cleanup := func() {
@@ -222,7 +230,7 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 	return nil
 }
 
-// processOfflineDealProposal just saves the deal to the database.
+// processOfflineDealProposal just saves the deal to the database after running deal filters
 // Execution resumes when processImportOfflineDealData is called.
 func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState, dh *dealHandler) *acceptError {
 	// Check that the deal proposal is unique
@@ -232,6 +240,11 @@ func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState, dh 
 
 	// Check that the deal uuid is unique
 	if aerr := p.checkDealUuidUnique(ds); aerr != nil {
+		return aerr
+	}
+
+	// Run deal through the filter
+	if aerr := p.runDealFilters(ds); aerr != nil {
 		return aerr
 	}
 
