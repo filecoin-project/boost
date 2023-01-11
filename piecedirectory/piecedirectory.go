@@ -77,15 +77,18 @@ func (ps *PieceDirectory) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid
 	defer span.End()
 
 	// Get the piece metadata from the DB
+	log.Debugw("piece metadata: get", "pieceCid", pieceCid)
 	md, err := ps.store.GetPieceMetadata(ctx, pieceCid)
 	if err != nil {
 		return types.PieceDirMetadata{}, err
 	}
 
 	// Check if this process is currently indexing the piece
+	log.Debugw("piece metadata: get indexing status", "pieceCid", pieceCid)
 	_, indexing := ps.addIdxOpByCid.Load(pieceCid)
 
 	// Return the db piece metadata along with the indexing flag
+	log.Debugw("piece metadata: get complete", "pieceCid", pieceCid)
 	return types.PieceDirMetadata{
 		Metadata: md,
 		Indexing: indexing,

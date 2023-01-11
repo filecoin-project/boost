@@ -127,13 +127,8 @@ function FlaggedPieces({setSearchQuery}) {
     </div>
 }
 
-function FlaggedPieceRow({piece, setSearchQuery}) {
-    var isUnsealed = false
-    for (var dl of piece.Deals) {
-        if (dl.SealStatus.IsUnsealed) {
-            isUnsealed = true
-        }
-    }
+function FlaggedPieceRow({piece}) {
+    var isUnsealed = hasUnsealedCopy(piece)
     return <tr>
         <td>
             <Link to={"/inspect/piece/"+piece.PieceCid}>
@@ -144,6 +139,15 @@ function FlaggedPieceRow({piece, setSearchQuery}) {
         <td>{isUnsealed ? 'Yes' : 'No'}</td>
         <td>{piece.Deals.length}</td>
     </tr>
+}
+
+function hasUnsealedCopy(piece) {
+    for (var dl of piece.Deals) {
+        if (dl.SealStatus.IsUnsealed) {
+            return true
+        }
+    }
+    return false
 }
 
 // Page showing information about a particular piece
@@ -282,7 +286,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
     const searchIsRootCid = searchQuery && searchQuery == rootCid
     const indexFailed = pieceStatus.IndexStatus.Status === 'Failed'
     const indexRegistered = pieceStatus.IndexStatus.Status === 'Registered'
-    const canReIndex = indexFailed || indexRegistered
+    const canReIndex = (indexFailed || indexRegistered) && hasUnsealedCopy(pieceStatus)
 
     return <div className="piece-detail" id={pieceCid}>
         <div className="content">
