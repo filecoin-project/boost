@@ -34,8 +34,9 @@ type PieceDirectory struct {
 	store       types.Store
 	pieceReader types.PieceReader
 
-	addIdxThrottle chan struct{}
-	addIdxOpByCid  sync.Map
+	addIdxThrottleSize int
+	addIdxThrottle     chan struct{}
+	addIdxOpByCid      sync.Map
 }
 
 func NewStore() *client.Store {
@@ -44,9 +45,10 @@ func NewStore() *client.Store {
 
 func NewPieceDirectory(store types.Store, pr types.PieceReader, addIndexThrottleSize int) *PieceDirectory {
 	return &PieceDirectory{
-		store:          store,
-		pieceReader:    pr,
-		addIdxThrottle: make(chan struct{}, addIndexThrottleSize),
+		store:              store,
+		pieceReader:        pr,
+		addIdxThrottleSize: addIndexThrottleSize,
+		addIdxThrottle:     make(chan struct{}, addIndexThrottleSize),
 	}
 }
 
@@ -226,6 +228,11 @@ func (ps *PieceDirectory) addIndexForPieceThrottled(ctx context.Context, pieceCi
 	})
 	op := opi.(*addIndexOperation)
 	if loaded {
+		log.Debugw("add index: operation in progress, waiting for completion", "pieceCid", pieceCid)
+		defer func() {
+			log.Debugw("add index: in progress operation completed", "pieceCid", pieceCid)
+		}()
+
 		// There is an add index operation in progress, so wait for it to
 		// complete
 		select {
@@ -234,12 +241,14 @@ func (ps *PieceDirectory) addIndexForPieceThrottled(ctx context.Context, pieceCi
 		case <-op.done:
 			return op.err
 		}
-	} else {
-		// A new operation was added to the map, so clean it up when it's done
-		defer ps.addIdxOpByCid.Delete(pieceCid)
 	}
 
+	// A new operation was added to the map, so clean it up when it's done
+	defer ps.addIdxOpByCid.Delete(pieceCid)
+
 	// Wait for the throttle to yield an open spot
+	log.Debugw("add index: wait for open throttle position",
+		"pieceCid", pieceCid, "queued", len(ps.addIdxThrottle), "queue-limit", ps.addIdxThrottleSize)
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -252,17 +261,20 @@ func (ps *PieceDirectory) addIndexForPieceThrottled(ctx context.Context, pieceCi
 	close(op.done)
 
 	// Return the result
+	log.Debugw("add index: completed", "pieceCid", pieceCid)
 	return op.err
 }
 
 func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	// Get a reader over the piece data
+	log.Debugw("add index: get index", "pieceCid", pieceCid)
 	reader, err := ps.pieceReader.GetReader(ctx, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
 	if err != nil {
 		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
 
 	// Iterate over all the blocks in the piece to extract the index records
+	log.Debugw("add index: read index", "pieceCid", pieceCid)
 	recs := make([]model.Record, 0)
 	opts := []carv2.Option{carv2.ZeroLengthSectionAsEOF(true)}
 	blockReader, err := carv2.NewBlockReader(reader, opts...)
@@ -288,6 +300,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 
 	// Add mh => piece index to store: "which piece contains the multihash?"
 	// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
+	log.Debugw("add index: store index in piece directory", "pieceCid", pieceCid)
 	if err := ps.store.AddIndex(ctx, pieceCid, recs); err != nil {
 		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
 	}
@@ -299,12 +312,15 @@ func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.C
 	ctx, span := tracing.Tracer.Start(ctx, "pm.build_index_for_piece")
 	defer span.End()
 
+	log.Debugw("build index: get piece deals", "pieceCid", pieceCid)
+
 	dls, err := ps.GetPieceDeals(ctx, pieceCid)
 	if err != nil {
 		return fmt.Errorf("getting piece deals: %w", err)
 	}
 
 	if len(dls) == 0 {
+		log.Debugw("build index: no deals found for piece", "pieceCid", pieceCid)
 		return fmt.Errorf("getting piece deals: no deals found for piece")
 	}
 

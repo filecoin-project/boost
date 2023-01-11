@@ -330,7 +330,7 @@ func (r *resolver) pieceStatus(ctx context.Context, pieceCid cid.Cid, allLegacyD
 		})
 	}
 
-	// Get the state of the piece
+	// Get the state of the piece's index
 	idxStatus, err := r.getIndexStatus(ctx, pieceCid, deals)
 	if err != nil {
 		return nil, err
