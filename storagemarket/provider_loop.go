@@ -222,7 +222,7 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 	return nil
 }
 
-// processOfflineDealProposal just saves the deal to the database.
+// processOfflineDealProposal just saves the deal to the database after running deal filters
 // Execution resumes when processImportOfflineDealData is called.
 func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState, dh *dealHandler) *acceptError {
 	// Check that the deal proposal is unique
@@ -233,6 +233,45 @@ func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState, dh 
 	// Check that the deal uuid is unique
 	if aerr := p.checkDealUuidUnique(ds); aerr != nil {
 		return aerr
+	}
+
+	// get current sealing pipeline status
+	status, err := sealingpipeline.GetStatus(p.ctx, p.fullnodeApi, p.sps)
+	if err != nil {
+		return &acceptError{
+			error:         fmt.Errorf("failed to fetch sealing pipeline status: %w", err),
+			reason:        "server error: get sealing status",
+			isSevereError: true,
+		}
+	}
+
+	// run custom decision logic by invoking the deal filter
+	// (the deal filter can be configured by the user)
+	params := types.DealParams{
+		DealUUID:           ds.DealUuid,
+		ClientDealProposal: ds.ClientDealProposal,
+		DealDataRoot:       ds.DealDataRoot,
+		Transfer:           ds.Transfer,
+	}
+
+	accept, reason, err := p.df(p.ctx, types.DealFilterParams{
+		DealParams:           &params,
+		SealingPipelineState: status})
+
+	if err != nil {
+		return &acceptError{
+			error:         fmt.Errorf("failed to invoke deal filter: %w", err),
+			reason:        "server error: deal filter error",
+			isSevereError: true,
+		}
+	}
+
+	if !accept {
+		return &acceptError{
+			error:         fmt.Errorf("deal filter rejected deal: %s", reason),
+			reason:        reason,
+			isSevereError: false,
+		}
 	}
 
 	// Save deal to DB
