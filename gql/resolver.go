@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 
+	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
@@ -139,6 +141,7 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 
 	resolvers := make([]*dealResolver, 0, len(deals))
 	for _, deal := range deals {
+		deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
 		resolvers = append(resolvers, newDealResolver(&deal, r.provider, r.dealsDB, r.logsDB, r.spApi))
 	}
 
@@ -516,16 +519,25 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 		if dr.IsOffline {
 			return "Awaiting Offline Data Import"
 		}
+		var pct uint64 = math.MaxUint64
+		if dr.ProviderDealState.Transfer.Size > 0 {
+			pct = (100 * dr.transferred) / dr.ProviderDealState.Transfer.Size
+		}
 		switch {
 		case dr.transferred == 0 && !dr.provider.IsTransferStalled(dr.DealUuid):
 			return "Transfer Queued"
-		case dr.transferred == 100:
-			return "Transfer Complete"
+		case pct == 100:
+			return "Verifying Commp"
 		default:
-			pct := (100 * dr.transferred) / dr.ProviderDealState.Transfer.Size
 			isStalled := dr.provider.IsTransferStalled(dr.DealUuid)
 			if isStalled {
-				return fmt.Sprintf("Transfer stalled at %d%% ", pct)
+				if pct == math.MaxUint64 {
+					return fmt.Sprintf("Transfer stalled at %s", humanize.Bytes(dr.transferred))
+				}
+				return fmt.Sprintf("Transfer stalled at %d%%", pct)
+			}
+			if pct == math.MaxUint64 {
+				return fmt.Sprintf("Transferring %s", humanize.Bytes(dr.transferred))
 			}
 			return fmt.Sprintf("Transferring %d%%", pct)
 		}

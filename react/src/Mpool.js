@@ -55,7 +55,7 @@ function MpoolMessage(props) {
         </tr>
         <tr key={i+"nonce"}>
             <td>Nonce</td>
-            <td>{msg.Nonce}</td>
+            <td>{msg.Nonce+''}</td>
         </tr>
         <tr key={i+"value"}>
             <td>Value</td>
