@@ -51,7 +51,7 @@ func TestMultiFilter(t *testing.T) {
 		{
 			CacheFile: filepath.Join(cfgDir, "retrievalconfig.json"),
 			Fetcher:   fpf.fetchList,
-			Handler:   filters.NewConfigFilter(&testBandwidthMeasure{}, &testRequestCounter{}),
+			Handler:   filters.NewConfigFilter(),
 		},
 	}, clock, onTick)
 	err = mf.Start(ctx)
@@ -169,7 +169,7 @@ func TestMultiFilter(t *testing.T) {
 		{
 			CacheFile: filepath.Join(cfgDir, "retrievalconfig.json"),
 			Fetcher:   fpf.fetchList,
-			Handler:   filters.NewConfigFilter(&testBandwidthMeasure{}, &testRequestCounter{}),
+			Handler:   filters.NewConfigFilter(),
 		},
 	}, clock, onTick)
 	err = mf.Start(ctx)

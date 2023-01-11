@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/protocolproxy"
-	"github.com/ipfs/go-bitswap/message"
 	bsnetwork "github.com/ipfs/go-bitswap/network"
 	"github.com/ipfs/go-bitswap/server"
 	"github.com/ipfs/go-cid"
@@ -20,35 +19,22 @@ type Filter interface {
 	FulfillRequest(p peer.ID, c cid.Cid) (bool, error)
 }
 
-type RequestCounter interface {
-	AddRequest(p peer.ID, c cid.Cid)
-	RemoveRequest(p peer.ID, c cid.Cid)
-}
-
-type BandwidthMeasure interface {
-	RecordBytesSent(sent uint64)
-}
-
 type BitswapServer struct {
-	remoteStore      blockstore.Blockstore
-	filter           Filter
-	requestCounter   RequestCounter
-	bandwidthMeasure BandwidthMeasure
-	ctx              context.Context
-	cancel           context.CancelFunc
-	proxy            *peer.AddrInfo
-	server           *server.Server
-	host             host.Host
+	remoteStore blockstore.Blockstore
+	filter      Filter
+	ctx         context.Context
+	cancel      context.CancelFunc
+	proxy       *peer.AddrInfo
+	server      *server.Server
+	host        host.Host
 }
 
 func NewBitswapServer(
 	remoteStore blockstore.Blockstore,
 	host host.Host,
 	filter Filter,
-	bandwidthMeasure BandwidthMeasure,
-	requestCounter RequestCounter,
 ) *BitswapServer {
-	return &BitswapServer{remoteStore: remoteStore, host: host, filter: filter, requestCounter: requestCounter, bandwidthMeasure: bandwidthMeasure}
+	return &BitswapServer{remoteStore: remoteStore, host: host, filter: filter}
 }
 
 const protectTag = "bitswap-server-to-proxy"
@@ -86,12 +72,8 @@ func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo) error {
 				log.Errorf("error running bitswap filter: %s", err.Error())
 				return false
 			}
-			if fulfill {
-				s.requestCounter.AddRequest(p, c)
-			}
 			return fulfill
 		}),
-		server.WithTracer(s),
 	}
 	net := bsnetwork.NewFromIpfsHost(host, nilRouter)
 	s.server = server.New(s.ctx, net, s.remoteStore, bsopts...)
@@ -112,27 +94,6 @@ func (s *BitswapServer) Stop() error {
 	}
 	s.cancel()
 	return s.server.Close()
-}
-
-func (s *BitswapServer) MessageReceived(p peer.ID, msg message.BitSwapMessage) {
-	entries := msg.Wantlist()
-	for _, entry := range entries {
-		if entry.Cancel {
-			s.requestCounter.RemoveRequest(p, entry.Cid)
-		}
-	}
-}
-
-func (s *BitswapServer) MessageSent(p peer.ID, msg message.BitSwapMessage) {
-	for _, bp := range msg.BlockPresences() {
-		s.requestCounter.RemoveRequest(p, bp.Cid)
-	}
-	totalSent := uint64(0)
-	for _, b := range msg.Blocks() {
-		totalSent += uint64(len(b.RawData()))
-		s.requestCounter.RemoveRequest(p, b.Cid())
-	}
-	s.bandwidthMeasure.RecordBytesSent(totalSent)
 }
 
 func (s *BitswapServer) keepProxyConnectionAlive(ctx context.Context, proxy peer.AddrInfo) {

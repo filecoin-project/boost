@@ -6,8 +6,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/dustin/go-humanize"
-	"github.com/filecoin-project/boost/cmd/booster-bitswap/requestcounter"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 )
@@ -21,44 +19,25 @@ const AllowList PeerListType = "allowlist"
 // DenyList is a peer list where the specified peers cannot serve retrievals, but all others can
 const DenyList PeerListType = "denylist"
 
-// BandwidthMeasure provides an up to date measurement of the current bytes per second transferred
-type BandwidthMeasure interface {
-	AvgBytesPerSecond() uint64
-}
-
-type RequestCounter interface {
-	StateForPeer(p peer.ID) requestcounter.ServerState
-}
-
 type remoteConfig struct {
-	peerListType                   PeerListType
-	peerList                       map[peer.ID]struct{}
-	underMaintenance               bool
-	maxSimultaneousRequests        uint64
-	maxSimultaneousRequestsPerPeer uint64
-	maxBandwidth                   uint64
+	peerListType     PeerListType
+	peerList         map[peer.ID]struct{}
+	underMaintenance bool
 }
 
 // ConfigFilter manages filtering based on a remotely fetched retrieval configuration
 type ConfigFilter struct {
-	remoteConfigLk   sync.RWMutex
-	bandwidthMeasure BandwidthMeasure
-	requestCounter   RequestCounter
-	remoteConfig     remoteConfig
+	remoteConfigLk sync.RWMutex
+	remoteConfig   remoteConfig
 }
 
 // NewConfigFilter constructs a new peer filter
-func NewConfigFilter(bandwidthMeasure BandwidthMeasure, requestCounter RequestCounter) *ConfigFilter {
+func NewConfigFilter() *ConfigFilter {
 	return &ConfigFilter{
-		bandwidthMeasure: bandwidthMeasure,
-		requestCounter:   requestCounter,
 		remoteConfig: remoteConfig{
-			peerListType:                   DenyList,
-			peerList:                       make(map[peer.ID]struct{}),
-			underMaintenance:               false,
-			maxSimultaneousRequests:        0,
-			maxSimultaneousRequestsPerPeer: 0,
-			maxBandwidth:                   0,
+			peerListType:     DenyList,
+			peerList:         make(map[peer.ID]struct{}),
+			underMaintenance: false,
 		},
 	}
 }
@@ -77,19 +56,6 @@ func (cf *ConfigFilter) FulfillRequest(p peer.ID, c cid.Cid) (bool, error) {
 	if (cf.remoteConfig.peerListType == DenyList) == has {
 		return false, nil
 	}
-	// don't fulfill requests when over maxbandwidth
-	if cf.remoteConfig.maxBandwidth > 0 && cf.bandwidthMeasure.AvgBytesPerSecond() > cf.remoteConfig.maxBandwidth {
-		return false, nil
-	}
-	s := cf.requestCounter.StateForPeer(p)
-	// don't fulfill requests when there are too many simultaneous requests over all
-	if cf.remoteConfig.maxSimultaneousRequests > 0 && s.TotalRequestsInProgress >= cf.remoteConfig.maxSimultaneousRequests {
-		return false, nil
-	}
-	// don't fulfill requests when there are too many simultaneous requests for this peer
-	if cf.remoteConfig.maxSimultaneousRequestsPerPeer > 0 && s.RequestsInProgressForPeer >= cf.remoteConfig.maxSimultaneousRequestsPerPeer {
-		return false, nil
-	}
 	// all filters passed, fulfill
 	return true, nil
 }
@@ -102,19 +68,9 @@ func (cf *ConfigFilter) parseRemoteConfig(response io.Reader) (remoteConfig, err
 		PeerIDs []string `json:"PeerIDs"`
 	}
 
-	type bitswapLimits struct {
-		SimultaneousRequests        uint64 `json:"SimultaneousRequests"`
-		SimultaneousRequestsPerPeer uint64 `json:"SimultaneousRequestsPerPeer"`
-		MaxBandwidth                string `json:"MaxBandwidth"`
-	}
-
-	type storageProviderLimits struct {
-		Bitswap bitswapLimits `json:"Bitswap"`
-	}
 	type responseType struct {
-		UnderMaintenance      bool                  `json:"UnderMaintenance"`
-		AllowDenyList         allowDenyList         `json:"AllowDenyList"`
-		StorageProviderLimits storageProviderLimits `json:"StorageProviderLimits"`
+		UnderMaintenance bool          `json:"UnderMaintenance"`
+		AllowDenyList    allowDenyList `json:"AllowDenyList"`
 	}
 
 	jsonResponse := json.NewDecoder(response)
@@ -144,20 +100,10 @@ func (cf *ConfigFilter) parseRemoteConfig(response io.Reader) (remoteConfig, err
 		peerList[peerID] = struct{}{}
 	}
 
-	maxBandwidth := uint64(0)
-	if decodedResponse.StorageProviderLimits.Bitswap.MaxBandwidth != "" {
-		maxBandwidth, err = humanize.ParseBytes(decodedResponse.StorageProviderLimits.Bitswap.MaxBandwidth)
-		if err != nil {
-			return remoteConfig{}, fmt.Errorf("parsing response: parsing 'MaxBandwidth': %w", err)
-		}
-	}
 	return remoteConfig{
-		underMaintenance:               decodedResponse.UnderMaintenance,
-		maxSimultaneousRequests:        decodedResponse.StorageProviderLimits.Bitswap.SimultaneousRequests,
-		maxSimultaneousRequestsPerPeer: decodedResponse.StorageProviderLimits.Bitswap.SimultaneousRequestsPerPeer,
-		maxBandwidth:                   maxBandwidth,
-		peerListType:                   peerListType,
-		peerList:                       peerList,
+		underMaintenance: decodedResponse.UnderMaintenance,
+		peerListType:     peerListType,
+		peerList:         peerList,
 	}, nil
 }
 
