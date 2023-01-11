@@ -182,13 +182,16 @@ func (r *resolver) PiecesWithRootPayloadCid(ctx context.Context, args struct{ Pa
 	return pieceCids, nil
 }
 
-func (r *resolver) PieceBuildIndex(ctx context.Context, args struct{ PieceCid string }) (bool, error) {
+func (r *resolver) PieceBuildIndex(args struct{ PieceCid string }) (bool, error) {
 	pieceCid, err := cid.Parse(args.PieceCid)
 	if err != nil {
 		return false, fmt.Errorf("%s is not a valid piece cid", args.PieceCid)
 	}
 
-	err = r.piecedirectory.BuildIndexForPiece(ctx, pieceCid)
+	// Use the global boost context for build piece, because if the user
+	// navigates away from the page we don't want to cancel the build piece
+	// operation
+	err = r.piecedirectory.BuildIndexForPiece(r.ctx, pieceCid)
 	if err != nil {
 		return false, err
 	}
