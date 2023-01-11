@@ -36,6 +36,7 @@ func main() {
 			marketAddCmd,
 			marketWithdrawCmd,
 			statsCmd,
+			sectorCmd,
 		},
 	}
 	app.Setup()
