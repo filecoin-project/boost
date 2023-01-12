@@ -478,7 +478,7 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 		offset = 0
 	}
 
-	log.Warnw("NextPiecesToCheck: returning piececids", "len", len(pieceCids), "offset", offset)
+	log.Debugw("NextPiecesToCheck: returning piececids", "len", len(pieceCids), "offset", offset)
 
 	return pieceCids, nil
 }
