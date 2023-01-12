@@ -115,7 +115,9 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 	var hasUnsealedDeal bool
 	dls := md.Deals
 	for _, dl := range dls {
-		isUnsealed, err := d.sapi.IsUnsealed(ctx, dl.SectorID, dl.PieceOffset.Unpadded(), dl.PieceLength.Unpadded())
+		isUnsealedCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		isUnsealed, err := d.sapi.IsUnsealed(isUnsealedCtx, dl.SectorID, dl.PieceOffset.Unpadded(), dl.PieceLength.Unpadded())
+		cancel()
 		if err != nil {
 			return fmt.Errorf("failed to check unsealed status of piece %s (sector %d, offset %d, length %d): %w",
 				pieceCid, dl.SectorID, dl.PieceOffset.Unpadded(), dl.PieceLength.Unpadded(), err)
