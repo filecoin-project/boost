@@ -419,7 +419,7 @@ var (
 	checked map[string]time.Time
 
 	// batch limit for each NextPiecesToCheck call
-	piecesToTrackerBatchSize = 2
+	PiecesToTrackerBatchSize = 1024
 )
 
 func init() {
@@ -433,10 +433,9 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 	q := query.Query{
 		Prefix:   "/" + sprefixPieceCidToCursor + "/",
 		KeysOnly: true,
-		Limit:    piecesToTrackerBatchSize,
+		Limit:    PiecesToTrackerBatchSize,
 		Offset:   offset,
 	}
-	fmt.Println("calling query with offset:", offset)
 	results, err := db.Query(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("listing pieces in database: %w", err)
@@ -455,7 +454,6 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 		i++
 
 		k := r.Key[len(q.Prefix):]
-		fmt.Println("got k:", k)
 		if t, ok := checked[k]; ok {
 			alreadyChecked := t.After(now.Add(-MinPieceCheckPeriod))
 
@@ -476,7 +474,7 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 
 	// if we got less pieces than the specified limit, we must be at the end of the table,
 	// so reset the cursor
-	if len(pieceCids) < piecesToTrackerBatchSize {
+	if i < PiecesToTrackerBatchSize-1 {
 		offset = 0
 	}
 

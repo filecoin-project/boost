@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
@@ -29,12 +28,16 @@ func TestPieceDoctor(t *testing.T) {
 		prev := ldb.MinPieceCheckPeriod
 		ldb.MinPieceCheckPeriod = 1 * time.Second
 
+		prevp := ldb.PiecesToTrackerBatchSize
+		ldb.PiecesToTrackerBatchSize = 4
+
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
 
 		testPieceDoctor(ctx, t, bdsvc, 8050, ldb.MinPieceCheckPeriod)
 
 		ldb.MinPieceCheckPeriod = prev
+		ldb.PiecesToTrackerBatchSize = prevp
 	})
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
@@ -68,6 +71,7 @@ func testPieceDoctor(ctx context.Context, t *testing.T, bdsvc *svc.Service, port
 	t.Run("next pieces", func(t *testing.T) {
 		testNextPieces(ctx, t, cl, pieceCheckPeriod)
 	})
+
 	t.Run("next pieces pagination", func(t *testing.T) {
 		testNextPiecesPagination(ctx, t, cl, pieceCheckPeriod)
 	})
@@ -116,9 +120,9 @@ func testNextPieces(ctx context.Context, t *testing.T, cl *client.Store, pieceCh
 }
 
 func testNextPiecesPagination(ctx context.Context, t *testing.T, cl *client.Store, pieceCheckPeriod time.Duration) {
-	// Add 7 pieces
+	// Add 8 pieces
 	var pcids []cid.Cid
-	for i := 1; i <= 7; i++ {
+	for i := 1; i <= 9; i++ {
 		pieceCid := blocks.NewBlock([]byte(fmt.Sprintf("%d%d", time.Now().UnixMilli(), i))).Cid()
 		fmt.Println(pieceCid)
 		di := model.DealInfo{
@@ -134,25 +138,67 @@ func testNextPiecesPagination(ctx context.Context, t *testing.T, cl *client.Stor
 		pcids = append(pcids, pieceCid)
 	}
 
-	pcids1, err := cl.NextPiecesToCheck(ctx)
+	// expect to get 4 pieces
+	pcids, err := cl.NextPiecesToCheck(ctx)
 	require.NoError(t, err)
+	require.Len(t, pcids, 4)
 
-	spew.Dump("pcids1", pcids1)
-
-	pcids2, err := cl.NextPiecesToCheck(ctx)
+	// expect to get 4 pieces
+	pcids, err = cl.NextPiecesToCheck(ctx)
 	require.NoError(t, err)
+	require.Len(t, pcids, 4)
 
-	spew.Dump("pcids2", pcids2)
-
-	pcids3, err := cl.NextPiecesToCheck(ctx)
+	// expect to get 1 pieces (end of table)
+	pcids, err = cl.NextPiecesToCheck(ctx)
 	require.NoError(t, err)
+	require.Len(t, pcids, 1)
 
-	spew.Dump("pcids3", pcids3)
-
-	pcids4, err := cl.NextPiecesToCheck(ctx)
+	// expect to get 0 pieces (first four)
+	pcids, err = cl.NextPiecesToCheck(ctx)
 	require.NoError(t, err)
+	require.Len(t, pcids, 0)
 
-	spew.Dump("pcids4", pcids4)
+	// expect to get 0 pieces (second four)
+	pcids, err = cl.NextPiecesToCheck(ctx)
+	require.NoError(t, err)
+	require.Len(t, pcids, 0)
+
+	// expect to get 0 pieces (end of table)
+	pcids, err = cl.NextPiecesToCheck(ctx)
+	require.NoError(t, err)
+	require.Len(t, pcids, 0)
+
+	// Add 1 more piece
+	for i := 1; i <= 1; i++ {
+		pieceCid := blocks.NewBlock([]byte(fmt.Sprintf("%d%d", time.Now().UnixMilli(), i))).Cid()
+		fmt.Println(pieceCid)
+		di := model.DealInfo{
+			DealUuid:    uuid.New().String(),
+			ChainDealID: abi.DealID(i),
+			SectorID:    abi.SectorNumber(i),
+			PieceOffset: 0,
+			PieceLength: 2048,
+		}
+		err := cl.AddDealForPiece(ctx, pieceCid, di)
+		require.NoError(t, err)
+
+		pcids = append(pcids, pieceCid)
+	}
+
+	// wait to reset the interval and start from scratch
+	time.Sleep(2 * time.Second)
+
+	pcids, err = cl.NextPiecesToCheck(ctx)
+	require.NoError(t, err)
+	require.Len(t, pcids, 4)
+
+	pcids, err = cl.NextPiecesToCheck(ctx)
+	require.NoError(t, err)
+	require.Len(t, pcids, 4)
+
+	pcids, err = cl.NextPiecesToCheck(ctx)
+	require.NoError(t, err)
+	require.Len(t, pcids, 2)
 }
 
 func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
