@@ -3,6 +3,7 @@ package gql
 import (
 	"context"
 	"fmt"
+	"time"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -238,7 +239,7 @@ func (r *resolver) pieceStatus(ctx context.Context, pieceCid cid.Cid, allLegacyD
 	for _, dl := range pieceInfo.Deals {
 		// Check the sealing status of each deal
 		errMsg := ""
-		isUnsealed, err := r.sa.IsUnsealed(ctx, dl.SectorID, dl.PieceOffset.Unpadded(), dl.PieceLength.Unpadded())
+		isUnsealed, err := r.isUnsealed(ctx, dl.SectorID, dl.PieceOffset.Unpadded(), dl.PieceLength.Unpadded())
 		if err != nil {
 			errMsg = err.Error()
 		}
@@ -276,7 +277,7 @@ func (r *resolver) pieceStatus(ctx context.Context, pieceCid cid.Cid, allLegacyD
 		// Only check the unseal state if the deal has already been added to a piece
 		st := &sealStatus{IsUnsealed: false}
 		if dl.Checkpoint >= dealcheckpoints.AddedPiece {
-			isUnsealed, err := r.sa.IsUnsealed(ctx, dl.SectorID, dl.Offset.Unpadded(), dl.Length.Unpadded())
+			isUnsealed, err := r.isUnsealed(ctx, dl.SectorID, dl.Offset.Unpadded(), dl.Length.Unpadded())
 			if err != nil {
 				st.Error = err.Error()
 			}
@@ -319,7 +320,7 @@ func (r *resolver) pieceStatus(ctx context.Context, pieceCid cid.Cid, allLegacyD
 			secID := abi.SectorNumber(sector.ID)
 			offset := abi.PaddedPieceSize(sector.Offset).Unpadded()
 			size := abi.PaddedPieceSize(sector.Length).Unpadded()
-			isUnsealed, err := r.sa.IsUnsealed(ctx, secID, offset, size)
+			isUnsealed, err := r.isUnsealed(ctx, secID, offset, size)
 			st = &sealStatus{IsUnsealed: isUnsealed}
 			if err != nil {
 				st.Error = err.Error()
@@ -418,4 +419,19 @@ func (r *resolver) getLegacyDealSector(ctx context.Context, pids []*pieceInfoDea
 		return pid.Sector
 	}
 	return nil
+}
+
+const isUnsealedTimeout = 5 * time.Second
+
+func (r *resolver) isUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error) {
+	isUnsealedCtx, cancel := context.WithTimeout(ctx, isUnsealedTimeout)
+	defer cancel()
+	isUnsealed, err := r.sa.IsUnsealed(isUnsealedCtx, sectorID, offset, length)
+	if err != nil && isUnsealedCtx.Err() != nil {
+		e := fmt.Errorf("IsUnsealed: timed out after %s (IsUnsealed blocks if the sector is currently being unsealed)",
+			isUnsealedTimeout)
+		return isUnsealed, e
+	}
+
+	return isUnsealed, err
 }
