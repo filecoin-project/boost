@@ -34,6 +34,7 @@ type Boost interface {
 
 	// MethodGroup: Boost
 	BoostIndexerAnnounceAllDeals(ctx context.Context) error                                                                        //perm:admin
+	BoostIndexerListMultihashes(ctx context.Context, proposalCid cid.Cid) ([]multihash.Multihash, error)                           //perm:admin
 	BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string) (*ProviderDealRejectionInfo, error)         //perm:admin
 	BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                                         //perm:admin
 	BoostDealBySignedProposalCid(ctx context.Context, proposalCid cid.Cid) (*smtypes.ProviderDealState, error)                     //perm:admin
