@@ -67,6 +67,8 @@ type BoostStruct struct {
 
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
 
+		BoostIndexerListMultihashes func(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) `perm:"admin"`
+
 		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
 		DealsConsiderOfflineRetrievalDeals func(p0 context.Context) (bool, error) `perm:"admin"`
@@ -428,6 +430,17 @@ func (s *BoostStruct) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 
 func (s *BoostStub) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 	return ErrNotSupported
+}
+
+func (s *BoostStruct) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) {
+	if s.Internal.BoostIndexerListMultihashes == nil {
+		return *new([]multihash.Multihash), ErrNotSupported
+	}
+	return s.Internal.BoostIndexerListMultihashes(p0, p1)
+}
+
+func (s *BoostStub) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) {
+	return *new([]multihash.Multihash), ErrNotSupported
 }
 
 func (s *BoostStruct) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) {

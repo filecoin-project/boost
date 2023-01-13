@@ -21,6 +21,7 @@
   * [BoostDealBySignedProposalCid](#boostdealbysignedproposalcid)
   * [BoostDummyDeal](#boostdummydeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
+  * [BoostIndexerListMultihashes](#boostindexerlistmultihashes)
   * [BoostOfflineDealWithData](#boostofflinedealwithdata)
 * [Deals](#deals)
   * [DealsConsiderOfflineRetrievalDeals](#dealsconsiderofflineretrievaldeals)
@@ -527,6 +528,27 @@ Perms: admin
 Inputs: `null`
 
 Response: `{}`
+
+### BoostIndexerListMultihashes
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
+Response:
+```json
+[
+  "Bw=="
+]
+```
 
 ### BoostOfflineDealWithData
 

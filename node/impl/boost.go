@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 
@@ -140,6 +141,28 @@ func (sm *BoostAPI) BoostDealBySignedProposalCid(ctx context.Context, proposalCi
 
 func (sm *BoostAPI) BoostIndexerAnnounceAllDeals(ctx context.Context) error {
 	return sm.IndexProvider.IndexerAnnounceAllDeals(ctx)
+}
+
+// BoostIndexerListMultihashes calls the index provider multihash lister for a given proposal cid
+func (sm *BoostAPI) BoostIndexerListMultihashes(ctx context.Context, proposalCid cid.Cid) ([]multihash.Multihash, error) {
+	it, err := sm.IndexProvider.MultihashLister(ctx, "", proposalCid.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	var mhs []multihash.Multihash
+	mh, err := it.Next()
+	for {
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return mhs, nil
+			}
+			return nil, err
+		}
+		mhs = append(mhs, mh)
+
+		mh, err = it.Next()
+	}
 }
 
 func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {

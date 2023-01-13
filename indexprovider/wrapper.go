@@ -132,51 +132,53 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 }
 
 func (w *Wrapper) Start(ctx context.Context) {
-	w.prov.RegisterMultihashLister(func(ctx context.Context, prov peer.ID, contextID []byte) (provider.MultihashIterator, error) {
-		provideF := func(pieceCid cid.Cid) (provider.MultihashIterator, error) {
-			ii, err := w.piecedirectory.GetIterableIndex(ctx, pieceCid)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get iterable index: %w", err)
-			}
+	w.prov.RegisterMultihashLister(w.MultihashLister)
+}
 
-			// Check if there are any records in the iterator. If there are no
-			// records, the multihash lister expects us to return an error.
-			hasRecords := ii.ForEach(func(_ multihash.Multihash, _ uint64) error {
-				return fmt.Errorf("has at least one record")
-			})
-			if hasRecords == nil {
-				return nil, fmt.Errorf("no records found for piece %s", pieceCid)
-			}
-
-			mhi, err := provider.CarMultihashIterator(ii)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get mhiterator: %w", err)
-			}
-			return mhi, nil
-		}
-
-		// convert context ID to proposal Cid
-		proposalCid, err := cid.Cast(contextID)
+func (w *Wrapper) MultihashLister(ctx context.Context, prov peer.ID, contextID []byte) (provider.MultihashIterator, error) {
+	provideF := func(pieceCid cid.Cid) (provider.MultihashIterator, error) {
+		ii, err := w.piecedirectory.GetIterableIndex(ctx, pieceCid)
 		if err != nil {
-			return nil, fmt.Errorf("failed to cast context ID to a cid")
+			return nil, fmt.Errorf("failed to get iterable index: %w", err)
 		}
 
-		// go from proposal cid -> piece cid by looking up deal in boost and if we can't find it there -> then markets
-		// check Boost deals DB
-		pds, boostErr := w.dealsDB.BySignedProposalCID(ctx, proposalCid)
-		if boostErr == nil {
-			pieceCid := pds.ClientDealProposal.Proposal.PieceCID
-			return provideF(pieceCid)
+		// Check if there are any records in the iterator. If there are no
+		// records, the multihash lister expects us to return an error.
+		hasRecords := ii.ForEach(func(_ multihash.Multihash, _ uint64) error {
+			return fmt.Errorf("has at least one record")
+		})
+		if hasRecords == nil {
+			return nil, fmt.Errorf("no records found for piece %s", pieceCid)
 		}
 
-		// check in legacy markets
-		md, legacyErr := w.legacyProv.GetLocalDeal(proposalCid)
-		if legacyErr == nil {
-			return provideF(md.Proposal.PieceCID)
+		mhi, err := provider.CarMultihashIterator(ii)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get mhiterator: %w", err)
 		}
+		return mhi, nil
+	}
 
-		return nil, fmt.Errorf("failed to look up deal in Boost, err=%s and Legacy Markets, err=%s", boostErr, legacyErr)
-	})
+	// convert context ID to proposal Cid
+	proposalCid, err := cid.Cast(contextID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to cast context ID to a cid")
+	}
+
+	// go from proposal cid -> piece cid by looking up deal in boost and if we can't find it there -> then markets
+	// check Boost deals DB
+	pds, boostErr := w.dealsDB.BySignedProposalCID(ctx, proposalCid)
+	if boostErr == nil {
+		pieceCid := pds.ClientDealProposal.Proposal.PieceCID
+		return provideF(pieceCid)
+	}
+
+	// check in legacy markets
+	md, legacyErr := w.legacyProv.GetLocalDeal(proposalCid)
+	if legacyErr == nil {
+		return provideF(md.Proposal.PieceCID)
+	}
+
+	return nil, fmt.Errorf("failed to look up deal in Boost, err=%s and Legacy Markets, err=%s", boostErr, legacyErr)
 }
 
 func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDealState) (cid.Cid, error) {
