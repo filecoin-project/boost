@@ -79,6 +79,7 @@ func newDealAccessor(db *sql.DB, deal *types.ProviderDealState) *dealAccessor {
 			"Error":                 &fielddef.FieldDef{F: &deal.Err},
 			"Retry":                 &fielddef.FieldDef{F: &deal.Retry},
 			"FastRetrieval":         &fielddef.FieldDef{F: &deal.FastRetrieval},
+			"AnnounceToIPNI":        &fielddef.FieldDef{F: &deal.AnnounceToIPNI},
 
 			// Needed so the deal can be looked up by signed proposal cid
 			"SignedProposalCID": &fielddef.SignedPropFieldDef{Prop: deal.ClientDealProposal},

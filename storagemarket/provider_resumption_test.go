@@ -24,7 +24,7 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 				return h.newDealBuilder(t, 1).withBlockingHttpServer().build()
 			},
 			stubAfterResumeF: func(tb *testDealBuilder) *testDeal {
-				return tb.withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().build()
+				return tb.withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().withAnnounceNonBlocking().build()
 			},
 			unblockF: func(td *testDeal) {
 				td.unblockTransfer()
@@ -51,7 +51,7 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 				return h.newDealBuilder(t, 1).withCommpNonBlocking().withPublishBlocking().withNormalHttpServer().build()
 			},
 			stubAfterResumeF: func(tb *testDealBuilder) *testDeal {
-				return tb.withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().build()
+				return tb.withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().withAnnounceNonBlocking().build()
 			},
 			waitForAndAssertBeforeResumeF: func(t *testing.T, h *ProviderHarness, td *testDeal) {
 				td.waitForAndAssert(t, ctx, dealcheckpoints.Transferred)
@@ -63,7 +63,7 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 				return h.newDealBuilder(t, 1).withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmBlocking().withNormalHttpServer().build()
 			},
 			stubAfterResumeF: func(tb *testDealBuilder) *testDeal {
-				return tb.withPublishConfirmNonBlocking().withAddPieceNonBlocking().build()
+				return tb.withPublishConfirmNonBlocking().withAddPieceNonBlocking().withAnnounceNonBlocking().build()
 			},
 			waitForAndAssertBeforeResumeF: func(t *testing.T, h *ProviderHarness, td *testDeal) {
 				td.waitForAndAssert(t, ctx, dealcheckpoints.Published)
@@ -75,7 +75,7 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 				return h.newDealBuilder(t, 1).withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceBlocking().withNormalHttpServer().build()
 			},
 			stubAfterResumeF: func(tb *testDealBuilder) *testDeal {
-				return tb.withAddPieceNonBlocking().build()
+				return tb.withAddPieceNonBlocking().withAnnounceNonBlocking().build()
 			},
 			waitForAndAssertBeforeResumeF: func(t *testing.T, h *ProviderHarness, td *testDeal) {
 				td.waitForAndAssert(t, ctx, dealcheckpoints.PublishConfirmed)

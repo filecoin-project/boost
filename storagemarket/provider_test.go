@@ -79,7 +79,7 @@ func TestSimpleDealHappy(t *testing.T) {
 		if localCommp {
 			// if commp is calculated locally, don't expect a remote call to commp
 			// (expect calls to all other miner APIs)
-			tdBuilder.withPublishBlocking().withPublishConfirmBlocking().withAddPieceBlocking()
+			tdBuilder.withPublishBlocking().withPublishConfirmBlocking().withAddPieceBlocking().withAnnounceBlocking()
 		} else {
 			tdBuilder.withAllMinerCallsBlocking()
 		}
@@ -160,100 +160,6 @@ func TestMultipleDealsConcurrent(t *testing.T) {
 	}
 
 	harness.EventuallyAssertNoTagged(t, ctx)
-}
-
-func TestMultipleDealsConcurrentWithFundsAndStorage(t *testing.T) {
-	nDeals := 10
-	ctx := context.Background()
-
-	// setup the provider test harness
-	harness := NewHarness(t)
-	// start the provider test harness
-	harness.Start(t, ctx)
-	defer harness.Stop()
-
-	var errGrp errgroup.Group
-	var tds []*testDeal
-	totalStorage := uint64(0)
-	totalCollat := abi.NewTokenAmount(0)
-	totalPublish := abi.NewTokenAmount(0)
-	// half the deals will finish, half will be blocked on the wait for publish call -> we will then assert that the funds and storage manager state is as expected
-	for i := 0; i < nDeals; i++ {
-		i := i
-		var td *testDeal
-		// for even numbered deals, we will never block
-		if i%2 == 0 {
-			// setup mock publish & add-piece expectations with non-blocking behaviours -> the associated tagged funds and storage will be released
-			td = harness.newDealBuilder(t, i).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
-		} else {
-			// for odd numbered deals, we will block on the publish-confirm step
-			// setup mock publish & add-piece expectations with blocking wait-for-publish behaviours -> the associated tagged funds and storage will not be released
-			td = harness.newDealBuilder(t, i).withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmBlocking().withAddPieceBlocking().withNormalHttpServer().build()
-			totalStorage = totalStorage + td.params.Transfer.Size
-			totalCollat = abi.NewTokenAmount(totalCollat.Add(totalCollat.Int, td.params.ClientDealProposal.Proposal.ProviderCollateral.Int).Int64())
-			totalPublish = abi.NewTokenAmount(totalPublish.Add(totalPublish.Int, harness.MinPublishFees.Int).Int64())
-		}
-
-		tds = append(tds, td)
-
-		errGrp.Go(func() error {
-			err := td.executeAndSubscribe()
-			if err != nil {
-				return err
-			}
-			var checkpoint dealcheckpoints.Checkpoint
-			if i%2 == 0 {
-				checkpoint = dealcheckpoints.AddedPiece
-			} else {
-				checkpoint = dealcheckpoints.Published
-			}
-			if err := td.waitForCheckpoint(checkpoint); err != nil {
-				return err
-			}
-
-			return nil
-		})
-	}
-	require.NoError(t, errGrp.Wait())
-
-	for i := 0; i < nDeals; i++ {
-		td := tds[i]
-		if i%2 == 0 {
-			td.assertPieceAdded(t, ctx)
-		} else {
-			td.assertDealPublished(t, ctx)
-		}
-	}
-
-	harness.EventuallyAssertStorageFundState(t, ctx, totalStorage, totalPublish, totalCollat)
-
-	// now confirm the publish for remaining deals and assert funds and storage
-	for i := 0; i < nDeals; i++ {
-		td := tds[i]
-		if i%2 != 0 {
-			td.unblockWaitForPublish()
-			totalPublish = abi.NewTokenAmount(totalPublish.Sub(totalPublish.Int, harness.MinPublishFees.Int).Int64())
-			totalCollat = abi.NewTokenAmount(totalCollat.Sub(totalCollat.Int, td.params.ClientDealProposal.Proposal.ProviderCollateral.Int).Int64())
-		}
-	}
-	harness.EventuallyAssertStorageFundState(t, ctx, totalStorage, totalPublish, totalCollat)
-
-	// now finish the remaining deals and assert funds and storage
-	for i := 0; i < nDeals; i++ {
-		td := tds[i]
-		if i%2 != 0 {
-			td.unblockAddPiece()
-			totalStorage = totalStorage - td.params.Transfer.Size
-		}
-	}
-	harness.EventuallyAssertNoTagged(t, ctx)
-	// assert that piece has been added for the deals
-	for i := 0; i < nDeals; i++ {
-		if i%2 != 0 {
-			td := tds[i]
-			td.assertPieceAdded(t, ctx)
-		}
-	}
 }
 
 func TestDealsRejectedForFunds(t *testing.T) {
@@ -580,7 +486,7 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 		expectedErr: "pubconferr",
 		onResume: func(builder *testDealBuilder) *testDeal {
 			// Simulate publish confirm success (and then success for all other calls to miner)
-			return builder.withPublishConfirmNonBlocking().withAddPieceNonBlocking().build()
+			return builder.withPublishConfirmNonBlocking().withAddPieceNonBlocking().withAnnounceNonBlocking().build()
 		},
 	}, {
 		name: "add piece fails",
@@ -591,7 +497,7 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 		expectedErr: "addpieceerr",
 		onResume: func(builder *testDealBuilder) *testDeal {
 			// Simulate add piece success
-			return builder.withAddPieceNonBlocking().build()
+			return builder.withAddPieceNonBlocking().withAnnounceNonBlocking().build()
 		},
 	}}
 
@@ -628,7 +534,7 @@ func TestDealAutoRestartAfterAutoRecoverableErrors(t *testing.T) {
 			require.NotNil(t, dh)
 
 			//Check for fast retrieval
-			require.False(t, td.params.FastRetrieval)
+			require.True(t, td.params.RemoveUnsealedCopy)
 
 			sub, err := dh.subscribeUpdates()
 			require.NoError(t, err)
@@ -657,7 +563,7 @@ func TestOfflineDealRestartAfterManualRecoverableErrors(t *testing.T) {
 		},
 		expectedErr: "mismatcherr",
 		onResume: func(builder *testDealBuilder) *testDeal {
-			return builder.withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().build()
+			return builder.withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().withAnnounceNonBlocking().build()
 		},
 	}}
 
@@ -734,7 +640,7 @@ func TestDealRestartAfterManualRecoverableErrors(t *testing.T) {
 		},
 		expectedErr: "puberr",
 		onResume: func(builder *testDealBuilder) *testDeal {
-			return builder.withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().build()
+			return builder.withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().withAnnounceNonBlocking().build()
 		},
 	}}
 
@@ -1102,6 +1008,31 @@ func TestDealVerification(t *testing.T) {
 	}
 }
 
+func TestIPNIAnnounce(t *testing.T) {
+	ctx := context.Background()
+
+	runTest := func(announce bool) {
+		// setup the provider test harness
+		harness := NewHarness(t)
+		harness.Start(t, ctx)
+		defer harness.Stop()
+
+		td := harness.newDealBuilder(t, 1).withAllMinerCallsNonBlocking().withNormalHttpServer().
+			withDealParamAnnounce(announce).build()
+		require.NoError(t, td.executeAndSubscribe())
+
+		td.waitForAndAssert(t, ctx, dealcheckpoints.IndexedAndAnnounced)
+	}
+
+	t.Run("announce", func(t *testing.T) {
+		runTest(true)
+	})
+
+	t.Run("don't announce", func(t *testing.T) {
+		runTest(false)
+	})
+}
+
 func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals int,
 	buildDeal func(i int) *testDeal, waitF func(i int, td *testDeal) error) []*testDeal {
 	tds := make([]*testDeal, 0, nDeals)
@@ -1161,6 +1092,11 @@ func (h *ProviderHarness) AssertPieceAdded(t *testing.T, ctx context.Context, dp
 	//require.True(t, ok)
 	//require.True(t, rg.EagerInit)
 	//require.Empty(t, rg.CarPath)
+}
+
+func (h *ProviderHarness) AssertDealIndexed(t *testing.T, ctx context.Context, dp *types.DealParams, so *smtestutil.StubbedMinerOutput) {
+	h.AssertEventuallyDealCleanedup(t, ctx, dp)
+	h.AssertDealDBState(t, ctx, dp, so.DealID, &so.FinalPublishCid, dealcheckpoints.IndexedAndAnnounced, so.SectorID, so.Offset, dp.ClientDealProposal.Proposal.PieceSize.Unpadded().Padded(), "")
 }
 
 func (h *ProviderHarness) EventuallyAssertNoTagged(t *testing.T, ctx context.Context) {
@@ -1523,7 +1459,7 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 		},
 	}
 	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, minerStub, sps, minerStub, df, sqldb,
-		logsDB, pm, &NoOpIndexProvider{}, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
+		logsDB, pm, minerStub, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
 	require.NoError(t, err)
 	ph.Provider = prov
 
@@ -1578,7 +1514,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	// construct a new provider with pre-existing state
 	prov, err := NewProvider(h.Provider.config, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
-		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.piecedirectory, &NoOpIndexProvider{}, h.Provider.askGetter,
+		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.piecedirectory, h.MinerStub, h.Provider.askGetter,
 		h.Provider.sigVerifier, h.Provider.dealLogger, h.Provider.Transport)
 
 	require.NoError(t, err)
@@ -1788,7 +1724,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 			Params: xferParams,
 			Size:   uint64(carv2Fileinfo.Size()),
 		},
-		FastRetrieval: false,
+		RemoveUnsealedCopy: true,
 	}
 
 	td := &testDeal{
@@ -1825,6 +1761,7 @@ type testDealBuilder struct {
 	msPublish        *minerStubCall
 	msPublishConfirm *minerStubCall
 	msAddPiece       *minerStubCall
+	msAnnounce       *minerStubCall
 }
 
 func (tbuilder *testDealBuilder) withPublishFailing(err error) *testDealBuilder {
@@ -1887,11 +1824,22 @@ func (tbuilder *testDealBuilder) withAddPieceNonBlocking() *testDealBuilder {
 	return tbuilder
 }
 
+func (tbuilder *testDealBuilder) withAnnounceBlocking() *testDealBuilder {
+	tbuilder.msAnnounce = &minerStubCall{blocking: true}
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) withAnnounceNonBlocking() *testDealBuilder {
+	tbuilder.msAnnounce = &minerStubCall{blocking: true}
+	return tbuilder
+}
+
 func (tbuilder *testDealBuilder) withAllMinerCallsNonBlocking() *testDealBuilder {
 	tbuilder.msCommp = &minerStubCall{blocking: false}
 	tbuilder.msPublish = &minerStubCall{blocking: false}
 	tbuilder.msPublishConfirm = &minerStubCall{blocking: false}
 	tbuilder.msAddPiece = &minerStubCall{blocking: false}
+	tbuilder.msAnnounce = &minerStubCall{blocking: false}
 	return tbuilder
 }
 
@@ -1900,6 +1848,7 @@ func (tbuilder *testDealBuilder) withAllMinerCallsBlocking() *testDealBuilder {
 	tbuilder.msPublish = &minerStubCall{blocking: true}
 	tbuilder.msPublishConfirm = &minerStubCall{blocking: true}
 	tbuilder.msAddPiece = &minerStubCall{blocking: true}
+	tbuilder.msAnnounce = &minerStubCall{blocking: true}
 
 	return tbuilder
 }
@@ -1934,12 +1883,17 @@ func (tbuilder *testDealBuilder) setTransferParams(serverURL string) {
 	tbuilder.td.params.Transfer.Params = transferParamsJSON
 }
 
+func (tbuilder *testDealBuilder) withDealParamAnnounce(announce bool) *testDealBuilder {
+	tbuilder.td.params.SkipIPNIAnnounce = !announce
+	return tbuilder
+}
+
 func (tbuilder *testDealBuilder) build() *testDeal {
 	// if the miner stub is supposed to be a no-op, setup a no-op and don't build any other stub behaviour
 	if tbuilder.msNoOp {
 		tbuilder.ms.SetupNoOp()
 	} else {
-		tbuilder.buildCommp().buildPublish().buildPublishConfirm().buildAddPiece()
+		tbuilder.buildCommp().buildPublish().buildPublishConfirm().buildAddPiece().buildAnnounce()
 	}
 
 	testDeal := tbuilder.td
@@ -1993,6 +1947,13 @@ func (tbuilder *testDealBuilder) buildAddPiece() *testDealBuilder {
 		}
 	}
 
+	return tbuilder
+}
+
+func (tbuilder *testDealBuilder) buildAnnounce() *testDealBuilder {
+	if tbuilder.msAnnounce != nil {
+		tbuilder.ms.SetupAnnounce(tbuilder.msAnnounce.blocking, !tbuilder.td.params.SkipIPNIAnnounce)
+	}
 	return tbuilder
 }
 
@@ -2140,6 +2101,8 @@ func (td *testDeal) waitForAndAssert(t *testing.T, ctx context.Context, cp dealc
 		td.ph.AssertPublishConfirmed(t, ctx, td.params, td.stubOutput)
 	case dealcheckpoints.AddedPiece:
 		td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2FilePath)
+	case dealcheckpoints.IndexedAndAnnounced:
+		td.ph.AssertDealIndexed(t, ctx, td.params, td.stubOutput)
 	default:
 		t.Fail()
 	}
@@ -2169,10 +2132,6 @@ func (td *testDeal) assertPieceAdded(t *testing.T, ctx context.Context) {
 	td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2FilePath)
 }
 
-func (td *testDeal) assertDealPublished(t *testing.T, ctx context.Context) {
-	td.ph.AssertPublished(t, ctx, td.params, td.stubOutput)
-}
-
 func (td *testDeal) assertDealFailedTransferNonRecoverable(t *testing.T, ctx context.Context, errStr string) {
 	td.ph.AssertDealFailedTransferNonRecoverable(t, ctx, td.params, errStr)
 }
@@ -2189,20 +2148,6 @@ func (td *testDeal) assertDealFailedNonRecoverable(t *testing.T, ctx context.Con
 	require.Contains(t, dbState.Err, errContains)
 	require.EqualValues(t, dealcheckpoints.Complete, dbState.Checkpoint)
 	require.EqualValues(t, types.DealRetryFatal, dbState.Retry)
-}
-
-type NoOpIndexProvider struct{}
-
-func (n *NoOpIndexProvider) Enabled() bool {
-	return true
-}
-
-func (n *NoOpIndexProvider) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDealState) (cid.Cid, error) {
-	return testutil.GenerateCid(), nil
-}
-
-func (n *NoOpIndexProvider) Start(_ context.Context) {
-
 }
 
 type mockAskStore struct {

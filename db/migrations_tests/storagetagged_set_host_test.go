@@ -24,13 +24,6 @@ func TestStorageTaggedSetHost(t *testing.T) {
 	req.NoError(goose.SetDialect("sqlite3"))
 	req.NoError(goose.UpTo(sqldb, ".", 20220908122510))
 
-	// Generate 2 deals
-	dealsDB := db.NewDealsDB(sqldb)
-
-	// Add FastRetrieval to allow tests to works
-	_, err := sqldb.Exec(`ALTER TABLE Deals ADD FastRetrieval BOOL`)
-	require.NoError(t, err)
-
 	deals, err := db.GenerateNDeals(2)
 	req.NoError(err)
 
@@ -44,8 +37,21 @@ func TestStorageTaggedSetHost(t *testing.T) {
 			Params: []byte(fmt.Sprintf(`{"url":"http://%s/file.car"}`, getHost(i))),
 			Size:   uint64(1024),
 		}
-		err = dealsDB.Insert(ctx, &deal)
-		req.NoError(err)
+		_, err = sqldb.Exec(`INSERT INTO Deals ("ID", "CreatedAt", "DealProposalSignature", "PieceCID", "PieceSize",
+                   "VerifiedDeal", "IsOffline", "ClientAddress", "ProviderAddress","Label", "StartEpoch", "EndEpoch",
+                   "StoragePricePerEpoch", "ProviderCollateral", "ClientCollateral", "ClientPeerID", "DealDataRoot",
+                   "InboundFilePath", "TransferType", "TransferParams", "TransferSize", "ChainDealID", "PublishCID",
+                   "SectorID", "Offset", "Length", "Checkpoint", "CheckpointAt", "Error", "Retry", "SignedProposalCID") 
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			deal.DealUuid, deal.CreatedAt, []byte("test"), deal.ClientDealProposal.Proposal.PieceCID.String(),
+			deal.ClientDealProposal.Proposal.PieceSize, deal.ClientDealProposal.Proposal.VerifiedDeal, deal.IsOffline,
+			deal.ClientDealProposal.Proposal.Client.String(), deal.ClientDealProposal.Proposal.Provider.String(), "test",
+			deal.ClientDealProposal.Proposal.StartEpoch, deal.ClientDealProposal.Proposal.EndEpoch, deal.ClientDealProposal.Proposal.StoragePricePerEpoch.Uint64(),
+			deal.ClientDealProposal.Proposal.ProviderCollateral.Int64(), deal.ClientDealProposal.Proposal.ClientCollateral.Uint64(), deal.ClientPeerID.String(),
+			deal.DealDataRoot.String(), deal.InboundFilePath, deal.Transfer.Type, deal.Transfer.Params, deal.Transfer.Size, deal.ChainDealID,
+			deal.PublishCID.String(), deal.SectorID, deal.Offset, deal.Length, deal.Checkpoint, deal.CheckpointAt, deal.Err, deal.Retry, []byte("test"))
+
+		require.NoError(t, err)
 	}
 
 	// Simulate tagging a deal
