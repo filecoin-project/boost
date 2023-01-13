@@ -168,7 +168,3 @@ func (s serverApi) IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, of
 func (s serverApi) UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error) {
 	return s.sa.UnsealSectorAt(ctx, sectorID, offset, length)
 }
-
-func (s serverApi) GetBlockByCid(ctx context.Context, blockCid cid.Cid) ([]byte, error) {
-	return s.piecedirectory.BlockstoreGet(ctx, blockCid)
-}

@@ -91,35 +91,6 @@ func TestHttpGzipResponse(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestBlockRetrieval(t *testing.T) {
-	//Create a new mock Http server with custom functions
-	ctrl := gomock.NewController(t)
-	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
-	httpServer := NewHttpServer("", 7779, mockHttpServer)
-	httpServer.Start(context.Background())
-
-	data := []byte("Hello World!")
-
-	mockHttpServer.EXPECT().GetBlockByCid(gomock.Any(), gomock.Any()).AnyTimes().Return(data, nil)
-
-	// Create a client and make request with Encoding header
-	client := new(http.Client)
-	request, err := http.NewRequest("GET", "http://localhost:7779/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
-	require.NoError(t, err)
-
-	response, err := client.Do(request)
-	require.NoError(t, err)
-	defer response.Body.Close()
-	require.Equal(t, "nosniff", response.Header.Get("X-Content-Type-Options"))
-	require.Equal(t, "application/vnd.ipld.raw", response.Header.Get("Content-Type"))
-	require.Equal(t, "attachment; filename=\"bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi\"; filename*=UTF-8''bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", response.Header.Get("Content-Disposition"))
-
-	out, err := io.ReadAll(response.Body)
-	require.NoError(t, err)
-
-	require.Equal(t, data, out)
-}
-
 func TestHttpInfo(t *testing.T) {
 	var v apiVersion
 
