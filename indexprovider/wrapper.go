@@ -22,6 +22,7 @@ import (
 	"github.com/ipni/index-provider/metadata"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multihash"
 	"go.uber.org/fx"
 )
 
@@ -136,6 +137,15 @@ func (w *Wrapper) Start(ctx context.Context) {
 			ii, err := w.piecedirectory.GetIterableIndex(ctx, pieceCid)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get iterable index: %w", err)
+			}
+
+			// Check if there are any records in the iterator. If there are no
+			// records, the multihash lister expects us to return an error.
+			hasRecords := ii.ForEach(func(_ multihash.Multihash, _ uint64) error {
+				return fmt.Errorf("has at least one record")
+			})
+			if hasRecords == nil {
+				return nil, fmt.Errorf("no records found for piece %s", pieceCid)
 			}
 
 			mhi, err := provider.CarMultihashIterator(ii)
