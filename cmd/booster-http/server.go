@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -53,7 +52,6 @@ type HttpServerApi interface {
 	GetPieceDeals(ctx context.Context, pieceCID cid.Cid) ([]model.DealInfo, error)
 	IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error)
 	UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error)
-	GetBlockByCid(ctx context.Context, blockCid cid.Cid) ([]byte, error)
 }
 
 func NewHttpServer(path string, port int, api HttpServerApi) *HttpServer {
@@ -64,17 +62,12 @@ func (s *HttpServer) pieceBasePath() string {
 	return s.path + "/piece/"
 }
 
-func (s *HttpServer) blockBasePath() string {
-	return s.path + "/ipfs/"
-}
-
 func (s *HttpServer) Start(ctx context.Context) {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
 	listenAddr := fmt.Sprintf(":%d", s.port)
 	handler := http.NewServeMux()
 	handler.HandleFunc(s.pieceBasePath(), s.handleByPieceCid)
-	handler.HandleFunc(s.blockBasePath(), s.handleBlockRequest)
 	handler.HandleFunc("/", s.handleIndex)
 	handler.HandleFunc("/index.html", s.handleIndex)
 	handler.HandleFunc("/info", s.handleInfo)
@@ -113,15 +106,7 @@ const idxPage = `
           Download a raw piece by its piece CID
         </td>
         <td>
-          <a href="/piece/bafySomePieceCid" > /piece/<piece cid></a>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          Download a block by CID
-        </td>
-        <td>
-          <a href="/ipfs/blockCid" > /block/<blockCid></a>
+          <a href="/piece/bafySomePieceCid">/piece/<piece cid></a>
         </td>
       </tr>
       </tbody>
@@ -142,48 +127,6 @@ func (s *HttpServer) handleInfo(w http.ResponseWriter, r *http.Request) {
 		Version: "0.2.0",
 	}
 	json.NewEncoder(w).Encode(v) //nolint:errcheck
-}
-
-func (s *HttpServer) handleBlockRequest(w http.ResponseWriter, r *http.Request) {
-	startTime := time.Now()
-	ctx, span := tracing.Tracer.Start(r.Context(), "http.block_cid")
-	defer span.End()
-
-	stats.Record(ctx, metrics.HttpBlockByCidRequestCount.M(1))
-
-	// Remove the path up to the payload cid
-	prefixLen := len(s.blockBasePath())
-	if len(r.URL.Path) <= prefixLen {
-		msg := fmt.Sprintf("path '%s' is missing block CID", r.URL.Path)
-		writeError(w, r, http.StatusBadRequest, msg)
-		stats.Record(ctx, metrics.HttpPayloadByCid400ResponseCount.M(1))
-		return
-	}
-
-	blockCidStr := r.URL.Path[prefixLen:]
-	blockCid, err := cid.Parse(blockCidStr)
-	if err != nil {
-		msg := fmt.Sprintf("parsing payload CID '%s': %s", blockCidStr, err.Error())
-		writeError(w, r, http.StatusBadRequest, msg)
-		stats.Record(ctx, metrics.HttpPayloadByCid400ResponseCount.M(1))
-		return
-	}
-
-	data, err := s.api.GetBlockByCid(ctx, blockCid)
-	if err != nil {
-		msg := fmt.Sprintf("server error getting data for block '%s': %s", blockCidStr, err.Error())
-		writeError(w, r, http.StatusInternalServerError, msg)
-		stats.Record(ctx, metrics.HttpBlockByCid500ResponseCount.M(1))
-		return
-	}
-
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", blockCid.String(), blockCid.String()))
-	w.Header().Set("X-Content-Type-Options", "nosniff") // no funny business in the browsers :^)
-	b := bytes.NewReader(data)
-
-	serveContent(w, r, b, "application/vnd.ipld.raw")
-	stats.Record(ctx, metrics.HttpBlockByCid200ResponseCount.M(1))
-	stats.Record(ctx, metrics.HttpBlockByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
 
 func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
