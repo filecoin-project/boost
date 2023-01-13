@@ -228,7 +228,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 
 	cw := cbg.NewCborWriter(w)
 
-	if _, err := cw.Write([]byte{166}); err != nil {
+	if _, err := cw.Write([]byte{167}); err != nil {
 		return err
 	}
 
@@ -320,19 +320,35 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	// t.FastRetrieval (bool) (bool)
-	if len("FastRetrieval") > cbg.MaxLength {
-		return xerrors.Errorf("Value in field \"FastRetrieval\" was too long")
+	// t.RemoveUnsealedCopy (bool) (bool)
+	if len("RemoveUnsealedCopy") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"RemoveUnsealedCopy\" was too long")
 	}
 
-	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("FastRetrieval"))); err != nil {
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("RemoveUnsealedCopy"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("FastRetrieval")); err != nil {
+	if _, err := io.WriteString(w, string("RemoveUnsealedCopy")); err != nil {
 		return err
 	}
 
-	if err := cbg.WriteBool(w, t.FastRetrieval); err != nil {
+	if err := cbg.WriteBool(w, t.RemoveUnsealedCopy); err != nil {
+		return err
+	}
+
+	// t.SkipIPNIAnnounce (bool) (bool)
+	if len("SkipIPNIAnnounce") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"SkipIPNIAnnounce\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("SkipIPNIAnnounce"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("SkipIPNIAnnounce")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteBool(w, t.SkipIPNIAnnounce); err != nil {
 		return err
 	}
 	return nil
@@ -451,8 +467,8 @@ func (t *DealParams) UnmarshalCBOR(r io.Reader) (err error) {
 				}
 
 			}
-			// t.FastRetrieval (bool) (bool)
-		case "FastRetrieval":
+			// t.RemoveUnsealedCopy (bool) (bool)
+		case "RemoveUnsealedCopy":
 
 			maj, extra, err = cr.ReadHeader()
 			if err != nil {
@@ -463,9 +479,27 @@ func (t *DealParams) UnmarshalCBOR(r io.Reader) (err error) {
 			}
 			switch extra {
 			case 20:
-				t.FastRetrieval = false
+				t.RemoveUnsealedCopy = false
 			case 21:
-				t.FastRetrieval = true
+				t.RemoveUnsealedCopy = true
+			default:
+				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
+			}
+			// t.SkipIPNIAnnounce (bool) (bool)
+		case "SkipIPNIAnnounce":
+
+			maj, extra, err = cr.ReadHeader()
+			if err != nil {
+				return err
+			}
+			if maj != cbg.MajOther {
+				return fmt.Errorf("booleans must be major type 7")
+			}
+			switch extra {
+			case 20:
+				t.SkipIPNIAnnounce = false
+			case 21:
+				t.SkipIPNIAnnounce = true
 			default:
 				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
 			}

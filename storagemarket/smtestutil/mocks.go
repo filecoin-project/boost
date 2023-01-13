@@ -8,6 +8,7 @@ import (
 
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/mock_types"
+	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
@@ -23,12 +24,14 @@ type MinerStub struct {
 	*mock_types.MockChainDealManager
 	*mock_types.MockPieceAdder
 	*mock_types.MockCommpCalculator
+	*mock_types.MockIndexProvider
 
 	lk                    sync.Mutex
 	unblockCommp          map[uuid.UUID]chan struct{}
 	unblockPublish        map[uuid.UUID]chan struct{}
 	unblockWaitForPublish map[uuid.UUID]chan struct{}
 	unblockAddPiece       map[uuid.UUID]chan struct{}
+	unblockAnnounce       map[uuid.UUID]chan struct{}
 }
 
 func NewMinerStub(ctrl *gomock.Controller) *MinerStub {
@@ -37,11 +40,13 @@ func NewMinerStub(ctrl *gomock.Controller) *MinerStub {
 		MockDealPublisher:    mock_types.NewMockDealPublisher(ctrl),
 		MockChainDealManager: mock_types.NewMockChainDealManager(ctrl),
 		MockPieceAdder:       mock_types.NewMockPieceAdder(ctrl),
+		MockIndexProvider:    mock_types.NewMockIndexProvider(ctrl),
 
 		unblockCommp:          make(map[uuid.UUID]chan struct{}),
 		unblockPublish:        make(map[uuid.UUID]chan struct{}),
 		unblockWaitForPublish: make(map[uuid.UUID]chan struct{}),
 		unblockAddPiece:       make(map[uuid.UUID]chan struct{}),
+		unblockAnnounce:       make(map[uuid.UUID]chan struct{}),
 	}
 }
 
@@ -99,14 +104,6 @@ type MinerStubBuilder struct {
 	rb       *[]byte
 }
 
-func (mb *MinerStubBuilder) SetupAllNonBlocking() *MinerStubBuilder {
-	return mb.SetupCommp(false).SetupPublish(false).SetupPublishConfirm(false).SetupAddPiece(false)
-}
-
-func (mb *MinerStubBuilder) SetupAllBlocking() *MinerStubBuilder {
-	return mb.SetupCommp(true).SetupPublish(true).SetupPublishConfirm(true).SetupAddPiece(true)
-}
-
 func (mb *MinerStubBuilder) SetupNoOp() *MinerStubBuilder {
 	mb.stub.MockCommpCalculator.EXPECT().ComputeDataCid(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any()).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
 		return abi.PieceInfo{
@@ -129,6 +126,10 @@ func (mb *MinerStubBuilder) SetupNoOp() *MinerStubBuilder {
 	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 		return mb.sectorId, mb.offset, nil
 	}).AnyTimes()
+
+	mb.stub.MockIndexProvider.EXPECT().Enabled().Return(true).AnyTimes()
+	mb.stub.MockIndexProvider.EXPECT().Start(gomock.Any()).AnyTimes()
+	mb.stub.MockIndexProvider.EXPECT().AnnounceBoostDeal(gomock.Any(), gomock.Any()).Return(testutil.GenerateCid(), nil).AnyTimes()
 
 	return mb
 }
@@ -262,7 +263,7 @@ func (mb *MinerStubBuilder) SetupAddPiece(blocking bool) *MinerStubBuilder {
 			StartEpoch: mb.dp.ClientDealProposal.Proposal.StartEpoch,
 			EndEpoch:   mb.dp.ClientDealProposal.Proposal.EndEpoch,
 		},
-		KeepUnsealed: mb.dp.FastRetrieval,
+		KeepUnsealed: !mb.dp.RemoveUnsealedCopy,
 	}
 
 	var readBytes []byte
@@ -300,12 +301,47 @@ func (mb *MinerStubBuilder) SetupAddPieceFailure(err error) {
 			StartEpoch: mb.dp.ClientDealProposal.Proposal.StartEpoch,
 			EndEpoch:   mb.dp.ClientDealProposal.Proposal.EndEpoch,
 		},
-		KeepUnsealed: mb.dp.FastRetrieval,
+		KeepUnsealed: !mb.dp.RemoveUnsealedCopy,
 	}
 
 	mb.stub.MockPieceAdder.EXPECT().AddPiece(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any(), gomock.Eq(sdInfo)).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader, _ api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 		return abi.SectorNumber(0), abi.PaddedPieceSize(0), err
 	})
+}
+
+func (mb *MinerStubBuilder) SetupAnnounce(blocking bool, announce bool) *MinerStubBuilder {
+	mb.stub.lk.Lock()
+	if blocking {
+		mb.stub.unblockAnnounce[mb.dp.DealUUID] = make(chan struct{})
+	}
+	mb.stub.lk.Unlock()
+
+	var callCount int
+	if announce {
+		callCount = 1
+	}
+
+	mb.stub.MockIndexProvider.EXPECT().Enabled().AnyTimes().Return(true)
+	mb.stub.MockIndexProvider.EXPECT().Start(gomock.Any()).AnyTimes()
+	mb.stub.MockIndexProvider.EXPECT().AnnounceBoostDeal(gomock.Any(), gomock.Any()).Times(callCount).DoAndReturn(func(ctx context.Context, _ *types.ProviderDealState) (cid.Cid, error) {
+		mb.stub.lk.Lock()
+		ch := mb.stub.unblockAddPiece[mb.dp.DealUUID]
+		mb.stub.lk.Unlock()
+		if ch != nil {
+			select {
+			case <-ctx.Done():
+				return cid.Undef, ctx.Err()
+			case <-ch:
+			}
+
+		}
+		if ctx.Err() != nil {
+			return cid.Undef, ctx.Err()
+		}
+
+		return testutil.GenerateCid(), nil
+	})
+	return mb
 }
 
 func (mb *MinerStubBuilder) Output() *StubbedMinerOutput {
