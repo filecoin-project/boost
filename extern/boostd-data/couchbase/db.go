@@ -726,7 +726,7 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 }
 
 // The minimum frequency with which to check pieces for errors (eg bad index)
-const MinPieceCheckPeriod = time.Second
+var MinPieceCheckPeriod = 30 * time.Second
 
 // Work out how frequently to check each piece, based on how many pieces
 // there are: if there are many pieces, each piece will be checked

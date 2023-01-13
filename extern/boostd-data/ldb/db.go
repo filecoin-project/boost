@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
@@ -405,6 +406,81 @@ func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihas
 		Offset: offset,
 		Size:   size,
 	}, nil
+}
+
+var (
+	// The minimum frequency with which to check pieces for errors (eg bad index)
+	MinPieceCheckPeriod = 30 * time.Second
+
+	// in-memory cursor to the position we reached in the leveldb table with respect to piece cids to process for errors with the doctor
+	offset int
+
+	// checked keeps track in memory when was the last time we processed a given piece cid
+	checked map[string]time.Time
+
+	// batch limit for each NextPiecesToCheck call
+	PiecesToTrackerBatchSize = 1024
+)
+
+func init() {
+	checked = make(map[string]time.Time)
+}
+
+func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.next_pieces_to_check")
+	defer span.End()
+
+	q := query.Query{
+		Prefix:   "/" + sprefixPieceCidToCursor + "/",
+		KeysOnly: true,
+		Limit:    PiecesToTrackerBatchSize,
+		Offset:   offset,
+	}
+	results, err := db.Query(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("listing pieces in database: %w", err)
+	}
+
+	var pieceCids []cid.Cid
+
+	now := time.Now()
+
+	var i int
+	for {
+		r, ok := results.NextSync()
+		if !ok {
+			break
+		}
+		i++
+
+		k := r.Key[len(q.Prefix):]
+		if t, ok := checked[k]; ok {
+			alreadyChecked := t.After(now.Add(-MinPieceCheckPeriod))
+
+			if alreadyChecked {
+				continue
+			}
+		}
+		checked[k] = now
+
+		pieceCid, err := cid.Parse(k)
+		if err != nil {
+			return nil, fmt.Errorf("parsing piece cid '%s': %w", k, err)
+		}
+
+		pieceCids = append(pieceCids, pieceCid)
+	}
+	offset += i
+
+	// if we got less pieces than the specified limit, we must be at the end of the table,
+	// so reset the cursor
+	if i < PiecesToTrackerBatchSize-1 {
+		offset = 0
+	}
+
+	log.Debugw("NextPiecesToCheck: returning piececids", "len", len(pieceCids), "offset", offset)
+
+	return pieceCids, nil
 }
 
 func (db *DB) ListPieces(ctx context.Context) ([]cid.Cid, error) {
