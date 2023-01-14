@@ -102,6 +102,7 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 		}
 
 		w := &Wrapper{
+			h:                h,
 			dealsDB:          dealsDB,
 			legacyProv:       legacyProv,
 			prov:             prov,
