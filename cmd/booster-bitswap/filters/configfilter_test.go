@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
-	"github.com/filecoin-project/boost/cmd/booster-bitswap/requestcounter"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
@@ -21,16 +20,6 @@ func TestConfigFilter(t *testing.T) {
 	require.NoError(t, err)
 	c, err := cid.Parse("QmWATWQ7fVPP2EFGu71UkfnqhYXDYH566qy47CnJDgvs8u")
 	require.NoError(t, err)
-	megabyte := uint64(1 << 20)
-	trc := &testRequestCounter{
-		totalRequestsInProgress: 10,
-		peerRequestsInProgress: map[peer.ID]uint64{
-			peer1: 3,
-			peer2: 4,
-			peer3: 5,
-		},
-	}
-	avgBandwidthPerSecond := 11 * megabyte
 	testCases := []struct {
 		name               string
 		response           string
@@ -80,45 +69,6 @@ func TestConfigFilter(t *testing.T) {
 			fulfillPeer3: false,
 		},
 		{
-			name: "working bandwidth limit",
-			response: `{
-				"StorageProviderLimits": {
-					"Bitswap": {
-						"MaxBandwidth": "10mb"
-					}
-				}
-			}`,
-			fulfillPeer1: false,
-			fulfillPeer2: false,
-			fulfillPeer3: false,
-		},
-		{
-			name: "working simultaneous request limit",
-			response: `{
-				"StorageProviderLimits": {
-					"Bitswap": {
-						"SimultaneousRequests": 10
-					}
-				}
-			}`,
-			fulfillPeer1: false,
-			fulfillPeer2: false,
-			fulfillPeer3: false,
-		},
-		{
-			name: "working simultaneous request per peer limit",
-			response: `{
-				"StorageProviderLimits": {
-					"Bitswap": {
-						"SimultaneousRequestsPerPeer": 4
-					}
-				}
-			}`,
-			fulfillPeer1: true,
-			fulfillPeer2: false,
-			fulfillPeer3: false,
-		},
-		{
 			name: "improperly formatted json",
 			response: `s{
 				"AllowDenyList": {
@@ -148,23 +98,11 @@ func TestConfigFilter(t *testing.T) {
 			}`,
 			expectedParseError: errors.New("parsing response: failed to parse peer ID: selected encoding not supported"),
 		},
-		{
-			name: "bandwidth not parsable",
-			response: `{
-				"StorageProviderLimits": {
-					"Bitswap": {
-						"MaxBandwidth": "10mg"
-					}
-				}
-			}`,
-			expectedParseError: errors.New("parsing response: parsing 'MaxBandwidth': unhandled size name: mg"),
-		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			tbm := &testBandwidthMeasure{avgBandwidthPerSecond}
 
-			pf := filters.NewConfigFilter(tbm, trc)
+			pf := filters.NewConfigFilter()
 			err := pf.ParseUpdate(strings.NewReader(testCase.response))
 			if testCase.expectedParseError == nil {
 				require.NoError(t, err)
@@ -181,25 +119,5 @@ func TestConfigFilter(t *testing.T) {
 				require.EqualError(t, err, testCase.expectedParseError.Error())
 			}
 		})
-	}
-}
-
-type testBandwidthMeasure struct {
-	avgBytesPerSecond uint64
-}
-
-func (tbm *testBandwidthMeasure) AvgBytesPerSecond() uint64 {
-	return tbm.avgBytesPerSecond
-}
-
-type testRequestCounter struct {
-	totalRequestsInProgress uint64
-	peerRequestsInProgress  map[peer.ID]uint64
-}
-
-func (trc *testRequestCounter) StateForPeer(p peer.ID) requestcounter.ServerState {
-	return requestcounter.ServerState{
-		TotalRequestsInProgress:   trc.totalRequestsInProgress,
-		RequestsInProgressForPeer: trc.peerRequestsInProgress[p],
 	}
 }

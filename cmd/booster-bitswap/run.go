@@ -7,14 +7,11 @@ import (
 	_ "net/http/pprof"
 	"strings"
 
-	"github.com/benbjohnson/clock"
 	"github.com/filecoin-project/boost/api"
 	bclient "github.com/filecoin-project/boost/api/client"
 	cliutil "github.com/filecoin-project/boost/cli/util"
-	"github.com/filecoin-project/boost/cmd/booster-bitswap/bandwidthmeasure"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
-	"github.com/filecoin-project/boost/cmd/booster-bitswap/requestcounter"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/go-jsonrpc"
@@ -128,14 +125,12 @@ var runCmd = &cli.Command{
 		}
 
 		// Create the bitswap server
-		bandwidthMeasure := bandwidthmeasure.NewBandwidthMeasure(bandwidthmeasure.DefaultBandwidthSamplePeriod, clock.New())
-		requestCounter := requestcounter.NewRequestCounter()
-		multiFilter := filters.NewMultiFilter(repoDir, bandwidthMeasure, requestCounter, cctx.String("api-filter-endpoint"), cctx.String("api-filter-auth"), cctx.StringSlice("badbits-denylists"))
+		multiFilter := filters.NewMultiFilter(repoDir, cctx.String("api-filter-endpoint"), cctx.String("api-filter-auth"), cctx.StringSlice("badbits-denylists"))
 		err = multiFilter.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)
 		}
-		server := NewBitswapServer(remoteStore, host, multiFilter, bandwidthMeasure, requestCounter)
+		server := NewBitswapServer(remoteStore, host, multiFilter)
 
 		var proxyAddrInfo *peer.AddrInfo
 		if cctx.IsSet("proxy") {

@@ -132,8 +132,6 @@ func NewMultiFilterWithConfigs(cfgDir string, filterDefinitions []FilterDefiniti
 
 func NewMultiFilter(
 	cfgDir string,
-	bandwidthMeasure BandwidthMeasure,
-	requestCounter RequestCounter,
 	apiFilterEndpoint string,
 	apiFilterAuth string,
 	BadBitsDenyList []string,
@@ -155,7 +153,7 @@ func NewMultiFilter(
 	filters = append(filters, FilterDefinition{
 		CacheFile: filepath.Join(cfgDir, "retrievalconfig.json"),
 		Fetcher:   configFetcher,
-		Handler:   NewConfigFilter(bandwidthMeasure, requestCounter),
+		Handler:   NewConfigFilter(),
 	})
 	return NewMultiFilterWithConfigs(cfgDir, filters, clock.New(), nil)
 }
