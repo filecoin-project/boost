@@ -146,7 +146,7 @@ func TestCancelTransferForTransferredDealFails(t *testing.T) {
 	defer harness.Stop()
 
 	// build the deal proposal
-	td := harness.newDealBuilder(t, 1).withCommpNonBlocking().withPublishBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().withNormalHttpServer().build()
+	td := harness.newDealBuilder(t, 1).withCommpNonBlocking().withPublishBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().withAnnounceNonBlocking().withNormalHttpServer().build()
 
 	// execute deal
 	err := td.executeAndSubscribe()

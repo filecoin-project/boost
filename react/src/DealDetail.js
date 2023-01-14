@@ -150,6 +150,14 @@ export function DealDetail(props) {
                     <td>{deal.IsVerified ? 'Yes' : 'No'}</td>
                 </tr>
                 <tr>
+                    <th>Keep Unsealed Copy</th>
+                    <td>{deal.KeepUnsealedCopy ? 'Yes' : 'No'}</td>
+                </tr>
+                <tr>
+                    <th>Announce To IPNI</th>
+                    <td>{deal.AnnounceToIPNI ? 'Yes' : 'No'}</td>
+                </tr>
+                <tr>
                     <th>Piece CID</th>
                     <td><Link to={'/inspect/'+deal.PieceCid}>{deal.PieceCid}</Link></td>
                 </tr>

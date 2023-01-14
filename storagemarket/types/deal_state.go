@@ -61,6 +61,9 @@ type ProviderDealState struct {
 
 	// Keep unsealed copy of the data
 	FastRetrieval bool
+
+	//Announce deal to the IPNI(Index Provider)
+	AnnounceToIPNI bool
 }
 
 func (d *ProviderDealState) String() string {
