@@ -23,13 +23,11 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/markets/sectoraccessor"
-	"github.com/filecoin-project/lotus/node/config"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/paths"
 	"github.com/filecoin-project/lotus/storage/sealer"
-	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
 )
@@ -153,8 +151,8 @@ var runCmd = &cli.Command{
 		}
 		defer lr.Close()
 
-		if err := lr.SetStorage(func(sc *storiface.StorageConfig) {
-			sc.StoragePaths = []storiface.LocalPath{}
+		if err := lr.SetStorage(func(sc *paths.StorageConfig) {
+			sc.StoragePaths = []paths.LocalPath{}
 		}); err != nil {
 			return fmt.Errorf("set storage config: %w", err)
 		}
@@ -165,7 +163,7 @@ var runCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("creating new local store: %w", err)
 		}
-		storage := lotus_modules.RemoteStorage(lstor, storageService, sauth, config.SealerConfig{
+		storage := lotus_modules.RemoteStorage(lstor, storageService, sauth, sealer.Config{
 			// TODO: Not sure if I need this, or any of the other fields in this struct
 			ParallelFetchLimit: 1,
 		})

@@ -38,17 +38,17 @@ func (m *MockPieceStore) EXPECT() *MockPieceStoreMockRecorder {
 }
 
 // AddDealForPiece mocks base method.
-func (m *MockPieceStore) AddDealForPiece(arg0 cid.Cid, arg1 piecestore.DealInfo) error {
+func (m *MockPieceStore) AddDealForPiece(arg0, arg1 cid.Cid, arg2 piecestore.DealInfo) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddDealForPiece", arg0, arg1)
+	ret := m.ctrl.Call(m, "AddDealForPiece", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddDealForPiece indicates an expected call of AddDealForPiece.
-func (mr *MockPieceStoreMockRecorder) AddDealForPiece(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockPieceStoreMockRecorder) AddDealForPiece(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddDealForPiece", reflect.TypeOf((*MockPieceStore)(nil).AddDealForPiece), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddDealForPiece", reflect.TypeOf((*MockPieceStore)(nil).AddDealForPiece), arg0, arg1, arg2)
 }
 
 // AddPieceBlockLocations mocks base method.

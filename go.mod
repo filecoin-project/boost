@@ -29,18 +29,16 @@ require (
 	github.com/filecoin-project/go-data-transfer v1.15.3
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
-	github.com/filecoin-project/go-fil-markets v1.25.2
+	github.com/filecoin-project/go-fil-markets v1.26.0
 	github.com/filecoin-project/go-jsonrpc v0.1.8
 	github.com/filecoin-project/go-legs v0.4.9
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
 	github.com/filecoin-project/go-state-types v0.9.9
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/index-provider v0.9.2-0.20221119192528-622ddb90df0e
-	github.com/filecoin-project/lotus v1.18.1-0.20221123044911-34d78093e8e2
+	github.com/filecoin-project/lotus v1.18.3-0.20230110150616-2995a530dcc7
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-storage v0.4.1
-	github.com/filecoin-project/storetheindex v0.4.30-0.20221114113647-683091f8e893
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
@@ -74,6 +72,8 @@ require (
 	github.com/ipld/go-car/v2 v2.5.0
 	github.com/ipld/go-ipld-prime v0.18.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
+	github.com/ipni/index-provider v0.10.0
+	github.com/ipni/storetheindex v0.5.3-0.20221203123030-16745cb63f15
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -129,10 +129,8 @@ require (
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/akavel/rsrc v0.8.0 // indirect
 	github.com/alecthomas/units v0.0.0-20210927113745-59d0afb8317a // indirect
-	github.com/armon/go-metrics v0.3.9 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
-	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cilium/ebpf v0.6.2 // indirect
@@ -203,12 +201,7 @@ require (
 	github.com/hannahhoward/cbor-gen-for v0.0.0-20200817222906-ea96cece81f1 // indirect
 	github.com/hannahhoward/go-pubsub v0.0.0-20200423002714-8d62886cc36e // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
-	github.com/hashicorp/go-hclog v0.16.2 // indirect
-	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
-	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
-	github.com/hashicorp/raft v1.1.1 // indirect
-	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
 	github.com/iancoleman/orderedmap v0.1.0 // indirect
 	github.com/icza/backscanner v0.0.0-20210726202459-ac2ffc679f94 // indirect
@@ -251,13 +244,10 @@ require (
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-connmgr v0.4.0 // indirect
-	github.com/libp2p/go-libp2p-consensus v0.0.1 // indirect
 	github.com/libp2p/go-libp2p-core v0.20.1 // indirect
-	github.com/libp2p/go-libp2p-gorpc v0.4.0 // indirect
 	github.com/libp2p/go-libp2p-kbucket v0.5.0 // indirect
 	github.com/libp2p/go-libp2p-noise v0.5.0 // indirect
 	github.com/libp2p/go-libp2p-peerstore v0.8.0 // indirect
-	github.com/libp2p/go-libp2p-raft v0.1.8 // indirect
 	github.com/libp2p/go-libp2p-routing-helpers v0.2.3 // indirect
 	github.com/libp2p/go-libp2p-tls v0.5.0 // indirect
 	github.com/libp2p/go-maddr-filter v0.1.0 // indirect
@@ -316,7 +306,6 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/twmb/murmur3 v1.1.6 // indirect
-	github.com/ugorji/go/codec v1.2.6 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.0.1 // indirect
 	github.com/whyrusleeping/bencher v0.0.0-20190829221104-bb6607aa8bba // indirect
