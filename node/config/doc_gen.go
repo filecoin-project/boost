@@ -298,22 +298,30 @@ another concurrent download is allowed to start).`,
 			Name: "BitswapPeerID",
 			Type: "string",
 
-			Comment: `The peed id used by booster-bitswap. To set, copy the value
-printed by running 'booster-bitswap init'. If this value is set,
-Boost will:
-- listen on bitswap protocols on its own peer id and forward them
-to booster bitswap
-- advertise bitswap records to the content indexer
-- list bitswap in available transports on the retrieval transport protocol`,
+			Comment: `The libp2p peer id used by booster-bitswap.
+Run 'booster-bitswap init' to get the peer id.
+When BitswapPeerID is not empty boostd will:
+- listen on bitswap protocols on boostd's own peer id and proxy
+requests to booster-bitswap
+- advertise boostd's peer id in bitswap records to the content indexer
+(bitswap clients connect to boostd, which proxies the requests to
+booster-bitswap)
+- list bitswap as an available transport on the retrieval transport protocol`,
 		},
 		{
 			Name: "BitswapPublicAddresses",
 			Type: "[]string",
 
 			Comment: `Public multiaddresses for booster-bitswap.
-If empty, booster-bitswap is assumed to be running privately.
-Boost will listen on bitswap protocols on its own peer id and forward them to booster-bitswap via the protocol proxy.
-If public addresses are set, Boost will announce the booster-bitswap peer id directly to the indexer as an extended provider.`,
+If empty
+- booster-bitswap is assumed to be running privately
+- boostd acts as a proxy: it listens on bitswap protocols on boostd's own
+peer id and forwards them to booster-bitswap
+If public addresses are set
+- boostd announces the booster-bitswap peer id to the indexer as an
+extended provider
+- clients make connections directly to the booster-bitswap process
+(boostd does not act as a proxy)`,
 		},
 		{
 			Name: "BitswapPrivKeyFile",

@@ -137,6 +137,7 @@ func (w *Wrapper) AnnounceExtendedProviders(ctx context.Context) error {
 	// for now, only generate an indexer provider announcement if bitswap announcements
 	// are enabled -- all other graphsync announcements are context ID specific
 	if !w.bitswapEnabled {
+		log.Info("bitswap is not enabled - skipping bitswap announcements to Indexer")
 		return nil
 	}
 
@@ -145,8 +146,16 @@ func (w *Wrapper) AnnounceExtendedProviders(ctx context.Context) error {
 	// if we're exposing bitswap publicly, we announce bitswap as an extended provider. If we're not
 	// we announce it as metadata on the main provider
 	if w.extendedProvider != nil {
+		log.Infof("bitswap is enabled and endpoint is public - "+
+			"announcing bitswap endpoint to indexer as extended provider: %s %s",
+			w.extendedProvider.ID, w.extendedProvider.Addrs)
+
 		adBuilder.WithExtendedProviders(*w.extendedProvider)
 	} else {
+		log.Infof("bitswap is enabled with boostd as proxy - "+
+			"announcing boostd as endpoint for bitswap to indexer: %s %s",
+			w.h.ID(), w.h.Addrs())
+
 		meta := metadata.Default.New(metadata.Bitswap{})
 		mbytes, err := meta.MarshalBinary()
 		if err != nil {
@@ -174,14 +183,15 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 		return errors.New("cannot announce all deals: index provider is disabled")
 	}
 
-	log.Info("will announce all Markets deals to Indexer")
+	log.Info("announcing all legacy deals to Indexer")
 	err := w.legacyProv.AnnounceAllDealsToIndexer(ctx)
-	if err != nil {
-		log.Warnw("some errors while announcing legacy deals to index provider", "err", err)
+	if err == nil {
+		log.Infof("finished announcing all legacy deals to Indexer")
+	} else {
+		log.Warnw("failed to announce legacy deals to Indexer", "err", err)
 	}
-	log.Infof("finished announcing markets deals to indexer")
 
-	log.Info("will announce all Boost deals to Indexer")
+	log.Info("announcing all Boost deals to Indexer")
 	deals, err := w.dealsDB.ListActive(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list deals: %w", err)
@@ -205,7 +215,7 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 			// don't log already advertised errors as errors - just skip them
 			if !errors.Is(err, provider.ErrAlreadyAdvertised) {
 				merr = multierror.Append(merr, err)
-				log.Errorw("failed to announce boost deal to Index provider", "dealId", d.DealUuid, "err", err)
+				log.Errorw("failed to announce boost deal to Indexer", "dealId", d.DealUuid, "err", err)
 			}
 			continue
 		}
@@ -213,7 +223,7 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 		nSuccess++
 	}
 
-	log.Infow("finished announcing boost deals to index provider", "number of deals", nSuccess, "number of shards", len(shards))
+	log.Infow("finished announcing all boost deals to Indexer", "number of deals", nSuccess, "number of shards", len(shards))
 	return merr
 }
 
