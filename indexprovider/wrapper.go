@@ -26,13 +26,13 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/index-provider/engine/xproviders"
-	"github.com/filecoin-project/index-provider/metadata"
+	"github.com/ipni/index-provider/engine/xproviders"
+	"github.com/ipni/index-provider/metadata"
 
 	"github.com/filecoin-project/boost/db"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
-	provider "github.com/filecoin-project/index-provider"
 	"github.com/ipfs/go-cid"
+	provider "github.com/ipni/index-provider"
 )
 
 var log = logging.Logger("index-provider-wrapper")

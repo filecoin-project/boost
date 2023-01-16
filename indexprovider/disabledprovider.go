@@ -3,16 +3,17 @@ package indexprovider
 import (
 	"context"
 	"fmt"
-
-	provider "github.com/filecoin-project/index-provider"
-	"github.com/filecoin-project/index-provider/metadata"
-	"github.com/filecoin-project/storetheindex/api/v0/ingest/schema"
 	"github.com/ipfs/go-cid"
+	"github.com/ipni/index-provider"
+	"github.com/ipni/index-provider/metadata"
+	"github.com/ipni/storetheindex/api/v0/ingest/schema"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type DisabledIndexProvider struct {
 }
+
+var _ provider.Interface = (*DisabledIndexProvider)(nil)
 
 func NewDisabledIndexProvider() *DisabledIndexProvider {
 	return &DisabledIndexProvider{}
@@ -33,7 +34,7 @@ func (d DisabledIndexProvider) NotifyPut(ctx context.Context, provider *peer.Add
 	return cid.Undef, fmt.Errorf("could not notify put: index provider disabled")
 }
 
-func (d DisabledIndexProvider) NotifyRemove(ctx context.Context, p peer.ID, contextID []byte) (cid.Cid, error) {
+func (d DisabledIndexProvider) NotifyRemove(ctx context.Context, providerID peer.ID, contextID []byte) (cid.Cid, error) {
 	return cid.Undef, fmt.Errorf("could not notify remove: index provider disabled")
 }
 

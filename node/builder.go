@@ -34,7 +34,6 @@ import (
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
 	"github.com/filecoin-project/go-state-types/abi"
-	provider "github.com/filecoin-project/index-provider"
 	lotus_api "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	lotus_journal "github.com/filecoin-project/lotus/journal"
@@ -63,6 +62,7 @@ import (
 	"github.com/filecoin-project/lotus/system"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipfs/go-metrics-interface"
+	provider "github.com/ipni/index-provider"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	record "github.com/libp2p/go-libp2p-record"
@@ -184,12 +184,6 @@ type Settings struct {
 	Lite   bool // Start node in "lite" mode
 }
 
-func FromVal[T any](v T) func() T {
-	return func() T {
-		return v
-	}
-}
-
 // Basic lotus-app services
 func defaults() []Option {
 	return []Option{
@@ -197,7 +191,6 @@ func defaults() []Option {
 		Override(new(lotus_journal.DisabledEvents), lotus_journal.EnvDisabledEvents),
 		Override(new(lotus_journal.Journal), lotus_modules.OpenFilesystemJournal),
 		Override(new(*alerting.Alerting), alerting.NewAlertingSystem),
-		Override(new(lotus_dtypes.NodeStartTime), FromVal(lotus_dtypes.NodeStartTime(time.Now()))),
 
 		Override(CheckFDLimit, lotus_modules.CheckFdLimit(build.DefaultFDLimit)),
 
@@ -470,7 +463,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		Override(new(paths.LocalStorage), From(new(lotus_repo.LockedRepo))),
 		Override(new(*paths.Local), lotus_modules.LocalStorage),
-		Override(new(lotus_config.SealerConfig), cfg.StorageManager()),
+		Override(new(sealer.Config), cfg.StorageManager()),
 		Override(new(*paths.Remote), lotus_modules.RemoteStorage),
 
 		Override(new(*fundmanager.FundManager), fundmanager.New(fundmanager.Config{
