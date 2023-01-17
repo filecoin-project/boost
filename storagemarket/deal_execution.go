@@ -565,9 +565,8 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 }
 
 func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
-	pc := deal.ClientDealProposal.Proposal.PieceCID
-
 	// add deal to piece metadata store
+	pc := deal.ClientDealProposal.Proposal.PieceCID
 	if err := p.piecedirectory.AddDealForPiece(ctx, pc, model.DealInfo{
 		DealUuid:    deal.DealUuid.String(),
 		ChainDealID: deal.ChainDealID,
