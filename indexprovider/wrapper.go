@@ -117,7 +117,10 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				go func() {
-					_ = w.AnnounceExtendedProviders(ctx)
+					err := w.AnnounceExtendedProviders(ctx)
+					if err != nil {
+						log.Warnf("announcing extended providers: %w", err)
+					}
 				}()
 				return nil
 			},
@@ -173,9 +176,22 @@ func (w *Wrapper) AnnounceExtendedProviders(ctx context.Context) error {
 		return err
 	}
 
+	// make sure we're connected to the mesh so that the message will go through
+	// pubsub and reach the indexer
+	err = w.meshCreator.Connect(ctx)
+	if err != nil {
+		log.Warnf("could not connect to pubsub mesh before announcing extended provider: %w", err)
+	}
+
 	// publish the extended providers announcement
-	_, err = w.prov.Publish(ctx, *ad)
-	return err
+	adCid, err := w.prov.Publish(ctx, *ad)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("announced endpoint to indexer with advertisement cid %s", adCid)
+
+	return nil
 }
 
 func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
