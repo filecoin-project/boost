@@ -10,13 +10,14 @@ import (
 	"github.com/filecoin-project/boost/api"
 	bclient "github.com/filecoin-project/boost/api/client"
 	cliutil "github.com/filecoin-project/boost/cli/util"
-	"github.com/filecoin-project/boost/cmd/booster-bitswap/blockfilter"
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/go-jsonrpc"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 )
 
@@ -63,6 +64,19 @@ var runCmd = &cli.Command{
 			Usage: "the endpoint for the tracing exporter",
 			Value: "http://tempo:14268/api/traces",
 		},
+		&cli.StringFlag{
+			Name:  "api-filter-endpoint",
+			Usage: "the endpoint to use for fetching a remote retrieval configuration for bitswap requests",
+		},
+		&cli.StringFlag{
+			Name:  "api-filter-auth",
+			Usage: "value to pass in the authorization header when sending a request to the API filter endpoint (e.g. 'Basic ~base64 encoded user/pass~'",
+		},
+		&cli.StringSliceFlag{
+			Name:  "badbits-denylists",
+			Usage: "the endpoints for fetching one or more custom BadBits list instead of the default one at https://badbits.dwebops.pub/denylist.json",
+			Value: cli.NewStringSlice("https://badbits.dwebops.pub/denylist.json"),
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -101,19 +115,22 @@ var runCmd = &cli.Command{
 		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi)
 		// Create the server API
 		port := cctx.Int("port")
-		repoDir := cctx.String(FlagRepo.Name)
+		repoDir, err := homedir.Expand(cctx.String(FlagRepo.Name))
+		if err != nil {
+			return fmt.Errorf("expanding repo file path: %w", err)
+		}
 		host, err := setupHost(repoDir, port)
 		if err != nil {
 			return fmt.Errorf("setting up libp2p host: %w", err)
 		}
 
 		// Create the bitswap server
-		blockFilter := blockfilter.NewBlockFilter(repoDir)
-		err = blockFilter.Start(ctx)
+		multiFilter := filters.NewMultiFilter(repoDir, cctx.String("api-filter-endpoint"), cctx.String("api-filter-auth"), cctx.StringSlice("badbits-denylists"))
+		err = multiFilter.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)
 		}
-		server := NewBitswapServer(remoteStore, host, blockFilter)
+		server := NewBitswapServer(remoteStore, host, multiFilter)
 
 		var proxyAddrInfo *peer.AddrInfo
 		if cctx.IsSet("proxy") {

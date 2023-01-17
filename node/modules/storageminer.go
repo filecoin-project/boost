@@ -34,8 +34,6 @@ import (
 	storageimpl "github.com/filecoin-project/go-fil-markets/storagemarket/impl"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
 	"github.com/filecoin-project/go-state-types/crypto"
-	provider "github.com/filecoin-project/index-provider"
-	"github.com/filecoin-project/index-provider/metadata"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/journal"
@@ -50,6 +48,8 @@ import (
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/ipfs/go-cid"
+	provider "github.com/ipni/index-provider"
+	"github.com/ipni/index-provider/metadata"
 	"github.com/libp2p/go-libp2p/core/host"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
@@ -443,11 +443,8 @@ func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.
 					VerifiedDeal:  deal.Proposal.VerifiedDeal,
 				},
 			}
-			if cfg.Dealmaking.BitswapPeerID != "" {
-				protocols = append(protocols, metadata.Bitswap{})
-			}
 
-			return metadata.New(protocols...)
+			return metadata.Default.New(protocols...)
 
 		}))
 		return p, nil

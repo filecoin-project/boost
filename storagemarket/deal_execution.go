@@ -568,9 +568,16 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 
 func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
 	pc := deal.ClientDealProposal.Proposal.PieceCID
+	propCid, err := deal.ClientDealProposal.Proposal.Cid()
+	if err != nil {
+		return &dealMakingError{
+			retry: types.DealRetryFatal,
+			error: fmt.Errorf("index and announce: getting deal proposal cid: %w", err),
+		}
+	}
 
 	// add deal to piecestore
-	if err := p.ps.AddDealForPiece(pc, piecestore.DealInfo{
+	if err := p.ps.AddDealForPiece(pc, propCid, piecestore.DealInfo{
 		DealID:   deal.ChainDealID,
 		SectorID: deal.SectorID,
 		Offset:   deal.Offset,
@@ -584,7 +591,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piecestore")
 
 	// register with dagstore
-	err := stores.RegisterShardSync(ctx, p.dagst, pc, "", true)
+	err = stores.RegisterShardSync(ctx, p.dagst, pc, "", true)
 
 	if err != nil {
 		if !errors.Is(err, dagstore.ErrShardExists) {

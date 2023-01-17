@@ -38,3 +38,14 @@ func MustParseCid(c string) cid.Cid {
 
 	return ret
 }
+func IndexerIngestTopic(netName dtypes.NetworkName) string {
+
+	nn := string(netName)
+	// The network name testnetnet is here for historical reasons.
+	// Going forward we aim to use the name `mainnet` where possible.
+	if nn == "testnetnet" {
+		nn = "mainnet"
+	}
+
+	return "/indexer/ingest/" + nn
+}
