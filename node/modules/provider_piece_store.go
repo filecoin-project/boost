@@ -3,9 +3,9 @@ package modules
 import (
 	"context"
 
+	marketevents "github.com/filecoin-project/boost/markets/loggers"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/go-address"
-	marketevents "github.com/filecoin-project/lotus/markets/loggers"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"go.uber.org/fx"
 )

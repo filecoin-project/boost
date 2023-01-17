@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/markets/dagstore"
 	"github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	bstore "github.com/ipfs/go-ipfs-blockstore"

@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
-	"github.com/filecoin-project/lotus/markets/idxprov"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/hashicorp/go-multierror"
