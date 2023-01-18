@@ -284,11 +284,11 @@ type PieceDirectoryConfig struct {
 	// the piece from the sealing subsystem, creates an index of where each block
 	// is in the piece, and adds the index to the piece directory.
 	ParallelAddIndexLimit int
-	// The port that the embedded piece directory service runs on.
-	// Set this value to zero to disable the embedded piece directory service
-	// (the piece directory service must be running externally)
+	// The port that the embedded piece directory data service runs on.
+	// Set this value to zero to disable the embedded piece directory data service
+	// (in that case the piece directory data service must be running externally)
 	EmbeddedServicePort uint64
-	// The connect string for the piece directory service RPC API
-	// Set this value to "" if the piece directory service is embedded.
+	// The connect string for the piece directory data service RPC API eg "http://localhost:8042"
+	// Set this value to "" if the piece directory data service is embedded.
 	ServiceApiInfo string
 }
