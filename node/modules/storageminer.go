@@ -5,20 +5,22 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	storageimpl "github.com/filecoin-project/go-fil-markets/storagemarket/impl"
-	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
-	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
-	"github.com/filecoin-project/lotus/markets/idxprov"
-	provider "github.com/ipni/index-provider"
-	"github.com/ipni/index-provider/metadata"
 	"path"
 	"time"
+
+	storageimpl "github.com/filecoin-project/go-fil-markets/storagemarket/impl"
+	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
+	"github.com/filecoin-project/go-fil-markets/stores"
+	provider "github.com/ipni/index-provider"
+	"github.com/ipni/index-provider/metadata"
 
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/markets/idxprov"
+	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/piecedirectory"
@@ -43,7 +45,6 @@ import (
 	ctypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/lib/sigs"
-	"github.com/filecoin-project/lotus/markets/storageadapter"
 	"github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
@@ -414,7 +415,7 @@ func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.
 	dataTransfer lotus_dtypes.ProviderDataTransfer,
 	spn lotus_storagemarket.StorageProviderNode,
 	df lotus_dtypes.StorageDealFilter,
-	dsw *mktsdagstore.Wrapper,
+	dsw stores.DAGStoreWrapper,
 	meshCreator idxprov.MeshCreator,
 ) (lotus_storagemarket.StorageProvider, error) {
 	return func(minerAddress lotus_dtypes.MinerAddress,
@@ -426,10 +427,10 @@ func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.
 		dataTransfer lotus_dtypes.ProviderDataTransfer,
 		spn lotus_storagemarket.StorageProviderNode,
 		df lotus_dtypes.StorageDealFilter,
-		dsw *mktsdagstore.Wrapper,
+		dsw stores.DAGStoreWrapper,
 		meshCreator idxprov.MeshCreator,
 	) (lotus_storagemarket.StorageProvider, error) {
-		prov, err := modules.StorageProvider(minerAddress, storedAsk, h, ds, r, pieceStore, indexer, dataTransfer, spn, df, dsw, meshCreator)
+		prov, err := StorageProvider(minerAddress, storedAsk, h, ds, r, pieceStore, indexer, dataTransfer, spn, df, dsw, meshCreator)
 		if err != nil {
 			return prov, err
 		}

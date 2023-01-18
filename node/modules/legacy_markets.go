@@ -3,6 +3,7 @@ package modules
 import (
 	"path/filepath"
 
+	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/go-address"
 	piecefilestore "github.com/filecoin-project/go-fil-markets/filestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
@@ -14,7 +15,6 @@ import (
 	smnet "github.com/filecoin-project/go-fil-markets/storagemarket/network"
 	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/lotus/markets/idxprov"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
