@@ -405,7 +405,7 @@ func NewChainDealManager(a v1api.FullNode) *storagemarket.ChainDealManager {
 
 // NewLegacyStorageProvider wraps lotus's storage provider function but additionally sets up the metadata announcement
 // for legacy deals based off of Boost's configured protocols
-func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.MinerAddress,
+func NewLegacyStorageProvider(minerAddress lotus_dtypes.MinerAddress,
 	storedAsk *storedask.StoredAsk,
 	h host.Host, ds lotus_dtypes.MetadataDS,
 	r repo.LockedRepo,
@@ -417,39 +417,26 @@ func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.
 	dsw *mktsdagstore.Wrapper,
 	meshCreator idxprov.MeshCreator,
 ) (lotus_storagemarket.StorageProvider, error) {
-	return func(minerAddress lotus_dtypes.MinerAddress,
-		storedAsk *storedask.StoredAsk,
-		h host.Host, ds lotus_dtypes.MetadataDS,
-		r repo.LockedRepo,
-		pieceStore lotus_dtypes.ProviderPieceStore,
-		indexer provider.Interface,
-		dataTransfer lotus_dtypes.ProviderDataTransfer,
-		spn lotus_storagemarket.StorageProviderNode,
-		df lotus_dtypes.StorageDealFilter,
-		dsw *mktsdagstore.Wrapper,
-		meshCreator idxprov.MeshCreator,
-	) (lotus_storagemarket.StorageProvider, error) {
-		prov, err := modules.StorageProvider(minerAddress, storedAsk, h, ds, r, pieceStore, indexer, dataTransfer, spn, df, dsw, meshCreator)
-		if err != nil {
-			return prov, err
-		}
-		p := prov.(*storageimpl.Provider)
-		p.Configure(storageimpl.CustomMetadataGenerator(func(deal lotus_storagemarket.MinerDeal) metadata.Metadata {
-
-			// Announce deal to network Indexer
-			protocols := []metadata.Protocol{
-				&metadata.GraphsyncFilecoinV1{
-					PieceCID:      deal.Proposal.PieceCID,
-					FastRetrieval: deal.FastRetrieval,
-					VerifiedDeal:  deal.Proposal.VerifiedDeal,
-				},
-			}
-
-			return metadata.Default.New(protocols...)
-
-		}))
-		return p, nil
+	prov, err := modules.StorageProvider(minerAddress, storedAsk, h, ds, r, pieceStore, indexer, dataTransfer, spn, df, dsw, meshCreator)
+	if err != nil {
+		return prov, err
 	}
+	p := prov.(*storageimpl.Provider)
+	p.Configure(storageimpl.CustomMetadataGenerator(func(deal lotus_storagemarket.MinerDeal) metadata.Metadata {
+
+		// Announce deal to network Indexer
+		protocols := []metadata.Protocol{
+			&metadata.GraphsyncFilecoinV1{
+				PieceCID:      deal.Proposal.PieceCID,
+				FastRetrieval: deal.FastRetrieval,
+				VerifiedDeal:  deal.Proposal.VerifiedDeal,
+			},
+		}
+
+		return metadata.Default.New(protocols...)
+
+	}))
+	return p, nil
 }
 
 func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {

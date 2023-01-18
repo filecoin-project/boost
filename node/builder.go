@@ -529,7 +529,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		// TODO: Not sure how to completely get rid of these yet:
 		// Error: creating node: starting node: missing dependencies for function "reflect".makeFuncStub (/usr/local/go/src/reflect/asm_amd64.s:30): missing types: *dagstore.DAGStore; *dagstore.Wrapper (did you mean stores.DAGStoreWrapper?)
 		Override(new(*dagstore.DAGStore), func() *dagstore.DAGStore { return nil }),
-		Override(new(*mktsdagstore.Wrapper), func() *mktsdagstore.Wrapper { return nil }),
+		Override(new(*mktsdagstore.Wrapper), func() *mktsdagstore.Wrapper { return &mktsdagstore.Wrapper{} }),
 
 		Override(new(pdtypes.Store), modules.NewPieceDirectoryStore(cfg)),
 		Override(new(*piecedirectory.PieceDirectory), modules.NewPieceDirectory(cfg)),
