@@ -148,14 +148,19 @@ func (w *Wrapper) AnnounceExtendedProviders(ctx context.Context) error {
 		}
 		var ep xproviders.Info
 		if len(w.cfg.Dealmaking.BitswapPublicAddresses) > 0 {
+			if w.cfg.Dealmaking.BitswapPrivKeyFile == "" {
+				return fmt.Errorf("missing required configuration key BitswapPrivKeyFile: " +
+					"boost is configured with BitswapPublicAddresses but the BitswapPrivKeyFile configuration key is empty")
+			}
+
 			// we need the private key for bitswaps peerID in order to announce publicly
 			keyFile, err := os.ReadFile(w.cfg.Dealmaking.BitswapPrivKeyFile)
 			if err != nil {
-				return err
+				return fmt.Errorf("opening BitswapPrivKeyFile %s: %w", w.cfg.Dealmaking.BitswapPrivKeyFile, err)
 			}
 			privKey, err := crypto.UnmarshalPrivateKey(keyFile)
 			if err != nil {
-				return err
+				return fmt.Errorf("unmarshalling BitswapPrivKeyFile %s: %w", w.cfg.Dealmaking.BitswapPrivKeyFile, err)
 			}
 			// setup an extended provider record, containing the booster-bitswap multi addr,
 			// peer ID, private key for signing, and metadata
