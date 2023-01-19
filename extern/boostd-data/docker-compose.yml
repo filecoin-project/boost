@@ -14,7 +14,7 @@ services:
       context: .
       dockerfile: ./Dockerfile.test
     environment:
-      COUCHBASE_URL: http://couchbase:8091  
+      COUCHBASE_HOST: couchbase
     volumes:
       - ./:/go/src/
     command: -v -count=1 ./...

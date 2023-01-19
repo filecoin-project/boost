@@ -29,7 +29,7 @@ import (
 )
 
 var testCouchSettings = couchbase.DBSettings{
-	ConnectString: "couchbase://localhost",
+	ConnectString: couchbase.GetConnectionStringForTest(),
 	Auth: couchbase.DBSettingsAuth{
 		Username: "Administrator",
 		Password: "boostdemo",
@@ -57,9 +57,6 @@ func TestService(t *testing.T) {
 		testService(ctx, t, bdsvc, 8042)
 	})
 	t.Run("couchbase", func(t *testing.T) {
-		// TODO: Unskip this test once the couchbase instance can be created
-		//  from a docker container in CI as part of the test
-		t.Skip()
 		// Running couchbase tests may require download the docker container
 		// so set a high timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
