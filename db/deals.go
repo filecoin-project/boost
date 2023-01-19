@@ -229,13 +229,25 @@ func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid cid.Cid) 
 	return d.scanRow(row)
 }
 
-func (d *DealsDB) Count(ctx context.Context, query string) (int, error) {
+func (d *DealsDB) Count(ctx context.Context, query string, filter map[string]interface{}) (int, error) {
 	whereArgs := []interface{}{}
 	where := "SELECT count(*) FROM Deals"
 	if query != "" {
 		searchWhere, searchArgs := withSearchQuery(query)
 		where += " WHERE " + searchWhere
 		whereArgs = append(whereArgs, searchArgs...)
+	}
+
+	if filter != nil {
+		filterWhere, filterArgs := withSearchFilter(filter)
+
+		if query != "" {
+			where += " AND "
+		} else {
+			where += " WHERE "
+		}
+		where += filterWhere
+		whereArgs = append(whereArgs, filterArgs...)
 	}
 	row := d.db.QueryRowContext(ctx, where, whereArgs...)
 
@@ -252,7 +264,7 @@ func (d *DealsDB) ListCompleted(ctx context.Context) ([]*types.ProviderDealState
 	return d.list(ctx, 0, 0, "Checkpoint = ?", dealcheckpoints.Complete.String())
 }
 
-func (d *DealsDB) List(ctx context.Context, query string, cursor *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
+func (d *DealsDB) List(ctx context.Context, query string, filter map[string]interface{}, cursor *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
 	where := ""
 	whereArgs := []interface{}{}
 
@@ -272,7 +284,38 @@ func (d *DealsDB) List(ctx context.Context, query string, cursor *graphql.ID, of
 		whereArgs = append(whereArgs, searchArgs...)
 	}
 
+	if filter != nil {
+		if where != "" {
+			where += " AND "
+		}
+
+		filterWhere, filterArgs := withSearchFilter(filter)
+		where += filterWhere
+		whereArgs = append(whereArgs, filterArgs...)
+	}
+
 	return d.list(ctx, offset, limit, where, whereArgs...)
+}
+
+var filterFields = []string{"Checkpoint", "IsOffline", "TransferType", "VerifiedDeal"}
+
+func withSearchFilter(filter map[string]interface{}) (string, []interface{}) {
+	whereArgs := []interface{}{}
+
+	statements := []string{}
+	for _, filterField := range filterFields {
+		// If the filterField is in the filter and it's not empty, append
+		value, ok := filter[filterField]
+		if ok {
+			st := filterField + " = ?"
+			statements = append(statements, st)
+			whereArgs = append(whereArgs, value)
+		}
+	}
+
+	where := "(" + strings.Join(statements, " AND ") + ")"
+
+	return where, whereArgs
 }
 
 var searchFields = []string{"ID", "PieceCID", "ClientAddress", "ProviderAddress", "ClientPeerID", "DealDataRoot", "PublishCID", "SignedProposalCID"}
