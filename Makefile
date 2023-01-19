@@ -104,12 +104,6 @@ booster-bitswap: $(BUILD_DEPS)
 .PHONY: booster-bitswap
 BINS+=booster-bitswap
 
-boostd-data: $(BUILD_DEPS)
-	rm -f boostd-data
-	$(GOCC) build $(GOFLAGS) -o boostd-data ./cmd/boostd-data
-.PHONY: boostd-data
-BINS+=boostd-data
-
 devnet: $(BUILD_DEPS)
 	rm -f devnet
 	$(GOCC) build $(GOFLAGS) -o devnet ./cmd/devnet
@@ -251,11 +245,6 @@ docker/booster-bitswap:
 		-t $(docker_user)/booster-bitswap-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/Dockerfile.source --target booster-bitswap-dev .
 .PHONY: docker/booster-bitswap
-docker/boostd-data:
-	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
-		-t $(docker_user)/boostd-data-dev:dev --build-arg BUILD_VERSION=dev \
-		-f docker/devnet/Dockerfile.source --target boostd-data-dev .
-.PHONY: docker/boostd-data
-docker/all: docker/lotus-test docker/boost docker/booster-http docker/booster-bitswap docker/boostd-data \
+docker/all: docker/lotus-test docker/boost docker/booster-http docker/booster-bitswap \
 	docker/lotus docker/lotus-miner
 .PHONY: docker/all
