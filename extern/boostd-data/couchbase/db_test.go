@@ -92,7 +92,7 @@ func TestGetShardPrefix(t *testing.T) {
 }
 
 var testCouchSettings = DBSettings{
-	ConnectString: "couchbase://127.0.0.1",
+	ConnectString: GetConnectionStringForTest(),
 	Auth: DBSettingsAuth{
 		Username: "Administrator",
 		Password: "boostdemo",
@@ -110,9 +110,7 @@ var testCouchSettings = DBSettings{
 }
 
 func TestSharding(t *testing.T) {
-	// Skip until the tests are refactored such that we can create a couchbase
-	// instance from docker
-	t.Skip()
+	SetupTestServer(t, testCouchSettings)
 
 	// Reduce the maximum records per shard such that lots of shards will be created
 	saved := maxRecsPerShard
