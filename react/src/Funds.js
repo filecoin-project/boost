@@ -23,7 +23,7 @@ export function FundsPage(props) {
 }
 
 function FundsChart(props) {
-    const {loading, error, data} = useQuery(FundsQuery, { pollInterval: 1000 })
+    const {loading, error, data} = useQuery(FundsQuery, { pollInterval: 30000 })
 
     if (loading) {
         return <div>Loading...</div>
@@ -273,7 +273,7 @@ function FundsLogs(props) {
         } catch {}
     }
     const {loading, error, data} = useQuery(FundsLogsQuery, {
-        pollInterval: pageNum === 1 ? 5000 : undefined,
+        pollInterval: pageNum === 1 ? 10000 : undefined,
         variables: {
             cursor: queryCursor,
             limit: rowsPerPage,
@@ -335,7 +335,7 @@ function FundsLog(props) {
 
 export function FundsMenuItem(props) {
     const {data} = useQuery(FundsQuery, {
-        pollInterval: 5000,
+        pollInterval: 10000,
         fetchPolicy: "network-only",
     })
 

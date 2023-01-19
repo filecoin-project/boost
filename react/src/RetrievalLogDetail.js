@@ -39,7 +39,7 @@ export function RetrievalLogDetail(props) {
     }
 
     const {loading, error, data} = useQuery(RetrievalLogQuery, {
-        pollInterval: 1000,
+        pollInterval: 10000,
         variables: {
             peerID: params.peerID,
             dealID: params.dealID,

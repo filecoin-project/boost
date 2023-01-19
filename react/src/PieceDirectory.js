@@ -136,7 +136,7 @@ function SearchBox(props) {
 
 export function PiecesMenuItem(props) {
     const {data} = useQuery(DealsCountQuery, {
-        pollInterval: 5000,
+        pollInterval: 10000,
         fetchPolicy: 'network-only',
     })
 

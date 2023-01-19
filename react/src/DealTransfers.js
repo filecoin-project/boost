@@ -26,7 +26,7 @@ function DealTransfersContent(props) {
 
 function DealTransfersChart(props) {
     const {loading, error, data} = useQuery(TransfersQuery, {
-        pollInterval: 1000,
+        pollInterval: 10000,
         fetchPolicy: 'network-only',
     })
 
@@ -80,7 +80,7 @@ function DealTransfersChart(props) {
 
 function TransferStats(props) {
     const {loading, error, data} = useQuery(TransferStatsQuery, {
-        pollInterval: 1000,
+        pollInterval: 10000,
         fetchPolicy: 'network-only',
     })
 
@@ -178,7 +178,7 @@ export function humanTransferRate(bytesPerSecond) {
 
 export function DealTransfersMenuItem(props) {
     const {data} = useQuery(TransfersQuery, {
-        pollInterval: 5000,
+        pollInterval: 10000,
         fetchPolicy: 'network-only',
     })
 
