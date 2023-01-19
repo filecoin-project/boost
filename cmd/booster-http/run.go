@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"net/http"
 	_ "net/http/pprof"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/filecoin-project/boost/markets/dagstore"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-state-types/abi"
 	lcli "github.com/filecoin-project/lotus/cli"
