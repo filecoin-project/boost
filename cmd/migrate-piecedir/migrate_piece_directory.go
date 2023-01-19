@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/model"
@@ -169,6 +170,8 @@ func migrate(cctx *cli.Context, dbType string, store StoreMigrationApi, migrateT
 	ctx := lcli.ReqContext(cctx)
 	svcCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	fmt.Println("Setting up connection and creating data structures... this might take a minute...")
 	err := store.Start(svcCtx)
 	if err != nil {
 		return fmt.Errorf("starting "+dbType+" store: %w", err)
@@ -356,6 +359,32 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 		return 0, fmt.Errorf("opening piece store: %w", err)
 	}
 
+	dbPath := path.Join(repoDir, "boost.db?cache=shared")
+	sqldb, err := db.SqlDB(dbPath)
+	if err != nil {
+		return 0, fmt.Errorf("opening boost sqlite db: %w", err)
+	}
+
+	qry := "SELECT ID, ChainDealID FROM Deals"
+	rows, err := sqldb.QueryContext(ctx, qry)
+	if err != nil {
+		return 0, fmt.Errorf("executing select on Deals: %w", err)
+	}
+
+	boostDeals := make(map[abi.DealID]string)
+
+	for rows.Next() {
+		var uuid string
+		var chainDealId abi.DealID
+
+		err := rows.Scan(&uuid, &chainDealId)
+		if err != nil {
+			return 0, fmt.Errorf("executing row scan: %w", err)
+		}
+
+		boostDeals[chainDealId] = uuid
+	}
+
 	pcids, err := ps.ListPieceInfoKeys()
 	if err != nil {
 		return 0, fmt.Errorf("getting piece store keys: %w", err)
@@ -387,16 +416,24 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 		var addedDeals bool
 		for _, d := range pi.Deals {
 			// Find the deal corresponding to the deal info's DealID
-			proposalCid, ok := propCidByChainDealID[d.DealID]
-			if !ok {
-				logger.Errorw("cant find deal for piece",
+			proposalCid, okLegacy := propCidByChainDealID[d.DealID]
+			uuid, okBoost := boostDeals[d.DealID]
+
+			if !okLegacy && !okBoost {
+				logger.Errorw("cant find boost deal or legacy deal for piece",
 					"pcid", pcid, "chain-deal-id", d.DealID, "err", err)
 				continue
 			}
 
+			isLegacy := false
+			if uuid == "" {
+				uuid = proposalCid.String()
+				isLegacy = true
+			}
+
 			dealInfo := model.DealInfo{
-				DealUuid:    proposalCid.String(),
-				IsLegacy:    true,
+				DealUuid:    uuid,
+				IsLegacy:    isLegacy,
 				ChainDealID: d.DealID,
 				MinerAddr:   address.Address(maddr),
 				SectorID:    d.SectorID,
