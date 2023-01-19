@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"

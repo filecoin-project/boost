@@ -485,16 +485,16 @@ is in the piece, and adds the index to the piece directory.`,
 			Name: "EmbeddedServicePort",
 			Type: "uint64",
 
-			Comment: `The port that the embedded piece directory service runs on.
-Set this value to zero to disable the embedded piece directory service
-(the piece directory service must be running externally)`,
+			Comment: `The port that the embedded piece directory data service runs on.
+Set this value to zero to disable the embedded piece directory data service
+(in that case the piece directory data service must be running externally)`,
 		},
 		{
 			Name: "ServiceApiInfo",
 			Type: "string",
 
-			Comment: `The connect string for the piece directory service RPC API
-Set this value to "" if the piece directory service is embedded.`,
+			Comment: `The connect string for the piece directory data service RPC API eg "http://localhost:8042"
+Set this value to "" if the piece directory data service is embedded.`,
 		},
 	},
 	"PieceDirectoryCouchbaseBucketConfig": []DocField{

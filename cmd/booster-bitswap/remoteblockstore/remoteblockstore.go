@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/filecoin-project/boost/metrics"
-	"github.com/filecoin-project/boost/tracing"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"

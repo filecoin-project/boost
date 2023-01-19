@@ -10,7 +10,7 @@ import (
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/piecedirectory"
-	"github.com/filecoin-project/boost/tracing"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mitchellh/go-homedir"

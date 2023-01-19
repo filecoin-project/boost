@@ -10,7 +10,7 @@ import (
 	"sort"
 
 	"github.com/filecoin-project/boost/piecedirectory"
-	tracing "github.com/filecoin-project/boost/tracing"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 
