@@ -1,4 +1,4 @@
-package svc
+package couchbase
 
 import (
 	"fmt"
@@ -15,7 +15,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	dockercl "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
-	"github.com/filecoin-project/boostd-data/couchbase"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
@@ -27,7 +26,7 @@ func init() {
 	logging.SetLogLevel("cbtest", "debug")
 }
 
-func SetupCouchbase(t *testing.T, dbSettings couchbase.DBSettings) {
+func SetupTestServer(t *testing.T, dbSettings DBSettings) {
 	ctx := context.Background()
 	cli, err := dockercl.NewClientWithOpts(dockercl.FromEnv)
 	require.NoError(t, err)
@@ -93,7 +92,7 @@ func SetupCouchbase(t *testing.T, dbSettings couchbase.DBSettings) {
 	tlog.Info("couchbase initialized cluster")
 }
 
-func initializeCouchbaseCluster(t *testing.T, settings couchbase.DBSettings) error {
+func initializeCouchbaseCluster(t *testing.T, settings DBSettings) error {
 	couchDir := "/opt/couchbase/var/lib/couchbase"
 	apiCall(t, "/nodes/self/controller/settings", url.Values{
 		"data_path":     {couchDir + "/data"},
@@ -137,7 +136,7 @@ func initializeCouchbaseCluster(t *testing.T, settings couchbase.DBSettings) err
 	return nil
 }
 
-func awaitServicesReady(t *testing.T, settings couchbase.DBSettings, duration time.Duration) {
+func awaitServicesReady(t *testing.T, settings DBSettings, duration time.Duration) {
 	start := time.Now()
 	cluster, err := gocb.Connect(settings.ConnectString, gocb.ClusterOptions{
 		TimeoutsConfig: gocb.TimeoutsConfig{
@@ -156,7 +155,7 @@ func awaitServicesReady(t *testing.T, settings couchbase.DBSettings, duration ti
 		for name, svc := range res.Services {
 			tlog.Info("  " + name + ":")
 			for _, endpoint := range svc {
-				tlog.Info("    " + couchbase.ServiceName(endpoint.Type) + ": " + couchbase.EndpointStateName(endpoint.State))
+				tlog.Info("    " + ServiceName(endpoint.Type) + ": " + EndpointStateName(endpoint.State))
 				if endpoint.State != gocb.EndpointStateConnected {
 					allOnline = false
 				}
@@ -174,7 +173,7 @@ func awaitServicesReady(t *testing.T, settings couchbase.DBSettings, duration ti
 	}
 }
 
-func awaitBucketCreationReady(t *testing.T, settings couchbase.DBSettings, duration time.Duration) {
+func awaitBucketCreationReady(t *testing.T, settings DBSettings, duration time.Duration) {
 	start := time.Now()
 	cluster, err := gocb.Connect(settings.ConnectString, gocb.ClusterOptions{
 		TimeoutsConfig: gocb.TimeoutsConfig{
@@ -194,7 +193,7 @@ func awaitBucketCreationReady(t *testing.T, settings couchbase.DBSettings, durat
 		// a relatively long timeout here
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_, err := couchbase.CreateBucket(ctx, cluster, "dummy", 128)
+		_, err := CreateBucket(ctx, cluster, "dummy", 128)
 		if err == nil {
 			return
 		}

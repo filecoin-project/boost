@@ -64,7 +64,7 @@ func TestService(t *testing.T) {
 		// so set a high timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-		SetupCouchbase(t, testCouchSettings)
+		couchbase.SetupTestServer(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
 		testService(ctx, t, bdsvc, 8043)
 	})
@@ -170,7 +170,7 @@ func TestServiceFuzz(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container in CI as part of the test
 		t.Skip()
-		SetupCouchbase(t, testCouchSettings)
+		couchbase.SetupTestServer(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
 		testServiceFuzz(ctx, t, bdsvc, 8043)
 	})
@@ -390,7 +390,7 @@ func TestCleanup(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container in CI as part of the test
 		t.Skip()
-		SetupCouchbase(t, testCouchSettings)
+		couchbase.SetupTestServer(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
 		testCleanup(ctx, t, bdsvc, 8043)
 	})
