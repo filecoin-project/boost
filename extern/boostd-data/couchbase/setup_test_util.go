@@ -2,6 +2,7 @@ package couchbase
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,29 +22,44 @@ func init() {
 }
 
 func SetupTestServer(t *testing.T, dbSettings DBSettings) {
+	ctx, cf := context.WithTimeout(context.TODO(), 15*time.Minute)
+	defer cf()
+
 	// first test if couchbase bucket are ready, maybe already service initialized
 	tlog.Info("check if couchbase ready...")
 	cluster, err := newTestCluster(dbSettings)
 	require.NoError(t, err)
 
-	ctx, cf := context.WithTimeout(context.TODO(), 20*time.Second)
-	defer cf()
-	if err := checkBucketReady(ctx, cluster); err == nil {
+	ctxInt, cf2 := context.WithTimeout(ctx, 20*time.Second)
+	defer cf2()
+	if err := checkClusterInitialized(ctxInt, cluster); err == nil {
 		tlog.Info("yes, let's go")
 		return
 	}
 
-	// otherwise do full setup
+	// do full setup
 	tlog.Info("wait for couchbase start...")
-	awaitCouchbaseUp(t, dbSettings, 10*time.Minute)
+	ctxInt, cf3 := context.WithTimeout(ctx, 10*time.Minute)
+	defer cf3()
+
+	if err := awaitCouchbaseUp(ctxInt, dbSettings); err != nil {
+		tlog.Info("got couchbase cluster init error, let's ckeck again, maybe it is actually initialized?")
+		ctxInt, cf4 := context.WithTimeout(ctx, 20*time.Second)
+		defer cf4()
+		if err := checkClusterInitialized(ctxInt, cluster); err == nil {
+			tlog.Info("yes, let's go")
+			return
+		}
+		require.NoError(t, err, "Do you run from dev environment? Do not forget to init couchbase with `docker compose up couchbase`")
+	}
 	tlog.Info("couchbase started")
 
 	tlog.Info("couchbase initialize cluster...")
 	initDeadline := 5 * time.Minute
 	tlog.Infof("give %s to be ready.", initDeadline)
-	ctx, cf2 := context.WithTimeout(context.TODO(), initDeadline)
-	defer cf2()
-	err = initializeCouchbaseCluster(t, ctx, dbSettings)
+	ctxInt, cf5 := context.WithTimeout(ctx, initDeadline)
+	defer cf5()
+	err = initializeCouchbaseCluster(t, ctxInt, dbSettings)
 	require.NoError(t, err)
 	tlog.Info("couchbase initialized cluster")
 }
@@ -165,52 +181,57 @@ func newTestCluster(settings DBSettings) (*gocb.Cluster, error) {
 	})
 }
 
-func checkBucketReady(ctx context.Context, cluster *gocb.Cluster) error {
-	if _, err := CreateBucket(ctx, cluster, "dummy", 128); err != nil {
+// ckeck for dummy bucket was created before
+func checkClusterInitialized(ctx context.Context, cluster *gocb.Cluster) error {
+	if err := cluster.Bucket("dummy").WaitUntilReady(20*time.Minute, // give big timeout, as it is also managed by external context ctx
+		&gocb.WaitUntilReadyOptions{DesiredState: gocb.ClusterStateOnline, Context: ctx}); err != nil {
+		tlog.Error(err)
 		return err
 	}
 	return nil
 }
 
-func awaitCouchbaseUp(t *testing.T, dbSettings DBSettings, duration time.Duration) {
-	waitForOkResponse(t, dbSettings, "/internalSettings", duration)
+func awaitCouchbaseUp(ctx context.Context, dbSettings DBSettings) error {
+	return waitForOkResponse(ctx, dbSettings, "/internalSettings")
 }
 
-func waitForOkResponse(t *testing.T, dbSettings DBSettings, path string, duration time.Duration) {
-	start := time.Now()
+func waitForOkResponse(ctx context.Context, dbSettings DBSettings, path string) error {
+	url, err := getTestURL(dbSettings.ConnectString)
+	if err != nil {
+		return err
+	}
+	fullPath := url + path
 	for {
-		fullPath := getTestURL(t, dbSettings.ConnectString) + path
-		resp, err := http.Get(fullPath)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullPath, nil)
+		if err != nil {
+			return err
+		}
+		resp, err := http.DefaultClient.Do(req)
 		if resp != nil && resp.Body != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
 			_ = resp.Body.Close()
 		}
 		if err == nil && resp != nil {
 			if resp.StatusCode < 300 {
-				return
+				return nil
 			} else if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-				msg := fmt.Sprintf("failed to GET %s: %d - %s", fullPath, resp.StatusCode, resp.Status)
-				require.Fail(t, msg)
+				return fmt.Errorf("failed to GET %s: %d - %s", fullPath, resp.StatusCode, resp.Status)
 			}
 		}
-
-		if time.Now().Sub(start) > duration {
-			msg := "failed to GET " + fullPath + " after " + duration.String()
-			if resp != nil {
-				msg += fmt.Sprintf(": %d - %s", resp.StatusCode, resp.Status)
-			}
-			if err != nil {
-				msg += ": " + err.Error()
-			}
-			require.Fail(t, msg)
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out trying to wait for couchbase online: %d - %s: %v", resp.StatusCode, resp.Status, err)
+		case <-time.After(time.Second):
 		}
-		time.Sleep(time.Second)
 	}
 }
 
 func apiCall(t *testing.T, dbSettings DBSettings, path string, values url.Values) {
 	t.Helper()
 
-	fullPath := getTestURL(t, dbSettings.ConnectString) + path
+	url, err := getTestURL(dbSettings.ConnectString)
+	require.NoError(t, err)
+	fullPath := url + path
 	resp, err := http.PostForm(fullPath, values)
 	require.NoError(t, err)
 	if resp.StatusCode >= 300 {
@@ -231,9 +252,10 @@ func GetConnectionStringForTest() string {
 	return fmt.Sprintf("couchbase://%s", res)
 }
 
-func getTestURL(t *testing.T, cs string) string {
-	t.Helper()
+func getTestURL(cs string) (string, error) {
 	res, err := url.Parse(cs)
-	require.NoError(t, err)
-	return fmt.Sprintf("http://%s:8091", res.Host)
+	if (err) != nil {
+		return "", err
+	}
+	return fmt.Sprintf("http://%s:8091", res.Host), nil
 }

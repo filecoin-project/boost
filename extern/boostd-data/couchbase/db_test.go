@@ -121,7 +121,7 @@ func TestSharding(t *testing.T) {
 
 	fileSize := 2 * 1024 * 1024
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	// Create a new couchbase db
