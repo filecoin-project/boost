@@ -1,0 +1,20 @@
+version: '3.7'
+
+services:
+
+  couchbase:
+    image: couchbase
+    ports:
+     - 8091-8096:8091-8096
+     - 11210-11211:11210-11211
+    restart: on-failure
+
+  go-tests:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.test
+    environment:
+      COUCHBASE_URL: http://couchbase:8091  
+    volumes:
+      - ./:/go/src/
+    command: -v -count=1 ./...

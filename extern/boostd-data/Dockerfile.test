@@ -1,0 +1,6 @@
+FROM golang:1.18-alpine
+
+WORKDIR /go/src/
+
+ENTRYPOINT ["go", "test"]
+CMD ["-v", "./..."]
