@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/couchbase/gocb/v2"
-	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"

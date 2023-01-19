@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"strings"
 
 	"github.com/filecoin-project/boost/metrics"
-	"github.com/filecoin-project/boost/tracing"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"

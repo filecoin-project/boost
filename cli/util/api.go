@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/api/client"
 	"github.com/filecoin-project/boost/node"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/lotus/node/repo"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
@@ -78,7 +79,7 @@ func GetAPIInfo(ctx *cli.Context, t lotus_repo.RepoType) (APIInfo, error) {
 		strma := ctx.String(f)
 		strma = strings.TrimSpace(strma)
 
-		if IsVeryVerbose {
+		if cliutil.IsVeryVerbose {
 			_, _ = fmt.Fprintf(ctx.App.Writer, "extracted API endpoint %s from API flag %s\n", strma, f)
 		}
 		return APIInfo{Addr: strma}, nil
@@ -91,7 +92,7 @@ func GetAPIInfo(ctx *cli.Context, t lotus_repo.RepoType) (APIInfo, error) {
 	primaryEnv, fallbacksEnvs, deprecatedEnvs := EnvsForAPIInfos(t)
 	env, ok := os.LookupEnv(primaryEnv)
 	if ok {
-		if IsVeryVerbose {
+		if cliutil.IsVeryVerbose {
 			_, _ = fmt.Fprintf(ctx.App.Writer,
 				"extracted API endpoint %s from primary environment variable %s\n", env, primaryEnv)
 		}
@@ -102,7 +103,7 @@ func GetAPIInfo(ctx *cli.Context, t lotus_repo.RepoType) (APIInfo, error) {
 		envVal, ok := os.LookupEnv(env)
 		if ok {
 			log.Warnf("Using deprecated env(%s) value, please use env(%s) instead.", env, primaryEnv)
-			if IsVeryVerbose {
+			if cliutil.IsVeryVerbose {
 				_, _ = fmt.Fprintf(ctx.App.Writer,
 					"extracted API endpoint %s from deprecated environment variable %s\n", envVal, env)
 			}
@@ -147,7 +148,7 @@ func GetAPIInfo(ctx *cli.Context, t lotus_repo.RepoType) (APIInfo, error) {
 			log.Warnf("Couldn't load CLI token, capabilities may be limited: %v", err)
 		}
 
-		if IsVeryVerbose {
+		if cliutil.IsVeryVerbose {
 			_, _ = fmt.Fprintf(ctx.App.Writer, "extracted API endpoint %s from repo flag %s\n", ma, f)
 		}
 
@@ -160,7 +161,7 @@ func GetAPIInfo(ctx *cli.Context, t lotus_repo.RepoType) (APIInfo, error) {
 	for _, env := range fallbacksEnvs {
 		envVal, ok := os.LookupEnv(env)
 		if ok {
-			if IsVeryVerbose {
+			if cliutil.IsVeryVerbose {
 				_, _ = fmt.Fprintf(ctx.App.Writer,
 					"extracted API endpoint %s from fallback environment variable %s\n", envVal, env)
 			}
@@ -212,7 +213,7 @@ func GetBoostAPI(ctx *cli.Context, opts ...GetBoostOption) (api.Boost, jsonrpc.C
 		addr = u.String()
 	}
 
-	if IsVeryVerbose {
+	if cliutil.IsVeryVerbose {
 		_, _ = fmt.Fprintln(ctx.App.Writer, "using Boost API endpoint:", addr)
 	}
 
@@ -230,7 +231,7 @@ func GetRawAPI(ctx *cli.Context, t repo.RepoType, version string) (string, http.
 		return "", nil, fmt.Errorf("could not get DialArgs: %w", err)
 	}
 
-	if IsVeryVerbose {
+	if cliutil.IsVeryVerbose {
 		_, _ = fmt.Fprintf(ctx.App.Writer, "using raw API %s endpoint: %s\n", version, addr)
 	}
 

@@ -1,8 +1,7 @@
 package main
 
 import (
-	"github.com/filecoin-project/boost/build"
-	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -10,12 +9,15 @@ import (
 
 var log = logging.Logger("boostd-data")
 
+// This service exposes an RPC API that is called by boostd in order to manage
+// boostd's data. The service provides different implementations of the data
+// interface according to the technologies that a user chooses (eg leveldb vs
+// couchbase)
 func main() {
 	app := &cli.App{
 		Name:                 "boostd-data",
-		Usage:                "Service that implements the boost indexing data API",
+		Usage:                "Service that implements boostd data API",
 		EnableBashCompletion: true,
-		Version:              build.UserVersion(),
 		Flags: []cli.Flag{
 			cliutil.FlagVeryVerbose,
 		},

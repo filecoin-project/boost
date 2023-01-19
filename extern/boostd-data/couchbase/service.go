@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
