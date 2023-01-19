@@ -1,4 +1,4 @@
-package ctxutil
+package cliutil
 
 import (
 	"context"

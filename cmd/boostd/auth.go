@@ -7,8 +7,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	bcli "github.com/filecoin-project/boost/cli"
-	boostcliutil "github.com/filecoin-project/boost/cli/util"
-
+	bcliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/lotus/api"
@@ -118,7 +117,7 @@ var AuthApiInfoToken = &cli.Command{
 			return fmt.Errorf("could not get API info for %s: %w", node.Boost, err)
 		}
 
-		currentEnv, _, _ := boostcliutil.EnvsForAPIInfos(node.Boost)
+		currentEnv, _, _ := bcliutil.EnvsForAPIInfos(node.Boost)
 		fmt.Printf("%s=%s:%s\n", currentEnv, string(token), ainfo.Addr)
 		return nil
 	},

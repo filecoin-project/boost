@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -18,7 +19,7 @@ func main() {
 		Usage:                "Service that implements boostd data API",
 		EnableBashCompletion: true,
 		Flags: []cli.Flag{
-			FlagVeryVerbose,
+			cliutil.FlagVeryVerbose,
 		},
 		Commands: []*cli.Command{
 			runCmd,
@@ -34,7 +35,7 @@ func main() {
 func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("boostd-data", "INFO")
 
-	if IsVeryVerbose {
+	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostd-data", "DEBUG")
 	}
 
