@@ -4,17 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-
 	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
-	lotus_config "github.com/filecoin-project/lotus/node/config"
+	"github.com/filecoin-project/lotus/markets/idxprov"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
@@ -27,13 +23,15 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multihash"
 	"go.uber.org/fx"
+	"os"
+	"path/filepath"
 )
 
 var log = logging.Logger("index-provider-wrapper")
 var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
-	cfg            lotus_config.DAGStoreConfig
+	cfg            *config.Boost
 	enabled        bool
 	dealsDB        *db.DealsDB
 	legacyProv     lotus_storagemarket.StorageProvider
@@ -44,10 +42,6 @@ type Wrapper struct {
 	// bitswapEnabled records whether to announce bitswap as an available
 	// protocol to the network indexer
 	bitswapEnabled bool
-	// when booster bitswap is exposed on a public address, extendedProvider
-	// holds the information needed to announce that multiaddr to the network indexer
-	// as the provider of bitswap
-	extendedProvider *xproviders.Info
 }
 
 func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
@@ -69,44 +63,16 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 		bitswapEnabled := cfg.Dealmaking.BitswapPeerID != ""
 
 		// setup bitswap extended provider if there is a public multi addr for bitswap
-		var ep *xproviders.Info
-		if bitswapEnabled && len(cfg.Dealmaking.BitswapPublicAddresses) > 0 {
-			// marshal bitswap metadata
-			meta := metadata.Default.New(metadata.Bitswap{})
-			mbytes, err := meta.MarshalBinary()
-			if err != nil {
-				return nil, err
-			}
-			// we need the private key for bitswaps peerID in order to announce publicly
-			keyFile, err := os.ReadFile(cfg.Dealmaking.BitswapPrivKeyFile)
-			if err != nil {
-				return nil, err
-			}
-			privKey, err := crypto.UnmarshalPrivateKey(keyFile)
-			if err != nil {
-				return nil, err
-			}
-			// setup an extended provider record, containing the booster-bitswap multi addr,
-			// peer ID, private key for signing, and metadata
-			ep = &xproviders.Info{
-				ID:       cfg.Dealmaking.BitswapPeerID,
-				Addrs:    cfg.Dealmaking.BitswapPublicAddresses,
-				Priv:     privKey,
-				Metadata: mbytes,
-			}
-		}
-
 		w := &Wrapper{
-			h:                h,
-			dealsDB:          dealsDB,
-			legacyProv:       legacyProv,
-			prov:             prov,
-			meshCreator:      meshCreator,
-			cfg:              cfg.DAGStore,
-			enabled:          !isDisabled,
-			piecedirectory:   piecedirectory,
-			bitswapEnabled:   bitswapEnabled,
-			extendedProvider: ep,
+			h:              h,
+			dealsDB:        dealsDB,
+			legacyProv:     legacyProv,
+			prov:           prov,
+			meshCreator:    meshCreator,
+			cfg:            cfg,
+			enabled:        !isDisabled,
+			piecedirectory: piecedirectory,
+			bitswapEnabled: bitswapEnabled,
 		}
 		// announce all deals on startup in case of a config change
 		lc.Append(fx.Hook{
@@ -128,39 +94,100 @@ func (w *Wrapper) Enabled() bool {
 	return w.enabled
 }
 
+// AnnounceExtendedProviders announces changes to Boost configuration in the context of retrieval
+// methods.
+//
+// The advertisement published by this function covers 3 cases:
+//
+// 1. bitswap is completely disabled: in which case an advertisement is
+// published with empty extended providers that should wipe previous
+// support on indexer side.
+//
+// 2. bitswap is enabled with public addresses: in which case publish an
+// advertisement with extended providers records corresponding to the
+// public addresses. Note, according the the IPNI spec, the host ID will
+// also be added to the extended providers for signing reasons with empty
+// metadata making a total of 2 extended provider records.
+//
+// 3. bitswap with boostd address: in which case public an advertisement
+// with one extended provider record that just adds bitswap metadata.
+//
+// Note that in any case one advertisement is published by boost on startup
+// to reflect on bitswap configuration, even if the config remains the
+// same. Future work should detect config change and only publish ads when
+// config changes.
 func (w *Wrapper) AnnounceExtendedProviders(ctx context.Context) error {
 	if !w.enabled {
 		return errors.New("cannot announce all deals: index provider is disabled")
 	}
 	// for now, only generate an indexer provider announcement if bitswap announcements
 	// are enabled -- all other graphsync announcements are context ID specific
-	if !w.bitswapEnabled {
-		log.Info("bitswap is not enabled - skipping bitswap announcements to Indexer")
-		return nil
-	}
 
 	// build the extended providers announcement
-	adBuilder := xproviders.NewAdBuilder(w.h.ID(), w.h.Peerstore().PrivKey(w.h.ID()), w.h.Addrs())
-	// if we're exposing bitswap publicly, we announce bitswap as an extended provider. If we're not
-	// we announce it as metadata on the main provider
-	if w.extendedProvider != nil {
-		log.Infof("bitswap is enabled and endpoint is public - "+
-			"announcing bitswap endpoint to indexer as extended provider: %s %s",
-			w.extendedProvider.ID, w.extendedProvider.Addrs)
+	key := w.h.Peerstore().PrivKey(w.h.ID())
+	adBuilder := xproviders.NewAdBuilder(w.h.ID(), key, w.h.Addrs())
 
-		adBuilder.WithExtendedProviders(*w.extendedProvider)
+	if !w.bitswapEnabled {
+		// If bitswap is completely disabled, publish an advertisement with empty extended providers
+		// which should override previously published extended providers associated to w.h.ID().
+		log.Info("bitswap is not enabled - announcing bitswap disabled to Indexer")
 	} else {
-		log.Infof("bitswap is enabled with boostd as proxy - "+
-			"announcing boostd as endpoint for bitswap to indexer: %s %s",
-			w.h.ID(), w.h.Addrs())
+		// if we're exposing bitswap publicly, we announce bitswap as an extended provider. If we're not
+		// we announce it as metadata on the main provider
 
+		// marshal bitswap metadata
 		meta := metadata.Default.New(metadata.Bitswap{})
 		mbytes, err := meta.MarshalBinary()
 		if err != nil {
 			return err
 		}
-		adBuilder.WithMetadata(mbytes)
+		var ep xproviders.Info
+		if len(w.cfg.Dealmaking.BitswapPublicAddresses) > 0 {
+			if w.cfg.Dealmaking.BitswapPrivKeyFile == "" {
+				return fmt.Errorf("missing required configuration key BitswapPrivKeyFile: " +
+					"boost is configured with BitswapPublicAddresses but the BitswapPrivKeyFile configuration key is empty")
+			}
+
+			// we need the private key for bitswaps peerID in order to announce publicly
+			keyFile, err := os.ReadFile(w.cfg.Dealmaking.BitswapPrivKeyFile)
+			if err != nil {
+				return fmt.Errorf("opening BitswapPrivKeyFile %s: %w", w.cfg.Dealmaking.BitswapPrivKeyFile, err)
+			}
+			privKey, err := crypto.UnmarshalPrivateKey(keyFile)
+			if err != nil {
+				return fmt.Errorf("unmarshalling BitswapPrivKeyFile %s: %w", w.cfg.Dealmaking.BitswapPrivKeyFile, err)
+			}
+			// setup an extended provider record, containing the booster-bitswap multi addr,
+			// peer ID, private key for signing, and metadata
+			ep = xproviders.Info{
+				ID:       w.cfg.Dealmaking.BitswapPeerID,
+				Addrs:    w.cfg.Dealmaking.BitswapPublicAddresses,
+				Priv:     privKey,
+				Metadata: mbytes,
+			}
+			log.Infof("bitswap is enabled and endpoint is public - "+
+				"announcing bitswap endpoint to indexer as extended provider: %s %s",
+				ep.ID, ep.Addrs)
+		} else {
+			log.Infof("bitswap is enabled with boostd as proxy - "+
+				"announcing boostd as endpoint for bitswap to indexer: %s %s",
+				w.h.ID(), w.h.Addrs())
+
+			addrs := make([]string, 0, len(w.h.Addrs()))
+			for _, addr := range w.h.Addrs() {
+				addrs = append(addrs, addr.String())
+			}
+
+			ep = xproviders.Info{
+				ID:       w.h.ID().String(),
+				Addrs:    addrs,
+				Priv:     key,
+				Metadata: mbytes,
+			}
+		}
+		adBuilder.WithExtendedProviders(ep)
 	}
+
 	last, _, err := w.prov.GetLatestAdv(ctx)
 	if err != nil {
 		return err
