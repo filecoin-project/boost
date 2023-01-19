@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	tracing2 "github.com/filecoin-project/boostd-data/shared/tracing"
 	"path"
 	"time"
 
@@ -32,7 +33,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/indexbs"
@@ -525,11 +525,11 @@ func NewIndexBackedBlockstore(lc fx.Lifecycle, dagst dagstore.Interface, ps lotu
 	return dtypes.IndexBackedBlockstore(rbs), nil
 }
 
-func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, error) {
-	return func(lc fx.Lifecycle) (*tracing.Tracing, error) {
+func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing2.Tracing, error) {
+	return func(lc fx.Lifecycle) (*tracing2.Tracing, error) {
 		if cfg.Tracing.Enabled {
 			// Instantiate the tracer and exporter
-			stop, err := tracing.New(cfg.Tracing.ServiceName, cfg.Tracing.Endpoint)
+			stop, err := tracing2.New(cfg.Tracing.ServiceName, cfg.Tracing.Endpoint)
 			if err != nil {
 				return nil, fmt.Errorf("failed to instantiate tracer: %w", err)
 			}
@@ -538,6 +538,6 @@ func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, erro
 			})
 		}
 
-		return &tracing.Tracing{}, nil
+		return &tracing2.Tracing{}, nil
 	}
 }

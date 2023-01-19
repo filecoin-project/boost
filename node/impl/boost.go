@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"io"
 	"net/http"
 	"sort"
 
 	"github.com/filecoin-project/boost/piecedirectory"
-	tracing "github.com/filecoin-project/boost/tracing"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 

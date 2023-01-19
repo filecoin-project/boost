@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/filecoin-project/boost/tracing"
 	"github.com/filecoin-project/boostd-data/couchbase"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boostd-data/svc"
-	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 	"net/http"
@@ -106,7 +106,7 @@ var couchbaseCmd = &cli.Command{
 }
 
 func runAction(cctx *cli.Context, dbType string, store *svc.Service) error {
-	ctx := lcli.ReqContext(cctx)
+	ctx := cliutil.ReqContext(cctx)
 
 	if cctx.Bool("pprof") {
 		go func() {

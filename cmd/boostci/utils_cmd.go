@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
-
 	"github.com/docker/go-units"
-	"github.com/filecoin-project/boost/cli/ctxutil"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/go-paramfetch"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/urfave/cli/v2"
@@ -15,7 +14,7 @@ var fetchParamCmd = &cli.Command{
 	Usage:     "Fetch proving parameters",
 	ArgsUsage: "[sectorSize]",
 	Action: func(cctx *cli.Context) error {
-		ctx := ctxutil.ReqContext(cctx)
+		ctx := cliutil.ReqContext(cctx)
 
 		if !cctx.Args().Present() {
 			return fmt.Errorf("must pass sector size to fetch params for (specify as \"32GiB\", for instance)")
