@@ -22,43 +22,48 @@ func init() {
 }
 
 func SetupTestServer(t *testing.T, dbSettings DBSettings) {
-	ctx, cf := context.WithTimeout(context.TODO(), 15*time.Minute)
+	ctx, cf := context.WithTimeout(context.TODO(), 10*time.Minute)
 	defer cf()
 
-	// first test if couchbase bucket are ready, maybe already service initialized
-	tlog.Info("check if couchbase ready...")
+	tlog.Info("wait for couchbase to start...")
+	// 2 min should be enough when running for CI
+	// when running from ci it is expected the couchbase image to be downloaded before
+	couchbaseStartDeadline := 2 * time.Minute
+	// try fail fast if running from local dev machine
+	if getTestHost() == "localhost" {
+		couchbaseStartDeadline = 20 * time.Second
+	}
+	tlog.Infof("giving %s to start.", couchbaseStartDeadline)
+	ctxInt, cfInt := context.WithTimeout(ctx, couchbaseStartDeadline)
+	defer cfInt()
+
+	if err := awaitCouchbaseUp(ctxInt, dbSettings); err != nil {
+		if getTestHost() == "localhost" {
+			require.NoError(t, err, "Do you run from dev environment? Do not forget to init couchbase with `docker compose up couchbase`")
+		}
+		require.NoError(t, err)
+	}
+	tlog.Info("couchbase has started")
+
+
+	// test if couchbase bucket was initialized before
+	tlog.Info("check if couchbase cluster ready...")
 	cluster, err := newTestCluster(dbSettings)
 	require.NoError(t, err)
 
-	ctxInt, cf2 := context.WithTimeout(ctx, 20*time.Second)
-	defer cf2()
+	ctxInt, cfInt2 := context.WithTimeout(ctx, 30*time.Second)
+	defer cfInt2()
 	if err := checkClusterInitialized(ctxInt, cluster); err == nil {
 		tlog.Info("yes, let's go")
 		return
 	}
 
 	// do full setup
-	tlog.Info("wait for couchbase start...")
-	ctxInt, cf3 := context.WithTimeout(ctx, 10*time.Minute)
-	defer cf3()
-
-	if err := awaitCouchbaseUp(ctxInt, dbSettings); err != nil {
-		tlog.Info("got couchbase cluster init error, let's ckeck again, maybe it is actually initialized?")
-		ctxInt, cf4 := context.WithTimeout(ctx, 20*time.Second)
-		defer cf4()
-		if err := checkClusterInitialized(ctxInt, cluster); err == nil {
-			tlog.Info("yes, let's go")
-			return
-		}
-		require.NoError(t, err, "Do you run from dev environment? Do not forget to init couchbase with `docker compose up couchbase`")
-	}
-	tlog.Info("couchbase started")
-
 	tlog.Info("couchbase initialize cluster...")
 	initDeadline := 5 * time.Minute
 	tlog.Infof("give %s to be ready.", initDeadline)
-	ctxInt, cf5 := context.WithTimeout(ctx, initDeadline)
-	defer cf5()
+	ctxInt, cfInt3 := context.WithTimeout(ctx, initDeadline)
+	defer cfInt3()
 	err = initializeCouchbaseCluster(t, ctxInt, dbSettings)
 	require.NoError(t, err)
 	tlog.Info("couchbase initialized cluster")
@@ -183,12 +188,9 @@ func newTestCluster(settings DBSettings) (*gocb.Cluster, error) {
 
 // ckeck for dummy bucket was created before
 func checkClusterInitialized(ctx context.Context, cluster *gocb.Cluster) error {
-	if err := cluster.Bucket("dummy").WaitUntilReady(20*time.Minute, // give big timeout, as it is also managed by external context ctx
-		&gocb.WaitUntilReadyOptions{DesiredState: gocb.ClusterStateOnline, Context: ctx}); err != nil {
-		tlog.Error(err)
-		return err
-	}
-	return nil
+	// give big timeout, as it is also managed by external context ctx
+	return cluster.Bucket("dummy").WaitUntilReady(20*time.Minute, 
+		&gocb.WaitUntilReadyOptions{DesiredState: gocb.ClusterStateOnline, Context: ctx})
 }
 
 func awaitCouchbaseUp(ctx context.Context, dbSettings DBSettings) error {
@@ -206,6 +208,7 @@ func waitForOkResponse(ctx context.Context, dbSettings DBSettings, path string) 
 		if err != nil {
 			return err
 		}
+		req.SetBasicAuth(dbSettings.Auth.Username, dbSettings.Auth.Password)
 		resp, err := http.DefaultClient.Do(req)
 		if resp != nil && resp.Body != nil {
 			_, _ = io.Copy(io.Discard, resp.Body)
@@ -220,7 +223,10 @@ func waitForOkResponse(ctx context.Context, dbSettings DBSettings, path string) 
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timed out trying to wait for couchbase online: %d - %s: %v", resp.StatusCode, resp.Status, err)
+			if resp != nil {
+				return fmt.Errorf("timed out trying to wait for couchbase online: %d - %s: %v", resp.StatusCode, resp.Status, err)
+			}
+			return fmt.Errorf("timed out trying to wait for couchbase online: %v", err)
 		case <-time.After(time.Second):
 		}
 	}
@@ -242,14 +248,17 @@ func apiCall(t *testing.T, dbSettings DBSettings, path string, values url.Values
 }
 
 // GetConnectionStringForTest get couchbase test instance connection string from env COUCHBASE_HOST
-// if not set use localhost
+// by default use localhost
 func GetConnectionStringForTest() string {
-	en := "COUCHBASE_HOST"
-	res := os.Getenv(en)
+	return fmt.Sprintf("couchbase://%s", getTestHost())
+}
+
+func getTestHost() string {
+	res := os.Getenv("COUCHBASE_HOST")
 	if res == "" {
 		res = "localhost"
 	}
-	return fmt.Sprintf("couchbase://%s", res)
+	return res
 }
 
 func getTestURL(cs string) (string, error) {
