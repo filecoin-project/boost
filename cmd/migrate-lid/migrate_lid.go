@@ -65,7 +65,7 @@ func checkMigrateType(migrateType string) error {
 var migrateLevelDBCmd = &cli.Command{
 	Name:        "leveldb",
 	Description: "Migrate boost piece information and dagstore to a leveldb store.\n" + desc,
-	Usage:       "migrate-piecedir leveldb dagstore|pieceinfo",
+	Usage:       "migrate-lid leveldb dagstore|pieceinfo",
 	Before:      before,
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() == 0 {
@@ -99,7 +99,7 @@ var migrateLevelDBCmd = &cli.Command{
 var migrateCouchDBCmd = &cli.Command{
 	Name:        "couchbase",
 	Description: "Migrate boost piece information and dagstore to a couchbase store\n" + desc,
-	Usage:       "migrate-piecedir couchbase dagstore|pieceinfo",
+	Usage:       "migrate-lid couchbase dagstore|pieceinfo",
 	Before:      before,
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -143,7 +143,7 @@ var migrateCouchDBCmd = &cli.Command{
 			return err
 		}
 
-		// Create a connection to the couchbase piece directory
+		// Create a connection to the couchbase local index directory
 		settings := couchbase.DBSettings{
 			ConnectString: cctx.String("connect-string"),
 			Auth: couchbase.DBSettingsAuth{
@@ -190,7 +190,7 @@ func migrate(cctx *cli.Context, dbType string, store StoreMigrationApi, migrateT
 		return err
 	}
 
-	fmt.Print("Migrating to " + dbType + " Piece Directory. ")
+	fmt.Print("Migrating to " + dbType + " Local Index Directory. ")
 	fmt.Println("See detailed logs of the migration at")
 	fmt.Println(logPath)
 
@@ -343,7 +343,7 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 		return 0, fmt.Errorf("getting miner address from repo %s: %w", repoDir, err)
 	}
 
-	logger.Infof("migrating piece store deal information to Piece Directory for miner %s", address.Address(maddr).String())
+	logger.Infof("migrating piece store deal information to Local Index Directory for miner %s", address.Address(maddr).String())
 	start := time.Now()
 
 	// Create a mapping of on-chain deal ID to deal proposal cid.
@@ -622,7 +622,7 @@ func loadIndex(path string) (index.Index, error) {
 
 var migrateReverseCmd = &cli.Command{
 	Name:  "reverse",
-	Usage: "Do a reverse migration from the piece directory back to the legacy format",
+	Usage: "Do a reverse migration from the local index directory back to the legacy format",
 	Subcommands: []*cli.Command{
 		migrateReverseLeveldbCmd,
 		migrateReverseCouchbaseCmd,
@@ -631,7 +631,7 @@ var migrateReverseCmd = &cli.Command{
 
 var migrateReverseLeveldbCmd = &cli.Command{
 	Name:   "leveldb",
-	Usage:  "Reverse migrate a leveldb piece directory",
+	Usage:  "Reverse migrate a leveldb local index directory",
 	Before: before,
 	Action: func(cctx *cli.Context) error {
 		return migrateReverse(cctx, "leveldb")
@@ -640,7 +640,7 @@ var migrateReverseLeveldbCmd = &cli.Command{
 
 var migrateReverseCouchbaseCmd = &cli.Command{
 	Name:   "couchbase",
-	Usage:  "Reverse migrate a couchbase piece directory",
+	Usage:  "Reverse migrate a couchbase local index directory",
 	Before: before,
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -687,7 +687,7 @@ func migrateReverse(cctx *cli.Context, dbType string) error {
 		}
 		store = ldb.NewStore(ldbRepoPath)
 	} else {
-		// Create a connection to the couchbase piece directory
+		// Create a connection to the couchbase local index directory
 		settings := couchbase.DBSettings{
 			ConnectString: cctx.String("connect-string"),
 			Auth: couchbase.DBSettingsAuth{
@@ -722,10 +722,10 @@ func migrateDBReverse(cctx *cli.Context, repoDir string, dbType string, pieceDir
 
 	pcids, err := pieceDir.ListPieces(ctx)
 	if err != nil {
-		return fmt.Errorf("listing piece directory pieces: %w", err)
+		return fmt.Errorf("listing local index directory pieces: %w", err)
 	}
 
-	logger.Infof("starting migration of %d piece infos from %s piece directory to piece store", len(pcids), dbType)
+	logger.Infof("starting migration of %d piece infos from %s local index directory to piece store", len(pcids), dbType)
 
 	// Open the datastore
 	ds, err := openDataStore(repoDir)
@@ -739,7 +739,7 @@ func migrateDBReverse(cctx *cli.Context, repoDir string, dbType string, pieceDir
 		return fmt.Errorf("opening piece store: %w", err)
 	}
 
-	// For each piece in the piece directory
+	// For each piece in the local index directory
 	var errorCount int
 	for i, pieceCid := range pcids {
 		// Reverse migrate the piece
@@ -759,7 +759,7 @@ func migrateDBReverse(cctx *cli.Context, repoDir string, dbType string, pieceDir
 }
 
 func migrateReversePiece(ctx context.Context, pieceCid cid.Cid, pieceDir StoreMigrationApi, ps piecestore.PieceStore) (int, error) {
-	// Get the piece metadata from the piece directory
+	// Get the piece metadata from the local index directory
 	pieceDirPieceInfo, err := pieceDir.GetPieceMetadata(ctx, pieceCid)
 	if err != nil {
 		return 0, fmt.Errorf("getting piece metadata for piece %s", pieceCid)
@@ -776,11 +776,11 @@ func migrateReversePiece(ctx context.Context, pieceCid cid.Cid, pieceDir StoreMi
 		pieceStoreDeals = pieceStorePieceInfo.Deals
 	}
 
-	// Iterate over each piece directory deal and add it to the piece store
+	// Iterate over each local index directory deal and add it to the piece store
 	// if it's not there already
 	var migrated int
 	for _, pieceDirDeal := range pieceDirPieceInfo.Deals {
-		// Check if the piece directory deal is already in the piece store
+		// Check if the local index directory deal is already in the piece store
 		var has bool
 		for _, pieceStoreDeal := range pieceStoreDeals {
 			if pieceStoreDeal.SectorID == pieceDirDeal.SectorID &&

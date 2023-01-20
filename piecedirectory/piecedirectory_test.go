@@ -167,7 +167,7 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 }
 
 // Verify that if the index has been imported from the DAG store, meaning
-// it has offset information but not block size information, the piece directory
+// it has offset information but not block size information, the local index directory
 // will re-build the index
 func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Create a random CAR file
@@ -216,7 +216,7 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 		}
 	}
 
-	// Add the index to the piece directory
+	// Add the index to the local index directory
 	err = cl.AddIndex(ctx, pieceCid, recs)
 	require.NoError(t, err)
 

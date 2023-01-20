@@ -12,6 +12,6 @@ endif
 GOFLAGS+=-ldflags="$(ldflags)"
 
 build:
-	rm -f migrate-piecedir
-	$(GOCC) build $(GOFLAGS) -o migrate-piecedir .
+	rm -f migrate-lid
+	$(GOCC) build $(GOFLAGS) -o migrate-lid .
 .PHONY: build

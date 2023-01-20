@@ -115,8 +115,8 @@ jobs:
           no_output_timeout: 30m
       - download-params
       # Note: setup_remote_docker takes about 10s and it's only needed for
-      # piece-directory tests so it may be worth refactoring so that it's
-      # only included for piece-directory
+      # local index directory tests so it may be worth refactoring so that it's
+      # only included for local index directory
       - setup_remote_docker:
           version: 20.10.18
           docker_layer_caching: true
@@ -322,6 +322,6 @@ workflows:
           target: "`go list ./... | grep -v boost/itests`"
 
       - test:
-          name: piece-directory
+          name: local index directory
           suite: all
           cwd: "./extern/boostd-data"

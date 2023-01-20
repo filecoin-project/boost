@@ -38,12 +38,12 @@ type Boost struct {
 	// The connect string for the sealing RPC API (lotus miner)
 	SealerApiInfo string
 	// The connect string for the sector index RPC API (lotus miner)
-	SectorIndexApiInfo string
-	Dealmaking         DealmakingConfig
-	Wallets            WalletsConfig
-	Graphql            GraphqlConfig
-	Tracing            TracingConfig
-	PieceDirectory     PieceDirectoryConfig
+	SectorIndexApiInfo  string
+	Dealmaking          DealmakingConfig
+	Wallets             WalletsConfig
+	Graphql             GraphqlConfig
+	Tracing             TracingConfig
+	LocalIndexDirectory LocalIndexDirectoryConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
@@ -261,34 +261,34 @@ type StorageConfig struct {
 	ParallelFetchLimit int
 }
 
-type PieceDirectoryCouchbaseBucketConfig struct {
+type LocalIndexDirectoryCouchbaseBucketConfig struct {
 	// Bucket setting RAMQuotaMB
 	RAMQuotaMB uint64
 }
 
-type PieceDirectoryCouchbaseConfig struct {
+type LocalIndexDirectoryCouchbaseConfig struct {
 	// The couchbase connect string eg "couchbase://127.0.0.1"
 	// If empty, a leveldb database is used instead.
 	ConnectString           string
 	Username                string
 	Password                string
-	PieceMetadataBucket     PieceDirectoryCouchbaseBucketConfig
-	MultihashToPiecesBucket PieceDirectoryCouchbaseBucketConfig
-	PieceOffsetsBucket      PieceDirectoryCouchbaseBucketConfig
+	PieceMetadataBucket     LocalIndexDirectoryCouchbaseBucketConfig
+	MultihashToPiecesBucket LocalIndexDirectoryCouchbaseBucketConfig
+	PieceOffsetsBucket      LocalIndexDirectoryCouchbaseBucketConfig
 }
 
-type PieceDirectoryConfig struct {
-	Couchbase PieceDirectoryCouchbaseConfig
+type LocalIndexDirectoryConfig struct {
+	Couchbase LocalIndexDirectoryCouchbaseConfig
 	// The maximum number of add index operations allowed to execute in parallel.
 	// The add index operation is executed when a new deal is created - it fetches
 	// the piece from the sealing subsystem, creates an index of where each block
-	// is in the piece, and adds the index to the piece directory.
+	// is in the piece, and adds the index to the local index directory.
 	ParallelAddIndexLimit int
-	// The port that the embedded piece directory data service runs on.
-	// Set this value to zero to disable the embedded piece directory data service
-	// (in that case the piece directory data service must be running externally)
+	// The port that the embedded local index directory data service runs on.
+	// Set this value to zero to disable the embedded local index directory data service
+	// (in that case the local index directory data service must be running externally)
 	EmbeddedServicePort uint64
-	// The connect string for the piece directory data service RPC API eg "http://localhost:8042"
-	// Set this value to "" if the piece directory data service is embedded.
+	// The connect string for the local index directory data service RPC API eg "http://localhost:8042"
+	// Set this value to "" if the local index directory data service is embedded.
 	ServiceApiInfo string
 }

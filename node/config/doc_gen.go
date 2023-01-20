@@ -68,8 +68,8 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
-			Name: "PieceDirectory",
-			Type: "PieceDirectoryConfig",
+			Name: "LocalIndexDirectory",
+			Type: "LocalIndexDirectoryConfig",
 
 			Comment: ``,
 		},
@@ -366,6 +366,85 @@ to keep the size of logsDB in check. Set the value as "0" to disable log cleanup
 			Comment: `The port that the graphql server listens on`,
 		},
 	},
+	"LocalIndexDirectoryConfig": []DocField{
+		{
+			Name: "Couchbase",
+			Type: "LocalIndexDirectoryCouchbaseConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "ParallelAddIndexLimit",
+			Type: "int",
+
+			Comment: `The maximum number of add index operations allowed to execute in parallel.
+The add index operation is executed when a new deal is created - it fetches
+the piece from the sealing subsystem, creates an index of where each block
+is in the piece, and adds the index to the local index directory.`,
+		},
+		{
+			Name: "EmbeddedServicePort",
+			Type: "uint64",
+
+			Comment: `The port that the embedded local index directory data service runs on.
+Set this value to zero to disable the embedded local index directory data service
+(in that case the local index directory data service must be running externally)`,
+		},
+		{
+			Name: "ServiceApiInfo",
+			Type: "string",
+
+			Comment: `The connect string for the local index directory data service RPC API eg "http://localhost:8042"
+Set this value to "" if the local index directory data service is embedded.`,
+		},
+	},
+	"LocalIndexDirectoryCouchbaseBucketConfig": []DocField{
+		{
+			Name: "RAMQuotaMB",
+			Type: "uint64",
+
+			Comment: `Bucket setting RAMQuotaMB`,
+		},
+	},
+	"LocalIndexDirectoryCouchbaseConfig": []DocField{
+		{
+			Name: "ConnectString",
+			Type: "string",
+
+			Comment: `The couchbase connect string eg "couchbase://127.0.0.1"
+If empty, a leveldb database is used instead.`,
+		},
+		{
+			Name: "Username",
+			Type: "string",
+
+			Comment: ``,
+		},
+		{
+			Name: "Password",
+			Type: "string",
+
+			Comment: ``,
+		},
+		{
+			Name: "PieceMetadataBucket",
+			Type: "LocalIndexDirectoryCouchbaseBucketConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "MultihashToPiecesBucket",
+			Type: "LocalIndexDirectoryCouchbaseBucketConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "PieceOffsetsBucket",
+			Type: "LocalIndexDirectoryCouchbaseBucketConfig",
+
+			Comment: ``,
+		},
+	},
 	"LotusDealmakingConfig": []DocField{
 		{
 			Name: "PieceCidBlocklist",
@@ -461,85 +540,6 @@ see https://boost.filecoin.io/configuration/deal-filters for more details`,
 		{
 			Name: "RetrievalPricing",
 			Type: "*lotus_config.RetrievalPricing",
-
-			Comment: ``,
-		},
-	},
-	"PieceDirectoryConfig": []DocField{
-		{
-			Name: "Couchbase",
-			Type: "PieceDirectoryCouchbaseConfig",
-
-			Comment: ``,
-		},
-		{
-			Name: "ParallelAddIndexLimit",
-			Type: "int",
-
-			Comment: `The maximum number of add index operations allowed to execute in parallel.
-The add index operation is executed when a new deal is created - it fetches
-the piece from the sealing subsystem, creates an index of where each block
-is in the piece, and adds the index to the piece directory.`,
-		},
-		{
-			Name: "EmbeddedServicePort",
-			Type: "uint64",
-
-			Comment: `The port that the embedded piece directory data service runs on.
-Set this value to zero to disable the embedded piece directory data service
-(in that case the piece directory data service must be running externally)`,
-		},
-		{
-			Name: "ServiceApiInfo",
-			Type: "string",
-
-			Comment: `The connect string for the piece directory data service RPC API eg "http://localhost:8042"
-Set this value to "" if the piece directory data service is embedded.`,
-		},
-	},
-	"PieceDirectoryCouchbaseBucketConfig": []DocField{
-		{
-			Name: "RAMQuotaMB",
-			Type: "uint64",
-
-			Comment: `Bucket setting RAMQuotaMB`,
-		},
-	},
-	"PieceDirectoryCouchbaseConfig": []DocField{
-		{
-			Name: "ConnectString",
-			Type: "string",
-
-			Comment: `The couchbase connect string eg "couchbase://127.0.0.1"
-If empty, a leveldb database is used instead.`,
-		},
-		{
-			Name: "Username",
-			Type: "string",
-
-			Comment: ``,
-		},
-		{
-			Name: "Password",
-			Type: "string",
-
-			Comment: ``,
-		},
-		{
-			Name: "PieceMetadataBucket",
-			Type: "PieceDirectoryCouchbaseBucketConfig",
-
-			Comment: ``,
-		},
-		{
-			Name: "MultihashToPiecesBucket",
-			Type: "PieceDirectoryCouchbaseBucketConfig",
-
-			Comment: ``,
-		},
-		{
-			Name: "PieceOffsetsBucket",
-			Type: "PieceDirectoryCouchbaseBucketConfig",
 
 			Comment: ``,
 		},

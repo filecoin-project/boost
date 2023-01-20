@@ -38,8 +38,8 @@ var runCmd = &cli.Command{
 			Value: 7777,
 		},
 		&cli.StringFlag{
-			Name:     "api-piece-directory",
-			Usage:    "the endpoint for the piece directory API",
+			Name:     "api-lid",
+			Usage:    "the endpoint for the local index directory API",
 			Required: true,
 		},
 		&cli.StringFlag{
@@ -73,13 +73,13 @@ var runCmd = &cli.Command{
 			}()
 		}
 
-		// Connect to the piece directory service
+		// Connect to the local index directory service
 		ctx := lcli.ReqContext(cctx)
 		pdClient := piecedirectory.NewStore()
 		defer pdClient.Close(ctx)
-		err := pdClient.Dial(ctx, cctx.String("api-piece-directory"))
+		err := pdClient.Dial(ctx, cctx.String("api-lid"))
 		if err != nil {
-			return fmt.Errorf("connecting to piece directory service: %w", err)
+			return fmt.Errorf("connecting to local index directory service: %w", err)
 		}
 
 		// Connect to the full node API

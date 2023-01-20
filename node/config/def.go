@@ -72,14 +72,14 @@ func DefaultBoost() *Boost {
 			ServiceName: "boostd",
 		},
 
-		PieceDirectory: PieceDirectoryConfig{
-			Couchbase: PieceDirectoryCouchbaseConfig{
+		LocalIndexDirectory: LocalIndexDirectoryConfig{
+			Couchbase: LocalIndexDirectoryCouchbaseConfig{
 				ConnectString:           "",
 				Username:                "",
 				Password:                "",
-				PieceMetadataBucket:     PieceDirectoryCouchbaseBucketConfig{},
-				MultihashToPiecesBucket: PieceDirectoryCouchbaseBucketConfig{},
-				PieceOffsetsBucket:      PieceDirectoryCouchbaseBucketConfig{},
+				PieceMetadataBucket:     LocalIndexDirectoryCouchbaseBucketConfig{},
+				MultihashToPiecesBucket: LocalIndexDirectoryCouchbaseBucketConfig{},
+				PieceOffsetsBucket:      LocalIndexDirectoryCouchbaseBucketConfig{},
 			},
 			ParallelAddIndexLimit: 4,
 			EmbeddedServicePort:   8042,

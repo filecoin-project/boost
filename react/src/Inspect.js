@@ -333,7 +333,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                 </tbody>
             </table>
 
-            <h3>Piece Directory</h3>
+            <h3>Local Index Directory</h3>
             {pieceStatus.PieceInfoDeals.length ? (
                 <table className="deals">
                     <tbody>
@@ -356,7 +356,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                     </tbody>
                 </table>
             ) : (
-                <p>No deals found in piece directory for piece CID {pieceCid}</p>
+                <p>No deals found in Local Index Directory for piece CID {pieceCid}</p>
             )}
 
             <h3>Deals</h3>
@@ -415,10 +415,10 @@ function SearchBox(props) {
 function IndexStatusInfo() {
     return <Info>
         <InfoListItem title="NotFound">
-            There was no information found for this piece CID in the Piece Directory.
+            There was no information found for this piece CID in the Local Index Directory.
         </InfoListItem>
         <InfoListItem title="Registered">
-            The piece has been added to the Piece Directory but has not yet been indexed.
+            The piece has been added to the Local Index Directory but has not yet been indexed.
         </InfoListItem>
         <InfoListItem title="Indexing">
             The piece is currently being indexed.

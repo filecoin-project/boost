@@ -187,7 +187,7 @@ func (ps *PieceDirectory) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uin
 	// Write the CAR size back to the store so that it's cached for next time
 	err = ps.store.SetCarSize(ctx, pieceCid, unpaddedCarSize)
 	if err != nil {
-		log.Errorw("writing CAR size to piece directory store", "pieceCid", pieceCid, "err", err)
+		log.Errorw("writing CAR size to local index directory store", "pieceCid", pieceCid, "err", err)
 	}
 
 	return unpaddedCarSize, nil
@@ -303,7 +303,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 
 	// Add mh => piece index to store: "which piece contains the multihash?"
 	// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
-	log.Debugw("add index: store index in piece directory", "pieceCid", pieceCid)
+	log.Debugw("add index: store index in local index directory", "pieceCid", pieceCid)
 	if err := ps.store.AddIndex(ctx, pieceCid, recs); err != nil {
 		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
 	}
