@@ -79,6 +79,7 @@ func before(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("dagstore", "DEBUG")
 		_ = logging.SetLogLevel("migrator", "DEBUG")
 		_ = logging.SetLogLevel("piecedir", "DEBUG")
+		_ = logging.SetLogLevel("fxlog", "DEBUG")
 	}
 
 	return nil
