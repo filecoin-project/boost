@@ -45,7 +45,6 @@ func SetupTestServer(t *testing.T, dbSettings DBSettings) {
 	}
 	tlog.Info("couchbase has started")
 
-
 	// test if couchbase bucket was initialized before
 	tlog.Info("check if couchbase cluster ready...")
 	cluster, err := newTestCluster(dbSettings)
@@ -189,7 +188,7 @@ func newTestCluster(settings DBSettings) (*gocb.Cluster, error) {
 // ckeck for dummy bucket was created before
 func checkClusterInitialized(ctx context.Context, cluster *gocb.Cluster) error {
 	// give big timeout, as it is also managed by external context ctx
-	return cluster.Bucket("dummy").WaitUntilReady(20*time.Minute, 
+	return cluster.Bucket("dummy").WaitUntilReady(20*time.Minute,
 		&gocb.WaitUntilReadyOptions{DesiredState: gocb.ClusterStateOnline, Context: ctx})
 }
 
@@ -234,16 +233,36 @@ func waitForOkResponse(ctx context.Context, dbSettings DBSettings, path string) 
 
 func apiCall(t *testing.T, dbSettings DBSettings, path string, values url.Values) {
 	t.Helper()
-
 	url, err := getTestURL(dbSettings.ConnectString)
 	require.NoError(t, err)
 	fullPath := url + path
-	resp, err := http.PostForm(fullPath, values)
-	require.NoError(t, err)
-	if resp.StatusCode >= 300 {
-		require.Fail(t, fmt.Sprintf("%s: %d %s", fullPath, resp.StatusCode, resp.Status))
+	callF := func() (bool, error) {
+		resp, err := http.PostForm(fullPath, values)
+		if err != nil {
+			return true, err
+		}
+		defer func() {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+		}()
+		if resp.StatusCode >= 300 {
+			return false, fmt.Errorf("%s: %d %s", fullPath, resp.StatusCode, resp.Status)
+		}
+		return false, nil
 	}
-	err = resp.Body.Close()
+
+	for i, d := range [...]uint{0, 16, 256, 1024} {
+		if i > 0 {
+			wait := time.Duration(d) * time.Millisecond
+			tlog.Warnf("Retry %d after %v: err: %v", i, wait, err)
+			time.Sleep(wait)
+		}
+		var retry bool
+		retry, err = callF()
+		if !retry {
+			break
+		}
+	}
 	require.NoError(t, err)
 }
 
