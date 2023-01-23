@@ -39,6 +39,13 @@ type dealAccessor struct {
 	def  map[string]fielddef.FieldDefinition
 }
 
+type FilterOptions struct {
+	Checkpoint   *string
+	IsOffline    *bool
+	TransferType *string
+	VerifiedDeal *bool
+}
+
 func (d *DealsDB) newDealDef(deal *types.ProviderDealState) *dealAccessor {
 	return newDealAccessor(d.db, deal)
 }
@@ -229,7 +236,7 @@ func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid cid.Cid) 
 	return d.scanRow(row)
 }
 
-func (d *DealsDB) Count(ctx context.Context, query string, filter map[string]interface{}) (int, error) {
+func (d *DealsDB) Count(ctx context.Context, query string, filter *FilterOptions) (int, error) {
 	whereArgs := []interface{}{}
 	where := "SELECT count(*) FROM Deals"
 	if query != "" {
@@ -238,8 +245,8 @@ func (d *DealsDB) Count(ctx context.Context, query string, filter map[string]int
 		whereArgs = append(whereArgs, searchArgs...)
 	}
 
-	if len(filter) > 0 {
-		filterWhere, filterArgs := withSearchFilter(filter)
+	if filter != nil {
+		filterWhere, filterArgs := withSearchFilter(*filter)
 
 		if query != "" {
 			where += " AND "
@@ -264,7 +271,7 @@ func (d *DealsDB) ListCompleted(ctx context.Context) ([]*types.ProviderDealState
 	return d.list(ctx, 0, 0, "Checkpoint = ?", dealcheckpoints.Complete.String())
 }
 
-func (d *DealsDB) List(ctx context.Context, query string, filter map[string]interface{}, cursor *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
+func (d *DealsDB) List(ctx context.Context, query string, filter *FilterOptions, cursor *graphql.ID, offset int, limit int) ([]*types.ProviderDealState, error) {
 	where := ""
 	whereArgs := []interface{}{}
 
@@ -284,12 +291,12 @@ func (d *DealsDB) List(ctx context.Context, query string, filter map[string]inte
 		whereArgs = append(whereArgs, searchArgs...)
 	}
 
-	if len(filter) > 0 {
+	if filter != nil {
 		if where != "" {
 			where += " AND "
 		}
 
-		filterWhere, filterArgs := withSearchFilter(filter)
+		filterWhere, filterArgs := withSearchFilter(*filter)
 		where += filterWhere
 		whereArgs = append(whereArgs, filterArgs...)
 	}
@@ -297,20 +304,28 @@ func (d *DealsDB) List(ctx context.Context, query string, filter map[string]inte
 	return d.list(ctx, offset, limit, where, whereArgs...)
 }
 
-var filterFields = []string{"Checkpoint", "IsOffline", "TransferType", "VerifiedDeal"}
-
-func withSearchFilter(filter map[string]interface{}) (string, []interface{}) {
+func withSearchFilter(filter FilterOptions) (string, []interface{}) {
 	whereArgs := []interface{}{}
-
 	statements := []string{}
-	for _, filterField := range filterFields {
-		// If the filterField is in the filter and it's not empty, append
-		value, ok := filter[filterField]
-		if ok && value != nil {
-			st := filterField + " = ?"
-			statements = append(statements, st)
-			whereArgs = append(whereArgs, value)
-		}
+
+	if filter.Checkpoint != nil {
+		statements = append(statements, "Checkpoint = ?")
+		whereArgs = append(whereArgs, *filter.Checkpoint)
+	}
+
+	if filter.IsOffline != nil {
+		statements = append(statements, "IsOffline = ?")
+		whereArgs = append(whereArgs, *filter.IsOffline)
+	}
+
+	if filter.TransferType != nil {
+		statements = append(statements, "TransferType = ?")
+		whereArgs = append(whereArgs, *filter.TransferType)
+	}
+
+	if filter.VerifiedDeal != nil {
+		statements = append(statements, "VerifiedDeal = ?")
+		whereArgs = append(whereArgs, *filter.VerifiedDeal)
 	}
 
 	if len(statements) == 0 {

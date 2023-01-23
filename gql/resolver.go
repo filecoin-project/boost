@@ -143,18 +143,11 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 		query = *args.Query.Value
 	}
 
-	filter := map[string]interface{}{}
-	if args.Filter.Checkpoint.String != "" {
-		filter["Checkpoint"] = args.Filter.Checkpoint.String
-	}
-	if args.Filter.IsOffline.Set && args.Filter.IsOffline.Value != nil {
-		filter["IsOffline"] = args.Filter.IsOffline.Value
-	}
-	if args.Filter.TransferType.Set && args.Filter.TransferType.Value != nil {
-		filter["TransferType"] = args.Filter.TransferType.Value
-	}
-	if args.Filter.VerifiedDeal.Set && args.Filter.VerifiedDeal.Value != nil {
-		filter["VerifiedDeal"] = args.Filter.VerifiedDeal.Value
+	filter := &db.FilterOptions{
+		Checkpoint:   &args.Filter.Checkpoint.String,
+		IsOffline:    args.Filter.IsOffline.Value,
+		TransferType: args.Filter.TransferType.Value,
+		VerifiedDeal: args.Filter.VerifiedDeal.Value,
 	}
 
 	deals, count, more, err := r.dealList(ctx, query, filter, args.Cursor, offset, limit)
@@ -329,7 +322,7 @@ func (r *resolver) dealsByPublishCID(ctx context.Context, publishCid cid.Cid) ([
 	return deals, nil
 }
 
-func (r *resolver) dealList(ctx context.Context, query string, filter map[string]interface{}, cursor *graphql.ID, offset int, limit int) ([]types.ProviderDealState, int, bool, error) {
+func (r *resolver) dealList(ctx context.Context, query string, filter *db.FilterOptions, cursor *graphql.ID, offset int, limit int) ([]types.ProviderDealState, int, bool, error) {
 	// Fetch one extra deal so that we can check if there are more deals
 	// beyond the limit
 	deals, err := r.dealsDB.List(ctx, query, filter, cursor, offset, limit+1)

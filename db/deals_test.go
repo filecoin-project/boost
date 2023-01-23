@@ -13,6 +13,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func ToFilterOptions(filters map[string]interface{}) *FilterOptions {
+	filter := &FilterOptions{}
+
+	cp, ok := filters["Checkpoint"].(string)
+	if ok {
+		filter.Checkpoint = &cp
+	}
+	io, ok := filters["IsOffline"].(bool)
+	if ok {
+		filter.IsOffline = &io
+	}
+	tt, ok := filters["TransferType"].(string)
+	if ok {
+		filter.TransferType = &tt
+	}
+	vd, ok := filters["VerifiedDeal"].(bool)
+	if ok {
+		filter.VerifiedDeal = &vd
+	}
+
+	return filter
+}
+
 func TestDealsDB(t *testing.T) {
 	req := require.New(t)
 	ctx := context.Background()
@@ -123,7 +146,7 @@ func TestDealsDBSearch(t *testing.T) {
 	tcs := []struct {
 		name   string
 		value  string
-		filter map[string]interface{}
+		filter *FilterOptions
 		count  int
 	}{{
 		name:   "search error",
@@ -183,24 +206,24 @@ func TestDealsDBSearch(t *testing.T) {
 	}, {
 		name:  "filter out isOffline",
 		value: "",
-		filter: map[string]interface{}{
+		filter: ToFilterOptions(map[string]interface{}{
 			"IsOffline": false,
-		},
+		}),
 		count: 0,
 	}, {
 		name:  "filter isOffline",
 		value: "",
-		filter: map[string]interface{}{
+		filter: ToFilterOptions(map[string]interface{}{
 			"IsOffline": true,
-		},
+		}),
 		count: 5,
 	}, {
 		name:  "filter isOffline and IndexedAndAnnounced (in sealing)",
 		value: "",
-		filter: map[string]interface{}{
+		filter: ToFilterOptions(map[string]interface{}{
 			"IsOffline":  true,
-			"Checkpoint": dealcheckpoints.IndexedAndAnnounced,
-		},
+			"Checkpoint": dealcheckpoints.IndexedAndAnnounced.String(),
+		}),
 		count: 0,
 	}}
 	for _, tc := range tcs {
@@ -224,13 +247,13 @@ func TestDealsDBSearch(t *testing.T) {
 
 func TestWithSearchFilter(t *testing.T) {
 	req := require.New(t)
-	filter := map[string]interface{}{
+
+	fo := ToFilterOptions(map[string]interface{}{
 		"Checkpoint":      "Accepted",
 		"IsOffline":       true,
 		"NotAValidFilter": 123,
-	}
-
-	where, whereArgs := withSearchFilter(filter)
+	})
+	where, whereArgs := withSearchFilter(*fo)
 	expectedArgs := []interface{}{
 		"Accepted",
 		true,
@@ -238,10 +261,11 @@ func TestWithSearchFilter(t *testing.T) {
 	req.Equal("(Checkpoint = ? AND IsOffline = ?)", where)
 	req.Equal(expectedArgs, whereArgs)
 
-	where, whereArgs = withSearchFilter(map[string]interface{}{
+	fo = ToFilterOptions(map[string]interface{}{
 		"IsOffline":       nil,
 		"NotAValidFilter": nil,
 	})
+	where, whereArgs = withSearchFilter(*fo)
 
 	req.Equal("", where)
 	req.Equal(0, len(whereArgs))
