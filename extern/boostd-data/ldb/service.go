@@ -267,7 +267,25 @@ func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 	return !t.IsZero(), nil
 }
 
-func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error {
+func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, error) {
+	log.Debugw("handle.is-complete-index", "pieceCid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.is_incomplete_index")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.is-complete-index", "took", fmt.Sprintf("%s", time.Since(now)))
+	}(time.Now())
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return false, normalizePieceCidError(pieceCid, err)
+	}
+
+	return md.CompleteIndex, nil
+}
+
+func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error {
 	log.Debugw("handle.add-index", "records", len(records))
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_index")
@@ -326,6 +344,9 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 	// mark indexing as complete
 	md.Cursor = cursor
 	md.IndexedAt = time.Now()
+	md.CompleteIndex = isCompleteIndex
+	md.Error = ""
+	md.ErrorType = ""
 
 	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
 	if err != nil {

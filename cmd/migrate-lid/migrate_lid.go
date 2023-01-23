@@ -44,7 +44,7 @@ import (
 type StoreMigrationApi interface {
 	Start(ctx context.Context) error
 	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
-	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error
+	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error
 	AddDealForPiece(ctx context.Context, pcid cid.Cid, info model.DealInfo) error
 	ListPieces(ctx context.Context) ([]cid.Cid, error)
 	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
@@ -62,11 +62,20 @@ func checkMigrateType(migrateType string) error {
 	return nil
 }
 
+var commonFlags = []cli.Flag{
+	&cli.StringFlag{
+		Name:     "force",
+		Usage:    "if the index has already been migrated, overwrite it",
+		Required: false,
+	},
+}
+
 var migrateLevelDBCmd = &cli.Command{
 	Name:        "leveldb",
 	Description: "Migrate boost piece information and dagstore to a leveldb store.\n" + desc,
 	Usage:       "migrate-lid leveldb dagstore|pieceinfo",
 	Before:      before,
+	Flags:       commonFlags,
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() == 0 {
 			return fmt.Errorf("must specify either dagstore or pieceinfo migration")
@@ -101,7 +110,7 @@ var migrateCouchDBCmd = &cli.Command{
 	Description: "Migrate boost piece information and dagstore to a couchbase store\n" + desc,
 	Usage:       "migrate-lid couchbase dagstore|pieceinfo",
 	Before:      before,
-	Flags: []cli.Flag{
+	Flags: append(commonFlags, []cli.Flag{
 		&cli.StringFlag{
 			Name:     "connect-string",
 			Usage:    "couchbase connect string eg 'couchbase://127.0.0.1'",
@@ -130,7 +139,7 @@ var migrateCouchDBCmd = &cli.Command{
 			Usage: "megabytes of ram allocated to piece offsets couchbase bucket (recommended at least 1024)",
 			Value: 1024,
 		},
-	},
+	}...),
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() == 0 {
 			return fmt.Errorf("must specify either dagstore or pieceinfo migration")
@@ -212,7 +221,7 @@ func migrate(cctx *cli.Context, dbType string, store StoreMigrationApi, migrateT
 	if migrateType == "dagstore" {
 		// Migrate the indices
 		bar.Describe("Migrating indices...")
-		errCount, err := migrateIndices(ctx, logger, bar, repoDir, store)
+		errCount, err := migrateIndices(ctx, logger, bar, repoDir, store, cctx.Bool("force"))
 		if errCount > 0 {
 			msg := fmt.Sprintf("Warning: there were errors migrating %d indices.", errCount)
 			msg += " See the log for details:\n" + logPath
@@ -241,7 +250,7 @@ func migrate(cctx *cli.Context, dbType string, store StoreMigrationApi, migrateT
 	return nil
 }
 
-func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store StoreMigrationApi) (int, error) {
+func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store StoreMigrationApi, force bool) (int, error) {
 	indicesPath := path.Join(repoDir, "dagstore", "index")
 	logger.Infof("migrating dagstore indices at %s", indicesPath)
 
@@ -264,7 +273,7 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 
 		start := time.Now()
 
-		indexed, err := migrateIndex(ctx, ipath, store)
+		indexed, err := migrateIndex(ctx, ipath, store, force)
 		bar.Add(1) //nolint:errcheck
 		if err != nil {
 			logger.Errorw("migrate index failed", "piece cid", ipath.name, "err", err)
@@ -287,19 +296,21 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 	return errCount, nil
 }
 
-func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi) (bool, error) {
+func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, force bool) (bool, error) {
 	pieceCid, err := cid.Parse(ipath.name)
 	if err != nil {
 		return false, fmt.Errorf("parsing index name %s as cid: %w", ipath.name, err)
 	}
 
-	// Check if the index has already been migrated
-	isIndexed, err := store.IsIndexed(ctx, pieceCid)
-	if err != nil {
-		return false, fmt.Errorf("checking if index %s is already migrated: %w", ipath.path, err)
-	}
-	if isIndexed {
-		return false, nil
+	if !force {
+		// Check if the index has already been migrated
+		isIndexed, err := store.IsIndexed(ctx, pieceCid)
+		if err != nil {
+			return false, fmt.Errorf("checking if index %s is already migrated: %w", ipath.path, err)
+		}
+		if isIndexed {
+			return false, nil
+		}
 	}
 
 	// Load the index file
@@ -321,7 +332,7 @@ func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi) (
 
 	// Add the index to the store
 	addStart := time.Now()
-	err = store.AddIndex(ctx, pieceCid, records)
+	err = store.AddIndex(ctx, pieceCid, records, false)
 	if err != nil {
 		return false, fmt.Errorf("adding index %s to store: %w", ipath.path, err)
 	}

@@ -335,13 +335,14 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr err
 	})
 }
 
-func (db *DB) MarkIndexingComplete(ctx context.Context, pieceCid cid.Cid, blockCount int) error {
+func (db *DB) MarkIndexingComplete(ctx context.Context, pieceCid cid.Cid, blockCount int, isCompleteIndex bool) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.mark_indexing_complete")
 	defer span.End()
 
 	return db.mutatePieceMetadata(ctx, pieceCid, "mark-indexing-complete", func(metadata CouchbaseMetadata) *CouchbaseMetadata {
 		// Mark indexing as complete
 		metadata.IndexedAt = time.Now()
+		metadata.CompleteIndex = isCompleteIndex
 		metadata.BlockCount = blockCount
 		metadata.Error = ""
 		metadata.ErrorType = ""
