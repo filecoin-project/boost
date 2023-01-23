@@ -128,7 +128,25 @@ function FlaggedPieces({setSearchQuery}) {
 }
 
 function FlaggedPieceRow({piece}) {
-    var isUnsealed = hasUnsealedCopy(piece)
+    // Lookup the piece by piece CID.
+    // We do this asynchronously instead of as part of the list query so that
+    // checking for unseal status of each piece doesn't block the whole page.
+    const { loading, error, data } = useQuery(PieceStatusQuery, {
+        variables: {
+            pieceCid: piece.PieceCid,
+        },
+    })
+
+    var isUnsealedMsg
+    if (loading) {
+        isUnsealedMsg = '...'
+    } else if (error) {
+        isUnsealedMsg = error.Message
+    } else if (data && data.pieceStatus) {
+        const isUnsealed = hasUnsealedCopy(data.pieceStatus)
+        isUnsealedMsg = isUnsealed ? 'Yes' : 'No'
+    }
+
     return <tr>
         <td>
             <Link to={"/inspect/piece/"+piece.PieceCid}>
@@ -136,7 +154,7 @@ function FlaggedPieceRow({piece}) {
             </Link>
         </td>
         <td>{piece.IndexStatus.Status}</td>
-        <td>{isUnsealed ? 'Yes' : 'No'}</td>
+        <td>{isUnsealedMsg}</td>
         <td>{piece.Deals.length}</td>
     </tr>
 }

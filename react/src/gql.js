@@ -407,10 +407,6 @@ const FlaggedPiecesQuery = gql`
                         Error
                     }
                     Deals {
-                        SealStatus {
-                            IsUnsealed
-                            Error
-                        }
                         Deal {
                             ID
                             IsLegacy
