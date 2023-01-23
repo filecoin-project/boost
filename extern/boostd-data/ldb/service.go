@@ -66,7 +66,7 @@ func (s *Store) Start(ctx context.Context) error {
 		return err
 	}
 
-	log.Debugw("new leveldb piece directory service", "repo path", repopath)
+	log.Debugw("new leveldb local index directory service", "repo path", repopath)
 	return nil
 }
 

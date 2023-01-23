@@ -38,57 +38,57 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 		var svcCtx context.Context
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				if cfg.PieceDirectory.ServiceApiInfo != "" {
-					return client.Dial(ctx, cfg.PieceDirectory.ServiceApiInfo)
+				if cfg.LocalIndexDirectory.ServiceApiInfo != "" {
+					return client.Dial(ctx, cfg.LocalIndexDirectory.ServiceApiInfo)
 				}
 
-				port := int(cfg.PieceDirectory.EmbeddedServicePort)
+				port := int(cfg.LocalIndexDirectory.EmbeddedServicePort)
 				if port == 0 {
-					return fmt.Errorf("starting piece directory client:" +
-						"either PieceDirectory.ServiceApiInfo must be defined or " +
-						"PieceDirectory.EmbeddedServicePort must be non-zero")
+					return fmt.Errorf("starting local index directory client:" +
+						"either LocalIndexDirectory.ServiceApiInfo must be defined or " +
+						"LocalIndexDirectory.EmbeddedServicePort must be non-zero")
 				}
 
 				svcCtx, cancel = context.WithCancel(ctx)
 
 				var bdsvc *svc.Service
-				if cfg.PieceDirectory.Couchbase.ConnectString != "" {
-					log.Infow("piece-directory: connecting to couchbase server",
-						"connect-string", cfg.PieceDirectory.Couchbase.ConnectString)
+				if cfg.LocalIndexDirectory.Couchbase.ConnectString != "" {
+					log.Infow("local index directory: connecting to couchbase server",
+						"connect-string", cfg.LocalIndexDirectory.Couchbase.ConnectString)
 
 					// If the couchbase connect string is defined, set up a
-					// piece directory service that connects to the couchbase db
+					// local index directory service that connects to the couchbase db
 					bdsvc = svc.NewCouchbase(couchbase.DBSettings{
-						ConnectString: cfg.PieceDirectory.Couchbase.ConnectString,
+						ConnectString: cfg.LocalIndexDirectory.Couchbase.ConnectString,
 						Auth: couchbase.DBSettingsAuth{
-							Username: cfg.PieceDirectory.Couchbase.Username,
-							Password: cfg.PieceDirectory.Couchbase.Password,
+							Username: cfg.LocalIndexDirectory.Couchbase.Username,
+							Password: cfg.LocalIndexDirectory.Couchbase.Password,
 						},
 						PieceMetadataBucket: couchbase.DBSettingsBucket{
-							RAMQuotaMB: cfg.PieceDirectory.Couchbase.PieceMetadataBucket.RAMQuotaMB,
+							RAMQuotaMB: cfg.LocalIndexDirectory.Couchbase.PieceMetadataBucket.RAMQuotaMB,
 						},
 						MultihashToPiecesBucket: couchbase.DBSettingsBucket{
-							RAMQuotaMB: cfg.PieceDirectory.Couchbase.MultihashToPiecesBucket.RAMQuotaMB,
+							RAMQuotaMB: cfg.LocalIndexDirectory.Couchbase.MultihashToPiecesBucket.RAMQuotaMB,
 						},
 						PieceOffsetsBucket: couchbase.DBSettingsBucket{
-							RAMQuotaMB: cfg.PieceDirectory.Couchbase.PieceOffsetsBucket.RAMQuotaMB,
+							RAMQuotaMB: cfg.LocalIndexDirectory.Couchbase.PieceOffsetsBucket.RAMQuotaMB,
 						},
 					})
 				} else {
-					log.Infow("piece-directory: connecting to leveldb instance")
+					log.Infow("local index directory: connecting to leveldb instance")
 
-					// Setup a piece directory service that connects to the leveldb
+					// Setup a local index directory service that connects to the leveldb
 					var err error
 					bdsvc, err = svc.NewLevelDB(r.Path())
 					if err != nil {
-						return fmt.Errorf("creating leveldb piece directory: %w", err)
+						return fmt.Errorf("creating leveldb local index directory: %w", err)
 					}
 				}
 
-				// Start the embedded piece directory service
+				// Start the embedded local index directory service
 				err := bdsvc.Start(svcCtx, port)
 				if err != nil {
-					return fmt.Errorf("starting piece directory service: %w", err)
+					return fmt.Errorf("starting local index directory service: %w", err)
 				}
 
 				// Connect to the embedded service
@@ -109,7 +109,7 @@ func NewPieceDirectory(cfg *config.Boost) func(maddr dtypes.MinerAddress, store 
 	return func(maddr dtypes.MinerAddress, store types.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
 		sa := sectoraccessor.NewSectorAccessor(maddr, secb, pp, full)
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		return piecedirectory.NewPieceDirectory(store, pr, cfg.PieceDirectory.ParallelAddIndexLimit)
+		return piecedirectory.NewPieceDirectory(store, pr, cfg.LocalIndexDirectory.ParallelAddIndexLimit)
 	}
 }
 

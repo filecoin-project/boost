@@ -19,11 +19,11 @@ type SealingApi interface {
 	IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error)
 }
 
-// The Doctor periodically queries the piece directory for piece cids, and runs
+// The Doctor periodically queries the local index directory for piece cids, and runs
 // checks against those pieces. If there is a problem with a piece, it is
 // flagged, so that it can be surfaced to the user.
 // Note that multiple Doctor processes can run in parallel. The logic for which
-// pieces to give to the Doctor to check is in the piece directory.
+// pieces to give to the Doctor to check is in the local index directory.
 type Doctor struct {
 	store types.Store
 	sapi  SealingApi
@@ -48,7 +48,7 @@ func (d *Doctor) Run(ctx context.Context) {
 		}
 
 		// Get the next pieces to check (eg pieces that haven't been checked
-		// for a while) from the piece directory
+		// for a while) from the local index directory
 		pcids, err := d.store.NextPiecesToCheck(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
@@ -83,7 +83,7 @@ func (d *Doctor) Run(ctx context.Context) {
 func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 	md, err := d.store.GetPieceMetadata(ctx, pieceCid)
 	if err != nil {
-		return fmt.Errorf("failed to get piece %s from piece directory: %w", pieceCid, err)
+		return fmt.Errorf("failed to get piece %s from local index directory: %w", pieceCid, err)
 	}
 
 	// Check if the piece is in an error state

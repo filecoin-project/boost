@@ -214,7 +214,7 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 }
 
 func (r *resolver) pieceStatus(ctx context.Context, pieceCid cid.Cid, allLegacyDeals []storagemarket.MinerDeal) (*pieceResolver, error) {
-	// Get piece info from piece directory
+	// Get piece info from local index directory
 	pieceInfo, err := r.piecedirectory.GetPieceMetadata(ctx, pieceCid)
 	if err != nil && !types.IsNotFound(err) {
 		return nil, err
@@ -234,7 +234,7 @@ func (r *resolver) pieceStatus(ctx context.Context, pieceCid cid.Cid, allLegacyD
 		}
 	}
 
-	// Convert piece directory deals to graphQL format
+	// Convert local index directory deals to graphQL format
 	var pids []*pieceInfoDeal
 	for _, dl := range pieceInfo.Deals {
 		// Check the sealing status of each deal

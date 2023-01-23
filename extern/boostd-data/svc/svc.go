@@ -42,7 +42,7 @@ func NewLevelDB(repoPath string) (*Service, error) {
 }
 
 func MakeLevelDBDir(repoPath string) (string, error) {
-	repoPath = path.Join(repoPath, "piece-directory", "leveldb")
+	repoPath = path.Join(repoPath, "lid", "leveldb")
 	if err := os.MkdirAll(repoPath, os.ModePerm); err != nil {
 		return "", fmt.Errorf("creating leveldb repo directory %s: %w", repoPath, err)
 	}
@@ -53,12 +53,12 @@ func (s *Service) Start(ctx context.Context, port int) error {
 	addr := fmt.Sprintf("localhost:%d", port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("setting up listener for piece directory service: %w", err)
+		return fmt.Errorf("setting up listener for local index directory service: %w", err)
 	}
 
 	err = s.impl.Start(ctx)
 	if err != nil {
-		return fmt.Errorf("starting piece directory service: %w", err)
+		return fmt.Errorf("starting local index directory service: %w", err)
 	}
 
 	server := jsonrpc.NewServer()
@@ -67,13 +67,13 @@ func (s *Service) Start(ctx context.Context, port int) error {
 	router.Handle("/", server)
 
 	srv := &http.Server{Handler: router}
-	log.Infow("piece directory server is listening", "addr", ln.Addr())
+	log.Infow("local index directory server is listening", "addr", ln.Addr())
 
 	done := make(chan struct{})
 	go func() {
 		err = srv.Serve(ln)
 		if err != nil && err != http.ErrServerClosed {
-			log.Errorf("exiting piece directory server: %s", err)
+			log.Errorf("exiting local index directory server: %s", err)
 		}
 
 		done <- struct{}{}
@@ -87,7 +87,7 @@ func (s *Service) Start(ctx context.Context, port int) error {
 		defer cancel()
 
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			log.Errorf("shutting down piece directory server: %s", err)
+			log.Errorf("shutting down local index directory server: %s", err)
 		}
 
 		<-done

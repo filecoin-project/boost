@@ -12,8 +12,8 @@ import (
 )
 
 var pieceDirCmd = &cli.Command{
-	Name:  "piecedir",
-	Usage: "Manage Piece Directory",
+	Name:  "lid",
+	Usage: "Manage Local Index Directory",
 	Subcommands: []*cli.Command{
 		pdIndexGenerate,
 		pdIndexMarkErroredCmd,
@@ -59,7 +59,7 @@ var pdIndexGenerate = &cli.Command{
 
 var pdIndexMarkErroredCmd = &cli.Command{
 	Name:  "mark-index",
-	Usage: "Mark an index errored for a given piece in the piece directory",
+	Usage: "Mark an index errored for a given piece in the local index directory",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "piece-cid",
