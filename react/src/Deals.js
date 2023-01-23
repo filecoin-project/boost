@@ -67,7 +67,7 @@ function StorageDealsContent(props) {
     const dealListOffset = (pageNum-1) * dealsPerPage
     const queryCursor = (pageNum === 1) ? null : params.cursor
     const {loading, error, data} = useQuery(DealsListQuery, {
-        pollInterval: searchQuery ? undefined : 1000,
+        pollInterval: searchQuery ? undefined : 10000,
         variables: {
             query: searchQuery,
             cursor: queryCursor,
@@ -135,7 +135,7 @@ function StorageDealsContent(props) {
 
 function LegacyDealsLink(props) {
     const {data} = useQuery(LegacyDealsCountQuery, {
-        pollInterval: 5000,
+        pollInterval: 10000,
         fetchPolicy: 'network-only',
     })
 
@@ -240,7 +240,7 @@ function TransferRate({deal}) {
 
 export function StorageDealsMenuItem(props) {
     const {data} = useQuery(DealsCountQuery, {
-        pollInterval: 5000,
+        pollInterval: 10000,
         fetchPolicy: 'network-only',
     })
 
