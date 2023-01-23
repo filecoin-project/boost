@@ -78,10 +78,12 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/conngater"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 //nolint:deadcode,varcheck
 var log = logging.Logger("builder")
+var fxlog = logging.Logger("fxlog")
 
 // special is a type used to give keys to modules which
 //
@@ -386,7 +388,9 @@ func New(ctx context.Context, opts ...Option) (StopFunc, error) {
 		fx.Options(ctors...),
 		fx.Options(settings.invokes...),
 
-		fx.NopLogger,
+		fx.WithLogger(func() fxevent.Logger {
+			return &fxevent.ZapLogger{Logger: fxlog.Desugar()}
+		}),
 	)
 
 	// TODO: we probably should have a 'firewall' for Closing signal
