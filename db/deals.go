@@ -238,7 +238,7 @@ func (d *DealsDB) Count(ctx context.Context, query string, filter map[string]int
 		whereArgs = append(whereArgs, searchArgs...)
 	}
 
-	if filter != nil {
+	if len(filter) > 0 {
 		filterWhere, filterArgs := withSearchFilter(filter)
 
 		if query != "" {
@@ -284,7 +284,7 @@ func (d *DealsDB) List(ctx context.Context, query string, filter map[string]inte
 		whereArgs = append(whereArgs, searchArgs...)
 	}
 
-	if filter != nil {
+	if len(filter) > 0 {
 		if where != "" {
 			where += " AND "
 		}

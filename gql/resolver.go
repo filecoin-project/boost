@@ -111,15 +111,22 @@ func (r *resolver) Deal(ctx context.Context, args struct{ ID graphql.ID }) (*dea
 	return newDealResolver(deal, r.provider, r.dealsDB, r.logsDB, r.spApi), nil
 }
 
+type filterArgs struct {
+	Checkpoint   gqltypes.Checkpoint
+	IsOffline    graphql.NullBool
+	TransferType graphql.NullString
+	VerifiedDeal graphql.NullBool
+}
+
 type dealsArgs struct {
 	Query  graphql.NullString
-	Filter graphql.Schema
+	Filter *filterArgs
 	Cursor *graphql.ID
 	Offset graphql.NullInt
 	Limit  graphql.NullInt
 }
 
-// query: deals(cursor, offset, limit) DealList
+// query: deals(query, filter, cursor, offset, limit) DealList
 func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver, error) {
 	offset := 0
 	if args.Offset.Set && args.Offset.Value != nil && *args.Offset.Value > 0 {
@@ -136,9 +143,21 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 		query = *args.Query.Value
 	}
 
-	// TODO: Pull the filters
+	filter := map[string]interface{}{}
+	if args.Filter.Checkpoint.String != "" {
+		filter["Checkpoint"] = args.Filter.Checkpoint.String
+	}
+	if args.Filter.IsOffline.Set && args.Filter.IsOffline.Value != nil {
+		filter["IsOffline"] = args.Filter.IsOffline.Value
+	}
+	if args.Filter.TransferType.Set && args.Filter.TransferType.Value != nil {
+		filter["TransferType"] = args.Filter.TransferType.Value
+	}
+	if args.Filter.VerifiedDeal.Set && args.Filter.VerifiedDeal.Value != nil {
+		filter["VerifiedDeal"] = args.Filter.VerifiedDeal.Value
+	}
 
-	deals, count, more, err := r.dealList(ctx, query, nil, args.Cursor, offset, limit)
+	deals, count, more, err := r.dealList(ctx, query, filter, args.Cursor, offset, limit)
 	if err != nil {
 		return nil, err
 	}
