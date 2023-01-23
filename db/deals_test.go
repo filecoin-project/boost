@@ -237,4 +237,12 @@ func TestWithSearchFilter(t *testing.T) {
 	}
 	req.Equal("(Checkpoint = ? AND IsOffline = ?)", where)
 	req.Equal(expectedArgs, whereArgs)
+
+	where, whereArgs = withSearchFilter(map[string]interface{}{
+		"IsOffline":       nil,
+		"NotAValidFilter": nil,
+	})
+
+	req.Equal("", where)
+	req.Equal(0, len(whereArgs))
 }

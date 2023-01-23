@@ -306,15 +306,18 @@ func withSearchFilter(filter map[string]interface{}) (string, []interface{}) {
 	for _, filterField := range filterFields {
 		// If the filterField is in the filter and it's not empty, append
 		value, ok := filter[filterField]
-		if ok {
+		if ok && value != nil {
 			st := filterField + " = ?"
 			statements = append(statements, st)
 			whereArgs = append(whereArgs, value)
 		}
 	}
 
-	where := "(" + strings.Join(statements, " AND ") + ")"
+	if len(statements) == 0 {
+		return "", whereArgs
+	}
 
+	where := "(" + strings.Join(statements, " AND ") + ")"
 	return where, whereArgs
 }
 
