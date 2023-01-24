@@ -43,7 +43,7 @@ type FilterOptions struct {
 	Checkpoint   *string
 	IsOffline    *bool
 	TransferType *string
-	VerifiedDeal *bool
+	IsVerified   *bool
 }
 
 func (d *DealsDB) newDealDef(deal *types.ProviderDealState) *dealAccessor {
@@ -323,9 +323,9 @@ func withSearchFilter(filter FilterOptions) (string, []interface{}) {
 		whereArgs = append(whereArgs, *filter.TransferType)
 	}
 
-	if filter.VerifiedDeal != nil {
+	if filter.IsVerified != nil {
 		statements = append(statements, "VerifiedDeal = ?")
-		whereArgs = append(whereArgs, *filter.VerifiedDeal)
+		whereArgs = append(whereArgs, *filter.IsVerified)
 	}
 
 	if len(statements) == 0 {

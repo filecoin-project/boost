@@ -115,7 +115,7 @@ type filterArgs struct {
 	Checkpoint   gqltypes.Checkpoint
 	IsOffline    graphql.NullBool
 	TransferType graphql.NullString
-	VerifiedDeal graphql.NullBool
+	IsVerified   graphql.NullBool
 }
 
 type dealsArgs struct {
@@ -143,11 +143,14 @@ func (r *resolver) Deals(ctx context.Context, args dealsArgs) (*dealListResolver
 		query = *args.Query.Value
 	}
 
-	filter := &db.FilterOptions{
-		Checkpoint:   &args.Filter.Checkpoint.String,
-		IsOffline:    args.Filter.IsOffline.Value,
-		TransferType: args.Filter.TransferType.Value,
-		VerifiedDeal: args.Filter.VerifiedDeal.Value,
+	var filter *db.FilterOptions
+	if args.Filter != nil {
+		filter = &db.FilterOptions{
+			Checkpoint:   args.Filter.Checkpoint.Value,
+			IsOffline:    args.Filter.IsOffline.Value,
+			TransferType: args.Filter.TransferType.Value,
+			IsVerified:   args.Filter.IsVerified.Value,
+		}
 	}
 
 	deals, count, more, err := r.dealList(ctx, query, filter, args.Cursor, offset, limit)

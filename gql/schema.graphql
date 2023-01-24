@@ -395,10 +395,10 @@ input StorageAskUpdate {
 }
 
 input DealFilter {
-  Checkpoint: Checkpoint!
+  Checkpoint: Checkpoint
   IsOffline: Boolean
   TransferType: String
-  VerifiedDeal: Boolean
+  IsVerified: Boolean
 }
 
 type RootQuery {

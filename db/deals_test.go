@@ -28,9 +28,9 @@ func ToFilterOptions(filters map[string]interface{}) *FilterOptions {
 	if ok {
 		filter.TransferType = &tt
 	}
-	vd, ok := filters["VerifiedDeal"].(bool)
+	vd, ok := filters["IsVerified"].(bool)
 	if ok {
-		filter.VerifiedDeal = &vd
+		filter.IsVerified = &vd
 	}
 
 	return filter

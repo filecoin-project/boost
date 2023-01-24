@@ -1,13 +1,15 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 )
 
 type Checkpoint struct {
-	String string
+	Value *string
+	Set   bool
 }
 
 // ImplementsGraphQLType maps this custom Go type
@@ -20,17 +22,32 @@ func (Checkpoint) ImplementsGraphQLType(name string) bool {
 //
 // This function will be called whenever you use the
 // Checkpoint scalar as an input
-func (n *Checkpoint) UnmarshalGraphQL(input interface{}) error {
-	cp, err := dealcheckpoints.FromString(input.(string))
-	n.String = cp.String()
-	return err
+func (cp *Checkpoint) UnmarshalGraphQL(input interface{}) error {
+	cp.Set = true
+
+	if input == nil {
+		return nil
+	}
+
+	switch v := input.(type) {
+	case string:
+		_, err := dealcheckpoints.FromString(input.(string))
+		if err != nil {
+			return fmt.Errorf("invalid Checkpoint value: %T", v)
+		}
+		cp.Value = &v
+		return nil
+	default:
+		return fmt.Errorf("wrong type for Checkpoint: %T", v)
+	}
 }
 
 // MarshalJSON is a custom marshaler for Checkpoint
 //
 // This function will be called whenever you
 // query for fields that use the Checkpoint type
-func (n Checkpoint) MarshalJSON() ([]byte, error) {
-	json := fmt.Sprintf(`{"__typename": "Checkpoint", "n": "%s"}`, n.String)
-	return []byte(json), nil
+func (cp Checkpoint) MarshalJSON() ([]byte, error) {
+	return json.Marshal(*cp.Value)
 }
+
+func (cp *Checkpoint) Nullable() {}
