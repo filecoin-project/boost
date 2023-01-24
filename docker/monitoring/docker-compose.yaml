@@ -7,7 +7,7 @@ networks:
 services:
   tempo:
     container_name: tempo
-    image: grafana/tempo:latest
+    image: grafana/tempo:r69-9a5eacf
     command: [ "-search.enabled=true", "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./tempo-local.yaml:/etc/tempo.yaml
