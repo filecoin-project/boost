@@ -44,7 +44,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -122,7 +122,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.5, sum(irate(boost_api_request_duration_ms_bucket{job=\"boost\", host=~\"$host\"}[$__rate_interval]) * 15) by (le))",
@@ -134,7 +134,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(irate(boost_api_request_duration_ms_bucket{job=\"boost\", host=~\"$host\"}[$__rate_interval]) * 15) by (le))",
@@ -146,7 +146,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.98, sum(irate(boost_api_request_duration_ms_bucket{job=\"boost\", host=~\"$host\"}[$__rate_interval]) * 15) by (le))",
@@ -162,7 +162,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -245,7 +245,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_goroutines{job=~\"boost\", host=~\"$host\"}",
@@ -273,7 +273,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -352,7 +352,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(booster_bitswap_bitswap_rbls_get_request_count{}[$__rate_interval]) * 15",
@@ -367,7 +367,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -446,7 +446,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(booster_bitswap_bitswap_rbls_has_request_count{}[$__rate_interval]) * 15",
@@ -461,7 +461,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -540,7 +540,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(booster_bitswap_bitswap_rbls_getsize_request_count{}[$__rate_interval]) * 15",
@@ -555,7 +555,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -634,7 +634,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(booster_bitswap_bitswap_rbls_get_success_response_count{}[$__rate_interval]) * 15",
@@ -645,7 +645,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(booster_bitswap_bitswap_rbls_get_fail_response_count{}[$__rate_interval]) * 15",
@@ -661,7 +661,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -740,7 +740,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(booster_bitswap_bitswap_rbls_has_success_response_count{}[$__rate_interval]) * 15",
@@ -751,7 +751,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(booster_bitswap_bitswap_rbls_has_fail_response_count{}[$__rate_interval]) * 15",
@@ -767,7 +767,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -846,7 +846,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(booster_bitswap_bitswap_rbls_getsize_success_response_count{}[$__rate_interval]) * 15",
@@ -857,7 +857,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(booster_bitswap_bitswap_rbls_getsize_fail_response_count{}[$__rate_interval]) * 15",
@@ -873,7 +873,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -954,7 +954,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "sum((irate(booster_bitswap_bitswap_rbls_get_success_response_count{}[$__rate_interval]) * 15) + (irate(booster_bitswap_bitswap_rbls_has_success_response_count{}[$__rate_interval]) * 15) + (irate(booster_bitswap_bitswap_rbls_getsize_success_response_count{}[$__rate_interval]) * 15)) / sum((irate(booster_bitswap_bitswap_rbls_get_request_count{}[$__rate_interval]) * 15) + (irate(booster_bitswap_bitswap_rbls_has_request_count{}[$__rate_interval]) * 15) + (irate(booster_bitswap_bitswap_rbls_getsize_request_count{}[$__rate_interval]) * 15))",
@@ -965,7 +965,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "sum((irate(booster_bitswap_bitswap_rbls_get_fail_response_count{}[$__rate_interval]) * 15) + (irate(booster_bitswap_bitswap_rbls_has_fail_response_count{}[$__rate_interval]) * 15) + (irate(booster_bitswap_bitswap_rbls_getsize_fail_response_count{}[$__rate_interval]) * 15)) / sum((irate(booster_bitswap_bitswap_rbls_get_request_count{}[$__rate_interval]) * 15) + (irate(booster_bitswap_bitswap_rbls_has_request_count{}[$__rate_interval]) * 15) + (irate(booster_bitswap_bitswap_rbls_getsize_request_count{}[$__rate_interval]) * 15))",
@@ -981,7 +981,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -1061,7 +1061,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "(irate(booster_bitswap_bitswap_rbls_get_success_response_count{}[$__rate_interval]) * 15) / (irate(booster_bitswap_bitswap_rbls_get_request_count{}[$__rate_interval]) * 15)",
@@ -1072,7 +1072,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "(irate(booster_bitswap_bitswap_rbls_get_fail_response_count{}[$__rate_interval]) * 15) / (irate(booster_bitswap_bitswap_rbls_get_request_count{}[$__rate_interval]) * 15)",
@@ -1088,7 +1088,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -1168,7 +1168,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "(irate(booster_bitswap_bitswap_rbls_has_success_response_count{}[$__rate_interval]) * 15) / (irate(booster_bitswap_bitswap_rbls_has_request_count{}[$__rate_interval]) * 15)",
@@ -1179,7 +1179,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "(irate(booster_bitswap_bitswap_rbls_has_fail_response_count{}[$__rate_interval]) * 15) / (irate(booster_bitswap_bitswap_rbls_has_fail_count{}[$__rate_interval]) * 15)",
@@ -1195,7 +1195,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -1275,7 +1275,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "(irate(booster_bitswap_bitswap_rbls_getsize_success_response_count{}[$__rate_interval]) * 15) / (irate(booster_bitswap_bitswap_rbls_getsize_request_count{}[$__rate_interval]) * 15)",
@@ -1286,7 +1286,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "(irate(booster_bitswap_bitswap_rbls_getsize_fail_response_count{}[$__rate_interval]) * 15) / (irate(booster_bitswap_bitswap_rbls_getsize_fail_count{}[$__rate_interval]) * 15)",
@@ -1302,7 +1302,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -1383,7 +1383,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_goroutines{job=\"booster-bitswap\", host=~\"$host\"}",
@@ -1408,7 +1408,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -1513,7 +1513,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "irate(booster_http_http_payload_by_cid_request_count{host=~\"$host\"}[$__rate_interval]) * 15",
@@ -1528,7 +1528,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -1633,7 +1633,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "irate(booster_http_http_piece_by_cid_request_count{host=~\"$host\"}[$__rate_interval]) * 15",
@@ -1648,7 +1648,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -1727,7 +1727,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "irate(booster_http_http_payload_by_cid_200_response_count{host=~\"$host\"}[$__rate_interval]) * 15",
@@ -1738,7 +1738,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "irate(booster_http_http_payload_by_cid_400_response_count{host=~\"$host\"}[$__rate_interval]) * 15",
@@ -1750,7 +1750,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "irate(booster_http_http_payload_by_cid_404_response_count{host=~\"$host\"}[$__rate_interval]) * 15",
@@ -1762,7 +1762,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "irate(booster_http_http_payload_by_cid_500_response_count{host=~\"$host\"}[$__rate_interval]) * 15",
@@ -1778,7 +1778,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -1857,7 +1857,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "irate(booster_http_http_piece_by_cid_200_response_count{host=~\"$host\"}[$__rate_interval]) * 15",
@@ -1868,7 +1868,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "irate(booster_http_http_piece_by_cid_400_response_count{host=~\"$host\"}[$__rate_interval]) * 15",
@@ -1880,7 +1880,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "irate(booster_http_http_piece_by_cid_404_response_count{host=~\"$host\"}[$__rate_interval]) * 15",
@@ -1892,7 +1892,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "irate(booster_http_http_piece_by_cid_500_response_count{host=~\"$host\"}[$__rate_interval]) * 15",
@@ -1908,7 +1908,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -1981,7 +1981,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "exemplar": false,
@@ -1996,7 +1996,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "histogram_quantile(0.95, sum(irate(booster_http_http_payload_by_cid_request_duration_ms_bucket{host=~\"$host\"}[$__rate_interval]) * 15) by (le))",
@@ -2008,7 +2008,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "histogram_quantile(0.98, sum(irate(booster_http_http_payload_by_cid_request_duration_ms_bucket{host=~\"$host\"}[$__rate_interval]) * 15) by (le))",
@@ -2024,7 +2024,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -2097,7 +2097,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "histogram_quantile(0.5, sum(irate(booster_http_http_piece_by_cid_request_duration_ms_bucket{host=~\"$host\"}[$__rate_interval]) * 15) by (le))",
@@ -2109,7 +2109,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "histogram_quantile(0.95, sum(irate(booster_http_http_piece_by_cid_request_duration_ms_bucket{host=~\"$host\"}[$__rate_interval]) * 15) by (le))",
@@ -2121,7 +2121,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "histogram_quantile(0.98, sum(irate(booster_http_http_piece_by_cid_request_duration_ms_bucket{host=~\"$host\"}[$__rate_interval]) * 15) by (le))",
@@ -2137,7 +2137,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -2217,7 +2217,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_goroutines{job=~\"booster-http\", host=~\"$host\"}",
@@ -2249,7 +2249,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "description": "PieceReader init count",
       "fieldConfig": {
@@ -2330,7 +2330,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(boost_dagstore_pr_init_count{job=~\"boost\", host=~\"$host\"}[$__rate_interval]) * 15",
@@ -2345,7 +2345,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "description": "PieceReader requested bytes",
       "fieldConfig": {
@@ -2427,7 +2427,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(boost_dagstore_pr_requested_bytes{job=~\"boost\", host=~\"$host\"}[$__rate_interval]) * 15",
@@ -2442,7 +2442,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "description": "PieceReader discard count",
       "fieldConfig": {
@@ -2522,7 +2522,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(boost_dagstore_pr_discard_count{job=~\"boost\", host=~\"$host\"}[$__rate_interval]) * 15",
@@ -2537,7 +2537,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "description": "PieceReader discarded bytes",
       "fieldConfig": {
@@ -2618,7 +2618,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(boost_dagstore_pr_discarded_bytes{job=~\"boost\", host=~\"$host\"}[$__rate_interval]) * 15",
@@ -2633,7 +2633,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "description": "PieceReader seek back count",
       "fieldConfig": {
@@ -2712,7 +2712,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(boost_dagstore_pr_seek_back_count{job=~\"boost\", host=~\"$host\"}[$__rate_interval]) * 15",
@@ -2727,7 +2727,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "description": "PieceReader seek back bytes",
       "fieldConfig": {
@@ -2806,7 +2806,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(boost_dagstore_pr_seek_back_bytes{job=~\"boost\", host=~\"$host\"}[$__rate_interval]) * 15",
@@ -2821,7 +2821,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "description": "PieceReader seek forward count",
       "fieldConfig": {
@@ -2901,7 +2901,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(boost_dagstore_pr_seek_forward_count{job=~\"boost\", host=~\"$host\"}[$__rate_interval]) * 15",
@@ -2916,7 +2916,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "description": "PieceReader seek forward bytes",
       "fieldConfig": {
@@ -2996,7 +2996,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "irate(boost_dagstore_pr_seek_forward_bytes{job=~\"boost\", host=~\"$host\"}[$__rate_interval]) * 15",
@@ -3024,7 +3024,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "3fdT3-V4z"
+          "uid": "prom1234"
         },
         "definition": "label_values(host)",
         "hide": 0,

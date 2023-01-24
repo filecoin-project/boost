@@ -44,7 +44,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -125,7 +125,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_mspan_inuse_bytes{job=~\"boost\"}",
@@ -137,7 +137,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_mspan_sys_bytes{job=~\"boost\"}",
@@ -150,7 +150,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_mcache_inuse_bytes{job=~\"boost\"}",
@@ -163,7 +163,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_mcache_sys_bytes{job=~\"boost\"}",
@@ -176,7 +176,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_buck_hash_sys_bytes{job=~\"boost\"}",
@@ -189,7 +189,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_gc_sys_bytes{job=~\"boost\"}",
@@ -202,7 +202,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_other_sys_bytes{job=~\"boost\"} - go_memstats_other_sys_bytes{job=~\"boost\"}",
@@ -216,7 +216,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_next_gc_bytes{job=~\"boost\"}",
@@ -233,7 +233,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -314,7 +314,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_heap_alloc_bytes{job=~\"boost\"}",
@@ -325,7 +325,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_heap_sys_bytes{job=~\"boost\"}",
@@ -337,7 +337,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_heap_idle_bytes{job=~\"boost\"}",
@@ -349,7 +349,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_heap_inuse_bytes{job=~\"boost\"}",
@@ -361,7 +361,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_heap_released_bytes{job=~\"boost\"}",
@@ -377,7 +377,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -458,7 +458,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_stack_inuse_bytes{job=~\"boost\"}",
@@ -470,7 +470,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_stack_sys_bytes{job=~\"boost\"}",
@@ -487,7 +487,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -568,7 +568,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_sys_bytes{job=~\"boost\"}",
@@ -583,7 +583,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -664,7 +664,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_memstats_mallocs_total{job=~\"boost\"} - go_memstats_frees_total{job=~\"boost\"}",
@@ -679,7 +679,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "description": "shows how many heap objects are allocated. This is a counter value so you can use rate() to objects allocated/s.",
       "fieldConfig": {
@@ -761,7 +761,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "rate(go_memstats_mallocs_total{job=~\"boost\"}[1m])",
@@ -776,7 +776,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "description": "go_memstats_lookups_total – counts how many pointer dereferences happened. This is a counter value so you can use rate() to lookups/s.",
       "fieldConfig": {
@@ -857,7 +857,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "rate(go_memstats_lookups_total{job=~\"boost\"}[1m])",
@@ -872,7 +872,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -952,7 +952,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_goroutines{job=~\"boost\"}",
@@ -967,7 +967,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -1047,7 +1047,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "rate(go_memstats_alloc_bytes_total{job=~\"boost\"}[1m])",
@@ -1062,7 +1062,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "3fdT3-V4z"
+        "uid": "prom1234"
       },
       "fieldConfig": {
         "defaults": {
@@ -1142,7 +1142,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "editorMode": "code",
           "expr": "go_gc_duration_seconds{job=~\"boost\"}",
@@ -1167,7 +1167,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -1247,7 +1247,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_mspan_inuse_bytes{job=~\"booster-http\"}",
@@ -1259,7 +1259,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_mspan_sys_bytes{job=~\"booster-http\"}",
@@ -1272,7 +1272,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_mcache_inuse_bytes{job=~\"booster-http\"}",
@@ -1285,7 +1285,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_mcache_sys_bytes{job=~\"booster-http\"}",
@@ -1298,7 +1298,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_buck_hash_sys_bytes{job=~\"booster-http\"}",
@@ -1311,7 +1311,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_gc_sys_bytes{job=~\"booster-http\"}",
@@ -1324,7 +1324,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_other_sys_bytes{job=~\"booster-http\"} - go_memstats_other_sys_bytes{job=~\"booster-http\"}",
@@ -1338,7 +1338,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_next_gc_bytes{job=~\"booster-http\"}",
@@ -1355,7 +1355,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -1435,7 +1435,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_heap_alloc_bytes{job=~\"booster-http\"}",
@@ -1446,7 +1446,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_heap_sys_bytes{job=~\"booster-http\"}",
@@ -1458,7 +1458,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_heap_idle_bytes{job=~\"booster-http\"}",
@@ -1470,7 +1470,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_heap_inuse_bytes{job=~\"booster-http\"}",
@@ -1482,7 +1482,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_heap_released_bytes{job=~\"booster-http\"}",
@@ -1502,7 +1502,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -1549,7 +1549,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_stack_inuse_bytes{job=~\"booster-http\"}",
@@ -1561,7 +1561,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_stack_sys_bytes{job=~\"booster-http\"}",
@@ -1605,7 +1605,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -1685,7 +1685,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_sys_bytes{job=~\"booster-http\"}",
@@ -1700,7 +1700,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -1780,7 +1780,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_mallocs_total{job=~\"booster-http\"} - go_memstats_frees_total{job=~\"booster-http\"}",
@@ -1795,7 +1795,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "description": "shows how many heap objects are allocated. This is a counter value so you can use rate() to objects allocated/s.",
           "fieldConfig": {
@@ -1876,7 +1876,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "rate(go_memstats_mallocs_total{job=~\"booster-http\"}[1m])",
@@ -1891,7 +1891,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "description": "go_memstats_lookups_total – counts how many pointer dereferences happened. This is a counter value so you can use rate() to lookups/s.",
           "fieldConfig": {
@@ -1972,7 +1972,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "rate(go_memstats_lookups_total{job=~\"booster-http\"}[1m])",
@@ -1987,7 +1987,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -2067,7 +2067,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_goroutines{job=~\"booster-http\"}",
@@ -2082,7 +2082,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -2162,7 +2162,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "rate(go_memstats_alloc_bytes_total{job=~\"booster-http\"}[1m])",
@@ -2177,7 +2177,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -2257,7 +2257,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_gc_duration_seconds{job=~\"booster-http\"}",
@@ -2286,7 +2286,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -2366,7 +2366,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_mspan_inuse_bytes{job=~\"booster-bitswap\"}",
@@ -2378,7 +2378,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_mspan_sys_bytes{job=~\"booster-bitswap\"}",
@@ -2391,7 +2391,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_mcache_inuse_bytes{job=~\"booster-bitswap\"}",
@@ -2404,7 +2404,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_mcache_sys_bytes{job=~\"booster-bitswap\"}",
@@ -2417,7 +2417,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_buck_hash_sys_bytes{job=~\"booster-bitswap\"}",
@@ -2430,7 +2430,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_gc_sys_bytes{job=~\"booster-bitswap\"}",
@@ -2443,7 +2443,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_other_sys_bytes{job=~\"booster-bitswap\"} - go_memstats_other_sys_bytes{job=~\"booster-bitswap\"}",
@@ -2457,7 +2457,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_next_gc_bytes{job=~\"booster-bitswap\"}",
@@ -2474,7 +2474,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -2554,7 +2554,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_heap_alloc_bytes{job=~\"booster-bitswap\"}",
@@ -2565,7 +2565,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_heap_sys_bytes{job=~\"booster-bitswap\"}",
@@ -2577,7 +2577,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_heap_idle_bytes{job=~\"booster-bitswap\"}",
@@ -2589,7 +2589,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_heap_inuse_bytes{job=~\"booster-bitswap\"}",
@@ -2601,7 +2601,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_heap_released_bytes{job=~\"booster-bitswap\"}",
@@ -2621,7 +2621,7 @@
           "dashes": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -2668,7 +2668,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_stack_inuse_bytes{job=~\"booster-bitswap\"}",
@@ -2680,7 +2680,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_stack_sys_bytes{job=~\"booster-bitswap\"}",
@@ -2724,7 +2724,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -2804,7 +2804,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_sys_bytes{job=~\"booster-bitswap\"}",
@@ -2819,7 +2819,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -2899,7 +2899,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_memstats_mallocs_total{job=~\"booster-bitswap\"} - go_memstats_frees_total{job=~\"booster-bitswap\"}",
@@ -2914,7 +2914,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "description": "shows how many heap objects are allocated. This is a counter value so you can use rate() to objects allocated/s.",
           "fieldConfig": {
@@ -2995,7 +2995,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "rate(go_memstats_mallocs_total{job=~\"booster-bitswap\"}[1m])",
@@ -3010,7 +3010,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "description": "go_memstats_lookups_total – counts how many pointer dereferences happened. This is a counter value so you can use rate() to lookups/s.",
           "fieldConfig": {
@@ -3091,7 +3091,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "rate(go_memstats_lookups_total{job=~\"booster-bitswap\"}[1m])",
@@ -3106,7 +3106,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -3186,7 +3186,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_goroutines{job=~\"booster-bitswap\"}",
@@ -3201,7 +3201,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -3281,7 +3281,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "rate(go_memstats_alloc_bytes_total{job=~\"booster-bitswap\"}[1m])",
@@ -3296,7 +3296,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "3fdT3-V4z"
+            "uid": "prom1234"
           },
           "fieldConfig": {
             "defaults": {
@@ -3376,7 +3376,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "3fdT3-V4z"
+                "uid": "prom1234"
               },
               "editorMode": "code",
               "expr": "go_gc_duration_seconds{job=~\"booster-bitswap\"}",
@@ -3408,7 +3408,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "3fdT3-V4z"
+          "uid": "prom1234"
         },
         "definition": "label_values(host)",
         "hide": 0,
