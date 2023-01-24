@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 
-	"github.com/filecoin-project/boost/build"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
@@ -23,8 +22,8 @@ func main() {
 		Name:                 "booster-bitswap",
 		Usage:                "Bitswap endpoint for retrieval from Filecoin",
 		EnableBashCompletion: true,
-		Version:              build.UserVersion(),
 		Flags: []cli.Flag{
+			cliutil.FlagVerbose,
 			cliutil.FlagVeryVerbose,
 			FlagRepo,
 		},
@@ -32,6 +31,7 @@ func main() {
 			initCmd,
 			runCmd,
 			fetchCmd,
+			versionCmd,
 		},
 	}
 	app.Setup()
@@ -44,6 +44,9 @@ func main() {
 func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("booster", "INFO")
 
+	if cliutil.IsVerbose {
+		_ = logging.SetLogLevel("remote-blockstore", "INFO")
+	}
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("booster", "DEBUG")
 		_ = logging.SetLogLevel("remote-blockstore", "DEBUG")
