@@ -195,7 +195,7 @@ function TableRow(props) {
 
 export function RetrievalLogsMenuItem(props) {
     const {data} = useQuery(RetrievalLogsCountQuery, {
-        pollinterval: 5000,
+        pollInterval: 5000,
         fetchPolicy: 'network-only',
         variables: {
             accepted: true,

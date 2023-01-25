@@ -172,7 +172,7 @@ function LogRow(props) {
 
 export function ProposalLogsMenuItem(props) {
     const {data} = useQuery(ProposalLogsCountQuery, {
-        pollinterval: 5000,
+        pollInterval: 5000,
         fetchPolicy: 'network-only',
         variables: {
             accepted: true,

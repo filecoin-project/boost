@@ -166,7 +166,7 @@ function StorageDealsContent(props) {
 
 function LegacyDealsLink(props) {
     const {data} = useQuery(LegacyDealsCountQuery, {
-        pollinterval: 5000,
+        pollInterval: 5000,
         fetchPolicy: 'network-only',
     })
 
@@ -358,7 +358,7 @@ function TransferRate({deal}) {
 
 export function StorageDealsMenuItem(props) {
     const {data} = useQuery(DealsCountQuery, {
-        pollinterval: 5000,
+        pollInterval: 5000,
         fetchPolicy: 'network-only',
     })
 

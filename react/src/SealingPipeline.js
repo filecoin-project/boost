@@ -194,7 +194,7 @@ function Workers(props) {
 
 export function SealingPipelineMenuItem(props) {
     const {data} = useQuery(SealingPipelineQuery, {
-        pollinterval: 5000,
+        pollInterval: 5000,
         fetchPolicy: "network-only",
     })
 

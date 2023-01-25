@@ -178,7 +178,7 @@ export function humanTransferRate(bytesPerSecond) {
 
 export function DealTransfersMenuItem(props) {
     const {data} = useQuery(TransfersQuery, {
-        pollinterval: 5000,
+        pollInterval: 5000,
         fetchPolicy: 'network-only',
     })
 
