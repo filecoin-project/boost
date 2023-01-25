@@ -48,7 +48,7 @@ services:
       #- "boost:host-gateway"
       #- "booster-http:host-gateway"
       #- "booster-bitswap:host-gateway"
-      #- "lotus-mienr:host-gateway"
+      #- "lotus-miner:host-gateway"
 
     logging:
       driver: loki
