@@ -10,6 +10,7 @@ datasources:
   isDefault: false
   version: 1
   editable: false
+  uid: prom1234
 - name: Tempo
   type: tempo
   access: proxy
