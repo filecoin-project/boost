@@ -63,13 +63,37 @@ function StorageDealsContent(props) {
         setSearchQuery('')
     }
 
+    const [displayFilters, setDisplayFilters] = useState(false)
+    const toggleFilters = () => {
+        setDisplayFilters(!displayFilters)
+    }
+
+    const [searchFilters, setSearchFilters] = useState(null)
+    const handleFiltersChanged = (event) => {
+        var value = event.target.value
+        if (value === "true") value = true
+        if (value === "false") value = false
+
+        var newFilters = {
+            ...searchFilters || {},
+            [event.target.name]: value
+        }
+
+        if (event.target.value === "") delete newFilters[event.target.name]
+        if (Object.keys(newFilters).length === 0) newFilters = null
+
+        console.log(newFilters)
+        setSearchFilters(newFilters)
+    }
+
     // Fetch deals on this page
     const dealListOffset = (pageNum-1) * dealsPerPage
     const queryCursor = (pageNum === 1) ? null : params.cursor
     const {loading, error, data} = useQuery(DealsListQuery, {
-        pollInterval: searchQuery ? undefined : 1000,
+        pollInterval: searchQuery ? undefined : 10e3,
         variables: {
             query: searchQuery,
+            filter: searchFilters,
             cursor: queryCursor,
             offset: dealListOffset,
             limit: dealsPerPage,
@@ -107,7 +131,15 @@ function StorageDealsContent(props) {
 
     return <div className="deals">
         <LegacyDealsLink />
-        <SearchBox value={searchQuery} clearSearchBox={clearSearchBox} onChange={handleSearchQueryChange} />
+        <SearchBox
+            value={searchQuery}
+            displayFilters={displayFilters}
+            clearSearchBox={clearSearchBox}
+            onChange={handleSearchQueryChange}
+            toggleFilters={toggleFilters}
+            searchFilters={searchFilters}
+            handleFiltersChanged={handleFiltersChanged} />
+
         <table>
             <tbody>
             <tr>
@@ -135,7 +167,7 @@ function StorageDealsContent(props) {
 
 function LegacyDealsLink(props) {
     const {data} = useQuery(LegacyDealsCountQuery, {
-        pollInterval: 5000,
+        pollinterval: 50000,
         fetchPolicy: 'network-only',
     })
 
@@ -151,6 +183,7 @@ function LegacyDealsLink(props) {
 }
 
 export function SearchBox(props) {
+    const searchFilters = props.searchFilters || {}
     return <div className="search">
         <DebounceInput
             autoFocus={!!props.value}
@@ -158,7 +191,43 @@ export function SearchBox(props) {
             debounceTimeout={300}
             value={props.value}
             onChange={props.onChange} />
-        { props.value ? <img alt="clear" class="clear-text" onClick={props.clearSearchBox} src={xImg} /> : null }
+        { props.value ? <img alt="clear" className="clear-text" onClick={props.clearSearchBox} src={xImg} /> : null }
+        <span className={(props.displayFilters ? "active": "") + " search-toggle"} onClick={props.toggleFilters}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-list" viewBox="0 0 16 16">
+                <path fillRule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+            </svg>
+        </span>
+        <div className={(props.displayFilters ? "": "hidden") + " search-filters"}>
+            <h3>Checkpoint</h3>
+            <div onChange={props.handleFiltersChanged}>
+                <input type="radio" id="CP-Any" name="Checkpoint" value="" checked={searchFilters.Checkpoint === undefined} />
+                <label htmlFor="CP-Any">Any</label><br />
+                <input type="radio" id="CP-Accepted" name="Checkpoint" value="Accepted" checked={searchFilters.Checkpoint === "Accepted"}  />
+                <label htmlFor="CP-Accepted">Accepted</label><br />
+                <input type="radio" id="CP-Transferred" name="Checkpoint" value="Transferred" checked={searchFilters.Checkpoint === "Transferred"} />
+                <label htmlFor="CP-Transferred">Transferred</label><br />
+                <input type="radio" id="CP-Published" name="Checkpoint" value="Published" checked={searchFilters.Checkpoint === "Published"}/>
+                <label htmlFor="CP-Published">Published</label><br />
+                <input type="radio" id="CP-PublishConfirmed" name="Checkpoint" value="PublishConfirmed" checked={searchFilters.Checkpoint === "PublishConfirmed"} />
+                <label htmlFor="CP-PublishConfirmed">PublishConfirmed</label><br />
+                <input type="radio" id="CP-AddedPiece" name="Checkpoint" value="AddedPiece" checked={searchFilters.Checkpoint === "AddedPiece"} />
+                <label htmlFor="CP-AddedPiece">AddedPiece</label><br />
+                <input type="radio" id="CP-IndexedAndAnnounced" name="Checkpoint" value="IndexedAndAnnounced" checked={searchFilters.Checkpoint === "IndexedAndAnnounced"} />
+                <label htmlFor="CP-IndexedAndAnnounced">IndexedAndAnnounced</label><br />
+                <input type="radio" id="CP-Complete" name="Checkpoint" value="Complete" checked={searchFilters.Checkpoint === "Complete"} />
+                <label htmlFor="CP-Complete">Complete</label><br />
+            </div>
+            <hr />
+            <h3>IsOffline</h3>
+            <div onChange={props.handleFiltersChanged}>
+                <input type="radio" id="IO-Any" name="IsOffline" value="" checked={searchFilters.IsOffline === undefined} />
+                <label htmlFor="IO-Any">Any</label><br />
+                <input type="radio" id="IO-True" name="IsOffline" value="true" checked={searchFilters.IsOffline === true}  />
+                <label htmlFor="IO-True">True</label><br />
+                <input type="radio" id="IO-False" name="IsOffline" value="false" checked={searchFilters.IsOffline === false} />
+                <label htmlFor="IO-False">False</label><br />
+            </div>
+        </div>
     </div>
 }
 
@@ -240,7 +309,7 @@ function TransferRate({deal}) {
 
 export function StorageDealsMenuItem(props) {
     const {data} = useQuery(DealsCountQuery, {
-        pollInterval: 5000,
+        pollinterval: 50000,
         fetchPolicy: 'network-only',
     })
 

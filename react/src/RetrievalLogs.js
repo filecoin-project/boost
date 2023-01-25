@@ -53,7 +53,7 @@ function RetrievalLogsContent(props) {
         } catch {}
     }
     const {loading, error, data} = useQuery(RetrievalLogsListQuery, {
-        pollInterval: 1000,
+        pollInterval: 10e3,
         variables: {
             cursor: queryCursor,
             offset: listOffset,
@@ -195,7 +195,7 @@ function TableRow(props) {
 
 export function RetrievalLogsMenuItem(props) {
     const {data} = useQuery(RetrievalLogsCountQuery, {
-        pollInterval: 5000,
+        pollinterval: 50000,
         fetchPolicy: 'network-only',
         variables: {
             accepted: true,

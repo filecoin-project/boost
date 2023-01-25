@@ -17,7 +17,7 @@ export function DealPublishPage(props) {
 
 function DealPublishContent() {
     const {loading, error, data} = useQuery(DealPublishQuery, {
-        pollInterval: 5000,
+        pollinterval: 50000,
     })
     const [publishNow] = useMutation(DealPublishNowMutation, {
         refetchQueries: [{ query: DealPublishQuery }]
@@ -110,7 +110,7 @@ function DealsTable(props) {
 
 export function DealPublishMenuItem(props) {
     const {data} = useQuery(DealPublishQuery, {
-        pollInterval: 5000,
+        pollinterval: 50000,
         fetchPolicy: 'network-only',
     })
 

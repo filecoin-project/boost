@@ -138,7 +138,7 @@ function LegacyStorageSpaceContent(props) {
 
 export function StorageSpaceMenuItem(props) {
     const {data} = useQuery(StorageQuery, {
-        pollInterval: 5000,
+        pollinterval: 50000,
         fetchPolicy: 'network-only',
     })
 

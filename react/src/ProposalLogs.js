@@ -53,7 +53,7 @@ function ProposalLogsContent(props) {
         } catch {}
     }
     const {loading, error, data} = useQuery(ProposalLogsListQuery, {
-        pollInterval: 1000,
+        pollInterval: 10e3,
         variables: {
             cursor: queryCursor,
             offset: listOffset,
@@ -172,7 +172,7 @@ function LogRow(props) {
 
 export function ProposalLogsMenuItem(props) {
     const {data} = useQuery(ProposalLogsCountQuery, {
-        pollInterval: 5000,
+        pollinterval: 50000,
         fetchPolicy: 'network-only',
         variables: {
             accepted: true,
