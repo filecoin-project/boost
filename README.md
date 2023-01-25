@@ -257,7 +257,7 @@ docker network connect devnet prometheus
 
 ### Explore Grafana / Tempo and search for traces
 
-http://localhost:3333
+http://localhost:3333 (username: `admin` ; password: `admin`)
 
 ### Making a deal
 
