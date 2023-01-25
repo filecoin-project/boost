@@ -7,8 +7,8 @@ networks:
 services:
   tempo:
     container_name: tempo
-    image: grafana/tempo:r69-9a5eacf
-    command: [ "-search.enabled=true", "-config.file=/etc/tempo.yaml" ]
+    image: grafana/tempo:r80-5710d1b
+    command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./tempo-local.yaml:/etc/tempo.yaml
       - ./overrides.yaml:/etc/overrides.yaml
