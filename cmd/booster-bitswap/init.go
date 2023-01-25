@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/filecoin-project/boost/build"
 	"github.com/libp2p/go-libp2p"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -57,7 +58,7 @@ func setupHost(cfgDir string, port int) (host.Host, error) {
 }
 
 func loadPeerKey(cfgDir string, createIfNotExists bool) (crypto.PrivKey, error) {
-	keyPath := filepath.Join(cfgDir, "libp2p.key")
+	keyPath := getKeyPath(cfgDir)
 	keyFile, err := os.ReadFile(keyPath)
 	if err == nil {
 		return crypto.UnmarshalPrivateKey(keyFile)
@@ -93,6 +94,10 @@ func loadPeerKey(cfgDir string, createIfNotExists bool) (crypto.PrivKey, error) 
 	return key, nil
 }
 
+func getKeyPath(cfgDir string) string {
+	return filepath.Join(cfgDir, "libp2p.key")
+}
+
 var initCmd = &cli.Command{
 	Name:   "init",
 	Usage:  "Init booster-bitswap config",
@@ -105,7 +110,18 @@ var initCmd = &cli.Command{
 		}
 
 		peerID, _, err := configureRepo(repoDir, true)
-		fmt.Println("Initialized booster-bitswap with libp2p peer ID: " + peerID.String())
+		fmt.Println("Initialized booster-bitswap with libp2p peer ID " + peerID.String())
+		fmt.Println("Key file: " + getKeyPath(repoDir))
 		return err
+	},
+}
+
+var versionCmd = &cli.Command{
+	Name:   "version",
+	Usage:  "Print booster-bitswap version",
+	Before: before,
+	Action: func(cctx *cli.Context) error {
+		fmt.Println("booster-bitswap " + build.UserVersion())
+		return nil
 	},
 }

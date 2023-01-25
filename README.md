@@ -203,10 +203,12 @@ Note that above you already ran a command to export FULLNODE_API (and point it t
 Note also that the provider address is `t01000` and you will need to supply an appropriate `--storage-price` when using `boost deal` since the devnet has a minimum price. Alternatively, using "Settings" in the Boost web UI to set the deal price to zero.
 
 ## Running Boost devnet in Docker
+### Prerequisites
+* Install Docker - https://docs.docker.com/get-docker/
 
 ### Building Docker images
 
-1. Build images
+1. Build images from the root of the Boost repository
 
 ```
 make docker/all
