@@ -44,6 +44,12 @@ services:
       - ./${PROMETHEUS_CONFIG_FILE:-prometheus.yaml}:/etc/prometheus.yaml
     ports:
       - "9090:9090"
+    #extra_hosts:
+      #- "boost:host-gateway"
+      #- "booster-http:host-gateway"
+      #- "booster-bitswap:host-gateway"
+      #- "lotus-mienr:host-gateway"
+
     logging:
       driver: loki
       options:
