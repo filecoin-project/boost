@@ -61,7 +61,7 @@ func setupHost(cfgDir string, port int) (host.Host, error) {
 }
 
 func loadPeerKey(cfgDir string, createIfNotExists bool) (crypto.PrivKey, error) {
-	keyPath := filepath.Join(cfgDir, "libp2p.key")
+	keyPath := getKeyPath(cfgDir)
 	keyFile, err := os.ReadFile(keyPath)
 	if err == nil {
 		return crypto.UnmarshalPrivateKey(keyFile)
@@ -92,6 +92,10 @@ func loadPeerKey(cfgDir string, createIfNotExists bool) (crypto.PrivKey, error) 
 	return key, nil
 }
 
+func getKeyPath(cfgDir string) string {
+	return filepath.Join(cfgDir, "libp2p.key")
+}
+
 var initCmd = &cli.Command{
 	Name:   "init",
 	Usage:  "Init booster-bitswap config",
@@ -104,7 +108,8 @@ var initCmd = &cli.Command{
 		}
 
 		peerID, _, err := configureRepo(repoDir, true)
-		fmt.Println("Initialized booster-bitswap with libp2p peer ID: " + peerID.String())
+		fmt.Println("Initialized booster-bitswap with libp2p peer ID " + peerID.String())
+		fmt.Println("Key file: " + getKeyPath(repoDir))
 		return err
 	},
 }
