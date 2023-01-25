@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -94,8 +94,10 @@
       "id": 2,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
@@ -197,7 +199,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "decbytes"
         },
         "overrides": []
       },
@@ -210,8 +213,10 @@
       "id": 3,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
@@ -233,10 +238,118 @@
           "refId": "A"
         }
       ],
-      "title": "Bitswap Bytes served",
+      "title": "booster BITSWAP - bytes served",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom1234"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom1234"
+          },
+          "editorMode": "code",
+          "expr": "irate(booster_http_http_payload_by_cid_request_count{host=~\"$host\"}[$__rate_interval]) * 15",
+          "legendFormat": "{{host}} -- payload by cid",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom1234"
+          },
+          "editorMode": "code",
+          "expr": "irate(booster_http_http_piece_by_cid_request_count{host=~\"$host\"}[$__rate_interval]) * 15",
+          "hide": false,
+          "legendFormat": "{{host}} -- piece by cid",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "booster HTTP - total retrievals",
       "type": "timeseries"
     }
   ],
+  "refresh": "10s",
   "revision": 1,
   "schemaVersion": 38,
   "style": "dark",
@@ -272,13 +385,13 @@
     ]
   },
   "time": {
-    "from": "now-2m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Overview",
   "uid": "ujthpso4k",
-  "version": 3,
+  "version": 8,
   "weekStart": ""
 }
