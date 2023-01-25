@@ -1,6 +1,8 @@
 server:
   http_listen_port: 3200
 
+search_enabled: true
+
 distributor:
   search_tags_deny_list:
     - "instance"
