@@ -7,7 +7,7 @@ import {
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
 import {humanFileSize} from "./util";
-import React, {useState} from "react";
+import React, {useState, useEffect, useRef} from "react";
 import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
@@ -82,7 +82,6 @@ function StorageDealsContent(props) {
         if (event.target.value === "") delete newFilters[event.target.name]
         if (Object.keys(newFilters).length === 0) newFilters = null
 
-        console.log(newFilters)
         setSearchFilters(newFilters)
     }
 
@@ -184,6 +183,26 @@ function LegacyDealsLink(props) {
 
 export function SearchBox(props) {
     const searchFilters = props.searchFilters || {}
+    const displayFilters = props.displayFilters
+    const toggleFilters = props.toggleFilters
+    const ref = useRef()
+
+    useEffect(() => {
+        const checkIfClickedOutside = e => {
+          // If the menu is open and the clicked target is not within the menu,
+          // then close the menu
+          if (displayFilters && ref.current && !ref.current.contains(e.target)) {
+            toggleFilters()
+          }
+        }
+
+        document.addEventListener("mousedown", checkIfClickedOutside)
+
+        return () => {
+          document.removeEventListener("mousedown", checkIfClickedOutside)
+        }
+      }, [displayFilters])
+
     return <div className="search">
         <DebounceInput
             autoFocus={!!props.value}
@@ -192,43 +211,73 @@ export function SearchBox(props) {
             value={props.value}
             onChange={props.onChange} />
         { props.value ? <img alt="clear" className="clear-text" onClick={props.clearSearchBox} src={xImg} /> : null }
-        <span className={(props.displayFilters ? "active": "") + " search-toggle"} onClick={props.toggleFilters}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-list" viewBox="0 0 16 16">
-                <path fillRule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
-            </svg>
-        </span>
-        <div className={(props.displayFilters ? "": "hidden") + " search-filters"}>
-            <h3>Checkpoint</h3>
-            <div onChange={props.handleFiltersChanged}>
-                <input type="radio" id="CP-Any" name="Checkpoint" value="" checked={searchFilters.Checkpoint === undefined} />
-                <label htmlFor="CP-Any">Any</label><br />
-                <input type="radio" id="CP-Accepted" name="Checkpoint" value="Accepted" checked={searchFilters.Checkpoint === "Accepted"}  />
-                <label htmlFor="CP-Accepted">Accepted</label><br />
-                <input type="radio" id="CP-Transferred" name="Checkpoint" value="Transferred" checked={searchFilters.Checkpoint === "Transferred"} />
-                <label htmlFor="CP-Transferred">Transferred</label><br />
-                <input type="radio" id="CP-Published" name="Checkpoint" value="Published" checked={searchFilters.Checkpoint === "Published"}/>
-                <label htmlFor="CP-Published">Published</label><br />
-                <input type="radio" id="CP-PublishConfirmed" name="Checkpoint" value="PublishConfirmed" checked={searchFilters.Checkpoint === "PublishConfirmed"} />
-                <label htmlFor="CP-PublishConfirmed">PublishConfirmed</label><br />
-                <input type="radio" id="CP-AddedPiece" name="Checkpoint" value="AddedPiece" checked={searchFilters.Checkpoint === "AddedPiece"} />
-                <label htmlFor="CP-AddedPiece">AddedPiece</label><br />
-                <input type="radio" id="CP-IndexedAndAnnounced" name="Checkpoint" value="IndexedAndAnnounced" checked={searchFilters.Checkpoint === "IndexedAndAnnounced"} />
-                <label htmlFor="CP-IndexedAndAnnounced">IndexedAndAnnounced</label><br />
-                <input type="radio" id="CP-Complete" name="Checkpoint" value="Complete" checked={searchFilters.Checkpoint === "Complete"} />
-                <label htmlFor="CP-Complete">Complete</label><br />
+        <div ref={ref} className={(props.displayFilters ? "active": "") + " search-toggle"}>
+            <div className="toggle" onClick={props.toggleFilters}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-list" viewBox="0 0 16 16">
+                    <path fillRule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+                </svg>
             </div>
-            <hr />
-            <h3>IsOffline</h3>
-            <div onChange={props.handleFiltersChanged}>
-                <input type="radio" id="IO-Any" name="IsOffline" value="" checked={searchFilters.IsOffline === undefined} />
-                <label htmlFor="IO-Any">Any</label><br />
-                <input type="radio" id="IO-True" name="IsOffline" value="true" checked={searchFilters.IsOffline === true}  />
-                <label htmlFor="IO-True">True</label><br />
-                <input type="radio" id="IO-False" name="IsOffline" value="false" checked={searchFilters.IsOffline === false} />
-                <label htmlFor="IO-False">False</label><br />
+            <div className={(props.displayFilters ? "": "hidden") + " search-filters"}>
+                <h3>Checkpoint</h3>
+                <div>
+                    <RadioGroup prefix="CP" field="Checkpoint" value="" label="Any"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="Accepted"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="Transferred"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="Published"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="PublishConfirmed"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="AddedPiece"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="IndexedAndAnnounced"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="Complete"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                </div>
+                <hr />
+                <h3>IsOffline</h3>
+                <div>
+                    <RadioGroup prefix="IO" field="IsOffline" value="" label="Any"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="IO" field="IsOffline" value={true}
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="IO" field="IsOffline" value={false}
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                </div>
             </div>
         </div>
     </div>
+}
+
+function RadioGroup (props) {
+    const {
+        prefix,
+        field,
+        value,
+        label,
+        searchFilters,
+        handleFiltersChanged
+    } = props
+
+    const htmlFor = prefix + '-' + value
+    var checked = false
+
+    if (searchFilters[field] === value) {
+        checked = true
+    } else if (value === "" && searchFilters[field] === undefined) {
+        checked = true
+    }
+    return (
+        <span className="radio-group">
+            <input type="radio" id={htmlFor} name={field} value={value.toString()}
+                checked={checked}
+                onChange={handleFiltersChanged} />
+            <label htmlFor={htmlFor}>{value === "" ? label : value.toString()}</label>
+        </span>
+    )
 }
 
 function DealRow(props) {
