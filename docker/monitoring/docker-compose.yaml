@@ -44,6 +44,10 @@ services:
       - ./${PROMETHEUS_CONFIG_FILE:-prometheus.yaml}:/etc/prometheus.yaml
     ports:
       - "9090:9090"
+    ## Uncomment and modify this section depending on your Filecoin deployment.
+    ## Prometheus needs to be able to scrape these targets so that it collects metrics
+    ## and have them visualized in Grafana.
+    ##
     #extra_hosts:
       #- "boost:host-gateway"
       #- "booster-http:host-gateway"
