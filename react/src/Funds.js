@@ -335,7 +335,7 @@ function FundsLog(props) {
 
 export function FundsMenuItem(props) {
     const {data} = useQuery(FundsQuery, {
-        pollinterval: 50000,
+        pollinterval: 5000,
         fetchPolicy: "network-only",
     })
 
