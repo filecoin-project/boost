@@ -53,6 +53,7 @@ func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block,
 		return nil, err
 	}
 	stats.Record(ctx, metrics.BitswapRblsGetSuccessResponseCount.M(1))
+	stats.Record(ctx, metrics.BitswapRblsBytesSentCount.M(int64(len(data))))
 	return blocks.NewBlockWithCid(data, c)
 }
 

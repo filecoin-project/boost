@@ -139,6 +139,7 @@ var (
 	BitswapRblsHasRequestCount             = stats.Int64("bitswap/rbls_has_request_count", "Counter of RemoteBlockstore Has requests", stats.UnitDimensionless)
 	BitswapRblsHasSuccessResponseCount     = stats.Int64("bitswap/rbls_has_success_response_count", "Counter of successful RemoteBlockstore Has responses", stats.UnitDimensionless)
 	BitswapRblsHasFailResponseCount        = stats.Int64("bitswap/rbls_has_fail_response_count", "Counter of failed RemoteBlockstore Has responses", stats.UnitDimensionless)
+	BitswapRblsBytesSentCount              = stats.Int64("bitswap/rbls_bytes_sent_count", "Counter of the number of bytes sent by bitswap since startup", stats.UnitBytes)
 )
 
 var (
@@ -228,6 +229,10 @@ var (
 	BitswapRblsHasFailResponseCountView = &view.View{
 		Measure:     BitswapRblsHasFailResponseCount,
 		Aggregation: view.Count(),
+	}
+	BitswapRblsBytesSentCountView = &view.View{
+		Measure:     BitswapRblsBytesSentCount,
+		Aggregation: view.Sum(),
 	}
 
 	InfoView = &view.View{
@@ -521,6 +526,7 @@ var DefaultViews = func() []*view.View {
 		BitswapRblsHasRequestCountView,
 		BitswapRblsHasSuccessResponseCountView,
 		BitswapRblsHasFailResponseCountView,
+		BitswapRblsBytesSentCountView,
 		lotusmetrics.DagStorePRBytesDiscardedView,
 		lotusmetrics.DagStorePRBytesRequestedView,
 		lotusmetrics.DagStorePRDiscardCountView,
