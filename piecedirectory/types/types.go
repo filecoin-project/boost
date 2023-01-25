@@ -28,8 +28,9 @@ type PieceReader interface {
 
 type Store interface {
 	AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error
-	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error
+	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error
 	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
+	IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, error)
 	GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, error)
 	GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash multihash.Multihash) (*model.OffsetSize, error)
 	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)

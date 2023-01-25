@@ -176,17 +176,17 @@ func (mr *MockStoreMockRecorder) AddDealForPiece(arg0, arg1, arg2 interface{}) *
 }
 
 // AddIndex mocks base method.
-func (m *MockStore) AddIndex(arg0 context.Context, arg1 cid.Cid, arg2 []model.Record) error {
+func (m *MockStore) AddIndex(arg0 context.Context, arg1 cid.Cid, arg2 []model.Record, arg3 bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddIndex", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "AddIndex", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddIndex indicates an expected call of AddIndex.
-func (mr *MockStoreMockRecorder) AddIndex(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockStoreMockRecorder) AddIndex(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddIndex", reflect.TypeOf((*MockStore)(nil).AddIndex), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddIndex", reflect.TypeOf((*MockStore)(nil).AddIndex), arg0, arg1, arg2, arg3)
 }
 
 // FlagPiece mocks base method.
@@ -291,6 +291,21 @@ func (m *MockStore) GetPieceMetadata(arg0 context.Context, arg1 cid.Cid) (model.
 func (mr *MockStoreMockRecorder) GetPieceMetadata(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPieceMetadata", reflect.TypeOf((*MockStore)(nil).GetPieceMetadata), arg0, arg1)
+}
+
+// IsCompleteIndex mocks base method.
+func (m *MockStore) IsCompleteIndex(arg0 context.Context, arg1 cid.Cid) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsCompleteIndex", arg0, arg1)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsCompleteIndex indicates an expected call of IsCompleteIndex.
+func (mr *MockStoreMockRecorder) IsCompleteIndex(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsCompleteIndex", reflect.TypeOf((*MockStore)(nil).IsCompleteIndex), arg0, arg1)
 }
 
 // IsIndexed mocks base method.

@@ -18,8 +18,9 @@ var log = logger.Logger("boostd-data-client")
 type Store struct {
 	client struct {
 		AddDealForPiece           func(context.Context, cid.Cid, model.DealInfo) error
-		AddIndex                  func(context.Context, cid.Cid, []model.Record) error
+		AddIndex                  func(context.Context, cid.Cid, []model.Record, bool) error
 		IsIndexed                 func(ctx context.Context, pieceCid cid.Cid) (bool, error)
+		IsCompleteIndex           func(ctx context.Context, pieceCid cid.Cid) (bool, error)
 		GetIndex                  func(context.Context, cid.Cid) ([]model.Record, error)
 		GetOffsetSize             func(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
 		ListPieces                func(ctx context.Context) ([]cid.Cid, error)
@@ -118,14 +119,18 @@ func (s *Store) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) e
 	return s.client.SetCarSize(ctx, pieceCid, size)
 }
 
-func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record) error {
+func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error {
 	log.Debugw("add-index", "piece-cid", pieceCid, "records", len(records))
 
-	return s.client.AddIndex(ctx, pieceCid, records)
+	return s.client.AddIndex(ctx, pieceCid, records, isCompleteIndex)
 }
 
 func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 	return s.client.IsIndexed(ctx, pieceCid)
+}
+
+func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, error) {
+	return s.client.IsCompleteIndex(ctx, pieceCid)
 }
 
 func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, error) {

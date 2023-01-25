@@ -187,7 +187,7 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 
 	recs := GetRecords(t, carv1Reader)
 	pieceCid := CalculateCommp(t, carv1Reader).PieceCID
-	err = cl.AddIndex(ctx, pieceCid, recs)
+	err = cl.AddIndex(ctx, pieceCid, recs, false)
 	require.NoError(t, err)
 
 	// Add deal info for the piece - it doesn't matter what it is, the piece
@@ -216,8 +216,8 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 		}
 	}
 
-	// Add the index to the local index directory
-	err = cl.AddIndex(ctx, pieceCid, recs)
+	// Add the index to the local index directory, marked as incomplete
+	err = cl.AddIndex(ctx, pieceCid, recs, false)
 	require.NoError(t, err)
 
 	// Create a CARv2 index over the CAR file
@@ -272,7 +272,7 @@ func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
 
 	recs := GetRecords(t, carv1Reader)
 	commpCalc := CalculateCommp(t, carv1Reader)
-	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs)
+	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs, false)
 	require.NoError(t, err)
 
 	// Add deal info for the piece without a CAR file
@@ -310,7 +310,7 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 
 	recs := GetRecords(t, carv1Reader)
 	commpCalc := CalculateCommp(t, carv1Reader)
-	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs)
+	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs, true)
 	require.NoError(t, err)
 
 	// Add deal info for the piece

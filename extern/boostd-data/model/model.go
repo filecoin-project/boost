@@ -35,10 +35,14 @@ type DealInfo struct {
 
 // Metadata for PieceCid
 type Metadata struct {
-	IndexedAt time.Time  `json:"i"`
-	Deals     []DealInfo `json:"d"`
-	Error     string     `json:"e"`
-	ErrorType string     `json:"t"`
+	IndexedAt time.Time `json:"i"`
+	// CompleteIndex indicates whether the index has all information or is
+	// missing block size information. Note that indexes imported from the
+	// dagstore do not have block size information.
+	CompleteIndex bool       `json:"c"`
+	Deals         []DealInfo `json:"d"`
+	Error         string     `json:"e"`
+	ErrorType     string     `json:"t"`
 }
 
 // Record is the information stored in the index for each block in a piece

@@ -279,7 +279,7 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 
 	// Create an index for the piece
 	recs := GetRecords(t, carv1Reader)
-	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs)
+	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs, true)
 	require.NoError(t, err)
 
 	// Check the piece
