@@ -444,6 +444,9 @@ type RootQuery {
   """Get the pieces that have a particular root payload CID"""
   piecesWithRootPayloadCid(payloadCid: String!): [String!]!
 
+  """Get the indexes for a particular piece CID"""
+  pieceIndexes(pieceCid: String!): [String!]!
+
   """Get storage space usage"""
   storage: Storage!
 

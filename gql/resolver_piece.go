@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
+	"github.com/multiformats/go-multihash"
 )
 
 type IndexStatus string
@@ -189,6 +190,30 @@ func (r *resolver) PiecesWithRootPayloadCid(ctx context.Context, args struct{ Pa
 		pieceCids = append(pieceCids, pieceCid)
 	}
 	return pieceCids, nil
+}
+
+func (r *resolver) PieceIndexes(ctx context.Context, args struct{ PieceCid string }) ([]string, error) {
+	var indexes []string
+	pieceCid, err := cid.Parse(args.PieceCid)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not a valid piece cid", args.PieceCid)
+	}
+
+	ii, err := r.piecedirectory.GetIterableIndex(ctx, pieceCid)
+	if err != nil {
+		return nil, fmt.Errorf("could not get indexes for %s: %w", pieceCid, err)
+	}
+
+	err = ii.ForEach(func(m multihash.Multihash, _ uint64) error {
+		indexes = append(indexes, cid.NewCidV1(cid.DagProtobuf, m).String())
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("iterating index for piece %s: %w", pieceCid, err)
+	}
+
+	return indexes, nil
 }
 
 func (r *resolver) PieceBuildIndex(args struct{ PieceCid string }) (bool, error) {
