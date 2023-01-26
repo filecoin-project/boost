@@ -23,7 +23,6 @@ import (
 	gst "github.com/filecoin-project/go-data-transfer/transport/graphsync"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/shared"
-	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/requestvalidation"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin/v8/paych"
@@ -196,11 +195,6 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 	}
 
 	mgr, err := dtimpl.NewDataTransfer(cfg.Datastore, dtn, tpt, dtRestartConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	err = mgr.RegisterVoucherType(&requestvalidation.StorageDataTransferVoucher{}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -578,27 +572,6 @@ func (c *Client) TransferStatusForContent(ctx context.Context, content cid.Cid, 
 
 func (c *Client) RestartTransfer(ctx context.Context, chanid *datatransfer.ChannelID) error {
 	return c.dataTransfer.RestartDataTransferChannel(ctx, *chanid)
-}
-
-func (c *Client) StartDataTransfer(ctx context.Context, miner address.Address, propCid cid.Cid, dataCid cid.Cid) (*datatransfer.ChannelID, error) {
-	ctx, span := Tracer.Start(ctx, "startDataTransfer")
-	defer span.End()
-
-	mpid, err := c.ConnectToMiner(ctx, miner)
-	if err != nil {
-		return nil, err
-	}
-
-	voucher := &requestvalidation.StorageDataTransferVoucher{Proposal: propCid}
-
-	c.host.ConnManager().Protect(mpid, "transferring")
-
-	chanid, err := c.dataTransfer.OpenPushDataChannel(ctx, mpid, voucher, dataCid, shared.AllSelector())
-	if err != nil {
-		return nil, fmt.Errorf("opening push data channel: %w", err)
-	}
-
-	return &chanid, nil
 }
 
 func (c *Client) SubscribeToDataTransferEvents(f datatransfer.Subscriber) func() {
