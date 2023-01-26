@@ -2,7 +2,6 @@ package retrieve
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -14,13 +13,9 @@ import (
 
 	boostcar "github.com/filecoin-project/boost/car"
 	"github.com/filecoin-project/boost/retrieve/rep"
-	smtypes "github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport/httptransport"
-	boosttypes "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
-	"github.com/filecoin-project/go-commp-utils/writer"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-data-transfer/channelmonitor"
 	dtimpl "github.com/filecoin-project/go-data-transfer/impl"
@@ -30,21 +25,16 @@ import (
 	commp "github.com/filecoin-project/go-fil-commp-hashhash"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/shared"
-	"github.com/filecoin-project/go-fil-markets/storagemarket"
-	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/clientutils"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/requestvalidation"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/network"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/builtin/v8/paych"
-	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/lotus/api"
 	rpcstmgr "github.com/filecoin-project/lotus/chain/stmgr/rpc"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
 	"github.com/filecoin-project/lotus/paychmgr"
-	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
@@ -55,7 +45,6 @@ import (
 	"github.com/ipfs/go-graphsync/storeutil"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-car"
 	"github.com/libp2p/go-libp2p/core/host"
 	inet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -96,8 +85,6 @@ type FilClient struct {
 	blockstore blockstore.Blockstore
 
 	dataTransfer datatransfer.Manager
-
-	computePieceComm GetPieceCommFunc
 
 	graphSync *gsimpl.GraphSync
 
@@ -292,7 +279,6 @@ func NewClientWithConfig(cfg *Config) (*FilClient, error) {
 		dataTransfer:               mgr,
 		pchmgr:                     pchmgr,
 		mpusher:                    mpusher,
-		computePieceComm:           GeneratePieceCommitment,
 		graphSync:                  gse,
 		transport:                  tpt,
 		logRetrievalProgressEvents: cfg.LogRetrievalProgressEvents,
@@ -308,10 +294,6 @@ func NewClientWithConfig(cfg *Config) (*FilClient, error) {
 
 func (fc *FilClient) GetDtMgr() datatransfer.Manager {
 	return fc.dataTransfer
-}
-
-func (fc *FilClient) SetPieceCommFunc(pcf GetPieceCommFunc) {
-	fc.computePieceComm = pcf
 }
 
 func (fc *FilClient) DealProtocolForMiner(ctx context.Context, miner address.Address) (protocol.ID, error) {
@@ -500,248 +482,6 @@ func ComputePrice(askPrice types.BigInt, size abi.PaddedPieceSize, duration abi.
 	return (*abi.TokenAmount)(&cost), nil
 }
 
-func (fc *FilClient) MakeDeal(ctx context.Context, miner address.Address, data cid.Cid, price types.BigInt, minSize abi.PaddedPieceSize, duration abi.ChainEpoch, verified bool, removeUnsealed bool) (*network.Proposal, error) {
-	ctx, span := Tracer.Start(ctx, "makeDeal", trace.WithAttributes(
-		attribute.Stringer("miner", miner),
-		attribute.Stringer("price", price),
-		attribute.Int64("minSize", int64(minSize)),
-		attribute.Int64("duration", int64(duration)),
-		attribute.Stringer("cid", data),
-	))
-	defer span.End()
-
-	commP, dataSize, size, err := fc.computePieceComm(ctx, data, fc.blockstore)
-	if err != nil {
-		return nil, err
-	}
-
-	if size.Padded() < minSize {
-		padded, err := ZeroPadPieceCommitment(commP, size, minSize.Unpadded())
-		if err != nil {
-			return nil, err
-		}
-
-		commP = padded
-		size = minSize.Unpadded()
-	}
-
-	head, err := fc.api.ChainHead(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	collBounds, err := fc.api.StateDealProviderCollateralBounds(ctx, size.Padded(), verified, types.EmptyTSK)
-	if err != nil {
-		return nil, err
-	}
-
-	// set provider collateral 10% above minimum to avoid fluctuations causing deal failure
-	provCol := big.Div(big.Mul(collBounds.Min, big.NewInt(11)), big.NewInt(10))
-
-	// give miners a week to seal and commit the sector
-	dealStart := head.Height() + (epochsPerHour * 24 * 7)
-
-	end := dealStart + duration
-
-	pricePerEpoch := big.Div(big.Mul(big.NewInt(int64(size.Padded())), price), big.NewInt(1<<30))
-
-	label, err := clientutils.LabelField(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct label field: %w", err)
-	}
-
-	proposal := &market.DealProposal{
-		PieceCID:     commP,
-		PieceSize:    size.Padded(),
-		VerifiedDeal: verified,
-		Client:       fc.ClientAddr,
-		Provider:     miner,
-
-		Label: label,
-
-		StartEpoch: dealStart,
-		EndEpoch:   end,
-
-		StoragePricePerEpoch: pricePerEpoch,
-		ProviderCollateral:   provCol,
-		ClientCollateral:     big.Zero(),
-	}
-
-	raw, err := cborutil.Dump(proposal)
-	if err != nil {
-		return nil, err
-	}
-	sig, err := fc.wallet.WalletSign(ctx, fc.ClientAddr, raw, api.MsgMeta{Type: api.MTDealProposal})
-	if err != nil {
-		return nil, err
-	}
-
-	sigprop := &market.ClientDealProposal{
-		Proposal:        *proposal,
-		ClientSignature: *sig,
-	}
-
-	return &network.Proposal{
-		DealProposal: sigprop,
-		Piece: &storagemarket.DataRef{
-			TransferType: storagemarket.TTGraphsync,
-			Root:         data,
-			RawBlockSize: dataSize,
-		},
-		FastRetrieval: !removeUnsealed,
-	}, nil
-}
-
-func (fc *FilClient) SendProposalV110(ctx context.Context, netprop network.Proposal, propCid cid.Cid) (bool, error) {
-	ctx, span := Tracer.Start(ctx, "sendProposalV110")
-	defer span.End()
-
-	s, err := fc.streamToMiner(ctx, netprop.DealProposal.Proposal.Provider, DealProtocolv110)
-	if err != nil {
-		return false, fmt.Errorf("opening stream to miner: %w", err)
-	}
-
-	fc.host.ConnManager().Protect(s.Conn().RemotePeer(), "SendProposalV110")
-	defer func() {
-		fc.host.ConnManager().Unprotect(s.Conn().RemotePeer(), "SendProposalV110")
-		s.Close()
-	}()
-
-	// Send proposal to provider using deal protocol v1.1.0 format
-	var resp network.SignedResponse
-	if err := doRpc(ctx, s, &netprop, &resp); err != nil {
-		return false, fmt.Errorf("send proposal rpc: %w", err)
-	}
-
-	switch resp.Response.State {
-	case storagemarket.StorageDealError:
-		return true, fmt.Errorf("error response from miner: %s", resp.Response.Message)
-	case storagemarket.StorageDealProposalRejected:
-		return true, fmt.Errorf("deal rejected by miner: %s", resp.Response.Message)
-	default:
-		return true, fmt.Errorf("unrecognized response from miner: %d %s", resp.Response.State, resp.Response.Message)
-	case storagemarket.StorageDealWaitingForData, storagemarket.StorageDealProposalAccepted:
-	}
-
-	if propCid != resp.Response.Proposal {
-		return true, fmt.Errorf("proposal in saved deal did not match response (%s != %s)", propCid, resp.Response.Proposal)
-	}
-
-	return false, nil
-}
-
-func (fc *FilClient) SendProposalV120(ctx context.Context, dbid uint, netprop network.Proposal, dealUUID uuid.UUID, announce multiaddr.Multiaddr, authToken string) (bool, error) {
-	ctx, span := Tracer.Start(ctx, "sendProposalV120")
-	defer span.End()
-
-	s, err := fc.streamToMiner(ctx, netprop.DealProposal.Proposal.Provider, DealProtocolv120)
-	if err != nil {
-		return false, fmt.Errorf("opening stream to miner: %w", err)
-	}
-
-	fc.host.ConnManager().Protect(s.Conn().RemotePeer(), "SendProposalV120")
-	defer func() {
-		fc.host.ConnManager().Unprotect(s.Conn().RemotePeer(), "SendProposalV120")
-		s.Close()
-	}()
-
-	// Add the data URL and authorization token to the transfer parameters
-	transferParams, err := json.Marshal(boosttypes.HttpRequest{
-		URL: "libp2p://" + announce.String(),
-		Headers: map[string]string{
-			"Authorization": httptransport.BasicAuthHeader("", authToken),
-		},
-	})
-	if err != nil {
-		return false, fmt.Errorf("marshalling deal transfer params: %w", err)
-	}
-
-	// Send proposal to storage provider using deal protocol v1.2.0 format
-	params := smtypes.DealParams{
-		DealUUID:           dealUUID,
-		ClientDealProposal: *netprop.DealProposal,
-		DealDataRoot:       netprop.Piece.Root,
-		Transfer: smtypes.Transfer{
-			Type:     "libp2p",
-			ClientID: fmt.Sprintf("%d", dbid),
-			Params:   transferParams,
-			Size:     netprop.Piece.RawBlockSize,
-		},
-		RemoveUnsealedCopy: !netprop.FastRetrieval,
-	}
-
-	var resp smtypes.DealResponse
-	if err := doRpc(ctx, s, &params, &resp); err != nil {
-		return false, fmt.Errorf("send proposal rpc: %w", err)
-	}
-
-	// Check if the deal proposal was accepted
-	if !resp.Accepted {
-		return true, fmt.Errorf("deal proposal rejected: %s", resp.Message)
-	}
-
-	return false, nil
-}
-
-func GeneratePieceCommitment(ctx context.Context, payloadCid cid.Cid, bstore blockstore.Blockstore) (cid.Cid, uint64, abi.UnpaddedPieceSize, error) {
-	selectiveCar := car.NewSelectiveCar(
-		context.Background(),
-		bstore,
-		[]car.Dag{{Root: payloadCid, Selector: shared.AllSelector()}},
-		car.MaxTraversalLinks(maxTraversalLinks),
-		car.TraverseLinksOnlyOnce(),
-	)
-	preparedCar, err := selectiveCar.Prepare()
-	if err != nil {
-		return cid.Undef, 0, 0, err
-	}
-
-	writer := new(commp.Calc)
-	err = preparedCar.Dump(ctx, writer)
-	if err != nil {
-		return cid.Undef, 0, 0, err
-	}
-
-	commpc, size, err := writer.Digest()
-	if err != nil {
-		return cid.Undef, 0, 0, err
-	}
-
-	commCid, err := commcid.DataCommitmentV1ToCID(commpc)
-	if err != nil {
-		return cid.Undef, 0, 0, err
-	}
-
-	return commCid, preparedCar.Size(), abi.PaddedPieceSize(size).Unpadded(), nil
-}
-
-func GeneratePieceCommitmentFFI(ctx context.Context, payloadCid cid.Cid, bstore blockstore.Blockstore) (cid.Cid, uint64, abi.UnpaddedPieceSize, error) {
-	selectiveCar := car.NewSelectiveCar(
-		context.Background(),
-		bstore,
-		[]car.Dag{{Root: payloadCid, Selector: shared.AllSelector()}},
-		car.MaxTraversalLinks(maxTraversalLinks),
-		car.TraverseLinksOnlyOnce(),
-	)
-	preparedCar, err := selectiveCar.Prepare()
-	if err != nil {
-		return cid.Undef, 0, 0, err
-	}
-
-	commpWriter := &writer.Writer{}
-	err = preparedCar.Dump(ctx, commpWriter)
-	if err != nil {
-		return cid.Undef, 0, 0, err
-	}
-
-	dataCIDSize, err := commpWriter.Sum()
-	if err != nil {
-		return cid.Undef, 0, 0, err
-	}
-
-	return dataCIDSize.PieceCID, preparedCar.Size(), dataCIDSize.PieceSize.Unpadded(), nil
-}
-
 func ZeroPadPieceCommitment(c cid.Cid, curSize abi.UnpaddedPieceSize, toSize abi.UnpaddedPieceSize) (cid.Cid, error) {
 
 	rawPaddedCommp, err := commp.PadCommP(
@@ -754,118 +494,6 @@ func ZeroPadPieceCommitment(c cid.Cid, curSize abi.UnpaddedPieceSize, toSize abi
 		return cid.Undef, err
 	}
 	return commcid.DataCommitmentV1ToCID(rawPaddedCommp)
-}
-
-func (fc *FilClient) DealStatus(ctx context.Context, miner address.Address, propCid cid.Cid, dealUUID *uuid.UUID) (*storagemarket.ProviderDealState, error) {
-	protos := []protocol.ID{DealStatusProtocolv110}
-	if dealUUID != nil {
-		// Deal status protocol v1.2.0 requires a deal uuid, so only include it
-		// if the deal uuid is not nil
-		protos = []protocol.ID{DealStatusProtocolv120, DealStatusProtocolv110}
-	}
-	s, err := fc.streamToMiner(ctx, miner, protos...)
-	if err != nil {
-		return nil, err
-	}
-
-	fc.host.ConnManager().Protect(s.Conn().RemotePeer(), "DealStatus")
-	defer func() {
-		fc.host.ConnManager().Unprotect(s.Conn().RemotePeer(), "DealStatus")
-		s.Close()
-	}()
-
-	// If the miner only supports deal status protocol v1.1.0,
-	// or we don't have a uuid for the deal
-	if s.Protocol() == DealStatusProtocolv110 {
-		// Query deal status by signed proposal cid
-		cidb, err := cborutil.Dump(propCid)
-		if err != nil {
-			return nil, err
-		}
-
-		sig, err := fc.wallet.WalletSign(ctx, fc.ClientAddr, cidb, api.MsgMeta{Type: api.MTUnknown})
-		if err != nil {
-			return nil, fmt.Errorf("signing status request failed: %w", err)
-		}
-
-		req := &network.DealStatusRequest{
-			Proposal:  propCid,
-			Signature: *sig,
-		}
-
-		var resp network.DealStatusResponse
-		if err := doRpc(ctx, s, req, &resp); err != nil {
-			return nil, fmt.Errorf("deal status rpc: %w", err)
-		}
-
-		return &resp.DealState, nil
-	}
-
-	// The miner supports deal status protocol v1.2.0 or above.
-	// Query deal status by deal UUID.
-	uuidBytes, err := dealUUID.MarshalBinary()
-	if err != nil {
-		return nil, fmt.Errorf("getting uuid bytes: %w", err)
-	}
-	sig, err := fc.wallet.WalletSign(ctx, fc.ClientAddr, uuidBytes, api.MsgMeta{Type: api.MTUnknown})
-	if err != nil {
-		return nil, fmt.Errorf("signing status request failed: %w", err)
-	}
-
-	req := &smtypes.DealStatusRequest{
-		DealUUID:  *dealUUID,
-		Signature: *sig,
-	}
-
-	var resp smtypes.DealStatusResponse
-	if err := doRpc(ctx, s, req, &resp); err != nil {
-		return nil, fmt.Errorf("deal status rpc: %w", err)
-	}
-
-	if resp.Error != "" {
-		return nil, fmt.Errorf("deal status error: %s", resp.Error)
-	}
-
-	st := resp.DealStatus
-	if st == nil {
-		return nil, fmt.Errorf("deal status is nil")
-	}
-
-	return &storagemarket.ProviderDealState{
-		State:         toLegacyDealStatus(st),
-		Message:       st.Error,
-		Proposal:      &st.Proposal,
-		ProposalCid:   &st.SignedProposalCid,
-		PublishCid:    st.PublishCid,
-		DealID:        st.ChainDealID,
-		FastRetrieval: true,
-	}, nil
-}
-
-// toLegacyDealStatus converts a v1.2.0 deal status to a legacy deal status
-func toLegacyDealStatus(ds *smtypes.DealStatus) storagemarket.StorageDealStatus {
-	if ds.Error != "" {
-		return storagemarket.StorageDealError
-	}
-
-	switch ds.Status {
-	case dealcheckpoints.Accepted.String():
-		return storagemarket.StorageDealWaitingForData
-	case dealcheckpoints.Transferred.String():
-		return storagemarket.StorageDealVerifyData
-	case dealcheckpoints.Published.String():
-		return storagemarket.StorageDealPublishing
-	case dealcheckpoints.PublishConfirmed.String():
-		return storagemarket.StorageDealStaged
-	case dealcheckpoints.AddedPiece.String():
-		return storagemarket.StorageDealAwaitingPreCommit
-	case dealcheckpoints.IndexedAndAnnounced.String():
-		return storagemarket.StorageDealAwaitingPreCommit
-	case dealcheckpoints.Complete.String():
-		return storagemarket.StorageDealSealing
-	}
-
-	return storagemarket.StorageDealUnknown
 }
 
 func (fc *FilClient) MinerPeer(ctx context.Context, miner address.Address) (peer.AddrInfo, error) {
@@ -1275,41 +903,6 @@ func (fc *FilClient) Balance(ctx context.Context) (*Balance, error) {
 
 type LockFundsResp struct {
 	MsgCid cid.Cid
-}
-
-func (fc *FilClient) LockMarketFunds(ctx context.Context, amt types.FIL) (*LockFundsResp, error) {
-
-	act, err := fc.api.StateGetActor(ctx, fc.ClientAddr, types.EmptyTSK)
-	if err != nil {
-		return nil, err
-	}
-
-	if types.BigCmp(types.BigInt(amt), act.Balance) > 0 {
-		return nil, fmt.Errorf("not enough funds to add: %s < %s", types.FIL(act.Balance), amt)
-	}
-
-	encAddr, err := cborutil.Dump(&fc.ClientAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	msg := &types.Message{
-		From:   fc.ClientAddr,
-		To:     builtin.StorageMarketActorAddr,
-		Method: builtin.MethodsMarket.AddBalance,
-		Value:  types.BigInt(amt),
-		Params: encAddr,
-		Nonce:  act.Nonce,
-	}
-
-	smsg, err := fc.mpusher.MpoolPushMessage(ctx, msg, &api.MessageSendSpec{})
-	if err != nil {
-		return nil, err
-	}
-
-	return &LockFundsResp{
-		MsgCid: smsg.Cid(),
-	}, nil
 }
 
 func (fc *FilClient) CheckChainDeal(ctx context.Context, dealid abi.DealID) (bool, *api.MarketDeal, error) {
