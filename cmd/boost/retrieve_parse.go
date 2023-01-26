@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"strings"
@@ -36,13 +37,16 @@ func parseMiners(cctx *cli.Context) ([]address.Address, error) {
 
 	var miners []address.Address
 	for _, ms := range minerStrings {
-
 		miner, err := address.NewFromString(ms)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse miner %s: %w", ms, err)
 		}
 
 		miners = append(miners, miner)
+	}
+
+	if len(miners) == 0 {
+		return nil, errors.New("you must specify at least one miner address")
 	}
 
 	return miners, nil
