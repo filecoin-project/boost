@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multihash"
+	"github.com/vence722/base122-go"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 )
@@ -219,9 +220,14 @@ func (db *DB) GetPieceCidsByMultihash(ctx context.Context, mh multihash.Multihas
 	ctx, span := tracing.Tracer.Start(ctx, "db.get_piece_cids_by_multihash")
 	defer span.End()
 
-	k := toCouchKey(mh.String())
+	b122mh, err := base122.EncodeToString(mh)
+	if err != nil {
+		return nil, fmt.Errorf("encoding multihash %s as base 122 string: %w", mh, err)
+	}
+	k := toCouchKey(b122mh)
+
 	var getResult *gocb.GetResult
-	getResult, err := db.mhToPieces.Get(k, &gocb.GetOptions{Context: ctx})
+	getResult, err = db.mhToPieces.Get(k, &gocb.GetOptions{Context: ctx})
 	if err != nil {
 		return nil, fmt.Errorf("getting piece cids by multihash %s: %w", mh, err)
 	}
@@ -234,9 +240,13 @@ func (db *DB) GetPieceCidsByMultihash(ctx context.Context, mh multihash.Multihas
 
 	pcids := make([]cid.Cid, 0, len(cidStrs))
 	for _, c := range cidStrs {
-		pcid, err := cid.Decode(c)
+		b122pcid, err := base122.DecodeFromString(c)
 		if err != nil {
-			return nil, fmt.Errorf("getting piece cids by multihash %s: parsing piece cid %s: %w", mh, pcid, err)
+			return nil, fmt.Errorf("getting piece cids by multihash %s: decoding base122 string %s into piece cid: %w", mh, c, err)
+		}
+		pcid, err := cid.Parse(b122pcid)
+		if err != nil {
+			return nil, fmt.Errorf("getting piece cids by multihash %s: parsing piece cid %s: %w", mh, c, err)
 		}
 		pcids = append(pcids, pcid)
 	}
@@ -261,10 +271,19 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, mhs []multihash.Mult
 			defer func() { <-throttle }()
 
 			return db.withCasRetry("multihash -> pieces", func() error {
-				cbKey := toCouchKey(mh.String())
+				b122mh, err := base122.EncodeToString(mh)
+				if err != nil {
+					return fmt.Errorf("encoding multihash %s as base 122 string: %w", mh, err)
+				}
+				cbKey := toCouchKey(b122mh)
+
+				b122pcid, err := base122.EncodeToString(pieceCid.Bytes())
+				if err != nil {
+					return fmt.Errorf("encoding piece cid %s as base 122 string: %w", pieceCid, err)
+				}
 
 				// Insert a tuple into the bucket: multihash -> [piece cid]
-				_, err := db.mhToPieces.Insert(cbKey, []string{pieceCid.String()}, &gocb.InsertOptions{Context: ctx})
+				_, err = db.mhToPieces.Insert(cbKey, []string{b122pcid}, &gocb.InsertOptions{Context: ctx})
 				if err == nil {
 					return nil
 				}
@@ -279,7 +298,7 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, mhs []multihash.Mult
 
 				// Add the piece cid to the set of piece cids
 				mops := []gocb.MutateInSpec{
-					gocb.ArrayAddUniqueSpec("", pieceCid.String(), &gocb.ArrayAddUniqueSpecOptions{}),
+					gocb.ArrayAddUniqueSpec("", b122pcid, &gocb.ArrayAddUniqueSpecOptions{}),
 				}
 				_, err = db.mhToPieces.MutateIn(cbKey, mops, &gocb.MutateInOptions{Context: ctx})
 				if err != nil {
