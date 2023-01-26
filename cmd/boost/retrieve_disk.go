@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	crand "crypto/rand"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -11,13 +10,11 @@ import (
 
 	"github.com/filecoin-project/boost/lib/keystore"
 	"github.com/filecoin-project/boost/retrieve"
-	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-bitswap"
 	bsnet "github.com/ipfs/go-bitswap/network"
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	flatfs "github.com/ipfs/go-ds-flatfs"
 	levelds "github.com/ipfs/go-ds-leveldb"
@@ -29,14 +26,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/urfave/cli/v2"
 )
-
-type dealData struct {
-	Proposal *market.ClientDealProposal
-}
-
-func dealsPath(baseDir string) string {
-	return filepath.Join(baseDir, "deals")
-}
 
 func keyPath(baseDir string) string {
 	return filepath.Join(baseDir, "libp2p.key")
@@ -52,47 +41,6 @@ func datastorePath(baseDir string) string {
 
 func walletPath(baseDir string) string {
 	return filepath.Join(baseDir, "wallet")
-}
-
-func saveDealProposal(dataDir string, propcid cid.Cid, proposal *market.ClientDealProposal) error {
-	dealsPath := dealsPath(dataDir)
-
-	if err := os.MkdirAll(dealsPath, 0755); err != nil {
-		return err
-	}
-
-	data := &dealData{
-		Proposal: proposal,
-	}
-
-	fi, err := os.Create(filepath.Join(dealsPath, propcid.String()))
-	if err != nil {
-		return err
-	}
-	defer fi.Close()
-
-	if err := json.NewEncoder(fi).Encode(data); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func listDeals(dataDir string) ([]cid.Cid, error) {
-	elems, err := ioutil.ReadDir(dealsPath(dataDir))
-	if err != nil {
-		return nil, err
-	}
-
-	var out []cid.Cid
-	for _, e := range elems {
-		fmt.Println(e.Name())
-		c, err := cid.Decode(e.Name())
-		if err == nil {
-			out = append(out, c)
-		}
-	}
-	return out, nil
 }
 
 func clientFromNode(cctx *cli.Context, nd *Node, dir string) (*retrieve.FilClient, func(), error) {
@@ -112,15 +60,6 @@ func clientFromNode(cctx *cli.Context, nd *Node, dir string) (*retrieve.FilClien
 	}
 
 	return fc, closer, nil
-}
-
-func getClient(cctx *cli.Context, dir string) (*retrieve.FilClient, func(), error) {
-	nd, err := setup(context.Background(), dir)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return clientFromNode(cctx, nd, dir)
 }
 
 type Node struct {

@@ -10,7 +10,6 @@ import (
 
 	"github.com/filecoin-project/boost/retrieve"
 	"github.com/filecoin-project/go-address"
-	"github.com/google/uuid"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
@@ -29,6 +28,56 @@ import (
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 )
+
+var flagMiner = &cli.StringFlag{
+	Name:    "miner",
+	Aliases: []string{"m"},
+}
+
+var flagMinerRequired = &cli.StringFlag{
+	Name:     flagMiner.Name,
+	Aliases:  flagMiner.Aliases,
+	Required: true,
+}
+
+var flagMiners = &cli.StringSliceFlag{
+	Name:    "miners",
+	Aliases: []string{"miner", "m"},
+}
+
+var flagMinersRequired = &cli.StringSliceFlag{
+	Name:     flagMiners.Name,
+	Aliases:  flagMiners.Aliases,
+	Required: true,
+}
+
+var flagOutput = &cli.StringFlag{
+	Name:    "output",
+	Aliases: []string{"o"},
+}
+
+var flagNetwork = &cli.StringFlag{
+	Name:        "network",
+	Aliases:     []string{"n"},
+	Usage:       "which network to retrieve from [fil|ipfs|auto]",
+	DefaultText: NetworkAuto,
+	Value:       NetworkAuto,
+}
+
+var flagCar = &cli.BoolFlag{
+	Name: "car",
+}
+
+const (
+	NetworkFIL  = "fil"
+	NetworkIPFS = "ipfs"
+	NetworkAuto = "auto"
+)
+
+var flagDmPathSel = &cli.StringFlag{
+	Name:  "datamodel-path-selector",
+	Usage: "a rudimentary (DM-level-only) text-path selector, allowing for sub-selection within a deal",
+}
 
 var retrieveCmd = &cli.Command{
 	Name:        "retrieve",
@@ -295,16 +344,6 @@ func parseMiners(cctx *cli.Context) ([]address.Address, error) {
 	return miners, nil
 }
 
-// Get whether to use a verified deal or not.
-func parseVerified(cctx *cli.Context) bool {
-	return cctx.Bool(flagVerified.Name)
-}
-
-// Get whether to ask SP to remove unsealed copy.
-func parseRemoveUnsealed(cctx *cli.Context) bool {
-	return cctx.Bool(removeUnsealed.Name)
-}
-
 // Get the destination file to write the output to, erroring if not a valid
 // path. This early error check is important because you don't want to do a
 // bunch of work, only to end up crashing when you try to write the file.
@@ -316,19 +355,4 @@ func parseOutput(cctx *cli.Context) (string, error) {
 	}
 
 	return path, nil
-}
-
-func parseDealUUID(cctx *cli.Context) (uuid.UUID, error) {
-	dealUUIDStr := cctx.String(flagDealUUID.Name)
-
-	if dealUUIDStr == "" {
-		return uuid.Nil, nil
-	}
-
-	dealUUID, err := uuid.Parse(dealUUIDStr)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to parse deal UUID '%s'", dealUUIDStr)
-	}
-
-	return dealUUID, nil
 }
