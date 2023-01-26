@@ -3,6 +3,7 @@ package retrieve
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -94,7 +95,7 @@ func (m *libp2pTransferManager) checkTransferExpiry(ctx context.Context) {
 	for _, val := range expired {
 		// Get the active transfer associated with the auth token
 		activeXfer, err := m.dtServer.Get(val.ID)
-		if err != nil && !xerrors.Is(err, httptransport.ErrTransferNotFound) {
+		if err != nil && !errors.Is(err, httptransport.ErrTransferNotFound) {
 			log.Errorw("getting transfer", "id", val.ID, "err", err)
 			continue
 		}
@@ -104,7 +105,7 @@ func (m *libp2pTransferManager) checkTransferExpiry(ctx context.Context) {
 		if activeXfer != nil {
 			// Cancel the transfer
 			_, err := m.dtServer.CancelTransfer(ctx, val.ID)
-			if err != nil && !xerrors.Is(err, httptransport.ErrTransferNotFound) {
+			if err != nil && !errors.Is(err, httptransport.ErrTransferNotFound) {
 				log.Errorw("canceling transfer", "id", val.ID, "err", err)
 				continue
 			}
@@ -112,7 +113,7 @@ func (m *libp2pTransferManager) checkTransferExpiry(ctx context.Context) {
 
 		// Check if the transfer already completed
 		completedXfer, err := m.getCompletedTransfer(val.ID)
-		if err != nil && !xerrors.Is(err, datastore.ErrNotFound) {
+		if err != nil && !errors.Is(err, datastore.ErrNotFound) {
 			log.Errorw("getting completed transfer", "id", val.ID, "err", err)
 			continue
 		}

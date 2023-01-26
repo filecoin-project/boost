@@ -57,21 +57,9 @@ var flagMiner = &cli.StringFlag{
 	Aliases: []string{"m"},
 }
 
-var flagMinerRequired = &cli.StringFlag{
-	Name:     flagMiner.Name,
-	Aliases:  flagMiner.Aliases,
-	Required: true,
-}
-
 var flagMiners = &cli.StringSliceFlag{
 	Name:    "miners",
 	Aliases: []string{"miner", "m"},
-}
-
-var flagMinersRequired = &cli.StringSliceFlag{
-	Name:     flagMiners.Name,
-	Aliases:  flagMiners.Aliases,
-	Required: true,
 }
 
 var flagOutput = &cli.StringFlag{
@@ -282,19 +270,6 @@ var retrieveCmd = &cli.Command{
 
 		return nil
 	},
-}
-
-// Read a single miner from the CLI, returning address.Undef if none is
-// provided.
-func parseMiner(cctx *cli.Context) (address.Address, error) {
-	minerStringRaw := cctx.String(flagMiner.Name)
-
-	miner, err := address.NewFromString(minerStringRaw)
-	if err != nil {
-		return address.Undef, fmt.Errorf("failed to parse miner: %s: %w", minerStringRaw, err)
-	}
-
-	return miner, nil
 }
 
 // Read a comma-separated or multi flag list of miners from the CLI.
