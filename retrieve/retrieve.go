@@ -576,24 +576,24 @@ func (c *Client) TransferStatusForContent(ctx context.Context, content cid.Cid, 
 	return nil, ErrNoTransferFound
 }
 
-func (fc *Client) RestartTransfer(ctx context.Context, chanid *datatransfer.ChannelID) error {
-	return fc.dataTransfer.RestartDataTransferChannel(ctx, *chanid)
+func (c *Client) RestartTransfer(ctx context.Context, chanid *datatransfer.ChannelID) error {
+	return c.dataTransfer.RestartDataTransferChannel(ctx, *chanid)
 }
 
-func (fc *Client) StartDataTransfer(ctx context.Context, miner address.Address, propCid cid.Cid, dataCid cid.Cid) (*datatransfer.ChannelID, error) {
+func (c *Client) StartDataTransfer(ctx context.Context, miner address.Address, propCid cid.Cid, dataCid cid.Cid) (*datatransfer.ChannelID, error) {
 	ctx, span := Tracer.Start(ctx, "startDataTransfer")
 	defer span.End()
 
-	mpid, err := fc.ConnectToMiner(ctx, miner)
+	mpid, err := c.ConnectToMiner(ctx, miner)
 	if err != nil {
 		return nil, err
 	}
 
 	voucher := &requestvalidation.StorageDataTransferVoucher{Proposal: propCid}
 
-	fc.host.ConnManager().Protect(mpid, "transferring")
+	c.host.ConnManager().Protect(mpid, "transferring")
 
-	chanid, err := fc.dataTransfer.OpenPushDataChannel(ctx, mpid, voucher, dataCid, shared.AllSelector())
+	chanid, err := c.dataTransfer.OpenPushDataChannel(ctx, mpid, voucher, dataCid, shared.AllSelector())
 	if err != nil {
 		return nil, fmt.Errorf("opening push data channel: %w", err)
 	}
@@ -601,8 +601,8 @@ func (fc *Client) StartDataTransfer(ctx context.Context, miner address.Address, 
 	return &chanid, nil
 }
 
-func (fc *Client) SubscribeToDataTransferEvents(f datatransfer.Subscriber) func() {
-	return fc.dataTransfer.SubscribeToEvents(f)
+func (c *Client) SubscribeToDataTransferEvents(f datatransfer.Subscriber) func() {
+	return c.dataTransfer.SubscribeToEvents(f)
 }
 
 type Balance struct {
@@ -615,18 +615,18 @@ type Balance struct {
 	VerifiedClientBalance *abi.StoragePower `json:"verifiedClientBalance"`
 }
 
-func (fc *Client) Balance(ctx context.Context) (*Balance, error) {
-	act, err := fc.api.StateGetActor(ctx, fc.ClientAddr, types.EmptyTSK)
+func (c *Client) Balance(ctx context.Context) (*Balance, error) {
+	act, err := c.api.StateGetActor(ctx, c.ClientAddr, types.EmptyTSK)
 	if err != nil {
 		return nil, err
 	}
 
-	market, err := fc.api.StateMarketBalance(ctx, fc.ClientAddr, types.EmptyTSK)
+	market, err := c.api.StateMarketBalance(ctx, c.ClientAddr, types.EmptyTSK)
 	if err != nil {
 		return nil, err
 	}
 
-	vcstatus, err := fc.api.StateVerifiedClientStatus(ctx, fc.ClientAddr, types.EmptyTSK)
+	vcstatus, err := c.api.StateVerifiedClientStatus(ctx, c.ClientAddr, types.EmptyTSK)
 	if err != nil {
 		return nil, err
 	}
@@ -634,7 +634,7 @@ func (fc *Client) Balance(ctx context.Context) (*Balance, error) {
 	avail := types.BigSub(market.Escrow, market.Locked)
 
 	return &Balance{
-		Account:               fc.ClientAddr,
+		Account:               c.ClientAddr,
 		Balance:               types.FIL(act.Balance),
 		MarketEscrow:          types.FIL(market.Escrow),
 		MarketLocked:          types.FIL(market.Locked),
@@ -647,8 +647,8 @@ type LockFundsResp struct {
 	MsgCid cid.Cid
 }
 
-func (fc *Client) CheckChainDeal(ctx context.Context, dealid abi.DealID) (bool, *api.MarketDeal, error) {
-	deal, err := fc.api.StateMarketStorageDeal(ctx, dealid, types.EmptyTSK)
+func (c *Client) CheckChainDeal(ctx context.Context, dealid abi.DealID) (bool, *api.MarketDeal, error) {
+	deal, err := c.api.StateMarketStorageDeal(ctx, dealid, types.EmptyTSK)
 	if err != nil {
 		nfs := fmt.Sprintf("deal %d not found", dealid)
 		if strings.Contains(err.Error(), nfs) {
@@ -661,7 +661,7 @@ func (fc *Client) CheckChainDeal(ctx context.Context, dealid abi.DealID) (bool, 
 	return true, deal, nil
 }
 
-func (fc *Client) CheckOngoingTransfer(ctx context.Context, miner address.Address, st *ChannelState) (outerr error) {
+func (c *Client) CheckOngoingTransfer(ctx context.Context, miner address.Address, st *ChannelState) (outerr error) {
 	defer func() {
 		// TODO: this is only here because for some reason restarting a data transfer can just panic
 		// https://github.com/filecoin-project/go-data-transfer/issues/150
@@ -670,9 +670,9 @@ func (fc *Client) CheckOngoingTransfer(ctx context.Context, miner address.Addres
 		}
 	}()
 	// make sure we at least have an open connection to the miner
-	if fc.host.Network().Connectedness(st.RemotePeer) != inet.Connected {
+	if c.host.Network().Connectedness(st.RemotePeer) != inet.Connected {
 		// try reconnecting
-		mpid, err := fc.ConnectToMiner(ctx, miner)
+		mpid, err := c.ConnectToMiner(ctx, miner)
 		if err != nil {
 			return err
 		}
@@ -682,34 +682,34 @@ func (fc *Client) CheckOngoingTransfer(ctx context.Context, miner address.Addres
 		}
 	}
 
-	return fc.dataTransfer.RestartDataTransferChannel(ctx, st.ChannelID)
+	return c.dataTransfer.RestartDataTransferChannel(ctx, st.ChannelID)
 
 }
 
-func (fc *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
+func (c *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
 	ctx, span := Tracer.Start(ctx, "retrievalQuery", trace.WithAttributes(
 		attribute.Stringer("miner", maddr),
 	))
 	defer span.End()
 
-	s, err := fc.streamToMiner(ctx, maddr, RetrievalQueryProtocol)
+	s, err := c.streamToMiner(ctx, maddr, RetrievalQueryProtocol)
 	if err != nil {
 		// publish fail event, log the err
-		fc.rep.Publish(
+		c.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.QueryPhase, pcid, "", maddr,
 				fmt.Sprintf("failed connecting to miner: %s", err.Error())))
 		return nil, err
 	}
 
-	fc.host.ConnManager().Protect(s.Conn().RemotePeer(), "RetrievalQuery")
+	c.host.ConnManager().Protect(s.Conn().RemotePeer(), "RetrievalQuery")
 	defer func() {
-		fc.host.ConnManager().Unprotect(s.Conn().RemotePeer(), "RetrievalQuery")
+		c.host.ConnManager().Unprotect(s.Conn().RemotePeer(), "RetrievalQuery")
 		s.Close()
 	}()
 
 	// We have connected
 	// publish connected event
-	fc.rep.Publish(rep.NewRetrievalEventConnect(rep.QueryPhase, pcid, "", maddr))
+	c.rep.Publish(rep.NewRetrievalEventConnect(rep.QueryPhase, pcid, "", maddr))
 
 	q := &retrievalmarket.Query{
 		PayloadCID: pcid,
@@ -718,42 +718,42 @@ func (fc *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pci
 	var resp retrievalmarket.QueryResponse
 	if err := doRpc(ctx, s, q, &resp); err != nil {
 		// publish failure event
-		fc.rep.Publish(
+		c.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.QueryPhase, pcid, "", maddr,
 				fmt.Sprintf("failed retrieval query ask: %s", err.Error())))
 		return nil, fmt.Errorf("retrieval query rpc: %w", err)
 	}
 
 	// publish query ask event
-	fc.rep.Publish(rep.NewRetrievalEventQueryAsk(rep.QueryPhase, pcid, "", maddr, resp))
+	c.rep.Publish(rep.NewRetrievalEventQueryAsk(rep.QueryPhase, pcid, "", maddr, resp))
 
 	return &resp, nil
 }
 
-func (fc *Client) RetrievalQueryToPeer(ctx context.Context, minerPeer peer.AddrInfo, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
+func (c *Client) RetrievalQueryToPeer(ctx context.Context, minerPeer peer.AddrInfo, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
 	ctx, span := Tracer.Start(ctx, "retrievalQueryPeer", trace.WithAttributes(
 		attribute.Stringer("peerID", minerPeer.ID),
 	))
 	defer span.End()
 
-	s, err := fc.openStreamToPeer(ctx, minerPeer, RetrievalQueryProtocol)
+	s, err := c.openStreamToPeer(ctx, minerPeer, RetrievalQueryProtocol)
 	if err != nil {
 		// publish fail event, log the err
-		fc.rep.Publish(
+		c.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.QueryPhase, pcid, minerPeer.ID, address.Undef,
 				fmt.Sprintf("failed connecting to miner: %s", err.Error())))
 		return nil, err
 	}
 
-	fc.host.ConnManager().Protect(s.Conn().RemotePeer(), "RetrievalQueryToPeer")
+	c.host.ConnManager().Protect(s.Conn().RemotePeer(), "RetrievalQueryToPeer")
 	defer func() {
-		fc.host.ConnManager().Unprotect(s.Conn().RemotePeer(), "RetrievalQueryToPeer")
+		c.host.ConnManager().Unprotect(s.Conn().RemotePeer(), "RetrievalQueryToPeer")
 		s.Close()
 	}()
 
 	// We have connected
 	// publish connected event
-	fc.rep.Publish(rep.NewRetrievalEventConnect(rep.QueryPhase, pcid, minerPeer.ID, address.Address{}))
+	c.rep.Publish(rep.NewRetrievalEventConnect(rep.QueryPhase, pcid, minerPeer.ID, address.Address{}))
 
 	q := &retrievalmarket.Query{
 		PayloadCID: pcid,
@@ -762,21 +762,21 @@ func (fc *Client) RetrievalQueryToPeer(ctx context.Context, minerPeer peer.AddrI
 	var resp retrievalmarket.QueryResponse
 	if err := doRpc(ctx, s, q, &resp); err != nil {
 		// publish failure event
-		fc.rep.Publish(
+		c.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.QueryPhase, pcid, minerPeer.ID, address.Undef,
 				fmt.Sprintf("failed retrieval query ask: %s", err.Error())))
 		return nil, fmt.Errorf("retrieval query rpc: %w", err)
 	}
 
 	// publish query ask event
-	fc.rep.Publish(rep.NewRetrievalEventQueryAsk(rep.QueryPhase, pcid, minerPeer.ID, address.Undef, resp))
+	c.rep.Publish(rep.NewRetrievalEventQueryAsk(rep.QueryPhase, pcid, minerPeer.ID, address.Undef, resp))
 
 	return &resp, nil
 }
 
-func (fc *Client) getPaychWithMinFunds(ctx context.Context, dest address.Address) (address.Address, error) {
+func (c *Client) getPaychWithMinFunds(ctx context.Context, dest address.Address) (address.Address, error) {
 
-	avail, err := fc.pchmgr.AvailableFundsByFromTo(ctx, fc.ClientAddr, dest)
+	avail, err := c.pchmgr.AvailableFundsByFromTo(ctx, c.ClientAddr, dest)
 	if err != nil {
 		return address.Undef, err
 	}
@@ -793,8 +793,8 @@ func (fc *Client) getPaychWithMinFunds(ctx context.Context, dest address.Address
 
 	amount := types.BigMul(types.BigInt(reqBalance), types.NewInt(2))
 
-	fmt.Println("getting payment channel: ", fc.ClientAddr, dest, amount)
-	pchaddr, mcid, err := fc.pchmgr.GetPaych(ctx, fc.ClientAddr, dest, amount, paychmgr.GetOpts{
+	fmt.Println("getting payment channel: ", c.ClientAddr, dest, amount)
+	pchaddr, mcid, err := c.pchmgr.GetPaych(ctx, c.ClientAddr, dest, amount, paychmgr.GetOpts{
 		Reserve:  false,
 		OffChain: false,
 	})
@@ -811,7 +811,7 @@ func (fc *Client) getPaychWithMinFunds(ctx context.Context, dest address.Address
 		return pchaddr, nil
 	}
 
-	return fc.pchmgr.GetPaychWaitReady(ctx, mcid)
+	return c.pchmgr.GetPaychWaitReady(ctx, mcid)
 }
 
 type RetrievalStats struct {
@@ -827,16 +827,16 @@ type RetrievalStats struct {
 	//TimeToFirstByte time.Duration
 }
 
-func (fc *Client) RetrieveContent(
+func (c *Client) RetrieveContent(
 	ctx context.Context,
 	miner address.Address,
 	proposal *retrievalmarket.DealProposal,
 ) (*RetrievalStats, error) {
 
-	return fc.RetrieveContentWithProgressCallback(ctx, miner, proposal, nil)
+	return c.RetrieveContentWithProgressCallback(ctx, miner, proposal, nil)
 }
 
-func (fc *Client) RetrieveContentWithProgressCallback(
+func (c *Client) RetrieveContentWithProgressCallback(
 	ctx context.Context,
 	miner address.Address,
 	proposal *retrievalmarket.DealProposal,
@@ -845,25 +845,25 @@ func (fc *Client) RetrieveContentWithProgressCallback(
 
 	log.Infof("Starting retrieval with miner: %s", miner)
 
-	minerPeer, err := fc.MinerPeer(ctx, miner)
+	minerPeer, err := c.MinerPeer(ctx, miner)
 	if err != nil {
 		return nil, err
 	}
-	minerOwner, err := fc.minerOwner(ctx, miner)
+	minerOwner, err := c.minerOwner(ctx, miner)
 	if err != nil {
 		return nil, err
 	}
-	return fc.RetrieveContentFromPeerWithProgressCallback(ctx, minerPeer.ID, minerOwner, proposal, progressCallback)
+	return c.RetrieveContentFromPeerWithProgressCallback(ctx, minerPeer.ID, minerOwner, proposal, progressCallback)
 }
 
-func (fc *Client) RetrieveContentFromPeerWithProgressCallback(
+func (c *Client) RetrieveContentFromPeerWithProgressCallback(
 	ctx context.Context,
 	peerID peer.ID,
 	minerWallet address.Address,
 	proposal *retrievalmarket.DealProposal,
 	progressCallback func(bytesReceived uint64),
 ) (*RetrievalStats, error) {
-	return fc.retrieveContentFromPeerWithProgressCallback(ctx, peerID, minerWallet, proposal, progressCallback, nil)
+	return c.retrieveContentFromPeerWithProgressCallback(ctx, peerID, minerWallet, proposal, progressCallback, nil)
 }
 
 type RetrievalResult struct {
@@ -871,7 +871,7 @@ type RetrievalResult struct {
 	Err error
 }
 
-func (fc *Client) RetrieveContentFromPeerAsync(
+func (c *Client) RetrieveContentFromPeerAsync(
 	ctx context.Context,
 	peerID peer.ID,
 	minerWallet address.Address,
@@ -883,7 +883,7 @@ func (fc *Client) RetrieveContentFromPeerAsync(
 	internalCtx, internalCancel := context.WithCancel(ctx)
 	go func() {
 		defer internalCancel()
-		result, err := fc.retrieveContentFromPeerWithProgressCallback(internalCtx, peerID, minerWallet, proposal, func(bytes uint64) {
+		result, err := c.retrieveContentFromPeerWithProgressCallback(internalCtx, peerID, minerWallet, proposal, func(bytes uint64) {
 			select {
 			case <-internalCtx.Done():
 			case progressChan <- bytes:
@@ -896,7 +896,7 @@ func (fc *Client) RetrieveContentFromPeerAsync(
 	}
 }
 
-func (fc *Client) retrieveContentFromPeerWithProgressCallback(
+func (c *Client) retrieveContentFromPeerWithProgressCallback(
 	ctx context.Context,
 	peerID peer.ID,
 	minerWallet address.Address,
@@ -910,7 +910,7 @@ func (fc *Client) retrieveContentFromPeerWithProgressCallback(
 
 	log.Infof("Starting retrieval with miner peer ID: %s", peerID)
 
-	ctx, span := Tracer.Start(ctx, "fcRetrieveContent")
+	ctx, span := Tracer.Start(ctx, "retrieveContent")
 	defer span.End()
 
 	// Stats
@@ -926,16 +926,16 @@ func (fc *Client) retrieveContentFromPeerWithProgressCallback(
 	var pchLane uint64
 	if pchRequired {
 		// Get the payment channel and create a lane for this retrieval
-		pchAddr, err := fc.getPaychWithMinFunds(ctx, minerWallet)
+		pchAddr, err := c.getPaychWithMinFunds(ctx, minerWallet)
 		if err != nil {
-			fc.rep.Publish(
+			c.rep.Publish(
 				rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef,
 					fmt.Sprintf("failed to get payment channel: %s", err.Error())))
 			return nil, fmt.Errorf("failed to get payment channel: %w", err)
 		}
-		pchLane, err = fc.pchmgr.AllocateLane(ctx, pchAddr)
+		pchLane, err = c.pchmgr.AllocateLane(ctx, pchAddr)
 		if err != nil {
-			fc.rep.Publish(
+			c.rep.Publish(
 				rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef,
 					fmt.Sprintf("failed to allocate lane: %s", err.Error())))
 			return nil, fmt.Errorf("failed to allocate lane: %w", err)
@@ -963,7 +963,7 @@ func (fc *Client) retrieveContentFromPeerWithProgressCallback(
 	dealComplete := false
 	receivedFirstByte := false
 
-	unsubscribe := fc.dataTransfer.SubscribeToEvents(func(event datatransfer.Event, state datatransfer.ChannelState) {
+	unsubscribe := c.dataTransfer.SubscribeToEvents(func(event datatransfer.Event, state datatransfer.ChannelState) {
 		// Copy chanid so it can be used later in the callback
 		chanidLk.Lock()
 		chanidCopy := chanid
@@ -1007,7 +1007,7 @@ func (fc *Client) retrieveContentFromPeerWithProgressCallback(
 					log.Info("Deal accepted")
 
 					// publish deal accepted event
-					fc.rep.Publish(rep.NewRetrievalEventAccepted(rep.RetrievalPhase, rootCid, peerID, address.Undef))
+					c.rep.Publish(rep.NewRetrievalEventAccepted(rep.RetrievalPhase, rootCid, peerID, address.Undef))
 
 				// Respond with a payment voucher when funds are requested
 				case retrievalmarket.DealStatusFundsNeeded, retrievalmarket.DealStatusFundsNeededLastPayment:
@@ -1016,7 +1016,7 @@ func (fc *Client) retrieveContentFromPeerWithProgressCallback(
 
 						totalPayment = types.BigAdd(totalPayment, resType.PaymentOwed)
 
-						vres, err := fc.pchmgr.CreateVoucher(ctx, pchAddr, paych.SignedVoucher{
+						vres, err := c.pchmgr.CreateVoucher(ctx, pchAddr, paych.SignedVoucher{
 							ChannelAddr: pchAddr,
 							Lane:        pchLane,
 							Nonce:       nonce,
@@ -1032,7 +1032,7 @@ func (fc *Client) retrieveContentFromPeerWithProgressCallback(
 							return
 						}
 
-						if err := fc.dataTransfer.SendVoucher(ctx, chanidCopy, &retrievalmarket.DealPayment{
+						if err := c.dataTransfer.SendVoucher(ctx, chanidCopy, &retrievalmarket.DealPayment{
 							ID:             proposal.ID,
 							PaymentChannel: pchAddr,
 							PaymentVoucher: vres.Voucher,
@@ -1091,7 +1091,7 @@ func (fc *Client) retrieveContentFromPeerWithProgressCallback(
 			// publish first byte event
 			if !receivedFirstByte {
 				receivedFirstByte = true
-				fc.rep.Publish(rep.NewRetrievalEventFirstByte(rep.RetrievalPhase, rootCid, peerID, address.Undef))
+				c.rep.Publish(rep.NewRetrievalEventFirstByte(rep.RetrievalPhase, rootCid, peerID, address.Undef))
 			}
 
 			progressCallback(state.Received())
@@ -1114,7 +1114,7 @@ func (fc *Client) retrieveContentFromPeerWithProgressCallback(
 		if eventCodeNotHandled {
 			log.Warnw("unhandled retrieval event", "dealID", dealID, "rootCid", rootCid, "peerID", peerID, "name", name, "code", code, "message", msg, "blocksIndex", blocksIndex, "totalReceived", totalReceived)
 		} else {
-			if !silenceEventCode || fc.logRetrievalProgressEvents {
+			if !silenceEventCode || c.logRetrievalProgressEvents {
 				log.Debugw("retrieval event", "dealID", dealID, "rootCid", rootCid, "peerID", peerID, "name", name, "code", code, "message", msg, "blocksIndex", blocksIndex, "totalReceived", totalReceived)
 			}
 		}
@@ -1122,11 +1122,11 @@ func (fc *Client) retrieveContentFromPeerWithProgressCallback(
 	defer unsubscribe()
 
 	// Submit the retrieval deal proposal to the miner
-	newchid, err := fc.dataTransfer.OpenPullDataChannel(ctx, peerID, proposal, proposal.PayloadCID, shared.AllSelector())
+	newchid, err := c.dataTransfer.OpenPullDataChannel(ctx, peerID, proposal, proposal.PayloadCID, shared.AllSelector())
 	if err != nil {
 		// We could fail before a successful proposal
 		// publish event failure
-		fc.rep.Publish(
+		c.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef,
 				fmt.Sprintf("deal proposal failed: %s", err.Error())))
 		return nil, err
@@ -1134,13 +1134,13 @@ func (fc *Client) retrieveContentFromPeerWithProgressCallback(
 
 	// Deal has been proposed
 	// publish deal proposed event
-	fc.rep.Publish(rep.NewRetrievalEventProposed(rep.RetrievalPhase, rootCid, peerID, address.Undef))
+	c.rep.Publish(rep.NewRetrievalEventProposed(rep.RetrievalPhase, rootCid, peerID, address.Undef))
 
 	chanidLk.Lock()
 	chanid = newchid
 	chanidLk.Unlock()
 
-	defer fc.dataTransfer.CloseDataTransferChannel(ctx, chanid)
+	defer c.dataTransfer.CloseDataTransferChannel(ctx, chanid)
 
 	// Wait for the retrieval to finish before exiting the function
 awaitfinished:
@@ -1149,7 +1149,7 @@ awaitfinished:
 		case err := <-dtRes:
 			if err != nil {
 				// If there is an error, publish a retrieval event failure
-				fc.rep.Publish(
+				c.rep.Publish(
 					rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef,
 						fmt.Sprintf("data transfer failed: %s", err.Error())))
 				return nil, fmt.Errorf("data transfer failed: %w", err)
@@ -1159,7 +1159,7 @@ awaitfinished:
 			break awaitfinished
 		case <-gracefulShutdownRequested:
 			go func() {
-				fc.dataTransfer.CloseDataTransferChannel(ctx, chanid)
+				c.dataTransfer.CloseDataTransferChannel(ctx, chanid)
 			}()
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -1168,24 +1168,24 @@ awaitfinished:
 
 	// Confirm that we actually ended up with the root block we wanted, failure
 	// here indicates a data transfer error that was not properly reported
-	if has, err := fc.blockstore.Has(ctx, rootCid); err != nil {
+	if has, err := c.blockstore.Has(ctx, rootCid); err != nil {
 		err = fmt.Errorf("could not get query blockstore: %w", err)
-		fc.rep.Publish(
+		c.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef, err.Error()))
 		return nil, err
 	} else if !has {
 		msg := "data transfer failed: unconfirmed block transfer"
-		fc.rep.Publish(
+		c.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef, msg))
 		return nil, errors.New(msg)
 	}
 
 	// Compile the retrieval stats
 
-	state, err := fc.dataTransfer.ChannelState(ctx, chanid)
+	state, err := c.dataTransfer.ChannelState(ctx, chanid)
 	if err != nil {
 		err = fmt.Errorf("could not get channel state: %w", err)
-		fc.rep.Publish(
+		c.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef, err.Error()))
 		return nil, err
 	}
@@ -1194,7 +1194,7 @@ awaitfinished:
 	speed := uint64(float64(state.Received()) / duration.Seconds())
 
 	// Otherwise publish a retrieval event success
-	fc.rep.Publish(rep.NewRetrievalEventSuccess(rep.RetrievalPhase, rootCid, peerID, address.Undef, state.Received(), state.ReceivedCidsTotal(), duration, totalPayment))
+	c.rep.Publish(rep.NewRetrievalEventSuccess(rep.RetrievalPhase, rootCid, peerID, address.Undef, state.Received(), state.ReceivedCidsTotal(), duration, totalPayment))
 
 	return &RetrievalStats{
 		Peer:         state.OtherPeer(),
@@ -1285,7 +1285,6 @@ func ChannelIDFromString(id string) (*datatransfer.ChannelID, error) {
 var dealIdGen = shared.NewTimeCounter()
 
 func RetrievalProposalForAsk(ask *retrievalmarket.QueryResponse, c cid.Cid, optionalSelector ipld.Node) (*retrievalmarket.DealProposal, error) {
-
 	if optionalSelector == nil {
 		optionalSelector = selectorparse.CommonSelector_ExploreAllRecursively
 	}
