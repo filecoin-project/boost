@@ -2,15 +2,39 @@ package db
 
 import (
 	"context"
-	"github.com/filecoin-project/boost/db/migrations"
 	"testing"
 	"time"
+
+	"github.com/filecoin-project/boost/db/migrations"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/stretchr/testify/require"
 )
+
+func ToFilterOptions(filters map[string]interface{}) *FilterOptions {
+	filter := &FilterOptions{}
+
+	cp, ok := filters["Checkpoint"].(string)
+	if ok {
+		filter.Checkpoint = &cp
+	}
+	io, ok := filters["IsOffline"].(bool)
+	if ok {
+		filter.IsOffline = &io
+	}
+	tt, ok := filters["TransferType"].(string)
+	if ok {
+		filter.TransferType = &tt
+	}
+	vd, ok := filters["IsVerified"].(bool)
+	if ok {
+		filter.IsVerified = &vd
+	}
+
+	return filter
+}
 
 func TestDealsDB(t *testing.T) {
 	req := require.New(t)
@@ -45,16 +69,16 @@ func TestDealsDB(t *testing.T) {
 	req.NoError(err)
 	req.Equal(deal.DealUuid, storedDealBySignedPropCid.DealUuid)
 
-	dealList, err := db.List(ctx, "", nil, 0, 0)
+	dealList, err := db.List(ctx, "", nil, nil, 0, 0)
 	req.NoError(err)
 	req.Len(dealList, len(deals))
 
-	limitedDealList, err := db.List(ctx, "", nil, 1, 1)
+	limitedDealList, err := db.List(ctx, "", nil, nil, 1, 1)
 	req.NoError(err)
 	req.Len(limitedDealList, 1)
 	req.Equal(dealList[1].DealUuid, limitedDealList[0].DealUuid)
 
-	count, err := db.Count(ctx, "")
+	count, err := db.Count(ctx, "", nil)
 	req.NoError(err)
 	req.Equal(len(deals), count)
 
@@ -120,62 +144,96 @@ func TestDealsDBSearch(t *testing.T) {
 	label, err := deals[0].ClientDealProposal.Proposal.Label.ToString()
 	req.NoError(err)
 	tcs := []struct {
-		name  string
-		value string
-		count int
+		name   string
+		value  string
+		filter *FilterOptions
+		count  int
 	}{{
-		name:  "search error",
-		value: "data-transfer failed",
-		count: 1,
+		name:   "search error",
+		value:  "data-transfer failed",
+		filter: nil,
+		count:  1,
 	}, {
-		name:  "search error with padding",
-		value: "  data-transfer failed\n\t ",
-		count: 1,
+		name:   "search error with padding",
+		value:  "  data-transfer failed\n\t ",
+		filter: nil,
+		count:  1,
 	}, {
-		name:  "Deal UUID",
-		value: deals[0].DealUuid.String(),
-		count: 1,
+		name:   "Deal UUID",
+		value:  deals[0].DealUuid.String(),
+		filter: nil,
+		count:  1,
 	}, {
-		name:  "piece CID",
-		value: deals[0].ClientDealProposal.Proposal.PieceCID.String(),
-		count: 1,
+		name:   "piece CID",
+		value:  deals[0].ClientDealProposal.Proposal.PieceCID.String(),
+		filter: nil,
+		count:  1,
 	}, {
-		name:  "client address",
-		value: deals[0].ClientDealProposal.Proposal.Client.String(),
-		count: 1,
+		name:   "client address",
+		value:  deals[0].ClientDealProposal.Proposal.Client.String(),
+		filter: nil,
+		count:  1,
 	}, {
-		name:  "provider address",
-		value: deals[0].ClientDealProposal.Proposal.Provider.String(),
-		count: len(deals),
+		name:   "provider address",
+		value:  deals[0].ClientDealProposal.Proposal.Provider.String(),
+		filter: nil,
+		count:  len(deals),
 	}, {
-		name:  "client peer ID",
-		value: deals[0].ClientPeerID.String(),
-		count: 1,
+		name:   "client peer ID",
+		value:  deals[0].ClientPeerID.String(),
+		filter: nil,
+		count:  1,
 	}, {
-		name:  "deal data root",
-		value: deals[0].DealDataRoot.String(),
-		count: 1,
+		name:   "deal data root",
+		value:  deals[0].DealDataRoot.String(),
+		filter: nil,
+		count:  1,
 	}, {
-		name:  "publish CID",
-		value: deals[0].PublishCID.String(),
-		count: 1,
+		name:   "publish CID",
+		value:  deals[0].PublishCID.String(),
+		filter: nil,
+		count:  1,
 	}, {
-		name:  "signed proposal CID",
-		value: signedPropCid.String(),
-		count: 1,
+		name:   "signed proposal CID",
+		value:  signedPropCid.String(),
+		filter: nil,
+		count:  1,
 	}, {
-		name:  "label",
-		value: label,
-		count: 1,
+		name:   "label",
+		value:  label,
+		filter: nil,
+		count:  1,
+	}, {
+		name:  "filter out isOffline",
+		value: "",
+		filter: ToFilterOptions(map[string]interface{}{
+			"IsOffline": false,
+		}),
+		count: 0,
+	}, {
+		name:  "filter isOffline",
+		value: "",
+		filter: ToFilterOptions(map[string]interface{}{
+			"IsOffline": true,
+		}),
+		count: 5,
+	}, {
+		name:  "filter isOffline and IndexedAndAnnounced (in sealing)",
+		value: "",
+		filter: ToFilterOptions(map[string]interface{}{
+			"IsOffline":  true,
+			"Checkpoint": dealcheckpoints.IndexedAndAnnounced.String(),
+		}),
+		count: 0,
 	}}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			count, err := db.Count(ctx, tc.value)
+			count, err := db.Count(ctx, tc.value, tc.filter)
 			req.NoError(err)
 			req.Equal(tc.count, count)
 
 			searchStart := time.Now()
-			searchRes, err := db.List(ctx, tc.value, nil, 0, 0)
+			searchRes, err := db.List(ctx, tc.value, tc.filter, nil, 0, 0)
 			searchElapsed := time.Since(searchStart)
 			req.NoError(err)
 			req.Len(searchRes, tc.count)
@@ -185,4 +243,30 @@ func TestDealsDBSearch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWithSearchFilter(t *testing.T) {
+	req := require.New(t)
+
+	fo := ToFilterOptions(map[string]interface{}{
+		"Checkpoint":      "Accepted",
+		"IsOffline":       true,
+		"NotAValidFilter": 123,
+	})
+	where, whereArgs := withSearchFilter(*fo)
+	expectedArgs := []interface{}{
+		"Accepted",
+		true,
+	}
+	req.Equal("(Checkpoint = ? AND IsOffline = ?)", where)
+	req.Equal(expectedArgs, whereArgs)
+
+	fo = ToFilterOptions(map[string]interface{}{
+		"IsOffline":       nil,
+		"NotAValidFilter": nil,
+	})
+	where, whereArgs = withSearchFilter(*fo)
+
+	req.Equal("", where)
+	req.Equal(0, len(whereArgs))
 }

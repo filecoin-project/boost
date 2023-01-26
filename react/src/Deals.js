@@ -7,7 +7,7 @@ import {
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
 import {humanFileSize} from "./util";
-import React, {useState} from "react";
+import React, {useState, useEffect, useRef} from "react";
 import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
@@ -63,6 +63,28 @@ function StorageDealsContent(props) {
         setSearchQuery('')
     }
 
+    const [displayFilters, setDisplayFilters] = useState(false)
+    const toggleFilters = () => {
+        setDisplayFilters(!displayFilters)
+    }
+
+    const [searchFilters, setSearchFilters] = useState(null)
+    const handleFiltersChanged = (event) => {
+        var value = event.target.value
+        if (value === "true") value = true
+        if (value === "false") value = false
+
+        var newFilters = {
+            ...searchFilters || {},
+            [event.target.name]: value
+        }
+
+        if (event.target.value === "") delete newFilters[event.target.name]
+        if (Object.keys(newFilters).length === 0) newFilters = null
+
+        setSearchFilters(newFilters)
+    }
+
     // Fetch deals on this page
     const dealListOffset = (pageNum-1) * dealsPerPage
     const queryCursor = (pageNum === 1) ? null : params.cursor
@@ -70,6 +92,7 @@ function StorageDealsContent(props) {
         pollInterval: searchQuery ? undefined : 1000,
         variables: {
             query: searchQuery,
+            filter: searchFilters,
             cursor: queryCursor,
             offset: dealListOffset,
             limit: dealsPerPage,
@@ -107,7 +130,15 @@ function StorageDealsContent(props) {
 
     return <div className="deals">
         <LegacyDealsLink />
-        <SearchBox value={searchQuery} clearSearchBox={clearSearchBox} onChange={handleSearchQueryChange} />
+        <SearchBox
+            value={searchQuery}
+            displayFilters={displayFilters}
+            clearSearchBox={clearSearchBox}
+            onChange={handleSearchQueryChange}
+            toggleFilters={toggleFilters}
+            searchFilters={searchFilters}
+            handleFiltersChanged={handleFiltersChanged} />
+
         <table>
             <tbody>
             <tr>
@@ -151,6 +182,27 @@ function LegacyDealsLink(props) {
 }
 
 export function SearchBox(props) {
+    const searchFilters = props.searchFilters || {}
+    const displayFilters = props.displayFilters
+    const toggleFilters = props.toggleFilters
+    const ref = useRef()
+
+    useEffect(() => {
+        const checkIfClickedOutside = e => {
+          // If the menu is open and the clicked target is not within the menu,
+          // then close the menu
+          if (displayFilters && ref.current && !ref.current.contains(e.target)) {
+            toggleFilters()
+          }
+        }
+
+        document.addEventListener("mousedown", checkIfClickedOutside)
+
+        return () => {
+          document.removeEventListener("mousedown", checkIfClickedOutside)
+        }
+      }, [displayFilters])
+
     return <div className="search">
         <DebounceInput
             autoFocus={!!props.value}
@@ -158,8 +210,74 @@ export function SearchBox(props) {
             debounceTimeout={300}
             value={props.value}
             onChange={props.onChange} />
-        { props.value ? <img alt="clear" class="clear-text" onClick={props.clearSearchBox} src={xImg} /> : null }
+        { props.value ? <img alt="clear" className="clear-text" onClick={props.clearSearchBox} src={xImg} /> : null }
+        <div ref={ref} className={(props.displayFilters ? "active": "") + " search-toggle"}>
+            <div className="toggle" onClick={props.toggleFilters}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-list" viewBox="0 0 16 16">
+                    <path fillRule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+                </svg>
+            </div>
+            <div className={(props.displayFilters ? "": "hidden") + " search-filters"}>
+                <h3>Checkpoint</h3>
+                <div>
+                    <RadioGroup prefix="CP" field="Checkpoint" value="" label="Any"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="Accepted"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="Transferred"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="Published"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="PublishConfirmed"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="AddedPiece"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="IndexedAndAnnounced"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="CP" field="Checkpoint" value="Complete"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                </div>
+                <hr />
+                <h3>IsOffline</h3>
+                <div>
+                    <RadioGroup prefix="IO" field="IsOffline" value="" label="Any"
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="IO" field="IsOffline" value={true}
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                    <RadioGroup prefix="IO" field="IsOffline" value={false}
+                        searchFilters={searchFilters} handleFiltersChanged={props.handleFiltersChanged} />
+                </div>
+            </div>
+        </div>
     </div>
+}
+
+function RadioGroup (props) {
+    const {
+        prefix,
+        field,
+        value,
+        label,
+        searchFilters,
+        handleFiltersChanged
+    } = props
+
+    const htmlFor = prefix + '-' + value
+    var checked = false
+
+    if (searchFilters[field] === value) {
+        checked = true
+    } else if (value === "" && searchFilters[field] === undefined) {
+        checked = true
+    }
+    return (
+        <span className="radio-group">
+            <input type="radio" id={htmlFor} name={field} value={value.toString()}
+                checked={checked}
+                onChange={handleFiltersChanged} />
+            <label htmlFor={htmlFor}>{value === "" ? label : value.toString()}</label>
+        </span>
+    )
 }
 
 function DealRow(props) {
