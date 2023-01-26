@@ -186,7 +186,7 @@ var retrieveCmd = &cli.Command{
 
 		// Do the retrieval
 		var networks = []RetrievalAttempt{&FILRetrievalAttempt{
-			FilClient:  fc,
+			Client:     fc,
 			Cid:        c,
 			Candidates: candidates,
 			SelNode:    selNode,
@@ -329,7 +329,7 @@ func walletPath(baseDir string) string {
 	return filepath.Join(baseDir, "wallet")
 }
 
-func clientFromNode(cctx *cli.Context, nd *Node, dir string) (*retrieve.FilClient, func(), error) {
+func clientFromNode(cctx *cli.Context, nd *Node, dir string) (*retrieve.Client, func(), error) {
 	api, closer, err := lcli.GetGatewayAPI(cctx)
 	if err != nil {
 		return nil, nil, err
@@ -340,12 +340,12 @@ func clientFromNode(cctx *cli.Context, nd *Node, dir string) (*retrieve.FilClien
 		return nil, nil, err
 	}
 
-	fc, err := retrieve.NewClient(nd.Host, api, nd.Wallet, addr, nd.Blockstore, nd.Datastore, dir)
+	c, err := retrieve.NewClient(nd.Host, api, nd.Wallet, addr, nd.Blockstore, nd.Datastore, dir)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return fc, closer, nil
+	return c, closer, nil
 }
 
 type Node struct {

@@ -38,7 +38,6 @@ import (
 	"github.com/ipfs/go-graphsync"
 	gsimpl "github.com/ipfs/go-graphsync/impl"
 	gsnet "github.com/ipfs/go-graphsync/network"
-	"github.com/ipfs/go-graphsync/peerstate"
 	"github.com/ipfs/go-graphsync/storeutil"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	logging "github.com/ipfs/go-log/v2"
@@ -66,32 +65,21 @@ const (
 	maxTraversalLinks = 32 * (1 << 20)
 )
 
-type FilClient struct {
-	mpusher *MsgPusher
-
-	pchmgr *paychmgr.Manager
-
-	host host.Host
-
-	api api.Gateway
-
-	wallet *wallet.LocalWallet
-
-	ClientAddr address.Address
-
-	blockstore blockstore.Blockstore
-
-	dataTransfer datatransfer.Manager
-
-	graphSync *gsimpl.GraphSync
-
-	transport *gst.Transport
+type Client struct {
+	api               api.Gateway
+	wallet            *wallet.LocalWallet
+	host              host.Host
+	ClientAddr        address.Address
+	Libp2pTransferMgr *libp2pTransferManager
+	blockstore        blockstore.Blockstore
+	dataTransfer      datatransfer.Manager
+	graphSync         *gsimpl.GraphSync
+	transport         *gst.Transport
+	rep               *rep.RetrievalEventPublisher
+	mpusher           *MsgPusher
+	pchmgr            *paychmgr.Manager
 
 	logRetrievalProgressEvents bool
-
-	Libp2pTransferMgr *libp2pTransferManager
-
-	retrievalEventPublisher *rep.RetrievalEventPublisher
 }
 
 type GetPieceCommFunc func(ctx context.Context, payloadCid cid.Cid, bstore blockstore.Blockstore) (cid.Cid, uint64, abi.UnpaddedPieceSize, error)
@@ -116,7 +104,7 @@ type Config struct {
 	Lp2pDTConfig               Lp2pDTConfig
 }
 
-func NewClient(h host.Host, api api.Gateway, w *wallet.LocalWallet, addr address.Address, bs blockstore.Blockstore, ds datastore.Batching, ddir string, opts ...func(*Config)) (*FilClient, error) {
+func NewClient(h host.Host, api api.Gateway, w *wallet.LocalWallet, addr address.Address, bs blockstore.Blockstore, ds datastore.Batching, ddir string, opts ...func(*Config)) (*Client, error) {
 	cfg := &Config{
 		Host:       h,
 		Api:        api,
@@ -170,7 +158,7 @@ func NewClient(h host.Host, api api.Gateway, w *wallet.LocalWallet, addr address
 	return NewClientWithConfig(cfg)
 }
 
-func NewClientWithConfig(cfg *Config) (*FilClient, error) {
+func NewClientWithConfig(cfg *Config) (*Client, error) {
 	ctx, shutdown := context.WithCancel(context.Background())
 
 	mpusher := NewMsgPusher(cfg.Api, cfg.Wallet)
@@ -265,9 +253,9 @@ func NewClientWithConfig(cfg *Config) (*FilClient, error) {
 	}
 
 	// Create a retrieval event publisher
-	retrievalEventPublisher := rep.New(ctx)
+	pb := rep.New(ctx)
 
-	fc := &FilClient{
+	c := &Client{
 		host:                       cfg.Host,
 		api:                        cfg.Api,
 		wallet:                     cfg.Wallet,
@@ -280,31 +268,31 @@ func NewClientWithConfig(cfg *Config) (*FilClient, error) {
 		transport:                  tpt,
 		logRetrievalProgressEvents: cfg.LogRetrievalProgressEvents,
 		Libp2pTransferMgr:          libp2pTransferMgr,
-		retrievalEventPublisher:    retrievalEventPublisher,
+		rep:                        pb,
 	}
 
-	// Subscribe this FilClient instance to retrieval events
-	retrievalEventPublisher.Subscribe(fc)
+	// Subscribe this instance to retrieval events
+	pb.Subscribe(c)
 
-	return fc, nil
+	return c, nil
 }
 
-func (fc *FilClient) GetDtMgr() datatransfer.Manager {
-	return fc.dataTransfer
+func (c *Client) GetDtMgr() datatransfer.Manager {
+	return c.dataTransfer
 }
 
-func (fc *FilClient) streamToMiner(ctx context.Context, maddr address.Address, protocol ...protocol.ID) (inet.Stream, error) {
+func (c *Client) streamToMiner(ctx context.Context, maddr address.Address, protocol ...protocol.ID) (inet.Stream, error) {
 	ctx, span := Tracer.Start(ctx, "streamToMiner", trace.WithAttributes(
 		attribute.Stringer("miner", maddr),
 	))
 	defer span.End()
 
-	mpid, err := fc.ConnectToMiner(ctx, maddr)
+	mpid, err := c.ConnectToMiner(ctx, maddr)
 	if err != nil {
 		return nil, err
 	}
 
-	s, err := fc.host.NewStream(ctx, mpid, protocol...)
+	s, err := c.host.NewStream(ctx, mpid, protocol...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open stream to peer: %w", err)
 	}
@@ -313,21 +301,21 @@ func (fc *FilClient) streamToMiner(ctx context.Context, maddr address.Address, p
 }
 
 // Errors - ErrMinerConnectionFailed, ErrLotusError
-func (fc *FilClient) ConnectToMiner(ctx context.Context, maddr address.Address) (peer.ID, error) {
-	addrInfo, err := fc.minerAddrInfo(ctx, maddr)
+func (c *Client) ConnectToMiner(ctx context.Context, maddr address.Address) (peer.ID, error) {
+	addrInfo, err := c.minerAddrInfo(ctx, maddr)
 	if err != nil {
 		return "", err
 	}
 
-	if err := fc.host.Connect(ctx, *addrInfo); err != nil {
+	if err := c.host.Connect(ctx, *addrInfo); err != nil {
 		return "", NewErrMinerConnectionFailed(err)
 	}
 
 	return addrInfo.ID, nil
 }
 
-func (fc *FilClient) minerAddrInfo(ctx context.Context, maddr address.Address) (*peer.AddrInfo, error) {
-	minfo, err := fc.api.StateMinerInfo(ctx, maddr, types.EmptyTSK)
+func (c *Client) minerAddrInfo(ctx context.Context, maddr address.Address) (*peer.AddrInfo, error) {
+	minfo, err := c.api.StateMinerInfo(ctx, maddr, types.EmptyTSK)
 	if err != nil {
 		return nil, NewErrLotusError(err)
 	}
@@ -351,7 +339,7 @@ func (fc *FilClient) minerAddrInfo(ctx context.Context, maddr address.Address) (
 		return nil, NewErrMinerConnectionFailed(fmt.Errorf("miner %s has no multiaddrs set on chain", maddr))
 	}
 
-	if err := fc.host.Connect(ctx, peer.AddrInfo{
+	if err := c.host.Connect(ctx, peer.AddrInfo{
 		ID:    *minfo.PeerId,
 		Addrs: maddrs,
 	}); err != nil {
@@ -364,18 +352,18 @@ func (fc *FilClient) minerAddrInfo(ctx context.Context, maddr address.Address) (
 	}, nil
 }
 
-func (fc *FilClient) openStreamToPeer(ctx context.Context, addr peer.AddrInfo, protocol protocol.ID) (inet.Stream, error) {
+func (c *Client) openStreamToPeer(ctx context.Context, addr peer.AddrInfo, protocol protocol.ID) (inet.Stream, error) {
 	ctx, span := Tracer.Start(ctx, "openStreamToPeer", trace.WithAttributes(
 		attribute.Stringer("peerID", addr.ID),
 	))
 	defer span.End()
 
-	err := fc.connectToPeer(ctx, addr)
+	err := c.connectToPeer(ctx, addr)
 	if err != nil {
 		return nil, err
 	}
 
-	s, err := fc.host.NewStream(ctx, addr.ID, protocol)
+	s, err := c.host.NewStream(ctx, addr.ID, protocol)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open stream to peer: %w", err)
 	}
@@ -384,34 +372,16 @@ func (fc *FilClient) openStreamToPeer(ctx context.Context, addr peer.AddrInfo, p
 }
 
 // Errors - ErrMinerConnectionFailed, ErrLotusError
-func (fc *FilClient) connectToPeer(ctx context.Context, addr peer.AddrInfo) error {
-	if err := fc.host.Connect(ctx, addr); err != nil {
+func (c *Client) connectToPeer(ctx context.Context, addr peer.AddrInfo) error {
+	if err := c.host.Connect(ctx, addr); err != nil {
 		return NewErrMinerConnectionFailed(err)
 	}
 
 	return nil
 }
 
-func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}) error {
-	dline, ok := ctx.Deadline()
-	if ok {
-		s.SetDeadline(dline)
-		defer s.SetDeadline(time.Time{})
-	}
-
-	if err := cborutil.WriteCborRPC(s, req); err != nil {
-		return fmt.Errorf("failed to send request: %w", err)
-	}
-
-	if err := cborutil.ReadCborRPC(s, resp); err != nil {
-		return fmt.Errorf("failed to read response: %w", err)
-	}
-
-	return nil
-}
-
-func (fc *FilClient) MinerPeer(ctx context.Context, miner address.Address) (peer.AddrInfo, error) {
-	minfo, err := fc.api.StateMinerInfo(ctx, miner, types.EmptyTSK)
+func (c *Client) MinerPeer(ctx context.Context, miner address.Address) (peer.AddrInfo, error) {
+	minfo, err := c.api.StateMinerInfo(ctx, miner, types.EmptyTSK)
 	if err != nil {
 		return peer.AddrInfo{}, err
 	}
@@ -435,8 +405,8 @@ func (fc *FilClient) MinerPeer(ctx context.Context, miner address.Address) (peer
 	}, nil
 }
 
-func (fc *FilClient) minerOwner(ctx context.Context, miner address.Address) (address.Address, error) {
-	minfo, err := fc.api.StateMinerInfo(ctx, miner, types.EmptyTSK)
+func (c *Client) minerOwner(ctx context.Context, miner address.Address) (address.Address, error) {
+	minfo, err := c.api.StateMinerInfo(ctx, miner, types.EmptyTSK)
 	if err != nil {
 		return address.Undef, err
 	}
@@ -445,6 +415,24 @@ func (fc *FilClient) minerOwner(ctx context.Context, miner address.Address) (add
 	}
 
 	return minfo.Owner, nil
+}
+
+func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}) error {
+	dline, ok := ctx.Deadline()
+	if ok {
+		s.SetDeadline(dline)
+		defer s.SetDeadline(time.Time{})
+	}
+
+	if err := cborutil.WriteCborRPC(s, req); err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+
+	if err := cborutil.ReadCborRPC(s, resp); err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	return nil
 }
 
 type TransferType string
@@ -517,175 +505,15 @@ func ChannelStateConv(st datatransfer.ChannelState) *ChannelState {
 		TransferID:   st.ChannelID().String(),
 		Stages:       st.Stages(),
 		TransferType: GraphsyncTransfer,
-		//Vouchers:          st.Vouchers(),
-		//VoucherResults:    st.VoucherResults(),
-		//LastVoucher:       st.LastVoucher(),
-		//LastVoucherResult: st.LastVoucherResult(),
-		//ReceivedCids:      st.ReceivedCids(),
-		//Queued:            st.Queued(),
 	}
 }
 
-func (fc *FilClient) V110TransfersInProgress(ctx context.Context) (map[datatransfer.ChannelID]datatransfer.ChannelState, error) {
-	return fc.dataTransfer.InProgressChannels(ctx)
+func (c *Client) GraphSyncStats() graphsync.Stats {
+	return c.graphSync.Stats()
 }
 
-func (fc *FilClient) TransfersInProgress(ctx context.Context) (map[string]*ChannelState, error) {
-	v1dts, err := fc.dataTransfer.InProgressChannels(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	v2dts, err := fc.Libp2pTransferMgr.All()
-	if err != nil {
-		return nil, err
-	}
-
-	dts := make(map[string]*ChannelState, len(v1dts)+len(v2dts))
-	for id, dt := range v1dts {
-		dts[id.String()] = ChannelStateConv(dt)
-	}
-	for id, dt := range v2dts {
-		dtcp := dt
-		dts[id] = &dtcp
-	}
-
-	return dts, nil
-}
-
-type GraphSyncDataTransfer struct {
-	// GraphSync request id for this transfer
-	RequestID graphsync.RequestID `json:"requestID"`
-	// Graphsync state for this transfer
-	RequestState string `json:"requestState"`
-	// If a channel ID is present, indicates whether this is the current graphsync request for this channel
-	// (could have changed in a restart)
-	IsCurrentChannelRequest bool `json:"isCurrentChannelRequest"`
-	// Data transfer channel ID for this transfer
-	ChannelID *datatransfer.ChannelID `json:"channelID"`
-	// Data transfer state for this transfer
-	ChannelState *ChannelState `json:"channelState"`
-	// Diagnostic information about this request -- and unexpected inconsistencies in
-	// request state
-	Diagnostics []string `json:"diagnostics"`
-}
-
-type MinerTransferDiagnostics struct {
-	ReceivingTransfers []*GraphSyncDataTransfer `json:"sendingTransfers"`
-	SendingTransfers   []*GraphSyncDataTransfer `json:"receivingTransfers"`
-}
-
-// MinerTransferDiagnostics provides in depth current information on the state of transfers for a given miner,
-// covering running graphsync requests and related data transfers, etc
-func (fc *FilClient) MinerTransferDiagnostics(ctx context.Context, miner address.Address) (*MinerTransferDiagnostics, error) {
-	start := time.Now()
-	defer func() {
-		log.Infof("get miner diagnostics took: %s", time.Since(start))
-	}()
-	mpid, err := fc.MinerPeer(ctx, miner)
-	if err != nil {
-		return nil, err
-	}
-	// gather information about active transport channels
-	transportChannels := fc.transport.ChannelsForPeer(mpid.ID)
-	// gather information about graphsync state for peer
-	gsPeerState := fc.graphSync.PeerState(mpid.ID)
-
-	sendingTransfers := fc.generateTransfers(ctx, transportChannels.SendingChannels, gsPeerState.IncomingState)
-	receivingTransfers := fc.generateTransfers(ctx, transportChannels.ReceivingChannels, gsPeerState.OutgoingState)
-
-	return &MinerTransferDiagnostics{
-		SendingTransfers:   sendingTransfers,
-		ReceivingTransfers: receivingTransfers,
-	}, nil
-}
-
-// generate transfers matches graphsync state and data transfer state for a given peer
-// to produce detailed output on what's happening with a transfer
-func (fc *FilClient) generateTransfers(ctx context.Context,
-	transportChannels map[datatransfer.ChannelID]gst.ChannelGraphsyncRequests,
-	gsPeerState peerstate.PeerState) []*GraphSyncDataTransfer {
-	tc := &transferConverter{
-		matchedRequests: make(map[graphsync.RequestID]*GraphSyncDataTransfer),
-		gsDiagnostics:   gsPeerState.Diagnostics(),
-		requestStates:   gsPeerState.RequestStates,
-	}
-
-	// iterate through all operating data transfer transport channels
-	for channelID, channelRequests := range transportChannels {
-		channelState, err := fc.TransferStatus(ctx, &channelID)
-		var baseDiagnostics []string
-		if err != nil {
-			baseDiagnostics = append(baseDiagnostics, fmt.Sprintf("Unable to lookup channel state: %s", err))
-			channelState = nil
-		}
-		// add the current request for this channel
-		tc.convertTransfer(&channelID, channelState, baseDiagnostics, channelRequests.Current, true)
-		for _, requestID := range channelRequests.Previous {
-			// add any previous requests that were cancelled for a restart
-			tc.convertTransfer(&channelID, channelState, baseDiagnostics, requestID, false)
-		}
-	}
-
-	// collect any graphsync data for channels we don't have any data transfer data for
-	tc.collectRemainingTransfers()
-
-	return tc.transfers
-}
-
-type transferConverter struct {
-	matchedRequests map[graphsync.RequestID]*GraphSyncDataTransfer
-	transfers       []*GraphSyncDataTransfer
-	gsDiagnostics   map[graphsync.RequestID][]string
-	requestStates   graphsync.RequestStates
-}
-
-// convert transfer assembles transfer and diagnostic data for a given graphsync/data-transfer request
-func (tc *transferConverter) convertTransfer(channelID *datatransfer.ChannelID, channelState *ChannelState, baseDiagnostics []string,
-	requestID graphsync.RequestID, isCurrentChannelRequest bool) {
-	diagnostics := baseDiagnostics
-	state, hasState := tc.requestStates[requestID]
-	stateString := state.String()
-	if !hasState {
-		stateString = "no graphsync state found"
-	}
-	if channelID == nil {
-		diagnostics = append(diagnostics, fmt.Sprintf("No data transfer channel id for GraphSync request ID %s", requestID))
-	} else if !hasState {
-		diagnostics = append(diagnostics, fmt.Sprintf("No current request state for data transfer channel id %s", channelID))
-	}
-	diagnostics = append(diagnostics, tc.gsDiagnostics[requestID]...)
-	transfer := &GraphSyncDataTransfer{
-		RequestID:               requestID,
-		RequestState:            stateString,
-		IsCurrentChannelRequest: isCurrentChannelRequest,
-		ChannelID:               channelID,
-		ChannelState:            channelState,
-		Diagnostics:             diagnostics,
-	}
-	tc.transfers = append(tc.transfers, transfer)
-	tc.matchedRequests[requestID] = transfer
-}
-
-func (tc *transferConverter) collectRemainingTransfers() {
-	for requestID := range tc.requestStates {
-		if _, ok := tc.matchedRequests[requestID]; !ok {
-			tc.convertTransfer(nil, nil, nil, requestID, false)
-		}
-	}
-	for requestID := range tc.gsDiagnostics {
-		if _, ok := tc.matchedRequests[requestID]; !ok {
-			tc.convertTransfer(nil, nil, nil, requestID, false)
-		}
-	}
-}
-
-func (fc *FilClient) GraphSyncStats() graphsync.Stats {
-	return fc.graphSync.Stats()
-}
-
-func (fc *FilClient) TransferStatus(ctx context.Context, chanid *datatransfer.ChannelID) (*ChannelState, error) {
-	st, err := fc.dataTransfer.ChannelState(ctx, *chanid)
+func (c *Client) TransferStatus(ctx context.Context, chanid *datatransfer.ChannelID) (*ChannelState, error) {
+	st, err := c.dataTransfer.ChannelState(ctx, *chanid)
 	if err != nil {
 		return nil, err
 	}
@@ -693,25 +521,25 @@ func (fc *FilClient) TransferStatus(ctx context.Context, chanid *datatransfer.Ch
 	return ChannelStateConv(st), nil
 }
 
-func (fc *FilClient) TransferStatusByID(ctx context.Context, id string) (*ChannelState, error) {
+func (c *Client) TransferStatusByID(ctx context.Context, id string) (*ChannelState, error) {
 	chid, err := ChannelIDFromString(id)
 	if err == nil {
 		// If the id is a data transfer channel id, get the transfer status by channel id
-		return fc.TransferStatus(ctx, chid)
+		return c.TransferStatus(ctx, chid)
 	}
 
 	// Get the transfer status by transfer id
-	return fc.Libp2pTransferMgr.byId(id)
+	return c.Libp2pTransferMgr.byId(id)
 }
 
 var ErrNoTransferFound = fmt.Errorf("no transfer found")
 
-func (fc *FilClient) TransferStatusForContent(ctx context.Context, content cid.Cid, miner address.Address) (*ChannelState, error) {
+func (c *Client) TransferStatusForContent(ctx context.Context, content cid.Cid, miner address.Address) (*ChannelState, error) {
 	start := time.Now()
 	defer func() {
 		log.Infof("check transfer status took: %s", time.Since(start))
 	}()
-	mpid, err := fc.MinerPeer(ctx, miner)
+	mpid, err := c.MinerPeer(ctx, miner)
 	if err != nil {
 		return nil, err
 	}
@@ -719,7 +547,7 @@ func (fc *FilClient) TransferStatusForContent(ctx context.Context, content cid.C
 	// Check if there's a storage deal transfer with the miner that matches the
 	// payload CID
 	// 1. over data transfer v1.2
-	xfer, err := fc.Libp2pTransferMgr.byRemoteAddrAndPayloadCid(mpid.ID.Pretty(), content)
+	xfer, err := c.Libp2pTransferMgr.byRemoteAddrAndPayloadCid(mpid.ID.Pretty(), content)
 	if err != nil {
 		return nil, err
 	}
@@ -728,7 +556,7 @@ func (fc *FilClient) TransferStatusForContent(ctx context.Context, content cid.C
 	}
 
 	// 2. over data transfer v1.1
-	inprog, err := fc.dataTransfer.InProgressChannels(ctx)
+	inprog, err := c.dataTransfer.InProgressChannels(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -748,11 +576,11 @@ func (fc *FilClient) TransferStatusForContent(ctx context.Context, content cid.C
 	return nil, ErrNoTransferFound
 }
 
-func (fc *FilClient) RestartTransfer(ctx context.Context, chanid *datatransfer.ChannelID) error {
+func (fc *Client) RestartTransfer(ctx context.Context, chanid *datatransfer.ChannelID) error {
 	return fc.dataTransfer.RestartDataTransferChannel(ctx, *chanid)
 }
 
-func (fc *FilClient) StartDataTransfer(ctx context.Context, miner address.Address, propCid cid.Cid, dataCid cid.Cid) (*datatransfer.ChannelID, error) {
+func (fc *Client) StartDataTransfer(ctx context.Context, miner address.Address, propCid cid.Cid, dataCid cid.Cid) (*datatransfer.ChannelID, error) {
 	ctx, span := Tracer.Start(ctx, "startDataTransfer")
 	defer span.End()
 
@@ -773,7 +601,7 @@ func (fc *FilClient) StartDataTransfer(ctx context.Context, miner address.Addres
 	return &chanid, nil
 }
 
-func (fc *FilClient) SubscribeToDataTransferEvents(f datatransfer.Subscriber) func() {
+func (fc *Client) SubscribeToDataTransferEvents(f datatransfer.Subscriber) func() {
 	return fc.dataTransfer.SubscribeToEvents(f)
 }
 
@@ -787,7 +615,7 @@ type Balance struct {
 	VerifiedClientBalance *abi.StoragePower `json:"verifiedClientBalance"`
 }
 
-func (fc *FilClient) Balance(ctx context.Context) (*Balance, error) {
+func (fc *Client) Balance(ctx context.Context) (*Balance, error) {
 	act, err := fc.api.StateGetActor(ctx, fc.ClientAddr, types.EmptyTSK)
 	if err != nil {
 		return nil, err
@@ -819,7 +647,7 @@ type LockFundsResp struct {
 	MsgCid cid.Cid
 }
 
-func (fc *FilClient) CheckChainDeal(ctx context.Context, dealid abi.DealID) (bool, *api.MarketDeal, error) {
+func (fc *Client) CheckChainDeal(ctx context.Context, dealid abi.DealID) (bool, *api.MarketDeal, error) {
 	deal, err := fc.api.StateMarketStorageDeal(ctx, dealid, types.EmptyTSK)
 	if err != nil {
 		nfs := fmt.Sprintf("deal %d not found", dealid)
@@ -833,7 +661,7 @@ func (fc *FilClient) CheckChainDeal(ctx context.Context, dealid abi.DealID) (boo
 	return true, deal, nil
 }
 
-func (fc *FilClient) CheckOngoingTransfer(ctx context.Context, miner address.Address, st *ChannelState) (outerr error) {
+func (fc *Client) CheckOngoingTransfer(ctx context.Context, miner address.Address, st *ChannelState) (outerr error) {
 	defer func() {
 		// TODO: this is only here because for some reason restarting a data transfer can just panic
 		// https://github.com/filecoin-project/go-data-transfer/issues/150
@@ -858,7 +686,7 @@ func (fc *FilClient) CheckOngoingTransfer(ctx context.Context, miner address.Add
 
 }
 
-func (fc *FilClient) RetrievalQuery(ctx context.Context, maddr address.Address, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
+func (fc *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
 	ctx, span := Tracer.Start(ctx, "retrievalQuery", trace.WithAttributes(
 		attribute.Stringer("miner", maddr),
 	))
@@ -867,7 +695,7 @@ func (fc *FilClient) RetrievalQuery(ctx context.Context, maddr address.Address, 
 	s, err := fc.streamToMiner(ctx, maddr, RetrievalQueryProtocol)
 	if err != nil {
 		// publish fail event, log the err
-		fc.retrievalEventPublisher.Publish(
+		fc.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.QueryPhase, pcid, "", maddr,
 				fmt.Sprintf("failed connecting to miner: %s", err.Error())))
 		return nil, err
@@ -881,7 +709,7 @@ func (fc *FilClient) RetrievalQuery(ctx context.Context, maddr address.Address, 
 
 	// We have connected
 	// publish connected event
-	fc.retrievalEventPublisher.Publish(rep.NewRetrievalEventConnect(rep.QueryPhase, pcid, "", maddr))
+	fc.rep.Publish(rep.NewRetrievalEventConnect(rep.QueryPhase, pcid, "", maddr))
 
 	q := &retrievalmarket.Query{
 		PayloadCID: pcid,
@@ -890,19 +718,19 @@ func (fc *FilClient) RetrievalQuery(ctx context.Context, maddr address.Address, 
 	var resp retrievalmarket.QueryResponse
 	if err := doRpc(ctx, s, q, &resp); err != nil {
 		// publish failure event
-		fc.retrievalEventPublisher.Publish(
+		fc.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.QueryPhase, pcid, "", maddr,
 				fmt.Sprintf("failed retrieval query ask: %s", err.Error())))
 		return nil, fmt.Errorf("retrieval query rpc: %w", err)
 	}
 
 	// publish query ask event
-	fc.retrievalEventPublisher.Publish(rep.NewRetrievalEventQueryAsk(rep.QueryPhase, pcid, "", maddr, resp))
+	fc.rep.Publish(rep.NewRetrievalEventQueryAsk(rep.QueryPhase, pcid, "", maddr, resp))
 
 	return &resp, nil
 }
 
-func (fc *FilClient) RetrievalQueryToPeer(ctx context.Context, minerPeer peer.AddrInfo, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
+func (fc *Client) RetrievalQueryToPeer(ctx context.Context, minerPeer peer.AddrInfo, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
 	ctx, span := Tracer.Start(ctx, "retrievalQueryPeer", trace.WithAttributes(
 		attribute.Stringer("peerID", minerPeer.ID),
 	))
@@ -911,7 +739,7 @@ func (fc *FilClient) RetrievalQueryToPeer(ctx context.Context, minerPeer peer.Ad
 	s, err := fc.openStreamToPeer(ctx, minerPeer, RetrievalQueryProtocol)
 	if err != nil {
 		// publish fail event, log the err
-		fc.retrievalEventPublisher.Publish(
+		fc.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.QueryPhase, pcid, minerPeer.ID, address.Undef,
 				fmt.Sprintf("failed connecting to miner: %s", err.Error())))
 		return nil, err
@@ -925,7 +753,7 @@ func (fc *FilClient) RetrievalQueryToPeer(ctx context.Context, minerPeer peer.Ad
 
 	// We have connected
 	// publish connected event
-	fc.retrievalEventPublisher.Publish(rep.NewRetrievalEventConnect(rep.QueryPhase, pcid, minerPeer.ID, address.Address{}))
+	fc.rep.Publish(rep.NewRetrievalEventConnect(rep.QueryPhase, pcid, minerPeer.ID, address.Address{}))
 
 	q := &retrievalmarket.Query{
 		PayloadCID: pcid,
@@ -934,19 +762,19 @@ func (fc *FilClient) RetrievalQueryToPeer(ctx context.Context, minerPeer peer.Ad
 	var resp retrievalmarket.QueryResponse
 	if err := doRpc(ctx, s, q, &resp); err != nil {
 		// publish failure event
-		fc.retrievalEventPublisher.Publish(
+		fc.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.QueryPhase, pcid, minerPeer.ID, address.Undef,
 				fmt.Sprintf("failed retrieval query ask: %s", err.Error())))
 		return nil, fmt.Errorf("retrieval query rpc: %w", err)
 	}
 
 	// publish query ask event
-	fc.retrievalEventPublisher.Publish(rep.NewRetrievalEventQueryAsk(rep.QueryPhase, pcid, minerPeer.ID, address.Undef, resp))
+	fc.rep.Publish(rep.NewRetrievalEventQueryAsk(rep.QueryPhase, pcid, minerPeer.ID, address.Undef, resp))
 
 	return &resp, nil
 }
 
-func (fc *FilClient) getPaychWithMinFunds(ctx context.Context, dest address.Address) (address.Address, error) {
+func (fc *Client) getPaychWithMinFunds(ctx context.Context, dest address.Address) (address.Address, error) {
 
 	avail, err := fc.pchmgr.AvailableFundsByFromTo(ctx, fc.ClientAddr, dest)
 	if err != nil {
@@ -999,7 +827,7 @@ type RetrievalStats struct {
 	//TimeToFirstByte time.Duration
 }
 
-func (fc *FilClient) RetrieveContent(
+func (fc *Client) RetrieveContent(
 	ctx context.Context,
 	miner address.Address,
 	proposal *retrievalmarket.DealProposal,
@@ -1008,7 +836,7 @@ func (fc *FilClient) RetrieveContent(
 	return fc.RetrieveContentWithProgressCallback(ctx, miner, proposal, nil)
 }
 
-func (fc *FilClient) RetrieveContentWithProgressCallback(
+func (fc *Client) RetrieveContentWithProgressCallback(
 	ctx context.Context,
 	miner address.Address,
 	proposal *retrievalmarket.DealProposal,
@@ -1028,7 +856,7 @@ func (fc *FilClient) RetrieveContentWithProgressCallback(
 	return fc.RetrieveContentFromPeerWithProgressCallback(ctx, minerPeer.ID, minerOwner, proposal, progressCallback)
 }
 
-func (fc *FilClient) RetrieveContentFromPeerWithProgressCallback(
+func (fc *Client) RetrieveContentFromPeerWithProgressCallback(
 	ctx context.Context,
 	peerID peer.ID,
 	minerWallet address.Address,
@@ -1043,7 +871,7 @@ type RetrievalResult struct {
 	Err error
 }
 
-func (fc *FilClient) RetrieveContentFromPeerAsync(
+func (fc *Client) RetrieveContentFromPeerAsync(
 	ctx context.Context,
 	peerID peer.ID,
 	minerWallet address.Address,
@@ -1068,7 +896,7 @@ func (fc *FilClient) RetrieveContentFromPeerAsync(
 	}
 }
 
-func (fc *FilClient) retrieveContentFromPeerWithProgressCallback(
+func (fc *Client) retrieveContentFromPeerWithProgressCallback(
 	ctx context.Context,
 	peerID peer.ID,
 	minerWallet address.Address,
@@ -1100,14 +928,14 @@ func (fc *FilClient) retrieveContentFromPeerWithProgressCallback(
 		// Get the payment channel and create a lane for this retrieval
 		pchAddr, err := fc.getPaychWithMinFunds(ctx, minerWallet)
 		if err != nil {
-			fc.retrievalEventPublisher.Publish(
+			fc.rep.Publish(
 				rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef,
 					fmt.Sprintf("failed to get payment channel: %s", err.Error())))
 			return nil, fmt.Errorf("failed to get payment channel: %w", err)
 		}
 		pchLane, err = fc.pchmgr.AllocateLane(ctx, pchAddr)
 		if err != nil {
-			fc.retrievalEventPublisher.Publish(
+			fc.rep.Publish(
 				rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef,
 					fmt.Sprintf("failed to allocate lane: %s", err.Error())))
 			return nil, fmt.Errorf("failed to allocate lane: %w", err)
@@ -1179,7 +1007,7 @@ func (fc *FilClient) retrieveContentFromPeerWithProgressCallback(
 					log.Info("Deal accepted")
 
 					// publish deal accepted event
-					fc.retrievalEventPublisher.Publish(rep.NewRetrievalEventAccepted(rep.RetrievalPhase, rootCid, peerID, address.Undef))
+					fc.rep.Publish(rep.NewRetrievalEventAccepted(rep.RetrievalPhase, rootCid, peerID, address.Undef))
 
 				// Respond with a payment voucher when funds are requested
 				case retrievalmarket.DealStatusFundsNeeded, retrievalmarket.DealStatusFundsNeededLastPayment:
@@ -1263,7 +1091,7 @@ func (fc *FilClient) retrieveContentFromPeerWithProgressCallback(
 			// publish first byte event
 			if !receivedFirstByte {
 				receivedFirstByte = true
-				fc.retrievalEventPublisher.Publish(rep.NewRetrievalEventFirstByte(rep.RetrievalPhase, rootCid, peerID, address.Undef))
+				fc.rep.Publish(rep.NewRetrievalEventFirstByte(rep.RetrievalPhase, rootCid, peerID, address.Undef))
 			}
 
 			progressCallback(state.Received())
@@ -1298,7 +1126,7 @@ func (fc *FilClient) retrieveContentFromPeerWithProgressCallback(
 	if err != nil {
 		// We could fail before a successful proposal
 		// publish event failure
-		fc.retrievalEventPublisher.Publish(
+		fc.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef,
 				fmt.Sprintf("deal proposal failed: %s", err.Error())))
 		return nil, err
@@ -1306,7 +1134,7 @@ func (fc *FilClient) retrieveContentFromPeerWithProgressCallback(
 
 	// Deal has been proposed
 	// publish deal proposed event
-	fc.retrievalEventPublisher.Publish(rep.NewRetrievalEventProposed(rep.RetrievalPhase, rootCid, peerID, address.Undef))
+	fc.rep.Publish(rep.NewRetrievalEventProposed(rep.RetrievalPhase, rootCid, peerID, address.Undef))
 
 	chanidLk.Lock()
 	chanid = newchid
@@ -1321,7 +1149,7 @@ awaitfinished:
 		case err := <-dtRes:
 			if err != nil {
 				// If there is an error, publish a retrieval event failure
-				fc.retrievalEventPublisher.Publish(
+				fc.rep.Publish(
 					rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef,
 						fmt.Sprintf("data transfer failed: %s", err.Error())))
 				return nil, fmt.Errorf("data transfer failed: %w", err)
@@ -1342,12 +1170,12 @@ awaitfinished:
 	// here indicates a data transfer error that was not properly reported
 	if has, err := fc.blockstore.Has(ctx, rootCid); err != nil {
 		err = fmt.Errorf("could not get query blockstore: %w", err)
-		fc.retrievalEventPublisher.Publish(
+		fc.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef, err.Error()))
 		return nil, err
 	} else if !has {
 		msg := "data transfer failed: unconfirmed block transfer"
-		fc.retrievalEventPublisher.Publish(
+		fc.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef, msg))
 		return nil, errors.New(msg)
 	}
@@ -1357,7 +1185,7 @@ awaitfinished:
 	state, err := fc.dataTransfer.ChannelState(ctx, chanid)
 	if err != nil {
 		err = fmt.Errorf("could not get channel state: %w", err)
-		fc.retrievalEventPublisher.Publish(
+		fc.rep.Publish(
 			rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef, err.Error()))
 		return nil, err
 	}
@@ -1366,7 +1194,7 @@ awaitfinished:
 	speed := uint64(float64(state.Received()) / duration.Seconds())
 
 	// Otherwise publish a retrieval event success
-	fc.retrievalEventPublisher.Publish(rep.NewRetrievalEventSuccess(rep.RetrievalPhase, rootCid, peerID, address.Undef, state.Received(), state.ReceivedCidsTotal(), duration, totalPayment))
+	fc.rep.Publish(rep.NewRetrievalEventSuccess(rep.RetrievalPhase, rootCid, peerID, address.Undef, state.Received(), state.ReceivedCidsTotal(), duration, totalPayment))
 
 	return &RetrievalStats{
 		Peer:         state.OtherPeer(),
@@ -1379,12 +1207,12 @@ awaitfinished:
 	}, nil
 }
 
-func (fc *FilClient) SubscribeToRetrievalEvents(subscriber rep.RetrievalSubscriber) {
-	fc.retrievalEventPublisher.Subscribe(subscriber)
+func (fc *Client) SubscribeToRetrievalEvents(subscriber rep.RetrievalSubscriber) {
+	fc.rep.Subscribe(subscriber)
 }
 
 // Implement RetrievalSubscriber
-func (fc *FilClient) OnRetrievalEvent(event rep.RetrievalEvent) {
+func (fc *Client) OnRetrievalEvent(event rep.RetrievalEvent) {
 	kv := make([]interface{}, 0)
 	logadd := func(kva ...interface{}) {
 		if len(kva)%2 != 0 {

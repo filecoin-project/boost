@@ -32,7 +32,7 @@ type RetrievalAttempt interface {
 }
 
 type FILRetrievalAttempt struct {
-	FilClient  *retrieve.FilClient
+	Client     *retrieve.Client
 	Cid        cid.Cid
 	Candidates []FILRetrievalCandidate
 	SelNode    ipld.Node
@@ -69,7 +69,7 @@ func (attempt *FILRetrievalAttempt) Retrieve(ctx context.Context, node *Node) (R
 		go func() {
 			defer wg.Done()
 
-			query, err := attempt.FilClient.RetrievalQuery(ctx, candidate.Miner, candidate.RootCid)
+			query, err := attempt.Client.RetrievalQuery(ctx, candidate.Miner, candidate.RootCid)
 			if err != nil {
 				log.Debugf("Retrieval query for miner %s failed: %v", candidate.Miner, err)
 				return
@@ -138,7 +138,7 @@ func (attempt *FILRetrievalAttempt) Retrieve(ctx context.Context, node *Node) (R
 		}
 
 		var bytesReceived uint64
-		stats_, err := attempt.FilClient.RetrieveContentWithProgressCallback(
+		stats_, err := attempt.Client.RetrieveContentWithProgressCallback(
 			ctx,
 			query.Candidate.Miner,
 			proposal,
