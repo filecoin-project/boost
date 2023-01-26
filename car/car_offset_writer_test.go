@@ -244,6 +244,7 @@ func DAGImport(dserv format.DAGService, fi io.Reader) (format.Node, error) {
 		Maxlinks:  1024,
 		RawLeaves: true,
 
+		// NOTE: InlineBuilder not recommended, we are using this to test identity CIDs
 		CidBuilder: cidutil.InlineBuilder{
 			Builder: prefix,
 			Limit:   32,

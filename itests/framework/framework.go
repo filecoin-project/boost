@@ -48,6 +48,7 @@ import (
 	"github.com/filecoin-project/lotus/storage/paths"
 	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
 	"github.com/google/uuid"
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	files "github.com/ipfs/go-ipfs-files"
@@ -59,6 +60,7 @@ import (
 	"github.com/ipld/go-car"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
@@ -477,7 +479,12 @@ func (f *TestFramework) WaitForDealAddedToSector(dealUuid uuid.UUID) error {
 	}
 }
 
-func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool) (*api.ProviderDealRejectionInfo, error) {
+type DealResult struct {
+	DealParams types.DealParams
+	Result     *api.ProviderDealRejectionInfo
+}
+
+func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool) (*DealResult, error) {
 	cidAndSize, err := storagemarket.GenerateCommP(carFilepath)
 	if err != nil {
 		return nil, err
@@ -545,7 +552,11 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		SkipIPNIAnnounce:   false,
 	}
 
-	return f.Client.StorageDeal(f.ctx, dealParams, peerID)
+	res, err := f.Client.StorageDeal(f.ctx, dealParams, peerID)
+	return &DealResult{
+		DealParams: dealParams,
+		Result:     res,
+	}, err
 }
 
 func (f *TestFramework) signProposal(addr address.Address, proposal *market.DealProposal) (*market.ClientDealProposal, error) {
@@ -669,6 +680,47 @@ func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, deal *cid.Ci
 	require.NoError(t, err)
 	require.NotEmpty(t, offers, "no offers")
 
+	return f.retrieve(ctx, t, offers[0], carExport)
+}
+
+func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, file *os.File) string {
+	bserv := dstest.Bserv()
+	ch, err := car.LoadCar(ctx, bserv.Blockstore(), file)
+	require.NoError(t, err)
+
+	var b blocks.Block
+	if ch.Roots[0].Prefix().MhType == multihash.IDENTITY {
+		mh, err := multihash.Decode(ch.Roots[0].Hash())
+		require.NoError(t, err)
+		b, err = blocks.NewBlockWithCid(mh.Digest, ch.Roots[0])
+		require.NoError(t, err)
+	} else {
+		b, err = bserv.GetBlock(ctx, ch.Roots[0])
+		require.NoError(t, err)
+	}
+
+	nd, err := ipld.Decode(b)
+	require.NoError(t, err)
+
+	dserv := dag.NewDAGService(bserv)
+	fil, err := unixfile.NewUnixfsFile(ctx, dserv, nd)
+	require.NoError(t, err)
+
+	tmpFile := path.Join(t.TempDir(), fmt.Sprintf("file-in-car-%d", rand.Uint32()))
+	err = files.WriteTo(fil, tmpFile)
+	require.NoError(t, err)
+
+	return tmpFile
+}
+
+func (f *TestFramework) RetrieveDirect(ctx context.Context, t *testing.T, root cid.Cid, pieceCid *cid.Cid, carExport bool) string {
+	offer, err := f.FullNode.ClientMinerQueryOffer(ctx, f.MinerAddr, root, pieceCid)
+	require.NoError(t, err)
+
+	return f.retrieve(ctx, t, offer, carExport)
+}
+
+func (f *TestFramework) retrieve(ctx context.Context, t *testing.T, offer lapi.QueryOffer, carExport bool) string {
 	p := path.Join(t.TempDir(), "ret-car-"+t.Name())
 	carFile, err := os.Create(p)
 	require.NoError(t, err)
@@ -682,7 +734,7 @@ func (f *TestFramework) Retrieve(ctx context.Context, t *testing.T, deal *cid.Ci
 	updates, err := f.FullNode.ClientGetRetrievalUpdates(updatesCtx)
 	require.NoError(t, err)
 
-	retrievalRes, err := f.FullNode.ClientRetrieve(ctx, offers[0].Order(caddr))
+	retrievalRes, err := f.FullNode.ClientRetrieve(ctx, offer.Order(caddr))
 	require.NoError(t, err)
 consumeEvents:
 	for {
@@ -710,7 +762,7 @@ consumeEvents:
 
 	require.NoError(t, f.FullNode.ClientExport(ctx,
 		lapi.ExportRef{
-			Root:   root,
+			Root:   offer.Root,
 			DealID: retrievalRes.DealID,
 		},
 		lapi.FileRef{
@@ -724,26 +776,4 @@ consumeEvents:
 	}
 
 	return ret
-}
-
-func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, file *os.File) string {
-	bserv := dstest.Bserv()
-	ch, err := car.LoadCar(ctx, bserv.Blockstore(), file)
-	require.NoError(t, err)
-
-	b, err := bserv.GetBlock(ctx, ch.Roots[0])
-	require.NoError(t, err)
-
-	nd, err := ipld.Decode(b)
-	require.NoError(t, err)
-
-	dserv := dag.NewDAGService(bserv)
-	fil, err := unixfile.NewUnixfsFile(ctx, dserv, nd)
-	require.NoError(t, err)
-
-	tmpFile := path.Join(t.TempDir(), fmt.Sprintf("file-in-car-%d", rand.Uint32()))
-	err = files.WriteTo(fil, tmpFile)
-	require.NoError(t, err)
-
-	return tmpFile
 }
