@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/filecoin-project/boost/lib/keystore"
+	"github.com/filecoin-project/boost/markets/utils"
 	"github.com/filecoin-project/boost/retrieve"
 
 	"github.com/filecoin-project/lotus/chain/types"
@@ -220,7 +221,7 @@ var retrieveCmd = &cli.Command{
 
 			// no err check - we just compiled this before starting, but now we do not wrap a `*`
 			selspec, _ := textselector.SelectorSpecFromPath(dmSelText, true, nil) //nolint:errcheck
-			if err := retrieve.TraverseDag(
+			if err := utils.TraverseDag(
 				cctx.Context,
 				dservOffline,
 				c,

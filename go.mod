@@ -341,7 +341,6 @@ require (
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/application-research/filclient v0.4.0
 	github.com/filecoin-project/boostd-data v0.0.0-00010101000000-000000000000
 	github.com/ipfs/go-ds-flatfs v0.5.1
 	github.com/schollz/progressbar/v3 v3.11.0
