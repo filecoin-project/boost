@@ -21,20 +21,10 @@ import (
 	"github.com/ipld/go-ipld-prime/traversal/selector"
 	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
 	textselector "github.com/ipld/go-ipld-selector-text-lite"
+	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 )
-
-// Get config directory from CLI metadata.
-func ddir(cctx *cli.Context) string {
-	mDdir := cctx.App.Metadata["ddir"]
-	switch ddir := mDdir.(type) {
-	case string:
-		return ddir
-	default:
-		panic("ddir should be present in CLI metadata")
-	}
-}
 
 var retrieveCmd = &cli.Command{
 	Name:        "retrieve",
@@ -49,6 +39,12 @@ var retrieveCmd = &cli.Command{
 		flagCar,
 	},
 	Action: func(cctx *cli.Context) error {
+
+		// Store config dir in metadata
+		ddir, err := homedir.Expand("~/.boost-client")
+		if err != nil {
+			fmt.Println("could not set config dir: ", err)
+		}
 
 		// Parse command input
 
@@ -107,8 +103,6 @@ var retrieveCmd = &cli.Command{
 		}
 
 		// Set up node and filclient
-
-		ddir := ddir(cctx)
 
 		node, err := setup(cctx.Context, ddir)
 		if err != nil {
