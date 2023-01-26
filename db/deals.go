@@ -248,13 +248,15 @@ func (d *DealsDB) Count(ctx context.Context, query string, filter *FilterOptions
 	if filter != nil {
 		filterWhere, filterArgs := withSearchFilter(*filter)
 
-		if query != "" {
-			where += " AND "
-		} else {
-			where += " WHERE "
+		if filterWhere != "" {
+			if query != "" {
+				where += " AND "
+			} else {
+				where += " WHERE "
+			}
+			where += filterWhere
+			whereArgs = append(whereArgs, filterArgs...)
 		}
-		where += filterWhere
-		whereArgs = append(whereArgs, filterArgs...)
 	}
 	row := d.db.QueryRowContext(ctx, where, whereArgs...)
 
@@ -297,8 +299,10 @@ func (d *DealsDB) List(ctx context.Context, query string, filter *FilterOptions,
 		}
 
 		filterWhere, filterArgs := withSearchFilter(*filter)
-		where += filterWhere
-		whereArgs = append(whereArgs, filterArgs...)
+		if filterWhere != "" {
+			where += filterWhere
+			whereArgs = append(whereArgs, filterArgs...)
+		}
 	}
 
 	return d.list(ctx, offset, limit, where, whereArgs...)
