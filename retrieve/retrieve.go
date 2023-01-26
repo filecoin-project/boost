@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	boostcar "github.com/filecoin-project/boost/car"
+	"github.com/filecoin-project/boost/car"
 	"github.com/filecoin-project/boost/retrieve/rep"
 	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/go-address"
@@ -21,8 +21,6 @@ import (
 	dtimpl "github.com/filecoin-project/go-data-transfer/impl"
 	dtnet "github.com/filecoin-project/go-data-transfer/network"
 	gst "github.com/filecoin-project/go-data-transfer/transport/graphsync"
-	commcid "github.com/filecoin-project/go-fil-commcid"
-	commp "github.com/filecoin-project/go-fil-commp-hashhash"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/requestvalidation"
@@ -60,14 +58,12 @@ var Tracer = otel.Tracer("filclient")
 var log = logging.Logger("filclient")
 var retrievalLogger = logging.Logger("filclient-retrieval")
 
-const DealProtocolv110 = "/fil/storage/mk/1.1.0"
-const DealProtocolv120 = "/fil/storage/mk/1.2.0"
-const QueryAskProtocol = "/fil/storage/ask/1.1.0"
-const DealStatusProtocolv110 = "/fil/storage/status/1.1.0"
-const DealStatusProtocolv120 = "/fil/storage/status/1.2.0"
-const RetrievalQueryProtocol = "/fil/retrieval/qry/1.0.0"
+const (
+	QueryAskProtocol       = "/fil/storage/ask/1.1.0"
+	RetrievalQueryProtocol = "/fil/retrieval/qry/1.0.0"
 
-const maxTraversalLinks = 32 * (1 << 20)
+	maxTraversalLinks = 32 * (1 << 20)
+)
 
 type FilClient struct {
 	mpusher *MsgPusher
@@ -157,7 +153,7 @@ func NewClient(h host.Host, api api.Gateway, w *wallet.LocalWallet, addr address
 				// finishes in case the connection bounced in the middle
 				// of a transfer, or there is a request for the same payload
 				// soon after
-				BlockInfoCacheManager: boostcar.NewDelayedUnrefBICM(time.Minute),
+				BlockInfoCacheManager: car.NewDelayedUnrefBICM(time.Minute),
 				ThrottleLimit:         uint(100),
 			},
 			// Wait up to 24 hours for the transfer to complete (including
@@ -296,26 +292,6 @@ func (fc *FilClient) GetDtMgr() datatransfer.Manager {
 	return fc.dataTransfer
 }
 
-func (fc *FilClient) DealProtocolForMiner(ctx context.Context, miner address.Address) (protocol.ID, error) {
-	// Connect to the miner. If there's not already a connection to the miner,
-	// libp2p will open a connection and exchange protocol IDs.
-	mpid, err := fc.ConnectToMiner(ctx, miner)
-	if err != nil {
-		return "", fmt.Errorf("connecting to %s: %w", miner, err)
-	}
-
-	// Get the supported deal protocols for the miner's peer
-	proto, err := fc.host.Peerstore().FirstSupportedProtocol(mpid, DealProtocolv120, DealProtocolv110)
-	if err != nil {
-		return "", fmt.Errorf("getting deal protocol for %s: %w", miner, err)
-	}
-	if proto == "" {
-		return "", fmt.Errorf("%s does not support any deal making protocol", miner)
-	}
-
-	return protocol.ID(proto), nil
-}
-
 func (fc *FilClient) streamToMiner(ctx context.Context, maddr address.Address, protocol ...protocol.ID) (inet.Stream, error) {
 	ctx, span := Tracer.Start(ctx, "streamToMiner", trace.WithAttributes(
 		attribute.Stringer("miner", maddr),
@@ -415,20 +391,6 @@ func (fc *FilClient) connectToPeer(ctx context.Context, addr peer.AddrInfo) erro
 	return nil
 }
 
-func (fc *FilClient) GetMinerVersion(ctx context.Context, maddr address.Address) (string, error) {
-	pid, err := fc.ConnectToMiner(ctx, maddr)
-	if err != nil {
-		return "", err
-	}
-
-	agent, err := fc.host.Peerstore().Get(pid, "AgentVersion")
-	if err != nil {
-		return "", nil
-	}
-
-	return agent.(string), nil
-}
-
 func (fc *FilClient) GetAsk(ctx context.Context, maddr address.Address) (*network.AskResponse, error) {
 	ctx, span := Tracer.Start(ctx, "doGetAsk", trace.WithAttributes(
 		attribute.Stringer("miner", maddr),
@@ -472,28 +434,6 @@ func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}
 	}
 
 	return nil
-}
-
-const epochsPerHour = 60 * 2
-
-func ComputePrice(askPrice types.BigInt, size abi.PaddedPieceSize, duration abi.ChainEpoch) (*abi.TokenAmount, error) {
-	cost := big.Mul(big.Div(big.Mul(big.NewInt(int64(size)), askPrice), big.NewInt(1<<30)), big.NewInt(int64(duration)))
-
-	return (*abi.TokenAmount)(&cost), nil
-}
-
-func ZeroPadPieceCommitment(c cid.Cid, curSize abi.UnpaddedPieceSize, toSize abi.UnpaddedPieceSize) (cid.Cid, error) {
-
-	rawPaddedCommp, err := commp.PadCommP(
-		// we know how long a pieceCid "hash" is, just blindly extract the trailing 32 bytes
-		c.Hash()[len(c.Hash())-32:],
-		uint64(curSize.Padded()),
-		uint64(toSize.Padded()),
-	)
-	if err != nil {
-		return cid.Undef, err
-	}
-	return commcid.DataCommitmentV1ToCID(rawPaddedCommp)
 }
 
 func (fc *FilClient) MinerPeer(ctx context.Context, miner address.Address) (peer.AddrInfo, error) {
