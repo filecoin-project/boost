@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/filecoin-project/boost/lib/keystore"
 	"github.com/filecoin-project/boost/retrieve"
-	"github.com/filecoin-project/boost/retrieve/keystore"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
