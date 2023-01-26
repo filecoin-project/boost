@@ -24,7 +24,6 @@ import (
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/requestvalidation"
-	"github.com/filecoin-project/go-fil-markets/storagemarket/network"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin/v8/paych"
@@ -55,13 +54,13 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-var Tracer = otel.Tracer("filclient")
+var (
+	Tracer = otel.Tracer("retrieve-client")
 
-var log = logging.Logger("filclient")
-var retrievalLogger = logging.Logger("filclient-retrieval")
+	log = logging.Logger("retrieve-client")
+)
 
 const (
-	QueryAskProtocol       = "/fil/storage/ask/1.1.0"
 	RetrievalQueryProtocol = "/fil/retrieval/qry/1.0.0"
 
 	maxTraversalLinks = 32 * (1 << 20)
@@ -391,33 +390,6 @@ func (fc *FilClient) connectToPeer(ctx context.Context, addr peer.AddrInfo) erro
 	}
 
 	return nil
-}
-
-func (fc *FilClient) GetAsk(ctx context.Context, maddr address.Address) (*network.AskResponse, error) {
-	ctx, span := Tracer.Start(ctx, "doGetAsk", trace.WithAttributes(
-		attribute.Stringer("miner", maddr),
-	))
-	defer span.End()
-
-	s, err := fc.streamToMiner(ctx, maddr, QueryAskProtocol)
-	if err != nil {
-		return nil, err
-	}
-	fc.host.ConnManager().Protect(s.Conn().RemotePeer(), "GetAsk")
-	defer func() {
-		fc.host.ConnManager().Unprotect(s.Conn().RemotePeer(), "GetAsk")
-		s.Close()
-	}()
-
-	areq := &network.AskRequest{Miner: maddr}
-	var resp network.AskResponse
-
-	// Sending the query ask and reading the response
-	if err := doRpc(ctx, s, areq, &resp); err != nil {
-		return nil, fmt.Errorf("get ask rpc: %w", err)
-	}
-
-	return &resp, nil
 }
 
 func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}) error {
@@ -1447,7 +1419,7 @@ func (fc *FilClient) OnRetrievalEvent(event rep.RetrievalEvent) {
 	case rep.RetrievalEventSuccess:
 		logadd("receivedSize", tevent.ReceivedSize())
 	}
-	retrievalLogger.Debugw("retrieval-event", kv...)
+	log.Debugw("retrieval-event", kv...)
 }
 
 func ChannelIDFromString(id string) (*datatransfer.ChannelID, error) {
