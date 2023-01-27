@@ -24,13 +24,9 @@ import (
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/go-state-types/builtin/v8/paych"
 	"github.com/filecoin-project/lotus/api"
-	rpcstmgr "github.com/filecoin-project/lotus/chain/stmgr/rpc"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
-	"github.com/filecoin-project/lotus/paychmgr"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
@@ -75,8 +71,6 @@ type Client struct {
 	graphSync         *gsimpl.GraphSync
 	transport         *gst.Transport
 	rep               *rep.RetrievalEventPublisher
-	mpusher           *MsgPusher
-	pchmgr            *paychmgr.Manager
 
 	logRetrievalProgressEvents bool
 }
@@ -158,26 +152,6 @@ func NewClient(h host.Host, api api.Gateway, w *wallet.LocalWallet, addr address
 }
 
 func NewClientWithConfig(cfg *Config) (*Client, error) {
-	ctx, shutdown := context.WithCancel(context.Background())
-
-	mpusher := NewMsgPusher(cfg.Api, cfg.Wallet)
-
-	smapi := rpcstmgr.NewRPCStateManager(cfg.Api)
-
-	pchds := namespace.Wrap(cfg.Datastore, datastore.NewKey("paych"))
-	store := paychmgr.NewStore(pchds)
-
-	papi := &paychApiProvider{
-		Gateway: cfg.Api,
-		wallet:  cfg.Wallet,
-		mp:      mpusher,
-	}
-
-	pchmgr := paychmgr.NewManager(ctx, shutdown, smapi, store, papi)
-	if err := pchmgr.Start(); err != nil {
-		return nil, err
-	}
-
 	gse := gsimpl.New(context.Background(),
 		gsnet.NewFromLibp2pHost(cfg.Host),
 		storeutil.LinkSystemForBlockstore(cfg.Blockstore),
@@ -193,6 +167,8 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 	if err := os.MkdirAll(cidlistsdirPath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to initialize cidlistsdir: %w", err)
 	}
+
+	ctx := context.Background()
 
 	mgr, err := dtimpl.NewDataTransfer(cfg.Datastore, dtn, tpt, dtRestartConfig)
 	if err != nil {
@@ -224,13 +200,6 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 		return nil, err
 	}
 
-	/*
-		mgr.SubscribeToEvents(func(event datatransfer.Event, channelState datatransfer.ChannelState) {
-			fmt.Printf("[%s] event: %s %d %s %s\n", time.Now().Format("15:04:05"), event.Message, event.Code, datatransfer.Events[event.Code], event.Timestamp.Format("15:04:05"))
-			fmt.Printf("channelstate: %s %s\n", datatransfer.Statuses[channelState.Status()], channelState.Message())
-		})
-	*/
-
 	// Create a server for libp2p data transfers
 	lp2pds := namespace.Wrap(cfg.Datastore, datastore.NewKey("/libp2p-dt"))
 	authDB := httptransport.NewAuthTokenDB(lp2pds)
@@ -255,11 +224,9 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 		wallet:                     cfg.Wallet,
 		ClientAddr:                 cfg.Addr,
 		blockstore:                 cfg.Blockstore,
-		dataTransfer:               mgr,
-		pchmgr:                     pchmgr,
-		mpusher:                    mpusher,
 		graphSync:                  gse,
 		transport:                  tpt,
+		dataTransfer:               mgr,
 		logRetrievalProgressEvents: cfg.LogRetrievalProgressEvents,
 		Libp2pTransferMgr:          libp2pTransferMgr,
 		rep:                        pb,
@@ -747,46 +714,6 @@ func (c *Client) RetrievalQueryToPeer(ctx context.Context, minerPeer peer.AddrIn
 	return &resp, nil
 }
 
-func (c *Client) getPaychWithMinFunds(ctx context.Context, dest address.Address) (address.Address, error) {
-
-	avail, err := c.pchmgr.AvailableFundsByFromTo(ctx, c.ClientAddr, dest)
-	if err != nil {
-		return address.Undef, err
-	}
-
-	reqBalance, err := types.ParseFIL("0.01")
-	if err != nil {
-		return address.Undef, err
-	}
-	fmt.Println("available", avail.ConfirmedAmt)
-
-	if types.BigCmp(avail.ConfirmedAmt, types.BigInt(reqBalance)) >= 0 {
-		return *avail.Channel, nil
-	}
-
-	amount := types.BigMul(types.BigInt(reqBalance), types.NewInt(2))
-
-	fmt.Println("getting payment channel: ", c.ClientAddr, dest, amount)
-	pchaddr, mcid, err := c.pchmgr.GetPaych(ctx, c.ClientAddr, dest, amount, paychmgr.GetOpts{
-		Reserve:  false,
-		OffChain: false,
-	})
-	if err != nil {
-		return address.Undef, fmt.Errorf("failed to get payment channel: %w", err)
-	}
-
-	fmt.Println("got payment channel: ", pchaddr, mcid)
-	if !mcid.Defined() {
-		if pchaddr == address.Undef {
-			return address.Undef, fmt.Errorf("GetPaych returned nothing")
-		}
-
-		return pchaddr, nil
-	}
-
-	return c.pchmgr.GetPaychWaitReady(ctx, mcid)
-}
-
 type RetrievalStats struct {
 	Peer         peer.ID
 	Size         uint64
@@ -895,24 +822,8 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 	var chanidLk sync.Mutex
 
 	pchRequired := !proposal.PricePerByte.IsZero() || !proposal.UnsealPrice.IsZero()
-	var pchAddr address.Address
-	var pchLane uint64
 	if pchRequired {
-		// Get the payment channel and create a lane for this retrieval
-		pchAddr, err := c.getPaychWithMinFunds(ctx, minerWallet)
-		if err != nil {
-			c.rep.Publish(
-				rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef,
-					fmt.Sprintf("failed to get payment channel: %s", err.Error())))
-			return nil, fmt.Errorf("failed to get payment channel: %w", err)
-		}
-		pchLane, err = c.pchmgr.AllocateLane(ctx, pchAddr)
-		if err != nil {
-			c.rep.Publish(
-				rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef,
-					fmt.Sprintf("failed to allocate lane: %s", err.Error())))
-			return nil, fmt.Errorf("failed to allocate lane: %w", err)
-		}
+		return nil, errors.New("payment channel required, boost doesn't support these retrievals")
 	}
 
 	// Set up incoming events handler
@@ -985,36 +896,8 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 				// Respond with a payment voucher when funds are requested
 				case retrievalmarket.DealStatusFundsNeeded, retrievalmarket.DealStatusFundsNeededLastPayment:
 					if pchRequired {
-						log.Infof("Sending payment voucher (nonce: %v, amount: %v)", nonce, resType.PaymentOwed)
-
-						totalPayment = types.BigAdd(totalPayment, resType.PaymentOwed)
-
-						vres, err := c.pchmgr.CreateVoucher(ctx, pchAddr, paych.SignedVoucher{
-							ChannelAddr: pchAddr,
-							Lane:        pchLane,
-							Nonce:       nonce,
-							Amount:      totalPayment,
-						})
-						if err != nil {
-							finish(err)
-							return
-						}
-
-						if types.BigCmp(vres.Shortfall, big.NewInt(0)) > 0 {
-							finish(fmt.Errorf("not enough funds remaining in payment channel (shortfall = %s)", vres.Shortfall))
-							return
-						}
-
-						if err := c.dataTransfer.SendVoucher(ctx, chanidCopy, &retrievalmarket.DealPayment{
-							ID:             proposal.ID,
-							PaymentChannel: pchAddr,
-							PaymentVoucher: vres.Voucher,
-						}); err != nil {
-							finish(fmt.Errorf("failed to send payment voucher: %w", err))
-							return
-						}
-
-						nonce++
+						finish(errors.New("payment channel required"))
+						return
 					} else {
 						finish(fmt.Errorf("the miner requested payment even though this transaction was determined to be zero cost"))
 						return
