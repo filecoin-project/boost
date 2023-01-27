@@ -4,8 +4,6 @@ go 1.18
 
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
-replace github.com/filecoin-project/go-jsonrpc => github.com/nonsense/go-jsonrpc v0.0.0-20221118154859-f3f8e9b1cb11
-
 // replace github.com/filecoin-project/lotus => ../lotus
 
 require (
@@ -30,7 +28,7 @@ require (
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
 	github.com/filecoin-project/go-fil-markets v1.26.0
-	github.com/filecoin-project/go-jsonrpc v0.1.8
+	github.com/filecoin-project/go-jsonrpc v0.2.0
 	github.com/filecoin-project/go-legs v0.4.9
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
