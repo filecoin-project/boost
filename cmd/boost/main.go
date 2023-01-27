@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/urfave/cli/v2"
 	"io/ioutil"
 	"os"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/filecoin-project/boost/build"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/urfave/cli/v2"
 )
 
 var log = logging.Logger("boost")
@@ -36,6 +36,7 @@ func main() {
 		Commands: []*cli.Command{
 			initCmd,
 			dealCmd,
+			dealCidGravityCmd,
 			dealStatusCmd,
 			offlineDealCmd,
 			providerCmd,
