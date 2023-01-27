@@ -39,6 +39,9 @@ func TestDummydealOnline(t *testing.T) {
 	failingFilepath, err := testutil.CreateRandomFile(tempdir, 5, 2000000)
 	require.NoError(t, err)
 
+	// NOTE: these calls to CreateDenseCARv2 have the identity CID builder enabled so will
+	// produce a root identity CID for this case. So we're testing deal-making and retrieval
+	// where a DAG has an identity CID root
 	rootCid, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
 	require.NoError(t, err)
 
@@ -56,7 +59,7 @@ func TestDummydealOnline(t *testing.T) {
 	// Make a deal
 	res, err := f.MakeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false)
 	require.NoError(t, err)
-	require.True(t, res.Accepted)
+	require.True(t, res.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
 	time.Sleep(2 * time.Second)
@@ -66,7 +69,7 @@ func TestDummydealOnline(t *testing.T) {
 	failingDealUuid := uuid.New()
 	res2, err2 := f.MakeDummyDeal(failingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
 	require.NoError(t, err2)
-	require.Contains(t, res2.Reason, "no space left", res2.Reason)
+	require.Contains(t, res2.Result.Reason, "no space left", res2.Result.Reason)
 	log.Debugw("got response from MarketDummyDeal for failing deal", "res2", spew.Sdump(res2))
 
 	// Wait for the first deal to be added to a sector and cleaned up so space is made
@@ -74,20 +77,18 @@ func TestDummydealOnline(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
 
-	// *********************************************************************
-	// Disable this part of the test for now because there is a bug in lotus
-	// introduced in this PR that causes the test to fail:
-	// https://github.com/filecoin-project/lotus/pull/9174/files#top
-	// *********************************************************************
+	// Make a third deal - it should succeed because the first deal has been cleaned up
+	passingDealUuid := uuid.New()
+	res2, err2 = f.MakeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
+	require.NoError(t, err2)
+	require.True(t, res2.Result.Accepted)
+	log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
 
-	//// Make a third deal - it should succeed because the first deal has been cleaned up
-	//passingDealUuid := uuid.New()
-	//res2, err2 = f.MakeDummyDeal(passingDealUuid, failingCarFilepath, failingRootCid, server.URL+"/"+filepath.Base(failingCarFilepath), false)
-	//require.NoError(t, err2)
-	//require.True(t, res2.Accepted)
-	//log.Debugw("got response from MarketDummyDeal", "res2", spew.Sdump(res2))
-	//
-	//// Wait for the deal to be added to a sector
-	//err = f.WaitForDealAddedToSector(passingDealUuid)
-	//require.NoError(t, err)
+	// Wait for the deal to be added to a sector
+	err = f.WaitForDealAddedToSector(passingDealUuid)
+	require.NoError(t, err)
+
+	// rootCid is an identity CID
+	outFile := f.RetrieveDirect(ctx, t, rootCid, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true)
+	kit.AssertFilesEqual(t, randomFilepath, outFile)
 }

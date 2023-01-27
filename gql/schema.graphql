@@ -37,6 +37,16 @@ type Sector {
   Length: Uint64!
 }
 
+enum Checkpoint {
+  Accepted
+  Transferred
+  Published
+  PublishConfirmed
+  AddedPiece
+  IndexedAndAnnounced
+  Complete
+}
+
 type Deal {
   ID: ID!
   ClientAddress: String!
@@ -63,7 +73,7 @@ type Deal {
   Transfer: TransferParams!
   TransferSamples: [TransferPoint]!
   IsTransferStalled: Boolean!
-  Checkpoint: String!
+  Checkpoint: Checkpoint!
   CheckpointAt: Time!
   Err: String!
   Retry: String!
@@ -395,6 +405,13 @@ input StorageAskUpdate {
   MaxPieceSize: Uint64
 }
 
+input DealFilter {
+  Checkpoint: Checkpoint
+  IsOffline: Boolean
+  TransferType: String
+  IsVerified: Boolean
+}
+
 type RootQuery {
   """Get height of chain"""
   epoch: EpochInfo!
@@ -406,7 +423,7 @@ type RootQuery {
   legacyDeal(id: ID!): LegacyDeal
 
   """Get all Deals"""
-  deals(query: String, cursor: ID, offset: Int, limit: Int): DealList!
+  deals(query: String, filter: DealFilter, cursor: ID, offset: Int, limit: Int): DealList!
 
   """Get all Deals made with legacy markets endpoint"""
   legacyDeals(query: String, cursor: ID, offset: Int, limit: Int): LegacyDealList!

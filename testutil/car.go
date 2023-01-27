@@ -139,6 +139,7 @@ func WriteUnixfsDAGTo(path string, into ipldformat.DAGService) (cid.Cid, error) 
 	params := ihelper.DagBuilderParams{
 		Maxlinks:  unixfsLinksPerLevel,
 		RawLeaves: true,
+		// NOTE: InlineBuilder not recommended, we are using this to test identity CIDs
 		CidBuilder: cidutil.InlineBuilder{
 			Builder: prefix,
 			Limit:   126,

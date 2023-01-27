@@ -257,7 +257,7 @@ docker network connect devnet prometheus
 
 ### Explore Grafana / Tempo and search for traces
 
-http://localhost:3333
+http://localhost:3333 (username: `admin` ; password: `admin`)
 
 ### Making a deal
 
@@ -279,6 +279,9 @@ By default the [docker-compose.yaml](./docker-compose.yaml) does not expose any 
 ```
 docker exec -it lotus lotus auth api-info --perm=admin
 FULLNODE_API_INFO=eyJ...ms4:/dns/lotus/tcp/1234/http
+
+docker exec -it lotus-miner lotus-miner auth api-info --perm=admin
+MINER_API_INFO=eyJ...UlI:/dns/lotus-miner/tcp/2345/http
 ```
 3. Change the `dns/lotus/tcp/1234/http` to `ip4/<127.0.0.1 or container's IP>/tcp/1234/http` for the use in `FULLNODE_API_INFO`.
 
