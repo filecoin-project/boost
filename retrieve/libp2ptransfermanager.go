@@ -17,7 +17,6 @@ import (
 	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipfs/go-datastore/query"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"golang.org/x/xerrors"
 )
 
 // libp2pCarServer is mocked out by the tests
@@ -186,7 +185,7 @@ func (m *libp2pTransferManager) CleanupPreparedRequest(ctx context.Context, dbid
 	// Cancel any related transfer
 	dbidstr := fmt.Sprintf("%d", dbid)
 	_, cancelerr := m.dtServer.CancelTransfer(ctx, dbidstr)
-	if cancelerr != nil && xerrors.Is(cancelerr, httptransport.ErrTransferNotFound) {
+	if cancelerr != nil && errors.Is(cancelerr, httptransport.ErrTransferNotFound) {
 		// Ignore transfer not found error
 		cancelerr = nil
 	}
@@ -274,7 +273,7 @@ func (m *libp2pTransferManager) byId(id string) (*ChannelState, error) {
 		st := m.toDTState(xfer.State())
 		return &st, nil
 	}
-	if !xerrors.Is(err, httptransport.ErrTransferNotFound) {
+	if !errors.Is(err, httptransport.ErrTransferNotFound) {
 		return nil, err
 	}
 
@@ -364,7 +363,7 @@ func (m *libp2pTransferManager) toDTState(st boosttypes.TransferState) ChannelSt
 func (m *libp2pTransferManager) getCompletedTransfer(id string) (*boosttypes.TransferState, error) {
 	data, err := m.dtds.Get(m.ctx, datastore.NewKey(id))
 	if err != nil {
-		if xerrors.Is(err, datastore.ErrNotFound) {
+		if errors.Is(err, datastore.ErrNotFound) {
 			return nil, fmt.Errorf("getting transfer status for id '%s': %w", id, err)
 		}
 		return nil, fmt.Errorf("getting transfer status for id '%s' from datastore: %w", id, err)
@@ -396,7 +395,7 @@ func (m *libp2pTransferManager) saveCompletedTransfer(id string, st boosttypes.T
 func (m *libp2pTransferManager) forEachCompletedTransfer(cb func(string, boosttypes.TransferState) bool) error {
 	qres, err := m.dtds.Query(m.ctx, query.Query{})
 	if err != nil {
-		return xerrors.Errorf("query error: %w", err)
+		return fmt.Errorf("query error: %w", err)
 	}
 	defer qres.Close() //nolint:errcheck
 

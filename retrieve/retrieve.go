@@ -381,8 +381,8 @@ func (c *Client) minerOwner(ctx context.Context, miner address.Address) (address
 func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}) error {
 	dline, ok := ctx.Deadline()
 	if ok {
-		s.SetDeadline(dline)
-		defer s.SetDeadline(time.Time{})
+		_ = s.SetDeadline(dline)
+		defer func() { _ = s.SetDeadline(time.Time{}) }()
 	}
 
 	if err := cborutil.WriteCborRPC(s, req); err != nil {
@@ -978,7 +978,7 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 	defer unsubscribe()
 
 	// Submit the retrieval deal proposal to the miner
-	newchid, err := c.dataTransfer.OpenPullDataChannel(ctx, peerID, proposal, proposal.PayloadCID, shared.AllSelector())
+	newchid, err := c.dataTransfer.OpenPullDataChannel(ctx, peerID, proposal, proposal.PayloadCID, selectorparse.CommonSelector_ExploreAllRecursively)
 	if err != nil {
 		// We could fail before a successful proposal
 		// publish event failure
@@ -996,7 +996,7 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 	chanid = newchid
 	chanidLk.Unlock()
 
-	defer c.dataTransfer.CloseDataTransferChannel(ctx, chanid)
+	defer func() { _ = c.dataTransfer.CloseDataTransferChannel(ctx, chanid) }()
 
 	// Wait for the retrieval to finish before exiting the function
 awaitfinished:
@@ -1015,7 +1015,7 @@ awaitfinished:
 			break awaitfinished
 		case <-gracefulShutdownRequested:
 			go func() {
-				c.dataTransfer.CloseDataTransferChannel(ctx, chanid)
+				_ = c.dataTransfer.CloseDataTransferChannel(ctx, chanid)
 			}()
 		case <-ctx.Done():
 			return nil, ctx.Err()

@@ -52,11 +52,6 @@ import (
 	"golang.org/x/xerrors"
 )
 
-var flagMiner = &cli.StringFlag{
-	Name:    "miner",
-	Aliases: []string{"m"},
-}
-
 var flagMiners = &cli.StringSliceFlag{
 	Name:    "miners",
 	Aliases: []string{"miner", "m"},
@@ -251,7 +246,7 @@ var retrieveCmd = &cli.Command{
 			if err != nil {
 				return err
 			}
-			car.WriteCar(cctx.Context, dservOffline, []cid.Cid{c}, file)
+			_ = car.WriteCar(cctx.Context, dservOffline, []cid.Cid{c}, file)
 
 			fmt.Println("Saved .car output to", output+".car")
 		} else {
