@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/retrievalmarket/client/rep"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -64,7 +63,6 @@ type Client struct {
 	dataTransfer datatransfer.Manager
 	graphSync    *gsimpl.GraphSync
 	transport    *gst.Transport
-	rep          *rep.RetrievalEventPublisher
 
 	logRetrievalProgressEvents bool
 }
@@ -168,9 +166,6 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 		return nil, err
 	}
 
-	// Create a retrieval event publisher
-	pb := rep.New(ctx)
-
 	c := &Client{
 		host:                       cfg.Host,
 		api:                        cfg.Api,
@@ -181,11 +176,7 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 		transport:                  tpt,
 		dataTransfer:               mgr,
 		logRetrievalProgressEvents: cfg.LogRetrievalProgressEvents,
-		rep:                        pb,
 	}
-
-	// Subscribe this instance to retrieval events
-	pb.Subscribe(c)
 
 	return c, nil
 }
@@ -373,10 +364,6 @@ func (c *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid
 
 	s, err := c.streamToMiner(ctx, maddr, RetrievalQueryProtocol)
 	if err != nil {
-		// publish fail event, log the err
-		c.rep.Publish(
-			rep.NewRetrievalEventFailure(rep.QueryPhase, pcid, "", maddr,
-				fmt.Sprintf("failed connecting to miner: %s", err.Error())))
 		return nil, err
 	}
 
@@ -388,24 +375,14 @@ func (c *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid
 
 	// We have connected
 
-	// publish connected event
-	c.rep.Publish(rep.NewRetrievalEventConnect(rep.QueryPhase, pcid, "", maddr))
-
 	q := &retrievalmarket.Query{
 		PayloadCID: pcid,
 	}
 
 	var resp retrievalmarket.QueryResponse
 	if err := doRpc(ctx, s, q, &resp); err != nil {
-		// publish failure event
-		c.rep.Publish(
-			rep.NewRetrievalEventFailure(rep.QueryPhase, pcid, "", maddr,
-				fmt.Sprintf("failed retrieval query ask: %s", err.Error())))
 		return nil, fmt.Errorf("retrieval query rpc: %w", err)
 	}
-
-	// publish query ask event
-	c.rep.Publish(rep.NewRetrievalEventQueryAsk(rep.QueryPhase, pcid, "", maddr, resp))
 
 	return &resp, nil
 }
@@ -574,9 +551,6 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 				case retrievalmarket.DealStatusAccepted:
 					log.Info("Deal accepted")
 
-					// publish deal accepted event
-					c.rep.Publish(rep.NewRetrievalEventAccepted(rep.RetrievalPhase, rootCid, peerID, address.Undef))
-
 				// Respond with a payment voucher when funds are requested
 				case retrievalmarket.DealStatusFundsNeeded, retrievalmarket.DealStatusFundsNeededLastPayment:
 					if pchRequired {
@@ -631,7 +605,6 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 			// publish first byte event
 			if !receivedFirstByte {
 				receivedFirstByte = true
-				c.rep.Publish(rep.NewRetrievalEventFirstByte(rep.RetrievalPhase, rootCid, peerID, address.Undef))
 			}
 
 			progressCallback(state.Received())
@@ -666,15 +639,10 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 	if err != nil {
 		// We could fail before a successful proposal
 		// publish event failure
-		c.rep.Publish(
-			rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef,
-				fmt.Sprintf("deal proposal failed: %s", err.Error())))
 		return nil, err
 	}
 
 	// Deal has been proposed
-	// publish deal proposed event
-	c.rep.Publish(rep.NewRetrievalEventProposed(rep.RetrievalPhase, rootCid, peerID, address.Undef))
 
 	chanidLk.Lock()
 	chanid = newchid
@@ -688,10 +656,6 @@ awaitfinished:
 		select {
 		case err := <-dtRes:
 			if err != nil {
-				// If there is an error, publish a retrieval event failure
-				c.rep.Publish(
-					rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef,
-						fmt.Sprintf("data transfer failed: %s", err.Error())))
 				return nil, fmt.Errorf("data transfer failed: %w", err)
 			}
 
@@ -709,32 +673,20 @@ awaitfinished:
 	// Confirm that we actually ended up with the root block we wanted, failure
 	// here indicates a data transfer error that was not properly reported
 	if has, err := c.blockstore.Has(ctx, rootCid); err != nil {
-		err = fmt.Errorf("could not get query blockstore: %w", err)
-		c.rep.Publish(
-			rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef, err.Error()))
-		return nil, err
+		return nil, fmt.Errorf("could not get query blockstore: %w", err)
 	} else if !has {
-		msg := "data transfer failed: unconfirmed block transfer"
-		c.rep.Publish(
-			rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef, msg))
-		return nil, errors.New(msg)
+		return nil, errors.New("data transfer failed: unconfirmed block transfer")
 	}
 
 	// Compile the retrieval stats
 
 	state, err := c.dataTransfer.ChannelState(ctx, chanid)
 	if err != nil {
-		err = fmt.Errorf("could not get channel state: %w", err)
-		c.rep.Publish(
-			rep.NewRetrievalEventFailure(rep.RetrievalPhase, rootCid, peerID, address.Undef, err.Error()))
-		return nil, err
+		return nil, fmt.Errorf("could not get channel state: %w", err)
 	}
 
 	duration := time.Since(startTime)
 	speed := uint64(float64(state.Received()) / duration.Seconds())
-
-	// Otherwise publish a retrieval event success
-	c.rep.Publish(rep.NewRetrievalEventSuccess(rep.RetrievalPhase, rootCid, peerID, address.Undef, state.Received(), state.ReceivedCidsTotal(), duration, totalPayment))
 
 	return &RetrievalStats{
 		Peer:         state.OtherPeer(),
@@ -745,44 +697,6 @@ awaitfinished:
 		NumPayments:  int(nonce),
 		AskPrice:     proposal.PricePerByte,
 	}, nil
-}
-
-func (fc *Client) OnRetrievalEvent(event rep.RetrievalEvent) {
-	kv := make([]interface{}, 0)
-	logadd := func(kva ...interface{}) {
-		if len(kva)%2 != 0 {
-			panic("bad number of key/value arguments")
-		}
-		for i := 0; i < len(kva); i += 2 {
-			key, ok := kva[i].(string)
-			if !ok {
-				panic("expected string key")
-			}
-			kv = append(kv, key, kva[i+1])
-		}
-	}
-	logadd("code", event.Code(),
-		"phase", event.Phase(),
-		"payloadCid", event.PayloadCid(),
-		"storageProviderId", event.StorageProviderId(),
-		"storageProviderAddr", event.StorageProviderAddr())
-	switch tevent := event.(type) {
-	case rep.RetrievalEventQueryAsk:
-		logadd("queryResponse:Status", tevent.QueryResponse().Status,
-			"queryResponse:PieceCIDFound", tevent.QueryResponse().PieceCIDFound,
-			"queryResponse:Size", tevent.QueryResponse().Size,
-			"queryResponse:PaymentAddress", tevent.QueryResponse().PaymentAddress,
-			"queryResponse:MinPricePerByte", tevent.QueryResponse().MinPricePerByte,
-			"queryResponse:MaxPaymentInterval", tevent.QueryResponse().MaxPaymentInterval,
-			"queryResponse:MaxPaymentIntervalIncrease", tevent.QueryResponse().MaxPaymentIntervalIncrease,
-			"queryResponse:Message", tevent.QueryResponse().Message,
-			"queryResponse:UnsealPrice", tevent.QueryResponse().UnsealPrice)
-	case rep.RetrievalEventFailure:
-		logadd("errorMessage", tevent.ErrorMessage())
-	case rep.RetrievalEventSuccess:
-		logadd("receivedSize", tevent.ReceivedSize())
-	}
-	log.Debugw("retrieval-event", kv...)
 }
 
 var dealIdGen = shared.NewTimeCounter()
