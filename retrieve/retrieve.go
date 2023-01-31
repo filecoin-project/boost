@@ -29,7 +29,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/wallet"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipfs/go-graphsync"
 	gsimpl "github.com/ipfs/go-graphsync/impl"
 	gsnet "github.com/ipfs/go-graphsync/network"
@@ -61,16 +60,15 @@ const (
 )
 
 type Client struct {
-	api               api.Gateway
-	wallet            *wallet.LocalWallet
-	host              host.Host
-	ClientAddr        address.Address
-	Libp2pTransferMgr *libp2pTransferManager
-	blockstore        blockstore.Blockstore
-	dataTransfer      datatransfer.Manager
-	graphSync         *gsimpl.GraphSync
-	transport         *gst.Transport
-	rep               *rep.RetrievalEventPublisher
+	api          api.Gateway
+	wallet       *wallet.LocalWallet
+	host         host.Host
+	ClientAddr   address.Address
+	blockstore   blockstore.Blockstore
+	dataTransfer datatransfer.Manager
+	graphSync    *gsimpl.GraphSync
+	transport    *gst.Transport
+	rep          *rep.RetrievalEventPublisher
 
 	logRetrievalProgressEvents bool
 }
@@ -200,21 +198,6 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 		return nil, err
 	}
 
-	// Create a server for libp2p data transfers
-	lp2pds := namespace.Wrap(cfg.Datastore, datastore.NewKey("/libp2p-dt"))
-	authDB := httptransport.NewAuthTokenDB(lp2pds)
-	dtServer := httptransport.NewLibp2pCarServer(cfg.Host, authDB, cfg.Blockstore, cfg.Lp2pDTConfig.Server)
-
-	// Create a manager to watch for libp2p data transfer events
-	lp2pXferOpts := libp2pTransferManagerOpts{
-		xferTimeout:     cfg.Lp2pDTConfig.TransferTimeout,
-		authCheckPeriod: time.Minute,
-	}
-	libp2pTransferMgr := newLibp2pTransferManager(dtServer, lp2pds, authDB, lp2pXferOpts)
-	if err := libp2pTransferMgr.Start(ctx); err != nil {
-		return nil, err
-	}
-
 	// Create a retrieval event publisher
 	pb := rep.New(ctx)
 
@@ -228,7 +211,6 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 		transport:                  tpt,
 		dataTransfer:               mgr,
 		logRetrievalProgressEvents: cfg.LogRetrievalProgressEvents,
-		Libp2pTransferMgr:          libp2pTransferMgr,
 		rep:                        pb,
 	}
 
@@ -480,60 +462,7 @@ func (c *Client) TransferStatus(ctx context.Context, chanid *datatransfer.Channe
 	return ChannelStateConv(st), nil
 }
 
-func (c *Client) TransferStatusByID(ctx context.Context, id string) (*ChannelState, error) {
-	chid, err := ChannelIDFromString(id)
-	if err == nil {
-		// If the id is a data transfer channel id, get the transfer status by channel id
-		return c.TransferStatus(ctx, chid)
-	}
-
-	// Get the transfer status by transfer id
-	return c.Libp2pTransferMgr.byId(id)
-}
-
 var ErrNoTransferFound = fmt.Errorf("no transfer found")
-
-func (c *Client) TransferStatusForContent(ctx context.Context, content cid.Cid, miner address.Address) (*ChannelState, error) {
-	start := time.Now()
-	defer func() {
-		log.Infof("check transfer status took: %s", time.Since(start))
-	}()
-	mpid, err := c.MinerPeer(ctx, miner)
-	if err != nil {
-		return nil, err
-	}
-
-	// Check if there's a storage deal transfer with the miner that matches the
-	// payload CID
-	// 1. over data transfer v1.2
-	xfer, err := c.Libp2pTransferMgr.byRemoteAddrAndPayloadCid(mpid.ID.Pretty(), content)
-	if err != nil {
-		return nil, err
-	}
-	if xfer != nil {
-		return xfer, nil
-	}
-
-	// 2. over data transfer v1.1
-	inprog, err := c.dataTransfer.InProgressChannels(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	for chanid, state := range inprog {
-		if chanid.Responder == mpid.ID {
-			if state.IsPull() {
-				// this isnt a storage deal transfer...
-				continue
-			}
-			if state.BaseCID() == content {
-				return ChannelStateConv(state), nil
-			}
-		}
-	}
-
-	return nil, ErrNoTransferFound
-}
 
 func (c *Client) RestartTransfer(ctx context.Context, chanid *datatransfer.ChannelID) error {
 	return c.dataTransfer.RestartDataTransferChannel(ctx, *chanid)
