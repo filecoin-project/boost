@@ -22,8 +22,6 @@ import (
 
 	"github.com/filecoin-project/go-address"
 
-	"github.com/ipfs/go-bitswap"
-	bsnet "github.com/ipfs/go-bitswap/network"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -43,7 +41,6 @@ import (
 	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
 	textselector "github.com/ipld/go-ipld-selector-text-lite"
 	"github.com/libp2p/go-libp2p"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/metrics"
@@ -347,9 +344,7 @@ type Node struct {
 	Host host.Host
 
 	Datastore  datastore.Batching
-	DHT        *dht.IpfsDHT
 	Blockstore blockstore.Blockstore
-	Bitswap    *bitswap.Bitswap
 
 	Wallet *wallet.LocalWallet
 }
@@ -383,23 +378,6 @@ func setup(ctx context.Context, cfgdir string) (*Node, error) {
 		return nil, err
 	}
 
-	dht, err := dht.New(
-		ctx,
-		h,
-		dht.Mode(dht.ModeClient),
-		dht.QueryFilter(dht.PublicQueryFilter),
-		dht.RoutingTableFilter(dht.PublicRoutingTableFilter),
-		dht.BootstrapPeersFunc(dht.GetDefaultBootstrapPeerAddrInfos),
-		dht.Datastore(ds),
-		dht.RoutingTablePeerDiversityFilter(dht.NewRTPeerDiversityFilter(h, 2, 3)),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	bsnet := bsnet.NewFromIpfsHost(h, dht)
-	bswap := bitswap.New(ctx, bsnet, bstore)
-
 	wallet, err := setupWallet(walletPath(cfgdir))
 	if err != nil {
 		return nil, err
@@ -408,9 +386,7 @@ func setup(ctx context.Context, cfgdir string) (*Node, error) {
 	return &Node{
 		Host:       h,
 		Blockstore: bstore,
-		DHT:        dht,
 		Datastore:  ds,
-		Bitswap:    bswap,
 		Wallet:     wallet,
 	}, nil
 }
