@@ -150,13 +150,20 @@ var retrieveCmd = &cli.Command{
 			return fmt.Errorf("Failed to create retrieval proposal with candidate miner %s: %v", miner, err)
 		}
 
-		stats, err := fc.RetrieveContent(ctx, miner, proposal)
+		stats_, err := fc.RetrieveContentWithProgressCallback(
+			ctx,
+			miner,
+			proposal,
+			func(bytesReceived_ uint64) {
+				printProgress(bytesReceived_)
+			},
+		)
 		if err != nil {
-			return err
+			return fmt.Errorf("Failed to retrieve content with candidate miner %s: %v", miner, err)
 		}
 
-		_ = stats
-		//printRetrievalStats(stats)
+		stats := &FILRetrievalStats{RetrievalStats: *stats_}
+		printRetrievalStats(stats)
 
 		dservOffline := merkledag.NewDAGService(blockservice.New(node.Blockstore, offline.Exchange(node.Blockstore)))
 
