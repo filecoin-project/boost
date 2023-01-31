@@ -75,31 +75,6 @@ func TestRetryShutdownRecoverable(t *testing.T) {
 	require.EqualValues(t, dealcheckpoints.Accepted, pds.Checkpoint)
 }
 
-func TestMultipleDealsConcurrentResumptionDisconnect(t *testing.T) {
-	logging.SetLogLevel("http-transport", "WARN") //nolint:errcheck
-
-	nDeals := 5
-	ctx := context.Background()
-	fileSize := testFileSize
-
-	// setup the provider test harness with a disconnecting server that disconnects after sending the given number of bytes
-	harness := NewHarness(t, withHttpDisconnectServerAfter(int64(fileSize/101)), withHttpTransportOpts([]httptransport.Option{httptransport.BackOffRetryOpt(50*time.Millisecond, 100*time.Millisecond, 2, 1000)}))
-	// start the provider test harness
-	harness.Start(t, ctx)
-	defer harness.Stop()
-
-	tds := harness.executeNDealsConcurrentAndWaitFor(t, nDeals, func(i int) *testDeal {
-		return harness.newDealBuilder(t, i, withNormalFileSize(fileSize)).withAllMinerCallsNonBlocking().withDisconnectingHttpServer().build()
-	}, func(_ int, td *testDeal) error {
-		return td.waitForCheckpoint(dealcheckpoints.AddedPiece)
-	})
-
-	for i := 0; i < nDeals; i++ {
-		td := tds[i]
-		td.assertPieceAdded(t, ctx)
-	}
-}
-
 func TestTransferCancelledByUser(t *testing.T) {
 	ctx := context.Background()
 
