@@ -62,7 +62,6 @@ var flagDmPathSel = &cli.StringFlag{
 var retrieveCmd = &cli.Command{
 	Name:        "retrieve",
 	Usage:       "Retrieve a file by CID from a miner",
-	Description: "Retrieve a file by CID from a miner. If desired, multiple miners can be specified as fallbacks in case of a failure (comma-separated, no spaces).",
 	ArgsUsage:   "<cid>",
 	Flags: []cli.Flag{
 		flagMiner,
