@@ -24,7 +24,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/wallet"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-graphsync"
 	gsimpl "github.com/ipfs/go-graphsync/impl"
 	gsnet "github.com/ipfs/go-graphsync/network"
 	"github.com/ipfs/go-graphsync/storeutil"
@@ -61,8 +60,6 @@ type Client struct {
 	ClientAddr   address.Address
 	blockstore   blockstore.Blockstore
 	dataTransfer datatransfer.Manager
-	graphSync    *gsimpl.GraphSync
-	transport    *gst.Transport
 
 	logRetrievalProgressEvents bool
 }
@@ -172,8 +169,6 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 		wallet:                     cfg.Wallet,
 		ClientAddr:                 cfg.Addr,
 		blockstore:                 cfg.Blockstore,
-		graphSync:                  gse,
-		transport:                  tpt,
 		dataTransfer:               mgr,
 		logRetrievalProgressEvents: cfg.LogRetrievalProgressEvents,
 	}
@@ -302,20 +297,6 @@ func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}
 	}
 
 	return nil
-}
-
-func (c *Client) GraphSyncStats() graphsync.Stats {
-	return c.graphSync.Stats()
-}
-
-var ErrNoTransferFound = fmt.Errorf("no transfer found")
-
-func (c *Client) RestartTransfer(ctx context.Context, chanid *datatransfer.ChannelID) error {
-	return c.dataTransfer.RestartDataTransferChannel(ctx, *chanid)
-}
-
-func (c *Client) SubscribeToDataTransferEvents(f datatransfer.Subscriber) func() {
-	return c.dataTransfer.SubscribeToEvents(f)
 }
 
 type Balance struct {
