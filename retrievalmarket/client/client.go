@@ -133,8 +133,6 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 		return nil, fmt.Errorf("failed to initialize cidlistsdir: %w", err)
 	}
 
-	ctx := context.Background()
-
 	mgr, err := dtimpl.NewDataTransfer(cfg.Datastore, dtn, tpt, dtRestartConfig)
 	if err != nil {
 		return nil, err
@@ -161,7 +159,7 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 		}
 	}
 
-	if err := mgr.Start(ctx); err != nil {
+	if err := mgr.Start(context.Background()); err != nil {
 		return nil, err
 	}
 
