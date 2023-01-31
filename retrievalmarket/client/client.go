@@ -249,34 +249,6 @@ func (c *Client) minerAddrInfo(ctx context.Context, maddr address.Address) (*pee
 	}, nil
 }
 
-func (c *Client) openStreamToPeer(ctx context.Context, addr peer.AddrInfo, protocol protocol.ID) (inet.Stream, error) {
-	ctx, span := Tracer.Start(ctx, "openStreamToPeer", trace.WithAttributes(
-		attribute.Stringer("peerID", addr.ID),
-	))
-	defer span.End()
-
-	err := c.connectToPeer(ctx, addr)
-	if err != nil {
-		return nil, err
-	}
-
-	s, err := c.host.NewStream(ctx, addr.ID, protocol)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open stream to peer: %w", err)
-	}
-
-	return s, nil
-}
-
-// Errors - ErrMinerConnectionFailed, ErrLotusError
-func (c *Client) connectToPeer(ctx context.Context, addr peer.AddrInfo) error {
-	if err := c.host.Connect(ctx, addr); err != nil {
-		return NewErrMinerConnectionFailed(err)
-	}
-
-	return nil
-}
-
 func (c *Client) MinerPeer(ctx context.Context, miner address.Address) (peer.AddrInfo, error) {
 	minfo, err := c.api.StateMinerInfo(ctx, miner, types.EmptyTSK)
 	if err != nil {
