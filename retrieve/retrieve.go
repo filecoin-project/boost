@@ -354,90 +354,8 @@ func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}
 	return nil
 }
 
-type TransferType string
-
-const (
-	BoostTransfer     TransferType = "boost"
-	GraphsyncTransfer TransferType = "graphsync"
-)
-
-type ChannelState struct {
-	//datatransfer.Channel
-
-	// SelfPeer returns the peer this channel belongs to
-	SelfPeer   peer.ID `json:"selfPeer"`
-	RemotePeer peer.ID `json:"remotePeer"`
-
-	// Status is the current status of this channel
-	Status    datatransfer.Status `json:"status"`
-	StatusStr string              `json:"statusMessage"`
-
-	// Sent returns the number of bytes sent
-	Sent uint64 `json:"sent"`
-
-	// Received returns the number of bytes received
-	Received uint64 `json:"received"`
-
-	// Message offers additional information about the current status
-	Message string `json:"message"`
-
-	BaseCid string `json:"baseCid"`
-
-	ChannelID datatransfer.ChannelID `json:"channelId"`
-
-	TransferID string `json:"transferId"`
-
-	// Vouchers returns all vouchers sent on this channel
-	//Vouchers []datatransfer.Voucher
-
-	// VoucherResults are results of vouchers sent on the channel
-	//VoucherResults []datatransfer.VoucherResult
-
-	// LastVoucher returns the last voucher sent on the channel
-	//LastVoucher datatransfer.Voucher
-
-	// LastVoucherResult returns the last voucher result sent on the channel
-	//LastVoucherResult datatransfer.VoucherResult
-
-	// ReceivedCids returns the cids received so far on the channel
-	//ReceivedCids []cid.Cid
-
-	// Queued returns the number of bytes read from the node and queued for sending
-	//Queued uint64
-
-	Stages *datatransfer.ChannelStages
-
-	TransferType TransferType
-}
-
-func ChannelStateConv(st datatransfer.ChannelState) *ChannelState {
-	return &ChannelState{
-		SelfPeer:     st.SelfPeer(),
-		RemotePeer:   st.OtherPeer(),
-		Status:       st.Status(),
-		StatusStr:    datatransfer.Statuses[st.Status()],
-		Sent:         st.Sent(),
-		Received:     st.Received(),
-		Message:      st.Message(),
-		BaseCid:      st.BaseCID().String(),
-		ChannelID:    st.ChannelID(),
-		TransferID:   st.ChannelID().String(),
-		Stages:       st.Stages(),
-		TransferType: GraphsyncTransfer,
-	}
-}
-
 func (c *Client) GraphSyncStats() graphsync.Stats {
 	return c.graphSync.Stats()
-}
-
-func (c *Client) TransferStatus(ctx context.Context, chanid *datatransfer.ChannelID) (*ChannelState, error) {
-	st, err := c.dataTransfer.ChannelState(ctx, *chanid)
-	if err != nil {
-		return nil, err
-	}
-
-	return ChannelStateConv(st), nil
 }
 
 var ErrNoTransferFound = fmt.Errorf("no transfer found")
@@ -504,31 +422,6 @@ func (c *Client) CheckChainDeal(ctx context.Context, dealid abi.DealID) (bool, *
 	}
 
 	return true, deal, nil
-}
-
-func (c *Client) CheckOngoingTransfer(ctx context.Context, miner address.Address, st *ChannelState) (outerr error) {
-	defer func() {
-		// TODO: this is only here because for some reason restarting a data transfer can just panic
-		// https://github.com/filecoin-project/go-data-transfer/issues/150
-		if e := recover(); e != nil {
-			outerr = fmt.Errorf("panic while checking transfer: %s", e)
-		}
-	}()
-	// make sure we at least have an open connection to the miner
-	if c.host.Network().Connectedness(st.RemotePeer) != inet.Connected {
-		// try reconnecting
-		mpid, err := c.ConnectToMiner(ctx, miner)
-		if err != nil {
-			return err
-		}
-
-		if mpid != st.RemotePeer {
-			return fmt.Errorf("miner peer ID is different than RemotePeer in data transfer channel")
-		}
-	}
-
-	return c.dataTransfer.RestartDataTransferChannel(ctx, st.ChannelID)
-
 }
 
 func (c *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
