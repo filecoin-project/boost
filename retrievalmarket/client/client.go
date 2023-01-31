@@ -204,7 +204,7 @@ func (c *Client) ConnectToMiner(ctx context.Context, maddr address.Address) (pee
 	}
 
 	if err := c.host.Connect(ctx, *addrInfo); err != nil {
-		return "", NewErrMinerConnectionFailed(err)
+		return "", err
 	}
 
 	return addrInfo.ID, nil
@@ -213,31 +213,29 @@ func (c *Client) ConnectToMiner(ctx context.Context, maddr address.Address) (pee
 func (c *Client) minerAddrInfo(ctx context.Context, maddr address.Address) (*peer.AddrInfo, error) {
 	minfo, err := c.api.StateMinerInfo(ctx, maddr, types.EmptyTSK)
 	if err != nil {
-		return nil, NewErrLotusError(err)
+		return nil, err
 	}
 
 	if minfo.PeerId == nil {
-		return nil, NewErrMinerConnectionFailed(fmt.Errorf("miner %s has no peer ID set", maddr))
+		return nil, fmt.Errorf("miner %s has no peer ID set", maddr)
 	}
 
 	var maddrs []multiaddr.Multiaddr
 	for _, mma := range minfo.Multiaddrs {
 		ma, err := multiaddr.NewMultiaddrBytes(mma)
 		if err != nil {
-			return nil, NewErrMinerConnectionFailed(fmt.Errorf("miner %s had invalid multiaddrs in their info: %w", maddr, err))
+			return nil, fmt.Errorf("miner %s had invalid multiaddrs in their info: %w", maddr, err)
 		}
 		maddrs = append(maddrs, ma)
 	}
 
 	if len(maddrs) == 0 {
-		return nil, NewErrMinerConnectionFailed(fmt.Errorf("miner %s has no multiaddrs set on chain", maddr))
+		return nil, fmt.Errorf("miner %s has no multiaddrs set on chain", maddr)
 	}
 
-	if err := c.host.Connect(ctx, peer.AddrInfo{
-		ID:    *minfo.PeerId,
-		Addrs: maddrs,
-	}); err != nil {
-		return nil, NewErrMinerConnectionFailed(err)
+	err = c.host.Connect(ctx, peer.AddrInfo{ID: *minfo.PeerId, Addrs: maddrs})
+	if err != nil {
+		return nil, err
 	}
 
 	return &peer.AddrInfo{
