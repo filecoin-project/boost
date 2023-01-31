@@ -12,7 +12,7 @@ import (
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/markets/utils"
-	"github.com/filecoin-project/boost/retrieve"
+	rc "github.com/filecoin-project/boost/retrievalmarket/client"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
 
 	"github.com/filecoin-project/lotus/chain/types"
@@ -60,9 +60,9 @@ var flagDmPathSel = &cli.StringFlag{
 }
 
 var retrieveCmd = &cli.Command{
-	Name:        "retrieve",
-	Usage:       "Retrieve a file by CID from a miner",
-	ArgsUsage:   "<cid>",
+	Name:      "retrieve",
+	Usage:     "Retrieve a file by CID from a miner",
+	ArgsUsage: "<cid>",
 	Flags: []cli.Flag{
 		flagMiner,
 		flagOutput,
@@ -89,7 +89,7 @@ var retrieveCmd = &cli.Command{
 			return err
 		}
 
-		fc, err := retrieve.NewClient(node.Host, api, node.Wallet, addr, node.Blockstore, node.Datastore, cfgdir)
+		fc, err := rc.NewClient(node.Host, api, node.Wallet, addr, node.Blockstore, node.Datastore, cfgdir)
 		if err != nil {
 			return err
 		}
@@ -149,7 +149,7 @@ var retrieveCmd = &cli.Command{
 			return fmt.Errorf("retrieval query for miner %s failed: %v", miner, err)
 		}
 
-		proposal, err := retrieve.RetrievalProposalForAsk(query, c, selNode)
+		proposal, err := rc.RetrievalProposalForAsk(query, c, selNode)
 		if err != nil {
 			return fmt.Errorf("Failed to create retrieval proposal with candidate miner %s: %v", miner, err)
 		}
@@ -259,7 +259,7 @@ type RetrievalStats interface {
 }
 
 type FILRetrievalStats struct {
-	retrieve.RetrievalStats
+	rc.RetrievalStats
 }
 
 func (stats *FILRetrievalStats) GetByteSize() uint64 {

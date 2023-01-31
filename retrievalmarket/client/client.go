@@ -1,4 +1,4 @@
-package retrieve
+package client
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/retrieve/rep"
+	"github.com/filecoin-project/boost/retrievalmarket/client/rep"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	datatransfer "github.com/filecoin-project/go-data-transfer"

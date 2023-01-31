@@ -1,4 +1,4 @@
-package retrieve
+package client
 
 import "fmt"
 
