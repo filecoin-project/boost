@@ -64,7 +64,7 @@ func Setup(cfgdir string) (*Node, error) {
 	bstoreDatastore, err := flatfs.CreateOrOpen(blockstorePath(cfgdir), flatfs.NextToLast(3), false)
 	bstore := blockstore.NewBlockstoreNoPrefix(bstoreDatastore)
 	if err != nil {
-		return nil, fmt.Errorf("blockstore could not be opened (it may be incompatible after an update - try running the clear blockstore subcommand to delete the blockstore and try again): %v", err)
+		return nil, fmt.Errorf("blockstore could not be opened: %w", err)
 	}
 
 	ds, err := levelds.NewDatastore(datastorePath(cfgdir), nil)
