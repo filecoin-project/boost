@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -376,52 +375,6 @@ type Balance struct {
 	MarketAvailable types.FIL       `json:"marketAvailable"`
 
 	VerifiedClientBalance *abi.StoragePower `json:"verifiedClientBalance"`
-}
-
-func (c *Client) Balance(ctx context.Context) (*Balance, error) {
-	act, err := c.api.StateGetActor(ctx, c.ClientAddr, types.EmptyTSK)
-	if err != nil {
-		return nil, err
-	}
-
-	market, err := c.api.StateMarketBalance(ctx, c.ClientAddr, types.EmptyTSK)
-	if err != nil {
-		return nil, err
-	}
-
-	vcstatus, err := c.api.StateVerifiedClientStatus(ctx, c.ClientAddr, types.EmptyTSK)
-	if err != nil {
-		return nil, err
-	}
-
-	avail := types.BigSub(market.Escrow, market.Locked)
-
-	return &Balance{
-		Account:               c.ClientAddr,
-		Balance:               types.FIL(act.Balance),
-		MarketEscrow:          types.FIL(market.Escrow),
-		MarketLocked:          types.FIL(market.Locked),
-		MarketAvailable:       types.FIL(avail),
-		VerifiedClientBalance: vcstatus,
-	}, nil
-}
-
-type LockFundsResp struct {
-	MsgCid cid.Cid
-}
-
-func (c *Client) CheckChainDeal(ctx context.Context, dealid abi.DealID) (bool, *api.MarketDeal, error) {
-	deal, err := c.api.StateMarketStorageDeal(ctx, dealid, types.EmptyTSK)
-	if err != nil {
-		nfs := fmt.Sprintf("deal %d not found", dealid)
-		if strings.Contains(err.Error(), nfs) {
-			return false, nil, nil
-		}
-
-		return false, nil, err
-	}
-
-	return true, deal, nil
 }
 
 func (c *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
