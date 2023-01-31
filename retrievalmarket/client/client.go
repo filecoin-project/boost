@@ -363,51 +363,11 @@ func (c *Client) RetrieveContentWithProgressCallback(
 	if err != nil {
 		return nil, err
 	}
-	minerOwner, err := c.minerOwner(ctx, miner)
+	minerOwnerWallet, err := c.minerOwner(ctx, miner)
 	if err != nil {
 		return nil, err
 	}
-	return c.RetrieveContentFromPeerWithProgressCallback(ctx, minerPeer.ID, minerOwner, proposal, progressCallback)
-}
-
-func (c *Client) RetrieveContentFromPeerWithProgressCallback(
-	ctx context.Context,
-	peerID peer.ID,
-	minerWallet address.Address,
-	proposal *retrievalmarket.DealProposal,
-	progressCallback func(bytesReceived uint64),
-) (*RetrievalStats, error) {
-	return c.retrieveContentFromPeerWithProgressCallback(ctx, peerID, minerWallet, proposal, progressCallback, nil)
-}
-
-type RetrievalResult struct {
-	*RetrievalStats
-	Err error
-}
-
-func (c *Client) RetrieveContentFromPeerAsync(
-	ctx context.Context,
-	peerID peer.ID,
-	minerWallet address.Address,
-	proposal *retrievalmarket.DealProposal,
-) (result <-chan RetrievalResult, onProgress <-chan uint64, gracefulShutdown func()) {
-	gracefulShutdownChan := make(chan struct{}, 1)
-	resultChan := make(chan RetrievalResult, 1)
-	progressChan := make(chan uint64)
-	internalCtx, internalCancel := context.WithCancel(ctx)
-	go func() {
-		defer internalCancel()
-		result, err := c.retrieveContentFromPeerWithProgressCallback(internalCtx, peerID, minerWallet, proposal, func(bytes uint64) {
-			select {
-			case <-internalCtx.Done():
-			case progressChan <- bytes:
-			}
-		}, gracefulShutdownChan)
-		resultChan <- RetrievalResult{result, err}
-	}()
-	return resultChan, progressChan, func() {
-		gracefulShutdownChan <- struct{}{}
-	}
+	return c.retrieveContentFromPeerWithProgressCallback(ctx, minerPeer.ID, minerOwnerWallet, proposal, progressCallback, nil)
 }
 
 func (c *Client) retrieveContentFromPeerWithProgressCallback(
