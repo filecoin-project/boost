@@ -10,9 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/car"
 	"github.com/filecoin-project/boost/retrieve/rep"
-	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -74,11 +72,6 @@ type Client struct {
 
 type GetPieceCommFunc func(ctx context.Context, payloadCid cid.Cid, bstore blockstore.Blockstore) (cid.Cid, uint64, abi.UnpaddedPieceSize, error)
 
-type Lp2pDTConfig struct {
-	Server          httptransport.ServerConfig
-	TransferTimeout time.Duration
-}
-
 type Config struct {
 	DataDir                    string
 	GraphsyncOpts              []gsimpl.Option
@@ -91,7 +84,6 @@ type Config struct {
 	ChannelMonitorConfig       channelmonitor.Config
 	RetrievalConfigurer        datatransfer.TransportConfigurer
 	LogRetrievalProgressEvents bool
-	Lp2pDTConfig               Lp2pDTConfig
 }
 
 func NewClient(h host.Host, api api.Gateway, w *wallet.LocalWallet, addr address.Address, bs blockstore.Blockstore, ds datastore.Batching, ddir string, opts ...func(*Config)) (*Client, error) {
@@ -125,19 +117,6 @@ func NewClient(h host.Host, api api.Gateway, w *wallet.LocalWallet, addr address
 
 			// Called when a restart completes successfully
 			//OnRestartComplete func(id datatransfer.ChannelID)
-		},
-		Lp2pDTConfig: Lp2pDTConfig{
-			Server: httptransport.ServerConfig{
-				// Keep the cache around for one minute after a request
-				// finishes in case the connection bounced in the middle
-				// of a transfer, or there is a request for the same payload
-				// soon after
-				BlockInfoCacheManager: car.NewDelayedUnrefBICM(time.Minute),
-				ThrottleLimit:         uint(100),
-			},
-			// Wait up to 24 hours for the transfer to complete (including
-			// after a connection bounce) before erroring out the deal
-			TransferTimeout: 24 * time.Hour,
 		},
 	}
 
