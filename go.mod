@@ -102,8 +102,8 @@ require (
 	go.opencensus.io v0.23.0
 	go.opentelemetry.io/otel v1.11.1
 	go.opentelemetry.io/otel/bridge/opencensus v0.33.0
-	go.opentelemetry.io/otel/exporters/jaeger v1.2.0
-	go.opentelemetry.io/otel/sdk v1.11.1
+	go.opentelemetry.io/otel/exporters/jaeger v1.2.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.11.1 // indirect
 	go.opentelemetry.io/otel/trace v1.11.1
 	go.uber.org/atomic v1.10.0
 	go.uber.org/fx v1.15.0
@@ -337,4 +337,27 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
+)
+
+require (
+	github.com/NYTimes/gziphandler v1.1.1
+	github.com/ipfs/go-ds-flatfs v0.5.1
+	github.com/schollz/progressbar/v3 v3.11.0
+)
+
+require (
+	github.com/Microsoft/go-winio v0.5.2 // indirect
+	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
+	github.com/containerd/containerd v1.6.10 // indirect
+	github.com/couchbase/gocb/v2 v2.5.0 // indirect
+	github.com/couchbase/gocbcore/v10 v10.1.2 // indirect
+	github.com/docker/distribution v2.8.1+incompatible // indirect
+	github.com/docker/docker v20.10.7+incompatible // indirect
+	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799 // indirect
+	github.com/tklauser/go-sysconf v0.3.5 // indirect
+	github.com/tklauser/numcpus v0.2.2 // indirect
+	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 )

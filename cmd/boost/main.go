@@ -37,6 +37,7 @@ func main() {
 			initCmd,
 			dealCmd,
 			dealStatusCmd,
+			retrieveCmd,
 			offlineDealCmd,
 			providerCmd,
 			walletCmd,
