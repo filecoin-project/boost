@@ -421,50 +421,6 @@ func (c *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid
 	return &resp, nil
 }
 
-func (c *Client) RetrievalQueryToPeer(ctx context.Context, minerPeer peer.AddrInfo, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
-	ctx, span := Tracer.Start(ctx, "retrievalQueryPeer", trace.WithAttributes(
-		attribute.Stringer("peerID", minerPeer.ID),
-	))
-	defer span.End()
-
-	s, err := c.openStreamToPeer(ctx, minerPeer, RetrievalQueryProtocol)
-	if err != nil {
-		// publish fail event, log the err
-		c.rep.Publish(
-			rep.NewRetrievalEventFailure(rep.QueryPhase, pcid, minerPeer.ID, address.Undef,
-				fmt.Sprintf("failed connecting to miner: %s", err.Error())))
-		return nil, err
-	}
-
-	c.host.ConnManager().Protect(s.Conn().RemotePeer(), "RetrievalQueryToPeer")
-	defer func() {
-		c.host.ConnManager().Unprotect(s.Conn().RemotePeer(), "RetrievalQueryToPeer")
-		s.Close()
-	}()
-
-	// We have connected
-	// publish connected event
-	c.rep.Publish(rep.NewRetrievalEventConnect(rep.QueryPhase, pcid, minerPeer.ID, address.Address{}))
-
-	q := &retrievalmarket.Query{
-		PayloadCID: pcid,
-	}
-
-	var resp retrievalmarket.QueryResponse
-	if err := doRpc(ctx, s, q, &resp); err != nil {
-		// publish failure event
-		c.rep.Publish(
-			rep.NewRetrievalEventFailure(rep.QueryPhase, pcid, minerPeer.ID, address.Undef,
-				fmt.Sprintf("failed retrieval query ask: %s", err.Error())))
-		return nil, fmt.Errorf("retrieval query rpc: %w", err)
-	}
-
-	// publish query ask event
-	c.rep.Publish(rep.NewRetrievalEventQueryAsk(rep.QueryPhase, pcid, minerPeer.ID, address.Undef, resp))
-
-	return &resp, nil
-}
-
 type RetrievalStats struct {
 	Peer         peer.ID
 	Size         uint64
@@ -473,18 +429,6 @@ type RetrievalStats struct {
 	TotalPayment abi.TokenAmount
 	NumPayments  int
 	AskPrice     abi.TokenAmount
-
-	// TODO: we should be able to get this if we hook into the graphsync event stream
-	//TimeToFirstByte time.Duration
-}
-
-func (c *Client) RetrieveContent(
-	ctx context.Context,
-	miner address.Address,
-	proposal *retrievalmarket.DealProposal,
-) (*RetrievalStats, error) {
-
-	return c.RetrieveContentWithProgressCallback(ctx, miner, proposal, nil)
 }
 
 func (c *Client) RetrieveContentWithProgressCallback(
