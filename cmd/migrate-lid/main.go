@@ -43,6 +43,7 @@ func main() {
 			migrateLevelDBCmd,
 			migrateCouchDBCmd,
 			migrateReverseCmd,
+			rebuildIndexesCmd,
 		},
 	}
 	app.Setup()

@@ -143,14 +143,11 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 	require.NoError(t, err)
 	require.True(t, indexed)
 
-	recs, err := cl.GetRecords(ctx, pieceCid)
+	recs, err := cl.GetIndex(ctx, pieceCid)
 	require.NoError(t, err)
 	require.Equal(t, len(records), len(recs))
 
-	loadedSubject, err := cl.GetIndex(ctx, pieceCid)
-	require.NoError(t, err)
-
-	ok, err := compareIndices(subject, loadedSubject)
+	ok, err := compareIndices(subject, recs)
 	require.NoError(t, err)
 	require.True(t, ok)
 }
@@ -224,7 +221,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service, port int
 			require.NoError(t, err)
 			require.True(t, indexed)
 
-			recs, err := cl.GetRecords(ctx, pieceCid)
+			recs, err := cl.GetIndex(ctx, pieceCid)
 			require.NoError(t, err)
 			require.Equal(t, len(records), len(recs))
 
@@ -277,10 +274,7 @@ func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service, port int
 			err = offsetEG.Wait()
 			require.NoError(t, err)
 
-			loadedSubject, err := cl.GetIndex(ctx, pieceCid)
-			require.NoError(t, err)
-
-			ok, err := compareIndices(idx, loadedSubject)
+			ok, err := compareIndices(idx, recs)
 			require.NoError(t, err)
 			require.True(t, ok)
 
@@ -353,11 +347,25 @@ func getRecords(subject index.Index) ([]model.Record, error) {
 	return records, nil
 }
 
-func compareIndices(subject, subjectDb index.Index) (bool, error) {
+func compareIndices(subject index.Index, recs []model.Record) (bool, error) {
+	var records []index.Record
+	for _, r := range recs {
+		records = append(records, index.Record{
+			Cid:    r.Cid,
+			Offset: r.Offset,
+		})
+	}
+
+	mis := make(index.MultihashIndexSorted)
+	err := mis.Load(records)
+	if err != nil {
+		return false, err
+	}
+
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
 
-	_, err := subject.Marshal(w)
+	_, err = subject.Marshal(w)
 	if err != nil {
 		return false, err
 	}
@@ -365,7 +373,7 @@ func compareIndices(subject, subjectDb index.Index) (bool, error) {
 	var b2 bytes.Buffer
 	w2 := bufio.NewWriter(&b2)
 
-	_, err = subjectDb.Marshal(w2)
+	_, err = mis.Marshal(w2)
 	if err != nil {
 		return false, err
 	}
@@ -460,14 +468,11 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 	require.NoError(t, err)
 	require.True(t, indexed)
 
-	recs, err := cl.GetRecords(ctx, pieceCid)
+	recs, err := cl.GetIndex(ctx, pieceCid)
 	require.NoError(t, err)
 	require.Equal(t, len(records), len(recs))
 
-	loadedSubject, err := cl.GetIndex(ctx, pieceCid)
-	require.NoError(t, err)
-
-	ok, err := compareIndices(subject, loadedSubject)
+	ok, err := compareIndices(subject, recs)
 	require.NoError(t, err)
 	require.True(t, ok)
 
@@ -480,7 +485,7 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
 	_, err = cl.GetOffsetSize(ctx, pieceCid, mhash)
 	require.ErrorContains(t, err, "not found")
 
-	_, err = cl.GetRecords(ctx, pieceCid)
+	_, err = cl.GetIndex(ctx, pieceCid)
 	require.ErrorContains(t, err, "not found")
 
 	_, err = cl.PiecesContainingMultihash(ctx, mhash)

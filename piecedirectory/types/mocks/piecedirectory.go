@@ -14,7 +14,6 @@ import (
 	abi "github.com/filecoin-project/go-state-types/abi"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"
-	index "github.com/ipld/go-car/v2/index"
 	multihash "github.com/multiformats/go-multihash"
 )
 
@@ -234,10 +233,10 @@ func (mr *MockStoreMockRecorder) FlaggedPiecesList(arg0, arg1, arg2, arg3 interf
 }
 
 // GetIndex mocks base method.
-func (m *MockStore) GetIndex(arg0 context.Context, arg1 cid.Cid) (index.Index, error) {
+func (m *MockStore) GetIndex(arg0 context.Context, arg1 cid.Cid) ([]model.Record, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetIndex", arg0, arg1)
-	ret0, _ := ret[0].(index.Index)
+	ret0, _ := ret[0].([]model.Record)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

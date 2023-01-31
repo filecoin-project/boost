@@ -8,7 +8,6 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
-	"github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
 )
 
@@ -31,7 +30,7 @@ type Store interface {
 	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error
 	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
 	IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, error)
-	GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, error)
+	GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error)
 	GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash multihash.Multihash) (*model.OffsetSize, error)
 	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
 	ListPieces(ctx context.Context) ([]cid.Cid, error)

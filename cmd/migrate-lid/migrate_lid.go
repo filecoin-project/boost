@@ -105,41 +105,46 @@ var migrateLevelDBCmd = &cli.Command{
 	},
 }
 
+var couchbaseFlags = []cli.Flag{
+	&cli.StringFlag{
+		Name:     "connect-string",
+		Usage:    "couchbase connect string eg 'couchbase://127.0.0.1'",
+		Required: true,
+	},
+	&cli.StringFlag{
+		Name:     "username",
+		Required: true,
+	},
+	&cli.StringFlag{
+		Name:     "password",
+		Required: true,
+	},
+}
+
+var couchbaseMemFlags = []cli.Flag{
+	&cli.Uint64Flag{
+		Name:  "piece-meta-ram-quota-mb",
+		Usage: "megabytes of ram allocated to piece metadata couchbase bucket (recommended at least 1024)",
+		Value: 1024,
+	},
+	&cli.Uint64Flag{
+		Name:  "mh-pieces-ram-quota-mb",
+		Usage: "megabytes of ram allocated to multihash to piece cid couchbase bucket (recommended at least 1024)",
+		Value: 1024,
+	},
+	&cli.Uint64Flag{
+		Name:  "piece-offsets-ram-quota-mb",
+		Usage: "megabytes of ram allocated to piece offsets couchbase bucket (recommended at least 1024)",
+		Value: 1024,
+	},
+}
+
 var migrateCouchDBCmd = &cli.Command{
 	Name:        "couchbase",
 	Description: "Migrate boost piece information and dagstore to a couchbase store\n" + desc,
 	Usage:       "migrate-lid couchbase dagstore|pieceinfo",
 	Before:      before,
-	Flags: append(commonFlags, []cli.Flag{
-		&cli.StringFlag{
-			Name:     "connect-string",
-			Usage:    "couchbase connect string eg 'couchbase://127.0.0.1'",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "username",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "password",
-			Required: true,
-		},
-		&cli.Uint64Flag{
-			Name:  "piece-meta-ram-quota-mb",
-			Usage: "megabytes of ram allocated to piece metadata couchbase bucket (recommended at least 1024)",
-			Value: 1024,
-		},
-		&cli.Uint64Flag{
-			Name:  "mh-pieces-ram-quota-mb",
-			Usage: "megabytes of ram allocated to multihash to piece cid couchbase bucket (recommended at least 1024)",
-			Value: 1024,
-		},
-		&cli.Uint64Flag{
-			Name:  "piece-offsets-ram-quota-mb",
-			Usage: "megabytes of ram allocated to piece offsets couchbase bucket (recommended at least 1024)",
-			Value: 1024,
-		},
-	}...),
+	Flags:       append(commonFlags, append(couchbaseFlags, couchbaseMemFlags...)...),
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() == 0 {
 			return fmt.Errorf("must specify either dagstore or pieceinfo migration")
@@ -153,22 +158,7 @@ var migrateCouchDBCmd = &cli.Command{
 		}
 
 		// Create a connection to the couchbase local index directory
-		settings := couchbase.DBSettings{
-			ConnectString: cctx.String("connect-string"),
-			Auth: couchbase.DBSettingsAuth{
-				Username: cctx.String("username"),
-				Password: cctx.String("password"),
-			},
-			PieceMetadataBucket: couchbase.DBSettingsBucket{
-				RAMQuotaMB: cctx.Uint64("piece-meta-ram-quota-mb"),
-			},
-			MultihashToPiecesBucket: couchbase.DBSettingsBucket{
-				RAMQuotaMB: cctx.Uint64("mh-pieces-ram-quota-mb"),
-			},
-			PieceOffsetsBucket: couchbase.DBSettingsBucket{
-				RAMQuotaMB: cctx.Uint64("piece-offsets-ram-quota-mb"),
-			},
-		}
+		settings := readCouchbaseSettings(cctx)
 
 		store := couchbase.NewStore(settings)
 		return migrate(cctx, "couchbase", store, migrateType)
@@ -343,10 +333,12 @@ func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, f
 
 func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store StoreMigrationApi) (int, error) {
 	// Open the datastore in the existing repo
-	ds, err := openDataStore(repoDir)
+	ds, lr, err := openDataStore(repoDir)
 	if err != nil {
 		return 0, fmt.Errorf("creating piece store from repo %s: %w", repoDir, err)
 	}
+
+	defer lr.Close()
 
 	// Get the miner address
 	maddr, err := modules.MinerAddress(ds)
@@ -521,38 +513,38 @@ func getLegacyDealsFSM(ctx context.Context, ds *backupds.Datastore) (fsm.Group, 
 	return deals, err
 }
 
-func openDataStore(path string) (*backupds.Datastore, error) {
+func openDataStore(path string) (*backupds.Datastore, repo.LockedRepo, error) {
 	ctx := context.Background()
 
 	rpo, err := repo.NewFS(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not open repo %s: %w", path, err)
+		return nil, nil, fmt.Errorf("could not open repo %s: %w", path, err)
 	}
 
 	exists, err := rpo.Exists()
 	if err != nil {
-		return nil, fmt.Errorf("checking repo %s exists: %w", path, err)
+		return nil, nil, fmt.Errorf("checking repo %s exists: %w", path, err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("repo does not exist: %s", path)
+		return nil, nil, fmt.Errorf("repo does not exist: %s", path)
 	}
 
 	lr, err := rpo.Lock(repo.StorageMiner)
 	if err != nil {
-		return nil, fmt.Errorf("locking repo %s: %w", path, err)
+		return nil, nil, fmt.Errorf("locking repo %s: %w", path, err)
 	}
 
 	mds, err := lr.Datastore(ctx, "/metadata")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	bds, err := backupds.Wrap(mds, "")
 	if err != nil {
-		return nil, fmt.Errorf("opening backupds: %w", err)
+		return nil, nil, fmt.Errorf("opening backupds: %w", err)
 	}
 
-	return bds, nil
+	return bds, lr, nil
 }
 
 func getRecords(subject index.Index) ([]model.Record, error) {
@@ -653,21 +645,7 @@ var migrateReverseCouchbaseCmd = &cli.Command{
 	Name:   "couchbase",
 	Usage:  "Reverse migrate a couchbase local index directory",
 	Before: before,
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:     "connect-string",
-			Usage:    "couchbase connect string eg 'couchbase://127.0.0.1'",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "username",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "password",
-			Required: true,
-		},
-	},
+	Flags:  couchbaseFlags,
 	Action: func(cctx *cli.Context) error {
 		return migrateReverse(cctx, "couchbase")
 	},
@@ -739,10 +717,12 @@ func migrateDBReverse(cctx *cli.Context, repoDir string, dbType string, pieceDir
 	logger.Infof("starting migration of %d piece infos from %s local index directory to piece store", len(pcids), dbType)
 
 	// Open the datastore
-	ds, err := openDataStore(repoDir)
+	ds, lr, err := openDataStore(repoDir)
 	if err != nil {
 		return fmt.Errorf("creating datastore from repo %s: %w", repoDir, err)
 	}
+
+	defer lr.Close()
 
 	// Open the Piece Store
 	ps, err := openPieceStore(ctx, ds)
@@ -859,10 +839,30 @@ func openPieceStore(ctx context.Context, ds *backupds.Datastore) (piecestore.Pie
 func createLogger(logPath string) (*zap.SugaredLogger, error) {
 	logCfg := zap.NewDevelopmentConfig()
 	logCfg.OutputPaths = []string{logPath}
+	logCfg.DisableStacktrace = true
 	zl, err := logCfg.Build()
 	if err != nil {
 		return nil, err
 	}
 	defer zl.Sync() //nolint:errcheck
 	return zl.Sugar(), err
+}
+
+func readCouchbaseSettings(cctx *cli.Context) couchbase.DBSettings {
+	return couchbase.DBSettings{
+		ConnectString: cctx.String("connect-string"),
+		Auth: couchbase.DBSettingsAuth{
+			Username: cctx.String("username"),
+			Password: cctx.String("password"),
+		},
+		PieceMetadataBucket: couchbase.DBSettingsBucket{
+			RAMQuotaMB: cctx.Uint64("piece-meta-ram-quota-mb"),
+		},
+		MultihashToPiecesBucket: couchbase.DBSettingsBucket{
+			RAMQuotaMB: cctx.Uint64("mh-pieces-ram-quota-mb"),
+		},
+		PieceOffsetsBucket: couchbase.DBSettingsBucket{
+			RAMQuotaMB: cctx.Uint64("piece-offsets-ram-quota-mb"),
+		},
+	}
 }

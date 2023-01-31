@@ -9,7 +9,6 @@ import (
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/ipfs/go-cid"
 	logger "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -61,36 +60,13 @@ func (s *Store) Close(_ context.Context) {
 	}
 }
 
-func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, error) {
+func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
 	resp, err := s.client.GetIndex(ctx, pieceCid)
 	if err != nil {
 		return nil, err
 	}
 
-	var records []index.Record
-	for _, r := range resp {
-		records = append(records, index.Record{
-			Cid:    r.Cid,
-			Offset: r.Offset,
-		})
-	}
-
-	mis := make(index.MultihashIndexSorted)
-	err = mis.Load(records)
-	if err != nil {
-		return nil, err
-	}
-
-	return &mis, nil
-}
-
-func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
-	resp, err := s.client.GetIndex(ctx, pieceCid)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Debugw("get-records", "piece-cid", pieceCid, "records", len(resp))
+	log.Debugw("get-index", "piece-cid", pieceCid, "records", len(resp))
 
 	return resp, nil
 }

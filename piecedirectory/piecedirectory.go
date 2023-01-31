@@ -24,6 +24,7 @@ import (
 	"github.com/ipld/go-car/util"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
+	"github.com/ipld/go-car/v2/index"
 	carindex "github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
 )
@@ -193,6 +194,22 @@ func (ps *PieceDirectory) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uin
 	return unpaddedCarSize, nil
 }
 
+// AddDealInfoForPiece just adds the deal information to the piece, without
+// trying to also build an index for the piece
+func (ps *PieceDirectory) AddDealInfoForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+	ctx, span := tracing.Tracer.Start(ctx, "pm.add_deal_info_for_piece")
+	defer span.End()
+
+	// Add deal to list of deals for this piece
+	if err := ps.store.AddDealForPiece(ctx, pieceCid, dealInfo); err != nil {
+		return fmt.Errorf("saving deal %s to store: %w", dealInfo.DealUuid, err)
+	}
+
+	return nil
+}
+
+// AddDealForPiece builds an index for the piece, and then adds the deal
+// information to the piece
 func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.add_deal_for_piece")
 	defer span.End()
@@ -205,7 +222,7 @@ func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid,
 
 	if !isIndexed {
 		// Perform indexing of piece
-		if err := ps.addIndexForPieceThrottled(ctx, pieceCid, dealInfo); err != nil {
+		if err := ps.AddIndexForPieceThrottled(ctx, pieceCid, dealInfo); err != nil {
 			return fmt.Errorf("adding index for piece %s: %w", pieceCid, err)
 		}
 	}
@@ -218,12 +235,17 @@ func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid,
 	return nil
 }
 
+// Check if the indexes have already been built for the piece
+func (ps *PieceDirectory) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
+	return ps.store.IsIndexed(ctx, pieceCid)
+}
+
 type addIndexOperation struct {
 	done chan struct{}
 	err  error
 }
 
-func (ps *PieceDirectory) addIndexForPieceThrottled(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (ps *PieceDirectory) AddIndexForPieceThrottled(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	// Check if there is already an add index operation in progress for the
 	// given piece cid. If not, create a new one.
 	opi, loaded := ps.addIdxOpByCid.LoadOrStore(pieceCid, &addIndexOperation{
@@ -327,7 +349,7 @@ func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.C
 		return fmt.Errorf("getting piece deals: no deals found for piece")
 	}
 
-	err = ps.addIndexForPieceThrottled(ctx, pieceCid, dls[0])
+	err = ps.AddIndexForPieceThrottled(ctx, pieceCid, dls[0])
 	if err != nil {
 		return fmt.Errorf("adding index for piece deal %d: %w", dls[0].ChainDealID, err)
 	}
@@ -415,17 +437,26 @@ func (ps *PieceDirectory) GetIterableIndex(ctx context.Context, pieceCid cid.Cid
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_iterable_index")
 	defer span.End()
 
-	idx, err := ps.store.GetIndex(ctx, pieceCid)
+	recs, err := ps.store.GetIndex(ctx, pieceCid)
 	if err != nil {
 		return nil, err
 	}
 
-	switch concrete := idx.(type) {
-	case carindex.IterableIndex:
-		return concrete, nil
-	default:
-		return nil, fmt.Errorf("expected index to be MultihashIndexSorted but got %T", idx)
+	var records []index.Record
+	for _, r := range recs {
+		records = append(records, index.Record{
+			Cid:    r.Cid,
+			Offset: r.Offset,
+		})
 	}
+
+	mis := make(index.MultihashIndexSorted)
+	err = mis.Load(records)
+	if err != nil {
+		return nil, err
+	}
+
+	return &mis, nil
 }
 
 // Get a block (used by Bitswap retrieval)
