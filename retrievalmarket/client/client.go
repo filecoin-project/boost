@@ -69,8 +69,6 @@ type Client struct {
 	logRetrievalProgressEvents bool
 }
 
-type GetPieceCommFunc func(ctx context.Context, payloadCid cid.Cid, bstore blockstore.Blockstore) (cid.Cid, uint64, abi.UnpaddedPieceSize, error)
-
 type Config struct {
 	DataDir                    string
 	GraphsyncOpts              []gsimpl.Option
@@ -106,16 +104,11 @@ func NewClient(h host.Host, api api.Gateway, w *wallet.LocalWallet, addr address
 			gsimpl.MaxLinksPerOutgoingRequests(maxTraversalLinks),
 		},
 		ChannelMonitorConfig: channelmonitor.Config{
-
 			AcceptTimeout:          time.Hour * 24,
 			RestartDebounce:        time.Second * 10,
 			RestartBackoff:         time.Second * 20,
 			MaxConsecutiveRestarts: 15,
-			//RestartAckTimeout:      time.Second * 30,
-			CompleteTimeout: time.Minute * 40,
-
-			// Called when a restart completes successfully
-			//OnRestartComplete func(id datatransfer.ChannelID)
+			CompleteTimeout:        time.Minute * 40,
 		},
 	}
 
@@ -197,10 +190,6 @@ func NewClientWithConfig(cfg *Config) (*Client, error) {
 	return c, nil
 }
 
-func (c *Client) GetDtMgr() datatransfer.Manager {
-	return c.dataTransfer
-}
-
 func (c *Client) streamToMiner(ctx context.Context, maddr address.Address, protocol ...protocol.ID) (inet.Stream, error) {
 	ctx, span := Tracer.Start(ctx, "streamToMiner", trace.WithAttributes(
 		attribute.Stringer("miner", maddr),
@@ -220,7 +209,6 @@ func (c *Client) streamToMiner(ctx context.Context, maddr address.Address, proto
 	return s, nil
 }
 
-// Errors - ErrMinerConnectionFailed, ErrLotusError
 func (c *Client) ConnectToMiner(ctx context.Context, maddr address.Address) (peer.ID, error) {
 	addrInfo, err := c.minerAddrInfo(ctx, maddr)
 	if err != nil {
@@ -399,6 +387,7 @@ func (c *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid
 	}()
 
 	// We have connected
+
 	// publish connected event
 	c.rep.Publish(rep.NewRetrievalEventConnect(rep.QueryPhase, pcid, "", maddr))
 
@@ -758,11 +747,6 @@ awaitfinished:
 	}, nil
 }
 
-func (fc *Client) SubscribeToRetrievalEvents(subscriber rep.RetrievalSubscriber) {
-	fc.rep.Subscribe(subscriber)
-}
-
-// Implement RetrievalSubscriber
 func (fc *Client) OnRetrievalEvent(event rep.RetrievalEvent) {
 	kv := make([]interface{}, 0)
 	logadd := func(kva ...interface{}) {
