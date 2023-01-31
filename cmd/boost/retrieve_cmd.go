@@ -5,13 +5,17 @@ import (
 	"io/fs"
 	"net/url"
 	"os"
+	"strings"
+	"time"
 
+	"github.com/dustin/go-humanize"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/markets/utils"
 	"github.com/filecoin-project/boost/retrieve"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
 
+	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 
 	"github.com/filecoin-project/go-address"
@@ -31,6 +35,7 @@ import (
 	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
 	textselector "github.com/ipld/go-ipld-selector-text-lite"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/term"
 	"golang.org/x/xerrors"
 )
 
@@ -150,7 +155,7 @@ var retrieveCmd = &cli.Command{
 			return fmt.Errorf("Failed to create retrieval proposal with candidate miner %s: %v", miner, err)
 		}
 
-		stats_, err := fc.RetrieveContentWithProgressCallback(
+		stats, err := fc.RetrieveContentWithProgressCallback(
 			ctx,
 			miner,
 			proposal,
@@ -162,8 +167,7 @@ var retrieveCmd = &cli.Command{
 			return fmt.Errorf("Failed to retrieve content with candidate miner %s: %v", miner, err)
 		}
 
-		stats := &FILRetrievalStats{RetrievalStats: *stats_}
-		printRetrievalStats(stats)
+		printRetrievalStats(&FILRetrievalStats{RetrievalStats: *stats})
 
 		dservOffline := merkledag.NewDAGService(blockservice.New(node.Blockstore, offline.Exchange(node.Blockstore)))
 
@@ -247,4 +251,71 @@ func parseOutput(cctx *cli.Context) (string, error) {
 	}
 
 	return path, nil
+}
+
+type RetrievalStats interface {
+	GetByteSize() uint64
+	GetDuration() time.Duration
+	GetAverageBytesPerSecond() uint64
+}
+
+type FILRetrievalStats struct {
+	retrieve.RetrievalStats
+}
+
+func (stats *FILRetrievalStats) GetByteSize() uint64 {
+	return stats.Size
+}
+
+func (stats *FILRetrievalStats) GetDuration() time.Duration {
+	return stats.Duration
+}
+
+func (stats *FILRetrievalStats) GetAverageBytesPerSecond() uint64 {
+	return stats.AverageSpeed
+}
+
+func printProgress(bytesReceived uint64) {
+	str := fmt.Sprintf("%v (%v)", bytesReceived, humanize.IBytes(bytesReceived))
+
+	termWidth, _, err := term.GetSize(int(os.Stdin.Fd()))
+	strLen := len(str)
+	if err == nil {
+
+		if strLen < termWidth {
+			// If the string is shorter than the terminal width, pad right side
+			// with spaces to remove old text
+			str = strings.Join([]string{str, strings.Repeat(" ", termWidth-strLen)}, "")
+		} else if strLen > termWidth {
+			// If the string doesn't fit in the terminal, cut it down to a size
+			// that fits
+			str = str[:termWidth]
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "%s\r", str)
+}
+
+func printRetrievalStats(stats RetrievalStats) {
+	switch stats := stats.(type) {
+	case *FILRetrievalStats:
+		fmt.Printf(`RETRIEVAL STATS (FIL)
+-----
+Size:          %v (%v)
+Duration:      %v
+Average Speed: %v (%v/s)
+Ask Price:     %v (%v)
+Total Payment: %v (%v)
+Num Payments:  %v
+Peer:          %v
+`,
+			stats.Size, humanize.IBytes(stats.Size),
+			stats.Duration,
+			stats.AverageSpeed, humanize.IBytes(stats.AverageSpeed),
+			stats.AskPrice, types.FIL(stats.AskPrice),
+			stats.TotalPayment, types.FIL(stats.TotalPayment),
+			stats.NumPayments,
+			stats.Peer,
+		)
+	}
 }
