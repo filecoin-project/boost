@@ -3,14 +3,12 @@ package main
 import (
 	"context"
 	crand "crypto/rand"
-	"errors"
 	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/filecoin-project/boost/lib/keystore"
 	"github.com/filecoin-project/boost/markets/utils"
@@ -49,9 +47,10 @@ import (
 	"golang.org/x/xerrors"
 )
 
-var flagMiners = &cli.StringSliceFlag{
-	Name:    "miners",
-	Aliases: []string{"miner", "m"},
+var flagMiner = &cli.StringFlag{
+	Name:     "miner",
+	Aliases:  []string{"miner", "m"},
+	Required: true,
 }
 
 var flagOutput = &cli.StringFlag{
@@ -74,7 +73,7 @@ var retrieveCmd = &cli.Command{
 	Description: "Retrieve a file by CID from a miner. If desired, multiple miners can be specified as fallbacks in case of a failure (comma-separated, no spaces).",
 	ArgsUsage:   "<cid>",
 	Flags: []cli.Flag{
-		flagMiners,
+		flagMiner,
 		flagOutput,
 		flagDmPathSel,
 		flagCar,
@@ -87,8 +86,6 @@ var retrieveCmd = &cli.Command{
 			fmt.Println("could not set config dir: ", err)
 		}
 
-		// Parse command input
-
 		cidStr := cctx.Args().First()
 		if cidStr == "" {
 			return fmt.Errorf("please specify a CID to retrieve")
@@ -96,9 +93,9 @@ var retrieveCmd = &cli.Command{
 
 		dmSelText := textselector.Expression(cctx.String(flagDmPathSel.Name))
 
-		miners, err := parseMiners(cctx)
+		miner, err := address.NewFromString(cctx.String("miner"))
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to parse miner %s: %w", cctx.String("miner"), err)
 		}
 
 		output, err := parseOutput(cctx)
@@ -158,22 +155,11 @@ var retrieveCmd = &cli.Command{
 		// candidate list. Otherwise, we can use the auto retrieve API endpoint
 		// to automatically find some candidates to retrieve from.
 
-		var candidates []FILRetrievalCandidate
-		if len(miners) > 0 {
-			for _, miner := range miners {
-				candidates = append(candidates, FILRetrievalCandidate{
-					Miner:   miner,
-					RootCid: c,
-				})
-			}
-		} else {
-			endpoint := "https://api.estuary.tech/retrieval-candidates" // TODO: don't hard code
-			candidates_, err := node.GetRetrievalCandidates(endpoint, c)
-			if err != nil {
-				return fmt.Errorf("failed to get retrieval candidates: %w", err)
-			}
-
-			candidates = candidates_
+		candidates := []FILRetrievalCandidate{
+			{
+				Miner:   miner,
+				RootCid: c,
+			},
 		}
 
 		// Do the retrieval
@@ -190,8 +176,6 @@ var retrieveCmd = &cli.Command{
 		}
 
 		printRetrievalStats(stats)
-
-		// Save the output
 
 		dservOffline := merkledag.NewDAGService(blockservice.New(node.Blockstore, offline.Exchange(node.Blockstore)))
 
@@ -262,34 +246,6 @@ var retrieveCmd = &cli.Command{
 
 		return nil
 	},
-}
-
-// Read a comma-separated or multi flag list of miners from the CLI.
-func parseMiners(cctx *cli.Context) ([]address.Address, error) {
-	// Each minerStringsRaw element may contain multiple comma-separated values
-	minerStringsRaw := cctx.StringSlice(flagMiners.Name)
-
-	// Split any comma-separated minerStringsRaw elements
-	var minerStrings []string
-	for _, raw := range minerStringsRaw {
-		minerStrings = append(minerStrings, strings.Split(raw, ",")...)
-	}
-
-	var miners []address.Address
-	for _, ms := range minerStrings {
-		miner, err := address.NewFromString(ms)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse miner %s: %w", ms, err)
-		}
-
-		miners = append(miners, miner)
-	}
-
-	if len(miners) == 0 {
-		return nil, errors.New("you must specify at least one miner address")
-	}
-
-	return miners, nil
 }
 
 // Get the destination file to write the output to, erroring if not a valid
