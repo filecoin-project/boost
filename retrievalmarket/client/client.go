@@ -45,6 +45,8 @@ var (
 	Tracer = otel.Tracer("retrieve-client")
 
 	log = logging.Logger("retrieve-client")
+
+	dealIdGen = shared.NewTimeCounter()
 )
 
 const (
@@ -297,16 +299,6 @@ func doRpc(ctx context.Context, s inet.Stream, req interface{}, resp interface{}
 	}
 
 	return nil
-}
-
-type Balance struct {
-	Account         address.Address `json:"account"`
-	Balance         types.FIL       `json:"balance"`
-	MarketEscrow    types.FIL       `json:"marketEscrow"`
-	MarketLocked    types.FIL       `json:"marketLocked"`
-	MarketAvailable types.FIL       `json:"marketAvailable"`
-
-	VerifiedClientBalance *abi.StoragePower `json:"verifiedClientBalance"`
 }
 
 func (c *Client) RetrievalQuery(ctx context.Context, maddr address.Address, pcid cid.Cid) (*retrievalmarket.QueryResponse, error) {
@@ -611,8 +603,6 @@ awaitfinished:
 		AskPrice:     proposal.PricePerByte,
 	}, nil
 }
-
-var dealIdGen = shared.NewTimeCounter()
 
 func RetrievalProposalForAsk(ask *retrievalmarket.QueryResponse, c cid.Cid, optionalSelector ipld.Node) (*retrievalmarket.DealProposal, error) {
 	if optionalSelector == nil {
