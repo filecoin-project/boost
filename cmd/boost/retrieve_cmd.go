@@ -1,31 +1,23 @@
 package main
 
 import (
-	"context"
-	crand "crypto/rand"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"net/url"
 	"os"
-	"path/filepath"
 
-	"github.com/filecoin-project/boost/lib/keystore"
+	clinode "github.com/filecoin-project/boost/cli/node"
+	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/markets/utils"
 	"github.com/filecoin-project/boost/retrieve"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
 
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/chain/wallet"
 	lcli "github.com/filecoin-project/lotus/cli"
 
 	"github.com/filecoin-project/go-address"
 
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	flatfs "github.com/ipfs/go-ds-flatfs"
-	levelds "github.com/ipfs/go-ds-leveldb"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
 	files "github.com/ipfs/go-ipfs-files"
 	"github.com/ipfs/go-merkledag"
@@ -38,18 +30,13 @@ import (
 	"github.com/ipld/go-ipld-prime/traversal/selector"
 	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
 	textselector "github.com/ipld/go-ipld-selector-text-lite"
-	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/metrics"
-	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 )
 
 var flagMiner = &cli.StringFlag{
 	Name:     "miner",
-	Aliases:  []string{"miner", "m"},
+	Aliases:  []string{"m"},
 	Required: true,
 }
 
@@ -79,16 +66,37 @@ var retrieveCmd = &cli.Command{
 		flagCar,
 	},
 	Action: func(cctx *cli.Context) error {
+		ctx := cliutil.ReqContext(cctx)
 
-		// Store config dir in metadata
-		ddir, err := homedir.Expand("~/.boost-client")
+		cfgdir := cctx.String(cmd.FlagRepo.Name)
+		node, err := clinode.Setup(cfgdir)
 		if err != nil {
-			fmt.Println("could not set config dir: ", err)
+			return fmt.Errorf("setting up CLI node: %w", err)
+		}
+
+		api, closer, err := lcli.GetGatewayAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("setting up gateway connection: %w", err)
+		}
+		defer closer()
+
+		addr, err := node.Wallet.GetDefault()
+		if err != nil {
+			return err
+		}
+
+		fc, err := retrieve.NewClient(node.Host, api, node.Wallet, addr, node.Blockstore, node.Datastore, cfgdir)
+		if err != nil {
+			return err
 		}
 
 		cidStr := cctx.Args().First()
 		if cidStr == "" {
 			return fmt.Errorf("please specify a CID to retrieve")
+		}
+		c, err := cid.Decode(cidStr)
+		if err != nil {
+			return err
 		}
 
 		dmSelText := textselector.Expression(cctx.String(flagDmPathSel.Name))
@@ -109,13 +117,7 @@ var retrieveCmd = &cli.Command{
 			}
 		}
 
-		c, err := cid.Decode(cidStr)
-		if err != nil {
-			return err
-		}
-
 		// Get subselector node
-
 		var selNode ipld.Node
 		if dmSelText != "" {
 			ssb := builder.NewSelectorSpecBuilder(basicnode.Prototype.Any)
@@ -138,44 +140,23 @@ var retrieveCmd = &cli.Command{
 			selNode = selspec.Node()
 		}
 
-		// Set up node and retrieval client
-		node, err := setup(cctx.Context, ddir)
+		query, err := fc.RetrievalQuery(ctx, miner, c)
+		if err != nil {
+			return fmt.Errorf("retrieval query for miner %s failed: %v", miner, err)
+		}
+
+		proposal, err := retrieve.RetrievalProposalForAsk(query, c, selNode)
+		if err != nil {
+			return fmt.Errorf("Failed to create retrieval proposal with candidate miner %s: %v", miner, err)
+		}
+
+		stats, err := fc.RetrieveContent(ctx, miner, proposal)
 		if err != nil {
 			return err
 		}
 
-		fc, closer, err := clientFromNode(cctx, node, ddir)
-		if err != nil {
-			return err
-		}
-		defer closer()
-
-		// Collect retrieval candidates and config. If one or more miners are
-		// provided, use those with the requested cid as the root cid as the
-		// candidate list. Otherwise, we can use the auto retrieve API endpoint
-		// to automatically find some candidates to retrieve from.
-
-		candidates := []FILRetrievalCandidate{
-			{
-				Miner:   miner,
-				RootCid: c,
-			},
-		}
-
-		// Do the retrieval
-		var networks = []RetrievalAttempt{&FILRetrievalAttempt{
-			Client:     fc,
-			Cid:        c,
-			Candidates: candidates,
-			SelNode:    selNode,
-		}}
-
-		stats, err := node.RetrieveFromBestCandidate(cctx.Context, networks)
-		if err != nil {
-			return err
-		}
-
-		printRetrievalStats(stats)
+		_ = stats
+		//printRetrievalStats(stats)
 
 		dservOffline := merkledag.NewDAGService(blockservice.New(node.Blockstore, offline.Exchange(node.Blockstore)))
 
@@ -186,7 +167,7 @@ var retrieveCmd = &cli.Command{
 			// no err check - we just compiled this before starting, but now we do not wrap a `*`
 			selspec, _ := textselector.SelectorSpecFromPath(dmSelText, true, nil) //nolint:errcheck
 			if err := utils.TraverseDag(
-				cctx.Context,
+				ctx,
 				dservOffline,
 				c,
 				selspec.Node(),
@@ -216,7 +197,7 @@ var retrieveCmd = &cli.Command{
 			}
 		}
 
-		dnode, err := dservOffline.Get(cctx.Context, c)
+		dnode, err := dservOffline.Get(ctx, c)
 		if err != nil {
 			return err
 		}
@@ -227,12 +208,12 @@ var retrieveCmd = &cli.Command{
 			if err != nil {
 				return err
 			}
-			_ = car.WriteCar(cctx.Context, dservOffline, []cid.Cid{c}, file)
+			_ = car.WriteCar(ctx, dservOffline, []cid.Cid{c}, file)
 
 			fmt.Println("Saved .car output to", output+".car")
 		} else {
 			// Otherwise write file as UnixFS File
-			ufsFile, err := unixfile.NewUnixfsFile(cctx.Context, dservOffline, dnode)
+			ufsFile, err := unixfile.NewUnixfsFile(ctx, dservOffline, dnode)
 			if err != nil {
 				return err
 			}
@@ -259,142 +240,4 @@ func parseOutput(cctx *cli.Context) (string, error) {
 	}
 
 	return path, nil
-}
-
-func keyPath(baseDir string) string {
-	return filepath.Join(baseDir, "libp2p.key")
-}
-
-func blockstorePath(baseDir string) string {
-	return filepath.Join(baseDir, "blockstore")
-}
-
-func datastorePath(baseDir string) string {
-	return filepath.Join(baseDir, "datastore")
-}
-
-func walletPath(baseDir string) string {
-	return filepath.Join(baseDir, "wallet")
-}
-
-func clientFromNode(cctx *cli.Context, nd *Node, dir string) (*retrieve.Client, func(), error) {
-	api, closer, err := lcli.GetGatewayAPI(cctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	addr, err := nd.Wallet.GetDefault()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	c, err := retrieve.NewClient(nd.Host, api, nd.Wallet, addr, nd.Blockstore, nd.Datastore, dir)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return c, closer, nil
-}
-
-type Node struct {
-	Host host.Host
-
-	Datastore  datastore.Batching
-	Blockstore blockstore.Blockstore
-
-	Wallet *wallet.LocalWallet
-}
-
-func setup(ctx context.Context, cfgdir string) (*Node, error) {
-	peerkey, err := loadOrInitPeerKey(keyPath(cfgdir))
-	if err != nil {
-		return nil, err
-	}
-
-	bwc := metrics.NewBandwidthCounter()
-
-	h, err := libp2p.New(
-		//libp2p.ConnectionManager(connmgr.NewConnManager(500, 800, time.Minute)),
-		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/6755"),
-		libp2p.Identity(peerkey),
-		libp2p.BandwidthReporter(bwc),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	bstoreDatastore, err := flatfs.CreateOrOpen(blockstorePath(cfgdir), flatfs.NextToLast(3), false)
-	bstore := blockstore.NewBlockstoreNoPrefix(bstoreDatastore)
-	if err != nil {
-		return nil, fmt.Errorf("blockstore could not be opened (it may be incompatible after an update - try running the clear blockstore subcommand to delete the blockstore and try again): %v", err)
-	}
-
-	ds, err := levelds.NewDatastore(datastorePath(cfgdir), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	wallet, err := setupWallet(walletPath(cfgdir))
-	if err != nil {
-		return nil, err
-	}
-
-	return &Node{
-		Host:       h,
-		Blockstore: bstore,
-		Datastore:  ds,
-		Wallet:     wallet,
-	}, nil
-}
-
-func loadOrInitPeerKey(kf string) (crypto.PrivKey, error) {
-	data, err := ioutil.ReadFile(kf)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, err
-		}
-
-		k, _, err := crypto.GenerateEd25519Key(crand.Reader)
-		if err != nil {
-			return nil, err
-		}
-
-		data, err := crypto.MarshalPrivateKey(k)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := ioutil.WriteFile(kf, data, 0600); err != nil {
-			return nil, err
-		}
-
-		return k, nil
-	}
-	return crypto.UnmarshalPrivateKey(data)
-}
-
-func setupWallet(dir string) (*wallet.LocalWallet, error) {
-	kstore, err := keystore.OpenOrInitKeystore(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	wallet, err := wallet.NewWallet(kstore)
-	if err != nil {
-		return nil, err
-	}
-
-	addrs, err := wallet.WalletList(context.TODO())
-	if err != nil {
-		return nil, err
-	}
-
-	if len(addrs) == 0 {
-		_, err := wallet.WalletNew(context.TODO(), types.KTBLS)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return wallet, nil
 }
