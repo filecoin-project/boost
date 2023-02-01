@@ -280,22 +280,6 @@ func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.
 	return pieceReader, nil
 }
 
-type limitSeekReader struct {
-	io.Reader
-	readSeeker   io.ReadSeeker
-	unpaddedSize int64
-	paddedSize   int64
-}
-
-var _ io.ReadSeeker = (*limitSeekReader)(nil)
-
-func (l *limitSeekReader) Seek(offset int64, whence int) (int64, error) {
-	if whence == io.SeekEnd {
-		offset -= (l.paddedSize - l.unpaddedSize)
-	}
-	return l.readSeeker.Seek(offset, whence)
-}
-
 func (s *HttpServer) unsealedDeal(ctx context.Context, pieceInfo piecestore.PieceInfo) (*piecestore.DealInfo, error) {
 	// There should always been deals in the PieceInfo, but check just in case
 	if len(pieceInfo.Deals) == 0 {
