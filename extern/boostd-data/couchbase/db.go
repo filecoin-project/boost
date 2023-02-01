@@ -31,6 +31,18 @@ const maxCouchKeyLen = 128
 // there is a cas mismatch
 const maxCasRetries = 10
 
+// The current piece metadata version. This version will be used when doing
+// data migrations (migrations are not yet implemented in version 1).
+const pieceMetadataVersion = "1"
+
+func newCouchbaseMetadata() CouchbaseMetadata {
+	return CouchbaseMetadata{
+		Metadata: model.Metadata{
+			Version: pieceMetadataVersion,
+		},
+	}
+}
+
 var binaryTranscoder = gocb.NewRawBinaryTranscoder()
 
 type DB struct {
@@ -407,7 +419,7 @@ type mutateMetadata func(CouchbaseMetadata) *CouchbaseMetadata
 func (db *DB) mutatePieceMetadata(ctx context.Context, pieceCid cid.Cid, opName string, mutate mutateMetadata) error {
 	return db.withCasRetry(opName, func() error {
 		// Get the piece metadata from the db
-		var md CouchbaseMetadata
+		md := newCouchbaseMetadata()
 		var pieceMetaExists bool
 		cbKey := toCouchKey(pieceCid.String())
 		getResult, err := db.pcidToMeta.Get(cbKey, &gocb.GetOptions{Context: ctx})

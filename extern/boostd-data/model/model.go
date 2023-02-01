@@ -35,6 +35,7 @@ type DealInfo struct {
 
 // Metadata for PieceCid
 type Metadata struct {
+	Version   string    `json:"v"`
 	IndexedAt time.Time `json:"i"`
 	// CompleteIndex indicates whether the index has all information or is
 	// missing block size information. Note that indexes imported from the

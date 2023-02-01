@@ -19,6 +19,10 @@ import (
 	mh "github.com/multiformats/go-multihash"
 )
 
+// The current piece metadata version. This version will be used when doing
+// data migrations (migrations are not yet implemented in version 1).
+const pieceMetadataVersion = "1"
+
 var log = logging.Logger("boostd-data-ldb")
 
 type LeveldbFlaggedMetadata struct {
@@ -29,6 +33,12 @@ type LeveldbFlaggedMetadata struct {
 type LeveldbMetadata struct {
 	model.Metadata
 	Cursor uint64 `json:"c"`
+}
+
+func newLeveldbMetadata() LeveldbMetadata {
+	return LeveldbMetadata{
+		Metadata: model.Metadata{Version: pieceMetadataVersion},
+	}
 }
 
 type Store struct {
@@ -90,7 +100,7 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
 		}
 		// there isn't yet any metadata, so create new metadata
-		md = LeveldbMetadata{}
+		md = newLeveldbMetadata()
 	}
 
 	// Check if the deal has already been added
@@ -338,7 +348,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
 		}
 		// there isn't yet any metadata, so create new metadata
-		md = LeveldbMetadata{}
+		md = newLeveldbMetadata()
 	}
 
 	// mark indexing as complete
