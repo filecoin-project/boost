@@ -245,6 +245,6 @@ docker/booster-bitswap:
 		-t $(docker_user)/booster-bitswap-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/Dockerfile.source --target booster-bitswap-dev .
 .PHONY: docker/booster-bitswap
-docker/all: docker/lotus-test docker/boost docker/booster-http docker/booster-bitswap \
+docker/all: docker/boost docker/booster-http docker/booster-bitswap \
 	docker/lotus docker/lotus-miner
 .PHONY: docker/all
