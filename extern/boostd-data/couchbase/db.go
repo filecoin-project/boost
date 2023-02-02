@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/couchbase/gocb/v2"
@@ -255,7 +254,7 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, mhs []multihash.Mult
 			defer func() { <-throttle }()
 
 			return db.withCasRetry("multihash -> pieces", func() error {
-				cbKey := trimKey(base64.RawStdEncoding.EncodeToString(mh))
+				cbKey := toCouchKey(base64.RawStdEncoding.EncodeToString(mh))
 
 				// Insert a tuple into the bucket: multihash -> [piece cid]
 				_, err := db.mhToPieces.Insert(cbKey, pieceCid.Bytes(), &gocb.InsertOptions{
@@ -302,7 +301,7 @@ func (db *DB) SetMultihashesToPieceCid(ctx context.Context, mhs []multihash.Mult
 }
 
 func (db *DB) getPieceCidsForMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, *gocb.GetResult, error) {
-	cbKey := trimKey(base64.RawStdEncoding.EncodeToString(mh))
+	cbKey := toCouchKey(base64.RawStdEncoding.EncodeToString(mh))
 
 	getRes, err := db.mhToPieces.Get(cbKey, &gocb.GetOptions{
 		Transcoder: binaryTranscoder,
@@ -327,7 +326,7 @@ func (db *DB) getPieceCidsForMultihash(ctx context.Context, mh multihash.Multiha
 
 func (db *DB) setPieceCidsForMultihash(ctx context.Context, mh multihash.Multihash, pieceCids []cid.Cid, cas gocb.Cas) error {
 	bz := cidsToBytes(pieceCids)
-	cbKey := trimKey(base64.RawStdEncoding.EncodeToString(mh))
+	cbKey := toCouchKey(base64.RawStdEncoding.EncodeToString(mh))
 	_, err := db.mhToPieces.Replace(cbKey, bz, &gocb.ReplaceOptions{
 		Context:    ctx,
 		Transcoder: binaryTranscoder,
@@ -870,7 +869,7 @@ func (db *DB) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset i
 			return nil, fmt.Errorf("unexpected row data %s reading row from %s: missing id", rowData, pieceCidToMetadataBucket)
 		}
 
-		c, err := cid.Parse(fromCouchKey(couchKey))
+		c, err := cid.Parse(couchKey)
 		if err != nil {
 			return nil, fmt.Errorf("parsing piece cid from couchbase key '%s': %w", couchKey, err)
 		}
@@ -937,7 +936,7 @@ func (db *DB) listPieces(res *gocb.QueryResult) ([]cid.Cid, error) {
 			return nil, fmt.Errorf("unexpected row data %s reading piece list row", rowData)
 		}
 
-		c, err := cid.Parse(fromCouchKey(couchKey))
+		c, err := cid.Parse(couchKey)
 		if err != nil {
 			return nil, fmt.Errorf("parsing piece cid from couchbase key '%s': %w", couchKey, err)
 		}
@@ -1014,24 +1013,13 @@ func (db *DB) withCasRetry(opName string, f func() error) error {
 	return err
 }
 
-func toCouchKey(key string) string {
-	return trimKey("u:" + key)
-}
-
-func trimKey(k string) string {
+func toCouchKey(k string) string {
 	if len(k) > maxCouchKeyLen {
 		// There is usually important stuff at the beginning and end of a key,
 		// so cut out the characters in the middle
 		k = k[:maxCouchKeyLen/2] + k[len(k)-maxCouchKeyLen/2:]
 	}
 	return k
-}
-
-func fromCouchKey(couchKey string) string {
-	if strings.HasPrefix(couchKey, "u:") {
-		return couchKey[2:]
-	}
-	return couchKey
 }
 
 func isNotFoundErr(err error) bool {
