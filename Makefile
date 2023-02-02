@@ -210,7 +210,7 @@ else
     lotus_version=dev
     lotus_checkout_dir=
 endif
-lotus_test_image=$(docker_user)/lotus-dev:$(lotus_version)
+lotus_test_image=$(docker_user)/lotus-test:$(lotus_version)
 docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image) \
 	--build-arg FFI_BUILD_FROM_SOURCE=$(ffi_from_source) $(docker_args)
 
