@@ -86,8 +86,8 @@ RUN ls -1 /lib/*/libhwloc.so.* | head -n 1 | xargs -n1 -I {} ln -s {} /lib/libhw
 
 WORKDIR /app
 
-COPY --from=lotus-dev /usr/local/bin/lotus /usr/local/bin/
-COPY --from=lotus-dev /usr/local/bin/lotus-miner /usr/local/bin/
+COPY --from=lotus-test /usr/local/bin/lotus /usr/local/bin/
+COPY --from=lotus-test /usr/local/bin/lotus-miner /usr/local/bin/
 ## Test lotus starts
 RUN lotus -v && lotus-miner -v 
 #########################################################################################
