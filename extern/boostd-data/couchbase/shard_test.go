@@ -2,6 +2,7 @@ package couchbase
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/model"
@@ -190,4 +191,28 @@ func TestSharding(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(recs), len(allRecs))
 	require.ElementsMatch(t, recs, allRecs)
+}
+
+// Verify that the maximum size of a json-marshalled map
+// multihash -> offset / size
+// is less than the maximum couchbase value size of 20mb
+func TestJSONMarshalledMapSize(t *testing.T) {
+	m := make(map[string]string)
+	for i := 0; i < maxRecsPerShard; i++ {
+		c := testutil.GenerateCid()
+		mhstr := encodeMultihashAsPath(c.Hash())
+		offsetSize := model.OffsetSize{
+			// Maximum offset and size are 64 Gib
+			Offset: 64 * 1024 * 1024 * 1024,
+			Size:   64 * 1024 * 1024 * 1024,
+		}
+		m[mhstr] = offsetSize.MarshallBase64()
+	}
+
+	bz, err := json.Marshal(m)
+	require.NoError(t, err)
+
+	t.Logf("json-marshalled size: %d", len(bz))
+	couchbaseMaxValueSize := 20 * 1024 * 1024
+	require.Less(t, len(bz), couchbaseMaxValueSize)
 }
