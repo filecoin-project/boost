@@ -200,7 +200,7 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=1.19.0-rc1
+lotus_version?=nonsense/hyperspace
 lotus_src_dir?=
 ffi_from_source?=0
 ifeq ($(lotus_src_dir),)
@@ -222,7 +222,7 @@ info/lotus-test:
 $(lotus_checkout_dir):
 	git clone --depth 1 --branch v$(lotus_version) https://github.com/filecoin-project/lotus $@
 docker/lotus-test: info/lotus-test | $(lotus_checkout_dir)
-	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile.lotus --target lotus-test \
+	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile.hyperspacenet --target lotus-test \
 		-t $(lotus_test_image) .
 .PHONY: docker/lotus-test
 
