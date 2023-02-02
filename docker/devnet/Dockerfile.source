@@ -2,7 +2,7 @@
 ## docker will invoke this file from ../../.. dir in order to access the code
 #########################################################################################
 ARG LOTUS_TEST_IMAGE=filecoin/lotus-test:latest
-FROM ${LOTUS_TEST_IMAGE} as lotus-dev
+FROM ${LOTUS_TEST_IMAGE} as lotus-test
 #########################################################################################
 FROM node:16.16-alpine3.15 AS react-builder
 
