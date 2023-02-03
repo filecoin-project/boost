@@ -208,8 +208,8 @@ ifeq ($(lotus_src_dir),)
 	ifeq ($(build_lotus),1)
 # v1: building lotus image with provided lotus version	
 		lotus_info_msg=!!! building lotus base image from github: tag $(lotus_version) !!!
-    	lotus_src_dir=/tmp/lotus-$(lotus_version)
-	    lotus_checkout_dir=$(lotus_src_dir)
+		lotus_src_dir=/tmp/lotus-$(lotus_version)
+		lotus_checkout_dir=$(lotus_src_dir)
 		lotus_build_cmd=docker/lotus-all-in-one		
 		lotus_base_image=$(docker_user)/lotus-all-in-one:dev
 	else
@@ -234,11 +234,11 @@ info/lotus-all-in-one:
 $(lotus_checkout_dir):
 	git clone --depth 1 --branch $(lotus_version) https://github.com/filecoin-project/lotus $@
 docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_checkout_dir)
-#	new lotus Dockerfile does not exist for older lotus versions
-#	temporary use the old Dockerfile.lotus
+# new lotus Dockerfile does not exist for older lotus versions
+# temporary use the old Dockerfile.lotus
 	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile.lotus --target lotus-test \
 		-t $(lotus_base_image) .	
-# 	code using new lotus Dockerfile
+# code using new lotus Dockerfile
 #	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile --target lotus-all-in-one \
 #		-t $(lotus_base_image) --build-arg GOFLAGS=-tags=debug .
 .PHONY: docker/lotus-all-in-one
