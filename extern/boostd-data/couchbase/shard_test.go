@@ -2,6 +2,7 @@ package couchbase
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/model"
@@ -13,6 +14,7 @@ import (
 	"os"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestBitMask(t *testing.T) {
@@ -91,6 +93,16 @@ func TestGetShardPrefix(t *testing.T) {
 	})
 }
 
+// Couchbase keys must be valid utf8, so ensure that all shard prefixes are
+// valid utf8
+func TestShardPrefixValidUtf8(t *testing.T) {
+	for i := 0; i < (1<<16)-1; i++ {
+		prefix, err := getShardPrefix(i)
+		require.NoError(t, err)
+		utf8.Valid([]byte(prefix))
+	}
+}
+
 var testCouchSettings = DBSettings{
 	ConnectString: "couchbase://127.0.0.1",
 	Auth: DBSettingsAuth{
@@ -147,10 +159,10 @@ func TestSharding(t *testing.T) {
 
 	var recs []model.Record
 	err = idx.(index.IterableIndex).ForEach(func(m multihash.Multihash, offset uint64) error {
-		cid := cid.NewCidV1(cid.Raw, m)
+		c := cid.NewCidV1(cid.Raw, m)
 
 		recs = append(recs, model.Record{
-			Cid: cid,
+			Cid: c,
 			OffsetSize: model.OffsetSize{
 				Offset: offset,
 				Size:   0,
@@ -179,4 +191,28 @@ func TestSharding(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(recs), len(allRecs))
 	require.ElementsMatch(t, recs, allRecs)
+}
+
+// Verify that the maximum size of a json-marshalled map
+// multihash -> offset / size
+// is less than the maximum couchbase value size of 20mb
+func TestJSONMarshalledMapSize(t *testing.T) {
+	m := make(map[string]string)
+	for i := 0; i < maxRecsPerShard; i++ {
+		c := testutil.GenerateCid()
+		mhstr := encodeMultihashAsPath(c.Hash())
+		offsetSize := model.OffsetSize{
+			// Maximum offset and size are 64 Gib
+			Offset: 64 * 1024 * 1024 * 1024,
+			Size:   64 * 1024 * 1024 * 1024,
+		}
+		m[mhstr] = offsetSize.MarshallBase64()
+	}
+
+	bz, err := json.Marshal(m)
+	require.NoError(t, err)
+
+	t.Logf("json-marshalled size: %d", len(bz))
+	couchbaseMaxValueSize := 20 * 1024 * 1024
+	require.Less(t, len(bz), couchbaseMaxValueSize)
 }

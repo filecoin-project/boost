@@ -35,6 +35,7 @@ type DealInfo struct {
 
 // Metadata for PieceCid
 type Metadata struct {
+	Version   string    `json:"v"`
 	IndexedAt time.Time `json:"i"`
 	// CompleteIndex indicates whether the index has all information or is
 	// missing block size information. Note that indexes imported from the
@@ -63,11 +64,11 @@ func (ofsz *OffsetSize) MarshallBase64() string {
 	buf := make([]byte, 2*binary.MaxVarintLen64)
 	n := binary.PutUvarint(buf, ofsz.Offset)
 	n += binary.PutUvarint(buf[n:], ofsz.Size)
-	return base64.StdEncoding.EncodeToString(buf[:n])
+	return base64.RawStdEncoding.EncodeToString(buf[:n])
 }
 
 func (ofsz *OffsetSize) UnmarshallBase64(str string) error {
-	buf, err := base64.StdEncoding.DecodeString(str)
+	buf, err := base64.RawStdEncoding.DecodeString(str)
 	if err != nil {
 		return fmt.Errorf("decoding offset/size from base64 string: %w", err)
 	}
