@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
+	flatfs "github.com/ipfs/go-ds-flatfs"
+	levelds "github.com/ipfs/go-ds-leveldb"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"net/url"
 	"os"
 	"strings"
@@ -39,19 +41,22 @@ import (
 	"golang.org/x/xerrors"
 )
 
-var flagMiner = &cli.StringFlag{
-	Name:     "miner",
-	Aliases:  []string{"m"},
+var flagProvider = &cli.StringFlag{
+	Name:     "provider",
+	Aliases:  []string{"p"},
+	Usage:    "The miner ID of the Storage Provider",
 	Required: true,
 }
 
 var flagOutput = &cli.StringFlag{
 	Name:    "output",
 	Aliases: []string{"o"},
+	Usage:   "The path to the output file",
 }
 
 var flagCar = &cli.BoolFlag{
-	Name: "car",
+	Name:  "car",
+	Usage: "Whether to output the data as a CAR file",
 }
 
 var flagDmPathSel = &cli.StringFlag{
@@ -64,7 +69,7 @@ var retrieveCmd = &cli.Command{
 	Usage:     "Retrieve a file by CID from a miner",
 	ArgsUsage: "<cid>",
 	Flags: []cli.Flag{
-		flagMiner,
+		flagProvider,
 		flagOutput,
 		flagDmPathSel,
 		flagCar,
@@ -72,53 +77,44 @@ var retrieveCmd = &cli.Command{
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
 
-		cfgdir := cctx.String(cmd.FlagRepo.Name)
-		node, err := clinode.Setup(cfgdir)
-		if err != nil {
-			return fmt.Errorf("setting up CLI node: %w", err)
-		}
-
-		api, closer, err := lcli.GetGatewayAPI(cctx)
-		if err != nil {
-			return fmt.Errorf("setting up gateway connection: %w", err)
-		}
-		defer closer()
-
-		addr, err := node.Wallet.GetDefault()
-		if err != nil {
-			return err
-		}
-
-		fc, err := rc.NewClient(node.Host, api, node.Wallet, addr, node.Blockstore, node.Datastore, cfgdir)
-		if err != nil {
-			return err
-		}
-
 		cidStr := cctx.Args().First()
 		if cidStr == "" {
 			return fmt.Errorf("please specify a CID to retrieve")
 		}
 		c, err := cid.Decode(cidStr)
 		if err != nil {
-			return err
+			return fmt.Errorf("decoding retrieval cid %s: %w", cidStr, err)
+		}
+
+		cfgdir := cctx.String(cmd.FlagRepo.Name)
+		node, err := clinode.Setup(cfgdir)
+		if err != nil {
+			return fmt.Errorf("setting up CLI node: %w", err)
 		}
 
 		dmSelText := textselector.Expression(cctx.String(flagDmPathSel.Name))
 
-		miner, err := address.NewFromString(cctx.String("miner"))
+		miner, err := address.NewFromString(cctx.String(flagProvider.Name))
 		if err != nil {
-			return fmt.Errorf("failed to parse miner %s: %w", cctx.String("miner"), err)
+			return fmt.Errorf("failed to parse miner %s: %w", cctx.String(flagProvider.Name), err)
 		}
 
-		output, err := parseOutput(cctx)
-		if err != nil {
-			return err
-		}
+		// Get the output path of the file
+		output := cctx.String("output")
 		if output == "" {
 			output = cidStr
 			if dmSelText != "" {
 				output += "_" + url.QueryEscape(string(dmSelText))
 			}
+		}
+
+		// The output path must not exist already
+		_, err = os.Stat(output)
+		if err == nil {
+			return fmt.Errorf("there is already a file at output path %s", output)
+		}
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("checking output path %s: %w", output, err)
 		}
 
 		// Get subselector node
@@ -144,6 +140,50 @@ var retrieveCmd = &cli.Command{
 			selNode = selspec.Node()
 		}
 
+		api, closer, err := lcli.GetGatewayAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("setting up gateway connection: %w", err)
+		}
+		defer closer()
+
+		addr, err := node.Wallet.GetDefault()
+		if err != nil {
+			return err
+		}
+
+		// Set up a blockstore in a temp directory
+		bstoreTmpDir, err := os.MkdirTemp("", "retrieve-blockstore")
+		if err != nil {
+			return fmt.Errorf("setting up temp dir: %w", err)
+		}
+		// Clean up the temp directory before exiting
+		defer os.RemoveAll(bstoreTmpDir)
+
+		bstoreDatastore, err := flatfs.CreateOrOpen(bstoreTmpDir, flatfs.NextToLast(3), false)
+		bstore := blockstore.NewBlockstoreNoPrefix(bstoreDatastore)
+		if err != nil {
+			return fmt.Errorf("could not open blockstore: %w", err)
+		}
+
+		// Set up a datastore in a temp directory
+		datastoreTmpDir, err := os.MkdirTemp("", "retrieve-datastore")
+		if err != nil {
+			return fmt.Errorf("setting up temp dir: %w", err)
+		}
+		// Clean up the temp directory before exiting
+		defer os.RemoveAll(datastoreTmpDir)
+
+		ds, err := levelds.NewDatastore(datastoreTmpDir, nil)
+		if err != nil {
+			return fmt.Errorf("could not create datastore: %w", err)
+		}
+
+		// Create the retrieval client
+		fc, err := rc.NewClient(node.Host, api, node.Wallet, addr, bstore, ds, cfgdir)
+		if err != nil {
+			return err
+		}
+
 		query, err := fc.RetrievalQuery(ctx, miner, c)
 		if err != nil {
 			return fmt.Errorf("retrieval query for miner %s failed: %v", miner, err)
@@ -154,6 +194,7 @@ var retrieveCmd = &cli.Command{
 			return fmt.Errorf("Failed to create retrieval proposal with candidate miner %s: %v", miner, err)
 		}
 
+		// Retrieve the data
 		stats, err := fc.RetrieveContentWithProgressCallback(
 			ctx,
 			miner,
@@ -168,7 +209,7 @@ var retrieveCmd = &cli.Command{
 
 		printRetrievalStats(&FILRetrievalStats{RetrievalStats: *stats})
 
-		dservOffline := merkledag.NewDAGService(blockservice.New(node.Blockstore, offline.Exchange(node.Blockstore)))
+		dservOffline := merkledag.NewDAGService(blockservice.New(bstore, offline.Exchange(bstore)))
 
 		// if we used a selector - need to find the sub-root the user actually wanted to retrieve
 		if dmSelText != "" {
@@ -237,19 +278,6 @@ var retrieveCmd = &cli.Command{
 
 		return nil
 	},
-}
-
-// Get the destination file to write the output to, erroring if not a valid
-// path. This early error check is important because you don't want to do a
-// bunch of work, only to end up crashing when you try to write the file.
-func parseOutput(cctx *cli.Context) (string, error) {
-	path := cctx.String(flagOutput.Name)
-
-	if path != "" && !fs.ValidPath(path) {
-		return "", fmt.Errorf("invalid output location '%s'", path)
-	}
-
-	return path, nil
 }
 
 type RetrievalStats interface {

@@ -15,10 +15,6 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
-	"github.com/ipfs/go-datastore"
-	flatfs "github.com/ipfs/go-ds-flatfs"
-	levelds "github.com/ipfs/go-ds-leveldb"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -26,10 +22,8 @@ import (
 )
 
 type Node struct {
-	Host       host.Host
-	Datastore  datastore.Batching
-	Blockstore blockstore.Blockstore
-	Wallet     *wallet.LocalWallet
+	Host   host.Host
+	Wallet *wallet.LocalWallet
 }
 
 func Setup(cfgdir string) (*Node, error) {
@@ -61,22 +55,9 @@ func Setup(cfgdir string) (*Node, error) {
 		return nil, err
 	}
 
-	bstoreDatastore, err := flatfs.CreateOrOpen(blockstorePath(cfgdir), flatfs.NextToLast(3), false)
-	bstore := blockstore.NewBlockstoreNoPrefix(bstoreDatastore)
-	if err != nil {
-		return nil, fmt.Errorf("blockstore could not be opened: %w", err)
-	}
-
-	ds, err := levelds.NewDatastore(datastorePath(cfgdir), nil)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Node{
-		Host:       h,
-		Blockstore: bstore,
-		Datastore:  ds,
-		Wallet:     wallet,
+		Host:   h,
+		Wallet: wallet,
 	}, nil
 }
 
@@ -134,14 +115,6 @@ func setupWallet(dir string) (*wallet.LocalWallet, error) {
 
 func keyPath(baseDir string) string {
 	return filepath.Join(baseDir, "libp2p.key")
-}
-
-func blockstorePath(baseDir string) string {
-	return filepath.Join(baseDir, "blockstore")
-}
-
-func datastorePath(baseDir string) string {
-	return filepath.Join(baseDir, "datastore")
 }
 
 func walletPath(baseDir string) string {
