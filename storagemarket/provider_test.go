@@ -1035,6 +1035,29 @@ func TestIPNIAnnounce(t *testing.T) {
 	})
 }
 
+func TestDealFilter(t *testing.T) {
+	ctx := context.Background()
+
+	var dealFilterParams dealfilter.DealFilterParams
+	df := func(ctx context.Context, dfp dealfilter.DealFilterParams) (bool, string, error) {
+		dealFilterParams = dfp
+		return true, "", nil
+	}
+
+	// setup the provider test harness
+	harness := NewHarness(t, withDealFilter(df))
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	td := harness.newDealBuilder(t, 1).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
+	require.NoError(t, td.executeAndSubscribe())
+
+	td.waitForAndAssert(t, ctx, dealcheckpoints.IndexedAndAnnounced)
+	require.EqualValues(t, 1000, dealFilterParams.FundsState.Collateral.Balance.Uint64())
+	require.EqualValues(t, 2000000, dealFilterParams.FundsState.Escrow.Available.Uint64())
+	require.EqualValues(t, 10000000000, dealFilterParams.StorageState.TotalAvailable)
+}
+
 func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals int,
 	buildDeal func(i int) *testDeal, waitF func(i int, td *testDeal) error) []*testDeal {
 	tds := make([]*testDeal, 0, nDeals)
@@ -1246,6 +1269,7 @@ type providerConfig struct {
 	maxPieceSize  abi.PaddedPieceSize
 
 	localCommp bool
+	dealFilter dealfilter.StorageDealFilter
 }
 
 type harnessOpt func(pc *providerConfig)
@@ -1314,6 +1338,12 @@ func withStateMarketBalance(locked, escrow abi.TokenAmount) harnessOpt {
 	return func(pc *providerConfig) {
 		pc.lockedFunds = locked
 		pc.escrowFunds = escrow
+	}
+}
+
+func withDealFilter(filter dealfilter.StorageDealFilter) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.dealFilter = filter
 	}
 }
 
@@ -1443,9 +1473,12 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	sm, err := smInitF(lr, sqldb)
 	require.NoError(t, err)
 
-	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
+	// Set a no-op deal filter unless a deal filter was specified as an option
 	df := func(ctx context.Context, deal dealfilter.DealFilterParams) (bool, string, error) {
 		return true, "", nil
+	}
+	if pc.dealFilter != nil {
+		df = pc.dealFilter
 	}
 
 	ps, err := piecestoreimpl.NewPieceStore(dssync.MutexWrap(ds.NewMapDatastore()))
