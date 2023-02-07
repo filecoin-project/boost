@@ -196,6 +196,57 @@ func TestMultiFilter(t *testing.T) {
 	require.False(t, fulfillRequest)
 }
 
+func TestMultiFilterCacheShouldNotBeSavedIfDataWasInvalid(t *testing.T) {
+	tickChan := make(chan struct{}, 1)
+	onTick := func() {
+		tickChan <- struct{}{}
+	}
+
+	fbf := &invalidBlockFetcher{}
+	clock := clock.NewMock()
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	cfgDir, err := os.MkdirTemp("", "filters")
+	require.NoError(t, err)
+
+	// create a valid cache file
+	denylistPath := filepath.Join(cfgDir, "denylist.json")
+	cacheContent := `[
+		{ "anchor": "09770fe7ec3124653c1d8f6917e3cd72cbd58a3e24a734bc362f656844c4ee7d"}
+	]
+	`
+	err = os.WriteFile(denylistPath, []byte(cacheContent), 0600)
+	require.NoError(t, err)
+
+	mf := filters.NewMultiFilterWithConfigs(cfgDir, []filters.FilterDefinition{
+		{
+			CacheFile: denylistPath,
+			Fetcher:   fbf.fetchDenyList,
+			Handler:   filters.NewBlockFilter(),
+		},
+	}, clock, onTick)
+
+	// multifilter should initialise from the cache
+	err = mf.Start(ctx)
+	require.NoError(t, err)
+
+	// wait for the update interval so that the cache gets refreshed in background
+	clock.Add(filters.UpdateInterval)
+	select {
+	case <-ctx.Done():
+		t.Fatal("should have updated list but didn't")
+	case <-tickChan:
+	}
+
+	// refresh should have happened
+	require.Equal(t, 1, fbf.fetchCount)
+
+	// the cache content shouldn't have been refreshed
+	cache, err := os.ReadFile(denylistPath)
+	require.NoError(t, err)
+	require.Equal(t, cacheContent, string(cache))
+}
+
 type fakeBlockFetcher struct {
 	fetchCount int
 }
@@ -218,6 +269,18 @@ func (fbf *fakeBlockFetcher) fetchDenyList(fetchTime time.Time) (bool, io.ReadCl
 	}
 	fbf.fetchCount++
 	return updated, ioutil.NopCloser(strings.NewReader(denyList)), nil
+}
+
+type invalidBlockFetcher struct {
+	fetchCount int
+}
+
+func (fbf *invalidBlockFetcher) fetchDenyList(fetchTime time.Time) (bool, io.ReadCloser, error) {
+	fbf.fetchCount++
+	denyList := `[
+		{ "anchor": "09770fe7ec3124653c1d8f6917e3cd72cbd58a3e24a734bc362f656844c4
+	`
+	return true, ioutil.NopCloser(strings.NewReader(denyList)), nil
 }
 
 type fakePeerFetcher struct {
