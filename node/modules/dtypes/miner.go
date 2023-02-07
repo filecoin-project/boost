@@ -4,12 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/ipfs/go-cid"
-
-	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
+	"github.com/ipfs/go-cid"
 )
 
 type MinerID abi.ActorID
@@ -90,7 +89,7 @@ type GetExpectedSealDurationFunc func() (time.Duration, error)
 type SetMaxDealStartDelayFunc func(time.Duration) error
 type GetMaxDealStartDelayFunc func() (time.Duration, error)
 
-type StorageDealFilter func(ctx context.Context, deal types.DealFilterParams) (bool, string, error)
-type RetrievalDealFilter func(ctx context.Context, deal retrievalmarket.ProviderDealState) (bool, string, error)
+type StorageDealFilter dealfilter.StorageDealFilter
+type RetrievalDealFilter dealfilter.RetrievalDealFilter
 
 type RetrievalPricingFunc func(ctx context.Context, dealPricingParams retrievalmarket.PricingInput) (retrievalmarket.Ask, error)

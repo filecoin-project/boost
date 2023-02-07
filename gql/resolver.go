@@ -13,9 +13,9 @@ import (
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
-	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
+	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
@@ -86,14 +86,6 @@ func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsD
 		spApi:      spApi,
 		fullNode:   fullNode,
 	}
-}
-
-type storageResolver struct {
-	Staged      gqltypes.Uint64
-	Transferred gqltypes.Uint64
-	Pending     gqltypes.Uint64
-	Free        gqltypes.Uint64
-	MountPoint  string
 }
 
 // query: deal(id) Deal

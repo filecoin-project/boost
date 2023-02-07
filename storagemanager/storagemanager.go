@@ -29,7 +29,7 @@ type Config struct {
 type StorageManager struct {
 	lr                 lotus_repo.LockedRepo
 	db                 *db.StorageDB
-	cfg                Config
+	Cfg                Config
 	StagingAreaDirPath string
 }
 
@@ -47,7 +47,7 @@ func New(cfg Config) func(lr lotus_repo.LockedRepo, sqldb *sql.DB) (*StorageMana
 
 		return &StorageManager{
 			db:                 db.NewStorageDB(sqldb),
-			cfg:                cfg,
+			Cfg:                cfg,
 			lr:                 lr,
 			StagingAreaDirPath: stagingPath,
 		}, nil
@@ -62,7 +62,7 @@ func (m *StorageManager) Free(ctx context.Context) (uint64, error) {
 		return 0, fmt.Errorf("getting total tagged: %w", err)
 	}
 
-	return m.cfg.MaxStagingDealsBytes - tagged, nil
+	return m.Cfg.MaxStagingDealsBytes - tagged, nil
 }
 
 // ErrNoSpaceLeft indicates that there is insufficient storage to accept a deal
@@ -72,10 +72,10 @@ var ErrNoSpaceLeft = errors.New("no space left")
 // If there is not enough space left, returns ErrNoSpaceLeft.
 func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, size uint64, host string) error {
 	// Get the total tagged storage, so that we know how much is available.
-	log.Debugw("tagging", "id", dealUuid, "size", size, "host", host, "maxbytes", m.cfg.MaxStagingDealsBytes)
+	log.Debugw("tagging", "id", dealUuid, "size", size, "host", host, "maxbytes", m.Cfg.MaxStagingDealsBytes)
 
-	if m.cfg.MaxStagingDealsBytes != 0 {
-		if m.cfg.MaxStagingDealsPercentPerHost != 0 {
+	if m.Cfg.MaxStagingDealsBytes != 0 {
+		if m.Cfg.MaxStagingDealsPercentPerHost != 0 {
 			// Get the total amount tagged for download from the host
 			tagged, err := m.TotalTaggedForHost(ctx, host)
 			if err != nil {
@@ -83,12 +83,12 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, size uint6
 			}
 
 			// Check the amount tagged + the size of the proposed deal against the limit
-			limit := (m.cfg.MaxStagingDealsBytes * m.cfg.MaxStagingDealsPercentPerHost) / 100
+			limit := (m.Cfg.MaxStagingDealsBytes * m.Cfg.MaxStagingDealsPercentPerHost) / 100
 			if tagged+size >= limit {
 				return fmt.Errorf("%w: cannot accept piece of size %d from host %s, "+
 					"on top of already allocated %d bytes, because it would exceed max %d bytes: "+
 					"staging area size %d x per host limit %d%%",
-					ErrNoSpaceLeft, size, host, tagged, limit, m.cfg.MaxStagingDealsBytes, m.cfg.MaxStagingDealsPercentPerHost)
+					ErrNoSpaceLeft, size, host, tagged, limit, m.Cfg.MaxStagingDealsBytes, m.Cfg.MaxStagingDealsPercentPerHost)
 			}
 		}
 
@@ -99,9 +99,9 @@ func (m *StorageManager) Tag(ctx context.Context, dealUuid uuid.UUID, size uint6
 		}
 
 		// Check the amount tagged + the size of the proposed deal against the limit
-		if tagged+size >= m.cfg.MaxStagingDealsBytes {
+		if tagged+size >= m.Cfg.MaxStagingDealsBytes {
 			err := fmt.Errorf("%w: cannot accept piece of size %d, on top of already allocated %d bytes, because it would exceed max staging area size %d",
-				ErrNoSpaceLeft, size, tagged, m.cfg.MaxStagingDealsBytes)
+				ErrNoSpaceLeft, size, tagged, m.Cfg.MaxStagingDealsBytes)
 			return err
 		}
 	}
