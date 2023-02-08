@@ -1447,7 +1447,10 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	store.EXPECT().IsIndexed(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	store.EXPECT().AddDealForPiece(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
+	pdctx, cancel := context.WithCancel(context.Background())
 	pm := piecedirectory.NewPieceDirectory(store, nil, 1)
+	pm.Start(pdctx)
+	t.Cleanup(cancel)
 
 	prvCfg := Config{
 		MaxTransferDuration: time.Hour,

@@ -53,7 +53,7 @@ var runCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:     "api-lid",
-			Usage:    "the endpoint for the local index directory API",
+			Usage:    "the endpoint for the local index directory API, eg 'http://localhost:8042'",
 			Required: true,
 		},
 		&cli.IntFlag{
@@ -169,6 +169,9 @@ var runCmd = &cli.Command{
 				return fmt.Errorf("parsing proxy multiaddr %s: %w", proxy, err)
 			}
 		}
+
+		// Start the local index directory
+		piecedirectory.Start(ctx)
 
 		// Start the bitswap server
 		log.Infof("Starting booster-bitswap node on port %d", port)

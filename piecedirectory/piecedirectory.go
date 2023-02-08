@@ -34,6 +34,8 @@ type PieceDirectory struct {
 	store       types.Store
 	pieceReader types.PieceReader
 
+	ctx context.Context
+
 	addIdxThrottleSize int
 	addIdxThrottle     chan struct{}
 	addIdxOpByCid      sync.Map
@@ -52,15 +54,8 @@ func NewPieceDirectory(store types.Store, pr types.PieceReader, addIndexThrottle
 	}
 }
 
-type SectorAccessorAsPieceReader struct {
-	dagstore.SectorAccessor
-}
-
-func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (types.SectionReader, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "sealer.get_reader")
-	defer span.End()
-
-	return s.SectorAccessor.UnsealSectorAt(ctx, id, offset.Unpadded(), length.Unpadded())
+func (ps *PieceDirectory) Start(ctx context.Context) {
+	ps.ctx = ctx
 }
 
 func (ps *PieceDirectory) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
@@ -248,20 +243,24 @@ func (ps *PieceDirectory) addIndexForPieceThrottled(ctx context.Context, pieceCi
 
 	// A new operation was added to the map, so clean it up when it's done
 	defer ps.addIdxOpByCid.Delete(pieceCid)
+	defer close(op.done)
 
 	// Wait for the throttle to yield an open spot
 	log.Debugw("add index: wait for open throttle position",
 		"pieceCid", pieceCid, "queued", len(ps.addIdxThrottle), "queue-limit", ps.addIdxThrottleSize)
 	select {
 	case <-ctx.Done():
+		op.err = ctx.Err()
 		return ctx.Err()
 	case ps.addIdxThrottle <- struct{}{}:
 	}
 	defer func() { <-ps.addIdxThrottle }()
 
-	// Perform the add index operation
-	op.err = ps.addIndexForPiece(ctx, pieceCid, dealInfo)
-	close(op.done)
+	// Perform the add index operation.
+	// Note: Once we start the add index operation we don't want to cancel it
+	// if one of the waiting threads cancels its context. So instead we use the
+	// PieceDirectory's context.
+	op.err = ps.addIndexForPiece(ps.ctx, pieceCid, dealInfo)
 
 	// Return the result
 	log.Debugw("add index: completed", "pieceCid", pieceCid)
@@ -592,4 +591,15 @@ func (c *countReader) ReadByte() (byte, error) {
 		c.count++
 	}
 	return b, err
+}
+
+type SectorAccessorAsPieceReader struct {
+	dagstore.SectorAccessor
+}
+
+func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (types.SectionReader, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "sealer.get_reader")
+	defer span.End()
+
+	return s.SectorAccessor.UnsealSectorAt(ctx, id, offset.Unpadded(), length.Unpadded())
 }

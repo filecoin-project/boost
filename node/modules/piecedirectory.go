@@ -105,11 +105,25 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 	}
 }
 
-func NewPieceDirectory(cfg *config.Boost) func(maddr dtypes.MinerAddress, store types.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
-	return func(maddr dtypes.MinerAddress, store types.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
+func NewPieceDirectory(cfg *config.Boost) func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store types.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
+	return func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store types.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
 		sa := sectoraccessor.NewSectorAccessor(maddr, secb, pp, full)
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		return piecedirectory.NewPieceDirectory(store, pr, cfg.LocalIndexDirectory.ParallelAddIndexLimit)
+		pd := piecedirectory.NewPieceDirectory(store, pr, cfg.LocalIndexDirectory.ParallelAddIndexLimit)
+
+		pdctx, cancel := context.WithCancel(context.Background())
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				pd.Start(pdctx)
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				cancel()
+				return nil
+			},
+		})
+
+		return pd
 	}
 }
 
