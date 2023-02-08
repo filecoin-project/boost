@@ -500,23 +500,26 @@ func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo
 	}
 }
 
-func NewIndexBackedBlockstore(lc fx.Lifecycle, dagst dagstore.Interface, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, rp retrievalmarket.RetrievalProvider) (dtypes.IndexBackedBlockstore, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	lc.Append(fx.Hook{
-		OnStop: func(ctx context.Context) error {
-			cancel()
-			return nil
-		},
-	})
-	ss, err := brm.NewShardSelector(ctx, ps, sa, rp)
-	if err != nil {
-		return nil, fmt.Errorf("creating shard selector: %w", err)
+func NewIndexBackedBlockstore(cfg *config.Boost) func(lc fx.Lifecycle, dagst dagstore.Interface, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, rp retrievalmarket.RetrievalProvider) (dtypes.IndexBackedBlockstore, error) {
+	return func(lc fx.Lifecycle, dagst dagstore.Interface, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, rp retrievalmarket.RetrievalProvider) (dtypes.IndexBackedBlockstore, error) {
+		ctx, cancel := context.WithCancel(context.Background())
+		lc.Append(fx.Hook{
+			OnStop: func(ctx context.Context) error {
+				cancel()
+				return nil
+			},
+		})
+		ss, err := brm.NewShardSelector(ctx, ps, sa, rp)
+		if err != nil {
+			return nil, fmt.Errorf("creating shard selector: %w", err)
+		}
+
+		rbs, err := indexbs.NewIndexBackedBlockstore(ctx, dagst, ss.ShardSelectorF, cfg.Dealmaking.BlockstoreCacheMaxShards, time.Duration(cfg.Dealmaking.BlockstoreCacheExpiry))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create index backed blockstore: %w", err)
+		}
+		return dtypes.IndexBackedBlockstore(rbs), nil
 	}
-	rbs, err := indexbs.NewIndexBackedBlockstore(ctx, dagst, ss.ShardSelectorF, 100)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create index backed blockstore: %w", err)
-	}
-	return dtypes.IndexBackedBlockstore(rbs), nil
 }
 
 func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, error) {

@@ -186,6 +186,12 @@ type DealmakingConfig struct {
 
 	RetrievalPricing *lotus_config.RetrievalPricing
 
+	// The maximum number of shards cached by the Dagstore for retrieval
+	// Lower this limit if boostd memory is too high during retrievals
+	BlockstoreCacheMaxShards int
+	// How long a blockstore shard should be cached before expiring without use
+	BlockstoreCacheExpiry Duration
+
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration Duration
 
