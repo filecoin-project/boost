@@ -259,10 +259,10 @@ func (p *Provider) ImportOfflineDealData(ctx context.Context, dealUuid uuid.UUID
 	return resp.ri, nil
 }
 
-// ExecuteDeal is called when the Storage Provider receives a deal proposal
+// ExecuteLibp2pDeal is called when the Storage Provider receives a deal proposal
 // from the network
-func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, clientPeer peer.ID) (*api.ProviderDealRejectionInfo, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "Provider.ExecuteDeal")
+func (p *Provider) ExecuteLibp2pDeal(ctx context.Context, dp *types.DealParams, clientPeer peer.ID) (*api.ProviderDealRejectionInfo, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "Provider.ExecuteLibp2pDeal")
 	defer span.End()
 
 	span.SetAttributes(attribute.String("dealUuid", dp.DealUUID.String())) // Example of adding additional attributes
@@ -292,14 +292,6 @@ func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, client
 			Reason: fmt.Sprintf("failed validation: %s", reason),
 		}, nil
 	}
-
-	return p.executeDeal(ctx, ds)
-}
-
-// executeDeal sends the deal to the main provider run loop for execution
-func (p *Provider) executeDeal(ctx context.Context, ds smtypes.ProviderDealState) (*api.ProviderDealRejectionInfo, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "Provider.executeDeal")
-	defer span.End()
 
 	ri, err := func() (*api.ProviderDealRejectionInfo, error) {
 		// send the deal to the main provider loop for execution

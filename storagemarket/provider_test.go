@@ -226,7 +226,7 @@ func TestDealRejectedForDuplicateProposal(t *testing.T) {
 		err := td.executeAndSubscribe()
 		require.NoError(t, err)
 
-		pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
+		pi, err := td.ph.Provider.ExecuteLibp2pDeal(context.Background(), td.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 		require.Contains(t, pi.Reason, "deal proposal is identical")
@@ -234,10 +234,10 @@ func TestDealRejectedForDuplicateProposal(t *testing.T) {
 
 	t.Run("offline", func(t *testing.T) {
 		td := harness.newDealBuilder(t, 1, withOfflineDeal()).withNoOpMinerStub().build()
-		_, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
+		_, err := td.ph.Provider.ExecuteLibp2pDeal(context.Background(), td.params, "")
 		require.NoError(t, err)
 
-		pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
+		pi, err := td.ph.Provider.ExecuteLibp2pDeal(context.Background(), td.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 		require.Contains(t, pi.Reason, "deal proposal is identical")
@@ -258,7 +258,7 @@ func TestDealRejectedForDuplicateUuid(t *testing.T) {
 
 		td2 := harness.newDealBuilder(t, 2).withNoOpMinerStub().withBlockingHttpServer().build()
 		td2.params.DealUUID = td.params.DealUUID
-		pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td2.params, "")
+		pi, err := td.ph.Provider.ExecuteLibp2pDeal(context.Background(), td2.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 		require.Contains(t, pi.Reason, "deal has the same uuid")
@@ -266,12 +266,12 @@ func TestDealRejectedForDuplicateUuid(t *testing.T) {
 
 	t.Run("offline", func(t *testing.T) {
 		td := harness.newDealBuilder(t, 1, withOfflineDeal()).withNoOpMinerStub().build()
-		_, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
+		_, err := td.ph.Provider.ExecuteLibp2pDeal(context.Background(), td.params, "")
 		require.NoError(t, err)
 
 		td2 := harness.newDealBuilder(t, 2, withOfflineDeal()).withNoOpMinerStub().build()
 		td2.params.DealUUID = td.params.DealUUID
-		pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td2.params, "")
+		pi, err := td.ph.Provider.ExecuteLibp2pDeal(context.Background(), td2.params, "")
 		require.NoError(t, err)
 		require.False(t, pi.Accepted)
 		require.Contains(t, pi.Reason, "deal has the same uuid")
@@ -288,7 +288,7 @@ func TestDealRejectedForInsufficientProviderFunds(t *testing.T) {
 	defer harness.Stop()
 
 	td := harness.newDealBuilder(t, 1).withNoOpMinerStub().withBlockingHttpServer().build()
-	pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, peer.ID(""))
+	pi, err := td.ph.Provider.ExecuteLibp2pDeal(context.Background(), td.params, peer.ID(""))
 	require.NoError(t, err)
 	require.False(t, pi.Accepted)
 	require.Contains(t, pi.Reason, "insufficient funds")
@@ -306,14 +306,14 @@ func TestDealRejectedForInsufficientProviderStorageSpace(t *testing.T) {
 
 	// Make a deal
 	td := harness.newDealBuilder(t, 1, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
-	pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, peer.ID(""))
+	pi, err := td.ph.Provider.ExecuteLibp2pDeal(context.Background(), td.params, peer.ID(""))
 	require.NoError(t, err)
 	require.True(t, pi.Accepted)
 
 	// Make a second deal - this one should fail because there is not enough
 	// space in the staging area for a second deal
 	td2 := harness.newDealBuilder(t, 2, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
-	pi, err = td2.ph.Provider.ExecuteDeal(context.Background(), td2.params, peer.ID(""))
+	pi, err = td2.ph.Provider.ExecuteLibp2pDeal(context.Background(), td2.params, peer.ID(""))
 	require.NoError(t, err)
 	require.False(t, pi.Accepted)
 	require.Contains(t, pi.Reason, "no space left")
@@ -345,13 +345,13 @@ func TestDealRejectedForInsufficientProviderStorageSpacePerHost(t *testing.T) {
 	// Make a deal with data url on host A
 	hostADeal := harness.newDealBuilder(t, 1, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
 	hostADeal.params.Transfer.Params = []byte(downloadUrl(hostA))
-	pi, err := hostADeal.ph.Provider.ExecuteDeal(ctx, hostADeal.params, "")
+	pi, err := hostADeal.ph.Provider.ExecuteLibp2pDeal(ctx, hostADeal.params, "")
 	require.NoError(t, err)
 	require.True(t, pi.Accepted)
 
 	// Make a deal with data url on host B
 	hostBDeal := harness.newDealBuilder(t, 2, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
-	pi, err = hostBDeal.ph.Provider.ExecuteDeal(ctx, hostBDeal.params, "")
+	pi, err = hostBDeal.ph.Provider.ExecuteLibp2pDeal(ctx, hostBDeal.params, "")
 	hostBDeal.params.Transfer.Params = []byte(downloadUrl(hostB))
 	require.NoError(t, err)
 	require.True(t, pi.Accepted)
@@ -362,7 +362,7 @@ func TestDealRejectedForInsufficientProviderStorageSpacePerHost(t *testing.T) {
 	// to 1.5 x the deal size.
 	hostADeal2 := harness.newDealBuilder(t, 3, withNormalFileSize(fileSize)).withNoOpMinerStub().withBlockingHttpServer().build()
 	hostADeal2.params.Transfer.Params = []byte(downloadUrl(hostA))
-	pi, err = hostADeal2.ph.Provider.ExecuteDeal(ctx, hostADeal2.params, "")
+	pi, err = hostADeal2.ph.Provider.ExecuteLibp2pDeal(ctx, hostADeal2.params, "")
 	require.NoError(t, err)
 	require.False(t, pi.Accepted)
 	require.Contains(t, pi.Reason, "no space left")
@@ -579,7 +579,7 @@ func TestOfflineDealRestartAfterManualRecoverableErrors(t *testing.T) {
 			// build the deal proposal
 			td := tc.dbuilder(harness)
 
-			_, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
+			_, err := td.ph.Provider.ExecuteLibp2pDeal(context.Background(), td.params, "")
 			require.NoError(t, err)
 
 			// execute deal
@@ -2005,7 +2005,7 @@ func (td *testDeal) executeAndSubscribe() error {
 	}
 	td.sub = sub
 
-	pi, err := td.ph.Provider.ExecuteDeal(context.Background(), td.params, "")
+	pi, err := td.ph.Provider.ExecuteLibp2pDeal(context.Background(), td.params, "")
 	if err != nil {
 		return err
 	}

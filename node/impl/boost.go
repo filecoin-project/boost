@@ -117,7 +117,7 @@ func (sm *BoostAPI) ServeRemote(perm bool) func(w http.ResponseWriter, r *http.R
 }
 
 func (sm *BoostAPI) BoostDummyDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
-	return sm.StorageProvider.ExecuteDeal(ctx, &params, "dummy")
+	return sm.StorageProvider.ExecuteLibp2pDeal(ctx, &params, "dummy")
 }
 
 func (sm *BoostAPI) BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
