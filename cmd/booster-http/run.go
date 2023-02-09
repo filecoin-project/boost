@@ -39,8 +39,13 @@ var runCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:     "api-lid",
-			Usage:    "the endpoint for the local index directory API",
+			Usage:    "the endpoint for the local index directory API, eg 'http://localhost:8042'",
 			Required: true,
+		},
+		&cli.IntFlag{
+			Name:  "add-index-throttle",
+			Usage: "the maximum number of add index operations that can run in parallel",
+			Value: 4,
 		},
 		&cli.StringFlag{
 			Name:     "api-fullnode",
@@ -118,6 +123,9 @@ var runCmd = &cli.Command{
 			cctx.Int("port"),
 			sapi,
 		)
+
+		// Start the local index directory
+		piecedirectory.Start(ctx)
 
 		// Start the server
 		log.Infof("Starting booster-http node on port %d with base path '%s'",

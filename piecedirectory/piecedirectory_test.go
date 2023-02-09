@@ -74,6 +74,7 @@ func testPieceDirectoryNotFound(ctx context.Context, t *testing.T, cl *client.St
 	ctrl := gomock.NewController(t)
 	pr := mock_piecedirectory.NewMockPieceReader(ctrl)
 	pm := NewPieceDirectory(cl, pr, 1)
+	pm.Start(ctx)
 
 	nonExistentPieceCid, err := cid.Parse("bafkqaaa")
 	require.NoError(t, err)
@@ -117,6 +118,7 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 	pr := CreateMockPieceReader(t, carv1Reader)
 
 	pm := NewPieceDirectory(cl, pr, 1)
+	pm.Start(ctx)
 	pieceCid := CalculateCommp(t, carv1Reader).PieceCID
 
 	// Add deal info for the piece - it doesn't matter what it is, the piece
@@ -242,6 +244,7 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// There is no size information in the index so the piece
 	// directory should re-build the index and then return the size.
 	pm := NewPieceDirectory(cl, pr, 1)
+	pm.Start(ctx)
 	sz, err := pm.BlockstoreGetSize(ctx, rec.Cid)
 	require.NoError(t, err)
 	require.Equal(t, len(blk.RawData()), sz)
@@ -290,6 +293,7 @@ func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
 	// There is no CAR size information in the deal info, so the piece
 	// directory should work it out from the index and piece data.
 	pm := NewPieceDirectory(cl, pr, 1)
+	pm.Start(ctx)
 	size, err := pm.GetCarSize(ctx, commpCalc.PieceCID)
 	require.NoError(t, err)
 	require.Equal(t, len(carBytes), int(size))
