@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"errors"
 	"io"
 	"time"
 
@@ -20,6 +21,8 @@ type SectionReader interface {
 	io.Seeker
 	io.Closer
 }
+
+var ErrSealed = errors.New("sector is not unsealed")
 
 type PieceReader interface {
 	// GetReader returns a reader over a piece. If there is no unsealed copy, returns ErrSealed.

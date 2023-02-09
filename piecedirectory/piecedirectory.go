@@ -601,5 +601,19 @@ func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, id abi.Sect
 	ctx, span := tracing.Tracer.Start(ctx, "sealer.get_reader")
 	defer span.End()
 
-	return s.SectorAccessor.UnsealSectorAt(ctx, id, offset.Unpadded(), length.Unpadded())
+	isUnsealed, err := s.SectorAccessor.IsUnsealed(ctx, id, offset.Unpadded(), length.Unpadded())
+	if err != nil {
+		return nil, fmt.Errorf("checking unsealed state of sector %d: %w", id, err)
+	}
+
+	if !isUnsealed {
+		return nil, fmt.Errorf("getting reader over sector %d: %w", id, types.ErrSealed)
+	}
+
+	r, err := s.SectorAccessor.UnsealSectorAt(ctx, id, offset.Unpadded(), length.Unpadded())
+	if err != nil {
+		return nil, fmt.Errorf("getting reader over sector %d: %w", id, err)
+	}
+
+	return r, nil
 }
