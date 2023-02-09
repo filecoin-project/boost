@@ -123,6 +123,7 @@ jobs:
     macos:
       xcode: "12.5.1"
     working_directory: ~/go/src/github.com/filecoin-project/boost
+    resource_class: large
     steps:
       - prepare:
           linux: false
