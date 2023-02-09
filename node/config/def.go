@@ -101,8 +101,8 @@ func DefaultBoost() *Boost {
 			},
 
 			// This should no longer be needed once LID is live
-			BlockstoreCacheMaxShards: 100,
-			BlockstoreCacheExpiry:    Duration(10 * time.Minute),
+			BlockstoreCacheMaxShards: 20, // Match default simultaneous retrievals
+			BlockstoreCacheExpiry:    Duration(30 * time.Second),
 
 			MaxTransferDuration: Duration(24 * 3600 * time.Second),
 
