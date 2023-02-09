@@ -94,6 +94,7 @@ type Provider struct {
 	// Database API
 	db        *sql.DB
 	dealsDB   *db.DealsDB
+	plDB      *db.ProposalLogsDB
 	logsSqlDB *sql.DB
 	logsDB    *db.LogsDB
 
@@ -125,7 +126,7 @@ type Provider struct {
 	sigVerifier types.SignatureVerifier
 }
 
-func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
+func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, plDB *db.ProposalLogsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
 	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, commpCalc smtypes.CommpCalculator,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, askGetter types.AskGetter,
@@ -155,6 +156,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		newDealPS: newDealPS,
 		db:        sqldb,
 		dealsDB:   dealsDB,
+		plDB:      plDB,
 		logsSqlDB: logsSqlDB,
 		sps:       sps,
 		df:        df,
@@ -280,20 +282,44 @@ func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, client
 		FastRetrieval:      !dp.RemoveUnsealedCopy,
 		AnnounceToIPNI:     !dp.SkipIPNIAnnounce,
 	}
-	// validate the deal proposal
+
+	// Validate the deal proposal
 	if err := p.validateDealProposal(ds); err != nil {
+		// Send the client a reason for the rejection that doesn't reveal the
+		// internal error message
 		reason := err.reason
 		if reason == "" {
 			reason = err.Error()
 		}
+
+		// Log the internal error message
 		p.dealLogger.Infow(dp.DealUUID, "deal proposal failed validation", "err", err.Error(), "reason", reason)
+		p.logDealAcceptReject(dp, nil, err)
 
 		return &api.ProviderDealRejectionInfo{
 			Reason: fmt.Sprintf("failed validation: %s", reason),
 		}, nil
 	}
 
-	return p.executeDeal(ctx, ds)
+	// Start executing the deal
+	res, err := p.executeDeal(ctx, ds)
+	p.logDealAcceptReject(dp, res, err)
+	return res, err
+}
+
+// logDealAcceptReject saves the deal accept / reject status and a rejection
+// reason to the database for display in the UI
+func (p *Provider) logDealAcceptReject(dp *types.DealParams, res *api.ProviderDealRejectionInfo, err error) {
+	reason := ""
+	accepted := true
+	if err != nil {
+		accepted = false
+		reason = err.Error()
+	} else if res != nil {
+		reason = res.Reason
+		accepted = res.Accepted
+	}
+	_ = p.plDB.InsertLog(p.ctx, *dp, accepted, reason) //nolint:errcheck
 }
 
 // executeDeal sends the deal to the main provider run loop for execution
