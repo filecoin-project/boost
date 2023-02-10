@@ -338,9 +338,8 @@ func HandleLegacyDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, host host.Host,
 	return nil
 }
 
-func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, spApi sealingpipeline.API) {
-	// The module that listens for requests over libp2p
-	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, spApi)
+func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
+	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi)
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -379,6 +378,28 @@ func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider
 		OnStop: func(ctx context.Context) error {
 			lp2pnet.Stop()
 			prov.Stop()
+			return nil
+		},
+	})
+}
+
+func HandleContractDeals(lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode) {
+	monitor, err := storagemarket.NewContractDealMonitor(prov, a)
+	if err != nil {
+		panic(err)
+	}
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			log.Info("contract deals monitor starting")
+
+			monitor.Start(ctx)
+
+			log.Info("contract deals monitor started")
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			monitor.Stop()
 			return nil
 		},
 	})

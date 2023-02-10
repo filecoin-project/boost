@@ -550,7 +550,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&legacyFees, &cfg.LotusDealmaking)),
 		Override(new(lotus_storagemarket.StorageProvider), modules.NewLegacyStorageProvider(cfg)),
 		Override(HandleDealsKey, modules.HandleLegacyDeals),
-		Override(HandleBoostDealsKey, modules.HandleBoostDeals),
+		Override(HandleBoostDealsKey, modules.HandleBoostLibp2pDeals),
 		Override(HandleProposalLogCleanerKey, modules.HandleProposalLogCleaner(time.Duration(cfg.Dealmaking.DealProposalLogDuration))),
 
 		// Boost storage deal filter

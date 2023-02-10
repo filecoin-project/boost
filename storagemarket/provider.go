@@ -261,10 +261,10 @@ func (p *Provider) ImportOfflineDealData(ctx context.Context, dealUuid uuid.UUID
 	return resp.ri, nil
 }
 
-// ExecuteDeal is called when the Storage Provider receives a deal proposal
+// ExecuteLibp2pDeal is called when the Storage Provider receives a deal proposal
 // from the network
-func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, clientPeer peer.ID) (*api.ProviderDealRejectionInfo, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "Provider.ExecuteDeal")
+func (p *Provider) ExecuteLibp2pDeal(ctx context.Context, dp *types.DealParams, clientPeer peer.ID) (*api.ProviderDealRejectionInfo, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "Provider.ExecuteLibp2pDeal")
 	defer span.End()
 
 	span.SetAttributes(attribute.String("dealUuid", dp.DealUUID.String())) // Example of adding additional attributes
