@@ -338,8 +338,9 @@ func HandleLegacyDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, host host.Host,
 	return nil
 }
 
-func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
-	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi)
+func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, spApi sealingpipeline.API) {
+	// The module that listens for requests over libp2p
+	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, spApi)
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -451,8 +452,8 @@ func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.
 	}
 }
 
-func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, dagst *mktsdagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
-	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
+func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, plDB *db.ProposalLogsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, dagst *mktsdagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
+	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, plDB *db.ProposalLogsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks,
 		commpc types.CommpCalculator, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
@@ -472,7 +473,7 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 		}
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl)
-		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, commpc,
+		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, plDB, fundMgr, storageMgr, a, dp, provAddr, secb, commpc,
 			sps, cdm, df, logsSqlDB.db, logsDB, dagst, ps, ip, lp, &signatureVerifier{a}, dl, tspt)
 		if err != nil {
 			return nil, err
