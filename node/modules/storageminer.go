@@ -338,8 +338,8 @@ func HandleLegacyDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, host host.Host,
 	return nil
 }
 
-func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
-	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi)
+func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, spApi sealingpipeline.API) {
+	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, spApi)
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
