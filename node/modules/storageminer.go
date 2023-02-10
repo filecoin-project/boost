@@ -383,6 +383,28 @@ func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Pr
 	})
 }
 
+func HandleContractDeals(lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode) {
+	monitor, err := storagemarket.NewContractDealMonitor(prov, a)
+	if err != nil {
+		panic(err)
+	}
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			log.Info("contract deals monitor starting")
+
+			monitor.Start(ctx)
+
+			log.Info("contract deals monitor started")
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			monitor.Stop()
+			return nil
+		},
+	})
+}
+
 type signatureVerifier struct {
 	fn v1api.FullNode
 }
