@@ -271,6 +271,8 @@ docker compose exec boost /bin/bash
 root@83260455bbd2:/app# ./sample/make-a-deal.sh
 ```
 
+You can also generate, dense, random cars and automatically make deals by leveraging the script at `./docker/devnet/boost/sample/random-deal.sh`. See the scripts comments for usage details.
+
 ### Accessing Lotus from localhost
 
 By default the [docker-compose.yaml](./docker-compose.yaml) does not expose any port of the `lotus` container. To access the `lotus` from a local machine:
