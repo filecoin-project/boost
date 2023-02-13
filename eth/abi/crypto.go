@@ -1,7 +1,7 @@
 package abi
 
 import (
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/filecoin-project/boost/eth/abi/common"
 	"golang.org/x/crypto/sha3"
 )
 

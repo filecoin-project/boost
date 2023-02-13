@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/filecoin-project/boost/eth/abi/common"
 )
 
 // The ABI holds information about a contract's context and available

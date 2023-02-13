@@ -22,7 +22,7 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/filecoin-project/boost/eth/abi/common"
 )
 
 // packBytesSlice packs the given bytes as [L, V] as the canonical representation

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/filecoin-project/boost/eth/abi/common"
 )
 
 type Error struct {
