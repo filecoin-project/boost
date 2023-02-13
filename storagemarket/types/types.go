@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/url"
 
-	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/transport/httptransport/util"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
@@ -85,11 +84,6 @@ type DealParams struct {
 	Transfer           Transfer // Transfer params will be the zero value if this is an offline deal
 	RemoveUnsealedCopy bool
 	SkipIPNIAnnounce   bool
-}
-
-type DealFilterParams struct {
-	DealParams           *DealParams
-	SealingPipelineState *sealingpipeline.Status
 }
 
 // Transfer has the parameters for a data transfer

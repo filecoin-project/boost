@@ -93,12 +93,20 @@ func (f *filter) update() error {
 		return nil
 	}
 	defer stream.Close()
-	// open the cache file
-	cache, err := os.OpenFile(f.CacheFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	// write cache to the temp file first
+	tmpFile := f.CacheFile + ".tmp"
+	cache, err := os.OpenFile(tmpFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("opening cache file: %w", err)
 	}
-	defer cache.Close()
+	defer func() {
+		// rename the temp file only if the operation succeeds
+		if cache.Close() == nil && err == nil {
+			_ = os.Rename(tmpFile, f.CacheFile)
+		} else {
+			_ = os.Remove(tmpFile)
+		}
+	}()
 	forkedStream := io.TeeReader(stream, cache)
 	f.lastUpdated = fetchTime
 	err = f.Handler.ParseUpdate(forkedStream)

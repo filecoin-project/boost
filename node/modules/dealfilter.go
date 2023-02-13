@@ -6,7 +6,7 @@ import (
 
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 
@@ -28,7 +28,7 @@ func BasicDealFilter(cfg config.DealmakingConfig, userCmd dtypes.StorageDealFilt
 		startDelay dtypes.GetMaxDealStartDelayFunc,
 		r lotus_repo.LockedRepo,
 	) dtypes.StorageDealFilter {
-		return func(ctx context.Context, params types.DealFilterParams) (bool, string, error) {
+		return func(ctx context.Context, params dealfilter.DealFilterParams) (bool, string, error) {
 			deal := params.DealParams
 			pr := deal.ClientDealProposal.Proposal
 

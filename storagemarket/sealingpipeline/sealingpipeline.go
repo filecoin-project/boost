@@ -22,7 +22,7 @@ type API interface {
 	SectorsListInStates(context.Context, []api.SectorState) ([]abi.SectorNumber, error)
 }
 
-func GetStatus(ctx context.Context, fullnodeApi api.FullNode, api API) (*Status, error) {
+func GetStatus(ctx context.Context, api API) (*Status, error) {
 	res, err := api.WorkerJobs(ctx)
 	if err != nil {
 		return nil, err

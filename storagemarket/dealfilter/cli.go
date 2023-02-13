@@ -6,33 +6,43 @@ import (
 	"encoding/json"
 	"os/exec"
 
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-
-	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/storagemarket/funds"
+	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
+	"github.com/filecoin-project/boost/storagemarket/storagespace"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 )
 
 const agent = "boost"
-const jsonVersion = "2.0.0"
+const jsonVersion = "2.1.0"
 
-func CliStorageDealFilter(cmd string) dtypes.StorageDealFilter {
-	return func(ctx context.Context, deal types.DealFilterParams) (bool, string, error) {
+type StorageDealFilter func(ctx context.Context, deal DealFilterParams) (bool, string, error)
+type RetrievalDealFilter func(ctx context.Context, deal retrievalmarket.ProviderDealState) (bool, string, error)
+
+func CliStorageDealFilter(cmd string) StorageDealFilter {
+	return func(ctx context.Context, deal DealFilterParams) (bool, string, error) {
 		d := struct {
 			types.DealParams
-			DealType      string
-			FormatVersion string
-			Agent         string
+			SealingPipelineState sealingpipeline.Status
+			FundsState           funds.Status
+			StorageState         storagespace.Status
+			DealType             string
+			FormatVersion        string
+			Agent                string
 		}{
-			DealParams:    *deal.DealParams,
-			DealType:      "storage",
-			FormatVersion: jsonVersion,
-			Agent:         agent,
+			DealParams:           deal.DealParams,
+			SealingPipelineState: deal.SealingPipelineState,
+			FundsState:           deal.FundsState,
+			StorageState:         deal.StorageState,
+			DealType:             "storage",
+			FormatVersion:        jsonVersion,
+			Agent:                agent,
 		}
 		return runDealFilter(ctx, cmd, d)
 	}
 }
 
-func CliRetrievalDealFilter(cmd string) dtypes.RetrievalDealFilter {
+func CliRetrievalDealFilter(cmd string) RetrievalDealFilter {
 	return func(ctx context.Context, deal retrievalmarket.ProviderDealState) (bool, string, error) {
 		d := struct {
 			retrievalmarket.ProviderDealState

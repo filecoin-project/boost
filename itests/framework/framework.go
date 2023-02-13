@@ -181,9 +181,11 @@ func (f *TestFramework) Start() error {
 		wg.Done()
 	}()
 
-	// Create a wallet for publish storage deals with some funds
-	wg.Add(1)
+	// Create wallets for publish storage deals and deal collateral with
+	// some funds
+	wg.Add(2)
 	var psdWalletAddr address.Address
+	var dealCollatAddr address.Address
 	go func() {
 		Log.Info("Creating publish storage deals wallet")
 		psdWalletAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
@@ -191,6 +193,15 @@ func (f *TestFramework) Start() error {
 		amt := abi.NewTokenAmount(1e18)
 		_ = sendFunds(f.ctx, fullnodeApi, psdWalletAddr, amt)
 		Log.Infof("Created publish storage deals wallet %s with %d attoFil", psdWalletAddr, amt)
+		wg.Done()
+	}()
+	go func() {
+		Log.Info("Creating deal collateral wallet")
+		dealCollatAddr, _ = fullnodeApi.WalletNew(f.ctx, chaintypes.KTBLS)
+
+		amt := abi.NewTokenAmount(1e18)
+		_ = sendFunds(f.ctx, fullnodeApi, dealCollatAddr, amt)
+		Log.Infof("Created deal collateral wallet %s with %d attoFil", dealCollatAddr, amt)
 		wg.Done()
 	}()
 	wg.Wait()
@@ -267,6 +278,7 @@ func (f *TestFramework) Start() error {
 	cfg.SealerApiInfo = apiInfo
 	cfg.Wallets.Miner = minerAddr.String()
 	cfg.Wallets.PublishStorageDeals = psdWalletAddr.String()
+	cfg.Wallets.DealCollateral = dealCollatAddr.String()
 	cfg.LotusDealmaking.MaxDealsPerPublishMsg = 1
 	cfg.LotusDealmaking.PublishMsgPeriod = lotus_config.Duration(0)
 	val, err := ltypes.ParseFIL("0.1 FIL")
