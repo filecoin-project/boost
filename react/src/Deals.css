@@ -33,6 +33,13 @@
 .deals td.client {
     width: 6em;
 }
+.deals td.client.contract {
+    background: url("./bootstrap-icons/icons/file-earmark-text.svg");
+    padding-left: 2.25em;
+    display: inline-block;
+    background-repeat: no-repeat;
+    background-position: 1em center;
+}
 
 .deals td.message {
     width: 100%;

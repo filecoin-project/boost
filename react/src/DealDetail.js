@@ -6,7 +6,7 @@ import {DealCancelMutation, DealFailPausedMutation, DealRetryPausedMutation, Dea
 import {useNavigate, useParams, Link} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";
-import {addCommas, humanFIL, humanFileSize} from "./util";
+import {addCommas, humanFIL, humanFileSize, isContractAddress} from "./util";
 import './DealDetail.css'
 import closeImg from './bootstrap-icons/icons/x-circle.svg'
 import {Info} from "./Info";
@@ -128,8 +128,11 @@ export function DealDetail(props) {
                 <tr>
                     <th>Client Address</th>
                     <td>
-                        <a href={"https://filfox.info/en/address/"+deal.ClientAddress} target="_blank" rel="noreferrer">
+                        <a href={"https://filfox.info/en/address/"+deal.ClientAddress} target="_blank" rel="noreferrer"
+                            className={isContractAddress(deal.ClientAddress) ? 'contract' : ''}
+                        >
                             {deal.ClientAddress}
+                            {isContractAddress(deal.ClientAddress) ? <span className="aux"> (Contract)</span> : ''}
                         </a>
                     </td>
                 </tr>
