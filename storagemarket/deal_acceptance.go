@@ -214,6 +214,13 @@ func (p *Provider) validateAsk(deal types.ProviderDealState) error {
 }
 
 func (p *Provider) validateSignature(tok shared.TipSetToken, deal types.ProviderDealState) (bool, error) {
+	// Check if the client is an f4 address, ie an FVM contract
+	clientAddr := deal.ClientDealProposal.Proposal.Client.String()
+	if len(clientAddr) >= 2 && (clientAddr[:2] == "t4" || clientAddr[:2] == "f4") {
+		// TODO: Simulate publish storage deals message to check f4 signature
+		return true, nil
+	}
+
 	b, err := cborutil.Dump(&deal.ClientDealProposal.Proposal)
 	if err != nil {
 		return false, fmt.Errorf("failed to serialize client deal proposal: %w", err)
