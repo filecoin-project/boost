@@ -3,9 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
-	_ "net/http/pprof"
-
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/markets/dagstore"
 	"github.com/filecoin-project/boost/piecedirectory"
@@ -16,6 +13,8 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
+	"net/http"
+	_ "net/http/pprof"
 )
 
 var runCmd = &cli.Command{
@@ -97,11 +96,9 @@ var runCmd = &cli.Command{
 
 		// Connect to the storage API and create a sector accessor
 		storageApiInfo := cctx.String("api-storage")
-		sa, storageCloser, err := lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
 		if err != nil {
-			return err
+			return fmt.Errorf("parsing storage API endpoint: %w", err)
 		}
-		defer storageCloser()
 
 		// Instantiate the tracer and exporter
 		enableTracing := cctx.Bool("tracing")
@@ -113,6 +110,13 @@ var runCmd = &cli.Command{
 			}
 			log.Info("Tracing exporter enabled")
 		}
+
+		// Create the sector accessor
+		sa, storageCloser, err := lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
+		if err != nil {
+			return err
+		}
+		defer storageCloser()
 
 		// Create the server API
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}

@@ -254,6 +254,19 @@ see https://boost.filecoin.io/configuration/deal-filters for more details`,
 			Comment: ``,
 		},
 		{
+			Name: "BlockstoreCacheMaxShards",
+			Type: "int",
+
+			Comment: `The maximum number of shards cached by the Dagstore for retrieval
+Lower this limit if boostd memory is too high during retrievals`,
+		},
+		{
+			Name: "BlockstoreCacheExpiry",
+			Type: "Duration",
+
+			Comment: `How long a blockstore shard should be cached before expiring without use`,
+		},
+		{
 			Name: "MaxTransferDuration",
 			Type: "Duration",
 

@@ -134,6 +134,7 @@ jobs:
     macos:
       xcode: "12.5.1"
     working_directory: ~/go/src/github.com/filecoin-project/boost
+    resource_class: large
     steps:
       - prepare:
           linux: false
@@ -141,8 +142,8 @@ jobs:
       - run:
           name: Install go
           command: |
-            curl -O https://dl.google.com/go/go1.18.7.darwin-arm64.pkg && \
-            sudo installer -pkg go1.18.7.darwin-arm64.pkg -target /
+            curl -O https://dl.google.com/go/go1.19.5.darwin-amd64.pkg && \
+            sudo installer -pkg go1.19.5.darwin-amd64.pkg -target /
       - run:
           name: Install pkg-config
           command: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config
@@ -290,8 +291,8 @@ workflows:
       - build-macos:
           filters:
             branches:
-              ignore:
-                - /.*/
+              only:
+                - /ci\/.*/
             tags:
               only:
                 - /^v\d+\.\d+\.\d+(-rc\d+)?$/

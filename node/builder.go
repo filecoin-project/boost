@@ -29,10 +29,10 @@ import (
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
-	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
+	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
@@ -541,7 +541,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		//Override(new(mktsdagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
 		//Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
 		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
-		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore),
+		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore(cfg)),
 
 		// Lotus Markets (retrieval)
 		Override(new(mktsdagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
@@ -573,7 +573,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		// Boost storage deal filter
 		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),
 		If(cfg.Dealmaking.Filter != "",
-			Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, dealfilter.CliStorageDealFilter(cfg.Dealmaking.Filter))),
+			Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, dtypes.StorageDealFilter(dealfilter.CliStorageDealFilter(cfg.Dealmaking.Filter)))),
 		),
 
 		// Lotus markets storage deal filter
@@ -585,7 +585,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		// Boost retrieval deal filter
 		Override(new(dtypes.RetrievalDealFilter), modules.RetrievalDealFilter(nil)),
 		If(cfg.Dealmaking.RetrievalFilter != "",
-			Override(new(dtypes.RetrievalDealFilter), modules.RetrievalDealFilter(dealfilter.CliRetrievalDealFilter(cfg.Dealmaking.RetrievalFilter))),
+			Override(new(dtypes.RetrievalDealFilter), modules.RetrievalDealFilter(dtypes.RetrievalDealFilter(dealfilter.CliRetrievalDealFilter(cfg.Dealmaking.RetrievalFilter)))),
 		),
 
 		// Lotus markets retrieval deal filter

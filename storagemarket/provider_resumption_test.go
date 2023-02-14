@@ -4,9 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/filecoin-project/go-state-types/abi"
-
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/stretchr/testify/require"
 )
 
