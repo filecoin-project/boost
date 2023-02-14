@@ -397,13 +397,19 @@ func HandleContractDeals(lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.
 		OnStart: func(ctx context.Context) error {
 			log.Info("contract deals monitor starting")
 
-			monitor.Start(ctx)
+			err := monitor.Start(ctx)
+			if err != nil {
+				return err
+			}
 
 			log.Info("contract deals monitor started")
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			monitor.Stop()
+			err := monitor.Stop()
+			if err != nil {
+				return err
+			}
 			return nil
 		},
 	})
@@ -440,14 +446,17 @@ func (s *signatureVerifier) verifyContractSignature(ctx context.Context, sig cry
 	var msg ltypes.Message
 	buf := new(bytes.Buffer)
 
-	params.MarshalCBOR(buf)
+	var err error
+	err = params.MarshalCBOR(buf)
+	if err != nil {
+		return false, err
+	}
 	msg.Params = buf.Bytes()
 
 	msg.From = builtin.StorageMarketActorAddr
 	msg.To = addr
 	msg.Nonce = 1
 
-	var err error
 	msg.Method, err = builtin.GenerateFRCMethodNum("AuthenticateMessage") // abi.MethodNum(2643134072)
 	if err != nil {
 		return false, err

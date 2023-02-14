@@ -44,6 +44,9 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 		EventType: "logs",
 		Params:    &ethtypes.EthSubscriptionParams{Topics: topicSpec},
 	})
+	if err != nil {
+		return err
+	}
 
 	subID, err := c.api.EthSubscribe(ctx, subParam)
 	if err != nil {
@@ -58,6 +61,9 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 		responseCh <- *resp
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	go func() {
 		// add cancel
