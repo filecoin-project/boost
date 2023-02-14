@@ -40,6 +40,7 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/gateway"
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/lib/sigs"
 	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
@@ -387,8 +388,8 @@ func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Pr
 	})
 }
 
-func HandleContractDeals(lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode) {
-	monitor, err := storagemarket.NewContractDealMonitor(prov, a)
+func HandleContractDeals(lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode, subCh *gateway.EthSubHandler) {
+	monitor, err := storagemarket.NewContractDealMonitor(prov, a, subCh)
 	if err != nil {
 		panic(err)
 	}

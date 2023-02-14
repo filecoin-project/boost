@@ -27,6 +27,7 @@ import (
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/gateway"
 	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -46,7 +47,8 @@ type BoostAPI struct {
 	api.Common
 	api.Net
 
-	Full lapi.FullNode
+	Full  lapi.FullNode
+	SubCh *gateway.EthSubHandler
 
 	Host host.Host
 

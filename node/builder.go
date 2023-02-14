@@ -151,6 +151,7 @@ const (
 
 	// boost should be started after legacy markets (HandleDealsKey)
 	HandleBoostDealsKey
+	HandleContractDealsKey
 	HandleProposalLogCleanerKey
 
 	// daemon
@@ -551,6 +552,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(lotus_storagemarket.StorageProvider), modules.NewLegacyStorageProvider(cfg)),
 		Override(HandleDealsKey, modules.HandleLegacyDeals),
 		Override(HandleBoostDealsKey, modules.HandleBoostLibp2pDeals),
+		Override(HandleContractDealsKey, modules.HandleContractDeals),
 		Override(HandleProposalLogCleanerKey, modules.HandleProposalLogCleaner(time.Duration(cfg.Dealmaking.DealProposalLogDuration))),
 
 		// Boost storage deal filter

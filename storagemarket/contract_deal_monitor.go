@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/filecoin-project/boost/eth/abi"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
 	"github.com/filecoin-project/lotus/gateway"
@@ -17,20 +19,16 @@ var (
 )
 
 type ContractDealMonitor struct {
-	api  api.FullNode
-	prov *Provider
+	api   api.FullNode
+	prov  *Provider
+	subCh *gateway.EthSubHandler
 }
 
-func NewContractDealMonitor(p *Provider, a api.FullNode) (*ContractDealMonitor, error) {
-	//api, closer, err := lcli.GetFullNodeAPIV1(cctx, cliutil.FullNodeWithEthSubscribtionHandler(subCh))
-	//if err != nil {
-	//return err
-	//}
-	//defer closer()
-
+func NewContractDealMonitor(p *Provider, a api.FullNode, subCh *gateway.EthSubHandler) (*ContractDealMonitor, error) {
 	cdm := &ContractDealMonitor{
-		api:  a,
-		prov: p,
+		api:   a,
+		prov:  p,
+		subCh: subCh,
 	}
 
 	return cdm, nil
@@ -55,12 +53,15 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 
 	responseCh := make(chan ethtypes.EthSubscriptionResponse, 1)
 
-	subCh := gateway.NewEthSubHandler()
-
-	err = subCh.AddSub(ctx, subID, func(ctx context.Context, resp *ethtypes.EthSubscriptionResponse) error {
+	err = c.subCh.AddSub(ctx, subID, func(ctx context.Context, resp *ethtypes.EthSubscriptionResponse) error {
 		responseCh <- *resp
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	contractAbi, err := abi.JSON(strings.NewReader(DealClientABI))
 	if err != nil {
 		return err
 	}
@@ -72,13 +73,68 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 			fmt.Println("event sub response triggered")
 			spew.Dump(resp)
 
-			//TODO: extract id
+			fmt.Println("== after resp ==")
+			result := resp.Result.([]interface{})[0]
+			event := result.(map[string]interface{})
+			topicContractAddress := event["address"].(string)
+			topicDealProposalID := event["topics"].([]interface{})[1].(string)
 
-			//TODO: eth_call GetDealProposal(id)
+			_from := "0xD66E69D6FeD4202DdB21266C5ECBe3B2Acd738a4" // address belonging to storage provider (configurable)
 
-			//TODO: parse response
+			// later we could filter / whitelist / blocklist by the originating contract
+			_to := topicContractAddress
 
-			// c.prov.ExecuteContractDeal(resp)
+			// GetDealProposal is a free data retrieval call binding the contract method 0xf4b2e4d8.
+
+			_params := "0xf4b2e4d8" + topicDealProposalID[2:] // cut 0x prefix
+
+			fmt.Println("from: ", _from)
+			fromEthAddr, err := ethtypes.ParseEthAddress(_from)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println("to: ", _to)
+			toEthAddr, err := ethtypes.ParseEthAddress(_to)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println("params: ", _to)
+			params, err := ethtypes.DecodeHexString(_params)
+			if err != nil {
+				panic(err)
+			}
+
+			res, err := c.api.EthCall(ctx, ethtypes.EthCall{
+				From: &fromEthAddr,
+				To:   &toEthAddr,
+				Data: params,
+			}, "latest")
+			if err != nil {
+				panic(err)
+			}
+
+			it, err := contractAbi.Unpack("getDealProposal", res)
+			if err != nil {
+				panic(err)
+			}
+
+			dealProposalResult := *abi.ConvertType(it[0], new(DealClientDealProposal)).(*DealClientDealProposal)
+
+			paramsVersion1, _ := abi.NewType("tuple", "paramsVersion1", []abi.ArgumentMarshaling{
+				{Name: "location_ref", Type: "string"},
+				{Name: "skip_ipni_announce", Type: "bool"},
+			})
+
+			it2, err := abi.Arguments{
+				{Type: paramsVersion1, Name: "paramsVersion1"},
+			}.Unpack(dealProposalResult.Params)
+			if err != nil {
+				panic(err)
+			}
+
+			paramsAndVersion := *abi.ConvertType(it2[0], new(paramsRecord)).(*paramsRecord)
+
+			_ = paramsAndVersion
 		}
 	}()
 
