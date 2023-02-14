@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -29,13 +30,16 @@ import (
 	"github.com/filecoin-project/dagstore/indexbs"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	"github.com/filecoin-project/go-fil-markets/shared"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	storageimpl "github.com/filecoin-project/go-fil-markets/storagemarket/impl"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
+	"github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/go-state-types/builtin/v11/account"
 	"github.com/filecoin-project/go-state-types/crypto"
+	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
+	ltypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/lib/sigs"
 	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
@@ -409,14 +413,52 @@ type signatureVerifier struct {
 	fn v1api.FullNode
 }
 
-func (s *signatureVerifier) VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error) {
+func (s *signatureVerifier) VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte) (bool, error) {
 	addr, err := s.fn.StateAccountKey(ctx, addr, ctypes.EmptyTSK)
 	if err != nil {
 		return false, err
 	}
 
+	// Check if the client is an f4 address, ie an FVM contract
+	clientAddr := addr.String()
+	if len(clientAddr) >= 2 && (clientAddr[:2] == "t4" || clientAddr[:2] == "f4") {
+		// Verify authorization by simulating an AuthenticateMessage
+		return s.verifyContractSignature(ctx, sig, addr, input)
+	}
+
+	// Otherwise do local signature verification
 	err = sigs.Verify(&sig, addr, input)
 	return err == nil, err
+}
+
+// verifyContractSignature simulates sending an AuthenticateMessage to authenticate the signer
+func (s *signatureVerifier) verifyContractSignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte) (bool, error) {
+	var params account.AuthenticateMessageParams
+	params.Message = input
+	params.Signature = sig.Data
+
+	var msg ltypes.Message
+	buf := new(bytes.Buffer)
+
+	params.MarshalCBOR(buf)
+	msg.Params = buf.Bytes()
+
+	msg.From = builtin.StorageMarketActorAddr
+	msg.To = addr
+	msg.Nonce = 1
+
+	var err error
+	msg.Method, err = builtin.GenerateFRCMethodNum("AuthenticateMessage") // abi.MethodNum(2643134072)
+	if err != nil {
+		return false, err
+	}
+
+	res, err := s.fn.StateCall(ctx, &msg, ltypes.EmptyTSK)
+	if err != nil {
+		return false, fmt.Errorf("verifying contract signature for address %s: %w", addr, err)
+	}
+
+	return res.MsgRct.ExitCode == exitcode.Ok, nil
 }
 
 func NewChainDealManager(a v1api.FullNode) *storagemarket.ChainDealManager {

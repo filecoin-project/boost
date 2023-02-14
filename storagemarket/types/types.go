@@ -11,7 +11,6 @@ import (
 	"github.com/filecoin-project/boost/transport/httptransport/util"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	multiaddrutil "github.com/filecoin-project/go-legs/httpsync/multiaddr"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -175,5 +174,5 @@ type AskGetter interface {
 }
 
 type SignatureVerifier interface {
-	VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error)
+	VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte) (bool, error)
 }
