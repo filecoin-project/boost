@@ -54,6 +54,7 @@ services:
     ports:
       - "8080:8080"
       - "1288:1288" # For the /metrics endpoint
+      - "50000:50000" # Exposed libp2p port
     environment:
       - LOTUS_API_LISTENADDRESS=/dns/boost/tcp/1288/http
       - LOTUS_PATH=/var/lib/lotus
@@ -84,6 +85,9 @@ services:
       - ./data/boost:/var/lib/boost:ro
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/lotus-miner:/var/lib/lotus-miner:ro
+    labels:
+      - "com.docker-tc.enabled=1"
+      - "com.docker-tc.delay=10ms"
 
   booster-bitswap:
     container_name: booster-bitswap
@@ -102,6 +106,9 @@ services:
       - ./data/boost:/var/lib/boost:ro
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/lotus-miner:/var/lib/lotus-miner:ro
+    labels:
+      - "com.docker-tc.enabled=1"
+      - "com.docker-tc.delay=10ms"
 
   demo-http-server:
     container_name: demo-http-server
@@ -110,3 +117,24 @@ services:
     logging: *default-logging
     volumes:
       - ./data/sample:/usr/share/nginx/html:ro
+    labels:
+      - "com.docker-tc.enabled=1"
+      - "com.docker-tc.limit=1mbps"
+      - "com.docker-tc.delay=100ms"
+
+  tc:
+    image: "${DOCKER_IMAGE_TERMINAL:-lukaszlach/docker-tc}"
+    container_name: docker-tc
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/docker-tc:/var/docker-tc
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+    environment:
+      HTTP_BIND: "${HTTP_BIND:-127.0.0.1}"
+      HTTP_PORT: "${HTTP_PORT:-4080}"
+    network_mode: host
