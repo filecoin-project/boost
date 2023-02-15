@@ -465,7 +465,7 @@ func (s *signatureVerifier) verifyContractSignature(ctx context.Context, sig cry
 
 	res, err := s.fn.StateCall(ctx, &msg, ltypes.EmptyTSK)
 	if err != nil {
-		return false, fmt.Errorf("verifying contract signature for address %s: %w", addr, err)
+		return false, fmt.Errorf("state call to %s returned an error: %w", addr, err)
 	}
 
 	return res.MsgRct.ExitCode == exitcode.Ok, nil
