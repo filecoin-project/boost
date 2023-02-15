@@ -7,10 +7,16 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/filecoin-project/boost/eth/abi"
+	ethabi "github.com/filecoin-project/boost/eth/abi"
+	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
 	"github.com/filecoin-project/lotus/gateway"
+	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -61,7 +67,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 		return err
 	}
 
-	contractAbi, err := abi.JSON(strings.NewReader(DealClientABI))
+	contractAbi, err := ethabi.JSON(strings.NewReader(DealClientABI))
 	if err != nil {
 		return err
 	}
@@ -85,7 +91,6 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 			_to := topicContractAddress
 
 			// GetDealProposal is a free data retrieval call binding the contract method 0xf4b2e4d8.
-
 			_params := "0xf4b2e4d8" + topicDealProposalID[2:] // cut 0x prefix
 
 			fmt.Println("from: ", _from)
@@ -118,23 +123,87 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 				panic(err)
 			}
 
-			dealProposalResult := *abi.ConvertType(it[0], new(DealClientDealProposal)).(*DealClientDealProposal)
+			dealProposalResult := *ethabi.ConvertType(it[0], new(DealClientDealProposal)).(*DealClientDealProposal)
 
-			paramsVersion1, _ := abi.NewType("tuple", "paramsVersion1", []abi.ArgumentMarshaling{
+			paramsVersion1, _ := ethabi.NewType("tuple", "paramsVersion1", []ethabi.ArgumentMarshaling{
 				{Name: "location_ref", Type: "string"},
 				{Name: "skip_ipni_announce", Type: "bool"},
 			})
 
-			it2, err := abi.Arguments{
+			it2, err := ethabi.Arguments{
 				{Type: paramsVersion1, Name: "paramsVersion1"},
 			}.Unpack(dealProposalResult.Params)
 			if err != nil {
 				panic(err)
 			}
 
-			paramsAndVersion := *abi.ConvertType(it2[0], new(paramsRecord)).(*paramsRecord)
+			paramsAndVersion := *ethabi.ConvertType(it2[0], new(paramsRecord)).(*paramsRecord)
 
-			_ = paramsAndVersion
+			rootCid, err := cid.Parse(dealProposalResult.Label)
+			if err != nil {
+				panicerr := fmt.Errorf("parsing label for root cid %s: %w", dealProposalResult.Label, err)
+				panic(panicerr)
+			}
+
+			_pieceCid, err := cid.Parse(dealProposalResult.PieceCid)
+			if err != nil {
+				panic(err)
+			}
+			_pieceSize := abi.PaddedPieceSize(dealProposalResult.PaddedPieceSize)
+			_client, err := address.NewFromBytes(dealProposalResult.Client)
+			if err != nil {
+				panic(err)
+			}
+
+			providerAddr, _ := address.NewFromString("t0100")
+
+			_label, err := market.NewLabelFromBytes(dealProposalResult.Label)
+			if err != nil {
+				panic(err)
+			}
+
+			prop := market.DealProposal{
+				PieceCID:     _pieceCid,
+				PieceSize:    _pieceSize,
+				VerifiedDeal: dealProposalResult.VerifiedDeal,
+				Client:       _client,
+				Provider:     providerAddr,
+
+				Label: _label,
+
+				StartEpoch:           abi.ChainEpoch(dealProposalResult.StartEpoch),
+				EndEpoch:             abi.ChainEpoch(dealProposalResult.EndEpoch),
+				StoragePricePerEpoch: abi.NewTokenAmount(int64(dealProposalResult.StoragePricePerEpoch)),
+
+				ProviderCollateral: abi.NewTokenAmount(int64(dealProposalResult.ProviderCollateral)),
+				ClientCollateral:   abi.NewTokenAmount(int64(dealProposalResult.ClientCollateral)),
+			}
+
+			proposal := types.DealParams{
+				DealUUID:  uuid.New(),
+				IsOffline: false,
+				ClientDealProposal: market.ClientDealProposal{
+					Proposal: prop,
+				},
+				DealDataRoot: rootCid,
+				Transfer: types.Transfer{
+					Type:   "http",
+					Params: []byte(fmt.Sprintf(`{"URL":"%s"}`, paramsAndVersion.LocationRef)),
+					//Size:
+				},
+				//RemoveUnsealedCopy: paramsAndVersion.RemoveUnsealedCopy,
+				RemoveUnsealedCopy: false,
+				SkipIPNIAnnounce:   paramsAndVersion.SkipIpniAnnounce,
+			}
+
+			log.Infow("received contract deal proposal", "id", proposal.DealUUID, "client-peer", _client)
+
+			resdeal, err := c.prov.ExecuteLibp2pDeal(context.Background(), &proposal, "")
+			if err != nil {
+				log.Warnw("contract deal proposal failed", "id", proposal.DealUUID, "err", err, "reason", resdeal.Reason)
+			}
+
+			_ = resdeal
 		}
 	}()
 
