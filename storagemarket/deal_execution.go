@@ -370,12 +370,14 @@ func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.
 	// log transfer progress to the deal log every 10%
 	var lastOutputPct int64
 	logTransferProgress := func(received int64) {
-		pct := (100 * received) / int64(deal.Transfer.Size)
-		outputPct := pct / 10
-		if outputPct != lastOutputPct {
-			lastOutputPct = outputPct
-			p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received,
-				"deal size", deal.Transfer.Size, "percent complete", pct)
+		if deal.Transfer.Size != 0 {
+			pct := (100 * received) / int64(deal.Transfer.Size)
+			outputPct := pct / 10
+			if outputPct != lastOutputPct {
+				lastOutputPct = outputPct
+				p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received,
+					"deal size", deal.Transfer.Size, "percent complete", pct)
+			}
 		}
 	}
 

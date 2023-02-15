@@ -155,7 +155,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 				panic(err)
 			}
 
-			providerAddr, _ := address.NewFromString("t0100")
+			providerAddr, _ := address.NewFromString("t01000")
 
 			_label, err := market.NewLabelFromBytes(dealProposalResult.Label)
 			if err != nil {
@@ -189,7 +189,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 				Transfer: types.Transfer{
 					Type:   "http",
 					Params: []byte(fmt.Sprintf(`{"URL":"%s"}`, paramsAndVersion.LocationRef)),
-					//Size:
+					Size:   1175,
 				},
 				//RemoveUnsealedCopy: paramsAndVersion.RemoveUnsealedCopy,
 				RemoveUnsealedCopy: false,
