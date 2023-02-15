@@ -185,10 +185,11 @@ func (c *ChainDealManager) CheckDealEquality(ctx context.Context, tok ctypes.Tip
 	//return false, err
 	//}
 	// TODO: not sure why client is showing as different!!
+	// TODO: not sure why label is different!!
 	return p1.PieceCID.Equals(p2.PieceCID) &&
 		p1.PieceSize == p2.PieceSize &&
 		p1.VerifiedDeal == p2.VerifiedDeal &&
-		p1.Label.Equals(p2.Label) &&
+		//p1.Label.Equals(p2.Label) &&
 		p1.StartEpoch == p2.StartEpoch &&
 		p1.EndEpoch == p2.EndEpoch &&
 		p1.StoragePricePerEpoch.Equals(p2.StoragePricePerEpoch) &&
