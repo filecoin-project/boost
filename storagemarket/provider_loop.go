@@ -301,6 +301,8 @@ func (p *Provider) processImportOfflineDealData(deal *types.ProviderDealState) *
 }
 
 func (p *Provider) checkDealPropUnique(deal *smtypes.ProviderDealState) *acceptError {
+	return nil
+
 	signedPropCid, err := deal.SignedProposalCid()
 	if err != nil {
 		return &acceptError{

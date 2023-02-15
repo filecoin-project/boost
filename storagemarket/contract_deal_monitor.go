@@ -128,6 +128,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 
 			paramsVersion1, _ := ethabi.NewType("tuple", "paramsVersion1", []ethabi.ArgumentMarshaling{
 				{Name: "location_ref", Type: "string"},
+				{Name: "car_size", Type: "uint256"},
 				{Name: "skip_ipni_announce", Type: "bool"},
 			})
 
@@ -195,7 +196,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 				Transfer: types.Transfer{
 					Type:   "http",
 					Params: []byte(fmt.Sprintf(`{"URL":"%s"}`, paramsAndVersion.LocationRef)),
-					Size:   1175,
+					Size:   paramsAndVersion.CarSize.Uint64(),
 				},
 				//RemoveUnsealedCopy: paramsAndVersion.RemoveUnsealedCopy,
 				RemoveUnsealedCopy: false,

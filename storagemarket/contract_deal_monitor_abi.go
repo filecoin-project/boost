@@ -1,5 +1,7 @@
 package storagemarket
 
+import "math/big"
+
 // DealClientDealProposal is an auto generated low-level Go binding around an user-defined struct.
 type DealClientDealProposal struct {
 	PieceCid             []byte
@@ -18,6 +20,7 @@ type DealClientDealProposal struct {
 
 type paramsRecord struct {
 	LocationRef      string
+	CarSize          *big.Int
 	SkipIpniAnnounce bool
 }
 
