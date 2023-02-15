@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
+	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
 	"github.com/filecoin-project/lotus/gateway"
@@ -184,6 +185,11 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 				IsOffline: false,
 				ClientDealProposal: market.ClientDealProposal{
 					Proposal: prop,
+					// signature is garbage, but it still needs to serialize, so shouldnt be empty!!
+					ClientSignature: crypto.Signature{
+						Type: crypto.SigTypeBLS,
+						Data: []byte{0xde, 0xad},
+					},
 				},
 				DealDataRoot: rootCid,
 				Transfer: types.Transfer{
