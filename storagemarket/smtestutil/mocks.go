@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"io/ioutil"
+	"strings"
 	"sync"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -167,6 +168,9 @@ func (mb *MinerStubBuilder) SetupCommp(blocking bool) *MinerStubBuilder {
 
 func (mb *MinerStubBuilder) SetupCommpFailure(err error) {
 	mb.stub.MockCommpCalculator.EXPECT().ComputeDataCid(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any()).DoAndReturn(func(_ context.Context, _ abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
+		if strings.HasPrefix(err.Error(), "panic: ") {
+			panic(err.Error()[len("panic: "):])
+		}
 		return abi.PieceInfo{}, err
 	})
 }
