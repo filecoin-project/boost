@@ -430,9 +430,7 @@ func (s *signatureVerifier) VerifySignature(ctx context.Context, sig crypto.Sign
 	clientAddr := addr.String()
 	if len(clientAddr) >= 2 && (clientAddr[:2] == "t4" || clientAddr[:2] == "f4") {
 		// Verify authorization by simulating an AuthenticateMessage
-		//TODO: disable contract simulation for now
-		//return s.verifyContractSignature(ctx, sig, addr, input)
-		return true, nil
+		return s.verifyContractSignature(ctx, sig, addr, input)
 	}
 
 	// Otherwise do local signature verification
