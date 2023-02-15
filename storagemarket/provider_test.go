@@ -567,6 +567,16 @@ func TestOfflineDealRestartAfterManualRecoverableErrors(t *testing.T) {
 		onResume: func(builder *testDealBuilder) *testDeal {
 			return builder.withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().withAnnounceNonBlocking().build()
 		},
+	}, {
+		name: "deal exec panic",
+		dbuilder: func(h *ProviderHarness) *testDeal {
+			// Simulate panic
+			return h.newDealBuilder(t, 1, withOfflineDeal()).withCommpFailing(errors.New("panic: commp panic")).build()
+		},
+		expectedErr: "Caught panic in deal execution: commp panic",
+		onResume: func(builder *testDealBuilder) *testDeal {
+			return builder.withCommpNonBlocking().withPublishNonBlocking().withPublishConfirmNonBlocking().withAddPieceNonBlocking().withAnnounceNonBlocking().build()
+		},
 	}}
 
 	for _, tc := range tcs {
