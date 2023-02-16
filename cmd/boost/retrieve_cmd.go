@@ -7,6 +7,10 @@ import (
 	"strings"
 	"time"
 
+	flatfs "github.com/ipfs/go-ds-flatfs"
+	levelds "github.com/ipfs/go-ds-leveldb"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
+
 	"github.com/dustin/go-humanize"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
@@ -219,6 +223,7 @@ var retrieveCmd = &cli.Command{
 				dservOffline,
 				c,
 				selspec.Node(),
+				nil,
 				func(p traversal.Progress, n ipld.Node, r traversal.VisitReason) error {
 					if r == traversal.VisitReason_SelectionMatch {
 
