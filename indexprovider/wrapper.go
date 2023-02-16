@@ -348,6 +348,29 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDeal
 	return annCid, err
 }
 
+func (w *Wrapper) AnnounceBoostDealRemoved(ctx context.Context, pds *types.ProviderDealState) (cid.Cid, error) {
+	if !w.enabled {
+		return cid.Undef, errors.New("cannot announce deal removal: index provider is disabled")
+	}
+
+	// ensure we have a connection with the full node host so that the index provider gossip sub announcements make their
+	// way to the filecoin bootstrapper network
+	if err := w.meshCreator.Connect(ctx); err != nil {
+		log.Errorw("failed to connect boost node to full daemon node", "err", err)
+	}
+
+	propCid, err := pds.SignedProposalCid()
+	if err != nil {
+		return cid.Undef, fmt.Errorf("failed to get proposal cid from deal: %w", err)
+	}
+
+	annCid, err := w.prov.NotifyRemove(ctx, "", propCid.Bytes())
+	if err != nil {
+		return cid.Undef, fmt.Errorf("failed to announce deal removal to index provider: %w", err)
+	}
+	return annCid, err
+}
+
 func (w *Wrapper) DagstoreReinitBoostDeals(ctx context.Context) (bool, error) {
 	deals, err := w.dealsDB.ListActive(ctx)
 	if err != nil {

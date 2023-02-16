@@ -9,6 +9,7 @@ import (
 	"github.com/filecoin-project/boost/db/fielddef"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
@@ -234,6 +235,15 @@ func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid cid.Cid) 
 	qry := "SELECT " + dealFieldsStr + " FROM Deals WHERE SignedProposalCID=?"
 	row := d.db.QueryRowContext(ctx, qry, proposalCid.String())
 	return d.scanRow(row)
+}
+
+func (d *DealsDB) BySectorIDs(ctx context.Context, sectorIDs []abi.SectorID) ([]*types.ProviderDealState, error) {
+	placeholders := strings.Repeat("?,", len(sectorIDs)-1) + "?"
+	secIDs := make([]interface{}, 0, len(sectorIDs))
+	for _, secID := range sectorIDs {
+		secIDs = append(secIDs, secID)
+	}
+	return d.list(ctx, 0, 0, "SectorID IN ("+placeholders+")", secIDs...)
 }
 
 func (d *DealsDB) Count(ctx context.Context, query string, filter *FilterOptions) (int, error) {
