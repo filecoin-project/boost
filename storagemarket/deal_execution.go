@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -78,7 +79,17 @@ func (p *Provider) runDeal(deal *types.ProviderDealState, dh *dealHandler) {
 	p.saveDealToDB(dh.Publisher, deal)
 }
 
-func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) *dealMakingError {
+func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (dmerr *dealMakingError) {
+	// Capture any panic as a manually retryable error
+	defer func() {
+		if err := recover(); err != nil {
+			dmerr = &dealMakingError{
+				error: fmt.Errorf("Caught panic in deal execution: %s\n%s", err, debug.Stack()),
+				retry: smtypes.DealRetryManual,
+			}
+		}
+	}()
+
 	// If the deal has not yet been handed off to the sealer
 	if deal.Checkpoint < dealcheckpoints.AddedPiece {
 		transferType := "downloaded file"
@@ -361,19 +372,29 @@ func (p *Provider) transferAndVerify(dh *dealHandler, pub event.Emitter, deal *s
 	return p.updateCheckpoint(pub, deal, dealcheckpoints.Transferred)
 }
 
+const OneGib = 1024 * 1024 * 1024
+
 func (p *Provider) waitForTransferFinish(ctx context.Context, handler transport.Handler, pub event.Emitter, deal *types.ProviderDealState) error {
 	defer handler.Close()
 	defer p.transfers.complete(deal.DealUuid)
 
-	// log transfer progress to the deal log every 10%
-	var lastOutputPct int64
+	// log transfer progress to the deal log every 10% or every GiB
+	var lastOutput int64
 	logTransferProgress := func(received int64) {
-		pct := (100 * received) / int64(deal.Transfer.Size)
-		outputPct := pct / 10
-		if outputPct != lastOutputPct {
-			lastOutputPct = outputPct
-			p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received,
-				"deal size", deal.Transfer.Size, "percent complete", pct)
+		if deal.Transfer.Size > 0 {
+			pct := (100 * received) / int64(deal.Transfer.Size)
+			outputPct := pct / 10
+			if outputPct != lastOutput {
+				lastOutput = outputPct
+				p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received,
+					"deal size", deal.Transfer.Size, "percent complete", pct)
+			}
+		} else {
+			gib := received / OneGib
+			if gib != lastOutput {
+				lastOutput = gib
+				p.dealLogger.Infow(deal.DealUuid, "transfer progress", "bytes received", received)
+			}
 		}
 	}
 

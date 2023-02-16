@@ -13,7 +13,6 @@ import (
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
-	mktsdagstore "github.com/filecoin-project/boost/markets/dagstore"
 	lotus_dealfilter "github.com/filecoin-project/boost/markets/dealfilter"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/markets/retrievaladapter"
@@ -48,6 +47,7 @@ import (
 	"github.com/filecoin-project/lotus/journal/alerting"
 	_ "github.com/filecoin-project/lotus/lib/sigs/bls"
 	_ "github.com/filecoin-project/lotus/lib/sigs/secp"
+	mdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
 	lotus_common "github.com/filecoin-project/lotus/node/impl/common"
 	lotus_net "github.com/filecoin-project/lotus/node/impl/net"
@@ -533,7 +533,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		// TODO: Not sure how to completely get rid of these yet:
 		// Error: creating node: starting node: missing dependencies for function "reflect".makeFuncStub (/usr/local/go/src/reflect/asm_amd64.s:30): missing types: *dagstore.DAGStore; *dagstore.Wrapper (did you mean stores.DAGStoreWrapper?)
 		Override(new(*dagstore.DAGStore), func() *dagstore.DAGStore { return nil }),
-		Override(new(*mktsdagstore.Wrapper), func() *mktsdagstore.Wrapper { return nil }),
+		Override(new(*mdagstore.Wrapper), func() *mdagstore.Wrapper { return nil }),
 
 		Override(new(pdtypes.Store), modules.NewPieceDirectoryStore(cfg)),
 		Override(new(*piecedirectory.PieceDirectory), modules.NewPieceDirectory(cfg)),
@@ -544,8 +544,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore(cfg)),
 
 		// Lotus Markets (retrieval)
-		Override(new(mktsdagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
-		Override(new(retrievalmarket.SectorAccessor), From(new(mktsdagstore.SectorAccessor))),
+		Override(new(mdagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
+		Override(new(retrievalmarket.SectorAccessor), From(new(mdagstore.SectorAccessor))),
 		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
 		Override(new(retrievalmarket.RetrievalProvider), modules.RetrievalProvider),
