@@ -33,7 +33,7 @@ func (sdb *SectorStateDB) List(ctx context.Context) ([]SectorState, error) {
 	states := make([]SectorState, 0, 16)
 	for rows.Next() {
 		var state SectorState
-		err := rows.Scan(&state.SectorID, &state.UpdatedAt, &state.Unsealed)
+		err := rows.Scan(&state.SectorID.Number, &state.UpdatedAt, &state.Unsealed)
 
 		if err != nil {
 			return nil, err
@@ -49,7 +49,7 @@ func (sdb *SectorStateDB) List(ctx context.Context) ([]SectorState, error) {
 
 func (sdb *SectorStateDB) Get(ctx context.Context, sectorID abi.SectorID) (*SectorState, error) {
 	qry := "SELECT UpdatedAt, Unsealed FROM SectorState WHERE SectorID = ?"
-	row := sdb.db.QueryRowContext(ctx, qry, sectorID)
+	row := sdb.db.QueryRowContext(ctx, qry, sectorID.Number)
 
 	state := &SectorState{SectorID: sectorID}
 	err := row.Scan(&state.UpdatedAt, &state.Unsealed)
@@ -61,6 +61,10 @@ func (sdb *SectorStateDB) Get(ctx context.Context, sectorID abi.SectorID) (*Sect
 }
 
 func (sdb *SectorStateDB) Update(ctx context.Context, updates map[abi.SectorID]bool) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
 	now := time.Now()
 	qry := "REPLACE INTO SectorState (SectorID, UpdatedAt, Unsealed) "
 
@@ -68,7 +72,7 @@ func (sdb *SectorStateDB) Update(ctx context.Context, updates map[abi.SectorID]b
 	var args []interface{}
 	for sectorID, isUnsealed := range updates {
 		vals = append(vals, "(?,?,?)")
-		args = append(args, sectorID, now, isUnsealed)
+		args = append(args, sectorID.Number, now, isUnsealed)
 	}
 	qry += "VALUES " + strings.Join(vals, ",")
 	_, err := sdb.db.ExecContext(ctx, qry, args...)

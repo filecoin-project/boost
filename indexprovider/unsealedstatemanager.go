@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	logging "github.com/ipfs/go-log/v2"
 	provider "github.com/ipni/index-provider"
@@ -15,11 +14,15 @@ import (
 
 var usmlog = logging.Logger("unsmgr")
 
+type ApiStorageMiner interface {
+	StorageList(ctx context.Context) (map[storiface.ID][]storiface.Decl, error)
+}
+
 type UnsealedStateManager struct {
 	idxprov Wrapper
-	dealsDB db.DealsDB
-	sdb     db.SectorStateDB
-	api     api.StorageMiner
+	dealsDB *db.DealsDB
+	sdb     *db.SectorStateDB
+	api     ApiStorageMiner
 }
 
 func (m *UnsealedStateManager) Start(ctx context.Context) {
@@ -48,13 +51,13 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 	// Get the deals in each sector that are now
 	// - unsealed
 	// - no longer unsealed
-	sectorsUnsealed := make([]abi.SectorID, 0, len(sectorIsUnsealedUpdates))
-	sectorsNotUnsealed := make([]abi.SectorID, 0, len(sectorIsUnsealedUpdates))
+	sectorsUnsealed := make([]abi.SectorNumber, 0, len(sectorIsUnsealedUpdates))
+	sectorsNotUnsealed := make([]abi.SectorNumber, 0, len(sectorIsUnsealedUpdates))
 	for sectorID, isUnsealed := range sectorIsUnsealedUpdates {
 		if isUnsealed {
-			sectorsUnsealed = append(sectorsUnsealed, sectorID)
+			sectorsUnsealed = append(sectorsUnsealed, sectorID.Number)
 		} else {
-			sectorsNotUnsealed = append(sectorsNotUnsealed, sectorID)
+			sectorsNotUnsealed = append(sectorsNotUnsealed, sectorID.Number)
 		}
 	}
 

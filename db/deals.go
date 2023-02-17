@@ -237,7 +237,11 @@ func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid cid.Cid) 
 	return d.scanRow(row)
 }
 
-func (d *DealsDB) BySectorIDs(ctx context.Context, sectorIDs []abi.SectorID) ([]*types.ProviderDealState, error) {
+func (d *DealsDB) BySectorIDs(ctx context.Context, sectorIDs []abi.SectorNumber) ([]*types.ProviderDealState, error) {
+	if len(sectorIDs) == 0 {
+		return nil, nil
+	}
+
 	placeholders := strings.Repeat("?,", len(sectorIDs)-1) + "?"
 	secIDs := make([]interface{}, 0, len(sectorIDs))
 	for _, secID := range sectorIDs {
