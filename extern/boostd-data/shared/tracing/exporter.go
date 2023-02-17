@@ -3,9 +3,7 @@ package tracing
 import (
 	"context"
 
-	octrace "go.opencensus.io/trace"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/bridge/opencensus"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -25,7 +23,13 @@ func New(service, endpoint string) (func(context.Context) error, error) {
 	// Opencensus bridge so that older OC spans are compatible with OT
 	// This is specifically to support capturing traces in contexts provided to go-jsonrpc,
 	// as it creates spans with OC instead of OT
-	octrace.DefaultTracer = opencensus.NewTracer(Tracer)
+	//
+	// TODO: Commenting this out for now as it causes dependency issues:
+	// github.com/filecoin-project/boost/tracing imports
+	//	go.opentelemetry.io/otel/bridge/opencensus imports
+	//	go.opentelemetry.io/otel/sdk/metric/export: module go.opentelemetry.io/otel/sdk/metric@latest found (v0.34.0), but does not contain package go.opentelemetry.io/otel/sdk/metric/export
+	// ...
+	//octrace.DefaultTracer = opencensus.NewTracer(Tracer)
 
 	return provider.Shutdown, nil
 }
