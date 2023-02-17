@@ -2,27 +2,25 @@ package main
 
 import (
 	"fmt"
-	flatfs "github.com/ipfs/go-ds-flatfs"
-	levelds "github.com/ipfs/go-ds-leveldb"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/dustin/go-humanize"
-	"github.com/filecoin-project/boost/cli/ctxutil"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/markets/utils"
 	rc "github.com/filecoin-project/boost/retrievalmarket/client"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-
-	"github.com/filecoin-project/go-address"
-
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
+	flatfs "github.com/ipfs/go-ds-flatfs"
+	levelds "github.com/ipfs/go-ds-leveldb"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
 	files "github.com/ipfs/go-ipfs-files"
 	"github.com/ipfs/go-merkledag"
@@ -74,7 +72,7 @@ var retrieveCmd = &cli.Command{
 		flagCar,
 	},
 	Action: func(cctx *cli.Context) error {
-		ctx := ctxutil.ReqContext(cctx)
+		ctx := cliutil.ReqContext(cctx)
 
 		cidStr := cctx.Args().First()
 		if cidStr == "" {

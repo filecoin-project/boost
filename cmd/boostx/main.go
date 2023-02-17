@@ -10,8 +10,8 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/filecoin-project/boost/build"
-	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/cmd"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
 )
 
 var log = logging.Logger("boostx")
