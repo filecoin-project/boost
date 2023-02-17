@@ -14,7 +14,8 @@ replace github.com/filecoin-project/go-jsonrpc => github.com/nonsense/go-jsonrpc
 
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
-	github.com/BurntSushi/toml v1.1.0
+	github.com/BurntSushi/toml v1.2.1
+	github.com/NYTimes/gziphandler v1.1.1
 	github.com/alecthomas/jsonschema v0.0.0-20200530073317-71f438968921
 	github.com/benbjohnson/clock v1.3.0
 	github.com/buger/goterm v1.0.3
@@ -100,15 +101,15 @@ require (
 	github.com/prometheus/client_golang v1.13.0
 	github.com/raulk/clock v1.1.0
 	github.com/raulk/go-watchdog v1.3.0
-	github.com/stretchr/testify v1.8.0
-	github.com/urfave/cli/v2 v2.16.3
+	github.com/stretchr/testify v1.8.1
+	github.com/urfave/cli/v2 v2.24.4
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
 	github.com/whyrusleeping/cbor-gen v0.0.0-20220514204315-f29c37e9c44c
 	go.opencensus.io v0.23.0
-	go.opentelemetry.io/otel v1.11.1
-	go.opentelemetry.io/otel/exporters/jaeger v1.2.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.11.1 // indirect
-	go.opentelemetry.io/otel/trace v1.11.1
+	go.opentelemetry.io/otel v1.13.0
+	go.opentelemetry.io/otel/exporters/jaeger v1.13.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.13.0 // indirect
+	go.opentelemetry.io/otel/trace v1.13.0
 	go.uber.org/atomic v1.10.0
 	go.uber.org/fx v1.15.0
 	go.uber.org/multierr v1.8.0
@@ -341,7 +342,6 @@ require (
 )
 
 require (
-	github.com/NYTimes/gziphandler v1.1.1
 	github.com/filecoin-project/boostd-data v0.0.0-00010101000000-000000000000
 	github.com/ipfs/go-ds-flatfs v0.5.1
 	github.com/schollz/progressbar/v3 v3.11.0

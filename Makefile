@@ -200,36 +200,53 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=1.19.0-rc1
+lotus_version?=v1.19.0
 lotus_src_dir?=
 ffi_from_source?=0
+build_lotus?=0
 ifeq ($(lotus_src_dir),)
-    lotus_src_dir=/tmp/lotus-$(lotus_version)
-    lotus_checkout_dir=$(lotus_src_dir)
+	ifeq ($(build_lotus),1)
+# v1: building lotus image with provided lotus version	
+		lotus_info_msg=!!! building lotus base image from github: tag $(lotus_version) !!!
+		lotus_src_dir=/tmp/lotus-$(lotus_version)
+		lotus_checkout_dir=$(lotus_src_dir)
+		lotus_build_cmd=docker/lotus-all-in-one		
+		lotus_base_image=$(docker_user)/lotus-all-in-one:dev
+	else
+# v2 (defaut): using lotus image 		
+		lotus_base_image?=filecoin/lotus-all-in-one:$(lotus_version)-debug
+		lotus_info_msg=using lotus image from dockerhub: $(lotus_base_image)
+		lotus_build_cmd=info/lotus-all-in-one
+	endif
 else
-    lotus_version=dev
+# v3: building lotus image from source
+	lotus_info_msg=!!! building lotus base image from source: $(lotus_src_dir) !!!
+	lotus_base_image=$(docker_user)/lotus-all-in-one:dev
+	lotus_build_cmd=docker/lotus-all-in-one
     lotus_checkout_dir=
 endif
-lotus_test_image=$(docker_user)/lotus-test:$(lotus_version)
-docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_test_image) \
+docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_base_image) \
 	--build-arg FFI_BUILD_FROM_SOURCE=$(ffi_from_source) $(docker_args)
-
-### lotus test docker image
-info/lotus-test:
-	@echo Lotus dir = $(lotus_src_dir)
-	@echo Lotus ver = $(lotus_version)
-.PHONY: info/lotus-test
+### lotus-all-in-one docker image build
+info/lotus-all-in-one:
+	@echo Docker build info: $(lotus_info_msg)
+.PHONY: info/lotus-all-in-one
 $(lotus_checkout_dir):
-	git clone --depth 1 --branch v$(lotus_version) https://github.com/filecoin-project/lotus $@
-docker/lotus-test: info/lotus-test | $(lotus_checkout_dir)
+	git clone --depth 1 --branch $(lotus_version) https://github.com/filecoin-project/lotus $@
+docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_checkout_dir)
+# new lotus Dockerfile does not exist for older lotus versions
+# temporary use the old Dockerfile.lotus
 	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile.lotus --target lotus-test \
-		-t $(lotus_test_image) .
-.PHONY: docker/lotus-test
+		-t $(lotus_base_image) .	
+# code using new lotus Dockerfile
+#	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile --target lotus-all-in-one \
+#		-t $(lotus_base_image) --build-arg GOFLAGS=-tags=debug .
+.PHONY: docker/lotus-all-in-one
 
 ### devnet images
 docker/%:
-	cd docker/devnet/$* && $(docker_build_cmd) -t $(docker_user)/$*-dev:$(lotus_version) \
-		--build-arg BUILD_VERSION=$(lotus_version) .
+	cd docker/devnet/$* && DOCKER_BUILDKIT=1 $(docker_build_cmd) -t $(docker_user)/$*-dev:dev \
+		--build-arg BUILD_VERSION=dev .
 docker/boost: build/.update-modules
 	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
 		-t $(docker_user)/boost-dev:dev --build-arg BUILD_VERSION=dev \
@@ -245,6 +262,6 @@ docker/booster-bitswap:
 		-t $(docker_user)/booster-bitswap-dev:dev --build-arg BUILD_VERSION=dev \
 		-f docker/devnet/Dockerfile.source --target booster-bitswap-dev .
 .PHONY: docker/booster-bitswap
-docker/all: docker/lotus-test docker/boost docker/booster-http docker/booster-bitswap \
+docker/all: $(lotus_build_cmd) docker/boost docker/booster-http docker/booster-bitswap \
 	docker/lotus docker/lotus-miner
 .PHONY: docker/all

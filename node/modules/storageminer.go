@@ -8,9 +8,6 @@ import (
 	"path"
 	"time"
 
-	provider "github.com/ipni/index-provider"
-	"github.com/ipni/index-provider/metadata"
-
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
@@ -52,6 +49,8 @@ import (
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/ipfs/go-cid"
+	provider "github.com/ipni/index-provider"
+	"github.com/ipni/index-provider/metadata"
 	"github.com/libp2p/go-libp2p/core/host"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
