@@ -22,6 +22,7 @@ import (
 	"github.com/ipfs/go-cid"
 )
 
+//go:generate cbor-gen-for DealProposalCbor ParamsVersion1
 //go:generate cbor-gen-for --map-encoding StorageAsk DealParams Transfer DealResponse DealStatusRequest DealStatusResponse DealStatus
 //go:generate go run github.com/golang/mock/mockgen -destination=mock_types/mocks.go -package=mock_types . PieceAdder,CommpCalculator,DealPublisher,ChainDealManager,IndexProvider
 
@@ -175,4 +176,29 @@ type AskGetter interface {
 
 type SignatureVerifier interface {
 	VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte) (bool, error)
+}
+
+type DealProposalCbor struct {
+	PieceCID     cid.Cid
+	PieceSize    abi.PaddedPieceSize
+	VerifiedDeal bool
+	Client       address.Address
+
+	Label market.DealLabel
+
+	StartEpoch           abi.ChainEpoch
+	EndEpoch             abi.ChainEpoch
+	StoragePricePerEpoch abi.TokenAmount
+
+	ProviderCollateral abi.TokenAmount
+	ClientCollateral   abi.TokenAmount
+
+	Version string
+	Params  []byte
+}
+
+type ParamsVersion1 struct {
+	LocationRef      string
+	CarSize          uint64
+	SkipIpniAnnounce bool
 }

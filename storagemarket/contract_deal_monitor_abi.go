@@ -1,29 +1,5 @@
 package storagemarket
 
-import "math/big"
-
-// DealClientDealProposal is an auto generated low-level Go binding around an user-defined struct.
-type DealClientDealProposal struct {
-	PieceCid             []byte
-	PaddedPieceSize      uint64
-	VerifiedDeal         bool
-	Client               []byte
-	Label                []byte
-	StartEpoch           uint64
-	EndEpoch             uint64
-	StoragePricePerEpoch uint64
-	ProviderCollateral   uint64
-	ClientCollateral     uint64
-	Version              string
-	Params               []byte
-}
-
-type paramsRecord struct {
-	LocationRef      string
-	CarSize          *big.Int
-	SkipIpniAnnounce bool
-}
-
 var DealClientABI = `
 [
     {
@@ -197,71 +173,9 @@ var DealClientABI = `
       "name": "getDealProposal",
       "outputs": [
         {
-          "components": [
-            {
-              "internalType": "bytes",
-              "name": "pieceCid",
-              "type": "bytes"
-            },
-            {
-              "internalType": "uint64",
-              "name": "paddedPieceSize",
-              "type": "uint64"
-            },
-            {
-              "internalType": "bool",
-              "name": "verifiedDeal",
-              "type": "bool"
-            },
-            {
-              "internalType": "bytes",
-              "name": "client",
-              "type": "bytes"
-            },
-            {
-              "internalType": "bytes",
-              "name": "label",
-              "type": "bytes"
-            },
-            {
-              "internalType": "uint64",
-              "name": "startEpoch",
-              "type": "uint64"
-            },
-            {
-              "internalType": "uint64",
-              "name": "endEpoch",
-              "type": "uint64"
-            },
-            {
-              "internalType": "uint64",
-              "name": "storagePricePerEpoch",
-              "type": "uint64"
-            },
-            {
-              "internalType": "uint64",
-              "name": "providerCollateral",
-              "type": "uint64"
-            },
-            {
-              "internalType": "uint64",
-              "name": "clientCollateral",
-              "type": "uint64"
-            },
-            {
-              "internalType": "string",
-              "name": "version",
-              "type": "string"
-            },
-            {
-              "internalType": "bytes",
-              "name": "params",
-              "type": "bytes"
-            }
-          ],
-          "internalType": "struct DealClient.DealProposal",
+          "internalType": "bytes",
           "name": "",
-          "type": "tuple"
+          "type": "bytes"
         }
       ],
       "stateMutability": "view",
@@ -293,71 +207,9 @@ var DealClientABI = `
     {
       "inputs": [
         {
-          "components": [
-            {
-              "internalType": "bytes",
-              "name": "pieceCid",
-              "type": "bytes"
-            },
-            {
-              "internalType": "uint64",
-              "name": "paddedPieceSize",
-              "type": "uint64"
-            },
-            {
-              "internalType": "bool",
-              "name": "verifiedDeal",
-              "type": "bool"
-            },
-            {
-              "internalType": "bytes",
-              "name": "client",
-              "type": "bytes"
-            },
-            {
-              "internalType": "bytes",
-              "name": "label",
-              "type": "bytes"
-            },
-            {
-              "internalType": "uint64",
-              "name": "startEpoch",
-              "type": "uint64"
-            },
-            {
-              "internalType": "uint64",
-              "name": "endEpoch",
-              "type": "uint64"
-            },
-            {
-              "internalType": "uint64",
-              "name": "storagePricePerEpoch",
-              "type": "uint64"
-            },
-            {
-              "internalType": "uint64",
-              "name": "providerCollateral",
-              "type": "uint64"
-            },
-            {
-              "internalType": "uint64",
-              "name": "clientCollateral",
-              "type": "uint64"
-            },
-            {
-              "internalType": "string",
-              "name": "version",
-              "type": "string"
-            },
-            {
-              "internalType": "bytes",
-              "name": "params",
-              "type": "bytes"
-            }
-          ],
-          "internalType": "struct DealClient.DealProposal",
+          "internalType": "bytes",
           "name": "_deal",
-          "type": "tuple"
+          "type": "bytes"
         }
       ],
       "name": "makeDealProposal",
@@ -396,62 +248,7 @@ var DealClientABI = `
       "outputs": [
         {
           "internalType": "bytes",
-          "name": "pieceCid",
-          "type": "bytes"
-        },
-        {
-          "internalType": "uint64",
-          "name": "paddedPieceSize",
-          "type": "uint64"
-        },
-        {
-          "internalType": "bool",
-          "name": "verifiedDeal",
-          "type": "bool"
-        },
-        {
-          "internalType": "bytes",
-          "name": "client",
-          "type": "bytes"
-        },
-        {
-          "internalType": "bytes",
-          "name": "label",
-          "type": "bytes"
-        },
-        {
-          "internalType": "uint64",
-          "name": "startEpoch",
-          "type": "uint64"
-        },
-        {
-          "internalType": "uint64",
-          "name": "endEpoch",
-          "type": "uint64"
-        },
-        {
-          "internalType": "uint64",
-          "name": "storagePricePerEpoch",
-          "type": "uint64"
-        },
-        {
-          "internalType": "uint64",
-          "name": "providerCollateral",
-          "type": "uint64"
-        },
-        {
-          "internalType": "uint64",
-          "name": "clientCollateral",
-          "type": "uint64"
-        },
-        {
-          "internalType": "string",
-          "name": "version",
-          "type": "string"
-        },
-        {
-          "internalType": "bytes",
-          "name": "params",
+          "name": "",
           "type": "bytes"
         }
       ],
@@ -477,4 +274,5 @@ var DealClientABI = `
       "type": "function"
     }
 ]
+
 `
