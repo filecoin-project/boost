@@ -67,42 +67,34 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 		return err
 	}
 
-	//contractAbi, err := ethabi.JSON(strings.NewReader(DealClientABI))
-	//if err != nil {
-	//return err
-	//}
 	go func() {
 		// add cancel
 
 		for resp := range responseCh {
-			//fmt.Println("event sub response triggered")
-			//spew.Dump(resp)
-
-			//fmt.Println("== after resp ==")
 			result := resp.Result.([]interface{})[0]
 			event := result.(map[string]interface{})
 			topicContractAddress := event["address"].(string)
 			topicDealProposalID := event["topics"].([]interface{})[1].(string)
 
-			_from := "0xD66E69D6FeD4202DdB21266C5ECBe3B2Acd738a4" // address belonging to storage provider (configurable)
+			//TODO: make this configurable
+			_from := "0xD66E69D6FeD4202DdB21266C5ECBe3B2Acd738a4"
 
-			// later we could filter / whitelist / blocklist by the originating contract
+			//TODO: implement whitelist?
 			_to := topicContractAddress
 
 			// GetDealProposal is a free data retrieval call binding the contract method 0xf4b2e4d8.
 			_params := "0xf4b2e4d8" + topicDealProposalID[2:] // cut 0x prefix
 
-			//fmt.Println("from: ", _from)
 			fromEthAddr, err := ethtypes.ParseEthAddress(_from)
 			if err != nil {
 				panic(err)
 			}
-			//fmt.Println("to: ", _to)
+
 			toEthAddr, err := ethtypes.ParseEthAddress(_to)
 			if err != nil {
 				panic(err)
 			}
-			//fmt.Println("params: ", _to)
+
 			params, err := ethtypes.DecodeHexString(_params)
 			if err != nil {
 				panic(err)
@@ -144,6 +136,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 				panic(err)
 			}
 
+			//TODO: get this from config or lotus-miner info?
 			providerAddr, _ := address.NewFromString("t01000")
 
 			prop := market.DealProposal{
@@ -219,35 +212,32 @@ func ethTopicHash(sig string) []byte {
 	return hasher.Sum(nil)
 }
 
-// lengthPrefixPointsTo interprets a 32 byte slice as an offset and then determines which indices to look to decode the type.
-func lengthPrefixPointsTo(output []byte) (start int, length int, err error) {
+func lengthPrefixPointsTo(output []byte) (int, int, error) {
 	index := 0
-	bigOffsetEnd := mbig.NewInt(0).SetBytes(output[index : index+32])
-	bigOffsetEnd.Add(bigOffsetEnd, mbig.NewInt(32))
-	outputLength := mbig.NewInt(int64(len(output)))
+	boffset := mbig.NewInt(0).SetBytes(output[index : index+32])
+	boffset.Add(boffset, mbig.NewInt(32))
+	boutputLen := mbig.NewInt(int64(len(output)))
 
-	if bigOffsetEnd.Cmp(outputLength) > 0 {
-		return 0, 0, fmt.Errorf("cannot marshal in to go slice: offset %v would go over slice boundary (len=%v)", bigOffsetEnd, outputLength)
+	if boffset.Cmp(boutputLen) > 0 {
+		return 0, 0, fmt.Errorf("offset %v is over boundary; len: %v", boffset, boutputLen)
 	}
 
-	if bigOffsetEnd.BitLen() > 63 {
-		return 0, 0, fmt.Errorf("offset larger than int64: %v", bigOffsetEnd)
+	if boffset.BitLen() > 63 {
+		return 0, 0, fmt.Errorf("offset larger than int64: %v", boffset)
 	}
 
-	offsetEnd := int(bigOffsetEnd.Uint64())
-	lengthBig := mbig.NewInt(0).SetBytes(output[offsetEnd-32 : offsetEnd])
+	offset := int(boffset.Uint64())
+	lengthBig := mbig.NewInt(0).SetBytes(output[offset-32 : offset])
 
-	totalSize := mbig.NewInt(0)
-	totalSize.Add(totalSize, bigOffsetEnd)
-	totalSize.Add(totalSize, lengthBig)
-	if totalSize.BitLen() > 63 {
-		return 0, 0, fmt.Errorf("length larger than int64: %v", totalSize)
+	size := mbig.NewInt(0)
+	size.Add(size, boffset)
+	size.Add(size, lengthBig)
+	if size.BitLen() > 63 {
+		return 0, 0, fmt.Errorf("len larger than int64: %v", size)
 	}
 
-	if totalSize.Cmp(outputLength) > 0 {
-		return 0, 0, fmt.Errorf("cannot marshal in to go type: length insufficient %v require %v", outputLength, totalSize)
+	if size.Cmp(boutputLen) > 0 {
+		return 0, 0, fmt.Errorf("length insufficient %v require %v", boutputLen, size)
 	}
-	start = int(bigOffsetEnd.Uint64())
-	length = int(lengthBig.Uint64())
-	return
+	return int(boffset.Uint64()), int(lengthBig.Uint64()), nil
 }
