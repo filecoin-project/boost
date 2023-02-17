@@ -14,10 +14,10 @@ import (
 	"github.com/filecoin-project/boost/cli/ctxutil"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
+	"github.com/filecoin-project/boost/markets/utils"
 	rc "github.com/filecoin-project/boost/retrievalmarket/client"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/markets/utils"
 
 	"github.com/filecoin-project/go-address"
 

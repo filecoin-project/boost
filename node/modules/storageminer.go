@@ -13,6 +13,8 @@ import (
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/markets/idxprov"
+	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	brm "github.com/filecoin-project/boost/retrievalmarket/lib"
@@ -33,14 +35,13 @@ import (
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	storageimpl "github.com/filecoin-project/go-fil-markets/storagemarket/impl"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
+	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/lib/sigs"
-	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
-	"github.com/filecoin-project/lotus/markets/idxprov"
-	"github.com/filecoin-project/lotus/markets/storageadapter"
+	mdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
@@ -413,7 +414,7 @@ func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.
 	dataTransfer lotus_dtypes.ProviderDataTransfer,
 	spn lotus_storagemarket.StorageProviderNode,
 	df lotus_dtypes.StorageDealFilter,
-	dsw *mktsdagstore.Wrapper,
+	dsw stores.DAGStoreWrapper,
 	meshCreator idxprov.MeshCreator,
 ) (lotus_storagemarket.StorageProvider, error) {
 	return func(minerAddress lotus_dtypes.MinerAddress,
@@ -425,10 +426,10 @@ func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.
 		dataTransfer lotus_dtypes.ProviderDataTransfer,
 		spn lotus_storagemarket.StorageProviderNode,
 		df lotus_dtypes.StorageDealFilter,
-		dsw *mktsdagstore.Wrapper,
+		dsw stores.DAGStoreWrapper,
 		meshCreator idxprov.MeshCreator,
 	) (lotus_storagemarket.StorageProvider, error) {
-		prov, err := modules.StorageProvider(minerAddress, storedAsk, h, ds, r, pieceStore, indexer, dataTransfer, spn, df, dsw, meshCreator)
+		prov, err := StorageProvider(minerAddress, storedAsk, h, ds, r, pieceStore, indexer, dataTransfer, spn, df, dsw, meshCreator)
 		if err != nil {
 			return prov, err
 		}
@@ -451,12 +452,12 @@ func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.
 	}
 }
 
-func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, dagst *mktsdagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
+func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, dagst *mdagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper, lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks,
 		commpc types.CommpCalculator, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
-		dagst *mktsdagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper,
+		dagst *mdagstore.Wrapper, ps lotus_dtypes.ProviderPieceStore, ip *indexprovider.Wrapper,
 		lp lotus_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 
 		prvCfg := storagemarket.Config{
