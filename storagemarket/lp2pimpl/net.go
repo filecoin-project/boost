@@ -28,7 +28,8 @@ import (
 var log = logging.Logger("boost-net")
 var propLog = logging.Logger("boost-prop")
 
-const DealProtocolID = "/fil/storage/mk/1.2.0"
+const DealProtocolv120ID = "/fil/storage/mk/1.2.0"
+const DealProtocolv121ID = "/fil/storage/mk/1.2.1"
 const DealStatusV12ProtocolID = "/fil/storage/status/1.2.0"
 const providerReadDeadline = 10 * time.Second
 const providerWriteDeadline = 10 * time.Second
@@ -57,7 +58,7 @@ func (c *DealClient) SendDealProposal(ctx context.Context, id peer.ID, params ty
 	log.Debugw("send deal proposal", "id", params.DealUUID, "provider-peer", id)
 
 	// Create a libp2p stream to the provider
-	s, err := c.retryStream.OpenStream(ctx, id, []protocol.ID{DealProtocolID})
+	s, err := c.retryStream.OpenStream(ctx, id, []protocol.ID{DealProtocolv121ID, DealProtocolv120ID})
 	if err != nil {
 		return nil, err
 	}
@@ -169,12 +170,26 @@ func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1ap
 
 func (p *DealProvider) Start(ctx context.Context) {
 	p.ctx = ctx
-	p.host.SetStreamHandler(DealProtocolID, p.handleNewDealStream)
+
+	// Note that the handling for deal protocol v1.2.0 and v1.2.1 is the same.
+	// Deal protocol v1.2.1 has a couple of new fields: SkipIPNIAnnounce and
+	// RemoveUnsealedCopy.
+	// If a client that supports deal protocol v1.2.0 sends a request to a
+	// boostd server that supports deal protocol v1.2.1, the DealParams struct
+	// will be missing these new fields.
+	// When the DealParams struct is unmarshalled the missing fields will be
+	// set to false, which maintains the previous behaviour:
+	// - SkipIPNIAnnounce=false:    announce deal to IPNI
+	// - RemoveUnsealedCopy=false:  keep unsealed copy of deal data
+	p.host.SetStreamHandler(DealProtocolv121ID, p.handleNewDealStream)
+	p.host.SetStreamHandler(DealProtocolv120ID, p.handleNewDealStream)
+
 	p.host.SetStreamHandler(DealStatusV12ProtocolID, p.handleNewDealStatusStream)
 }
 
 func (p *DealProvider) Stop() {
-	p.host.RemoveStreamHandler(DealProtocolID)
+	p.host.RemoveStreamHandler(DealProtocolv121ID)
+	p.host.RemoveStreamHandler(DealProtocolv120ID)
 	p.host.RemoveStreamHandler(DealStatusV12ProtocolID)
 }
 

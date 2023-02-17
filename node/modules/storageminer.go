@@ -8,9 +8,6 @@ import (
 	"path"
 	"time"
 
-	storageimpl "github.com/filecoin-project/go-fil-markets/storagemarket/impl"
-	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
-	"github.com/filecoin-project/go-fil-markets/stores"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/metadata"
 
@@ -40,6 +37,9 @@ import (
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/shared"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
+	storageimpl "github.com/filecoin-project/go-fil-markets/storagemarket/impl"
+	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
+	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"

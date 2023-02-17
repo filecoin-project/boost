@@ -220,6 +220,230 @@ func (t *StorageAsk) UnmarshalCBOR(r io.Reader) (err error) {
 
 	return nil
 }
+func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
+	if t == nil {
+		_, err := w.Write(cbg.CborNull)
+		return err
+	}
+
+	cw := cbg.NewCborWriter(w)
+
+	if _, err := cw.Write([]byte{165}); err != nil {
+		return err
+	}
+
+	// t.DealUUID (uuid.UUID) (array)
+	if len("DealUUID") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"DealUUID\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("DealUUID")); err != nil {
+		return err
+	}
+
+	if len(t.DealUUID) > cbg.ByteArrayMaxLen {
+		return xerrors.Errorf("Byte array in field t.DealUUID was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajByteString, uint64(len(t.DealUUID))); err != nil {
+		return err
+	}
+
+	if _, err := cw.Write(t.DealUUID[:]); err != nil {
+		return err
+	}
+
+	// t.IsOffline (bool) (bool)
+	if len("IsOffline") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"IsOffline\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("IsOffline"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("IsOffline")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteBool(w, t.IsOffline); err != nil {
+		return err
+	}
+
+	// t.ClientDealProposal (market.ClientDealProposal) (struct)
+	if len("ClientDealProposal") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"ClientDealProposal\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("ClientDealProposal"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("ClientDealProposal")); err != nil {
+		return err
+	}
+
+	if err := t.ClientDealProposal.MarshalCBOR(cw); err != nil {
+		return err
+	}
+
+	// t.DealDataRoot (cid.Cid) (struct)
+	if len("DealDataRoot") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"DealDataRoot\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealDataRoot"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("DealDataRoot")); err != nil {
+		return err
+	}
+
+	if err := cbg.WriteCid(cw, t.DealDataRoot); err != nil {
+		return xerrors.Errorf("failed to write cid field t.DealDataRoot: %w", err)
+	}
+
+	// t.Transfer (types.Transfer) (struct)
+	if len("Transfer") > cbg.MaxLength {
+		return xerrors.Errorf("Value in field \"Transfer\" was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Transfer"))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string("Transfer")); err != nil {
+		return err
+	}
+
+	if err := t.Transfer.MarshalCBOR(cw); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *DealParamsV120) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = DealParamsV120{}
+
+	cr := cbg.NewCborReader(r)
+
+	maj, extra, err := cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
+	if maj != cbg.MajMap {
+		return fmt.Errorf("cbor input should be of type map")
+	}
+
+	if extra > cbg.MaxLength {
+		return fmt.Errorf("DealParamsV120: map struct too large (%d)", extra)
+	}
+
+	var name string
+	n := extra
+
+	for i := uint64(0); i < n; i++ {
+
+		{
+			sval, err := cbg.ReadString(cr)
+			if err != nil {
+				return err
+			}
+
+			name = string(sval)
+		}
+
+		switch name {
+		// t.DealUUID (uuid.UUID) (array)
+		case "DealUUID":
+
+			maj, extra, err = cr.ReadHeader()
+			if err != nil {
+				return err
+			}
+
+			if extra > cbg.ByteArrayMaxLen {
+				return fmt.Errorf("t.DealUUID: byte array too large (%d)", extra)
+			}
+			if maj != cbg.MajByteString {
+				return fmt.Errorf("expected byte array")
+			}
+
+			if extra != 16 {
+				return fmt.Errorf("expected array to have 16 elements")
+			}
+
+			t.DealUUID = [16]uint8{}
+
+			if _, err := io.ReadFull(cr, t.DealUUID[:]); err != nil {
+				return err
+			}
+			// t.IsOffline (bool) (bool)
+		case "IsOffline":
+
+			maj, extra, err = cr.ReadHeader()
+			if err != nil {
+				return err
+			}
+			if maj != cbg.MajOther {
+				return fmt.Errorf("booleans must be major type 7")
+			}
+			switch extra {
+			case 20:
+				t.IsOffline = false
+			case 21:
+				t.IsOffline = true
+			default:
+				return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
+			}
+			// t.ClientDealProposal (market.ClientDealProposal) (struct)
+		case "ClientDealProposal":
+
+			{
+
+				if err := t.ClientDealProposal.UnmarshalCBOR(cr); err != nil {
+					return xerrors.Errorf("unmarshaling t.ClientDealProposal: %w", err)
+				}
+
+			}
+			// t.DealDataRoot (cid.Cid) (struct)
+		case "DealDataRoot":
+
+			{
+
+				c, err := cbg.ReadCid(cr)
+				if err != nil {
+					return xerrors.Errorf("failed to read cid field t.DealDataRoot: %w", err)
+				}
+
+				t.DealDataRoot = c
+
+			}
+			// t.Transfer (types.Transfer) (struct)
+		case "Transfer":
+
+			{
+
+				if err := t.Transfer.UnmarshalCBOR(cr); err != nil {
+					return xerrors.Errorf("unmarshaling t.Transfer: %w", err)
+				}
+
+			}
+
+		default:
+			// Field doesn't exist on this type, so ignore it
+			cbg.ScanForLinks(r, func(cid.Cid) {})
+		}
+	}
+
+	return nil
+}
 func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if t == nil {
 		_, err := w.Write(cbg.CborNull)
