@@ -4,14 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"github.com/filecoin-project/go-state-types/abi"
-	"strings"
 	"time"
 )
+
+type SealState string
+
+const SealStateSealed SealState = "Sealed"
+const SealStateUnsealed SealState = "Unsealed"
+const SealStateRemoved SealState = "Removed"
 
 type SectorState struct {
 	SectorID  abi.SectorID
 	UpdatedAt time.Time
-	Unsealed  bool
+	SealState SealState
 }
 
 type SectorStateDB struct {
@@ -23,7 +28,7 @@ func NewSectorStateDB(db *sql.DB) *SectorStateDB {
 }
 
 func (sdb *SectorStateDB) List(ctx context.Context) ([]SectorState, error) {
-	qry := "SELECT SectorID, UpdatedAt, Unsealed FROM SectorState"
+	qry := "SELECT MinerID, SectorID, UpdatedAt, SealState FROM SectorState"
 	rows, err := sdb.db.QueryContext(ctx, qry)
 	if err != nil {
 		return nil, err
@@ -33,7 +38,7 @@ func (sdb *SectorStateDB) List(ctx context.Context) ([]SectorState, error) {
 	states := make([]SectorState, 0, 16)
 	for rows.Next() {
 		var state SectorState
-		err := rows.Scan(&state.SectorID.Number, &state.UpdatedAt, &state.Unsealed)
+		err := rows.Scan(&state.SectorID.Miner, &state.SectorID.Number, &state.UpdatedAt, &state.SealState)
 
 		if err != nil {
 			return nil, err
@@ -47,34 +52,9 @@ func (sdb *SectorStateDB) List(ctx context.Context) ([]SectorState, error) {
 	return states, nil
 }
 
-func (sdb *SectorStateDB) Get(ctx context.Context, sectorID abi.SectorID) (*SectorState, error) {
-	qry := "SELECT UpdatedAt, Unsealed FROM SectorState WHERE SectorID = ?"
-	row := sdb.db.QueryRowContext(ctx, qry, sectorID.Number)
-
-	state := &SectorState{SectorID: sectorID}
-	err := row.Scan(&state.UpdatedAt, &state.Unsealed)
-	if err != nil {
-		return nil, err
-	}
-
-	return state, nil
-}
-
-func (sdb *SectorStateDB) Update(ctx context.Context, updates map[abi.SectorID]bool) error {
-	if len(updates) == 0 {
-		return nil
-	}
-
+func (sdb *SectorStateDB) Update(ctx context.Context, sectorID abi.SectorID, SealState SealState) error {
 	now := time.Now()
-	qry := "REPLACE INTO SectorState (SectorID, UpdatedAt, Unsealed) "
-
-	var vals []string
-	var args []interface{}
-	for sectorID, isUnsealed := range updates {
-		vals = append(vals, "(?,?,?)")
-		args = append(args, sectorID.Number, now, isUnsealed)
-	}
-	qry += "VALUES " + strings.Join(vals, ",")
-	_, err := sdb.db.ExecContext(ctx, qry, args...)
+	qry := "REPLACE INTO SectorState (MinerID, SectorID, UpdatedAt, SealState) VALUES (?, ?, ?, ?)"
+	_, err := sdb.db.ExecContext(ctx, qry, sectorID.Miner, sectorID.Number, now, SealState)
 	return err
 }

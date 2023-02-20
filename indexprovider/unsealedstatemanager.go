@@ -2,6 +2,7 @@ package indexprovider
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/filecoin-project/boost/db"
@@ -9,6 +10,7 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	logging "github.com/ipfs/go-log/v2"
 	provider "github.com/ipni/index-provider"
+	"github.com/ipni/index-provider/metadata"
 	"time"
 )
 
@@ -19,14 +21,24 @@ type ApiStorageMiner interface {
 }
 
 type UnsealedStateManager struct {
-	idxprov Wrapper
+	idxprov *Wrapper
 	dealsDB *db.DealsDB
 	sdb     *db.SectorStateDB
 	api     ApiStorageMiner
 }
 
-func (m *UnsealedStateManager) Start(ctx context.Context) {
-	ticker := time.NewTicker(time.Hour)
+func NewUnsealedStateManager(idxprov *Wrapper, dealsDB *db.DealsDB, sdb *db.SectorStateDB, api ApiStorageMiner) *UnsealedStateManager {
+	return &UnsealedStateManager{
+		idxprov: idxprov,
+		dealsDB: dealsDB,
+		sdb:     sdb,
+		api:     api,
+	}
+}
+
+func (m *UnsealedStateManager) Run(ctx context.Context) {
+	usmlog.Info("starting unsealed state manager")
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -43,106 +55,120 @@ func (m *UnsealedStateManager) Start(ctx context.Context) {
 }
 
 func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
-	sectorIsUnsealedUpdates, err := m.getStateUpdates(ctx)
+	usmlog.Info("checking for sector state updates")
+	stateUpdates, err := m.getStateUpdates(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Get the deals in each sector that are now
-	// - unsealed
-	// - no longer unsealed
-	sectorsUnsealed := make([]abi.SectorNumber, 0, len(sectorIsUnsealedUpdates))
-	sectorsNotUnsealed := make([]abi.SectorNumber, 0, len(sectorIsUnsealedUpdates))
-	for sectorID, isUnsealed := range sectorIsUnsealedUpdates {
-		if isUnsealed {
-			sectorsUnsealed = append(sectorsUnsealed, sectorID.Number)
+	for sectorID, sectorSealState := range stateUpdates {
+		deal, err := m.dealsDB.BySectorID(ctx, sectorID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				// If boost doesn't know about this deal, just ignore it
+				continue
+			}
+			return fmt.Errorf("getting deal for miner %d / sector %d: %w", sectorID.Miner, sectorID.Number, err)
+		}
+
+		if !deal.AnnounceToIPNI {
+			continue
+		}
+
+		propCid, err := deal.SignedProposalCid()
+		if err != nil {
+			return fmt.Errorf("failed to get proposal cid from deal: %w", err)
+		}
+
+		if sectorSealState == db.SealStateRemoved {
+			// Announce deals that are no longer unsealed to indexer
+			announceCid, err := m.idxprov.AnnounceBoostDealRemoved(ctx, propCid)
+			if err != nil && !errors.Is(err, provider.ErrContextIDNotFound) {
+				usmlog.Errorw("announcing deal removed to index provider",
+					"deal id", deal.DealUuid, "error", err)
+				continue
+			}
+
+			usmlog.Infow("announced to index provider that deal has been removed",
+				"deal id", deal.DealUuid, "sector id", deal.SectorID, "announce cid", announceCid.String())
 		} else {
-			sectorsNotUnsealed = append(sectorsNotUnsealed, sectorID.Number)
-		}
-	}
+			// Announce deals that have changed seal state to indexer
+			md := metadata.GraphsyncFilecoinV1{
+				PieceCID:      deal.ClientDealProposal.Proposal.PieceCID,
+				FastRetrieval: sectorSealState == db.SealStateUnsealed,
+				VerifiedDeal:  deal.ClientDealProposal.Proposal.VerifiedDeal,
+			}
+			announceCid, err := m.idxprov.announceBoostDealMetadata(ctx, md, propCid)
+			if err != nil && !errors.Is(err, provider.ErrAlreadyAdvertised) {
+				usmlog.Errorf("announcing deal %s to index provider: %w", deal.DealUuid, err)
+				continue
+			}
 
-	dealsUnsealed, err := m.dealsDB.BySectorIDs(ctx, sectorsUnsealed)
-	if err != nil {
-		return fmt.Errorf("getting deals for unsealed sectors: %w", err)
-	}
-	dealsNotUnsealed, err := m.dealsDB.BySectorIDs(ctx, sectorsNotUnsealed)
-	if err != nil {
-		return fmt.Errorf("getting deals for sealed sectors: %w", err)
-	}
-
-	// Announce deals that are now unsealed to indexer
-	for _, deal := range dealsUnsealed {
-		announceCid, err := m.idxprov.AnnounceBoostDeal(ctx, deal)
-		if err != nil && !errors.Is(err, provider.ErrAlreadyAdvertised) {
-			return fmt.Errorf("announcing deal %s to index provider: %w", deal.DealUuid, err)
+			usmlog.Infow("announced deal seal state to index provider",
+				"deal id", deal.DealUuid, "sector id", deal.SectorID,
+				"seal state", sectorSealState, "announce cid", announceCid.String())
 		}
 
-		log.Infow("announced to index provider that deal is now unsealed",
-			"deal id", deal.DealUuid, "sector id", deal.SectorID, "announce cid", announceCid)
-	}
-
-	// Announce deals that are no longer unsealed to indexer
-	for _, deal := range dealsNotUnsealed {
-		announceCid, err := m.idxprov.AnnounceBoostDealRemoved(ctx, deal)
-		if err != nil && !errors.Is(err, provider.ErrContextIDNotFound) {
-			return fmt.Errorf("announcing deal %s no longer unsealed to index provider: %w", deal.DealUuid, err)
+		// Update the sector seal state in the database
+		err = m.sdb.Update(ctx, sectorID, sectorSealState)
+		if err != nil {
+			return fmt.Errorf("updating sectors unseal state in database for miner %d / sector %d: %w", sectorID.Miner, sectorID.Number, err)
 		}
-
-		log.Infof("announced to index provider that deal no longer has unsealed sector",
-			"deal id", deal.DealUuid, "sector id", deal.SectorID, "announce cid", announceCid)
-	}
-
-	// Update the sector unseal state in the database
-	err = m.sdb.Update(ctx, sectorIsUnsealedUpdates)
-	if err != nil {
-		return fmt.Errorf("updating sectors unseal state in database: %w", err)
 	}
 
 	return nil
 }
 
-func (m *UnsealedStateManager) getStateUpdates(ctx context.Context) (map[abi.SectorID]bool, error) {
+func (m *UnsealedStateManager) getStateUpdates(ctx context.Context) (map[abi.SectorID]db.SealState, error) {
 	// Get the current unsealed state of all sectors from lotus
 	storageList, err := m.api.StorageList(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting sectors state from lotus: %w", err)
 	}
 
-	// Convert to a map of <sector id> => <is unsealed>
-	sectorIsUnsealed := make(map[abi.SectorID]bool, len(storageList))
+	// Convert to a map of <sector id> => <seal state>
+	sectorStates := make(map[abi.SectorID]db.SealState, len(storageList))
 	for _, storageStates := range storageList {
-		sectorIsUnsealed[storageStates[0].SectorID] = false
 		for _, storageState := range storageStates {
-			if storageState.SectorFileType.Has(storiface.FTUnsealed) {
-				sectorIsUnsealed[storageState.SectorID] = true
+			var sealState db.SealState
+			switch {
+			case storageState.SectorFileType.Has(storiface.FTUnsealed):
+				sealState = db.SealStateUnsealed
+			case storageState.SectorFileType.Has(storiface.FTSealed):
+				sealState = db.SealStateSealed
 			}
+			sectorStates[storageState.SectorID] = sealState
 		}
 	}
 
-	// Get the state of all sectors in the database
-	sectors, err := m.sdb.List(ctx)
+	// Get the previously known state of all sectors in the database
+	previousSectorStates, err := m.sdb.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting sectors state from database: %w", err)
 	}
 
 	// Check which sectors have changed state since the last time we checked
-	sectorIsUnsealedUpdates := make(map[abi.SectorID]bool)
-	for _, sector := range sectors {
-		isUnsealed, ok := sectorIsUnsealed[sector.SectorID]
+	sealStateUpdates := make(map[abi.SectorID]db.SealState)
+	for _, previousSectorState := range previousSectorStates {
+		sealState, ok := sectorStates[previousSectorState.SectorID]
 		if ok {
-			if sector.Unsealed != isUnsealed {
-				sectorIsUnsealedUpdates[sector.SectorID] = isUnsealed
+			// Check if the state has changed
+			if previousSectorState.SealState != sealState {
+				sealStateUpdates[previousSectorState.SectorID] = sealState
 			}
 			// Delete the sector from the map - at the end the remaining
 			// sectors in the map are ones we didn't know about before
-			delete(sectorIsUnsealed, sector.SectorID)
+			delete(sectorStates, previousSectorState.SectorID)
+		} else {
+			// The sector is no longer in the list, so it must have been removed
+			sealStateUpdates[previousSectorState.SectorID] = db.SealStateRemoved
 		}
 	}
 
 	// The remaining sectors in the map are ones we didn't know about before
-	for sectorID, isUnsealed := range sectorIsUnsealed {
-		sectorIsUnsealedUpdates[sectorID] = isUnsealed
+	for sectorID, sealState := range sectorStates {
+		sealStateUpdates[sectorID] = sealState
 	}
 
-	return sectorIsUnsealedUpdates, nil
+	return sealStateUpdates, nil
 }

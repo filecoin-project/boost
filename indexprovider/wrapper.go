@@ -8,29 +8,26 @@ import (
 	"os"
 	"path/filepath"
 
+	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/markets/idxprov"
+	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	dst "github.com/filecoin-project/dagstore"
+	"github.com/filecoin-project/lotus/markets/dagstore"
+	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/repo"
+	"github.com/hashicorp/go-multierror"
+	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
+	provider "github.com/ipni/index-provider"
+	"github.com/ipni/index-provider/engine/xproviders"
+	"github.com/ipni/index-provider/metadata"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	host "github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/fx"
-
-	"github.com/filecoin-project/boost/markets/idxprov"
-	dst "github.com/filecoin-project/dagstore"
-	"github.com/filecoin-project/lotus/markets/dagstore"
-
-	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
-	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	"github.com/hashicorp/go-multierror"
-	logging "github.com/ipfs/go-log/v2"
-
-	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/ipni/index-provider/engine/xproviders"
-	"github.com/ipni/index-provider/metadata"
-
-	"github.com/ipfs/go-cid"
-	provider "github.com/ipni/index-provider"
 )
 
 var log = logging.Logger("index-provider-wrapper")
@@ -52,12 +49,12 @@ type Wrapper struct {
 }
 
 func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-	legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
-	meshCreator idxprov.MeshCreator) (*Wrapper, error) {
+	ssDB *db.SectorStateDB, legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
+	meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
 
 	return func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-		legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
-		meshCreator idxprov.MeshCreator) (*Wrapper, error) {
+		ssDB *db.SectorStateDB, legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
+		meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
 		if cfg.DAGStore.RootDir == "" {
 			cfg.DAGStore.RootDir = filepath.Join(r.Path(), defaultDagStoreDir)
 		}
@@ -79,15 +76,26 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 			bitswapEnabled: bitswapEnabled,
 			enabled:        !isDisabled,
 		}
-		// announce all deals on startup in case of a config change
+
+		runCtx, runCancel := context.WithCancel(context.Background())
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
+				// Watch for changes in sector unseal state and update the
+				// indexer when there are changes
+				usm := NewUnsealedStateManager(w, dealsDB, ssDB, storageService)
+				go usm.Run(runCtx)
+
+				// Announce all deals on startup in case of a config change
 				go func() {
 					err := w.AnnounceExtendedProviders(ctx)
 					if err != nil {
 						log.Warnf("announcing extended providers: %w", err)
 					}
 				}()
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				runCancel()
 				return nil
 			},
 		})
@@ -314,33 +322,37 @@ func (w *Wrapper) Start(ctx context.Context) {
 	})
 }
 
-func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDealState) (cid.Cid, error) {
+func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, deal *types.ProviderDealState) (cid.Cid, error) {
+	// Filter out deals that should not be announced
+	if !deal.AnnounceToIPNI {
+		return cid.Undef, nil
+	}
+
+	propCid, err := deal.SignedProposalCid()
+	if err != nil {
+		return cid.Undef, fmt.Errorf("failed to get proposal cid from deal: %w", err)
+	}
+	md := metadata.GraphsyncFilecoinV1{
+		PieceCID:      deal.ClientDealProposal.Proposal.PieceCID,
+		FastRetrieval: deal.FastRetrieval,
+		VerifiedDeal:  deal.ClientDealProposal.Proposal.VerifiedDeal,
+	}
+	return w.announceBoostDealMetadata(ctx, md, propCid)
+}
+
+func (w *Wrapper) announceBoostDealMetadata(ctx context.Context, md metadata.GraphsyncFilecoinV1, propCid cid.Cid) (cid.Cid, error) {
 	if !w.enabled {
 		return cid.Undef, errors.New("cannot announce deal: index provider is disabled")
 	}
 
-	// Announce deal to network Indexer
-	protocols := []metadata.Protocol{
-		&metadata.GraphsyncFilecoinV1{
-			PieceCID:      pds.ClientDealProposal.Proposal.PieceCID,
-			FastRetrieval: pds.FastRetrieval,
-			VerifiedDeal:  pds.ClientDealProposal.Proposal.VerifiedDeal,
-		},
-	}
-
-	fm := metadata.Default.New(protocols...)
-
-	// ensure we have a connection with the full node host so that the index provider gossip sub announcements make their
+	// Ensure we have a connection with the full node host so that the index provider gossip sub announcements make their
 	// way to the filecoin bootstrapper network
 	if err := w.meshCreator.Connect(ctx); err != nil {
 		log.Errorw("failed to connect boost node to full daemon node", "err", err)
 	}
 
-	propCid, err := pds.SignedProposalCid()
-	if err != nil {
-		return cid.Undef, fmt.Errorf("failed to get proposal cid from deal: %w", err)
-	}
-
+	// Announce deal to network Indexer
+	fm := metadata.Default.New(&md)
 	annCid, err := w.prov.NotifyPut(ctx, nil, propCid.Bytes(), fm)
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to announce deal to index provider: %w", err)
@@ -348,22 +360,18 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, pds *types.ProviderDeal
 	return annCid, err
 }
 
-func (w *Wrapper) AnnounceBoostDealRemoved(ctx context.Context, pds *types.ProviderDealState) (cid.Cid, error) {
+func (w *Wrapper) AnnounceBoostDealRemoved(ctx context.Context, propCid cid.Cid) (cid.Cid, error) {
 	if !w.enabled {
 		return cid.Undef, errors.New("cannot announce deal removal: index provider is disabled")
 	}
 
-	// ensure we have a connection with the full node host so that the index provider gossip sub announcements make their
+	// Ensure we have a connection with the full node host so that the index provider gossip sub announcements make their
 	// way to the filecoin bootstrapper network
 	if err := w.meshCreator.Connect(ctx); err != nil {
 		log.Errorw("failed to connect boost node to full daemon node", "err", err)
 	}
 
-	propCid, err := pds.SignedProposalCid()
-	if err != nil {
-		return cid.Undef, fmt.Errorf("failed to get proposal cid from deal: %w", err)
-	}
-
+	// Announce deal removal to network Indexer
 	annCid, err := w.prov.NotifyRemove(ctx, "", propCid.Bytes())
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to announce deal removal to index provider: %w", err)

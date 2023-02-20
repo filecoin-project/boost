@@ -9,6 +9,7 @@ import (
 	"github.com/filecoin-project/boost/db/fielddef"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/google/uuid"
@@ -237,17 +238,15 @@ func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid cid.Cid) 
 	return d.scanRow(row)
 }
 
-func (d *DealsDB) BySectorIDs(ctx context.Context, sectorIDs []abi.SectorNumber) ([]*types.ProviderDealState, error) {
-	if len(sectorIDs) == 0 {
-		return nil, nil
+func (d *DealsDB) BySectorID(ctx context.Context, sectorID abi.SectorID) (*types.ProviderDealState, error) {
+	addr, err := address.NewIDAddress(uint64(sectorID.Miner))
+	if err != nil {
+		return nil, fmt.Errorf("creating address from ID %d: %w", sectorID.Miner, err)
 	}
 
-	placeholders := strings.Repeat("?,", len(sectorIDs)-1) + "?"
-	secIDs := make([]interface{}, 0, len(sectorIDs))
-	for _, secID := range sectorIDs {
-		secIDs = append(secIDs, secID)
-	}
-	return d.list(ctx, 0, 0, "SectorID IN ("+placeholders+")", secIDs...)
+	qry := "SELECT " + dealFieldsStr + " FROM Deals WHERE ProviderAddress=? AND SectorID=?"
+	row := d.db.QueryRowContext(ctx, qry, addr.String(), sectorID.Number)
+	return d.scanRow(row)
 }
 
 func (d *DealsDB) Count(ctx context.Context, query string, filter *FilterOptions) (int, error) {

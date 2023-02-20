@@ -1,9 +1,10 @@
 -- +goose Up
 -- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS SectorState (
+    MinerID INT,
     SectorID INT,
     UpdatedAt DateTime,
-    Unsealed BOOL
+    SealState TEXT
 );
 
 CREATE INDEX IF NOT EXISTS index_sector_state_sector_id on SectorState(SectorID);

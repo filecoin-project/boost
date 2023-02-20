@@ -28,6 +28,7 @@ func TestDealAnnounceToIPNI(t *testing.T) {
 	req.NoError(err)
 
 	// Insert the deals in DB
+	deals[0].AnnounceToIPNI = false
 	err = dealsDB.Insert(ctx, &deals[0])
 	require.NoError(t, err)
 
