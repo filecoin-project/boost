@@ -38,7 +38,7 @@ func NewUnsealedStateManager(idxprov *Wrapper, dealsDB *db.DealsDB, sdb *db.Sect
 
 func (m *UnsealedStateManager) Run(ctx context.Context) {
 	usmlog.Info("starting unsealed state manager")
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 
 	// Check immediately
