@@ -463,7 +463,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		Override(new(paths.LocalStorage), From(new(lotus_repo.LockedRepo))),
 		Override(new(*paths.Local), lotus_modules.LocalStorage),
-		Override(new(sealer.Config), cfg.StorageManager()),
+		Override(new(lotus_config.SealerConfig), cfg.StorageManager()),
 		Override(new(*paths.Remote), lotus_modules.RemoteStorage),
 
 		Override(new(*fundmanager.FundManager), fundmanager.New(fundmanager.Config{

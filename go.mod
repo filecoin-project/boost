@@ -32,9 +32,9 @@ require (
 	github.com/filecoin-project/go-legs v0.4.9
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.10.0-rc2.0.20230213183937-7f1ede218b87
+	github.com/filecoin-project/go-state-types v0.10.0-rc3.0.20230220124418-91b4419c9b6e
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/lotus v1.20.0-hyperspace-nv20-event-migration-speedup
+	github.com/filecoin-project/lotus v1.20.0-rc2.0.20230220141149-1706a9fd6dd1
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-storage v0.4.1
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
@@ -46,7 +46,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hnlq715/golang-lru v0.3.0
 	github.com/ipfs/go-bitswap v0.11.0
-	github.com/ipfs/go-block-format v0.0.3
+	github.com/ipfs/go-block-format v0.1.1
 	github.com/ipfs/go-blockservice v0.5.0
 	github.com/ipfs/go-cid v0.3.2
 	github.com/ipfs/go-cidutil v0.1.0
@@ -76,7 +76,7 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/libp2p/go-eventbus v0.2.1
-	github.com/libp2p/go-libp2p v0.23.2
+	github.com/libp2p/go-libp2p v0.23.4
 	github.com/libp2p/go-libp2p-gostream v0.5.0
 	github.com/libp2p/go-libp2p-http v0.2.1
 	github.com/libp2p/go-libp2p-kad-dht v0.18.0
@@ -85,7 +85,7 @@ require (
 	github.com/libp2p/go-msgio v0.2.0
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/multiformats/go-multiaddr v0.7.0
+	github.com/multiformats/go-multiaddr v0.8.0
 	github.com/multiformats/go-multibase v0.1.1
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/open-rpc/meta-schema v0.0.0-20201029221707-1b72ef2ea333
@@ -93,7 +93,7 @@ require (
 	github.com/prometheus/client_golang v1.13.0
 	github.com/raulk/clock v1.1.0
 	github.com/raulk/go-watchdog v1.3.0
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	github.com/urfave/cli/v2 v2.16.3
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
 	github.com/whyrusleeping/cbor-gen v0.0.0-20221021053955-c138aae13722
@@ -214,13 +214,13 @@ require (
 	github.com/ipfs/go-ipfs-delay v0.0.1 // indirect
 	github.com/ipfs/go-ipfs-http-client v0.4.0 // indirect
 	github.com/ipfs/go-ipfs-posinfo v0.0.1 // indirect
-	github.com/ipfs/go-ipfs-pq v0.0.2 // indirect
+	github.com/ipfs/go-ipfs-pq v0.0.3 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.2 // indirect
 	github.com/ipfs/go-ipld-cbor v0.0.6 // indirect
 	github.com/ipfs/go-ipns v0.3.0 // indirect
 	github.com/ipfs/go-log v1.0.5 // indirect
 	github.com/ipfs/go-path v0.3.0 // indirect
-	github.com/ipfs/go-peertaskqueue v0.8.0 // indirect
+	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
 	github.com/ipfs/go-unixfsnode v1.4.0 // indirect
 	github.com/ipfs/go-verifcid v0.0.2 // indirect
 	github.com/ipfs/interface-go-ipfs-core v0.7.0 // indirect
@@ -345,14 +345,13 @@ require (
 	github.com/armon/go-metrics v0.3.9 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.14.0 // indirect
-	github.com/filecoin-project/index-provider v0.9.1 // indirect
-	github.com/filecoin-project/storetheindex v0.4.30-0.20221114113647-683091f8e893 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/hashicorp/go-hclog v0.16.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/raft v1.1.1 // indirect
 	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea // indirect
+	github.com/ipfs/go-libipfs v0.4.1 // indirect
 	github.com/libp2p/go-libp2p-consensus v0.0.1 // indirect
 	github.com/libp2p/go-libp2p-gorpc v0.4.0 // indirect
 	github.com/libp2p/go-libp2p-raft v0.1.8 // indirect
