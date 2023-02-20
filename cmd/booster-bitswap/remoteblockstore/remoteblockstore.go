@@ -8,10 +8,10 @@ import (
 
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/tracing"
-	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	format "github.com/ipfs/go-ipld-format"
+	"github.com/ipfs/go-libipfs/blocks"
 	logging "github.com/ipfs/go-log/v2"
 	"go.opencensus.io/stats"
 	"go.opentelemetry.io/otel/attribute"

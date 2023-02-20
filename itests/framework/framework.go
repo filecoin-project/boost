@@ -45,14 +45,14 @@ import (
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/ctladdr"
-	"github.com/filecoin-project/lotus/storage/paths"
 	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
+	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
-	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	files "github.com/ipfs/go-ipfs-files"
 	ipld "github.com/ipfs/go-ipld-format"
+	"github.com/ipfs/go-libipfs/blocks"
 	logging "github.com/ipfs/go-log/v2"
 	dag "github.com/ipfs/go-merkledag"
 	dstest "github.com/ipfs/go-merkledag/test"
@@ -239,7 +239,7 @@ func (f *TestFramework) Start() error {
 	// The in-memory repo implementation assumes that its being used to test
 	// a miner, which has storage configuration.
 	// Boost doesn't have storage configuration so clear the storage config.
-	if err := lr.SetStorage(func(sc *paths.StorageConfig) {
+	if err := lr.SetStorage(func(sc *storiface.StorageConfig) {
 		sc.StoragePaths = nil
 	}); err != nil {
 		return fmt.Errorf("set storage config: %w", err)
