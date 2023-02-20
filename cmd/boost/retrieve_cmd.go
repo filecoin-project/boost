@@ -22,9 +22,6 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
-	flatfs "github.com/ipfs/go-ds-flatfs"
-	levelds "github.com/ipfs/go-ds-leveldb"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
 	files "github.com/ipfs/go-ipfs-files"
 	"github.com/ipfs/go-merkledag"
@@ -223,7 +220,6 @@ var retrieveCmd = &cli.Command{
 				dservOffline,
 				c,
 				selspec.Node(),
-				nil,
 				func(p traversal.Progress, n ipld.Node, r traversal.VisitReason) error {
 					if r == traversal.VisitReason_SelectionMatch {
 
