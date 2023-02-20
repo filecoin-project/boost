@@ -41,6 +41,13 @@ func (m *UnsealedStateManager) Run(ctx context.Context) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
+	// Check immediately
+	err := m.checkForUpdates(ctx)
+	if err != nil {
+		usmlog.Errorf("error checking for unsealed state updates: %s", err)
+	}
+
+	// Check every tick
 	for {
 		select {
 		case <-ctx.Done():
@@ -83,14 +90,18 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 		if sectorSealState == db.SealStateRemoved {
 			// Announce deals that are no longer unsealed to indexer
 			announceCid, err := m.idxprov.AnnounceBoostDealRemoved(ctx, propCid)
-			if err != nil && !errors.Is(err, provider.ErrContextIDNotFound) {
-				usmlog.Errorw("announcing deal removed to index provider",
-					"deal id", deal.DealUuid, "error", err)
-				continue
+			if err != nil {
+				// Check if the error is because the deal wasn't previously announced
+				if !errors.Is(err, provider.ErrContextIDNotFound) {
+					// There was some other error, write it to the log
+					usmlog.Errorw("announcing deal removed to index provider",
+						"deal id", deal.DealUuid, "error", err)
+					continue
+				}
+			} else {
+				usmlog.Infow("announced to index provider that deal has been removed",
+					"deal id", deal.DealUuid, "sector id", deal.SectorID, "announce cid", announceCid.String())
 			}
-
-			usmlog.Infow("announced to index provider that deal has been removed",
-				"deal id", deal.DealUuid, "sector id", deal.SectorID, "announce cid", announceCid.String())
 		} else {
 			// Announce deals that have changed seal state to indexer
 			md := metadata.GraphsyncFilecoinV1{
@@ -99,14 +110,18 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 				VerifiedDeal:  deal.ClientDealProposal.Proposal.VerifiedDeal,
 			}
 			announceCid, err := m.idxprov.announceBoostDealMetadata(ctx, md, propCid)
-			if err != nil && !errors.Is(err, provider.ErrAlreadyAdvertised) {
-				usmlog.Errorf("announcing deal %s to index provider: %w", deal.DealUuid, err)
-				continue
+			if err != nil {
+				// Check if the error is because the deal was already advertised
+				if !errors.Is(err, provider.ErrAlreadyAdvertised) {
+					// There was some other error, write it to the log
+					usmlog.Errorf("announcing deal %s to index provider: %w", deal.DealUuid, err)
+					continue
+				}
+			} else {
+				usmlog.Infow("announced deal seal state to index provider",
+					"deal id", deal.DealUuid, "sector id", deal.SectorID,
+					"seal state", sectorSealState, "announce cid", announceCid.String())
 			}
-
-			usmlog.Infow("announced deal seal state to index provider",
-				"deal id", deal.DealUuid, "sector id", deal.SectorID,
-				"seal state", sectorSealState, "announce cid", announceCid.String())
 		}
 
 		// Update the sector seal state in the database
