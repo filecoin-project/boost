@@ -238,15 +238,13 @@ func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid cid.Cid) 
 	return d.scanRow(row)
 }
 
-func (d *DealsDB) BySectorID(ctx context.Context, sectorID abi.SectorID) (*types.ProviderDealState, error) {
+func (d *DealsDB) BySectorID(ctx context.Context, sectorID abi.SectorID) ([]*types.ProviderDealState, error) {
 	addr, err := address.NewIDAddress(uint64(sectorID.Miner))
 	if err != nil {
 		return nil, fmt.Errorf("creating address from ID %d: %w", sectorID.Miner, err)
 	}
 
-	qry := "SELECT " + dealFieldsStr + " FROM Deals WHERE ProviderAddress=? AND SectorID=?"
-	row := d.db.QueryRowContext(ctx, qry, addr.String(), sectorID.Number)
-	return d.scanRow(row)
+	return d.list(ctx, 0, 0, "ProviderAddress=? AND SectorID=?", addr.String(), sectorID.Number)
 }
 
 func (d *DealsDB) Count(ctx context.Context, query string, filter *FilterOptions) (int, error) {
