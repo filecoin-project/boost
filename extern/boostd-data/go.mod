@@ -7,10 +7,10 @@ require (
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ethereum/go-ethereum v1.10.19
-	github.com/filecoin-project/go-state-types v0.1.9
+	github.com/filecoin-project/go-state-types v0.10.0-rc3
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
-	github.com/ipfs/go-cid v0.1.0
+	github.com/ipfs/go-cid v0.2.0
 	github.com/ipfs/go-datastore v0.5.1
 	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/go-log/v2 v2.5.1
@@ -36,7 +36,7 @@ require (
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-units v0.4.0 // indirect
-	github.com/filecoin-project/go-address v0.0.6 // indirect
+	github.com/filecoin-project/go-address v1.1.0 // indirect
 	github.com/filecoin-project/go-crypto v0.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
