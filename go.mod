@@ -36,7 +36,7 @@ require (
 	github.com/filecoin-project/go-paramfetch v0.0.4
 	github.com/filecoin-project/go-state-types v0.10.0-rc3
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/lotus v1.20.0-rc2-boost
+	github.com/filecoin-project/lotus v1.20.0-rc2
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-storage v0.4.1
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
@@ -346,6 +346,8 @@ require (
 	github.com/armon/go-metrics v0.3.9 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.14.0 // indirect
+	github.com/filecoin-project/index-provider v0.9.1 // indirect
+	github.com/filecoin-project/storetheindex v0.4.30-0.20221114113647-683091f8e893 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/hashicorp/go-hclog v0.16.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
