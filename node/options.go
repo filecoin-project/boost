@@ -154,3 +154,9 @@ func as(in interface{}, as interface{}) interface{} {
 		return outs
 	}).Interface()
 }
+
+func FromVal[T any](v T) func() T {
+	return func() T {
+		return v
+	}
+}

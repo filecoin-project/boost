@@ -7,6 +7,10 @@ import (
 	"strings"
 	"time"
 
+	flatfs "github.com/ipfs/go-ds-flatfs"
+	levelds "github.com/ipfs/go-ds-leveldb"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
+
 	"github.com/dustin/go-humanize"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
@@ -18,9 +22,6 @@ import (
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
-	flatfs "github.com/ipfs/go-ds-flatfs"
-	levelds "github.com/ipfs/go-ds-leveldb"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
 	files "github.com/ipfs/go-ipfs-files"
 	"github.com/ipfs/go-merkledag"

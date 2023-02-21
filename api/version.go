@@ -27,11 +27,11 @@ func (ve Version) EqMajorMinor(v2 Version) bool {
 
 // semver versions of the rpc api exposed
 var (
-	FullAPIVersion0 = newVer(1, 4, 0)
-	FullAPIVersion1 = newVer(2, 1, 0)
+	FullAPIVersion0 = newVer(1, 5, 0)
+	FullAPIVersion1 = newVer(2, 3, 0)
 
-	MinerAPIVersion0  = newVer(1, 3, 0)
-	WorkerAPIVersion0 = newVer(1, 1, 0)
+	MinerAPIVersion0  = newVer(1, 5, 0)
+	WorkerAPIVersion0 = newVer(1, 7, 0)
 
 	BoostAPIVersion0 = newVer(1, 0, 0)
 )

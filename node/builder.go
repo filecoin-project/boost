@@ -192,6 +192,7 @@ func defaults() []Option {
 		Override(new(lotus_journal.DisabledEvents), lotus_journal.EnvDisabledEvents),
 		Override(new(lotus_journal.Journal), lotus_modules.OpenFilesystemJournal),
 		Override(new(*alerting.Alerting), alerting.NewAlertingSystem),
+		Override(new(lotus_dtypes.NodeStartTime), FromVal(lotus_dtypes.NodeStartTime(time.Now()))),
 
 		Override(CheckFDLimit, lotus_modules.CheckFdLimit(build.DefaultFDLimit)),
 
@@ -464,7 +465,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		Override(new(paths.LocalStorage), From(new(lotus_repo.LockedRepo))),
 		Override(new(*paths.Local), lotus_modules.LocalStorage),
-		Override(new(sealer.Config), cfg.StorageManager()),
+		Override(new(lotus_config.SealerConfig), cfg.StorageManager()),
 		Override(new(*paths.Remote), lotus_modules.RemoteStorage),
 
 		Override(new(*fundmanager.FundManager), fundmanager.New(fundmanager.Config{
