@@ -47,7 +47,6 @@ require (
 	github.com/graph-gophers/graphql-transport-ws v0.0.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hnlq715/golang-lru v0.3.0
-	github.com/ipfs/go-block-format v0.1.1
 	github.com/ipfs/go-blockservice v0.5.0
 	github.com/ipfs/go-cid v0.3.2
 	github.com/ipfs/go-cidutil v0.1.0
@@ -354,6 +353,7 @@ require (
 	github.com/hashicorp/raft v1.1.1 // indirect
 	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea // indirect
 	github.com/ipfs/go-bitswap v0.11.0 // indirect
+	github.com/ipfs/go-block-format v0.1.1 // indirect
 	github.com/libp2p/go-libp2p-consensus v0.0.1 // indirect
 	github.com/libp2p/go-libp2p-gorpc v0.4.0 // indirect
 	github.com/libp2p/go-libp2p-raft v0.1.8 // indirect

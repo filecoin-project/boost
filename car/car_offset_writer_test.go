@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"testing"
 
-	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cidutil"
 	"github.com/ipfs/go-datastore"
@@ -15,6 +14,7 @@ import (
 	bstore "github.com/ipfs/go-ipfs-blockstore"
 	chunk "github.com/ipfs/go-ipfs-chunker"
 	format "github.com/ipfs/go-ipld-format"
+	"github.com/ipfs/go-libipfs/blocks"
 	"github.com/ipfs/go-merkledag"
 	merkledagpb "github.com/ipfs/go-merkledag/pb"
 	"github.com/ipfs/go-unixfs/importer/balanced"
