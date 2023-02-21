@@ -4,7 +4,9 @@ import (
 	"context"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/db/migrations"
+	"github.com/filecoin-project/boost/indexprovider/mock"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/lotus/markets/idxprov"
@@ -18,47 +20,77 @@ import (
 
 // Empty response from MinerAPI.StorageList()
 func TestUnsealedStateManagerEmptyStorageList(t *testing.T) {
-	usm, _, _ := setup(t)
+	usm, legacyStorageProvider, _, _ := setup(t)
+	legacyStorageProvider.EXPECT().ListLocalDeals().AnyTimes().Return(nil, nil)
 
 	// Check for updates with an empty response from MinerAPI.StorageList()
 	err := usm.checkForUpdates(context.Background())
 	require.NoError(t, err)
 }
 
-// Only announce sectors that are in the boost database
+// Only announce sectors for deals that are in the boost database or
+// legacy datastore
 func TestUnsealedStateManagerMatchingDealOnly(t *testing.T) {
 	ctx := context.Background()
-	usm, storageMiner, prov := setup(t)
 
-	// Add a deal to the database
-	deals, err := db.GenerateNDeals(1)
-	require.NoError(t, err)
-	err = usm.dealsDB.Insert(ctx, &deals[0])
-	require.NoError(t, err)
+	runTest := func(t *testing.T, usm *UnsealedStateManager, storageMiner *mockApiStorageMiner, prov *mock_provider.MockInterface, provAddr address.Address, sectorNum abi.SectorNumber) {
+		// Set the response from MinerAPI.StorageList() to be two unsealed sectors
+		minerID, err := address.IDFromAddress(provAddr)
+		require.NoError(t, err)
+		storageMiner.storageList = map[storiface.ID][]storiface.Decl{
+			// This sector matches the deal in the database
+			"uuid-existing-deal": {{
+				SectorID:       abi.SectorID{Miner: abi.ActorID(minerID), Number: sectorNum},
+				SectorFileType: storiface.FTUnsealed,
+			}},
+			// This sector should be ignored because the sector ID doesn't match
+			// any deal in the database
+			"uuid-unknown-deal": {{
+				SectorID:       abi.SectorID{Miner: abi.ActorID(minerID), Number: sectorNum + 1},
+				SectorFileType: storiface.FTUnsealed,
+			}},
+		}
 
-	// Set the response from MinerAPI.StorageList() to be two unsealed sectors
-	minerID, err := address.IDFromAddress(deals[0].ClientDealProposal.Proposal.Provider)
-	require.NoError(t, err)
-	storageMiner.storageList = map[storiface.ID][]storiface.Decl{
-		// This sector matches the deal in the database
-		"uuid-existing-deal": {{
-			SectorID:       abi.SectorID{Miner: abi.ActorID(minerID), Number: deals[0].SectorID},
-			SectorFileType: storiface.FTUnsealed,
-		}},
-		// This sector should be ignored because the sector ID doesn't match
-		// any deal in the boost table
-		"uuid-unknown-deal": {{
-			SectorID:       abi.SectorID{Miner: abi.ActorID(minerID), Number: deals[0].SectorID + 1},
-			SectorFileType: storiface.FTUnsealed,
-		}},
+		// Expect checkForUpdates to call NotifyPut exactly once, because only
+		// one sector from the storage list is in the database
+		prov.EXPECT().NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+
+		err = usm.checkForUpdates(ctx)
+		require.NoError(t, err)
 	}
 
-	// Expect checkForUpdates to call NotifyPut exactly once, because only
-	// one sector is in the boost database
-	prov.EXPECT().NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+	t.Run("deal in boost db", func(t *testing.T) {
+		usm, legacyStorageProvider, storageMiner, prov := setup(t)
+		legacyStorageProvider.EXPECT().ListLocalDeals().Return(nil, nil)
 
-	err = usm.checkForUpdates(ctx)
-	require.NoError(t, err)
+		// Add a deal to the database
+		deals, err := db.GenerateNDeals(1)
+		require.NoError(t, err)
+		err = usm.dealsDB.Insert(ctx, &deals[0])
+		require.NoError(t, err)
+
+		provAddr := deals[0].ClientDealProposal.Proposal.Provider
+		sectorNum := deals[0].SectorID
+		runTest(t, usm, storageMiner, prov, provAddr, sectorNum)
+	})
+
+	t.Run("deal in legacy datastore", func(t *testing.T) {
+		usm, legacyStorageProvider, storageMiner, prov := setup(t)
+
+		// Simulate returning a deal from the legacy datastore
+		boostDeals, err := db.GenerateNDeals(1)
+		require.NoError(t, err)
+
+		sectorNum := abi.SectorNumber(10)
+		deals := []storagemarket.MinerDeal{{
+			ClientDealProposal: boostDeals[0].ClientDealProposal,
+			SectorNumber:       sectorNum,
+		}}
+		legacyStorageProvider.EXPECT().ListLocalDeals().Return(deals, nil)
+
+		provAddr := deals[0].ClientDealProposal.Proposal.Provider
+		runTest(t, usm, storageMiner, prov, provAddr, sectorNum)
+	})
 }
 
 // Tests that various scenarios of sealing state changes produce the expected
@@ -219,7 +251,8 @@ func TestUnsealedStateManagerStateChange(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			usm, storageMiner, prov := setup(t)
+			usm, legacyStorageProvider, storageMiner, prov := setup(t)
+			legacyStorageProvider.EXPECT().ListLocalDeals().AnyTimes().Return(nil, nil)
 
 			// Add a deal to the database
 			deals, err := db.GenerateNDeals(1)
@@ -259,7 +292,7 @@ func TestUnsealedStateManagerStateChange(t *testing.T) {
 	}
 }
 
-func setup(t *testing.T) (*UnsealedStateManager, *mockApiStorageMiner, *mock_provider.MockInterface) {
+func setup(t *testing.T) (*UnsealedStateManager, *mock.MockStorageProvider, *mockApiStorageMiner, *mock_provider.MockInterface) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	prov := mock_provider.NewMockInterface(ctrl)
@@ -271,6 +304,7 @@ func setup(t *testing.T) (*UnsealedStateManager, *mockApiStorageMiner, *mock_pro
 	dealsDB := db.NewDealsDB(sqldb)
 	sectorStateDB := db.NewSectorStateDB(sqldb)
 	storageMiner := &mockApiStorageMiner{}
+	storageProvider := mock.NewMockStorageProvider(ctrl)
 
 	wrapper := &Wrapper{
 		enabled:     true,
@@ -278,13 +312,8 @@ func setup(t *testing.T) (*UnsealedStateManager, *mockApiStorageMiner, *mock_pro
 		prov:        prov,
 		meshCreator: &meshCreatorStub{},
 	}
-	usm := UnsealedStateManager{
-		idxprov: wrapper,
-		dealsDB: dealsDB,
-		sdb:     sectorStateDB,
-		api:     storageMiner,
-	}
-	return &usm, storageMiner, prov
+	usm := NewUnsealedStateManager(wrapper, storageProvider, dealsDB, sectorStateDB, storageMiner)
+	return usm, storageProvider, storageMiner, prov
 }
 
 type mockApiStorageMiner struct {

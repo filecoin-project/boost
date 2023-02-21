@@ -82,7 +82,7 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 			OnStart: func(ctx context.Context) error {
 				// Watch for changes in sector unseal state and update the
 				// indexer when there are changes
-				usm := NewUnsealedStateManager(w, dealsDB, ssDB, storageService)
+				usm := NewUnsealedStateManager(w, legacyProv, dealsDB, ssDB, storageService)
 				go usm.Run(runCtx)
 
 				// Announce all deals on startup in case of a config change

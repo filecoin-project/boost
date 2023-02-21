@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/go-address"
+	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	logging "github.com/ipfs/go-log/v2"
@@ -13,6 +16,8 @@ import (
 	"time"
 )
 
+//go:generate go run github.com/golang/mock/mockgen -destination=./mock/mock.go -package=mock github.com/filecoin-project/go-fil-markets/storagemarket StorageProvider
+
 var usmlog = logging.Logger("unsmgr")
 
 type ApiStorageMiner interface {
@@ -20,18 +25,20 @@ type ApiStorageMiner interface {
 }
 
 type UnsealedStateManager struct {
-	idxprov *Wrapper
-	dealsDB *db.DealsDB
-	sdb     *db.SectorStateDB
-	api     ApiStorageMiner
+	idxprov    *Wrapper
+	legacyProv storagemarket.StorageProvider
+	dealsDB    *db.DealsDB
+	sdb        *db.SectorStateDB
+	api        ApiStorageMiner
 }
 
-func NewUnsealedStateManager(idxprov *Wrapper, dealsDB *db.DealsDB, sdb *db.SectorStateDB, api ApiStorageMiner) *UnsealedStateManager {
+func NewUnsealedStateManager(idxprov *Wrapper, legacyProv storagemarket.StorageProvider, dealsDB *db.DealsDB, sdb *db.SectorStateDB, api ApiStorageMiner) *UnsealedStateManager {
 	return &UnsealedStateManager{
-		idxprov: idxprov,
-		dealsDB: dealsDB,
-		sdb:     sdb,
-		api:     api,
+		idxprov:    idxprov,
+		legacyProv: legacyProv,
+		dealsDB:    dealsDB,
+		sdb:        sdb,
+		api:        api,
 	}
 }
 
@@ -67,12 +74,17 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 		return err
 	}
 
+	legacyDeals, err := m.legacyDealsBySectorID(stateUpdates)
+	if err != nil {
+		return fmt.Errorf("getting legacy deals from datastore: %w", err)
+	}
+
 	// For each sector
 	for sectorID, sectorSealState := range stateUpdates {
 		// Get the deals in the sector
-		deals, err := m.dealsDB.BySectorID(ctx, sectorID)
+		deals, err := m.dealsBySectorID(ctx, legacyDeals, sectorID)
 		if err != nil {
-			return fmt.Errorf("getting deal for miner %d / sector %d: %w", sectorID.Miner, sectorID.Number, err)
+			return fmt.Errorf("getting deals for miner %d / sector %d: %w", sectorID.Miner, sectorID.Number, err)
 		}
 
 		// For each deal in the sector
@@ -81,10 +93,11 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 				continue
 			}
 
-			propCid, err := deal.SignedProposalCid()
+			propnd, err := cborutil.AsIpld(&deal.DealProposal)
 			if err != nil {
-				return fmt.Errorf("failed to get proposal cid from deal: %w", err)
+				return fmt.Errorf("failed to compute signed deal proposal ipld node: %w", err)
 			}
+			propCid := propnd.Cid()
 
 			if sectorSealState == db.SealStateRemoved {
 				// Announce deals that are no longer unsealed to indexer
@@ -94,31 +107,31 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 					if !errors.Is(err, provider.ErrContextIDNotFound) {
 						// There was some other error, write it to the log
 						usmlog.Errorw("announcing deal removed to index provider",
-							"deal id", deal.DealUuid, "error", err)
+							"deal id", deal.DealID, "error", err)
 						continue
 					}
 				} else {
 					usmlog.Infow("announced to index provider that deal has been removed",
-						"deal id", deal.DealUuid, "sector id", deal.SectorID, "announce cid", announceCid.String())
+						"deal id", deal.DealID, "sector id", deal.SectorID.Number, "announce cid", announceCid.String())
 				}
 			} else {
 				// Announce deals that have changed seal state to indexer
 				md := metadata.GraphsyncFilecoinV1{
-					PieceCID:      deal.ClientDealProposal.Proposal.PieceCID,
+					PieceCID:      deal.DealProposal.Proposal.PieceCID,
 					FastRetrieval: sectorSealState == db.SealStateUnsealed,
-					VerifiedDeal:  deal.ClientDealProposal.Proposal.VerifiedDeal,
+					VerifiedDeal:  deal.DealProposal.Proposal.VerifiedDeal,
 				}
 				announceCid, err := m.idxprov.announceBoostDealMetadata(ctx, md, propCid)
 				if err != nil {
 					// Check if the error is because the deal was already advertised
 					if !errors.Is(err, provider.ErrAlreadyAdvertised) {
 						// There was some other error, write it to the log
-						usmlog.Errorf("announcing deal %s to index provider: %w", deal.DealUuid, err)
+						usmlog.Errorf("announcing deal %s to index provider: %w", deal.DealID, err)
 						continue
 					}
 				} else {
 					usmlog.Infow("announced deal seal state to index provider",
-						"deal id", deal.DealUuid, "sector id", deal.SectorID,
+						"deal id", deal.DealID, "sector id", deal.SectorID.Number,
 						"seal state", sectorSealState, "announce cid", announceCid.String())
 				}
 			}
@@ -186,4 +199,74 @@ func (m *UnsealedStateManager) getStateUpdates(ctx context.Context) (map[abi.Sec
 	}
 
 	return sealStateUpdates, nil
+}
+
+type basicDealInfo struct {
+	AnnounceToIPNI bool
+	DealID         string
+	SectorID       abi.SectorID
+	DealProposal   storagemarket.ClientDealProposal
+}
+
+// Get deals by sector ID, whether they're legacy or boost deals
+func (m *UnsealedStateManager) dealsBySectorID(ctx context.Context, legacyDeals map[abi.SectorID][]storagemarket.MinerDeal, sectorID abi.SectorID) ([]basicDealInfo, error) {
+	// First query the boost database
+	deals, err := m.dealsDB.BySectorID(ctx, sectorID)
+	if err != nil {
+		return nil, fmt.Errorf("getting deals from boost database: %w", err)
+	}
+
+	basicDeals := make([]basicDealInfo, 0, len(deals))
+	for _, dl := range deals {
+		basicDeals = append(basicDeals, basicDealInfo{
+			AnnounceToIPNI: dl.AnnounceToIPNI,
+			DealID:         dl.DealUuid.String(),
+			SectorID:       sectorID,
+			DealProposal:   dl.ClientDealProposal,
+		})
+	}
+
+	// Then check the legacy deals
+	legDeals, ok := legacyDeals[sectorID]
+	if ok {
+		for _, dl := range legDeals {
+			basicDeals = append(basicDeals, basicDealInfo{
+				AnnounceToIPNI: true,
+				DealID:         dl.ProposalCid.String(),
+				SectorID:       sectorID,
+				DealProposal:   dl.ClientDealProposal,
+			})
+		}
+	}
+
+	return basicDeals, nil
+}
+
+// Iterate over all legacy deals and make a map of sector ID -> legacy deal.
+// To save memory, only include legacy deals with a sector ID that we know
+// we're going to query, ie the set of sector IDs in the stateUpdates map.
+func (m *UnsealedStateManager) legacyDealsBySectorID(stateUpdates map[abi.SectorID]db.SealState) (map[abi.SectorID][]storagemarket.MinerDeal, error) {
+	legacyDeals, err := m.legacyProv.ListLocalDeals()
+	if err != nil {
+		return nil, err
+	}
+
+	bySectorID := make(map[abi.SectorID][]storagemarket.MinerDeal, len(legacyDeals))
+	for _, deal := range legacyDeals {
+		minerID, err := address.IDFromAddress(deal.Proposal.Provider)
+		if err != nil {
+			// just skip the deal if we can't convert its address to an ID address
+			continue
+		}
+		sectorID := abi.SectorID{
+			Miner:  abi.ActorID(minerID),
+			Number: deal.SectorNumber,
+		}
+		_, ok := stateUpdates[sectorID]
+		if ok {
+			bySectorID[sectorID] = append(bySectorID[sectorID], deal)
+		}
+	}
+
+	return bySectorID, nil
 }
