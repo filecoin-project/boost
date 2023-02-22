@@ -71,7 +71,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 		return err
 	}
 
-	log.Infow("Contract deals subscription", "maddr", c.maddr, "topic", TopicHash.String())
+	log.Infow("contract deals subscription", "maddr", c.maddr, "topic", TopicHash.String())
 
 	go func() {
 		for {
