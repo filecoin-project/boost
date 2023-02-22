@@ -38,7 +38,7 @@ func BasicDealFilter(cfg config.DealmakingConfig, userCmd dtypes.StorageDealFilt
 				return false, "miner error", err
 			}
 
-			if deal.Transfer.Type != "manual" && !b {
+			if !deal.IsOffline && !b {
 				log.Warnf("online storage deal consideration disabled; rejecting storage deal proposal from client: %s", deal.ClientDealProposal.Proposal.Client.String())
 				return false, "miner is not considering online storage deals", nil
 			}
@@ -49,7 +49,7 @@ func BasicDealFilter(cfg config.DealmakingConfig, userCmd dtypes.StorageDealFilt
 				return false, "miner error", err
 			}
 
-			if deal.Transfer.Type == "manual" && !b {
+			if deal.IsOffline && !b {
 				log.Warnf("offline storage deal consideration disabled; rejecting storage deal proposal from client: %s", deal.ClientDealProposal.Proposal.Client.String())
 				return false, "miner is not accepting offline storage deals", nil
 			}

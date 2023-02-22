@@ -2,6 +2,7 @@ package storagemarket
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	"github.com/filecoin-project/boost/storagemarket/funds"
@@ -11,8 +12,9 @@ import (
 )
 
 func (p *Provider) getDealFilterParams(deal *types.ProviderDealState) (*dealfilter.DealFilterParams, *acceptError) {
-	// Get current sealing pipeline status
-	sealingStatus, err := sealingpipeline.GetStatus(p.ctx, p.sps)
+
+	// Check cached sealing pipeline status and error
+	sealingStatus, err := p.sealingPipelineStatus()
 	if err != nil {
 		return nil, &acceptError{
 			error:         fmt.Errorf("storage deal filter: failed to fetch sealing pipeline status: %w", err),
@@ -54,8 +56,28 @@ func (p *Provider) getDealFilterParams(deal *types.ProviderDealState) (*dealfilt
 
 	return &dealfilter.DealFilterParams{
 		DealParams:           params,
-		SealingPipelineState: *sealingStatus,
+		SealingPipelineState: sealingStatus,
 		FundsState:           *fundsStatus,
 		StorageState:         *storageStatus,
 	}, nil
+}
+
+// sealingPipelineStatus updates the SealingPipelineCache to reduce constant sealingpipeline.GetStatus calls
+// to the lotus-miner. This is to speed up the deal filter processing
+func (p *Provider) sealingPipelineStatus() (sealingpipeline.Status, error) {
+
+	if time.Now().After(p.spsCache.CacheTime.Add(p.config.SealingPipelineCacheTimeout)) || p.spsCache.CacheError != nil {
+		sealingStatus, err := sealingpipeline.GetStatus(p.ctx, p.sps)
+		if err != nil {
+			p.spsCache.CacheError = err
+			p.spsCache.CacheTime = time.Now()
+		} else {
+			p.spsCache.Status = *sealingStatus
+			p.spsCache.CacheTime = time.Now()
+			p.spsCache.CacheError = nil
+		}
+		return p.spsCache.Status, p.spsCache.CacheError
+	}
+
+	return p.spsCache.Status, p.spsCache.CacheError
 }
