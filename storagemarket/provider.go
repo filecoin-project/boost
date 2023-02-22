@@ -157,8 +157,9 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		cfg.MaxConcurrentLocalCommp = 1
 	}
 
-	// Set the timeout to 30 seconds
-	cfg.SealingPipelineCacheTimeout = 30
+	if cfg.SealingPipelineCacheTimeout < 0 {
+		cfg.SealingPipelineCacheTimeout = 30
+	}
 
 	return &Provider{
 		ctx:       ctx,

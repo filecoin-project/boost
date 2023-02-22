@@ -245,6 +245,11 @@ type DealmakingConfig struct {
 	// The deal logs older than DealLogDurationDays are deleted from the logsDB
 	// to keep the size of logsDB in check. Set the value as "0" to disable log cleanup
 	DealLogDurationDays int
+
+	// The sealing pipeline status is cached by Boost if deal filters are enabled to avoid constant call to
+	// lotus-miner API. SealingPipelineCacheTimeout defines cache timeout value in seconds. Default is 30 seconds.
+	// Any value less than 0 will result in use of default
+	SealingPipelineCacheTimeout int
 }
 
 type FeeConfig struct {

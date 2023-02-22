@@ -64,6 +64,17 @@ func (p *Provider) getDealFilterParams(deal *types.ProviderDealState) (*dealfilt
 // sealingPipelineStatus updates the SealingPipelineCache to reduce constant sealingpipeline.GetStatus calls
 // to the lotus-miner. This is to speed up the deal filter processing
 func (p *Provider) sealingPipelineStatus() {
+
+	sealingStatus, err := sealingpipeline.GetStatus(p.ctx, p.sps)
+	if err != nil {
+		p.spsCache.CacheError = err
+		p.spsCache.CacheTime = time.Now()
+	} else {
+		p.spsCache.Status = *sealingStatus
+		p.spsCache.CacheTime = time.Now()
+		p.spsCache.CacheError = nil
+	}
+
 	// Create a ticker with a second tick
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
