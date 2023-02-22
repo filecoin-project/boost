@@ -43,6 +43,7 @@ type Boost struct {
 	Wallets            WalletsConfig
 	Graphql            GraphqlConfig
 	Tracing            TracingConfig
+	ContractDeals      ContractDealsConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
@@ -239,6 +240,14 @@ type DealmakingConfig struct {
 	// The deal logs older than DealLogDurationDays are deleted from the logsDB
 	// to keep the size of logsDB in check. Set the value as "0" to disable log cleanup
 	DealLogDurationDays int
+}
+
+type ContractDealsConfig struct {
+	// Allowlist for contracts that this SP should accept deals from
+	AllowlistContracts []string
+
+	// From address for eth_ state call
+	From string
 }
 
 type FeeConfig struct {

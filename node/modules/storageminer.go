@@ -388,32 +388,31 @@ func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Pr
 	})
 }
 
-func HandleContractDeals(lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode, subCh *gateway.EthSubHandler) {
-	monitor, err := storagemarket.NewContractDealMonitor(prov, a, subCh)
-	if err != nil {
-		panic(err)
+func HandleContractDeals(c *config.ContractDealsConfig) func(mctx helpers.MetricsCtx, lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode, subCh *gateway.EthSubHandler, maddr lotus_dtypes.MinerAddress) {
+	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode, subCh *gateway.EthSubHandler, maddr lotus_dtypes.MinerAddress) {
+		monitor := storagemarket.NewContractDealMonitor(prov, a, subCh, c, address.Address(maddr))
+
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				log.Info("contract deals monitor starting")
+
+				err := monitor.Start(ctx)
+				if err != nil {
+					return err
+				}
+
+				log.Info("contract deals monitor started")
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				err := monitor.Stop()
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		})
 	}
-
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			log.Info("contract deals monitor starting")
-
-			err := monitor.Start(ctx)
-			if err != nil {
-				return err
-			}
-
-			log.Info("contract deals monitor started")
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			err := monitor.Stop()
-			if err != nil {
-				return err
-			}
-			return nil
-		},
-	})
 }
 
 type signatureVerifier struct {
