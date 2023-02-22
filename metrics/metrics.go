@@ -116,12 +116,12 @@ var (
 	SplitstoreCompactionDead        = stats.Int64("splitstore/dead", "Number of dead blocks in last compaction", stats.UnitDimensionless)
 
 	// http
-	HttpPayloadByCidRequestCount     = stats.Int64("http/payload_by_cid_request_count", "Counter of /payload/<payload-cid> requests", stats.UnitDimensionless)
+	HttpPayloadByCidRequestCount     = stats.Int64("http/payload_by_cid_request_count", "Counter of /ipfs/<payload-cid> requests", stats.UnitDimensionless)
 	HttpPayloadByCidRequestDuration  = stats.Float64("http/payload_by_cid_request_duration_ms", "Time spent retrieving a payload by cid", stats.UnitMilliseconds)
-	HttpPayloadByCid200ResponseCount = stats.Int64("http/payload_by_cid_200_response_count", "Counter of /payload/<payload-cid> 200 responses", stats.UnitDimensionless)
-	HttpPayloadByCid400ResponseCount = stats.Int64("http/payload_by_cid_400_response_count", "Counter of /payload/<payload-cid> 400 responses", stats.UnitDimensionless)
-	HttpPayloadByCid404ResponseCount = stats.Int64("http/payload_by_cid_404_response_count", "Counter of /payload/<payload-cid> 404 responses", stats.UnitDimensionless)
-	HttpPayloadByCid500ResponseCount = stats.Int64("http/payload_by_cid_500_response_count", "Counter of /payload/<payload-cid> 500 responses", stats.UnitDimensionless)
+	HttpPayloadByCid200ResponseCount = stats.Int64("http/payload_by_cid_200_response_count", "Counter of /ipfs/<payload-cid> 200 responses", stats.UnitDimensionless)
+	HttpPayloadByCid400ResponseCount = stats.Int64("http/payload_by_cid_400_response_count", "Counter of /ipfs/<payload-cid> 400 responses", stats.UnitDimensionless)
+	HttpPayloadByCid404ResponseCount = stats.Int64("http/payload_by_cid_404_response_count", "Counter of /ipfs/<payload-cid> 404 responses", stats.UnitDimensionless)
+	HttpPayloadByCid500ResponseCount = stats.Int64("http/payload_by_cid_500_response_count", "Counter of /ipfs/<payload-cid> 500 responses", stats.UnitDimensionless)
 	HttpPieceByCidRequestCount       = stats.Int64("http/piece_by_cid_request_count", "Counter of /piece/<piece-cid> requests", stats.UnitDimensionless)
 	HttpPieceByCidRequestDuration    = stats.Float64("http/piece_by_cid_request_duration_ms", "Time spent retrieving a piece by cid", stats.UnitMilliseconds)
 	HttpPieceByCid200ResponseCount   = stats.Int64("http/piece_by_cid_200_response_count", "Counter of /piece/<piece-cid> 200 responses", stats.UnitDimensionless)
