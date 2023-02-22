@@ -154,15 +154,12 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 						return fmt.Errorf("parsing cid failed: %w", err)
 					}
 
-					//TODO: get this from config or lotus-miner info?
-					providerAddr, _ := address.NewFromString("t01000")
-
 					prop := market.DealProposal{
 						PieceCID:     dpc.PieceCID,
 						PieceSize:    dpc.PieceSize,
 						VerifiedDeal: dpc.VerifiedDeal,
 						Client:       dpc.Client,
-						Provider:     providerAddr,
+						Provider:     c.maddr,
 
 						Label: dpc.Label,
 
