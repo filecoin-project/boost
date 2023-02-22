@@ -132,7 +132,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 						return fmt.Errorf("length prefix points erred: %w", err)
 					}
 
-					var dpc types.DealProposalCbor
+					var dpc types.ContractDealProposal
 					err = dpc.UnmarshalCBOR(bytes.NewReader(res[begin : begin+length]))
 					if err != nil {
 						return fmt.Errorf("cbor unmarshal failed: %w", err)

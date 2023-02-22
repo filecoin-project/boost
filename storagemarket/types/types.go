@@ -170,28 +170,3 @@ type AskGetter interface {
 type SignatureVerifier interface {
 	VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte) (bool, error)
 }
-
-type DealProposalCbor struct {
-	PieceCID     cid.Cid
-	PieceSize    abi.PaddedPieceSize
-	VerifiedDeal bool
-	Client       address.Address
-
-	Label market.DealLabel
-
-	StartEpoch           abi.ChainEpoch
-	EndEpoch             abi.ChainEpoch
-	StoragePricePerEpoch abi.TokenAmount
-
-	ProviderCollateral abi.TokenAmount
-	ClientCollateral   abi.TokenAmount
-
-	Version string
-	Params  []byte
-}
-
-type ParamsVersion1 struct {
-	LocationRef      string
-	CarSize          uint64
-	SkipIpniAnnounce bool
-}

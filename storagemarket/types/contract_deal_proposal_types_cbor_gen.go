@@ -19,9 +19,9 @@ var _ = cid.Undef
 var _ = math.E
 var _ = sort.Sort
 
-var lengthBufDealProposalCbor = []byte{140}
+var lengthBufContractDealProposal = []byte{140}
 
-func (t *DealProposalCbor) MarshalCBOR(w io.Writer) error {
+func (t *ContractDealProposal) MarshalCBOR(w io.Writer) error {
 	if t == nil {
 		_, err := w.Write(cbg.CborNull)
 		return err
@@ -29,7 +29,7 @@ func (t *DealProposalCbor) MarshalCBOR(w io.Writer) error {
 
 	cw := cbg.NewCborWriter(w)
 
-	if _, err := cw.Write(lengthBufDealProposalCbor); err != nil {
+	if _, err := cw.Write(lengthBufContractDealProposal); err != nil {
 		return err
 	}
 
@@ -124,8 +124,8 @@ func (t *DealProposalCbor) MarshalCBOR(w io.Writer) error {
 	return nil
 }
 
-func (t *DealProposalCbor) UnmarshalCBOR(r io.Reader) (err error) {
-	*t = DealProposalCbor{}
+func (t *ContractDealProposal) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = ContractDealProposal{}
 
 	cr := cbg.NewCborReader(r)
 
