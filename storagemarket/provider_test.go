@@ -1506,6 +1506,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 			StallCheckPeriod: time.Millisecond,
 			StallTimeout:     time.Hour,
 		},
+		SealingPipelineCacheTimeout: time.Second,
+		StorageFilter:               "1",
 	}
 	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, minerStub, sps, minerStub, df, sqldb,
 		logsDB, dagStore, ps, minerStub, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
