@@ -249,6 +249,9 @@ type DealmakingConfig struct {
 }
 
 type ContractDealsConfig struct {
+	// Whether to enable chain monitoring in order to accept contract deals
+	Enabled bool
+
 	// Allowlist for contracts that this SP should accept deals from
 	AllowlistContracts []string
 

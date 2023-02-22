@@ -391,6 +391,11 @@ func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Pr
 
 func HandleContractDeals(c *config.ContractDealsConfig) func(mctx helpers.MetricsCtx, lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode, subCh *gateway.EthSubHandler, maddr lotus_dtypes.MinerAddress) {
 	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode, subCh *gateway.EthSubHandler, maddr lotus_dtypes.MinerAddress) {
+		if !c.Enabled {
+			log.Info("Contract deals monitor is currently disabled. Update config.toml if you want to enable it.")
+			return
+		}
+
 		monitor := storagemarket.NewContractDealMonitor(prov, a, subCh, c, address.Address(maddr))
 
 		lc.Append(fx.Hook{
