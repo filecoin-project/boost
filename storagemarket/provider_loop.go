@@ -70,6 +70,10 @@ type acceptError struct {
 }
 
 func (p *Provider) runDealFilters(deal *types.ProviderDealState) *acceptError {
+	if p.config.StorageFilter == "" {
+		return nil
+	}
+
 	// run custom storage deal filter decision logic
 	dealFilterParams, aerr := p.getDealFilterParams(deal)
 	if aerr != nil {
@@ -115,10 +119,8 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 	}
 
 	// Run deal through the filter if deal filter is set
-	if p.config.StorageFilter != "" {
-		if aerr := p.runDealFilters(deal); aerr != nil {
-			return aerr
-		}
+	if aerr := p.runDealFilters(deal); aerr != nil {
+		return aerr
 	}
 
 	cleanup := func() {
@@ -228,10 +230,8 @@ func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState, dh 
 	}
 
 	// Run deal through the filter if deal filter is set
-	if p.config.StorageFilter != "" {
-		if aerr := p.runDealFilters(ds); aerr != nil {
-			return aerr
-		}
+	if aerr := p.runDealFilters(ds); aerr != nil {
+		return aerr
 	}
 
 	// Save deal to DB

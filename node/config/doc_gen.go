@@ -352,7 +352,7 @@ to keep the size of logsDB in check. Set the value as "0" to disable log cleanup
 		},
 		{
 			Name: "SealingPipelineCacheTimeout",
-			Type: "int",
+			Type: "Duration",
 
 			Comment: `The sealing pipeline status is cached by Boost if deal filters are enabled to avoid constant call to
 lotus-miner API. SealingPipelineCacheTimeout defines cache timeout value in seconds. Default is 30 seconds.

@@ -69,7 +69,7 @@ type Config struct {
 	// Cleanup deal logs from DB older than this many number of days
 	DealLogDurationDays int
 	// Cache timeout for Sealing Pipeline status
-	SealingPipelineCacheTimeout int
+	SealingPipelineCacheTimeout time.Duration
 	StorageFilter               string
 }
 
@@ -468,11 +468,6 @@ func (p *Provider) Start() error {
 		if err != nil {
 			p.dealLogger.LogError(deal.DealUuid, "failed to restart deal", err)
 		}
-	}
-
-	// Populate Sealing Pipeline Status Cache if deal filter is enabled
-	if p.config.StorageFilter != "" {
-		go p.sealingPipelineStatus()
 	}
 
 	// Start provider run loop

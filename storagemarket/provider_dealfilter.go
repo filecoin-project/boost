@@ -14,9 +14,10 @@ import (
 func (p *Provider) getDealFilterParams(deal *types.ProviderDealState) (*dealfilter.DealFilterParams, *acceptError) {
 
 	// Check cached sealing pipeline status and error
-	if p.spsCache.CacheError != nil {
+	sealingStatus, err := p.sealingPipelineStatus()
+	if err != nil {
 		return nil, &acceptError{
-			error:         fmt.Errorf("storage deal filter: failed to fetch sealing pipeline status: %w", p.spsCache.CacheError),
+			error:         fmt.Errorf("storage deal filter: failed to fetch sealing pipeline status: %w", err),
 			reason:        "server error: storage deal filter: getting sealing status",
 			isSevereError: true,
 		}
@@ -55,7 +56,7 @@ func (p *Provider) getDealFilterParams(deal *types.ProviderDealState) (*dealfilt
 
 	return &dealfilter.DealFilterParams{
 		DealParams:           params,
-		SealingPipelineState: p.spsCache.Status,
+		SealingPipelineState: sealingStatus,
 		FundsState:           *fundsStatus,
 		StorageState:         *storageStatus,
 	}, nil
@@ -63,41 +64,20 @@ func (p *Provider) getDealFilterParams(deal *types.ProviderDealState) (*dealfilt
 
 // sealingPipelineStatus updates the SealingPipelineCache to reduce constant sealingpipeline.GetStatus calls
 // to the lotus-miner. This is to speed up the deal filter processing
-func (p *Provider) sealingPipelineStatus() {
+func (p *Provider) sealingPipelineStatus() (sealingpipeline.Status, error) {
 
-	sealingStatus, err := sealingpipeline.GetStatus(p.ctx, p.sps)
-	if err != nil {
-		p.spsCache.CacheError = err
-		p.spsCache.CacheTime = time.Now()
-	} else {
-		p.spsCache.Status = *sealingStatus
-		p.spsCache.CacheTime = time.Now()
-		p.spsCache.CacheError = nil
-	}
-
-	// Create a ticker with a second tick
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			// time.Now() > cache time + timeout
-			if time.Now().After(p.spsCache.CacheTime.Add(time.Duration(p.config.SealingPipelineCacheTimeout) * time.Second)) {
-				sealingStatus, err := sealingpipeline.GetStatus(p.ctx, p.sps)
-				if err != nil {
-					p.spsCache.CacheError = err
-					p.spsCache.CacheTime = time.Now()
-				} else {
-					p.spsCache.Status = *sealingStatus
-					p.spsCache.CacheTime = time.Now()
-					p.spsCache.CacheError = nil
-				}
-			} else {
-				continue
-			}
-		case <-p.ctx.Done():
-			return
+	if time.Now().After(p.spsCache.CacheTime.Add(p.config.SealingPipelineCacheTimeout)) || p.spsCache.CacheError != nil {
+		sealingStatus, err := sealingpipeline.GetStatus(p.ctx, p.sps)
+		if err != nil {
+			p.spsCache.CacheError = err
+			p.spsCache.CacheTime = time.Now()
+		} else {
+			p.spsCache.Status = *sealingStatus
+			p.spsCache.CacheTime = time.Now()
+			p.spsCache.CacheError = nil
 		}
+		return p.spsCache.Status, p.spsCache.CacheError
 	}
+
+	return p.spsCache.Status, p.spsCache.CacheError
 }
