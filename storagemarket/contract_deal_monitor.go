@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	TopicHash = paddedEthHash(ethTopicHash("DealProposalCreate(bytes32)")) // deals published on chain
+	TopicHash = paddedEthHash(ethTopicHash("DealProposalCreate(bytes32,bytes,bool,uint256)")) // deals published on chain
 )
 
 type ContractDealMonitor struct {
@@ -71,7 +71,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 		return err
 	}
 
-	log.Infow("Contract deals miner address", "maddr", c.maddr)
+	log.Infow("Contract deals subscription", "maddr", c.maddr, "topic", TopicHash.String())
 
 	go func() {
 		for {
