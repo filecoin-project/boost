@@ -52,6 +52,12 @@ var (
 	addPieceRetryTimeout = 6 * time.Hour
 )
 
+type SealingPipelineCache struct {
+	Status     sealingpipeline.Status
+	CacheTime  time.Time
+	CacheError error
+}
+
 type Config struct {
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration time.Duration
@@ -62,6 +68,9 @@ type Config struct {
 	TransferLimiter         TransferLimiterConfig
 	// Cleanup deal logs from DB older than this many number of days
 	DealLogDurationDays int
+	// Cache timeout for Sealing Pipeline status
+	SealingPipelineCacheTimeout time.Duration
+	StorageFilter               string
 }
 
 var log = logging.Logger("boost-provider")
@@ -86,7 +95,8 @@ type Provider struct {
 	storageSpaceChan     chan storageSpaceDealReq
 
 	// Sealing Pipeline API
-	sps sealingpipeline.API
+	sps      sealingpipeline.API
+	spsCache SealingPipelineCache
 
 	// Boost deal filter
 	df dtypes.StorageDealFilter
@@ -147,6 +157,10 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		cfg.MaxConcurrentLocalCommp = 1
 	}
 
+	if cfg.SealingPipelineCacheTimeout < 0 {
+		cfg.SealingPipelineCacheTimeout = 30 * time.Second
+	}
+
 	return &Provider{
 		ctx:       ctx,
 		cancel:    cancel,
@@ -157,6 +171,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		dealsDB:   dealsDB,
 		logsSqlDB: logsSqlDB,
 		sps:       sps,
+		spsCache:  SealingPipelineCache{},
 		df:        df,
 
 		acceptDealChan:       make(chan acceptDealReq),
