@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"time"
 
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -34,6 +37,8 @@ import (
 	"github.com/ipfs/go-datastore/namespace"
 	ds_sync "github.com/ipfs/go-datastore/sync"
 	"github.com/ipld/go-car"
+	carv2 "github.com/ipld/go-car/v2"
+	"github.com/ipld/go-car/v2/blockstore"
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
 	"github.com/multiformats/go-multibase"
 	"github.com/urfave/cli/v2"
@@ -233,6 +238,77 @@ var commpCmd = &cli.Command{
 		fmt.Println("CommP CID: ", encoder.Encode(commp.PieceCID))
 		fmt.Println("Piece size: ", types.NewInt(uint64(commp.PieceSize.Unpadded().Padded())))
 		fmt.Println("Car file size: ", stat.Size())
+		return nil
+	},
+}
+
+var generateRandCar = &cli.Command{
+	Name:      "generate-rand-car",
+	Usage:     "creates a randomly generated dense car",
+	ArgsUsage: "<outputPath>",
+	Before:    before,
+	Flags: []cli.Flag{
+		&cli.IntFlag{
+			Name:    "size",
+			Aliases: []string{"s"},
+			Usage:   "The size of the data to turn into a car",
+			Value:   8000000,
+		},
+		&cli.IntFlag{
+			Name:    "chunksize",
+			Aliases: []string{"c"},
+			Value:   512,
+			Usage:   "Size of chunking that should occur",
+		},
+		&cli.IntFlag{
+			Name:    "maxlinks",
+			Aliases: []string{"l"},
+			Value:   8,
+			Usage:   "Max number of leaves per level",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		if cctx.Args().Len() < 1 {
+			return fmt.Errorf("usage: generate-car <outputPath> -size -chunksize -maxleaves")
+		}
+
+		outPath := cctx.Args().Get(0)
+		size := cctx.Int("size")
+		cs := cctx.Int64("chunksize")
+		ml := cctx.Int("maxlinks")
+
+		rf, err := testutil.CreateRandomFile(outPath, int(time.Now().Unix()), size)
+		if err != nil {
+			return err
+		}
+
+		// carv1
+		caropts := []carv2.Option{
+			blockstore.WriteAsCarV1(true),
+		}
+
+		root, cn, err := testutil.CreateDenseCARWith(outPath, rf, cs, ml, caropts)
+		if err != nil {
+			return err
+		}
+
+		err = os.Remove(rf)
+		if err != nil {
+			return err
+		}
+
+		encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
+		rn := encoder.Encode(root)
+		base := path.Dir(cn)
+		np := path.Join(base, rn+".car")
+
+		err = os.Rename(cn, np)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Payload CID: %s, written to: %s\n", rn, np)
+
 		return nil
 	},
 }

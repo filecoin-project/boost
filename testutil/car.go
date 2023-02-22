@@ -20,6 +20,7 @@ import (
 	"github.com/ipfs/go-merkledag"
 	"github.com/ipfs/go-unixfs/importer/balanced"
 	ihelper "github.com/ipfs/go-unixfs/importer/helpers"
+	"github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
 	"github.com/multiformats/go-multihash"
 )
@@ -61,13 +62,23 @@ func CreateRandomFile(dir string, rseed, size int) (string, error) {
 	return file.Name(), nil
 }
 
+func CreateDenseCARv2(dir, src string) (cid.Cid, string, error) {
+	cs := int64(unixfsChunkSize)
+	maxlinks := unixfsLinksPerLevel
+	// Use carv2
+	caropts := []car.Option{
+		blockstore.UseWholeCIDs(true),
+	}
+	return CreateDenseCARWith(dir, src, cs, maxlinks, caropts)
+}
+
 // CreateDenseCARv2 generates a "dense" UnixFS CARv2 from the supplied ordinary file.
 // A dense UnixFS CARv2 is one storing leaf data. Contrast to CreateRefCARv2.
-func CreateDenseCARv2(dir, src string) (cid.Cid, string, error) {
+func CreateDenseCARWith(dir, src string, chunksize int64, maxlinks int, caropts []car.Option) (cid.Cid, string, error) {
 	bs := bstore.NewBlockstore(dssync.MutexWrap(ds.NewMapDatastore()))
 	dagSvc := merkledag.NewDAGService(blockservice.New(bs, offline.Exchange(bs)))
 
-	root, err := WriteUnixfsDAGTo(src, dagSvc)
+	root, err := WriteUnixfsDAGTo(src, dagSvc, chunksize, maxlinks)
 	if err != nil {
 		return cid.Undef, "", err
 	}
@@ -83,14 +94,14 @@ func CreateDenseCARv2(dir, src string) (cid.Cid, string, error) {
 		return cid.Undef, "", err
 	}
 
-	rw, err := blockstore.OpenReadWrite(out.Name(), []cid.Cid{root}, blockstore.UseWholeCIDs(true))
+	rw, err := blockstore.OpenReadWrite(out.Name(), []cid.Cid{root}, caropts...)
 	if err != nil {
 		return cid.Undef, "", err
 	}
 
 	dagSvc = merkledag.NewDAGService(blockservice.New(rw, offline.Exchange(rw)))
 
-	root2, err := WriteUnixfsDAGTo(src, dagSvc)
+	root2, err := WriteUnixfsDAGTo(src, dagSvc, chunksize, maxlinks)
 	if err != nil {
 		return cid.Undef, "", err
 	}
@@ -107,7 +118,7 @@ func CreateDenseCARv2(dir, src string) (cid.Cid, string, error) {
 	return root, out.Name(), nil
 }
 
-func WriteUnixfsDAGTo(path string, into ipldformat.DAGService) (cid.Cid, error) {
+func WriteUnixfsDAGTo(path string, into ipldformat.DAGService, chunksize int64, maxlinks int) (cid.Cid, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return cid.Undef, err
@@ -137,7 +148,7 @@ func WriteUnixfsDAGTo(path string, into ipldformat.DAGService) (cid.Cid, error) 
 
 	bufferedDS := ipldformat.NewBufferedDAG(context.Background(), into)
 	params := ihelper.DagBuilderParams{
-		Maxlinks:  unixfsLinksPerLevel,
+		Maxlinks:  maxlinks,
 		RawLeaves: true,
 		// NOTE: InlineBuilder not recommended, we are using this to test identity CIDs
 		CidBuilder: cidutil.InlineBuilder{
@@ -148,7 +159,7 @@ func WriteUnixfsDAGTo(path string, into ipldformat.DAGService) (cid.Cid, error) 
 		NoCopy:  true,
 	}
 
-	db, err := params.New(chunk.NewSizeSplitter(rpf, int64(unixfsChunkSize)))
+	db, err := params.New(chunk.NewSizeSplitter(rpf, chunksize))
 	if err != nil {
 		return cid.Undef, err
 	}

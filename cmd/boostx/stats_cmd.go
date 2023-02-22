@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/filecoin-project/boost/cli/ctxutil"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
@@ -22,7 +22,7 @@ var statsCmd = &cli.Command{
 	Description: "Statistics on how many SPs are running Boost",
 	Before:      before,
 	Action: func(cctx *cli.Context) error {
-		ctx := ctxutil.ReqContext(cctx)
+		ctx := cliutil.ReqContext(cctx)
 
 		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
 		if err != nil {

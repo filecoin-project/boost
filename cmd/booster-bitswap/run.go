@@ -13,7 +13,7 @@ import (
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
 	"github.com/filecoin-project/boost/metrics"
-	"github.com/filecoin-project/boost/tracing"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/go-jsonrpc"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -76,6 +76,31 @@ var runCmd = &cli.Command{
 			Name:  "badbits-denylists",
 			Usage: "the endpoints for fetching one or more custom BadBits list instead of the default one at https://badbits.dwebops.pub/denylist.json",
 			Value: cli.NewStringSlice("https://badbits.dwebops.pub/denylist.json"),
+		},
+		&cli.IntFlag{
+			Name:  "engine-blockstore-worker-count",
+			Usage: "number of threads for blockstore operations. Used to throttle the number of concurrent requests to the block store",
+			Value: 128,
+		},
+		&cli.IntFlag{
+			Name:  "engine-task-worker-count",
+			Usage: "number of worker threads used for preparing and packaging responses before they are sent out. This number should generally be equal to task-worker-count",
+			Value: 128,
+		},
+		&cli.IntFlag{
+			Name:  "max-outstanding-bytes-per-peer",
+			Usage: "maximum number of bytes (across all tasks) pending to be processed and sent to any individual peer (default 32MiB)",
+			Value: 32 << 20,
+		},
+		&cli.IntFlag{
+			Name:  "target-message-size",
+			Usage: "target size of messages for bitswap to batch messages, actual size may vary depending on the queue (default 1MiB)",
+			Value: 1 << 20,
+		},
+		&cli.IntFlag{
+			Name:  "task-worker-count",
+			Usage: "Number of threads (goroutines) sending outgoing messages. Throttles the number of concurrent send operations",
+			Value: 128,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -143,7 +168,13 @@ var runCmd = &cli.Command{
 
 		// Start the bitswap server
 		log.Infof("Starting booster-bitswap node on port %d", port)
-		err = server.Start(ctx, proxyAddrInfo)
+		err = server.Start(ctx, proxyAddrInfo, &BitswapServerOptions{
+			EngineBlockstoreWorkerCount: cctx.Int("engine-blockstore-worker-count"),
+			EngineTaskWorkerCount:       cctx.Int("engine-task-worker-count"),
+			MaxOutstandingBytesPerPeer:  cctx.Int("max-outstanding-bytes-per-peer"),
+			TargetMessageSize:           cctx.Int("target-message-size"),
+			TaskWorkerCount:             cctx.Int("task-worker-count"),
+		})
 		if err != nil {
 			return err
 		}

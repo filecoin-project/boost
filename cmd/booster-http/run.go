@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -11,25 +10,14 @@ import (
 	"github.com/filecoin-project/boost/api"
 	bclient "github.com/filecoin-project/boost/api/client"
 	cliutil "github.com/filecoin-project/boost/cli/util"
-	"github.com/filecoin-project/boost/tracing"
+	"github.com/filecoin-project/boost/cmd/lib"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
-	lapi "github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/api/client"
-	"github.com/filecoin-project/lotus/api/v0api"
-	"github.com/filecoin-project/lotus/api/v1api"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/markets/dagstore"
-	"github.com/filecoin-project/lotus/markets/sectoraccessor"
-	"github.com/filecoin-project/lotus/node/config"
-	lotus_modules "github.com/filecoin-project/lotus/node/modules"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
-	"github.com/filecoin-project/lotus/node/repo"
-	"github.com/filecoin-project/lotus/storage/paths"
-	"github.com/filecoin-project/lotus/storage/sealer"
-	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
 )
@@ -105,7 +93,7 @@ var runCmd = &cli.Command{
 
 		// Connect to the full node API
 		fnApiInfo := cctx.String("api-fullnode")
-		fullnodeApi, ncloser, err := getFullNodeApi(ctx, fnApiInfo)
+		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log)
 		if err != nil {
 			return fmt.Errorf("getting full node API: %w", err)
 		}
@@ -113,15 +101,9 @@ var runCmd = &cli.Command{
 
 		// Connect to the storage API
 		storageApiInfo := cctx.String("api-storage")
-		sauth, err := storageAuthWithURL(storageApiInfo)
 		if err != nil {
 			return fmt.Errorf("parsing storage API endpoint: %w", err)
 		}
-		storageService, storageCloser, err := getMinerApi(ctx, storageApiInfo)
-		if err != nil {
-			return fmt.Errorf("getting miner API: %w", err)
-		}
-		defer storageCloser()
 
 		// Instantiate the tracer and exporter
 		enableTracing := cctx.Bool("tracing")
@@ -134,44 +116,13 @@ var runCmd = &cli.Command{
 			log.Info("Tracing exporter enabled")
 		}
 
-		maddr, err := storageService.ActorAddress(ctx)
+		// Create the sector accessor
+		sa, storageCloser, err := lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
 		if err != nil {
-			return fmt.Errorf("getting miner actor address: %w", err)
+			return err
 		}
-		log.Infof("Miner address: %s", maddr)
+		defer storageCloser()
 
-		// Use an in-memory repo because we don't need any functions
-		// of a real repo, we just need to supply something that satisfies
-		// the LocalStorage interface to the store
-		memRepo := repo.NewMemory(nil)
-
-		// passing FullNode, so that we don't pass StorageMiner or Worker and
-		// skip initializing of sectorstore.json with random local storage ID
-		lr, err := memRepo.Lock(repo.FullNode)
-		if err != nil {
-			return fmt.Errorf("locking mem repo: %w", err)
-		}
-		defer lr.Close()
-
-		if err := lr.SetStorage(func(sc *storiface.StorageConfig) {
-			sc.StoragePaths = []storiface.LocalPath{}
-		}); err != nil {
-			return fmt.Errorf("set storage config: %w", err)
-		}
-
-		// Create the store interface
-		var urls []string
-		lstor, err := paths.NewLocal(ctx, lr, storageService, urls)
-		if err != nil {
-			return fmt.Errorf("creating new local store: %w", err)
-		}
-		storage := lotus_modules.RemoteStorage(lstor, storageService, sauth, config.SealerConfig{
-			// TODO: Not sure if I need this, or any of the other fields in this struct
-			ParallelFetchLimit: 1,
-		})
-		// Create the piece provider and sector accessors
-		pp := sealer.NewPieceProvider(storage, storageService, storageService)
-		sa := sectoraccessor.NewSectorAccessor(dtypes.MinerAddress(maddr), storageService, pp, fullnodeApi)
 		allowIndexing := cctx.Bool("allow-indexing")
 		// Create the server API
 		sapi := serverApi{ctx: ctx, bapi: bapi, sa: sa}
@@ -219,16 +170,6 @@ var runCmd = &cli.Command{
 	},
 }
 
-func storageAuthWithURL(apiInfo string) (sealer.StorageAuth, error) {
-	s := strings.Split(apiInfo, ":")
-	if len(s) != 2 {
-		return nil, errors.New("unexpected format of `apiInfo`")
-	}
-	headers := http.Header{}
-	headers.Add("Authorization", "Bearer "+s[0])
-	return sealer.StorageAuth(headers), nil
-}
-
 type serverApi struct {
 	ctx  context.Context
 	bapi api.Boost
@@ -261,58 +202,6 @@ func getBoostApi(ctx context.Context, ai string) (api.Boost, jsonrpc.ClientClose
 	api, closer, err := bclient.NewBoostRPCV0(ctx, addr, info.AuthHeader())
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating full node service API: %w", err)
-	}
-
-	return api, closer, nil
-}
-
-func getFullNodeApi(ctx context.Context, ai string) (v1api.FullNode, jsonrpc.ClientCloser, error) {
-	ai = strings.TrimPrefix(strings.TrimSpace(ai), "FULLNODE_API_INFO=")
-	info := cliutil.ParseApiInfo(ai)
-	addr, err := info.DialArgs("v1")
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get DialArgs: %w", err)
-	}
-
-	log.Infof("Using full node API at %s", addr)
-	api, closer, err := client.NewFullNodeRPCV1(ctx, addr, info.AuthHeader())
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating full node service API: %w", err)
-	}
-
-	v, err := api.Version(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("checking full node service API version: %w", err)
-	}
-
-	if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
-		return nil, nil, fmt.Errorf("full node service API version didn't match (expected %s, remote %s)", lapi.FullAPIVersion1, v.APIVersion)
-	}
-
-	return api, closer, nil
-}
-
-func getMinerApi(ctx context.Context, ai string) (v0api.StorageMiner, jsonrpc.ClientCloser, error) {
-	ai = strings.TrimPrefix(strings.TrimSpace(ai), "MINER_API_INFO=")
-	info := cliutil.ParseApiInfo(ai)
-	addr, err := info.DialArgs("v0")
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get DialArgs: %w", err)
-	}
-
-	log.Infof("Using storage API at %s", addr)
-	api, closer, err := client.NewStorageMinerRPCV0(ctx, addr, info.AuthHeader())
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating miner service API: %w", err)
-	}
-
-	v, err := api.Version(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("checking miner service API version: %w", err)
-	}
-
-	if !v.APIVersion.EqMajorMinor(lapi.MinerAPIVersion0) {
-		return nil, nil, fmt.Errorf("miner service API version didn't match (expected %s, remote %s)", lapi.MinerAPIVersion0, v.APIVersion)
 	}
 
 	return api, closer, nil

@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/protocolproxy"
-	bsnetwork "github.com/ipfs/go-bitswap/network"
-	"github.com/ipfs/go-bitswap/server"
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	nilrouting "github.com/ipfs/go-ipfs-routing/none"
+	bsnetwork "github.com/ipfs/go-libipfs/bitswap/network"
+	"github.com/ipfs/go-libipfs/bitswap/server"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -29,6 +29,14 @@ type BitswapServer struct {
 	host        host.Host
 }
 
+type BitswapServerOptions struct {
+	EngineBlockstoreWorkerCount int
+	EngineTaskWorkerCount       int
+	TaskWorkerCount             int
+	TargetMessageSize           int
+	MaxOutstandingBytesPerPeer  int
+}
+
 func NewBitswapServer(
 	remoteStore blockstore.Blockstore,
 	host host.Host,
@@ -39,7 +47,7 @@ func NewBitswapServer(
 
 const protectTag = "bitswap-server-to-proxy"
 
-func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo) error {
+func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo, opts *BitswapServerOptions) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	s.proxy = proxy
 
@@ -63,7 +71,11 @@ func (s *BitswapServer) Start(ctx context.Context, proxy *peer.AddrInfo) error {
 		return err
 	}
 	bsopts := []server.Option{
-		server.MaxOutstandingBytesPerPeer(1 << 20),
+		server.EngineBlockstoreWorkerCount(opts.EngineBlockstoreWorkerCount),
+		server.EngineTaskWorkerCount(opts.EngineTaskWorkerCount),
+		server.MaxOutstandingBytesPerPeer(opts.MaxOutstandingBytesPerPeer),
+		server.TaskWorkerCount(opts.TaskWorkerCount),
+		server.WithTargetMessageSize(opts.TargetMessageSize),
 		server.WithPeerBlockRequestFilter(func(p peer.ID, c cid.Cid) bool {
 			fulfill, err := s.filter.FulfillRequest(p, c)
 			// peer request filter expects a true if the request should be fulfilled, so

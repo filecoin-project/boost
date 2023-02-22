@@ -21,4 +21,4 @@ fi
 
 echo Starting booster-bitswap...
 export GOLOG_LOG_LEVEL=remote-blockstore=debug,booster=debug,engine=debug,bitswap-server=debug
-exec booster-bitswap --vv run --api-boost=$BOOST_API_INFO --tracing
+exec booster-bitswap --vv run --api-boost=$BOOST_API_INFO --tracing --engine-blockstore-worker-count=64 --engine-task-worker-count=64 --max-outstanding-bytes-per-peer=8388608 --target-message-size=524288 --task-worker-count=64

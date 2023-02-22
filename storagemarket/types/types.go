@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/url"
 
-	"github.com/filecoin-project/boost/sealingpipeline"
 	"github.com/filecoin-project/boost/transport/httptransport/util"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
@@ -22,8 +21,7 @@ import (
 	"github.com/ipfs/go-cid"
 )
 
-//go:generate cbor-gen-for DealProposalCbor ParamsVersion1
-//go:generate cbor-gen-for --map-encoding StorageAsk DealParams Transfer DealResponse DealStatusRequest DealStatusResponse DealStatus
+//go:generate cbor-gen-for --map-encoding StorageAsk DealParamsV120 DealParams Transfer DealResponse DealStatusRequest DealStatusResponse DealStatus
 //go:generate go run github.com/golang/mock/mockgen -destination=mock_types/mocks.go -package=mock_types . PieceAdder,CommpCalculator,DealPublisher,ChainDealManager,IndexProvider
 
 // StorageAsk defines the parameters by which a miner will choose to accept or
@@ -85,11 +83,6 @@ type DealParams struct {
 	Transfer           Transfer // Transfer params will be the zero value if this is an offline deal
 	RemoveUnsealedCopy bool
 	SkipIPNIAnnounce   bool
-}
-
-type DealFilterParams struct {
-	DealParams           *DealParams
-	SealingPipelineState *sealingpipeline.Status
 }
 
 // Transfer has the parameters for a data transfer

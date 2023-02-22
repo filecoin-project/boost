@@ -9,7 +9,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/filecoin-project/boost/api"
-	"github.com/filecoin-project/boost/sealingpipeline"
+	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	lclient "github.com/filecoin-project/lotus/api/client"
