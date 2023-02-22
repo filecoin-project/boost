@@ -52,6 +52,12 @@ var (
 	addPieceRetryTimeout = 6 * time.Hour
 )
 
+type SealingPipelineCache struct {
+	Status     sealingpipeline.Status
+	CacheTime  time.Time
+	CacheError error
+}
+
 type Config struct {
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration time.Duration
@@ -62,6 +68,9 @@ type Config struct {
 	TransferLimiter         TransferLimiterConfig
 	// Cleanup deal logs from DB older than this many number of days
 	DealLogDurationDays int
+	// Cache timeout for Sealing Pipeline status
+	SealingPipelineCacheTimeout int
+	StorageFilter               string
 }
 
 var log = logging.Logger("boost-provider")
@@ -86,7 +95,8 @@ type Provider struct {
 	storageSpaceChan     chan storageSpaceDealReq
 
 	// Sealing Pipeline API
-	sps sealingpipeline.API
+	sps      sealingpipeline.API
+	spsCache SealingPipelineCache
 
 	// Boost deal filter
 	df dtypes.StorageDealFilter
@@ -147,6 +157,9 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		cfg.MaxConcurrentLocalCommp = 1
 	}
 
+	// Set the timeout to 30 seconds
+	cfg.SealingPipelineCacheTimeout = 30
+
 	return &Provider{
 		ctx:       ctx,
 		cancel:    cancel,
@@ -157,6 +170,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		dealsDB:   dealsDB,
 		logsSqlDB: logsSqlDB,
 		sps:       sps,
+		spsCache:  SealingPipelineCache{},
 		df:        df,
 
 		acceptDealChan:       make(chan acceptDealReq),
@@ -453,6 +467,11 @@ func (p *Provider) Start() error {
 		if err != nil {
 			p.dealLogger.LogError(deal.DealUuid, "failed to restart deal", err)
 		}
+	}
+
+	// Populate Sealing Pipeline Status Cache if deal filter is enabled
+	if p.config.StorageFilter != "" {
+		go p.sealingPipelineStatus()
 	}
 
 	// Start provider run loop

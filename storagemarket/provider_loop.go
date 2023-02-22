@@ -114,9 +114,11 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 		return aerr
 	}
 
-	// Run deal through the filter
-	if aerr := p.runDealFilters(deal); aerr != nil {
-		return aerr
+	// Run deal through the filter if deal filter is set
+	if p.config.StorageFilter != "" {
+		if aerr := p.runDealFilters(deal); aerr != nil {
+			return aerr
+		}
 	}
 
 	cleanup := func() {
@@ -225,9 +227,11 @@ func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState, dh 
 		return aerr
 	}
 
-	// Run deal through the filter
-	if aerr := p.runDealFilters(ds); aerr != nil {
-		return aerr
+	// Run deal through the filter if deal filter is set
+	if p.config.StorageFilter != "" {
+		if aerr := p.runDealFilters(ds); aerr != nil {
+			return aerr
+		}
 	}
 
 	// Save deal to DB
