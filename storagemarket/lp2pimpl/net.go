@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -152,14 +153,16 @@ type DealProvider struct {
 	host     host.Host
 	prov     *storagemarket.Provider
 	fullNode v1api.FullNode
+	plDB     *db.ProposalLogsDB
 	spApi    sealingpipeline.API
 }
 
-func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode, spApi sealingpipeline.API) *DealProvider {
+func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) *DealProvider {
 	p := &DealProvider{
 		host:     h,
 		prov:     prov,
 		fullNode: fullNodeApi,
+		plDB:     plDB,
 		spApi:    spApi,
 	}
 	return p
@@ -236,6 +239,8 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 		"end epoch", proposal.ClientDealProposal.Proposal.EndEpoch,
 		"price per epoch", proposal.ClientDealProposal.Proposal.StoragePricePerEpoch,
 	)
+
+	_ = p.plDB.InsertLog(p.ctx, proposal, res.Accepted, res.Reason) //nolint:errcheck
 
 	// Write the response to the client
 	err = cborutil.WriteCborRPC(s, &types.DealResponse{Accepted: res.Accepted, Message: res.Reason})

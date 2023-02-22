@@ -344,8 +344,8 @@ func HandleLegacyDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, host host.Host,
 	return nil
 }
 
-func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, spApi sealingpipeline.API) {
-	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, spApi)
+func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
+	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi)
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -546,7 +546,7 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 		}
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl)
-		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, nil, fundMgr, storageMgr, a, dp, provAddr, secb, commpc,
+		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, commpc,
 			sps, cdm, df, logsSqlDB.db, logsDB, dagst, ps, ip, lp, &signatureVerifier{a}, dl, tspt)
 		if err != nil {
 			return nil, err

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	market8 "github.com/filecoin-project/go-state-types/builtin/v9/market"
@@ -82,8 +81,6 @@ func (c *ChainDealManager) GetCurrentDealInfo(ctx context.Context, tok ctypes.Ti
 			return CurrentDealInfo{}, err
 		}
 		if !equal {
-			spew.Dump(proposal)
-			spew.Dump(marketDeal.Proposal)
 			return CurrentDealInfo{}, fmt.Errorf("Deal proposals for publish message %s did not match", publishCid)
 		}
 	}
@@ -189,7 +186,7 @@ func (c *ChainDealManager) CheckDealEquality(ctx context.Context, tok ctypes.Tip
 	return p1.PieceCID.Equals(p2.PieceCID) &&
 		p1.PieceSize == p2.PieceSize &&
 		p1.VerifiedDeal == p2.VerifiedDeal &&
-		//p1.Label.Equals(p2.Label) &&
+		p1.Label.Equals(p2.Label) &&
 		p1.StartEpoch == p2.StartEpoch &&
 		p1.EndEpoch == p2.EndEpoch &&
 		p1.StoragePricePerEpoch.Equals(p2.StoragePricePerEpoch) &&
