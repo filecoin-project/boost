@@ -469,7 +469,9 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 				StallCheckPeriod: time.Duration(cfg.Dealmaking.HttpTransferStallCheckPeriod),
 				StallTimeout:     time.Duration(cfg.Dealmaking.HttpTransferStallTimeout),
 			},
-			DealLogDurationDays: cfg.Dealmaking.DealLogDurationDays,
+			DealLogDurationDays:         cfg.Dealmaking.DealLogDurationDays,
+			StorageFilter:               cfg.Dealmaking.Filter,
+			SealingPipelineCacheTimeout: time.Duration(cfg.Dealmaking.SealingPipelineCacheTimeout),
 		}
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl)
