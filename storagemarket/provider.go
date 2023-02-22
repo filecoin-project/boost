@@ -158,7 +158,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 	}
 
 	if cfg.SealingPipelineCacheTimeout < 0 {
-		cfg.SealingPipelineCacheTimeout = 30
+		cfg.SealingPipelineCacheTimeout = 30 * time.Second
 	}
 
 	return &Provider{
