@@ -13,16 +13,6 @@ import (
 
 func (p *Provider) getDealFilterParams(deal *types.ProviderDealState) (*dealfilter.DealFilterParams, *acceptError) {
 
-	// Check cached sealing pipeline status and error
-	sealingStatus, err := p.sealingPipelineStatus()
-	if err != nil {
-		return nil, &acceptError{
-			error:         fmt.Errorf("storage deal filter: failed to fetch sealing pipeline status: %w", err),
-			reason:        "server error: storage deal filter: getting sealing status",
-			isSevereError: true,
-		}
-	}
-
 	// Get the status of funds in the collateral and publish message wallets
 	fundsStatus, err := funds.GetStatus(p.ctx, p.fundManager)
 	if err != nil {
@@ -56,6 +46,21 @@ func (p *Provider) getDealFilterParams(deal *types.ProviderDealState) (*dealfilt
 	// Clear transfer params in case it contains sensitive information
 	// (eg Authorization header)
 	params.Transfer.Params = []byte{}
+
+	sealingStatus := sealingpipeline.Status{}
+
+	// Check cached sealing pipeline status and error. Only check this if the deal filter is set
+	// to avoid making expensive sealingpipeline.GetStatus call
+	if p.config.StorageFilter != "" {
+		sealingStatus, err = p.sealingPipelineStatus()
+		if err != nil {
+			return nil, &acceptError{
+				error:         fmt.Errorf("storage deal filter: failed to fetch sealing pipeline status: %w", err),
+				reason:        "server error: storage deal filter: getting sealing status",
+				isSevereError: true,
+			}
+		}
+	}
 
 	return &dealfilter.DealFilterParams{
 		DealParams:           params,

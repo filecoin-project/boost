@@ -70,9 +70,6 @@ type acceptError struct {
 }
 
 func (p *Provider) runDealFilters(deal *types.ProviderDealState) *acceptError {
-	if p.config.StorageFilter == "" {
-		return nil
-	}
 
 	// run custom storage deal filter decision logic
 	dealFilterParams, aerr := p.getDealFilterParams(deal)
