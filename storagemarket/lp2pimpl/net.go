@@ -239,7 +239,6 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 		"end epoch", proposal.ClientDealProposal.Proposal.EndEpoch,
 		"price per epoch", proposal.ClientDealProposal.Proposal.StoragePricePerEpoch,
 	)
-
 	_ = p.plDB.InsertLog(p.ctx, proposal, res.Accepted, res.Reason) //nolint:errcheck
 
 	// Write the response to the client

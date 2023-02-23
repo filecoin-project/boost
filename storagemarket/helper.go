@@ -173,16 +173,14 @@ func (c *ChainDealManager) dealIDFromPublishDealsMsg(ctx context.Context, tok ct
 	return dealIDs[outIdx], wmsg.TipSet, nil
 }
 func (c *ChainDealManager) CheckDealEquality(ctx context.Context, tok ctypes.TipSetKey, p1, p2 market.DealProposal) (bool, error) {
-	//p1ClientID, err := c.fullnodeApi.StateLookupID(ctx, p1.Client, tok)
-	//if err != nil {
-	//return false, err
-	//}
-	//p2ClientID, err := c.fullnodeApi.StateLookupID(ctx, p2.Client, tok)
-	//if err != nil {
-	//return false, err
-	//}
-	// TODO: not sure why client is showing as different!!
-	// TODO: not sure why label is different!!
+	p1ClientID, err := c.fullnodeApi.StateLookupID(ctx, p1.Client, tok)
+	if err != nil {
+		return false, err
+	}
+	p2ClientID, err := c.fullnodeApi.StateLookupID(ctx, p2.Client, tok)
+	if err != nil {
+		return false, err
+	}
 	return p1.PieceCID.Equals(p2.PieceCID) &&
 		p1.PieceSize == p2.PieceSize &&
 		p1.VerifiedDeal == p2.VerifiedDeal &&
@@ -192,17 +190,6 @@ func (c *ChainDealManager) CheckDealEquality(ctx context.Context, tok ctypes.Tip
 		p1.StoragePricePerEpoch.Equals(p2.StoragePricePerEpoch) &&
 		p1.ProviderCollateral.Equals(p2.ProviderCollateral) &&
 		p1.ClientCollateral.Equals(p2.ClientCollateral) &&
-		p1.Provider == p2.Provider, nil
-
-	//return p1.PieceCID.Equals(p2.PieceCID) &&
-	//p1.PieceSize == p2.PieceSize &&
-	//p1.VerifiedDeal == p2.VerifiedDeal &&
-	//p1.Label.Equals(p2.Label) &&
-	//p1.StartEpoch == p2.StartEpoch &&
-	//p1.EndEpoch == p2.EndEpoch &&
-	//p1.StoragePricePerEpoch.Equals(p2.StoragePricePerEpoch) &&
-	//p1.ProviderCollateral.Equals(p2.ProviderCollateral) &&
-	//p1.ClientCollateral.Equals(p2.ClientCollateral) &&
-	//p1.Provider == p2.Provider &&
-	//p1ClientID == p2ClientID, nil
+		p1.Provider == p2.Provider &&
+		p1ClientID == p2ClientID, nil
 }
