@@ -277,7 +277,7 @@ func (p *Provider) ImportOfflineDealData(ctx context.Context, dealUuid uuid.UUID
 // ExecuteDeal is called when the Storage Provider receives a deal proposal
 // from the network
 func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, clientPeer peer.ID) (*api.ProviderDealRejectionInfo, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "Provider.ExecuteDeal")
+	ctx, span := tracing.Tracer.Start(ctx, "Provider.ExecuteLibp2pDeal")
 	defer span.End()
 
 	span.SetAttributes(attribute.String("dealUuid", dp.DealUUID.String())) // Example of adding additional attributes
@@ -295,14 +295,18 @@ func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, client
 		FastRetrieval:      !dp.RemoveUnsealedCopy,
 		AnnounceToIPNI:     !dp.SkipIPNIAnnounce,
 	}
-	// validate the deal proposal
+
+	// Validate the deal proposal
 	if err := p.validateDealProposal(ds); err != nil {
+		// Send the client a reason for the rejection that doesn't reveal the
+		// internal error message
 		reason := err.reason
 		if reason == "" {
 			reason = err.Error()
 		}
-		p.dealLogger.Infow(dp.DealUUID, "deal proposal failed validation", "err", err.Error(), "reason", reason)
 
+		// Log the internal error message
+		p.dealLogger.Infow(dp.DealUUID, "deal proposal failed validation", "err", err.Error(), "reason", reason)
 		return &api.ProviderDealRejectionInfo{
 			Reason: fmt.Sprintf("failed validation: %s", reason),
 		}, nil

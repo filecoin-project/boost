@@ -43,6 +43,7 @@ type Boost struct {
 	Wallets            WalletsConfig
 	Graphql            GraphqlConfig
 	Tracing            TracingConfig
+	ContractDeals      ContractDealsConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
@@ -250,6 +251,17 @@ type DealmakingConfig struct {
 	// lotus-miner API. SealingPipelineCacheTimeout defines cache timeout value in seconds. Default is 30 seconds.
 	// Any value less than 0 will result in use of default
 	SealingPipelineCacheTimeout Duration
+}
+
+type ContractDealsConfig struct {
+	// Whether to enable chain monitoring in order to accept contract deals
+	Enabled bool
+
+	// Allowlist for contracts that this SP should accept deals from
+	AllowlistContracts []string
+
+	// From address for eth_ state call
+	From string
 }
 
 type FeeConfig struct {

@@ -2,7 +2,7 @@
 ## docker will invoke this file from ../../.. dir in order to access the code
 #########################################################################################
 ARG LOTUS_TEST_IMAGE=filecoin/lotus-test:latest
-FROM ${LOTUS_TEST_IMAGE} as lotus-dev
+FROM ${LOTUS_TEST_IMAGE} as lotus-test
 #########################################################################################
 FROM node:16.16-alpine3.15 AS react-builder
 
@@ -86,8 +86,8 @@ RUN ls -1 /lib/*/libhwloc.so.* | head -n 1 | xargs -n1 -I {} ln -s {} /lib/libhw
 
 WORKDIR /app
 
-COPY --from=lotus-dev /usr/local/bin/lotus /usr/local/bin/
-COPY --from=lotus-dev /usr/local/bin/lotus-miner /usr/local/bin/
+COPY --from=lotus-test /usr/local/bin/lotus /usr/local/bin/
+COPY --from=lotus-test /usr/local/bin/lotus-miner /usr/local/bin/
 ## Test lotus starts
 RUN lotus -v && lotus-miner -v 
 #########################################################################################

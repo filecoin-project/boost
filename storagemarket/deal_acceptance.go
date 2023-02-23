@@ -3,12 +3,10 @@ package storagemarket
 import (
 	"errors"
 	"fmt"
-
 	cborutil "github.com/filecoin-project/go-cbor-util"
 
 	"github.com/filecoin-project/boost/markets/utils"
 	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/go-fil-markets/shared"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -48,7 +46,7 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) *validatio
 		return &validationError{error: fmt.Errorf("proposal PieceCID undefined")}
 	}
 
-	if ok, err := p.validateSignature(tok, deal); err != nil || !ok {
+	if ok, err := p.validateSignature(deal); err != nil || !ok {
 		if err != nil {
 			return &validationError{
 				reason: "server error: validating signature",
@@ -213,13 +211,13 @@ func (p *Provider) validateAsk(deal types.ProviderDealState) error {
 	return nil
 }
 
-func (p *Provider) validateSignature(tok shared.TipSetToken, deal types.ProviderDealState) (bool, error) {
+func (p *Provider) validateSignature(deal types.ProviderDealState) (bool, error) {
 	b, err := cborutil.Dump(&deal.ClientDealProposal.Proposal)
 	if err != nil {
 		return false, fmt.Errorf("failed to serialize client deal proposal: %w", err)
 	}
 
-	verified, err := p.sigVerifier.VerifySignature(p.ctx, deal.ClientDealProposal.ClientSignature, deal.ClientDealProposal.Proposal.Client, b, tok)
+	verified, err := p.sigVerifier.VerifySignature(p.ctx, deal.ClientDealProposal.ClientSignature, deal.ClientDealProposal.Proposal.Client, b)
 	if err != nil {
 		return false, fmt.Errorf("error verifying signature: %w", err)
 	}

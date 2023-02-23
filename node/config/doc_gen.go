@@ -68,6 +68,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "ContractDeals",
+			Type: "ContractDealsConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "LotusDealmaking",
 			Type: "lotus_config.DealmakingConfig",
 
@@ -116,6 +122,26 @@ your node if metadata log is disabled`,
 			Type: "lotus_config.Pubsub",
 
 			Comment: ``,
+		},
+	},
+	"ContractDealsConfig": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: `Whether to enable chain monitoring in order to accept contract deals`,
+		},
+		{
+			Name: "AllowlistContracts",
+			Type: "[]string",
+
+			Comment: `Allowlist for contracts that this SP should accept deals from`,
+		},
+		{
+			Name: "From",
+			Type: "string",
+
+			Comment: `From address for eth_ state call`,
 		},
 	},
 	"DealmakingConfig": []DocField{
