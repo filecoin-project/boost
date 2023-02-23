@@ -27,7 +27,8 @@ type ContractDealProposal struct {
 }
 
 type ContractParamsVersion1 struct {
-	LocationRef      string
-	CarSize          uint64
-	SkipIpniAnnounce bool
+	LocationRef        string
+	CarSize            uint64
+	SkipIpniAnnounce   bool
+	RemoveUnsealedCopy bool
 }
