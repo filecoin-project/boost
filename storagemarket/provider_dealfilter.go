@@ -48,6 +48,9 @@ func (p *Provider) getDealFilterParams(deal *types.ProviderDealState) (*dealfilt
 		ClientDealProposal: deal.ClientDealProposal,
 		DealDataRoot:       deal.DealDataRoot,
 		Transfer:           deal.Transfer,
+		IsOffline:          deal.IsOffline,
+		RemoveUnsealedCopy: !deal.FastRetrieval,
+		SkipIPNIAnnounce:   !deal.AnnounceToIPNI,
 	}
 
 	// Clear transfer params in case it contains sensitive information
