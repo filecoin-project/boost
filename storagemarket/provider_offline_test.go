@@ -73,7 +73,7 @@ func TestOfflineDealInsufficientProviderFunds(t *testing.T) {
 	td := harness.newDealBuilder(t, 1, withOfflineDeal()).withNoOpMinerStub().build()
 
 	// create a deal proposal for the offline deal
-	pi, err := harness.Provider.ExecuteLibp2pDeal(context.Background(), td.params, peer.ID(""))
+	pi, err := harness.Provider.ExecuteDeal(context.Background(), td.params, peer.ID(""))
 	require.NoError(t, err)
 	require.True(t, pi.Accepted)
 

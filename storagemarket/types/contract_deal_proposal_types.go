@@ -26,7 +26,7 @@ type ContractDealProposal struct {
 	Params  []byte
 }
 
-type ParamsVersion1 struct {
+type ContractParamsVersion1 struct {
 	LocationRef      string
 	CarSize          uint64
 	SkipIpniAnnounce bool

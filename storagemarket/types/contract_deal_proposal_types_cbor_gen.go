@@ -321,7 +321,7 @@ func (t *ContractDealProposal) UnmarshalCBOR(r io.Reader) (err error) {
 
 var lengthBufParamsVersion1 = []byte{131}
 
-func (t *ParamsVersion1) MarshalCBOR(w io.Writer) error {
+func (t *ContractParamsVersion1) MarshalCBOR(w io.Writer) error {
 	if t == nil {
 		_, err := w.Write(cbg.CborNull)
 		return err
@@ -358,8 +358,8 @@ func (t *ParamsVersion1) MarshalCBOR(w io.Writer) error {
 	return nil
 }
 
-func (t *ParamsVersion1) UnmarshalCBOR(r io.Reader) (err error) {
-	*t = ParamsVersion1{}
+func (t *ContractParamsVersion1) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = ContractParamsVersion1{}
 
 	cr := cbg.NewCborReader(r)
 

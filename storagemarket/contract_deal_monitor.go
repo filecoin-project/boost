@@ -73,6 +73,11 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 
 	log.Infow("contract deals subscription", "maddr", c.maddr, "topic", TopicHash.String())
 
+	fromEthAddr, err := ethtypes.ParseEthAddress(c.cfg.From)
+	if err != nil {
+		return fmt.Errorf("parsing `from` eth address failed: %w", err)
+	}
+
 	go func() {
 		for {
 			select {
@@ -91,24 +96,15 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 					topicContractAddress := event["address"].(string)
 					topicDealProposalID := event["topics"].([]interface{})[1].(string)
 
-					_from := c.cfg.From
-
 					// allowlist check
 					if len(c.cfg.AllowlistContracts) != 0 && !slices.Contains(c.cfg.AllowlistContracts, topicContractAddress) {
 						return fmt.Errorf("allowlist does not contain this contract address: %s", topicContractAddress)
 					}
 
-					_to := topicContractAddress
-
 					// GetDealProposal is a free data retrieval call binding the contract method 0xf4b2e4d8.
 					_params := "0xf4b2e4d8" + topicDealProposalID[2:] // cut 0x prefix
 
-					fromEthAddr, err := ethtypes.ParseEthAddress(_from)
-					if err != nil {
-						return fmt.Errorf("parsing `from` eth address failed: %w", err)
-					}
-
-					toEthAddr, err := ethtypes.ParseEthAddress(_to)
+					toEthAddr, err := ethtypes.ParseEthAddress(topicContractAddress)
 					if err != nil {
 						return fmt.Errorf("parsing `to` eth address failed: %w", err)
 					}
@@ -138,7 +134,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 						return fmt.Errorf("cbor unmarshal failed: %w", err)
 					}
 
-					var pv1 types.ParamsVersion1
+					var pv1 types.ContractParamsVersion1
 					err = pv1.UnmarshalCBOR(bytes.NewReader(dpc.Params))
 					if err != nil {
 						return fmt.Errorf("params cbor unmarshal failed: %w", err)
@@ -195,9 +191,10 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 
 					log.Infow("received contract deal proposal", "id", proposal.DealUUID, "client-peer", dpc.Client)
 
-					reason, err := c.prov.ExecuteLibp2pDeal(context.Background(), &proposal, "")
+					reason, err := c.prov.ExecuteDeal(context.Background(), &proposal, "")
 					if err != nil {
 						log.Warnw("contract deal proposal failed", "id", proposal.DealUUID, "err", err, "reason", reason.Reason)
+						return nil
 					}
 
 					if reason.Accepted {
