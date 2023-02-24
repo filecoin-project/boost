@@ -34,7 +34,6 @@ import (
 	tspttypes "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
-	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/shared_testutil"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -1506,6 +1505,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 			StallCheckPeriod: time.Millisecond,
 			StallTimeout:     time.Hour,
 		},
+		SealingPipelineCacheTimeout: time.Second,
+		StorageFilter:               "1",
 	}
 	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, minerStub, sps, minerStub, df, sqldb,
 		logsDB, dagStore, ps, minerStub, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
@@ -2235,6 +2236,6 @@ type mockSignatureVerifier struct {
 	err   error
 }
 
-func (m *mockSignatureVerifier) VerifySignature(ctx context.Context, sig acrypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error) {
+func (m *mockSignatureVerifier) VerifySignature(ctx context.Context, sig acrypto.Signature, addr address.Address, input []byte) (bool, error) {
 	return m.valid, m.err
 }

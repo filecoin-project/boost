@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"sort"
 
-	tracing "github.com/filecoin-project/boost/tracing"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -17,18 +16,20 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/gateway"
 	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
-	"github.com/filecoin-project/lotus/markets/storageadapter"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/google/uuid"
@@ -46,7 +47,8 @@ type BoostAPI struct {
 	api.Common
 	api.Net
 
-	Full lapi.FullNode
+	Full  lapi.FullNode
+	SubCh *gateway.EthSubHandler
 
 	Host host.Host
 

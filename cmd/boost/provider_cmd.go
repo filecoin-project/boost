@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	bcli "github.com/filecoin-project/boost/cli"
-	"github.com/filecoin-project/boost/cli/ctxutil"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/network"
@@ -45,7 +45,7 @@ var libp2pInfoCmd = &cli.Command{
 	Description: "Lists the libp2p address and protocols supported by the Storage Provider",
 	Before:      before,
 	Action: func(cctx *cli.Context) error {
-		ctx := ctxutil.ReqContext(cctx)
+		ctx := cliutil.ReqContext(cctx)
 
 		if cctx.Args().Len() != 1 {
 			return fmt.Errorf("usage: protocols <provider address>")

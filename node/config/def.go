@@ -113,6 +113,7 @@ func DefaultBoost() *Boost {
 			HttpTransferStallTimeout:           Duration(5 * time.Minute),
 			HttpTransferStallCheckPeriod:       Duration(30 * time.Second),
 			DealLogDurationDays:                30,
+			SealingPipelineCacheTimeout:        Duration(30 * time.Second),
 		},
 
 		LotusDealmaking: lotus_config.DealmakingConfig{

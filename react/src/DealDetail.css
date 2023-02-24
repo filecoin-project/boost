@@ -88,6 +88,14 @@
     color: #999;
 }
 
+.deal-detail .contract {
+    background: url("./bootstrap-icons/icons/file-earmark-text.svg");
+    padding-left: 1.5em;
+    display: inline-block;
+    background-repeat: no-repeat;
+    background-position: left center;
+}
+
 .deal-detail .buttons {
     display: inline-block;
     float: right;

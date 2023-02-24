@@ -14,11 +14,11 @@ import (
 	"github.com/chzyer/readline"
 	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost/api"
-	"github.com/filecoin-project/boost/cli/ctxutil"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/util"
+	scliutil "github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/go-address"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
@@ -70,7 +70,7 @@ var initCmd = &cli.Command{
 	}...),
 	Before: before,
 	Action: func(cctx *cli.Context) error {
-		ctx := ctxutil.ReqContext(cctx)
+		ctx := scliutil.ReqContext(cctx)
 
 		bp, err := initBoost(ctx, cctx, nil)
 		if err != nil {
@@ -185,7 +185,7 @@ var migrateMonolithCmd = &cli.Command{
 }
 
 func migrate(cctx *cli.Context, fromMonolith bool, mktsRepoPath string) error {
-	ctx := ctxutil.ReqContext(cctx)
+	ctx := scliutil.ReqContext(cctx)
 
 	// Open markets repo
 	fmt.Printf("Opening repo '%s'\n", mktsRepoPath)

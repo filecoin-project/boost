@@ -14,12 +14,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/fx"
 
+	"github.com/filecoin-project/boost/markets/idxprov"
 	dst "github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/lotus/markets/dagstore"
-	"github.com/filecoin-project/lotus/markets/idxprov"
 
+	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/hashicorp/go-multierror"
 	logging "github.com/ipfs/go-log/v2"
 
@@ -27,8 +29,6 @@ import (
 	"github.com/ipni/index-provider/engine/xproviders"
 	"github.com/ipni/index-provider/metadata"
 
-	"github.com/filecoin-project/boost/db"
-	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/ipfs/go-cid"
 	provider "github.com/ipni/index-provider"
 )

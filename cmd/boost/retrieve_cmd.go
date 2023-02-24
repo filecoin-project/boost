@@ -12,16 +12,14 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 
 	"github.com/dustin/go-humanize"
-	"github.com/filecoin-project/boost/cli/ctxutil"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
+	"github.com/filecoin-project/boost/markets/utils"
 	rc "github.com/filecoin-project/boost/retrievalmarket/client"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/markets/utils"
-
-	"github.com/filecoin-project/go-address"
-
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
@@ -75,7 +73,7 @@ var retrieveCmd = &cli.Command{
 		flagCar,
 	},
 	Action: func(cctx *cli.Context) error {
-		ctx := ctxutil.ReqContext(cctx)
+		ctx := cliutil.ReqContext(cctx)
 
 		cidStr := cctx.Args().First()
 		if cidStr == "" {

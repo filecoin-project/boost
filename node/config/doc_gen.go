@@ -68,6 +68,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "ContractDeals",
+			Type: "ContractDealsConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "LotusDealmaking",
 			Type: "lotus_config.DealmakingConfig",
 
@@ -116,6 +122,26 @@ your node if metadata log is disabled`,
 			Type: "lotus_config.Pubsub",
 
 			Comment: ``,
+		},
+	},
+	"ContractDealsConfig": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: `Whether to enable chain monitoring in order to accept contract deals`,
+		},
+		{
+			Name: "AllowlistContracts",
+			Type: "[]string",
+
+			Comment: `Allowlist for contracts that this SP should accept deals from`,
+		},
+		{
+			Name: "From",
+			Type: "string",
+
+			Comment: `From address for eth_ state call`,
 		},
 	},
 	"DealmakingConfig": []DocField{
@@ -349,6 +375,14 @@ a file containing the booster-bitswap peer id's private key. Can be left blank w
 
 			Comment: `The deal logs older than DealLogDurationDays are deleted from the logsDB
 to keep the size of logsDB in check. Set the value as "0" to disable log cleanup`,
+		},
+		{
+			Name: "SealingPipelineCacheTimeout",
+			Type: "Duration",
+
+			Comment: `The sealing pipeline status is cached by Boost if deal filters are enabled to avoid constant call to
+lotus-miner API. SealingPipelineCacheTimeout defines cache timeout value in seconds. Default is 30 seconds.
+Any value less than 0 will result in use of default`,
 		},
 	},
 	"FeeConfig": []DocField{
