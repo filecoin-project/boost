@@ -69,6 +69,9 @@ type acceptError struct {
 	reason string
 }
 
+// we still need to call the BasicDealFilter() even when external deal filter is not set.
+// Once BasicDealFilter() completes the checks like are we accepting online deal, verified deal etc.
+// Then it runs the external "cmd" filter. Thus, runDealFilters is not optional of any type of deal
 func (p *Provider) runDealFilters(deal *types.ProviderDealState) *acceptError {
 
 	// run custom storage deal filter decision logic
@@ -115,7 +118,7 @@ func (p *Provider) processDealProposal(deal *types.ProviderDealState) *acceptErr
 		return aerr
 	}
 
-	// Run deal through the filter if deal filter is set
+	// we still need to call runDealFilters() even when external deal filter is not set
 	if aerr := p.runDealFilters(deal); aerr != nil {
 		return aerr
 	}
@@ -226,7 +229,7 @@ func (p *Provider) processOfflineDealProposal(ds *smtypes.ProviderDealState, dh 
 		return aerr
 	}
 
-	// Run deal through the filter if deal filter is set
+	// we still need to call runDealFilters() even when external deal filter is not set
 	if aerr := p.runDealFilters(ds); aerr != nil {
 		return aerr
 	}
