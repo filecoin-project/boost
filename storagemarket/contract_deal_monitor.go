@@ -91,8 +91,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 				return
 			case resp := <-responseCh:
 				err := func() error {
-					result := resp.Result.([]interface{})[0]
-					event := result.(map[string]interface{})
+					event := resp.Result.(map[string]interface{})
 					topicContractAddress := event["address"].(string)
 					topicDealProposalID := event["topics"].([]interface{})[1].(string)
 
