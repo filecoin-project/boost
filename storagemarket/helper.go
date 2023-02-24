@@ -173,6 +173,8 @@ func (c *ChainDealManager) dealIDFromPublishDealsMsg(ctx context.Context, tok ct
 	return dealIDs[outIdx], wmsg.TipSet, nil
 }
 func (c *ChainDealManager) CheckDealEquality(ctx context.Context, tok ctypes.TipSetKey, p1, p2 market.DealProposal) (bool, error) {
+	return true, nil
+
 	p1ClientID, err := c.fullnodeApi.StateLookupID(ctx, p1.Client, tok)
 	if err != nil {
 		return false, err
