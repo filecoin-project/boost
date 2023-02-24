@@ -220,7 +220,6 @@ var retrieveCmd = &cli.Command{
 				dservOffline,
 				c,
 				selspec.Node(),
-				nil,
 				func(p traversal.Progress, n ipld.Node, r traversal.VisitReason) error {
 					if r == traversal.VisitReason_SelectionMatch {
 

@@ -358,20 +358,7 @@ require (
 
 require (
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
-	github.com/armon/go-metrics v0.3.9 // indirect
-	github.com/boltdb/bolt v1.3.1 // indirect
-	github.com/elastic/go-elasticsearch/v7 v7.14.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
-	github.com/hashicorp/go-hclog v0.16.2 // indirect
-	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
-	github.com/hashicorp/go-msgpack v0.5.5 // indirect
-	github.com/hashicorp/raft v1.1.1 // indirect
-	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea // indirect
-	github.com/libp2p/go-libp2p-consensus v0.0.1 // indirect
-	github.com/libp2p/go-libp2p-gorpc v0.4.0 // indirect
-	github.com/libp2p/go-libp2p-raft v0.1.8 // indirect
-	github.com/ugorji/go/codec v1.2.6 // indirect
-	github.com/ipfs/go-block-format v0.1.1 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 )
