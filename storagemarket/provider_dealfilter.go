@@ -13,14 +13,30 @@ import (
 
 func (p *Provider) getDealFilterParams(deal *types.ProviderDealState) (*dealfilter.DealFilterParams, *acceptError) {
 
-	// Check cached sealing pipeline status and error
-	sealingStatus, err := p.sealingPipelineStatus()
-	if err != nil {
-		return nil, &acceptError{
-			error:         fmt.Errorf("storage deal filter: failed to fetch sealing pipeline status: %w", err),
-			reason:        "server error: storage deal filter: getting sealing status",
-			isSevereError: true,
-		}
+	params := types.DealParams{
+		DealUUID:           deal.DealUuid,
+		ClientDealProposal: deal.ClientDealProposal,
+		DealDataRoot:       deal.DealDataRoot,
+		Transfer:           deal.Transfer,
+		IsOffline:          deal.IsOffline,
+		RemoveUnsealedCopy: !deal.FastRetrieval,
+		SkipIPNIAnnounce:   !deal.AnnounceToIPNI,
+	}
+
+	// Clear transfer params in case it contains sensitive information
+	// (eg Authorization header)
+	params.Transfer.Params = []byte{}
+
+	// If no external deal filter is set then return empty value for SealingPipelineState,
+	// FundsState and StorageState to shorten the execution. This also avoids the expensive
+	// p.sealingPipelineStatus() call
+	if p.config.StorageFilter == "" {
+		return &dealfilter.DealFilterParams{
+			DealParams:           params,
+			SealingPipelineState: sealingpipeline.Status{},
+			FundsState:           funds.Status{},
+			StorageState:         storagespace.Status{},
+		}, nil
 	}
 
 	// Get the status of funds in the collateral and publish message wallets
@@ -43,19 +59,15 @@ func (p *Provider) getDealFilterParams(deal *types.ProviderDealState) (*dealfilt
 		}
 	}
 
-	params := types.DealParams{
-		DealUUID:           deal.DealUuid,
-		ClientDealProposal: deal.ClientDealProposal,
-		DealDataRoot:       deal.DealDataRoot,
-		Transfer:           deal.Transfer,
-		IsOffline:          deal.IsOffline,
-		RemoveUnsealedCopy: !deal.FastRetrieval,
-		SkipIPNIAnnounce:   !deal.AnnounceToIPNI,
+	// Check cached sealing pipeline status and error
+	sealingStatus, err := p.sealingPipelineStatus()
+	if err != nil {
+		return nil, &acceptError{
+			error:         fmt.Errorf("storage deal filter: failed to fetch sealing pipeline status: %w", err),
+			reason:        "server error: storage deal filter: getting sealing status",
+			isSevereError: true,
+		}
 	}
-
-	// Clear transfer params in case it contains sensitive information
-	// (eg Authorization header)
-	params.Transfer.Params = []byte{}
 
 	return &dealfilter.DealFilterParams{
 		DealParams:           params,
