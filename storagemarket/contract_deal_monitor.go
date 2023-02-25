@@ -221,7 +221,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 					return nil
 				}()
 				if err != nil {
-					log.Errorw("handling DealProposalCreate event erred: %w", err)
+					log.Errorw("handling DealProposalCreate event erred", "err", err)
 				}
 			}
 		}
