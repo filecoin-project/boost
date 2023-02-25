@@ -72,6 +72,12 @@ func DefaultBoost() *Boost {
 			ServiceName: "boostd",
 		},
 
+		ContractDeals: ContractDealsConfig{
+			Enabled:            false,
+			AllowlistContracts: []string{},
+			From:               "0x0000000000000000000000000000000000000000",
+		},
+
 		Dealmaking: DealmakingConfig{
 			ConsiderOnlineStorageDeals:     true,
 			ConsiderOfflineStorageDeals:    true,
