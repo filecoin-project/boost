@@ -12,6 +12,7 @@ type ContractDealProposal struct {
 	PieceSize    abi.PaddedPieceSize
 	VerifiedDeal bool
 	Client       address.Address
+	Provider     address.Address
 
 	Label market.DealLabel
 

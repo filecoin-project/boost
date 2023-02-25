@@ -149,6 +149,13 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 						return fmt.Errorf("parsing cid failed: %w", err)
 					}
 
+					//TODO: confirm that this is correct
+					if !dpc.Provider.Empty() {
+						if dpc.Provider != c.maddr {
+							return fmt.Errorf("proposal includes a provider which is not us, skipping. provider: %v ; us: %v", dpc.Provider, c.maddr)
+						}
+					}
+
 					prop := market.DealProposal{
 						PieceCID:     dpc.PieceCID,
 						PieceSize:    dpc.PieceSize,

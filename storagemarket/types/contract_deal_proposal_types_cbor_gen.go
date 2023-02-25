@@ -55,6 +55,11 @@ func (t *ContractDealProposal) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
+	// t.Provider (address.Address) (struct)
+	if err := t.Provider.MarshalCBOR(cw); err != nil {
+		return err
+	}
+
 	// t.Label (types.DealLabel) (struct)
 	if err := t.Label.MarshalCBOR(cw); err != nil {
 		return err
@@ -196,6 +201,15 @@ func (t *ContractDealProposal) UnmarshalCBOR(r io.Reader) (err error) {
 
 		if err := t.Client.UnmarshalCBOR(cr); err != nil {
 			return xerrors.Errorf("unmarshaling t.Client: %w", err)
+		}
+
+	}
+	// t.Provider (address.Address) (struct)
+
+	{
+
+		if err := t.Provider.UnmarshalCBOR(cr); err != nil {
+			return xerrors.Errorf("unmarshaling t.Provider: %w", err)
 		}
 
 	}
@@ -355,6 +369,11 @@ func (t *ContractParamsVersion1) MarshalCBOR(w io.Writer) error {
 	if err := cbg.WriteBool(w, t.SkipIpniAnnounce); err != nil {
 		return err
 	}
+
+	// t.RemoveUnsealedCopy (bool) (bool)
+	if err := cbg.WriteBool(w, t.RemoveUnsealedCopy); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -419,6 +438,24 @@ func (t *ContractParamsVersion1) UnmarshalCBOR(r io.Reader) (err error) {
 		t.SkipIpniAnnounce = false
 	case 21:
 		t.SkipIpniAnnounce = true
+	default:
+		return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
+	}
+
+	// t.RemoveUnsealedCopy (bool) (bool)
+
+	maj, extra, err = cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	if maj != cbg.MajOther {
+		return fmt.Errorf("booleans must be major type 7")
+	}
+	switch extra {
+	case 20:
+		t.RemoveUnsealedCopy = false
+	case 21:
+		t.RemoveUnsealedCopy = true
 	default:
 		return fmt.Errorf("booleans are either major type 7, value 20 or 21 (got %d)", extra)
 	}
