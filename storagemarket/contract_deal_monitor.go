@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	TopicHash = paddedEthHash(ethTopicHash("DealProposalCreate(bytes32,bytes,bool,uint256)")) // deals published on chain
+	TopicHash = paddedEthHash(ethTopicHash("DealProposalCreate(bytes32,uint64,bool,uint256)")) // deals published on chain
 )
 
 type ContractDealMonitor struct {
