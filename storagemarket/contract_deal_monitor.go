@@ -149,9 +149,18 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 						return fmt.Errorf("parsing cid failed: %w", err)
 					}
 
+					var prov address.Address
+
 					//TODO: confirm that this is correct
-					if !dpc.Provider.Empty() {
-						if dpc.Provider != c.maddr {
+					if dpc.Provider != "" {
+						var err error
+						prov, err = address.NewFromString(dpc.Provider)
+
+						if err != nil {
+							return fmt.Errorf("specified provider is not empty, but also not an address: %s", dpc.Provider)
+						}
+
+						if prov.String() != c.maddr.String() {
 							return fmt.Errorf("proposal includes a provider which is not us, skipping. provider: %v ; us: %v", dpc.Provider, c.maddr)
 						}
 					}
@@ -161,7 +170,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 						PieceSize:    dpc.PieceSize,
 						VerifiedDeal: dpc.VerifiedDeal,
 						Client:       dpc.Client,
-						Provider:     c.maddr,
+						Provider:     prov,
 
 						Label: dpc.Label,
 
