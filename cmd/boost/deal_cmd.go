@@ -56,7 +56,7 @@ var dealFlags = []cli.Flag{
 	&cli.IntFlag{
 		Name:        "start-epoch-diff",
 		Usage:       "diff between current chain head and start epoch by when the deal should be proved by provider on-chain. Setting start-epoch flag overrides this.",
-		DefaultText: "current chain head + 2 days",
+		DefaultText: "start-epoch default",
 	},
 	&cli.IntFlag{
 		Name:        "start-epoch",
