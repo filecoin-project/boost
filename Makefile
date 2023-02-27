@@ -75,6 +75,9 @@ debug: build-go
 calibnet-go: GOFLAGS+=-tags=calibnet
 calibnet-go: build-go
 
+hyperspacenet-go: GOFLAGS+=-tags=hyperspacenet
+hyperspacenet-go: build-go
+
 deps: $(BUILD_DEPS)
 .PHONY: deps
 
@@ -138,6 +141,9 @@ build: react build-go
 
 calibnet: react calibnet-go
 .PHONY: calibnet
+
+hyperspacenet: react hyperspacenet-go
+.PHONY: hyperspacenet
 
 install: install-boost install-devnet
 
