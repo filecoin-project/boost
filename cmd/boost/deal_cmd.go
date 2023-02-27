@@ -54,6 +54,11 @@ var dealFlags = []cli.Flag{
 		Required: true,
 	},
 	&cli.IntFlag{
+		Name:        "start-epoch-diff",
+		Usage:       "diff between current chain head and start epoch by when the deal should be proved by provider on-chain. Setting start-epoch flag overrides this.",
+		DefaultText: "current chain head + 2 days",
+	},
+	&cli.IntFlag{
 		Name:        "start-epoch",
 		Usage:       "start epoch by when the deal should be proved by provider on-chain",
 		DefaultText: "current chain head + 2 days",
@@ -234,17 +239,22 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	}
 
 	var startEpoch abi.ChainEpoch
+
+	if cctx.IsSet("start-epoch-diff") {
+		head, err := getChainHead(api, ctx)
+		if err != nil {
+			return err
+		}
+		startEpoch = head + abi.ChainEpoch(cctx.Int("start-epoch-diff"))
+	}
+
 	if cctx.IsSet("start-epoch") {
 		startEpoch = abi.ChainEpoch(cctx.Int("start-epoch"))
 	} else {
-		tipset, err := api.ChainHead(ctx)
+		head, err := getChainHead(api, ctx)
 		if err != nil {
-			return fmt.Errorf("getting chain head: %w", err)
+			return err
 		}
-
-		head := tipset.Height()
-
-		log.Debugw("current block height", "number", head)
 
 		startEpoch = head + abi.ChainEpoch(5760) // head + 2 days
 	}
@@ -318,6 +328,18 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	fmt.Println(msg)
 
 	return nil
+}
+
+func getChainHead(api api.Gateway, ctx context.Context) (abi.ChainEpoch, error) {
+	tipset, err := api.ChainHead(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("getting chain head: %w", err)
+	}
+
+	head := tipset.Height()
+
+	log.Debugw("current block height", "number", head)
+	return head, nil
 }
 
 func dealProposal(ctx context.Context, n *clinode.Node, clientAddr address.Address, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, startEpoch abi.ChainEpoch, duration int, verified bool, providerCollateral abi.TokenAmount, storagePrice abi.TokenAmount) (*market.ClientDealProposal, error) {
