@@ -7,14 +7,14 @@ import (
 	"github.com/ipfs/go-cid"
 )
 
-//go:generate cbor-gen-for --map-encoding ContractDealProposal ContractParamsVersion1
+//go:generate cbor-gen-for ContractDealProposal ContractParamsVersion1
 
 type ContractDealProposal struct {
 	PieceCID     cid.Cid
 	PieceSize    abi.PaddedPieceSize
 	VerifiedDeal bool
 	Client       address.Address
-	Provider     string
+	//Provider     string
 
 	Label market.DealLabel
 
