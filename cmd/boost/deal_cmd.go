@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -54,14 +55,12 @@ var dealFlags = []cli.Flag{
 		Required: true,
 	},
 	&cli.IntFlag{
-		Name:        "start-epoch-diff",
-		Usage:       "diff between current chain head and start epoch by when the deal should be proved by provider on-chain. Setting start-epoch flag overrides this.",
-		DefaultText: "start-epoch default",
+		Name:  "start-epoch-head-offset",
+		Usage: "start epoch by when the deal should be proved by provider on-chain after current chain head",
 	},
 	&cli.IntFlag{
-		Name:        "start-epoch",
-		Usage:       "start epoch by when the deal should be proved by provider on-chain",
-		DefaultText: "current chain head + 2 days",
+		Name:  "start-epoch",
+		Usage: "start epoch by when the deal should be proved by provider on-chain",
 	},
 	&cli.IntFlag{
 		Name:  "duration",
@@ -238,24 +237,26 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		providerCollateral = big.Div(big.Mul(bounds.Min, big.NewInt(6)), big.NewInt(5)) // add 20%
 	}
 
-	var startEpoch abi.ChainEpoch
-
-	if cctx.IsSet("start-epoch-diff") {
-		head, err := getChainHead(api, ctx)
-		if err != nil {
-			return err
-		}
-		startEpoch = head + abi.ChainEpoch(cctx.Int("start-epoch-diff"))
+	tipset, err := api.ChainHead(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot get chain head: %w", err)
 	}
 
-	if cctx.IsSet("start-epoch") {
+	head := tipset.Height()
+	log.Debugw("current block height", "number", head)
+
+	if cctx.IsSet("start-epoch") && cctx.IsSet("start-epoch-head-offset") {
+		return errors.New("only one flag from `start-epoch-head-offset' or `start-epoch` can be specified")
+	}
+
+	var startEpoch abi.ChainEpoch
+
+	if cctx.IsSet("start-epoch-head-offset") {
+		startEpoch = head + abi.ChainEpoch(cctx.Int("start-epoch-head-offset"))
+	} else if cctx.IsSet("start-epoch") {
 		startEpoch = abi.ChainEpoch(cctx.Int("start-epoch"))
 	} else {
-		head, err := getChainHead(api, ctx)
-		if err != nil {
-			return err
-		}
-
+		// default
 		startEpoch = head + abi.ChainEpoch(5760) // head + 2 days
 	}
 
@@ -328,18 +329,6 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	fmt.Println(msg)
 
 	return nil
-}
-
-func getChainHead(api api.Gateway, ctx context.Context) (abi.ChainEpoch, error) {
-	tipset, err := api.ChainHead(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("getting chain head: %w", err)
-	}
-
-	head := tipset.Height()
-
-	log.Debugw("current block height", "number", head)
-	return head, nil
 }
 
 func dealProposal(ctx context.Context, n *clinode.Node, clientAddr address.Address, rootCid cid.Cid, pieceSize abi.PaddedPieceSize, pieceCid cid.Cid, minerAddr address.Address, startEpoch abi.ChainEpoch, duration int, verified bool, providerCollateral abi.TokenAmount, storagePrice abi.TokenAmount) (*market.ClientDealProposal, error) {
