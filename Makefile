@@ -205,8 +205,8 @@ ffi_from_source?=0
 build_lotus?=0
 ifeq ($(build_lotus),1)
 # v1: building lotus image with provided lotus version
-	lotus_info_msg=!!! building lotus base image from github: tag $(lotus_version) !!!
-	lotus_src_dir=/tmp/lotus-$(lotus_version)
+	lotus_info_msg=!!! building lotus base image from github: branch/tag $(lotus_version) !!!
+	override lotus_src_dir=/tmp/lotus-$(lotus_version)
 	lotus_build_cmd=update/lotus docker/lotus-all-in-one
 	lotus_base_image=$(docker_user)/lotus-all-in-one:dev
 else
