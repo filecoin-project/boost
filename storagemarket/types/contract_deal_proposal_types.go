@@ -14,7 +14,7 @@ type ContractDealProposal struct {
 	PieceSize    abi.PaddedPieceSize
 	VerifiedDeal bool
 	Client       address.Address
-	//Provider     string
+	Provider     address.Address
 
 	Label market.DealLabel
 
@@ -24,9 +24,6 @@ type ContractDealProposal struct {
 
 	ProviderCollateral abi.TokenAmount
 	ClientCollateral   abi.TokenAmount
-
-	Version string
-	Params  []byte
 }
 
 type ContractParamsVersion1 struct {

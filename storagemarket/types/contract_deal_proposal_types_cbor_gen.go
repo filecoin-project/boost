@@ -19,7 +19,7 @@ var _ = cid.Undef
 var _ = math.E
 var _ = sort.Sort
 
-var lengthBufContractDealProposal = []byte{140}
+var lengthBufContractDealProposal = []byte{139}
 
 func (t *ContractDealProposal) MarshalCBOR(w io.Writer) error {
 	if t == nil {
@@ -52,6 +52,11 @@ func (t *ContractDealProposal) MarshalCBOR(w io.Writer) error {
 
 	// t.Client (address.Address) (struct)
 	if err := t.Client.MarshalCBOR(cw); err != nil {
+		return err
+	}
+
+	// t.Provider (address.Address) (struct)
+	if err := t.Provider.MarshalCBOR(cw); err != nil {
 		return err
 	}
 
@@ -96,31 +101,6 @@ func (t *ContractDealProposal) MarshalCBOR(w io.Writer) error {
 	if err := t.ClientCollateral.MarshalCBOR(cw); err != nil {
 		return err
 	}
-
-	// t.Version (string) (string)
-	if len(t.Version) > cbg.MaxLength {
-		return xerrors.Errorf("Value in field t.Version was too long")
-	}
-
-	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Version))); err != nil {
-		return err
-	}
-	if _, err := io.WriteString(w, string(t.Version)); err != nil {
-		return err
-	}
-
-	// t.Params ([]uint8) (slice)
-	if len(t.Params) > cbg.ByteArrayMaxLen {
-		return xerrors.Errorf("Byte array in field t.Params was too long")
-	}
-
-	if err := cw.WriteMajorTypeHeader(cbg.MajByteString, uint64(len(t.Params))); err != nil {
-		return err
-	}
-
-	if _, err := cw.Write(t.Params[:]); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -143,7 +123,7 @@ func (t *ContractDealProposal) UnmarshalCBOR(r io.Reader) (err error) {
 		return fmt.Errorf("cbor input should be of type array")
 	}
 
-	if extra != 12 {
+	if extra != 11 {
 		return fmt.Errorf("cbor input had wrong number of fields")
 	}
 
@@ -196,6 +176,15 @@ func (t *ContractDealProposal) UnmarshalCBOR(r io.Reader) (err error) {
 
 		if err := t.Client.UnmarshalCBOR(cr); err != nil {
 			return xerrors.Errorf("unmarshaling t.Client: %w", err)
+		}
+
+	}
+	// t.Provider (address.Address) (struct)
+
+	{
+
+		if err := t.Provider.UnmarshalCBOR(cr); err != nil {
+			return xerrors.Errorf("unmarshaling t.Provider: %w", err)
 		}
 
 	}
@@ -284,37 +273,6 @@ func (t *ContractDealProposal) UnmarshalCBOR(r io.Reader) (err error) {
 			return xerrors.Errorf("unmarshaling t.ClientCollateral: %w", err)
 		}
 
-	}
-	// t.Version (string) (string)
-
-	{
-		sval, err := cbg.ReadString(cr)
-		if err != nil {
-			return err
-		}
-
-		t.Version = string(sval)
-	}
-	// t.Params ([]uint8) (slice)
-
-	maj, extra, err = cr.ReadHeader()
-	if err != nil {
-		return err
-	}
-
-	if extra > cbg.ByteArrayMaxLen {
-		return fmt.Errorf("t.Params: byte array too large (%d)", extra)
-	}
-	if maj != cbg.MajByteString {
-		return fmt.Errorf("expected byte array")
-	}
-
-	if extra > 0 {
-		t.Params = make([]uint8, extra)
-	}
-
-	if _, err := io.ReadFull(cr, t.Params[:]); err != nil {
-		return err
 	}
 	return nil
 }
