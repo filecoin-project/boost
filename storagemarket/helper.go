@@ -195,5 +195,5 @@ func (c *ChainDealManager) CheckDealEquality(ctx context.Context, tok ctypes.Tip
 
 	log.Warnw("check deal quality", "result", res, "p1clientid", p1ClientID, "p2clientid", p2ClientID, "label_equality", p1.Label.Equals(p2.Label), "provider_equality", p1.Provider == p2.Provider)
 
-	return true, nil
+	return res, nil
 }
