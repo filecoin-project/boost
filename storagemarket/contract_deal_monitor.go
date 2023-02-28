@@ -279,7 +279,8 @@ func (c *ContractDealMonitor) getDealProposal(ctx context.Context, topicContract
 }
 
 func (c *ContractDealMonitor) getExtraData(ctx context.Context, topicContractAddress string, topicDealProposalID string, fromEthAddr ethtypes.EthAddress) ([]byte, error) {
-	_params := "0x000" + topicDealProposalID[2:] // cut 0x prefix
+	// GetExtraParams is a free data retrieval call binding the contract method 0x4634aed5.
+	_params := "0x4634aed5" + topicDealProposalID[2:] // cut 0x prefix
 
 	toEthAddr, err := ethtypes.ParseEthAddress(topicContractAddress)
 	if err != nil {
