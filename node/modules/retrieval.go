@@ -142,9 +142,9 @@ func NewRetrievalLogDB(db *RetrievalSqlDB) *rtvllog.RetrievalLogDB {
 }
 
 // Write graphsync retrieval updates to the database
-func HandleRetrievalGraphsyncUpdates(duration time.Duration) func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt lotus_dtypes.ProviderDataTransfer) {
+func HandleRetrievalGraphsyncUpdates(duration time.Duration, stalledDuration time.Duration) func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt lotus_dtypes.ProviderDataTransfer) {
 	return func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt lotus_dtypes.ProviderDataTransfer) {
-		rel := rtvllog.NewRetrievalLog(db, duration)
+		rel := rtvllog.NewRetrievalLog(db, duration, dt, stalledDuration)
 
 		relctx, cancel := context.WithCancel(context.Background())
 		type unsubFn func()
