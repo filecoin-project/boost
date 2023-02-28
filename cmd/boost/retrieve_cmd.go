@@ -65,7 +65,7 @@ var flagDmPathSel = &cli.StringFlag{
 
 var retrieveCmd = &cli.Command{
 	Name:      "retrieve",
-	Usage:     "Retrieve a file by CID from a miner",
+	Usage:     "Retrieve a file by payload CID from a miner",
 	ArgsUsage: "<cid>",
 	Flags: []cli.Flag{
 		flagProvider,
@@ -78,7 +78,7 @@ var retrieveCmd = &cli.Command{
 
 		cidStr := cctx.Args().First()
 		if cidStr == "" {
-			return fmt.Errorf("please specify a CID to retrieve")
+			return fmt.Errorf("please specify a payload CID to retrieve")
 		}
 		c, err := cid.Decode(cidStr)
 		if err != nil {
