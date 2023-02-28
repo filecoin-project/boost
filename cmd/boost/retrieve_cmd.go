@@ -10,6 +10,7 @@ import (
 	flatfs "github.com/ipfs/go-ds-flatfs"
 	levelds "github.com/ipfs/go-ds-leveldb"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/mitchellh/go-homedir"
 
 	"github.com/dustin/go-humanize"
 	clinode "github.com/filecoin-project/boost/cli/node"
@@ -85,6 +86,12 @@ var retrieveCmd = &cli.Command{
 		}
 
 		cfgdir := cctx.String(cmd.FlagRepo.Name)
+
+		cfgdir, err = homedir.Expand(cfgdir)
+		if err != nil {
+			return fmt.Errorf("expanding homedir: %w", err)
+		}
+
 		node, err := clinode.Setup(cfgdir)
 		if err != nil {
 			return fmt.Errorf("setting up CLI node: %w", err)
