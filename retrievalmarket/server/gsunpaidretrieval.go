@@ -1,0 +1,444 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	datatransfer "github.com/filecoin-project/go-data-transfer"
+	"github.com/filecoin-project/go-data-transfer/encoding"
+	"github.com/filecoin-project/go-data-transfer/message"
+	"github.com/filecoin-project/go-data-transfer/network"
+	"github.com/filecoin-project/go-data-transfer/registry"
+	"github.com/filecoin-project/go-data-transfer/transport/graphsync/extension"
+	"github.com/filecoin-project/go-fil-markets/piecestore"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket/impl/requestvalidation"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket/migrations"
+	"github.com/filecoin-project/go-fil-markets/stores"
+	"github.com/hannahhoward/go-pubsub"
+	"github.com/ipfs/go-graphsync"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/libp2p/go-libp2p/core/peer"
+	cbg "github.com/whyrusleeping/cbor-gen"
+	"golang.org/x/xerrors"
+	"sync"
+)
+
+var log = logging.Logger("boostgs")
+
+// Uniquely identify a request (requesting peer + data transfer id)
+type reqId struct {
+	p  peer.ID
+	id datatransfer.TransferID
+}
+
+// GraphsyncUnpaidRetrieval intercepts incoming requests to Graphsync.
+// If the request is for a paid retrieval, it is forwarded to the existing
+// Graphsync implementation.
+// If the request is a simple unpaid retrieval, it is handled by this class.
+type GraphsyncUnpaidRetrieval struct {
+	graphsync.GraphExchange
+	peerID    peer.ID
+	dtnet     network.DataTransferNetwork
+	decoder   *registry.Registry
+	validator *requestvalidation.ProviderRequestValidator
+	pubSub    *pubsub.PubSub
+	vdeps     ValidationDeps
+
+	activeRetrievalsLk sync.RWMutex
+	activeRetrievals   map[reqId]*channelState
+
+	ctx context.Context
+}
+
+var _ graphsync.GraphExchange = (*GraphsyncUnpaidRetrieval)(nil)
+
+var defaultExtensions = []graphsync.ExtensionName{
+	extension.ExtensionDataTransfer1_1,
+}
+
+type ValidationDeps struct {
+	DealDecider    retrievalimpl.DealDecider
+	DagStore       stores.DAGStoreWrapper
+	PieceStore     piecestore.PieceStore
+	SectorAccessor retrievalmarket.SectorAccessor
+}
+
+func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtnet network.DataTransferNetwork, vdeps ValidationDeps) (*GraphsyncUnpaidRetrieval, error) {
+	typeRegistry := registry.NewRegistry()
+	err := typeRegistry.Register(&retrievalmarket.DealProposal{}, nil)
+	if err != nil {
+		return nil, err
+	}
+	err = typeRegistry.Register(&migrations.DealProposal0{}, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GraphsyncUnpaidRetrieval{
+		GraphExchange:    gs,
+		peerID:           peerID,
+		dtnet:            dtnet,
+		decoder:          typeRegistry,
+		pubSub:           pubsub.New(eventDispatcher),
+		vdeps:            vdeps,
+		activeRetrievals: make(map[reqId]*channelState),
+	}, nil
+}
+
+func (g *GraphsyncUnpaidRetrieval) Start(ctx context.Context) {
+	g.ctx = ctx
+	g.validator = requestvalidation.NewProviderRequestValidator(&validationEnv{
+		ctx:            ctx,
+		ValidationDeps: g.vdeps,
+	})
+}
+
+// Called when a new request is received
+func (g *GraphsyncUnpaidRetrieval) trackTransfer(p peer.ID, id datatransfer.TransferID, cs *channelState) {
+	// Record the transfer as an active retrieval so we can distinguish between
+	// retrievals intercepted by this class, and those passed through to the
+	// paid retrieval implementation.
+	g.activeRetrievalsLk.Lock()
+	g.activeRetrievals[reqId{p: p, id: id}] = cs
+	g.activeRetrievalsLk.Unlock()
+
+	// Protect the connection so that it doesn't get reaped by the
+	// connection manager before the transfer has completed
+	g.dtnet.Protect(p, fmt.Sprintf("%d", id))
+}
+
+// Called when a request completes (either successfully or in failure)
+// TODO: Make sure that untrackTransfer is always called eventually
+// (may need to add a timeout)
+func (g *GraphsyncUnpaidRetrieval) untrackTransfer(p peer.ID, id datatransfer.TransferID) {
+	g.activeRetrievalsLk.Lock()
+	delete(g.activeRetrievals, reqId{p: p, id: id})
+	g.activeRetrievalsLk.Unlock()
+
+	g.dtnet.Unprotect(p, fmt.Sprintf("%d", id))
+}
+
+func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestQueuedHook(hook graphsync.OnIncomingRequestQueuedHook) graphsync.UnregisterHookFunc {
+	return g.GraphExchange.RegisterIncomingRequestQueuedHook(func(p peer.ID, request graphsync.RequestData, hookActions graphsync.RequestQueuedHookActions) {
+		interceptRtvl, err := g.interceptRetrieval(p, request)
+		if err != nil {
+			log.Errorw("incoming request failed", "request", request, "error", err)
+			return
+		}
+
+		if !interceptRtvl {
+			hook(p, request, hookActions)
+			return
+		}
+	})
+}
+
+func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsync.RequestData) (bool, error) {
+	// Extract the request message from the extension data
+	msg, err := extension.GetTransferData(request, defaultExtensions)
+	if err != nil {
+		log.Errorw("failed to extract message from request", "request", request, "err", err)
+		return false, nil
+	}
+	// Extension not found, ignore
+	if msg == nil {
+		return false, nil
+	}
+
+	// When a data transfer request comes in on graphsync, the remote peer
+	// initiated a pull request for data. If it's not a request, ignore it.
+	if !msg.IsRequest() {
+		return false, nil
+	}
+
+	dtRequest := msg.(datatransfer.Request)
+	if !dtRequest.IsNew() && !dtRequest.IsRestart() {
+		// The request is not for a new retrieval (it's a cancel etc).
+		// If this message is for an existing unpaid retrieval it will already
+		// be in our map (because we must have already processed the new
+		// retrieval request)
+		_, ok := g.isActiveUnpaidRetrieval(reqId{p: p, id: msg.TransferID()})
+		return ok, nil
+	}
+
+	// The request is for a new transfer / restart transfer, so check if it's
+	// for an unpaid retrieval
+	voucher, decodeErr := g.decodeVoucher(dtRequest, g.decoder)
+	if decodeErr != nil {
+		return false, fmt.Errorf("decoding new request voucher: %w", decodeErr)
+	}
+
+	proposal, ok := voucher.(*retrievalmarket.DealProposal)
+	if !ok {
+		legacyProposal, ok := voucher.(*migrations.DealProposal0)
+		if !ok {
+			return false, errors.New("wrong voucher type")
+		}
+		newProposal := migrations.MigrateDealProposal0To1(*legacyProposal)
+		proposal = &newProposal
+	}
+
+	// If it's a paid retrieval, do not intercept it
+	if !proposal.UnsealPrice.IsZero() || !proposal.PricePerByte.IsZero() {
+		return false, nil
+	}
+
+	// It's for an unpaid retrieval. Initialize the channel state.
+	selBytes, err := encoding.Encode(request.Selector())
+	if err != nil {
+		return true, fmt.Errorf("encoding selector: %w", err)
+	}
+	cs := &channelState{
+		selfPeer:   g.peerID,
+		transferID: msg.TransferID(),
+		marketsID:  proposal.ID,
+		baseCid:    request.Root(),
+		selector:   &cbg.Deferred{Raw: selBytes},
+		sender:     g.peerID,
+		recipient:  p,
+		status:     datatransfer.Requested,
+		isPull:     true,
+	}
+
+	// Record the data transfer ID so that we can intercept future
+	// events for this transfer
+	g.trackTransfer(p, msg.TransferID(), cs)
+
+	// Fire transfer queued event
+	g.publish(datatransfer.TransferRequestQueued, "", cs)
+
+	// This is an unpaid retrieval, so this class is responsible for
+	// handling it
+	return true, nil
+}
+
+func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.OnIncomingRequestHook) graphsync.UnregisterHookFunc {
+	return g.GraphExchange.RegisterIncomingRequestHook(func(p peer.ID, request graphsync.RequestData, hookActions graphsync.IncomingRequestHookActions) {
+		msg, cs, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
+		if !intercept {
+			hook(p, request, hookActions)
+			return
+		}
+
+		err := func() error {
+			voucher, decodeErr := g.decodeVoucher(msg, g.decoder)
+			if decodeErr != nil {
+				return fmt.Errorf("decoding new request voucher: %w", decodeErr)
+			}
+
+			// Validate the request
+			res, validateErr := g.validator.ValidatePull(false, datatransfer.ChannelID{}, p, voucher, request.Root(), request.Selector())
+			isAccepted := validateErr == nil || validateErr == datatransfer.ErrPause || validateErr == datatransfer.ErrResume
+			const isPaused = false // There are no payments required, so never pause
+			resultType := datatransfer.EmptyTypeIdentifier
+			if res != nil {
+				resultType = res.Type()
+			}
+			respMsg, msgErr := message.NewResponse(msg.TransferID(), isAccepted, isPaused, resultType, res)
+			if msgErr != nil {
+				return fmt.Errorf("creating accept response message: %w", msgErr)
+			}
+
+			// Send an accept message / validation failed message
+			if err := g.dtnet.SendMessage(g.ctx, p, respMsg); err != nil {
+				return fmt.Errorf("failed to send accept message to requestor %s: %w", p, err)
+			}
+
+			if validateErr == datatransfer.ErrPause || validateErr == datatransfer.ErrResume {
+				return nil
+			}
+
+			return validateErr
+		}()
+
+		if err != nil {
+			g.failTransfer(cs, err)
+			return
+		}
+
+		// Mark the request as valid
+		hookActions.ValidateRequest()
+
+		// Fire Accept event
+		cs.status = datatransfer.Ongoing
+		g.publish(datatransfer.Accept, "", cs)
+	})
+}
+
+func (g *GraphsyncUnpaidRetrieval) RegisterOutgoingBlockHook(hook graphsync.OnOutgoingBlockHook) graphsync.UnregisterHookFunc {
+	return g.GraphExchange.RegisterOutgoingBlockHook(func(p peer.ID, request graphsync.RequestData, block graphsync.BlockData, hookActions graphsync.OutgoingBlockHookActions) {
+		if _, _, intercept := g.isRequestForActiveUnpaidRetrieval(p, request); !intercept {
+			hook(p, request, block, hookActions)
+			return
+		}
+	})
+}
+
+func (g *GraphsyncUnpaidRetrieval) RegisterCompletedResponseListener(listener graphsync.OnResponseCompletedListener) graphsync.UnregisterHookFunc {
+	return g.GraphExchange.RegisterCompletedResponseListener(func(p peer.ID, request graphsync.RequestData, status graphsync.ResponseStatusCode) {
+		msg, cs, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
+		if !intercept {
+			listener(p, request, status)
+			return
+		}
+
+		// Check that it's an incoming response from the other peer
+		// (not an outgoing response)
+		if p == g.peerID {
+			return
+		}
+
+		defer g.untrackTransfer(p, msg.TransferID())
+
+		// Request was cancelled, nothing further to do
+		if status == graphsync.RequestCancelled {
+			return
+		}
+
+		var completeErr error
+		if status != graphsync.RequestCompletedFull {
+			completeErr = xerrors.Errorf("graphsync response to peer %s did not complete: response status code %s", p, status)
+		}
+
+		if completeErr != nil {
+			g.failTransfer(cs, completeErr)
+			return
+		}
+
+		//err = pr.env.SendEvent(channel.dealID, rm.ProviderEventBlocksCompleted)
+		//if err != nil {
+		//	return true, nil, err
+		//}
+
+		// Include a markets protocol Completed message in the response
+		voucher := &retrievalmarket.DealResponse{
+			ID:     cs.marketsID,
+			Status: retrievalmarket.DealStatusCompleted,
+		}
+
+		const isAccepted = true
+		const isPaused = false
+		respMsg, err := message.CompleteResponse(msg.TransferID(), isAccepted, isPaused, voucher.Type(), voucher)
+		if err != nil {
+			g.failTransfer(cs, fmt.Errorf("getting complete response: %w", err))
+			return
+		}
+
+		// Send the other peer a message that the transfer has completed
+		//log.Infow("sending completion message to initiator", "chid", chid)
+		if err := g.dtnet.SendMessage(g.ctx, p, respMsg); err != nil {
+			err := fmt.Errorf("failed to send completion message to requestor %s: %w", p, err)
+			g.failTransfer(cs, err)
+			return
+		}
+
+		log.Infow("successfully sent completion message to requestor", "peer", p)
+		cs.status = datatransfer.Completed
+		g.publish(datatransfer.Complete, "", cs)
+	})
+}
+
+func (g *GraphsyncUnpaidRetrieval) RegisterRequestorCancelledListener(listener graphsync.OnRequestorCancelledListener) graphsync.UnregisterHookFunc {
+	return g.GraphExchange.RegisterRequestorCancelledListener(func(p peer.ID, request graphsync.RequestData) {
+		_, cs, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
+		if !intercept {
+			listener(p, request)
+			return
+		}
+
+		cs.status = datatransfer.Cancelled
+		g.publish(datatransfer.Cancel, "", cs)
+		g.untrackTransfer(p, cs.transferID)
+	})
+}
+
+func (g *GraphsyncUnpaidRetrieval) RegisterBlockSentListener(listener graphsync.OnBlockSentListener) graphsync.UnregisterHookFunc {
+	return g.GraphExchange.RegisterBlockSentListener(func(p peer.ID, request graphsync.RequestData, block graphsync.BlockData) {
+		_, cs, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
+		if !intercept {
+			listener(p, request, block)
+			return
+		}
+
+		// When a data transfer is restarted, the requester sends a list of CIDs
+		// that it already has. Graphsync calls the sent hook for all blocks even
+		// if they are in the list (meaning, they aren't actually sent over the
+		// wire). So here we check if the block was actually sent
+		// over the wire before firing the data sent event.
+		if block.BlockSizeOnWire() == 0 {
+			return
+		}
+
+		// Fire block sent event
+		g.publish(datatransfer.DataSent, "", cs)
+	})
+}
+
+func (g *GraphsyncUnpaidRetrieval) RegisterNetworkErrorListener(listener graphsync.OnNetworkErrorListener) graphsync.UnregisterHookFunc {
+	return g.GraphExchange.RegisterNetworkErrorListener(func(p peer.ID, request graphsync.RequestData, err error) {
+		_, cs, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
+		if !intercept {
+			listener(p, request, err)
+			return
+		}
+
+		// Don't set the channel state to errored, as a network error is not
+		// necessarily fatal
+		// TODO: If the client always sends a restart message after a network
+		// disconnect, then maybe a network error *should* be fatal
+		g.publish(datatransfer.Error, fmt.Sprintf("network error: %s", err), cs)
+	})
+}
+
+func (g *GraphsyncUnpaidRetrieval) failTransfer(cs *channelState, err error) {
+	cs.status = datatransfer.Failed
+	cs.message = err.Error()
+	g.publish(datatransfer.Error, err.Error(), cs)
+	g.untrackTransfer(cs.recipient, cs.transferID)
+	log.Infow("transfer failed", "transfer id", cs.transferID, "peer", cs.recipient, "err", err)
+}
+
+func (g *GraphsyncUnpaidRetrieval) decodeVoucher(request datatransfer.Request, registry *registry.Registry) (datatransfer.Voucher, error) {
+	vtypStr := request.VoucherType()
+	decoder, has := registry.Decoder(vtypStr)
+	if !has {
+		return nil, xerrors.Errorf("unknown voucher type: %s", vtypStr)
+	}
+	encodable, err := request.Voucher(decoder)
+	if err != nil {
+		return nil, err
+	}
+	return encodable.(datatransfer.Registerable), nil
+}
+
+func (g *GraphsyncUnpaidRetrieval) isRequestForActiveUnpaidRetrieval(p peer.ID, request graphsync.RequestData) (datatransfer.Request, *channelState, bool) {
+	// Extract the data transfer message from the Graphsync request
+	msg, err := extension.GetTransferData(request, defaultExtensions)
+	if err != nil {
+		log.Errorw("failed to extract message from request", "request", request, "err", err)
+		return nil, nil, false
+	}
+	// Extension not found, ignore
+	if msg == nil {
+		return nil, nil, false
+	}
+
+	// Check it's a request (not a response)
+	if !msg.IsRequest() {
+		return nil, nil, false
+	}
+
+	dtRequest := msg.(datatransfer.Request)
+	cs, ok := g.isActiveUnpaidRetrieval(reqId{p: p, id: msg.TransferID()})
+	return dtRequest, cs, ok
+}
+
+func (g *GraphsyncUnpaidRetrieval) isActiveUnpaidRetrieval(id reqId) (*channelState, bool) {
+	g.activeRetrievalsLk.RLock()
+	defer g.activeRetrievalsLk.RUnlock()
+
+	cs, ok := g.activeRetrievals[id]
+	return cs, ok
+}

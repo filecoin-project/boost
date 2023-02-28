@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
+	"github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
 	lotus_retrievalmarket "github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -142,8 +143,8 @@ func NewRetrievalLogDB(db *RetrievalSqlDB) *rtvllog.RetrievalLogDB {
 }
 
 // Write graphsync retrieval updates to the database
-func HandleRetrievalGraphsyncUpdates(duration time.Duration, stalledDuration time.Duration) func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt lotus_dtypes.ProviderDataTransfer) {
-	return func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt lotus_dtypes.ProviderDataTransfer) {
+func HandleRetrievalGraphsyncUpdates(duration time.Duration, stalledDuration time.Duration) func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt lotus_dtypes.ProviderDataTransfer, gsur *server.GraphsyncUnpaidRetrieval) {
+	return func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt lotus_dtypes.ProviderDataTransfer, gsur *server.GraphsyncUnpaidRetrieval) {
 		rel := rtvllog.NewRetrievalLog(db, duration, dt, stalledDuration)
 
 		relctx, cancel := context.WithCancel(context.Background())
@@ -155,6 +156,11 @@ func HandleRetrievalGraphsyncUpdates(duration time.Duration, stalledDuration tim
 				unsubs = append(unsubs, unsubFn(m.SubscribeToQueryEvents(rel.OnQueryEvent)))
 				unsubs = append(unsubs, unsubFn(m.SubscribeToValidationEvents(rel.OnValidationEvent)))
 				unsubs = append(unsubs, unsubFn(dt.SubscribeToEvents(rel.OnDataTransferEvent)))
+				unsubs = append(unsubs, unsubFn(gsur.SubscribeToEvents(rel.OnDataTransferEvent)))
+				// TODO: fire market event so that these transfers show up in retrievals list
+				//unsubs = append(unsubs, unsubFn(gsur.SubscribeToEvents(func(event datatransfer.Event, channelState datatransfer.ChannelState) {
+				//	log.Infow("dt event", "event", datatransfer.Events[event.Code], "msg", event.Message, "state", channelState.Message())
+				//})))
 				rel.Start(relctx)
 				return nil
 			},
