@@ -26,6 +26,7 @@ import (
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
+	"github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
@@ -144,6 +145,7 @@ const (
 	HandleMigrateProviderFundsKey
 	HandleDealsKey
 	HandleCreateRetrievalTablesKey
+	HandleSetShardSelector
 	HandleRetrievalEventsKey
 	HandleRetrievalKey
 	HandleRetrievalTransportsKey
@@ -508,8 +510,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		// Lotus Markets
-		Override(new(lotus_dtypes.StagingBlockstore), lotus_modules.StagingBlockstore),
-		Override(new(lotus_dtypes.StagingGraphsync), lotus_modules.StagingGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
+		Override(new(*server.GraphsyncUnpaidRetrieval), modules.Graphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
+		Override(new(lotus_dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
 		Override(new(lotus_dtypes.ProviderPieceStore), lotus_modules.NewProviderPieceStore),
 
 		// Lotus Markets (retrieval deps)
@@ -527,7 +529,9 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
 		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
 		Override(new(stores.DAGStoreWrapper), From(new(*mdagstore.Wrapper))),
+		Override(new(*modules.ShardSelector), modules.NewShardSelector),
 		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore(cfg)),
+		Override(HandleSetShardSelector, modules.SetShardSelectorFunc),
 
 		// Lotus Markets (retrieval)
 		Override(new(mdagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
