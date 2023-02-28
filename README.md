@@ -219,7 +219,7 @@ On ARM-based systems (*Apple M1/M2*) you need to force building Filecoin's Rust 
 make docker/all ffi_from_source=1 build_lotus=1
 ```
 
-If you need to build containers using a specific version of lotus then provide the version as a parameter, e.g. `make docker/all lotus_version=v1.20.0-rc2 build_lotus=1`. The version must be a tag name of [Lotus git repo](https://github.com/filecoin-project/lotus/tags). Or you can build using a local source of lotus - `make docker/all lotus_src_dir=<path of lotus source> build_lotus=1`. 
+If you need to build containers using a specific version of lotus then provide the version as a parameter, e.g. `make docker/all lotus_version=v1.20.0-rc2 build_lotus=1`. The version must be a tag or a remote branch name of [Lotus git repo](https://github.com/filecoin-project/lotus).
 
 ### Start devnet docker stack
 

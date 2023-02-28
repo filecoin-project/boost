@@ -206,8 +206,8 @@ build_lotus?=0
 ifeq ($(build_lotus),1)
 # v1: building lotus image with provided lotus version
 	lotus_info_msg=!!! building lotus base image from github: tag $(lotus_version) !!!
-	lotus_src_dir?=/tmp/lotus-$(lotus_version)
-	lotus_build_cmd=docker/lotus-all-in-one
+	lotus_src_dir=/tmp/lotus-$(lotus_version)
+	lotus_build_cmd=update/lotus docker/lotus-all-in-one
 	lotus_base_image=$(docker_user)/lotus-all-in-one:dev
 else
 # v2 (default): using lotus image
@@ -221,9 +221,13 @@ docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_base_image) \
 info/lotus-all-in-one:
 	@echo Docker build info: $(lotus_info_msg)
 .PHONY: info/lotus-all-in-one
+### checkout/update lotus if needed
 $(lotus_src_dir):
 	git clone --depth 1 --branch $(lotus_version) https://github.com/filecoin-project/lotus $@
-docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_src_dir)
+update/lotus: $(lotus_src_dir)
+	cd $(lotus_src_dir) && git pull
+.PHONY: update/lotus	
+ docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_src_dir)
 	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile --target lotus-all-in-one \
 		-t $(lotus_base_image) --build-arg GOFLAGS=-tags=debug .
 .PHONY: docker/lotus-all-in-one
