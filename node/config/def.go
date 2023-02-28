@@ -87,9 +87,9 @@ func DefaultBoost() *Boost {
 
 			StartEpochSealingBuffer: 480, // 480 epochs buffer == 4 hours from adding deal to sector to sector being sealed
 
-			DealProposalLogDuration:  Duration(time.Hour * 24),
-			RetrievalLogDuration:     Duration(time.Hour * 24),
-			StalledRetrievalDuration: Duration(time.Minute * 30),
+			DealProposalLogDuration: Duration(time.Hour * 24),
+			RetrievalLogDuration:    Duration(time.Hour * 24),
+			StalledRetrievalTimeout: Duration(time.Minute * 30),
 
 			RetrievalPricing: &lotus_config.RetrievalPricing{
 				Strategy: RetrievalPricingDefaultMode,

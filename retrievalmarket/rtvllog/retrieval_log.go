@@ -14,23 +14,27 @@ import (
 var log = logging.Logger("rtrvlog")
 
 type RetrievalLog struct {
-	db              *RetrievalLogDB
-	duration        time.Duration
-	dataTransfer    lotus_dtypes.ProviderDataTransfer
-	stalledDuration time.Duration
-	ctx             context.Context
+	db             *RetrievalLogDB
+	duration       time.Duration
+	dataTransfer   lotus_dtypes.ProviderDataTransfer
+	stalledTimeout time.Duration
+	ctx            context.Context
 
 	lastUpdateLk sync.Mutex
 	lastUpdate   map[string]time.Time
 }
 
-func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration, dt lotus_dtypes.ProviderDataTransfer, stalledDuration time.Duration) *RetrievalLog {
+func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration, dt lotus_dtypes.ProviderDataTransfer, stalledTimeout time.Duration) *RetrievalLog {
+	if duration < stalledTimeout {
+		log.Warnf("the RetrievalLogDuration (%s) should exceed the StalledRetrievalTimeout (%s)", duration.String(), stalledTimeout.String())
+	}
+
 	return &RetrievalLog{
-		db:              db,
-		duration:        duration,
-		dataTransfer:    dt,
-		stalledDuration: stalledDuration,
-		lastUpdate:      make(map[string]time.Time),
+		db:             db,
+		duration:       duration,
+		dataTransfer:   dt,
+		stalledTimeout: stalledTimeout,
+		lastUpdate:     make(map[string]time.Time),
 	}
 }
 
@@ -243,7 +247,7 @@ func (r *RetrievalLog) gcRetrievals(ctx context.Context) {
 			return
 		case now := <-ticker.C:
 			// Get retrievals last updated
-			rows, err := r.db.ListLastUpdatedAndOpen(ctx, now.Add(-r.stalledDuration))
+			rows, err := r.db.ListLastUpdatedAndOpen(ctx, now.Add(-r.stalledTimeout))
 
 			if err != nil {
 				log.Errorw("error fetching open, stalled retrievals", "err", err)
@@ -256,7 +260,7 @@ func (r *RetrievalLog) gcRetrievals(ctx context.Context) {
 				if err != nil {
 					log.Errorw("error canceling retrieval", "dealID", row.DealID, "err", err)
 				} else {
-					log.Infof("Canceled retrieval %s, older than %s", row.DealID, r.stalledDuration)
+					log.Infof("Canceled retrieval %s, older than %s", row.DealID, r.stalledTimeout)
 				}
 			}
 		}
