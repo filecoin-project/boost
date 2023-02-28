@@ -1,54 +1,48 @@
 package modules
 
 import (
-	"github.com/ipfs/go-graphsync"
-	graphsyncimpl "github.com/ipfs/go-graphsync/impl"
-	gsnet "github.com/ipfs/go-graphsync/network"
-	"github.com/ipfs/go-graphsync/storeutil"
+	"context"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/retrievalmarket/server"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
+	"github.com/filecoin-project/go-fil-markets/stores"
+	lotus_modules "github.com/filecoin-project/lotus/node/modules"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
+	lotus_helpers "github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/fx"
-
-	"github.com/filecoin-project/lotus/node/config"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
-	"github.com/filecoin-project/lotus/node/modules/helpers"
-	"github.com/filecoin-project/lotus/node/repo"
 )
 
-// Graphsync creates a graphsync instance from the given loader and storer
-func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForRetrieval uint64) func(mctx helpers.MetricsCtx, lc fx.Lifecycle, r repo.LockedRepo, clientBs dtypes.ClientBlockstore, chainBs dtypes.ExposedBlockstore, h host.Host) (dtypes.Graphsync, error) {
-	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle, r repo.LockedRepo, clientBs dtypes.ClientBlockstore, chainBs dtypes.ExposedBlockstore, h host.Host) (dtypes.Graphsync, error) {
-		graphsyncNetwork := gsnet.NewFromLibp2pHost(h)
-		lsys := storeutil.LinkSystemForBlockstore(clientBs)
+// Graphsync creates a graphsync instance used to serve retrievals.
+func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore, h host.Host, net lotus_dtypes.ProviderTransferNetwork, dealDecider lotus_dtypes.RetrievalDealFilter, dagStore stores.DAGStoreWrapper, pstore lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor) (*server.GraphsyncUnpaidRetrieval, error) {
+	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore, h host.Host, net lotus_dtypes.ProviderTransferNetwork, dealDecider lotus_dtypes.RetrievalDealFilter, dagStore stores.DAGStoreWrapper, pstore lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor) (*server.GraphsyncUnpaidRetrieval, error) {
+		// Create a Graphsync instance
+		mkgs := lotus_modules.StagingGraphsync(parallelTransfersForStorage, parallelTransfersForStoragePerPeer, parallelTransfersForRetrieval)
+		gs := mkgs(mctx, lc, ibs, h)
 
-		gs := graphsyncimpl.New(helpers.LifecycleCtx(mctx, lc),
-			graphsyncNetwork,
-			lsys,
-			graphsyncimpl.RejectAllRequestsByDefault(),
-			graphsyncimpl.MaxInProgressIncomingRequests(parallelTransfersForStorage),
-			graphsyncimpl.MaxInProgressOutgoingRequests(parallelTransfersForRetrieval),
-			graphsyncimpl.MaxLinksPerIncomingRequests(config.MaxTraversalLinks),
-			graphsyncimpl.MaxLinksPerOutgoingRequests(config.MaxTraversalLinks))
-		chainLinkSystem := storeutil.LinkSystemForBlockstore(chainBs)
-		err := gs.RegisterPersistenceOption("chainstore", chainLinkSystem)
-		if err != nil {
-			return nil, err
+		// Wrap the Graphsync instance with a handler for unpaid retrieval requests
+		vdeps := server.ValidationDeps{
+			DealDecider:    retrievalimpl.DealDecider(dealDecider),
+			DagStore:       dagStore,
+			PieceStore:     pstore,
+			SectorAccessor: sa,
 		}
-		gs.RegisterIncomingRequestHook(func(p peer.ID, requestData graphsync.RequestData, hookActions graphsync.IncomingRequestHookActions) {
-			_, has := requestData.Extension("chainsync")
-			if has {
-				// TODO: we should confirm the selector is a reasonable one before we validate
-				// TODO: this code will get more complicated and should probably not live here eventually
-				hookActions.ValidateRequest()
-				hookActions.UsePersistenceOption("chainstore")
-			}
+		gsupr, err := server.NewGraphsyncUnpaidRetrieval(h.ID(), gs, net, vdeps)
+
+		// Set up a context that is cancelled when the boostd process exits
+		gsctx, cancel := context.WithCancel(context.Background())
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				gsupr.Start(gsctx)
+				return nil
+			},
+			OnStop: func(_ context.Context) error {
+				cancel()
+				return nil
+			},
 		})
-		gs.RegisterOutgoingRequestHook(func(p peer.ID, requestData graphsync.RequestData, hookActions graphsync.OutgoingRequestHookActions) {
-			_, has := requestData.Extension("chainsync")
-			if has {
-				hookActions.UsePersistenceOption("chainstore")
-			}
-		})
-		return gs, nil
+
+		return gsupr, err
 	}
 }
