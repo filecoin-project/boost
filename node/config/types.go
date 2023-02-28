@@ -175,7 +175,11 @@ type DealmakingConfig struct {
 	// The amount of time to keep deal proposal logs for before cleaning them up.
 	DealProposalLogDuration Duration
 	// The amount of time to keep retrieval deal logs for before cleaning them up.
+	// Note RetrievalLogDuration should exceed the StalledRetrievalTimeout as the
+	// logs db is leveraged for pruning stalled retrievals.
 	RetrievalLogDuration Duration
+	// The amount of time stalled retrieval deals will remain open before being canceled.
+	StalledRetrievalTimeout Duration
 
 	// A command used for fine-grained evaluation of storage deals
 	// see https://boost.filecoin.io/configuration/deal-filters for more details
