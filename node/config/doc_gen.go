@@ -296,7 +296,8 @@ Lower this limit if boostd memory is too high during retrievals`,
 			Name: "RemoteCommp",
 			Type: "bool",
 
-			Comment: `Whether to do commp on the Boost node (local) or on the Sealer (remote)`,
+			Comment: `Whether to do commp on the Boost node (local) or on the Sealer (remote)
+Please note that this only works for v1.2.0 deals and not legacy deals`,
 		},
 		{
 			Name: "MaxConcurrentLocalCommp",
