@@ -181,7 +181,7 @@ func (c *ChainDealManager) CheckDealEquality(ctx context.Context, tok ctypes.Tip
 	if err != nil {
 		return false, err
 	}
-	return p1.PieceCID.Equals(p2.PieceCID) &&
+	res := p1.PieceCID.Equals(p2.PieceCID) &&
 		p1.PieceSize == p2.PieceSize &&
 		p1.VerifiedDeal == p2.VerifiedDeal &&
 		p1.Label.Equals(p2.Label) &&
@@ -191,5 +191,9 @@ func (c *ChainDealManager) CheckDealEquality(ctx context.Context, tok ctypes.Tip
 		p1.ProviderCollateral.Equals(p2.ProviderCollateral) &&
 		p1.ClientCollateral.Equals(p2.ClientCollateral) &&
 		p1.Provider == p2.Provider &&
-		p1ClientID == p2ClientID, nil
+		p1ClientID == p2ClientID
+
+	log.Warnw("check deal quality", "result", res, "p1clientid", p1ClientID, "p2clientid", p2ClientID, "label_equality", p1.Label.Equals(p2.Label), "provider_equality", p1.Provider == p2.Provider)
+
+	return res, nil
 }
