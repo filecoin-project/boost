@@ -226,12 +226,10 @@ If you need to build containers using a specific version of lotus then provide t
 1. Run
 
 ```
-cd docker/devnet
-rm -r ./data
-docker compose up -d
+make devnet/up
 ```
 
-It will spin up `lotus`, `lotus-miner`, `boost`, `booster-http` and `demo-http-server` containers. All temporary data will be saved in `./data` folder.
+It will spin up `lotus`, `lotus-miner`, `boost`, `booster-http` and `demo-http-server` containers. All temporary data will be saved in `./docker/devnet/data` folder.
 
 The initial setup could take up to 20 min or more as it needs to download Filecoin proof parameters. During the initial setup, it is normal to see error messages in the log. Containers are waiting for the lotus to be ready. It may timeout several times. Restart is expected to be managed by `docker`.
 
@@ -265,7 +263,7 @@ The `boost` container is packed with `boost` and `lotus` clients. You can connec
 
 ```
 # Attach to a running boost container
-docker compose exec boost /bin/bash
+make devnet/exec service=boost
 
 # Execute the demo script /app/sample/make-a-deal.sh
 root@83260455bbd2:/app# ./sample/make-a-deal.sh
@@ -291,9 +289,7 @@ MINER_API_INFO=eyJ...UlI:/dns/lotus-miner/tcp/2345/http
 
 To stop containers and drop everything:
 ```
-docker compose down --rmi local
-
-rm -rf ./data
+make devnet/down
 
 rm -rf ~/.cache/filecoin-proof-parameters
 ```
