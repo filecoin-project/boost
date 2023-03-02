@@ -208,10 +208,10 @@ ifeq ($(build_lotus),1)
 	lotus_info_msg=!!! building lotus base image from github: branch/tag $(lotus_version) !!!
 	override lotus_src_dir=/tmp/lotus-$(lotus_version)
 	lotus_build_cmd=update/lotus docker/lotus-all-in-one
-	lotus_base_image=$(docker_user)/lotus-all-in-one:dev
+	lotus_base_image=$(docker_user)/lotus-all-in-one:$(lotus_version)-debug
 else
 # v2 (default): using lotus image
-	lotus_base_image?=filecoin/lotus-all-in-one:$(lotus_version)-debug
+	lotus_base_image?=$(docker_user)/lotus-all-in-one:$(lotus_version)-debug
 	lotus_info_msg=using lotus image from dockerhub: $(lotus_base_image)
 	lotus_build_cmd=info/lotus-all-in-one
 endif
