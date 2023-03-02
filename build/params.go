@@ -9,8 +9,6 @@ import (
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 )
 
-var MessageConfidence = uint64(5)
-
 // Core network constants
 
 func BlocksTopic(netName dtypes.NetworkName) string   { return "/fil/blocks/" + string(netName) }
