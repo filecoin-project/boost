@@ -227,7 +227,8 @@ $(lotus_src_dir):
 update/lotus: $(lotus_src_dir)
 	cd $(lotus_src_dir) && git pull
 .PHONY: update/lotus	
- docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_src_dir)
+
+docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_src_dir)
 	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile --target lotus-all-in-one \
 		-t $(lotus_base_image) --build-arg GOFLAGS=-tags=debug .
 .PHONY: docker/lotus-all-in-one
