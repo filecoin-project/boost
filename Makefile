@@ -208,10 +208,10 @@ ifeq ($(build_lotus),1)
 	lotus_info_msg=!!! building lotus base image from github: branch/tag $(lotus_version) !!!
 	override lotus_src_dir=/tmp/lotus-$(lotus_version)
 	lotus_build_cmd=update/lotus docker/lotus-all-in-one
-	lotus_base_image=$(docker_user)/lotus-all-in-one:dev
+	lotus_base_image=$(docker_user)/lotus-all-in-one:$(lotus_version)-debug
 else
 # v2 (default): using lotus image
-	lotus_base_image?=filecoin/lotus-all-in-one:$(lotus_version)-debug
+	lotus_base_image?=$(docker_user)/lotus-all-in-one:$(lotus_version)-debug
 	lotus_info_msg=using lotus image from dockerhub: $(lotus_base_image)
 	lotus_build_cmd=info/lotus-all-in-one
 endif
@@ -227,7 +227,8 @@ $(lotus_src_dir):
 update/lotus: $(lotus_src_dir)
 	cd $(lotus_src_dir) && git pull
 .PHONY: update/lotus	
- docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_src_dir)
+
+docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_src_dir)
 	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile --target lotus-all-in-one \
 		-t $(lotus_base_image) --build-arg GOFLAGS=-tags=debug .
 .PHONY: docker/lotus-all-in-one
@@ -254,3 +255,16 @@ docker/booster-bitswap:
 docker/all: $(lotus_build_cmd) docker/boost docker/booster-http docker/booster-bitswap \
 	docker/lotus docker/lotus-miner
 .PHONY: docker/all
+
+devnet/up:
+	rm -rf ./docker/devnet/data && docker compose -f ./docker/devnet/docker-compose.yaml up -d
+
+devnet/%:
+	docker compose -f ./docker/devnet/docker-compose.yaml up --build $* -d
+
+devnet/down:
+	docker compose -f ./docker/devnet/docker-compose.yaml down --rmi=local && sleep 2 && rm -rf ./docker/devnet/data
+
+process?=/bin/bash
+devnet/exec:
+	docker compose -f ./docker/devnet/docker-compose.yaml exec $(service) $(process)
