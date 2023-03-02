@@ -69,9 +69,6 @@ build/.update-modules:
 
 CLEAN+=build/.update-modules
 
-debug: GOFLAGS+=-tags=debug
-debug: build-go
-
 calibnet-go: GOFLAGS+=-tags=calibnet
 calibnet-go: build-go
 
