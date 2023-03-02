@@ -16,7 +16,7 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/specs-storage/storage"
+	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 )
@@ -146,7 +146,7 @@ type PieceAdder interface {
 }
 
 type CommpCalculator interface {
-	ComputeDataCid(ctx context.Context, pieceSize abi.UnpaddedPieceSize, pieceData storage.Data) (abi.PieceInfo, error)
+	ComputeDataCid(ctx context.Context, pieceSize abi.UnpaddedPieceSize, pieceData storiface.Data) (abi.PieceInfo, error)
 }
 
 type DealPublisher interface {
