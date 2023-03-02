@@ -259,6 +259,9 @@ docker/all: $(lotus_build_cmd) docker/boost docker/booster-http docker/booster-b
 devnet/up:
 	rm -rf ./docker/devnet/data && docker compose -f ./docker/devnet/docker-compose.yaml up -d
 
+devnet/%:
+	docker compose -f ./docker/devnet/docker-compose.yaml up --build $* -d
+
 devnet/down:
 	docker compose -f ./docker/devnet/docker-compose.yaml down --rmi=local && sleep 2 && rm -rf ./docker/devnet/data
 
