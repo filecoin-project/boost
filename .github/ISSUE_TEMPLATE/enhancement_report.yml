@@ -1,0 +1,42 @@
+name: "Enhancement Report"
+description: "Suggest an improvement to an existing Boost feature"
+labels: [need/triage, kind/enhancement]
+body:
+  - type: checkboxes
+    attributes:
+      label: Checklist
+      description: Please check off the following boxes before continuing to continuing to create an improvement suggestion!
+      options:
+        - label: This is **not** a question or a support request. If you have any boost related questions, please ask in the [discussion forum](https://github.com/filecoin-project/boost/discussions).
+          required: true
+        - label: This is **not** a new feature request. If it is, please file a [feature request](https://github.com/filecoin-project/boost/issues/new?assignees=&labels=need%2Ftriage%2Ckind%2Ffeature&template=feature_request.yml) instead.
+          required: true
+        - label: I **have** searched on the [issue tracker](https://github.com/filecoin-project/boost/issues) and the [discussion forum](https://github.com/filecoin-project/boost/discussions), and there is no existing related issue or discussion.
+          required: true
+        - label: I am running the [`Latest release`](https://github.com/filecoin-project/boost/releases), or the most recent RC(release canadiate) for the upcoming release or the dev branch(master), or have an issue updating to any of these.
+          required: true
+  - type: checkboxes
+    attributes:
+      label: Boost component
+      description: Please select the boost component you are filing an improvement request for
+      options:
+        - label: boost daemon - storage providers
+          required: false
+        - label: boost client
+          required: false
+        - label: boost UI
+          required: false
+        - label: boost data-transfer
+          required: false
+        - label: boost index-provider
+          required: false
+        - label:  Other
+          required: false
+  - type: textarea
+    id: request
+    attributes:
+      label: Improvement Suggestion
+      description: A clear and concise description of what the motivation or the current problem is and what is the suggested improvement?
+      placeholder: Ex. Currently Boost... However, as a storage provider or client, I'd like...
+    validations:
+      required: true

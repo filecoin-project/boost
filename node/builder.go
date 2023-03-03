@@ -156,6 +156,7 @@ const (
 
 	// boost should be started after legacy markets (HandleDealsKey)
 	HandleBoostDealsKey
+	HandleContractDealsKey
 	HandleProposalLogCleanerKey
 
 	// daemon
@@ -196,6 +197,7 @@ func defaults() []Option {
 		Override(new(lotus_journal.DisabledEvents), lotus_journal.EnvDisabledEvents),
 		Override(new(lotus_journal.Journal), lotus_modules.OpenFilesystemJournal),
 		Override(new(*alerting.Alerting), alerting.NewAlertingSystem),
+		Override(new(lotus_dtypes.NodeStartTime), FromVal(lotus_dtypes.NodeStartTime(time.Now()))),
 
 		Override(CheckFDLimit, lotus_modules.CheckFdLimit(build.DefaultFDLimit)),
 
@@ -470,7 +472,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		Override(new(paths.LocalStorage), From(new(lotus_repo.LockedRepo))),
 		Override(new(*paths.Local), lotus_modules.LocalStorage),
-		Override(new(sealer.Config), cfg.StorageManager()),
+		Override(new(lotus_config.SealerConfig), cfg.StorageManager()),
 		Override(new(*paths.Remote), lotus_modules.RemoteStorage),
 
 		Override(new(*fundmanager.FundManager), fundmanager.New(fundmanager.Config{
@@ -549,7 +551,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
 		Override(new(retrievalmarket.RetrievalProvider), modules.RetrievalProvider),
-		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Dealmaking.RetrievalLogDuration))),
+		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Dealmaking.RetrievalLogDuration), time.Duration(cfg.Dealmaking.StalledRetrievalTimeout))),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
 		Override(new(*protocolproxy.ProtocolProxy), modules.NewProtocolProxy(cfg)),
@@ -567,7 +569,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&legacyFees, &cfg.LotusDealmaking)),
 		Override(new(lotus_storagemarket.StorageProvider), modules.NewLegacyStorageProvider(cfg)),
 		Override(HandleDealsKey, modules.HandleLegacyDeals),
-		Override(HandleBoostDealsKey, modules.HandleBoostDeals),
+		Override(HandleBoostDealsKey, modules.HandleBoostLibp2pDeals),
+		Override(HandleContractDealsKey, modules.HandleContractDeals(&cfg.ContractDeals)),
 		Override(HandleProposalLogCleanerKey, modules.HandleProposalLogCleaner(time.Duration(cfg.Dealmaking.DealProposalLogDuration))),
 
 		// Boost storage deal filter

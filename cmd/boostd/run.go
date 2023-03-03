@@ -11,6 +11,9 @@ import (
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/filecoin-project/lotus/gateway"
+
+	lcliutil "github.com/filecoin-project/lotus/cli/util"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 
 	"net/http"
@@ -43,7 +46,8 @@ var runCmd = &cli.Command{
 			}()
 		}
 
-		fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx)
+		subCh := gateway.NewEthSubHandler()
+		fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx, lcliutil.FullNodeWithEthSubscribtionHandler(subCh))
 		if err != nil {
 			return fmt.Errorf("getting full node api: %w", err)
 		}
@@ -93,6 +97,7 @@ var runCmd = &cli.Command{
 		var boostApi api.Boost
 		stop, err := node.New(ctx,
 			node.BoostAPI(&boostApi),
+			node.Override(new(*gateway.EthSubHandler), subCh),
 			node.Override(new(dtypes.ShutdownChan), shutdownChan),
 			node.Base(),
 			node.Repo(r),

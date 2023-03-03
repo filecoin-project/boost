@@ -44,6 +44,7 @@ type Boost struct {
 	Graphql             GraphqlConfig
 	Tracing             TracingConfig
 	LocalIndexDirectory LocalIndexDirectoryConfig
+	ContractDeals       ContractDealsConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
@@ -176,7 +177,11 @@ type DealmakingConfig struct {
 	// The amount of time to keep deal proposal logs for before cleaning them up.
 	DealProposalLogDuration Duration
 	// The amount of time to keep retrieval deal logs for before cleaning them up.
+	// Note RetrievalLogDuration should exceed the StalledRetrievalTimeout as the
+	// logs db is leveraged for pruning stalled retrievals.
 	RetrievalLogDuration Duration
+	// The amount of time stalled retrieval deals will remain open before being canceled.
+	StalledRetrievalTimeout Duration
 
 	// A command used for fine-grained evaluation of storage deals
 	// see https://boost.filecoin.io/configuration/deal-filters for more details
@@ -197,6 +202,7 @@ type DealmakingConfig struct {
 	MaxTransferDuration Duration
 
 	// Whether to do commp on the Boost node (local) or on the Sealer (remote)
+	// Please note that this only works for v1.2.0 deals and not legacy deals
 	RemoteCommp bool
 	// The maximum number of commp processes to run in parallel on the local
 	// boost process
@@ -246,6 +252,22 @@ type DealmakingConfig struct {
 	// The deal logs older than DealLogDurationDays are deleted from the logsDB
 	// to keep the size of logsDB in check. Set the value as "0" to disable log cleanup
 	DealLogDurationDays int
+
+	// The sealing pipeline status is cached by Boost if deal filters are enabled to avoid constant call to
+	// lotus-miner API. SealingPipelineCacheTimeout defines cache timeout value in seconds. Default is 30 seconds.
+	// Any value less than 0 will result in use of default
+	SealingPipelineCacheTimeout Duration
+}
+
+type ContractDealsConfig struct {
+	// Whether to enable chain monitoring in order to accept contract deals
+	Enabled bool
+
+	// Allowlist for contracts that this SP should accept deals from
+	AllowlistContracts []string
+
+	// From address for eth_ state call
+	From string
 }
 
 type FeeConfig struct {
