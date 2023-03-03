@@ -7,25 +7,34 @@ import (
 
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	logging "github.com/ipfs/go-log/v2"
 )
 
 var log = logging.Logger("rtrvlog")
 
 type RetrievalLog struct {
-	db       *RetrievalLogDB
-	duration time.Duration
-	ctx      context.Context
+	db             *RetrievalLogDB
+	duration       time.Duration
+	dataTransfer   lotus_dtypes.ProviderDataTransfer
+	stalledTimeout time.Duration
+	ctx            context.Context
 
 	lastUpdateLk sync.Mutex
 	lastUpdate   map[string]time.Time
 }
 
-func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration) *RetrievalLog {
+func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration, dt lotus_dtypes.ProviderDataTransfer, stalledTimeout time.Duration) *RetrievalLog {
+	if duration < stalledTimeout {
+		log.Warnf("the RetrievalLogDuration (%s) should exceed the StalledRetrievalTimeout (%s)", duration.String(), stalledTimeout.String())
+	}
+
 	return &RetrievalLog{
-		db:         db,
-		duration:   duration,
-		lastUpdate: make(map[string]time.Time),
+		db:             db,
+		duration:       duration,
+		dataTransfer:   dt,
+		stalledTimeout: stalledTimeout,
+		lastUpdate:     make(map[string]time.Time),
 	}
 }
 
@@ -33,6 +42,7 @@ func (r *RetrievalLog) Start(ctx context.Context) {
 	r.ctx = ctx
 	go r.gcUpdateMap(ctx)
 	go r.gcDatabase(ctx)
+	go r.gcRetrievals(ctx)
 }
 
 // Called when there is a retrieval ask query
@@ -221,6 +231,37 @@ func (r *RetrievalLog) gcDatabase(ctx context.Context) {
 				log.Errorw("error trimming retrieval logs", "err", err)
 			} else if count > 0 {
 				log.Infof("Deleted %d retrieval logs older than %s", count, r.duration)
+			}
+		}
+	}
+}
+
+// Periodically cancels stalled retrievals older than 30mins
+func (r *RetrievalLog) gcRetrievals(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			// Get retrievals last updated
+			rows, err := r.db.ListLastUpdatedAndOpen(ctx, now.Add(-r.stalledTimeout))
+
+			if err != nil {
+				log.Errorw("error fetching open, stalled retrievals", "err", err)
+				continue
+			}
+
+			for _, row := range rows {
+				chid := datatransfer.ChannelID{Initiator: row.PeerID, Responder: row.LocalPeerID, ID: row.TransferID}
+				err := r.dataTransfer.CloseDataTransferChannel(ctx, chid)
+				if err != nil {
+					log.Errorw("error canceling retrieval", "dealID", row.DealID, "err", err)
+				} else {
+					log.Infof("Canceled retrieval %s, older than %s", row.DealID, r.stalledTimeout)
+				}
 			}
 		}
 	}

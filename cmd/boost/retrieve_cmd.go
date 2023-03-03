@@ -12,16 +12,14 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 
 	"github.com/dustin/go-humanize"
-	"github.com/filecoin-project/boost/cli/ctxutil"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
+	"github.com/filecoin-project/boost/markets/utils"
 	rc "github.com/filecoin-project/boost/retrievalmarket/client"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/markets/utils"
-
-	"github.com/filecoin-project/go-address"
-
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
@@ -66,7 +64,7 @@ var flagDmPathSel = &cli.StringFlag{
 
 var retrieveCmd = &cli.Command{
 	Name:      "retrieve",
-	Usage:     "Retrieve a file by CID from a miner",
+	Usage:     "Retrieve a file by payload CID from a miner",
 	ArgsUsage: "<cid>",
 	Flags: []cli.Flag{
 		flagProvider,
@@ -75,11 +73,11 @@ var retrieveCmd = &cli.Command{
 		flagCar,
 	},
 	Action: func(cctx *cli.Context) error {
-		ctx := ctxutil.ReqContext(cctx)
+		ctx := cliutil.ReqContext(cctx)
 
 		cidStr := cctx.Args().First()
 		if cidStr == "" {
-			return fmt.Errorf("please specify a CID to retrieve")
+			return fmt.Errorf("please specify a payload CID to retrieve")
 		}
 		c, err := cid.Decode(cidStr)
 		if err != nil {
@@ -87,6 +85,12 @@ var retrieveCmd = &cli.Command{
 		}
 
 		cfgdir := cctx.String(cmd.FlagRepo.Name)
+
+		cfgdir, err = homedir.Expand(cfgdir)
+		if err != nil {
+			return fmt.Errorf("expanding homedir: %w", err)
+		}
+
 		node, err := clinode.Setup(cfgdir)
 		if err != nil {
 			return fmt.Errorf("setting up CLI node: %w", err)

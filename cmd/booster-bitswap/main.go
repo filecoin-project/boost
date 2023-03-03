@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 )

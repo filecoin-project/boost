@@ -35,30 +35,33 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
 		--wallet-publish-storage-deals=$PUBMSG_WALLET   \
 		--wallet-deal-collateral=$COLLAT_WALLET   \
 		--max-staging-deals-bytes=2000000000
-	
+
 	# echo exit code: $?
-	
+
 	echo Setting port in boost config...
 	sed -i 's|ip4/0.0.0.0/tcp/0|ip4/0.0.0.0/tcp/50000|g' $BOOST_PATH/config.toml
-	
+
 	echo Done
 	touch $BOOST_PATH/.init.boost
 fi
 
+# TODO(anteva): fixme: hack as boostd fails to start without this dir
+mkdir -p /var/lib/boost/deal-staging
+
 if [ ! -f $BOOST_PATH/.register.boost ]; then
 	echo Temporary starting boost to get maddr...
-	
+
 	boostd -vv run &> $BOOST_PATH/boostd.log &
 	BOOST_PID=`echo $!`
 	echo Got boost PID = $BOOST_PID
 
 	until cat $BOOST_PATH/boostd.log | grep maddr; do echo "Waiting for boost..."; sleep 1; done
 	echo Looks like boost started and initialized...
-	
+
 	echo Registering to lotus-miner...
 	MADDR=`cat $BOOST_PATH/boostd.log | grep maddr | cut -f3 -d"{" | cut -f1 -d:`
 	echo Got maddr=${MADDR}
-	
+
 	lotus-miner actor set-peer-id ${MADDR}
 	lotus-miner actor set-addrs /dns/boost/tcp/50000
 	echo Registered
@@ -71,5 +74,4 @@ if [ ! -f $BOOST_PATH/.register.boost ]; then
 fi
 
 echo Starting boost in dev mode...
-exec boostd -vv run
-
+exec boostd -vv run --nosync=true

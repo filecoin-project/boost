@@ -219,11 +219,10 @@ ifeq ($(lotus_src_dir),)
 		lotus_build_cmd=info/lotus-all-in-one
 	endif
 else
-# v3: building lotus image from source
-	lotus_info_msg=!!! building lotus base image from source: $(lotus_src_dir) !!!
-	lotus_base_image=$(docker_user)/lotus-all-in-one:dev
-	lotus_build_cmd=docker/lotus-all-in-one
-    lotus_checkout_dir=
+# v2 (default): using lotus image
+	lotus_base_image?=$(docker_user)/lotus-all-in-one:$(lotus_version)-debug
+	lotus_info_msg=using lotus image from dockerhub: $(lotus_base_image)
+	lotus_build_cmd=info/lotus-all-in-one
 endif
 docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_base_image) \
 	--build-arg FFI_BUILD_FROM_SOURCE=$(ffi_from_source) $(docker_args)
@@ -231,7 +230,8 @@ docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_base_image) \
 info/lotus-all-in-one:
 	@echo Docker build info: $(lotus_info_msg)
 .PHONY: info/lotus-all-in-one
-$(lotus_checkout_dir):
+### checkout/update lotus if needed
+$(lotus_src_dir):
 	git clone --depth 1 --branch $(lotus_version) https://github.com/filecoin-project/lotus $@
 docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_checkout_dir)
 # new lotus Dockerfile does not exist for older lotus versions
@@ -265,3 +265,16 @@ docker/booster-bitswap:
 docker/all: $(lotus_build_cmd) docker/boost docker/booster-http docker/booster-bitswap \
 	docker/lotus docker/lotus-miner
 .PHONY: docker/all
+
+devnet/up:
+	rm -rf ./docker/devnet/data && docker compose -f ./docker/devnet/docker-compose.yaml up -d
+
+devnet/%:
+	docker compose -f ./docker/devnet/docker-compose.yaml up --build $* -d
+
+devnet/down:
+	docker compose -f ./docker/devnet/docker-compose.yaml down --rmi=local && sleep 2 && rm -rf ./docker/devnet/data
+
+process?=/bin/bash
+devnet/exec:
+	docker compose -f ./docker/devnet/docker-compose.yaml exec $(service) $(process)

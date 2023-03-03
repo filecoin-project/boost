@@ -6,7 +6,7 @@ import {
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
-import {humanFileSize} from "./util";
+import {humanFileSize, isContractAddress} from "./util";
 import React, {useState, useEffect, useRef} from "react";
 import {PageContainer, ShortClientAddress, ShortDealLink} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
@@ -305,7 +305,7 @@ function DealRow(props) {
                 <ShortDealLink id={deal.ID} />
             </td>
             <td className="size">{humanFileSize(deal.Transfer.Size)}</td>
-            <td className="client">
+            <td className={'client ' + (isContractAddress(deal.ClientAddress) ? 'contract' : '')}>
                 <ShortClientAddress address={deal.ClientAddress} />
             </td>
             <td className="message">

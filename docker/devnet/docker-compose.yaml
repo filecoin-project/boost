@@ -19,6 +19,7 @@ services:
       - "1234:1234"
       - "9090:9090"
     environment:
+      - LOTUS_FEVM_ENABLEETHRPC=true
       - LOTUS_API_LISTENADDRESS=/dns/lotus/tcp/1234/http
       - LOTUS_LIBP2P_LISTENADDRESSES=/ip4/0.0.0.0/tcp/9090
     restart: unless-stopped

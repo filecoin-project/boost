@@ -9,6 +9,7 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	"github.com/filecoin-project/go-jsonrpc"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"

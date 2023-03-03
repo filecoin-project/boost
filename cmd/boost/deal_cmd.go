@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -54,9 +55,12 @@ var dealFlags = []cli.Flag{
 		Required: true,
 	},
 	&cli.IntFlag{
-		Name:        "start-epoch",
-		Usage:       "start epoch by when the deal should be proved by provider on-chain",
-		DefaultText: "current chain head + 2 days",
+		Name:  "start-epoch-head-offset",
+		Usage: "start epoch by when the deal should be proved by provider on-chain after current chain head",
+	},
+	&cli.IntFlag{
+		Name:  "start-epoch",
+		Usage: "start epoch by when the deal should be proved by provider on-chain",
 	},
 	&cli.IntFlag{
 		Name:  "duration",
@@ -233,19 +237,26 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		providerCollateral = big.Div(big.Mul(bounds.Min, big.NewInt(6)), big.NewInt(5)) // add 20%
 	}
 
+	tipset, err := api.ChainHead(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot get chain head: %w", err)
+	}
+
+	head := tipset.Height()
+	log.Debugw("current block height", "number", head)
+
+	if cctx.IsSet("start-epoch") && cctx.IsSet("start-epoch-head-offset") {
+		return errors.New("only one flag from `start-epoch-head-offset' or `start-epoch` can be specified")
+	}
+
 	var startEpoch abi.ChainEpoch
-	if cctx.IsSet("start-epoch") {
+
+	if cctx.IsSet("start-epoch-head-offset") {
+		startEpoch = head + abi.ChainEpoch(cctx.Int("start-epoch-head-offset"))
+	} else if cctx.IsSet("start-epoch") {
 		startEpoch = abi.ChainEpoch(cctx.Int("start-epoch"))
 	} else {
-		tipset, err := api.ChainHead(ctx)
-		if err != nil {
-			return fmt.Errorf("getting chain head: %w", err)
-		}
-
-		head := tipset.Height()
-
-		log.Debugw("current block height", "number", head)
-
+		// default
 		startEpoch = head + abi.ChainEpoch(5760) // head + 2 days
 	}
 

@@ -68,6 +68,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "ContractDeals",
+			Type: "ContractDealsConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "LotusDealmaking",
 			Type: "lotus_config.DealmakingConfig",
 
@@ -116,6 +122,26 @@ your node if metadata log is disabled`,
 			Type: "lotus_config.Pubsub",
 
 			Comment: ``,
+		},
+	},
+	"ContractDealsConfig": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: `Whether to enable chain monitoring in order to accept contract deals`,
+		},
+		{
+			Name: "AllowlistContracts",
+			Type: "[]string",
+
+			Comment: `Allowlist for contracts that this SP should accept deals from`,
+		},
+		{
+			Name: "From",
+			Type: "string",
+
+			Comment: `From address for eth_ state call`,
 		},
 	},
 	"DealmakingConfig": []DocField{
@@ -225,7 +251,15 @@ Set this value to 0 to indicate there is no limit per host.`,
 			Name: "RetrievalLogDuration",
 			Type: "Duration",
 
-			Comment: `The amount of time to keep retrieval deal logs for before cleaning them up.`,
+			Comment: `The amount of time to keep retrieval deal logs for before cleaning them up.
+Note RetrievalLogDuration should exceed the StalledRetrievalTimeout as the
+logs db is leveraged for pruning stalled retrievals.`,
+		},
+		{
+			Name: "StalledRetrievalTimeout",
+			Type: "Duration",
+
+			Comment: `The amount of time stalled retrieval deals will remain open before being canceled.`,
 		},
 		{
 			Name: "Filter",
@@ -270,7 +304,8 @@ Lower this limit if boostd memory is too high during retrievals`,
 			Name: "RemoteCommp",
 			Type: "bool",
 
-			Comment: `Whether to do commp on the Boost node (local) or on the Sealer (remote)`,
+			Comment: `Whether to do commp on the Boost node (local) or on the Sealer (remote)
+Please note that this only works for v1.2.0 deals and not legacy deals`,
 		},
 		{
 			Name: "MaxConcurrentLocalCommp",
