@@ -28,7 +28,7 @@ export function ShortClientAddress(props) {
 }
 
 export function ShortPeerID(props) {
-    const shortPeerId = props.peerId.substring(0, 8) + '…'
+    const shortPeerId = '…' + props.peerId.slice(-8)
     return <div>{shortPeerId}</div>
 }
 
