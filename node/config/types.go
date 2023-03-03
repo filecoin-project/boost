@@ -197,6 +197,9 @@ type DealmakingConfig struct {
 	// How long a blockstore shard should be cached before expiring without use
 	BlockstoreCacheExpiry Duration
 
+	// How long to cache calls to check whether a sector is unsealed
+	IsUnsealedCacheExpiry Duration
+
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration Duration
 
