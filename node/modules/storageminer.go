@@ -33,6 +33,7 @@ import (
 	"github.com/filecoin-project/dagstore/indexbs"
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-address"
+	dtnet "github.com/filecoin-project/go-data-transfer/network"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	storageimpl "github.com/filecoin-project/go-fil-markets/storagemarket/impl"
@@ -673,4 +674,10 @@ func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, erro
 
 		return &tracing.Tracing{}, nil
 	}
+}
+
+// NewProviderTransferNetwork sets up the libp2p protocol networking for data transfer
+func NewProviderTransferNetwork(h host.Host) lotus_dtypes.ProviderTransferNetwork {
+	// Leave it up to the client to reconnect
+	return dtnet.NewFromLibp2pHost(h, dtnet.RetryParameters(0, 0, 0, 0))
 }
