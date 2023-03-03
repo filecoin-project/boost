@@ -156,10 +156,13 @@ func HandleRetrievalGraphsyncUpdates(duration time.Duration, stalledDuration tim
 				unsubs = append(unsubs, unsubFn(m.SubscribeToQueryEvents(rel.OnQueryEvent)))
 				unsubs = append(unsubs, unsubFn(m.SubscribeToValidationEvents(rel.OnValidationEvent)))
 				unsubs = append(unsubs, unsubFn(dt.SubscribeToEvents(rel.OnDataTransferEvent)))
-				unsubs = append(unsubs, unsubFn(gsur.SubscribeToEvents(rel.OnDataTransferEvent)))
-				// TODO: fire market event so that these transfers show up in retrievals list
-				//unsubs = append(unsubs, unsubFn(gsur.SubscribeToEvents(func(event datatransfer.Event, channelState datatransfer.ChannelState) {
-				//	log.Infow("dt event", "event", datatransfer.Events[event.Code], "msg", event.Message, "state", channelState.Message())
+				unsubs = append(unsubs, unsubFn(gsur.SubscribeToDataTransferEvents(rel.OnDataTransferEvent)))
+				unsubs = append(unsubs, unsubFn(gsur.SubscribeToMarketsEvents(rel.OnRetrievalEvent)))
+				//unsubs = append(unsubs, unsubFn(gsur.SubscribeToDataTransferEvents(func(event datatransfer.Event, channelState datatransfer.ChannelState) {
+				//	log.Infow("dt event", "event", datatransfer.Events[event.Code], "msg", event.Message, "state", datatransfer.Statuses[channelState.Status()])
+				//})))
+				//unsubs = append(unsubs, unsubFn(gsur.SubscribeToMarketsEvents(func(event lotus_retrievalmarket.ProviderEvent, state lotus_retrievalmarket.ProviderDealState) {
+				//	log.Infow("mt event", "event", lotus_retrievalmarket.ProviderEvents[event], "msg", state.Message, "state", state.Status.String())
 				//})))
 				rel.Start(relctx)
 				return nil
