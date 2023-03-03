@@ -14,8 +14,8 @@ import (
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
-	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-libipfs/blocks"
 	"github.com/ipld/go-car/v2"
 	"github.com/stretchr/testify/require"
 )

@@ -549,14 +549,16 @@ func (c *Client) retrieveContentFromPeerWithProgressCallback(
 	chanid = newchid
 	chanidLk.Unlock()
 
-	defer func() { _ = c.dataTransfer.CloseDataTransferChannel(ctx, chanid) }()
-
 	// Wait for the retrieval to finish before exiting the function
 awaitfinished:
 	for {
 		select {
 		case err := <-dtRes:
 			if err != nil {
+				go func() {
+					_ = c.dataTransfer.CloseDataTransferChannel(ctx, chanid)
+				}()
+
 				return nil, fmt.Errorf("data transfer failed: %w", err)
 			}
 

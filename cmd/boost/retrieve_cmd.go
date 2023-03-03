@@ -33,6 +33,7 @@ import (
 	"github.com/ipld/go-ipld-prime/traversal/selector"
 	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
 	textselector "github.com/ipld/go-ipld-selector-text-lite"
+	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/term"
 	"golang.org/x/xerrors"
@@ -63,7 +64,7 @@ var flagDmPathSel = &cli.StringFlag{
 
 var retrieveCmd = &cli.Command{
 	Name:      "retrieve",
-	Usage:     "Retrieve a file by CID from a miner",
+	Usage:     "Retrieve a file by payload CID from a miner",
 	ArgsUsage: "<cid>",
 	Flags: []cli.Flag{
 		flagProvider,
@@ -76,7 +77,7 @@ var retrieveCmd = &cli.Command{
 
 		cidStr := cctx.Args().First()
 		if cidStr == "" {
-			return fmt.Errorf("please specify a CID to retrieve")
+			return fmt.Errorf("please specify a payload CID to retrieve")
 		}
 		c, err := cid.Decode(cidStr)
 		if err != nil {
@@ -84,6 +85,12 @@ var retrieveCmd = &cli.Command{
 		}
 
 		cfgdir := cctx.String(cmd.FlagRepo.Name)
+
+		cfgdir, err = homedir.Expand(cfgdir)
+		if err != nil {
+			return fmt.Errorf("expanding homedir: %w", err)
+		}
+
 		node, err := clinode.Setup(cfgdir)
 		if err != nil {
 			return fmt.Errorf("setting up CLI node: %w", err)

@@ -21,7 +21,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/piecedirectory"
-	"github.com/filecoin-project/boost/piecedirectory/types/mocks"
+	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -35,7 +35,6 @@ import (
 	"github.com/filecoin-project/boost/transport/mocks"
 	tspttypes "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/go-fil-markets/shared_testutil"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -1510,6 +1509,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 			StallCheckPeriod: time.Millisecond,
 			StallTimeout:     time.Hour,
 		},
+		SealingPipelineCacheTimeout: time.Second,
+		StorageFilter:               "1",
 	}
 	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, minerStub, sps, minerStub, df, sqldb,
 		logsDB, pm, minerStub, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
@@ -2230,6 +2231,6 @@ type mockSignatureVerifier struct {
 	err   error
 }
 
-func (m *mockSignatureVerifier) VerifySignature(ctx context.Context, sig acrypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error) {
+func (m *mockSignatureVerifier) VerifySignature(ctx context.Context, sig acrypto.Signature, addr address.Address, input []byte) (bool, error) {
 	return m.valid, m.err
 }

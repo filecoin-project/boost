@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -8,7 +9,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
@@ -32,14 +32,19 @@ import (
 	"github.com/filecoin-project/dagstore/indexbs"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	"github.com/filecoin-project/go-fil-markets/shared"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	storageimpl "github.com/filecoin-project/go-fil-markets/storagemarket/impl"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
 	"github.com/filecoin-project/go-fil-markets/stores"
+	"github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/go-state-types/builtin/v9/account"
 	"github.com/filecoin-project/go-state-types/crypto"
+	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/build"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
+	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/gateway"
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/lib/sigs"
 	"github.com/filecoin-project/lotus/node/modules"
@@ -339,7 +344,7 @@ func HandleLegacyDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, host host.Host,
 	return nil
 }
 
-func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
+func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP lotus_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
 	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi)
 
 	lc.Append(fx.Hook{
@@ -384,18 +389,91 @@ func HandleBoostDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider
 	})
 }
 
+func HandleContractDeals(c *config.ContractDealsConfig) func(mctx helpers.MetricsCtx, lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode, subCh *gateway.EthSubHandler, maddr lotus_dtypes.MinerAddress) {
+	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode, subCh *gateway.EthSubHandler, maddr lotus_dtypes.MinerAddress) {
+		if !c.Enabled {
+			log.Info("Contract deals monitor is currently disabled. Update config.toml if you want to enable it.")
+			return
+		}
+
+		monitor := storagemarket.NewContractDealMonitor(prov, a, subCh, c, address.Address(maddr))
+
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				log.Info("contract deals monitor starting")
+
+				err := monitor.Start(ctx)
+				if err != nil {
+					return err
+				}
+
+				log.Info("contract deals monitor started")
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				err := monitor.Stop()
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		})
+	}
+}
+
 type signatureVerifier struct {
 	fn v1api.FullNode
 }
 
-func (s *signatureVerifier) VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte, encodedTs shared.TipSetToken) (bool, error) {
+func (s *signatureVerifier) VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte) (bool, error) {
 	addr, err := s.fn.StateAccountKey(ctx, addr, ctypes.EmptyTSK)
 	if err != nil {
 		return false, err
 	}
 
+	// Check if the client is an f4 address, ie an FVM contract
+	clientAddr := addr.String()
+	if len(clientAddr) >= 2 && (clientAddr[:2] == "t4" || clientAddr[:2] == "f4") {
+		// Verify authorization by simulating an AuthenticateMessage
+		return s.verifyContractSignature(ctx, sig, addr, input)
+	}
+
+	// Otherwise do local signature verification
 	err = sigs.Verify(&sig, addr, input)
 	return err == nil, err
+}
+
+// verifyContractSignature simulates sending an AuthenticateMessage to authenticate the signer
+func (s *signatureVerifier) verifyContractSignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte) (bool, error) {
+	var params account.AuthenticateMessageParams
+	params.Message = input
+	params.Signature = sig.Data
+
+	var msg ltypes.Message
+	buf := new(bytes.Buffer)
+
+	var err error
+	err = params.MarshalCBOR(buf)
+	if err != nil {
+		return false, err
+	}
+	msg.Params = buf.Bytes()
+
+	msg.From = builtin.StorageMarketActorAddr
+	msg.To = addr
+	msg.Nonce = 1
+
+	msg.Method, err = builtin.GenerateFRCMethodNum("AuthenticateMessage") // abi.MethodNum(2643134072)
+	if err != nil {
+		return false, err
+	}
+
+	res, err := s.fn.StateCall(ctx, &msg, ltypes.EmptyTSK)
+	if err != nil {
+		return false, fmt.Errorf("state call to %s returned an error: %w", addr, err)
+	}
+
+	return res.MsgRct.ExitCode == exitcode.Ok, nil
 }
 
 func NewChainDealManager(a v1api.FullNode) *storagemarket.ChainDealManager {
@@ -469,7 +547,9 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 				StallCheckPeriod: time.Duration(cfg.Dealmaking.HttpTransferStallCheckPeriod),
 				StallTimeout:     time.Duration(cfg.Dealmaking.HttpTransferStallTimeout),
 			},
-			DealLogDurationDays: cfg.Dealmaking.DealLogDurationDays,
+			DealLogDurationDays:         cfg.Dealmaking.DealLogDurationDays,
+			StorageFilter:               cfg.Dealmaking.Filter,
+			SealingPipelineCacheTimeout: time.Duration(cfg.Dealmaking.SealingPipelineCacheTimeout),
 		}
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl)

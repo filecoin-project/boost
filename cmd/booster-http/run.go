@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boostd-data/model"
@@ -13,8 +16,6 @@ import (
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
-	"net/http"
-	_ "net/http/pprof"
 )
 
 var runCmd = &cli.Command{

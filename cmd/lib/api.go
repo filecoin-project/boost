@@ -16,11 +16,13 @@ import (
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/markets/dagstore"
+	"github.com/filecoin-project/lotus/node/config"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/paths"
 	"github.com/filecoin-project/lotus/storage/sealer"
+	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	logging "github.com/ipfs/go-log/v2"
 )
 
@@ -115,8 +117,8 @@ func CreateSectorAccessor(ctx context.Context, storageApiInfo string, fullnodeAp
 	}
 	defer lr.Close()
 
-	if err := lr.SetStorage(func(sc *paths.StorageConfig) {
-		sc.StoragePaths = []paths.LocalPath{}
+	if err := lr.SetStorage(func(sc *storiface.StorageConfig) {
+		sc.StoragePaths = []storiface.LocalPath{}
 	}); err != nil {
 		return nil, nil, fmt.Errorf("set storage config: %w", err)
 	}
@@ -127,7 +129,7 @@ func CreateSectorAccessor(ctx context.Context, storageApiInfo string, fullnodeAp
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating new local store: %w", err)
 	}
-	storage := lotus_modules.RemoteStorage(lstor, storageService, sauth, sealer.Config{
+	storage := lotus_modules.RemoteStorage(lstor, storageService, sauth, config.SealerConfig{
 		// TODO: Not sure if I need this, or any of the other fields in this struct
 		ParallelFetchLimit: 1,
 	})
