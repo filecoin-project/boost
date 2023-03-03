@@ -16,7 +16,6 @@ import (
 	lotus_dealfilter "github.com/filecoin-project/boost/markets/dealfilter"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/markets/retrievaladapter"
-	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	lotus_storageadapter "github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/impl"
@@ -534,7 +533,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(HandleSetShardSelector, modules.SetShardSelectorFunc),
 
 		// Lotus Markets (retrieval)
-		Override(new(mdagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
+		Override(new(mdagstore.SectorAccessor), modules.NewSectorAccessor(cfg)),
 		Override(new(retrievalmarket.SectorAccessor), From(new(mdagstore.SectorAccessor))),
 		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),

@@ -15,6 +15,7 @@ import (
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/markets/idxprov"
+	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
@@ -580,6 +581,14 @@ func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo
 
 		return server
 	}
+}
+
+// Use a caching sector accessor
+func NewSectorAccessor(cfg *config.Boost) sectoraccessor.SectorAccessorConstructor {
+	// The cache just holds booleans, so there's no harm in using a big number
+	// for cache size
+	const maxCacheSize = 4096
+	return sectoraccessor.NewCachingSectorAccessor(maxCacheSize, time.Duration(cfg.Dealmaking.IsUnsealedCacheExpiry))
 }
 
 // ShardSelector helps to resolve a circular dependency:
