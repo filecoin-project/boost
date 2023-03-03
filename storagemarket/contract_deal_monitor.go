@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	TopicHash = paddedEthHash(ethTopicHash("DealProposalCreate(bytes32,bytes,bool,uint256)")) // deals published on chain
+	TopicHash = paddedEthHash(ethTopicHash("DealProposalCreate(bytes32,uint64,bool,uint256)")) // deals published on chain
 )
 
 type ContractDealMonitor struct {
@@ -91,8 +91,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 				return
 			case resp := <-responseCh:
 				err := func() error {
-					result := resp.Result.([]interface{})[0]
-					event := result.(map[string]interface{})
+					event := resp.Result.(map[string]interface{})
 					topicContractAddress := event["address"].(string)
 					topicDealProposalID := event["topics"].([]interface{})[1].(string)
 
@@ -101,41 +100,24 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 						return fmt.Errorf("allowlist does not contain this contract address: %s", topicContractAddress)
 					}
 
-					// GetDealProposal is a free data retrieval call binding the contract method 0xf4b2e4d8.
-					_params := "0xf4b2e4d8" + topicDealProposalID[2:] // cut 0x prefix
-
-					toEthAddr, err := ethtypes.ParseEthAddress(topicContractAddress)
+					res, err := c.getDealProposal(ctx, topicContractAddress, topicDealProposalID, fromEthAddr)
 					if err != nil {
-						return fmt.Errorf("parsing `to` eth address failed: %w", err)
+						return fmt.Errorf("eth call for get deal proposal failed: %w", err)
 					}
 
-					params, err := ethtypes.DecodeHexString(_params)
+					resParams, err := c.getExtraData(ctx, topicContractAddress, topicDealProposalID, fromEthAddr)
 					if err != nil {
-						return fmt.Errorf("decoding params failed: %w", err)
+						return fmt.Errorf("eth call for extra data failed: %w", err)
 					}
 
-					res, err := c.api.EthCall(ctx, ethtypes.EthCall{
-						From: &fromEthAddr,
-						To:   &toEthAddr,
-						Data: params,
-					}, "latest")
-					if err != nil {
-						return fmt.Errorf("eth call erred: %w", err)
-					}
-
-					begin, length, err := lengthPrefixPointsTo(res)
-					if err != nil {
-						return fmt.Errorf("length prefix points erred: %w", err)
-					}
-
-					var dpc types.ContractDealProposal
-					err = dpc.UnmarshalCBOR(bytes.NewReader(res[begin : begin+length]))
+					var dpc market.DealProposal
+					err = dpc.UnmarshalCBOR(bytes.NewReader(res))
 					if err != nil {
 						return fmt.Errorf("cbor unmarshal failed: %w", err)
 					}
 
 					var pv1 types.ContractParamsVersion1
-					err = pv1.UnmarshalCBOR(bytes.NewReader(dpc.Params))
+					err = pv1.UnmarshalCBOR(bytes.NewReader(resParams))
 					if err != nil {
 						return fmt.Errorf("params cbor unmarshal failed: %w", err)
 					}
@@ -206,7 +188,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 					return nil
 				}()
 				if err != nil {
-					log.Errorw("handling DealProposalCreate event erred: %w", err)
+					log.Errorw("handling DealProposalCreate event erred", "err", err)
 				}
 			}
 		}
@@ -263,4 +245,66 @@ func lengthPrefixPointsTo(output []byte) (int, int, error) {
 		return 0, 0, fmt.Errorf("length insufficient %v require %v", boutputLen, size)
 	}
 	return int(boffset.Uint64()), int(lengthBig.Uint64()), nil
+}
+
+func (c *ContractDealMonitor) getDealProposal(ctx context.Context, topicContractAddress string, topicDealProposalID string, fromEthAddr ethtypes.EthAddress) ([]byte, error) {
+	// GetDealProposal is a free data retrieval call binding the contract method 0xf4b2e4d8.
+	_params := "0xf4b2e4d8" + topicDealProposalID[2:] // cut 0x prefix
+
+	toEthAddr, err := ethtypes.ParseEthAddress(topicContractAddress)
+	if err != nil {
+		return nil, fmt.Errorf("parsing `to` eth address failed: %w", err)
+	}
+
+	params, err := ethtypes.DecodeHexString(_params)
+	if err != nil {
+		return nil, fmt.Errorf("decoding params failed: %w", err)
+	}
+
+	res, err := c.api.EthCall(ctx, ethtypes.EthCall{
+		From: &fromEthAddr,
+		To:   &toEthAddr,
+		Data: params,
+	}, "latest")
+	if err != nil {
+		return nil, fmt.Errorf("eth call erred: %w", err)
+	}
+
+	begin, length, err := lengthPrefixPointsTo(res)
+	if err != nil {
+		return nil, fmt.Errorf("length prefix points erred: %w", err)
+	}
+
+	return res[begin : begin+length], nil
+}
+
+func (c *ContractDealMonitor) getExtraData(ctx context.Context, topicContractAddress string, topicDealProposalID string, fromEthAddr ethtypes.EthAddress) ([]byte, error) {
+	// GetExtraParams is a free data retrieval call binding the contract method 0x4634aed5.
+	_params := "0x4634aed5" + topicDealProposalID[2:] // cut 0x prefix
+
+	toEthAddr, err := ethtypes.ParseEthAddress(topicContractAddress)
+	if err != nil {
+		return nil, fmt.Errorf("parsing `to` eth address failed: %w", err)
+	}
+
+	params, err := ethtypes.DecodeHexString(_params)
+	if err != nil {
+		return nil, fmt.Errorf("decoding params failed: %w", err)
+	}
+
+	res, err := c.api.EthCall(ctx, ethtypes.EthCall{
+		From: &fromEthAddr,
+		To:   &toEthAddr,
+		Data: params,
+	}, "latest")
+	if err != nil {
+		return nil, fmt.Errorf("eth call erred: %w", err)
+	}
+
+	begin, length, err := lengthPrefixPointsTo(res)
+	if err != nil {
+		return nil, fmt.Errorf("length prefix points erred: %w", err)
+	}
+
+	return res[begin : begin+length], nil
 }
