@@ -295,6 +295,12 @@ Lower this limit if boostd memory is too high during retrievals`,
 			Comment: `How long a blockstore shard should be cached before expiring without use`,
 		},
 		{
+			Name: "IsUnsealedCacheExpiry",
+			Type: "Duration",
+
+			Comment: `How long to cache calls to check whether a sector is unsealed`,
+		},
+		{
 			Name: "MaxTransferDuration",
 			Type: "Duration",
 
