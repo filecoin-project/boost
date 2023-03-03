@@ -12,14 +12,17 @@ import (
 	cbg "github.com/whyrusleeping/cbor-gen"
 )
 
+type retrievalState struct {
+	cs   *channelState
+	mkts *retrievalmarket.ProviderDealState
+}
+
 // channelState is immutable channel data plus mutable state
 type channelState struct {
 	// peerId of the manager peer
 	selfPeer peer.ID
 	// an identifier for this channel shared by request and responder, set by requester through protocol
 	transferID datatransfer.TransferID
-	// an identifier for this markets protocol data transfer
-	marketsID retrievalmarket.DealID
 	// base CID for the piece being transferred
 	baseCid cid.Cid
 	// portion of Piece to return, specified by an IPLD selector
