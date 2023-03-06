@@ -52,6 +52,9 @@ type GraphsyncUnpaidRetrieval struct {
 	activeRetrievals   map[reqId]*retrievalState
 
 	ctx context.Context
+
+	// Used by the tests
+	outgoingBlockHook func(*retrievalState)
 }
 
 var _ graphsync.GraphExchange = (*GraphsyncUnpaidRetrieval)(nil)
@@ -290,9 +293,14 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 
 func (g *GraphsyncUnpaidRetrieval) RegisterOutgoingBlockHook(hook graphsync.OnOutgoingBlockHook) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterOutgoingBlockHook(func(p peer.ID, request graphsync.RequestData, block graphsync.BlockData, hookActions graphsync.OutgoingBlockHookActions) {
-		if _, _, intercept := g.isRequestForActiveUnpaidRetrieval(p, request); !intercept {
+		_, state, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
+		if !intercept {
 			hook(p, request, block, hookActions)
 			return
+		}
+
+		if g.outgoingBlockHook != nil {
+			g.outgoingBlockHook(state)
 		}
 	})
 }
@@ -412,11 +420,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterNetworkErrorListener(listener graphsy
 			return
 		}
 
-		// Don't set the channel state to errored, as a network error is not
-		// necessarily fatal
-		// TODO: If the client always sends a restart message after a network
-		// disconnect, then maybe a network error *should* be fatal
-		g.publishDTEvent(datatransfer.Error, fmt.Sprintf("network error: %s", err), state.cs)
+		g.failTransfer(state, err)
 	})
 }
 
