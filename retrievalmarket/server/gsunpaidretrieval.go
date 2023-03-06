@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-data-transfer/encoding"
 	"github.com/filecoin-project/go-data-transfer/message"
@@ -22,7 +24,6 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	"sync"
 )
 
 var log = logging.Logger("boostgs")
@@ -128,6 +129,32 @@ func (g *GraphsyncUnpaidRetrieval) untrackTransfer(p peer.ID, id datatransfer.Tr
 	g.activeRetrievalsLk.Unlock()
 
 	g.dtnet.Unprotect(p, fmt.Sprintf("%d", id))
+}
+
+func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatransfer.TransferID, p *peer.ID) error {
+	didCancel := false
+
+	// If peer is set we can cancel more efficiently
+	if p != nil {
+		state := g.activeRetrievals[reqId{p: *p, id: id}]
+		g.failTransfer(state, errors.New("transfer cancelled by provider"))
+		return nil
+	}
+
+	// Peer was not given so we need to iterate over active retrievals
+	for _, state := range g.activeRetrievals {
+		if state.cs.transferID == id {
+			didCancel = true
+			g.failTransfer(state, errors.New("transfer cancelled by provider"))
+			// Dont break, transferID might not be unique, so we have to keep iterating
+		}
+	}
+
+	if !didCancel {
+		return fmt.Errorf("no transfer with id %d", id)
+	}
+
+	return nil
 }
 
 func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestQueuedHook(hook graphsync.OnIncomingRequestQueuedHook) graphsync.UnregisterHookFunc {
@@ -434,6 +461,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterNetworkErrorListener(listener graphsy
 			return
 		}
 
+		// Consider network errors as fatal, clients can resume if they wish
 		g.failTransfer(state, err)
 	})
 }

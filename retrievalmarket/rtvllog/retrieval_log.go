@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/retrievalmarket/server"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -17,6 +18,7 @@ type RetrievalLog struct {
 	db             *RetrievalLogDB
 	duration       time.Duration
 	dataTransfer   lotus_dtypes.ProviderDataTransfer
+	gsur           *server.GraphsyncUnpaidRetrieval
 	stalledTimeout time.Duration
 	ctx            context.Context
 
@@ -24,7 +26,7 @@ type RetrievalLog struct {
 	lastUpdate   map[string]time.Time
 }
 
-func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration, dt lotus_dtypes.ProviderDataTransfer, stalledTimeout time.Duration) *RetrievalLog {
+func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration, dt lotus_dtypes.ProviderDataTransfer, stalledTimeout time.Duration, gsur *server.GraphsyncUnpaidRetrieval) *RetrievalLog {
 	if duration < stalledTimeout {
 		log.Warnf("the RetrievalLogDuration (%s) should exceed the StalledRetrievalTimeout (%s)", duration.String(), stalledTimeout.String())
 	}
@@ -33,6 +35,7 @@ func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration, dt lotus_dtypes
 		db:             db,
 		duration:       duration,
 		dataTransfer:   dt,
+		gsur:           gsur,
 		stalledTimeout: stalledTimeout,
 		lastUpdate:     make(map[string]time.Time),
 	}
@@ -238,7 +241,7 @@ func (r *RetrievalLog) gcDatabase(ctx context.Context) {
 
 // Periodically cancels stalled retrievals older than 30mins
 func (r *RetrievalLog) gcRetrievals(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
 	for {
@@ -256,7 +259,14 @@ func (r *RetrievalLog) gcRetrievals(ctx context.Context) {
 
 			for _, row := range rows {
 				chid := datatransfer.ChannelID{Initiator: row.PeerID, Responder: row.LocalPeerID, ID: row.TransferID}
-				err := r.dataTransfer.CloseDataTransferChannel(ctx, chid)
+				// Try to cancel via unpaid graphsync first
+				err := r.gsur.CancelTransfer(ctx, row.TransferID, &row.PeerID)
+
+				if err != nil {
+					// Attempt to terminate legacy, paid retrievals if we didnt cancel a free retrieval
+					err = r.dataTransfer.CloseDataTransferChannel(ctx, chid)
+				}
+
 				if err != nil {
 					log.Debugw("error canceling retrieval", "dealID", row.DealID, "err", err)
 				} else {
