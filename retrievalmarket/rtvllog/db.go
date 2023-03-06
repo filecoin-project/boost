@@ -124,7 +124,13 @@ func (d *RetrievalLogDB) List(ctx context.Context, cursor *time.Time, offset int
 }
 
 func (d *RetrievalLogDB) ListLastUpdatedAndOpen(ctx context.Context, lastUpdated time.Time) ([]RetrievalDealState, error) {
-	return d.list(ctx, 0, 0, "UpdatedAt <= ? AND Status != 'DealStatusCompleted' AND Status != 'DealStatusCancelled'", lastUpdated)
+	where := "UpdatedAt <= ?" +
+		"AND Status != 'DealStatusCompleted'" +
+		"AND Status != 'DealStatusCancelled'" +
+		"AND Status != 'DealStatusErrored'" +
+		"AND Status != 'DealStatusRejected'"
+
+	return d.list(ctx, 0, 0, where, lastUpdated)
 }
 
 func (d *RetrievalLogDB) list(ctx context.Context, offset int, limit int, where string, whereArgs ...interface{}) ([]RetrievalDealState, error) {
