@@ -27,6 +27,11 @@ import (
 
 var log = logging.Logger("boostgs")
 
+var incomingReqExtensions = []graphsync.ExtensionName{
+	extension.ExtensionIncomingRequest1_1,
+	extension.ExtensionDataTransfer1_1,
+}
+
 // Uniquely identify a request (requesting peer + data transfer id)
 type reqId struct {
 	p  peer.ID
@@ -260,9 +265,22 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 				return fmt.Errorf("creating accept response message: %w", msgErr)
 			}
 
-			// Send an accept message / validation failed message
-			if err := g.dtnet.SendMessage(g.ctx, p, respMsg); err != nil {
-				return fmt.Errorf("failed to send accept message to requestor %s: %w", p, err)
+			// Send an accept message / validation failed message as an extension
+			// (a go-data-transfer protocol message that gets embedded in a
+			// graphsync message)
+			if respMsg != nil {
+				// This hook uses a unique extension name so it can be attached
+				// to a graphsync message with data from a different hook.
+				// incomingReqExtensions also includes the default extension
+				// name to maintain compatibility with previous data-transfer
+				// protocol versions.
+				extensions, extensionErr := extension.ToExtensionData(respMsg, incomingReqExtensions)
+				if extensionErr != nil {
+					return fmt.Errorf("building extension data: %w", extensionErr)
+				}
+				for _, ext := range extensions {
+					hookActions.SendExtensionData(ext)
+				}
 			}
 
 			if validateErr == datatransfer.ErrPause || validateErr == datatransfer.ErrResume {
@@ -273,6 +291,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 		}()
 
 		if err != nil {
+			hookActions.TerminateWithError(err)
 			g.failTransfer(state, err)
 			return
 		}
