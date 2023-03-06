@@ -22,7 +22,6 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/xerrors"
 	"sync"
 )
 
@@ -326,12 +325,8 @@ func (g *GraphsyncUnpaidRetrieval) RegisterCompletedResponseListener(listener gr
 			return
 		}
 
-		var completeErr error
 		if status != graphsync.RequestCompletedFull {
-			completeErr = xerrors.Errorf("graphsync response to peer %s did not complete: response status code %s", p, status)
-		}
-
-		if completeErr != nil {
+			completeErr := fmt.Errorf("graphsync response to peer %s did not complete: response status code %s", p, status)
 			g.failTransfer(state, completeErr)
 			return
 		}
@@ -380,7 +375,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterRequestorCancelledListener(listener g
 		}
 
 		state.cs.status = datatransfer.Cancelled
-		g.publishDTEvent(datatransfer.Cancel, "", state.cs)
+		g.publishDTEvent(datatransfer.Cancel, "client cancelled", state.cs)
 		state.mkts.Status = retrievalmarket.DealStatusCancelled
 		g.publishMktsEvent(retrievalmarket.ProviderEventCancelComplete, *state.mkts)
 
@@ -439,7 +434,7 @@ func (g *GraphsyncUnpaidRetrieval) decodeVoucher(request datatransfer.Request, r
 	vtypStr := request.VoucherType()
 	decoder, has := registry.Decoder(vtypStr)
 	if !has {
-		return nil, xerrors.Errorf("unknown voucher type: %s", vtypStr)
+		return nil, fmt.Errorf("unknown voucher type: %s", vtypStr)
 	}
 	encodable, err := request.Voucher(decoder)
 	if err != nil {
