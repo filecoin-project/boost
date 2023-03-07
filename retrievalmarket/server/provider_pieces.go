@@ -39,7 +39,7 @@ func GetAllPieceInfoForPayload(dagStore stores.DAGStoreWrapper, pieceStore piece
 		// this payloadCID may be an identity CID that's in the root of a CAR but
 		// not recorded in the index
 		var idErr error
-		piecesWithTargetBlock, idErr = GetCommonPiecesFromIdentityCidLinks(dagStore, payloadCID)
+		piecesWithTargetBlock, idErr = GetCommonPiecesFromIdentityCidLinks(dagStore.GetPiecesContainingBlock, payloadCID)
 		if idErr != nil {
 			return []piecestore.PieceInfo{}, idErr
 		}
@@ -65,8 +65,8 @@ func GetAllPieceInfoForPayload(dagStore stores.DAGStoreWrapper, pieceStore piece
 
 // GetCommonPiecesFromIdentityCidLinks will inspect a payloadCID and if it has an identity multihash,
 // will determine which pieces contain all of the links within the decoded identity multihash block
-func GetCommonPiecesFromIdentityCidLinks(dagStore stores.DAGStoreWrapper, payloadCID cid.Cid) ([]cid.Cid, error) {
-	links, err := linksFromIdentityCid(payloadCID)
+func GetCommonPiecesFromIdentityCidLinks(piecesWithCid func(c cid.Cid) ([]cid.Cid, error), payloadCID cid.Cid) ([]cid.Cid, error) {
+	links, err := LinksFromIdentityCid(payloadCID)
 	if err != nil || len(links) == 0 {
 		return links, err
 	}
@@ -74,7 +74,7 @@ func GetCommonPiecesFromIdentityCidLinks(dagStore stores.DAGStoreWrapper, payloa
 	pieces := make([]cid.Cid, 0)
 	// for each link, query the dagstore for pieces that contain it
 	for i, link := range links {
-		piecesWithThisCid, err := dagStore.GetPiecesContainingBlock(link)
+		piecesWithThisCid, err := piecesWithCid(link)
 		if err != nil {
 			return nil, fmt.Errorf("getting pieces for identity CID sub-link %s: %w", link, err)
 		}
@@ -104,10 +104,10 @@ func GetCommonPiecesFromIdentityCidLinks(dagStore stores.DAGStoreWrapper, payloa
 	return pieces, nil
 }
 
-// linksFromIdentityCid will extract zero or more CIDs contained within a valid identity CID.
+// LinksFromIdentityCid will extract zero or more CIDs contained within a valid identity CID.
 // If the CID is not an identity CID, an empty list is returned. If the CID is an identity CID and
 // cannot be decoded, an error is returned.
-func linksFromIdentityCid(identityCid cid.Cid) ([]cid.Cid, error) {
+func LinksFromIdentityCid(identityCid cid.Cid) ([]cid.Cid, error) {
 	if identityCid.Prefix().MhType != multihash.IDENTITY {
 		return []cid.Cid{}, nil
 	}
@@ -141,7 +141,7 @@ func linksFromIdentityCid(identityCid cid.Cid) ([]cid.Cid, error) {
 		if cids[0].Prefix().MhType == multihash.IDENTITY {
 			// nested, recurse
 			// (just because you can, it doesn't mean you should, nested identity CIDs are an extra layer of silly)
-			cids, err = linksFromIdentityCid(cids[0])
+			cids, err = LinksFromIdentityCid(cids[0])
 			if err != nil {
 				return nil, err
 			}

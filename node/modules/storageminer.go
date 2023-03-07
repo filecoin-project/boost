@@ -651,7 +651,8 @@ func NewIndexBackedBlockstore(cfg *config.Boost) func(lc fx.Lifecycle, dagst dag
 			},
 		})
 
-		rbs, err := indexbs.NewIndexBackedBlockstore(ctx, dagst, ss.Proxy, cfg.Dealmaking.BlockstoreCacheMaxShards, time.Duration(cfg.Dealmaking.BlockstoreCacheExpiry))
+		ibsds := brm.NewIndexBackedBlockstoreDagstore(dagst)
+		rbs, err := indexbs.NewIndexBackedBlockstore(ctx, ibsds, ss.Proxy, cfg.Dealmaking.BlockstoreCacheMaxShards, time.Duration(cfg.Dealmaking.BlockstoreCacheExpiry))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create index backed blockstore: %w", err)
 		}
