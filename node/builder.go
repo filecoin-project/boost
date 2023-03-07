@@ -595,7 +595,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(lotus_modules.MinerSealingService), lotus_modules.ConnectSealingService(cfg.SealerApiInfo)),
 
 		Override(new(sealer.StorageAuth), lotus_modules.StorageAuthWithURL(cfg.SectorIndexApiInfo)),
-		Override(HandleOnlineBackupMgr, modules.NewOnlineBackupMgr(&cfg.BackupMgr)),
+		Override(HandleOnlineBackupMgr, modules.NewOnlineBackupMgr),
 
 		// Dynamic Lotus configs
 		Override(new(lotus_dtypes.ConsiderOnlineStorageDealsConfigFunc), lotus_modules.NewConsiderOnlineStorageDealsConfigFunc),

@@ -1,8 +1,6 @@
 package config
 
 import (
-	"time"
-
 	"github.com/filecoin-project/lotus/chain/types"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
 	"github.com/ipfs/go-cid"
@@ -29,25 +27,12 @@ type Backup struct {
 	DisableMetadataLog bool
 }
 
-type BackupMgr struct {
-	// Set this to true if you wish to enable the online backup manager for Boost
-	// Default it false
-	Enabled bool
-	// Frequency of online backup in hours
-	Frequency time.Duration
-	// Location of backup files. Must be specified for online backups to work
-	// This should be an absolute path
-	Location string
-}
-
 // Boost is a boost service config
 type Boost struct {
 	// The version of the config file (used for migrations)
 	ConfigVersion int
 
 	Common
-
-	BackupMgr
 
 	Storage StorageConfig
 	// The connect string for the sealing RPC API (lotus miner)

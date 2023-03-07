@@ -1,4 +1,4 @@
-package modules
+package backup
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/repo"
-	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/lib/backupds"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-datastore"
@@ -19,69 +18,57 @@ import (
 	"github.com/mitchellh/go-homedir"
 )
 
-const metadaFileName = "metadata"
+const MetadataFileName = "metadata"
 
-var fm = []string{"config.toml",
+var BkpFileList = []string{"config.toml",
 	"storage.json",
 	"token"}
 
-type BackupMgrConfig struct {
-	// Frequency of online backup in hours
-	Frequency time.Duration
-	// Location of backup files. Must be specified for online backups to work
-	Location string
+var RestoreFileChk = []string{
+	"metadata",
+	"boost.db",
 }
 
-type BackupDBs struct {
-	db   *sqlite3.SQLiteConn
-	name string
+type BackupDB struct {
+	Db   *sqlite3.SQLiteConn
+	Name string
 }
 
 type BackupMgr struct {
-	ctx       context.Context
-	cancel    context.CancelFunc
-	closeSync sync.Once
-	runWg     sync.WaitGroup
-	src       lotus_repo.LockedRepo
-	cfg       BackupMgrConfig
-	ds        datastore.Batching
-	dbs       []BackupDBs
-	lck       sync.Mutex
+	src lotus_repo.LockedRepo
+	ds  datastore.Batching
+	db  BackupDB
+	lck sync.Mutex
 }
 
-func NewBackupMgr(src lotus_repo.LockedRepo, cfg BackupMgrConfig, ds datastore.Batching, dbs []BackupDBs) (*BackupMgr, error) {
-	ctx, cancel := context.WithCancel(context.Background())
+func NewBackupMgr(src lotus_repo.LockedRepo, ds datastore.Batching, db BackupDB) (*BackupMgr, error) {
 	return &BackupMgr{
-		ctx:    ctx,
-		cancel: cancel,
-		src:    src,
-		cfg:    cfg,
-		ds:     ds,
-		dbs:    dbs,
+		src: src,
+		ds:  ds,
+		db:  db,
 	}, nil
 }
 
-func (b *BackupMgr) Start() error {
-	log.Infow("online backup manager: starting")
-	_, err := os.Stat(b.cfg.Location)
+func (b *BackupMgr) Backup(ctx context.Context, dstDir string) error {
+	_, err := os.Stat(dstDir)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("could not open backup location: %w", err)
 	}
-	b.run()
-	return nil
+
+	return b.takeBackup(ctx, dstDir)
 }
 
-func (b *BackupMgr) TakeBackup() error {
+func (b *BackupMgr) takeBackup(ctx context.Context, dstDir string) error {
 	s := b.lck.TryLock()
 	if !s {
-		return fmt.Errorf("unable to take lock for backup")
+		return fmt.Errorf("unable to take lock for backup, please check if there is already another backup running")
 	}
 	defer b.lck.Unlock()
 
 	// Create tmp backup directory and open it as Boost repo
 	bkpDir, err := ioutil.TempDir("", "boost_backup_")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	defer os.RemoveAll(bkpDir)
@@ -101,55 +88,26 @@ func (b *BackupMgr) TakeBackup() error {
 		return fmt.Errorf("error creating keystore directory %s: %w", path.Join(dst.Path(), "keystore"), err)
 	}
 
-	srcKS, err := b.src.KeyStore()
-	if err != nil {
-		return err
-	}
-
-	dstKS, err := dst.KeyStore()
-	if err != nil {
-		return err
-	}
-
 	// Copy keys from Boost to the backup repo
-	err = copyKeys(srcKS, dstKS)
+	err = CopyKeysBetweenRepos(b.src, dst)
 	if err != nil {
 		return err
 	}
 
 	// Copy metadata from boost repo to backup repo
-	fpath, err := homedir.Expand(path.Join(dst.Path(), metadaFileName))
+	fpath, err := homedir.Expand(path.Join(dst.Path(), MetadataFileName))
 	if err != nil {
 		return fmt.Errorf("expanding metadata file path: %w", err)
 	}
 
-	err = backupMetadata(b.ctx, b.ds, fpath)
+	err = BackupMetadata(ctx, b.ds, fpath)
 	if err != nil {
 		return err
 	}
 
 	// Backup the SQL DBs
-	var wg sync.WaitGroup
-	wg.Add(len(b.dbs))
-	results := make(chan error, len(b.dbs))
-	for _, sqlDB := range b.dbs {
-		go func(d BackupDBs) {
-			defer wg.Done()
-			err = sqlBackup(d.db, bkpDir, d.name)
-			if err != nil {
-				results <- err
-				return
-			}
-			results <- nil
-		}(sqlDB)
-	}
-
-	wg.Wait()
-	close(results)
-	for v := range results {
-		if v != nil {
-			return fmt.Errorf("sql backup failed with error: %w", v)
-		}
+	if err := sqlBackup(b.db.Db, bkpDir, b.db.Name); err != nil {
+		return err
 	}
 
 	// Generate the list of files to be copied from boost repo to the backup repo
@@ -158,13 +116,15 @@ func (b *BackupMgr) TakeBackup() error {
 		return fmt.Errorf("failed to read files from config directory: %w", err)
 	}
 
+	var fl []string
+	fl = append(fl, BkpFileList...)
 	for _, cfgFile := range cfgFiles {
 		f := path.Join("config", cfgFile.Name())
-		fm = append(fm, f)
+		fl = append(fl, f)
 	}
 
 	// Copy files
-	if err := copyFiles(b.src.Path(), dst.Path(), fm); err != nil {
+	if err := CopyFiles(b.src.Path(), dst.Path(), fl); err != nil {
 		return fmt.Errorf("error copying file: %w", err)
 	}
 
@@ -174,8 +134,8 @@ func (b *BackupMgr) TakeBackup() error {
 	}
 
 	// Move directory to the backup location
-	if err := os.Rename(bkpDir, path.Join(b.cfg.Location, "boost_backup_"+time.Now().Format("20060102150405"))); err != nil {
-		return fmt.Errorf("error moving backup directory %s to %s: %w", bkpDir, b.cfg.Location, err)
+	if err := os.Rename(bkpDir, path.Join(dstDir, "boost_backup_"+time.Now().Format("20060102150405"))); err != nil {
+		return fmt.Errorf("error moving backup directory %s to %s: %w", bkpDir, dstDir, err)
 	}
 
 	// TODO: Archive the directory and save it to the backup location
@@ -187,21 +147,21 @@ func sqlBackup(srcD *sqlite3.SQLiteConn, dstDir, name string) error {
 	dbPath := path.Join(dstDir, name+"?cache=shared")
 	db, sqlt3, err := db.SqlDB(dbPath)
 	if err != nil {
-		return fmt.Errorf("failed to open source sql db for backup for %v: %w", name, err)
+		return fmt.Errorf("failed to open source sql db for backup: %w", err)
 	}
 
 	defer db.Close()
 
 	bkp, err := sqlt3.Backup("main", srcD, "main")
 	if err != nil {
-		return fmt.Errorf("failed to start db backup for %v: %w", name, err)
+		return fmt.Errorf("failed to start db backup: %w", err)
 	}
 	defer bkp.Close()
 
 	// Allow the initial page count and remaining values to be retrieved
 	isDone, err := bkp.Step(0)
 	if err != nil {
-		return fmt.Errorf("unable to perform an initial 0-page backup step for %v: %w", name, err)
+		return fmt.Errorf("unable to perform an initial 0-page backup step: %w", err)
 	}
 	if isDone {
 		return fmt.Errorf("backup is unexpectedly done")
@@ -210,20 +170,20 @@ func sqlBackup(srcD *sqlite3.SQLiteConn, dstDir, name string) error {
 	// Check that the page count and remaining values are reasonable.
 	initialPageCount := bkp.PageCount()
 	if initialPageCount <= 0 {
-		return fmt.Errorf("unexpected initial page count value for %v: %v", name, initialPageCount)
+		return fmt.Errorf("unexpected initial page count value: %v", initialPageCount)
 	}
 	initialRemaining := bkp.Remaining()
 	if initialRemaining <= 0 {
-		return fmt.Errorf("unexpected initial remaining value for %v: %v", name, initialRemaining)
+		return fmt.Errorf("unexpected initial remaining value: %v", initialRemaining)
 	}
 	if initialRemaining != initialPageCount {
-		return fmt.Errorf("initial remaining value %v differs from the initial page count value %v for %v", initialRemaining, initialPageCount, name)
+		return fmt.Errorf("initial remaining value %v differs from the initial page count value %v", initialRemaining, initialPageCount)
 	}
 
 	// Copy all the pages
 	isDone, err = bkp.Step(-1)
 	if err != nil {
-		return fmt.Errorf("failed to perform a backup step for %v: %w", name, err)
+		return fmt.Errorf("failed to perform a backup step: %w", err)
 	}
 	if !isDone {
 		return fmt.Errorf("backup is unexpectedly not done")
@@ -236,19 +196,29 @@ func sqlBackup(srcD *sqlite3.SQLiteConn, dstDir, name string) error {
 	}
 	finalRemaining := bkp.Remaining()
 	if finalRemaining != 0 {
-		return fmt.Errorf("unexpected remaining value: %v for %v", finalRemaining, name)
+		return fmt.Errorf("unexpected remaining value: %v", finalRemaining)
 	}
 
 	// Finish the backup.
 	err = bkp.Finish()
 	if err != nil {
-		return fmt.Errorf("failed to finish backup for %v: %w", name, err)
+		return fmt.Errorf("failed to finish backup: %w", err)
 	}
 
 	return nil
 }
 
-func copyKeys(srcKS types.KeyStore, dstKS types.KeyStore) error {
+func CopyKeysBetweenRepos(srcRepo lotus_repo.LockedRepo, dstRepo lotus_repo.LockedRepo) error {
+	srcKS, err := srcRepo.KeyStore()
+	if err != nil {
+		return err
+	}
+
+	dstKS, err := dstRepo.KeyStore()
+	if err != nil {
+		return err
+	}
+
 	keys, err := srcKS.List()
 	if err != nil {
 		return err
@@ -267,7 +237,7 @@ func copyKeys(srcKS types.KeyStore, dstKS types.KeyStore) error {
 	return nil
 }
 
-func backupMetadata(ctx context.Context, srcDS datastore.Batching, fpath string) error {
+func BackupMetadata(ctx context.Context, srcDS datastore.Batching, fpath string) error {
 	bds, err := backupds.Wrap(srcDS, backupds.NoLogdir)
 	if err != nil {
 		return err
@@ -278,20 +248,18 @@ func backupMetadata(ctx context.Context, srcDS datastore.Batching, fpath string)
 		return fmt.Errorf("opening backup file %s: %w", fpath, err)
 	}
 
-	defer func() {
-		if err := out.Close(); err != nil {
-			log.Errorw("closing backup file: %w", err)
-		}
-	}()
-
 	if err := bds.Backup(ctx, out); err != nil {
 		return fmt.Errorf("backup error: %w", err)
+	}
+
+	if err := out.Close(); err != nil {
+		return fmt.Errorf("closing backup file: %w", err)
 	}
 
 	return nil
 }
 
-func copyFiles(srcDir, destDir string, flist []string) error {
+func CopyFiles(srcDir, destDir string, flist []string) error {
 
 	for _, fName := range flist {
 
@@ -330,38 +298,4 @@ func copyFiles(srcDir, destDir string, flist []string) error {
 	}
 
 	return nil
-}
-
-func (b *BackupMgr) run() {
-	log.Info("online backup manager: start")
-	b.runWg.Add(1)
-	defer func() {
-		b.runWg.Done()
-		log.Info("online backup manager: complete")
-	}()
-
-	// Create a ticker with an hour tick
-	ticker := time.NewTicker(time.Hour * b.cfg.Frequency)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			if err := b.TakeBackup(); err != nil {
-				log.Errorf("failed to take backup at %s", time.Now())
-				// TODO: Surface results to Boost UI
-			}
-		case <-b.ctx.Done():
-			return
-		}
-	}
-}
-
-func (b *BackupMgr) Stop() {
-	b.closeSync.Do(func() {
-		log.Infow("online backup manager: shutdown")
-		b.cancel()
-		b.runWg.Wait()
-		log.Info("online backup manager: shutdown complete")
-	})
 }

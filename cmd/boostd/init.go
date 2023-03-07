@@ -16,6 +16,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/impl/backup"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/util"
 	scliutil "github.com/filecoin-project/boostd-data/shared/cliutil"
@@ -221,7 +222,7 @@ func migrate(cctx *cli.Context, fromMonolith bool, mktsRepoPath string) error {
 
 	// Migrate keystore
 	fmt.Println("Migrating keystore")
-	err = migrateMarketsKeystore(mktsRepo, boostRepo)
+	err = backup.CopyKeysBetweenRepos(mktsRepo, boostRepo)
 	if err != nil {
 		return err
 	}
@@ -801,36 +802,6 @@ func importPrefix(ctx context.Context, prefix string, mktsDS datastore.Batching,
 			return nil
 		}
 	}
-}
-
-func migrateMarketsKeystore(mktsRepo lotus_repo.LockedRepo, boostRepo lotus_repo.LockedRepo) error {
-	boostKS, err := boostRepo.KeyStore()
-	if err != nil {
-		return err
-	}
-
-	mktsKS, err := mktsRepo.KeyStore()
-	if err != nil {
-		return err
-	}
-
-	keys, err := mktsKS.List()
-	if err != nil {
-		return err
-	}
-
-	for _, k := range keys {
-		ki, err := mktsKS.Get(k)
-		if err != nil {
-			return err
-		}
-		err = boostKS.Put(k, ki)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // checkV1ApiSupport uses v0 api version to signal support for v1 API

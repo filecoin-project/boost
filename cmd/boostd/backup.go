@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
+	bcli "github.com/filecoin-project/boost/cli"
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/node/impl/backup"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
@@ -17,24 +20,47 @@ import (
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 
-const metadaFileName = "metadata"
-
-var fm = []string{"boost.db",
-	"boost.logs.db",
-	"config.toml",
-	"storage.json",
-	"token"}
-
 var backupCmd = &cli.Command{
 	Name:        "backup",
 	Usage:       "boostd backup <backup directory>",
-	Description: "Performs offline backup of Boost",
+	Description: "Takes a backup of Boost",
 	Before:      before,
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "offline",
+			Usage: "Performs an offline backup of Boost. Boost must be stopped.",
+			Value: false,
+		},
+	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() != 1 {
 			return fmt.Errorf("usage: boostd backup <backup directory>")
 		}
 
+		// Online backup
+		if !cctx.Bool("offline") {
+			api, closer, err := bcli.GetBoostAPI(cctx)
+			if err != nil {
+				return err
+			}
+			defer closer()
+
+			ctx := bcli.ReqContext(cctx)
+
+			bkpPath, err := homedir.Expand(cctx.Args().First())
+			if err != nil {
+				return fmt.Errorf("expanding backup directory path: %w", err)
+			}
+
+			bpath, err := filepath.Abs(bkpPath)
+			if err != nil {
+				return fmt.Errorf("failed get absolute path for backup directory: %w", err)
+			}
+
+			return api.OnlineBackup(ctx, bpath)
+		}
+
+		// Offline backup
 		boostRepoPath := cctx.String(FlagBoostRepo)
 
 		r, err := lotus_repo.NewFS(boostRepoPath)
@@ -58,11 +84,6 @@ var backupCmd = &cli.Command{
 		mds, err := lr.Datastore(cctx.Context, metadataNamespace)
 		if err != nil {
 			return fmt.Errorf("getting metadata datastore: %w", err)
-		}
-
-		bds, err := backupds.Wrap(mds, backupds.NoLogdir)
-		if err != nil {
-			return err
 		}
 
 		bkpPath, err := homedir.Expand(cctx.Args().First())
@@ -100,7 +121,7 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("error creating keystore directory %s: %w", path.Join(bkpDir, "keystore"), err)
 		}
 
-		if err := migrateMarketsKeystore(lr, lb); err != nil {
+		if err := backup.CopyKeysBetweenRepos(lr, lb); err != nil {
 			return fmt.Errorf("error copying keys: %w", err)
 		}
 
@@ -108,7 +129,7 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("error creating config directory %s: %w", path.Join(bkpDir, "config"), err)
 		}
 
-		fpathName := path.Join(bkpDir, metadaFileName)
+		fpathName := path.Join(bkpDir, backup.MetadataFileName)
 
 		fpath, err := homedir.Expand(fpathName)
 		if err != nil {
@@ -117,19 +138,9 @@ var backupCmd = &cli.Command{
 
 		fmt.Println("creating metadata backup")
 
-		out, err := os.OpenFile(fpath, os.O_CREATE|os.O_WRONLY, 0644)
+		err = backup.BackupMetadata(cctx.Context, mds, fpath)
 		if err != nil {
-			return fmt.Errorf("opening backup file %s: %w", fpath, err)
-		}
-
-		defer func() {
-			if err := out.Close(); err != nil {
-				log.Errorw("closing backup file: %w", err)
-			}
-		}()
-
-		if err := bds.Backup(cctx.Context, out); err != nil {
-			return fmt.Errorf("backup error: %w", err)
+			return fmt.Errorf("failed to take metadata backup: %w", err)
 		}
 
 		cfgFiles, err := ioutil.ReadDir(path.Join(lr.Path(), "config"))
@@ -137,19 +148,17 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("failed to read files from config directory: %w", err)
 		}
 
+		var fl []string
+		fl = append(fl, backup.BkpFileList...)
 		for _, cfgFile := range cfgFiles {
 			f := path.Join("config", cfgFile.Name())
-			fm = append(fm, f)
+			fl = append(fl, f)
 		}
+		fl = append(fl, db.DealsDBName)
 
 		fmt.Println("Copying the files to backup directory")
 
-		destPath, err := homedir.Expand(bkpDir)
-		if err != nil {
-			return fmt.Errorf("expanding destination file path %s: %w", bkpDir, err)
-		}
-
-		if err := copyFiles(lr.Path(), destPath, fm); err != nil {
+		if err := backup.CopyFiles(lr.Path(), bkpDir, fl); err != nil {
 			return fmt.Errorf("error copying file: %w", err)
 		}
 
@@ -181,7 +190,7 @@ var restoreCmd = &cli.Command{
 
 		fmt.Printf("Checking backup directory %s\n", bpath)
 
-		flist := []string{"metadata", "boost.db", "boost.logs.db"}
+		flist := backup.RestoreFileChk
 		for _, fileName := range flist {
 			_, err = os.Stat(path.Join(bpath, fileName))
 			if os.IsNotExist(err) {
@@ -231,7 +240,7 @@ var restoreCmd = &cli.Command{
 
 		fmt.Println("Copying keystore")
 
-		if err := migrateMarketsKeystore(lb, lr); err != nil {
+		if err := backup.CopyKeysBetweenRepos(lb, lr); err != nil {
 			return fmt.Errorf("error copying keys: %w", err)
 		}
 
@@ -240,7 +249,7 @@ var restoreCmd = &cli.Command{
 			return err
 		}
 
-		fpathName := path.Join(bpath, metadaFileName)
+		fpathName := path.Join(bpath, backup.MetadataFileName)
 
 		fpath, err := homedir.Expand(fpathName)
 		if err != nil {
@@ -286,9 +295,11 @@ var restoreCmd = &cli.Command{
 			return fmt.Errorf("failed to read files from config directory: %w", err)
 		}
 
+		var fl []string
+		fl = append(fl, backup.BkpFileList...)
 		for _, cfgFile := range cfgFiles {
 			f := path.Join("config", cfgFile.Name())
-			fm = append(fm, f)
+			fl = append(fl, f)
 		}
 
 		//Remove default config.toml created with repo to avoid conflict with symllink
@@ -296,7 +307,7 @@ var restoreCmd = &cli.Command{
 			return fmt.Errorf("failed to remove the default config file: %w", err)
 		}
 
-		if err := copyFiles(lb.Path(), lr.Path(), fm); err != nil {
+		if err := backup.CopyFiles(lb.Path(), lr.Path(), fl); err != nil {
 			return fmt.Errorf("error copying file: %w", err)
 		}
 
@@ -304,45 +315,4 @@ var restoreCmd = &cli.Command{
 
 		return nil
 	},
-}
-
-func copyFiles(srcDir, destDir string, flist []string) error {
-
-	for _, fName := range flist {
-
-		f, err := os.Lstat(path.Join(srcDir, fName))
-
-		if os.IsNotExist(err) {
-			fmt.Printf("Not copying %s as file does not exists\n", path.Join(srcDir, fName))
-			return nil
-		}
-
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-
-		// Handle if symlinks
-		if f.Mode()&os.ModeSymlink == os.ModeSymlink {
-			linkDest, err := os.Readlink(path.Join(srcDir, fName))
-			if err != nil {
-				return err
-			}
-			if err = os.Symlink(linkDest, path.Join(destDir, fName)); err != nil {
-				return err
-			}
-		} else {
-
-			input, err := ioutil.ReadFile(path.Join(srcDir, fName))
-			if err != nil {
-				return err
-			}
-
-			err = ioutil.WriteFile(path.Join(destDir, fName), input, f.Mode())
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }

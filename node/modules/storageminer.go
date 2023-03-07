@@ -16,6 +16,7 @@ import (
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/impl/backup"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	brm "github.com/filecoin-project/boost/retrievalmarket/lib"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -635,48 +636,20 @@ func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, erro
 	}
 }
 
-func NewOnlineBackupMgr(cfg *config.BackupMgr) func(lc fx.Lifecycle, src lotus_repo.LockedRepo, ds datastore.Batching, dealsDB *sqlite3.SQLiteConn, logsDB *sqlite3.SQLiteConn) error {
-	return func(lc fx.Lifecycle, src lotus_repo.LockedRepo, ds datastore.Batching, dealsDB *sqlite3.SQLiteConn, logsDB *sqlite3.SQLiteConn) error {
-		if !cfg.Enabled {
-			log.Info("Online backup manager is disabled in config.")
-			return nil
+func NewOnlineBackupMgr() func(lc fx.Lifecycle, src lotus_repo.LockedRepo, ds datastore.Batching, dealsDB *sqlite3.SQLiteConn, logsDB *sqlite3.SQLiteConn) (*backup.BackupMgr, error) {
+	return func(lc fx.Lifecycle, src lotus_repo.LockedRepo, ds datastore.Batching, dealsDB *sqlite3.SQLiteConn, logsDB *sqlite3.SQLiteConn) (*backup.BackupMgr, error) {
+
+		dbs := backup.BackupDB{
+			Db:   dealsDB,
+			Name: db.DealsDBName,
 		}
 
-		bkpCfg := BackupMgrConfig{
-			Frequency: cfg.Frequency,
-			Location:  cfg.Location,
-		}
-
-		var dbs []BackupDBs
-		dbs = append(dbs, BackupDBs{
-			db:   dealsDB,
-			name: db.DealsDBName,
-		})
-		dbs = append(dbs, BackupDBs{
-			db:   logsDB,
-			name: db.LogsDBName,
-		})
-
-		bkp, err := NewBackupMgr(src, bkpCfg, ds, dbs)
+		bkp, err := backup.NewBackupMgr(src, ds, dbs)
 		if err != nil {
-			return err
+			return &backup.BackupMgr{}, err
 		}
 
-		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				log.Info("contract deals monitor starting")
-				err := bkp.Start()
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-			OnStop: func(ctx context.Context) error {
-				bkp.Stop()
-				return nil
-			},
-		})
-		return nil
+		return bkp, nil
 	}
 
 }

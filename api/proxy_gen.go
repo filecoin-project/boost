@@ -122,6 +122,8 @@ type BoostStruct struct {
 
 		MarketSetRetrievalAsk func(p0 context.Context, p1 *retrievalmarket.Ask) error `perm:"admin"`
 
+		OnlineBackup func(p0 context.Context, p1 string) error ``
+
 		PiecesGetCIDInfo func(p0 context.Context, p1 cid.Cid) (*piecestore.CIDInfo, error) `perm:"read"`
 
 		PiecesGetMaxOffset func(p0 context.Context, p1 cid.Cid) (uint64, error) `perm:"read"`
@@ -731,6 +733,17 @@ func (s *BoostStruct) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmar
 }
 
 func (s *BoostStub) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmarket.Ask) error {
+	return ErrNotSupported
+}
+
+func (s *BoostStruct) OnlineBackup(p0 context.Context, p1 string) error {
+	if s.Internal.OnlineBackup == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.OnlineBackup(p0, p1)
+}
+
+func (s *BoostStub) OnlineBackup(p0 context.Context, p1 string) error {
 	return ErrNotSupported
 }
 
