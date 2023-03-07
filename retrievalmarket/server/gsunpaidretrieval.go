@@ -461,7 +461,15 @@ func (g *GraphsyncUnpaidRetrieval) RegisterNetworkErrorListener(listener graphsy
 			return
 		}
 
-		// Consider network errors as fatal, clients can resume if they wish
+		// Consider network errors as fatal, clients can sent a new request if they wish
+
+		// Cancel the graphsync retrieval
+		cancelErr := g.GraphExchange.Cancel(g.ctx, request.ID())
+		if cancelErr != nil {
+			log.Errorf("cancelling graphsync response after network error: %w", cancelErr)
+		}
+
+		// Fail the transfer
 		g.failTransfer(state, err)
 	})
 }
