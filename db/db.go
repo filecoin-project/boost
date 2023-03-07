@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 )
@@ -22,15 +23,15 @@ type Scannable interface {
 	Scan(dest ...interface{}) error
 }
 
-func SqlDB(dbPath string) (*sql.DB, *sqlite3.SQLiteConn, error) {
+func SqlDB(dbPath, driverName string) (*sql.DB, *sqlite3.SQLiteConn, error) {
 	var sqlite3conn *sqlite3.SQLiteConn
-	sql.Register("sqlite3backup", &sqlite3.SQLiteDriver{
+	sql.Register(driverName, &sqlite3.SQLiteDriver{
 		ConnectHook: func(conn *sqlite3.SQLiteConn) error {
 			sqlite3conn = conn
 			return nil
 		},
 	})
-	db, err := sql.Open("sqlite3backup", "file:"+dbPath)
+	db, err := sql.Open(driverName, "file:"+dbPath)
 	if err == nil {
 		// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 		// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
@@ -62,7 +63,7 @@ func CreateTestTmpDB(t *testing.T) *sql.DB {
 	f, err := ioutil.TempFile(t.TempDir(), "*.db")
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
-	d, _, err := SqlDB(f.Name())
+	d, _, err := SqlDB(f.Name(), uuid.NewString())
 	require.NoError(t, err)
 	return d
 }

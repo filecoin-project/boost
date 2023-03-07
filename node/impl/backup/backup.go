@@ -145,7 +145,7 @@ func (b *BackupMgr) takeBackup(ctx context.Context, dstDir string) error {
 
 func sqlBackup(srcD *sqlite3.SQLiteConn, dstDir, name string) error {
 	dbPath := path.Join(dstDir, name+"?cache=shared")
-	db, sqlt3, err := db.SqlDB(dbPath)
+	db, sqlt3, err := db.SqlDB(dbPath, "bkpdb")
 	if err != nil {
 		return fmt.Errorf("failed to open source sql db for backup: %w", err)
 	}

@@ -312,7 +312,7 @@ func NewBoostDB(r lotus_repo.LockedRepo) (*DealSqlDB, error) {
 	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
 	dbPath := path.Join(r.Path(), db.DealsDBName+"?cache=shared")
-	db, sqlt3, err := db.SqlDB(dbPath)
+	db, sqlt3, err := db.SqlDB(dbPath, db.DealsDBName)
 	return &DealSqlDB{
 		db:    db,
 		sqlt3: sqlt3,
@@ -328,7 +328,7 @@ func NewLogsSqlDB(r repo.LockedRepo) (*LogSqlDB, error) {
 	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
 	dbPath := path.Join(r.Path(), db.LogsDBName+"?cache=shared")
-	d, sqlt3, err := db.SqlDB(dbPath)
+	d, sqlt3, err := db.SqlDB(dbPath, db.LogsDBName)
 	if err != nil {
 		return nil, err
 	}
