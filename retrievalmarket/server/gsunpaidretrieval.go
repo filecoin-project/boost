@@ -136,8 +136,10 @@ func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatr
 
 	// If peer is set we can cancel more efficiently
 	if p != nil {
-		state := g.activeRetrievals[reqId{p: *p, id: id}]
-		g.failTransfer(state, errors.New("transfer cancelled by provider"))
+		state, ok := g.activeRetrievals[reqId{p: *p, id: id}]
+		if ok {
+			g.failTransfer(state, errors.New("transfer cancelled by provider"))
+		}
 		return nil
 	}
 
