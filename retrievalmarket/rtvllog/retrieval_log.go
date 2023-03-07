@@ -241,7 +241,7 @@ func (r *RetrievalLog) gcDatabase(ctx context.Context) {
 
 // Periodically cancels stalled retrievals older than 30mins
 func (r *RetrievalLog) gcRetrievals(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
 	for {
