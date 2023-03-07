@@ -2,7 +2,6 @@ package node
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -23,6 +22,7 @@ import (
 	"github.com/filecoin-project/boost/node/impl/common"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -154,6 +154,7 @@ const (
 	HandleBoostDealsKey
 	HandleContractDealsKey
 	HandleProposalLogCleanerKey
+	HandleOnlineBackupMgr
 
 	// daemon
 	ExtractApiKey
@@ -408,7 +409,7 @@ var BoostNode = Options(
 	Override(new(lotus_dtypes.MinerID), lotus_modules.MinerID),
 
 	Override(new(lotus_dtypes.NetworkName), lotus_modules.StorageNetworkName),
-	Override(new(*sql.DB), modules.NewBoostDB),
+	Override(new(*modules.DealSqlDB), modules.NewBoostDB),
 	Override(new(*modules.LogSqlDB), modules.NewLogsSqlDB),
 	Override(new(*modules.RetrievalSqlDB), modules.NewRetrievalSqlDB),
 	Override(HandleCreateRetrievalTablesKey, modules.CreateRetrievalTables),
@@ -594,6 +595,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(lotus_modules.MinerSealingService), lotus_modules.ConnectSealingService(cfg.SealerApiInfo)),
 
 		Override(new(sealer.StorageAuth), lotus_modules.StorageAuthWithURL(cfg.SectorIndexApiInfo)),
+		Override(HandleOnlineBackupMgr, modules.NewOnlineBackupMgr(&cfg.BackupMgr)),
 
 		// Dynamic Lotus configs
 		Override(new(lotus_dtypes.ConsiderOnlineStorageDealsConfigFunc), lotus_modules.NewConsiderOnlineStorageDealsConfigFunc),
@@ -644,7 +646,7 @@ func BoostAPI(out *api.Boost) Option {
 		),
 
 		func(s *Settings) error {
-			s.nodeType = Boost
+			s.nodeType = repo.Boost
 			return nil
 		},
 
@@ -655,30 +657,4 @@ func BoostAPI(out *api.Boost) Option {
 			return nil
 		},
 	)
-}
-
-var Boost boost
-
-type boost struct{}
-
-func (f boost) Type() string {
-	return "Boost"
-}
-
-func (f boost) Config() interface{} {
-	return config.DefaultBoost()
-}
-
-func (boost) SupportsStagingDeals() {}
-
-func (boost) APIFlags() []string {
-	return []string{"boost-api-url"}
-}
-
-func (boost) RepoFlags() []string {
-	return []string{"boost-repo"}
-}
-
-func (boost) APIInfoEnvVars() (primary string, fallbacks []string, deprecated []string) {
-	return "BOOST_API_INFO", nil, nil
 }

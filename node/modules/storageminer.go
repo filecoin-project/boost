@@ -54,9 +54,11 @@ import (
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/metadata"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/mattn/go-sqlite3"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
 )
@@ -300,30 +302,43 @@ func StorageNetworkName(ctx helpers.MetricsCtx, a v1api.FullNode) (dtypes.Networ
 	return dtypes.NetworkName(n), nil
 }
 
-func NewBoostDB(r lotus_repo.LockedRepo) (*sql.DB, error) {
+type DealSqlDB struct {
+	db    *sql.DB
+	sqlt3 *sqlite3.SQLiteConn
+}
+
+func NewBoostDB(r lotus_repo.LockedRepo) (*DealSqlDB, error) {
 	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
-	dbPath := path.Join(r.Path(), "boost.db?cache=shared")
-	return db.SqlDB(dbPath)
+	dbPath := path.Join(r.Path(), db.DealsDBName+"?cache=shared")
+	db, sqlt3, err := db.SqlDB(dbPath)
+	return &DealSqlDB{
+		db:    db,
+		sqlt3: sqlt3,
+	}, err
 }
 
 type LogSqlDB struct {
-	db *sql.DB
+	db    *sql.DB
+	sqlt3 *sqlite3.SQLiteConn
 }
 
 func NewLogsSqlDB(r repo.LockedRepo) (*LogSqlDB, error) {
 	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
-	dbPath := path.Join(r.Path(), "boost.logs.db?cache=shared")
-	d, err := db.SqlDB(dbPath)
+	dbPath := path.Join(r.Path(), db.LogsDBName+"?cache=shared")
+	d, sqlt3, err := db.SqlDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
-	return &LogSqlDB{d}, nil
+	return &LogSqlDB{
+		db:    d,
+		sqlt3: sqlt3,
+	}, nil
 }
 
-func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
-	return db.NewDealsDB(sqldb)
+func NewDealsDB(dealSqldb *DealSqlDB) *db.DealsDB {
+	return db.NewDealsDB(dealSqldb.db)
 }
 
 func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
@@ -618,4 +633,50 @@ func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, erro
 
 		return &tracing.Tracing{}, nil
 	}
+}
+
+func NewOnlineBackupMgr(cfg *config.BackupMgr) func(lc fx.Lifecycle, src lotus_repo.LockedRepo, ds datastore.Batching, dealsDB *sqlite3.SQLiteConn, logsDB *sqlite3.SQLiteConn) error {
+	return func(lc fx.Lifecycle, src lotus_repo.LockedRepo, ds datastore.Batching, dealsDB *sqlite3.SQLiteConn, logsDB *sqlite3.SQLiteConn) error {
+		if !cfg.Enabled {
+			log.Info("Online backup manager is disabled in config.")
+			return nil
+		}
+
+		bkpCfg := BackupMgrConfig{
+			Frequency: cfg.Frequency,
+			Location:  cfg.Location,
+		}
+
+		var dbs []BackupDBs
+		dbs = append(dbs, BackupDBs{
+			db:   dealsDB,
+			name: db.DealsDBName,
+		})
+		dbs = append(dbs, BackupDBs{
+			db:   logsDB,
+			name: db.LogsDBName,
+		})
+
+		bkp, err := NewBackupMgr(src, bkpCfg, ds, dbs)
+		if err != nil {
+			return err
+		}
+
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				log.Info("contract deals monitor starting")
+				err := bkp.Start()
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				bkp.Stop()
+				return nil
+			},
+		})
+		return nil
+	}
+
 }

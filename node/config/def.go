@@ -51,12 +51,20 @@ func defCommon() Common {
 
 }
 
+func defBackupMgr() BackupMgr {
+	return BackupMgr{
+		Enabled: false,
+	}
+}
+
 var DefaultDefaultMaxFee = types.MustParseFIL("0.07")
 var DefaultSimultaneousTransfers = uint64(20)
 
 func DefaultBoost() *Boost {
 	cfg := &Boost{
 		Common: defCommon(),
+
+		BackupMgr: defBackupMgr(),
 
 		Storage: StorageConfig{
 			ParallelFetchLimit: 10,

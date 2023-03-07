@@ -18,6 +18,28 @@ var Doc = map[string][]DocField{
 your node if metadata log is disabled`,
 		},
 	},
+	"BackupMgr": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: `Set this to true if you wish to enable the online backup manager for Boost
+Default it false`,
+		},
+		{
+			Name: "Frequency",
+			Type: "time.Duration",
+
+			Comment: `Frequency of online backup in hours`,
+		},
+		{
+			Name: "Location",
+			Type: "string",
+
+			Comment: `Location of backup files. Must be specified for online backups to work
+This should be an absolute path`,
+		},
+	},
 	"Boost": []DocField{
 		{
 			Name: "ConfigVersion",

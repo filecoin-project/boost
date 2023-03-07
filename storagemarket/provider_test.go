@@ -1418,7 +1418,7 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	f, err := ioutil.TempFile(dir, "*.db")
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
-	sqldb, err := db.SqlDB(f.Name())
+	sqldb, _, err := db.SqlDB(f.Name())
 	require.NoError(t, err)
 	dealsDB := db.NewDealsDB(sqldb)
 	fundsDB := db.NewFundsDB(sqldb)

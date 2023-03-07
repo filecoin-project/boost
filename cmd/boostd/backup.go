@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/filecoin-project/boost/node/repo"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/cheggaaa/pb.v1"
 
-	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/lotus/lib/backupds"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
@@ -49,7 +49,7 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("repo at '%s' is not initialized", cctx.String(FlagBoostRepo))
 		}
 
-		lr, err := r.LockRO(node.Boost)
+		lr, err := r.LockRO(repo.Boost)
 		if err != nil {
 			return fmt.Errorf("locking repo: %w. Please stop the boostd process to take backup", err)
 		}
@@ -88,7 +88,7 @@ var backupCmd = &cli.Command{
 			return err
 		}
 
-		lb, err := b.Lock(node.Boost)
+		lb, err := b.Lock(repo.Boost)
 		if err != nil {
 			return err
 		}
@@ -208,11 +208,11 @@ var restoreCmd = &cli.Command{
 		}
 
 		fmt.Println("Creating boost repo")
-		if err := r.Init(node.Boost); err != nil {
+		if err := r.Init(repo.Boost); err != nil {
 			return err
 		}
 
-		lr, err := r.Lock(node.Boost)
+		lr, err := r.Lock(repo.Boost)
 		if err != nil {
 			return err
 		}
@@ -223,7 +223,7 @@ var restoreCmd = &cli.Command{
 			return err
 		}
 
-		lb, err := b.Lock(node.Boost)
+		lb, err := b.Lock(repo.Boost)
 		if err != nil {
 			return err
 		}

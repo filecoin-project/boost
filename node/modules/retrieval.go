@@ -122,7 +122,7 @@ type RetrievalSqlDB struct {
 
 func NewRetrievalSqlDB(r repo.LockedRepo) (*RetrievalSqlDB, error) {
 	dbPath := path.Join(r.Path(), "boost.retrieval.db?cache=shared")
-	d, err := db.SqlDB(dbPath)
+	d, _, err := db.SqlDB(dbPath)
 	if err != nil {
 		return nil, err
 	}

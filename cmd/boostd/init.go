@@ -15,8 +15,8 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost/api"
 	cliutil "github.com/filecoin-project/boost/cli/util"
-	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/util"
 	scliutil "github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/go-address"
@@ -77,7 +77,7 @@ var initCmd = &cli.Command{
 			return err
 		}
 
-		lr, err := bp.repo.Lock(node.Boost)
+		lr, err := bp.repo.Lock(repo.Boost)
 		if err != nil {
 			return err
 		}
@@ -201,7 +201,7 @@ func migrate(cctx *cli.Context, fromMonolith bool, mktsRepoPath string) error {
 		return err
 	}
 
-	boostRepo, err := bp.repo.Lock(node.Boost)
+	boostRepo, err := bp.repo.Lock(repo.Boost)
 	if err != nil {
 		return err
 	}
@@ -624,7 +624,7 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 	}
 
 	fmt.Println("Creating boost repo")
-	if err := r.Init(node.Boost); err != nil {
+	if err := r.Init(repo.Boost); err != nil {
 		return nil, err
 	}
 
