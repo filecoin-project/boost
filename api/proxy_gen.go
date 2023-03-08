@@ -122,7 +122,7 @@ type BoostStruct struct {
 
 		MarketSetRetrievalAsk func(p0 context.Context, p1 *retrievalmarket.Ask) error `perm:"admin"`
 
-		OnlineBackup func(p0 context.Context, p1 string) error ``
+		OnlineBackup func(p0 context.Context, p1 string) error `perm:"admin"`
 
 		PiecesGetCIDInfo func(p0 context.Context, p1 cid.Cid) (*piecestore.CIDInfo, error) `perm:"read"`
 

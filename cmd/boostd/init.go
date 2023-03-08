@@ -16,7 +16,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/node/impl/backup"
+	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/util"
 	scliutil "github.com/filecoin-project/boostd-data/shared/cliutil"
@@ -222,7 +222,7 @@ func migrate(cctx *cli.Context, fromMonolith bool, mktsRepoPath string) error {
 
 	// Migrate keystore
 	fmt.Println("Migrating keystore")
-	err = backup.CopyKeysBetweenRepos(mktsRepo, boostRepo)
+	err = backupmgr.CopyKeysBetweenRepos(mktsRepo, boostRepo)
 	if err != nil {
 		return err
 	}

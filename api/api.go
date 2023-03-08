@@ -98,7 +98,7 @@ type Boost interface {
 	DealsSetConsiderUnverifiedStorageDeals(context.Context, bool) error //perm:admin
 
 	// MethodGroup: Misc
-	OnlineBackup(context.Context, string) error
+	OnlineBackup(context.Context, string) error //perm:admin
 }
 
 // DagstoreShardInfo is the serialized form of dagstore.DagstoreShardInfo that

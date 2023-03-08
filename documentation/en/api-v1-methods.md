@@ -1657,7 +1657,7 @@ Response:
 ### OnlineBackup
 There are not yet any comments for this method.
 
-Perms: 
+Perms: admin
 
 Inputs:
 ```json

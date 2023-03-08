@@ -10,7 +10,7 @@ import (
 
 	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/node/impl/backup"
+	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
@@ -121,7 +121,7 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("error creating keystore directory %s: %w", path.Join(bkpDir, "keystore"), err)
 		}
 
-		if err := backup.CopyKeysBetweenRepos(lr, lb); err != nil {
+		if err := backupmgr.CopyKeysBetweenRepos(lr, lb); err != nil {
 			return fmt.Errorf("error copying keys: %w", err)
 		}
 
@@ -129,7 +129,7 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("error creating config directory %s: %w", path.Join(bkpDir, "config"), err)
 		}
 
-		fpathName := path.Join(bkpDir, backup.MetadataFileName)
+		fpathName := path.Join(bkpDir, backupmgr.MetadataFileName)
 
 		fpath, err := homedir.Expand(fpathName)
 		if err != nil {
@@ -138,7 +138,7 @@ var backupCmd = &cli.Command{
 
 		fmt.Println("creating metadata backup")
 
-		err = backup.BackupMetadata(cctx.Context, mds, fpath)
+		err = backupmgr.BackupMetadata(cctx.Context, mds, fpath)
 		if err != nil {
 			return fmt.Errorf("failed to take metadata backup: %w", err)
 		}
@@ -149,7 +149,7 @@ var backupCmd = &cli.Command{
 		}
 
 		var fl []string
-		fl = append(fl, backup.BkpFileList...)
+		fl = append(fl, backupmgr.BkpFileList...)
 		for _, cfgFile := range cfgFiles {
 			f := path.Join("config", cfgFile.Name())
 			fl = append(fl, f)
@@ -158,7 +158,7 @@ var backupCmd = &cli.Command{
 
 		fmt.Println("Copying the files to backup directory")
 
-		if err := backup.CopyFiles(lr.Path(), bkpDir, fl); err != nil {
+		if err := backupmgr.CopyFiles(lr.Path(), bkpDir, fl); err != nil {
 			return fmt.Errorf("error copying file: %w", err)
 		}
 
@@ -190,7 +190,7 @@ var restoreCmd = &cli.Command{
 
 		fmt.Printf("Checking backup directory %s\n", bpath)
 
-		flist := backup.RestoreFileChk
+		flist := backupmgr.RestoreFileChk
 		for _, fileName := range flist {
 			_, err = os.Stat(path.Join(bpath, fileName))
 			if os.IsNotExist(err) {
@@ -240,7 +240,7 @@ var restoreCmd = &cli.Command{
 
 		fmt.Println("Copying keystore")
 
-		if err := backup.CopyKeysBetweenRepos(lb, lr); err != nil {
+		if err := backupmgr.CopyKeysBetweenRepos(lb, lr); err != nil {
 			return fmt.Errorf("error copying keys: %w", err)
 		}
 
@@ -249,7 +249,7 @@ var restoreCmd = &cli.Command{
 			return err
 		}
 
-		fpathName := path.Join(bpath, backup.MetadataFileName)
+		fpathName := path.Join(bpath, backupmgr.MetadataFileName)
 
 		fpath, err := homedir.Expand(fpathName)
 		if err != nil {
@@ -296,7 +296,7 @@ var restoreCmd = &cli.Command{
 		}
 
 		var fl []string
-		fl = append(fl, backup.BkpFileList...)
+		fl = append(fl, backupmgr.BkpFileList...)
 		for _, cfgFile := range cfgFiles {
 			f := path.Join("config", cfgFile.Name())
 			fl = append(fl, f)
@@ -307,7 +307,7 @@ var restoreCmd = &cli.Command{
 			return fmt.Errorf("failed to remove the default config file: %w", err)
 		}
 
-		if err := backup.CopyFiles(lb.Path(), lr.Path(), fl); err != nil {
+		if err := backupmgr.CopyFiles(lb.Path(), lr.Path(), fl); err != nil {
 			return fmt.Errorf("error copying file: %w", err)
 		}
 

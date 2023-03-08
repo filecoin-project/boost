@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/filecoin-project/boost/node/impl/backup"
+	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -83,7 +83,7 @@ type BoostAPI struct {
 
 	DS lotus_dtypes.MetadataDS
 
-	Bkp backup.BackupMgr
+	Bkp *backupmgr.BackupMgr
 
 	ConsiderOnlineStorageDealsConfigFunc        lotus_dtypes.ConsiderOnlineStorageDealsConfigFunc        `optional:"true"`
 	SetConsiderOnlineStorageDealsConfigFunc     lotus_dtypes.SetConsiderOnlineStorageDealsConfigFunc     `optional:"true"`

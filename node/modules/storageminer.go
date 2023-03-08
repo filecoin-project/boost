@@ -16,7 +16,7 @@ import (
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/node/impl/backup"
+	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	brm "github.com/filecoin-project/boost/retrievalmarket/lib"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -55,7 +55,6 @@ import (
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/metadata"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -303,43 +302,30 @@ func StorageNetworkName(ctx helpers.MetricsCtx, a v1api.FullNode) (dtypes.Networ
 	return dtypes.NetworkName(n), nil
 }
 
-type DealSqlDB struct {
-	db    *sql.DB
-	sqlt3 *sqlite3.SQLiteConn
-}
-
-func NewBoostDB(r lotus_repo.LockedRepo) (*DealSqlDB, error) {
+func NewBoostDB(r lotus_repo.LockedRepo) (*sql.DB, *sqlite3.SQLiteConn, error) {
 	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
 	dbPath := path.Join(r.Path(), db.DealsDBName+"?cache=shared")
-	db, sqlt3, err := db.SqlDB(dbPath, db.DealsDBName)
-	return &DealSqlDB{
-		db:    db,
-		sqlt3: sqlt3,
-	}, err
+	return db.SqlDB(dbPath, db.DealsDBName)
 }
 
 type LogSqlDB struct {
-	db    *sql.DB
-	sqlt3 *sqlite3.SQLiteConn
+	db *sql.DB
 }
 
 func NewLogsSqlDB(r repo.LockedRepo) (*LogSqlDB, error) {
 	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
 	dbPath := path.Join(r.Path(), db.LogsDBName+"?cache=shared")
-	d, sqlt3, err := db.SqlDB(dbPath, db.LogsDBName)
+	d, _, err := db.SqlDB(dbPath, db.LogsDBName)
 	if err != nil {
 		return nil, err
 	}
-	return &LogSqlDB{
-		db:    d,
-		sqlt3: sqlt3,
-	}, nil
+	return &LogSqlDB{d}, nil
 }
 
-func NewDealsDB(dealSqldb *DealSqlDB) *db.DealsDB {
-	return db.NewDealsDB(dealSqldb.db)
+func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
+	return db.NewDealsDB(sqldb)
 }
 
 func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
@@ -636,20 +622,8 @@ func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, erro
 	}
 }
 
-func NewOnlineBackupMgr() func(lc fx.Lifecycle, src lotus_repo.LockedRepo, ds datastore.Batching, dealsDB *sqlite3.SQLiteConn, logsDB *sqlite3.SQLiteConn) (*backup.BackupMgr, error) {
-	return func(lc fx.Lifecycle, src lotus_repo.LockedRepo, ds datastore.Batching, dealsDB *sqlite3.SQLiteConn, logsDB *sqlite3.SQLiteConn) (*backup.BackupMgr, error) {
-
-		dbs := backup.BackupDB{
-			Db:   dealsDB,
-			Name: db.DealsDBName,
-		}
-
-		bkp, err := backup.NewBackupMgr(src, ds, dbs)
-		if err != nil {
-			return &backup.BackupMgr{}, err
-		}
-
-		return bkp, nil
+func NewOnlineBackupMgr(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo, ds lotus_dtypes.MetadataDS, dealsDB *sqlite3.SQLiteConn) *backupmgr.BackupMgr {
+	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo, ds lotus_dtypes.MetadataDS, dealsDB *sqlite3.SQLiteConn) *backupmgr.BackupMgr {
+		return backupmgr.NewBackupMgr(r, ds, dealsDB, db.DealsDBName)
 	}
-
 }

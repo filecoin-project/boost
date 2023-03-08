@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -19,6 +20,7 @@ import (
 	lotus_storageadapter "github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/impl"
+	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/node/impl/common"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
@@ -154,7 +156,7 @@ const (
 	HandleBoostDealsKey
 	HandleContractDealsKey
 	HandleProposalLogCleanerKey
-	HandleOnlineBackupMgr
+	HandleOnlineBackupMgrKey
 
 	// daemon
 	ExtractApiKey
@@ -409,7 +411,7 @@ var BoostNode = Options(
 	Override(new(lotus_dtypes.MinerID), lotus_modules.MinerID),
 
 	Override(new(lotus_dtypes.NetworkName), lotus_modules.StorageNetworkName),
-	Override(new(*modules.DealSqlDB), modules.NewBoostDB),
+	Override(new(*sql.DB), modules.NewBoostDB),
 	Override(new(*modules.LogSqlDB), modules.NewLogsSqlDB),
 	Override(new(*modules.RetrievalSqlDB), modules.NewRetrievalSqlDB),
 	Override(HandleCreateRetrievalTablesKey, modules.CreateRetrievalTables),
@@ -595,7 +597,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(lotus_modules.MinerSealingService), lotus_modules.ConnectSealingService(cfg.SealerApiInfo)),
 
 		Override(new(sealer.StorageAuth), lotus_modules.StorageAuthWithURL(cfg.SectorIndexApiInfo)),
-		Override(HandleOnlineBackupMgr, modules.NewOnlineBackupMgr),
+		Override(new(*backupmgr.BackupMgr), modules.NewOnlineBackupMgr(cfg)),
 
 		// Dynamic Lotus configs
 		Override(new(lotus_dtypes.ConsiderOnlineStorageDealsConfigFunc), lotus_modules.NewConsiderOnlineStorageDealsConfigFunc),

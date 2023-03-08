@@ -1,4 +1,4 @@
-package backup
+package backupmgr
 
 import (
 	"context"
@@ -9,9 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/db"
+	boostdb "github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/lotus/lib/backupds"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-datastore"
 	"github.com/mattn/go-sqlite3"
@@ -29,24 +30,21 @@ var RestoreFileChk = []string{
 	"boost.db",
 }
 
-type BackupDB struct {
-	Db   *sqlite3.SQLiteConn
-	Name string
-}
-
 type BackupMgr struct {
-	src lotus_repo.LockedRepo
-	ds  datastore.Batching
-	db  BackupDB
-	lck sync.Mutex
+	src     lotus_repo.LockedRepo
+	ds      dtypes.MetadataDS
+	sqlConn *sqlite3.SQLiteConn
+	dbName  string
+	lck     sync.Mutex
 }
 
-func NewBackupMgr(src lotus_repo.LockedRepo, ds datastore.Batching, db BackupDB) (*BackupMgr, error) {
+func NewBackupMgr(src lotus_repo.LockedRepo, ds datastore.Batching, sqlConn *sqlite3.SQLiteConn, name string) *BackupMgr {
 	return &BackupMgr{
-		src: src,
-		ds:  ds,
-		db:  db,
-	}, nil
+		src:     src,
+		ds:      ds,
+		sqlConn: sqlConn,
+		dbName:  name,
+	}
 }
 
 func (b *BackupMgr) Backup(ctx context.Context, dstDir string) error {
@@ -106,7 +104,7 @@ func (b *BackupMgr) takeBackup(ctx context.Context, dstDir string) error {
 	}
 
 	// Backup the SQL DBs
-	if err := sqlBackup(b.db.Db, bkpDir, b.db.Name); err != nil {
+	if err := sqlBackup(b.sqlConn, bkpDir, b.dbName); err != nil {
 		return err
 	}
 
@@ -145,12 +143,12 @@ func (b *BackupMgr) takeBackup(ctx context.Context, dstDir string) error {
 
 func sqlBackup(srcD *sqlite3.SQLiteConn, dstDir, name string) error {
 	dbPath := path.Join(dstDir, name+"?cache=shared")
-	db, sqlt3, err := db.SqlDB(dbPath, "bkpdb")
+	dstDB, sqlt3, err := boostdb.SqlDB(dbPath, fmt.Sprintf("bkpDB_%v", time.Now().UnixNano()))
 	if err != nil {
 		return fmt.Errorf("failed to open source sql db for backup: %w", err)
 	}
 
-	defer db.Close()
+	defer dstDB.Close()
 
 	bkp, err := sqlt3.Backup("main", srcD, "main")
 	if err != nil {
