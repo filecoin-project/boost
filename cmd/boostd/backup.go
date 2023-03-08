@@ -2,14 +2,12 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"time"
 
 	bcli "github.com/filecoin-project/boost/cli"
-	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/mitchellh/go-homedir"
@@ -125,8 +123,8 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("error copying keys: %w", err)
 		}
 
-		if err := os.Mkdir(path.Join(bkpDir, "config"), 0755); err != nil {
-			return fmt.Errorf("error creating config directory %s: %w", path.Join(bkpDir, "config"), err)
+		if err := os.Mkdir(path.Join(bkpDir, backupmgr.ConfigDirName), 0755); err != nil {
+			return fmt.Errorf("error creating config directory %s: %w", path.Join(bkpDir, backupmgr.ConfigDirName), err)
 		}
 
 		fpathName := path.Join(bkpDir, backupmgr.MetadataFileName)
@@ -143,18 +141,10 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("failed to take metadata backup: %w", err)
 		}
 
-		cfgFiles, err := ioutil.ReadDir(path.Join(lr.Path(), "config"))
+		fl, err := backupmgr.GenerateBkpFileList(bkpDir, true)
 		if err != nil {
-			return fmt.Errorf("failed to read files from config directory: %w", err)
+			return fmt.Errorf("failed to generate list of files to be copied: %w", err)
 		}
-
-		var fl []string
-		fl = append(fl, backupmgr.BkpFileList...)
-		for _, cfgFile := range cfgFiles {
-			f := path.Join("config", cfgFile.Name())
-			fl = append(fl, f)
-		}
-		fl = append(fl, db.DealsDBName)
 
 		fmt.Println("Copying the files to backup directory")
 
@@ -286,20 +276,13 @@ var restoreCmd = &cli.Command{
 
 		fmt.Println("Restoring files")
 
-		if err := os.Mkdir(path.Join(lr.Path(), "config"), 0755); err != nil {
-			return fmt.Errorf("error creating config directory %s: %w", path.Join(lr.Path(), "config"), err)
+		if err := os.Mkdir(path.Join(lr.Path(), backupmgr.ConfigDirName), 0755); err != nil {
+			return fmt.Errorf("error creating config directory %s: %w", path.Join(lr.Path(), backupmgr.ConfigDirName), err)
 		}
 
-		cfgFiles, err := ioutil.ReadDir(path.Join(lb.Path(), "config"))
+		fl, err := backupmgr.GenerateBkpFileList(lr.Path(), true)
 		if err != nil {
-			return fmt.Errorf("failed to read files from config directory: %w", err)
-		}
-
-		var fl []string
-		fl = append(fl, backupmgr.BkpFileList...)
-		for _, cfgFile := range cfgFiles {
-			f := path.Join("config", cfgFile.Name())
-			fl = append(fl, f)
+			return fmt.Errorf("failed to generate list of files to be copied: %w", err)
 		}
 
 		//Remove default config.toml created with repo to avoid conflict with symllink

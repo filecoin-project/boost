@@ -20,6 +20,7 @@ import (
 )
 
 const MetadataFileName = "metadata"
+const ConfigDirName = "config"
 
 var BkpFileList = []string{"config.toml",
 	"storage.json",
@@ -109,19 +110,15 @@ func (b *BackupMgr) takeBackup(ctx context.Context, dstDir string) error {
 	}
 
 	// Generate the list of files to be copied from boost repo to the backup repo
-	cfgFiles, err := ioutil.ReadDir(path.Join(b.src.Path(), "config"))
+	fl, err := GenerateBkpFileList(b.src.Path(), false)
 	if err != nil {
-		return fmt.Errorf("failed to read files from config directory: %w", err)
-	}
-
-	var fl []string
-	fl = append(fl, BkpFileList...)
-	for _, cfgFile := range cfgFiles {
-		f := path.Join("config", cfgFile.Name())
-		fl = append(fl, f)
+		return fmt.Errorf("unable to generate list of files: %w", err)
 	}
 
 	// Copy files
+	if err := os.Mkdir(path.Join(bkpDir, ConfigDirName), 0755); err != nil {
+		return fmt.Errorf("error creating config directory %s: %w", path.Join(bkpDir, ConfigDirName), err)
+	}
 	if err := CopyFiles(b.src.Path(), dst.Path(), fl); err != nil {
 		return fmt.Errorf("error copying file: %w", err)
 	}
@@ -296,4 +293,22 @@ func CopyFiles(srcDir, destDir string, flist []string) error {
 	}
 
 	return nil
+}
+
+func GenerateBkpFileList(repoPath string, offline bool) ([]string, error) {
+	cfgFiles, err := ioutil.ReadDir(path.Join(repoPath, ConfigDirName))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read files from config directory: %w", err)
+	}
+	var fl []string
+	for _, cfgFile := range cfgFiles {
+		f := path.Join(ConfigDirName, cfgFile.Name())
+		fl = append(fl, f)
+	}
+	fl = append(fl, BkpFileList...)
+	if offline {
+		fl = append(fl, boostdb.DealsDBName)
+	}
+
+	return fl, nil
 }

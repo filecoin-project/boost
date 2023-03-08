@@ -39,6 +39,11 @@ func SqlDB(dbPath, driverName string) (*sql.DB, *sqlite3.SQLiteConn, error) {
 		db.SetMaxOpenConns(1)
 	}
 
+	// Open the connection to ensure sqlite3conn is not returned as nil. sql.Open does not starts a connection
+	if err := db.Ping(); err != nil {
+		return &sql.DB{}, &sqlite3.SQLiteConn{}, err
+	}
+
 	return db, sqlite3conn, err
 }
 
