@@ -74,5 +74,4 @@ if [ ! -f $BOOST_PATH/.register.boost ]; then
 fi
 
 echo Starting boost in dev mode...
-exec boostd -vv run
-
+exec boostd -vv run --nosync=true

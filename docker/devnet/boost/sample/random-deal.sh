@@ -8,14 +8,19 @@
 # $ boost init
 # $ lotus send --from=`lotus wallet default` `boost wallet default` 100
 # $ boostx market-add 50
-# $ ./sample/random-deal.sh
+# $ ./sample/random-deal.sh 51200 100
 ###################################################################################
 set -e
 
 ci="\e[3m"
 cn="\e[0m"
 
-FILE=`boostx generate-rand-car -c=512 -l=8 -s=5120000 /app/public/ | awk '{print $NF}'`
+chunks="${1:-51200}"
+links="${2:-100}"
+
+printf "${ci}boostx generate-rand-car -c=$chunks -l=$links -s=5120000 /app/public/ | awk '{print $NF}'\n\n${cn}"
+
+FILE=`boostx generate-rand-car -c=$chunks -l=$links -s=5120000 /app/public/ | awk '{print $NF}'`
 PAYLOAD_CID=$(find "$FILE" | xargs -I{} basename {} | sed 's/\.car//')
 
 COMMP_CID=`boostx commp $FILE 2> /dev/null | grep CID | cut -d: -f2 | xargs`
