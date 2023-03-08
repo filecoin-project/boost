@@ -132,28 +132,29 @@ func (g *GraphsyncUnpaidRetrieval) untrackTransfer(p peer.ID, id datatransfer.Tr
 }
 
 func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatransfer.TransferID, p *peer.ID) error {
-	didCancel := false
-
-	// If peer is set we can cancel more efficiently
+	var state *retrievalState
 	if p != nil {
-		state, ok := g.activeRetrievals[reqId{p: *p, id: id}]
-		if ok {
-			g.failTransfer(state, errors.New("transfer cancelled by provider"))
-		}
-		return nil
+		state = g.activeRetrievals[reqId{p: *p, id: id}]
 	}
 
-	// Peer was not given so we need to iterate over active retrievals
-	for _, state := range g.activeRetrievals {
-		if state.cs.transferID == id {
-			didCancel = true
-			g.failTransfer(state, errors.New("transfer cancelled by provider"))
-			// Dont break, transferID might not be unique, so we have to keep iterating
+	if state == nil {
+		for _, st := range g.activeRetrievals {
+			if st.cs.transferID == id {
+				state = st
+				break
+			}
 		}
 	}
 
-	if !didCancel {
+	if state == nil {
 		return fmt.Errorf("no transfer with id %d", id)
+	}
+
+	err := g.dtnet.SendMessage(ctx, state.cs.recipient, message.CancelResponse(state.cs.transferID))
+	g.failTransfer(state, errors.New("transfer cancelled by provider"))
+
+	if err != nil {
+		return fmt.Errorf("cancelling request for transfer %d: %w", id, err)
 	}
 
 	return nil
