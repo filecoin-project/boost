@@ -27,6 +27,7 @@ func CreateTables(ctx context.Context, db *sql.DB) error {
 }
 
 type RetrievalDealState struct {
+	RowID                   uint64
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
 	LocalPeerID             peer.ID
@@ -113,11 +114,11 @@ func (d *RetrievalLogDB) Get(ctx context.Context, peerID string, dealID uint64) 
 	return &rows[0], nil
 }
 
-func (d *RetrievalLogDB) List(ctx context.Context, cursor *time.Time, offset int, limit int) ([]RetrievalDealState, error) {
+func (d *RetrievalLogDB) List(ctx context.Context, cursor *uint64, offset int, limit int) ([]RetrievalDealState, error) {
 	where := ""
 	whereArgs := []interface{}{}
 	if cursor != nil {
-		where += "CreatedAt <= ?"
+		where += "RowID <= ?"
 		whereArgs = append(whereArgs, *cursor)
 	}
 	return d.list(ctx, offset, limit, where, whereArgs...)
@@ -135,6 +136,7 @@ func (d *RetrievalLogDB) ListLastUpdatedAndOpen(ctx context.Context, lastUpdated
 
 func (d *RetrievalLogDB) list(ctx context.Context, offset int, limit int, where string, whereArgs ...interface{}) ([]RetrievalDealState, error) {
 	qry := "SELECT " +
+		"RowID, " +
 		"CreatedAt, " +
 		"UpdatedAt, " +
 		"LocalPeerID, " +
@@ -157,7 +159,7 @@ func (d *RetrievalLogDB) list(ctx context.Context, offset int, limit int, where 
 	if where != "" {
 		qry += " WHERE " + where
 	}
-	qry += " ORDER BY CreatedAt desc"
+	qry += " ORDER BY RowID desc"
 
 	args := append([]interface{}{}, whereArgs...)
 	if limit > 0 {
@@ -187,6 +189,7 @@ func (d *RetrievalLogDB) list(ctx context.Context, offset int, limit int, where 
 
 		var dealState RetrievalDealState
 		err := rows.Scan(
+			&dealState.RowID,
 			&dealState.CreatedAt,
 			&dealState.UpdatedAt,
 			&localPeerID,

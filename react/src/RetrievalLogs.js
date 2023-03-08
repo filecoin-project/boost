@@ -68,14 +68,14 @@ function RetrievalLogsContent(props) {
     var res = data.retrievalLogs
     var logs = res.logs
     if (pageNum === 1) {
-        logs.sort((a, b) => b.CreatedAt.getTime() - a.CreatedAt.getTime())
+        logs.sort((a, b) => Number(b.RowID - a.RowID))
         logs = logs.slice(0, rowsPerPage)
     }
     const totalCount = res.totalCount
 
     var cursor = params.cursor
     if (pageNum === 1 && logs.length) {
-        cursor = logs[0].CreatedAt
+        cursor = Number(logs[0].RowID)
     }
 
     var toggleTimestampFormat = () => saveTimestampFormat(!timestampFormat)
@@ -105,7 +105,7 @@ function RetrievalLogsContent(props) {
 
             {logs.map(row => (
                 <TableRow
-                    key={row.CreatedAt}
+                    key={row.RowID}
                     row={row}
                     timestampFormat={timestampFormat}
                     toggleTimestampFormat={toggleTimestampFormat}
@@ -150,12 +150,12 @@ function TableRow(props) {
     const dealIDToClipboard = () => fieldToClipboard(row.DealID, copyPeerId)
 
     var status = getDealStatus(row.DTStatus)
-    if (row.DTStatus != status && row.DTStatus != '') {
+    if (row.DTStatus !== status && row.DTStatus !== '') {
         status += ": " + row.DTStatus
     }
     var msg = row.Message
-    if (row.DTMessage != '') {
-        if (msg != '') {
+    if (row.DTMessage !== '') {
+        if (msg !== '') {
             msg += ' - '
         }
         msg += row.DTMessage

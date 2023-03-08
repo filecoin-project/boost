@@ -256,9 +256,10 @@ const RetrievalLogQuery = gql`
 `;
 
 const RetrievalLogsListQuery = gql`
-    query AppRetrievalLogsListQuery($cursor: BigInt, $offset: Int, $limit: Int) {
+    query AppRetrievalLogsListQuery($cursor: Uint64, $offset: Int, $limit: Int) {
         retrievalLogs(cursor: $cursor, offset: $offset, limit: $limit) {
             logs {
+                RowID
                 CreatedAt
                 UpdatedAt
                 PeerID
