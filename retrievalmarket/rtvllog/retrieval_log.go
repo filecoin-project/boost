@@ -22,6 +22,8 @@ type RetrievalLog struct {
 	stalledTimeout time.Duration
 	ctx            context.Context
 
+	dbUpdates chan func()
+
 	lastUpdateLk sync.Mutex
 	lastUpdate   map[string]time.Time
 }
@@ -37,6 +39,7 @@ func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration, dt lotus_dtypes
 		dataTransfer:   dt,
 		gsur:           gsur,
 		stalledTimeout: stalledTimeout,
+		dbUpdates:      make(chan func(), 256),
 		lastUpdate:     make(map[string]time.Time),
 	}
 }
@@ -46,6 +49,7 @@ func (r *RetrievalLog) Start(ctx context.Context) {
 	go r.gcUpdateMap(ctx)
 	go r.gcDatabase(ctx)
 	go r.gcRetrievals(ctx)
+	go r.processDBUpdates(ctx)
 }
 
 // Called when there is a retrieval ask query
@@ -90,10 +94,13 @@ func (r *RetrievalLog) OnValidationEvent(evt retrievalmarket.ProviderValidationE
 		st.PricePerByte = evt.Proposal.PricePerByte
 		st.UnsealPrice = evt.Proposal.UnsealPrice
 	}
-	err := r.db.Insert(r.ctx, st)
-	if err != nil {
-		log.Errorw("failed to update retrieval deal logger db", "err", err)
-	}
+
+	r.dbUpdate(func() {
+		err := r.db.Insert(r.ctx, st)
+		if err != nil {
+			log.Errorw("failed to update retrieval deal logger db", "err", err)
+		}
+	})
 }
 
 // Called when there is an event from the data-transfer subsystem
@@ -121,10 +128,12 @@ func (r *RetrievalLog) OnDataTransferEvent(event datatransfer.Event, state datat
 		}
 	}
 
-	err := r.db.UpdateDataTransferState(r.ctx, event, state)
-	if err != nil {
-		log.Errorw("failed to update retrieval deal logger db dt state", "err", err)
-	}
+	r.dbUpdate(func() {
+		err := r.db.UpdateDataTransferState(r.ctx, event, state)
+		if err != nil {
+			log.Errorw("failed to update retrieval deal logger db dt state", "err", err)
+		}
+	})
 }
 
 // Called when there is a markets event
@@ -148,32 +157,34 @@ func (r *RetrievalLog) OnRetrievalEvent(event retrievalmarket.ProviderEvent, sta
 		log.Debugw("event", "evt", retrievalmarket.ProviderEvents[event], "status", state.Status)
 	}
 
-	var err error
-	if event == retrievalmarket.ProviderEventOpen {
-		err = r.db.Insert(r.ctx, &RetrievalDealState{
-			PeerID:                  state.Receiver,
-			DealID:                  state.ID,
-			TransferID:              transferID,
-			PayloadCID:              state.PayloadCID,
-			PieceCID:                state.PieceCID,
-			PaymentInterval:         state.PaymentInterval,
-			PaymentIntervalIncrease: state.PaymentIntervalIncrease,
-			PricePerByte:            state.PricePerByte,
-			UnsealPrice:             state.UnsealPrice,
-			Status:                  state.Status.String(),
-		})
-	} else {
-		err = r.db.Update(r.ctx, state)
-	}
+	r.dbUpdate(func() {
+		var err error
+		if event == retrievalmarket.ProviderEventOpen {
+			err = r.db.Insert(r.ctx, &RetrievalDealState{
+				PeerID:                  state.Receiver,
+				DealID:                  state.ID,
+				TransferID:              transferID,
+				PayloadCID:              state.PayloadCID,
+				PieceCID:                state.PieceCID,
+				PaymentInterval:         state.PaymentInterval,
+				PaymentIntervalIncrease: state.PaymentIntervalIncrease,
+				PricePerByte:            state.PricePerByte,
+				UnsealPrice:             state.UnsealPrice,
+				Status:                  state.Status.String(),
+			})
+		} else {
+			err = r.db.Update(r.ctx, state)
+		}
 
-	if err != nil {
-		log.Errorw("failed to update state in retrieval deal logger db", "err", err)
-	}
+		if err != nil {
+			log.Errorw("failed to update state in retrieval deal logger db", "err", err)
+		}
 
-	err = r.db.InsertMarketsEvent(r.ctx, event, state)
-	if err != nil {
-		log.Errorw("failed to insert market event into retrieval deal logger db", "err", err)
-	}
+		err = r.db.InsertMarketsEvent(r.ctx, event, state)
+		if err != nil {
+			log.Errorw("failed to insert market event into retrieval deal logger db", "err", err)
+		}
+	})
 }
 
 // Some events may be very frequent, so limit events to two per second per retrieval deal
@@ -273,6 +284,23 @@ func (r *RetrievalLog) gcRetrievals(ctx context.Context) {
 					log.Infof("Canceled retrieval %s, older than %s", row.DealID, r.stalledTimeout)
 				}
 			}
+		}
+	}
+}
+
+// Perform database updates in a separate thread so that they don't block the
+// event publisher loop
+func (r *RetrievalLog) dbUpdate(update func()) {
+	r.dbUpdates <- update
+}
+
+func (r *RetrievalLog) processDBUpdates(ctx context.Context) {
+	for ctx.Err() == nil {
+		select {
+		case <-ctx.Done():
+			return
+		case update := <-r.dbUpdates:
+			update()
 		}
 	}
 }
