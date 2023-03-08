@@ -55,8 +55,11 @@ func (sm *BoostAPI) MarketRestartDataTransfer(ctx context.Context, transferID da
 func (sm *BoostAPI) MarketCancelDataTransfer(ctx context.Context, transferID datatransfer.TransferID, otherPeer peer.ID, isInitiator bool) error {
 	selfPeer := sm.Host.ID()
 
-	// Unpaid retrievals
-	sm.GraphsyncUnpaidRetrieval.CancelTransfer(ctx, transferID, &otherPeer)
+	// Attempt to cancel unpaid first, if that succeeds, we're done
+	err := sm.GraphsyncUnpaidRetrieval.CancelTransfer(ctx, transferID, &otherPeer)
+	if err == nil {
+		return nil
+	}
 
 	// Legacy, paid retrievals
 	if isInitiator {
