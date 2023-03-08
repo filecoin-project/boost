@@ -159,6 +159,16 @@ func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatr
 	return nil
 }
 
+func (g *GraphsyncUnpaidRetrieval) List() []retrievalState {
+	values := make([]retrievalState, 0, len(g.activeRetrievals))
+
+	for _, value := range g.activeRetrievals {
+		values = append(values, *value)
+	}
+
+	return values
+}
+
 func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestQueuedHook(hook graphsync.OnIncomingRequestQueuedHook) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterIncomingRequestQueuedHook(func(p peer.ID, request graphsync.RequestData, hookActions graphsync.RequestQueuedHookActions) {
 		interceptRtvl, err := g.interceptRetrieval(p, request)
