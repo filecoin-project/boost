@@ -103,13 +103,13 @@ func (d *RetrievalLogDB) Insert(ctx context.Context, l *RetrievalDealState) erro
 	return err
 }
 
-func (d *RetrievalLogDB) Get(ctx context.Context, peerID string, dealID uint64) (*RetrievalDealState, error) {
-	rows, err := d.list(ctx, 0, 0, "PeerID = ? AND DealID = ?", peerID, dealID)
+func (d *RetrievalLogDB) Get(ctx context.Context, peerID string, transferID uint64) (*RetrievalDealState, error) {
+	rows, err := d.list(ctx, 0, 0, "PeerID = ? AND TransferID = ?", peerID, transferID)
 	if err != nil {
 		return nil, err
 	}
 	if len(rows) == 0 {
-		return nil, fmt.Errorf("no retrieval found with peer ID %s and deal ID %d", peerID, dealID)
+		return nil, fmt.Errorf("no retrieval found with peer ID %s and transfer ID %d", peerID, transferID)
 	}
 	return &rows[0], nil
 }
@@ -268,12 +268,16 @@ func (d *RetrievalLogDB) Update(ctx context.Context, state retrievalmarket.Provi
 		"Message":   state.Message,
 		"UpdatedAt": time.Now(),
 	}
+	where := "PeerID = ? AND DealID = ?"
+	args := []interface{}{state.Receiver.String(), state.DealProposal.ID}
 	if state.ChannelID != nil {
+		where += " AND TransferID = ?"
+		args = append(args, state.ChannelID.ID)
 		fields["TransferID"] = state.ChannelID.ID
 		fields["LocalPeerID"] = state.ChannelID.Responder.String()
 	}
 
-	return d.update(ctx, fields, "PeerID = ? AND DealID = ?", state.Receiver.String(), state.DealProposal.ID)
+	return d.update(ctx, fields, where, args...)
 }
 
 func (d *RetrievalLogDB) UpdateDataTransferState(ctx context.Context, event datatransfer.Event, state datatransfer.ChannelState) error {

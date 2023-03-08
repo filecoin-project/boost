@@ -128,12 +128,12 @@ type retrievalStateListResolver struct {
 }
 
 type retLogArgs struct {
-	PeerID string
-	DealID gqltypes.Uint64
+	PeerID     string
+	TransferID gqltypes.Uint64
 }
 
 func (r *resolver) RetrievalLog(ctx context.Context, args retLogArgs) (*retrievalStateResolver, error) {
-	st, err := r.retDB.Get(ctx, args.PeerID, uint64(args.DealID))
+	st, err := r.retDB.Get(ctx, args.PeerID, uint64(args.TransferID))
 	if err != nil {
 		return nil, err
 	}

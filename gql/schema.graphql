@@ -431,7 +431,7 @@ type RootQuery {
   proposalLogsCount: ProposalLogsCount!
 
   """Get individual retrieval log"""
-  retrievalLog(peerID: String!, dealID: Uint64!): RetrievalState
+  retrievalLog(peerID: String!, transferID: Uint64!): RetrievalState
 
   """Get retrieval logs"""
   retrievalLogs(cursor: Uint64, offset: Int, limit: Int): RetrievalStateList!
