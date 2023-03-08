@@ -145,6 +145,7 @@ const (
 	HandleDealsKey
 	HandleCreateRetrievalTablesKey
 	HandleSetShardSelector
+	HandleSetRetrievalAskGetter
 	HandleRetrievalEventsKey
 	HandleRetrievalKey
 	HandleRetrievalTransportsKey
@@ -510,6 +511,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// Lotus Markets
 		Override(new(lotus_dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
+		Override(new(*modules.ProxyAskGetter), modules.NewAskGetter),
+		Override(new(server.AskGetter), From(new(*modules.ProxyAskGetter))),
 		Override(new(*server.GraphsyncUnpaidRetrieval), modules.Graphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
 		Override(new(lotus_dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
 		Override(new(lotus_dtypes.ProviderPieceStore), lotus_modules.NewProviderPieceStore),
@@ -539,6 +542,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
 		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
+		Override(HandleSetRetrievalAskGetter, modules.SetAskGetter),
 		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Dealmaking.RetrievalLogDuration), time.Duration(cfg.Dealmaking.StalledRetrievalTimeout))),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),

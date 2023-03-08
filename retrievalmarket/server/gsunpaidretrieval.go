@@ -66,12 +66,16 @@ var defaultExtensions = []graphsync.ExtensionName{
 	extension.ExtensionDataTransfer1_1,
 }
 
+type AskGetter interface {
+	GetAsk() *retrievalmarket.Ask
+}
+
 type ValidationDeps struct {
 	DealDecider    retrievalimpl.DealDecider
 	DagStore       stores.DAGStoreWrapper
 	PieceStore     piecestore.PieceStore
 	SectorAccessor retrievalmarket.SectorAccessor
-	AskStore       retrievalmarket.AskStore
+	AskStore       AskGetter
 }
 
 func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtnet network.DataTransferNetwork, vdeps ValidationDeps) (*GraphsyncUnpaidRetrieval, error) {
