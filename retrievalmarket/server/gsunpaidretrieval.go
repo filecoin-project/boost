@@ -96,7 +96,7 @@ func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtn
 		decoder:          typeRegistry,
 		pubSubDT:         pubsub.New(eventDispatcherDT),
 		pubSubMkts:       pubsub.New(eventDispatcherMkts),
-		validator:        &requestValidator{ValidationDeps: vdeps},
+		validator:        newRequestValidator(vdeps),
 		activeRetrievals: make(map[reqId]*retrievalState),
 	}, nil
 }
@@ -282,7 +282,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 			}
 
 			// Validate the request
-			res, validateErr := g.validator.validatePullRequest(p, voucher, request.Root(), request.Selector())
+			res, validateErr := g.validator.validatePullRequest(msg.IsRestart(), p, voucher, request.Root(), request.Selector())
 			isAccepted := validateErr == nil
 			const isPaused = false // There are no payments required, so never pause
 			resultType := datatransfer.EmptyTypeIdentifier
@@ -524,4 +524,8 @@ func (g *GraphsyncUnpaidRetrieval) isActiveUnpaidRetrieval(id reqId) (*retrieval
 
 	state, ok := g.activeRetrievals[id]
 	return state, ok
+}
+
+func (g *GraphsyncUnpaidRetrieval) SubscribeToValidationEvents(sub retrievalmarket.ProviderValidationSubscriber) retrievalmarket.Unsubscribe {
+	return g.validator.Subscribe(sub)
 }

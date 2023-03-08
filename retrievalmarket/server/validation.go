@@ -9,6 +9,7 @@ import (
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket/migrations"
+	"github.com/hannahhoward/go-pubsub"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
@@ -25,14 +26,19 @@ func init() {
 }
 
 type requestValidator struct {
-	ctx context.Context
+	ctx  context.Context
+	psub *pubsub.PubSub
 	ValidationDeps
+}
+
+func newRequestValidator(vdeps ValidationDeps) *requestValidator {
+	return &requestValidator{ValidationDeps: vdeps, psub: pubsub.New(queryValidationDispatcher)}
 }
 
 // validatePullRequest validates a request for data. This can be the initial
 // request to pull data or a new request created when the data transfer is
 // restarted (eg after a connection failure).
-func (rv *requestValidator) validatePullRequest(receiver peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
+func (rv *requestValidator) validatePullRequest(isRestart bool, receiver peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
 	proposal, ok := voucher.(*retrievalmarket.DealProposal)
 	var legacyProtocol bool
 	if !ok {
@@ -45,6 +51,15 @@ func (rv *requestValidator) validatePullRequest(receiver peer.ID, voucher datatr
 		legacyProtocol = true
 	}
 	response, err := rv.validatePull(receiver, proposal, legacyProtocol, baseCid, selector)
+	rv.psub.Publish(retrievalmarket.ProviderValidationEvent{
+		IsRestart: isRestart,
+		Receiver:  receiver,
+		Proposal:  proposal,
+		BaseCid:   baseCid,
+		Selector:  selector,
+		Response:  &response,
+		Error:     err,
+	})
 	if legacyProtocol {
 		downgradedResponse := migrations.DealResponse0{
 			Status:      response.Status,
@@ -141,14 +156,14 @@ func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *retrievalmark
 }
 
 // Get the best piece containing the payload cid (first unsealed piece)
-func (v *requestValidator) getPiece(payloadCid cid.Cid, pieceCID *cid.Cid) (piecestore.PieceInfo, bool, error) {
+func (rv *requestValidator) getPiece(payloadCid cid.Cid, pieceCID *cid.Cid) (piecestore.PieceInfo, bool, error) {
 	inPieceCid := cid.Undef
 	if pieceCID != nil {
 		inPieceCid = *pieceCID
 	}
 
-	pieces, piecesErr := GetAllPieceInfoForPayload(v.DagStore, v.PieceStore, payloadCid)
-	pieceInfo, isUnsealed := GetBestPieceInfoMatch(v.ctx, v.SectorAccessor, pieces, inPieceCid)
+	pieces, piecesErr := GetAllPieceInfoForPayload(rv.DagStore, rv.PieceStore, payloadCid)
+	pieceInfo, isUnsealed := GetBestPieceInfoMatch(rv.ctx, rv.SectorAccessor, pieces, inPieceCid)
 	if pieceInfo.Defined() {
 		return pieceInfo, isUnsealed, nil
 	}
@@ -156,4 +171,21 @@ func (v *requestValidator) getPiece(payloadCid cid.Cid, pieceCID *cid.Cid) (piec
 		return piecestore.PieceInfoUndefined, false, piecesErr
 	}
 	return piecestore.PieceInfoUndefined, false, fmt.Errorf("unknown pieceCID %s", pieceCID.String())
+}
+
+func (rv *requestValidator) Subscribe(subscriber retrievalmarket.ProviderValidationSubscriber) retrievalmarket.Unsubscribe {
+	return retrievalmarket.Unsubscribe(rv.psub.Subscribe(subscriber))
+}
+
+func queryValidationDispatcher(evt pubsub.Event, subscriberFn pubsub.SubscriberFn) error {
+	e, ok := evt.(retrievalmarket.ProviderValidationEvent)
+	if !ok {
+		return errors.New("wrong type of event")
+	}
+	cb, ok := subscriberFn.(retrievalmarket.ProviderValidationSubscriber)
+	if !ok {
+		return errors.New("wrong type of callback")
+	}
+	cb(e)
+	return nil
 }
