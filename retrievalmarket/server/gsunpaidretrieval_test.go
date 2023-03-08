@@ -5,6 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"testing"
+	"time"
+
 	boosttu "github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -31,23 +36,20 @@ import (
 	"github.com/ipld/go-car/v2/blockstore"
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
 	"github.com/stretchr/testify/require"
-	"io"
-	"os"
-	"testing"
-	"time"
 )
 
 var tlog = logging.Logger("testgs")
 
 type testCase struct {
-	name            string
-	reqPayloadCid   cid.Cid
-	watch           func(client retrievalmarket.RetrievalClient, gsupr *GraphsyncUnpaidRetrieval)
-	ask             *retrievalmarket.Ask
-	noUnsealedCopy  bool
-	expectErr       bool
-	expectCancel    bool
-	expectRejection string
+	name                      string
+	reqPayloadCid             cid.Cid
+	watch                     func(client retrievalmarket.RetrievalClient, gsupr *GraphsyncUnpaidRetrieval)
+	ask                       *retrievalmarket.Ask
+	noUnsealedCopy            bool
+	expectErr                 bool
+	expectClientCancelEvent   bool
+	expectProviderCancelEvent bool
+	expectRejection           string
 }
 
 var providerCancelled = errors.New("provider cancelled")
@@ -55,7 +57,7 @@ var clientCancelled = errors.New("client cancelled")
 var clientRejected = errors.New("client received reject response")
 
 func TestGS(t *testing.T) {
-	//_ = logging.SetLogLevel("testgs", "debug")
+	// _ = logging.SetLogLevel("testgs", "debug")
 	_ = logging.SetLogLevel("testgs", "info")
 	//_ = logging.SetLogLevel("dt-impl", "debug")
 
@@ -105,7 +107,44 @@ func TestGS(t *testing.T) {
 				}
 			}
 		},
-		expectCancel: true,
+		expectClientCancelEvent:   true,
+		expectProviderCancelEvent: true,
+	}, {
+		name: "provider cancel request after sending 2 blocks",
+		watch: func(client retrievalmarket.RetrievalClient, gsupr *GraphsyncUnpaidRetrieval) {
+			count := 0
+			gsupr.outgoingBlockHook = func(state *retrievalState) {
+				count++
+				if count == 2 {
+					tlog.Debug("provider cancelling client deal")
+					err := gsupr.CancelTransfer(context.TODO(), state.cs.transferID, &state.cs.recipient)
+					require.NoError(t, err)
+				}
+				if count == 10 {
+					tlog.Warn("sending last block but client cancel hasn't arrived yet")
+				}
+			}
+		},
+		expectErr:               true,
+		expectClientCancelEvent: true,
+	}, {
+		name: "provider cancel request after sending 2 blocks without peer id",
+		watch: func(client retrievalmarket.RetrievalClient, gsupr *GraphsyncUnpaidRetrieval) {
+			count := 0
+			gsupr.outgoingBlockHook = func(state *retrievalState) {
+				count++
+				if count == 2 {
+					tlog.Debug("provider cancelling client deal")
+					err := gsupr.CancelTransfer(context.TODO(), state.cs.transferID, nil)
+					require.NoError(t, err)
+				}
+				if count == 10 {
+					tlog.Warn("sending last block but client cancel hasn't arrived yet")
+				}
+			}
+		},
+		expectErr:               true,
+		expectClientCancelEvent: true,
 	}}
 
 	for _, tc := range testCases {
@@ -249,9 +288,9 @@ func runRequestTest(t *testing.T, tc testCase) {
 
 	// Wait for provider completion
 	err = waitFor(ctx, t, providerResChan)
-	if tc.expectErr || tc.expectCancel {
+	if tc.expectErr || tc.expectProviderCancelEvent {
 		require.Error(t, err)
-		if tc.expectCancel {
+		if tc.expectProviderCancelEvent {
 			require.EqualError(t, err, providerCancelled.Error())
 		}
 	} else {
@@ -260,9 +299,9 @@ func runRequestTest(t *testing.T, tc testCase) {
 
 	// Wait for client completion
 	err = waitFor(ctx, t, clientResChan)
-	if tc.expectErr || tc.expectCancel {
+	if tc.expectErr || tc.expectClientCancelEvent {
 		require.Error(t, err)
-		if tc.expectCancel {
+		if tc.expectClientCancelEvent {
 			require.EqualError(t, err, clientCancelled.Error())
 		} else if tc.expectRejection != "" {
 			require.ErrorContains(t, err, tc.expectRejection)

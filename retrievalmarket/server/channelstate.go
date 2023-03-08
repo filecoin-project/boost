@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/ipfs/go-cid"
@@ -16,6 +17,9 @@ type retrievalState struct {
 	cs   *channelState
 	mkts *retrievalmarket.ProviderDealState
 }
+
+func (r retrievalState) ChannelState() channelState                           { return *r.cs }
+func (r retrievalState) ProviderDealState() retrievalmarket.ProviderDealState { return *r.mkts }
 
 // channelState is immutable channel data plus mutable state
 type channelState struct {
