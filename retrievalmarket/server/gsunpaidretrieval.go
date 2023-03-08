@@ -283,6 +283,10 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 			return
 		}
 
+		dtOpenMsg := "unpaid"
+		if msg.IsRestart() {
+			dtOpenMsg += " (restart)"
+		}
 		g.publishDTEvent(datatransfer.Open, "unpaid", state.cs)
 		g.publishMktsEvent(retrievalmarket.ProviderEventOpen, *state.mkts)
 

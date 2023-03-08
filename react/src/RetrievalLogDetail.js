@@ -31,8 +31,8 @@ export function RetrievalLogDetail(props) {
         msgEl.textContent = msg
     }
 
-    function dealIDToClipboard() {
-        navigator.clipboard.writeText(retrieval.DealID+'')
+    function transferIDToClipboard() {
+        navigator.clipboard.writeText(retrieval.TransferID+'')
         const el = document.body.querySelector('.content .title .copy')
         addClassFor(el, 'copied', 500)
         showPopup("Copied " + retrieval.DealID + " to clipboard")
@@ -42,7 +42,7 @@ export function RetrievalLogDetail(props) {
         pollInterval: 1000,
         variables: {
             peerID: params.peerID,
-            dealID: params.dealID,
+            transferID: params.transferID,
         },
         fetchPolicy: 'network-only',
     })
@@ -67,7 +67,7 @@ export function RetrievalLogDetail(props) {
         evtRowData.push({evt: evt, prev: prev})
     }
 
-    return <div className="retrieval-log-detail modal" id={retrieval.PeerID + '/' + retrieval.DealID}>
+    return <div className="retrieval-log-detail modal" id={retrieval.PeerID + '/' + retrieval.TransferID}>
         <div className="content">
             <div className="close" onClick={() => navigate(-1)}>
                 <img className="icon" alt="" src={closeImg} />
@@ -76,8 +76,8 @@ export function RetrievalLogDetail(props) {
                 <div className="message"></div>
             </div>
             <div className="title">
-                <span>Retrieval {retrieval.DealID + ''}</span>
-                <span className="copy" onClick={dealIDToClipboard} title="Copy deal uuid to clipboard"></span>
+                <span>Retrieval {retrieval.TransferID + ''}</span>
+                <span className="copy" onClick={transferIDToClipboard} title="Copy transfer ID to clipboard"></span>
             </div>
             <table className="retrieval-fields">
                 <tbody>
@@ -94,7 +94,11 @@ export function RetrievalLogDetail(props) {
                     <td>{retrieval.PeerID}</td>
                 </tr>
                 <tr>
-                    <th>Deal ID</th>
+                    <th>Transfer ID</th>
+                    <td>{retrieval.TransferID+''}</td>
+                </tr>
+                <tr>
+                    <th>Retrieval Deal ID</th>
                     <td>{retrieval.DealID+''}</td>
                 </tr>
                 <tr>
