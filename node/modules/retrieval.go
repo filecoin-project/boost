@@ -158,6 +158,7 @@ func HandleRetrievalGraphsyncUpdates(duration time.Duration, stalledDuration tim
 				unsubs = append(unsubs, unsubFn(dt.SubscribeToEvents(rel.OnDataTransferEvent)))
 				unsubs = append(unsubs, unsubFn(gsur.SubscribeToDataTransferEvents(rel.OnDataTransferEvent)))
 				unsubs = append(unsubs, unsubFn(gsur.SubscribeToMarketsEvents(rel.OnRetrievalEvent)))
+				unsubs = append(unsubs, unsubFn(gsur.SubscribeToValidationEvents(rel.OnValidationEvent)))
 				//unsubs = append(unsubs, unsubFn(gsur.SubscribeToDataTransferEvents(func(event datatransfer.Event, channelState datatransfer.ChannelState) {
 				//	log.Infow("dt event", "event", datatransfer.Events[event.Code], "msg", event.Message, "state", datatransfer.Statuses[channelState.Status()])
 				//})))

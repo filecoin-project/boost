@@ -190,7 +190,7 @@ function RetrievalEvent(props) {
             <td className="at">{moment(evt.CreatedAt).format(dateFormat)}</td>
             <td className="since-last">{sinceLast}</td>
             <td className={"event " + evt.EventType}>
-                {evt.EventType == 'data-transfer' ? 'DT:' : null}
+                {evt.EventType === 'data-transfer' ? 'DT:' : null}
                 {getEventName(evt.Name)}
             </td>
             <td className="status">{getDealStatus(evt.Status)}</td>
