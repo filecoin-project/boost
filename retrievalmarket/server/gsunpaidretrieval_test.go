@@ -142,7 +142,8 @@ func runRequestTest(t *testing.T, tc testCase) {
 	if tc.ask != nil {
 		ask = tc.ask
 	}
-	askStore.SetAsk(ask)
+	err = askStore.SetAsk(ask)
+	require.NoError(t, err)
 
 	sectorAccessor := testnodes.NewTestSectorAccessor()
 	if !tc.noUnsealedCopy {
