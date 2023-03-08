@@ -51,7 +51,7 @@ func (rv *requestValidator) validatePullRequest(isRestart bool, receiver peer.ID
 		legacyProtocol = true
 	}
 	response, err := rv.validatePull(receiver, proposal, legacyProtocol, baseCid, selector)
-	rv.psub.Publish(retrievalmarket.ProviderValidationEvent{
+	_ = rv.psub.Publish(retrievalmarket.ProviderValidationEvent{
 		IsRestart: isRestart,
 		Receiver:  receiver,
 		Proposal:  proposal,
