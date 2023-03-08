@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	boosttu "github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -13,6 +14,7 @@ import (
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket/impl/askstore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket/impl/testnodes"
 	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
 	tut "github.com/filecoin-project/go-fil-markets/shared_testutil"
@@ -38,27 +40,55 @@ import (
 var tlog = logging.Logger("testgs")
 
 type testCase struct {
-	name          string
-	reqMissingCid bool
-	watch         func(client retrievalmarket.RetrievalClient, gsupr *GraphsyncUnpaidRetrieval)
-	expectErr     bool
-	expectCancel  bool
+	name            string
+	reqPayloadCid   cid.Cid
+	watch           func(client retrievalmarket.RetrievalClient, gsupr *GraphsyncUnpaidRetrieval)
+	ask             *retrievalmarket.Ask
+	noUnsealedCopy  bool
+	expectErr       bool
+	expectCancel    bool
+	expectRejection string
 }
 
 var providerCancelled = errors.New("provider cancelled")
 var clientCancelled = errors.New("client cancelled")
+var clientRejected = errors.New("client received reject response")
 
 func TestGS(t *testing.T) {
 	//_ = logging.SetLogLevel("testgs", "debug")
 	_ = logging.SetLogLevel("testgs", "info")
 	//_ = logging.SetLogLevel("dt-impl", "debug")
 
+	missingCid, err := cid.Parse("bafkqaaa")
+	require.NoError(t, err)
+
 	testCases := []testCase{{
 		name: "happy path",
 	}, {
 		name:          "request missing payload cid",
-		reqMissingCid: true,
+		reqPayloadCid: missingCid,
 		expectErr:     true,
+	}, {
+		name:            "request for piece with no unsealed sectors",
+		noUnsealedCopy:  true,
+		expectErr:       true,
+		expectRejection: "no unsealed piece",
+	}, {
+		name: "request for non-zero price per byte",
+		ask: &retrievalmarket.Ask{
+			UnsealPrice:  abi.NewTokenAmount(0),
+			PricePerByte: abi.NewTokenAmount(1),
+		},
+		expectErr:       true,
+		expectRejection: "ask price is non-zero",
+	}, {
+		name: "request for non-zero unseal price",
+		ask: &retrievalmarket.Ask{
+			UnsealPrice:  abi.NewTokenAmount(1),
+			PricePerByte: abi.NewTokenAmount(0),
+		},
+		expectErr:       true,
+		expectRejection: "ask price is non-zero",
 	}, {
 		name: "cancel request after sending 2 blocks",
 		watch: func(client retrievalmarket.RetrievalClient, gsupr *GraphsyncUnpaidRetrieval) {
@@ -86,7 +116,7 @@ func TestGS(t *testing.T) {
 }
 
 func runRequestTest(t *testing.T, tc testCase) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// Create a CAR file and set up mocks
@@ -106,14 +136,27 @@ func runRequestTest(t *testing.T, tc testCase) {
 		},
 	}
 
-	pieceStore := tut.NewTestPieceStore()
+	askStore, err := askstore.NewAskStore(namespace.Wrap(testData.Ds1, datastore.NewKey("retrieval-ask")), datastore.NewKey("latest"))
+	require.NoError(t, err)
+	ask := &retrievalmarket.Ask{UnsealPrice: abi.NewTokenAmount(0), PricePerByte: abi.NewTokenAmount(0)}
+	if tc.ask != nil {
+		ask = tc.ask
+	}
+	askStore.SetAsk(ask)
+
 	sectorAccessor := testnodes.NewTestSectorAccessor()
+	if !tc.noUnsealedCopy {
+		sectorAccessor.MarkUnsealed(ctx, sectorID, offset.Unpadded(), abi.UnpaddedPieceSize(len(carData)))
+	}
+
+	pieceStore := tut.NewTestPieceStore()
 	sectorAccessor.ExpectUnseal(sectorID, offset.Unpadded(), abi.UnpaddedPieceSize(len(carData)), carData)
 	dagstoreWrapper := tut.NewMockDagStoreWrapper(pieceStore, sectorAccessor)
 	vdeps := ValidationDeps{
 		DagStore:       dagstoreWrapper,
 		PieceStore:     pieceStore,
 		SectorAccessor: sectorAccessor,
+		AskStore:       askStore,
 	}
 
 	expectedPiece := pieceInfo.PieceCID
@@ -185,6 +228,8 @@ func runRequestTest(t *testing.T, tc testCase) {
 			clientResChan <- nil
 		case retrievalmarket.ClientEventCancelComplete:
 			clientResChan <- clientCancelled
+		case retrievalmarket.ClientEventDealRejected:
+			clientResChan <- fmt.Errorf("%s :%w", state.Message, clientRejected)
 		case retrievalmarket.ClientEventDataTransferError:
 			clientResChan <- errors.New(state.Message)
 		}
@@ -195,9 +240,8 @@ func runRequestTest(t *testing.T, tc testCase) {
 	sel := selectorparse.CommonSelector_ExploreAllRecursively
 	params, err := retrievalmarket.NewParamsV1(abi.NewTokenAmount(0), 0, 0, sel, nil, abi.NewTokenAmount(0))
 	require.NoError(t, err)
-	if tc.reqMissingCid {
-		carRootCid, err = cid.Parse("bafkqaaa")
-		require.NoError(t, err)
+	if tc.reqPayloadCid != cid.Undef {
+		carRootCid = tc.reqPayloadCid
 	}
 	_, err = client.Retrieve(ctx, 1, carRootCid, params, abi.NewTokenAmount(0), retrievalPeer, address.TestAddress, address.TestAddress2)
 	require.NoError(t, err)
@@ -219,6 +263,8 @@ func runRequestTest(t *testing.T, tc testCase) {
 		require.Error(t, err)
 		if tc.expectCancel {
 			require.EqualError(t, err, clientCancelled.Error())
+		} else if tc.expectRejection != "" {
+			require.ErrorContains(t, err, tc.expectRejection)
 		}
 	} else {
 		require.NoError(t, err)
@@ -258,6 +304,11 @@ func createRetrievalClient(ctx context.Context, t *testing.T, testData *tut.Libp
 	ba := tut.NewTestRetrievalBlockstoreAccessor()
 	client, err := retrievalimpl.NewClient(nw1, dt1, retrievalClientNode, &tut.TestPeerResolver{}, clientDs, ba)
 	require.NoError(t, err)
+
+	dt1.SubscribeToEvents(func(event datatransfer.Event, channelState datatransfer.ChannelState) {
+		tlog.Debugf("client dt: %s %s / %s", datatransfer.Events[event.Code], event.Message, datatransfer.Statuses[channelState.Status()])
+	})
+
 	return client
 }
 

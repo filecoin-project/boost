@@ -15,7 +15,6 @@ import (
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket/impl/requestvalidation"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket/migrations"
 	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -48,10 +47,9 @@ type GraphsyncUnpaidRetrieval struct {
 	peerID     peer.ID
 	dtnet      network.DataTransferNetwork
 	decoder    *registry.Registry
-	validator  *requestvalidation.ProviderRequestValidator
+	validator  *requestValidator
 	pubSubDT   *pubsub.PubSub
 	pubSubMkts *pubsub.PubSub
-	vdeps      ValidationDeps
 
 	activeRetrievalsLk sync.RWMutex
 	activeRetrievals   map[reqId]*retrievalState
@@ -73,6 +71,7 @@ type ValidationDeps struct {
 	DagStore       stores.DAGStoreWrapper
 	PieceStore     piecestore.PieceStore
 	SectorAccessor retrievalmarket.SectorAccessor
+	AskStore       retrievalmarket.AskStore
 }
 
 func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtnet network.DataTransferNetwork, vdeps ValidationDeps) (*GraphsyncUnpaidRetrieval, error) {
@@ -93,17 +92,14 @@ func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtn
 		decoder:          typeRegistry,
 		pubSubDT:         pubsub.New(eventDispatcherDT),
 		pubSubMkts:       pubsub.New(eventDispatcherMkts),
-		vdeps:            vdeps,
+		validator:        &requestValidator{ValidationDeps: vdeps},
 		activeRetrievals: make(map[reqId]*retrievalState),
 	}, nil
 }
 
 func (g *GraphsyncUnpaidRetrieval) Start(ctx context.Context) {
 	g.ctx = ctx
-	g.validator = requestvalidation.NewProviderRequestValidator(&validationEnv{
-		ctx:            ctx,
-		ValidationDeps: g.vdeps,
-	})
+	g.validator.ctx = ctx
 }
 
 // Called when a new request is received
@@ -282,8 +278,8 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 			}
 
 			// Validate the request
-			res, validateErr := g.validator.ValidatePull(false, datatransfer.ChannelID{}, p, voucher, request.Root(), request.Selector())
-			isAccepted := validateErr == nil || validateErr == datatransfer.ErrPause || validateErr == datatransfer.ErrResume
+			res, validateErr := g.validator.validatePullRequest(p, voucher, request.Root(), request.Selector())
+			isAccepted := validateErr == nil
 			const isPaused = false // There are no payments required, so never pause
 			resultType := datatransfer.EmptyTypeIdentifier
 			if res != nil {
@@ -310,10 +306,6 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 				for _, ext := range extensions {
 					hookActions.SendExtensionData(ext)
 				}
-			}
-
-			if validateErr == datatransfer.ErrPause || validateErr == datatransfer.ErrResume {
-				return nil
 			}
 
 			return validateErr

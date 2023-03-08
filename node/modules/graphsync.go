@@ -15,8 +15,8 @@ import (
 )
 
 // Graphsync creates a graphsync instance used to serve retrievals.
-func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore, h host.Host, net lotus_dtypes.ProviderTransferNetwork, dealDecider lotus_dtypes.RetrievalDealFilter, dagStore stores.DAGStoreWrapper, pstore lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor) (*server.GraphsyncUnpaidRetrieval, error) {
-	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore, h host.Host, net lotus_dtypes.ProviderTransferNetwork, dealDecider lotus_dtypes.RetrievalDealFilter, dagStore stores.DAGStoreWrapper, pstore lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor) (*server.GraphsyncUnpaidRetrieval, error) {
+func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore, h host.Host, net lotus_dtypes.ProviderTransferNetwork, dealDecider lotus_dtypes.RetrievalDealFilter, dagStore stores.DAGStoreWrapper, pstore lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askStore retrievalmarket.AskStore) (*server.GraphsyncUnpaidRetrieval, error) {
+	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore, h host.Host, net lotus_dtypes.ProviderTransferNetwork, dealDecider lotus_dtypes.RetrievalDealFilter, dagStore stores.DAGStoreWrapper, pstore lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askStore retrievalmarket.AskStore) (*server.GraphsyncUnpaidRetrieval, error) {
 		// Create a Graphsync instance
 		mkgs := lotus_modules.StagingGraphsync(parallelTransfersForStorage, parallelTransfersForStoragePerPeer, parallelTransfersForRetrieval)
 		gs := mkgs(mctx, lc, ibs, h)
@@ -27,6 +27,7 @@ func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePe
 			DagStore:       dagStore,
 			PieceStore:     pstore,
 			SectorAccessor: sa,
+			AskStore:       askStore,
 		}
 		gsupr, err := server.NewGraphsyncUnpaidRetrieval(h.ID(), gs, net, vdeps)
 

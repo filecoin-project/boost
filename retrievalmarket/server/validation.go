@@ -1,49 +1,147 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket/impl/requestvalidation"
-	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket/migrations"
 	"github.com/ipfs/go-cid"
+	"github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/codec/dagcbor"
+	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-// An implementation of ValidationEnvironment for unpaid retrieval
-type validationEnv struct {
+var allSelectorBytes []byte
+
+func init() {
+	buf := new(bytes.Buffer)
+	_ = dagcbor.Encode(selectorparse.CommonSelector_ExploreAllRecursively, buf)
+	allSelectorBytes = buf.Bytes()
+}
+
+type requestValidator struct {
 	ctx context.Context
 	ValidationDeps
 }
 
-var _ requestvalidation.ValidationEnvironment = (*validationEnv)(nil)
-
-func (v *validationEnv) GetAsk(ctx context.Context, payloadCid cid.Cid, pieceCid *cid.Cid, piece piecestore.PieceInfo, isUnsealed bool, client peer.ID) (retrievalmarket.Ask, error) {
-	return retrievalmarket.Ask{
-		PricePerByte:            abi.NewTokenAmount(0),
-		UnsealPrice:             abi.NewTokenAmount(0),
-		PaymentInterval:         0,
-		PaymentIntervalIncrease: 0,
-	}, nil
-}
-
-func (v *validationEnv) CheckDealParams(ask retrievalmarket.Ask, pricePerByte abi.TokenAmount, paymentInterval uint64, paymentIntervalIncrease uint64, unsealPrice abi.TokenAmount) error {
-	return nil
-}
-
-func (v *validationEnv) RunDealDecisioningLogic(ctx context.Context, state retrievalmarket.ProviderDealState) (bool, string, error) {
-	if v.DealDecider == nil {
-		return true, "", nil
+// validatePullRequest validates a request for data. This can be the initial
+// request to pull data or a new request created when the data transfer is
+// restarted (eg after a connection failure).
+func (rv *requestValidator) validatePullRequest(receiver peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
+	proposal, ok := voucher.(*retrievalmarket.DealProposal)
+	var legacyProtocol bool
+	if !ok {
+		legacyProposal, ok := voucher.(*migrations.DealProposal0)
+		if !ok {
+			return nil, errors.New("wrong voucher type")
+		}
+		newProposal := migrations.MigrateDealProposal0To1(*legacyProposal)
+		proposal = &newProposal
+		legacyProtocol = true
 	}
-	return v.DealDecider(ctx, state)
+	response, err := rv.validatePull(receiver, proposal, legacyProtocol, baseCid, selector)
+	if legacyProtocol {
+		downgradedResponse := migrations.DealResponse0{
+			Status:      response.Status,
+			ID:          response.ID,
+			Message:     response.Message,
+			PaymentOwed: response.PaymentOwed,
+		}
+		return &downgradedResponse, err
+	}
+	return &response, err
 }
 
-func (v *validationEnv) BeginTracking(pds retrievalmarket.ProviderDealState) error {
+func (rv *requestValidator) validatePull(receiver peer.ID, proposal *retrievalmarket.DealProposal, legacyProtocol bool, baseCid cid.Cid, selector ipld.Node) (retrievalmarket.DealResponse, error) {
+	response := retrievalmarket.DealResponse{
+		ID:     proposal.ID,
+		Status: retrievalmarket.DealStatusAccepted,
+	}
+
+	// Decide whether to accept the deal
+	err := rv.acceptDeal(receiver, proposal, legacyProtocol, baseCid, selector)
+	if err != nil {
+		response.Status = retrievalmarket.DealStatusRejected
+		response.Message = err.Error()
+		return response, err
+	}
+
+	return response, nil
+}
+
+func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *retrievalmarket.DealProposal, legacyProtocol bool, baseCid cid.Cid, selector ipld.Node) error {
+	// Check the proposal CID matches
+	if proposal.PayloadCID != baseCid {
+		return errors.New("incorrect CID for this proposal")
+	}
+
+	// Check the proposal selector matches
+	buf := new(bytes.Buffer)
+	err := dagcbor.Encode(selector, buf)
+	if err != nil {
+		return err
+	}
+	bytesCompare := allSelectorBytes
+	if proposal.SelectorSpecified() {
+		bytesCompare = proposal.Selector.Raw
+	}
+	if !bytes.Equal(buf.Bytes(), bytesCompare) {
+		return errors.New("incorrect selector for this proposal")
+	}
+
+	// Check if the piece is unsealed
+	_, isUnsealed, err := rv.getPiece(proposal.PayloadCID, proposal.PieceCID)
+	if err != nil {
+		if err == retrievalmarket.ErrNotFound {
+			return fmt.Errorf("there is no piece containing payload cid %s: %w", proposal.PayloadCID, err)
+		}
+		return err
+	}
+	if !isUnsealed {
+		return fmt.Errorf("there is no unsealed piece containing payload cid %s", proposal.PayloadCID)
+	}
+
+	// Check the retrieval ask price
+	ask := rv.AskStore.GetAsk()
+	if ask == nil {
+		return fmt.Errorf("retrieval ask price is not configured")
+	}
+
+	if !ask.UnsealPrice.IsZero() || !ask.PricePerByte.IsZero() {
+		return fmt.Errorf("request for unpaid retrieval but ask price is non-zero: %d unseal / %d per byte",
+			ask.UnsealPrice, ask.PricePerByte)
+	}
+	if err != nil {
+		return err
+	}
+
+	// Check the deal filter
+	if rv.DealDecider != nil {
+		state := retrievalmarket.ProviderDealState{
+			DealProposal:    *proposal,
+			Receiver:        receiver,
+			LegacyProtocol:  legacyProtocol,
+			CurrentInterval: proposal.PaymentInterval,
+		}
+		accepted, reason, err := rv.DealDecider(rv.ctx, state)
+		if err != nil {
+			return fmt.Errorf("error running retrieval filter: %w", err)
+		}
+		if !accepted {
+			return fmt.Errorf("rejected by retrieval filter: %s", reason)
+		}
+	}
+
 	return nil
 }
 
-func (v *validationEnv) GetPiece(payloadCid cid.Cid, pieceCID *cid.Cid) (piecestore.PieceInfo, bool, error) {
+// Get the best piece containing the payload cid (first unsealed piece)
+func (v *requestValidator) getPiece(payloadCid cid.Cid, pieceCID *cid.Cid) (piecestore.PieceInfo, bool, error) {
 	inPieceCid := cid.Undef
 	if pieceCID != nil {
 		inPieceCid = *pieceCID
