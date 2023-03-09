@@ -4,8 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
-
+	"github.com/filecoin-project/boost/metrics"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-data-transfer/encoding"
 	"github.com/filecoin-project/go-data-transfer/message"
@@ -23,6 +22,8 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
+	"go.opencensus.io/stats"
+	"sync"
 )
 
 var log = logging.Logger("boostgs")
@@ -172,6 +173,8 @@ func (g *GraphsyncUnpaidRetrieval) List() []retrievalState {
 
 func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestQueuedHook(hook graphsync.OnIncomingRequestQueuedHook) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterIncomingRequestQueuedHook(func(p peer.ID, request graphsync.RequestData, hookActions graphsync.RequestQueuedHookActions) {
+		stats.Record(g.ctx, metrics.GraphsyncRequestQueuedCount.M(1))
+
 		interceptRtvl, err := g.interceptRetrieval(p, request)
 		if err != nil {
 			log.Errorw("incoming request failed", "request", request, "error", err)
@@ -180,8 +183,10 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestQueuedHook(hook graphs
 
 		if !interceptRtvl {
 			hook(p, request, hookActions)
+			stats.Record(g.ctx, metrics.GraphsyncRequestQueuedPaidCount.M(1))
 			return
 		}
+		stats.Record(g.ctx, metrics.GraphsyncRequestQueuedUnpaidCount.M(1))
 	})
 }
 
@@ -277,11 +282,16 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 
 func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.OnIncomingRequestHook) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterIncomingRequestHook(func(p peer.ID, request graphsync.RequestData, hookActions graphsync.IncomingRequestHookActions) {
+		stats.Record(g.ctx, metrics.GraphsyncRequestStartedCount.M(1))
+
 		msg, state, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
 		if !intercept {
 			hook(p, request, hookActions)
+			stats.Record(g.ctx, metrics.GraphsyncRequestStartedPaidCount.M(1))
 			return
 		}
+
+		stats.Record(g.ctx, metrics.GraphsyncRequestStartedUnpaidCount.M(1))
 
 		dtOpenMsg := "unpaid"
 		if msg.IsRestart() {
@@ -333,6 +343,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 		if err != nil {
 			hookActions.TerminateWithError(err)
 			g.failTransfer(state, err)
+			stats.Record(g.ctx, metrics.GraphsyncRequestStartedUnpaidFailCount.M(1))
 			return
 		}
 
@@ -346,6 +357,8 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 		g.publishMktsEvent(retrievalmarket.ProviderEventDealAccepted, *state.mkts)
 		state.mkts.Status = retrievalmarket.DealStatusUnsealed
 		g.publishMktsEvent(retrievalmarket.ProviderEventUnsealComplete, *state.mkts)
+
+		stats.Record(g.ctx, metrics.GraphsyncRequestStartedUnpaidSuccessCount.M(1))
 	})
 }
 
@@ -368,6 +381,10 @@ func (g *GraphsyncUnpaidRetrieval) RegisterCompletedResponseListener(listener gr
 		msg, state, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
 		if !intercept {
 			listener(p, request, status)
+			if p != g.peerID {
+				stats.Record(g.ctx, metrics.GraphsyncRequestCompletedCount.M(1))
+				stats.Record(g.ctx, metrics.GraphsyncRequestCompletedPaidCount.M(1))
+			}
 			return
 		}
 
@@ -376,6 +393,9 @@ func (g *GraphsyncUnpaidRetrieval) RegisterCompletedResponseListener(listener gr
 		if p == g.peerID {
 			return
 		}
+
+		stats.Record(g.ctx, metrics.GraphsyncRequestCompletedCount.M(1))
+		stats.Record(g.ctx, metrics.GraphsyncRequestCompletedUnpaidCount.M(1))
 
 		defer g.untrackTransfer(p, msg.TransferID())
 
@@ -387,6 +407,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterCompletedResponseListener(listener gr
 		if status != graphsync.RequestCompletedFull {
 			completeErr := fmt.Errorf("graphsync response to peer %s did not complete: response status code %s", p, status)
 			g.failTransfer(state, completeErr)
+			stats.Record(g.ctx, metrics.GraphsyncRequestCompletedUnpaidFailCount.M(1))
 			return
 		}
 
@@ -412,6 +433,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterCompletedResponseListener(listener gr
 		if err := g.dtnet.SendMessage(g.ctx, p, respMsg); err != nil {
 			err := fmt.Errorf("failed to send completion message to requestor %s: %w", p, err)
 			g.failTransfer(state, err)
+			stats.Record(g.ctx, metrics.GraphsyncRequestCompletedUnpaidFailCount.M(1))
 			return
 		}
 
@@ -421,15 +443,19 @@ func (g *GraphsyncUnpaidRetrieval) RegisterCompletedResponseListener(listener gr
 		state.mkts.Status = retrievalmarket.DealStatusCompleted
 		g.publishMktsEvent(retrievalmarket.ProviderEventComplete, *state.mkts)
 
+		stats.Record(g.ctx, metrics.GraphsyncRequestCompletedUnpaidSuccessCount.M(1))
 		log.Infow("successfully sent completion message to requestor", "peer", p)
 	})
 }
 
 func (g *GraphsyncUnpaidRetrieval) RegisterRequestorCancelledListener(listener graphsync.OnRequestorCancelledListener) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterRequestorCancelledListener(func(p peer.ID, request graphsync.RequestData) {
+		stats.Record(g.ctx, metrics.GraphsyncRequestClientCancelledCount.M(1))
+
 		_, state, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
 		if !intercept {
 			listener(p, request)
+			stats.Record(g.ctx, metrics.GraphsyncRequestClientCancelledPaidCount.M(1))
 			return
 		}
 
@@ -439,14 +465,23 @@ func (g *GraphsyncUnpaidRetrieval) RegisterRequestorCancelledListener(listener g
 		g.publishMktsEvent(retrievalmarket.ProviderEventCancelComplete, *state.mkts)
 
 		g.untrackTransfer(p, state.cs.transferID)
+
+		stats.Record(g.ctx, metrics.GraphsyncRequestClientCancelledUnpaidCount.M(1))
 	})
 }
 
 func (g *GraphsyncUnpaidRetrieval) RegisterBlockSentListener(listener graphsync.OnBlockSentListener) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterBlockSentListener(func(p peer.ID, request graphsync.RequestData, block graphsync.BlockData) {
+		sizeOnWire := block.BlockSizeOnWire()
 		_, state, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
 		if !intercept {
 			listener(p, request, block)
+			if sizeOnWire > 0 {
+				stats.Record(g.ctx, metrics.GraphsyncRequestBlockSentCount.M(1))
+				stats.Record(g.ctx, metrics.GraphsyncRequestBlockSentPaidCount.M(1))
+				stats.Record(g.ctx, metrics.GraphsyncRequestBytesSentCount.M(int64(sizeOnWire)))
+				stats.Record(g.ctx, metrics.GraphsyncRequestBytesSentPaidCount.M(int64(sizeOnWire)))
+			}
 			return
 		}
 
@@ -455,7 +490,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterBlockSentListener(listener graphsync.
 		// if they are in the list (meaning, they aren't actually sent over the
 		// wire). So here we check if the block was actually sent
 		// over the wire before firing the data sent event.
-		if block.BlockSizeOnWire() == 0 {
+		if sizeOnWire == 0 {
 			return
 		}
 
@@ -463,11 +498,18 @@ func (g *GraphsyncUnpaidRetrieval) RegisterBlockSentListener(listener graphsync.
 		state.cs.sent += block.BlockSizeOnWire()
 		g.publishDTEvent(datatransfer.DataSent, "", state.cs)
 		state.mkts.TotalSent += block.BlockSizeOnWire()
+
+		stats.Record(g.ctx, metrics.GraphsyncRequestBlockSentCount.M(1))
+		stats.Record(g.ctx, metrics.GraphsyncRequestBlockSentUnpaidCount.M(1))
+		stats.Record(g.ctx, metrics.GraphsyncRequestBytesSentCount.M(int64(sizeOnWire)))
+		stats.Record(g.ctx, metrics.GraphsyncRequestBytesSentUnpaidCount.M(int64(sizeOnWire)))
 	})
 }
 
 func (g *GraphsyncUnpaidRetrieval) RegisterNetworkErrorListener(listener graphsync.OnNetworkErrorListener) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterNetworkErrorListener(func(p peer.ID, request graphsync.RequestData, err error) {
+		stats.Record(g.ctx, metrics.GraphsyncRequestNetworkErrorCount.M(1))
+
 		_, state, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
 		if !intercept {
 			listener(p, request, err)

@@ -140,6 +140,31 @@ var (
 	BitswapRblsHasSuccessResponseCount     = stats.Int64("bitswap/rbls_has_success_response_count", "Counter of successful RemoteBlockstore Has responses", stats.UnitDimensionless)
 	BitswapRblsHasFailResponseCount        = stats.Int64("bitswap/rbls_has_fail_response_count", "Counter of failed RemoteBlockstore Has responses", stats.UnitDimensionless)
 	BitswapRblsBytesSentCount              = stats.Int64("bitswap/rbls_bytes_sent_count", "Counter of the number of bytes sent by bitswap since startup", stats.UnitBytes)
+
+	// graphsync
+	GraphsyncRequestQueuedCount                 = stats.Int64("graphsync/request_queued_count", "Counter of Graphsync requests queued", stats.UnitDimensionless)
+	GraphsyncRequestQueuedPaidCount             = stats.Int64("graphsync/request_queued_paid_count", "Counter of Graphsync paid requests queued", stats.UnitDimensionless)
+	GraphsyncRequestQueuedUnpaidCount           = stats.Int64("graphsync/request_queued_unpaid_count", "Counter of Graphsync unpaid requests queued", stats.UnitDimensionless)
+	GraphsyncRequestStartedCount                = stats.Int64("graphsync/request_started_count", "Counter of Graphsync requests started", stats.UnitDimensionless)
+	GraphsyncRequestStartedPaidCount            = stats.Int64("graphsync/request_started_paid_count", "Counter of Graphsync paid requests started", stats.UnitDimensionless)
+	GraphsyncRequestStartedUnpaidCount          = stats.Int64("graphsync/request_started_unpaid_count", "Counter of Graphsync unpaid requests started", stats.UnitDimensionless)
+	GraphsyncRequestStartedUnpaidSuccessCount   = stats.Int64("graphsync/request_started_unpaid_success_count", "Counter of Graphsync successful unpaid requests started", stats.UnitDimensionless)
+	GraphsyncRequestStartedUnpaidFailCount      = stats.Int64("graphsync/request_started_unpaid_fail_count", "Counter of Graphsync failed unpaid requests started", stats.UnitDimensionless)
+	GraphsyncRequestCompletedCount              = stats.Int64("graphsync/request_completed_count", "Counter of Graphsync requests completed", stats.UnitDimensionless)
+	GraphsyncRequestCompletedPaidCount          = stats.Int64("graphsync/request_completed_paid_count", "Counter of Graphsync paid requests completed", stats.UnitDimensionless)
+	GraphsyncRequestCompletedUnpaidCount        = stats.Int64("graphsync/request_completed_unpaid_count", "Counter of Graphsync unpaid requests completed", stats.UnitDimensionless)
+	GraphsyncRequestCompletedUnpaidSuccessCount = stats.Int64("graphsync/request_completed_unpaid_success_count", "Counter of Graphsync successful unpaid requests completed", stats.UnitDimensionless)
+	GraphsyncRequestCompletedUnpaidFailCount    = stats.Int64("graphsync/request_completed_unpaid_fail_count", "Counter of Graphsync failed unpaid requests completed", stats.UnitDimensionless)
+	GraphsyncRequestClientCancelledCount        = stats.Int64("graphsync/request_client_cancelled_count", "Counter of Graphsync requests cancelled", stats.UnitDimensionless)
+	GraphsyncRequestClientCancelledPaidCount    = stats.Int64("graphsync/request_client_cancelled_paid_count", "Counter of Graphsync paid requests cancelled", stats.UnitDimensionless)
+	GraphsyncRequestClientCancelledUnpaidCount  = stats.Int64("graphsync/request_client_cancelled_unpaid_count", "Counter of Graphsync unpaid requests cancelled", stats.UnitDimensionless)
+	GraphsyncRequestBlockSentCount              = stats.Int64("graphsync/request_block_sent_count", "Counter of Graphsync blocks sent", stats.UnitDimensionless)
+	GraphsyncRequestBlockSentPaidCount          = stats.Int64("graphsync/request_block_sent_paid_count", "Counter of Graphsync paid blocks sent", stats.UnitDimensionless)
+	GraphsyncRequestBlockSentUnpaidCount        = stats.Int64("graphsync/request_block_sent_unpaid_count", "Counter of Graphsync unpaid blocks sent", stats.UnitDimensionless)
+	GraphsyncRequestBytesSentCount              = stats.Int64("graphsync/request_bytes_sent_count", "Counter of Graphsync paid bytes sent", stats.UnitBytes)
+	GraphsyncRequestBytesSentPaidCount          = stats.Int64("graphsync/request_bytes_sent_paid_count", "Counter of Graphsync paid bytes sent", stats.UnitBytes)
+	GraphsyncRequestBytesSentUnpaidCount        = stats.Int64("graphsync/request_bytes_sent_unpaid_count", "Counter of Graphsync unpaid bytes sent", stats.UnitBytes)
+	GraphsyncRequestNetworkErrorCount           = stats.Int64("graphsync/request_network_error_count", "Counter of Graphsync network errors", stats.UnitDimensionless)
 )
 
 var (
@@ -233,6 +258,100 @@ var (
 	BitswapRblsBytesSentCountView = &view.View{
 		Measure:     BitswapRblsBytesSentCount,
 		Aggregation: view.Sum(),
+	}
+
+	// graphsync
+	GraphsyncRequestQueuedCountView = &view.View{
+		Measure:     GraphsyncRequestQueuedCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestQueuedPaidCountView = &view.View{
+		Measure:     GraphsyncRequestQueuedPaidCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestQueuedUnpaidCountView = &view.View{
+		Measure:     GraphsyncRequestQueuedUnpaidCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestStartedCountView = &view.View{
+		Measure:     GraphsyncRequestStartedCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestStartedPaidCountView = &view.View{
+		Measure:     GraphsyncRequestStartedPaidCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestStartedUnpaidCountView = &view.View{
+		Measure:     GraphsyncRequestStartedUnpaidCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestStartedUnpaidSuccessCountView = &view.View{
+		Measure:     GraphsyncRequestStartedUnpaidSuccessCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestStartedUnpaidFailCountView = &view.View{
+		Measure:     GraphsyncRequestStartedUnpaidFailCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestCompletedCountView = &view.View{
+		Measure:     GraphsyncRequestCompletedCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestCompletedPaidCountView = &view.View{
+		Measure:     GraphsyncRequestCompletedPaidCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestCompletedUnpaidCountView = &view.View{
+		Measure:     GraphsyncRequestCompletedUnpaidCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestCompletedUnpaidSuccessCountView = &view.View{
+		Measure:     GraphsyncRequestCompletedUnpaidSuccessCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestCompletedUnpaidFailCountView = &view.View{
+		Measure:     GraphsyncRequestCompletedUnpaidFailCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestClientCancelledCountView = &view.View{
+		Measure:     GraphsyncRequestClientCancelledCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestClientCancelledPaidCountView = &view.View{
+		Measure:     GraphsyncRequestClientCancelledPaidCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestClientCancelledUnpaidCountView = &view.View{
+		Measure:     GraphsyncRequestClientCancelledUnpaidCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestBlockSentCountView = &view.View{
+		Measure:     GraphsyncRequestBlockSentCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestPaidBlockSentCountView = &view.View{
+		Measure:     GraphsyncRequestBlockSentPaidCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestUnpaidBlockSentCountView = &view.View{
+		Measure:     GraphsyncRequestBlockSentUnpaidCount,
+		Aggregation: view.Count(),
+	}
+	GraphsyncRequestBytesSentCountView = &view.View{
+		Measure:     GraphsyncRequestBytesSentCount,
+		Aggregation: view.Sum(),
+	}
+	GraphsyncRequestPaidBytesSentCountView = &view.View{
+		Measure:     GraphsyncRequestBytesSentPaidCount,
+		Aggregation: view.Sum(),
+	}
+	GraphsyncRequestUnpaidBytesSentCountView = &view.View{
+		Measure:     GraphsyncRequestBytesSentUnpaidCount,
+		Aggregation: view.Sum(),
+	}
+	GraphsyncRequestNetworkErrorCountView = &view.View{
+		Measure:     GraphsyncRequestNetworkErrorCount,
+		Aggregation: view.Count(),
 	}
 
 	InfoView = &view.View{
@@ -527,6 +646,29 @@ var DefaultViews = func() []*view.View {
 		BitswapRblsHasSuccessResponseCountView,
 		BitswapRblsHasFailResponseCountView,
 		BitswapRblsBytesSentCountView,
+		GraphsyncRequestQueuedCountView,
+		GraphsyncRequestQueuedPaidCountView,
+		GraphsyncRequestQueuedUnpaidCountView,
+		GraphsyncRequestStartedCountView,
+		GraphsyncRequestStartedPaidCountView,
+		GraphsyncRequestStartedUnpaidCountView,
+		GraphsyncRequestStartedUnpaidSuccessCountView,
+		GraphsyncRequestStartedUnpaidFailCountView,
+		GraphsyncRequestCompletedCountView,
+		GraphsyncRequestCompletedPaidCountView,
+		GraphsyncRequestCompletedUnpaidCountView,
+		GraphsyncRequestCompletedUnpaidSuccessCountView,
+		GraphsyncRequestCompletedUnpaidFailCountView,
+		GraphsyncRequestClientCancelledCountView,
+		GraphsyncRequestClientCancelledPaidCountView,
+		GraphsyncRequestClientCancelledUnpaidCountView,
+		GraphsyncRequestBlockSentCountView,
+		GraphsyncRequestPaidBlockSentCountView,
+		GraphsyncRequestUnpaidBlockSentCountView,
+		GraphsyncRequestBytesSentCountView,
+		GraphsyncRequestPaidBytesSentCountView,
+		GraphsyncRequestUnpaidBytesSentCountView,
+		GraphsyncRequestNetworkErrorCountView,
 		lotusmetrics.DagStorePRBytesDiscardedView,
 		lotusmetrics.DagStorePRBytesRequestedView,
 		lotusmetrics.DagStorePRDiscardCountView,
