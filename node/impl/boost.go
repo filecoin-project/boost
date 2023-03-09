@@ -489,6 +489,11 @@ func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) e
 	return nil
 }
 
+func (sm *BoostAPI) BoostMakeDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
+	log.Infow("received json-rpc deal proposal", "id", params.DealUUID)
+	return sm.StorageProvider.ExecuteDeal(ctx, &params, "json-rpc-deal")
+}
+
 func (sm *BoostAPI) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error) {
 	blk, err := sm.IndexBackedBlockstore.Get(ctx, c)
 	if err != nil {
