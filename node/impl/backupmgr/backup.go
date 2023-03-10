@@ -82,6 +82,8 @@ func (b *BackupMgr) takeBackup(ctx context.Context, dstDir string) error {
 		return err
 	}
 
+	defer dst.Close()
+
 	// Create keystore at backup location
 	if err := os.Mkdir(path.Join(dst.Path(), "keystore"), 0700); err != nil {
 		return fmt.Errorf("error creating keystore directory %s: %w", path.Join(dst.Path(), "keystore"), err)
@@ -123,17 +125,10 @@ func (b *BackupMgr) takeBackup(ctx context.Context, dstDir string) error {
 		return fmt.Errorf("error copying file: %w", err)
 	}
 
-	// Close backup repo before moving it
-	if err := dst.Close(); err != nil {
-		return fmt.Errorf("error closing the locked backup repo: %w", err)
-	}
-
 	// Move directory to the backup location
 	if err := os.Rename(bkpDir, path.Join(dstDir, "boost_backup_"+time.Now().Format("20060102150405"))); err != nil {
 		return fmt.Errorf("error moving backup directory %s to %s: %w", bkpDir, dstDir, err)
 	}
-
-	// TODO: Archive the directory and save it to the backup location
 
 	return nil
 }
