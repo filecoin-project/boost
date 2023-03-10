@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"path"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 )
@@ -23,15 +23,8 @@ type Scannable interface {
 	Scan(dest ...interface{}) error
 }
 
-func SqlDB(dbPath, driverName string) (*sql.DB, *sqlite3.SQLiteConn, error) {
-	var sqlite3conn *sqlite3.SQLiteConn
-	sql.Register(driverName, &sqlite3.SQLiteDriver{
-		ConnectHook: func(conn *sqlite3.SQLiteConn) error {
-			sqlite3conn = conn
-			return nil
-		},
-	})
-	db, err := sql.Open(driverName, "file:"+dbPath)
+func SqlDB(dbPath string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", "file:"+dbPath)
 	if err == nil {
 		// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 		// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
@@ -39,12 +32,7 @@ func SqlDB(dbPath, driverName string) (*sql.DB, *sqlite3.SQLiteConn, error) {
 		db.SetMaxOpenConns(1)
 	}
 
-	// Open the connection to ensure sqlite3conn is not returned as nil. sql.Open does not starts a connection
-	if err := db.Ping(); err != nil {
-		return &sql.DB{}, &sqlite3.SQLiteConn{}, err
-	}
-
-	return db, sqlite3conn, err
+	return db, err
 }
 
 //go:embed create_main_db.sql
@@ -68,7 +56,101 @@ func CreateTestTmpDB(t *testing.T) *sql.DB {
 	f, err := ioutil.TempFile(t.TempDir(), "*.db")
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
-	d, _, err := SqlDB(f.Name(), uuid.NewString())
+	d, err := SqlDB(f.Name())
 	require.NoError(t, err)
 	return d
+}
+
+func SqlBackup(srcDB *sql.DB, dstDir, dbFileName string) error {
+	dbPath := path.Join(dstDir, dbFileName+"?cache=shared")
+	dstDB, err := SqlDB(dbPath)
+	if err != nil {
+		return fmt.Errorf("failed to open source sql db for backup: %w", err)
+	}
+
+	defer dstDB.Close()
+
+	err = dstDB.Ping()
+	if err != nil {
+		return fmt.Errorf("failed to open source sql db for backup: %w", err)
+	}
+
+	ctx := context.Background()
+
+	destConn, err := dstDB.Conn(ctx)
+	if err != nil {
+		return err
+	}
+
+	srcConn, err := srcDB.Conn(ctx)
+	if err != nil {
+		return err
+	}
+
+	return destConn.Raw(func(destConn interface{}) error {
+		return srcConn.Raw(func(srcConn interface{}) error {
+			destSQLiteConn, ok := destConn.(*sqlite3.SQLiteConn)
+			if !ok {
+				return fmt.Errorf("can't convert destination connection to SQLiteConn")
+			}
+
+			srcSQLiteConn, ok := srcConn.(*sqlite3.SQLiteConn)
+			if !ok {
+				return fmt.Errorf("can't convert source connection to SQLiteConn")
+			}
+
+			b, err := destSQLiteConn.Backup("main", srcSQLiteConn, "main")
+			if err != nil {
+				return fmt.Errorf("error initializing SQLite backup: %w", err)
+			}
+
+			// Allow the initial page count and remaining values to be retrieved
+			isDone, err := b.Step(0)
+			if err != nil {
+				return fmt.Errorf("unable to perform an initial 0-page backup step: %w", err)
+			}
+			if isDone {
+				return fmt.Errorf("backup is unexpectedly done")
+			}
+
+			// Check that the page count and remaining values are reasonable.
+			initialPageCount := b.PageCount()
+			if initialPageCount <= 0 {
+				return fmt.Errorf("unexpected initial page count value: %v", initialPageCount)
+			}
+			initialRemaining := b.Remaining()
+			if initialRemaining <= 0 {
+				return fmt.Errorf("unexpected initial remaining value: %v", initialRemaining)
+			}
+			if initialRemaining != initialPageCount {
+				return fmt.Errorf("initial remaining value %v differs from the initial page count value %v", initialRemaining, initialPageCount)
+			}
+
+			// Copy all the pages
+			isDone, err = b.Step(-1)
+			if err != nil {
+				return fmt.Errorf("failed to perform a backup step: %w", err)
+			}
+			if !isDone {
+				return fmt.Errorf("backup is unexpectedly not done")
+			}
+
+			// Check that the page count and remaining values are reasonable.
+			finalPageCount := b.PageCount()
+			if finalPageCount != initialPageCount {
+				return fmt.Errorf("final page count %v differs from the initial page count %v", initialPageCount, finalPageCount)
+			}
+			finalRemaining := b.Remaining()
+			if finalRemaining != 0 {
+				return fmt.Errorf("unexpected remaining value: %v", finalRemaining)
+			}
+
+			err = b.Finish()
+			if err != nil {
+				return fmt.Errorf("error finishing backup: %w", err)
+			}
+
+			return err
+		})
+	})
 }

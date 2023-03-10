@@ -58,7 +58,6 @@ import (
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/metadata"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/mattn/go-sqlite3"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
 )
@@ -302,11 +301,11 @@ func StorageNetworkName(ctx helpers.MetricsCtx, a v1api.FullNode) (dtypes.Networ
 	return dtypes.NetworkName(n), nil
 }
 
-func NewBoostDB(r lotus_repo.LockedRepo) (*sql.DB, *sqlite3.SQLiteConn, error) {
+func NewBoostDB(r lotus_repo.LockedRepo) (*sql.DB, error) {
 	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
 	dbPath := path.Join(r.Path(), db.DealsDBName+"?cache=shared")
-	return db.SqlDB(dbPath, db.DealsDBName)
+	return db.SqlDB(dbPath)
 }
 
 type LogSqlDB struct {
@@ -317,7 +316,7 @@ func NewLogsSqlDB(r repo.LockedRepo) (*LogSqlDB, error) {
 	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
 	dbPath := path.Join(r.Path(), db.LogsDBName+"?cache=shared")
-	d, _, err := db.SqlDB(dbPath, db.LogsDBName)
+	d, err := db.SqlDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -622,8 +621,8 @@ func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, erro
 	}
 }
 
-func NewOnlineBackupMgr(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo, ds lotus_dtypes.MetadataDS, dealsDB *sqlite3.SQLiteConn) *backupmgr.BackupMgr {
-	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo, ds lotus_dtypes.MetadataDS, dealsDB *sqlite3.SQLiteConn) *backupmgr.BackupMgr {
-		return backupmgr.NewBackupMgr(r, ds, dealsDB, db.DealsDBName)
+func NewOnlineBackupMgr(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo, ds lotus_dtypes.MetadataDS, dealsDB *sql.DB) *backupmgr.BackupMgr {
+	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo, ds lotus_dtypes.MetadataDS, dealsDB *sql.DB) *backupmgr.BackupMgr {
+		return backupmgr.NewBackupMgr(r, ds, db.DealsDBName, dealsDB)
 	}
 }

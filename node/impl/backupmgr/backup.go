@@ -2,6 +2,7 @@ package backupmgr
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-datastore"
-	"github.com/mattn/go-sqlite3"
 	"github.com/mitchellh/go-homedir"
 )
 
@@ -32,19 +32,19 @@ var RestoreFileChk = []string{
 }
 
 type BackupMgr struct {
-	src     lotus_repo.LockedRepo
-	ds      dtypes.MetadataDS
-	sqlConn *sqlite3.SQLiteConn
-	dbName  string
-	lck     sync.Mutex
+	src    lotus_repo.LockedRepo
+	ds     dtypes.MetadataDS
+	dbName string
+	lck    sync.Mutex
+	db     *sql.DB
 }
 
-func NewBackupMgr(src lotus_repo.LockedRepo, ds datastore.Batching, sqlConn *sqlite3.SQLiteConn, name string) *BackupMgr {
+func NewBackupMgr(src lotus_repo.LockedRepo, ds datastore.Batching, name string, db *sql.DB) *BackupMgr {
 	return &BackupMgr{
-		src:     src,
-		ds:      ds,
-		sqlConn: sqlConn,
-		dbName:  name,
+		src:    src,
+		ds:     ds,
+		dbName: name,
+		db:     db,
 	}
 }
 
@@ -107,7 +107,7 @@ func (b *BackupMgr) takeBackup(ctx context.Context, dstDir string) error {
 	}
 
 	// Backup the SQL DBs
-	if err := sqlBackup(b.sqlConn, bkpDir, b.dbName); err != nil {
+	if err := boostdb.SqlBackup(b.db, bkpDir, b.dbName); err != nil {
 		return err
 	}
 
@@ -133,70 +133,70 @@ func (b *BackupMgr) takeBackup(ctx context.Context, dstDir string) error {
 	return nil
 }
 
-func sqlBackup(srcD *sqlite3.SQLiteConn, dstDir, name string) error {
-	dbPath := path.Join(dstDir, name+"?cache=shared")
-	dstDB, sqlt3, err := boostdb.SqlDB(dbPath, fmt.Sprintf("bkpDB_%v", time.Now().UnixNano()))
-	if err != nil {
-		return fmt.Errorf("failed to open source sql db for backup: %w", err)
-	}
-
-	defer dstDB.Close()
-
-	bkp, err := sqlt3.Backup("main", srcD, "main")
-	if err != nil {
-		return fmt.Errorf("failed to start db backup: %w", err)
-	}
-	defer bkp.Close()
-
-	// Allow the initial page count and remaining values to be retrieved
-	isDone, err := bkp.Step(0)
-	if err != nil {
-		return fmt.Errorf("unable to perform an initial 0-page backup step: %w", err)
-	}
-	if isDone {
-		return fmt.Errorf("backup is unexpectedly done")
-	}
-
-	// Check that the page count and remaining values are reasonable.
-	initialPageCount := bkp.PageCount()
-	if initialPageCount <= 0 {
-		return fmt.Errorf("unexpected initial page count value: %v", initialPageCount)
-	}
-	initialRemaining := bkp.Remaining()
-	if initialRemaining <= 0 {
-		return fmt.Errorf("unexpected initial remaining value: %v", initialRemaining)
-	}
-	if initialRemaining != initialPageCount {
-		return fmt.Errorf("initial remaining value %v differs from the initial page count value %v", initialRemaining, initialPageCount)
-	}
-
-	// Copy all the pages
-	isDone, err = bkp.Step(-1)
-	if err != nil {
-		return fmt.Errorf("failed to perform a backup step: %w", err)
-	}
-	if !isDone {
-		return fmt.Errorf("backup is unexpectedly not done")
-	}
-
-	// Check that the page count and remaining values are reasonable.
-	finalPageCount := bkp.PageCount()
-	if finalPageCount != initialPageCount {
-		return fmt.Errorf("final page count %v differs from the initial page count %v", initialPageCount, finalPageCount)
-	}
-	finalRemaining := bkp.Remaining()
-	if finalRemaining != 0 {
-		return fmt.Errorf("unexpected remaining value: %v", finalRemaining)
-	}
-
-	// Finish the backup.
-	err = bkp.Finish()
-	if err != nil {
-		return fmt.Errorf("failed to finish backup: %w", err)
-	}
-
-	return nil
-}
+//func sqlBackup(srcD *sqlite3.SQLiteConn, dstDir, name string) error {
+//	dbPath := path.Join(dstDir, name+"?cache=shared")
+//	dstDB, sqlt3, err := boostdb.SqlDB(dbPath, fmt.Sprintf("bkpDB_%v", time.Now().UnixNano()))
+//	if err != nil {
+//		return fmt.Errorf("failed to open source sql db for backup: %w", err)
+//	}
+//
+//	defer dstDB.Close()
+//
+//	bkp, err := sqlt3.Backup("main", srcD, "main")
+//	if err != nil {
+//		return fmt.Errorf("failed to start db backup: %w", err)
+//	}
+//	defer bkp.Close()
+//
+//	// Allow the initial page count and remaining values to be retrieved
+//	isDone, err := bkp.Step(0)
+//	if err != nil {
+//		return fmt.Errorf("unable to perform an initial 0-page backup step: %w", err)
+//	}
+//	if isDone {
+//		return fmt.Errorf("backup is unexpectedly done")
+//	}
+//
+//	// Check that the page count and remaining values are reasonable.
+//	initialPageCount := bkp.PageCount()
+//	if initialPageCount <= 0 {
+//		return fmt.Errorf("unexpected initial page count value: %v", initialPageCount)
+//	}
+//	initialRemaining := bkp.Remaining()
+//	if initialRemaining <= 0 {
+//		return fmt.Errorf("unexpected initial remaining value: %v", initialRemaining)
+//	}
+//	if initialRemaining != initialPageCount {
+//		return fmt.Errorf("initial remaining value %v differs from the initial page count value %v", initialRemaining, initialPageCount)
+//	}
+//
+//	// Copy all the pages
+//	isDone, err = bkp.Step(-1)
+//	if err != nil {
+//		return fmt.Errorf("failed to perform a backup step: %w", err)
+//	}
+//	if !isDone {
+//		return fmt.Errorf("backup is unexpectedly not done")
+//	}
+//
+//	// Check that the page count and remaining values are reasonable.
+//	finalPageCount := bkp.PageCount()
+//	if finalPageCount != initialPageCount {
+//		return fmt.Errorf("final page count %v differs from the initial page count %v", initialPageCount, finalPageCount)
+//	}
+//	finalRemaining := bkp.Remaining()
+//	if finalRemaining != 0 {
+//		return fmt.Errorf("unexpected remaining value: %v", finalRemaining)
+//	}
+//
+//	// Finish the backup.
+//	err = bkp.Finish()
+//	if err != nil {
+//		return fmt.Errorf("failed to finish backup: %w", err)
+//	}
+//
+//	return nil
+//}
 
 func CopyKeysBetweenRepos(srcRepo lotus_repo.LockedRepo, dstRepo lotus_repo.LockedRepo) error {
 	srcKS, err := srcRepo.KeyStore()
