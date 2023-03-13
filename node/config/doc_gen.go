@@ -251,7 +251,15 @@ Set this value to 0 to indicate there is no limit per host.`,
 			Name: "RetrievalLogDuration",
 			Type: "Duration",
 
-			Comment: `The amount of time to keep retrieval deal logs for before cleaning them up.`,
+			Comment: `The amount of time to keep retrieval deal logs for before cleaning them up.
+Note RetrievalLogDuration should exceed the StalledRetrievalTimeout as the
+logs db is leveraged for pruning stalled retrievals.`,
+		},
+		{
+			Name: "StalledRetrievalTimeout",
+			Type: "Duration",
+
+			Comment: `The amount of time stalled retrieval deals will remain open before being canceled.`,
 		},
 		{
 			Name: "Filter",
@@ -296,7 +304,8 @@ Lower this limit if boostd memory is too high during retrievals`,
 			Name: "RemoteCommp",
 			Type: "bool",
 
-			Comment: `Whether to do commp on the Boost node (local) or on the Sealer (remote)`,
+			Comment: `Whether to do commp on the Boost node (local) or on the Sealer (remote)
+Please note that this only works for v1.2.0 deals and not legacy deals`,
 		},
 		{
 			Name: "MaxConcurrentLocalCommp",

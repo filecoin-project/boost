@@ -176,7 +176,11 @@ type DealmakingConfig struct {
 	// The amount of time to keep deal proposal logs for before cleaning them up.
 	DealProposalLogDuration Duration
 	// The amount of time to keep retrieval deal logs for before cleaning them up.
+	// Note RetrievalLogDuration should exceed the StalledRetrievalTimeout as the
+	// logs db is leveraged for pruning stalled retrievals.
 	RetrievalLogDuration Duration
+	// The amount of time stalled retrieval deals will remain open before being canceled.
+	StalledRetrievalTimeout Duration
 
 	// A command used for fine-grained evaluation of storage deals
 	// see https://boost.filecoin.io/configuration/deal-filters for more details
@@ -197,6 +201,7 @@ type DealmakingConfig struct {
 	MaxTransferDuration Duration
 
 	// Whether to do commp on the Boost node (local) or on the Sealer (remote)
+	// Please note that this only works for v1.2.0 deals and not legacy deals
 	RemoteCommp bool
 	// The maximum number of commp processes to run in parallel on the local
 	// boost process

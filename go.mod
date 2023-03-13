@@ -34,7 +34,7 @@ require (
 	github.com/filecoin-project/go-legs v0.4.9
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.10.0-rc3.0.20230220124418-91b4419c9b6e
+	github.com/filecoin-project/go-state-types v0.10.0
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/lotus v1.20.0-rc2.0.20230220151034-d929257fd800
 	github.com/filecoin-project/specs-actors v0.9.15

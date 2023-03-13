@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	TopicHash = paddedEthHash(ethTopicHash("DealProposalCreate(bytes32,bytes,bool,uint256)")) // deals published on chain
+	TopicHash = paddedEthHash(ethTopicHash("DealProposalCreate(bytes32,uint64,bool,uint256)")) // deals published on chain
 )
 
 type ContractDealMonitor struct {
@@ -90,124 +90,113 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 				}
 				return
 			case resp := <-responseCh:
-				err := func() error {
-					result := resp.Result.([]interface{})[0]
-					event := result.(map[string]interface{})
-					topicContractAddress := event["address"].(string)
-					topicDealProposalID := event["topics"].([]interface{})[1].(string)
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							log.Errorw("recovered from panic from handling eth_subscribe event", "recover", r)
+						}
+					}()
 
-					// allowlist check
-					if len(c.cfg.AllowlistContracts) != 0 && !slices.Contains(c.cfg.AllowlistContracts, topicContractAddress) {
-						return fmt.Errorf("allowlist does not contain this contract address: %s", topicContractAddress)
-					}
+					err := func() error {
+						event := resp.Result.(map[string]interface{})
+						topicContractAddress := event["address"].(string)
+						topicDealProposalID := event["topics"].([]interface{})[1].(string)
 
-					// GetDealProposal is a free data retrieval call binding the contract method 0xf4b2e4d8.
-					_params := "0xf4b2e4d8" + topicDealProposalID[2:] // cut 0x prefix
+						// allowlist check
+						if len(c.cfg.AllowlistContracts) != 0 && !slices.Contains(c.cfg.AllowlistContracts, topicContractAddress) {
+							return fmt.Errorf("allowlist does not contain this contract address: %s", topicContractAddress)
+						}
 
-					toEthAddr, err := ethtypes.ParseEthAddress(topicContractAddress)
-					if err != nil {
-						return fmt.Errorf("parsing `to` eth address failed: %w", err)
-					}
+						res, err := c.getDealProposal(ctx, topicContractAddress, topicDealProposalID, fromEthAddr)
+						if err != nil {
+							return fmt.Errorf("eth call for get deal proposal failed: %w", err)
+						}
 
-					params, err := ethtypes.DecodeHexString(_params)
-					if err != nil {
-						return fmt.Errorf("decoding params failed: %w", err)
-					}
+						resParams, err := c.getExtraData(ctx, topicContractAddress, topicDealProposalID, fromEthAddr)
+						if err != nil {
+							return fmt.Errorf("eth call for extra data failed: %w", err)
+						}
 
-					res, err := c.api.EthCall(ctx, ethtypes.EthCall{
-						From: &fromEthAddr,
-						To:   &toEthAddr,
-						Data: params,
-					}, "latest")
-					if err != nil {
-						return fmt.Errorf("eth call erred: %w", err)
-					}
+						var dpc market.DealProposal
+						err = dpc.UnmarshalCBOR(bytes.NewReader(res))
+						if err != nil {
+							return fmt.Errorf("cbor unmarshal failed: %w", err)
+						}
 
-					begin, length, err := lengthPrefixPointsTo(res)
-					if err != nil {
-						return fmt.Errorf("length prefix points erred: %w", err)
-					}
+						var pv1 types.ContractParamsVersion1
+						err = pv1.UnmarshalCBOR(bytes.NewReader(resParams))
+						if err != nil {
+							return fmt.Errorf("params cbor unmarshal failed: %w", err)
+						}
 
-					var dpc types.ContractDealProposal
-					err = dpc.UnmarshalCBOR(bytes.NewReader(res[begin : begin+length]))
-					if err != nil {
-						return fmt.Errorf("cbor unmarshal failed: %w", err)
-					}
+						rootCidStr, err := dpc.Label.ToString()
+						if err != nil {
+							return fmt.Errorf("getting cid from label failed: %w", err)
+						}
 
-					var pv1 types.ContractParamsVersion1
-					err = pv1.UnmarshalCBOR(bytes.NewReader(dpc.Params))
-					if err != nil {
-						return fmt.Errorf("params cbor unmarshal failed: %w", err)
-					}
+						rootCid, err := cid.Parse(rootCidStr)
+						if err != nil {
+							return fmt.Errorf("parsing cid failed: %w", err)
+						}
 
-					rootCidStr, err := dpc.Label.ToString()
-					if err != nil {
-						return fmt.Errorf("getting cid from label failed: %w", err)
-					}
+						prop := market.DealProposal{
+							PieceCID:     dpc.PieceCID,
+							PieceSize:    dpc.PieceSize,
+							VerifiedDeal: dpc.VerifiedDeal,
+							Client:       dpc.Client,
+							Provider:     c.maddr,
 
-					rootCid, err := cid.Parse(rootCidStr)
-					if err != nil {
-						return fmt.Errorf("parsing cid failed: %w", err)
-					}
+							Label: dpc.Label,
 
-					prop := market.DealProposal{
-						PieceCID:     dpc.PieceCID,
-						PieceSize:    dpc.PieceSize,
-						VerifiedDeal: dpc.VerifiedDeal,
-						Client:       dpc.Client,
-						Provider:     c.maddr,
+							StartEpoch:           dpc.StartEpoch,
+							EndEpoch:             dpc.EndEpoch,
+							StoragePricePerEpoch: dpc.StoragePricePerEpoch,
 
-						Label: dpc.Label,
+							ProviderCollateral: dpc.ProviderCollateral,
+							ClientCollateral:   dpc.ClientCollateral,
+						}
 
-						StartEpoch:           dpc.StartEpoch,
-						EndEpoch:             dpc.EndEpoch,
-						StoragePricePerEpoch: dpc.StoragePricePerEpoch,
-
-						ProviderCollateral: dpc.ProviderCollateral,
-						ClientCollateral:   dpc.ClientCollateral,
-					}
-
-					proposal := types.DealParams{
-						DealUUID:  uuid.New(),
-						IsOffline: false,
-						ClientDealProposal: market.ClientDealProposal{
-							Proposal: prop,
-							// signature is garbage, but it still needs to serialize, so shouldnt be empty!!
-							ClientSignature: crypto.Signature{
-								Type: crypto.SigTypeBLS,
-								Data: []byte{0xde, 0xad},
+						proposal := types.DealParams{
+							DealUUID:  uuid.New(),
+							IsOffline: false,
+							ClientDealProposal: market.ClientDealProposal{
+								Proposal: prop,
+								// signature is garbage, but it still needs to serialize, so shouldnt be empty!!
+								ClientSignature: crypto.Signature{
+									Type: crypto.SigTypeBLS,
+									Data: []byte{0xde, 0xad},
+								},
 							},
-						},
-						DealDataRoot: rootCid,
-						Transfer: types.Transfer{
-							Type:   "http",
-							Params: []byte(fmt.Sprintf(`{"URL":"%s"}`, pv1.LocationRef)),
-							Size:   pv1.CarSize,
-						},
-						//TODO: maybe add to pv1?? RemoveUnsealedCopy: paramsAndVersion.RemoveUnsealedCopy,
-						RemoveUnsealedCopy: false,
-						SkipIPNIAnnounce:   pv1.SkipIpniAnnounce,
-					}
+							DealDataRoot: rootCid,
+							Transfer: types.Transfer{
+								Type:   "http",
+								Params: []byte(fmt.Sprintf(`{"URL":"%s"}`, pv1.LocationRef)),
+								Size:   pv1.CarSize,
+							},
+							RemoveUnsealedCopy: pv1.RemoveUnsealedCopy,
+							SkipIPNIAnnounce:   pv1.SkipIpniAnnounce,
+						}
 
-					log.Infow("received contract deal proposal", "id", proposal.DealUUID, "client-peer", dpc.Client)
+						log.Infow("received contract deal proposal", "id", proposal.DealUUID, "client-peer", dpc.Client)
 
-					reason, err := c.prov.ExecuteDeal(context.Background(), &proposal, "")
-					if err != nil {
-						log.Warnw("contract deal proposal failed", "id", proposal.DealUUID, "err", err, "reason", reason.Reason)
+						reason, err := c.prov.ExecuteDeal(context.Background(), &proposal, "")
+						if err != nil {
+							log.Warnw("contract deal proposal failed", "id", proposal.DealUUID, "err", err, "reason", reason.Reason)
+							return nil
+						}
+
+						if reason.Accepted {
+							log.Infow("contract deal proposal accepted", "id", proposal.DealUUID)
+						} else {
+							log.Warnw("contract deal proposal rejected", "id", proposal.DealUUID, "err", err, "reason", reason.Reason)
+						}
+
 						return nil
+					}()
+					if err != nil {
+						log.Errorw("handling DealProposalCreate event erred", "err", err)
 					}
-
-					if reason.Accepted {
-						log.Infow("contract deal proposal accepted", "id", proposal.DealUUID)
-					} else {
-						log.Warnw("contract deal proposal rejected", "id", proposal.DealUUID, "err", err, "reason", reason.Reason)
-					}
-
-					return nil
 				}()
-				if err != nil {
-					log.Errorw("handling DealProposalCreate event erred: %w", err)
-				}
 			}
 		}
 	}()
@@ -262,5 +251,68 @@ func lengthPrefixPointsTo(output []byte) (int, int, error) {
 	if size.Cmp(boutputLen) > 0 {
 		return 0, 0, fmt.Errorf("length insufficient %v require %v", boutputLen, size)
 	}
+
 	return int(boffset.Uint64()), int(lengthBig.Uint64()), nil
+}
+
+func (c *ContractDealMonitor) getDealProposal(ctx context.Context, topicContractAddress string, topicDealProposalID string, fromEthAddr ethtypes.EthAddress) ([]byte, error) {
+	// GetDealProposal is a free data retrieval call binding the contract method 0xf4b2e4d8.
+	_params := "0xf4b2e4d8" + topicDealProposalID[2:] // cut 0x prefix
+
+	toEthAddr, err := ethtypes.ParseEthAddress(topicContractAddress)
+	if err != nil {
+		return nil, fmt.Errorf("parsing `to` eth address failed: %w", err)
+	}
+
+	params, err := ethtypes.DecodeHexString(_params)
+	if err != nil {
+		return nil, fmt.Errorf("decoding params failed: %w", err)
+	}
+
+	res, err := c.api.EthCall(ctx, ethtypes.EthCall{
+		From: &fromEthAddr,
+		To:   &toEthAddr,
+		Data: params,
+	}, "latest")
+	if err != nil {
+		return nil, fmt.Errorf("eth call erred: %w", err)
+	}
+
+	begin, length, err := lengthPrefixPointsTo(res)
+	if err != nil {
+		return nil, fmt.Errorf("length prefix points erred: %w", err)
+	}
+
+	return res[begin : begin+length], nil
+}
+
+func (c *ContractDealMonitor) getExtraData(ctx context.Context, topicContractAddress string, topicDealProposalID string, fromEthAddr ethtypes.EthAddress) ([]byte, error) {
+	// GetExtraParams is a free data retrieval call binding the contract method 0x4634aed5.
+	_params := "0x4634aed5" + topicDealProposalID[2:] // cut 0x prefix
+
+	toEthAddr, err := ethtypes.ParseEthAddress(topicContractAddress)
+	if err != nil {
+		return nil, fmt.Errorf("parsing `to` eth address failed: %w", err)
+	}
+
+	params, err := ethtypes.DecodeHexString(_params)
+	if err != nil {
+		return nil, fmt.Errorf("decoding params failed: %w", err)
+	}
+
+	res, err := c.api.EthCall(ctx, ethtypes.EthCall{
+		From: &fromEthAddr,
+		To:   &toEthAddr,
+		Data: params,
+	}, "latest")
+	if err != nil {
+		return nil, fmt.Errorf("eth call erred: %w", err)
+	}
+
+	begin, length, err := lengthPrefixPointsTo(res)
+	if err != nil {
+		return nil, fmt.Errorf("length prefix points erred: %w", err)
+	}
+
+	return res[begin : begin+length], nil
 }

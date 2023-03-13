@@ -72,6 +72,12 @@ func DefaultBoost() *Boost {
 			ServiceName: "boostd",
 		},
 
+		ContractDeals: ContractDealsConfig{
+			Enabled:            false,
+			AllowlistContracts: []string{},
+			From:               "0x0000000000000000000000000000000000000000",
+		},
+
 		Dealmaking: DealmakingConfig{
 			ConsiderOnlineStorageDeals:     true,
 			ConsiderOfflineStorageDeals:    true,
@@ -89,6 +95,7 @@ func DefaultBoost() *Boost {
 
 			DealProposalLogDuration: Duration(time.Hour * 24),
 			RetrievalLogDuration:    Duration(time.Hour * 24),
+			StalledRetrievalTimeout: Duration(time.Minute * 30),
 
 			RetrievalPricing: &lotus_config.RetrievalPricing{
 				Strategy: RetrievalPricingDefaultMode,
