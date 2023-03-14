@@ -352,6 +352,7 @@ require (
 )
 
 require (
+	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/filecoin-project/boostd-data v0.0.0-00010101000000-000000000000
 	github.com/ipfs/go-ds-flatfs v0.5.1
 )
