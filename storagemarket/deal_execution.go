@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -612,7 +613,17 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piecestore")
 
 	// register with dagstore
-	err = stores.RegisterShardSync(ctx, p.dagst, pc, "", true)
+	b := backoff.NewExponentialBackOff()
+	b.MaxInterval = 60 * time.Second
+	b.MaxElapsedTime = 10 * time.Minute
+	err = backoff.Retry(func() error {
+		err = stores.RegisterShardSync(ctx, p.dagst, pc, "", true)
+		if err != nil {
+			log.Warnw("failed to register shard with error: %w Will retry after %d seconds", err, b.NextBackOff()/time.Second)
+			return err
+		}
+		return nil
+	}, b)
 
 	if err != nil {
 		if !errors.Is(err, dagstore.ErrShardExists) {
