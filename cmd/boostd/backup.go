@@ -141,7 +141,7 @@ var backupCmd = &cli.Command{
 			return fmt.Errorf("failed to take metadata backup: %w", err)
 		}
 
-		fl, err := backupmgr.GenerateBkpFileList(bkpDir, true)
+		fl, err := backupmgr.GenerateBkpFileList(lr.Path(), true)
 		if err != nil {
 			return fmt.Errorf("failed to generate list of files to be copied: %w", err)
 		}
@@ -280,7 +280,7 @@ var restoreCmd = &cli.Command{
 			return fmt.Errorf("error creating config directory %s: %w", path.Join(lr.Path(), backupmgr.ConfigDirName), err)
 		}
 
-		fl, err := backupmgr.GenerateBkpFileList(lr.Path(), true)
+		fl, err := backupmgr.GenerateBkpFileList(lb.Path(), true)
 		if err != nil {
 			return fmt.Errorf("failed to generate list of files to be copied: %w", err)
 		}
