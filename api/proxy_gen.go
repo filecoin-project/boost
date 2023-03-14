@@ -51,7 +51,7 @@ type BoostStruct struct {
 
 		BoostDagstoreInitializeShard func(p0 context.Context, p1 string) error `perm:"admin"`
 
-		BoostDagstoreListShards func(p0 context.Context) ([]DagstoreShardInfo, error) `perm:"read"`
+		BoostDagstoreListShards func(p0 context.Context) ([]DagstoreShardInfo, error) `perm:"admin"`
 
 		BoostDagstorePiecesContainingMultihash func(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) `perm:"read"`
 
@@ -68,6 +68,8 @@ type BoostStruct struct {
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
 
 		BoostIndexerListMultihashes func(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) `perm:"admin"`
+
+		BoostMakeDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"write"`
 
 		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
@@ -441,6 +443,17 @@ func (s *BoostStruct) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid
 
 func (s *BoostStub) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) {
 	return *new([]multihash.Multihash), ErrNotSupported
+}
+
+func (s *BoostStruct) BoostMakeDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
+	if s.Internal.BoostMakeDeal == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.BoostMakeDeal(p0, p1)
+}
+
+func (s *BoostStub) BoostMakeDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
+	return nil, ErrNotSupported
 }
 
 func (s *BoostStruct) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) {
