@@ -258,7 +258,7 @@ func (r *RetrievalLog) gcRetrievals(ctx context.Context) {
 				chid := datatransfer.ChannelID{Initiator: row.PeerID, Responder: row.LocalPeerID, ID: row.TransferID}
 				err := r.dataTransfer.CloseDataTransferChannel(ctx, chid)
 				if err != nil {
-					log.Errorw("error canceling retrieval", "dealID", row.DealID, "err", err)
+					log.Debugw("error canceling retrieval", "dealID", row.DealID, "err", err)
 				} else {
 					log.Infof("Canceled retrieval %s, older than %s", row.DealID, r.stalledTimeout)
 				}
