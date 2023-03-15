@@ -78,8 +78,13 @@ func (b *BackupMgr) initBackup(ctx context.Context, dstDir string) error {
 	}
 
 	// Move directory to the backup location
-	if err := os.Rename(bkpDir, path.Join(dstDir, "boost_backup_"+time.Now().Format("20060102150405"))); err != nil {
-		return fmt.Errorf("error moving backup directory %s to %s: %w", bkpDir, dstDir, err)
+	backupDirName := "boost_backup_" + time.Now().Format("20060102150405")
+	if err := os.Rename(bkpDir, path.Join(dstDir, backupDirName)); err != nil {
+		// Try to rename in place if move fails. This would preserve the backup directory and allow user to use the backup
+		if merr := os.Rename(bkpDir, path.Join(os.TempDir(), backupDirName)); merr != nil {
+			return fmt.Errorf("failed to move backup directory and error renaming backup directory %s: %w", bkpDir, merr)
+		}
+		return fmt.Errorf("error moving backup directory %s to %s: %w\nbackup directory saved as %v", bkpDir, dstDir, err, path.Join(os.TempDir(), backupDirName))
 	}
 
 	return nil
