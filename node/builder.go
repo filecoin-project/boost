@@ -538,8 +538,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		//Override(new(dagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
 
 		// TODO: Not sure how to completely get rid of these yet:
-		// Error: creating node: starting node: missing dependencies for function "reflect".makeFuncStub (/usr/local/go/src/reflect/asm_amd64.s:30): missing types: *dagstore.DAGStore; *dagstore.Wrapper (did you mean stores.
-    ?)
+		// Error: creating node: starting node: missing dependencies for function "reflect".makeFuncStub (/usr/local/go/src/reflect/asm_amd64.s:30): missing types: *dagstore.DAGStore; *dagstore.Wrapper (did you mean stores.DAGStoreWrapper?)
 		Override(new(*dagstore.DAGStore), func() *dagstore.DAGStore { return nil }),
 		Override(new(*mdagstore.Wrapper), func() *mdagstore.Wrapper { return nil }),
 
