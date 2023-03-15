@@ -198,8 +198,6 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 			}()
 		}
 	}
-
-	return nil
 }
 
 func (c *ContractDealMonitor) Stop() error {
