@@ -87,7 +87,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 			} else {
 				log.Warnw("contract deal monitor context closed, exiting...", "err", err)
 			}
-			return
+			return nil
 		case resp := <-responseCh:
 			func() {
 				defer func() {
