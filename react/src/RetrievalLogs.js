@@ -68,14 +68,14 @@ function RetrievalLogsContent(props) {
     var res = data.retrievalLogs
     var logs = res.logs
     if (pageNum === 1) {
-        logs.sort((a, b) => b.CreatedAt.getTime() - a.CreatedAt.getTime())
+        logs.sort((a, b) => Number(b.RowID - a.RowID))
         logs = logs.slice(0, rowsPerPage)
     }
     const totalCount = res.totalCount
 
     var cursor = params.cursor
     if (pageNum === 1 && logs.length) {
-        cursor = logs[0].CreatedAt
+        cursor = Number(logs[0].RowID)
     }
 
     var toggleTimestampFormat = () => saveTimestampFormat(!timestampFormat)
@@ -96,7 +96,7 @@ function RetrievalLogsContent(props) {
             <tr>
                 <th onClick={toggleTimestampFormat} className="start">Start</th>
                 <th>Peer ID</th>
-                <th>Deal ID</th>
+                <th>Transfer ID</th>
                 <th>Payload CID</th>
                 <th>Sent</th>
                 <th>Status</th>
@@ -105,7 +105,7 @@ function RetrievalLogsContent(props) {
 
             {logs.map(row => (
                 <TableRow
-                    key={row.CreatedAt}
+                    key={row.RowID}
                     row={row}
                     timestampFormat={timestampFormat}
                     toggleTimestampFormat={toggleTimestampFormat}
@@ -146,16 +146,16 @@ function TableRow(props) {
 
     const copyPeerId = "copy-"+row.CreatedAt+row.PeerID
     const peerIDToClipboard = () => fieldToClipboard(row.PeerID, copyPeerId)
-    const copyDealId = "copy-"+row.CreatedAt+row.DealID
-    const dealIDToClipboard = () => fieldToClipboard(row.DealID, copyPeerId)
+    const copyTransferId = "copy-"+row.CreatedAt+row.TransferID
+    const transferIDToClipboard = () => fieldToClipboard(row.TransferID, copyTransferId)
 
     var status = getDealStatus(row.DTStatus)
-    if (row.DTStatus != status && row.DTStatus != '') {
+    if (row.DTStatus !== status && row.DTStatus !== '') {
         status += ": " + row.DTStatus
     }
     var msg = row.Message
-    if (row.DTMessage != '') {
-        if (msg != '') {
+    if (row.DTMessage !== '') {
+        if (msg !== '') {
             msg += ' - '
         }
         msg += row.DTMessage
@@ -169,10 +169,10 @@ function TableRow(props) {
                 <span id={copyPeerId} className="copy" onClick={peerIDToClipboard} title="Copy peer ID to clipboard"></span>
                 <ShortPeerID peerId={row.PeerID} />
             </td>
-            <td className="deal-id">
-                <span id={copyDealId} className="copy" onClick={dealIDToClipboard} title="Copy deal ID to clipboard"></span>
-                <Link to={basePath+'/'+row.PeerID+'/'+row.DealID}>
-                    {'…'+(row.DealID+'').slice(-8)}
+            <td className="transfer-id">
+                <span id={copyTransferId} className="copy" onClick={transferIDToClipboard} title="Copy transfer ID to clipboard"></span>
+                <Link to={basePath+'/'+row.PeerID+'/'+row.TransferID}>
+                    {'…'+(row.TransferID+'').slice(-8)}
                 </Link>
             </td>
             <td className="payload-cid">

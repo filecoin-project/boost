@@ -218,6 +218,7 @@ type MarketEvent {
 }
 
 type RetrievalState {
+  RowID: Uint64!
   CreatedAt: Time!
   UpdatedAt: Time!
   PeerID: String!
@@ -430,10 +431,10 @@ type RootQuery {
   proposalLogsCount: ProposalLogsCount!
 
   """Get individual retrieval log"""
-  retrievalLog(peerID: String!, dealID: Uint64!): RetrievalState
+  retrievalLog(peerID: String!, transferID: Uint64!): RetrievalState
 
   """Get retrieval logs"""
-  retrievalLogs(cursor: BigInt, offset: Int, limit: Int): RetrievalStateList!
+  retrievalLogs(cursor: Uint64, offset: Int, limit: Int): RetrievalStateList!
 
   """Get the number of retrieval logs"""
   retrievalLogsCount: RetrievalStatesCount!

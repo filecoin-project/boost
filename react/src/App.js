@@ -43,7 +43,7 @@ function App(props) {
                                         <Route path="/proposal-logs/from/:cursor/page/:pageNum" element={<ProposalLogsPage />} />
                                         <Route path="/retrieval-logs" element={<RetrievalLogsPage />} />
                                         <Route path="/retrieval-logs/from/:cursor/page/:pageNum" element={<RetrievalLogsPage />} />
-                                        <Route path="/retrieval-logs/:peerID/:dealID" element={<RetrievalLogDetail />} />
+                                        <Route path="/retrieval-logs/:peerID/:transferID" element={<RetrievalLogDetail />} />
                                         <Route path="/storage-space" element={<StorageSpacePage />} />
                                         <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
                                         <Route path="/funds" element={<FundsPage />} />

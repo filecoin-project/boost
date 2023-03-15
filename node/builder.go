@@ -16,7 +16,6 @@ import (
 	lotus_dealfilter "github.com/filecoin-project/boost/markets/dealfilter"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/markets/retrievaladapter"
-	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	lotus_storageadapter "github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/impl"
@@ -26,6 +25,7 @@ import (
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
+	"github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
@@ -144,6 +144,8 @@ const (
 	HandleMigrateProviderFundsKey
 	HandleDealsKey
 	HandleCreateRetrievalTablesKey
+	HandleSetShardSelector
+	HandleSetRetrievalAskGetter
 	HandleRetrievalEventsKey
 	HandleRetrievalKey
 	HandleRetrievalTransportsKey
@@ -508,8 +510,11 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		// Lotus Markets
-		Override(new(lotus_dtypes.StagingBlockstore), lotus_modules.StagingBlockstore),
-		Override(new(lotus_dtypes.StagingGraphsync), lotus_modules.StagingGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
+		Override(new(lotus_dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
+		Override(new(*modules.ProxyAskGetter), modules.NewAskGetter),
+		Override(new(server.AskGetter), From(new(*modules.ProxyAskGetter))),
+		Override(new(*server.GraphsyncUnpaidRetrieval), modules.Graphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
+		Override(new(lotus_dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
 		Override(new(lotus_dtypes.ProviderPieceStore), lotus_modules.NewProviderPieceStore),
 
 		// Lotus Markets (retrieval deps)
@@ -527,14 +532,17 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
 		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
 		Override(new(stores.DAGStoreWrapper), From(new(*mdagstore.Wrapper))),
+		Override(new(*modules.ShardSelector), modules.NewShardSelector),
 		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore(cfg)),
+		Override(HandleSetShardSelector, modules.SetShardSelectorFunc),
 
 		// Lotus Markets (retrieval)
-		Override(new(mdagstore.SectorAccessor), sectoraccessor.NewSectorAccessor),
+		Override(new(mdagstore.SectorAccessor), modules.NewSectorAccessor(cfg)),
 		Override(new(retrievalmarket.SectorAccessor), From(new(mdagstore.SectorAccessor))),
 		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
 		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
+		Override(HandleSetRetrievalAskGetter, modules.SetAskGetter),
 		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Dealmaking.RetrievalLogDuration), time.Duration(cfg.Dealmaking.StalledRetrievalTimeout))),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
@@ -545,7 +553,6 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(provider.Interface), modules.IndexProvider(cfg.IndexProvider)),
 
 		// Lotus Markets (storage)
-		Override(new(lotus_dtypes.ProviderTransferNetwork), lotus_modules.NewProviderTransferNetwork),
 		Override(new(lotus_dtypes.ProviderTransport), lotus_modules.NewProviderTransport),
 		Override(new(lotus_dtypes.ProviderDataTransfer), modules.NewProviderDataTransfer),
 		Override(new(*storedask.StoredAsk), lotus_modules.NewStorageAsk),

@@ -111,6 +111,8 @@ func DefaultBoost() *Boost {
 			BlockstoreCacheMaxShards: 20, // Match default simultaneous retrievals
 			BlockstoreCacheExpiry:    Duration(30 * time.Second),
 
+			IsUnsealedCacheExpiry: Duration(5 * time.Minute),
+
 			MaxTransferDuration: Duration(24 * 3600 * time.Second),
 
 			RemoteCommp:             false,
