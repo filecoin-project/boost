@@ -3,8 +3,6 @@ package gql
 import (
 	"context"
 	"fmt"
-	"time"
-
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	smfunds "github.com/filecoin-project/boost/storagemarket/funds"
 	"github.com/graph-gophers/graphql-go"
@@ -84,15 +82,9 @@ func (r *resolver) FundsLogs(ctx context.Context, args fundsLogsArgs) (*fundsLog
 		limit = int(*args.Limit.Value)
 	}
 
-	var cursor *time.Time
-	if args.Cursor != nil {
-		val := (*args.Cursor).Int64()
-		asTime := time.Unix(val/1000, (val%1000)*1e6)
-		cursor = &asTime
-	}
-
 	// Fetch one extra log so that we can check if there are more logs
 	// beyond the limit
+	cursor := bigIntToTime(args.Cursor)
 	logs, err := r.fundsDB.Logs(ctx, cursor, offset, limit+1)
 	if err != nil {
 		return nil, fmt.Errorf("getting funds logs: %w", err)

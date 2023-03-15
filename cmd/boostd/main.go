@@ -3,12 +3,11 @@ package main
 import (
 	"os"
 
+	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/cmd"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
-
-	"github.com/filecoin-project/boost/build"
-	"github.com/filecoin-project/boostd-data/shared/cliutil"
 )
 
 var log = logging.Logger("boostd")
@@ -48,8 +47,8 @@ func main() {
 			importDataCmd,
 			logCmd,
 			dagstoreCmd,
-			piecesCmd,
 			netCmd,
+			pieceDirCmd,
 		},
 	}
 	app.Setup()
@@ -66,6 +65,7 @@ func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("modules", "INFO")
 	_ = logging.SetLogLevel("cfg", "INFO")
 	_ = logging.SetLogLevel("boost-storage-deal", "INFO")
+	_ = logging.SetLogLevel("piecedir", "INFO")
 	_ = logging.SetLogLevel("index-provider-wrapper", "INFO")
 
 	if cliutil.IsVeryVerbose {
@@ -78,6 +78,8 @@ func before(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("boost-migrator", "DEBUG")
 		_ = logging.SetLogLevel("dagstore", "DEBUG")
 		_ = logging.SetLogLevel("migrator", "DEBUG")
+		_ = logging.SetLogLevel("piecedir", "DEBUG")
+		_ = logging.SetLogLevel("fxlog", "DEBUG")
 	}
 
 	return nil

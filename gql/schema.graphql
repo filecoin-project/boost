@@ -183,6 +183,17 @@ type PieceStatus {
   PieceInfoDeals: [PieceInfoDeal]!
 }
 
+type FlaggedPieceStatus {
+  CreatedAt: Time!
+  Piece: PieceStatus!
+}
+
+type FlaggedPiecesList {
+  totalCount: Int!
+  pieces: [FlaggedPieceStatus]!
+  more: Boolean!
+}
+
 type ProposalLog {
   DealUUID: ID!
   Accepted: Boolean!
@@ -439,6 +450,9 @@ type RootQuery {
   """Get the number of retrieval logs"""
   retrievalLogsCount: RetrievalStatesCount!
 
+  """Get a list of pieces that have been flagged as having problems"""
+  piecesFlagged(cursor: BigInt, offset: Int, limit: Int): FlaggedPiecesList!
+
   """Get information about a piece from the piece store, DAG store and database"""
   pieceStatus(pieceCid: String!): PieceStatus!
 
@@ -447,6 +461,9 @@ type RootQuery {
 
   """Get the pieces that have a particular root payload CID"""
   piecesWithRootPayloadCid(payloadCid: String!): [String!]!
+
+  """Get the indexes for a particular piece CID"""
+  pieceIndexes(pieceCid: String!): [String!]!
 
   """Get storage space usage"""
   storage: Storage!
@@ -494,6 +511,9 @@ type RootMutation {
 
   """Publish all pending deals now"""
   dealPublishNow: Boolean!
+
+  """Explicitly load the piece data from the sealing subsystem and index it"""
+  pieceBuildIndex(pieceCid: String!): Boolean!
 
   """Top-up the available deal collateral in escrow for deal publishing"""
   fundsMoveToEscrow(amount: BigInt!): Boolean!

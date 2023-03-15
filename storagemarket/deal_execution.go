@@ -13,9 +13,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	transporttypes "github.com/filecoin-project/boost/transport/types"
-	"github.com/filecoin-project/dagstore"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
-	"github.com/filecoin-project/go-fil-markets/stores"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
@@ -109,11 +107,11 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (d
 		}
 		deal.NBytesReceived = fi.Size()
 		p.dealLogger.Infow(deal.DealUuid, "size of "+transferType, "filepath", deal.InboundFilePath, "size", fi.Size())
-	} else {
-		// if the deal has already been handed to the sealer, the inbound file
-		// could already have been removed and in that case, the number of
-		// bytes received should be the same as deal size as we've already
-		// verified the transfer.
+	} else if !deal.IsOffline {
+		// For online deals where the deal has already been handed to the sealer,
+		// the inbound file could already have been removed and in that case,
+		// the number of bytes received should be the same as deal size as
+		// we've already verified the transfer.
 		deal.NBytesReceived = int64(deal.Transfer.Size)
 	}
 
@@ -588,43 +586,23 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 }
 
 func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
+	// add deal to piece metadata store
 	pc := deal.ClientDealProposal.Proposal.PieceCID
-	propCid, err := deal.ClientDealProposal.Proposal.Cid()
-	if err != nil {
-		return &dealMakingError{
-			retry: types.DealRetryFatal,
-			error: fmt.Errorf("index and announce: getting deal proposal cid: %w", err),
-		}
-	}
-
-	// add deal to piecestore
-	if err := p.ps.AddDealForPiece(pc, propCid, piecestore.DealInfo{
-		DealID:   deal.ChainDealID,
-		SectorID: deal.SectorID,
-		Offset:   deal.Offset,
-		Length:   deal.Length,
+	if err := p.piecedirectory.AddDealForPiece(ctx, pc, model.DealInfo{
+		DealUuid:    deal.DealUuid.String(),
+		ChainDealID: deal.ChainDealID,
+		MinerAddr:   p.Address,
+		SectorID:    deal.SectorID,
+		PieceOffset: deal.Offset,
+		PieceLength: deal.Length,
+		CarLength:   uint64(deal.NBytesReceived),
 	}); err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryAuto,
-			error: fmt.Errorf("failed to add deal to piecestore: %w", err),
+			error: fmt.Errorf("failed to add deal to piece metadata store: %w", err),
 		}
 	}
-	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piecestore")
-
-	// register with dagstore
-	err = stores.RegisterShardSync(ctx, p.dagst, pc, "", true)
-
-	if err != nil {
-		if !errors.Is(err, dagstore.ErrShardExists) {
-			return &dealMakingError{
-				retry: types.DealRetryAuto,
-				error: fmt.Errorf("failed to register deal with dagstore: %w", err),
-			}
-		}
-		p.dealLogger.Infow(deal.DealUuid, "deal has previously been registered in dagstore")
-	} else {
-		p.dealLogger.Infow(deal.DealUuid, "deal has successfully been registered in the dagstore")
-	}
+	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piece metadata store")
 
 	// if the index provider is enabled
 	if p.ip.Enabled() {

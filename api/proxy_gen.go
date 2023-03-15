@@ -10,7 +10,6 @@ import (
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
@@ -68,6 +67,8 @@ type BoostStruct struct {
 
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
 
+		BoostIndexerListMultihashes func(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) `perm:"admin"`
+
 		BoostMakeDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"write"`
 
 		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
@@ -124,15 +125,9 @@ type BoostStruct struct {
 
 		MarketSetRetrievalAsk func(p0 context.Context, p1 *retrievalmarket.Ask) error `perm:"admin"`
 
-		PiecesGetCIDInfo func(p0 context.Context, p1 cid.Cid) (*piecestore.CIDInfo, error) `perm:"read"`
+		PdBuildIndexForPieceCid func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
 
-		PiecesGetMaxOffset func(p0 context.Context, p1 cid.Cid) (uint64, error) `perm:"read"`
-
-		PiecesGetPieceInfo func(p0 context.Context, p1 cid.Cid) (*piecestore.PieceInfo, error) `perm:"read"`
-
-		PiecesListCidInfos func(p0 context.Context) ([]cid.Cid, error) `perm:"read"`
-
-		PiecesListPieces func(p0 context.Context) ([]cid.Cid, error) `perm:"read"`
+		PdMarkIndexErrored func(p0 context.Context, p1 cid.Cid, p2 string) error `perm:"admin"`
 
 		RuntimeSubsystems func(p0 context.Context) (lapi.MinerSubsystems, error) `perm:"read"`
 
@@ -437,6 +432,17 @@ func (s *BoostStruct) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 
 func (s *BoostStub) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 	return ErrNotSupported
+}
+
+func (s *BoostStruct) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) {
+	if s.Internal.BoostIndexerListMultihashes == nil {
+		return *new([]multihash.Multihash), ErrNotSupported
+	}
+	return s.Internal.BoostIndexerListMultihashes(p0, p1)
+}
+
+func (s *BoostStub) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) {
+	return *new([]multihash.Multihash), ErrNotSupported
 }
 
 func (s *BoostStruct) BoostMakeDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
@@ -747,59 +753,26 @@ func (s *BoostStub) MarketSetRetrievalAsk(p0 context.Context, p1 *retrievalmarke
 	return ErrNotSupported
 }
 
-func (s *BoostStruct) PiecesGetCIDInfo(p0 context.Context, p1 cid.Cid) (*piecestore.CIDInfo, error) {
-	if s.Internal.PiecesGetCIDInfo == nil {
-		return nil, ErrNotSupported
+func (s *BoostStruct) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) error {
+	if s.Internal.PdBuildIndexForPieceCid == nil {
+		return ErrNotSupported
 	}
-	return s.Internal.PiecesGetCIDInfo(p0, p1)
+	return s.Internal.PdBuildIndexForPieceCid(p0, p1)
 }
 
-func (s *BoostStub) PiecesGetCIDInfo(p0 context.Context, p1 cid.Cid) (*piecestore.CIDInfo, error) {
-	return nil, ErrNotSupported
+func (s *BoostStub) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) error {
+	return ErrNotSupported
 }
 
-func (s *BoostStruct) PiecesGetMaxOffset(p0 context.Context, p1 cid.Cid) (uint64, error) {
-	if s.Internal.PiecesGetMaxOffset == nil {
-		return 0, ErrNotSupported
+func (s *BoostStruct) PdMarkIndexErrored(p0 context.Context, p1 cid.Cid, p2 string) error {
+	if s.Internal.PdMarkIndexErrored == nil {
+		return ErrNotSupported
 	}
-	return s.Internal.PiecesGetMaxOffset(p0, p1)
+	return s.Internal.PdMarkIndexErrored(p0, p1, p2)
 }
 
-func (s *BoostStub) PiecesGetMaxOffset(p0 context.Context, p1 cid.Cid) (uint64, error) {
-	return 0, ErrNotSupported
-}
-
-func (s *BoostStruct) PiecesGetPieceInfo(p0 context.Context, p1 cid.Cid) (*piecestore.PieceInfo, error) {
-	if s.Internal.PiecesGetPieceInfo == nil {
-		return nil, ErrNotSupported
-	}
-	return s.Internal.PiecesGetPieceInfo(p0, p1)
-}
-
-func (s *BoostStub) PiecesGetPieceInfo(p0 context.Context, p1 cid.Cid) (*piecestore.PieceInfo, error) {
-	return nil, ErrNotSupported
-}
-
-func (s *BoostStruct) PiecesListCidInfos(p0 context.Context) ([]cid.Cid, error) {
-	if s.Internal.PiecesListCidInfos == nil {
-		return *new([]cid.Cid), ErrNotSupported
-	}
-	return s.Internal.PiecesListCidInfos(p0)
-}
-
-func (s *BoostStub) PiecesListCidInfos(p0 context.Context) ([]cid.Cid, error) {
-	return *new([]cid.Cid), ErrNotSupported
-}
-
-func (s *BoostStruct) PiecesListPieces(p0 context.Context) ([]cid.Cid, error) {
-	if s.Internal.PiecesListPieces == nil {
-		return *new([]cid.Cid), ErrNotSupported
-	}
-	return s.Internal.PiecesListPieces(p0)
-}
-
-func (s *BoostStub) PiecesListPieces(p0 context.Context) ([]cid.Cid, error) {
-	return *new([]cid.Cid), ErrNotSupported
+func (s *BoostStub) PdMarkIndexErrored(p0 context.Context, p1 cid.Cid, p2 string) error {
+	return ErrNotSupported
 }
 
 func (s *BoostStruct) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystems, error) {

@@ -22,6 +22,8 @@ import (
 	"github.com/filecoin-project/boost/node/impl/common"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/piecedirectory"
+	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -38,7 +40,6 @@ import (
 	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
-	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-state-types/abi"
 	lotus_api "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -77,10 +78,12 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/conngater"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 //nolint:deadcode,varcheck
 var log = logging.Logger("builder")
+var fxlog = logging.Logger("fxlog")
 
 // special is a type used to give keys to modules which
 //
@@ -141,6 +144,7 @@ const (
 
 	// miner
 	GetParamsKey
+	StartPieceDoctorKey
 	HandleMigrateProviderFundsKey
 	HandleDealsKey
 	HandleCreateRetrievalTablesKey
@@ -388,7 +392,9 @@ func New(ctx context.Context, opts ...Option) (StopFunc, error) {
 		fx.Options(ctors...),
 		fx.Options(settings.invokes...),
 
-		fx.NopLogger,
+		fx.WithLogger(func() fxevent.Logger {
+			return &fxevent.ZapLogger{Logger: fxlog.Desugar()}
+		}),
 	)
 
 	// TODO: we probably should have a 'firewall' for Closing signal
@@ -515,7 +521,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(server.AskGetter), From(new(*modules.ProxyAskGetter))),
 		Override(new(*server.GraphsyncUnpaidRetrieval), modules.Graphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
 		Override(new(lotus_dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
-		Override(new(lotus_dtypes.ProviderPieceStore), lotus_modules.NewProviderPieceStore),
+		Override(new(lotus_dtypes.ProviderPieceStore), modules.NewProviderPieceStore),
+		Override(StartPieceDoctorKey, modules.NewPieceDoctor),
 
 		// Lotus Markets (retrieval deps)
 		Override(new(sealer.PieceProvider), sealer.NewPieceProvider),
@@ -528,11 +535,20 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		// DAG Store
-		Override(new(mdagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
-		Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
+		//Override(new(dagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
+
+		// TODO: Not sure how to completely get rid of these yet:
+		// Error: creating node: starting node: missing dependencies for function "reflect".makeFuncStub (/usr/local/go/src/reflect/asm_amd64.s:30): missing types: *dagstore.DAGStore; *dagstore.Wrapper (did you mean stores.
+    ?)
+		Override(new(*dagstore.DAGStore), func() *dagstore.DAGStore { return nil }),
+		Override(new(*mdagstore.Wrapper), func() *mdagstore.Wrapper { return nil }),
+
+		Override(new(pdtypes.Store), modules.NewPieceDirectoryStore(cfg)),
+		Override(new(*piecedirectory.PieceDirectory), modules.NewPieceDirectory(cfg)),
+		Override(DAGStoreKey, modules.NewDAGStoreWrapper),
+		//Override(new(mktsdagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
+		//Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
 		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
-		Override(new(stores.DAGStoreWrapper), From(new(*mdagstore.Wrapper))),
-		Override(new(*modules.ShardSelector), modules.NewShardSelector),
 		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore(cfg)),
 		Override(HandleSetShardSelector, modules.SetShardSelectorFunc),
 
@@ -541,7 +557,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(retrievalmarket.SectorAccessor), From(new(mdagstore.SectorAccessor))),
 		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
 		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
-		Override(new(retrievalmarket.RetrievalProvider), lotus_modules.RetrievalProvider),
+		Override(new(retrievalmarket.RetrievalProvider), modules.RetrievalProvider),
 		Override(HandleSetRetrievalAskGetter, modules.SetAskGetter),
 		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Dealmaking.RetrievalLogDuration), time.Duration(cfg.Dealmaking.StalledRetrievalTimeout))),
 		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),

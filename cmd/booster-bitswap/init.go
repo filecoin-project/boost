@@ -25,10 +25,6 @@ func configureRepo(cfgDir string, createIfNotExist bool) (peer.ID, crypto.PrivKe
 		return "", nil, fmt.Errorf("%s is a required flag", FlagRepo.Name)
 	}
 
-	if err := os.MkdirAll(cfgDir, 0744); err != nil {
-		return "", nil, err
-	}
-
 	peerkey, err := loadPeerKey(cfgDir, createIfNotExist)
 	if err != nil {
 		return "", nil, err
@@ -72,7 +68,9 @@ func loadPeerKey(cfgDir string, createIfNotExists bool) (crypto.PrivKey, error) 
 		return nil, err
 	}
 	if !createIfNotExists {
-		return nil, fmt.Errorf("booster-bitswap has not been initialized. Run the booster-bitswap init command")
+		msg := keyPath + " not found: "
+		msg += "booster-bitswap has not been initialized. Run the booster-bitswap init command"
+		return nil, fmt.Errorf(msg)
 	}
 	log.Infof("Generating new peer key...")
 
@@ -86,6 +84,9 @@ func loadPeerKey(cfgDir string, createIfNotExists bool) (crypto.PrivKey, error) 
 		return nil, err
 	}
 
+	if err := os.MkdirAll(cfgDir, 0744); err != nil {
+		return nil, err
+	}
 	if err := os.WriteFile(keyPath, data, 0600); err != nil {
 		return nil, err
 	}
