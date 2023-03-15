@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	mbig "math/big"
 
@@ -56,9 +57,31 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 		return err
 	}
 
-	subID, err := c.api.EthSubscribe(ctx, subParam)
-	if err != nil {
-		return err
+	type result struct {
+		subID ethtypes.EthSubscriptionID
+		err   error
+	}
+
+	var cres chan result
+	go func() {
+		sub, err := c.api.EthSubscribe(ctx, subParam)
+		cres <- result{
+			sub,
+			err,
+		}
+	}()
+
+	var subID ethtypes.EthSubscriptionID
+
+	select {
+	case <-time.After(30 * time.Second):
+		log.Errorw("contract deal monitor cant subscribe to events, exiting...")
+		return nil
+	case res := <-cres:
+		if res.err != nil {
+			return res.err
+		}
+		subID = res.subID
 	}
 
 	responseCh := make(chan ethtypes.EthSubscriptionResponse, 1)
