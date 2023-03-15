@@ -405,12 +405,16 @@ func HandleContractDeals(c *config.ContractDealsConfig) func(mctx helpers.Metric
 			OnStart: func(ctx context.Context) error {
 				log.Info("contract deals monitor starting")
 
-				err := monitor.Start(ctx)
-				if err != nil {
-					return err
-				}
+				go func() {
+					err := monitor.Start(ctx)
+					if err != nil {
+						log.Errorw("contract deals monitor erred", "err", err)
+						return
+					}
 
-				log.Info("contract deals monitor started")
+					log.Info("contract deals monitor started")
+				}()
+
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
