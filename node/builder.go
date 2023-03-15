@@ -516,6 +516,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		// Lotus Markets
+		Override(new(lotus_dtypes.StagingBlockstore), From(new(*piecedirectory.PieceDirectory))),
 		Override(new(lotus_dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
 		Override(new(*modules.ProxyAskGetter), modules.NewAskGetter),
 		Override(new(server.AskGetter), From(new(*modules.ProxyAskGetter))),
@@ -548,6 +549,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		//Override(new(mktsdagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
 		//Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
 		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
+		Override(new(*modules.ShardSelector), modules.NewShardSelector),
 		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore(cfg)),
 		Override(HandleSetShardSelector, modules.SetShardSelectorFunc),
 
