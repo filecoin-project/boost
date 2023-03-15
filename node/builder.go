@@ -19,9 +19,11 @@ import (
 	lotus_storageadapter "github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/impl"
+	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/node/impl/common"
 	"github.com/filecoin-project/boost/node/modules"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -156,6 +158,7 @@ const (
 	HandleBoostDealsKey
 	HandleContractDealsKey
 	HandleProposalLogCleanerKey
+	HandleOnlineBackupMgrKey
 
 	// daemon
 	ExtractApiKey
@@ -601,6 +604,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(lotus_modules.MinerSealingService), lotus_modules.ConnectSealingService(cfg.SealerApiInfo)),
 
 		Override(new(sealer.StorageAuth), lotus_modules.StorageAuthWithURL(cfg.SectorIndexApiInfo)),
+		Override(new(*backupmgr.BackupMgr), modules.NewOnlineBackupMgr(cfg)),
 
 		// Dynamic Lotus configs
 		Override(new(lotus_dtypes.ConsiderOnlineStorageDealsConfigFunc), lotus_modules.NewConsiderOnlineStorageDealsConfigFunc),
@@ -651,7 +655,7 @@ func BoostAPI(out *api.Boost) Option {
 		),
 
 		func(s *Settings) error {
-			s.nodeType = Boost
+			s.nodeType = repo.Boost
 			return nil
 		},
 
@@ -662,30 +666,4 @@ func BoostAPI(out *api.Boost) Option {
 			return nil
 		},
 	)
-}
-
-var Boost boost
-
-type boost struct{}
-
-func (f boost) Type() string {
-	return "Boost"
-}
-
-func (f boost) Config() interface{} {
-	return config.DefaultBoost()
-}
-
-func (boost) SupportsStagingDeals() {}
-
-func (boost) APIFlags() []string {
-	return []string{"boost-api-url"}
-}
-
-func (boost) RepoFlags() []string {
-	return []string{"boost-repo"}
-}
-
-func (boost) APIInfoEnvVars() (primary string, fallbacks []string, deprecated []string) {
-	return "BOOST_API_INFO", nil, nil
 }

@@ -80,6 +80,8 @@
   * [NetPubsubScores](#netpubsubscores)
   * [NetSetLimit](#netsetlimit)
   * [NetStat](#netstat)
+* [Online](#online)
+  * [OnlineBackup](#onlinebackup)
 * [Pieces](#pieces)
   * [PiecesGetCIDInfo](#piecesgetcidinfo)
   * [PiecesGetMaxOffset](#piecesgetmaxoffset)
@@ -1704,6 +1706,23 @@ Response:
   }
 }
 ```
+
+## Online
+
+
+### OnlineBackup
+There are not yet any comments for this method.
+
+Perms: admin
+
+Inputs:
+```json
+[
+  "string value"
+]
+```
+
+Response: `{}`
 
 ## Pieces
 

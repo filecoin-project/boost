@@ -2,11 +2,12 @@ package db
 
 import (
 	"context"
+	"io/ioutil"
+	"path"
 	"testing"
 	"time"
 
 	"github.com/filecoin-project/boost/db/migrations"
-
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	cborutil "github.com/filecoin-project/go-cbor-util"
@@ -269,4 +270,40 @@ func TestWithSearchFilter(t *testing.T) {
 
 	req.Equal("", where)
 	req.Equal(0, len(whereArgs))
+}
+
+func TestSqlDbBkp(t *testing.T) {
+	req := require.New(t)
+	ctx := context.Background()
+
+	sqldb := CreateTestTmpDB(t)
+	require.NoError(t, CreateAllBoostTables(ctx, sqldb, sqldb))
+	require.NoError(t, migrations.Migrate(sqldb))
+
+	db := NewDealsDB(sqldb)
+	deals, err := GenerateDeals()
+	req.NoError(err)
+
+	for _, deal := range deals {
+		err = db.Insert(ctx, &deal)
+		req.NoError(err)
+	}
+
+	f, err := ioutil.TempFile(t.TempDir(), "*.db")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+
+	dir := t.TempDir()
+	err = SqlBackup(sqldb, dir, "test_db.db")
+	require.NoError(t, err)
+
+	bdb, err := SqlDB(path.Join(dir, "test_db.db"))
+	require.NoError(t, err)
+
+	bkdb := NewDealsDB(bdb)
+
+	dealList, err := bkdb.List(ctx, "", nil, nil, 0, 0)
+	req.NoError(err)
+	req.Len(dealList, len(deals))
+
 }

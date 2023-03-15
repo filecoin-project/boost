@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -85,6 +86,8 @@ type BoostAPI struct {
 	Tracing *tracing.Tracing
 
 	DS lotus_dtypes.MetadataDS
+
+	Bkp *backupmgr.BackupMgr
 
 	ConsiderOnlineStorageDealsConfigFunc        lotus_dtypes.ConsiderOnlineStorageDealsConfigFunc        `optional:"true"`
 	SetConsiderOnlineStorageDealsConfigFunc     lotus_dtypes.SetConsiderOnlineStorageDealsConfigFunc     `optional:"true"`
@@ -509,4 +512,8 @@ func (sm *BoostAPI) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) 
 
 func (sm *BoostAPI) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) {
 	return sm.IndexBackedBlockstore.GetSize(ctx, c)
+}
+
+func (sm *BoostAPI) OnlineBackup(ctx context.Context, dstDir string) error {
+	return sm.Bkp.Backup(ctx, dstDir)
 }

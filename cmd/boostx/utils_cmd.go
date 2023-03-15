@@ -11,8 +11,8 @@ import (
 
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
-	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/filecoin-project/go-fil-markets/stores"
@@ -329,7 +329,7 @@ var generatecarCmd = &cli.Command{
 		ctx := lcli.ReqContext(cctx)
 
 		r := lotus_repo.NewMemory(nil)
-		lr, err := r.Lock(node.Boost)
+		lr, err := r.Lock(repo.Boost)
 		if err != nil {
 			return err
 		}

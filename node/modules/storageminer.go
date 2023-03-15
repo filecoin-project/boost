@@ -17,6 +17,7 @@ import (
 	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	brm "github.com/filecoin-project/boost/retrievalmarket/lib"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -306,7 +307,7 @@ func StorageNetworkName(ctx helpers.MetricsCtx, a v1api.FullNode) (dtypes.Networ
 func NewBoostDB(r lotus_repo.LockedRepo) (*sql.DB, error) {
 	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
-	dbPath := path.Join(r.Path(), "boost.db?cache=shared")
+	dbPath := path.Join(r.Path(), db.DealsDBName+"?cache=shared")
 	return db.SqlDB(dbPath)
 }
 
@@ -317,7 +318,7 @@ type LogSqlDB struct {
 func NewLogsSqlDB(r repo.LockedRepo) (*LogSqlDB, error) {
 	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
-	dbPath := path.Join(r.Path(), "boost.logs.db?cache=shared")
+	dbPath := path.Join(r.Path(), db.LogsDBName+"?cache=shared")
 	d, err := db.SqlDB(dbPath)
 	if err != nil {
 		return nil, err
@@ -678,6 +679,12 @@ func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, erro
 		}
 
 		return &tracing.Tracing{}, nil
+	}
+}
+
+func NewOnlineBackupMgr(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo, ds lotus_dtypes.MetadataDS, dealsDB *sql.DB) *backupmgr.BackupMgr {
+	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo, ds lotus_dtypes.MetadataDS, dealsDB *sql.DB) *backupmgr.BackupMgr {
+		return backupmgr.NewBackupMgr(r, ds, db.DealsDBName, dealsDB)
 	}
 }
 
