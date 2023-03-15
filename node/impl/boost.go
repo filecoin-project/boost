@@ -19,6 +19,7 @@ import (
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	retmarket "github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -71,6 +72,9 @@ type BoostAPI struct {
 	RetrievalProvider retrievalmarket.RetrievalProvider
 	SectorAccessor    retrievalmarket.SectorAccessor
 	DealPublisher     *storageadapter.DealPublisher
+
+	// Graphsync Unpaid Retrieval
+	GraphsyncUnpaidRetrieval *retmarket.GraphsyncUnpaidRetrieval
 
 	// Sealing Pipeline API
 	Sps sealingpipeline.API

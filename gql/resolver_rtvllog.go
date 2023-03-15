@@ -2,8 +2,6 @@ package gql
 
 import (
 	"context"
-	"time"
-
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/graph-gophers/graphql-go"
@@ -12,6 +10,10 @@ import (
 type retrievalStateResolver struct {
 	rtvllog.RetrievalDealState
 	db *rtvllog.RetrievalLogDB
+}
+
+func (r *retrievalStateResolver) RowID() gqltypes.Uint64 {
+	return gqltypes.Uint64(r.RetrievalDealState.RowID)
 }
 
 func (r *retrievalStateResolver) CreatedAt() graphql.Time {
@@ -126,12 +128,12 @@ type retrievalStateListResolver struct {
 }
 
 type retLogArgs struct {
-	PeerID string
-	DealID gqltypes.Uint64
+	PeerID     string
+	TransferID gqltypes.Uint64
 }
 
 func (r *resolver) RetrievalLog(ctx context.Context, args retLogArgs) (*retrievalStateResolver, error) {
-	st, err := r.retDB.Get(ctx, args.PeerID, uint64(args.DealID))
+	st, err := r.retDB.Get(ctx, args.PeerID, uint64(args.TransferID))
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +142,7 @@ func (r *resolver) RetrievalLog(ctx context.Context, args retLogArgs) (*retrieva
 }
 
 type retrievalStatesArgs struct {
-	Cursor *gqltypes.BigInt // CreatedAt in milli-seconds
+	Cursor *gqltypes.Uint64 // database row id
 	Offset graphql.NullInt
 	Limit  graphql.NullInt
 }
@@ -158,11 +160,10 @@ func (r *resolver) RetrievalLogs(ctx context.Context, args retrievalStatesArgs) 
 
 	// Fetch one extra row so that we can check if there are more rows
 	// beyond the limit
-	var cursor *time.Time
+	var cursor *uint64
 	if args.Cursor != nil {
-		val := (*args.Cursor).Int64()
-		asTime := time.Unix(val/1000, (val%1000)*1e6)
-		cursor = &asTime
+		cursorptr := uint64(*args.Cursor)
+		cursor = &cursorptr
 	}
 	rows, err := r.retDB.List(ctx, cursor, offset, limit+1)
 	if err != nil {

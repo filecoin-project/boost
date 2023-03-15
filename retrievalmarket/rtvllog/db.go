@@ -27,6 +27,7 @@ func CreateTables(ctx context.Context, db *sql.DB) error {
 }
 
 type RetrievalDealState struct {
+	RowID                   uint64
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
 	LocalPeerID             peer.ID
@@ -102,33 +103,40 @@ func (d *RetrievalLogDB) Insert(ctx context.Context, l *RetrievalDealState) erro
 	return err
 }
 
-func (d *RetrievalLogDB) Get(ctx context.Context, peerID string, dealID uint64) (*RetrievalDealState, error) {
-	rows, err := d.list(ctx, 0, 0, "PeerID = ? AND DealID = ?", peerID, dealID)
+func (d *RetrievalLogDB) Get(ctx context.Context, peerID string, transferID uint64) (*RetrievalDealState, error) {
+	rows, err := d.list(ctx, 0, 0, "PeerID = ? AND TransferID = ?", peerID, transferID)
 	if err != nil {
 		return nil, err
 	}
 	if len(rows) == 0 {
-		return nil, fmt.Errorf("no retrieval found with peer ID %s and deal ID %d", peerID, dealID)
+		return nil, fmt.Errorf("no retrieval found with peer ID %s and transfer ID %d", peerID, transferID)
 	}
 	return &rows[0], nil
 }
 
-func (d *RetrievalLogDB) List(ctx context.Context, cursor *time.Time, offset int, limit int) ([]RetrievalDealState, error) {
+func (d *RetrievalLogDB) List(ctx context.Context, cursor *uint64, offset int, limit int) ([]RetrievalDealState, error) {
 	where := ""
 	whereArgs := []interface{}{}
 	if cursor != nil {
-		where += "CreatedAt <= ?"
+		where += "RowID <= ?"
 		whereArgs = append(whereArgs, *cursor)
 	}
 	return d.list(ctx, offset, limit, where, whereArgs...)
 }
 
 func (d *RetrievalLogDB) ListLastUpdatedAndOpen(ctx context.Context, lastUpdated time.Time) ([]RetrievalDealState, error) {
-	return d.list(ctx, 0, 0, "UpdatedAt <= ? AND Status != 'DealStatusCompleted' AND Status != 'DealStatusCancelled'", lastUpdated)
+	where := "UpdatedAt <= ?" +
+		"AND Status != 'DealStatusCompleted'" +
+		"AND Status != 'DealStatusCancelled'" +
+		"AND Status != 'DealStatusErrored'" +
+		"AND Status != 'DealStatusRejected'"
+
+	return d.list(ctx, 0, 0, where, lastUpdated)
 }
 
 func (d *RetrievalLogDB) list(ctx context.Context, offset int, limit int, where string, whereArgs ...interface{}) ([]RetrievalDealState, error) {
 	qry := "SELECT " +
+		"RowID, " +
 		"CreatedAt, " +
 		"UpdatedAt, " +
 		"LocalPeerID, " +
@@ -151,7 +159,7 @@ func (d *RetrievalLogDB) list(ctx context.Context, offset int, limit int, where 
 	if where != "" {
 		qry += " WHERE " + where
 	}
-	qry += " ORDER BY CreatedAt desc"
+	qry += " ORDER BY RowID desc"
 
 	args := append([]interface{}{}, whereArgs...)
 	if limit > 0 {
@@ -181,6 +189,7 @@ func (d *RetrievalLogDB) list(ctx context.Context, offset int, limit int, where 
 
 		var dealState RetrievalDealState
 		err := rows.Scan(
+			&dealState.RowID,
 			&dealState.CreatedAt,
 			&dealState.UpdatedAt,
 			&localPeerID,
@@ -259,12 +268,16 @@ func (d *RetrievalLogDB) Update(ctx context.Context, state retrievalmarket.Provi
 		"Message":   state.Message,
 		"UpdatedAt": time.Now(),
 	}
+	where := "PeerID = ? AND DealID = ?"
+	args := []interface{}{state.Receiver.String(), state.DealProposal.ID}
 	if state.ChannelID != nil {
+		where += " AND TransferID = ?"
+		args = append(args, state.ChannelID.ID)
 		fields["TransferID"] = state.ChannelID.ID
 		fields["LocalPeerID"] = state.ChannelID.Responder.String()
 	}
 
-	return d.update(ctx, fields, "PeerID = ? AND DealID = ?", state.Receiver.String(), state.DealProposal.ID)
+	return d.update(ctx, fields, where, args...)
 }
 
 func (d *RetrievalLogDB) UpdateDataTransferState(ctx context.Context, event datatransfer.Event, state datatransfer.ChannelState) error {

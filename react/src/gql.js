@@ -222,8 +222,8 @@ const ProposalLogsCountQuery = gql`
 `;
 
 const RetrievalLogQuery = gql`
-    query AppRetrievalLogQuery($peerID: String!, $dealID: Uint64!) {
-        retrievalLog(peerID: $peerID, dealID: $dealID) {
+    query AppRetrievalLogQuery($peerID: String!, $transferID: Uint64!) {
+        retrievalLog(peerID: $peerID, transferID: $transferID) {
             CreatedAt
             UpdatedAt
             PeerID
@@ -256,9 +256,10 @@ const RetrievalLogQuery = gql`
 `;
 
 const RetrievalLogsListQuery = gql`
-    query AppRetrievalLogsListQuery($cursor: BigInt, $offset: Int, $limit: Int) {
+    query AppRetrievalLogsListQuery($cursor: Uint64, $offset: Int, $limit: Int) {
         retrievalLogs(cursor: $cursor, offset: $offset, limit: $limit) {
             logs {
+                RowID
                 CreatedAt
                 UpdatedAt
                 PeerID
