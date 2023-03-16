@@ -25,6 +25,7 @@ import (
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
+	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -435,7 +436,13 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 
 	// Get the pieces that contain the cid
 	pieces, err := ps.PiecesContainingMultihash(ctx, c.Hash())
+
+	// Check if it's an identity cid, if it is, return its digest
 	if err != nil {
+		digest, ok, err := isIdentity(c)
+		if err == nil && ok {
+			return digest, nil
+		}
 		return nil, fmt.Errorf("getting pieces containing cid %s: %w", c, err)
 	}
 	if len(pieces) == 0 {
@@ -616,4 +623,14 @@ func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, id abi.Sect
 	}
 
 	return r, nil
+}
+
+func isIdentity(c cid.Cid) (digest []byte, ok bool, err error) {
+	dmh, err := multihash.Decode(c.Hash())
+	if err != nil {
+		return nil, false, err
+	}
+	ok = dmh.Code == multihash.IDENTITY
+	digest = dmh.Digest
+	return digest, ok, nil
 }
