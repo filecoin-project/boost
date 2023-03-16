@@ -516,7 +516,6 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		// Lotus Markets
-		Override(new(lotus_dtypes.StagingBlockstore), From(new(*piecedirectory.PieceDirectory))),
 		Override(new(lotus_dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
 		Override(new(*modules.ProxyAskGetter), modules.NewAskGetter),
 		Override(new(server.AskGetter), From(new(*modules.ProxyAskGetter))),
