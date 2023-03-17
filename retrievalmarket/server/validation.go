@@ -127,9 +127,11 @@ func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *retrievalmark
 		return fmt.Errorf("retrieval ask price is not configured")
 	}
 
-	if !ask.UnsealPrice.IsZero() || !ask.PricePerByte.IsZero() {
-		return fmt.Errorf("request for unpaid retrieval but ask price is non-zero: %d unseal / %d per byte",
-			ask.UnsealPrice, ask.PricePerByte)
+	// Check if the price per byte is non-zero.
+	// Note that we don't check the unseal price, because we only serve
+	// unsealed copies, so the unseal price is irrelevant.
+	if !ask.PricePerByte.IsZero() {
+		return fmt.Errorf("request for unpaid retrieval but ask price is non-zero: %d per byte", ask.PricePerByte)
 	}
 	if err != nil {
 		return err

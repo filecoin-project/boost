@@ -84,13 +84,14 @@ func TestGS(t *testing.T) {
 		expectErr:       true,
 		expectRejection: "ask price is non-zero",
 	}, {
+		// Note: we disregard the unseal price because we only serve deals
+		// with an unsealed piece, so the unseal price is irrelevant.
+		// Therefore the retrieval should succeed for non-zero unseal price.
 		name: "request for non-zero unseal price",
 		ask: &retrievalmarket.Ask{
 			UnsealPrice:  abi.NewTokenAmount(1),
 			PricePerByte: abi.NewTokenAmount(0),
 		},
-		expectErr:       true,
-		expectRejection: "ask price is non-zero",
 	}, {
 		name: "cancel request after sending 2 blocks",
 		watch: func(client retrievalmarket.RetrievalClient, gsupr *GraphsyncUnpaidRetrieval) {
