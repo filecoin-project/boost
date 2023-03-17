@@ -88,5 +88,4 @@ type ProviderPieceStore piecestore.PieceStore
 
 type ProviderRequestValidator *requestvalidation.UnifiedRequestValidator
 
-type StagingBlockstore blockstore.BasicBlockstore
 type StagingGraphsync graphsync.GraphExchange

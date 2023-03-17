@@ -4,26 +4,33 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/piecestore"
-	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
-	"github.com/filecoin-project/boostd-data/svc/types"
-	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-address"
+	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
+	"github.com/filecoin-project/go-fil-markets/piecestore"
+	piecestoreimpl "github.com/filecoin-project/go-fil-markets/piecestore/impl"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-statemachine/fsm"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/filecoin-project/lotus/lib/backupds"
 	"github.com/filecoin-project/lotus/node/modules"
+	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipld/go-car/v2/index"
 	"github.com/mitchellh/go-homedir"
 	"github.com/multiformats/go-multicodec"
@@ -37,19 +44,16 @@ import (
 type StoreMigrationApi interface {
 	Start(ctx context.Context) error
 	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
-	GetIndex(context.Context, cid.Cid) (<-chan types.IndexRecord, error)
-	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) <-chan types.AddIndexProgress
+	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error
 	AddDealForPiece(ctx context.Context, pcid cid.Cid, info model.DealInfo) error
 	ListPieces(ctx context.Context) ([]cid.Cid, error)
 	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
-	GetPieceDeals(context.Context, cid.Cid) ([]model.DealInfo, error)
 }
 
 var desc = "It is recommended to do the dagstore migration while boost is running. " +
 	"The dagstore migration may take several hours. It is safe to stop and restart " +
 	"the process. It will continue from where it was stopped.\n" +
-	"The pieceinfo migration must be done after boost has been shut down. " +
-	"It takes a few minutes."
+	"The pieceinfo migration must be done after boost has been shut down."
 
 func checkMigrateType(migrateType string) error {
 	if migrateType != "dagstore" && migrateType != "pieceinfo" {
@@ -101,26 +105,39 @@ var migrateLevelDBCmd = &cli.Command{
 	},
 }
 
-var migrateYugabyteDBCmd = &cli.Command{
-	Name:        "yugabyte",
-	Description: "Migrate boost piece information and dagstore to a yugabyte store\n" + desc,
-	Usage:       "migrate-lid yugabyte dagstore|pieceinfo",
+var migrateCouchDBCmd = &cli.Command{
+	Name:        "couchbase",
+	Description: "Migrate boost piece information and dagstore to a couchbase store\n" + desc,
+	Usage:       "migrate-lid couchbase dagstore|pieceinfo",
 	Before:      before,
 	Flags: append(commonFlags, []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:     "hosts",
-			Usage:    "yugabyte hosts to connect to over cassandra interface eg '127.0.0.1'",
+		&cli.StringFlag{
+			Name:     "connect-string",
+			Usage:    "couchbase connect string eg 'couchbase://127.0.0.1'",
 			Required: true,
 		},
 		&cli.StringFlag{
-			Name:     "connect-string",
-			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
+			Name:     "username",
 			Required: true,
 		},
-		&cli.IntFlag{
-			Name:  "insert-parallelism",
-			Usage: "the number of threads to use when inserting into the PayloadToPieces index",
-			Value: 16,
+		&cli.StringFlag{
+			Name:     "password",
+			Required: true,
+		},
+		&cli.Uint64Flag{
+			Name:  "piece-meta-ram-quota-mb",
+			Usage: "megabytes of ram allocated to piece metadata couchbase bucket (recommended at least 1024)",
+			Value: 1024,
+		},
+		&cli.Uint64Flag{
+			Name:  "mh-pieces-ram-quota-mb",
+			Usage: "megabytes of ram allocated to multihash to piece cid couchbase bucket (recommended at least 1024)",
+			Value: 1024,
+		},
+		&cli.Uint64Flag{
+			Name:  "piece-offsets-ram-quota-mb",
+			Usage: "megabytes of ram allocated to piece offsets couchbase bucket (recommended at least 1024)",
+			Value: 1024,
 		},
 	}...),
 	Action: func(cctx *cli.Context) error {
@@ -135,15 +152,26 @@ var migrateYugabyteDBCmd = &cli.Command{
 			return err
 		}
 
-		// Create a connection to the yugabyte local index directory
-		settings := yugabyte.DBSettings{
-			Hosts:                    cctx.StringSlice("hosts"),
-			ConnectString:            cctx.String("connect-string"),
-			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
+		// Create a connection to the couchbase local index directory
+		settings := couchbase.DBSettings{
+			ConnectString: cctx.String("connect-string"),
+			Auth: couchbase.DBSettingsAuth{
+				Username: cctx.String("username"),
+				Password: cctx.String("password"),
+			},
+			PieceMetadataBucket: couchbase.DBSettingsBucket{
+				RAMQuotaMB: cctx.Uint64("piece-meta-ram-quota-mb"),
+			},
+			MultihashToPiecesBucket: couchbase.DBSettingsBucket{
+				RAMQuotaMB: cctx.Uint64("mh-pieces-ram-quota-mb"),
+			},
+			PieceOffsetsBucket: couchbase.DBSettingsBucket{
+				RAMQuotaMB: cctx.Uint64("piece-offsets-ram-quota-mb"),
+			},
 		}
 
-		store := yugabyte.NewStore(settings)
-		return migrate(cctx, "yugabyte", store, migrateType)
+		store := couchbase.NewStore(settings)
+		return migrate(cctx, "couchbase", store, migrateType)
 	},
 }
 
@@ -304,11 +332,9 @@ func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, f
 
 	// Add the index to the store
 	addStart := time.Now()
-	respch := store.AddIndex(ctx, pieceCid, records, false)
-	for resp := range respch {
-		if resp.Err != "" {
-			return false, fmt.Errorf("adding index %s to store: %s", ipath.path, err)
-		}
+	err = store.AddIndex(ctx, pieceCid, records, false)
+	if err != nil {
+		return false, fmt.Errorf("adding index %s to store: %w", ipath.path, err)
 	}
 	log.Debugw("AddIndex", "took", time.Since(addStart).String())
 
@@ -317,7 +343,7 @@ func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, f
 
 func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store StoreMigrationApi) (int, error) {
 	// Open the datastore in the existing repo
-	ds, err := lib.OpenDataStore(repoDir)
+	ds, err := openDataStore(repoDir)
 	if err != nil {
 		return 0, fmt.Errorf("creating piece store from repo %s: %w", repoDir, err)
 	}
@@ -334,12 +360,12 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 	// Create a mapping of on-chain deal ID to deal proposal cid.
 	// This is needed below so that we can map from the legacy piece store
 	// info to a legacy deal.
-	propCidByChainDealID, err := lib.GetPropCidByChainDealID(ctx, ds)
+	propCidByChainDealID, err := getPropCidByChainDealID(ctx, ds)
 	if err != nil {
 		return 0, fmt.Errorf("building chain deal id -> proposal cid map: %w", err)
 	}
 
-	ps, err := lib.OpenPieceStore(ctx, ds)
+	ps, err := openPieceStore(ctx, ds)
 	if err != nil {
 		return 0, fmt.Errorf("opening piece store: %w", err)
 	}
@@ -454,6 +480,81 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 	return errorCount, nil
 }
 
+func getPropCidByChainDealID(ctx context.Context, ds *backupds.Datastore) (map[abi.DealID]cid.Cid, error) {
+	deals, err := getLegacyDealsFSM(ctx, ds)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build a mapping of chain deal ID to proposal CID
+	var list []storagemarket.MinerDeal
+	if err := deals.List(&list); err != nil {
+		return nil, err
+	}
+
+	byChainDealID := make(map[abi.DealID]cid.Cid, len(list))
+	for _, d := range list {
+		if d.DealID != 0 {
+			byChainDealID[d.DealID] = d.ProposalCid
+		}
+	}
+
+	return byChainDealID, nil
+}
+
+func getLegacyDealsFSM(ctx context.Context, ds *backupds.Datastore) (fsm.Group, error) {
+	// Get the deals FSM
+	provDS := namespace.Wrap(ds, datastore.NewKey("/deals/provider"))
+	deals, migrate, err := vfsm.NewVersionedFSM(provDS, fsm.Parameters{
+		StateType:     storagemarket.MinerDeal{},
+		StateKeyField: "State",
+	}, nil, "2")
+	if err != nil {
+		return nil, fmt.Errorf("reading legacy deals from datastore: %w", err)
+	}
+
+	err = migrate(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("running provider fsm migration script: %w", err)
+	}
+
+	return deals, err
+}
+
+func openDataStore(path string) (*backupds.Datastore, error) {
+	ctx := context.Background()
+
+	rpo, err := repo.NewFS(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not open repo %s: %w", path, err)
+	}
+
+	exists, err := rpo.Exists()
+	if err != nil {
+		return nil, fmt.Errorf("checking repo %s exists: %w", path, err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("repo does not exist: %s", path)
+	}
+
+	lr, err := rpo.Lock(repo.StorageMiner)
+	if err != nil {
+		return nil, fmt.Errorf("locking repo %s: %w", path, err)
+	}
+
+	mds, err := lr.Datastore(ctx, "/metadata")
+	if err != nil {
+		return nil, err
+	}
+
+	bds, err := backupds.Wrap(mds, "")
+	if err != nil {
+		return nil, fmt.Errorf("opening backupds: %w", err)
+	}
+
+	return bds, nil
+}
+
 func getRecords(subject index.Index) ([]model.Record, error) {
 	records := make([]model.Record, 0)
 
@@ -488,7 +589,7 @@ type idxPath struct {
 }
 
 func getIndexPaths(pathDir string) ([]idxPath, error) {
-	files, err := os.ReadDir(pathDir)
+	files, err := ioutil.ReadDir(pathDir)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +636,7 @@ var migrateReverseCmd = &cli.Command{
 	Usage: "Do a reverse migration from the local index directory back to the legacy format",
 	Subcommands: []*cli.Command{
 		migrateReverseLeveldbCmd,
-		migrateReverseYugabyteCmd,
+		migrateReverseCouchbaseCmd,
 	},
 }
 
@@ -548,29 +649,27 @@ var migrateReverseLeveldbCmd = &cli.Command{
 	},
 }
 
-var migrateReverseYugabyteCmd = &cli.Command{
-	Name:   "yugabyte",
-	Usage:  "Reverse migrate a yugabyte local index directory",
+var migrateReverseCouchbaseCmd = &cli.Command{
+	Name:   "couchbase",
+	Usage:  "Reverse migrate a couchbase local index directory",
 	Before: before,
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:     "hosts",
-			Usage:    "yugabyte hosts to connect to over cassandra interface eg '127.0.0.1'",
+		&cli.StringFlag{
+			Name:     "connect-string",
+			Usage:    "couchbase connect string eg 'couchbase://127.0.0.1'",
 			Required: true,
 		},
 		&cli.StringFlag{
-			Name:     "connect-string",
-			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
+			Name:     "username",
 			Required: true,
 		},
-		&cli.IntFlag{
-			Name:  "insert-parallelism",
-			Usage: "the number of threads to use when inserting into the PayloadToPieces index",
-			Value: 16,
+		&cli.StringFlag{
+			Name:     "password",
+			Required: true,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		return migrateReverse(cctx, "yugabyte")
+		return migrateReverse(cctx, "couchbase")
 	},
 }
 
@@ -589,7 +688,7 @@ func migrateReverse(cctx *cli.Context, dbType string) error {
 		return err
 	}
 
-	// Get a leveldb / yugabyte store
+	// Get a leveldb / couchbase store
 	var store StoreMigrationApi
 	if dbType == "leveldb" {
 		// Create a connection to the leveldb store
@@ -599,13 +698,16 @@ func migrateReverse(cctx *cli.Context, dbType string) error {
 		}
 		store = ldb.NewStore(ldbRepoPath)
 	} else {
-		// Create a connection to the yugabyte local index directory
-		settings := yugabyte.DBSettings{
-			ConnectString:            cctx.String("connect-string"),
-			Hosts:                    cctx.StringSlice("hosts"),
-			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
+		// Create a connection to the couchbase local index directory
+		settings := couchbase.DBSettings{
+			ConnectString: cctx.String("connect-string"),
+			Auth: couchbase.DBSettingsAuth{
+				Username: cctx.String("username"),
+				Password: cctx.String("password"),
+			},
 		}
-		store = yugabyte.NewStore(settings)
+
+		store = couchbase.NewStore(settings)
 	}
 
 	// Perform the reverse migration
@@ -637,13 +739,13 @@ func migrateDBReverse(cctx *cli.Context, repoDir string, dbType string, pieceDir
 	logger.Infof("starting migration of %d piece infos from %s local index directory to piece store", len(pcids), dbType)
 
 	// Open the datastore
-	ds, err := lib.OpenDataStore(repoDir)
+	ds, err := openDataStore(repoDir)
 	if err != nil {
 		return fmt.Errorf("creating datastore from repo %s: %w", repoDir, err)
 	}
 
 	// Open the Piece Store
-	ps, err := lib.OpenPieceStore(ctx, ds)
+	ps, err := openPieceStore(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("opening piece store: %w", err)
 	}
@@ -722,6 +824,36 @@ func migrateReversePiece(ctx context.Context, pieceCid cid.Cid, pieceDir StoreMi
 	}
 
 	return migrated, nil
+}
+
+func openPieceStore(ctx context.Context, ds *backupds.Datastore) (piecestore.PieceStore, error) {
+	// Open the piece store
+	ps, err := piecestoreimpl.NewPieceStore(namespace.Wrap(ds, datastore.NewKey("/storagemarket")))
+	if err != nil {
+		return nil, fmt.Errorf("creating piece store from datastore : %w", err)
+	}
+
+	// Wait for the piece store to be ready
+	ch := make(chan error, 1)
+	ps.OnReady(func(e error) {
+		ch <- e
+	})
+
+	err = ps.Start(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("starting piece store: %w", err)
+	}
+
+	select {
+	case err = <-ch:
+		if err != nil {
+			return nil, fmt.Errorf("waiting for piece store to be ready: %w", err)
+		}
+	case <-ctx.Done():
+		return nil, errors.New("cancelled while waiting for piece store to be ready")
+	}
+
+	return ps, nil
 }
 
 func createLogger(logPath string) (*zap.SugaredLogger, error) {

@@ -12,6 +12,8 @@ import (
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/crypto"
@@ -67,10 +69,6 @@ type BoostStruct struct {
 		BoostDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
-
-		BoostIndexerAnnounceLatest func(p0 context.Context) (cid.Cid, error) `perm:"admin"`
-
-		BoostIndexerAnnounceLatestHttp func(p0 context.Context, p1 []string) (cid.Cid, error) `perm:"admin"`
 
 		BoostIndexerListMultihashes func(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) `perm:"admin"`
 
@@ -133,6 +131,8 @@ type BoostStruct struct {
 		OnlineBackup func(p0 context.Context, p1 string) error `perm:"admin"`
 
 		PdBuildIndexForPieceCid func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
+
+		PdMarkIndexErrored func(p0 context.Context, p1 cid.Cid, p2 string) error `perm:"admin"`
 
 		RuntimeSubsystems func(p0 context.Context) (lapi.MinerSubsystems, error) `perm:"read"`
 
@@ -439,28 +439,6 @@ func (s *BoostStruct) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 
 func (s *BoostStub) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 	return ErrNotSupported
-}
-
-func (s *BoostStruct) BoostIndexerAnnounceLatest(p0 context.Context) (cid.Cid, error) {
-	if s.Internal.BoostIndexerAnnounceLatest == nil {
-		return *new(cid.Cid), ErrNotSupported
-	}
-	return s.Internal.BoostIndexerAnnounceLatest(p0)
-}
-
-func (s *BoostStub) BoostIndexerAnnounceLatest(p0 context.Context) (cid.Cid, error) {
-	return *new(cid.Cid), ErrNotSupported
-}
-
-func (s *BoostStruct) BoostIndexerAnnounceLatestHttp(p0 context.Context, p1 []string) (cid.Cid, error) {
-	if s.Internal.BoostIndexerAnnounceLatestHttp == nil {
-		return *new(cid.Cid), ErrNotSupported
-	}
-	return s.Internal.BoostIndexerAnnounceLatestHttp(p0, p1)
-}
-
-func (s *BoostStub) BoostIndexerAnnounceLatestHttp(p0 context.Context, p1 []string) (cid.Cid, error) {
-	return *new(cid.Cid), ErrNotSupported
 }
 
 func (s *BoostStruct) BoostIndexerListMultihashes(p0 context.Context, p1 cid.Cid) ([]multihash.Multihash, error) {
@@ -801,6 +779,17 @@ func (s *BoostStruct) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) er
 }
 
 func (s *BoostStub) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) error {
+	return ErrNotSupported
+}
+
+func (s *BoostStruct) PdMarkIndexErrored(p0 context.Context, p1 cid.Cid, p2 string) error {
+	if s.Internal.PdMarkIndexErrored == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.PdMarkIndexErrored(p0, p1, p2)
+}
+
+func (s *BoostStub) PdMarkIndexErrored(p0 context.Context, p1 cid.Cid, p2 string) error {
 	return ErrNotSupported
 }
 

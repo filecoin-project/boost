@@ -2,45 +2,486 @@ package svc
 
 import (
 	"context"
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/stretchr/testify/require"
+	"encoding/hex"
+	"fmt"
+	"math/rand"
+	"os"
 	"testing"
 	"time"
+
+	"golang.org/x/sync/errgroup"
+
+	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/boostd-data/client"
+	"github.com/filecoin-project/boostd-data/couchbase"
+	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipld/go-car/v2"
+	"github.com/ipld/go-car/v2/index"
+	"github.com/multiformats/go-multicodec"
+	"github.com/multiformats/go-multihash"
+	"github.com/stretchr/testify/require"
 )
 
-func TestServiceLevelDB(t *testing.T) {
-	_ = logging.SetLogLevel("cbtest", "debug")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	bdsvc, err := NewLevelDB("")
-	require.NoError(t, err)
-
-	testService(ctx, t, bdsvc, "localhost:0")
+var testCouchSettings = couchbase.DBSettings{
+	ConnectString: "couchbase://localhost",
+	Auth: couchbase.DBSettingsAuth{
+		Username: "Administrator",
+		Password: "boostdemo",
+	},
+	PieceMetadataBucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	MultihashToPiecesBucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	PieceOffsetsBucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	TestMode: true,
 }
 
-func TestServiceFuzzLevelDB(t *testing.T) {
+func TestService(t *testing.T) {
+	_ = logging.SetLogLevel("*", "debug")
+
+	t.Run("leveldb", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		bdsvc, err := NewLevelDB("")
+		require.NoError(t, err)
+		testService(ctx, t, bdsvc, 8042)
+	})
+	t.Run("couchbase", func(t *testing.T) {
+		// TODO: Unskip this test once the couchbase instance can be created
+		//  from a docker container in CI as part of the test
+		t.Skip()
+		// Running couchbase tests may require download the docker container
+		// so set a high timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		SetupCouchbase(t, testCouchSettings)
+		bdsvc := NewCouchbase(testCouchSettings)
+		testService(ctx, t, bdsvc, 8043)
+	})
+}
+
+func testService(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
+	err := bdsvc.Start(ctx, port)
+	require.NoError(t, err)
+
+	cl := client.NewStore()
+	err = cl.Dial(context.Background(), fmt.Sprintf("http://localhost:%d", port))
+	require.NoError(t, err)
+	defer cl.Close(ctx)
+
+	sampleidx := "fixtures/baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka.full.idx"
+
+	pieceCid, err := cid.Parse("baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka")
+	require.NoError(t, err)
+
+	subject, err := loadIndex(sampleidx)
+	require.NoError(t, err)
+
+	records, err := getRecords(subject)
+	require.NoError(t, err)
+
+	randomuuid, err := uuid.Parse("4d8f5ce6-dbfd-40dc-8b03-29308e97357b")
+	require.NoError(t, err)
+
+	err = cl.AddIndex(ctx, pieceCid, records, true)
+	require.NoError(t, err)
+
+	di := model.DealInfo{
+		DealUuid:    randomuuid.String(),
+		SectorID:    abi.SectorNumber(1),
+		PieceOffset: 1,
+		PieceLength: 2,
+		CarLength:   3,
+	}
+
+	// Add a deal for the piece
+	err = cl.AddDealForPiece(ctx, pieceCid, di)
+	require.NoError(t, err)
+
+	// Add the same deal a second time to test uniqueness
+	err = cl.AddDealForPiece(ctx, pieceCid, di)
+	require.NoError(t, err)
+
+	// There should only be one deal
+	dis, err := cl.GetPieceDeals(ctx, pieceCid)
+	require.NoError(t, err)
+	require.Len(t, dis, 1)
+	require.Equal(t, di, dis[0])
+
+	b, err := hex.DecodeString("1220ff63d7689e2d9567d1a90a7a68425f430137142e1fbc28fe4780b9ee8a5ef842")
+	require.NoError(t, err)
+
+	mhash, err := multihash.Cast(b)
+	require.NoError(t, err)
+
+	offset, err := cl.GetOffsetSize(ctx, pieceCid, mhash)
+	require.NoError(t, err)
+	require.EqualValues(t, 3039040395, offset.Offset)
+	require.EqualValues(t, 0, offset.Size)
+
+	pcids, err := cl.PiecesContainingMultihash(ctx, mhash)
+	require.NoError(t, err)
+	require.Len(t, pcids, 1)
+	require.Equal(t, pieceCid, pcids[0])
+
+	allPieceCids, err := cl.ListPieces(ctx)
+	require.NoError(t, err)
+	require.Len(t, allPieceCids, 1)
+	require.Equal(t, pieceCid, allPieceCids[0])
+
+	indexed, err := cl.IsIndexed(ctx, pieceCid)
+	require.NoError(t, err)
+	require.True(t, indexed)
+
+	recs, err := cl.GetRecords(ctx, pieceCid)
+	require.NoError(t, err)
+	require.Equal(t, len(records), len(recs))
+
+	loadedSubject, err := cl.GetIndex(ctx, pieceCid)
+	require.NoError(t, err)
+
+	ok, err := compareIndices(subject, loadedSubject)
+	require.NoError(t, err)
+	require.True(t, ok)
+}
+
+func TestServiceFuzz(t *testing.T) {
 	t.Skip()
 	_ = logging.SetLogLevel("*", "info")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	bdsvc, err := NewLevelDB("")
-	require.NoError(t, err)
-	addr := "localhost:0"
-	ln, err := bdsvc.Start(ctx, addr)
-	require.NoError(t, err)
-	testServiceFuzz(ctx, t, ln.String())
+	t.Run("level db", func(t *testing.T) {
+		bdsvc, err := NewLevelDB("")
+		require.NoError(t, err)
+		testServiceFuzz(ctx, t, bdsvc, 8042)
+	})
+	t.Run("couchbase", func(t *testing.T) {
+		// TODO: Unskip this test once the couchbase instance can be created
+		//  from a docker container in CI as part of the test
+		t.Skip()
+		SetupCouchbase(t, testCouchSettings)
+		bdsvc := NewCouchbase(testCouchSettings)
+		testServiceFuzz(ctx, t, bdsvc, 8043)
+	})
 }
 
-func TestCleanupLevelDB(t *testing.T) {
+func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
+	err := bdsvc.Start(ctx, port)
+	require.NoError(t, err)
+
+	cl := client.NewStore()
+	err = cl.Dial(context.Background(), "http://localhost:8042")
+	require.NoError(t, err)
+	defer cl.Close(ctx)
+
+	var idxs []index.Index
+	for i := 0; i < 10; i++ {
+		size := (5 + (i % 3)) << 20
+		idxs = append(idxs, createCarIndex(t, size, i+1))
+	}
+
+	throttle := make(chan struct{}, 64)
+	var eg errgroup.Group
+	for _, idx := range idxs {
+		idx := idx
+		eg.Go(func() error {
+			records, err := getRecords(idx)
+			require.NoError(t, err)
+
+			randomuuid := uuid.New()
+			pieceCid := testutil.GenerateCid()
+			err = cl.AddIndex(ctx, pieceCid, records, true)
+			require.NoError(t, err)
+
+			di := model.DealInfo{
+				DealUuid:    randomuuid.String(),
+				SectorID:    abi.SectorNumber(1),
+				PieceOffset: 1,
+				PieceLength: 2,
+				CarLength:   3,
+			}
+
+			err = cl.AddDealForPiece(ctx, pieceCid, di)
+			require.NoError(t, err)
+
+			dis, err := cl.GetPieceDeals(ctx, pieceCid)
+			require.NoError(t, err)
+			require.Len(t, dis, 1)
+			require.Equal(t, di, dis[0])
+
+			indexed, err := cl.IsIndexed(ctx, pieceCid)
+			require.NoError(t, err)
+			require.True(t, indexed)
+
+			recs, err := cl.GetRecords(ctx, pieceCid)
+			require.NoError(t, err)
+			require.Equal(t, len(records), len(recs))
+
+			var offsetEG errgroup.Group
+			for _, r := range recs {
+				if rand.Float32() > 0.1 {
+					continue
+				}
+
+				idx := idx
+				c := r.Cid
+				throttle <- struct{}{}
+				offsetEG.Go(func() error {
+					defer func() { <-throttle }()
+
+					mhash := c.Hash()
+					var err error
+					err1 := idx.GetAll(c, func(expected uint64) bool {
+						var offsetSize *model.OffsetSize
+						offsetSize, err = cl.GetOffsetSize(ctx, pieceCid, mhash)
+						if err != nil {
+							return false
+						}
+						if expected != offsetSize.Offset {
+							err = fmt.Errorf("cid %s: expected offset %d, got offset %d", c, expected, offsetSize.Offset)
+							return false
+						}
+						return true
+					})
+					if err != nil {
+						return err
+					}
+					if err1 != nil {
+						return err1
+					}
+
+					pcids, err := cl.PiecesContainingMultihash(ctx, mhash)
+					if err != nil {
+						return err
+					}
+					if len(pcids) != 1 {
+						return fmt.Errorf("expected 1 piece, got %d", len(pcids))
+					}
+					if pieceCid != pcids[0] {
+						return fmt.Errorf("expected piece %s, got %s", pieceCid, pcids[0])
+					}
+					return nil
+				})
+			}
+			err = offsetEG.Wait()
+			require.NoError(t, err)
+
+			loadedSubject, err := cl.GetIndex(ctx, pieceCid)
+			require.NoError(t, err)
+
+			ok, err := compareIndices(idx, loadedSubject)
+			require.NoError(t, err)
+			require.True(t, ok)
+
+			return nil
+		})
+	}
+
+	err = eg.Wait()
+	require.NoError(t, err)
+}
+
+func createCarIndex(t *testing.T, size int, rseed int) index.Index {
+	// Create a CAR file
+	randomFilePath, err := testutil.CreateRandomFile(t.TempDir(), rseed, size)
+	require.NoError(t, err)
+	_, carFilePath, err := testutil.CreateDenseCARv2(t.TempDir(), randomFilePath)
+	require.NoError(t, err)
+	carFile, err := os.Open(carFilePath)
+	require.NoError(t, err)
+	defer carFile.Close()
+	idx, err := car.ReadOrGenerateIndex(carFile)
+	require.NoError(t, err)
+	return idx
+}
+
+func loadIndex(path string) (index.Index, error) {
+	defer func(now time.Time) {
+		log.Debugw("loadindex", "took", time.Since(now).String())
+	}(time.Now())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	subject, err := index.ReadFrom(idxf)
+	if err != nil {
+		return nil, err
+	}
+
+	return subject, nil
+}
+
+func getRecords(subject index.Index) ([]model.Record, error) {
+	records := make([]model.Record, 0)
+
+	switch idx := subject.(type) {
+	case index.IterableIndex:
+		err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
+
+			cid := cid.NewCidV1(cid.Raw, m)
+
+			records = append(records, model.Record{
+				Cid: cid,
+				OffsetSize: model.OffsetSize{
+					Offset: offset,
+					Size:   0,
+				},
+			})
+
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec())
+	}
+	return records, nil
+}
+
+func compareIndices(subject, subjectDb index.Index) (bool, error) {
+	var b bytes.Buffer
+	w := bufio.NewWriter(&b)
+
+	_, err := subject.Marshal(w)
+	if err != nil {
+		return false, err
+	}
+
+	var b2 bytes.Buffer
+	w2 := bufio.NewWriter(&b2)
+
+	_, err = subjectDb.Marshal(w2)
+	if err != nil {
+		return false, err
+	}
+
+	res := bytes.Compare(b.Bytes(), b2.Bytes())
+
+	return res == 0, nil
+}
+
+func TestCleanup(t *testing.T) {
 	_ = logging.SetLogLevel("*", "debug")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	bdsvc, err := NewLevelDB("")
+	t.Run("level db", func(t *testing.T) {
+		bdsvc, err := NewLevelDB("")
+		require.NoError(t, err)
+		testCleanup(ctx, t, bdsvc, 8042)
+	})
+	t.Run("couchbase", func(t *testing.T) {
+		// TODO: Unskip this test once the couchbase instance can be created
+		//  from a docker container in CI as part of the test
+		t.Skip()
+		SetupCouchbase(t, testCouchSettings)
+		bdsvc := NewCouchbase(testCouchSettings)
+		testCleanup(ctx, t, bdsvc, 8043)
+	})
+}
+
+func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
+	err := bdsvc.Start(ctx, port)
 	require.NoError(t, err)
-	testCleanup(ctx, t, bdsvc, "localhost:0")
+
+	cl := client.NewStore()
+	err = cl.Dial(context.Background(), fmt.Sprintf("http://localhost:%d", port))
+	require.NoError(t, err)
+	defer cl.Close(ctx)
+
+	sampleidx := "fixtures/baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka.full.idx"
+
+	pieceCid, err := cid.Parse("baga6ea4seaqnfhocd544oidrgsss2ahoaomvxuaqxfmlsizljtzsuivjl5hamka")
+	require.NoError(t, err)
+
+	subject, err := loadIndex(sampleidx)
+	require.NoError(t, err)
+
+	records, err := getRecords(subject)
+	require.NoError(t, err)
+
+	randomuuid, err := uuid.Parse("4d8f5ce6-dbfd-40dc-8b03-29308e97357b")
+	require.NoError(t, err)
+
+	err = cl.AddIndex(ctx, pieceCid, records, true)
+	require.NoError(t, err)
+
+	di := model.DealInfo{
+		DealUuid:    randomuuid.String(),
+		SectorID:    abi.SectorNumber(1),
+		PieceOffset: 1,
+		PieceLength: 2,
+		CarLength:   3,
+	}
+
+	// Add a deal for the piece
+	err = cl.AddDealForPiece(ctx, pieceCid, di)
+	require.NoError(t, err)
+
+	// There should only be one deal
+	dis, err := cl.GetPieceDeals(ctx, pieceCid)
+	require.NoError(t, err)
+	require.Len(t, dis, 1)
+	require.Equal(t, di, dis[0])
+
+	b, err := hex.DecodeString("1220ff63d7689e2d9567d1a90a7a68425f430137142e1fbc28fe4780b9ee8a5ef842")
+	require.NoError(t, err)
+
+	mhash, err := multihash.Cast(b)
+	require.NoError(t, err)
+
+	offset, err := cl.GetOffsetSize(ctx, pieceCid, mhash)
+	require.NoError(t, err)
+	require.EqualValues(t, 3039040395, offset.Offset)
+	require.EqualValues(t, 0, offset.Size)
+
+	pcids, err := cl.PiecesContainingMultihash(ctx, mhash)
+	require.NoError(t, err)
+	require.Len(t, pcids, 1)
+	require.Equal(t, pieceCid, pcids[0])
+
+	indexed, err := cl.IsIndexed(ctx, pieceCid)
+	require.NoError(t, err)
+	require.True(t, indexed)
+
+	recs, err := cl.GetRecords(ctx, pieceCid)
+	require.NoError(t, err)
+	require.Equal(t, len(records), len(recs))
+
+	loadedSubject, err := cl.GetIndex(ctx, pieceCid)
+	require.NoError(t, err)
+
+	ok, err := compareIndices(subject, loadedSubject)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	err = cl.RemoveDealForPiece(ctx, pieceCid, di.DealUuid)
+	require.NoError(t, err)
+
+	_, err = cl.GetPieceDeals(ctx, pieceCid)
+	require.ErrorContains(t, err, "not found")
+
+	_, err = cl.GetOffsetSize(ctx, pieceCid, mhash)
+	require.ErrorContains(t, err, "not found")
+
+	_, err = cl.GetRecords(ctx, pieceCid)
+	require.ErrorContains(t, err, "not found")
+
+	_, err = cl.PiecesContainingMultihash(ctx, mhash)
+	require.ErrorContains(t, err, "not found")
+
+	indexed, err = cl.IsIndexed(ctx, pieceCid)
+	require.NoError(t, err)
+	require.False(t, indexed)
 }

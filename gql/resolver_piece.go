@@ -3,22 +3,18 @@ package gql
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
-	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boostd-data/svc/types"
-	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multihash"
-	"golang.org/x/sync/errgroup"
 )
 
 type IndexStatus string
@@ -31,38 +27,29 @@ const (
 	IndexStatusFailed     IndexStatus = "Failed"
 )
 
-type SealedStatus string
-
-const (
-	SealedStatusUnknown         SealedStatus = "Unknown"
-	SealedStatusError           SealedStatus = "Error"
-	SealedStatusHasUnsealedCopy SealedStatus = "HasUnsealedCopy"
-	SealedStatusNoUnsealedCopy  SealedStatus = "NoUnsealedCopy"
-)
-
 type sealStatusResolver struct {
-	Status string
-	Error  string
+	IsUnsealed bool
+	Error      string
 }
 
 type pieceDealResolver struct {
+	sa     retrievalmarket.SectorAccessor
 	Deal   *basicDealResolver
 	Sector *sectorResolver
-	ss     *sealStatusReporter
 }
 
 func (pdr *pieceDealResolver) SealStatus(ctx context.Context) *sealStatusResolver {
-	return pdr.ss.sealStatus(ctx)
+	return sealStatus(ctx, pdr.sa, pdr.Sector)
 }
 
 type pieceInfoDeal struct {
+	sa          retrievalmarket.SectorAccessor
 	ChainDealID gqltypes.Uint64
 	Sector      *sectorResolver
-	ss          *sealStatusReporter
 }
 
 func (pid *pieceInfoDeal) SealStatus(ctx context.Context) *sealStatusResolver {
-	return pid.ss.sealStatus(ctx)
+	return sealStatus(ctx, pid.sa, pid.Sector)
 }
 
 type indexStatus struct {
@@ -78,17 +65,14 @@ type pieceResolver struct {
 }
 
 type flaggedPieceResolver struct {
-	PieceCid    string
-	IndexStatus *indexStatus
-	DealCount   int32
-	CreatedAt   graphql.Time
+	Piece     *pieceResolver
+	CreatedAt graphql.Time
 }
 
 type piecesFlaggedArgs struct {
-	HasUnsealedCopy graphql.NullBool
-	Cursor          *gqltypes.BigInt // CreatedAt in milli-seconds
-	Offset          graphql.NullInt
-	Limit           graphql.NullInt
+	Cursor *gqltypes.BigInt // CreatedAt in milli-seconds
+	Offset graphql.NullInt
+	Limit  graphql.NullInt
 }
 
 type flaggedPieceListResolver struct {
@@ -108,15 +92,10 @@ func (r *resolver) PiecesFlagged(ctx context.Context, args piecesFlaggedArgs) (*
 		limit = int(*args.Limit.Value)
 	}
 
-	var filter *types.FlaggedPiecesListFilter
-	if args.HasUnsealedCopy.Set && args.HasUnsealedCopy.Value != nil {
-		filter = &types.FlaggedPiecesListFilter{HasUnsealedCopy: *args.HasUnsealedCopy.Value}
-	}
-
 	// Fetch one extra row so that we can check if there are more rows
 	// beyond the limit
 	cursor := bigIntToTime(args.Cursor)
-	flaggedPieces, err := r.piecedirectory.FlaggedPiecesList(ctx, filter, cursor, offset, limit+1)
+	flaggedPieces, err := r.piecedirectory.FlaggedPiecesList(ctx, cursor, offset, limit+1)
 	if err != nil {
 		return nil, err
 	}
@@ -127,65 +106,33 @@ func (r *resolver) PiecesFlagged(ctx context.Context, args piecesFlaggedArgs) (*
 	}
 
 	// Get the total row count
-	count, err := r.piecedirectory.FlaggedPiecesCount(ctx, filter)
+	count, err := r.piecedirectory.FlaggedPiecesCount(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var eg errgroup.Group
+	allLegacyDeals, err := r.legacyProv.ListLocalDeals()
+	if err != nil {
+		return nil, err
+	}
+
 	flaggedPieceResolvers := make([]*flaggedPieceResolver, 0, len(flaggedPieces))
 	for _, flaggedPiece := range flaggedPieces {
-		flaggedPiece := flaggedPiece
-		eg.Go(func() error {
-			// Get piece info from local index directory
-			pieceInfo, pmErr := r.piecedirectory.GetPieceMetadata(ctx, flaggedPiece.PieceCid)
-			if pmErr != nil && !types.IsNotFound(pmErr) {
-				return pmErr
-			}
-
-			// Get the state of the piece's index
-			idxStatus, err := r.getIndexStatus(pieceInfo, pmErr)
-			if err != nil {
-				return err
-			}
-
-			flaggedPieceResolvers = append(flaggedPieceResolvers, &flaggedPieceResolver{
-				PieceCid:    flaggedPiece.PieceCid.String(),
-				IndexStatus: idxStatus,
-				DealCount:   int32(len(pieceInfo.Deals)),
-				CreatedAt:   graphql.Time{Time: flaggedPiece.CreatedAt},
-			})
-			return nil
+		pieceResolver, err := r.pieceStatus(ctx, flaggedPiece.PieceCid, allLegacyDeals)
+		if err != nil {
+			return nil, err
+		}
+		flaggedPieceResolvers = append(flaggedPieceResolvers, &flaggedPieceResolver{
+			Piece:     pieceResolver,
+			CreatedAt: graphql.Time{Time: flaggedPiece.CreatedAt},
 		})
 	}
-	err = eg.Wait()
-	if err != nil {
-		return nil, err
-	}
-
-	sort.Slice(flaggedPieceResolvers, func(i, j int) bool {
-		return flaggedPieceResolvers[i].CreatedAt.After(flaggedPieces[j].CreatedAt)
-	})
 
 	return &flaggedPieceListResolver{
 		TotalCount: int32(count),
 		Pieces:     flaggedPieceResolvers,
 		More:       more,
 	}, nil
-}
-
-type piecesFlaggedCountArgs struct {
-	HasUnsealedCopy graphql.NullBool
-}
-
-func (r *resolver) PiecesFlaggedCount(ctx context.Context, args piecesFlaggedCountArgs) (int32, error) {
-	var filter *types.FlaggedPiecesListFilter
-	if args.HasUnsealedCopy.Set && args.HasUnsealedCopy.Value != nil {
-		filter = &types.FlaggedPiecesListFilter{HasUnsealedCopy: *args.HasUnsealedCopy.Value}
-	}
-
-	count, err := r.piecedirectory.FlaggedPiecesCount(ctx, filter)
-	return int32(count), err
 }
 
 func (r *resolver) PiecesWithPayloadCid(ctx context.Context, args struct{ PayloadCid string }) ([]string, error) {
@@ -288,6 +235,15 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 		return nil, fmt.Errorf("%s is not a valid piece cid", args.PieceCid)
 	}
 
+	allLegacyDeals, err := r.legacyProv.ListLocalDeals()
+	if err != nil {
+		return nil, err
+	}
+
+	return r.pieceStatus(ctx, pieceCid, allLegacyDeals)
+}
+
+func (r *resolver) pieceStatus(ctx context.Context, pieceCid cid.Cid, allLegacyDeals []storagemarket.MinerDeal) (*pieceResolver, error) {
 	// Get piece info from local index directory
 	pieceInfo, pmErr := r.piecedirectory.GetPieceMetadata(ctx, pieceCid)
 	if pmErr != nil && !types.IsNotFound(pmErr) {
@@ -301,34 +257,24 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 	}
 
 	// Get legacy markets deals by piece Cid
-	legacyDeals, err := r.legacyDeals.ByPieceCid(ctx, pieceCid)
-	if err != nil {
-		return nil, err
+	var legacyDeals []storagemarket.MinerDeal
+	for _, dl := range allLegacyDeals {
+		if dl.Ref.PieceCid != nil && *dl.Ref.PieceCid == pieceCid {
+			legacyDeals = append(legacyDeals, dl)
+		}
 	}
 
 	// Convert local index directory deals to graphQL format
 	var pids []*pieceInfoDeal
 	for _, dl := range pieceInfo.Deals {
-		sector := &sectorResolver{
-			ID:     gqltypes.Uint64(dl.SectorID),
-			Offset: gqltypes.Uint64(dl.PieceOffset),
-			Length: gqltypes.Uint64(dl.PieceLength),
-		}
-
-		actorId, err := address.IDFromAddress(dl.MinerAddr)
-		if err != nil {
-			return nil, fmt.Errorf("getting actor id from address %s", dl.MinerAddr)
-		}
-
 		pids = append(pids, &pieceInfoDeal{
 			ChainDealID: gqltypes.Uint64(dl.ChainDealID),
-			Sector:      sector,
-			ss: &sealStatusReporter{
-				sa:      r.sa,
-				ssm:     r.ssm,
-				sector:  sector,
-				minerID: abi.ActorID(actorId),
+			Sector: &sectorResolver{
+				ID:     gqltypes.Uint64(dl.SectorID),
+				Offset: gqltypes.Uint64(dl.PieceOffset),
+				Length: gqltypes.Uint64(dl.PieceLength),
 			},
+			sa: r.sa,
 		})
 	}
 
@@ -348,28 +294,14 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 		}
 		bd.Message = dl.Checkpoint.String()
 
-		provAddr, err := address.NewFromString(bd.ProviderAddress)
-		if err != nil {
-			return nil, fmt.Errorf("parsing actor address %s", bd.ProviderAddress)
-		}
-		minerId, err := address.IDFromAddress(provAddr)
-		if err != nil {
-			return nil, fmt.Errorf("getting actor id from address %s", bd.ProviderAddress)
-		}
-		sector := &sectorResolver{
-			ID:     gqltypes.Uint64(dl.SectorID),
-			Offset: gqltypes.Uint64(dl.Offset),
-			Length: gqltypes.Uint64(dl.Length),
-		}
 		deals = append(deals, &pieceDealResolver{
-			Deal:   &bd,
-			Sector: sector,
-			ss: &sealStatusReporter{
-				sa:      r.sa,
-				sector:  sector,
-				ssm:     r.ssm,
-				minerID: abi.ActorID(minerId),
+			Deal: &bd,
+			Sector: &sectorResolver{
+				ID:     gqltypes.Uint64(dl.SectorID),
+				Offset: gqltypes.Uint64(dl.Offset),
+				Length: gqltypes.Uint64(dl.Length),
 			},
+			sa: r.sa,
 		})
 	}
 
@@ -405,17 +337,12 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 		deals = append(deals, &pieceDealResolver{
 			Deal:   &bd,
 			Sector: sector,
-			ss: &sealStatusReporter{
-				sector:  sector,
-				sa:      r.sa,
-				ssm:     r.ssm,
-				minerID: abi.ActorID(minerId),
-			},
+			sa:     r.sa,
 		})
 	}
 
 	// Get the state of the piece's index
-	idxStatus, err := r.getIndexStatus(pieceInfo, pmErr)
+	idxStatus, err := r.getIndexStatus(ctx, pieceCid, pieceInfo, pmErr, deals)
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +355,7 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 	}, nil
 }
 
-func (r *resolver) getIndexStatus(md pdtypes.PieceDirMetadata, mdErr error) (*indexStatus, error) {
+func (r *resolver) getIndexStatus(ctx context.Context, pieceCid cid.Cid, md pdtypes.PieceDirMetadata, mdErr error, deals []*pieceDealResolver) (*indexStatus, error) {
 	var idxst IndexStatus
 	idxerr := ""
 
@@ -440,10 +367,29 @@ func (r *resolver) getIndexStatus(md pdtypes.PieceDirMetadata, mdErr error) (*in
 		idxerr = mdErr.Error()
 	case md.Indexing:
 		idxst = IndexStatusIndexing
+	case md.Error != "":
+		idxst = IndexStatusFailed
+		idxerr = md.Error
 	case md.IndexedAt.IsZero():
 		idxst = IndexStatusRegistered
 	default:
 		idxst = IndexStatusComplete
+	}
+
+	// Try retrieving the piece payload cid as a means to check if the
+	// payload cid => piece cid index has been created correctly
+	if idxst == IndexStatusComplete && len(deals) > 0 {
+		cidstr := deals[0].Deal.DealDataRoot
+		c, err := cid.Parse(cidstr)
+		if err != nil {
+			// This should never happen, but check just in case
+			return nil, fmt.Errorf("parsing retrieved deal data root cid %s: %w", cidstr, err)
+		}
+		pieces, err := r.piecedirectory.PiecesContainingMultihash(ctx, c.Hash())
+		if err != nil || len(pieces) == 0 {
+			idxst = IndexStatusFailed
+			idxerr = fmt.Sprintf("unable to resolve piece's root payload cid %s to piece cid", cidstr)
+		}
 	}
 
 	return &indexStatus{Status: string(idxst), Error: idxerr}, nil
@@ -483,79 +429,31 @@ func (r *resolver) getLegacyDealSector(ctx context.Context, pids []*pieceInfoDea
 
 const isUnsealedTimeout = 5 * time.Second
 
-type sealStatusReporter struct {
-	sa      retrievalmarket.SectorAccessor
-	sector  *sectorResolver
-	ssm     *sectorstatemgr.SectorStateMgr
-	minerID abi.ActorID
-}
-
-func (ss *sealStatusReporter) sealStatus(ctx context.Context) *sealStatusResolver {
-	if ss.sector == nil || ss.sector.ID == 0 {
+func sealStatus(ctx context.Context, sa retrievalmarket.SectorAccessor, sector *sectorResolver) *sealStatusResolver {
+	if sector == nil || sector.ID == 0 {
 		return &sealStatusResolver{Error: "unable to find sector for deal"}
 	}
-	if ss.sector.Length == 0 {
-		return &sealStatusResolver{Error: fmt.Sprintf("sector %d has zero length", ss.sector.ID)}
+	if sector.Length == 0 {
+		return &sealStatusResolver{Error: fmt.Sprintf("sector %d has zero length", sector.ID)}
 	}
 
 	ssr := &sealStatusResolver{}
-
-	// Get the sealing status as reported by the SectorsStatus API call
 	isUnsealedCtx, cancel := context.WithTimeout(ctx, isUnsealedTimeout)
 	defer cancel()
 
-	sectorsStatusApiIsUnsealed, err := ss.sa.IsUnsealed(
-		isUnsealedCtx, abi.SectorNumber(ss.sector.ID),
-		abi.PaddedPieceSize(ss.sector.Offset).Unpadded(),
-		abi.PaddedPieceSize(ss.sector.Length).Unpadded(),
+	isUnsealed, err := sa.IsUnsealed(
+		isUnsealedCtx, abi.SectorNumber(sector.ID),
+		abi.PaddedPieceSize(sector.Offset).Unpadded(),
+		abi.PaddedPieceSize(sector.Length).Unpadded(),
 	)
-
+	ssr.IsUnsealed = isUnsealed
 	if err != nil {
-		ssr.Status = string(SealedStatusError)
 		ssr.Error = err.Error()
 		if isUnsealedCtx.Err() != nil {
 			ssr.Error = fmt.Sprintf("IsUnsealed: timed out after %s "+
 				"(IsUnsealed blocks if the sector is currently being unsealed)",
 				isUnsealedTimeout)
 		}
-		return ssr
-	}
-
-	if sectorsStatusApiIsUnsealed {
-		ssr.Status = string(SealedStatusHasUnsealedCopy)
-	} else {
-		ssr.Status = string(SealedStatusNoUnsealedCopy)
-	}
-
-	// Get the sealing status as reported by the StorageList API call
-	ss.ssm.LatestUpdateMu.Lock()
-	lu := ss.ssm.LatestUpdate
-	ss.ssm.LatestUpdateMu.Unlock()
-
-	// Check if the StorageList API call has completed at least once.
-	// If not, just return the sealing status reported by the SectorsStatus API call.
-	if lu == nil {
-		return ssr
-	}
-
-	sectorId := abi.SectorID{
-		Miner:  ss.minerID,
-		Number: abi.SectorNumber(ss.sector.ID),
-	}
-	sectorState, ok := lu.SectorStates[sectorId]
-	if !ok {
-		return ssr
-	}
-
-	// Check that the sealing status of the sector reported by both API calls
-	// agrees
-	storageListApiIsUnsealed := sectorState == db.SealStateUnsealed
-	if storageListApiIsUnsealed != sectorsStatusApiIsUnsealed {
-		// The sealing status reported by the two APIs disagrees, so report
-		// the sealing status as unknown. It could be that the change happened
-		// recently and the caches are out of sync, or it could be that the
-		// sector is corrupted.
-		ssr.Status = string(SealedStatusUnknown)
 	}
 
 	return ssr

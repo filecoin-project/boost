@@ -28,6 +28,8 @@ import (
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-fil-markets/shared"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"

@@ -1,26 +1,26 @@
-.inspect-content table {
+.piece-directory table {
     font-size: 1em;
     width: 100%;
 }
 
-.inspect-content td, .inspect-content th {
+.piece-directory td, .piece-directory th {
     padding: 0.5em 1em;
     font-weight: normal;
 }
 
-.inspect-content th {
+.piece-directory th {
     white-space: nowrap;
     text-align: left;
     opacity: 0.6;
 }
 
-.inspect .search {
+.piece-directory .search {
     position: absolute;
     right: 8em;
     top: 2em;
 }
 
-.inspect .search input {
+.piece-directory .search input {
     background-image: url("./bootstrap-icons/icons/search.svg");
     background-repeat: no-repeat;
     background-position: left 0.5em center;
@@ -28,18 +28,18 @@
     padding-right: 2em;
 }
 
-.inspect .search .clear-text {
+.piece-directory .search .clear-text {
     position: absolute;
     right: 1em;
     top: 1.1em;
     cursor: pointer;
 }
 
-.piece-detail h3 {
+.piece-directory h3 {
     margin-top: 2em;
 }
 
-.piece-detail .title {
+.piece-directory .title {
     font-size: 1.25em;
     color: #a61e4d;
     margin: 2em 0.8em 1.5em 0.8em;
@@ -55,10 +55,6 @@
     margin:  0.8em;
 }
 
-.piece-detail p {
-    padding: 0.5em 1em;
-}
-
 .piece-detail table {
     font-size: 1em;
 }
@@ -72,7 +68,6 @@
 
 .piece-detail table th {
     text-align: left;
-    vertical-align: top;
 }
 
 .piece-detail table.deals .param {
@@ -81,26 +76,4 @@
 
 .piece-detail td, .piece-detail th {
     padding: 0.5em 1em;
-}
-
-.inspect-content .title {
-    font-size: 1.25em;
-    margin: 2em 0.8em 1em 0.8em;
-}
-
-.inspect .payload-cid {
-    padding: 0.5em 1em;
-}
-
-.inspect > p {
-    padding: 2em 1em;
-}
-
-.flagged-pieces-none {
-    padding: 1em 1em 4em 1em;
-}
-
-.button.build-index {
-    display: inline-block;
-    margin: 1em 0;
 }

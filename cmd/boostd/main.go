@@ -50,7 +50,6 @@ func main() {
 			dagstoreCmd,
 			netCmd,
 			pieceDirCmd,
-			recoverCmd,
 		},
 	}
 	app.Setup()
@@ -86,10 +85,6 @@ func before(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("migrator", "DEBUG")
 		_ = logging.SetLogLevel("piecedir", "DEBUG")
 		_ = logging.SetLogLevel("fxlog", "DEBUG")
-		_ = logging.SetLogLevel("unsmgr", "DEBUG")
-		_ = logging.SetLogLevel("piecedoc", "DEBUG")
-		_ = logging.SetLogLevel("piecedirectory", "DEBUG")
-		_ = logging.SetLogLevel("sectorstatemgr", "DEBUG")
 	}
 
 	return nil

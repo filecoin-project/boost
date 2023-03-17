@@ -341,9 +341,6 @@ workflows:
           target: "`go list ./... | grep -v boost/itests`"
 
       - test:
-          name: test-itest-ipni
-          suite: itest-ipni
-          target: "./itests/ipni_publish_test.go"
-
-      - lid-docker-compose
-
+          name: local index directory
+          suite: all
+          cwd: "./extern/boostd-data"

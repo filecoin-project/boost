@@ -446,26 +446,29 @@ const PiecesWithPayloadCidQuery = gql`
 `;
 
 const FlaggedPiecesQuery = gql`
-    query AppFlaggedPiecesQuery($hasUnsealedCopy: Boolean, $cursor: BigInt, $offset: Int, $limit: Int) {
-        piecesFlagged(hasUnsealedCopy: $hasUnsealedCopy, cursor: $cursor, offset: $offset, limit: $limit) {
+    query AppFlaggedPiecesQuery($cursor: BigInt, $offset: Int, $limit: Int) {
+        piecesFlagged(cursor: $cursor, offset: $offset, limit: $limit) {
             pieces {
                 CreatedAt
-                PieceCid
-                IndexStatus {
-                    Status
-                    Error
+                Piece {
+                    PieceCid
+                    IndexStatus {
+                        Status
+                        Error
+                    }
+                    Deals {
+                        Deal {
+                            ID
+                            IsLegacy
+                            CreatedAt
+                            DealDataRoot
+                        }
+                    }
                 }
-                DealCount
             }
             totalCount
             more
         }
-    }
-`;
-
-const FlaggedPiecesCountQuery = gql`
-    query AppFlaggedPiecesCountQuery($hasUnsealedCopy: Boolean) {
-        piecesFlaggedCount(hasUnsealedCopy: $hasUnsealedCopy)
     }
 `;
 
@@ -791,8 +794,6 @@ export {
     PieceBuildIndexMutation,
     PieceStatusQuery,
     FlaggedPiecesQuery,
-    FlaggedPiecesCountQuery,
-    LIDQuery,
     StorageQuery,
     LegacyStorageQuery,
     FundsQuery,

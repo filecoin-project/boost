@@ -5,54 +5,40 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 
-	"go.uber.org/fx"
-
-	"github.com/ipfs/go-datastore"
-	"github.com/ipld/go-ipld-prime"
-
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
-	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
-	"github.com/filecoin-project/go-address"
-	cborutil "github.com/filecoin-project/go-cbor-util"
-	"github.com/filecoin-project/go-state-types/abi"
-	lotus_modules "github.com/filecoin-project/lotus/node/modules"
+	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipni/go-libipni/metadata"
 	provider "github.com/ipni/index-provider"
-	"github.com/ipni/index-provider/engine"
 	"github.com/ipni/index-provider/engine/xproviders"
+	"github.com/ipni/index-provider/metadata"
 	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/host"
+	host "github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multihash"
+	"go.uber.org/fx"
 )
 
 var log = logging.Logger("index-provider-wrapper")
 var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
-	enabled bool
-
 	cfg            *config.Boost
+	enabled        bool
 	dealsDB        *db.DealsDB
-	legacyProv     storagemarket.StorageProvider
+	legacyProv     lotus_storagemarket.StorageProvider
 	prov           provider.Interface
 	piecedirectory *piecedirectory.PieceDirectory
-	ssm            *sectorstatemgr.SectorStateMgr
 	meshCreator    idxprov.MeshCreator
 	h              host.Host
 	// bitswapEnabled records whether to announce bitswap as an available
@@ -63,14 +49,13 @@ type Wrapper struct {
 }
 
 func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-	ssDB *db.SectorStateDB, legacyProv storagemarket.StorageProvider, prov provider.Interface,
-	piecedirectory *piecedirectory.PieceDirectory, ssm *sectorstatemgr.SectorStateMgr, meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
+	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface,
+	piecedirectory *piecedirectory.PieceDirectory, meshCreator idxprov.MeshCreator) (*Wrapper, error) {
 
 	return func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-		ssDB *db.SectorStateDB, legacyProv storagemarket.StorageProvider, prov provider.Interface,
+		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface,
 		piecedirectory *piecedirectory.PieceDirectory,
-		ssm *sectorstatemgr.SectorStateMgr,
-		meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
+		meshCreator idxprov.MeshCreator) (*Wrapper, error) {
 
 		if cfg.DAGStore.RootDir == "" {
 			cfg.DAGStore.RootDir = filepath.Join(r.Path(), defaultDagStoreDir)
@@ -94,8 +79,6 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 			enabled:        !isDisabled,
 			piecedirectory: piecedirectory,
 			bitswapEnabled: bitswapEnabled,
-			httpEnabled:    httpEnabled,
-			ssm:            ssm,
 		}
 		return w, nil
 	}
@@ -488,14 +471,54 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 	return merr
 }
 
-// While ingesting cids for each piece, if there is an error the indexer
-// checks if the error contains the string "content not found":
-// - if so, the indexer skips the piece and continues ingestion
-// - if not, the indexer pauses ingestion
-var ErrStringSkipAdIngest = "content not found"
+func (w *Wrapper) Start(ctx context.Context) {
+	w.prov.RegisterMultihashLister(w.MultihashLister)
+}
 
-func skipError(err error) error {
-	return fmt.Errorf("%s: %s: %w", ErrStringSkipAdIngest, err.Error(), ipld.ErrNotExists{})
+func (w *Wrapper) MultihashLister(ctx context.Context, prov peer.ID, contextID []byte) (provider.MultihashIterator, error) {
+	provideF := func(pieceCid cid.Cid) (provider.MultihashIterator, error) {
+		ii, err := w.piecedirectory.GetIterableIndex(ctx, pieceCid)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get iterable index: %w", err)
+		}
+
+		// Check if there are any records in the iterator. If there are no
+		// records, the multihash lister expects us to return an error.
+		hasRecords := ii.ForEach(func(_ multihash.Multihash, _ uint64) error {
+			return fmt.Errorf("has at least one record")
+		})
+		if hasRecords == nil {
+			return nil, fmt.Errorf("no records found for piece %s", pieceCid)
+		}
+
+		mhi, err := provider.CarMultihashIterator(ii)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get mhiterator: %w", err)
+		}
+		return mhi, nil
+	}
+
+	// convert context ID to proposal Cid
+	proposalCid, err := cid.Cast(contextID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to cast context ID to a cid")
+	}
+
+	// go from proposal cid -> piece cid by looking up deal in boost and if we can't find it there -> then markets
+	// check Boost deals DB
+	pds, boostErr := w.dealsDB.BySignedProposalCID(ctx, proposalCid)
+	if boostErr == nil {
+		pieceCid := pds.ClientDealProposal.Proposal.PieceCID
+		return provideF(pieceCid)
+	}
+
+	// check in legacy markets
+	md, legacyErr := w.legacyProv.GetLocalDeal(proposalCid)
+	if legacyErr == nil {
+		return provideF(md.Proposal.PieceCID)
+	}
+
+	return nil, fmt.Errorf("failed to look up deal in Boost, err=%s and Legacy Markets, err=%s", boostErr, legacyErr)
 }
 
 func (w *Wrapper) IndexerAnnounceLatest(ctx context.Context) (cid.Cid, error) {
@@ -676,11 +699,4 @@ func (w *Wrapper) AnnounceBoostDealRemoved(ctx context.Context, propCid cid.Cid)
 		return cid.Undef, fmt.Errorf("failed to announce deal removal to index provider: %w", err)
 	}
 	return annCid, err
-}
-
-type basicDealInfo struct {
-	AnnounceToIPNI bool
-	DealID         string
-	SectorID       abi.SectorID
-	DealProposal   storagemarket.ClientDealProposal
 }

@@ -9,9 +9,9 @@ import (
 	"path"
 	"time"
 
+	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/svc/types"
-	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/gorilla/mux"
 	logging "github.com/ipfs/go-log/v2"
@@ -22,11 +22,11 @@ var (
 )
 
 type Service struct {
-	Impl types.ServiceImpl
+	impl types.ServiceImpl
 }
 
-func NewYugabyte(settings yugabyte.DBSettings) *Service {
-	return &Service{Impl: yugabyte.NewStore(settings)}
+func NewCouchbase(settings couchbase.DBSettings) *Service {
+	return &Service{impl: couchbase.NewStore(settings)}
 }
 
 func NewLevelDB(repoPath string) (*Service, error) {
@@ -38,7 +38,7 @@ func NewLevelDB(repoPath string) (*Service, error) {
 		}
 	}
 
-	return &Service{Impl: ldb.NewStore(repoPath)}, nil
+	return &Service{impl: ldb.NewStore(repoPath)}, nil
 }
 
 func MakeLevelDBDir(repoPath string) (string, error) {
@@ -49,19 +49,20 @@ func MakeLevelDBDir(repoPath string) (string, error) {
 	return repoPath, nil
 }
 
-func (s *Service) Start(ctx context.Context, addr string) (net.Addr, error) {
+func (s *Service) Start(ctx context.Context, port int) error {
+	addr := fmt.Sprintf("localhost:%d", port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return nil, fmt.Errorf("setting up listener for local index directory service: %w", err)
+		return fmt.Errorf("setting up listener for local index directory service: %w", err)
 	}
 
-	err = s.Impl.Start(ctx)
+	err = s.impl.Start(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("starting local index directory service: %w", err)
+		return fmt.Errorf("starting local index directory service: %w", err)
 	}
 
 	server := jsonrpc.NewServer()
-	server.Register("boostddata", s.Impl)
+	server.Register("boostddata", s.impl)
 	router := mux.NewRouter()
 	router.Handle("/", server)
 
@@ -92,5 +93,5 @@ func (s *Service) Start(ctx context.Context, addr string) (net.Addr, error) {
 		<-done
 	}()
 
-	return ln.Addr(), nil
+	return nil
 }

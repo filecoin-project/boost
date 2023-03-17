@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore/mount"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/boxo/blockservice"
@@ -43,12 +44,9 @@ type apiVersion struct {
 }
 
 type HttpServer struct {
-	path       string
-	listenAddr string
-	port       int
-	api        HttpServerApi
-	opts       HttpServerOptions
-	idxPage    string
+	path string
+	port int
+	api  HttpServerApi
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -61,17 +59,8 @@ type HttpServerApi interface {
 	UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error)
 }
 
-type HttpServerOptions struct {
-	Blockstore               blockstore.Blockstore
-	ServePieces              bool
-	SupportedResponseFormats []string
-}
-
-func NewHttpServer(path string, listenAddr string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
-	if opts == nil {
-		opts = &HttpServerOptions{ServePieces: true}
-	}
-	return &HttpServer{path: path, listenAddr: listenAddr, port: port, api: api, opts: *opts, idxPage: parseTemplate(*opts)}
+func NewHttpServer(path string, port int, api HttpServerApi) *HttpServer {
+	return &HttpServer{path: path, port: port, api: api}
 }
 
 func (s *HttpServer) pieceBasePath() string {
@@ -126,6 +115,27 @@ func (s *HttpServer) Stop() error {
 	s.cancel()
 	return s.server.Close()
 }
+
+const idxPage = `
+<html>
+  <body>
+    <h4>Booster HTTP Server</h4>
+    Endpoints:
+    <table>
+      <tbody>
+      <tr>
+        <td>
+          Download a raw piece by its piece CID
+        </td>
+        <td>
+          <a href="/piece/bafySomePieceCid">/piece/<piece cid></a>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </body>
+</html>
+`
 
 func (s *HttpServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
@@ -297,7 +307,7 @@ func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.
 }
 
 func (s *HttpServer) unsealedDeal(ctx context.Context, pieceCid cid.Cid, pieceDeals []model.DealInfo) (*model.DealInfo, error) {
-	// There should always be deals in the PieceInfo, but check just in case
+	// There should always been deals in the PieceInfo, but check just in case
 	if len(pieceDeals) == 0 {
 		return nil, fmt.Errorf("there are no deals containing piece %s: %w", pieceCid, ErrNotFound)
 	}

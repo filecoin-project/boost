@@ -39,24 +39,25 @@ type Metadata struct {
 	IndexedAt time.Time `json:"i"`
 	// CompleteIndex indicates whether the index has all information or is
 	// missing block size information. Note that indexes imported from the
-	// dagstore do not have block size information (they only have block
-	// offsets).
+	// dagstore do not have block size information.
 	CompleteIndex bool       `json:"c"`
 	Deals         []DealInfo `json:"d"`
+	Error         string     `json:"e"`
+	ErrorType     string     `json:"t"`
 }
 
 // Record is the information stored in the index for each block in a piece
 type Record struct {
-	Cid cid.Cid `json:"c"`
+	Cid cid.Cid
 	OffsetSize
 }
 
 type OffsetSize struct {
 	// Offset is the offset into the CAR file of the section, where a section
 	// is <section size><cid><block data>
-	Offset uint64 `json:"o"`
+	Offset uint64
 	// Size is the size of the block data (not the whole section)
-	Size uint64 `json:"s"`
+	Size uint64
 }
 
 func (ofsz *OffsetSize) MarshallBase64() string {
@@ -84,8 +85,6 @@ func (ofsz *OffsetSize) UnmarshallBase64(str string) error {
 // FlaggedPiece is a piece that has been flagged for the user's attention
 // (eg because the index is missing)
 type FlaggedPiece struct {
-	PieceCid        cid.Cid
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	HasUnsealedCopy bool
+	CreatedAt time.Time
+	PieceCid  cid.Cid
 }

@@ -5,12 +5,11 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
 	"github.com/filecoin-project/boost/cmd/lib"
-	"github.com/filecoin-project/boost/cmd/lib/filters"
-	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/piecedirectory"
-	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -158,28 +157,14 @@ var runCmd = &cli.Command{
 		defer storageCloser()
 
 		// Connect to the local index directory service
-		cl := bdclient.NewStore()
-		defer cl.Close(ctx)
-		err = cl.Dial(ctx, cctx.String("api-lid"))
+		pdClient := piecedirectory.NewStore()
+		defer pdClient.Close(ctx)
+		err = pdClient.Dial(ctx, cctx.String("api-lid"))
 		if err != nil {
 			return fmt.Errorf("connecting to local index directory service: %w", err)
 		}
 
 		// Create the bitswap host
-		bitswapBlockMetrics := remoteblockstore.BlockMetrics{
-			GetRequestCount:             metrics.BitswapRblsGetRequestCount,
-			GetFailResponseCount:        metrics.BitswapRblsGetFailResponseCount,
-			GetSuccessResponseCount:     metrics.BitswapRblsGetSuccessResponseCount,
-			BytesSentCount:              metrics.BitswapRblsBytesSentCount,
-			HasRequestCount:             metrics.BitswapRblsHasRequestCount,
-			HasFailResponseCount:        metrics.BitswapRblsHasFailResponseCount,
-			HasSuccessResponseCount:     metrics.BitswapRblsHasSuccessResponseCount,
-			GetSizeRequestCount:         metrics.BitswapRblsGetSizeRequestCount,
-			GetSizeFailResponseCount:    metrics.BitswapRblsGetSizeFailResponseCount,
-			GetSizeSuccessResponseCount: metrics.BitswapRblsGetSizeSuccessResponseCount,
-		}
-
-		// Create the server API
 		port := cctx.Int("port")
 		repoDir, err := homedir.Expand(cctx.String(FlagRepo.Name))
 		if err != nil {
@@ -197,8 +182,8 @@ var runCmd = &cli.Command{
 			return fmt.Errorf("starting block filter: %w", err)
 		}
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		pd := piecedirectory.NewPieceDirectory(cl, pr, cctx.Int("add-index-throttle"))
-		remoteStore := remoteblockstore.NewRemoteBlockstore(pd, &bitswapBlockMetrics)
+		piecedirectory := piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
+		remoteStore := remoteblockstore.NewRemoteBlockstore(piecedirectory)
 		server := NewBitswapServer(remoteStore, host, multiFilter)
 
 		var proxyAddrInfo *peer.AddrInfo
@@ -211,7 +196,7 @@ var runCmd = &cli.Command{
 		}
 
 		// Start the local index directory
-		pd.Start(ctx)
+		piecedirectory.Start(ctx)
 
 		// Start the bitswap server
 		log.Infof("Starting booster-bitswap node on port %d", port)

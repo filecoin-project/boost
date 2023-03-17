@@ -2,19 +2,12 @@ package modules
 
 import (
 	"context"
-	"sync"
-	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	retrievalimpl "github.com/filecoin-project/boost-gfm/retrievalmarket/impl"
-	graphsync "github.com/filecoin-project/boost-graphsync/impl"
-	gsnet "github.com/filecoin-project/boost-graphsync/network"
-	"github.com/filecoin-project/boost-graphsync/storeutil"
-	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
-	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/metrics"
 	lotus_helpers "github.com/filecoin-project/lotus/node/modules/helpers"
@@ -56,32 +49,13 @@ func SetAskGetter(proxy *ProxyAskGetter, rp retrievalmarket.RetrievalProvider) {
 	proxy.AskGetter = rp
 }
 
-// LinkSystemProv is used to avoid circular dependencies
-type LinkSystemProv struct {
-	*ipld.LinkSystem
-}
-
-func NewLinkSystemProvider() *LinkSystemProv {
-	return &LinkSystemProv{}
-}
-
-func (p *LinkSystemProv) LinkSys() *ipld.LinkSystem {
-	return p.LinkSystem
-}
-
-func SetLinkSystem(proxy *LinkSystemProv, prov provider.Interface) {
-	e := prov.(*engine.Engine)
-	proxy.LinkSystem = e.LinkSystem()
-}
-
-// RetrievalGraphsync creates a graphsync instance used to serve retrievals.
-func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, pstore dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter, ls server.LinkSystemProvider) (*server.GraphsyncUnpaidRetrieval, error) {
-	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, pstore dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter, ls server.LinkSystemProvider) (*server.GraphsyncUnpaidRetrieval, error) {
-		// Graphsync tracks metrics separately, pass nothing to the remote blockstore
-		rb := remoteblockstore.NewRemoteBlockstore(pid, nil)
+// Graphsync creates a graphsync instance used to serve retrievals.
+func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net lotus_dtypes.ProviderTransferNetwork, dealDecider lotus_dtypes.RetrievalDealFilter, pstore lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
+	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net lotus_dtypes.ProviderTransferNetwork, dealDecider lotus_dtypes.RetrievalDealFilter, pstore lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
+		rb := remoteblockstore.NewRemoteBlockstore(pid)
 
 		// Create a Graphsync instance
-		mkgs := Graphsync(parallelTransfersForStorage, parallelTransfersForStoragePerPeer, parallelTransfersForRetrieval)
+		mkgs := lotus_modules.StagingGraphsync(parallelTransfersForStorage, parallelTransfersForStoragePerPeer, parallelTransfersForRetrieval)
 		gs := mkgs(mctx, lc, rb, h)
 
 		// Wrap the Graphsync instance with a handler for unpaid retrieval requests

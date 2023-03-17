@@ -31,6 +31,7 @@ import (
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/piecedirectory"
+	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -45,7 +46,10 @@ import (
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
-	lotus_gfm_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
+	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
+	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
 	"github.com/filecoin-project/go-state-types/abi"
 	lotus_api "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -537,11 +541,9 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
 		Override(new(*modules.ProxyAskGetter), modules.NewAskGetter),
 		Override(new(server.AskGetter), From(new(*modules.ProxyAskGetter))),
-		Override(new(*modules.LinkSystemProv), modules.NewLinkSystemProvider),
-		Override(new(server.LinkSystemProvider), From(new(*modules.LinkSystemProv))),
-		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
-		Override(new(dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
-		Override(new(dtypes.ProviderPieceStore), modules.NewProviderPieceStore),
+		Override(new(*server.GraphsyncUnpaidRetrieval), modules.Graphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
+		Override(new(lotus_dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
+		Override(new(lotus_dtypes.ProviderPieceStore), modules.NewProviderPieceStore),
 		Override(StartPieceDoctorKey, modules.NewPieceDoctor),
 
 		// Lotus Markets (retrieval deps)
@@ -555,17 +557,19 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		// DAG Store
+		//Override(new(dagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
 
 		// TODO: Not sure how to completely get rid of these yet:
 		// Error: creating node: starting node: missing dependencies for function "reflect".makeFuncStub (/usr/local/go/src/reflect/asm_amd64.s:30): missing types: *dagstore.DAGStore; *dagstore.Wrapper (did you mean stores.DAGStoreWrapper?)
 		Override(new(*dagstore.DAGStore), func() *dagstore.DAGStore { return nil }),
 		Override(new(*mdagstore.Wrapper), func() *mdagstore.Wrapper { return nil }),
 
-		Override(new(*bdclient.Store), modules.NewPieceDirectoryStore(cfg)),
+		Override(new(pdtypes.Store), modules.NewPieceDirectoryStore(cfg)),
 		Override(new(*piecedirectory.PieceDirectory), modules.NewPieceDirectory(cfg)),
 		Override(DAGStoreKey, modules.NewDAGStoreWrapper),
+		//Override(new(mktsdagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
+		//Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
 		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
-
 		Override(new(*modules.ShardSelector), modules.NewShardSelector),
 		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore(cfg)),
 		Override(HandleSetShardSelector, modules.SetShardSelectorFunc),
@@ -574,7 +578,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(mdagstore.SectorAccessor), modules.NewSectorAccessor(cfg)),
 		Override(new(retrievalmarket.SectorAccessor), From(new(mdagstore.SectorAccessor))),
 		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
-		Override(new(rmnet.RetrievalMarketNetwork), modules.RetrievalNetwork),
+		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
 		Override(new(retrievalmarket.RetrievalProvider), modules.RetrievalProvider),
 		Override(HandleSetRetrievalAskGetter, modules.SetAskGetter),
 		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Dealmaking.RetrievalLogDuration), time.Duration(cfg.Dealmaking.StalledRetrievalTimeout))),

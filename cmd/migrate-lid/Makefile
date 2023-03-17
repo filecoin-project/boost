@@ -12,6 +12,6 @@ endif
 GOFLAGS+=-ldflags="$(ldflags)"
 
 build:
-	rm -f boostd-data
-	$(GOCC) build $(GOFLAGS) -o boostd-data ./cmd
+	rm -f migrate-lid
+	$(GOCC) build $(GOFLAGS) -o migrate-lid .
 .PHONY: build

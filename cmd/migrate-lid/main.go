@@ -41,7 +41,7 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			migrateLevelDBCmd,
-			migrateYugabyteDBCmd,
+			migrateCouchDBCmd,
 			migrateReverseCmd,
 		},
 	}

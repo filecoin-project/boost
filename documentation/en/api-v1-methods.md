@@ -23,8 +23,6 @@
   * [BoostDealBySignedProposalCid](#boostdealbysignedproposalcid)
   * [BoostDummyDeal](#boostdummydeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
-  * [BoostIndexerAnnounceLatest](#boostindexerannouncelatest)
-  * [BoostIndexerAnnounceLatestHttp](#boostindexerannouncelatesthttp)
   * [BoostIndexerListMultihashes](#boostindexerlistmultihashes)
   * [BoostMakeDeal](#boostmakedeal)
   * [BoostOfflineDealWithData](#boostofflinedealwithdata)
@@ -89,6 +87,7 @@
   * [OnlineBackup](#onlinebackup)
 * [Pd](#pd)
   * [PdBuildIndexForPieceCid](#pdbuildindexforpiececid)
+  * [PdMarkIndexErrored](#pdmarkindexerrored)
 * [Runtime](#runtime)
   * [RuntimeSubsystems](#runtimesubsystems)
 * [Sectors](#sectors)
@@ -561,41 +560,6 @@ Perms: admin
 Inputs: `null`
 
 Response: `{}`
-
-### BoostIndexerAnnounceLatest
-
-
-Perms: admin
-
-Inputs: `null`
-
-Response:
-```json
-{
-  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-}
-```
-
-### BoostIndexerAnnounceLatestHttp
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  [
-    "string value"
-  ]
-]
-```
-
-Response:
-```json
-{
-  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-}
-```
 
 ### BoostIndexerListMultihashes
 
@@ -1822,6 +1786,23 @@ Inputs:
   {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   }
+]
+```
+
+Response: `{}`
+
+### PdMarkIndexErrored
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "string value"
 ]
 ```
 

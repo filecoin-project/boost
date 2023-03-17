@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
-	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"
@@ -292,6 +290,43 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (Leve
 	return metadata, nil
 }
 
+func (db *DB) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.set_car_size")
+	defer span.End()
+
+	md, err := db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return fmt.Errorf("getting piece metadata for piece %s: %w", pieceCid, err)
+	}
+
+	// Set the car size on each deal (should be the same for all deals)
+	for _, dl := range md.Deals {
+		dl.CarLength = size
+	}
+
+	return db.SetPieceCidToMetadata(ctx, pieceCid, md)
+}
+
+func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error {
+	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
+	defer span.End()
+
+	md, err := db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return fmt.Errorf("getting piece metadata for piece %s: %w", pieceCid, err)
+	}
+
+	if md.Error != "" {
+		// If the error state has already been set, don't over-write the existing error
+		return nil
+	}
+
+	md.Error = err.Error()
+	md.ErrorType = fmt.Sprintf("%T", err)
+
+	return db.SetPieceCidToMetadata(ctx, pieceCid, md)
+}
+
 // AllRecords
 func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.all_records")
@@ -325,7 +360,7 @@ func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, er
 		kcid := cid.NewCidV1(cid.Raw, m)
 
 		offset, n := binary.Uvarint(r.Value)
-		size, _ := binary.Uvarint(r.Value[n:])
+		size, n := binary.Uvarint(r.Value[n:])
 
 		records = append(records, model.Record{
 			Cid: kcid,
@@ -366,7 +401,7 @@ func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihas
 	}
 
 	offset, n := binary.Uvarint(b)
-	size, _ := binary.Uvarint(b[n:])
+	size, n := binary.Uvarint(b[n:])
 	return &model.OffsetSize{
 		Offset: offset,
 		Size:   size,
@@ -375,7 +410,7 @@ func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihas
 
 var (
 	// The minimum frequency with which to check pieces for errors (eg bad index)
-	MinPieceCheckPeriod = 5 * time.Minute
+	MinPieceCheckPeriod = 30 * time.Second
 
 	// in-memory cursor to the position we reached in the leveldb table with respect to piece cids to process for errors with the doctor
 	offset int
@@ -446,32 +481,6 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 	log.Debugw("NextPiecesToCheck: returning piececids", "len", len(pieceCids), "offset", offset)
 
 	return pieceCids, nil
-}
-
-func (db *DB) PiecesCount(ctx context.Context) (int, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "db.pieces_count")
-	defer span.End()
-
-	q := query.Query{
-		Prefix:   "/" + sprefixPieceCidToCursor + "/",
-		KeysOnly: true,
-	}
-	results, err := db.Query(ctx, q)
-	if err != nil {
-		return -1, fmt.Errorf("listing pieces in database: %w", err)
-	}
-
-	var count int
-	for {
-		_, ok := results.NextSync()
-		if !ok {
-			break
-		}
-
-		count++
-	}
-
-	return count, nil
 }
 
 func (db *DB) ListPieces(ctx context.Context) ([]cid.Cid, error) {
@@ -643,7 +652,7 @@ func (db *DB) RemoveIndexes(ctx context.Context, cursor uint64, pieceCid cid.Cid
 	return nil
 }
 
-func (db *DB) ListFlaggedPieces(ctx context.Context, filter *types.FlaggedPiecesListFilter, cursor *time.Time, o int, limit int) ([]model.FlaggedPiece, error) {
+func (db *DB) ListFlaggedPieces(ctx context.Context) ([]model.FlaggedPiece, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.list_flagged_pieces")
 	defer span.End()
 
@@ -675,48 +684,19 @@ func (db *DB) ListFlaggedPieces(ctx context.Context, filter *types.FlaggedPieces
 			return nil, fmt.Errorf("failed to unmarshal LeveldbFlaggedMetadata: %w; %v", err, r.Value)
 		}
 
-		if filter != nil && filter.HasUnsealedCopy != v.HasUnsealedCopy {
-			continue
-		}
-
-		if cursor != nil && v.CreatedAt.Before(*cursor) {
-			continue
-		}
-
-		records = append(records, model.FlaggedPiece{
-			CreatedAt:       v.CreatedAt,
-			UpdatedAt:       v.UpdatedAt,
-			PieceCid:        pieceCid,
-			HasUnsealedCopy: v.HasUnsealedCopy,
-		})
-	}
-
-	sort.Slice(records, func(i, j int) bool {
-		return records[i].CreatedAt.Before(records[j].CreatedAt)
-	})
-
-	if offset > 0 {
-		if offset >= len(records) {
-			records = []model.FlaggedPiece{}
-		} else {
-			records = records[offset:]
-		}
-	}
-
-	if len(records) > limit {
-		records = records[:limit]
+		records = append(records, model.FlaggedPiece{CreatedAt: v.CreatedAt, PieceCid: pieceCid})
 	}
 
 	return records, nil
 }
 
-func (db *DB) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error) {
+func (db *DB) FlaggedPiecesCount(ctx context.Context) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.flagged_pieces_count")
 	defer span.End()
 
 	q := query.Query{
 		Prefix:   "/" + sprefixPieceCidToFlagged + "/",
-		KeysOnly: filter == nil,
+		KeysOnly: true,
 	}
 	results, err := db.Query(ctx, q)
 	if err != nil {
@@ -725,21 +705,9 @@ func (db *DB) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiece
 
 	var i int
 	for {
-		r, ok := results.NextSync()
+		_, ok := results.NextSync()
 		if !ok {
 			break
-		}
-
-		if filter != nil {
-			var v LeveldbFlaggedMetadata
-			err = json.Unmarshal(r.Value, &v)
-			if err != nil {
-				return 0, fmt.Errorf("failed to unmarshal LeveldbFlaggedMetadata: %w; %v", err, r.Value)
-			}
-
-			if filter.HasUnsealedCopy != v.HasUnsealedCopy {
-				continue
-			}
 		}
 
 		i++

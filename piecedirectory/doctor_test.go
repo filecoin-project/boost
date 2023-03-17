@@ -1,6 +1,3 @@
-//go:build test_lid
-// +build test_lid
-
 package piecedirectory
 
 import (
@@ -10,19 +7,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/sectorstatemgr"
-	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"
+	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
-	"github.com/filecoin-project/boostd-data/yugabyte"
-	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
-	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-libipfs/blocks"
 	"github.com/ipld/go-car/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -35,23 +28,23 @@ func TestPieceDoctor(t *testing.T) {
 		prev := ldb.MinPieceCheckPeriod
 		ldb.MinPieceCheckPeriod = 1 * time.Second
 
+		prevp := ldb.PiecesToTrackerBatchSize
+		ldb.PiecesToTrackerBatchSize = 4
+
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
 
-		ln, err := bdsvc.Start(ctx, "localhost:0")
+		port := 8050
+		err = bdsvc.Start(ctx, port)
 		require.NoError(t, err)
 
 		cl := client.NewStore()
-		err = cl.Dial(ctx, fmt.Sprintf("ws://%s", ln))
+		err = cl.Dial(ctx, fmt.Sprintf("http://localhost:%d", port))
 		require.NoError(t, err)
 		defer cl.Close(ctx)
 
 		t.Run("next pieces pagination", func(t *testing.T) {
-			prevp := ldb.PiecesToTrackerBatchSize
-			testNextPiecesPagination(ctx, t, cl, func(pageSize int) {
-				ldb.PiecesToTrackerBatchSize = pageSize
-			})
-			ldb.PiecesToTrackerBatchSize = prevp
+			testNextPiecesPagination(ctx, t, cl, ldb.MinPieceCheckPeriod)
 		})
 
 		t.Run("check pieces", func(t *testing.T) {
@@ -59,46 +52,37 @@ func TestPieceDoctor(t *testing.T) {
 		})
 
 		ldb.MinPieceCheckPeriod = prev
+		ldb.PiecesToTrackerBatchSize = prevp
 	})
+	t.Run("couchbase", func(t *testing.T) {
+		// TODO: Unskip this test once the couchbase instance can be created
+		//  from a docker container in CI
+		t.Skip()
 
-	t.Run("yugabyte", func(t *testing.T) {
-		prev := yugabyte.MinPieceCheckPeriod
-		yugabyte.MinPieceCheckPeriod = 1 * time.Second
+		prev := couchbase.MinPieceCheckPeriod
+		couchbase.MinPieceCheckPeriod = 1 * time.Second
 
-		svc.SetupYugabyte(t)
+		svc.SetupCouchbase(t, testCouchSettings)
+		bdsvc := svc.NewCouchbase(testCouchSettings)
 
-		bdsvc := svc.NewYugabyte(svc.TestYugabyteSettings)
-
-		ln, err := bdsvc.Start(ctx, "localhost:0")
+		port := 8051
+		err := bdsvc.Start(ctx, port)
 		require.NoError(t, err)
 
 		cl := client.NewStore()
-		err = cl.Dial(ctx, fmt.Sprintf("ws://%s", ln))
+		err = cl.Dial(ctx, fmt.Sprintf("http://localhost:%d", port))
 		require.NoError(t, err)
 		defer cl.Close(ctx)
 
-		ybstore := bdsvc.Impl.(*yugabyte.Store)
-
 		t.Run("next pieces", func(t *testing.T) {
-			svc.RecreateTables(ctx, t, ybstore)
-			testNextPieces(ctx, t, cl, yugabyte.MinPieceCheckPeriod)
-		})
-
-		t.Run("next pieces pagination", func(t *testing.T) {
-			svc.RecreateTables(ctx, t, ybstore)
-			prevp := yugabyte.TrackerCheckBatchSize
-			testNextPiecesPagination(ctx, t, cl, func(pageSize int) {
-				yugabyte.TrackerCheckBatchSize = pageSize
-			})
-			yugabyte.TrackerCheckBatchSize = prevp
+			testNextPieces(ctx, t, cl, couchbase.MinPieceCheckPeriod)
 		})
 
 		t.Run("check pieces", func(t *testing.T) {
-			svc.RecreateTables(ctx, t, ybstore)
 			testCheckPieces(ctx, t, cl)
 		})
 
-		yugabyte.MinPieceCheckPeriod = prev
+		couchbase.MinPieceCheckPeriod = prev
 	})
 }
 
@@ -108,6 +92,7 @@ func TestPieceDoctor(t *testing.T) {
 func testNextPieces(ctx context.Context, t *testing.T, cl *client.Store, pieceCheckPeriod time.Duration) {
 	// Add a new piece
 	pieceCid := blocks.NewBlock([]byte(fmt.Sprintf("%d", time.Now().UnixMilli()))).Cid()
+	fmt.Println(pieceCid)
 	di := model.DealInfo{
 		DealUuid:    uuid.New().String(),
 		ChainDealID: 1,
@@ -142,14 +127,14 @@ func testNextPieces(ctx context.Context, t *testing.T, cl *client.Store, pieceCh
 	require.Contains(t, pcids, pieceCid)
 }
 
-func testNextPiecesPagination(ctx context.Context, t *testing.T, cl *client.Store, setPageSize func(int)) {
-	setPageSize(4)
-
-	// Add 9 pieces
+func testNextPiecesPagination(ctx context.Context, t *testing.T, cl *client.Store, pieceCheckPeriod time.Duration) {
+	// Add 8 pieces
+	allPcids := make(map[cid.Cid]struct{})
 	seen := make(map[cid.Cid]int)
 
 	for i := 1; i <= 9; i++ {
-		pieceCid := testutil.GenerateCid()
+		pieceCid := blocks.NewBlock([]byte(fmt.Sprintf("%d%d", time.Now().UnixMilli(), i))).Cid()
+		fmt.Println(pieceCid)
 		di := model.DealInfo{
 			DealUuid:    uuid.New().String(),
 			ChainDealID: abi.DealID(i),
@@ -159,6 +144,8 @@ func testNextPiecesPagination(ctx context.Context, t *testing.T, cl *client.Stor
 		}
 		err := cl.AddDealForPiece(ctx, pieceCid, di)
 		require.NoError(t, err)
+
+		allPcids[pieceCid] = struct{}{}
 	}
 
 	// expect to get 4 pieces
@@ -204,16 +191,19 @@ func testNextPiecesPagination(ctx context.Context, t *testing.T, cl *client.Stor
 
 	// Add 1 more piece
 	for i := 1; i <= 1; i++ {
-		pieceCid := testutil.GenerateCid()
+		pieceCid := blocks.NewBlock([]byte(fmt.Sprintf("%d%d", time.Now().UnixMilli(), i))).Cid()
+		fmt.Println(pieceCid)
 		di := model.DealInfo{
 			DealUuid:    uuid.New().String(),
-			ChainDealID: abi.DealID(100),
-			SectorID:    abi.SectorNumber(100),
+			ChainDealID: abi.DealID(i),
+			SectorID:    abi.SectorNumber(i),
 			PieceOffset: 0,
 			PieceLength: 2048,
 		}
 		err := cl.AddDealForPiece(ctx, pieceCid, di)
 		require.NoError(t, err)
+
+		allPcids[pieceCid] = struct{}{}
 	}
 
 	// wait to reset the interval and start from scratch
@@ -260,48 +250,30 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	commpCalc := CalculateCommp(t, carv1Reader)
 
 	// Add deal info for the piece
-	minerActorID := abi.ActorID(1011)
-	minerAddr, err := address.NewIDAddress(uint64(minerActorID))
-	require.NoError(t, err)
 	di := model.DealInfo{
 		DealUuid:    uuid.New().String(),
 		ChainDealID: 1,
-		MinerAddr:   minerAddr,
 		SectorID:    1,
 		PieceOffset: 0,
 		PieceLength: commpCalc.PieceSize,
 	}
-	dlSectorID := abi.SectorID{
-		Miner:  minerActorID,
-		Number: di.SectorID,
-	}
 	err = cl.AddDealForPiece(ctx, commpCalc.PieceCID, di)
 	require.NoError(t, err)
 
-	// Initialize the sector state such that the deal's sector is active and
-	// there is an unsealed copy
-	ssu := &sectorstatemgr.SectorStateUpdates{
-		ActiveSectors: map[abi.SectorID]struct{}{
-			dlSectorID: struct{}{},
-		},
-		SectorStates: map[abi.SectorID]db.SealState{
-			dlSectorID: db.SealStateUnsealed,
-		},
-	}
-
 	// Create a doctor
-	doc := NewDoctor(cl, nil, nil)
+	sapi := CreateMockDoctorSealingApi()
+	doc := NewDoctor(cl, sapi)
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID)
 	require.NoError(t, err)
 
 	// The piece should be flagged because there is no index for it
-	count, err := cl.FlaggedPiecesCount(ctx, nil)
+	count, err := cl.FlaggedPiecesCount(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
-	pcids, err := cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
+	pcids, err := cl.FlaggedPiecesList(ctx, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(pcids))
 
@@ -311,47 +283,47 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID)
 	require.NoError(t, err)
 
 	// The piece should no longer be flagged
-	count, err = cl.FlaggedPiecesCount(ctx, nil)
+	count, err = cl.FlaggedPiecesCount(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
-	pcids, err = cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
+	pcids, err = cl.FlaggedPiecesList(ctx, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pcids))
 
-	// Simulate deleting the unsealed copy
-	ssu.SectorStates[dlSectorID] = db.SealStateSealed
+	// Mark the piece as not being unsealed
+	sapi.isUnsealed = false
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID)
 	require.NoError(t, err)
 
 	// The piece should be flagged because there is no unsealed copy
-	count, err = cl.FlaggedPiecesCount(ctx, nil)
+	count, err = cl.FlaggedPiecesCount(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
-	pcids, err = cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
+	pcids, err = cl.FlaggedPiecesList(ctx, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(pcids))
 
-	// Simulate a sector unseal
-	ssu.SectorStates[dlSectorID] = db.SealStateUnsealed
+	// Mark the piece as being unsealed
+	sapi.isUnsealed = true
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID)
 	require.NoError(t, err)
 
 	// The piece should no longer be flagged
-	count, err = cl.FlaggedPiecesCount(ctx, nil)
+	count, err = cl.FlaggedPiecesCount(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
-	pcids, err = cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
+	pcids, err = cl.FlaggedPiecesList(ctx, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pcids))
 }

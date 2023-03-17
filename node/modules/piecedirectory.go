@@ -3,51 +3,42 @@ package modules
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/filecoin-project/boost-gfm/piecestore"
-	"github.com/filecoin-project/boost-gfm/shared"
-	"github.com/filecoin-project/boost-gfm/storagemarket"
-	"github.com/filecoin-project/boost-gfm/stores"
-	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
-	"github.com/filecoin-project/boost/sectorstatemgr"
-	bdclient "github.com/filecoin-project/boostd-data/client"
+	"github.com/filecoin-project/boost/piecedirectory/types"
+	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
-	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-jsonrpc"
-	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/go-fil-markets/piecestore"
+	"github.com/filecoin-project/go-fil-markets/shared"
+	"github.com/filecoin-project/go-fil-markets/storagemarket"
+	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/lotus/api/v1api"
+	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
-	bstore "github.com/ipfs/boxo/blockstore"
-	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
+	bstore "github.com/ipfs/go-ipfs-blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
 	"go.uber.org/fx"
 )
 
-func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) *bdclient.Store {
-	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) *bdclient.Store {
-		svcDialOpts := []jsonrpc.Option{
-			jsonrpc.WithTimeout(time.Duration(cfg.LocalIndexDirectory.ServiceRPCTimeout)),
-		}
-		client := bdclient.NewStore(svcDialOpts...)
+func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) types.Store {
+	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) types.Store {
+		client := piecedirectory.NewStore()
 
 		var cancel context.CancelFunc
 		var svcCtx context.Context
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				if cfg.LocalIndexDirectory.ServiceApiInfo != "" {
-					log.Infow("local index directory: dialing the service api", "service-api-info", cfg.LocalIndexDirectory.ServiceApiInfo)
 					return client.Dial(ctx, cfg.LocalIndexDirectory.ServiceApiInfo)
 				}
 
@@ -59,20 +50,31 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 				}
 
 				svcCtx, cancel = context.WithCancel(ctx)
+
 				var bdsvc *svc.Service
-				switch {
-				case cfg.LocalIndexDirectory.Yugabyte.Enabled:
-					log.Infow("local index directory: connecting to yugabyte server",
-						"connect-string", cfg.LocalIndexDirectory.Yugabyte.ConnectString,
-						"hosts", cfg.LocalIndexDirectory.Yugabyte.Hosts)
+				if cfg.LocalIndexDirectory.Couchbase.ConnectString != "" {
+					log.Infow("local index directory: connecting to couchbase server",
+						"connect-string", cfg.LocalIndexDirectory.Couchbase.ConnectString)
 
-					// Set up a local index directory service that connects to the yugabyte db
-					bdsvc = svc.NewYugabyte(yugabyte.DBSettings{
-						Hosts:         cfg.LocalIndexDirectory.Yugabyte.Hosts,
-						ConnectString: cfg.LocalIndexDirectory.Yugabyte.ConnectString,
+					// If the couchbase connect string is defined, set up a
+					// local index directory service that connects to the couchbase db
+					bdsvc = svc.NewCouchbase(couchbase.DBSettings{
+						ConnectString: cfg.LocalIndexDirectory.Couchbase.ConnectString,
+						Auth: couchbase.DBSettingsAuth{
+							Username: cfg.LocalIndexDirectory.Couchbase.Username,
+							Password: cfg.LocalIndexDirectory.Couchbase.Password,
+						},
+						PieceMetadataBucket: couchbase.DBSettingsBucket{
+							RAMQuotaMB: cfg.LocalIndexDirectory.Couchbase.PieceMetadataBucket.RAMQuotaMB,
+						},
+						MultihashToPiecesBucket: couchbase.DBSettingsBucket{
+							RAMQuotaMB: cfg.LocalIndexDirectory.Couchbase.MultihashToPiecesBucket.RAMQuotaMB,
+						},
+						PieceOffsetsBucket: couchbase.DBSettingsBucket{
+							RAMQuotaMB: cfg.LocalIndexDirectory.Couchbase.PieceOffsetsBucket.RAMQuotaMB,
+						},
 					})
-
-				default:
+				} else {
 					log.Infow("local index directory: connecting to leveldb instance")
 
 					// Setup a local index directory service that connects to the leveldb
@@ -84,21 +86,16 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 				}
 
 				// Start the embedded local index directory service
-				addr := fmt.Sprintf("localhost:%d", port)
-				_, err := bdsvc.Start(svcCtx, addr)
+				err := bdsvc.Start(svcCtx, port)
 				if err != nil {
 					return fmt.Errorf("starting local index directory service: %w", err)
 				}
 
 				// Connect to the embedded service
-				return client.Dial(ctx, fmt.Sprintf("ws://%s", addr))
+				return client.Dial(ctx, fmt.Sprintf("http://localhost:%d", port))
 			},
 			OnStop: func(ctx context.Context) error {
-				// cancel is nil if we use the service api (boostd-data process)
-				if cancel != nil {
-					cancel()
-				}
-
+				cancel()
 				client.Close(ctx)
 				return nil
 			},
@@ -108,8 +105,8 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 	}
 }
 
-func NewPieceDirectory(cfg *config.Boost) func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store *bdclient.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
-	return func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store *bdclient.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
+func NewPieceDirectory(cfg *config.Boost) func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store types.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
+	return func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store types.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
 		sa := sectoraccessor.NewSectorAccessor(maddr, secb, pp, full)
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
 		pd := piecedirectory.NewPieceDirectory(store, pr, cfg.LocalIndexDirectory.ParallelAddIndexLimit)
@@ -134,8 +131,8 @@ func NewPieceStore(pm *piecedirectory.PieceDirectory, maddr address.Address) pie
 	return &boostPieceStoreWrapper{piecedirectory: pm, maddr: maddr}
 }
 
-func NewPieceDoctor(lc fx.Lifecycle, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *piecedirectory.Doctor {
-	doc := piecedirectory.NewDoctor(store, ssm, fullnodeApi)
+func NewPieceDoctor(lc fx.Lifecycle, store types.Store, sapi mktsdagstore.SectorAccessor) *piecedirectory.Doctor {
+	doc := piecedirectory.NewDoctor(store, sapi)
 	docctx, cancel := context.WithCancel(context.Background())
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -285,21 +282,4 @@ type closableBlockstore struct {
 
 func (c closableBlockstore) Close() error {
 	return nil
-}
-
-func NewBlockGetter(pd *piecedirectory.PieceDirectory) gql.BlockGetter {
-	return &pdBlockGetter{pd: pd}
-}
-
-type pdBlockGetter struct {
-	pd *piecedirectory.PieceDirectory
-}
-
-func (p *pdBlockGetter) Get(ctx context.Context, c cid.Cid) (blocks.Block, error) {
-	bz, err := p.pd.BlockstoreGet(ctx, c)
-	if err != nil {
-		return nil, err
-	}
-
-	return blocks.NewBlockWithCid(bz, c)
 }

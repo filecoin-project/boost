@@ -172,16 +172,8 @@ func (sm *BoostAPI) BoostIndexerListMultihashes(ctx context.Context, proposalCid
 	}
 }
 
-func (sm *BoostAPI) BoostIndexerAnnounceLatest(ctx context.Context) (cid.Cid, error) {
-	return sm.IndexProvider.IndexerAnnounceLatest(ctx)
-}
-
-func (sm *BoostAPI) BoostIndexerAnnounceLatestHttp(ctx context.Context, announceUrls []string) (cid.Cid, error) {
-	return sm.IndexProvider.IndexerAnnounceLatestHttp(ctx, announceUrls)
-}
-
-func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (*api.ProviderDealRejectionInfo, error) {
-	res, err := sm.StorageProvider.ImportOfflineDealData(ctx, dealUuid, filePath, delAfterImport)
+func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
+	res, err := sm.StorageProvider.ImportOfflineDealData(ctx, dealUuid, filePath)
 	return res, err
 }
 
@@ -549,6 +541,10 @@ func (sm *BoostAPI) PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Ci
 	defer span.End()
 
 	return sm.Pd.BuildIndexForPiece(ctx, piececid)
+}
+
+func (sm *BoostAPI) PdMarkIndexErrored(ctx context.Context, piececid cid.Cid, err string) error {
+	return sm.Pd.MarkIndexErrored(ctx, piececid, err)
 }
 
 func (sm *BoostAPI) OnlineBackup(ctx context.Context, dstDir string) error {

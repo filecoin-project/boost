@@ -3,6 +3,7 @@ package piecedirectory
 import (
 	"bufio"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -10,15 +11,14 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/piecedirectory/types"
-	bdclient "github.com/filecoin-project/boostd-data/client"
+	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
-	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/hashicorp/go-multierror"
-	bstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
+	bstore "github.com/ipfs/go-ipfs-blockstore"
 	format "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car/util"
@@ -27,13 +27,12 @@ import (
 	carindex "github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 var log = logging.Logger("piecedirectory")
 
 type PieceDirectory struct {
-	store       *bdclient.Store
+	store       types.Store
 	pieceReader types.PieceReader
 
 	ctx context.Context
@@ -43,7 +42,11 @@ type PieceDirectory struct {
 	addIdxOpByCid      sync.Map
 }
 
-func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThrottleSize int) *PieceDirectory {
+func NewStore() *client.Store {
+	return client.NewStore()
+}
+
+func NewPieceDirectory(store types.Store, pr types.PieceReader, addIndexThrottleSize int) *PieceDirectory {
 	return &PieceDirectory{
 		store:              store,
 		pieceReader:        pr,
@@ -56,16 +59,12 @@ func (ps *PieceDirectory) Start(ctx context.Context) {
 	ps.ctx = ctx
 }
 
-func (ps *PieceDirectory) FlaggedPiecesList(ctx context.Context, filter *bdtypes.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
-	return ps.store.FlaggedPiecesList(ctx, filter, cursor, offset, limit)
+func (ps *PieceDirectory) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+	return ps.store.FlaggedPiecesList(ctx, cursor, offset, limit)
 }
 
-func (ps *PieceDirectory) FlaggedPiecesCount(ctx context.Context, filter *bdtypes.FlaggedPiecesListFilter) (int, error) {
-	return ps.store.FlaggedPiecesCount(ctx, filter)
-}
-
-func (ps *PieceDirectory) PiecesCount(ctx context.Context) (int, error) {
-	return ps.store.PiecesCount(ctx)
+func (ps *PieceDirectory) FlaggedPiecesCount(ctx context.Context) (int, error) {
+	return ps.store.FlaggedPiecesCount(ctx)
 }
 
 // Get all metadata about a particular piece
@@ -112,9 +111,85 @@ func (ps *PieceDirectory) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, h
 	return ps.store.GetOffsetSize(ctx, pieceCid, hash)
 }
 
-func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
-	log.Debugw("add deal for piece", "piececid", pieceCid, "uuid", dealInfo.DealUuid)
+func (ps *PieceDirectory) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
+	// Get the deals for the piece
+	dls, err := ps.GetPieceDeals(ctx, pieceCid)
+	if err != nil {
+		return 0, fmt.Errorf("getting piece deals for piece %s: %w", pieceCid, err)
+	}
 
+	if len(dls) == 0 {
+		return 0, fmt.Errorf("no deals for piece %s in index: piece not found", pieceCid)
+	}
+
+	// The size of the CAR should be the same for any deal, so just return the
+	// first non-zero CAR size
+	for _, dl := range dls {
+		if dl.CarLength > 0 {
+			return dl.CarLength, nil
+		}
+	}
+
+	// There are no deals with a non-zero CAR size.
+	// The CAR size is zero if it's been imported from the dagstore (the
+	// dagstore doesn't store CAR size information). So instead work out the
+	// size of the CAR by getting the offset of the last section in the CAR
+	// file, then reading the section information.
+
+	// Get the offset of the last section in the CAR file from the index.
+	var lastSectionOffset uint64
+	idx, err := ps.GetIterableIndex(ctx, pieceCid)
+	if err != nil {
+		return 0, fmt.Errorf("getting index for piece %s: %w", pieceCid, err)
+	}
+	err = idx.ForEach(func(_ mh.Multihash, offset uint64) error {
+		if offset > lastSectionOffset {
+			lastSectionOffset = offset
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("iterating index for piece %s: %w", pieceCid, err)
+	}
+
+	// Get a reader over the piece
+	pieceReader, err := ps.GetPieceReader(ctx, pieceCid)
+	if err != nil {
+		return 0, fmt.Errorf("getting piece reader for piece %s: %w", pieceCid, err)
+	}
+
+	// Seek to the last section
+	_, err = pieceReader.Seek(int64(lastSectionOffset), io.SeekStart)
+	if err != nil {
+		return 0, fmt.Errorf("seeking to offset %d in piece data: %w", lastSectionOffset, err)
+	}
+
+	// A section consists of
+	// <size of cid+block><cid><block>
+
+	// Get <size of cid+block>
+	cr := &countReader{r: bufio.NewReader(pieceReader)}
+	dataLength, err := binary.ReadUvarint(cr)
+	if err != nil {
+		return 0, fmt.Errorf("reading CAR section length: %w", err)
+	}
+
+	// The number of bytes in the uvarint that records <size of cid+block>
+	dataLengthUvarSize := cr.count
+
+	// Get the size of the (unpadded) CAR file
+	unpaddedCarSize := lastSectionOffset + dataLengthUvarSize + dataLength
+
+	// Write the CAR size back to the store so that it's cached for next time
+	err = ps.store.SetCarSize(ctx, pieceCid, unpaddedCarSize)
+	if err != nil {
+		log.Errorw("writing CAR size to local index directory store", "pieceCid", pieceCid, "err", err)
+	}
+
+	return unpaddedCarSize, nil
+}
+
+func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.add_deal_for_piece")
 	defer span.End()
 
@@ -236,9 +311,6 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	return nil
 }
 
-// BuildIndexForPiece builds indexes for a given piece CID. The piece must contain a valid deal
-// corresponding to an unsealed sector for this method to work. It will try to build index
-// using all available deals and will exit as soon as it succeeds for one of the deals
 func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.build_index_for_piece")
 	defer span.End()
@@ -255,18 +327,12 @@ func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.C
 		return fmt.Errorf("getting piece deals: no deals found for piece")
 	}
 
-	var merr error
-
-	// Iterate over all available deals in case first deal does not have an unsealed sector
-	for _, dl := range dls {
-		err = ps.addIndexForPieceThrottled(ctx, pieceCid, dl)
-		if err == nil {
-			return nil
-		}
-		merr = multierror.Append(merr, fmt.Errorf("adding index for piece deal %d: %w", dl.ChainDealID, err))
+	err = ps.addIndexForPieceThrottled(ctx, pieceCid, dls[0])
+	if err != nil {
+		return fmt.Errorf("adding index for piece deal %d: %w", dls[0].ChainDealID, err)
 	}
 
-	return merr
+	return nil
 }
 
 func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid string) error {
@@ -280,6 +346,10 @@ func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.C
 		return fmt.Errorf("deleting deal from piece metadata: %w", err)
 	}
 	return nil
+}
+
+func (ps *PieceDirectory) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err string) error {
+	return ps.store.MarkIndexErrored(ctx, pieceCid, err)
 }
 
 //func (ps *piecedirectory) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
@@ -303,7 +373,6 @@ func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.C
 func (ps *PieceDirectory) GetPieceReader(ctx context.Context, pieceCid cid.Cid) (types.SectionReader, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_reader")
 	defer span.End()
-	span.SetAttributes(attribute.String("piececid", pieceCid.String()))
 
 	// Get all deals containing this piece
 	deals, err := ps.GetPieceDeals(ctx, pieceCid)
@@ -438,56 +507,44 @@ func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int
 		return 0, format.ErrNotFound{Cid: c}
 	}
 
-	var merr error
+	// Get the size of the block from the first piece (should be the same for
+	// any piece)
+	offsetSize, err := ps.GetOffsetSize(ctx, pieces[0], c.Hash())
+	if err != nil {
+		return 0, fmt.Errorf("getting size of cid %s in piece %s: %w", c, pieces[0], err)
+	}
 
-	// Iterate over all pieces in case the sector containing the first piece with the Block
-	// is not unsealed
-	for _, p := range pieces {
-		// Get the size of the block from the piece (should be the same for
-		// all pieces)
-		offsetSize, err := ps.GetOffsetSize(ctx, p, c.Hash())
-		if err != nil {
-			merr = multierror.Append(merr, fmt.Errorf("getting size of cid %s in piece %s: %w", c, p, err))
-			continue
-		}
-
-		if offsetSize.Size > 0 {
-			return int(offsetSize.Size), nil
-		}
-
-		// Indexes imported from the DAG store do not have block size information
-		// (they only have offset information). Check if the block size is zero
-		// because the index is incomplete.
-		isComplete, err := ps.store.IsCompleteIndex(ctx, p)
-		if err != nil {
-			merr = multierror.Append(merr, fmt.Errorf("getting index complete status for piece %s: %w", p, err))
-			continue
-		}
-
-		if isComplete {
-			// The deal index is complete, so it must be a zero-sized block.
-			// A zero-sized block is unusual, but possible.
-			return int(offsetSize.Size), nil
-		}
-
-		// The index is incomplete, so re-build the index on the fly
-		err = ps.BuildIndexForPiece(ctx, p)
-		if err != nil {
-			merr = multierror.Append(merr, fmt.Errorf("re-building index for piece %s: %w", p, err))
-			continue
-		}
-
-		// Now get the size again
-		offsetSize, err = ps.GetOffsetSize(ctx, p, c.Hash())
-		if err != nil {
-			merr = multierror.Append(merr, fmt.Errorf("getting size of cid %s in piece %s: %w", c, p, err))
-			continue
-		}
-
+	if offsetSize.Size > 0 {
 		return int(offsetSize.Size), nil
 	}
 
-	return 0, merr
+	// Indexes imported from the DAG store do not have block size information
+	// (they only have offset information). Check if the block size is zero
+	// because the index is incomplete.
+	isComplete, err := ps.store.IsCompleteIndex(ctx, pieces[0])
+	if err != nil {
+		return 0, fmt.Errorf("getting index complete status for piece %s: %w", pieces[0], err)
+	}
+
+	if isComplete {
+		// The deal index is complete, so it must be a zero-sized block.
+		// A zero-sized block is unusual, but possible.
+		return int(offsetSize.Size), nil
+	}
+
+	// The index is incomplete, so re-build the index on the fly
+	err = ps.BuildIndexForPiece(ctx, pieces[0])
+	if err != nil {
+		return 0, fmt.Errorf("re-building index for piece %s: %w", pieces[0], err)
+	}
+
+	// Now get the size again
+	offsetSize, err = ps.GetOffsetSize(ctx, pieces[0], c.Hash())
+	if err != nil {
+		return 0, fmt.Errorf("getting size of cid %s in piece %s: %w", c, pieces[0], err)
+	}
+
+	return int(offsetSize.Size), nil
 }
 
 func (ps *PieceDirectory) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) {
@@ -527,6 +584,20 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 	}
 
 	return bs, nil
+}
+
+// countReader just counts the number of bytes read
+type countReader struct {
+	r     *bufio.Reader
+	count uint64
+}
+
+func (c *countReader) ReadByte() (byte, error) {
+	b, err := c.r.ReadByte()
+	if err == nil {
+		c.count++
+	}
+	return b, err
 }
 
 type SectorAccessorAsPieceReader struct {

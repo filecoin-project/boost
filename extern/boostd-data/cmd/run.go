@@ -3,29 +3,28 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
-
+	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boostd-data/svc"
-	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
+	"net/http"
 )
 
 var runCmd = &cli.Command{
 	Name: "run",
 	Subcommands: []*cli.Command{
 		leveldbCmd,
-		yugabyteCmd,
+		couchbaseCmd,
 	},
 }
 
 var runFlags = []cli.Flag{
-	&cli.StringFlag{
-		Name:  "addr",
-		Usage: "the address the boostd-data listens on",
-		Value: "localhost:8042",
+	&cli.UintFlag{
+		Name:  "port",
+		Usage: "the port the boostd-data listens on",
+		Value: 8042,
 	},
 	&cli.BoolFlag{
 		Name:  "pprof",
@@ -71,32 +70,38 @@ var leveldbCmd = &cli.Command{
 	},
 }
 
-var yugabyteCmd = &cli.Command{
-	Name:   "yugabyte",
-	Usage:  "Run boostd-data with a yugabyte database",
+var couchbaseCmd = &cli.Command{
+	Name:   "couchbase",
+	Usage:  "Run boostd-data with a couchbase database",
 	Before: before,
 	Flags: append([]cli.Flag{
-		&cli.StringSliceFlag{
-			Name:     "hosts",
-			Usage:    "yugabyte hosts to connect to over cassandra interface eg '127.0.0.1'",
+		&cli.StringFlag{
+			Name:     "connect-string",
+			Usage:    "couchbase connect string eg 'couchbase://127.0.0.1'",
 			Required: true,
 		},
 		&cli.StringFlag{
-			Name:     "connect-string",
-			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
+			Name:     "username",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "password",
 			Required: true,
 		}},
 		runFlags...,
 	),
 	Action: func(cctx *cli.Context) error {
-		// Create a yugabyte data service
-		settings := yugabyte.DBSettings{
-			Hosts:         cctx.StringSlice("hosts"),
+		// Create a couchbase data service
+		settings := couchbase.DBSettings{
 			ConnectString: cctx.String("connect-string"),
+			Auth: couchbase.DBSettingsAuth{
+				Username: cctx.String("username"),
+				Password: cctx.String("password"),
+			},
 		}
 
-		bdsvc := svc.NewYugabyte(settings)
-		return runAction(cctx, "yugabyte", bdsvc)
+		bdsvc := svc.NewCouchbase(settings)
+		return runAction(cctx, "couchbase", bdsvc)
 	},
 }
 
@@ -125,14 +130,14 @@ func runAction(cctx *cli.Context, dbType string, store *svc.Service) error {
 	}
 
 	// Start the server
-	addr := cctx.String("addr")
-	_, err = store.Start(ctx, addr)
+	port := cctx.Int("port")
+	err = store.Start(ctx, port)
 	if err != nil {
 		return fmt.Errorf("starting %s store: %w", dbType, err)
 	}
 
-	log.Infof("Started boostd-data %s service on address %s",
-		dbType, addr)
+	log.Infof("Started boostd-data %s service on port %d",
+		dbType, port)
 
 	// Monitor for shutdown.
 	<-ctx.Done()

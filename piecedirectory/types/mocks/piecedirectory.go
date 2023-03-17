@@ -338,6 +338,20 @@ func (mr *MockStoreMockRecorder) ListPieces(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPieces", reflect.TypeOf((*MockStore)(nil).ListPieces), arg0)
 }
 
+// MarkIndexErrored mocks base method.
+func (m *MockStore) MarkIndexErrored(arg0 context.Context, arg1 cid.Cid, arg2 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkIndexErrored", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkIndexErrored indicates an expected call of MarkIndexErrored.
+func (mr *MockStoreMockRecorder) MarkIndexErrored(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkIndexErrored", reflect.TypeOf((*MockStore)(nil).MarkIndexErrored), arg0, arg1, arg2)
+}
+
 // NextPiecesToCheck mocks base method.
 func (m *MockStore) NextPiecesToCheck(arg0 context.Context) ([]cid.Cid, error) {
 	m.ctrl.T.Helper()
@@ -408,6 +422,20 @@ func (m *MockStore) RemovePieceMetadata(arg0 context.Context, arg1 cid.Cid) erro
 func (mr *MockStoreMockRecorder) RemovePieceMetadata(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemovePieceMetadata", reflect.TypeOf((*MockStore)(nil).RemovePieceMetadata), arg0, arg1)
+}
+
+// SetCarSize mocks base method.
+func (m *MockStore) SetCarSize(arg0 context.Context, arg1 cid.Cid, arg2 uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetCarSize", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetCarSize indicates an expected call of SetCarSize.
+func (mr *MockStoreMockRecorder) SetCarSize(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCarSize", reflect.TypeOf((*MockStore)(nil).SetCarSize), arg0, arg1, arg2)
 }
 
 // UnflagPiece mocks base method.
