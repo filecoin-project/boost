@@ -114,6 +114,7 @@ var statsCmd = &cli.Command{
 
 					fmt.Println("boost provider ", maddr.String(), "raw power:", minerToMinerPower[maddr].RawBytePower)
 					fmt.Println("boost provider ", maddr.String(), "quality adj power:", minerToMinerPower[maddr].QualityAdjPower)
+					fmt.Println("boost provider ", maddr.String(), "protos:", protos)
 
 					boostNodes++
 					boostQualityAdjPower = big.Add(boostQualityAdjPower, minerToMinerPower[maddr].QualityAdjPower)
