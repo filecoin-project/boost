@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	mbig "math/big"
 
@@ -252,6 +253,10 @@ func lengthPrefixPointsTo(output []byte) (int, int, error) {
 }
 
 func (c *ContractDealMonitor) getDealProposal(ctx context.Context, topicContractAddress string, topicDealProposalID string, fromEthAddr ethtypes.EthAddress) ([]byte, error) {
+	defer func(now time.Time) {
+		log.Warnw("contract getDealProposal elapsed", "took", time.Since(now))
+	}(time.Now())
+
 	// GetDealProposal is a free data retrieval call binding the contract method 0xf4b2e4d8.
 	_params := "0xf4b2e4d8" + topicDealProposalID[2:] // cut 0x prefix
 
