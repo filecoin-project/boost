@@ -1,35 +1,185 @@
-import {useQuery} from "@apollo/react-hooks";
+import {useMutation, useQuery} from "@apollo/react-hooks";
 import {
+    FlaggedPiecesQuery, PieceBuildIndexMutation,
     PieceStatusQuery, PiecesWithPayloadCidQuery, PiecesWithRootPayloadCidQuery
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
 import React, {useState} from "react";
 import {PageContainer, ShortDealLink} from "./Components";
-import {Link, useParams} from "react-router-dom";
+import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import xImg from './bootstrap-icons/icons/x-lg.svg'
 import inspectImg from './bootstrap-icons/icons/wrench.svg'
 import './Inspect.css'
+import {Pagination} from "./Pagination";
+import {Info, InfoListItem} from "./Info";
+
+var inspectBasePath = '/inspect'
 
 export function InspectMenuItem(props) {
     return (
-        <Link key="inspect" className="menu-item" to="/inspect">
+        <Link key="inspect" className="menu-item" to={inspectBasePath}>
             <img className="icon" alt="" src={inspectImg} />
             <h3>Inspect</h3>
         </Link>
     )
 }
 
+// Main page with flagged pieces
 export function InspectPage(props) {
     return <PageContainer title="Inspect Piece metadata">
         <InspectContent />
     </PageContainer>
 }
 
-function InspectContent(props) {
+function InspectContent() {
     const params = useParams()
     const [searchQuery, setSearchQuery] = useState(params.query)
+
+    const flaggedPiecesContent = searchQuery ? null : <FlaggedPieces setSearchQuery={setSearchQuery}  />
+
+    const showSearchPrompt = flaggedPiecesContent == null
+    return <div className="inspect-content">
+        { <SearchResults searchQuery={searchQuery} setSearchQuery={setSearchQuery} showSearchPrompt={showSearchPrompt} /> }
+        { flaggedPiecesContent }
+    </div>
+}
+
+function FlaggedPieces({setSearchQuery}) {
+    const navigate = useNavigate()
+    const params = useParams()
+    const pageNum = (params.pageNum && parseInt(params.pageNum)) || 1
+
+    var [rowsPerPage, setRowsPerPage] = useState(RowsPerPage.load)
+    const onRowsPerPageChange = (e) => {
+        const val = parseInt(e.target.value)
+        RowsPerPage.save(val)
+        setRowsPerPage(val)
+        navigate(inspectBasePath)
+        scrollTop()
+    }
+
+    // Fetch rows on this page
+    const listOffset = (pageNum-1) * rowsPerPage
+    const queryCursor = (pageNum === 1) ? null : params.cursor
+    const {loading, error, data} = useQuery(FlaggedPiecesQuery, {
+        pollInterval: 10000,
+        variables: {
+            cursor: queryCursor,
+            offset: listOffset,
+            limit: rowsPerPage,
+        },
+        fetchPolicy: 'network-only',
+    })
+
+    if (error) return <div>Error: {error.message + " - check connection to Boost server"}</div>
+    if (loading) return <div>Loading...</div>
+
+    var res = data.piecesFlagged
+    var rows = res.pieces
+    const totalCount = data.piecesFlagged.totalCount
+    const moreRows = data.piecesFlagged.more
+
+    if (!totalCount) {
+        return <div className="flagged-pieces-none">
+            Boost doctor did not find any pieces with errors
+        </div>
+    }
+
+    var cursor = params.cursor
+    if (pageNum === 1 && rows.length) {
+        cursor = rows[0].CreatedAt.getTime()
+    }
+
+    const paginationParams = {
+        basePath: inspectBasePath,
+        cursor, pageNum, totalCount,
+        rowsPerPage: rowsPerPage,
+        moreRows: moreRows,
+        onRowsPerPageChange: onRowsPerPageChange,
+        onLinkClick: scrollTop,
+    }
+
+    return <div className="flagged-pieces">
+        <h3>Flagged pieces</h3>
+
+        <table>
+            <tbody>
+            <tr>
+                <th>Piece CID</th>
+                <th>Index</th>
+                <th>Unsealed Copy</th>
+                <th>Deals</th>
+            </tr>
+
+            {rows.map(piece => (
+                <FlaggedPieceRow
+                    key={piece.Piece.PieceCid}
+                    piece={piece.Piece}
+                    setSearchQuery={setSearchQuery}
+                />
+            ))}
+            </tbody>
+        </table>
+
+        <Pagination {...paginationParams} />
+    </div>
+}
+
+function FlaggedPieceRow({piece}) {
+    // Lookup the piece by piece CID.
+    // We do this asynchronously instead of as part of the list query so that
+    // checking for unseal status of each piece doesn't block the whole page.
+    const { loading, error, data } = useQuery(PieceStatusQuery, {
+        variables: {
+            pieceCid: piece.PieceCid,
+        },
+    })
+
+    var isUnsealedMsg
+    if (loading) {
+        isUnsealedMsg = '...'
+    } else if (error) {
+        isUnsealedMsg = error.Message
+    } else if (data && data.pieceStatus) {
+        const isUnsealed = hasUnsealedCopy(data.pieceStatus)
+        isUnsealedMsg = isUnsealed ? 'Yes' : 'No'
+    }
+
+    return <tr>
+        <td>
+            <Link to={"/inspect/piece/"+piece.PieceCid}>
+                {piece.PieceCid}
+            </Link>
+        </td>
+        <td>{piece.IndexStatus.Status}</td>
+        <td>{isUnsealedMsg}</td>
+        <td>{piece.Deals.length}</td>
+    </tr>
+}
+
+function hasUnsealedCopy(piece) {
+    for (var dl of piece.Deals) {
+        if (dl.SealStatus.IsUnsealed) {
+            return true
+        }
+    }
+    return false
+}
+
+// Page showing information about a particular piece
+export function InspectPiecePage(props) {
+    const params = useParams()
+
+    return <PageContainer title="Inspect Piece metadata">
+        <div className="inspect-content">
+            <SearchResults searchQuery={params.pieceCID} />
+        </div>
+    </PageContainer>
+}
+
+function SearchResults({searchQuery, setSearchQuery, showSearchPrompt}) {
     const handleSearchQueryChange = (event) => {
         setSearchQuery(event.target.value)
     }
@@ -76,6 +226,7 @@ function InspectContent(props) {
 
     // Lookup a piece by piece CID
     const pieceRes = useQuery(PieceStatusQuery, {
+        pollInterval: 10000,
         variables: {
             pieceCid: pieceCid,
         },
@@ -105,7 +256,9 @@ function InspectContent(props) {
     const showPayload = pieceCids.length > 1
     var content = null
     if (!errorMsg && !pieceStatus && !showPayload) {
-        content = <p>Enter piece CID or payload CID into the search box</p>
+        if (showSearchPrompt) {
+            content = <p>Enter piece CID or payload CID into the search box</p>
+        }
     } else if (!showPayload && !showPieceStats) {
         content = <p>No piece found with piece CID or payload CID {pieceCid}</p>
     } else {
@@ -115,7 +268,9 @@ function InspectContent(props) {
         </>
     }
     return <div className="inspect">
-        <SearchBox value={searchQuery} clearSearchBox={clearSearchBox} onChange={handleSearchQueryChange} />
+        { setSearchQuery ? (
+            <SearchBox value={searchQuery} clearSearchBox={clearSearchBox} onChange={handleSearchQueryChange} />
+        ) : null }
         { errorMsg ? <div>Error: {errorMsg}</div>  : null}
         { content }
     </div>
@@ -133,41 +288,70 @@ function PiecesWithPayload({payloadCid, pieceCids, setSearchQuery}) {
 }
 
 function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
+    // Re-build index
+    const [buildIndex] = useMutation(PieceBuildIndexMutation, {
+        // refetchQueries: props.refetchQueries,
+        variables: {pieceCid: pieceCid}
+    })
+
     if (!pieceStatus) {
         return <div>No piece found with piece CID {pieceCid}</div>
     }
 
     const rootCid = pieceStatus.Deals.length ? pieceStatus.Deals[0].Deal.DealDataRoot : null
-    const searchIsPayloadCid = searchQuery && searchQuery != pieceCid && searchQuery != rootCid
+    const searchIsAnyCid = searchQuery && searchQuery != pieceCid && searchQuery != rootCid
+    const searchIsPieceCid = searchQuery && searchQuery == pieceCid
+    const searchIsRootCid = searchQuery && searchQuery == rootCid
+    const indexFailed = pieceStatus.IndexStatus.Status === 'Failed'
+    const indexRegistered = pieceStatus.IndexStatus.Status === 'Registered'
+    const canReIndex = (indexFailed || indexRegistered) && hasUnsealedCopy(pieceStatus)
 
     return <div className="piece-detail" id={pieceCid}>
         <div className="content">
             <table className="piece-fields">
                 <tbody>
-                {searchIsPayloadCid ? (
+                {searchIsAnyCid ? (
                     <tr key="payload cid">
                         <th>Searched CID (non-root)</th>
-                        <td>{searchQuery}</td>
+                        <td><strong>{searchQuery}</strong></td>
                     </tr>
                 ) : null}
                 {rootCid ? (
                     <tr key="data root cid">
                         <th>Data Root CID</th>
-                        <td>{rootCid}</td>
+                        <td>
+                            { searchIsRootCid ? <strong>{rootCid}</strong> : rootCid }
+                        </td>
                     </tr>
                 ) : null}
                 <tr key="piece cid">
                     <th>Piece CID</th>
-                    <td>{pieceCid}</td>
+                    {searchIsPieceCid ? (
+                      <td><strong>{pieceCid}</strong></td>
+                    ) : (
+                      <td>{pieceCid}</td>
+                    )}
                 </tr>
                 <tr key="index status">
                     <th>Index Status</th>
-                    <td>{pieceStatus.IndexStatus.Status}</td>
+                    <td>
+                        <span>
+                            {pieceStatus.IndexStatus.Status}
+                            {indexFailed && pieceStatus.IndexStatus.Error ? ': ' + pieceStatus.IndexStatus.Error : '' }
+                            <IndexStatusInfo />
+                        </span>
+                        <br/>
+                        {canReIndex ? (
+                            <div className="button build-index" title="Re-build index" onClick={buildIndex}>
+                                Re-index
+                            </div>
+                        ) : null}
+                    </td>
                 </tr>
                 </tbody>
             </table>
 
-            <h3>Piece Store</h3>
+            <h3>Local Index Directory</h3>
             {pieceStatus.PieceInfoDeals.length ? (
                 <table className="deals">
                     <tbody>
@@ -190,11 +374,11 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                     </tbody>
                 </table>
             ) : (
-                <p>No data found in piece store for piece CID {pieceCid}</p>
+                <p>No deals found in Local Index Directory for piece CID {pieceCid}</p>
             )}
 
             <h3>Deals</h3>
-            {pieceStatus.PieceInfoDeals.length ? (
+            {pieceStatus.Deals.length ? (
                 <table className="deals">
                     <tbody>
                     <tr>
@@ -244,4 +428,43 @@ function SearchBox(props) {
             onChange={props.onChange} />
         { props.value ? <img alt="clear" className="clear-text" onClick={props.clearSearchBox} src={xImg} /> : null }
     </div>
+}
+
+function IndexStatusInfo() {
+    return <Info>
+        <InfoListItem title="NotFound">
+            There was no information found for this piece CID in the Local Index Directory.
+        </InfoListItem>
+        <InfoListItem title="Registered">
+            The piece has been added to the Local Index Directory but has not yet been indexed.
+        </InfoListItem>
+        <InfoListItem title="Indexing">
+            The piece is currently being indexed.
+        </InfoListItem>
+        <InfoListItem title="Complete">
+            The piece has been indexed successfully.
+        </InfoListItem>
+        <InfoListItem title="Failed">
+            There was an error indexing the piece.
+        </InfoListItem>
+    </Info>
+}
+
+const RowsPerPage = {
+    Default: 10,
+
+    settingsKey: "settings.flagged-pieces.per-page",
+
+    load: () => {
+        const saved = localStorage.getItem(RowsPerPage.settingsKey)
+        return JSON.parse(saved) || RowsPerPage.Default
+    },
+
+    save: (val) => {
+        localStorage.setItem(RowsPerPage.settingsKey, JSON.stringify(val));
+    }
+}
+
+function scrollTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" })
 }

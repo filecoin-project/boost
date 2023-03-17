@@ -8,8 +8,8 @@ import (
 	context "context"
 	reflect "reflect"
 
+	model "github.com/filecoin-project/boostd-data/model"
 	mount "github.com/filecoin-project/dagstore/mount"
-	piecestore "github.com/filecoin-project/go-fil-markets/piecestore"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"
@@ -38,19 +38,34 @@ func (m *MockHttpServerApi) EXPECT() *MockHttpServerApiMockRecorder {
 	return m.recorder
 }
 
-// GetPieceInfo mocks base method.
-func (m *MockHttpServerApi) GetPieceInfo(pieceCID cid.Cid) (*piecestore.PieceInfo, error) {
+// GetBlockByCid mocks base method.
+func (m *MockHttpServerApi) GetBlockByCid(ctx context.Context, blockCid cid.Cid) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPieceInfo", pieceCID)
-	ret0, _ := ret[0].(*piecestore.PieceInfo)
+	ret := m.ctrl.Call(m, "GetBlockByCid", ctx, blockCid)
+	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetPieceInfo indicates an expected call of GetPieceInfo.
-func (mr *MockHttpServerApiMockRecorder) GetPieceInfo(pieceCID interface{}) *gomock.Call {
+// GetBlockByCid indicates an expected call of GetBlockByCid.
+func (mr *MockHttpServerApiMockRecorder) GetBlockByCid(ctx, blockCid interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPieceInfo", reflect.TypeOf((*MockHttpServerApi)(nil).GetPieceInfo), pieceCID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockByCid", reflect.TypeOf((*MockHttpServerApi)(nil).GetBlockByCid), ctx, blockCid)
+}
+
+// GetPieceDeals mocks base method.
+func (m *MockHttpServerApi) GetPieceDeals(ctx context.Context, pieceCID cid.Cid) ([]model.DealInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPieceDeals", ctx, pieceCID)
+	ret0, _ := ret[0].([]model.DealInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPieceDeals indicates an expected call of GetPieceDeals.
+func (mr *MockHttpServerApiMockRecorder) GetPieceDeals(ctx, pieceCID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPieceDeals", reflect.TypeOf((*MockHttpServerApi)(nil).GetPieceDeals), ctx, pieceCID)
 }
 
 // IsUnsealed mocks base method.

@@ -58,7 +58,7 @@ function LegacyStorageDealsContent(props) {
     const dealListOffset = (pageNum-1) * dealsPerPage
     const queryCursor = pageNum === 1 ? null : params.cursor
     const {loading, error, data} = useQuery(LegacyDealsListQuery, {
-        pollInterval: searchQuery ? undefined : (pageNum === 1 ? 5000 : undefined),
+        pollInterval: searchQuery ? undefined : (pageNum === 1 ? 10000 : undefined),
         variables: {
             query: searchQuery,
             cursor: queryCursor,

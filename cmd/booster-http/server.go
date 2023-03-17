@@ -14,9 +14,9 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/fatih/color"
 	"github.com/filecoin-project/boost/metrics"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore/mount"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hashicorp/go-multierror"
@@ -39,10 +39,9 @@ type apiVersion struct {
 }
 
 type HttpServer struct {
-	path          string
-	port          int
-	allowIndexing bool
-	api           HttpServerApi
+	path string
+	port int
+	api  HttpServerApi
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -50,13 +49,13 @@ type HttpServer struct {
 }
 
 type HttpServerApi interface {
-	GetPieceInfo(pieceCID cid.Cid) (*piecestore.PieceInfo, error)
+	GetPieceDeals(ctx context.Context, pieceCID cid.Cid) ([]model.DealInfo, error)
 	IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error)
 	UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error)
 }
 
-func NewHttpServer(path string, port int, allowIndexing bool, api HttpServerApi) *HttpServer {
-	return &HttpServer{path: path, port: port, allowIndexing: allowIndexing, api: api}
+func NewHttpServer(path string, port int, api HttpServerApi) *HttpServer {
+	return &HttpServer{path: path, port: port, api: api}
 }
 
 func (s *HttpServer) pieceBasePath() string {
@@ -107,8 +106,9 @@ const idxPage = `
           Download a raw piece by its piece CID
         </td>
         <td>
-          <a href="/piece/bafySomePieceCid" > /piece/<piece cid></a>
+          <a href="/piece/bafySomePieceCid">/piece/<piece cid></a>
         </td>
+      </tr>
       </tbody>
     </table>
   </body>
@@ -172,16 +172,16 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	etag := pieceCid.String()
 	w.Header().Set("Etag", etag)
 
-	serveContent(w, r, content)
+	serveContent(w, r, content, "application/piece")
 
 	stats.Record(ctx, metrics.HttpPieceByCid200ResponseCount.M(1))
 	stats.Record(ctx, metrics.HttpPieceByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
 
-func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker) {
+func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker, contentType string) {
 	// Set the Content-Type header explicitly so that http.ServeContent doesn't
 	// try to do it implicitly
-	w.Header().Set("Content-Type", "application/piece")
+	w.Header().Set("Content-Type", contentType)
 
 	var writer http.ResponseWriter
 
@@ -260,19 +260,19 @@ func writeError(w http.ResponseWriter, r *http.Request, status int, msg string) 
 
 func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.ReadSeeker, error) {
 	// Get the deals for the piece
-	pieceInfo, err := s.api.GetPieceInfo(pieceCid)
+	pieceDeals, err := s.api.GetPieceDeals(ctx, pieceCid)
 	if err != nil {
 		return nil, fmt.Errorf("getting sector info for piece %s: %w", pieceCid, err)
 	}
 
 	// Get the first unsealed deal
-	di, err := s.unsealedDeal(ctx, *pieceInfo)
+	di, err := s.unsealedDeal(ctx, pieceCid, pieceDeals)
 	if err != nil {
 		return nil, fmt.Errorf("getting unsealed CAR file: %w", err)
 	}
 
 	// Get the raw piece data from the sector
-	pieceReader, err := s.api.UnsealSectorAt(ctx, di.SectorID, di.Offset.Unpadded(), di.Length.Unpadded())
+	pieceReader, err := s.api.UnsealSectorAt(ctx, di.SectorID, di.PieceOffset.Unpadded(), di.PieceLength.Unpadded())
 	if err != nil {
 		return nil, fmt.Errorf("getting raw data from sector %d: %w", di.SectorID, err)
 	}
@@ -280,17 +280,17 @@ func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.
 	return pieceReader, nil
 }
 
-func (s *HttpServer) unsealedDeal(ctx context.Context, pieceInfo piecestore.PieceInfo) (*piecestore.DealInfo, error) {
+func (s *HttpServer) unsealedDeal(ctx context.Context, pieceCid cid.Cid, pieceDeals []model.DealInfo) (*model.DealInfo, error) {
 	// There should always been deals in the PieceInfo, but check just in case
-	if len(pieceInfo.Deals) == 0 {
-		return nil, fmt.Errorf("there are no deals containing piece %s: %w", pieceInfo.PieceCID, ErrNotFound)
+	if len(pieceDeals) == 0 {
+		return nil, fmt.Errorf("there are no deals containing piece %s: %w", pieceCid, ErrNotFound)
 	}
 
 	// The same piece can be in many deals. Find the first unsealed deal.
 	sealedCount := 0
 	var allErr error
-	for _, di := range pieceInfo.Deals {
-		isUnsealed, err := s.api.IsUnsealed(ctx, di.SectorID, di.Offset.Unpadded(), di.Length.Unpadded())
+	for _, di := range pieceDeals {
+		isUnsealed, err := s.api.IsUnsealed(ctx, di.SectorID, di.PieceOffset.Unpadded(), di.PieceLength.Unpadded())
 		if err != nil {
 			allErr = multierror.Append(allErr, err)
 			continue
@@ -304,29 +304,29 @@ func (s *HttpServer) unsealedDeal(ctx context.Context, pieceInfo piecestore.Piec
 
 	// It wasn't possible to find a deal with the piece cid that is unsealed.
 	// Try to return an error message with as much useful information as possible
-	dealSectors := make([]string, 0, len(pieceInfo.Deals))
-	for _, di := range pieceInfo.Deals {
-		dealSectors = append(dealSectors, fmt.Sprintf("Deal %d: Sector %d", di.DealID, di.SectorID))
+	dealSectors := make([]string, 0, len(pieceDeals))
+	for _, di := range pieceDeals {
+		dealSectors = append(dealSectors, fmt.Sprintf("Deal %d: Sector %d", di.ChainDealID, di.SectorID))
 	}
 
 	if allErr == nil {
 		dealSectorsErr := fmt.Errorf("%s: %w", strings.Join(dealSectors, ", "), ErrNotFound)
 		return nil, fmt.Errorf("checked unsealed status of %d deals containing piece %s: none are unsealed: %w",
-			len(pieceInfo.Deals), pieceInfo.PieceCID, dealSectorsErr)
+			len(pieceDeals), pieceCid, dealSectorsErr)
 	}
 
-	if len(pieceInfo.Deals) == 1 {
+	if len(pieceDeals) == 1 {
 		return nil, fmt.Errorf("checking unsealed status of deal %d (sector %d) containing piece %s: %w",
-			pieceInfo.Deals[0].DealID, pieceInfo.Deals[0].SectorID, pieceInfo.PieceCID, allErr)
+			pieceDeals[0].ChainDealID, pieceDeals[0].SectorID, pieceCid, allErr)
 	}
 
 	if sealedCount == 0 {
 		return nil, fmt.Errorf("checking unsealed status of %d deals containing piece %s: %s: %w",
-			len(pieceInfo.Deals), pieceInfo.PieceCID, dealSectors, allErr)
+			len(pieceDeals), pieceCid, dealSectors, allErr)
 	}
 
 	return nil, fmt.Errorf("checking unsealed status of %d deals containing piece %s - %d are sealed, %d had errors: %s: %w",
-		len(pieceInfo.Deals), pieceInfo.PieceCID, sealedCount, len(pieceInfo.Deals)-sealedCount, dealSectors, allErr)
+		len(pieceDeals), pieceCid, sealedCount, len(pieceDeals)-sealedCount, dealSectors, allErr)
 }
 
 // writeErrorWatcher calls onError if there is an error writing to the writer

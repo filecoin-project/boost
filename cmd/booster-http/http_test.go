@@ -9,10 +9,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/filecoin-project/boostd-data/model"
+
 	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/golang/mock/gomock"
-	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +22,7 @@ func TestNewHttpServer(t *testing.T) {
 
 	// Create a new mock Http server
 	ctrl := gomock.NewController(t)
-	httpServer := NewHttpServer("", 7777, false, mocks_booster_http.NewMockHttpServerApi(ctrl))
+	httpServer := NewHttpServer("", 7777, mocks_booster_http.NewMockHttpServerApi(ctrl))
 	httpServer.Start(context.Background())
 
 	// Check that server is up
@@ -40,7 +40,7 @@ func TestHttpGzipResponse(t *testing.T) {
 	// Create a new mock Http server with custom functions
 	ctrl := gomock.NewController(t)
 	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
-	httpServer := NewHttpServer("", 7777, false, mockHttpServer)
+	httpServer := NewHttpServer("", 7778, mockHttpServer)
 	httpServer.Start(context.Background())
 
 	// Create mock unsealed file for piece/car
@@ -51,31 +51,22 @@ func TestHttpGzipResponse(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	//Create CID
-	cid, err := cid.Parse("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi")
-	require.NoError(t, err)
-
 	// Crate pieceInfo
-	deal := piecestore.DealInfo{
-		DealID:   1234567,
-		SectorID: 0,
-		Offset:   1233,
-		Length:   123,
+	deal := model.DealInfo{
+		ChainDealID: 1234567,
+		SectorID:    0,
+		PieceOffset: 1233,
+		PieceLength: 123,
 	}
-	var deals []piecestore.DealInfo
-
-	pieceInfo := piecestore.PieceInfo{
-		PieceCID: cid,
-		Deals:    append(deals, deal),
-	}
+	deals := []model.DealInfo{deal}
 
 	mockHttpServer.EXPECT().UnsealSectorAt(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(f, nil)
 	mockHttpServer.EXPECT().IsUnsealed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(true, nil)
-	mockHttpServer.EXPECT().GetPieceInfo(gomock.Any()).AnyTimes().Return(&pieceInfo, nil)
+	mockHttpServer.EXPECT().GetPieceDeals(gomock.Any(), gomock.Any()).AnyTimes().Return(deals, nil)
 
 	//Create a client and make request with Encoding header
 	client := new(http.Client)
-	request, err := http.NewRequest("GET", "http://localhost:7777/piece/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
+	request, err := http.NewRequest("GET", "http://localhost:7778/piece/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
 	require.NoError(t, err)
 	request.Header.Add("Accept-Encoding", "gzip")
 
@@ -105,10 +96,10 @@ func TestHttpInfo(t *testing.T) {
 
 	// Create a new mock Http server
 	ctrl := gomock.NewController(t)
-	httpServer := NewHttpServer("", 7777, false, mocks_booster_http.NewMockHttpServerApi(ctrl))
+	httpServer := NewHttpServer("", 7780, mocks_booster_http.NewMockHttpServerApi(ctrl))
 	httpServer.Start(context.Background())
 
-	response, err := http.Get("http://localhost:7777/info")
+	response, err := http.Get("http://localhost:7780/info")
 	require.NoError(t, err)
 	defer response.Body.Close()
 
@@ -118,5 +109,4 @@ func TestHttpInfo(t *testing.T) {
 	// Stop the server
 	err = httpServer.Stop()
 	require.NoError(t, err)
-
 }
