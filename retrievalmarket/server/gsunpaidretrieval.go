@@ -222,6 +222,13 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 	// for an unpaid retrieval
 	voucher, decodeErr := g.decodeVoucher(dtRequest, g.decoder)
 	if decodeErr != nil {
+		// If we don't recognize the voucher, don't intercept the retrieval
+		// (the legacy retrieval code recognizes some vouchers that we are not
+		// interested in, eg LegsVoucher for downloading announcement deal
+		// cids)
+		if errors.Is(decodeErr, unknownVoucherErr) {
+			return false, nil
+		}
 		return false, fmt.Errorf("decoding new request voucher: %w", decodeErr)
 	}
 
@@ -540,11 +547,13 @@ func (g *GraphsyncUnpaidRetrieval) failTransfer(state *retrievalState, err error
 	log.Infow("transfer failed", "transfer id", state.cs.transferID, "peer", state.cs.recipient, "err", err)
 }
 
+var unknownVoucherErr = errors.New("unknown voucher type")
+
 func (g *GraphsyncUnpaidRetrieval) decodeVoucher(request datatransfer.Request, registry *registry.Registry) (datatransfer.Voucher, error) {
 	vtypStr := request.VoucherType()
 	decoder, has := registry.Decoder(vtypStr)
 	if !has {
-		return nil, fmt.Errorf("unknown voucher type: %s", vtypStr)
+		return nil, fmt.Errorf("voucher type: %s: %w", vtypStr, unknownVoucherErr)
 	}
 	encodable, err := request.Voucher(decoder)
 	if err != nil {
