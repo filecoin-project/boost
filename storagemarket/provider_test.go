@@ -707,7 +707,7 @@ func TestDealRestartAfterManualRecoverableErrors(t *testing.T) {
 	}
 }
 
-// Tests scenarios that a contract deal fails fatally
+// Tests scenario that a contract deal fails fatally when PublishStorageDeal fails.
 func TestContractDealFatalFailAfterPublishError(t *testing.T) {
 	ctx := context.Background()
 
@@ -717,18 +717,19 @@ func TestContractDealFatalFailAfterPublishError(t *testing.T) {
 	harness.Start(t, ctx)
 	defer harness.Stop()
 
-	// Simulate publish deal failure
-
+	// generate random f4 client contract address
 	f4addr, err := address.NewFromString("f410fnqocy7tkrlw4l5mdhgjlc4gsiafr7e76yopvo2y")
 	require.NoError(t, err)
 
+	// simulate publish deal failure
 	td := harness.newDealBuilder(t, 1, withClientAddr(f4addr)).withCommpNonBlocking().withPublishFailing(errors.New("puberr")).withNormalHttpServer().build()
 
 	// execute deal
 	err = td.executeAndSubscribe()
 	require.NoError(t, err)
 
-	// expect recoverable error with retry type Fatal
+	// expect fatal error (types.DealRetryFatal) as this is a contract deal
+	// note that we return recoverable errors for regular client addresses
 	err = td.waitForError("puberr", types.DealRetryFatal)
 	require.NoError(t, err)
 }
