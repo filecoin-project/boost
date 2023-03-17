@@ -176,18 +176,18 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 						SkipIPNIAnnounce:   pv1.SkipIpniAnnounce,
 					}
 
-					log.Infow("received contract deal proposal", "id", proposal.DealUUID, "client-peer", dpc.Client)
+					log.Infow("received contract deal proposal", "id", topicDealProposalID, "uuid", proposal.DealUUID, "client-peer", dpc.Client, "contract", topicContractAddress, "piece-cid", dpc.PieceCID.String())
 
 					reason, err := c.prov.ExecuteDeal(context.Background(), &proposal, "")
 					if err != nil {
-						log.Warnw("contract deal proposal failed", "id", proposal.DealUUID, "err", err, "reason", reason.Reason)
+						log.Warnw("contract deal proposal failed", "id", topicDealProposalID, "uuid", proposal.DealUUID, "err", err, "reason", reason.Reason)
 						return nil
 					}
 
 					if reason.Accepted {
-						log.Infow("contract deal proposal accepted", "id", proposal.DealUUID)
+						log.Infow("contract deal proposal accepted", "id", topicDealProposalID, "uuid", proposal.DealUUID)
 					} else {
-						log.Warnw("contract deal proposal rejected", "id", proposal.DealUUID, "err", err, "reason", reason.Reason)
+						log.Warnw("contract deal proposal rejected", "id", topicDealProposalID, "uuid", proposal.DealUUID, "err", err, "reason", reason.Reason)
 					}
 
 					return nil
