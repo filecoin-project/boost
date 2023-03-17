@@ -2,11 +2,12 @@ package modules
 
 import (
 	"context"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
+
+	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
+	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
-	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-state-types/abi"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -43,16 +44,18 @@ func SetAskGetter(proxy *ProxyAskGetter, rp retrievalmarket.RetrievalProvider) {
 }
 
 // Graphsync creates a graphsync instance used to serve retrievals.
-func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore, h host.Host, net lotus_dtypes.ProviderTransferNetwork, dealDecider lotus_dtypes.RetrievalDealFilter, dagStore stores.DAGStoreWrapper, pstore lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
-	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore, h host.Host, net lotus_dtypes.ProviderTransferNetwork, dealDecider lotus_dtypes.RetrievalDealFilter, dagStore stores.DAGStoreWrapper, pstore lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
+func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net lotus_dtypes.ProviderTransferNetwork, dealDecider lotus_dtypes.RetrievalDealFilter, pstore lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
+	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net lotus_dtypes.ProviderTransferNetwork, dealDecider lotus_dtypes.RetrievalDealFilter, pstore lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
+		rb := remoteblockstore.NewRemoteBlockstore(pid)
+
 		// Create a Graphsync instance
 		mkgs := lotus_modules.StagingGraphsync(parallelTransfersForStorage, parallelTransfersForStoragePerPeer, parallelTransfersForRetrieval)
-		gs := mkgs(mctx, lc, ibs, h)
+		gs := mkgs(mctx, lc, rb, h)
 
 		// Wrap the Graphsync instance with a handler for unpaid retrieval requests
 		vdeps := server.ValidationDeps{
 			DealDecider:    retrievalimpl.DealDecider(dealDecider),
-			DagStore:       dagStore,
+			DagStore:       NewDAGStoreWrapper(pid),
 			PieceStore:     pstore,
 			SectorAccessor: sa,
 			AskStore:       askGetter,

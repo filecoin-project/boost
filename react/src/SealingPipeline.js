@@ -17,7 +17,7 @@ export function SealingPipelinePage(props) {
 }
 
 function SealingPipelineContent(props) {
-    const {loading, error, data} = useQuery(SealingPipelineQuery, { pollInterval: 2000 })
+    const {loading, error, data} = useQuery(SealingPipelineQuery, { pollInterval: 10000 })
 
     if (loading) {
         return <div>Loading...</div>
@@ -194,7 +194,7 @@ function Workers(props) {
 
 export function SealingPipelineMenuItem(props) {
     const {data} = useQuery(SealingPipelineQuery, {
-        pollInterval: 5000,
+        pollInterval: 10000,
         fetchPolicy: "network-only",
     })
 

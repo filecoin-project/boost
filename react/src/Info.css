@@ -36,3 +36,12 @@
 .info .content a {
     text-decoration: underline;
 }
+
+.info .info-item {
+    padding: 0.5em 0.5em 1em 0.5em;
+}
+
+.info .info-item .info-title {
+    padding-bottom: 0.5em;
+    font-size: 1.125em;
+}

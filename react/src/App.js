@@ -17,8 +17,9 @@ import {Epoch} from "./Epoch";
 import {LegacyDealDetail} from "./LegacyDealDetail"
 import {SettingsPage} from "./Settings";
 import {Banner} from "./Banner";
+import {PieceDirectoryDetail, PieceDirectoryPage} from "./PieceDirectory";
 import {ProposalLogsPage} from "./ProposalLogs";
-import {InspectPage} from "./Inspect";
+import {InspectPage, InspectPiecePage} from "./Inspect";
 import {RetrievalLogsPage} from "./RetrievalLogs";
 import {RetrievalLogDetail} from "./RetrievalLogDetail";
 
@@ -52,9 +53,12 @@ function App(props) {
                                         <Route path="/deal-transfers" element={<DealTransfersPage />} />
                                         <Route path="/mpool" element={<MpoolPage />} />
                                         <Route path="/settings" element={<SettingsPage />} />
+                                        <Route path="/piece-directory" element={<PieceDirectoryPage />} />
                                         <Route path="/deals/:dealID" element={<DealDetail />} />
                                         <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
                                         <Route path="/inspect" element={<InspectPage />} />
+                                        <Route path="/inspect/piece/:pieceCID" element={<InspectPiecePage />} />
+                                        <Route path="/inspect/from/:cursor/page/:pageNum" element={<InspectPage />} />
                                         <Route path="/inspect/:query" element={<InspectPage />} />
                                         <Route path="/" element={<StorageDealsPage />} />
                                     </Routes>

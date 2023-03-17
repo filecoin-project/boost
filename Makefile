@@ -226,7 +226,7 @@ $(lotus_src_dir):
 	git clone --depth 1 --branch $(lotus_version) https://github.com/filecoin-project/lotus $@
 update/lotus: $(lotus_src_dir)
 	cd $(lotus_src_dir) && git pull
-.PHONY: update/lotus	
+.PHONY: update/lotus
 
 docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_src_dir)
 	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile --target lotus-all-in-one \

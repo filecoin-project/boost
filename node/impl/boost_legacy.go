@@ -7,12 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/filecoin-project/dagstore/shard"
-	"github.com/multiformats/go-multihash"
-
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -215,52 +211,6 @@ func (sm *BoostAPI) ActorSectorSize(ctx context.Context, addr address.Address) (
 		return 0, err
 	}
 	return mi.SectorSize, nil
-}
-
-func (sm *BoostAPI) PiecesListPieces(ctx context.Context) ([]cid.Cid, error) {
-	return sm.PieceStore.ListPieceInfoKeys()
-}
-
-func (sm *BoostAPI) PiecesListCidInfos(ctx context.Context) ([]cid.Cid, error) {
-	return sm.PieceStore.ListCidInfoKeys()
-}
-
-func (sm *BoostAPI) PiecesGetPieceInfo(ctx context.Context, pieceCid cid.Cid) (*piecestore.PieceInfo, error) {
-	pi, err := sm.PieceStore.GetPieceInfo(pieceCid)
-	if err != nil {
-		return nil, fmt.Errorf("getting piece from piece store: %w", err)
-	}
-	return &pi, nil
-}
-
-func (sm *BoostAPI) PiecesGetCIDInfo(ctx context.Context, payloadCid cid.Cid) (*piecestore.CIDInfo, error) {
-	ci, err := sm.PieceStore.GetCIDInfo(payloadCid)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ci, nil
-}
-
-func (sm *BoostAPI) PiecesGetMaxOffset(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
-	var maxOffset uint64
-
-	it, err := sm.DAGStore.GetIterableIndex(shard.KeyFromCID(pieceCid))
-	if err != nil {
-		return maxOffset, fmt.Errorf("getting iterable index for piece %s from DAG store: %w", pieceCid, err)
-	}
-
-	err = it.ForEach(func(mh multihash.Multihash, offset uint64) error {
-		if offset > maxOffset {
-			maxOffset = offset
-		}
-		return nil
-	})
-	if err != nil {
-		return maxOffset, fmt.Errorf("iterating over CAR index: %w", err)
-	}
-
-	return maxOffset, err
 }
 
 func (sm *BoostAPI) RuntimeSubsystems(context.Context) (res lapi.MinerSubsystems, err error) {
