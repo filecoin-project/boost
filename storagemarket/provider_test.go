@@ -707,6 +707,32 @@ func TestDealRestartAfterManualRecoverableErrors(t *testing.T) {
 	}
 }
 
+// Tests scenarios that a contract deal fails fatally
+func TestContractDealFatalFailAfterPublishError(t *testing.T) {
+	ctx := context.Background()
+
+	// setup the provider test harness
+	harness := NewHarness(t)
+	// start the provider test harness
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	// Simulate publish deal failure
+
+	f4addr, err := address.NewFromString("f410fnqocy7tkrlw4l5mdhgjlc4gsiafr7e76yopvo2y")
+	require.NoError(t, err)
+
+	td := harness.newDealBuilder(t, 1, withClientAddr(f4addr)).withCommpNonBlocking().withPublishFailing(errors.New("puberr")).withNormalHttpServer().build()
+
+	// execute deal
+	err = td.executeAndSubscribe()
+	require.NoError(t, err)
+
+	// expect recoverable error with retry type Fatal
+	err = td.waitForError("puberr", types.DealRetryFatal)
+	require.NoError(t, err)
+}
+
 // Tests scenarios where a deal is paused with an error that the user must
 // resolve by retrying manually, and the user fails the deal
 func TestDealFailAfterManualRecoverableErrors(t *testing.T) {
@@ -1604,6 +1630,7 @@ type dealProposalConfig struct {
 	offlineDeal        bool
 	verifiedDeal       bool
 	providerCollateral abi.TokenAmount
+	clientAddr         address.Address
 	minerAddr          address.Address
 	pieceCid           cid.Cid
 	pieceSize          abi.PaddedPieceSize
@@ -1661,6 +1688,12 @@ func withMinerAddr(addr address.Address) dealProposalOpt {
 	}
 }
 
+func withClientAddr(addr address.Address) dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.clientAddr = addr
+	}
+}
+
 func withPieceCid(c cid.Cid) dealProposalOpt {
 	return func(dc *dealProposalConfig) {
 		dc.pieceCid = c
@@ -1694,6 +1727,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 		verifiedDeal:       false,
 		providerCollateral: abi.NewTokenAmount(1),
 		minerAddr:          tbuilder.ph.MinerAddr,
+		clientAddr:         tbuilder.ph.ClientAddr,
 		pieceCid:           cid.Undef,
 		undefinedPieceCid:  false,
 		startEpoch:         50000,
@@ -1750,7 +1784,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 		PieceCID:             pieceCid,
 		PieceSize:            pieceSize,
 		VerifiedDeal:         dc.verifiedDeal,
-		Client:               tbuilder.ph.ClientAddr,
+		Client:               dc.clientAddr,
 		Provider:             dc.minerAddr,
 		Label:                dc.label,
 		StartEpoch:           dc.startEpoch,
