@@ -36,7 +36,7 @@ require (
 	github.com/filecoin-project/go-paramfetch v0.0.4
 	github.com/filecoin-project/go-state-types v0.10.0
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/lotus v1.20.4-0.20230317003437-cf6b75807087
+	github.com/filecoin-project/lotus v1.20.3-boost
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-storage v0.4.1
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
