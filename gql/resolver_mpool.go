@@ -11,7 +11,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	stbig "github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/lotus/chain/consensus/filcns"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/specs-actors/actors/builtin/multisig"
 )
@@ -67,7 +67,7 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 		method := m.Message.Method.String()
 		toact, err := r.fullNode.StateGetActor(ctx, m.Message.To, types.EmptyTSK)
 		if err == nil {
-			method = filcns.NewActorRegistry().Methods[toact.Code][m.Message.Method].Params.Name()
+			method = consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method].Params.Name()
 		}
 
 		var params string
