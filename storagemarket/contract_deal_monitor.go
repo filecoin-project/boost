@@ -176,7 +176,7 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 						SkipIPNIAnnounce:   pv1.SkipIpniAnnounce,
 					}
 
-					log.Infow("received contract deal proposal", "id", topicDealProposalID, "uuid", proposal.DealUUID, "client-peer", dpc.Client)
+					log.Infow("received contract deal proposal", "id", topicDealProposalID, "uuid", proposal.DealUUID, "client-peer", dpc.Client, "contract", topicContractAddress, "piece-cid", dpc.PieceCID.String())
 
 					reason, err := c.prov.ExecuteDeal(context.Background(), &proposal, "")
 					if err != nil {
