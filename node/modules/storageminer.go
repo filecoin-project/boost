@@ -14,8 +14,10 @@ import (
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/markets/idxprov"
+	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	brm "github.com/filecoin-project/boost/retrievalmarket/lib"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -29,7 +31,9 @@ import (
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/indexbs"
+	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-address"
+	dtnet "github.com/filecoin-project/go-data-transfer/network"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	storageimpl "github.com/filecoin-project/go-fil-markets/storagemarket/impl"
@@ -303,7 +307,7 @@ func StorageNetworkName(ctx helpers.MetricsCtx, a v1api.FullNode) (dtypes.Networ
 func NewBoostDB(r lotus_repo.LockedRepo) (*sql.DB, error) {
 	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
-	dbPath := path.Join(r.Path(), "boost.db?cache=shared")
+	dbPath := path.Join(r.Path(), db.DealsDBName+"?cache=shared")
 	return db.SqlDB(dbPath)
 }
 
@@ -314,7 +318,7 @@ type LogSqlDB struct {
 func NewLogsSqlDB(r repo.LockedRepo) (*LogSqlDB, error) {
 	// fixes error "database is locked", caused by concurrent access from deal goroutines to a single sqlite3 db connection
 	// see: https://github.com/mattn/go-sqlite3#:~:text=Error%3A%20database%20is%20locked
-	dbPath := path.Join(r.Path(), "boost.logs.db?cache=shared")
+	dbPath := path.Join(r.Path(), db.LogsDBName+"?cache=shared")
 	d, err := db.SqlDB(dbPath)
 	if err != nil {
 		return nil, err
@@ -402,12 +406,16 @@ func HandleContractDeals(c *config.ContractDealsConfig) func(mctx helpers.Metric
 			OnStart: func(ctx context.Context) error {
 				log.Info("contract deals monitor starting")
 
-				err := monitor.Start(ctx)
-				if err != nil {
-					return err
-				}
+				go func() {
+					err := monitor.Start(ctx)
+					if err != nil {
+						log.Errorw("contract deals monitor erred", "err", err)
+						return
+					}
 
-				log.Info("contract deals monitor started")
+					log.Info("contract deals monitor started")
+				}()
+
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
@@ -581,8 +589,65 @@ func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo
 	}
 }
 
-func NewIndexBackedBlockstore(cfg *config.Boost) func(lc fx.Lifecycle, dagst dagstore.Interface, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, rp retrievalmarket.RetrievalProvider) (dtypes.IndexBackedBlockstore, error) {
-	return func(lc fx.Lifecycle, dagst dagstore.Interface, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, rp retrievalmarket.RetrievalProvider) (dtypes.IndexBackedBlockstore, error) {
+// Use a caching sector accessor
+func NewSectorAccessor(cfg *config.Boost) sectoraccessor.SectorAccessorConstructor {
+	// The cache just holds booleans, so there's no harm in using a big number
+	// for cache size
+	const maxCacheSize = 4096
+	return sectoraccessor.NewCachingSectorAccessor(maxCacheSize, time.Duration(cfg.Dealmaking.IsUnsealedCacheExpiry))
+}
+
+// ShardSelector helps to resolve a circular dependency:
+// The IndexBackedBlockstore has a shard selector, which needs to query the
+// RetrievalProviderNode's ask to find out if it's free to retrieve a
+// particular piece.
+// However the RetrievalProviderNode depends on the DAGStore which depends on
+// IndexBackedBlockstore.
+// So we
+//   - create a ShardSelector that has no dependencies with a default shard
+//     selection function that just selects no shards
+//   - later call SetShardSelectorFunc to create a real shard selector function
+//     with all its dependencies, and set it on the ShardSelector object.
+type ShardSelector struct {
+	Proxy  indexbs.ShardSelectorF
+	Target indexbs.ShardSelectorF
+}
+
+func NewShardSelector() *ShardSelector {
+	ss := &ShardSelector{
+		// The default target function always selects no shards
+		Target: func(c cid.Cid, shards []shard.Key) (shard.Key, error) {
+			return shard.Key{}, indexbs.ErrNoShardSelected
+		},
+	}
+	ss.Proxy = func(c cid.Cid, shards []shard.Key) (shard.Key, error) {
+		return ss.Target(c, shards)
+	}
+
+	return ss
+}
+
+func SetShardSelectorFunc(lc fx.Lifecycle, shardSelector *ShardSelector, ps lotus_dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, rp retrievalmarket.RetrievalProvider) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			cancel()
+			return nil
+		},
+	})
+
+	ss, err := brm.NewShardSelector(ctx, ps, sa, rp)
+	if err != nil {
+		return fmt.Errorf("creating shard selector: %w", err)
+	}
+
+	shardSelector.Target = ss.ShardSelectorF
+
+	return nil
+}
+
+func NewIndexBackedBlockstore(cfg *config.Boost) func(lc fx.Lifecycle, dagst dagstore.Interface, ss *ShardSelector) (dtypes.IndexBackedBlockstore, error) {
+	return func(lc fx.Lifecycle, dagst dagstore.Interface, ss *ShardSelector) (dtypes.IndexBackedBlockstore, error) {
 		ctx, cancel := context.WithCancel(context.Background())
 		lc.Append(fx.Hook{
 			OnStop: func(ctx context.Context) error {
@@ -590,12 +655,9 @@ func NewIndexBackedBlockstore(cfg *config.Boost) func(lc fx.Lifecycle, dagst dag
 				return nil
 			},
 		})
-		ss, err := brm.NewShardSelector(ctx, ps, sa, rp)
-		if err != nil {
-			return nil, fmt.Errorf("creating shard selector: %w", err)
-		}
 
-		rbs, err := indexbs.NewIndexBackedBlockstore(ctx, dagst, ss.ShardSelectorF, cfg.Dealmaking.BlockstoreCacheMaxShards, time.Duration(cfg.Dealmaking.BlockstoreCacheExpiry))
+		ibsds := brm.NewIndexBackedBlockstoreDagstore(dagst)
+		rbs, err := indexbs.NewIndexBackedBlockstore(ctx, ibsds, ss.Proxy, cfg.Dealmaking.BlockstoreCacheMaxShards, time.Duration(cfg.Dealmaking.BlockstoreCacheExpiry))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create index backed blockstore: %w", err)
 		}
@@ -618,4 +680,16 @@ func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, erro
 
 		return &tracing.Tracing{}, nil
 	}
+}
+
+func NewOnlineBackupMgr(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo, ds lotus_dtypes.MetadataDS, dealsDB *sql.DB) *backupmgr.BackupMgr {
+	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo, ds lotus_dtypes.MetadataDS, dealsDB *sql.DB) *backupmgr.BackupMgr {
+		return backupmgr.NewBackupMgr(r, ds, db.DealsDBName, dealsDB)
+	}
+}
+
+// NewProviderTransferNetwork sets up the libp2p protocol networking for data transfer
+func NewProviderTransferNetwork(h host.Host) lotus_dtypes.ProviderTransferNetwork {
+	// Leave it up to the client to reconnect
+	return dtnet.NewFromLibp2pHost(h, dtnet.RetryParameters(0, 0, 0, 0))
 }

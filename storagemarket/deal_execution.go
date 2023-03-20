@@ -451,11 +451,24 @@ func (p *Provider) publishDeal(ctx context.Context, pub event.Emitter, deal *typ
 				}
 			}
 
+			// Check if the client is an f4 address, ie an FVM contract
+			clientAddr := deal.ClientDealProposal.Proposal.Client.String()
+			isContractClient := len(clientAddr) >= 2 && (clientAddr[:2] == "t4" || clientAddr[:2] == "f4")
+
+			if isContractClient {
+				// For contract deal publish errors the deal fails fatally: we don't
+				// want to retry because the deal is probably taken by another SP
+				return &dealMakingError{
+					retry: types.DealRetryFatal,
+					error: fmt.Errorf("fatal error to publish deal %s: %w", deal.DealUuid, err),
+				}
+			}
+
 			// For any other publish error the user must manually retry: we don't
 			// want to automatically retry because deal publishing costs money
 			return &dealMakingError{
 				retry: types.DealRetryManual,
-				error: fmt.Errorf("failed to publish deal %s: %w", deal.DealUuid, err),
+				error: fmt.Errorf("recoverable error to publish deal %s: %w", deal.DealUuid, err),
 			}
 		}
 

@@ -15,8 +15,9 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost/api"
 	cliutil "github.com/filecoin-project/boost/cli/util"
-	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/impl/backupmgr"
+	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/util"
 	scliutil "github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/go-address"
@@ -77,7 +78,7 @@ var initCmd = &cli.Command{
 			return err
 		}
 
-		lr, err := bp.repo.Lock(node.Boost)
+		lr, err := bp.repo.Lock(repo.Boost)
 		if err != nil {
 			return err
 		}
@@ -201,7 +202,7 @@ func migrate(cctx *cli.Context, fromMonolith bool, mktsRepoPath string) error {
 		return err
 	}
 
-	boostRepo, err := bp.repo.Lock(node.Boost)
+	boostRepo, err := bp.repo.Lock(repo.Boost)
 	if err != nil {
 		return err
 	}
@@ -221,7 +222,7 @@ func migrate(cctx *cli.Context, fromMonolith bool, mktsRepoPath string) error {
 
 	// Migrate keystore
 	fmt.Println("Migrating keystore")
-	err = migrateMarketsKeystore(mktsRepo, boostRepo)
+	err = backupmgr.CopyKeysBetweenRepos(mktsRepo, boostRepo)
 	if err != nil {
 		return err
 	}
@@ -624,7 +625,7 @@ func initBoost(ctx context.Context, cctx *cli.Context, marketsRepo lotus_repo.Lo
 	}
 
 	fmt.Println("Creating boost repo")
-	if err := r.Init(node.Boost); err != nil {
+	if err := r.Init(repo.Boost); err != nil {
 		return nil, err
 	}
 
@@ -801,36 +802,6 @@ func importPrefix(ctx context.Context, prefix string, mktsDS datastore.Batching,
 			return nil
 		}
 	}
-}
-
-func migrateMarketsKeystore(mktsRepo lotus_repo.LockedRepo, boostRepo lotus_repo.LockedRepo) error {
-	boostKS, err := boostRepo.KeyStore()
-	if err != nil {
-		return err
-	}
-
-	mktsKS, err := mktsRepo.KeyStore()
-	if err != nil {
-		return err
-	}
-
-	keys, err := mktsKS.List()
-	if err != nil {
-		return err
-	}
-
-	for _, k := range keys {
-		ki, err := mktsKS.Get(k)
-		if err != nil {
-			return err
-		}
-		err = boostKS.Put(k, ki)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // checkV1ApiSupport uses v0 api version to signal support for v1 API

@@ -21,7 +21,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/etclabscore/go-openrpc-reflect v0.0.36
 	github.com/fatih/color v1.13.0
-	github.com/filecoin-project/dagstore v0.6.0
+	github.com/filecoin-project/dagstore v0.7.0
 	github.com/filecoin-project/go-address v1.1.0
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-cbor-util v0.0.1
@@ -30,7 +30,7 @@ require (
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
 	github.com/filecoin-project/go-fil-markets v1.26.0
-	github.com/filecoin-project/go-jsonrpc v0.2.1
+	github.com/filecoin-project/go-jsonrpc v0.2.3
 	github.com/filecoin-project/go-legs v0.4.9
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
@@ -52,7 +52,7 @@ require (
 	github.com/ipfs/go-cid v0.3.2
 	github.com/ipfs/go-cidutil v0.1.0
 	github.com/ipfs/go-datastore v0.6.0
-	github.com/ipfs/go-graphsync v0.13.2
+	github.com/ipfs/go-graphsync v0.13.3
 	github.com/ipfs/go-ipfs-blockstore v1.2.0
 	github.com/ipfs/go-ipfs-blocksutil v0.0.1
 	github.com/ipfs/go-ipfs-chunker v0.0.5
@@ -77,7 +77,6 @@ require (
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/libp2p/go-eventbus v0.2.1
 	github.com/libp2p/go-libp2p v0.23.4
 	github.com/libp2p/go-libp2p-gostream v0.5.0
 	github.com/libp2p/go-libp2p-http v0.2.1
@@ -202,7 +201,7 @@ require (
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hako/durafmt v0.0.0-20200710122514-c0fb7b4da026 // indirect
 	github.com/hannahhoward/cbor-gen-for v0.0.0-20200817222906-ea96cece81f1 // indirect
-	github.com/hannahhoward/go-pubsub v0.0.0-20200423002714-8d62886cc36e // indirect
+	github.com/hannahhoward/go-pubsub v0.0.0-20200423002714-8d62886cc36e
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-hclog v0.16.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
@@ -240,7 +239,7 @@ require (
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
-	github.com/jellydator/ttlcache/v2 v2.11.1 // indirect
+	github.com/jellydator/ttlcache/v2 v2.11.1
 	github.com/jessevdk/go-flags v1.4.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

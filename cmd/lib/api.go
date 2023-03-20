@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/filecoin-project/boost/api"
 	cliutil "github.com/filecoin-project/boost/cli/util"
@@ -136,6 +137,8 @@ func CreateSectorAccessor(ctx context.Context, storageApiInfo string, fullnodeAp
 
 	// Create the piece provider
 	pp := sealer.NewPieceProvider(storage, storageService, storageService)
-	sa := sectoraccessor.NewSectorAccessor(dtypes.MinerAddress(maddr), storageService, pp, fullnodeApi)
+	const maxCacheSize = 4096
+	newSectorAccessor := sectoraccessor.NewCachingSectorAccessor(maxCacheSize, 5*time.Minute)
+	sa := newSectorAccessor(dtypes.MinerAddress(maddr), storageService, pp, fullnodeApi)
 	return sa, storageCloser, nil
 }

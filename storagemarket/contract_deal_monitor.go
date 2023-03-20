@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	mbig "math/big"
 
@@ -78,130 +79,126 @@ func (c *ContractDealMonitor) Start(ctx context.Context) error {
 		return fmt.Errorf("parsing `from` eth address failed: %w", err)
 	}
 
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				err := ctx.Err()
-				if err == context.Canceled {
-					log.Infow("contract deal monitor context canceled, exiting...")
-				} else {
-					log.Warnw("contract deal monitor context closed, exiting...", "err", err)
-				}
-				return
-			case resp := <-responseCh:
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							log.Errorw("recovered from panic from handling eth_subscribe event", "recover", r)
-						}
-					}()
-
-					err := func() error {
-						event := resp.Result.(map[string]interface{})
-						topicContractAddress := event["address"].(string)
-						topicDealProposalID := event["topics"].([]interface{})[1].(string)
-
-						// allowlist check
-						if len(c.cfg.AllowlistContracts) != 0 && !slices.Contains(c.cfg.AllowlistContracts, topicContractAddress) {
-							return fmt.Errorf("allowlist does not contain this contract address: %s", topicContractAddress)
-						}
-
-						res, err := c.getDealProposal(ctx, topicContractAddress, topicDealProposalID, fromEthAddr)
-						if err != nil {
-							return fmt.Errorf("eth call for get deal proposal failed: %w", err)
-						}
-
-						resParams, err := c.getExtraData(ctx, topicContractAddress, topicDealProposalID, fromEthAddr)
-						if err != nil {
-							return fmt.Errorf("eth call for extra data failed: %w", err)
-						}
-
-						var dpc market.DealProposal
-						err = dpc.UnmarshalCBOR(bytes.NewReader(res))
-						if err != nil {
-							return fmt.Errorf("cbor unmarshal failed: %w", err)
-						}
-
-						var pv1 types.ContractParamsVersion1
-						err = pv1.UnmarshalCBOR(bytes.NewReader(resParams))
-						if err != nil {
-							return fmt.Errorf("params cbor unmarshal failed: %w", err)
-						}
-
-						rootCidStr, err := dpc.Label.ToString()
-						if err != nil {
-							return fmt.Errorf("getting cid from label failed: %w", err)
-						}
-
-						rootCid, err := cid.Parse(rootCidStr)
-						if err != nil {
-							return fmt.Errorf("parsing cid failed: %w", err)
-						}
-
-						prop := market.DealProposal{
-							PieceCID:     dpc.PieceCID,
-							PieceSize:    dpc.PieceSize,
-							VerifiedDeal: dpc.VerifiedDeal,
-							Client:       dpc.Client,
-							Provider:     c.maddr,
-
-							Label: dpc.Label,
-
-							StartEpoch:           dpc.StartEpoch,
-							EndEpoch:             dpc.EndEpoch,
-							StoragePricePerEpoch: dpc.StoragePricePerEpoch,
-
-							ProviderCollateral: dpc.ProviderCollateral,
-							ClientCollateral:   dpc.ClientCollateral,
-						}
-
-						proposal := types.DealParams{
-							DealUUID:  uuid.New(),
-							IsOffline: false,
-							ClientDealProposal: market.ClientDealProposal{
-								Proposal: prop,
-								// signature is garbage, but it still needs to serialize, so shouldnt be empty!!
-								ClientSignature: crypto.Signature{
-									Type: crypto.SigTypeBLS,
-									Data: []byte{0xde, 0xad},
-								},
-							},
-							DealDataRoot: rootCid,
-							Transfer: types.Transfer{
-								Type:   "http",
-								Params: []byte(fmt.Sprintf(`{"URL":"%s"}`, pv1.LocationRef)),
-								Size:   pv1.CarSize,
-							},
-							RemoveUnsealedCopy: pv1.RemoveUnsealedCopy,
-							SkipIPNIAnnounce:   pv1.SkipIpniAnnounce,
-						}
-
-						log.Infow("received contract deal proposal", "id", proposal.DealUUID, "client-peer", dpc.Client)
-
-						reason, err := c.prov.ExecuteDeal(context.Background(), &proposal, "")
-						if err != nil {
-							log.Warnw("contract deal proposal failed", "id", proposal.DealUUID, "err", err, "reason", reason.Reason)
-							return nil
-						}
-
-						if reason.Accepted {
-							log.Infow("contract deal proposal accepted", "id", proposal.DealUUID)
-						} else {
-							log.Warnw("contract deal proposal rejected", "id", proposal.DealUUID, "err", err, "reason", reason.Reason)
-						}
-
-						return nil
-					}()
-					if err != nil {
-						log.Errorw("handling DealProposalCreate event erred", "err", err)
+	for {
+		select {
+		case <-ctx.Done():
+			err := ctx.Err()
+			if err == context.Canceled {
+				log.Infow("contract deal monitor context canceled, exiting...")
+			} else {
+				log.Warnw("contract deal monitor context closed, exiting...", "err", err)
+			}
+			return nil
+		case resp := <-responseCh:
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Errorw("recovered from panic from handling eth_subscribe event", "recover", r)
 					}
 				}()
-			}
-		}
-	}()
 
-	return nil
+				err := func() error {
+					event := resp.Result.(map[string]interface{})
+					topicContractAddress := event["address"].(string)
+					topicDealProposalID := event["topics"].([]interface{})[1].(string)
+
+					// allowlist check
+					if len(c.cfg.AllowlistContracts) != 0 && !slices.Contains(c.cfg.AllowlistContracts, topicContractAddress) {
+						return fmt.Errorf("allowlist does not contain this contract address: %s", topicContractAddress)
+					}
+
+					res, err := c.getDealProposal(ctx, topicContractAddress, topicDealProposalID, fromEthAddr)
+					if err != nil {
+						return fmt.Errorf("eth call for get deal proposal failed: %w", err)
+					}
+
+					resParams, err := c.getExtraData(ctx, topicContractAddress, topicDealProposalID, fromEthAddr)
+					if err != nil {
+						return fmt.Errorf("eth call for extra data failed: %w", err)
+					}
+
+					var dpc market.DealProposal
+					err = dpc.UnmarshalCBOR(bytes.NewReader(res))
+					if err != nil {
+						return fmt.Errorf("cbor unmarshal failed: %w", err)
+					}
+
+					var pv1 types.ContractParamsVersion1
+					err = pv1.UnmarshalCBOR(bytes.NewReader(resParams))
+					if err != nil {
+						return fmt.Errorf("params cbor unmarshal failed: %w", err)
+					}
+
+					rootCidStr, err := dpc.Label.ToString()
+					if err != nil {
+						return fmt.Errorf("getting cid from label failed: %w", err)
+					}
+
+					rootCid, err := cid.Parse(rootCidStr)
+					if err != nil {
+						return fmt.Errorf("parsing cid failed: %w", err)
+					}
+
+					prop := market.DealProposal{
+						PieceCID:     dpc.PieceCID,
+						PieceSize:    dpc.PieceSize,
+						VerifiedDeal: dpc.VerifiedDeal,
+						Client:       dpc.Client,
+						Provider:     c.maddr,
+
+						Label: dpc.Label,
+
+						StartEpoch:           dpc.StartEpoch,
+						EndEpoch:             dpc.EndEpoch,
+						StoragePricePerEpoch: dpc.StoragePricePerEpoch,
+
+						ProviderCollateral: dpc.ProviderCollateral,
+						ClientCollateral:   dpc.ClientCollateral,
+					}
+
+					proposal := types.DealParams{
+						DealUUID:  uuid.New(),
+						IsOffline: false,
+						ClientDealProposal: market.ClientDealProposal{
+							Proposal: prop,
+							// signature is garbage, but it still needs to serialize, so shouldnt be empty!!
+							ClientSignature: crypto.Signature{
+								Type: crypto.SigTypeBLS,
+								Data: []byte{0xde, 0xad},
+							},
+						},
+						DealDataRoot: rootCid,
+						Transfer: types.Transfer{
+							Type:   "http",
+							Params: []byte(fmt.Sprintf(`{"URL":"%s"}`, pv1.LocationRef)),
+							Size:   pv1.CarSize,
+						},
+						RemoveUnsealedCopy: pv1.RemoveUnsealedCopy,
+						SkipIPNIAnnounce:   pv1.SkipIpniAnnounce,
+					}
+
+					log.Infow("received contract deal proposal", "id", topicDealProposalID, "uuid", proposal.DealUUID, "client-peer", dpc.Client, "contract", topicContractAddress, "piece-cid", dpc.PieceCID.String())
+
+					reason, err := c.prov.ExecuteDeal(context.Background(), &proposal, "")
+					if err != nil {
+						log.Warnw("contract deal proposal failed", "id", topicDealProposalID, "uuid", proposal.DealUUID, "err", err, "reason", reason.Reason)
+						return nil
+					}
+
+					if reason.Accepted {
+						log.Infow("contract deal proposal accepted", "id", topicDealProposalID, "uuid", proposal.DealUUID)
+					} else {
+						log.Warnw("contract deal proposal rejected", "id", topicDealProposalID, "uuid", proposal.DealUUID, "err", err, "reason", reason.Reason)
+					}
+
+					return nil
+				}()
+				if err != nil {
+					log.Errorw("handling DealProposalCreate event erred", "err", err)
+				}
+			}()
+		}
+	}
 }
 
 func (c *ContractDealMonitor) Stop() error {
@@ -256,6 +253,10 @@ func lengthPrefixPointsTo(output []byte) (int, int, error) {
 }
 
 func (c *ContractDealMonitor) getDealProposal(ctx context.Context, topicContractAddress string, topicDealProposalID string, fromEthAddr ethtypes.EthAddress) ([]byte, error) {
+	defer func(now time.Time) {
+		log.Debugw("contract getDealProposal elapsed", "took", time.Since(now))
+	}(time.Now())
+
 	// GetDealProposal is a free data retrieval call binding the contract method 0xf4b2e4d8.
 	_params := "0xf4b2e4d8" + topicDealProposalID[2:] // cut 0x prefix
 
@@ -287,6 +288,10 @@ func (c *ContractDealMonitor) getDealProposal(ctx context.Context, topicContract
 }
 
 func (c *ContractDealMonitor) getExtraData(ctx context.Context, topicContractAddress string, topicDealProposalID string, fromEthAddr ethtypes.EthAddress) ([]byte, error) {
+	defer func(now time.Time) {
+		log.Debugw("contract getExtraData elapsed", "took", time.Since(now))
+	}(time.Now())
+
 	// GetExtraParams is a free data retrieval call binding the contract method 0x4634aed5.
 	_params := "0x4634aed5" + topicDealProposalID[2:] // cut 0x prefix
 

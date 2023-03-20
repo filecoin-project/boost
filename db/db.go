@@ -7,10 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"path"
 	"testing"
 
+	"github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 )
+
+const DealsDBName = "boost.db"
+const LogsDBName = "boost.logs.db"
 
 var ErrNotFound = errors.New("not found")
 
@@ -54,4 +59,98 @@ func CreateTestTmpDB(t *testing.T) *sql.DB {
 	d, err := SqlDB(f.Name())
 	require.NoError(t, err)
 	return d
+}
+
+func SqlBackup(srcDB *sql.DB, dstDir, dbFileName string) error {
+	dbPath := path.Join(dstDir, dbFileName+"?cache=shared")
+	dstDB, err := SqlDB(dbPath)
+	if err != nil {
+		return fmt.Errorf("failed to open source sql db for backup: %w", err)
+	}
+
+	defer dstDB.Close()
+
+	err = dstDB.Ping()
+	if err != nil {
+		return fmt.Errorf("failed to open source sql db for backup: %w", err)
+	}
+
+	ctx := context.Background()
+
+	destConn, err := dstDB.Conn(ctx)
+	if err != nil {
+		return err
+	}
+
+	srcConn, err := srcDB.Conn(ctx)
+	if err != nil {
+		return err
+	}
+
+	return destConn.Raw(func(destConn interface{}) error {
+		return srcConn.Raw(func(srcConn interface{}) error {
+			destSQLiteConn, ok := destConn.(*sqlite3.SQLiteConn)
+			if !ok {
+				return fmt.Errorf("can't convert destination connection to SQLiteConn")
+			}
+
+			srcSQLiteConn, ok := srcConn.(*sqlite3.SQLiteConn)
+			if !ok {
+				return fmt.Errorf("can't convert source connection to SQLiteConn")
+			}
+
+			b, err := destSQLiteConn.Backup("main", srcSQLiteConn, "main")
+			if err != nil {
+				return fmt.Errorf("error initializing SQLite backup: %w", err)
+			}
+
+			// Allow the initial page count and remaining values to be retrieved
+			isDone, err := b.Step(0)
+			if err != nil {
+				return fmt.Errorf("unable to perform an initial 0-page backup step: %w", err)
+			}
+			if isDone {
+				return fmt.Errorf("backup is unexpectedly done")
+			}
+
+			// Check that the page count and remaining values are reasonable.
+			initialPageCount := b.PageCount()
+			if initialPageCount <= 0 {
+				return fmt.Errorf("unexpected initial page count value: %v", initialPageCount)
+			}
+			initialRemaining := b.Remaining()
+			if initialRemaining <= 0 {
+				return fmt.Errorf("unexpected initial remaining value: %v", initialRemaining)
+			}
+			if initialRemaining != initialPageCount {
+				return fmt.Errorf("initial remaining value %v differs from the initial page count value %v", initialRemaining, initialPageCount)
+			}
+
+			// Copy all the pages
+			isDone, err = b.Step(-1)
+			if err != nil {
+				return fmt.Errorf("failed to perform a backup step: %w", err)
+			}
+			if !isDone {
+				return fmt.Errorf("backup is unexpectedly not done")
+			}
+
+			// Check that the page count and remaining values are reasonable.
+			finalPageCount := b.PageCount()
+			if finalPageCount != initialPageCount {
+				return fmt.Errorf("final page count %v differs from the initial page count %v", initialPageCount, finalPageCount)
+			}
+			finalRemaining := b.Remaining()
+			if finalRemaining != 0 {
+				return fmt.Errorf("unexpected remaining value: %v", finalRemaining)
+			}
+
+			err = b.Finish()
+			if err != nil {
+				return fmt.Errorf("error finishing backup: %w", err)
+			}
+
+			return err
+		})
+	})
 }

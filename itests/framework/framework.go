@@ -17,6 +17,7 @@ import (
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -232,7 +233,7 @@ func (f *TestFramework) Start() error {
 	// Create an in-memory repo
 	r := lotus_repo.NewMemory(nil)
 
-	lr, err := r.Lock(node.Boost)
+	lr, err := r.Lock(repo.Boost)
 	if err != nil {
 		return err
 	}

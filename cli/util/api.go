@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/filecoin-project/boost/node/repo"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 
@@ -17,9 +18,7 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/api/client"
-	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
-	"github.com/filecoin-project/lotus/node/repo"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 )
 
@@ -192,7 +191,7 @@ func GetBoostAPI(ctx *cli.Context, opts ...GetBoostOption) (api.Boost, jsonrpc.C
 		return tn.(api.Boost), func() {}, nil
 	}
 
-	addr, headers, err := GetRawAPI(ctx, node.Boost, "v0")
+	addr, headers, err := GetRawAPI(ctx, repo.Boost, "v0")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -220,7 +219,7 @@ func GetBoostAPI(ctx *cli.Context, opts ...GetBoostOption) (api.Boost, jsonrpc.C
 	return client.NewBoostRPCV0(ctx.Context, addr, headers)
 }
 
-func GetRawAPI(ctx *cli.Context, t repo.RepoType, version string) (string, http.Header, error) {
+func GetRawAPI(ctx *cli.Context, t lotus_repo.RepoType, version string) (string, http.Header, error) {
 	ainfo, err := GetAPIInfo(ctx, t)
 	if err != nil {
 		return "", nil, fmt.Errorf("could not get API info for %s: %w", t.Type(), err)
