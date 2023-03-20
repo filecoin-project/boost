@@ -105,6 +105,7 @@ var (
 	ConnGaterKey         = special{12} // libp2p option
 	DAGStoreKey          = special{13} // constructor returns multiple values
 	ResourceManagerKey   = special{14} // Libp2p option
+	UserAgentKey         = special{15} // Libp2p option
 )
 
 type invoke int
@@ -227,6 +228,8 @@ var LibP2P = Options(
 	Override(SmuxTransportKey, lotus_lp2p.SmuxTransport()),
 	Override(RelayKey, lotus_lp2p.NoRelay()),
 	Override(SecurityKey, lotus_lp2p.Security(true, false)),
+	Override(DefaultTransportsKey, lp2p.DefaultTransports),
+	Override(UserAgentKey, modules.UserAgent),
 
 	// Host
 	Override(new(lotus_lp2p.RawHost), lotus_lp2p.Host),
