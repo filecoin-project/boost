@@ -159,12 +159,12 @@ var statsCmd = &cli.Command{
 						}
 					}
 
+					lk.Lock()
 					var out string
 					out += "Provider " + maddr.String()
 					if contains(protos, "/fil/storage/mk/1.2.0") {
 						out += " is running boost"
 
-						lk.Lock()
 						boostNodes++
 						boostQualityAdjPower = big.Add(boostQualityAdjPower, minerToMinerPower[maddr].QualityAdjPower)
 						boostRawBytePower = big.Add(boostRawBytePower, minerToMinerPower[maddr].RawBytePower)
@@ -174,10 +174,9 @@ var statsCmd = &cli.Command{
 								transportProtos[p.Name]++
 							}
 						}
-						lk.Unlock()
-
 					} else if contains(protos, "/fil/storage/mk/1.1.0") {
 						out += " is running markets"
+						agentVersions[agentVersion]++
 						marketsNodes++
 					} else {
 						out += " is not running markets or boost"
@@ -187,6 +186,8 @@ var statsCmd = &cli.Command{
 						out += " (with indexer)"
 						indexerNodes++
 					}
+					lk.Unlock()
+
 					out += "\n"
 					out += "  agent version:     " + agentVersion + "\n"
 					out += "  raw power:         " + minerToMinerPower[maddr].RawBytePower.String() + "\n"
