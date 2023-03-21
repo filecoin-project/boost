@@ -33,10 +33,14 @@ type BenchDB interface {
 	GetIterableIndex(ctx context.Context, pieceCid cid.Cid) (carindex.IterableIndex, error)
 }
 
+type addPiecesSpec struct {
+	pieceCount     int
+	blocksPerPiece int
+}
+
 type runOpts struct {
+	addPiecesSpecs            []addPiecesSpec
 	pieceParallelism          int
-	blocksPerPiece            int
-	pieceCount                int
 	bitswapFetchCount         int
 	bitswapFetchParallelism   int
 	graphsyncFetchCount       int
@@ -60,8 +64,10 @@ func run(ctx context.Context, db BenchDB, opts runOpts) error {
 	}()
 
 	// Add sample data to the database
-	if err := addPieces(ctx, db, opts.pieceParallelism, opts.pieceCount, opts.blocksPerPiece); err != nil {
-		return err
+	for _, pc := range opts.addPiecesSpecs {
+		if err := addPieces(ctx, db, opts.pieceParallelism, pc.pieceCount, pc.blocksPerPiece); err != nil {
+			return err
+		}
 	}
 
 	// Run bitswap fetch simulation
@@ -89,7 +95,13 @@ func loadCmd(createDB func(context.Context, string) (BenchDB, error)) *cli.Comma
 			}
 
 			opts := runOptsFromCctx(cctx)
-			return addPieces(ctx, db, opts.pieceParallelism, opts.pieceCount, opts.blocksPerPiece)
+			for _, pc := range opts.addPiecesSpecs {
+				err = addPieces(ctx, db, opts.pieceParallelism, pc.pieceCount, pc.blocksPerPiece)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 	}
 }
