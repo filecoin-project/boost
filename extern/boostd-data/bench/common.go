@@ -1,11 +1,20 @@
 package main
 
-import "github.com/urfave/cli/v2"
+import (
+	"github.com/urfave/cli/v2"
+	"strconv"
+	"strings"
+)
 
 var commonFlags = []cli.Flag{
 	&cli.IntFlag{
 		Name:  "piece-add-parallelism",
 		Value: 2,
+	},
+	&cli.StringSliceFlag{
+		Name:  "pieces",
+		Usage: "Array of piece count / blocks per piece in the form '<piece count>x<blocks per piece>' (eg '10x128')",
+		Value: cli.NewStringSlice("30x1024"),
 	},
 	&cli.IntFlag{
 		Name:  "piece-count",
@@ -33,11 +42,36 @@ var commonFlags = []cli.Flag{
 	},
 }
 
+const piecesUsageErr = "pieces parameter must be of the form <piece count>x<blocks per piece>"
+
 func runOptsFromCctx(cctx *cli.Context) runOpts {
+	pieces := cctx.StringSlice("pieces")
+	addPiecesSpecs := make([]addPiecesSpec, 0, len(pieces))
+	for _, pc := range pieces {
+		countBlocks := strings.Split(pc, "x")
+		if len(countBlocks) != 2 {
+			panic(piecesUsageErr)
+		}
+
+		pieceCount, err := strconv.Atoi(countBlocks[0])
+		if err != nil {
+			panic(piecesUsageErr)
+		}
+
+		blocksPerPiece, err := strconv.Atoi(countBlocks[1])
+		if err != nil {
+			panic(piecesUsageErr)
+		}
+
+		addPiecesSpecs = append(addPiecesSpecs, addPiecesSpec{
+			pieceCount:     pieceCount,
+			blocksPerPiece: blocksPerPiece,
+		})
+	}
+
 	return runOpts{
+		addPiecesSpecs:            addPiecesSpecs,
 		pieceParallelism:          cctx.Int("piece-add-parallelism"),
-		blocksPerPiece:            cctx.Int("blocks-per-piece"),
-		pieceCount:                cctx.Int("piece-count"),
 		bitswapFetchCount:         cctx.Int("bs-fetch-count"),
 		bitswapFetchParallelism:   cctx.Int("bs-fetch-parallelism"),
 		graphsyncFetchCount:       cctx.Int("gs-fetch-count"),
