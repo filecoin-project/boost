@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/binary"
 	"golang.org/x/sync/errgroup"
 
@@ -81,24 +80,15 @@ func (db *FoundationDB) GetBlockSample(ctx context.Context, count int) ([]pieceB
 	var blocks []pieceBlock
 
 	_, err := db.db.Transact(func(tr fdb.Transaction) (interface{}, error) {
-		for i := 0; i < count; i++ {
-			// todo smarter sampling? There is a multihash prefix here...
-			randomPrefix := make([]byte, 4)
-			_, _ = rand.Read(randomPrefix)
+		start := tuple.Tuple{PieceToMHIndex}.FDBKey()
+		end := tuple.Tuple{PieceToMHIndex, []byte{0xff, 0xff, 0xff, 0xff}}.FDBKey()
+		rangeResult := tr.GetRange(fdb.KeyRange{Begin: start, End: end}, fdb.RangeOptions{Limit: count}).Iterator()
 
-			start := tuple.Tuple{PieceToMHIndex, randomPrefix}.FDBKey()
-			end := tuple.Tuple{PieceToMHIndex, []byte{0xff}}.FDBKey() // todo does this work?
-			rangeResult, err := tr.GetRange(fdb.KeyRange{Begin: start, End: end}, fdb.RangeOptions{}).GetSliceWithError()
+		for rangeResult.Advance() {
+			kv, err := rangeResult.Get()
 			if err != nil {
 				return nil, err
 			}
-
-			if len(rangeResult) == 0 {
-				continue
-			}
-
-			kv := rangeResult[0]
-
 			keyTuple, err := tuple.Unpack(kv.Key)
 			if err != nil {
 				return nil, err

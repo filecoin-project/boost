@@ -281,10 +281,14 @@ func graphsyncFetch(ctx context.Context, db BenchDB, count int, parallelism int)
 }
 
 func executeFetch(ctx context.Context, db BenchDB, count int, parallelism int, processSample func(pieceBlock) error) error {
+	log.Infow("generating block samples", "count", count, "parallelism", parallelism)
+	start := time.Now()
 	samples, err := db.GetBlockSample(ctx, count)
 	if err != nil {
 		return err
 	}
+
+	log.Infow("generated block samples", "count", count, "parallelism", parallelism, "duration", time.Since(start).String())
 
 	sampleChan := make(chan pieceBlock, len(samples))
 	for _, sample := range samples {
