@@ -95,7 +95,7 @@ func loadCmd(createDB func(context.Context, string) (BenchDB, error)) *cli.Comma
 }
 
 func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int, blocksPerPiece int) error {
-	log.Infof("Adding %d pieces with %d blocks per piece...", pieceCount, blocksPerPiece)
+	log.Infow("Adding pieces", "pieceCount", pieceCount, "blocksPerPiece", blocksPerPiece)
 
 	queue := make(chan struct{}, pieceCount)
 	for i := 0; i < pieceCount; i++ {
@@ -162,10 +162,14 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 		return err
 	}
 
-	log.Infof("Added %d pieces in %s", pieceCount, time.Since(addStart))
-	log.Debugf("total CPU time %s", totalCreateRecs+totalAddRecs)
-	log.Debugf("  created records in %s", totalCreateRecs)
-	log.Debugf("  added records in %s", totalAddRecs)
+	duration := time.Since(addStart)
+	log.Infow("Add piece complete",
+		"pieceCount", pieceCount,
+		"duration", duration.String(),
+		"duration-ms", duration.Milliseconds(),
+		"total-cpu-ms", (totalCreateRecs + totalAddRecs).Milliseconds(),
+		"create-ms", totalCreateRecs.Milliseconds(),
+		"add-ms", totalAddRecs.Milliseconds())
 	return nil
 }
 
@@ -187,7 +191,7 @@ func bitswapCmd(createDB func(context.Context, string) (BenchDB, error)) *cli.Co
 }
 
 func bitswapFetch(ctx context.Context, db BenchDB, count int, parallelism int) error {
-	log.Infof("Bitswap simulation: fetching %d random blocks with parallelism %d...", count, parallelism)
+	log.Infow("bitswap simulation", "blockCount", count, "parallelism", parallelism)
 
 	var lk sync.Mutex
 	var mhLookupTotal, getOffsetSizeTotal time.Duration
@@ -215,10 +219,14 @@ func bitswapFetch(ctx context.Context, db BenchDB, count int, parallelism int) e
 		return err
 	}
 
-	log.Infof("Bitswap simulation completed in %s", time.Since(fetchStart))
-	log.Debugf("total CPU time: %s", mhLookupTotal+getOffsetSizeTotal)
-	log.Debugf("  multihash lookup total time: %s", mhLookupTotal)
-	log.Debugf("  get offset / size total time: %s", getOffsetSizeTotal)
+	duration := time.Since(fetchStart)
+	log.Infow("bitswap simulation complete",
+		"blockCount", count,
+		"duration", duration.String(),
+		"duration-ms", duration.Milliseconds(),
+		"total-cpu-ms", (mhLookupTotal + getOffsetSizeTotal).Milliseconds(),
+		"mh-lookup-ms", mhLookupTotal.Milliseconds(),
+		"get-offset-size-ms", getOffsetSizeTotal.Milliseconds())
 	return nil
 }
 
@@ -240,7 +248,7 @@ func graphsyncCmd(createDB func(context.Context, string) (BenchDB, error)) *cli.
 }
 
 func graphsyncFetch(ctx context.Context, db BenchDB, count int, parallelism int) error {
-	log.Infof("Graphsync simulation: fetching %d random blocks with parallelism %d...", count, parallelism)
+	log.Infow("graphsync simulation", "blockCount", count, "parallelism", parallelism)
 
 	fetchStart := time.Now()
 	var mhLookupTotal, getIdxTotal time.Duration
@@ -261,10 +269,14 @@ func graphsyncFetch(ctx context.Context, db BenchDB, count int, parallelism int)
 		return err
 	}
 
-	log.Infof("Graphsync simulation completed in %s", time.Since(fetchStart))
-	log.Debugf("total CPU time: %s", mhLookupTotal+getIdxTotal)
-	log.Debugf("  multihash lookup total time: %s", mhLookupTotal)
-	log.Debugf("  get index total time: %s", getIdxTotal)
+	duration := time.Since(fetchStart)
+	log.Infow("graphsync simulation complete",
+		"blockCount", count,
+		"duration", duration.String(),
+		"duration-ms", duration.Milliseconds(),
+		"total-cpu-ms", (mhLookupTotal + getIdxTotal).Milliseconds(),
+		"mh-lookup-ms", mhLookupTotal.Milliseconds(),
+		"get-index-ms", getIdxTotal.Milliseconds())
 	return nil
 }
 
