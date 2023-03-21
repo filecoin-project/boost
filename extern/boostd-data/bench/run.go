@@ -11,6 +11,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -102,7 +103,9 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 	}
 	close(queue)
 
+	var lk sync.Mutex
 	var totalCreateRecs, totalAddRecs time.Duration
+
 	addStart := time.Now()
 	var eg errgroup.Group
 	baseCid := testutil.GenerateCid().Bytes()
@@ -135,7 +138,7 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 							},
 						})
 					}
-					totalCreateRecs += time.Since(createRecsStart)
+					totalCreateRecsDelta := time.Since(createRecsStart)
 
 					// Add the records to the db
 					addRecsStart := time.Now()
@@ -144,7 +147,11 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 					if err != nil {
 						return err
 					}
+
+					lk.Lock()
+					totalCreateRecs += totalCreateRecsDelta
 					totalAddRecs += time.Since(addRecsStart)
+					lk.Unlock()
 				}
 			}
 		})
@@ -182,19 +189,26 @@ func bitswapCmd(createDB func(context.Context, string) (BenchDB, error)) *cli.Co
 func bitswapFetch(ctx context.Context, db BenchDB, count int, parallelism int) error {
 	log.Infof("Bitswap simulation: fetching %d random blocks with parallelism %d...", count, parallelism)
 
-	fetchStart := time.Now()
+	var lk sync.Mutex
 	var mhLookupTotal, getOffsetSizeTotal time.Duration
+
+	fetchStart := time.Now()
 	err := executeFetch(ctx, db, count, parallelism, func(sample pieceBlock) error {
 		mhLookupStart := time.Now()
 		_, err := db.PiecesContainingMultihash(ctx, sample.PayloadMultihash)
 		if err != nil {
 			return err
 		}
-		mhLookupTotal += time.Since(mhLookupStart)
+		mhLookupTotalDelta := time.Since(mhLookupStart)
 
 		getIdxStart := time.Now()
 		_, err = db.GetOffsetSize(ctx, sample.PieceCid, sample.PayloadMultihash)
+
+		lk.Lock()
+		defer lk.Unlock()
+		mhLookupTotal += mhLookupTotalDelta
 		getOffsetSizeTotal += time.Since(getIdxStart)
+
 		return err
 	})
 	if err != nil {
