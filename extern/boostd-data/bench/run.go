@@ -179,6 +179,7 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 		"pieceCount", pieceCount,
 		"duration", duration.String(),
 		"duration-ms", duration.Milliseconds(),
+		"blockRate", float64(pieceCount*blocksPerPiece)/duration.Seconds(),
 		"total-cpu-ms", (totalCreateRecs + totalAddRecs).Milliseconds(),
 		"create-ms", totalCreateRecs.Milliseconds(),
 		"add-ms", totalAddRecs.Milliseconds())
