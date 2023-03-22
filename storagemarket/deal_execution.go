@@ -50,6 +50,11 @@ func (p *Provider) runDeal(deal *types.ProviderDealState, dh *dealHandler) {
 		p.saveDealToDB(dh.Publisher, deal)
 	}
 
+	// Fail offline deals or retry early if start epoch has passed
+	if err := p.checkDealProposalStartEpoch(deal); err != nil {
+		p.failDeal(dh.Publisher, deal, err, false)
+	}
+
 	// Execute the deal
 	err := p.execDeal(deal, dh)
 	if err == nil {

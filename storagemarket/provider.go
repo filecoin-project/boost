@@ -459,6 +459,11 @@ func (p *Provider) Start() error {
 			continue
 		}
 
+		// Fail deals if start epoch has passed
+		if err := p.checkDealProposalStartEpoch(deal); err != nil {
+			p.failDeal(dh.Publisher, deal, err, false)
+		}
+
 		// If it's an offline deal, and the deal data hasn't yet been
 		// imported, just wait for the SP operator to import the data
 		if deal.IsOffline && deal.InboundFilePath == "" {
