@@ -62,6 +62,11 @@ func (m *StorageManager) Free(ctx context.Context) (uint64, error) {
 		return 0, fmt.Errorf("getting total tagged: %w", err)
 	}
 
+	//Return 0 if user sets this value to lower than currently occupied by deals
+	if m.Cfg.MaxStagingDealsBytes < tagged {
+		return 0, nil
+	}
+
 	return m.Cfg.MaxStagingDealsBytes - tagged, nil
 }
 
