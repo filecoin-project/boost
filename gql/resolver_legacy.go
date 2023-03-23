@@ -236,3 +236,7 @@ func (r *legacyDealResolver) Message() string {
 	}
 	return r.MinerDeal.Message
 }
+
+func (r *legacyDealResolver) IsVerified() bool {
+	return r.Proposal.VerifiedDeal
+}
