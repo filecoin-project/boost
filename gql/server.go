@@ -46,6 +46,8 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// Serve dummy deals
 	port := int(s.resolver.cfg.Graphql.Port)
+	bindAddress := s.resolver.cfg.Graphql.ListenAddress
+
 	err = serveDummyDeals(mux, port)
 	if err != nil {
 		return err
@@ -72,7 +74,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	wsHandler := graphqlws.NewHandlerFunc(schema, queryHandler, wsOpts...)
 
-	listenAddr := fmt.Sprintf(":%d", port)
+	listenAddr := fmt.Sprintf("%s:%d", bindAddress, port)
 	s.srv = &http.Server{Addr: listenAddr, Handler: mux}
 	fmt.Printf("Graphql server listening on %s\n", listenAddr)
 	mux.Handle("/graphql/subscription", &corsHandler{wsHandler})
