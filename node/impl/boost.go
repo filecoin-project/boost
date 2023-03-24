@@ -12,8 +12,8 @@ import (
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/filecoin-project/go-fil-markets/stores"
-
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	lotus_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
@@ -26,8 +26,6 @@ import (
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/shard"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/gateway"
@@ -66,8 +64,8 @@ type BoostAPI struct {
 
 	// Lotus Markets
 	SectorBlocks *sectorblocks.SectorBlocks
-	PieceStore   lotus_dtypes.ProviderPieceStore
-	DataTransfer lotus_dtypes.ProviderDataTransfer
+	PieceStore   dtypes.ProviderPieceStore
+	DataTransfer dtypes.ProviderDataTransfer
 
 	RetrievalProvider retrievalmarket.RetrievalProvider
 	SectorAccessor    retrievalmarket.SectorAccessor
@@ -434,7 +432,7 @@ func (sm *BoostAPI) BoostDagstoreRegisterShard(ctx context.Context, key string) 
 	if err != nil {
 		return fmt.Errorf("parsing shard key as piece cid: %w", err)
 	}
-	if err = stores.RegisterShardSync(ctx, sm.DagStoreWrapper, pieceCid, "", true); err != nil {
+	if err = registerShardSync(ctx, sm.DagStoreWrapper, pieceCid, "", true); err != nil {
 		return fmt.Errorf("failed to register shard: %w", err)
 	}
 
@@ -487,7 +485,7 @@ func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) e
 	if err != nil {
 		return fmt.Errorf("parsing shard key as piece cid: %w", err)
 	}
-	if err = stores.DestroyShardSync(ctx, sm.DagStoreWrapper, pieceCid); err != nil {
+	if err = destroyShardSync(ctx, sm.DagStoreWrapper, pieceCid); err != nil {
 		return fmt.Errorf("failed to destroy shard: %w", err)
 	}
 	return nil
@@ -516,4 +514,33 @@ func (sm *BoostAPI) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, erro
 
 func (sm *BoostAPI) OnlineBackup(ctx context.Context, dstDir string) error {
 	return sm.Bkp.Backup(ctx, dstDir)
+}
+
+func registerShardSync(ctx context.Context, ds *mktsdagstore.Wrapper, pieceCid cid.Cid, carPath string, eagerInit bool) error {
+	resch := make(chan dagstore.ShardResult, 1)
+	if err := ds.RegisterShard(ctx, pieceCid, carPath, eagerInit, resch); err != nil {
+		return err
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case res := <-resch:
+		return res.Error
+	}
+}
+
+func destroyShardSync(ctx context.Context, ds *mktsdagstore.Wrapper, pieceCid cid.Cid) error {
+	resch := make(chan dagstore.ShardResult, 1)
+
+	if err := ds.DestroyShard(ctx, pieceCid, resch); err != nil {
+		return err
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case res := <-resch:
+		return res.Error
+	}
 }

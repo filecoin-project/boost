@@ -2,12 +2,12 @@ package lib
 
 import (
 	"context"
+	"github.com/filecoin-project/boost-gfm/piecestore"
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost/retrievalmarket/mock"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/dagstore/indexbs"
 	"github.com/filecoin-project/dagstore/shard"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"

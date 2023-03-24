@@ -7,10 +7,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/mock_types"
 	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/lotus/api"

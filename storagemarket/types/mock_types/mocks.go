@@ -10,7 +10,7 @@ import (
 	reflect "reflect"
 
 	types "github.com/filecoin-project/boost/storagemarket/types"
-	storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
+	storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	market "github.com/filecoin-project/go-state-types/builtin/v9/market"
 	api "github.com/filecoin-project/lotus/api"

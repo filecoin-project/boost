@@ -9,8 +9,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/filecoin-project/boost-gfm/piecestore"
 	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
 	"github.com/golang/mock/gomock"
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"

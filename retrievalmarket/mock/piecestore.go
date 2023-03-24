@@ -8,8 +8,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	piecestore "github.com/filecoin-project/go-fil-markets/piecestore"
-	shared "github.com/filecoin-project/go-fil-markets/shared"
+	piecestore "github.com/filecoin-project/boost-gfm/piecestore"
+	shared "github.com/filecoin-project/boost-gfm/shared"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"
 )

@@ -2,19 +2,27 @@ package modules
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/retrievalmarket/types"
 	"github.com/filecoin-project/go-address"
+	datatransfer "github.com/filecoin-project/go-data-transfer"
+	datatransferv2 "github.com/filecoin-project/go-data-transfer/v2"
 	"github.com/filecoin-project/lotus/node/config"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
+	"github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/datamodel"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/engine"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 )
@@ -26,14 +34,14 @@ type IdxProv struct {
 	Datastore lotus_dtypes.MetadataDS
 }
 
-func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHost host.Host, dt lotus_dtypes.ProviderDataTransfer, maddr lotus_dtypes.MinerAddress, ps *pubsub.PubSub, nn lotus_dtypes.NetworkName) (provider.Interface, error) {
+func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHost host.Host, dt dtypes.ProviderDataTransfer, maddr lotus_dtypes.MinerAddress, ps *pubsub.PubSub, nn lotus_dtypes.NetworkName) (provider.Interface, error) {
 	if !cfg.Enable {
 		log.Warnf("Starting Boost with index provider disabled - no announcements will be made to the index provider")
-		return func(params IdxProv, marketHost host.Host, dt lotus_dtypes.ProviderDataTransfer, maddr lotus_dtypes.MinerAddress, ps *pubsub.PubSub, nn lotus_dtypes.NetworkName) (provider.Interface, error) {
+		return func(params IdxProv, marketHost host.Host, dt dtypes.ProviderDataTransfer, maddr lotus_dtypes.MinerAddress, ps *pubsub.PubSub, nn lotus_dtypes.NetworkName) (provider.Interface, error) {
 			return indexprovider.NewDisabledIndexProvider(), nil
 		}
 	}
-	return func(args IdxProv, marketHost host.Host, dt lotus_dtypes.ProviderDataTransfer, maddr lotus_dtypes.MinerAddress, ps *pubsub.PubSub, nn lotus_dtypes.NetworkName) (provider.Interface, error) {
+	return func(args IdxProv, marketHost host.Host, dt dtypes.ProviderDataTransfer, maddr lotus_dtypes.MinerAddress, ps *pubsub.PubSub, nn lotus_dtypes.NetworkName) (provider.Interface, error) {
 		topicName := cfg.TopicName
 		// If indexer topic name is left empty, infer it from the network name.
 		if topicName == "" {
@@ -46,11 +54,17 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			log.Debugw("Inferred indexer topic from network name", "topic", topicName)
 		}
 
+		marketHostAddrs := marketHost.Addrs()
+		marketHostAddrsStr := make([]string, 0, len(marketHostAddrs))
+		for _, a := range marketHostAddrs {
+			marketHostAddrsStr = append(marketHostAddrsStr, a.String())
+		}
+
 		ipds := namespace.Wrap(args.Datastore, datastore.NewKey("/index-provider"))
 		var opts = []engine.Option{
 			engine.WithDatastore(ipds),
 			engine.WithHost(marketHost),
-			engine.WithRetrievalAddrs(marketHost.Addrs()...),
+			engine.WithRetrievalAddrs(marketHostAddrsStr...),
 			engine.WithEntriesCacheCapacity(cfg.EntriesCacheCapacity),
 			engine.WithChainedEntries(cfg.EntriesChunkSize),
 			engine.WithTopicName(topicName),
@@ -78,7 +92,7 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			ma := address.Address(maddr)
 			opts = append(opts,
 				engine.WithPublisherKind(engine.DataTransferPublisher),
-				engine.WithDataTransfer(dt),
+				engine.WithDataTransfer(dtV1ToIndexerDT(dt)),
 				engine.WithExtraGossipData(ma.Bytes()),
 				engine.WithTopic(t),
 			)
@@ -115,4 +129,140 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 		})
 		return e, nil
 	}
+}
+
+func dtV1ToIndexerDT(dt dtypes.ProviderDataTransfer) datatransferv2.Manager {
+	return &indexerDT{dt: dt}
+}
+
+type indexerDT struct {
+	dt dtypes.ProviderDataTransfer
+}
+
+var _ datatransferv2.Manager = (*indexerDT)(nil)
+
+func (i *indexerDT) RegisterVoucherType(voucherType datatransferv2.TypeIdentifier, validator datatransferv2.RequestValidator) error {
+	return nil
+	//return i.dt.RegisterVoucherType(&dtv1Voucher{t: string(voucherType)}, &dtv1ReqValidator{v: validator})
+}
+
+func (i *indexerDT) RegisterTransportConfigurer(voucherType datatransferv2.TypeIdentifier, configurer datatransferv2.TransportConfigurer) error {
+	// Note: storetheindex 0.5.10 ignores configurer's arguments
+	// TODO:
+	return nil
+	//return fmt.Errorf("not implemented")
+	//return i.dt.RegisterTransportConfigurer(voucherType, configurer)
+}
+
+func (i *indexerDT) Start(ctx context.Context) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (i *indexerDT) OnReady(readyFunc datatransferv2.ReadyFunc) {
+}
+
+func (i *indexerDT) Stop(ctx context.Context) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (i *indexerDT) OpenPushDataChannel(ctx context.Context, to peer.ID, voucher datatransferv2.TypedVoucher, baseCid cid.Cid, selector datamodel.Node, options ...datatransferv2.TransferOption) (datatransferv2.ChannelID, error) {
+	return datatransferv2.ChannelID{}, fmt.Errorf("not implemented")
+}
+
+func (i *indexerDT) OpenPullDataChannel(ctx context.Context, to peer.ID, voucher datatransferv2.TypedVoucher, baseCid cid.Cid, selector datamodel.Node, options ...datatransferv2.TransferOption) (datatransferv2.ChannelID, error) {
+	return datatransferv2.ChannelID{}, fmt.Errorf("not implemented")
+}
+
+func (i *indexerDT) SendVoucher(ctx context.Context, chid datatransferv2.ChannelID, voucher datatransferv2.TypedVoucher) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (i *indexerDT) SendVoucherResult(ctx context.Context, chid datatransferv2.ChannelID, voucherResult datatransferv2.TypedVoucher) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (i *indexerDT) UpdateValidationStatus(ctx context.Context, chid datatransferv2.ChannelID, validationResult datatransferv2.ValidationResult) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (i *indexerDT) CloseDataTransferChannel(ctx context.Context, chid datatransferv2.ChannelID) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (i *indexerDT) PauseDataTransferChannel(ctx context.Context, chid datatransferv2.ChannelID) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (i *indexerDT) ResumeDataTransferChannel(ctx context.Context, chid datatransferv2.ChannelID) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (i *indexerDT) TransferChannelStatus(ctx context.Context, x datatransferv2.ChannelID) datatransferv2.Status {
+	return 0
+}
+
+func (i *indexerDT) ChannelState(ctx context.Context, chid datatransferv2.ChannelID) (datatransferv2.ChannelState, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (i *indexerDT) SubscribeToEvents(subscriber datatransferv2.Subscriber) datatransferv2.Unsubscribe {
+	return func() {}
+}
+
+func (i *indexerDT) InProgressChannels(ctx context.Context) (map[datatransferv2.ChannelID]datatransferv2.ChannelState, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (i *indexerDT) RestartDataTransferChannel(ctx context.Context, chid datatransferv2.ChannelID) error {
+	return fmt.Errorf("not implemented")
+}
+
+type dtv1Voucher struct {
+	t string
+}
+
+func (d *dtv1Voucher) Type() datatransfer.TypeIdentifier {
+	return datatransfer.TypeIdentifier(d.t)
+}
+
+type dtv1VoucherResult struct {
+	t string
+}
+
+func (d *dtv1VoucherResult) Type() datatransfer.TypeIdentifier {
+	return datatransfer.TypeIdentifier(d.t)
+}
+
+type dtv1ReqValidator struct {
+	v datatransferv2.RequestValidator
+}
+
+func (d *dtv1ReqValidator) ValidatePush(isRestart bool, chid datatransfer.ChannelID, sender peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
+	chidv2 := datatransferv2.ChannelID{
+		Initiator: chid.Initiator,
+		Responder: chid.Responder,
+		ID:        datatransferv2.TransferID(chid.ID),
+	}
+	d2v := types.BindnodeRegistry.TypeToNode(voucher.Type())
+	res, err := d.v.ValidatePush(chidv2, sender, d2v, baseCid, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dtv1VoucherResult{t: string(res.VoucherResult.Type)}, nil
+}
+
+func (d *dtv1ReqValidator) ValidatePull(isRestart bool, chid datatransfer.ChannelID, receiver peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
+	chidv2 := datatransferv2.ChannelID{
+		Initiator: chid.Initiator,
+		Responder: chid.Responder,
+		ID:        datatransferv2.TransferID(chid.ID),
+	}
+	d2v := types.BindnodeRegistry.TypeToNode(voucher.Type())
+	res, err := d.v.ValidatePull(chidv2, receiver, d2v, baseCid, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dtv1VoucherResult{t: string(res.VoucherResult.Type)}, nil
 }

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/ipfs/go-cid"

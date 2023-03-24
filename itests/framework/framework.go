@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	lotus_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/api"
 	boostclient "github.com/filecoin-project/boost/client"
 	"github.com/filecoin-project/boost/node"
@@ -24,8 +26,6 @@ import (
 	types2 "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin"

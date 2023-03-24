@@ -5,11 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/filecoin-project/dagstore"
 	"io"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost-gfm/piecestore"
+	"github.com/filecoin-project/boost-gfm/shared"
+	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
@@ -26,10 +30,6 @@ import (
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
-	"github.com/filecoin-project/go-fil-markets/shared"
-	"github.com/filecoin-project/go-fil-markets/storagemarket"
-	"github.com/filecoin-project/go-fil-markets/stores"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ctypes "github.com/filecoin-project/lotus/chain/types"
@@ -56,6 +56,12 @@ type SealingPipelineCache struct {
 	Status     sealingpipeline.Status
 	CacheTime  time.Time
 	CacheError error
+}
+
+// DagstoreShardRegistry provides the one method from the Dagstore that we use
+// in deal execution: registering a shard
+type DagstoreShardRegistry interface {
+	RegisterShard(ctx context.Context, pieceCid cid.Cid, carPath string, eagerInit bool, resch chan dagstore.ShardResult) error
 }
 
 type Config struct {
@@ -127,7 +133,7 @@ type Provider struct {
 
 	dealLogger *logs.DealLogger
 
-	dagst stores.DAGStoreWrapper
+	dagst DagstoreShardRegistry
 	ps    piecestore.PieceStore
 
 	ip          types.IndexProvider
@@ -138,7 +144,7 @@ type Provider struct {
 func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
 	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, commpCalc smtypes.CommpCalculator,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
-	dagst stores.DAGStoreWrapper, ps piecestore.PieceStore, ip types.IndexProvider, askGetter types.AskGetter,
+	dagst DagstoreShardRegistry, ps piecestore.PieceStore, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
 
 	xferLimiter, err := newTransferLimiter(cfg.TransferLimiter)

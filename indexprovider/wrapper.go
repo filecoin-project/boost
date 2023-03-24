@@ -18,10 +18,10 @@ import (
 	dst "github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 
+	lotus_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/hashicorp/go-multierror"
 	logging "github.com/ipfs/go-log/v2"
 

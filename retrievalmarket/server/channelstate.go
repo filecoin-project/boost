@@ -3,8 +3,8 @@ package server
 import (
 	"bytes"
 
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
