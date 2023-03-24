@@ -23,8 +23,9 @@ var importDataCmd = &cli.Command{
 		}
 
 		id := cctx.Args().Get(0)
+		tpath := cctx.Args().Get(1)
 
-		path, err := homedir.Expand(cctx.Args().First())
+		path, err := homedir.Expand(tpath)
 		if err != nil {
 			return fmt.Errorf("expanding file path: %w", err)
 		}
