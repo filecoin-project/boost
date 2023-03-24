@@ -34,7 +34,9 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
-	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
+	basicnode "github.com/ipld/go-ipld-prime/node/basic"
+	"github.com/ipld/go-ipld-prime/traversal/selector"
+	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
 	"github.com/stretchr/testify/require"
 )
 
@@ -278,7 +280,13 @@ func runRequestTest(t *testing.T, tc testCase) {
 
 	// Retrieve the data
 	tlog.Infof("Retrieve cid %s from peer %s", carRootCid, retrievalPeer.ID)
-	sel := selectorparse.CommonSelector_ExploreAllRecursively
+	// Use an explore-all but add unixfs-preload to make sure we have UnixFS
+	// ADL support wired up.
+	ssb := builder.NewSelectorSpecBuilder(basicnode.Prototype.Any)
+	sel := ssb.ExploreInterpretAs("unixfs-preload", ssb.ExploreRecursive(
+		selector.RecursionLimitNone(),
+		ssb.ExploreAll(ssb.ExploreRecursiveEdge()),
+	)).Node()
 	params, err := retrievalmarket.NewParamsV1(abi.NewTokenAmount(0), 0, 0, sel, nil, abi.NewTokenAmount(0))
 	require.NoError(t, err)
 	if tc.reqPayloadCid != cid.Undef {
