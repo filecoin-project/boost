@@ -6,7 +6,6 @@ import (
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
-	"github.com/filecoin-project/boost/retrievalmarket/types"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-data-transfer/transport/graphsync"
@@ -257,20 +256,26 @@ type dtv1ReqValidator struct {
 }
 
 func (d *dtv1ReqValidator) ValidatePush(isRestart bool, chid datatransfer.ChannelID, sender peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
-	d2v := types.BindnodeRegistry.TypeToNode(voucher.Type())
+	d2v := dtsync.BindnodeRegistry.TypeToNode(voucher.(*legsVoucherDTv1).Voucher)
 	res, err := d.v.ValidatePush(toChannelIDV2(chid), sender, d2v, baseCid, selector)
 	if err != nil {
 		return nil, err
+	}
+	if !res.Accepted {
+		return nil, datatransfer.ErrRejected
 	}
 
 	return &dtv1VoucherResult{t: string(res.VoucherResult.Type)}, nil
 }
 
 func (d *dtv1ReqValidator) ValidatePull(isRestart bool, chid datatransfer.ChannelID, receiver peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
-	d2v := types.BindnodeRegistry.TypeToNode(voucher.Type())
+	d2v := dtsync.BindnodeRegistry.TypeToNode(voucher.(*legsVoucherDTv1).Voucher)
 	res, err := d.v.ValidatePull(toChannelIDV2(chid), receiver, d2v, baseCid, selector)
 	if err != nil {
 		return nil, err
+	}
+	if !res.Accepted {
+		return nil, datatransfer.ErrRejected
 	}
 
 	return &dtv1VoucherResult{t: string(res.VoucherResult.Type)}, nil
