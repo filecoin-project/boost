@@ -3,13 +3,13 @@ package modules
 import (
 	"context"
 	"fmt"
-
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
+	"github.com/filecoin-project/go-data-transfer/transport/graphsync"
 	datatransferv2 "github.com/filecoin-project/go-data-transfer/v2"
 	"github.com/filecoin-project/lotus/node/config"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -20,6 +20,7 @@ import (
 	"github.com/ipld/go-ipld-prime/datamodel"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/engine"
+	"github.com/ipni/storetheindex/dagsync/dtsync"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -141,17 +142,35 @@ type indexerDT struct {
 
 var _ datatransferv2.Manager = (*indexerDT)(nil)
 
+type legsVoucherDTv1 struct {
+	*dtsync.Voucher
+}
+
+func (l *legsVoucherDTv1) Type() datatransfer.TypeIdentifier {
+	return datatransfer.TypeIdentifier(dtsync.LegsVoucherType)
+}
+
 func (i *indexerDT) RegisterVoucherType(voucherType datatransferv2.TypeIdentifier, validator datatransferv2.RequestValidator) error {
-	return nil
-	//return i.dt.RegisterVoucherType(&dtv1Voucher{t: string(voucherType)}, &dtv1ReqValidator{v: validator})
+	if voucherType == dtsync.LegsVoucherType {
+		return i.dt.RegisterVoucherType(&legsVoucherDTv1{}, &dtv1ReqValidator{v: validator})
+	}
+	return fmt.Errorf("unrecognized voucher type: %s", voucherType)
 }
 
 func (i *indexerDT) RegisterTransportConfigurer(voucherType datatransferv2.TypeIdentifier, configurer datatransferv2.TransportConfigurer) error {
-	// Note: storetheindex 0.5.10 ignores configurer's arguments
-	// TODO:
-	return nil
-	//return fmt.Errorf("not implemented")
-	//return i.dt.RegisterTransportConfigurer(voucherType, configurer)
+	if voucherType == dtsync.LegsVoucherType {
+		v := &legsVoucherDTv1{}
+		return i.dt.RegisterTransportConfigurer(v, func(chid datatransfer.ChannelID, voucher datatransfer.Voucher, transport datatransfer.Transport) {
+			//opts := configurer(toChannelIDV2(chid), v.AsVoucher())
+			//useStoreOpt, ok := opts[0].(graphsync2.UseStore)
+			gsTransport, ok := transport.(*graphsync.Transport)
+			if ok {
+				var lsys ipld.LinkSystem
+				gsTransport.UseStore(chid, lsys)
+			}
+		})
+	}
+	return fmt.Errorf("unrecognized voucher type: %s", voucherType)
 }
 
 func (i *indexerDT) Start(ctx context.Context) error {
@@ -238,13 +257,8 @@ type dtv1ReqValidator struct {
 }
 
 func (d *dtv1ReqValidator) ValidatePush(isRestart bool, chid datatransfer.ChannelID, sender peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
-	chidv2 := datatransferv2.ChannelID{
-		Initiator: chid.Initiator,
-		Responder: chid.Responder,
-		ID:        datatransferv2.TransferID(chid.ID),
-	}
 	d2v := types.BindnodeRegistry.TypeToNode(voucher.Type())
-	res, err := d.v.ValidatePush(chidv2, sender, d2v, baseCid, selector)
+	res, err := d.v.ValidatePush(toChannelIDV2(chid), sender, d2v, baseCid, selector)
 	if err != nil {
 		return nil, err
 	}
@@ -253,16 +267,19 @@ func (d *dtv1ReqValidator) ValidatePush(isRestart bool, chid datatransfer.Channe
 }
 
 func (d *dtv1ReqValidator) ValidatePull(isRestart bool, chid datatransfer.ChannelID, receiver peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
-	chidv2 := datatransferv2.ChannelID{
-		Initiator: chid.Initiator,
-		Responder: chid.Responder,
-		ID:        datatransferv2.TransferID(chid.ID),
-	}
 	d2v := types.BindnodeRegistry.TypeToNode(voucher.Type())
-	res, err := d.v.ValidatePull(chidv2, receiver, d2v, baseCid, selector)
+	res, err := d.v.ValidatePull(toChannelIDV2(chid), receiver, d2v, baseCid, selector)
 	if err != nil {
 		return nil, err
 	}
 
 	return &dtv1VoucherResult{t: string(res.VoucherResult.Type)}, nil
+}
+
+func toChannelIDV2(chid datatransfer.ChannelID) datatransferv2.ChannelID {
+	return datatransferv2.ChannelID{
+		Initiator: chid.Initiator,
+		Responder: chid.Responder,
+		ID:        datatransferv2.TransferID(chid.ID),
+	}
 }
