@@ -77,6 +77,7 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			"topic", topicName,
 			"retAddrs", marketHost.Addrs())
 		// If announcements to the network are enabled, then set options for datatransfer publisher.
+		var e *engine.Engine
 		if cfg.Enable {
 			// Join the indexer topic using the market's pubsub instance. Otherwise, the provider
 			// engine would create its own instance of pubsub down the line in go-legs, which has
@@ -92,7 +93,9 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			ma := address.Address(maddr)
 			opts = append(opts,
 				engine.WithPublisherKind(engine.DataTransferPublisher),
-				engine.WithDataTransfer(dtV1ToIndexerDT(dt)),
+				engine.WithDataTransfer(dtV1ToIndexerDT(dt, func() ipld.LinkSystem {
+					return *e.LinkSystem()
+				})),
 				engine.WithExtraGossipData(ma.Bytes()),
 				engine.WithTopic(t),
 			)
@@ -103,7 +106,8 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 		}
 
 		// Instantiate the index provider engine.
-		e, err := engine.New(opts...)
+		var err error
+		e, err = engine.New(opts...)
 		if err != nil {
 			return nil, xerrors.Errorf("creating indexer provider engine: %w", err)
 		}
@@ -131,12 +135,17 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 	}
 }
 
-func dtV1ToIndexerDT(dt dtypes.ProviderDataTransfer) datatransferv2.Manager {
-	return &indexerDT{dt: dt}
+// The index provider needs to set up some go-data-transfer voucher code.
+// Below we write a shim for the specific use case of index provider, that
+// translates between the go-data-transfer v2 use case that the index provider
+// implements and the go-data-transfer v1 code that boost imports.
+func dtV1ToIndexerDT(dt dtypes.ProviderDataTransfer, linksys func() ipld.LinkSystem) datatransferv2.Manager {
+	return &indexerDT{dt: dt, linksys: linksys}
 }
 
 type indexerDT struct {
-	dt dtypes.ProviderDataTransfer
+	dt      dtypes.ProviderDataTransfer
+	linksys func() ipld.LinkSystem
 }
 
 var _ datatransferv2.Manager = (*indexerDT)(nil)
@@ -158,14 +167,10 @@ func (i *indexerDT) RegisterVoucherType(voucherType datatransferv2.TypeIdentifie
 
 func (i *indexerDT) RegisterTransportConfigurer(voucherType datatransferv2.TypeIdentifier, configurer datatransferv2.TransportConfigurer) error {
 	if voucherType == dtsync.LegsVoucherType {
-		v := &legsVoucherDTv1{}
-		return i.dt.RegisterTransportConfigurer(v, func(chid datatransfer.ChannelID, voucher datatransfer.Voucher, transport datatransfer.Transport) {
-			//opts := configurer(toChannelIDV2(chid), v.AsVoucher())
-			//useStoreOpt, ok := opts[0].(graphsync2.UseStore)
+		return i.dt.RegisterTransportConfigurer(&legsVoucherDTv1{}, func(chid datatransfer.ChannelID, voucher datatransfer.Voucher, transport datatransfer.Transport) {
 			gsTransport, ok := transport.(*graphsync.Transport)
 			if ok {
-				var lsys ipld.LinkSystem
-				gsTransport.UseStore(chid, lsys)
+				gsTransport.UseStore(chid, i.linksys())
 			}
 		})
 	}
