@@ -2,6 +2,11 @@ package main
 
 import (
 	"context"
+	"math/rand"
+	"sync"
+	"time"
+
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
@@ -10,9 +15,6 @@ import (
 	mh "github.com/multiformats/go-multihash"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
-	"math/rand"
-	"sync"
-	"time"
 )
 
 const sectorSize = 32 * 1024 * 1024 * 1024
@@ -48,6 +50,11 @@ type runOpts struct {
 }
 
 func run(ctx context.Context, db BenchDB, opts runOpts) error {
+	metrics.GetOrRegisterCounter("postgres.run", nil).Inc(1)
+	defer func(now time.Time) {
+		metrics.GetOrRegisterResettingTimer("postgres.run.duration", nil).UpdateSince(now)
+	}(time.Now())
+
 	log.Infof("Running benchmark for %s", db.Name())
 	log.Infof("Initializing...")
 	if err := db.Init(ctx); err != nil {
@@ -183,6 +190,8 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 		"total-cpu-ms", (totalCreateRecs + totalAddRecs).Milliseconds(),
 		"create-ms", totalCreateRecs.Milliseconds(),
 		"add-ms", totalAddRecs.Milliseconds())
+
+	metrics.GetOrRegisterResettingTimer("postgres.addpiece", nil).UpdateSince(addStart)
 	return nil
 }
 
