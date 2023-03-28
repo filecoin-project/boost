@@ -84,7 +84,11 @@ var libp2pInfoCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("getting protocols for peer %s: %w", addrInfo.ID, err)
 		}
-		sort.Strings(protos)
+		protostrs := make([]string, 0, len(protos))
+		for _, proto := range protos {
+			protostrs = append(protostrs, string(proto))
+		}
+		sort.Strings(protostrs)
 
 		agentVersionI, err := n.Host.Peerstore().Get(addrInfo.ID, "AgentVersion")
 		if err != nil {
@@ -98,7 +102,7 @@ var libp2pInfoCmd = &cli.Command{
 				"agent":      agentVersion,
 				"id":         addrInfo.ID.String(),
 				"multiaddrs": addrInfo.Addrs,
-				"protocols":  protos,
+				"protocols":  protostrs,
 			})
 		}
 
@@ -109,7 +113,7 @@ var libp2pInfoCmd = &cli.Command{
 		for _, addr := range addrInfo.Addrs {
 			fmt.Println("  " + addr.String())
 		}
-		fmt.Println("Protocols:\n" + "  " + strings.Join(protos, "\n  "))
+		fmt.Println("Protocols:\n" + "  " + strings.Join(protostrs, "\n  "))
 		return nil
 	},
 }
