@@ -157,6 +157,7 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 							},
 						})
 					}
+					metrics.GetOrRegisterResettingTimer("runner.gen-n-blocks", nil).UpdateSince(createRecsStart)
 					totalCreateRecsDelta := time.Since(createRecsStart)
 
 					// Add the records to the db

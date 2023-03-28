@@ -33,7 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	time.Sleep(6 * time.Second) // 5+1 because of influxdb reporter
+	time.Sleep(11 * time.Second) // 10+1 because of influxdb reporter
 }
 
 func before(cctx *cli.Context) error {
@@ -61,6 +61,6 @@ func metricsSetup() {
 	database := "metrics"
 	namespace := ""
 
-	go InfluxDBWithTags(metrics.DefaultRegistry, 5*time.Second, endpoint, database, username, password, namespace, tags)
+	go InfluxDBWithTags(metrics.DefaultRegistry, 10*time.Second, endpoint, database, username, password, namespace, tags)
 	log.Info("setting up influxdb exporter")
 }
