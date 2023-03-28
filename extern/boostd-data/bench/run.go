@@ -162,10 +162,13 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 					// Add the records to the db
 					addRecsStart := time.Now()
 					pcid := testutil.GenerateCid()
+
+					start := time.Now()
 					err := db.AddIndexRecords(ctx, pcid, recs)
 					if err != nil {
 						return err
 					}
+					metrics.GetOrRegisterResettingTimer("runner.add-index-records", nil).UpdateSince(start)
 
 					lk.Lock()
 					totalCreateRecs += totalCreateRecsDelta
@@ -191,7 +194,8 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 		"create-ms", totalCreateRecs.Milliseconds(),
 		"add-ms", totalAddRecs.Milliseconds())
 
-	metrics.GetOrRegisterResettingTimer("postgres.addpiece", nil).UpdateSince(addStart)
+	metrics.GetOrRegisterResettingTimer("postgres.fixtures", nil).UpdateSince(addStart)
+
 	return nil
 }
 
@@ -221,14 +225,17 @@ func bitswapFetch(ctx context.Context, db BenchDB, count int, parallelism int) e
 	fetchStart := time.Now()
 	err := executeFetch(ctx, db, count, parallelism, func(sample pieceBlock) error {
 		mhLookupStart := time.Now()
+
 		_, err := db.PiecesContainingMultihash(ctx, sample.PayloadMultihash)
 		if err != nil {
 			return err
 		}
 		mhLookupTotalDelta := time.Since(mhLookupStart)
+		metrics.GetOrRegisterResettingTimer("runner.pieces-containing-multihash", nil).UpdateSince(mhLookupStart)
 
 		getIdxStart := time.Now()
 		_, err = db.GetOffsetSize(ctx, sample.PieceCid, sample.PayloadMultihash)
+		metrics.GetOrRegisterResettingTimer("runner.get-offset-size", nil).UpdateSince(getIdxStart)
 
 		lk.Lock()
 		defer lk.Unlock()
@@ -281,10 +288,12 @@ func graphsyncFetch(ctx context.Context, db BenchDB, count int, parallelism int)
 			return err
 		}
 		mhLookupTotal += time.Since(mhLookupStart)
+		metrics.GetOrRegisterResettingTimer("runner.pieces-containing-multihash", nil).UpdateSince(mhLookupStart)
 
 		getIdxStart := time.Now()
 		_, err = db.GetIterableIndex(ctx, sample.PieceCid)
 		getIdxTotal += time.Since(getIdxStart)
+		metrics.GetOrRegisterResettingTimer("runner.get-iterable-index", nil).UpdateSince(getIdxStart)
 		return err
 	})
 	if err != nil {
@@ -309,6 +318,8 @@ func executeFetch(ctx context.Context, db BenchDB, count int, parallelism int, p
 	if err != nil {
 		return err
 	}
+
+	metrics.GetOrRegisterResettingTimer("runner.get-block-sample", nil).UpdateSince(start)
 
 	log.Infow("generated block samples", "count", count, "parallelism", parallelism, "duration", time.Since(start).String())
 
