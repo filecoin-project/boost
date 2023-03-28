@@ -235,6 +235,10 @@ func bitswapFetch(ctx context.Context, db BenchDB, count int, parallelism int) e
 
 		getIdxStart := time.Now()
 		_, err = db.GetOffsetSize(ctx, sample.PieceCid, sample.PayloadMultihash)
+		if err != nil {
+			metrics.GetOrRegisterResettingTimer("runner.get-offset-size.err", nil).UpdateSince(getIdxStart)
+			return err
+		}
 		metrics.GetOrRegisterResettingTimer("runner.get-offset-size", nil).UpdateSince(getIdxStart)
 
 		lk.Lock()
