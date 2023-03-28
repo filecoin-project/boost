@@ -57,7 +57,7 @@ func setupHost(cfgDir string, port int) (host.Host, error) {
 		libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
 		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
 		libp2p.Identity(peerKey),
-		libp2p.ResourceManager(network.NullResourceManager),
+		libp2p.ResourceManager(&network.NullResourceManager{}),
 	)
 }
 

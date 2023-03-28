@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -268,7 +267,7 @@ func (fbf *fakeBlockFetcher) fetchDenyList(fetchTime time.Time) (bool, io.ReadCl
 		`
 	}
 	fbf.fetchCount++
-	return updated, ioutil.NopCloser(strings.NewReader(denyList)), nil
+	return updated, io.NopCloser(strings.NewReader(denyList)), nil
 }
 
 type invalidBlockFetcher struct {
@@ -280,7 +279,7 @@ func (fbf *invalidBlockFetcher) fetchDenyList(fetchTime time.Time) (bool, io.Rea
 	denyList := `[
 		{ "anchor": "09770fe7ec3124653c1d8f6917e3cd72cbd58a3e24a734bc362f656844c4
 	`
-	return true, ioutil.NopCloser(strings.NewReader(denyList)), nil
+	return true, io.NopCloser(strings.NewReader(denyList)), nil
 }
 
 type fakePeerFetcher struct {
@@ -307,5 +306,5 @@ func (fpf *fakePeerFetcher) fetchList(fetchTime time.Time) (bool, io.ReadCloser,
 		}`
 	}
 	fpf.fetchCount++
-	return updated, ioutil.NopCloser(strings.NewReader(list)), nil
+	return updated, io.NopCloser(strings.NewReader(list)), nil
 }

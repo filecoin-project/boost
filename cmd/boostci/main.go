@@ -1,7 +1,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 
@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	llog.SetOutput(ioutil.Discard)
+	llog.SetOutput(io.Discard)
 }
 
 func main() {

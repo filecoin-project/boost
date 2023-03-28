@@ -3,7 +3,6 @@ package smtestutil
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"strings"
 	"sync"
 
@@ -288,7 +287,7 @@ func (mb *MinerStubBuilder) SetupAddPiece(blocking bool) *MinerStubBuilder {
 		}
 
 		var err error
-		readBytes, err = ioutil.ReadAll(r)
+		readBytes, err = io.ReadAll(r)
 		return mb.sectorId, mb.offset, err
 	})
 

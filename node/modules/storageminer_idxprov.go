@@ -170,7 +170,12 @@ func (i *indexerDT) RegisterTransportConfigurer(voucherType datatransferv2.TypeI
 		return i.dt.RegisterTransportConfigurer(&legsVoucherDTv1{}, func(chid datatransfer.ChannelID, voucher datatransfer.Voucher, transport datatransfer.Transport) {
 			gsTransport, ok := transport.(*graphsync.Transport)
 			if ok {
-				gsTransport.UseStore(chid, i.linksys())
+				err := gsTransport.UseStore(chid, i.linksys())
+				if err != nil {
+					log.Warnf("setting store for legs voucher: %s", err)
+				}
+			} else {
+				log.Warnf("expected transport configurer to pass graphsync transport but got %T", transport)
 			}
 		})
 	}
@@ -238,14 +243,6 @@ func (i *indexerDT) InProgressChannels(ctx context.Context) (map[datatransferv2.
 
 func (i *indexerDT) RestartDataTransferChannel(ctx context.Context, chid datatransferv2.ChannelID) error {
 	return fmt.Errorf("not implemented")
-}
-
-type dtv1Voucher struct {
-	t string
-}
-
-func (d *dtv1Voucher) Type() datatransfer.TypeIdentifier {
-	return datatransfer.TypeIdentifier(d.t)
 }
 
 type dtv1VoucherResult struct {

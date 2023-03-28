@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http/httptest"
 	"os"
@@ -1201,7 +1200,7 @@ func (h *ProviderHarness) AssertSealedContents(t *testing.T, carV2FilePath strin
 
 	r, err := cr.DataReader()
 	require.NoError(t, err)
-	actual, err := ioutil.ReadAll(r)
+	actual, err := io.ReadAll(r)
 	require.NoError(t, err)
 
 	// the read-bytes also contains extra zeros for the padding magic, so just match without the padding bytes.
@@ -1442,7 +1441,7 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	require.NoError(t, err)
 
 	// setup the databases
-	f, err := ioutil.TempFile(dir, "*.db")
+	f, err := os.CreateTemp(dir, "*.db")
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	sqldb, err := db.SqlDB(f.Name())

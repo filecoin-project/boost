@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"golang.org/x/tools/go/packages"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -104,7 +103,7 @@ type field struct {
 }
 
 func parseTypesFile(src string) (map[string][]field, error) {
-	tfb, err := ioutil.ReadFile(src)
+	tfb, err := os.ReadFile(src)
 	if err != nil {
 		return nil, err
 	}

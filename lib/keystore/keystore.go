@@ -3,7 +3,7 @@ package keystore
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -81,7 +81,7 @@ func (fsr *DiskKeyStore) Get(name string) (types.KeyInfo, error) {
 	}
 	defer file.Close() //nolint: errcheck // read only op
 
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return types.KeyInfo{}, fmt.Errorf("reading key '%s': %w", name, err)
 	}
@@ -113,7 +113,7 @@ func (fsr *DiskKeyStore) Put(name string, info types.KeyInfo) error {
 		return fmt.Errorf("encoding key '%s': %w", name, err)
 	}
 
-	err = ioutil.WriteFile(keyPath, keyData, 0600)
+	err = os.WriteFile(keyPath, keyData, 0600)
 	if err != nil {
 		return fmt.Errorf("writing key '%s': %w", name, err)
 	}

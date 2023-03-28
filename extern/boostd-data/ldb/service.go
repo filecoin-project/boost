@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 
@@ -32,7 +32,7 @@ func NewStore(_repopath string) *Store {
 	repopath := _repopath
 	if _repopath == "" {
 		var err error
-		repopath, err = ioutil.TempDir("", "ds-leveldb")
+		repopath, err = os.MkdirTemp("", "ds-leveldb")
 		if err != nil {
 			panic(err)
 		}

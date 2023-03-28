@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -151,7 +150,7 @@ func ReaderParamEncoder(addr string) jsonrpc.Option {
 					}
 
 					if resp.StatusCode != http.StatusOK {
-						b, _ := ioutil.ReadAll(resp.Body)
+						b, _ := io.ReadAll(resp.Body)
 						log.Errorf("sending reader param (%s): non-200 status: %s, msg: '%s'", u.String(), resp.Status, string(b))
 						return
 					}
@@ -175,7 +174,7 @@ func ReaderParamEncoder(addr string) jsonrpc.Option {
 				defer resp.Body.Close() //nolint
 
 				if resp.StatusCode != http.StatusOK {
-					b, _ := ioutil.ReadAll(resp.Body)
+					b, _ := io.ReadAll(resp.Body)
 					log.Errorf("sending reader param (%s): non-200 status: %s, msg: '%s'", u.String(), resp.Status, string(b))
 					return
 				}

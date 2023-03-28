@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
@@ -239,12 +238,12 @@ func serveCarFile(dealUuid uuid.UUID, fpath string) (string, error) {
 	carName := dealUuid.String() + ".car"
 	destPath := path.Join(gql.DummyDealsDir, carName)
 
-	bytes, err := ioutil.ReadFile(fpath)
+	bytes, err := os.ReadFile(fpath)
 	if err != nil {
 		return "", fmt.Errorf("reading source car file: %w", err)
 	}
 
-	err = ioutil.WriteFile(destPath, bytes, 0644)
+	err = os.WriteFile(destPath, bytes, 0644)
 	if err != nil {
 		return "", fmt.Errorf("writing destination car file: %w", err)
 	}
