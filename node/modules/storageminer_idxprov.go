@@ -151,7 +151,7 @@ type indexerDT struct {
 var _ datatransferv2.Manager = (*indexerDT)(nil)
 
 type legsVoucherDTv1 struct {
-	*dtsync.Voucher
+	dtsync.Voucher
 }
 
 func (l *legsVoucherDTv1) Type() datatransfer.TypeIdentifier {
@@ -246,11 +246,12 @@ func (i *indexerDT) RestartDataTransferChannel(ctx context.Context, chid datatra
 }
 
 type dtv1VoucherResult struct {
-	t string
+	voucherType datatransferv2.TypeIdentifier
+	dtsync.VoucherResult
 }
 
 func (d *dtv1VoucherResult) Type() datatransfer.TypeIdentifier {
-	return datatransfer.TypeIdentifier(d.t)
+	return datatransfer.TypeIdentifier(d.voucherType)
 }
 
 type dtv1ReqValidator struct {
@@ -258,7 +259,7 @@ type dtv1ReqValidator struct {
 }
 
 func (d *dtv1ReqValidator) ValidatePush(isRestart bool, chid datatransfer.ChannelID, sender peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
-	d2v := dtsync.BindnodeRegistry.TypeToNode(voucher.(*legsVoucherDTv1).Voucher)
+	d2v := dtsync.BindnodeRegistry.TypeToNode(&voucher.(*legsVoucherDTv1).Voucher)
 	res, err := d.v.ValidatePush(toChannelIDV2(chid), sender, d2v, baseCid, selector)
 	if err != nil {
 		return nil, err
@@ -267,11 +268,11 @@ func (d *dtv1ReqValidator) ValidatePush(isRestart bool, chid datatransfer.Channe
 		return nil, datatransfer.ErrRejected
 	}
 
-	return &dtv1VoucherResult{t: string(res.VoucherResult.Type)}, nil
+	return toVoucherResult(res)
 }
 
 func (d *dtv1ReqValidator) ValidatePull(isRestart bool, chid datatransfer.ChannelID, receiver peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
-	d2v := dtsync.BindnodeRegistry.TypeToNode(voucher.(*legsVoucherDTv1).Voucher)
+	d2v := dtsync.BindnodeRegistry.TypeToNode(&voucher.(*legsVoucherDTv1).Voucher)
 	res, err := d.v.ValidatePull(toChannelIDV2(chid), receiver, d2v, baseCid, selector)
 	if err != nil {
 		return nil, err
@@ -280,7 +281,20 @@ func (d *dtv1ReqValidator) ValidatePull(isRestart bool, chid datatransfer.Channe
 		return nil, datatransfer.ErrRejected
 	}
 
-	return &dtv1VoucherResult{t: string(res.VoucherResult.Type)}, nil
+	return toVoucherResult(res)
+}
+
+func toVoucherResult(res datatransferv2.ValidationResult) (datatransfer.VoucherResult, error) {
+	voucherResVoucher := res.VoucherResult.Voucher
+	vri, err := dtsync.BindnodeRegistry.TypeFromNode(voucherResVoucher, &dtsync.VoucherResult{})
+	if err != nil {
+		return nil, fmt.Errorf("getting VoucherResult from ValidationResult: %w", err)
+	}
+	vr := vri.(*dtsync.VoucherResult)
+	if vr == nil {
+		return nil, fmt.Errorf("got nil VoucherResult from ValidationResult")
+	}
+	return &dtv1VoucherResult{VoucherResult: *vr, voucherType: res.VoucherResult.Type}, nil
 }
 
 func toChannelIDV2(chid datatransfer.ChannelID) datatransferv2.ChannelID {
