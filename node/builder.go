@@ -5,13 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	storageimpl "github.com/filecoin-project/boost-gfm/storagemarket/impl"
-	lotus_gfm_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"time"
 
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	rmnet "github.com/filecoin-project/boost-gfm/retrievalmarket/network"
 	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	storageimpl "github.com/filecoin-project/boost-gfm/storagemarket/impl"
 	"github.com/filecoin-project/boost-gfm/storagemarket/impl/storedask"
 	"github.com/filecoin-project/boost-gfm/stores"
 	"github.com/filecoin-project/boost/api"
@@ -42,6 +41,7 @@ import (
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
+	lotus_gfm_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	lotus_api "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -593,7 +593,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		),
 
 		// Lotus markets retrieval deal filter
-		Override(new(lotus_gfm_storagemarket.StorageProviderNode), modules.LotusFGMStorageProviderNode),
+		Override(new(lotus_gfm_storagemarket.StorageProviderNode), modules.LotusGFMStorageProviderNode),
 		Override(new(lotus_dtypes.RetrievalDealFilter), lotus_modules.RetrievalDealFilter(nil)),
 		If(cfg.LotusDealmaking.RetrievalFilter != "",
 			Override(new(lotus_dtypes.RetrievalDealFilter), lotus_modules.RetrievalDealFilter(lotus_dealfilter.CliRetrievalDealFilter(cfg.LotusDealmaking.RetrievalFilter))),

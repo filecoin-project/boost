@@ -817,7 +817,7 @@ func RetrievalProvider(
 	)
 }
 
-func LotusFGMStorageProviderNode(spn gfm_storagemarket.StorageProviderNode) lotus_gfm_storagemarket.StorageProviderNode {
+func LotusGFMStorageProviderNode(spn gfm_storagemarket.StorageProviderNode) lotus_gfm_storagemarket.StorageProviderNode {
 	return &lotusGFMSPN{StorageProviderNode: spn}
 }
 

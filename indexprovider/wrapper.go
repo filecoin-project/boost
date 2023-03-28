@@ -18,7 +18,7 @@ import (
 	dst "github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 
-	lotus_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -41,7 +41,7 @@ type Wrapper struct {
 	cfg         *config.Boost
 	enabled     bool
 	dealsDB     *db.DealsDB
-	legacyProv  lotus_storagemarket.StorageProvider
+	legacyProv  gfm_storagemarket.StorageProvider
 	prov        provider.Interface
 	dagStore    *dagstore.Wrapper
 	meshCreator idxprov.MeshCreator
@@ -52,11 +52,11 @@ type Wrapper struct {
 }
 
 func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
+	legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
 	meshCreator idxprov.MeshCreator) (*Wrapper, error) {
 
 	return func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
+		legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
 		meshCreator idxprov.MeshCreator) (*Wrapper, error) {
 		if cfg.DAGStore.RootDir == "" {
 			cfg.DAGStore.RootDir = filepath.Join(r.Path(), defaultDagStoreDir)

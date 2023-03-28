@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	lotus_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
@@ -60,7 +60,7 @@ type BoostAPI struct {
 	IndexProvider   *indexprovider.Wrapper
 
 	// Legacy Lotus
-	LegacyStorageProvider lotus_storagemarket.StorageProvider
+	LegacyStorageProvider gfm_storagemarket.StorageProvider
 
 	// Lotus Markets
 	SectorBlocks *sectorblocks.SectorBlocks

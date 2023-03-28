@@ -3,7 +3,6 @@ package impl
 import (
 	"context"
 	"fmt"
-	"github.com/filecoin-project/boost/api"
 	"os"
 	"strconv"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-state-types/abi"

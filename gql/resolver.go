@@ -5,18 +5,18 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"math"
 
 	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	lotus_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -54,7 +54,7 @@ type resolver struct {
 	fundMgr    *fundmanager.FundManager
 	storageMgr *storagemanager.StorageManager
 	provider   *storagemarket.Provider
-	legacyProv lotus_storagemarket.StorageProvider
+	legacyProv gfm_storagemarket.StorageProvider
 	legacyDT   dtypes.ProviderDataTransfer
 	ps         piecestore.PieceStore
 	sa         retrievalmarket.SectorAccessor
@@ -64,7 +64,7 @@ type resolver struct {
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		cfg:        cfg,
 		repo:       r,
