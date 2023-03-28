@@ -32,7 +32,7 @@ require (
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-cbor-util v0.0.1
 	github.com/filecoin-project/go-commp-utils v0.1.3
-	github.com/filecoin-project/go-data-transfer v1.15.4-0.20230324153735-1742c4b70b46
+	github.com/filecoin-project/go-data-transfer v1.15.4-boost
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
 	github.com/filecoin-project/go-fil-markets v1.27.0-rc1
@@ -343,8 +343,8 @@ require (
 )
 
 require (
-	github.com/filecoin-project/boost-gfm v0.0.0-20230324160153-aff8f246f74b
-	github.com/filecoin-project/boost-graphsync v0.0.0-20230324142143-d13108b0efc1
+	github.com/filecoin-project/boost-gfm v1.26.5
+	github.com/filecoin-project/boost-graphsync v0.13.6
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc4
 	github.com/ipfs/kubo v0.18.1
 )

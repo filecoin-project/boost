@@ -327,10 +327,10 @@ github.com/fatih/color v1.8.0/go.mod h1:3l45GVGkyrnYNl9HoIjnp2NnNWvh6hLAqD8yTfGj
 github.com/fatih/color v1.13.0 h1:8LOYc1KYPPmyKMuN8QV2DNRWNbLo6LZ0iLs8+mlH53w=
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=
 github.com/felixge/httpsnoop v1.0.3 h1:s/nj+GCswXYzN5v2DpNMuMQYe+0DDwt5WVCU6CWBdXk=
-github.com/filecoin-project/boost-gfm v0.0.0-20230324160153-aff8f246f74b h1:RiqQSVmzzX71q+IqFIkZ9edz7gMPuw16a1pQq8su3FU=
-github.com/filecoin-project/boost-gfm v0.0.0-20230324160153-aff8f246f74b/go.mod h1:1Yqz6PxjmTnQrY+H8RW6A07z3w8J5RItp/sM/rxJDrE=
-github.com/filecoin-project/boost-graphsync v0.0.0-20230324142143-d13108b0efc1 h1:YKeg6OXc7qcN5tPlOtMRh1Bt3TtwnG6p5+Yv++KT370=
-github.com/filecoin-project/boost-graphsync v0.0.0-20230324142143-d13108b0efc1/go.mod h1:WL0AQccJeNASH4XG5CaXJ0zbkqoTaqOZCekyCFly75s=
+github.com/filecoin-project/boost-gfm v1.26.5 h1:TZ8W9Q6MiCP2gh6q6Nkeh0fWARVxLI8Wv0ycvyHUWDA=
+github.com/filecoin-project/boost-gfm v1.26.5/go.mod h1:tnZkUzxysZ8Qw0dSj1nUCqJdJNKwIwCA+RqGN3b8Ne8=
+github.com/filecoin-project/boost-graphsync v0.13.6 h1:UZZHwUt9epr3r1KUAy7A01vbmkgYRgpm9O0ZCVa/fzE=
+github.com/filecoin-project/boost-graphsync v0.13.6/go.mod h1:WL0AQccJeNASH4XG5CaXJ0zbkqoTaqOZCekyCFly75s=
 github.com/filecoin-project/dagstore v0.7.0 h1:IS0R+69za8dguYWeqz/MI+nb7ONpk03tAkxPCBXEKm0=
 github.com/filecoin-project/dagstore v0.7.0/go.mod h1:YKn4qXih+/2xQWpfJsaKGOi4POw5vH5grDmfPCCnx8g=
 github.com/filecoin-project/go-address v0.0.3/go.mod h1:jr8JxKsYx+lQlQZmF5i2U0Z+cGQ59wMIps/8YW/lDj8=
@@ -359,8 +359,8 @@ github.com/filecoin-project/go-commp-utils/nonffi v0.0.0-20220905160352-62059082
 github.com/filecoin-project/go-crypto v0.0.0-20191218222705-effae4ea9f03/go.mod h1:+viYnvGtUTgJRdy6oaeF4MTFKAfatX071MPDPBL11EQ=
 github.com/filecoin-project/go-crypto v0.0.1 h1:AcvpSGGCgjaY8y1az6AMfKQWreF/pWO2JJGLl6gCq6o=
 github.com/filecoin-project/go-crypto v0.0.1/go.mod h1:+viYnvGtUTgJRdy6oaeF4MTFKAfatX071MPDPBL11EQ=
-github.com/filecoin-project/go-data-transfer v1.15.4-0.20230324153735-1742c4b70b46 h1:NSaOOMeSlB92c30Mkmb2NExLbsiEISbHdxDmj1OLSDM=
-github.com/filecoin-project/go-data-transfer v1.15.4-0.20230324153735-1742c4b70b46/go.mod h1:TG5KPRKEwzy+v5YNpE2XfpFK+E2M1Aaa7lRjUqnlI8E=
+github.com/filecoin-project/go-data-transfer v1.15.4-boost h1:rGsPDeDk0nbzLOPn/9iCIrhLNy69Vkr9tRBcetM4kd0=
+github.com/filecoin-project/go-data-transfer v1.15.4-boost/go.mod h1:S5Es9uoD+3TveYyGjxZInAF6mSQtRjNzezV7Y7Sh8X0=
 github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc4 h1:Y5RMvFT4OthsAhDx7xKfkJ5QdiWq9Ox7N46Mi0PF0PE=
 github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc4/go.mod h1:1WDoUgWYB2KvogfPTdDmoyBTa9cb9+oGwqKCCipnJeY=
 github.com/filecoin-project/go-ds-versioning v0.1.2 h1:to4pTadv3IeV1wvgbCbN6Vqd+fu+7tveXgv/rCEZy6w=
