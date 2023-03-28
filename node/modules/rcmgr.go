@@ -123,7 +123,7 @@ func ResourceManager(connMgrHi uint) func(lc fx.Lifecycle, repo repo.LockedRepo)
 		}
 
 		rcmgrMetricsOnce.Do(func() {
-			rcmgrObs.MustRegisterWith(prometheus.DefaultRegisterer)
+			rcmgrObs.MustRegisterWith(&prometheusRegisterer{Registerer: prometheus.DefaultRegisterer})
 		})
 
 		// Metrics
@@ -261,4 +261,20 @@ func (r rcmgrMetrics) AllowMemory(size int) {
 
 func (r rcmgrMetrics) BlockMemory(size int) {
 	stats.Record(context.Background(), metrics.RcmgrBlockMem.M(1))
+}
+
+type prometheusRegisterer struct {
+	prometheus.Registerer
+}
+
+// MustRegister wraps the original MustRegister with a more forgiving contract:
+// don't panic if the error is because the collector has already been registered
+func (r *prometheusRegisterer) MustRegister(cs ...prometheus.Collector) {
+	for _, c := range cs {
+		if err := r.Register(c); err != nil {
+			if !errors.As(err, &prometheus.AlreadyRegisteredError{}) {
+				panic(err)
+			}
+		}
+	}
 }
