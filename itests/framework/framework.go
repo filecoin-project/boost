@@ -12,8 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	lotus_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/api"
 	boostclient "github.com/filecoin-project/boost/client"
 	"github.com/filecoin-project/boost/node"
@@ -26,6 +25,8 @@ import (
 	types2 "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
+	lotus_gfm_retrievalmarket "github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	lotus_gfm_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin"
@@ -593,7 +594,7 @@ func (f *TestFramework) signProposal(addr address.Address, proposal *market.Deal
 
 func (f *TestFramework) DefaultMarketsV1DealParams() lapi.StartDealParams {
 	return lapi.StartDealParams{
-		Data:              &lotus_storagemarket.DataRef{TransferType: lotus_storagemarket.TTGraphsync},
+		Data:              &lotus_gfm_storagemarket.DataRef{TransferType: gfm_storagemarket.TTGraphsync},
 		EpochPrice:        ltypes.NewInt(62500000), // minimum asking price
 		MinBlocksDuration: uint64(lbuild.MinDealDuration),
 		Miner:             f.MinerAddr,
@@ -671,14 +672,14 @@ func (f *TestFramework) WaitDealSealed(ctx context.Context, deal *cid.Cid) error
 		}
 
 		switch di.State {
-		case lotus_storagemarket.StorageDealAwaitingPreCommit, lotus_storagemarket.StorageDealSealing:
-		case lotus_storagemarket.StorageDealProposalRejected:
+		case gfm_storagemarket.StorageDealAwaitingPreCommit, gfm_storagemarket.StorageDealSealing:
+		case gfm_storagemarket.StorageDealProposalRejected:
 			return errors.New("deal rejected")
-		case lotus_storagemarket.StorageDealFailing:
+		case gfm_storagemarket.StorageDealFailing:
 			return errors.New("deal failed")
-		case lotus_storagemarket.StorageDealError:
+		case gfm_storagemarket.StorageDealError:
 			return fmt.Errorf("deal errored: %s", di.Message)
-		case lotus_storagemarket.StorageDealActive:
+		case gfm_storagemarket.StorageDealActive:
 			return nil
 		}
 
@@ -763,13 +764,13 @@ consumeEvents:
 			}
 		}
 		switch evt.Status {
-		case retrievalmarket.DealStatusCompleted:
+		case lotus_gfm_retrievalmarket.DealStatusCompleted:
 			break consumeEvents
-		case retrievalmarket.DealStatusRejected:
+		case lotus_gfm_retrievalmarket.DealStatusRejected:
 			t.Fatalf("Retrieval Proposal Rejected: %s", evt.Message)
 		case
-			retrievalmarket.DealStatusDealNotFound,
-			retrievalmarket.DealStatusErrored:
+			lotus_gfm_retrievalmarket.DealStatusDealNotFound,
+			lotus_gfm_retrievalmarket.DealStatusErrored:
 			t.Fatalf("Retrieval Error: %s", evt.Message)
 		}
 	}
