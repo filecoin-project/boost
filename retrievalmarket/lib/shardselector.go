@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost-gfm/piecestore"
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/dagstore/indexbs"
 	"github.com/filecoin-project/dagstore/shard"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	lru "github.com/hnlq715/golang-lru"
 	"github.com/ipfs/go-cid"

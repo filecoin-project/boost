@@ -2,8 +2,8 @@ package server
 
 import (
 	"errors"
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/hannahhoward/go-pubsub"
 	"time"
 )

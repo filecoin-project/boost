@@ -17,7 +17,7 @@ func (r *resolver) Libp2pAddrInfo() (*libp2pAddrInfoResolver, error) {
 
 	protos := make([]*string, 0, len(r.h.Mux().Protocols()))
 	for _, proto := range r.h.Mux().Protocols() {
-		cp := proto
+		cp := string(proto)
 		protos = append(protos, &cp)
 	}
 

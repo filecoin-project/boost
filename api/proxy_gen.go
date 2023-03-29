@@ -7,12 +7,12 @@ import (
 	"errors"
 	"time"
 
+	"github.com/filecoin-project/boost-gfm/piecestore"
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	"github.com/filecoin-project/boost-gfm/storagemarket"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/crypto"
@@ -102,7 +102,7 @@ type BoostStruct struct {
 
 		MarketCancelDataTransfer func(p0 context.Context, p1 datatransfer.TransferID, p2 peer.ID, p3 bool) error `perm:"write"`
 
-		MarketDataTransferUpdates func(p0 context.Context) (<-chan lapi.DataTransferChannel, error) `perm:"write"`
+		MarketDataTransferUpdates func(p0 context.Context) (<-chan DataTransferChannel, error) `perm:"write"`
 
 		MarketGetAsk func(p0 context.Context) (*storagemarket.SignedStorageAsk, error) `perm:"read"`
 
@@ -110,7 +110,7 @@ type BoostStruct struct {
 
 		MarketImportDealData func(p0 context.Context, p1 cid.Cid, p2 string) error `perm:"write"`
 
-		MarketListDataTransfers func(p0 context.Context) ([]lapi.DataTransferChannel, error) `perm:"write"`
+		MarketListDataTransfers func(p0 context.Context) ([]DataTransferChannel, error) `perm:"write"`
 
 		MarketListIncompleteDeals func(p0 context.Context) ([]storagemarket.MinerDeal, error) `perm:"read"`
 
@@ -628,14 +628,14 @@ func (s *BoostStub) MarketCancelDataTransfer(p0 context.Context, p1 datatransfer
 	return ErrNotSupported
 }
 
-func (s *BoostStruct) MarketDataTransferUpdates(p0 context.Context) (<-chan lapi.DataTransferChannel, error) {
+func (s *BoostStruct) MarketDataTransferUpdates(p0 context.Context) (<-chan DataTransferChannel, error) {
 	if s.Internal.MarketDataTransferUpdates == nil {
 		return nil, ErrNotSupported
 	}
 	return s.Internal.MarketDataTransferUpdates(p0)
 }
 
-func (s *BoostStub) MarketDataTransferUpdates(p0 context.Context) (<-chan lapi.DataTransferChannel, error) {
+func (s *BoostStub) MarketDataTransferUpdates(p0 context.Context) (<-chan DataTransferChannel, error) {
 	return nil, ErrNotSupported
 }
 
@@ -672,15 +672,15 @@ func (s *BoostStub) MarketImportDealData(p0 context.Context, p1 cid.Cid, p2 stri
 	return ErrNotSupported
 }
 
-func (s *BoostStruct) MarketListDataTransfers(p0 context.Context) ([]lapi.DataTransferChannel, error) {
+func (s *BoostStruct) MarketListDataTransfers(p0 context.Context) ([]DataTransferChannel, error) {
 	if s.Internal.MarketListDataTransfers == nil {
-		return *new([]lapi.DataTransferChannel), ErrNotSupported
+		return *new([]DataTransferChannel), ErrNotSupported
 	}
 	return s.Internal.MarketListDataTransfers(p0)
 }
 
-func (s *BoostStub) MarketListDataTransfers(p0 context.Context) ([]lapi.DataTransferChannel, error) {
-	return *new([]lapi.DataTransferChannel), ErrNotSupported
+func (s *BoostStub) MarketListDataTransfers(p0 context.Context) ([]DataTransferChannel, error) {
+	return *new([]DataTransferChannel), ErrNotSupported
 }
 
 func (s *BoostStruct) MarketListIncompleteDeals(p0 context.Context) ([]storagemarket.MinerDeal, error) {

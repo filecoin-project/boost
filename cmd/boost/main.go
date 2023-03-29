@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 
 	"github.com/filecoin-project/boost/cmd"
@@ -19,7 +19,7 @@ import (
 var log = logging.Logger("boost")
 
 func init() {
-	llog.SetOutput(ioutil.Discard)
+	llog.SetOutput(io.Discard)
 }
 
 func main() {

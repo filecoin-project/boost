@@ -8,20 +8,20 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	transporttypes "github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/dagstore"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
-	"github.com/filecoin-project/go-fil-markets/stores"
 	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-libp2p/core/event"
 )
@@ -625,7 +625,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piecestore")
 
 	// register with dagstore
-	err = stores.RegisterShardSync(ctx, p.dagst, pc, "", true)
+	err = p.registerShardSync(ctx, pc)
 
 	if err != nil {
 		if !errors.Is(err, dagstore.ErrShardExists) {
@@ -664,6 +664,23 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	}
 
 	return nil
+}
+
+// registerShardSync calls the DAGStore RegisterShard method and waits
+// synchronously in a dedicated channel until the registration has completed
+// fully.
+func (p *Provider) registerShardSync(ctx context.Context, pc cid.Cid) error {
+	resch := make(chan dagstore.ShardResult, 1)
+	if err := p.dagst.RegisterShard(ctx, pc, "", true, resch); err != nil {
+		return fmt.Errorf("registering shard: %w", err)
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case res := <-resch:
+		return res.Error
+	}
 }
 
 // fireSealingUpdateEvents periodically checks the sealing status of the deal

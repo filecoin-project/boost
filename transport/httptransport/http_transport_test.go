@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -171,7 +170,7 @@ func TestConcurrentTransfers(t *testing.T) {
 					if err != nil {
 						return err
 					}
-					bz, err := ioutil.ReadAll(f)
+					bz, err := io.ReadAll(f)
 					if err != nil {
 						return err
 					}
@@ -401,7 +400,7 @@ func executeTransfer(t *testing.T, ctx context.Context, ht *httpTransport, size 
 }
 
 func assertFileContents(t *testing.T, file string, expected []byte) {
-	bz, err := ioutil.ReadFile(file)
+	bz, err := os.ReadFile(file)
 	require.NoError(t, err)
 	require.Equal(t, len(expected), len(bz))
 	require.Equal(t, expected, bz)

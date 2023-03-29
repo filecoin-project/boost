@@ -8,11 +8,15 @@ import (
 	"math"
 
 	"github.com/dustin/go-humanize"
+	"github.com/filecoin-project/boost-gfm/piecestore"
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -21,11 +25,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/dagstore"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/lotus/api/v1api"
-	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
@@ -54,8 +54,8 @@ type resolver struct {
 	fundMgr    *fundmanager.FundManager
 	storageMgr *storagemanager.StorageManager
 	provider   *storagemarket.Provider
-	legacyProv lotus_storagemarket.StorageProvider
-	legacyDT   lotus_dtypes.ProviderDataTransfer
+	legacyProv gfm_storagemarket.StorageProvider
+	legacyDT   dtypes.ProviderDataTransfer
 	ps         piecestore.PieceStore
 	sa         retrievalmarket.SectorAccessor
 	dagst      dagstore.Interface
@@ -64,7 +64,7 @@ type resolver struct {
 	fullNode   v1api.FullNode
 }
 
-func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv lotus_storagemarket.StorageProvider, legacyDT lotus_dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
+func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
 	return &resolver{
 		cfg:        cfg,
 		repo:       r,

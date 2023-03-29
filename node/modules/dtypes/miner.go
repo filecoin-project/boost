@@ -2,13 +2,13 @@ package dtypes
 
 import (
 	"context"
+	"github.com/ipfs/go-cid"
 	"time"
 
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
-	"github.com/ipfs/go-cid"
 )
 
 type MinerID abi.ActorID

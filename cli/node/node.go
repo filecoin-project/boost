@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -62,7 +61,7 @@ func Setup(cfgdir string) (*Node, error) {
 }
 
 func loadOrInitPeerKey(kf string) (crypto.PrivKey, error) {
-	data, err := ioutil.ReadFile(kf)
+	data, err := os.ReadFile(kf)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, err
@@ -78,7 +77,7 @@ func loadOrInitPeerKey(kf string) (crypto.PrivKey, error) {
 			return nil, err
 		}
 
-		if err := ioutil.WriteFile(kf, data, 0600); err != nil {
+		if err := os.WriteFile(kf, data, 0600); err != nil {
 			return nil, err
 		}
 

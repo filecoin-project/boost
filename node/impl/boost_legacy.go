@@ -10,11 +10,12 @@ import (
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/multiformats/go-multihash"
 
+	"github.com/filecoin-project/boost-gfm/piecestore"
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	"github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -22,7 +23,7 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
-func (sm *BoostAPI) MarketListDataTransfers(ctx context.Context) ([]lapi.DataTransferChannel, error) {
+func (sm *BoostAPI) MarketListDataTransfers(ctx context.Context) ([]api.DataTransferChannel, error) {
 	inProgressChannels, err := sm.DataTransfer.InProgressChannels(ctx)
 	if err != nil {
 		return nil, err
@@ -31,14 +32,14 @@ func (sm *BoostAPI) MarketListDataTransfers(ctx context.Context) ([]lapi.DataTra
 	unpaidRetrievals := sm.GraphsyncUnpaidRetrieval.List()
 
 	// Get legacy, paid retrievals
-	apiChannels := make([]lapi.DataTransferChannel, 0, len(inProgressChannels)+len(unpaidRetrievals))
+	apiChannels := make([]api.DataTransferChannel, 0, len(inProgressChannels)+len(unpaidRetrievals))
 	for _, channelState := range inProgressChannels {
-		apiChannels = append(apiChannels, lapi.NewDataTransferChannel(sm.Host.ID(), channelState))
+		apiChannels = append(apiChannels, api.NewDataTransferChannel(sm.Host.ID(), channelState))
 	}
 
 	// Include unpaid retrievals
 	for _, ur := range unpaidRetrievals {
-		apiChannels = append(apiChannels, lapi.NewDataTransferChannel(sm.Host.ID(), ur.ChannelState()))
+		apiChannels = append(apiChannels, api.NewDataTransferChannel(sm.Host.ID(), ur.ChannelState()))
 	}
 
 	return apiChannels, nil
@@ -68,11 +69,11 @@ func (sm *BoostAPI) MarketCancelDataTransfer(ctx context.Context, transferID dat
 	return sm.DataTransfer.CloseDataTransferChannel(ctx, datatransfer.ChannelID{Initiator: otherPeer, Responder: selfPeer, ID: transferID})
 }
 
-func (sm *BoostAPI) MarketDataTransferUpdates(ctx context.Context) (<-chan lapi.DataTransferChannel, error) {
-	channels := make(chan lapi.DataTransferChannel)
+func (sm *BoostAPI) MarketDataTransferUpdates(ctx context.Context) (<-chan api.DataTransferChannel, error) {
+	channels := make(chan api.DataTransferChannel)
 
 	unsub := sm.DataTransfer.SubscribeToEvents(func(evt datatransfer.Event, channelState datatransfer.ChannelState) {
-		channel := lapi.NewDataTransferChannel(sm.Host.ID(), channelState)
+		channel := api.NewDataTransferChannel(sm.Host.ID(), channelState)
 		select {
 		case <-ctx.Done():
 		case channels <- channel:

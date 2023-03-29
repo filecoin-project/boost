@@ -1,7 +1,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 
 	llog "log"
@@ -17,7 +17,7 @@ import (
 var log = logging.Logger("boostx")
 
 func init() {
-	llog.SetOutput(ioutil.Discard)
+	llog.SetOutput(io.Discard)
 }
 
 func main() {
