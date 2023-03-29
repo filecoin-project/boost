@@ -5,37 +5,38 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"os"
-	"testing"
-	"time"
-
+	"github.com/filecoin-project/boost-gfm/piecestore"
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	retrievalimpl "github.com/filecoin-project/boost-gfm/retrievalmarket/impl"
+	"github.com/filecoin-project/boost-gfm/retrievalmarket/impl/askstore"
+	"github.com/filecoin-project/boost-gfm/retrievalmarket/impl/testnodes"
+	rmnet "github.com/filecoin-project/boost-gfm/retrievalmarket/network"
+	tut "github.com/filecoin-project/boost-gfm/shared_testutil"
+	graphsync "github.com/filecoin-project/boost-graphsync"
+	graphsyncimpl "github.com/filecoin-project/boost-graphsync/impl"
+	"github.com/filecoin-project/boost-graphsync/network"
+	"github.com/filecoin-project/boost-graphsync/storeutil"
 	boosttu "github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	dtimpl "github.com/filecoin-project/go-data-transfer/impl"
 	"github.com/filecoin-project/go-data-transfer/testutil"
 	dtgstransport "github.com/filecoin-project/go-data-transfer/transport/graphsync"
-	"github.com/filecoin-project/go-fil-markets/piecestore"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket/impl/askstore"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket/impl/testnodes"
-	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
-	tut "github.com/filecoin-project/go-fil-markets/shared_testutil"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
-	"github.com/ipfs/go-graphsync"
-	graphsyncimpl "github.com/ipfs/go-graphsync/impl"
-	"github.com/ipfs/go-graphsync/network"
-	"github.com/ipfs/go-graphsync/storeutil"
 	logging "github.com/ipfs/go-log/v2"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
-	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
+	basicnode "github.com/ipld/go-ipld-prime/node/basic"
+	"github.com/ipld/go-ipld-prime/traversal/selector"
+	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
 	"github.com/stretchr/testify/require"
+	"io"
+	"os"
+	"testing"
+	"time"
 )
 
 var tlog = logging.Logger("testgs")
@@ -278,7 +279,13 @@ func runRequestTest(t *testing.T, tc testCase) {
 
 	// Retrieve the data
 	tlog.Infof("Retrieve cid %s from peer %s", carRootCid, retrievalPeer.ID)
-	sel := selectorparse.CommonSelector_ExploreAllRecursively
+	// Use an explore-all but add unixfs-preload to make sure we have UnixFS
+	// ADL support wired up.
+	ssb := builder.NewSelectorSpecBuilder(basicnode.Prototype.Any)
+	sel := ssb.ExploreInterpretAs("unixfs-preload", ssb.ExploreRecursive(
+		selector.RecursionLimitNone(),
+		ssb.ExploreAll(ssb.ExploreRecursiveEdge()),
+	)).Node()
 	params, err := retrievalmarket.NewParamsV1(abi.NewTokenAmount(0), 0, 0, sel, nil, abi.NewTokenAmount(0))
 	require.NoError(t, err)
 	if tc.reqPayloadCid != cid.Undef {

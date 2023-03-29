@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"testing"
 	"time"
@@ -74,7 +73,7 @@ func TestOutboundForwarding(t *testing.T) {
 			},
 			expectedResponse: &messages.ForwardingResponse{
 				Code:    messages.ResponseRejected,
-				Message: "remote peer: protocol not supported",
+				Message: "remote peer: protocols not supported",
 			},
 		},
 	}
@@ -104,7 +103,9 @@ func TestOutboundForwarding(t *testing.T) {
 				tn.publicNode.SetStreamHandler(otherProtocol, handler)
 			}
 			response, s := tn.openOutboundForwardingRequest(testCase.write)
-			require.Equal(t, testCase.expectedResponse, response)
+			require.Equal(t, testCase.expectedResponse.Code, response.Code)
+			require.Equal(t, testCase.expectedResponse.ProtocolID, response.ProtocolID)
+			require.Contains(t, response.Message, testCase.expectedResponse.Message)
 			if response.Code == messages.ResponseOk {
 				_, err := s.Write([]byte("request"))
 				require.NoError(t, err)
@@ -198,7 +199,7 @@ func TestInboundForwarding(t *testing.T) {
 					if testCase.rejectResponse {
 						_ = s.Reset()
 					} else {
-						userRequest, err := ioutil.ReadAll(s)
+						userRequest, err := io.ReadAll(s)
 						require.NoError(t, err)
 						require.Equal(t, "request", string(userRequest))
 						_, err = s.Write([]byte("response"))

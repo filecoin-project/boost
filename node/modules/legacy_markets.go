@@ -1,22 +1,23 @@
 package modules
 
 import (
+	"context"
 	"path/filepath"
 
+	piecefilestore "github.com/filecoin-project/boost-gfm/filestore"
+	"github.com/filecoin-project/boost-gfm/storagemarket"
+	storageimpl "github.com/filecoin-project/boost-gfm/storagemarket/impl"
+	"github.com/filecoin-project/boost-gfm/storagemarket/impl/storedask"
+	smnet "github.com/filecoin-project/boost-gfm/storagemarket/network"
+	"github.com/filecoin-project/boost-gfm/stores"
 	"github.com/filecoin-project/boost/markets/idxprov"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/go-address"
-	piecefilestore "github.com/filecoin-project/go-fil-markets/filestore"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	retrievalimpl "github.com/filecoin-project/go-fil-markets/retrievalmarket/impl"
-	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
-	"github.com/filecoin-project/go-fil-markets/storagemarket"
-	storageimpl "github.com/filecoin-project/go-fil-markets/storagemarket/impl"
-	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
-	smnet "github.com/filecoin-project/go-fil-markets/storagemarket/network"
-	"github.com/filecoin-project/go-fil-markets/stores"
-	"github.com/filecoin-project/go-state-types/big"
+	datatransferv2 "github.com/filecoin-project/go-data-transfer/v2"
+	lotus_gfm_filestore "github.com/filecoin-project/go-fil-markets/filestore"
+	lotus_gfm_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
@@ -24,15 +25,15 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 )
 
-func StorageProvider(minerAddress dtypes.MinerAddress,
+func StorageProvider(minerAddress lotus_dtypes.MinerAddress,
 	storedAsk *storedask.StoredAsk,
-	h host.Host, ds dtypes.MetadataDS,
+	h host.Host, ds lotus_dtypes.MetadataDS,
 	r repo.LockedRepo,
 	pieceStore dtypes.ProviderPieceStore,
 	indexer provider.Interface,
 	dataTransfer dtypes.ProviderDataTransfer,
 	spn storagemarket.StorageProviderNode,
-	df dtypes.StorageDealFilter,
+	df storageimpl.DealDeciderFunc,
 	dsw stores.DAGStoreWrapper,
 	meshCreator idxprov.MeshCreator,
 ) (storagemarket.StorageProvider, error) {
@@ -45,7 +46,7 @@ func StorageProvider(minerAddress dtypes.MinerAddress,
 		return nil, err
 	}
 
-	opt := storageimpl.CustomDealDecisionLogic(storageimpl.DealDeciderFunc(df))
+	opt := storageimpl.CustomDealDecisionLogic(df)
 
 	return storageimpl.NewProvider(
 		net,
@@ -63,33 +64,48 @@ func StorageProvider(minerAddress dtypes.MinerAddress,
 	)
 }
 
-// RetrievalProvider creates a new retrieval provider attached to the provider blockstore
-func RetrievalProvider(
-	maddr dtypes.MinerAddress,
-	adapter retrievalmarket.RetrievalProviderNode,
-	sa retrievalmarket.SectorAccessor,
-	netwk rmnet.RetrievalMarketNetwork,
-	ds dtypes.MetadataDS,
-	pieceStore dtypes.ProviderPieceStore,
-	dt dtypes.ProviderDataTransfer,
-	pricingFnc dtypes.RetrievalPricingFunc,
-	userFilter dtypes.RetrievalDealFilter,
-	dagStore stores.DAGStoreWrapper,
-) (retrievalmarket.RetrievalProvider, error) {
-	opt := retrievalimpl.DealDeciderOpt(retrievalimpl.DealDecider(userFilter))
+func DealDeciderFn(df lotus_dtypes.StorageDealFilter) storageimpl.DealDeciderFunc {
+	return func(ctx context.Context, deal storagemarket.MinerDeal) (bool, string, error) {
+		return df(ctx, toLotusGFMMinerDeal(deal))
+	}
+}
 
-	retrievalmarket.DefaultPricePerByte = big.Zero() // todo: for whatever reason this is a global var in markets
-
-	return retrievalimpl.NewProvider(
-		address.Address(maddr),
-		adapter,
-		sa,
-		netwk,
-		pieceStore,
-		dagStore,
-		dt,
-		namespace.Wrap(ds, datastore.NewKey("/retrievals/provider")),
-		retrievalimpl.RetrievalPricingFunc(pricingFnc),
-		opt,
-	)
+func toLotusGFMMinerDeal(deal storagemarket.MinerDeal) lotus_gfm_storagemarket.MinerDeal {
+	lotusGFMDeal := lotus_gfm_storagemarket.MinerDeal{
+		ClientDealProposal:    deal.ClientDealProposal,
+		ProposalCid:           deal.ProposalCid,
+		AddFundsCid:           deal.AddFundsCid,
+		PublishCid:            deal.PublishCid,
+		Miner:                 deal.Miner,
+		Client:                deal.Client,
+		State:                 deal.State,
+		PiecePath:             lotus_gfm_filestore.Path(deal.PiecePath),
+		MetadataPath:          lotus_gfm_filestore.Path(deal.MetadataPath),
+		SlashEpoch:            deal.SlashEpoch,
+		FastRetrieval:         deal.FastRetrieval,
+		Message:               deal.Message,
+		FundsReserved:         deal.FundsReserved,
+		AvailableForRetrieval: deal.AvailableForRetrieval,
+		DealID:                deal.DealID,
+		CreationTime:          deal.CreationTime,
+		SectorNumber:          deal.SectorNumber,
+		InboundCAR:            deal.InboundCAR,
+	}
+	if deal.Ref != nil {
+		lotusGFMDeal.Ref = &lotus_gfm_storagemarket.DataRef{
+			TransferType: deal.Ref.TransferType,
+			Root:         deal.Ref.Root,
+			PieceCid:     deal.Ref.PieceCid,
+			PieceSize:    deal.Ref.PieceSize,
+			RawBlockSize: deal.Ref.RawBlockSize,
+		}
+	}
+	if deal.TransferChannelId != nil {
+		lotusGFMDeal.TransferChannelId = &datatransferv2.ChannelID{
+			Initiator: deal.TransferChannelId.Initiator,
+			Responder: deal.TransferChannelId.Responder,
+			ID:        datatransferv2.TransferID(deal.TransferChannelId.ID),
+		}
+	}
+	return lotusGFMDeal
 }

@@ -137,7 +137,11 @@ var statsCmd = &cli.Command{
 					if err != nil {
 						return fmt.Errorf("getting protocols for peer %s: %w", addrInfo.ID, err)
 					}
-					sort.Strings(protos)
+					protostrs := make([]string, 0, len(protos))
+					for _, proto := range protos {
+						protostrs = append(protostrs, string(proto))
+					}
+					sort.Strings(protostrs)
 
 					// Get peer's libp2p agent version
 					agentVersionI, err := n.Host.Peerstore().Get(addrInfo.ID, "AgentVersion")
@@ -151,7 +155,7 @@ var statsCmd = &cli.Command{
 
 					// Get SP's supported transports
 					var transports *transports_types.QueryResponse
-					if contains(protos, string(lp2pimpl.TransportsProtocolID)) {
+					if contains(protostrs, string(lp2pimpl.TransportsProtocolID)) {
 						client := lp2pimpl.NewTransportsClient(n.Host)
 						transports, err = client.SendQuery(ctx, addrInfo.ID)
 						if err != nil {
@@ -162,7 +166,7 @@ var statsCmd = &cli.Command{
 					lk.Lock()
 					var out string
 					out += "Provider " + maddr.String()
-					if contains(protos, "/fil/storage/mk/1.2.0") {
+					if contains(protostrs, "/fil/storage/mk/1.2.0") {
 						out += " is running boost"
 
 						boostNodes++
@@ -174,7 +178,7 @@ var statsCmd = &cli.Command{
 								transportProtos[p.Name]++
 							}
 						}
-					} else if contains(protos, "/fil/storage/mk/1.1.0") {
+					} else if contains(protostrs, "/fil/storage/mk/1.1.0") {
 						out += " is running markets"
 						agentVersions[agentVersion]++
 						marketsNodes++
@@ -182,7 +186,7 @@ var statsCmd = &cli.Command{
 						out += " is not running markets or boost"
 						noProtocolsNodes++
 					}
-					if contains(protos, "/legs/head/") {
+					if contains(protostrs, "/legs/head/") {
 						out += " (with indexer)"
 						indexerNodes++
 					}
@@ -193,7 +197,7 @@ var statsCmd = &cli.Command{
 					out += "  raw power:         " + minerToMinerPower[maddr].RawBytePower.String() + "\n"
 					out += "  quality adj power: " + minerToMinerPower[maddr].QualityAdjPower.String() + "\n"
 					out += "  protocols:\n"
-					out += "    " + strings.Join(protos, "\n    ") + "\n"
+					out += "    " + strings.Join(protostrs, "\n    ") + "\n"
 
 					if transports != nil {
 						out += "  transports:\n"

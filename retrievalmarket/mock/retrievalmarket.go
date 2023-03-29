@@ -9,8 +9,8 @@ import (
 	io "io"
 	reflect "reflect"
 
-	retrievalmarket "github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	shared "github.com/filecoin-project/go-fil-markets/shared"
+	retrievalmarket "github.com/filecoin-project/boost-gfm/retrievalmarket"
+	shared "github.com/filecoin-project/boost-gfm/shared"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	gomock "github.com/golang/mock/gomock"
 )

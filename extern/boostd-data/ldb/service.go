@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 
@@ -58,7 +58,7 @@ func (s *Store) Start(ctx context.Context) error {
 	if repopath == "" {
 		// used by tests
 		var err error
-		repopath, err = ioutil.TempDir("", "ds-leveldb")
+		repopath, err = os.MkdirTemp("", "ds-leveldb")
 		if err != nil {
 			return fmt.Errorf("creating leveldb tmp dir: %w", err)
 		}

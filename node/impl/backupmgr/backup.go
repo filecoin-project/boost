@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"sync"
@@ -65,7 +64,7 @@ func (b *BackupMgr) initBackup(ctx context.Context, dstDir string) error {
 	defer b.lck.Unlock()
 
 	// Create tmp backup directory and open it as Boost repo
-	bkpDir, err := ioutil.TempDir("", "boost_backup_")
+	bkpDir, err := os.MkdirTemp("", "boost_backup_")
 	if err != nil {
 		return err
 	}
@@ -224,12 +223,12 @@ func CopyFiles(srcDir, destDir string, flist []string) error {
 			}
 		} else {
 
-			input, err := ioutil.ReadFile(path.Join(srcDir, fName))
+			input, err := os.ReadFile(path.Join(srcDir, fName))
 			if err != nil {
 				return err
 			}
 
-			err = ioutil.WriteFile(path.Join(destDir, fName), input, f.Mode())
+			err = os.WriteFile(path.Join(destDir, fName), input, f.Mode())
 			if err != nil {
 				return err
 			}
@@ -240,7 +239,7 @@ func CopyFiles(srcDir, destDir string, flist []string) error {
 }
 
 func GenerateBkpFileList(repoPath string, offline bool) ([]string, error) {
-	cfgFiles, err := ioutil.ReadDir(path.Join(repoPath, ConfigDirName))
+	cfgFiles, err := os.ReadDir(path.Join(repoPath, ConfigDirName))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read files from config directory: %w", err)
 	}

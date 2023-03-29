@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	logging "github.com/ipfs/go-log/v2"
 )
 
@@ -17,7 +17,7 @@ var log = logging.Logger("rtrvlog")
 type RetrievalLog struct {
 	db             *RetrievalLogDB
 	duration       time.Duration
-	dataTransfer   lotus_dtypes.ProviderDataTransfer
+	dataTransfer   dtypes.ProviderDataTransfer
 	gsur           *server.GraphsyncUnpaidRetrieval
 	stalledTimeout time.Duration
 	ctx            context.Context
@@ -28,7 +28,7 @@ type RetrievalLog struct {
 	lastUpdate   map[string]time.Time
 }
 
-func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration, dt lotus_dtypes.ProviderDataTransfer, stalledTimeout time.Duration, gsur *server.GraphsyncUnpaidRetrieval) *RetrievalLog {
+func NewRetrievalLog(db *RetrievalLogDB, duration time.Duration, dt dtypes.ProviderDataTransfer, stalledTimeout time.Duration, gsur *server.GraphsyncUnpaidRetrieval) *RetrievalLog {
 	if duration < stalledTimeout {
 		log.Warnf("the RetrievalLogDuration (%s) should exceed the StalledRetrievalTimeout (%s)", duration.String(), stalledTimeout.String())
 	}

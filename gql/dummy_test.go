@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -45,7 +45,7 @@ func TestDummyServer(t *testing.T) {
 	rq.NoError(err)
 
 	fileName := "test.car"
-	err = ioutil.WriteFile(path.Join(DummyDealsDir, fileName), randBytes.Bytes(), 0644)
+	err = os.WriteFile(path.Join(DummyDealsDir, fileName), randBytes.Bytes(), 0644)
 	rq.NoError(err)
 
 	reqUrl := DummyDealsBase + "/" + fileName

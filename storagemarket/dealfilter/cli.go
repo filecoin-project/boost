@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"os/exec"
 
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost/storagemarket/funds"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/storagespace"
 	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 )
 
 const agent = "boost"
