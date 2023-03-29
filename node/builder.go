@@ -7,16 +7,20 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	rmnet "github.com/filecoin-project/boost-gfm/retrievalmarket/network"
+	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	storageimpl "github.com/filecoin-project/boost-gfm/storagemarket/impl"
+	"github.com/filecoin-project/boost-gfm/storagemarket/impl/storedask"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
-	lotus_dealfilter "github.com/filecoin-project/boost/markets/dealfilter"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/markets/retrievaladapter"
-	lotus_storageadapter "github.com/filecoin-project/boost/markets/storageadapter"
+	storageadapter "github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/impl"
 	"github.com/filecoin-project/boost/node/impl/backupmgr"
@@ -38,10 +42,11 @@ import (
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
-	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
-	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
+	//"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	//rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
+	//lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
+	//"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
+	lotus_gfm_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	lotus_api "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -50,6 +55,7 @@ import (
 	_ "github.com/filecoin-project/lotus/lib/sigs/bls"
 	_ "github.com/filecoin-project/lotus/lib/sigs/secp"
 	mdagstore "github.com/filecoin-project/lotus/markets/dagstore"
+	lotus_dealfilter "github.com/filecoin-project/lotus/markets/dealfilter"
 	lotus_config "github.com/filecoin-project/lotus/node/config"
 	lotus_common "github.com/filecoin-project/lotus/node/impl/common"
 	lotus_net "github.com/filecoin-project/lotus/node/impl/net"
@@ -522,18 +528,19 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		// Lotus Markets
-		Override(new(lotus_dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
+		Override(new(dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
 		Override(new(*modules.ProxyAskGetter), modules.NewAskGetter),
 		Override(new(server.AskGetter), From(new(*modules.ProxyAskGetter))),
-		Override(new(*server.GraphsyncUnpaidRetrieval), modules.Graphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
-		Override(new(lotus_dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
-		Override(new(lotus_dtypes.ProviderPieceStore), modules.NewProviderPieceStore),
+		//Override(new(*server.GraphsyncUnpaidRetrieval), modules.Graphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
+		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
+		Override(new(dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
+		Override(new(dtypes.ProviderPieceStore), modules.NewProviderPieceStore),
 		Override(StartPieceDoctorKey, modules.NewPieceDoctor),
 
 		// Lotus Markets (retrieval deps)
 		Override(new(sealer.PieceProvider), sealer.NewPieceProvider),
 
-		Override(new(lotus_dtypes.RetrievalPricingFunc), lotus_modules.RetrievalPricingFunc(lotus_config.DealmakingConfig{
+		Override(new(dtypes.RetrievalPricingFunc), modules.RetrievalPricingFunc(config.DealmakingConfig{
 			RetrievalPricing: &lotus_config.RetrievalPricing{
 				Strategy: config.RetrievalPricingDefaultMode,
 				Default:  &lotus_config.RetrievalPricingDefault{},
@@ -541,7 +548,6 @@ func ConfigBoost(cfg *config.Boost) Option {
 		})),
 
 		// DAG Store
-		//Override(new(dagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
 
 		// TODO: Not sure how to completely get rid of these yet:
 		// Error: creating node: starting node: missing dependencies for function "reflect".makeFuncStub (/usr/local/go/src/reflect/asm_amd64.s:30): missing types: *dagstore.DAGStore; *dagstore.Wrapper (did you mean stores.DAGStoreWrapper?)
@@ -551,9 +557,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(pdtypes.Store), modules.NewPieceDirectoryStore(cfg)),
 		Override(new(*piecedirectory.PieceDirectory), modules.NewPieceDirectory(cfg)),
 		Override(DAGStoreKey, modules.NewDAGStoreWrapper),
-		//Override(new(mktsdagstore.MinerAPI), lotus_modules.NewMinerAPI(cfg.DAGStore)),
-		//Override(DAGStoreKey, lotus_modules.DAGStore(cfg.DAGStore)),
 		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
+
 		Override(new(*modules.ShardSelector), modules.NewShardSelector),
 		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore(cfg)),
 		Override(HandleSetShardSelector, modules.SetShardSelectorFunc),
@@ -562,11 +567,11 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(mdagstore.SectorAccessor), modules.NewSectorAccessor(cfg)),
 		Override(new(retrievalmarket.SectorAccessor), From(new(mdagstore.SectorAccessor))),
 		Override(new(retrievalmarket.RetrievalProviderNode), retrievaladapter.NewRetrievalProviderNode),
-		Override(new(rmnet.RetrievalMarketNetwork), lotus_modules.RetrievalNetwork),
+		Override(new(rmnet.RetrievalMarketNetwork), modules.RetrievalNetwork),
 		Override(new(retrievalmarket.RetrievalProvider), modules.RetrievalProvider),
 		Override(HandleSetRetrievalAskGetter, modules.SetAskGetter),
 		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Dealmaking.RetrievalLogDuration), time.Duration(cfg.Dealmaking.StalledRetrievalTimeout))),
-		Override(HandleRetrievalKey, lotus_modules.HandleRetrieval),
+		Override(HandleRetrievalKey, modules.HandleRetrieval),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
 		Override(new(*protocolproxy.ProtocolProxy), modules.NewProtocolProxy(cfg)),
 		Override(HandleRetrievalTransportsKey, modules.HandleRetrievalTransports),
@@ -575,12 +580,12 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(provider.Interface), modules.IndexProvider(cfg.IndexProvider)),
 
 		// Lotus Markets (storage)
-		Override(new(lotus_dtypes.ProviderTransport), lotus_modules.NewProviderTransport),
-		Override(new(lotus_dtypes.ProviderDataTransfer), modules.NewProviderDataTransfer),
-		Override(new(*storedask.StoredAsk), lotus_modules.NewStorageAsk),
+		Override(new(dtypes.ProviderTransport), modules.NewProviderTransport),
+		Override(new(dtypes.ProviderDataTransfer), modules.NewProviderDataTransfer),
+		Override(new(*storedask.StoredAsk), modules.NewStorageAsk),
 
-		Override(new(lotus_storagemarket.StorageProviderNode), lotus_storageadapter.NewProviderNodeAdapter(&legacyFees, &cfg.LotusDealmaking)),
-		Override(new(lotus_storagemarket.StorageProvider), modules.NewLegacyStorageProvider(cfg)),
+		Override(new(gfm_storagemarket.StorageProviderNode), storageadapter.NewProviderNodeAdapter(&legacyFees, &cfg.LotusDealmaking)),
+		Override(new(gfm_storagemarket.StorageProvider), modules.NewLegacyStorageProvider(cfg)),
 		Override(HandleDealsKey, modules.HandleLegacyDeals),
 		Override(HandleBoostDealsKey, modules.HandleBoostLibp2pDeals),
 		Override(HandleContractDealsKey, modules.HandleContractDeals(&cfg.ContractDeals)),
@@ -597,6 +602,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		If(cfg.LotusDealmaking.Filter != "",
 			Override(new(lotus_dtypes.StorageDealFilter), lotus_modules.BasicDealFilter(cfg.LotusDealmaking, lotus_dealfilter.CliStorageDealFilter(cfg.LotusDealmaking.Filter))),
 		),
+		Override(new(storageimpl.DealDeciderFunc), modules.DealDeciderFn),
 
 		// Boost retrieval deal filter
 		Override(new(dtypes.RetrievalDealFilter), modules.RetrievalDealFilter(nil)),
@@ -605,12 +611,13 @@ func ConfigBoost(cfg *config.Boost) Option {
 		),
 
 		// Lotus markets retrieval deal filter
+		Override(new(lotus_gfm_storagemarket.StorageProviderNode), modules.LotusGFMStorageProviderNode),
 		Override(new(lotus_dtypes.RetrievalDealFilter), lotus_modules.RetrievalDealFilter(nil)),
 		If(cfg.LotusDealmaking.RetrievalFilter != "",
 			Override(new(lotus_dtypes.RetrievalDealFilter), lotus_modules.RetrievalDealFilter(lotus_dealfilter.CliRetrievalDealFilter(cfg.LotusDealmaking.RetrievalFilter))),
 		),
 
-		Override(new(*lotus_storageadapter.DealPublisher), lotus_storageadapter.NewDealPublisher(&legacyFees, lotus_storageadapter.PublishMsgConfig{
+		Override(new(*storageadapter.DealPublisher), storageadapter.NewDealPublisher(&legacyFees, storageadapter.PublishMsgConfig{
 			Period:                  time.Duration(cfg.LotusDealmaking.PublishMsgPeriod),
 			MaxDealsPerMsg:          cfg.LotusDealmaking.MaxDealsPerPublishMsg,
 			StartEpochSealingBuffer: cfg.LotusDealmaking.StartEpochSealingBuffer,

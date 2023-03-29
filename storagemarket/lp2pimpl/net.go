@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost-gfm/shared"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -13,7 +14,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
-	"github.com/filecoin-project/go-fil-markets/shared"
 	"github.com/filecoin-project/lotus/api/v1api"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/lib/sigs"

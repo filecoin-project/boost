@@ -6,7 +6,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 
@@ -53,7 +53,7 @@ func CreateAllBoostTables(ctx context.Context, mainDB *sql.DB, logsDB *sql.DB) e
 }
 
 func CreateTestTmpDB(t *testing.T) *sql.DB {
-	f, err := ioutil.TempFile(t.TempDir(), "*.db")
+	f, err := os.CreateTemp(t.TempDir(), "*.db")
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	d, err := SqlDB(f.Name())

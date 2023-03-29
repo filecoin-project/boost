@@ -90,7 +90,7 @@ var fetchCmd = &cli.Command{
 			libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
 			libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
 			libp2p.Identity(privKey),
-			libp2p.ResourceManager(network.NullResourceManager),
+			libp2p.ResourceManager(&network.NullResourceManager{}),
 		)
 		if err != nil {
 			return err
@@ -132,7 +132,7 @@ var fetchCmd = &cli.Command{
 			return protos[i] < protos[j]
 		})
 		log.Debugw("host libp2p protocols", "protocols", protos)
-		p, err := host.Peerstore().FirstSupportedProtocol(serverAddrInfo.ID, bitswap.ProtocolStrings...)
+		p, err := host.Peerstore().FirstSupportedProtocol(serverAddrInfo.ID, bitswap.Protocols...)
 		if err != nil {
 			return fmt.Errorf("getting first supported protocol from peer store for %s: %w", serverAddrInfo.ID, err)
 		}

@@ -3,8 +3,8 @@ package datatransfer
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 
@@ -90,12 +90,12 @@ func (t *MockTransport) Execute(ctx context.Context, params ExecuteParams) (chan
 		return nil, fmt.Errorf("unmarshalling data transfer params: %w", err)
 	}
 
-	bz, err := ioutil.ReadFile(transferParams.Path)
+	bz, err := os.ReadFile(transferParams.Path)
 	if err != nil {
 		return nil, fmt.Errorf("reading file %s: %w", transferParams.Path, err)
 	}
 
-	err = ioutil.WriteFile(params.FilePath, bz, 0644)
+	err = os.WriteFile(params.FilePath, bz, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("writing file %s: %w", params.FilePath, err)
 	}

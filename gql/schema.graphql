@@ -91,6 +91,7 @@ type LegacyDeal {
   PieceCid: String!
   PiecePath: String!
   PieceSize: Uint64!
+  IsVerified: Boolean!
   ProviderCollateral: Uint64!
   StartEpoch: Uint64!
   EndEpoch: Uint64!

@@ -9,7 +9,7 @@ import (
 	bstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/ipld/go-car/v2/blockstore"
 
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 )
 
 // ProxyBlockstoreAccessor is an accessor that returns a fixed blockstore.

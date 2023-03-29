@@ -1,15 +1,16 @@
 package dtypes
 
 import (
+	graphsync "github.com/filecoin-project/boost-graphsync"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
+	dtnet "github.com/filecoin-project/go-data-transfer/network"
 	"github.com/filecoin-project/go-statestore"
 	bserv "github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-graphsync"
 	exchange "github.com/ipfs/go-ipfs-exchange-interface"
 
-	"github.com/filecoin-project/go-fil-markets/piecestore"
-	"github.com/filecoin-project/go-fil-markets/storagemarket/impl/requestvalidation"
+	"github.com/filecoin-project/boost-gfm/piecestore"
+	"github.com/filecoin-project/boost-gfm/storagemarket/impl/requestvalidation"
 	ipfsblockstore "github.com/ipfs/go-ipfs-blockstore"
 
 	"github.com/filecoin-project/lotus/blockstore"
@@ -78,10 +79,14 @@ type Graphsync graphsync.GraphExchange
 
 // ClientDataTransfer is a data transfer manager for the client
 type ClientDataTransfer datatransfer.Manager
+type ProviderDataTransfer datatransfer.Manager
+type ProviderTransferNetwork dtnet.DataTransferNetwork
+type ProviderTransport datatransfer.Transport
 
 type ProviderDealStore *statestore.StateStore
 type ProviderPieceStore piecestore.PieceStore
 
 type ProviderRequestValidator *requestvalidation.UnifiedRequestValidator
 
+type StagingBlockstore blockstore.BasicBlockstore
 type StagingGraphsync graphsync.GraphExchange

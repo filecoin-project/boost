@@ -2,7 +2,7 @@ package db
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 	"time"
@@ -289,7 +289,7 @@ func TestSqlDbBkp(t *testing.T) {
 		req.NoError(err)
 	}
 
-	f, err := ioutil.TempFile(t.TempDir(), "*.db")
+	f, err := os.CreateTemp(t.TempDir(), "*.db")
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 

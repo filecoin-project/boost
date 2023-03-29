@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/ipfs/go-cid"
 	"os"
+	"path/filepath"
 	"strings"
 
 	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
+	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 )
 
@@ -21,9 +23,19 @@ var importDataCmd = &cli.Command{
 		}
 
 		id := cctx.Args().Get(0)
-		filePath := cctx.Args().Get(1)
+		tpath := cctx.Args().Get(1)
 
-		_, err := os.Stat(filePath)
+		path, err := homedir.Expand(tpath)
+		if err != nil {
+			return fmt.Errorf("expanding file path: %w", err)
+		}
+
+		filePath, err := filepath.Abs(path)
+		if err != nil {
+			return fmt.Errorf("failed get absolute path for file: %w", err)
+		}
+
+		_, err = os.Stat(filePath)
 		if err != nil {
 			return fmt.Errorf("opening file %s: %w", filePath, err)
 		}

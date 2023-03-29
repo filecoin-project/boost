@@ -7,7 +7,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/docker/go-units"
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/urfave/cli/v2"
 

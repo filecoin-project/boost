@@ -8,9 +8,9 @@ import (
 
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 )
 
 func ExternalRetrievalPricingFunc(cmd string) dtypes.RetrievalPricingFunc {

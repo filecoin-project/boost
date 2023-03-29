@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/dustin/go-humanize"
+	"github.com/filecoin-project/boost-gfm/storagemarket"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
-	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
 )
@@ -235,4 +235,8 @@ func (r *legacyDealResolver) Message() string {
 		}
 	}
 	return r.MinerDeal.Message
+}
+
+func (r *legacyDealResolver) IsVerified() bool {
+	return r.Proposal.VerifiedDeal
 }
