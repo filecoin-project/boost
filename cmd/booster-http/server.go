@@ -137,7 +137,7 @@ func (s *HttpServer) handleInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	v := apiVersion{
-		Version: "0.2.0",
+		Version: "0.3.0",
 	}
 	json.NewEncoder(w).Encode(v) //nolint:errcheck
 }
