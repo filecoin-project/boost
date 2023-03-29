@@ -13,15 +13,16 @@ import (
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-data-transfer/transport/graphsync"
 	datatransferv2 "github.com/filecoin-project/go-data-transfer/v2"
+	"github.com/filecoin-project/lotus/node/config"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
-	"github.com/ipni/go-libipni/dagsync/dtsync"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/engine"
+	"github.com/ipni/storetheindex/dagsync/dtsync"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -78,8 +79,7 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			"pid", marketHost.ID(),
 			"topic", topicName,
 			"retAddrs", marketHost.Addrs())
-
-		// If announcements to the network are enabled, then set options for the publisher.
+		// If announcements to the network are enabled, then set options for datatransfer publisher.
 		var e *engine.Engine
 		if cfg.Enable {
 			// Join the indexer topic using the market's pubsub instance. Otherwise, the provider
@@ -95,6 +95,11 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			// The extra data is required by the lotus-specific index-provider gossip message validators.
 			ma := address.Address(maddr)
 			opts = append(opts,
+				engine.WithPublisherKind(engine.DataTransferPublisher),
+				engine.WithDataTransfer(dtV1ToIndexerDT(dt, func() ipld.LinkSystem {
+					return *e.LinkSystem()
+				})),
+				engine.WithExtraGossipData(ma.Bytes()),
 				engine.WithTopic(t),
 				engine.WithExtraGossipData(ma.Bytes()),
 			)
@@ -175,16 +180,24 @@ type indexerDT struct {
 
 var _ datatransferv2.Manager = (*indexerDT)(nil)
 
+type legsVoucherDTv1 struct {
+	dtsync.Voucher
+}
+
+func (l *legsVoucherDTv1) Type() datatransfer.TypeIdentifier {
+	return datatransfer.TypeIdentifier(dtsync.LegsVoucherType)
+}
+
 func (i *indexerDT) RegisterVoucherType(voucherType datatransferv2.TypeIdentifier, validator datatransferv2.RequestValidator) error {
 	if voucherType == dtsync.LegsVoucherType {
-		return i.dt.RegisterVoucherType(&types.LegsVoucherDTv1{}, &dtv1ReqValidator{v: validator})
+		return i.dt.RegisterVoucherType(&legsVoucherDTv1{}, &dtv1ReqValidator{v: validator})
 	}
 	return fmt.Errorf("unrecognized voucher type: %s", voucherType)
 }
 
 func (i *indexerDT) RegisterTransportConfigurer(voucherType datatransferv2.TypeIdentifier, configurer datatransferv2.TransportConfigurer) error {
 	if voucherType == dtsync.LegsVoucherType {
-		return i.dt.RegisterTransportConfigurer(&types.LegsVoucherDTv1{}, func(chid datatransfer.ChannelID, voucher datatransfer.Voucher, transport datatransfer.Transport) {
+		return i.dt.RegisterTransportConfigurer(&legsVoucherDTv1{}, func(chid datatransfer.ChannelID, voucher datatransfer.Voucher, transport datatransfer.Transport) {
 			gsTransport, ok := transport.(*graphsync.Transport)
 			if ok {
 				err := gsTransport.UseStore(chid, i.linksys())
@@ -262,12 +275,21 @@ func (i *indexerDT) RestartDataTransferChannel(ctx context.Context, chid datatra
 	return fmt.Errorf("not implemented")
 }
 
+type dtv1VoucherResult struct {
+	voucherType datatransferv2.TypeIdentifier
+	dtsync.VoucherResult
+}
+
+func (d *dtv1VoucherResult) Type() datatransfer.TypeIdentifier {
+	return datatransfer.TypeIdentifier(d.voucherType)
+}
+
 type dtv1ReqValidator struct {
 	v datatransferv2.RequestValidator
 }
 
 func (d *dtv1ReqValidator) ValidatePush(isRestart bool, chid datatransfer.ChannelID, sender peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
-	d2v := dtsync.BindnodeRegistry.TypeToNode(&voucher.(*types.LegsVoucherDTv1).Voucher)
+	d2v := dtsync.BindnodeRegistry.TypeToNode(&voucher.(*legsVoucherDTv1).Voucher)
 	res, err := d.v.ValidatePush(toChannelIDV2(chid), sender, d2v, baseCid, selector)
 	if err != nil {
 		return nil, err
@@ -280,7 +302,7 @@ func (d *dtv1ReqValidator) ValidatePush(isRestart bool, chid datatransfer.Channe
 }
 
 func (d *dtv1ReqValidator) ValidatePull(isRestart bool, chid datatransfer.ChannelID, receiver peer.ID, voucher datatransfer.Voucher, baseCid cid.Cid, selector ipld.Node) (datatransfer.VoucherResult, error) {
-	d2v := dtsync.BindnodeRegistry.TypeToNode(&voucher.(*types.LegsVoucherDTv1).Voucher)
+	d2v := dtsync.BindnodeRegistry.TypeToNode(&voucher.(*legsVoucherDTv1).Voucher)
 	res, err := d.v.ValidatePull(toChannelIDV2(chid), receiver, d2v, baseCid, selector)
 	if err != nil {
 		return nil, err
@@ -302,7 +324,7 @@ func toVoucherResult(res datatransferv2.ValidationResult) (datatransfer.VoucherR
 	if vr == nil {
 		return nil, fmt.Errorf("got nil VoucherResult from ValidationResult")
 	}
-	return &types.LegsVoucherResultDtv1{VoucherResult: *vr, VoucherType: res.VoucherResult.Type}, nil
+	return &dtv1VoucherResult{VoucherResult: *vr, voucherType: res.VoucherResult.Type}, nil
 }
 
 func toChannelIDV2(chid datatransfer.ChannelID) datatransferv2.ChannelID {

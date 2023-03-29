@@ -8,13 +8,13 @@ import (
 	"os"
 	"path/filepath"
 
+	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
@@ -36,7 +36,7 @@ type Wrapper struct {
 	cfg            *config.Boost
 	enabled        bool
 	dealsDB        *db.DealsDB
-	legacyProv     lotus_storagemarket.StorageProvider
+	legacyProv     gfm_storagemarket.StorageProvider
 	prov           provider.Interface
 	piecedirectory *piecedirectory.PieceDirectory
 	meshCreator    idxprov.MeshCreator
@@ -49,11 +49,11 @@ type Wrapper struct {
 }
 
 func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-	legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface,
+	legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface,
 	piecedirectory *piecedirectory.PieceDirectory, meshCreator idxprov.MeshCreator) (*Wrapper, error) {
 
 	return func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-		legacyProv lotus_storagemarket.StorageProvider, prov provider.Interface,
+		legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface,
 		piecedirectory *piecedirectory.PieceDirectory,
 		meshCreator idxprov.MeshCreator) (*Wrapper, error) {
 

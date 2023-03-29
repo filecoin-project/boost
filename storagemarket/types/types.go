@@ -11,6 +11,7 @@ import (
 	"github.com/filecoin-project/boost/transport/httptransport/util"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
+	multiaddrutil "github.com/filecoin-project/go-legs/httpsync/multiaddr"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/crypto"

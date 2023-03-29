@@ -36,8 +36,6 @@ import (
 	tspttypes "github.com/filecoin-project/boost/transport/types"
 	bdclientutil "github.com/filecoin-project/boostd-data/clientutil"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-fil-markets/shared_testutil"
-	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"

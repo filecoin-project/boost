@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"sort"
@@ -589,7 +588,7 @@ type idxPath struct {
 }
 
 func getIndexPaths(pathDir string) ([]idxPath, error) {
-	files, err := ioutil.ReadDir(pathDir)
+	files, err := os.ReadDir(pathDir)
 	if err != nil {
 		return nil, err
 	}

@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
-
 	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	retrievalimpl "github.com/filecoin-project/boost-gfm/retrievalmarket/impl"

@@ -8,10 +8,11 @@ import (
 	bserv "github.com/ipfs/boxo/blockservice"
 	exchange "github.com/ipfs/boxo/exchange"
 	"github.com/ipfs/go-datastore"
+	exchange "github.com/ipfs/go-ipfs-exchange-interface"
 
 	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/storagemarket/impl/requestvalidation"
-	ipfsblockstore "github.com/ipfs/boxo/blockstore"
+	ipfsblockstore "github.com/ipfs/go-ipfs-blockstore"
 
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/node/repo/imports"
@@ -88,4 +89,5 @@ type ProviderPieceStore piecestore.PieceStore
 
 type ProviderRequestValidator *requestvalidation.UnifiedRequestValidator
 
+type StagingBlockstore blockstore.BasicBlockstore
 type StagingGraphsync graphsync.GraphExchange

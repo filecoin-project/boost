@@ -2,8 +2,6 @@ package modules
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"path/filepath"
 
 	piecefilestore "github.com/filecoin-project/boost-gfm/filestore"
@@ -13,7 +11,6 @@ import (
 	smnet "github.com/filecoin-project/boost-gfm/storagemarket/network"
 	"github.com/filecoin-project/boost-gfm/stores"
 	"github.com/filecoin-project/boost/markets/idxprov"
-	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/go-address"
 	datatransferv2 "github.com/filecoin-project/go-data-transfer/v2"

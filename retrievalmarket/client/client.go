@@ -28,6 +28,7 @@ import (
 	blockstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"

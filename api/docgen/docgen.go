@@ -20,7 +20,7 @@ import (
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-graphsync"
+	graphsync "github.com/ipfs/go-graphsync"
 	textselector "github.com/ipld/go-ipld-selector-text-lite"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"

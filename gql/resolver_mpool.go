@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
+	"github.com/filecoin-project/lotus/chain/consensus"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/lib/mpoolmonitor"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/chain/consensus"
+	stbig "github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/chain/types"
 	cbg "github.com/whyrusleeping/cbor-gen"
 )
@@ -47,8 +47,23 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Alerts bool }) (mpool
 
 	baseFee := ts.Blocks()[0].ParentBaseFee
 
-	if !args.Alerts {
-		msgs, err = r.mpool.PendingLocal(ctx)
+	gqlmsgs := make([]*msg, 0, len(msgs))
+	for _, m := range msgs {
+		if filter != nil {
+			// Filter for local messages
+			if _, has := filter[m.Message.From]; !has {
+				continue
+			}
+		}
+
+		method := m.Message.Method.String()
+		toact, err := r.fullNode.StateGetActor(ctx, m.Message.To, types.EmptyTSK)
+		if err == nil {
+			consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method].Params.Name()
+		}
+
+		var params string
+		paramsMsg, err := messageFromBytes(m.Message.Params)
 		if err != nil {
 			return mpoolmsg{}, err
 		}

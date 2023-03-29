@@ -4,7 +4,6 @@ import (
 	"bytes"
 
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	graphsync "github.com/filecoin-project/boost-graphsync"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"

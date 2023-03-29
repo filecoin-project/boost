@@ -5,11 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"os"
-	"testing"
-	"time"
-
 	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	retrievalimpl "github.com/filecoin-project/boost-gfm/retrievalmarket/impl"
@@ -38,6 +33,10 @@ import (
 	"github.com/ipld/go-ipld-prime/traversal/selector"
 	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
 	"github.com/stretchr/testify/require"
+	"io"
+	"os"
+	"testing"
+	"time"
 )
 
 var tlog = logging.Logger("testgs")
