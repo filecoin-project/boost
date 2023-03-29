@@ -83,7 +83,7 @@ var runCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "api-filter-endpoint",
-			Usage: "the endpoint to use for fetching a remote retrieval configuration for bitswap requests",
+			Usage: "the endpoint to use for fetching a remote retrieval configuration for requests",
 		},
 		&cli.StringFlag{
 			Name:  "api-filter-auth",

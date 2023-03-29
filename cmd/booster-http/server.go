@@ -15,7 +15,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	"github.com/filecoin-project/boost/extern/go-libipfs/gateway"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore/mount"
@@ -26,6 +25,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
+	"github.com/ipfs/go-libipfs/gateway"
 	"go.opencensus.io/stats"
 )
 
