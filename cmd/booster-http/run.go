@@ -16,6 +16,7 @@ import (
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/filters"
 	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
+	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-jsonrpc"
@@ -168,7 +169,20 @@ var runCmd = &cli.Command{
 			if err != nil {
 				return fmt.Errorf("starting block filter: %w", err)
 			}
-			rbs := remoteblockstore.NewRemoteBlockstore(bapi)
+
+			httpBlockMetrics := remoteblockstore.BlockMetrics{
+				GetRequestCount:             metrics.HttpRblsGetRequestCount,
+				GetFailResponseCount:        metrics.HttpRblsGetFailResponseCount,
+				GetSuccessResponseCount:     metrics.HttpRblsGetSuccessResponseCount,
+				BytesSentCount:              metrics.HttpRblsBytesSentCount,
+				HasRequestCount:             metrics.HttpRblsHasRequestCount,
+				HasFailResponseCount:        metrics.HttpRblsHasFailResponseCount,
+				HasSuccessResponseCount:     metrics.HttpRblsHasSuccessResponseCount,
+				GetSizeRequestCount:         metrics.HttpRblsGetSizeRequestCount,
+				GetSizeFailResponseCount:    metrics.HttpRblsGetSizeFailResponseCount,
+				GetSizeSuccessResponseCount: metrics.HttpRblsGetSizeSuccessResponseCount,
+			}
+			rbs := remoteblockstore.NewRemoteBlockstore(bapi, httpBlockMetrics)
 			filtered := filters.NewFilteredBlockstore(rbs, multiFilter)
 			opts.Blockstore = filtered
 		}

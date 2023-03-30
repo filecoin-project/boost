@@ -129,6 +129,18 @@ var (
 	HttpPieceByCid404ResponseCount   = stats.Int64("http/piece_by_cid_404_response_count", "Counter of /piece/<piece-cid> 404 responses", stats.UnitDimensionless)
 	HttpPieceByCid500ResponseCount   = stats.Int64("http/piece_by_cid_500_response_count", "Counter of /piece/<piece-cid> 500 responses", stats.UnitDimensionless)
 
+	// http remote blockstore
+	HttpRblsGetRequestCount             = stats.Int64("http/rbls_get_request_count", "Counter of RemoteBlockstore Get requests", stats.UnitDimensionless)
+	HttpRblsGetSuccessResponseCount     = stats.Int64("http/rbls_get_success_response_count", "Counter of successful RemoteBlockstore Get responses", stats.UnitDimensionless)
+	HttpRblsGetFailResponseCount        = stats.Int64("http/rbls_get_fail_response_count", "Counter of failed RemoteBlockstore Get responses", stats.UnitDimensionless)
+	HttpRblsGetSizeRequestCount         = stats.Int64("http/rbls_getsize_request_count", "Counter of RemoteBlockstore GetSize requests", stats.UnitDimensionless)
+	HttpRblsGetSizeSuccessResponseCount = stats.Int64("http/rbls_getsize_success_response_count", "Counter of successful RemoteBlockstore GetSize responses", stats.UnitDimensionless)
+	HttpRblsGetSizeFailResponseCount    = stats.Int64("http/rbls_getsize_fail_response_count", "Counter of failed RemoteBlockstore GetSize responses", stats.UnitDimensionless)
+	HttpRblsHasRequestCount             = stats.Int64("http/rbls_has_request_count", "Counter of RemoteBlockstore Has requests", stats.UnitDimensionless)
+	HttpRblsHasSuccessResponseCount     = stats.Int64("http/rbls_has_success_response_count", "Counter of successful RemoteBlockstore Has responses", stats.UnitDimensionless)
+	HttpRblsHasFailResponseCount        = stats.Int64("http/rbls_has_fail_response_count", "Counter of failed RemoteBlockstore Has responses", stats.UnitDimensionless)
+	HttpRblsBytesSentCount              = stats.Int64("http/rbls_bytes_sent_count", "Counter of the number of bytes sent by bitswap since startup", stats.UnitBytes)
+
 	// bitswap
 	BitswapRblsGetRequestCount             = stats.Int64("bitswap/rbls_get_request_count", "Counter of RemoteBlockstore Get requests", stats.UnitDimensionless)
 	BitswapRblsGetSuccessResponseCount     = stats.Int64("bitswap/rbls_get_success_response_count", "Counter of successful RemoteBlockstore Get responses", stats.UnitDimensionless)
@@ -216,6 +228,47 @@ var (
 	HttpPieceByCid500ResponseCountView = &view.View{
 		Measure:     HttpPieceByCid500ResponseCount,
 		Aggregation: view.Count(),
+	}
+
+	HttpRblsGetRequestCountView = &view.View{
+		Measure:     HttpRblsGetRequestCount,
+		Aggregation: view.Count(),
+	}
+	HttpRblsGetSuccessResponseCountView = &view.View{
+		Measure:     HttpRblsGetSuccessResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpRblsGetFailResponseCountView = &view.View{
+		Measure:     HttpRblsGetFailResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpRblsGetSizeRequestCountView = &view.View{
+		Measure:     HttpRblsGetSizeRequestCount,
+		Aggregation: view.Count(),
+	}
+	HttpRblsGetSizeSuccessResponseCountView = &view.View{
+		Measure:     HttpRblsGetSizeSuccessResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpRblsGetSizeFailResponseCountView = &view.View{
+		Measure:     HttpRblsGetSizeFailResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpRblsHasRequestCountView = &view.View{
+		Measure:     HttpRblsHasRequestCount,
+		Aggregation: view.Count(),
+	}
+	HttpRblsHasSuccessResponseCountView = &view.View{
+		Measure:     HttpRblsHasSuccessResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpRblsHasFailResponseCountView = &view.View{
+		Measure:     HttpRblsHasFailResponseCount,
+		Aggregation: view.Count(),
+	}
+	HttpRblsBytesSentCountView = &view.View{
+		Measure:     HttpRblsBytesSentCount,
+		Aggregation: view.Sum(),
 	}
 
 	// bitswap
@@ -636,6 +689,16 @@ var DefaultViews = func() []*view.View {
 		HttpPieceByCid400ResponseCountView,
 		HttpPieceByCid404ResponseCountView,
 		HttpPieceByCid500ResponseCountView,
+		HttpRblsGetRequestCountView,
+		HttpRblsGetSuccessResponseCountView,
+		HttpRblsGetFailResponseCountView,
+		HttpRblsGetSizeRequestCountView,
+		HttpRblsGetSizeSuccessResponseCountView,
+		HttpRblsGetSizeFailResponseCountView,
+		HttpRblsHasRequestCountView,
+		HttpRblsHasSuccessResponseCountView,
+		HttpRblsHasFailResponseCountView,
+		HttpRblsBytesSentCountView,
 		BitswapRblsGetRequestCountView,
 		BitswapRblsGetSuccessResponseCountView,
 		BitswapRblsGetFailResponseCountView,
