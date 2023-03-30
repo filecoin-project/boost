@@ -2,6 +2,7 @@ package rtvllog
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -58,6 +59,34 @@ func (r *RetrievalLog) OnQueryEvent(evt retrievalmarket.ProviderQueryEvent) {
 		"status", evt.Response.Status,
 		"msg", evt.Response.Message,
 		"err", evt.Error)
+
+	// Log failures to DB
+	if evt.Error != nil {
+		st := &RetrievalDealState{
+			Status:      fmt.Sprintf("failed to respond to the query: %s", evt.Error.Error()),
+			UnsealPrice: evt.Response.UnsealPrice,
+			Message:     evt.Response.Message,
+		}
+		r.db.Insert(r.ctx, st)
+	} else {
+		if evt.Response.Status == retrievalmarket.QueryResponseUnavailable {
+			st := &RetrievalDealState{
+				Status:      "retrieval query offer was unavailable",
+				UnsealPrice: evt.Response.UnsealPrice,
+				Message:     evt.Response.Message,
+			}
+			r.db.Insert(r.ctx, st)
+		}
+
+		if evt.Response.Status == retrievalmarket.QueryResponseError {
+			st := &RetrievalDealState{
+				Status:      "retrieval query offer errored",
+				UnsealPrice: evt.Response.UnsealPrice,
+				Message:     evt.Response.Message,
+			}
+			r.db.Insert(r.ctx, st)
+		}
+	}
 }
 
 // Called when there is a validation event.
