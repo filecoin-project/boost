@@ -70,6 +70,7 @@ type Deal {
   ChainDealID: Uint64!
   PublishCid: String!
   IsOffline: Boolean!
+  CleanupData: Boolean!
   Transfer: TransferParams!
   TransferSamples: [TransferPoint]!
   IsTransferStalled: Boolean!

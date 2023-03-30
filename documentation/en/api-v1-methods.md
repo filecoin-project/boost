@@ -380,6 +380,7 @@ Response:
     }
   },
   "IsOffline": true,
+  "CleanupData": true,
   "ClientPeerID": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
   "DealDataRoot": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
@@ -447,6 +448,7 @@ Response:
     }
   },
   "IsOffline": true,
+  "CleanupData": true,
   "ClientPeerID": "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
   "DealDataRoot": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
@@ -601,7 +603,8 @@ Inputs:
 ```json
 [
   "07070707-0707-0707-0707-070707070707",
-  "string value"
+  "string value",
+  true
 ]
 ```
 

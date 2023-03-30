@@ -70,7 +70,7 @@ type BoostStruct struct {
 
 		BoostMakeDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"write"`
 
-		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
+		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
 		DealsConsiderOfflineRetrievalDeals func(p0 context.Context) (bool, error) `perm:"admin"`
 
@@ -452,14 +452,14 @@ func (s *BoostStub) BoostMakeDeal(p0 context.Context, p1 smtypes.DealParams) (*P
 	return nil, ErrNotSupported
 }
 
-func (s *BoostStruct) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) {
+func (s *BoostStruct) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) {
 	if s.Internal.BoostOfflineDealWithData == nil {
 		return nil, ErrNotSupported
 	}
-	return s.Internal.BoostOfflineDealWithData(p0, p1, p2)
+	return s.Internal.BoostOfflineDealWithData(p0, p1, p2, p3)
 }
 
-func (s *BoostStub) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) {
+func (s *BoostStub) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) {
 	return nil, ErrNotSupported
 }
 

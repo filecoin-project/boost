@@ -81,6 +81,7 @@ const DealsListQuery = gql`
                 AnnounceToIPNI
                 KeepUnsealedCopy
                 IsOffline
+                CleanupData
                 Err
                 Retry
                 Message
@@ -166,6 +167,7 @@ const DealSubscription = gql`
             ChainDealID
             PublishCid
             IsOffline
+            CleanupData
             Checkpoint
             CheckpointAt
             AnnounceToIPNI
