@@ -116,7 +116,7 @@ func TestHttpInfo(t *testing.T) {
 	defer response.Body.Close()
 
 	json.NewDecoder(response.Body).Decode(&v) //nolint:errcheck
-	require.Equal(t, "0.2.0", v.Version)
+	require.Equal(t, "0.3.0", v.Version)
 
 	// Stop the server
 	err = httpServer.Stop()
