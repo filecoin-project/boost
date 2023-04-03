@@ -29,7 +29,7 @@ var cassandraCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		return run(ctx, db, false, runOptsFromCctx(cctx))
+		return run(ctx, db, runOptsFromCctx(cctx))
 	},
 	Subcommands: []*cli.Command{
 		loadCmd(createCassandra),
@@ -132,7 +132,7 @@ func (c *CassandraDB) GetBlockSample(ctx context.Context, count int) ([]pieceBlo
 	return pbs, nil
 }
 
-func (c *CassandraDB) AddIndexRecords(ctx context.Context, yuga bool, pieceCid cid.Cid, recs []model.Record) error {
+func (c *CassandraDB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
 	if len(recs) == 0 {
 		return nil
 	}

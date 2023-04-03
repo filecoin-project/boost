@@ -50,12 +50,11 @@ var postgresCmd = &cli.Command{
 		}),
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
-		db, err := NewPostgresDB(cctx.String("connect-string"))
+		db, err := NewPostgresDB(cctx.String("connect-string"), cctx.Bool("is-yugabyte"))
 		if err != nil {
 			return err
 		}
-		yuga := cctx.Bool("is-yugabyte")
-		return run(ctx, db, yuga, runOptsFromCctx(cctx))
+		return run(ctx, db, runOptsFromCctx(cctx))
 	},
 	Subcommands: []*cli.Command{
 		loadCmd(createPostgres),
@@ -65,7 +64,7 @@ var postgresCmd = &cli.Command{
 }
 
 func createPostgres(ctx context.Context, connectString string) (BenchDB, error) {
-	db, err := NewPostgresDB(connectString)
+	db, err := NewPostgresDB(connectString, false)
 	if err != nil {
 		return nil, err
 	}
@@ -80,15 +79,16 @@ type Postgres struct {
 	defDb         *sql.DB
 	db            *sql.DB
 	connectString string
+	yuga          bool
 }
 
-func NewPostgresDB(connectString string) (*Postgres, error) {
+func NewPostgresDB(connectString string, yugabyte bool) (*Postgres, error) {
 	defDb, err := sql.Open("postgres", connectString)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to default database: %w", err)
 	}
 
-	return &Postgres{defDb: defDb, connectString: connectString}, nil
+	return &Postgres{defDb: defDb, connectString: connectString, yuga: yugabyte}, nil
 }
 
 func (db *Postgres) Name() string {
@@ -183,12 +183,12 @@ func (db *Postgres) GetBlockSample(ctx context.Context, count int) ([]pieceBlock
 	return pbs, nil
 }
 
-func (db *Postgres) AddIndexRecords(ctx context.Context, yuga bool, pieceCid cid.Cid, recs []model.Record) error {
+func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
 	if len(recs) == 0 {
 		return nil
 	}
 
-	if yuga {
+	if db.yuga {
 		tx, err := db.db.BeginTx(ctx, nil)
 		if err != nil {
 			return err

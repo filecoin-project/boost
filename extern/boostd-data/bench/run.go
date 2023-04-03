@@ -27,7 +27,7 @@ type pieceBlock struct {
 type BenchDB interface {
 	Name() string
 	Init(ctx context.Context) error
-	AddIndexRecords(ctx context.Context, yuga bool, pieceCid cid.Cid, recs []model.Record) error
+	AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error
 	Cleanup(ctx context.Context) error
 	GetBlockSample(ctx context.Context, count int) ([]pieceBlock, error)
 	PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error)
@@ -49,7 +49,7 @@ type runOpts struct {
 	graphsyncFetchParallelism int
 }
 
-func run(ctx context.Context, db BenchDB, yuga bool, opts runOpts) error {
+func run(ctx context.Context, db BenchDB, opts runOpts) error {
 	metrics.GetOrRegisterCounter("postgres.run", nil).Inc(1)
 	defer func(now time.Time) {
 		metrics.GetOrRegisterResettingTimer("postgres.run.duration", nil).UpdateSince(now)
@@ -72,7 +72,7 @@ func run(ctx context.Context, db BenchDB, yuga bool, opts runOpts) error {
 
 	// Add sample data to the database
 	for _, pc := range opts.addPiecesSpecs {
-		if err := addPieces(ctx, db, yuga, opts.pieceParallelism, pc.pieceCount, pc.blocksPerPiece); err != nil {
+		if err := addPieces(ctx, db, opts.pieceParallelism, pc.pieceCount, pc.blocksPerPiece); err != nil {
 			return err
 		}
 	}
@@ -101,11 +101,9 @@ func loadCmd(createDB func(context.Context, string) (BenchDB, error)) *cli.Comma
 				return err
 			}
 
-			yuga := cctx.Bool("is-yugabyte")
-
 			opts := runOptsFromCctx(cctx)
 			for _, pc := range opts.addPiecesSpecs {
-				err = addPieces(ctx, db, yuga, opts.pieceParallelism, pc.pieceCount, pc.blocksPerPiece)
+				err = addPieces(ctx, db, opts.pieceParallelism, pc.pieceCount, pc.blocksPerPiece)
 				if err != nil {
 					return err
 				}
@@ -115,7 +113,7 @@ func loadCmd(createDB func(context.Context, string) (BenchDB, error)) *cli.Comma
 	}
 }
 
-func addPieces(ctx context.Context, db BenchDB, yuga bool, parallelism int, pieceCount int, blocksPerPiece int) error {
+func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int, blocksPerPiece int) error {
 	log.Infow("Adding pieces", "pieceCount", pieceCount, "blocksPerPiece", blocksPerPiece)
 
 	queue := make(chan struct{}, pieceCount)
@@ -167,7 +165,7 @@ func addPieces(ctx context.Context, db BenchDB, yuga bool, parallelism int, piec
 					pcid := testutil.GenerateCid()
 
 					start := time.Now()
-					err := db.AddIndexRecords(ctx, yuga, pcid, recs)
+					err := db.AddIndexRecords(ctx, pcid, recs)
 					if err != nil {
 						return err
 					}
