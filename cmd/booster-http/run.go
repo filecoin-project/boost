@@ -68,9 +68,19 @@ var runCmd = &cli.Command{
 			Value: true,
 		},
 		&cli.BoolFlag{
-			Name:  "ipfs-gateway",
-			Usage: "enables the ipfs gateway API (serve blocks and CAR files)",
+			Name:  "serve-blocks",
+			Usage: "serve blocks with the ipfs gateway API",
 			Value: true,
+		},
+		&cli.BoolFlag{
+			Name:  "serve-cars",
+			Usage: "serve CAR files with the ipfs gateway API",
+			Value: true,
+		},
+		&cli.BoolFlag{
+			Name:  "serve-files",
+			Usage: "serve original files (eg jpg, mov) with the ipfs gateway API",
+			Value: false,
 		},
 		&cli.BoolFlag{
 			Name:  "tracing",
@@ -98,9 +108,10 @@ var runCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		servePieces := cctx.Bool("serve-pieces")
-		enableIpfsGateway := cctx.Bool("ipfs-gateway")
+		responseFormats := parseSupportedResponseFormats(cctx)
+		enableIpfsGateway := len(responseFormats) > 0
 		if !servePieces && !enableIpfsGateway {
-			return errors.New("either the IPFS gateway or serving pieces must be enabled")
+			return errors.New("one of --serve-pieces, --serve-blocks, etc must be enabled")
 		}
 
 		if cctx.Bool("pprof") {
@@ -155,7 +166,8 @@ var runCmd = &cli.Command{
 
 		// Create the server API
 		opts := &HttpServerOptions{
-			ServePieces: servePieces,
+			ServePieces:              servePieces,
+			SupportedResponseFormats: responseFormats,
 		}
 		if enableIpfsGateway {
 			repoDir, err := createRepoDir(cctx.String(FlagRepo.Name))
@@ -202,11 +214,7 @@ var runCmd = &cli.Command{
 			return fmt.Errorf("starting http server: %w", err)
 		}
 
-		if enableIpfsGateway {
-			log.Infof("serving IPFS gateway at " + server.ipfsBasePath())
-		} else {
-			log.Infof("IPFS gateway is disabled")
-		}
+		log.Infof(ipfsGatewayMsg(cctx, server.ipfsBasePath()))
 		if servePieces {
 			log.Infof("serving raw pieces at " + server.pieceBasePath())
 		} else {
@@ -236,6 +244,42 @@ var runCmd = &cli.Command{
 
 		return nil
 	},
+}
+
+func parseSupportedResponseFormats(cctx *cli.Context) []string {
+	fmts := []string{}
+	if cctx.Bool("serve-blocks") {
+		fmts = append(fmts, "application/vnd.ipld.raw")
+	}
+	if cctx.Bool("serve-cars") {
+		fmts = append(fmts, "application/vnd.ipld.car")
+	}
+	if cctx.Bool("serve-files") {
+		// Allow the user to not specify a specific response format.
+		// In that case the gateway will respond with any kind of file
+		// (eg jpg, mov etc)
+		fmts = append(fmts, "")
+	}
+	return fmts
+}
+
+func ipfsGatewayMsg(cctx *cli.Context, ipfsBasePath string) string {
+	fmts := []string{}
+	if cctx.Bool("serve-blocks") {
+		fmts = append(fmts, "blocks")
+	}
+	if cctx.Bool("serve-cars") {
+		fmts = append(fmts, "CARs")
+	}
+	if cctx.Bool("serve-files") {
+		fmts = append(fmts, "files")
+	}
+
+	if len(fmts) == 0 {
+		return "IPFS gateway is disabled"
+	}
+
+	return "serving IPFS gateway at " + ipfsBasePath + " (serving " + strings.Join(fmts, ", ") + ")"
 }
 
 func createRepoDir(repoDir string) (string, error) {

@@ -25,7 +25,6 @@ import (
 	"github.com/ipfs/go-datastore"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
-	"github.com/ipfs/go-libipfs/gateway"
 	"go.opencensus.io/stats"
 )
 
@@ -61,8 +60,9 @@ type HttpServerApi interface {
 }
 
 type HttpServerOptions struct {
-	Blockstore  blockstore.Blockstore
-	ServePieces bool
+	Blockstore               blockstore.Blockstore
+	ServePieces              bool
+	SupportedResponseFormats []string
 }
 
 func NewHttpServer(path string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
@@ -94,10 +94,7 @@ func (s *HttpServer) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("creating blocks gateway: %w", err)
 		}
-		headers := map[string][]string{}
-		gateway.AddAccessControlHeaders(headers)
-		gwHandler := gateway.NewHandler(gateway.Config{Headers: headers}, gw)
-		handler.Handle(s.ipfsBasePath(), gwHandler)
+		handler.Handle(s.ipfsBasePath(), newGatewayHandler(gw, s.opts.SupportedResponseFormats))
 	}
 
 	handler.HandleFunc("/", s.handleIndex)
