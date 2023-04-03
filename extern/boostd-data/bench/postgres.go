@@ -43,14 +43,19 @@ var postgresCmd = &cli.Command{
 	Flags: append(commonFlags, &cli.StringFlag{
 		Name:  "connect-string",
 		Value: "postgresql://postgres:postgres@localhost?sslmode=disable",
-	}),
+	},
+		&cli.BoolFlag{
+			Name:  "is-yugabyte",
+			Value: false,
+		}),
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
 		db, err := NewPostgresDB(cctx.String("connect-string"))
 		if err != nil {
 			return err
 		}
-		return run(ctx, db, runOptsFromCctx(cctx))
+		yuga := cctx.Bool("is-yugabyte")
+		return run(ctx, db, yuga, runOptsFromCctx(cctx))
 	},
 	Subcommands: []*cli.Command{
 		loadCmd(createPostgres),
@@ -178,7 +183,7 @@ func (db *Postgres) GetBlockSample(ctx context.Context, count int) ([]pieceBlock
 	return pbs, nil
 }
 
-func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
+func (db *Postgres) AddIndexRecords(ctx context.Context, yuga bool, pieceCid cid.Cid, recs []model.Record) error {
 	if len(recs) == 0 {
 		return nil
 	}
@@ -193,11 +198,19 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 			defer tx.Rollback()
 
 			// Add payload to pieces index
-			//if _, err := tx.Exec(`
-			//create temp table PayloadToPiecesTmp (like PayloadToPieces excluding constraints) on commit drop;
-			//`); err != nil {
-			//return fmt.Errorf("create PayloadToPiecesTemp: %w", err)
-			//}
+			if yuga {
+				if _, err := tx.Exec(`
+create temp table PayloadToPiecesTmp (like PayloadToPieces);
+`); err != nil {
+					return fmt.Errorf("create PayloadToPiecesTemp: %w", err)
+				}
+			} else {
+				if _, err := tx.Exec(`
+create temp table PayloadToPiecesTmp (like PayloadToPieces excluding constraints) on commit drop;
+`); err != nil {
+					return fmt.Errorf("create PayloadToPiecesTemp: %w", err)
+				}
+			}
 
 			stmt, err := tx.Prepare(`copy PayloadToPieces (PayloadMultihash, PieceCids) from stdin `)
 			if err != nil {
@@ -219,12 +232,20 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 			//return fmt.Errorf("insert into PayloadToPieces: %w", err)
 			//}
 
-			//// Add piece to block info index
-			//if _, err := tx.Exec(`
-			//create temp table PieceBlockOffsetSizeTmp (like PieceBlockOffsetSize excluding constraints) on commit drop;
-			//`); err != nil {
-			//return fmt.Errorf("create PieceBlockOffsetSizeTmp: %w", err)
-			//}
+			// Add piece to block info index
+			if yuga {
+				if _, err := tx.Exec(`
+create temp table PieceBlockOffsetSizeTmp (like PieceBlockOffsetSize);
+`); err != nil {
+					return fmt.Errorf("create PieceBlockOffsetSizeTmp: %w", err)
+				}
+			} else {
+				if _, err := tx.Exec(`
+create temp table PieceBlockOffsetSizeTmp (like PieceBlockOffsetSize excluding constraints) on commit drop;
+`); err != nil {
+					return fmt.Errorf("create PieceBlockOffsetSizeTmp: %w", err)
+				}
+			}
 
 			stmt, err = tx.Prepare(`copy PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) from stdin `)
 			if err != nil {

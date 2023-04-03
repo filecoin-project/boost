@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"encoding/binary"
+
 	"golang.org/x/sync/errgroup"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -27,7 +28,7 @@ var foundationCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		return run(ctx, db, runOptsFromCctx(cctx))
+		return run(ctx, db, false, runOptsFromCctx(cctx))
 	},
 }
 
@@ -154,7 +155,7 @@ func (db *FoundationDB) GetBlockSample(ctx context.Context, count int) ([]pieceB
 }
 */
 
-func (db *FoundationDB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
+func (db *FoundationDB) AddIndexRecords(ctx context.Context, yuga bool, pieceCid cid.Cid, recs []model.Record) error {
 	if len(recs) == 0 {
 		return nil
 	}

@@ -4,6 +4,9 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/gocql/gocql"
@@ -11,8 +14,6 @@ import (
 	"github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
 	"github.com/urfave/cli/v2"
-	"strings"
-	"time"
 )
 
 var cassandraCmd = &cli.Command{
@@ -28,7 +29,7 @@ var cassandraCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		return run(ctx, db, runOptsFromCctx(cctx))
+		return run(ctx, db, false, runOptsFromCctx(cctx))
 	},
 	Subcommands: []*cli.Command{
 		loadCmd(createCassandra),
@@ -131,7 +132,7 @@ func (c *CassandraDB) GetBlockSample(ctx context.Context, count int) ([]pieceBlo
 	return pbs, nil
 }
 
-func (c *CassandraDB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
+func (c *CassandraDB) AddIndexRecords(ctx context.Context, yuga bool, pieceCid cid.Cid, recs []model.Record) error {
 	if len(recs) == 0 {
 		return nil
 	}
