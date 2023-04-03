@@ -200,7 +200,7 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, yuga bool, pieceCid cid
 			// Add payload to pieces index
 			if yuga {
 				if _, err := tx.Exec(`
-create temp table PayloadToPiecesTmp (like PayloadToPieces);
+create temp table PayloadToPiecesTmp AS (SELECT * FROM PayloadToPieces);
 `); err != nil {
 					return fmt.Errorf("create PayloadToPiecesTemp: %w", err)
 				}
@@ -235,7 +235,7 @@ create temp table PayloadToPiecesTmp (like PayloadToPieces excluding constraints
 			// Add piece to block info index
 			if yuga {
 				if _, err := tx.Exec(`
-create temp table PieceBlockOffsetSizeTmp (like PieceBlockOffsetSize);
+create temp table PieceBlockOffsetSizeTmp AS (SELECT * FROM PieceBlockOffsetSize);
 `); err != nil {
 					return fmt.Errorf("create PieceBlockOffsetSizeTmp: %w", err)
 				}
