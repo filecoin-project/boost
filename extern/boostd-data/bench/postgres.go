@@ -17,6 +17,8 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+const PSQLMaxParams = 65535 //PostgreSQL only supports 65535 parameters
+
 var dropCmd = &cli.Command{
 	Name:   "postgres-drop",
 	Before: before,
@@ -196,33 +198,51 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 		defer tx.Commit()
 
 		// Add payload to pieces index
-		vals := ""
-		args := make([]interface{}, 0, len(recs)*2)
-		for i, rec := range recs {
-			if i > 0 {
-				vals = vals + ","
+		ppParam := 2
+		for l := 0; l < len(recs); l += ((PSQLMaxParams - 1) / ppParam) {
+			start := l
+			end := l + ((PSQLMaxParams - 1) / ppParam)
+			if end > len(recs) {
+				end = len(recs)
 			}
-			vals = vals + fmt.Sprintf("($%d,$%d)", (i*2)+1, (i*2)+2)
-			args = append(args, rec.Cid.Hash(), pieceCid.Bytes())
-		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCids) VALUES `+vals, args...)
-		if err != nil {
-			return fmt.Errorf("executing insert: %w", err)
+			chunk := recs[start:end]
+			vals := ""
+			args := make([]interface{}, 0, len(chunk)*2)
+			for i, rec := range chunk {
+				if i > 0 {
+					vals = vals + ","
+				}
+				vals = vals + fmt.Sprintf("($%d,$%d)", (i*2)+1, (i*2)+2)
+				args = append(args, rec.Cid.Hash(), pieceCid.Bytes())
+			}
+			_, err = tx.ExecContext(ctx, `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCids) VALUES `+vals, args...)
+			if err != nil {
+				return fmt.Errorf("executing insert: %w", err)
+			}
 		}
 
 		// Add piece to block info index
-		vals = ""
-		args = make([]interface{}, 0, len(recs)*4)
-		for i, rec := range recs {
-			if i > 0 {
-				vals = vals + ","
+		pbparam := 4
+		for l := 0; l < len(recs); l += ((PSQLMaxParams - 1) / pbparam) {
+			start := l
+			end := l + ((PSQLMaxParams - 1) / ppParam)
+			if end > len(recs) {
+				end = len(recs)
 			}
-			vals = vals + fmt.Sprintf("($%d,$%d,$%d,$%d)", (i*4)+1, (i*4)+2, (i*4)+3, (i*4)+4)
-			args = append(args, pieceCid.Bytes(), rec.Cid.Hash(), rec.Offset, rec.Size)
-		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES `+vals, args...)
-		if err != nil {
-			return fmt.Errorf("executing insert: %w", err)
+			chunk := recs[start:end] // No need to shadow variable since we're using a range expression
+			vals := ""
+			args := make([]interface{}, 0, len(chunk)*4)
+			for i, rec := range chunk {
+				if i > 0 {
+					vals = vals + ","
+				}
+				vals = vals + fmt.Sprintf("($%d,$%d,$%d,$%d)", (i*4)+1, (i*4)+2, (i*4)+3, (i*4)+4)
+				args = append(args, pieceCid.Bytes(), rec.Cid.Hash(), rec.Offset, rec.Size)
+			}
+			_, err = tx.ExecContext(ctx, `INSERT INTO PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES `+vals, args...)
+			if err != nil {
+				return fmt.Errorf("executing insert: %w", err)
+			}
 		}
 
 		return nil
