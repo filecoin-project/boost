@@ -188,6 +188,46 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, yuga bool, pieceCid cid
 		return nil
 	}
 
+	if yuga {
+		tx, err := db.db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer tx.Commit()
+
+		// Add payload to pieces index
+		vals := ""
+		args := make([]interface{}, 0, len(recs)*2)
+		for i, rec := range recs {
+			if i > 0 {
+				vals = vals + ","
+			}
+			vals = vals + fmt.Sprintf("($%d,$%d)", (i*2)+1, (i*2)+2)
+			args = append(args, rec.Cid.Hash(), pieceCid.Bytes())
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCids) VALUES `+vals, args...)
+		if err != nil {
+			return fmt.Errorf("executing insert: %w", err)
+		}
+
+		// Add piece to block info index
+		vals = ""
+		args = make([]interface{}, 0, len(recs)*4)
+		for i, rec := range recs {
+			if i > 0 {
+				vals = vals + ","
+			}
+			vals = vals + fmt.Sprintf("($%d,$%d,$%d,$%d)", (i*4)+1, (i*4)+2, (i*4)+3, (i*4)+4)
+			args = append(args, pieceCid.Bytes(), rec.Cid.Hash(), rec.Offset, rec.Size)
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES `+vals, args...)
+		if err != nil {
+			return fmt.Errorf("executing insert: %w", err)
+		}
+
+		return nil
+	}
+
 	var err error
 	for attempt := 0; attempt < 5; attempt++ {
 		err = func() error {
@@ -198,18 +238,10 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, yuga bool, pieceCid cid
 			defer tx.Rollback()
 
 			// Add payload to pieces index
-			if yuga {
-				if _, err := tx.Exec(`
-create temp table PayloadToPiecesTmp AS (SELECT * FROM PayloadToPieces);
-`); err != nil {
-					return fmt.Errorf("create PayloadToPiecesTemp: %w", err)
-				}
-			} else {
-				if _, err := tx.Exec(`
+			if _, err := tx.Exec(`
 create temp table PayloadToPiecesTmp (like PayloadToPieces excluding constraints) on commit drop;
 `); err != nil {
-					return fmt.Errorf("create PayloadToPiecesTemp: %w", err)
-				}
+				return fmt.Errorf("create PayloadToPiecesTemp: %w", err)
 			}
 
 			stmt, err := tx.Prepare(`copy PayloadToPieces (PayloadMultihash, PieceCids) from stdin `)
@@ -233,18 +265,10 @@ create temp table PayloadToPiecesTmp (like PayloadToPieces excluding constraints
 			//}
 
 			// Add piece to block info index
-			if yuga {
-				if _, err := tx.Exec(`
-create temp table PieceBlockOffsetSizeTmp AS (SELECT * FROM PieceBlockOffsetSize);
-`); err != nil {
-					return fmt.Errorf("create PieceBlockOffsetSizeTmp: %w", err)
-				}
-			} else {
-				if _, err := tx.Exec(`
+			if _, err := tx.Exec(`
 create temp table PieceBlockOffsetSizeTmp (like PieceBlockOffsetSize excluding constraints) on commit drop;
 `); err != nil {
-					return fmt.Errorf("create PieceBlockOffsetSizeTmp: %w", err)
-				}
+				return fmt.Errorf("create PieceBlockOffsetSizeTmp: %w", err)
 			}
 
 			stmt, err = tx.Prepare(`copy PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) from stdin `)
