@@ -16,6 +16,30 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var createCmd = &cli.Command{
+	Name:   "postgres-create",
+	Before: before,
+	Flags: append(commonFlags, &cli.StringFlag{
+		Name:  "connect-string",
+		Value: "postgresql://postgres:postgres@localhost?sslmode=disable",
+	}),
+	Action: func(cctx *cli.Context) error {
+		ctx := cliutil.ReqContext(cctx)
+		db, err := NewPostgresDB(cctx.String("connect-string"))
+		if err != nil {
+			return err
+		}
+
+		log.Infof("Creating db...")
+		if err := db.CreateDB(ctx); err != nil {
+			return err
+		}
+		log.Infof("Created db")
+
+		return nil
+	},
+}
+
 var initCmd = &cli.Command{
 	Name:   "postgres-init",
 	Before: before,
@@ -116,12 +140,16 @@ func (db *Postgres) Name() string {
 //go:embed create_tables.sql
 var createTables string
 
-func (db *Postgres) Init(ctx context.Context) error {
-	_, err := db.defDb.ExecContext(ctx, `CREATE DATABASE bench`)
+func (db *Postgres) CreateDB(ctx context.Context) error {
+	_, err := db.defDb.ExecContext(ctx, `CREATE DATABASE IF NOT EXISTS bench`)
 	if err != nil {
 		return fmt.Errorf("creating database bench: %w", err)
 	}
 
+	return nil
+}
+
+func (db *Postgres) Init(ctx context.Context) error {
 	err = db.connect(ctx)
 	if err != nil {
 		return fmt.Errorf("connecting to db: %w", err)

@@ -1,9 +1,9 @@
-CREATE TABLE PayloadToPieces (
+CREATE TABLE IF NOT EXISTS PayloadToPieces (
     PayloadMultihash bytea PRIMARY KEY,
     PieceCids bytea
 );
 
-CREATE TABLE PieceBlockOffsetSize (
+CREATE TABLE IF NOT EXISTS PieceBlockOffsetSize (
     PieceCid bytea,
     PayloadMultihash bytea,
     BlockOffset BIGINT,
