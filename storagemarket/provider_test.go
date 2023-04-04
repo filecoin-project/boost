@@ -1843,6 +1843,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 type minerStubCall struct {
 	err      error
 	blocking bool
+	optional bool
 }
 
 type testDealBuilder struct {
@@ -1879,8 +1880,12 @@ func (tbuilder *testDealBuilder) withCommpFailing(err error) *testDealBuilder {
 	return tbuilder
 }
 
-func (tbuilder *testDealBuilder) withCommpBlocking() *testDealBuilder {
-	tbuilder.msCommp = &minerStubCall{blocking: true}
+func (tbuilder *testDealBuilder) withCommpBlocking(optional ...bool) *testDealBuilder {
+	isOptional := false
+	if len(optional) > 0 {
+		isOptional = optional[0]
+	}
+	tbuilder.msCommp = &minerStubCall{blocking: true, optional: isOptional}
 	return tbuilder
 }
 
@@ -2003,7 +2008,7 @@ func (tbuilder *testDealBuilder) buildCommp() *testDealBuilder {
 		if err := tbuilder.msCommp.err; err != nil {
 			tbuilder.ms.SetupCommpFailure(err)
 		} else {
-			tbuilder.ms.SetupCommp(tbuilder.msCommp.blocking)
+			tbuilder.ms.SetupCommp(tbuilder.msCommp.blocking, tbuilder.msCommp.optional)
 		}
 	}
 

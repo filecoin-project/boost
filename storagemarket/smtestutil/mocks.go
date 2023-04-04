@@ -134,14 +134,14 @@ func (mb *MinerStubBuilder) SetupNoOp() *MinerStubBuilder {
 	return mb
 }
 
-func (mb *MinerStubBuilder) SetupCommp(blocking bool) *MinerStubBuilder {
+func (mb *MinerStubBuilder) SetupCommp(blocking bool, optional bool) *MinerStubBuilder {
 	mb.stub.lk.Lock()
 	if blocking {
 		mb.stub.unblockCommp[mb.dp.DealUUID] = make(chan struct{})
 	}
 	mb.stub.lk.Unlock()
 
-	mb.stub.MockCommpCalculator.EXPECT().ComputeDataCid(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any()).DoAndReturn(func(ctx context.Context, _ abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
+	exp := mb.stub.MockCommpCalculator.EXPECT().ComputeDataCid(gomock.Any(), gomock.Eq(mb.dp.ClientDealProposal.Proposal.PieceSize.Unpadded()), gomock.Any()).DoAndReturn(func(ctx context.Context, _ abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
 		mb.stub.lk.Lock()
 		ch := mb.stub.unblockCommp[mb.dp.DealUUID]
 		mb.stub.lk.Unlock()
@@ -161,6 +161,9 @@ func (mb *MinerStubBuilder) SetupCommp(blocking bool) *MinerStubBuilder {
 			PieceCID: mb.dp.ClientDealProposal.Proposal.PieceCID,
 		}, nil
 	})
+	if optional {
+		exp.AnyTimes()
+	}
 
 	return mb
 }
