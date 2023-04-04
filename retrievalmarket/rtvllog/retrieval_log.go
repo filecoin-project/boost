@@ -61,31 +61,27 @@ func (r *RetrievalLog) OnQueryEvent(evt retrievalmarket.ProviderQueryEvent) {
 		"err", evt.Error)
 
 	// Log failures to DB
+	st := &RetrievalDealState{
+		UnsealPrice: evt.Response.UnsealPrice,
+		Message:     evt.Response.Message,
+	}
 	if evt.Error != nil {
-		st := &RetrievalDealState{
-			Status:      fmt.Sprintf("failed to respond to the query: %s", evt.Error.Error()),
-			UnsealPrice: evt.Response.UnsealPrice,
-			Message:     evt.Response.Message,
-		}
-		r.db.Insert(r.ctx, st)
+		st.Status = fmt.Sprintf("failed to respond to the query: %s", evt.Error.Error())
 	} else {
 		if evt.Response.Status == retrievalmarket.QueryResponseUnavailable {
-			st := &RetrievalDealState{
-				Status:      "retrieval query offer was unavailable",
-				UnsealPrice: evt.Response.UnsealPrice,
-				Message:     evt.Response.Message,
-			}
-			r.db.Insert(r.ctx, st)
+			st.Status = "retrieval query offer was unavailable"
 		}
-
 		if evt.Response.Status == retrievalmarket.QueryResponseError {
-			st := &RetrievalDealState{
-				Status:      "retrieval query offer errored",
-				UnsealPrice: evt.Response.UnsealPrice,
-				Message:     evt.Response.Message,
-			}
-			r.db.Insert(r.ctx, st)
+			st.Status = "retrieval query offer errored"
 		}
+	}
+	if st.Status != "" {
+		r.dbUpdate(func() {
+			err := r.db.Insert(r.ctx, st)
+			if err != nil {
+				log.Errorw("failed to update retrieval deal logger db", "err", err)
+			}
+		})
 	}
 }
 
