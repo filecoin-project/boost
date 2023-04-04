@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/ipfs/go-cid"
@@ -12,8 +15,6 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/multiformats/go-multihash"
 	"github.com/urfave/cli/v2"
-	"strings"
-	"time"
 )
 
 var postgresCmd = &cli.Command{
@@ -74,11 +75,12 @@ var createTables string
 
 func (db *Postgres) Init(ctx context.Context) error {
 	// Drop the db in case it didn't get cleaned up last time the program ran
-	_, _ = db.defDb.ExecContext(ctx, `DROP database bench`)
+	//_, _ = db.defDb.ExecContext(ctx, `DROP database bench`)
 
 	_, err := db.defDb.ExecContext(ctx, `CREATE DATABASE bench`)
 	if err != nil {
-		return fmt.Errorf("creating database bench: %w", err)
+		//ignore error as we have multiple clients
+		//return fmt.Errorf("creating database bench: %w", err)
 	}
 
 	err = db.connect(ctx)
@@ -88,7 +90,8 @@ func (db *Postgres) Init(ctx context.Context) error {
 
 	_, err = db.db.ExecContext(ctx, createTables)
 	if err != nil {
-		return fmt.Errorf("creating tables: %w", err)
+		//ignore errors as we have multiple clients
+		//return fmt.Errorf("creating tables: %w", err)
 	}
 
 	return nil
