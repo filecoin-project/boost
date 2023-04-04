@@ -17,6 +17,26 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var dropCmd = &cli.Command{
+	Name:   "postgres-drop",
+	Before: before,
+	Flags: append(commonFlags, &cli.StringFlag{
+		Name:  "connect-string",
+		Value: "postgresql://postgres:postgres@localhost?sslmode=disable",
+	}),
+	Action: func(cctx *cli.Context) error {
+		ctx := cliutil.ReqContext(cctx)
+		db, err := NewPostgresDB(cctx.String("connect-string"))
+		if err != nil {
+			return err
+		}
+
+		_, _ = db.defDb.ExecContext(ctx, `DROP database bench`)
+
+		return nil
+	},
+}
+
 var postgresCmd = &cli.Command{
 	Name:   "postgres",
 	Before: before,

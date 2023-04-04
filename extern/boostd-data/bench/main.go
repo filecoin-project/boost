@@ -24,6 +24,7 @@ func main() {
 			cassandraCmd,
 			foundationCmd,
 			postgresCmd,
+			dropCmd,
 		},
 	}
 	app.Setup()
