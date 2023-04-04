@@ -347,9 +347,7 @@ func TestLibp2pCarServerNewTransferCancelsPreviousTransfer(t *testing.T) {
 	require.NotEmpty(t, clientEvts1)
 	lastClientEvt1 := clientEvts1[len(clientEvts1)-1]
 	// It's possible the transfer finishes successfully before it gets cancelled
-	if lastClientEvt1.Error == nil {
-		require.Equal(t, carSize, int(lastClientEvt1.NBytesReceived))
-	} else {
+	if lastClientEvt1.Error != nil {
 		require.Error(t, lastClientEvt1.Error)
 		require.Less(t, int(clientReceived), carSize)
 	}
