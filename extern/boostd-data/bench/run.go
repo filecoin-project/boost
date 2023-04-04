@@ -130,7 +130,7 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 	baseCid := testutil.GenerateCid().Bytes()
 	for i := 0; i < parallelism; i++ {
 		eg.Go(func() error {
-			for {
+			for ctx.Err() == nil {
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
@@ -177,6 +177,8 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 					lk.Unlock()
 				}
 			}
+
+			return ctx.Err()
 		})
 	}
 
