@@ -227,7 +227,8 @@ func (d *RetrievalLogDB) list(ctx context.Context, offset int, limit int, where 
 
 		dealState.PayloadCID, err = cid.Parse(payloadCid.String)
 		if err != nil {
-			return nil, fmt.Errorf("parsing payload cid '%s': %w", payloadCid.String, err)
+			//return nil, fmt.Errorf("parsing payload cid '%s': %w", payloadCid.String, err)
+			dealState.PayloadCID = cid.Undef
 		}
 
 		if pieceCid.Valid && pieceCid.String != "" {
