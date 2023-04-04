@@ -193,58 +193,58 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 			defer tx.Rollback()
 
 			// Add payload to pieces index
-			if _, err := tx.Exec(`
-create temp table PayloadToPiecesTmp (like PayloadToPieces excluding constraints) on commit drop;
-`); err != nil {
-				return fmt.Errorf("create PayloadToPiecesTemp: %w", err)
-			}
+			//if _, err := tx.Exec(`
+			//create temp table PayloadToPiecesTmp (like PayloadToPieces excluding constraints) on commit drop;
+			//`); err != nil {
+			//return fmt.Errorf("create PayloadToPiecesTemp: %w", err)
+			//}
 
-			stmt, err := tx.Prepare(`copy PayloadToPiecesTmp (PayloadMultihash, PieceCids) from stdin `)
+			stmt, err := tx.Prepare(`copy PayloadToPieces (PayloadMultihash, PieceCids) from stdin `)
 			if err != nil {
-				return fmt.Errorf("prepare copy PayloadToPiecesTemp: %w", err)
+				return fmt.Errorf("prepare copy PayloadToPieces: %w", err)
 			}
 
 			for _, rec := range recs {
 				if _, err := stmt.Exec(rec.Cid.Hash(), pieceCid.Bytes()); err != nil {
-					return fmt.Errorf("exec copy PayloadToPiecesTemp: %w", err)
+					return fmt.Errorf("exec copy PayloadToPieces: %w", err)
 				}
 			}
 			if err := stmt.Close(); err != nil {
 				return fmt.Errorf("close PayloadToPiecesTemp statement: %w", err)
 			}
 
-			if _, err := tx.Exec(`
-insert into PayloadToPieces select * from PayloadToPiecesTmp on conflict do nothing
-`); err != nil {
-				return fmt.Errorf("insert into PayloadToPieces: %w", err)
-			}
+			//if _, err := tx.Exec(`
+			//insert into PayloadToPieces select * from PayloadToPiecesTmp on conflict do nothing
+			//`); err != nil {
+			//return fmt.Errorf("insert into PayloadToPieces: %w", err)
+			//}
 
-			// Add piece to block info index
-			if _, err := tx.Exec(`
-create temp table PieceBlockOffsetSizeTmp (like PieceBlockOffsetSize excluding constraints) on commit drop;
-`); err != nil {
-				return fmt.Errorf("create PieceBlockOffsetSizeTmp: %w", err)
-			}
+			//// Add piece to block info index
+			//if _, err := tx.Exec(`
+			//create temp table PieceBlockOffsetSizeTmp (like PieceBlockOffsetSize excluding constraints) on commit drop;
+			//`); err != nil {
+			//return fmt.Errorf("create PieceBlockOffsetSizeTmp: %w", err)
+			//}
 
-			stmt, err = tx.Prepare(`copy PieceBlockOffsetSizeTmp (PieceCid, PayloadMultihash, BlockOffset, BlockSize) from stdin `)
+			stmt, err = tx.Prepare(`copy PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) from stdin `)
 			if err != nil {
-				return fmt.Errorf("prepare copy PieceBlockOffsetSizeTmp: %w", err)
+				return fmt.Errorf("prepare copy PieceBlockOffsetSize: %w", err)
 			}
 
 			for _, rec := range recs {
 				if _, err := stmt.Exec(pieceCid.Bytes(), rec.Cid.Hash(), rec.Offset, rec.Size); err != nil {
-					return fmt.Errorf("exec copy PieceBlockOffsetSizeTmp: %w", err)
+					return fmt.Errorf("exec copy PieceBlockOffsetSize: %w", err)
 				}
 			}
 			if err := stmt.Close(); err != nil {
-				return fmt.Errorf("close PieceBlockOffsetSizeTmp statement: %w", err)
+				return fmt.Errorf("close PieceBlockOffsetSize statement: %w", err)
 			}
 
-			if _, err := tx.Exec(`
-insert into PieceBlockOffsetSize select * from PieceBlockOffsetSizeTmp on conflict do nothing
-`); err != nil {
-				return fmt.Errorf("insert into PieceBlockOffsetSize: %w", err)
-			}
+			//if _, err := tx.Exec(`
+			//insert into PieceBlockOffsetSize select * from PieceBlockOffsetSizeTmp on conflict do nothing
+			//`); err != nil {
+			//return fmt.Errorf("insert into PieceBlockOffsetSize: %w", err)
+			//}
 
 			err = tx.Commit()
 			if err != nil {
