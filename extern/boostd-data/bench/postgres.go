@@ -198,7 +198,7 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 		defer tx.Commit()
 
 		// Add payload to pieces index
-		ppParam := 2
+		ppParam := 4
 		for l := 0; l < len(recs); l += ((PSQLMaxParams - 1) / ppParam) {
 			start := l
 			end := l + ((PSQLMaxParams - 1) / ppParam)
@@ -215,14 +215,14 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 				vals = vals + fmt.Sprintf("($%d,$%d)", (i*2)+1, (i*2)+2)
 				args = append(args, rec.Cid.Hash(), pieceCid.Bytes())
 			}
-			_, err = tx.ExecContext(ctx, `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCids) VALUES `+vals, args...)
+			_, err = tx.ExecContext(ctx, `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCids) VALUES `+vals+" ON CONFLICT DO NOTHING", args...)
 			if err != nil {
 				return fmt.Errorf("executing insert: %w", err)
 			}
 		}
 
 		// Add piece to block info index
-		pbparam := 4
+		pbparam := 8
 		for l := 0; l < len(recs); l += ((PSQLMaxParams - 1) / pbparam) {
 			start := l
 			end := l + ((PSQLMaxParams - 1) / ppParam)
@@ -239,7 +239,7 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 				vals = vals + fmt.Sprintf("($%d,$%d,$%d,$%d)", (i*4)+1, (i*4)+2, (i*4)+3, (i*4)+4)
 				args = append(args, pieceCid.Bytes(), rec.Cid.Hash(), rec.Offset, rec.Size)
 			}
-			_, err = tx.ExecContext(ctx, `INSERT INTO PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES `+vals, args...)
+			_, err = tx.ExecContext(ctx, `INSERT INTO PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES `+vals+" ON CONFLICT DO NOTHING", args...)
 			if err != nil {
 				return fmt.Errorf("executing insert: %w", err)
 			}
