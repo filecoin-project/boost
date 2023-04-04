@@ -56,19 +56,6 @@ func run(ctx context.Context, db BenchDB, opts runOpts) error {
 	}(time.Now())
 
 	log.Infof("Running benchmark for %s", db.Name())
-	log.Infof("Initializing...")
-	if err := db.Init(ctx); err != nil {
-		return err
-	}
-	log.Infof("Initialized")
-
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := db.Cleanup(ctx); err != nil {
-			log.Errorf("cleaning up database: %w", err)
-		}
-	}()
 
 	// Add sample data to the database
 	for _, pc := range opts.addPiecesSpecs {

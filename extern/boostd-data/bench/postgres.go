@@ -16,6 +16,30 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var initCmd = &cli.Command{
+	Name:   "postgres-init",
+	Before: before,
+	Flags: append(commonFlags, &cli.StringFlag{
+		Name:  "connect-string",
+		Value: "postgresql://postgres:postgres@localhost?sslmode=disable",
+	}),
+	Action: func(cctx *cli.Context) error {
+		ctx := cliutil.ReqContext(cctx)
+		db, err := NewPostgresDB(cctx.String("connect-string"))
+		if err != nil {
+			return err
+		}
+
+		log.Infof("Initializing...")
+		if err := db.Init(ctx); err != nil {
+			return err
+		}
+		log.Infof("Initialized")
+
+		return nil
+	},
+}
+
 var dropCmd = &cli.Command{
 	Name:   "postgres-drop",
 	Before: before,
@@ -93,13 +117,9 @@ func (db *Postgres) Name() string {
 var createTables string
 
 func (db *Postgres) Init(ctx context.Context) error {
-	// Drop the db in case it didn't get cleaned up last time the program ran
-	//_, _ = db.defDb.ExecContext(ctx, `DROP database bench`)
-
 	_, err := db.defDb.ExecContext(ctx, `CREATE DATABASE bench`)
 	if err != nil {
-		//ignore error as we have multiple clients
-		//return fmt.Errorf("creating database bench: %w", err)
+		return fmt.Errorf("creating database bench: %w", err)
 	}
 
 	err = db.connect(ctx)
@@ -109,8 +129,7 @@ func (db *Postgres) Init(ctx context.Context) error {
 
 	_, err = db.db.ExecContext(ctx, createTables)
 	if err != nil {
-		//ignore errors as we have multiple clients
-		//return fmt.Errorf("creating tables: %w", err)
+		return fmt.Errorf("creating tables: %w", err)
 	}
 
 	return nil
