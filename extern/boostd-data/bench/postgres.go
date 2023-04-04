@@ -6,7 +6,6 @@ import (
 	_ "embed"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
@@ -182,91 +181,133 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 	if len(recs) == 0 {
 		return nil
 	}
-
-	var err error
-	for attempt := 0; attempt < 5; attempt++ {
-		err = func() error {
-			tx, err := db.db.BeginTx(ctx, nil)
-			if err != nil {
-				return err
-			}
-			defer tx.Rollback()
-
-			// Add payload to pieces index
-			//if _, err := tx.Exec(`
-			//create temp table PayloadToPiecesTmp (like PayloadToPieces excluding constraints) on commit drop;
-			//`); err != nil {
-			//return fmt.Errorf("create PayloadToPiecesTemp: %w", err)
-			//}
-
-			stmt, err := tx.Prepare(`copy PayloadToPieces (PayloadMultihash, PieceCids) from stdin `)
-			if err != nil {
-				return fmt.Errorf("prepare copy PayloadToPieces: %w", err)
-			}
-
-			for _, rec := range recs {
-				if _, err := stmt.Exec(rec.Cid.Hash(), pieceCid.Bytes()); err != nil {
-					return fmt.Errorf("exec copy PayloadToPieces: %w", err)
-				}
-			}
-			if err := stmt.Close(); err != nil {
-				return fmt.Errorf("close PayloadToPiecesTemp statement: %w", err)
-			}
-
-			//if _, err := tx.Exec(`
-			//insert into PayloadToPieces select * from PayloadToPiecesTmp on conflict do nothing
-			//`); err != nil {
-			//return fmt.Errorf("insert into PayloadToPieces: %w", err)
-			//}
-
-			//// Add piece to block info index
-			//if _, err := tx.Exec(`
-			//create temp table PieceBlockOffsetSizeTmp (like PieceBlockOffsetSize excluding constraints) on commit drop;
-			//`); err != nil {
-			//return fmt.Errorf("create PieceBlockOffsetSizeTmp: %w", err)
-			//}
-
-			stmt, err = tx.Prepare(`copy PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) from stdin `)
-			if err != nil {
-				return fmt.Errorf("prepare copy PieceBlockOffsetSize: %w", err)
-			}
-
-			for _, rec := range recs {
-				if _, err := stmt.Exec(pieceCid.Bytes(), rec.Cid.Hash(), rec.Offset, rec.Size); err != nil {
-					return fmt.Errorf("exec copy PieceBlockOffsetSize: %w", err)
-				}
-			}
-			if err := stmt.Close(); err != nil {
-				return fmt.Errorf("close PieceBlockOffsetSize statement: %w", err)
-			}
-
-			//if _, err := tx.Exec(`
-			//insert into PieceBlockOffsetSize select * from PieceBlockOffsetSizeTmp on conflict do nothing
-			//`); err != nil {
-			//return fmt.Errorf("insert into PieceBlockOffsetSize: %w", err)
-			//}
-
-			err = tx.Commit()
-			if err != nil {
-				return fmt.Errorf("commit: %w", err)
-			}
-
-			return nil
-		}()
-
-		if err == nil {
-			return nil
-		}
-
-		if strings.Contains(err.Error(), "Restart read required") {
-			time.Sleep(time.Duration(attempt*100) * time.Millisecond)
-			continue
-		}
-
+	tx, err := db.db.BeginTx(ctx, nil)
+	if err != nil {
 		return err
 	}
+	defer tx.Commit()
 
-	return err
+	// Add payload to pieces index
+	vals := ""
+	args := make([]interface{}, 0, len(recs)*2)
+	for i, rec := range recs {
+		if i > 0 {
+			vals = vals + ","
+		}
+		vals = vals + fmt.Sprintf("($%d,$%d)", (i*2)+1, (i*2)+2)
+		args = append(args, rec.Cid.Hash(), pieceCid.Bytes())
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCids) VALUES `+vals, args...)
+	if err != nil {
+		return fmt.Errorf("executing insert: %w", err)
+	}
+
+	// Add piece to block info index
+	vals = ""
+	args = make([]interface{}, 0, len(recs)*4)
+	for i, rec := range recs {
+		if i > 0 {
+			vals = vals + ","
+		}
+		vals = vals + fmt.Sprintf("($%d,$%d,$%d,$%d)", (i*4)+1, (i*4)+2, (i*4)+3, (i*4)+4)
+		args = append(args, pieceCid.Bytes(), rec.Cid.Hash(), rec.Offset, rec.Size)
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES `+vals, args...)
+	if err != nil {
+		return fmt.Errorf("executing insert: %w", err)
+	}
+
+	return nil
+
+	//if len(recs) == 0 {
+	//return nil
+	//}
+
+	//var err error
+
+	//for attempt := 0; attempt < 5; attempt++ {
+	//err = func() error {
+	//tx, err := db.db.BeginTx(ctx, nil)
+	//if err != nil {
+	//return err
+	//}
+	//defer tx.Rollback()
+
+	// Add payload to pieces index
+	//if _, err := tx.Exec(`
+	//create temp table PayloadToPiecesTmp (like PayloadToPieces excluding constraints) on commit drop;
+	//`); err != nil {
+	//return fmt.Errorf("create PayloadToPiecesTemp: %w", err)
+	//}
+
+	//stmt, err := tx.Prepare(`copy PayloadToPieces (PayloadMultihash, PieceCids) from stdin `)
+	//if err != nil {
+	//return fmt.Errorf("prepare copy PayloadToPieces: %w", err)
+	//}
+
+	//for _, rec := range recs {
+	//if _, err := stmt.Exec(rec.Cid.Hash(), pieceCid.Bytes()); err != nil {
+	//return fmt.Errorf("exec copy PayloadToPieces: %w", err)
+	//}
+	//}
+	//if err := stmt.Close(); err != nil {
+	//return fmt.Errorf("close PayloadToPiecesTemp statement: %w", err)
+	//}
+
+	//if _, err := tx.Exec(`
+	//insert into PayloadToPieces select * from PayloadToPiecesTmp on conflict do nothing
+	//`); err != nil {
+	//return fmt.Errorf("insert into PayloadToPieces: %w", err)
+	//}
+
+	//// Add piece to block info index
+	//if _, err := tx.Exec(`
+	//create temp table PieceBlockOffsetSizeTmp (like PieceBlockOffsetSize excluding constraints) on commit drop;
+	//`); err != nil {
+	//return fmt.Errorf("create PieceBlockOffsetSizeTmp: %w", err)
+	//}
+
+	//stmt, err = tx.Prepare(`copy PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) from stdin `)
+	//if err != nil {
+	//return fmt.Errorf("prepare copy PieceBlockOffsetSize: %w", err)
+	//}
+
+	//for _, rec := range recs {
+	//if _, err := stmt.Exec(pieceCid.Bytes(), rec.Cid.Hash(), rec.Offset, rec.Size); err != nil {
+	//return fmt.Errorf("exec copy PieceBlockOffsetSize: %w", err)
+	//}
+	//}
+	//if err := stmt.Close(); err != nil {
+	//return fmt.Errorf("close PieceBlockOffsetSize statement: %w", err)
+	//}
+
+	//if _, err := tx.Exec(`
+	//insert into PieceBlockOffsetSize select * from PieceBlockOffsetSizeTmp on conflict do nothing
+	//`); err != nil {
+	//return fmt.Errorf("insert into PieceBlockOffsetSize: %w", err)
+	//}
+
+	//err = tx.Commit()
+	//if err != nil {
+	//return fmt.Errorf("commit: %w", err)
+	//}
+
+	//return nil
+	//}()
+
+	//if err == nil {
+	//return nil
+	//}
+
+	//if strings.Contains(err.Error(), "Restart read required") {
+	//time.Sleep(time.Duration(attempt*100) * time.Millisecond)
+	//continue
+	//}
+
+	//return err
+	//}
+
+	//return err
 }
 
 func (db *Postgres) PiecesContainingMultihash(ctx context.Context, m multihash.Multihash) ([]cid.Cid, error) {
