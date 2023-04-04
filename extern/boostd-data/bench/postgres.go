@@ -197,7 +197,7 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 		vals = vals + fmt.Sprintf("($%d,$%d)", (i*2)+1, (i*2)+2)
 		args = append(args, rec.Cid.Hash(), pieceCid.Bytes())
 	}
-	_, err = db.db.ExecContext(ctx, `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCids) VALUES `+vals, args...)
+	_, err := db.db.ExecContext(ctx, `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCids) VALUES `+vals, args...)
 	if err != nil {
 		return fmt.Errorf("executing insert: %w", err)
 	}
