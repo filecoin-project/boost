@@ -78,14 +78,14 @@ func run(ctx context.Context, db BenchDB, opts runOpts) error {
 	}
 
 	// Run bitswap fetch simulation
-	if err := bitswapFetch(ctx, db, opts.bitswapFetchCount, opts.bitswapFetchParallelism); err != nil {
-		return err
-	}
+	//if err := bitswapFetch(ctx, db, opts.bitswapFetchCount, opts.bitswapFetchParallelism); err != nil {
+	//return err
+	//}
 
 	// Run graphsync fetch simulation
-	if err := graphsyncFetch(ctx, db, opts.graphsyncFetchCount, opts.graphsyncFetchParallelism); err != nil {
-		return err
-	}
+	//if err := graphsyncFetch(ctx, db, opts.graphsyncFetchCount, opts.graphsyncFetchParallelism); err != nil {
+	//return err
+	//}
 
 	return nil
 }

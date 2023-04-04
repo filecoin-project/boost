@@ -52,9 +52,9 @@ var postgresCmd = &cli.Command{
 		return run(ctx, db, runOptsFromCctx(cctx))
 	},
 	Subcommands: []*cli.Command{
-		loadCmd(createPostgres),
-		bitswapCmd(createPostgres),
-		graphsyncCmd(createPostgres),
+		//loadCmd(createPostgres),
+		//bitswapCmd(createPostgres),
+		//graphsyncCmd(createPostgres),
 	},
 }
 
@@ -181,11 +181,11 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 	if len(recs) == 0 {
 		return nil
 	}
-	tx, err := db.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Commit()
+	//tx, err := db.db.BeginTx(ctx, nil)
+	//if err != nil {
+	//return err
+	//}
+	//defer tx.Commit()
 
 	// Add payload to pieces index
 	vals := ""
@@ -197,7 +197,7 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 		vals = vals + fmt.Sprintf("($%d,$%d)", (i*2)+1, (i*2)+2)
 		args = append(args, rec.Cid.Hash(), pieceCid.Bytes())
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCids) VALUES `+vals, args...)
+	_, err = db.db.ExecContext(ctx, `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCids) VALUES `+vals, args...)
 	if err != nil {
 		return fmt.Errorf("executing insert: %w", err)
 	}
@@ -212,7 +212,7 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 		vals = vals + fmt.Sprintf("($%d,$%d,$%d,$%d)", (i*4)+1, (i*4)+2, (i*4)+3, (i*4)+4)
 		args = append(args, pieceCid.Bytes(), rec.Cid.Hash(), rec.Offset, rec.Size)
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES `+vals, args...)
+	_, err = db.db.ExecContext(ctx, `INSERT INTO PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES `+vals, args...)
 	if err != nil {
 		return fmt.Errorf("executing insert: %w", err)
 	}
