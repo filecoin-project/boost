@@ -141,7 +141,7 @@ func (db *Postgres) Name() string {
 var createTables string
 
 func (db *Postgres) CreateDB(ctx context.Context) error {
-	_, err := db.defDb.ExecContext(ctx, `CREATE DATABASE IF NOT EXISTS bench`)
+	_, err := db.defDb.ExecContext(ctx, `CREATE DATABASE bench`)
 	if err != nil {
 		return fmt.Errorf("creating database bench: %w", err)
 	}
