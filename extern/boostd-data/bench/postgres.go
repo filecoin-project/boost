@@ -150,7 +150,7 @@ func (db *Postgres) CreateDB(ctx context.Context) error {
 }
 
 func (db *Postgres) Init(ctx context.Context) error {
-	err = db.connect(ctx)
+	err := db.connect(ctx)
 	if err != nil {
 		return fmt.Errorf("connecting to db: %w", err)
 	}
