@@ -65,7 +65,10 @@ func (r *RetrievalLog) OnQueryEvent(evt retrievalmarket.ProviderQueryEvent) {
 		Message:     evt.Response.Message,
 	}
 	if evt.Error != nil {
-		st.Status = evt.Error.Error()
+		st.Status = "Failed"
+		if evt.Response.Message == "" {
+			st.Message = evt.Error.Error()
+		}
 	} else {
 		if evt.Response.Status == retrievalmarket.QueryResponseUnavailable {
 			st.Status = "unavailable"
