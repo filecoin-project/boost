@@ -94,3 +94,11 @@
 .inspect > p {
     padding: 2em 1em;
 }
+
+.inspect a.download {
+    background-image: url("./bootstrap-icons/icons/download.svg");
+    background-position: left;
+    background-repeat: no-repeat;
+    padding-left: 1.25em;
+    margin-left: 1em;
+}
