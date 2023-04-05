@@ -17,7 +17,6 @@ replace github.com/filecoin-project/boostd-data => ./extern/boostd-data
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0
 	github.com/BurntSushi/toml v1.2.1
-	github.com/NYTimes/gziphandler v1.1.1
 	github.com/alecthomas/jsonschema v0.0.0-20200530073317-71f438968921
 	github.com/benbjohnson/clock v1.3.0
 	github.com/buger/goterm v1.0.3
@@ -230,11 +229,11 @@ require (
 	github.com/ipfs/go-ipld-cbor v0.0.6
 	github.com/ipfs/go-ipns v0.3.0 // indirect
 	github.com/ipfs/go-log v1.0.5 // indirect
-	github.com/ipfs/go-path v0.3.1 // indirect
+	github.com/ipfs/go-path v0.3.1
 	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
 	github.com/ipfs/go-unixfsnode v1.5.2
 	github.com/ipfs/go-verifcid v0.0.2 // indirect
-	github.com/ipfs/interface-go-ipfs-core v0.11.1 // indirect
+	github.com/ipfs/interface-go-ipfs-core v0.11.1
 	github.com/ipld/go-codec-dagpb v1.5.0
 	github.com/ipld/go-ipld-adl-hamt v0.0.0-20220616142416-9004dbd839e0 // indirect
 	github.com/ipsn/go-secp256k1 v0.0.0-20180726113642-9d62b9f0bc52 // indirect
@@ -282,7 +281,7 @@ require (
 	github.com/multiformats/go-base36 v0.2.0 // indirect
 	github.com/multiformats/go-multiaddr-dns v0.3.1 // indirect
 	github.com/multiformats/go-multiaddr-fmt v0.1.0 // indirect
-	github.com/multiformats/go-multicodec v0.8.0 // indirect
+	github.com/multiformats/go-multicodec v0.8.0
 	github.com/multiformats/go-multistream v0.4.1 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/nikkolasg/hexjson v0.1.0 // indirect
@@ -328,8 +327,8 @@ require (
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/term v0.5.0
 	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9 // indirect
-	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect
-	google.golang.org/grpc v1.47.0 // indirect
+	google.golang.org/genproto v0.0.0-20221118155620-16455021b5e6 // indirect
+	google.golang.org/grpc v1.52.3 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -339,10 +338,15 @@ require (
 
 require (
 	github.com/filecoin-project/boostd-data v0.0.0-00010101000000-000000000000
+	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
 	github.com/ipfs/go-ds-flatfs v0.5.1
+	github.com/ipfs/go-fetcher v1.6.1
+	github.com/ipfs/go-ipfs-redirects-file v0.1.1 // indirect
+	github.com/ipfs/go-namesys v0.7.0
 )
 
 require (
+	github.com/NYTimes/gziphandler v1.1.1
 	github.com/filecoin-project/boost-gfm v1.26.5
 	github.com/filecoin-project/boost-graphsync v0.13.6
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc4
@@ -352,6 +356,7 @@ require (
 require (
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
 	github.com/google/pprof v0.0.0-20221203041831-ce31453925ec // indirect
+	github.com/hashicorp/go-uuid v1.0.2 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
 	github.com/onsi/ginkgo/v2 v2.5.1 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
@@ -359,6 +364,8 @@ require (
 	github.com/quic-go/qtls-go1-20 v0.1.1 // indirect
 	github.com/quic-go/quic-go v0.33.0 // indirect
 	github.com/quic-go/webtransport-go v0.5.2 // indirect
+	github.com/tidwall/gjson v1.14.0 // indirect
+	github.com/ucarion/urlpath v0.0.0-20200424170820-7ccc79b76bbb // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )

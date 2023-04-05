@@ -20,8 +20,11 @@ import (
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hashicorp/go-multierror"
+	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	offline "github.com/ipfs/go-ipfs-exchange-offline"
 	"go.opencensus.io/stats"
 )
 
@@ -39,10 +42,11 @@ type apiVersion struct {
 }
 
 type HttpServer struct {
-	path          string
-	port          int
-	allowIndexing bool
-	api           HttpServerApi
+	path    string
+	port    int
+	api     HttpServerApi
+	opts    HttpServerOptions
+	idxPage string
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -55,26 +59,50 @@ type HttpServerApi interface {
 	UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error)
 }
 
-func NewHttpServer(path string, port int, allowIndexing bool, api HttpServerApi) *HttpServer {
-	return &HttpServer{path: path, port: port, allowIndexing: allowIndexing, api: api}
+type HttpServerOptions struct {
+	Blockstore               blockstore.Blockstore
+	ServePieces              bool
+	SupportedResponseFormats []string
+}
+
+func NewHttpServer(path string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
+	if opts == nil {
+		opts = &HttpServerOptions{ServePieces: true}
+	}
+	return &HttpServer{path: path, port: port, api: api, opts: *opts, idxPage: parseTemplate(*opts)}
 }
 
 func (s *HttpServer) pieceBasePath() string {
 	return s.path + "/piece/"
 }
 
-func (s *HttpServer) Start(ctx context.Context) {
-	s.ctx, s.cancel = context.WithCancel(ctx)
+func (s *HttpServer) ipfsBasePath() string {
+	return s.path + "/ipfs/"
+}
 
-	listenAddr := fmt.Sprintf(":%d", s.port)
+func (s *HttpServer) Start(ctx context.Context) error {
+	s.ctx, s.cancel = context.WithCancel(ctx)
 	handler := http.NewServeMux()
-	handler.HandleFunc(s.pieceBasePath(), s.handleByPieceCid)
+
+	if s.opts.ServePieces {
+		handler.HandleFunc(s.pieceBasePath(), s.handleByPieceCid)
+	}
+
+	if s.opts.Blockstore != nil {
+		blockService := blockservice.New(s.opts.Blockstore, offline.Exchange(s.opts.Blockstore))
+		gw, err := NewBlocksGateway(blockService, nil)
+		if err != nil {
+			return fmt.Errorf("creating blocks gateway: %w", err)
+		}
+		handler.Handle(s.ipfsBasePath(), newGatewayHandler(gw, s.opts.SupportedResponseFormats))
+	}
+
 	handler.HandleFunc("/", s.handleIndex)
 	handler.HandleFunc("/index.html", s.handleIndex)
 	handler.HandleFunc("/info", s.handleInfo)
 	handler.Handle("/metrics", metrics.Exporter("booster_http")) // metrics
 	s.server = &http.Server{
-		Addr:    listenAddr,
+		Addr:    fmt.Sprintf(":%d", s.port),
 		Handler: handler,
 		// This context will be the parent of the context associated with all
 		// incoming requests
@@ -88,6 +116,8 @@ func (s *HttpServer) Start(ctx context.Context) {
 			log.Fatalf("http.ListenAndServe(): %w", err)
 		}
 	}()
+
+	return nil
 }
 
 func (s *HttpServer) Stop() error {
@@ -95,36 +125,16 @@ func (s *HttpServer) Stop() error {
 	return s.server.Close()
 }
 
-const idxPage = `
-<html>
-  <body>
-    <h4>Booster HTTP Server</h4>
-    Endpoints:
-    <table>
-      <tbody>
-      <tr>
-        <td>
-          Download a raw piece by its piece CID
-        </td>
-        <td>
-          <a href="/piece/bafySomePieceCid" > /piece/<piece cid></a>
-        </td>
-      </tbody>
-    </table>
-  </body>
-</html>
-`
-
 func (s *HttpServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(idxPage)) //nolint:errcheck
+	w.Write([]byte(s.idxPage)) //nolint:errcheck
 }
 
 func (s *HttpServer) handleInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	v := apiVersion{
-		Version: "0.2.0",
+		Version: "0.3.0",
 	}
 	json.NewEncoder(w).Encode(v) //nolint:errcheck
 }
@@ -169,8 +179,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set an Etag based on the piece cid
-	etag := pieceCid.String()
-	w.Header().Set("Etag", etag)
+	setEtag(w, pieceCid.String())
 
 	serveContent(w, r, content)
 
@@ -235,6 +244,11 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker)
 	}
 }
 
+func setEtag(w http.ResponseWriter, etag string) {
+	// Note: the etag must be surrounded by "quotes"
+	w.Header().Set("Etag", `"`+etag+`"`)
+}
+
 // isNotFoundError falls back to checking the error string for "not found".
 // Unfortunately we can't always use errors.Is() because the error might
 // have crossed an RPC boundary.
@@ -281,7 +295,7 @@ func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.
 }
 
 func (s *HttpServer) unsealedDeal(ctx context.Context, pieceInfo piecestore.PieceInfo) (*piecestore.DealInfo, error) {
-	// There should always been deals in the PieceInfo, but check just in case
+	// There should always be deals in the PieceInfo, but check just in case
 	if len(pieceInfo.Deals) == 0 {
 		return nil, fmt.Errorf("there are no deals containing piece %s: %w", pieceInfo.PieceCID, ErrNotFound)
 	}

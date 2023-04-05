@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -29,12 +28,27 @@ type RemoteBlockstoreAPI interface {
 
 // RemoteBlockstore is a read-only blockstore over all cids across all pieces on a provider.
 type RemoteBlockstore struct {
-	api RemoteBlockstoreAPI
+	api          RemoteBlockstoreAPI
+	blockMetrics BlockMetrics
 }
 
-func NewRemoteBlockstore(api RemoteBlockstoreAPI) blockstore.Blockstore {
+type BlockMetrics struct {
+	GetRequestCount             *stats.Int64Measure
+	GetFailResponseCount        *stats.Int64Measure
+	GetSuccessResponseCount     *stats.Int64Measure
+	BytesSentCount              *stats.Int64Measure
+	HasRequestCount             *stats.Int64Measure
+	HasFailResponseCount        *stats.Int64Measure
+	HasSuccessResponseCount     *stats.Int64Measure
+	GetSizeRequestCount         *stats.Int64Measure
+	GetSizeFailResponseCount    *stats.Int64Measure
+	GetSizeSuccessResponseCount *stats.Int64Measure
+}
+
+func NewRemoteBlockstore(api RemoteBlockstoreAPI, blockMetrics BlockMetrics) blockstore.Blockstore {
 	return &RemoteBlockstore{
-		api: api,
+		api:          api,
+		blockMetrics: blockMetrics,
 	}
 }
 
@@ -42,7 +56,7 @@ func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block,
 	ctx, span := tracing.Tracer.Start(ctx, "rbls.get")
 	defer span.End()
 	span.SetAttributes(attribute.String("cid", c.String()))
-	stats.Record(ctx, metrics.BitswapRblsGetRequestCount.M(1))
+	stats.Record(ctx, ro.blockMetrics.GetRequestCount.M(1))
 
 	log.Debugw("Get", "cid", c)
 	data, err := ro.api.BlockstoreGet(ctx, c)
@@ -50,12 +64,12 @@ func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block,
 	log.Debugw("Get response", "cid", c, "size", len(data), "error", err)
 	if err != nil {
 		log.Infow("Get failed", "cid", c, "error", err)
-		stats.Record(ctx, metrics.BitswapRblsGetFailResponseCount.M(1))
+		stats.Record(ctx, ro.blockMetrics.GetFailResponseCount.M(1))
 		return nil, err
 	}
 	log.Infow("Get", "cid", c, "size", len(data))
-	stats.Record(ctx, metrics.BitswapRblsGetSuccessResponseCount.M(1))
-	stats.Record(ctx, metrics.BitswapRblsBytesSentCount.M(int64(len(data))))
+	stats.Record(ctx, ro.blockMetrics.GetSuccessResponseCount.M(1))
+	stats.Record(ctx, ro.blockMetrics.BytesSentCount.M(int64(len(data))))
 	return blocks.NewBlockWithCid(data, c)
 }
 
@@ -63,15 +77,15 @@ func (ro *RemoteBlockstore) Has(ctx context.Context, c cid.Cid) (bool, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "rbls.has")
 	defer span.End()
 	span.SetAttributes(attribute.String("cid", c.String()))
-	stats.Record(ctx, metrics.BitswapRblsHasRequestCount.M(1))
+	stats.Record(ctx, ro.blockMetrics.HasRequestCount.M(1))
 
 	log.Debugw("Has", "cid", c)
 	has, err := ro.api.BlockstoreHas(ctx, c)
 	log.Debugw("Has response", "cid", c, "has", has, "error", err)
 	if err != nil {
-		stats.Record(ctx, metrics.BitswapRblsHasFailResponseCount.M(1))
+		stats.Record(ctx, ro.blockMetrics.HasFailResponseCount.M(1))
 	} else {
-		stats.Record(ctx, metrics.BitswapRblsHasSuccessResponseCount.M(1))
+		stats.Record(ctx, ro.blockMetrics.HasSuccessResponseCount.M(1))
 	}
 	return has, err
 }
@@ -80,16 +94,16 @@ func (ro *RemoteBlockstore) GetSize(ctx context.Context, c cid.Cid) (int, error)
 	ctx, span := tracing.Tracer.Start(ctx, "rbls.get_size")
 	defer span.End()
 	span.SetAttributes(attribute.String("cid", c.String()))
-	stats.Record(ctx, metrics.BitswapRblsGetSizeRequestCount.M(1))
+	stats.Record(ctx, ro.blockMetrics.GetSizeRequestCount.M(1))
 
 	log.Debugw("GetSize", "cid", c)
 	size, err := ro.api.BlockstoreGetSize(ctx, c)
 	err = normalizeError(err)
 	log.Debugw("GetSize response", "cid", c, "size", size, "error", err)
 	if err != nil {
-		stats.Record(ctx, metrics.BitswapRblsGetSizeFailResponseCount.M(1))
+		stats.Record(ctx, ro.blockMetrics.GetSizeFailResponseCount.M(1))
 	} else {
-		stats.Record(ctx, metrics.BitswapRblsGetSizeSuccessResponseCount.M(1))
+		stats.Record(ctx, ro.blockMetrics.GetSizeSuccessResponseCount.M(1))
 	}
 	return size, err
 }
