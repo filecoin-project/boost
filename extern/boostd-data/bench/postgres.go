@@ -19,16 +19,23 @@ import (
 // The maximum number of parameters allowed in an insert query in PostgreSQL
 const PSQLMaxParams = 65535
 
+var postgresConnectFlag = &cli.StringFlag{
+	Name:  "connect-string",
+	Value: "postgresql://postgres:postgres@localhost?sslmode=disable",
+}
+
+var postgresInsertTmpTableFlag = &cli.BoolFlag{
+	Name:  "insert-tmp-table",
+	Value: false,
+}
+
 var createCmd = &cli.Command{
 	Name:   "postgres-create",
 	Before: before,
-	Flags: append(commonFlags, &cli.StringFlag{
-		Name:  "connect-string",
-		Value: "postgresql://postgres:postgres@localhost?sslmode=disable",
-	}),
+	Flags:  append(commonFlags, postgresConnectFlag),
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
-		db, err := NewPostgresDB(cctx.String("connect-string"))
+		db, err := NewPostgresDB(cctx.String("connect-string"), false)
 		if err != nil {
 			return err
 		}
@@ -46,13 +53,10 @@ var createCmd = &cli.Command{
 var initCmd = &cli.Command{
 	Name:   "postgres-init",
 	Before: before,
-	Flags: append(commonFlags, &cli.StringFlag{
-		Name:  "connect-string",
-		Value: "postgresql://postgres:postgres@localhost?sslmode=disable",
-	}),
+	Flags:  append(commonFlags, postgresConnectFlag),
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
-		db, err := NewPostgresDB(cctx.String("connect-string"))
+		db, err := NewPostgresDB(cctx.String("connect-string"), false)
 		if err != nil {
 			return err
 		}
@@ -70,13 +74,10 @@ var initCmd = &cli.Command{
 var dropCmd = &cli.Command{
 	Name:   "postgres-drop",
 	Before: before,
-	Flags: append(commonFlags, &cli.StringFlag{
-		Name:  "connect-string",
-		Value: "postgresql://postgres:postgres@localhost?sslmode=disable",
-	}),
+	Flags:  append(commonFlags, postgresConnectFlag),
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
-		db, err := NewPostgresDB(cctx.String("connect-string"))
+		db, err := NewPostgresDB(cctx.String("connect-string"), false)
 		if err != nil {
 			return err
 		}
@@ -90,13 +91,10 @@ var dropCmd = &cli.Command{
 var postgresCmd = &cli.Command{
 	Name:   "postgres",
 	Before: before,
-	Flags: append(commonFlags, &cli.StringFlag{
-		Name:  "connect-string",
-		Value: "postgresql://postgres:postgres@localhost?sslmode=disable",
-	}),
+	Flags:  append(commonFlags, postgresConnectFlag, postgresInsertTmpTableFlag),
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
-		db, err := NewPostgresDB(cctx.String("connect-string"))
+		db, err := NewPostgresDB(cctx.String("connect-string"), cctx.Bool("insert-tmp-table"))
 		if err != nil {
 			return err
 		}
@@ -115,8 +113,8 @@ var postgresCmd = &cli.Command{
 	},
 }
 
-func createPostgres(ctx context.Context, connectString string) (BenchDB, error) {
-	db, err := NewPostgresDB(connectString)
+func createPostgres(ctx context.Context, connectString string, insertWithTmpTable bool) (BenchDB, error) {
+	db, err := NewPostgresDB(connectString, insertWithTmpTable)
 	if err != nil {
 		return nil, err
 	}
@@ -128,18 +126,23 @@ func createPostgres(ctx context.Context, connectString string) (BenchDB, error) 
 }
 
 type Postgres struct {
-	defDb         *sql.DB
-	db            *sql.DB
-	connectString string
+	defDb              *sql.DB
+	db                 *sql.DB
+	connectString      string
+	insertWithTmpTable bool
 }
 
-func NewPostgresDB(connectString string) (*Postgres, error) {
+func NewPostgresDB(connectString string, insertWithTmpTable bool) (*Postgres, error) {
 	defDb, err := sql.Open("postgres", connectString)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to default database: %w", err)
 	}
 
-	return &Postgres{defDb: defDb, connectString: connectString}, nil
+	return &Postgres{
+		defDb:              defDb,
+		connectString:      connectString,
+		insertWithTmpTable: insertWithTmpTable,
+	}, nil
 }
 
 func (db *Postgres) Name() string {
@@ -238,6 +241,10 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 		return nil
 	}
 
+	if db.insertWithTmpTable {
+		return db.addIndexRecordsWithTmpTable(ctx, pieceCid, recs)
+	}
+
 	// Add payload to pieces index
 	paramsPerRow := 2
 	batchSize := (PSQLMaxParams - 1) / paramsPerRow
@@ -290,6 +297,75 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 		if err != nil {
 			return fmt.Errorf("executing insert: %w", err)
 		}
+	}
+
+	return nil
+}
+
+func (db *Postgres) addIndexRecordsWithTmpTable(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
+	tx, err := db.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Add payload to pieces index
+	if _, err := tx.Exec(`
+			create temp table PayloadToPiecesTmp (like PayloadToPieces excluding constraints) on commit drop;
+		`); err != nil {
+		return fmt.Errorf("create PayloadToPiecesTemp: %w", err)
+	}
+
+	stmt, err := tx.Prepare(`copy PayloadToPieces (PayloadMultihash, PieceCids) from stdin `)
+	if err != nil {
+		return fmt.Errorf("prepare copy PayloadToPieces: %w", err)
+	}
+
+	for _, rec := range recs {
+		if _, err := stmt.Exec(rec.Cid.Hash(), pieceCid.Bytes()); err != nil {
+			return fmt.Errorf("exec copy PayloadToPieces: %w", err)
+		}
+	}
+	if err := stmt.Close(); err != nil {
+		return fmt.Errorf("close PayloadToPiecesTemp statement: %w", err)
+	}
+
+	if _, err := tx.Exec(`
+			insert into PayloadToPieces select * from PayloadToPiecesTmp on conflict do nothing
+		`); err != nil {
+		return fmt.Errorf("insert into PayloadToPieces: %w", err)
+	}
+
+	// Add piece to block info index
+	if _, err := tx.Exec(`
+			create temp table PieceBlockOffsetSizeTmp (like PieceBlockOffsetSize excluding constraints) on commit drop;
+		`); err != nil {
+		return fmt.Errorf("create PieceBlockOffsetSizeTmp: %w", err)
+	}
+
+	stmt, err = tx.Prepare(`copy PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) from stdin `)
+	if err != nil {
+		return fmt.Errorf("prepare copy PieceBlockOffsetSize: %w", err)
+	}
+
+	for _, rec := range recs {
+		if _, err := stmt.Exec(pieceCid.Bytes(), rec.Cid.Hash(), rec.Offset, rec.Size); err != nil {
+			return fmt.Errorf("exec copy PieceBlockOffsetSize: %w", err)
+		}
+	}
+	if err := stmt.Close(); err != nil {
+		return fmt.Errorf("close PieceBlockOffsetSize statement: %w", err)
+	}
+
+	if _, err := tx.Exec(`
+			insert into PieceBlockOffsetSize select * from PieceBlockOffsetSizeTmp on conflict do nothing
+		`); err != nil {
+		return fmt.Errorf("insert into PieceBlockOffsetSize: %w", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("commit: %w", err)
 	}
 
 	return nil
