@@ -2,6 +2,11 @@ package main
 
 import (
 	"context"
+	"math/rand"
+	"sync"
+	"time"
+
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
@@ -10,9 +15,6 @@ import (
 	mh "github.com/multiformats/go-multihash"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
-	"math/rand"
-	"sync"
-	"time"
 )
 
 const sectorSize = 32 * 1024 * 1024 * 1024
@@ -48,20 +50,12 @@ type runOpts struct {
 }
 
 func run(ctx context.Context, db BenchDB, opts runOpts) error {
-	log.Infof("Running benchmark for %s", db.Name())
-	log.Infof("Initializing...")
-	if err := db.Init(ctx); err != nil {
-		return err
-	}
-	log.Infof("Initialized")
+	metrics.GetOrRegisterCounter("postgres.run", nil).Inc(1)
+	defer func(now time.Time) {
+		metrics.GetOrRegisterResettingTimer("postgres.run.duration", nil).UpdateSince(now)
+	}(time.Now())
 
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := db.Cleanup(ctx); err != nil {
-			log.Errorf("cleaning up database: %w", err)
-		}
-	}()
+	log.Infof("Running benchmark for %s", db.Name())
 
 	// Add sample data to the database
 	for _, pc := range opts.addPiecesSpecs {
@@ -71,14 +65,14 @@ func run(ctx context.Context, db BenchDB, opts runOpts) error {
 	}
 
 	// Run bitswap fetch simulation
-	if err := bitswapFetch(ctx, db, opts.bitswapFetchCount, opts.bitswapFetchParallelism); err != nil {
-		return err
-	}
+	//if err := bitswapFetch(ctx, db, opts.bitswapFetchCount, opts.bitswapFetchParallelism); err != nil {
+	//return err
+	//}
 
 	// Run graphsync fetch simulation
-	if err := graphsyncFetch(ctx, db, opts.graphsyncFetchCount, opts.graphsyncFetchParallelism); err != nil {
-		return err
-	}
+	//if err := graphsyncFetch(ctx, db, opts.graphsyncFetchCount, opts.graphsyncFetchParallelism); err != nil {
+	//return err
+	//}
 
 	return nil
 }
@@ -123,7 +117,7 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 	baseCid := testutil.GenerateCid().Bytes()
 	for i := 0; i < parallelism; i++ {
 		eg.Go(func() error {
-			for {
+			for ctx.Err() == nil {
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
@@ -150,15 +144,19 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 							},
 						})
 					}
+					metrics.GetOrRegisterResettingTimer("runner.gen-n-blocks", nil).UpdateSince(createRecsStart)
 					totalCreateRecsDelta := time.Since(createRecsStart)
 
 					// Add the records to the db
 					addRecsStart := time.Now()
 					pcid := testutil.GenerateCid()
+
+					start := time.Now()
 					err := db.AddIndexRecords(ctx, pcid, recs)
 					if err != nil {
 						return err
 					}
+					metrics.GetOrRegisterResettingTimer("runner.add-index-records", nil).UpdateSince(start)
 
 					lk.Lock()
 					totalCreateRecs += totalCreateRecsDelta
@@ -166,6 +164,8 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 					lk.Unlock()
 				}
 			}
+
+			return ctx.Err()
 		})
 	}
 
@@ -183,6 +183,9 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 		"total-cpu-ms", (totalCreateRecs + totalAddRecs).Milliseconds(),
 		"create-ms", totalCreateRecs.Milliseconds(),
 		"add-ms", totalAddRecs.Milliseconds())
+
+	metrics.GetOrRegisterResettingTimer("postgres.fixtures", nil).UpdateSince(addStart)
+
 	return nil
 }
 
@@ -212,14 +215,21 @@ func bitswapFetch(ctx context.Context, db BenchDB, count int, parallelism int) e
 	fetchStart := time.Now()
 	err := executeFetch(ctx, db, count, parallelism, func(sample pieceBlock) error {
 		mhLookupStart := time.Now()
+
 		_, err := db.PiecesContainingMultihash(ctx, sample.PayloadMultihash)
 		if err != nil {
 			return err
 		}
 		mhLookupTotalDelta := time.Since(mhLookupStart)
+		metrics.GetOrRegisterResettingTimer("runner.pieces-containing-multihash", nil).UpdateSince(mhLookupStart)
 
 		getIdxStart := time.Now()
 		_, err = db.GetOffsetSize(ctx, sample.PieceCid, sample.PayloadMultihash)
+		if err != nil {
+			metrics.GetOrRegisterResettingTimer("runner.get-offset-size.err", nil).UpdateSince(getIdxStart)
+			return err
+		}
+		metrics.GetOrRegisterResettingTimer("runner.get-offset-size", nil).UpdateSince(getIdxStart)
 
 		lk.Lock()
 		defer lk.Unlock()
@@ -272,10 +282,12 @@ func graphsyncFetch(ctx context.Context, db BenchDB, count int, parallelism int)
 			return err
 		}
 		mhLookupTotal += time.Since(mhLookupStart)
+		metrics.GetOrRegisterResettingTimer("runner.pieces-containing-multihash", nil).UpdateSince(mhLookupStart)
 
 		getIdxStart := time.Now()
 		_, err = db.GetIterableIndex(ctx, sample.PieceCid)
 		getIdxTotal += time.Since(getIdxStart)
+		metrics.GetOrRegisterResettingTimer("runner.get-iterable-index", nil).UpdateSince(getIdxStart)
 		return err
 	})
 	if err != nil {
@@ -300,6 +312,8 @@ func executeFetch(ctx context.Context, db BenchDB, count int, parallelism int, p
 	if err != nil {
 		return err
 	}
+
+	metrics.GetOrRegisterResettingTimer("runner.get-block-sample", nil).UpdateSince(start)
 
 	log.Infow("generated block samples", "count", count, "parallelism", parallelism, "duration", time.Since(start).String())
 

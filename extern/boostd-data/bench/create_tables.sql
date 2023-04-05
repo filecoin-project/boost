@@ -10,3 +10,7 @@ CREATE TABLE PieceBlockOffsetSize (
     BlockSize BIGINT,
     PRIMARY KEY (PieceCid, PayloadMultihash)
 );
+
+SELECT create_distributed_table('PayloadToPieces', 'PayloadMultihash');
+
+SELECT create_distributed_table('PieceBlockOffsetSize', 'PieceCid');
