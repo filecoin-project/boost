@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"go.opencensus.io/stats"
 	"go.uber.org/fx"
+	"sync"
 	"time"
 )
 
@@ -103,6 +104,7 @@ func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePe
 }
 
 func graphsyncStats(mctx helpers.MetricsCtx, lc fx.Lifecycle, gs dtypes.Graphsync) {
+	var closeOnce sync.Once
 	stopStats := make(chan struct{})
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
@@ -135,7 +137,7 @@ func graphsyncStats(mctx helpers.MetricsCtx, lc fx.Lifecycle, gs dtypes.Graphsyn
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			close(stopStats)
+			closeOnce.Do(func() { close(stopStats) })
 			return nil
 		},
 	})
