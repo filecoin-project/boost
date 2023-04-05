@@ -13,7 +13,7 @@ COPY gql /src/gql
 RUN npm_config_legacy_peer_deps=yes npm ci --no-audit --prefix react&& \
       npm run --prefix react build
 #########################################################################################
-FROM golang:1.18-bullseye as builder
+FROM golang:1.19-bullseye as builder
 
 RUN apt update && apt install -y \
       build-essential \
@@ -89,7 +89,7 @@ WORKDIR /app
 COPY --from=lotus-test /usr/local/bin/lotus /usr/local/bin/
 COPY --from=lotus-test /usr/local/bin/lotus-miner /usr/local/bin/
 ## Test lotus starts
-RUN lotus -v && lotus-miner -v 
+RUN lotus -v && lotus-miner -v
 #########################################################################################
 FROM runner as boost-dev
 
@@ -103,18 +103,18 @@ LABEL org.opencontainers.image.version=$BUILD_VERSION \
       version=$BUILD_VERSION \
       release=$BUILD_VERSION \
       summary="This image is used to host the boost-dev storage provider" \
-      description="This image is used to host the boost-dev storage provider" 
+      description="This image is used to host the boost-dev storage provider"
 
 ENV BOOST_PATH /var/lib/boost
 VOLUME /var/lib/boost
-EXPOSE 8080  
+EXPOSE 8080
 
 COPY --from=builder /go/src/boostd /usr/local/bin/
 COPY --from=builder /go/src/boost /usr/local/bin/
 COPY --from=builder /go/src/boostx /usr/local/bin/
 COPY docker/devnet/boost/entrypoint.sh /app/
 COPY docker/devnet/boost/sample/* /app/sample/
-RUN boost -v 
+RUN boost -v
 
 ENTRYPOINT ["./entrypoint.sh"]
 #########################################################################################
@@ -130,9 +130,9 @@ LABEL org.opencontainers.image.version=$BUILD_VERSION \
       version=$BUILD_VERSION \
       release=$BUILD_VERSION \
       summary="This image is used to host booster-http-dev" \
-      description="This image is used to host booster-http-dev" 
+      description="This image is used to host booster-http-dev"
 
-EXPOSE 7777  
+EXPOSE 7777
 
 COPY --from=builder /go/src/boostd /usr/local/bin/
 COPY --from=builder /go/src/booster-http /usr/local/bin/
@@ -152,7 +152,7 @@ LABEL org.opencontainers.image.version=$BUILD_VERSION \
       version=$BUILD_VERSION \
       release=$BUILD_VERSION \
       summary="This image is used to host booster-bitswap-dev" \
-      description="This image is used to host booster-bitswap-dev" 
+      description="This image is used to host booster-bitswap-dev"
 
 EXPOSE 8888
 
