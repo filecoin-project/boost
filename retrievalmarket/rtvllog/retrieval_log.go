@@ -2,7 +2,6 @@ package rtvllog
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -66,13 +65,13 @@ func (r *RetrievalLog) OnQueryEvent(evt retrievalmarket.ProviderQueryEvent) {
 		Message:     evt.Response.Message,
 	}
 	if evt.Error != nil {
-		st.Status = fmt.Sprintf("failed to respond to the query: %s", evt.Error.Error())
+		st.Status = evt.Error.Error()
 	} else {
 		if evt.Response.Status == retrievalmarket.QueryResponseUnavailable {
-			st.Status = "retrieval query offer was unavailable"
+			st.Status = "unavailable"
 		}
 		if evt.Response.Status == retrievalmarket.QueryResponseError {
-			st.Status = "retrieval query offer errored"
+			st.Status = "errored"
 		}
 	}
 	if st.Status != "" {
