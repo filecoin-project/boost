@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
@@ -94,6 +96,8 @@ var postgresCmd = &cli.Command{
 	Flags:  append(commonFlags, postgresConnectFlag, postgresInsertTmpTableFlag),
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
+		rand.Seed(time.Now().UnixNano())
+
 		db, err := NewPostgresDB(cctx.String("connect-string"), cctx.Bool("insert-tmp-table"))
 		if err != nil {
 			return err
@@ -101,7 +105,7 @@ var postgresCmd = &cli.Command{
 
 		err = db.connect(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("connecting to db: %w", err)
 		}
 
 		return run(ctx, db, runOptsFromCctx(cctx))
@@ -176,7 +180,7 @@ func (db *Postgres) Init(ctx context.Context) error {
 }
 
 func (db *Postgres) connect(ctx context.Context) error {
-	benchConnStr, err := getConnStringWithDb(db.connectString, "bench")
+	benchConnStr, err := getConnStringWithDb(db.connectString, "postgres")
 	if err != nil {
 		return err
 	}
@@ -266,7 +270,7 @@ func (db *Postgres) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs 
 			args = append(args, rec.Cid.Hash(), pieceCid.Bytes())
 		}
 		_, err := db.db.ExecContext(ctx,
-			`INSERT INTO PayloadToPieces (PayloadMultihash, PieceCids) VALUES `+vals+" ON CONFLICT DO NOTHING", args...)
+			`INSERT INTO payloadtopieces (payloadmultihash, piececids) VALUES `+vals+" ON CONFLICT DO NOTHING", args...)
 		if err != nil {
 			return fmt.Errorf("executing insert: %w", err)
 		}

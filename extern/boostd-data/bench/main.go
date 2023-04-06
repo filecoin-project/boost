@@ -58,7 +58,7 @@ func metricsSetup() {
 	tags := make(map[string]string)
 	tags["host"] = hostname
 
-	endpoint := "http://10.14.1.226:8086"
+	endpoint := "http://10.14.1.217:8086"
 	username := "admin"
 	password := "admin"
 	database := "metrics"
