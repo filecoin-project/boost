@@ -592,7 +592,7 @@ func TestOfflineDealRestartAfterManualRecoverableErrors(t *testing.T) {
 			require.NoError(t, err)
 
 			// execute deal
-			err = td.executeAndSubscribeImportOfflineDeal()
+			err = td.executeAndSubscribeImportOfflineDeal(false)
 			require.NoError(t, err)
 
 			// expect recoverable error with retry type Manual
@@ -1218,10 +1218,11 @@ func (h *ProviderHarness) AssertEventuallyDealCleanedup(t *testing.T, ctx contex
 			return false
 		}
 
-		// the deal inbound file should no longer exist if it is an online deal
-		if !dp.IsOffline {
+		// the deal inbound file should no longer exist if it is an online deal,
+		// or if it is an offline deal with the delete after import flag set
+		if dbState.CleanupData {
 			_, statErr := os.Stat(dbState.InboundFilePath)
-			return statErr != nil
+			return os.IsNotExist(statErr)
 		}
 		return true
 	}, 5*time.Second, 200*time.Millisecond)
@@ -1822,11 +1823,18 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 		RemoveUnsealedCopy: true,
 	}
 
+	// Create a copy of the car file so that if the original car file gets
+	// cleaned up after the deal is added to a sector, we still have a copy
+	// we can use to compare with the contents of the unsealed file.
+	carFileCopyPath := carFilePath + ".copy"
+	err = copyFile(carFilePath, carFileCopyPath)
+	require.NoError(tbuilder.t, err)
 	td := &testDeal{
-		ph:            tbuilder.ph,
-		params:        dealParams,
-		carv2FilePath: carFilePath,
-		carv2FileName: name,
+		ph:                tbuilder.ph,
+		params:            dealParams,
+		carv2FilePath:     carFilePath,
+		carv2CopyFilePath: carFileCopyPath,
+		carv2FileName:     name,
 	}
 
 	publishCid := testutil.GenerateCid()
@@ -2058,18 +2066,19 @@ func (tbuilder *testDealBuilder) buildAnnounce() *testDealBuilder {
 }
 
 type testDeal struct {
-	ph            *ProviderHarness
-	params        *types.DealParams
-	carv2FilePath string
-	carv2FileName string
-	stubOutput    *smtestutil.StubbedMinerOutput
-	sub           event.Subscription
+	ph                *ProviderHarness
+	params            *types.DealParams
+	carv2FilePath     string
+	carv2FileName     string
+	carv2CopyFilePath string
+	stubOutput        *smtestutil.StubbedMinerOutput
+	sub               event.Subscription
 
 	tBuilder *testDealBuilder
 }
 
-func (td *testDeal) executeAndSubscribeImportOfflineDeal() error {
-	pi, err := td.ph.Provider.ImportOfflineDealData(context.Background(), td.params.DealUUID, td.carv2FilePath)
+func (td *testDeal) executeAndSubscribeImportOfflineDeal(delAfterImport bool) error {
+	pi, err := td.ph.Provider.ImportOfflineDealData(context.Background(), td.params.DealUUID, td.carv2FilePath, delAfterImport)
 	if err != nil {
 		return err
 	}
@@ -2200,7 +2209,7 @@ func (td *testDeal) waitForAndAssert(t *testing.T, ctx context.Context, cp dealc
 	case dealcheckpoints.PublishConfirmed:
 		td.ph.AssertPublishConfirmed(t, ctx, td.params, td.stubOutput)
 	case dealcheckpoints.AddedPiece:
-		td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2FilePath)
+		td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2CopyFilePath)
 	case dealcheckpoints.IndexedAndAnnounced:
 		td.ph.AssertDealIndexed(t, ctx, td.params, td.stubOutput)
 	default:
@@ -2229,7 +2238,7 @@ func (td *testDeal) unblockAddPiece() {
 }
 
 func (td *testDeal) assertPieceAdded(t *testing.T, ctx context.Context) {
-	td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2FilePath)
+	td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2CopyFilePath)
 }
 
 func (td *testDeal) assertDealFailedTransferNonRecoverable(t *testing.T, ctx context.Context, errStr string) {
@@ -2277,4 +2286,18 @@ type mockSignatureVerifier struct {
 
 func (m *mockSignatureVerifier) VerifySignature(ctx context.Context, sig acrypto.Signature, addr address.Address, input []byte) (bool, error) {
 	return m.valid, m.err
+}
+
+func copyFile(source string, dest string) error {
+	input, err := os.ReadFile(source)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(dest, input, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -267,6 +267,10 @@ export function DealDetail(props) {
                     <th>Inbound File Path</th>
                     <td>{deal.InboundFilePath}</td>
                 </tr>
+                <tr>
+                    <th>Delete After Add Piece</th>
+                    <td>{deal.CleanupData ? 'Yes' : 'No'}</td>
+                </tr>
                 {deal.Sector.ID > 0 ? (
                     <>
                     <tr>

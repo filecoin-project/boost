@@ -145,8 +145,8 @@ func (sm *BoostAPI) BoostIndexerAnnounceAllDeals(ctx context.Context) error {
 	return sm.IndexProvider.IndexerAnnounceAllDeals(ctx)
 }
 
-func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
-	res, err := sm.StorageProvider.ImportOfflineDealData(ctx, dealUuid, filePath)
+func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (*api.ProviderDealRejectionInfo, error) {
+	res, err := sm.StorageProvider.ImportOfflineDealData(ctx, dealUuid, filePath, delAfterImport)
 	return res, err
 }
 

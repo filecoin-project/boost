@@ -185,7 +185,7 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 		}
 		bd.Message = dl.Checkpoint.String()
 
-		// Only check the unseal state if the deal has already been added to a piece
+		// Only check the unseal state if the deal has already been added to a sector
 		st := &sealStatus{IsUnsealed: false}
 		if dl.Checkpoint >= dealcheckpoints.AddedPiece {
 			isUnsealed, err := r.sa.IsUnsealed(ctx, dl.SectorID, dl.Offset.Unpadded(), dl.Length.Unpadded())

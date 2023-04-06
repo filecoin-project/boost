@@ -239,10 +239,10 @@ func (p *Provider) GetAsk() *storagemarket.SignedStorageAsk {
 
 // ImportOfflineDealData is called when the Storage Provider imports data for
 // an offline deal (the deal must already have been proposed by the client)
-func (p *Provider) ImportOfflineDealData(ctx context.Context, dealUuid uuid.UUID, filePath string) (pi *api.ProviderDealRejectionInfo, err error) {
-	p.dealLogger.Infow(dealUuid, "import data for offline deal", "filepath", filePath)
+func (p *Provider) ImportOfflineDealData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (pi *api.ProviderDealRejectionInfo, err error) {
+	p.dealLogger.Infow(dealUuid, "import data for offline deal", "filepath", filePath, "delete after import", delAfterImport)
 
-	// db should already have a deal with this uuid as the deal proposal should have been agreed before hand
+	// db should already have a deal with this uuid as the deal proposal should have been made beforehand
 	ds, err := p.dealsDB.ByID(p.ctx, dealUuid)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -258,6 +258,7 @@ func (p *Provider) ImportOfflineDealData(ctx context.Context, dealUuid uuid.UUID
 	}
 
 	ds.InboundFilePath = filePath
+	ds.CleanupData = delAfterImport
 
 	resp, err := p.checkForDealAcceptance(ctx, ds, true)
 	if err != nil {
@@ -265,12 +266,12 @@ func (p *Provider) ImportOfflineDealData(ctx context.Context, dealUuid uuid.UUID
 		return nil, fmt.Errorf("failed to send deal for acceptance: %w", err)
 	}
 
-	// if there was an error, we don't return a rejection reason
+	// if there was an error, we just return the error message (there is no rejection reason)
 	if resp.err != nil {
 		return nil, fmt.Errorf("failed to accept deal: %w", resp.err)
 	}
 
-	// return rejection reason as provider has rejected the deal.
+	// return rejection reason as provider has rejected the deal
 	if !resp.ri.Accepted {
 		p.dealLogger.Infow(dealUuid, "deal execution rejected by provider", "reason", resp.ri.Reason)
 		return resp.ri, nil
@@ -297,6 +298,7 @@ func (p *Provider) ExecuteDeal(ctx context.Context, dp *types.DealParams, client
 		DealDataRoot:       dp.DealDataRoot,
 		Transfer:           dp.Transfer,
 		IsOffline:          dp.IsOffline,
+		CleanupData:        !dp.IsOffline,
 		Retry:              smtypes.DealRetryAuto,
 		FastRetrieval:      !dp.RemoveUnsealedCopy,
 		AnnounceToIPNI:     !dp.SkipIPNIAnnounce,
