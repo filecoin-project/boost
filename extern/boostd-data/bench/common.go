@@ -17,14 +17,6 @@ var commonFlags = []cli.Flag{
 		Value: cli.NewStringSlice("30x1024"),
 	},
 	&cli.IntFlag{
-		Name:  "piece-count",
-		Value: 30,
-	},
-	&cli.IntFlag{
-		Name:  "blocks-per-piece",
-		Value: 1024,
-	},
-	&cli.IntFlag{
 		Name:  "bs-fetch-count",
 		Value: 100,
 	},
