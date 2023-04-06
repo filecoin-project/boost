@@ -57,7 +57,7 @@ func (db *FoundationDB) Name() string {
 	return "Foundation DB"
 }
 
-func (db *FoundationDB) Init(ctx context.Context) error {
+func (db *FoundationDB) Init(ctx context.Context, b bool) error {
 	// kv store, so nothing to do
 	return nil
 }

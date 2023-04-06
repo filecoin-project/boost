@@ -12,6 +12,8 @@ import (
 
 var log = logging.Logger("bench")
 
+var metricsEnabled bool
+
 func main() {
 	app := &cli.App{
 		Name:                 "bench",
@@ -19,12 +21,17 @@ func main() {
 		EnableBashCompletion: true,
 		Flags: []cli.Flag{
 			cliutil.FlagVeryVerbose,
+			&cli.BoolFlag{
+				Name:        "metrics",
+				Usage:       "enables / disables influxdb metrics",
+				Value:       true,
+				Destination: &metricsEnabled,
+			},
 		},
 		Commands: []*cli.Command{
 			cassandraCmd,
 			foundationCmd,
 			postgresCmd,
-			createCmd,
 			initCmd,
 			dropCmd,
 		},
@@ -36,7 +43,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	time.Sleep(11 * time.Second) // 10+1 because of influxdb reporter
+	if metricsEnabled {
+		time.Sleep(11 * time.Second) // 10+1 because of influxdb reporter
+	}
 }
 
 func before(cctx *cli.Context) error {
@@ -46,7 +55,9 @@ func before(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("bench", "debug")
 	}
 
-	metricsSetup()
+	if metricsEnabled {
+		metricsSetup()
+	}
 
 	return nil
 }

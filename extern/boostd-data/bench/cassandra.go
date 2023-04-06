@@ -62,7 +62,7 @@ func (c *CassandraDB) Name() string {
 //go:embed create_tables.cql
 var createTablesCQL string
 
-func (c *CassandraDB) Init(ctx context.Context) error {
+func (c *CassandraDB) Init(ctx context.Context, b bool) error {
 	tables := []string{`PayloadToPieces`, `PieceBlockOffsetSize`}
 	for _, tbl := range tables {
 		qry := `drop table if exists bench.` + tbl

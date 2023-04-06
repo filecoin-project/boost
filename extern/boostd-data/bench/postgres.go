@@ -31,31 +31,13 @@ var postgresInsertTmpTableFlag = &cli.BoolFlag{
 	Value: false,
 }
 
-var createCmd = &cli.Command{
-	Name:   "postgres-create",
-	Before: before,
-	Flags:  append(commonFlags, postgresConnectFlag),
-	Action: func(cctx *cli.Context) error {
-		ctx := cliutil.ReqContext(cctx)
-		db, err := NewPostgresDB(cctx.String("connect-string"), false)
-		if err != nil {
-			return err
-		}
-
-		log.Infof("Creating db...")
-		if err := db.CreateDB(ctx); err != nil {
-			return err
-		}
-		log.Infof("Created db")
-
-		return nil
-	},
-}
-
 var initCmd = &cli.Command{
 	Name:   "postgres-init",
 	Before: before,
-	Flags:  append(commonFlags, postgresConnectFlag),
+	Flags: append(commonFlags, postgresConnectFlag, &cli.BoolFlag{
+		Name:  "distributed",
+		Value: true,
+	}),
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
 		db, err := NewPostgresDB(cctx.String("connect-string"), false)
@@ -64,7 +46,7 @@ var initCmd = &cli.Command{
 		}
 
 		log.Infof("Initializing...")
-		if err := db.Init(ctx); err != nil {
+		if err := db.Init(ctx, cctx.Bool("distributed")); err != nil {
 			return err
 		}
 		log.Infof("Initialized")
@@ -84,7 +66,11 @@ var dropCmd = &cli.Command{
 			return err
 		}
 
-		_, _ = db.defDb.ExecContext(ctx, `DROP database bench`)
+		log.Infof("Cleaning up...")
+		if err := db.Cleanup(ctx); err != nil {
+			return err
+		}
+		log.Infof("Cleaned up")
 
 		return nil
 	},
@@ -103,11 +89,6 @@ var postgresCmd = &cli.Command{
 			return err
 		}
 
-		err = db.connect(ctx)
-		if err != nil {
-			return fmt.Errorf("connecting to db: %w", err)
-		}
-
 		return run(ctx, db, runOptsFromCctx(cctx))
 	},
 	Subcommands: []*cli.Command{
@@ -118,32 +99,23 @@ var postgresCmd = &cli.Command{
 }
 
 func createPostgres(ctx context.Context, connectString string, insertWithTmpTable bool) (BenchDB, error) {
-	db, err := NewPostgresDB(connectString, insertWithTmpTable)
-	if err != nil {
-		return nil, err
-	}
-	err = db.connect(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return db, err
+	return NewPostgresDB(connectString, insertWithTmpTable)
 }
 
 type Postgres struct {
-	defDb              *sql.DB
 	db                 *sql.DB
 	connectString      string
 	insertWithTmpTable bool
 }
 
 func NewPostgresDB(connectString string, insertWithTmpTable bool) (*Postgres, error) {
-	defDb, err := sql.Open("postgres", connectString)
+	db, err := sql.Open("postgres", connectString)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to default database: %w", err)
 	}
 
 	return &Postgres{
-		defDb:              defDb,
+		db:                 db,
 		connectString:      connectString,
 		insertWithTmpTable: insertWithTmpTable,
 	}, nil
@@ -156,50 +128,30 @@ func (db *Postgres) Name() string {
 //go:embed create_tables.sql
 var createTables string
 
-func (db *Postgres) CreateDB(ctx context.Context) error {
-	_, err := db.defDb.ExecContext(ctx, `CREATE DATABASE bench`)
-	if err != nil {
-		return fmt.Errorf("creating database bench: %w", err)
-	}
+//go:embed create_tables_distributed.sql
+var createTablesDistributed string
 
-	return nil
-}
-
-func (db *Postgres) Init(ctx context.Context) error {
-	err := db.connect(ctx)
-	if err != nil {
-		return fmt.Errorf("connecting to db: %w", err)
-	}
-
-	_, err = db.db.ExecContext(ctx, createTables)
+func (db *Postgres) Init(ctx context.Context, distributed bool) error {
+	_, err := db.db.ExecContext(ctx, createTables)
 	if err != nil {
 		return fmt.Errorf("creating tables: %w", err)
 	}
 
-	return nil
-}
-
-func (db *Postgres) connect(ctx context.Context) error {
-	benchConnStr, err := getConnStringWithDb(db.connectString, "postgres")
-	if err != nil {
-		return err
+	if distributed {
+		_, err := db.db.ExecContext(ctx, createTablesDistributed)
+		if err != nil {
+			return fmt.Errorf("creating distributed tables: %w", err)
+		}
 	}
-	benchDb, err := sql.Open("postgres", benchConnStr)
-	if err != nil {
-		return fmt.Errorf("connecting to database Bench: %w", err)
-	}
-	db.db = benchDb
 
 	return nil
 }
+
+//go:embed drop_tables.sql
+var dropTables string
 
 func (db *Postgres) Cleanup(ctx context.Context) error {
-	err := db.db.Close()
-	if err != nil {
-		return err
-	}
-
-	_, err = db.defDb.ExecContext(ctx, `DROP database bench`)
+	_, err := db.db.ExecContext(ctx, dropTables)
 	return err
 }
 

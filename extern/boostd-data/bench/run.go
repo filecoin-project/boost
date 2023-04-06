@@ -26,7 +26,7 @@ type pieceBlock struct {
 
 type BenchDB interface {
 	Name() string
-	Init(ctx context.Context) error
+	Init(ctx context.Context, distributed bool) error
 	AddIndexRecords(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error
 	Cleanup(ctx context.Context) error
 	GetBlockSample(ctx context.Context, count int) ([]pieceBlock, error)
