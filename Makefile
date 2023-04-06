@@ -13,12 +13,13 @@ $(warning Your Golang version is go$(shell expr $(GOVERSION) / 1000000).$(shell 
 $(error Update Golang to version to at least 1.16.0)
 endif
 
-LTS_NODE_VER=16
-NODE_VER=$(shell node -v)
-ifeq ($(patsubst v$(LTS_NODE_VER).%,matched,$(NODE_VER)), matched)
-	NODE_LTS=true
+ALLOWED_NODE_VERSIONS := 16 18
+validate-node-version:
+ifeq ($(filter $(shell node -v | cut -c2-3),$(ALLOWED_NODE_VERSIONS)),)
+	@echo "Unsupported Node.js version. Please install one of the following versions: $(ALLOWED_NODE_VERSIONS)"
+	exit 1
 else
-	NODE_LTS=false
+	@echo "Node.js version $(shell node -v) is supported."
 endif
 
 # git modules that need to be loaded
@@ -115,20 +116,15 @@ boostci: $(BUILD_DEPS)
 	$(GOCC) build $(GOFLAGS) -o boostci ./cmd/boostci
 .PHONY: boostci
 
-react: check-node-lts
+react: validate-node-version
 	npm_config_legacy_peer_deps=yes npm ci --no-audit --prefix react
 	npm run --prefix react build
 .PHONY: react
 
-update-react: check-node-lts
+update-react: validate-node-version
 	npm_config_legacy_peer_deps=yes npm install --no-audit --prefix react
 	npm run --prefix react build
 .PHONY: react
-
-.PHONY: check-node-lts
-check-node-lts:
-	@$(NODE_LTS) || echo Build requires Node v$(LTS_NODE_VER) \(detected Node $(NODE_VER)\)
-	@$(NODE_LTS) && echo Building using Node v$(LTS_NODE_VER)
 
 build-go: boost devnet
 .PHONY: build-go
