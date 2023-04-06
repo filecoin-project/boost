@@ -64,6 +64,7 @@ func newDealAccessor(db *sql.DB, deal *types.ProviderDealState) *dealAccessor {
 			"PieceSize":             &fielddef.FieldDef{F: &deal.ClientDealProposal.Proposal.PieceSize},
 			"VerifiedDeal":          &fielddef.FieldDef{F: &deal.ClientDealProposal.Proposal.VerifiedDeal},
 			"IsOffline":             &fielddef.FieldDef{F: &deal.IsOffline},
+			"CleanupData":           &fielddef.FieldDef{F: &deal.CleanupData},
 			"ClientAddress":         &fielddef.AddrFieldDef{F: &deal.ClientDealProposal.Proposal.Client},
 			"ProviderAddress":       &fielddef.AddrFieldDef{F: &deal.ClientDealProposal.Proposal.Provider},
 			"Label":                 &fielddef.LabelFieldDef{F: &deal.ClientDealProposal.Proposal.Label},

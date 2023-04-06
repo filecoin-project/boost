@@ -38,7 +38,7 @@ func TestDummydealOffline(t *testing.T) {
 	res := dealRes.Result
 	require.NoError(t, err)
 	require.True(t, res.Accepted)
-	res, err = f.Boost.BoostOfflineDealWithData(context.Background(), offlineDealUuid, carFilepath)
+	res, err = f.Boost.BoostOfflineDealWithData(context.Background(), offlineDealUuid, carFilepath, false)
 	require.NoError(t, err)
 	require.True(t, res.Accepted)
 	err = f.WaitForDealAddedToSector(offlineDealUuid)

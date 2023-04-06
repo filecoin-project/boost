@@ -2,6 +2,7 @@ package storagemarket
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -31,7 +32,7 @@ func TestSimpleOfflineDealHappy(t *testing.T) {
 	td.waitForAndAssert(t, ctx, dealcheckpoints.Accepted)
 
 	// import data for offline deal
-	require.NoError(t, td.executeAndSubscribeImportOfflineDeal())
+	require.NoError(t, td.executeAndSubscribeImportOfflineDeal(false))
 
 	// unblock commp -> wait for Transferred checkpoint
 	td.unblockCommp()
@@ -79,8 +80,36 @@ func TestOfflineDealInsufficientProviderFunds(t *testing.T) {
 
 	// expect that when the deal data is imported, the import will fail because
 	// there are not enough funds for the deal
-	pi, err = td.ph.Provider.ImportOfflineDealData(context.Background(), td.params.DealUUID, td.carv2FilePath)
+	pi, err = td.ph.Provider.ImportOfflineDealData(context.Background(), td.params.DealUUID, td.carv2FilePath, false)
 	require.NoError(t, err)
 	require.False(t, pi.Accepted)
 	require.Contains(t, pi.Reason, "insufficient funds")
+}
+
+func TestOfflineDealDataCleanup(t *testing.T) {
+	ctx := context.Background()
+
+	for _, delAfterImport := range []bool{true, false} {
+		t.Run(fmt.Sprintf("delete after import: %t", delAfterImport), func(t *testing.T) {
+			harness := NewHarness(t)
+			harness.Start(t, ctx)
+			defer harness.Stop()
+
+			// first make an offline deal proposal
+			td := harness.newDealBuilder(t, 1, withOfflineDeal()).withAllMinerCallsNonBlocking().build()
+
+			// execute deal
+			require.NoError(t, td.executeAndSubscribe())
+
+			// wait for Accepted checkpoint
+			td.waitForAndAssert(t, ctx, dealcheckpoints.Accepted)
+
+			// import the deal data
+			require.NoError(t, td.executeAndSubscribeImportOfflineDeal(delAfterImport))
+
+			// check whether the deal data was removed after add piece
+			td.waitForAndAssert(t, ctx, dealcheckpoints.AddedPiece)
+			harness.EventuallyAssertNoTagged(t, ctx)
+		})
+	}
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/filecoin-project/boost/api"
 	bclient "github.com/filecoin-project/boost/api/client"
 	cliutil "github.com/filecoin-project/boost/cli/util"
-	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
-	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
+	"github.com/filecoin-project/boost/cmd/lib/filters"
+	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/go-jsonrpc"
@@ -137,7 +137,19 @@ var runCmd = &cli.Command{
 		}
 		defer bcloser()
 
-		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi)
+		bitswapBlockMetrics := remoteblockstore.BlockMetrics{
+			GetRequestCount:             metrics.BitswapRblsGetRequestCount,
+			GetFailResponseCount:        metrics.BitswapRblsGetFailResponseCount,
+			GetSuccessResponseCount:     metrics.BitswapRblsGetSuccessResponseCount,
+			BytesSentCount:              metrics.BitswapRblsBytesSentCount,
+			HasRequestCount:             metrics.BitswapRblsHasRequestCount,
+			HasFailResponseCount:        metrics.BitswapRblsHasFailResponseCount,
+			HasSuccessResponseCount:     metrics.BitswapRblsHasSuccessResponseCount,
+			GetSizeRequestCount:         metrics.BitswapRblsGetSizeRequestCount,
+			GetSizeFailResponseCount:    metrics.BitswapRblsGetSizeFailResponseCount,
+			GetSizeSuccessResponseCount: metrics.BitswapRblsGetSizeSuccessResponseCount,
+		}
+		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi, bitswapBlockMetrics)
 		// Create the server API
 		port := cctx.Int("port")
 		repoDir, err := homedir.Expand(cctx.String(FlagRepo.Name))

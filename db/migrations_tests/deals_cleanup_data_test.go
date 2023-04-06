@@ -10,17 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDealAnnounceToIPNI(t *testing.T) {
+func TestDealCleanupData(t *testing.T) {
 	req := require.New(t)
 	ctx := context.Background()
 
 	sqldb := db.CreateTestTmpDB(t)
 	req.NoError(db.CreateAllBoostTables(ctx, sqldb, sqldb))
 
-	// Run migrations up to the one that adds the AnnounceToIPNI field to Deals
+	// Run migrations up to the one that adds the CleanupData field to Deals
 	goose.SetBaseFS(migrations.EmbedMigrations)
 	req.NoError(goose.SetDialect("sqlite3"))
-	req.NoError(goose.UpTo(sqldb, ".", 20230104230242))
+	req.NoError(goose.UpTo(sqldb, ".", 20230330111514))
 
 	// Generate 1 deal
 	dealsDB := db.NewDealsDB(sqldb)
@@ -29,15 +29,14 @@ func TestDealAnnounceToIPNI(t *testing.T) {
 
 	// Insert the deal into the DB
 	deal := deals[0]
-	deal.AnnounceToIPNI = false
-
+	deal.IsOffline = false
 	_, err = sqldb.Exec(`INSERT INTO Deals ("ID", "CreatedAt", "DealProposalSignature", "PieceCID", "PieceSize",
                    "VerifiedDeal", "IsOffline", "ClientAddress", "ProviderAddress","Label", "StartEpoch", "EndEpoch",
                    "StoragePricePerEpoch", "ProviderCollateral", "ClientCollateral", "ClientPeerID", "DealDataRoot",
                    "InboundFilePath", "TransferType", "TransferParams", "TransferSize", "ChainDealID", "PublishCID",
                    "SectorID", "Offset", "Length", "Checkpoint", "CheckpointAt", "Error", "Retry", "SignedProposalCID",
-                   "FastRetrieval","AnnounceToIPNI")
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                   "FastRetrieval", "AnnounceToIPNI") 
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		deal.DealUuid, deal.CreatedAt, []byte("test"), deal.ClientDealProposal.Proposal.PieceCID.String(),
 		deal.ClientDealProposal.Proposal.PieceSize, deal.ClientDealProposal.Proposal.VerifiedDeal, deal.IsOffline,
 		deal.ClientDealProposal.Proposal.Client.String(), deal.ClientDealProposal.Proposal.Provider.String(), "test",
@@ -55,5 +54,8 @@ func TestDealAnnounceToIPNI(t *testing.T) {
 	// Get the deal state
 	dealState, err := dealsDB.ByID(ctx, deals[0].DealUuid)
 	require.NoError(t, err)
-	require.True(t, dealState.AnnounceToIPNI)
+
+	// Expect CleanupData to be true because the migration should set
+	// CleanupData to be the opposite of IsOffline
+	require.True(t, dealState.CleanupData)
 }

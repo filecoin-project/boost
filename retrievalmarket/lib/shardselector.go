@@ -128,16 +128,16 @@ func (s *ShardSelector) checkIsAvailable(sk shard.Key) (bool, error) {
 	for _, di := range pieceInfo.Deals {
 		isUnsealed, err := s.sa.IsUnsealed(s.ctx, di.SectorID, di.Offset.Unpadded(), di.Length.Unpadded())
 		if err != nil {
-			sslog.Warnf("checking if sector is unsealed", "shard", "sector", di.SectorID, sk, "err", err)
+			sslog.Warnf("checking if sector is unsealed", "shard", sk, "sector", di.SectorID, sk, "err", err)
 			lastErr = err
 			continue
 		}
 
 		if isUnsealed {
-			sslog.Debugw("sector is unsealed", "shard", "sector", di.SectorID)
+			sslog.Debugw("sector is unsealed", "shard", sk, "sector", di.SectorID)
 			unsealedDeals = append(unsealedDeals, di)
 		} else {
-			sslog.Debugw("sector is sealed", "shard", "sector", di.SectorID)
+			sslog.Debugw("sector is sealed", "shard", sk, "sector", di.SectorID)
 		}
 	}
 
