@@ -160,7 +160,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                         <th>Data Root CID</th>
                         <td>
                             <span>{rootCid}</span>
-                            <a className="download" target="_blank" href={"/download/block/"+searchQuery}>
+                            <a className="download" target="_blank" href={"/download/block/"+rootCid}>
                                 Download block
                             </a>
                         </td>
