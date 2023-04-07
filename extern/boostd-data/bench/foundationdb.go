@@ -10,7 +10,6 @@ import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/apple/foundationdb/bindings/go/src/fdb/tuple"
 	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
@@ -21,14 +20,17 @@ var foundationCmd = &cli.Command{
 	Name:   "foundation",
 	Before: before,
 	Flags:  commonFlags,
-	Action: func(cctx *cli.Context) error {
-		ctx := cliutil.ReqContext(cctx)
-		db, err := NewFoundationDB()
-		if err != nil {
-			return err
-		}
-		return run(ctx, db, runOptsFromCctx(cctx))
+	Subcommands: []*cli.Command{
+		initCmd(createFoundation),
+		dropCmd(createFoundation),
+		loadCmd(createFoundation),
+		bitswapCmd(createFoundation),
+		graphsyncCmd(createFoundation),
 	},
+}
+
+func createFoundation(ctx context.Context, cctx *cli.Context) (BenchDB, error) {
+	return NewFoundationDB()
 }
 
 const (

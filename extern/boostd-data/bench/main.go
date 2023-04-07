@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math/rand"
 	"os"
 	"time"
 
@@ -32,12 +33,11 @@ func main() {
 			cassandraCmd,
 			foundationCmd,
 			postgresCmd,
-			initCmd,
-			dropCmd,
 		},
 	}
 	app.Setup()
 
+	rand.Seed(time.Now().UnixNano())
 	if err := app.Run(os.Args); err != nil {
 		log.Errorf("Error: %s", err.Error())
 		os.Exit(1)

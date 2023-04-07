@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var commonFlags = []cli.Flag{
+var loadFlags = []cli.Flag{
 	&cli.IntFlag{
 		Name:  "piece-add-parallelism",
 		Value: 2,
@@ -16,6 +16,9 @@ var commonFlags = []cli.Flag{
 		Usage: "Array of piece count / blocks per piece in the form '<piece count>x<blocks per piece>' (eg '10x128')",
 		Value: cli.NewStringSlice("30x1024"),
 	},
+}
+
+var bitswapFlags = []cli.Flag{
 	&cli.IntFlag{
 		Name:  "bs-fetch-count",
 		Value: 100,
@@ -24,6 +27,9 @@ var commonFlags = []cli.Flag{
 		Name:  "bs-fetch-parallelism",
 		Value: 10,
 	},
+}
+
+var graphsyncFlags = []cli.Flag{
 	&cli.IntFlag{
 		Name:  "gs-fetch-count",
 		Value: 10,
@@ -33,6 +39,8 @@ var commonFlags = []cli.Flag{
 		Value: 3,
 	},
 }
+
+var commonFlags = append(loadFlags, append(bitswapFlags, graphsyncFlags...)...)
 
 const piecesUsageErr = "pieces parameter must be of the form <piece count>x<blocks per piece>"
 

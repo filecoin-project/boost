@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/gocql/gocql"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2/index"
@@ -18,27 +17,17 @@ import (
 var cassandraCmd = &cli.Command{
 	Name:   "cassandra",
 	Before: before,
-	Flags: append(commonFlags, &cli.StringFlag{
-		Name:  "connect-string",
-		Value: "localhost",
-	}),
-	Action: func(cctx *cli.Context) error {
-		ctx := cliutil.ReqContext(cctx)
-		db, err := NewCassandraDB(cctx.String("connect-string"))
-		if err != nil {
-			return err
-		}
-		return run(ctx, db, runOptsFromCctx(cctx))
-	},
 	Subcommands: []*cli.Command{
+		initCmd(createCassandra),
+		dropCmd(createCassandra),
 		loadCmd(createCassandra),
 		bitswapCmd(createCassandra),
 		graphsyncCmd(createCassandra),
 	},
 }
 
-func createCassandra(ctx context.Context, connectString string) (BenchDB, error) {
-	return NewCassandraDB(connectString)
+func createCassandra(ctx context.Context, cctx *cli.Context) (BenchDB, error) {
+	return NewCassandraDB(cctx.String("connect-string"))
 }
 
 type CassandraDB struct {

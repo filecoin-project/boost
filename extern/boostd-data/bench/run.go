@@ -49,41 +49,75 @@ type runOpts struct {
 	graphsyncFetchParallelism int
 }
 
-func run(ctx context.Context, db BenchDB, opts runOpts) error {
-	metrics.GetOrRegisterCounter("postgres.run", nil).Inc(1)
-	defer func(now time.Time) {
-		metrics.GetOrRegisterResettingTimer("postgres.run.duration", nil).UpdateSince(now)
-	}(time.Now())
-
-	log.Infof("Running benchmark for %s", db.Name())
-
-	// Add sample data to the database
-	for _, pc := range opts.addPiecesSpecs {
-		if err := addPieces(ctx, db, opts.pieceParallelism, pc.pieceCount, pc.blocksPerPiece); err != nil {
-			return err
-		}
-	}
-
-	// Run bitswap fetch simulation
-	//if err := bitswapFetch(ctx, db, opts.bitswapFetchCount, opts.bitswapFetchParallelism); err != nil {
-	//return err
-	//}
-
-	// Run graphsync fetch simulation
-	//if err := graphsyncFetch(ctx, db, opts.graphsyncFetchCount, opts.graphsyncFetchParallelism); err != nil {
-	//return err
-	//}
-
-	return nil
+var connectStringFlag = &cli.StringFlag{
+	Name:  "connect-string",
+	Value: "postgresql://postgres:postgres@localhost?sslmode=disable",
 }
 
-func loadCmd(createDB func(context.Context, string) (BenchDB, error)) *cli.Command {
+func initCmd(createDB func(context.Context, *cli.Context) (BenchDB, error)) *cli.Command {
+	return &cli.Command{
+		Name:   "init",
+		Before: before,
+		Flags: []cli.Flag{connectStringFlag, &cli.BoolFlag{
+			Name:  "distributed",
+			Value: true,
+		}},
+		Action: func(cctx *cli.Context) error {
+			ctx := cliutil.ReqContext(cctx)
+			db, err := createDB(ctx, cctx)
+			if err != nil {
+				return err
+			}
+
+			log.Infof("Initializing...")
+			if err := db.Init(ctx, cctx.Bool("distributed")); err != nil {
+				return err
+			}
+			log.Infof("Initialized")
+			return nil
+		},
+	}
+}
+
+func dropCmd(createDB func(context.Context, *cli.Context) (BenchDB, error)) *cli.Command {
+	return &cli.Command{
+		Name:   "drop",
+		Before: before,
+		Flags:  []cli.Flag{connectStringFlag},
+		Action: func(cctx *cli.Context) error {
+			ctx := cliutil.ReqContext(cctx)
+			db, err := createDB(ctx, cctx)
+			if err != nil {
+				return err
+			}
+
+			log.Infof("Cleaning up...")
+			if err := db.Cleanup(ctx); err != nil {
+				return err
+			}
+			log.Infof("Cleaned up")
+
+			return nil
+		},
+	}
+}
+
+func loadCmd(createDB func(context.Context, *cli.Context) (BenchDB, error)) *cli.Command {
 	return &cli.Command{
 		Name:   "load",
 		Before: before,
+		Flags: append([]cli.Flag{connectStringFlag, &cli.BoolFlag{
+			Name:  "insert-tmp-table",
+			Value: false,
+		}}, loadFlags...),
 		Action: func(cctx *cli.Context) error {
+			metrics.GetOrRegisterCounter("load", nil).Inc(1)
+			defer func(now time.Time) {
+				metrics.GetOrRegisterResettingTimer("load.duration", nil).UpdateSince(now)
+			}(time.Now())
+
 			ctx := cliutil.ReqContext(cctx)
-			db, err := createDB(ctx, cctx.String("connect-string"))
+			db, err := createDB(ctx, cctx)
 			if err != nil {
 				return err
 			}
@@ -184,18 +218,19 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 		"create-ms", totalCreateRecs.Milliseconds(),
 		"add-ms", totalAddRecs.Milliseconds())
 
-	metrics.GetOrRegisterResettingTimer("postgres.fixtures", nil).UpdateSince(addStart)
+	metrics.GetOrRegisterResettingTimer("fixtures", nil).UpdateSince(addStart)
 
 	return nil
 }
 
-func bitswapCmd(createDB func(context.Context, string) (BenchDB, error)) *cli.Command {
+func bitswapCmd(createDB func(context.Context, *cli.Context) (BenchDB, error)) *cli.Command {
 	return &cli.Command{
 		Name:   "bitswap",
 		Before: before,
+		Flags:  append(bitswapFlags, connectStringFlag),
 		Action: func(cctx *cli.Context) error {
 			ctx := cliutil.ReqContext(cctx)
-			db, err := createDB(ctx, cctx.String("connect-string"))
+			db, err := createDB(ctx, cctx)
 			if err != nil {
 				return err
 			}
@@ -253,13 +288,14 @@ func bitswapFetch(ctx context.Context, db BenchDB, count int, parallelism int) e
 	return nil
 }
 
-func graphsyncCmd(createDB func(context.Context, string) (BenchDB, error)) *cli.Command {
+func graphsyncCmd(createDB func(context.Context, *cli.Context) (BenchDB, error)) *cli.Command {
 	return &cli.Command{
 		Name:   "graphsync",
 		Before: before,
+		Flags:  append(graphsyncFlags, connectStringFlag),
 		Action: func(cctx *cli.Context) error {
 			ctx := cliutil.ReqContext(cctx)
-			db, err := createDB(ctx, cctx.String("connect-string"))
+			db, err := createDB(ctx, cctx)
 			if err != nil {
 				return err
 			}
@@ -271,7 +307,7 @@ func graphsyncCmd(createDB func(context.Context, string) (BenchDB, error)) *cli.
 }
 
 func graphsyncFetch(ctx context.Context, db BenchDB, count int, parallelism int) error {
-	log.Infow("graphsync simulation", "blockCount", count, "parallelism", parallelism)
+	log.Infow("graphsync simulation", "fetchCount", count, "parallelism", parallelism)
 
 	fetchStart := time.Now()
 	var mhLookupTotal, getIdxTotal time.Duration
@@ -296,7 +332,7 @@ func graphsyncFetch(ctx context.Context, db BenchDB, count int, parallelism int)
 
 	duration := time.Since(fetchStart)
 	log.Infow("graphsync simulation complete",
-		"blockCount", count,
+		"fetchCount", count,
 		"duration", duration.String(),
 		"duration-ms", duration.Milliseconds(),
 		"total-cpu-ms", (mhLookupTotal + getIdxTotal).Milliseconds(),

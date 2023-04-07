@@ -5,12 +5,9 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
-	"math/rand"
 	"strings"
-	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2/index"
 	_ "github.com/lib/pq"
@@ -21,85 +18,24 @@ import (
 // The maximum number of parameters allowed in an insert query in PostgreSQL
 const PSQLMaxParams = 65535
 
-var postgresConnectFlag = &cli.StringFlag{
-	Name:  "connect-string",
-	Value: "postgresql://postgres:postgres@localhost?sslmode=disable",
-}
-
-var postgresInsertTmpTableFlag = &cli.BoolFlag{
-	Name:  "insert-tmp-table",
-	Value: false,
-}
-
-var initCmd = &cli.Command{
-	Name:   "postgres-init",
-	Before: before,
-	Flags: append(commonFlags, postgresConnectFlag, &cli.BoolFlag{
-		Name:  "distributed",
-		Value: true,
-	}),
-	Action: func(cctx *cli.Context) error {
-		ctx := cliutil.ReqContext(cctx)
-		db, err := NewPostgresDB(cctx.String("connect-string"), false)
-		if err != nil {
-			return err
-		}
-
-		log.Infof("Initializing...")
-		if err := db.Init(ctx, cctx.Bool("distributed")); err != nil {
-			return err
-		}
-		log.Infof("Initialized")
-
-		return nil
-	},
-}
-
-var dropCmd = &cli.Command{
-	Name:   "postgres-drop",
-	Before: before,
-	Flags:  append(commonFlags, postgresConnectFlag),
-	Action: func(cctx *cli.Context) error {
-		ctx := cliutil.ReqContext(cctx)
-		db, err := NewPostgresDB(cctx.String("connect-string"), false)
-		if err != nil {
-			return err
-		}
-
-		log.Infof("Cleaning up...")
-		if err := db.Cleanup(ctx); err != nil {
-			return err
-		}
-		log.Infof("Cleaned up")
-
-		return nil
-	},
-}
-
 var postgresCmd = &cli.Command{
 	Name:   "postgres",
 	Before: before,
-	Flags:  append(commonFlags, postgresConnectFlag, postgresInsertTmpTableFlag),
-	Action: func(cctx *cli.Context) error {
-		ctx := cliutil.ReqContext(cctx)
-		rand.Seed(time.Now().UnixNano())
-
-		db, err := NewPostgresDB(cctx.String("connect-string"), cctx.Bool("insert-tmp-table"))
-		if err != nil {
-			return err
-		}
-
-		return run(ctx, db, runOptsFromCctx(cctx))
-	},
 	Subcommands: []*cli.Command{
-		//loadCmd(createPostgres),
-		//bitswapCmd(createPostgres),
-		//graphsyncCmd(createPostgres),
+		initCmd(createPostgres),
+		dropCmd(createPostgres),
+		loadCmd(createPostgres),
+		bitswapCmd(createPostgres),
+		graphsyncCmd(createPostgres),
 	},
 }
 
-func createPostgres(ctx context.Context, connectString string, insertWithTmpTable bool) (BenchDB, error) {
-	return NewPostgresDB(connectString, insertWithTmpTable)
+func createPostgres(ctx context.Context, cctx *cli.Context) (BenchDB, error) {
+	insertTmpTable := false
+	if cctx.IsSet("insert-tmp-table") {
+		insertTmpTable = cctx.Bool("insert-tmp-table")
+	}
+	return NewPostgresDB(cctx.String("connect-string"), insertTmpTable)
 }
 
 type Postgres struct {
