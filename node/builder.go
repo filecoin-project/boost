@@ -480,6 +480,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*paths.Remote), lotus_modules.RemoteStorage),
 
 		Override(new(*fundmanager.FundManager), fundmanager.New(fundmanager.Config{
+			Enabled:      cfg.Dealmaking.FundsTaggingEnabled,
 			StorageMiner: walletMiner,
 			CollatWallet: walletDealCollat,
 			PubMsgWallet: walletPSD,
