@@ -17,6 +17,13 @@ var importDataCmd = &cli.Command{
 	Name:      "import-data",
 	Usage:     "Import data for offline deal made with Boost",
 	ArgsUsage: "<proposal CID> <file> or <deal UUID> <file>",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "delete-after-import",
+			Usage: "whether to delete the data for the offline deal after the deal has been added to a sector",
+			Value: false,
+		},
+	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() < 2 {
 			return fmt.Errorf("must specify proposal CID / deal UUID and file path")
@@ -58,7 +65,12 @@ var importDataCmd = &cli.Command{
 		defer closer()
 
 		// If the user has supplied a signed proposal cid
+		deleteAfterImport := cctx.Bool("delete-after-import")
 		if proposalCid != nil {
+			if deleteAfterImport {
+				return fmt.Errorf("legacy deal data cannot be automatically deleted after import (only new deals)")
+			}
+
 			// Look up the deal in the boost database
 			deal, err := napi.BoostDealBySignedProposalCid(cctx.Context, *proposalCid)
 			if err != nil {
@@ -74,6 +86,7 @@ var importDataCmd = &cli.Command{
 				if err != nil {
 					return fmt.Errorf("couldnt import v1.1.0 deal, or find boost deal: %w", err)
 				}
+
 				fmt.Printf("Offline deal import for v1.1.0 deal %s scheduled for execution\n", proposalCid.String())
 				return nil
 			}
@@ -83,7 +96,7 @@ var importDataCmd = &cli.Command{
 		}
 
 		// Deal proposal by deal uuid (v1.2.0 deal)
-		rej, err := napi.BoostOfflineDealWithData(cctx.Context, dealUuid, filePath)
+		rej, err := napi.BoostOfflineDealWithData(cctx.Context, dealUuid, filePath, deleteAfterImport)
 		if err != nil {
 			return fmt.Errorf("failed to execute offline deal: %w", err)
 		}

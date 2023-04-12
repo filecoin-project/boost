@@ -13,7 +13,7 @@ type Status struct {
 	TotalAvailable uint64
 	// The number of bytes reserved for accepted deals
 	Tagged uint64
-	// The number of bytes that have been downloaded and are waiting to be added to a piece
+	// The number of bytes that have been downloaded and are waiting to be added to a sector
 	Staged uint64
 	// The number of bytes that are not tagged
 	Free uint64

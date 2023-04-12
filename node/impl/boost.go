@@ -172,8 +172,8 @@ func (sm *BoostAPI) BoostIndexerListMultihashes(ctx context.Context, proposalCid
 	}
 }
 
-func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string) (*api.ProviderDealRejectionInfo, error) {
-	res, err := sm.StorageProvider.ImportOfflineDealData(ctx, dealUuid, filePath)
+func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (*api.ProviderDealRejectionInfo, error) {
+	res, err := sm.StorageProvider.ImportOfflineDealData(ctx, dealUuid, filePath, delAfterImport)
 	return res, err
 }
 

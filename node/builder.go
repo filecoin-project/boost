@@ -42,10 +42,6 @@ import (
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
-	//"github.com/filecoin-project/go-fil-markets/retrievalmarket"
-	//rmnet "github.com/filecoin-project/go-fil-markets/retrievalmarket/network"
-	//lotus_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
-	//"github.com/filecoin-project/go-fil-markets/storagemarket/impl/storedask"
 	lotus_gfm_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
 	lotus_api "github.com/filecoin-project/lotus/api"
@@ -517,6 +513,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner, cfg)),
 
 		// GraphQL server
+		Override(new(gql.BlockGetter), From(new(dtypes.IndexBackedBlockstore))),
 		Override(new(*gql.Server), modules.NewGraphqlServer(cfg)),
 
 		// Tracing
