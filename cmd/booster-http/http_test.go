@@ -67,7 +67,7 @@ func TestHttpGzipResponse(t *testing.T) {
 
 	//Create a client and make request with Encoding header
 	client := new(http.Client)
-	request, err := http.NewRequest("GET", "http://localhost:7778/piece/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
+	request, err := http.NewRequest("GET", "http://localhost:7777/piece/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
 	require.NoError(t, err)
 	request.Header.Add("Accept-Encoding", "gzip")
 
@@ -101,7 +101,7 @@ func TestHttpInfo(t *testing.T) {
 	err := httpServer.Start(context.Background())
 	require.NoError(t, err)
 
-	response, err := http.Get("http://localhost:7780/info")
+	response, err := http.Get("http://localhost:7777/info")
 	require.NoError(t, err)
 	defer response.Body.Close()
 
