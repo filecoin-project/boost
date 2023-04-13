@@ -615,11 +615,21 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                 <tbody>
                 {searchIsAnyCid ? (
                     <tr key="payload cid">
-                        <th>Searched CID</th>
+                        <th>Searched CID (non-root)</th>
                         <td>
                             <span><strong>{searchQuery}</strong></span>
-                            &nbsp;
                             <a className="download" target="_blank" href={"/download/block/"+searchQuery}>
+                                Download block
+                            </a>
+                        </td>
+                    </tr>
+                ) : null}
+                {rootCid ? (
+                    <tr key="data root cid">
+                        <th>Data Root CID</th>
+                        <td>
+                            { searchIsRootCid ? <strong>{rootCid}</strong> : <span>rootCid</span> }
+                            <a className="download" target="_blank" href={"/download/block/"+rootCid}>
                                 Download block
                             </a>
                         </td>

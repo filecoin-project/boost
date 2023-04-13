@@ -143,7 +143,7 @@ update-react: validate-node-version
 	npm run --prefix react build
 .PHONY: react
 
-build-go: boost boostd boostx boostd-data booster-http booster-bitswap devnet migrate-lid
+build-go: boost devnet
 .PHONY: build-go
 
 build: react build-go
@@ -217,7 +217,7 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=v1.23.2
+lotus_version?=v1.21.0-rc2
 ffi_from_source?=0
 build_lotus?=0
 ifeq ($(build_lotus),1)

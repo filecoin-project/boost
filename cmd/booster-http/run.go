@@ -6,8 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+	"strings"
 
 	"github.com/filecoin-project/boost/cmd/lib"
+	"github.com/filecoin-project/boost/cmd/lib/filters"
+	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
+	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
@@ -170,6 +175,40 @@ var runCmd = &cli.Command{
 		// Create the server API
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
 		piecedirectory := piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
+
+		opts := &HttpServerOptions{
+			ServePieces:              servePieces,
+			SupportedResponseFormats: responseFormats,
+		}
+		if enableIpfsGateway {
+			repoDir, err := createRepoDir(cctx.String(FlagRepo.Name))
+			if err != nil {
+				return err
+			}
+
+			// Set up badbits filter
+			multiFilter := filters.NewMultiFilter(repoDir, cctx.String("api-filter-endpoint"), cctx.String("api-filter-auth"), cctx.StringSlice("badbits-denylists"))
+			err = multiFilter.Start(ctx)
+			if err != nil {
+				return fmt.Errorf("starting block filter: %w", err)
+			}
+
+			httpBlockMetrics := remoteblockstore.BlockMetrics{
+				GetRequestCount:             metrics.HttpRblsGetRequestCount,
+				GetFailResponseCount:        metrics.HttpRblsGetFailResponseCount,
+				GetSuccessResponseCount:     metrics.HttpRblsGetSuccessResponseCount,
+				BytesSentCount:              metrics.HttpRblsBytesSentCount,
+				HasRequestCount:             metrics.HttpRblsHasRequestCount,
+				HasFailResponseCount:        metrics.HttpRblsHasFailResponseCount,
+				HasSuccessResponseCount:     metrics.HttpRblsHasSuccessResponseCount,
+				GetSizeRequestCount:         metrics.HttpRblsGetSizeRequestCount,
+				GetSizeFailResponseCount:    metrics.HttpRblsGetSizeFailResponseCount,
+				GetSizeSuccessResponseCount: metrics.HttpRblsGetSizeSuccessResponseCount,
+			}
+			rbs := remoteblockstore.NewRemoteBlockstore(piecedirectory, &httpBlockMetrics)
+			filtered := filters.NewFilteredBlockstore(rbs, multiFilter)
+			opts.Blockstore = filtered
+		}
 		sapi := serverApi{ctx: ctx, piecedirectory: piecedirectory, sa: sa}
 		server := NewHttpServer(
 			cctx.String("base-path"),
@@ -185,7 +224,17 @@ var runCmd = &cli.Command{
 		// Start the server
 		log.Infof("Starting booster-http node on port %d with base path '%s'",
 			cctx.Int("port"), cctx.String("base-path"))
-		server.Start(ctx)
+		err = server.Start(ctx)
+		if err != nil {
+			return fmt.Errorf("starting http server: %w", err)
+		}
+
+		log.Infof(ipfsGatewayMsg(cctx, server.ipfsBasePath()))
+		if servePieces {
+			log.Infof("serving raw pieces at " + server.pieceBasePath())
+		} else {
+			log.Infof("serving raw pieces is disabled")
+		}
 
 		// Monitor for shutdown.
 		<-ctx.Done()

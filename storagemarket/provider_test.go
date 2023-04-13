@@ -2429,17 +2429,3 @@ func copyFile(source string, dest string) error {
 
 	return nil
 }
-
-func mockTipset(minerAddr address.Address, height abi.ChainEpoch) (*chaintypes.TipSet, error) {
-	dummyCid, _ := cid.Parse("bafkqaaa")
-	return chaintypes.NewTipSet([]*chaintypes.BlockHeader{{
-		Miner:                 minerAddr,
-		Height:                height,
-		ParentStateRoot:       dummyCid,
-		Messages:              dummyCid,
-		ParentMessageReceipts: dummyCid,
-		BlockSig:              &crypto.Signature{Type: crypto.SigTypeBLS},
-		BLSAggregate:          &crypto.Signature{Type: crypto.SigTypeBLS},
-		Timestamp:             1,
-	}})
-}

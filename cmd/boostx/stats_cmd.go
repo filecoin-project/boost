@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
+	transports_types "github.com/filecoin-project/boost/retrievalmarket/types"
 	"regexp"
 	"sort"
 	"strings"

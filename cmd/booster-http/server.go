@@ -20,12 +20,11 @@ import (
 	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hashicorp/go-multierror"
-	"github.com/ipfs/boxo/blockservice"
-	blockstore "github.com/ipfs/boxo/blockstore"
-	offline "github.com/ipfs/boxo/exchange/offline"
-	"github.com/ipfs/boxo/gateway"
+	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	offline "github.com/ipfs/go-ipfs-exchange-offline"
 	"go.opencensus.io/stats"
 )
 
@@ -43,9 +42,11 @@ type apiVersion struct {
 }
 
 type HttpServer struct {
-	path string
-	port int
-	api  HttpServerApi
+	path    string
+	port    int
+	api     HttpServerApi
+	opts    HttpServerOptions
+	idxPage string
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -58,8 +59,17 @@ type HttpServerApi interface {
 	UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error)
 }
 
-func NewHttpServer(path string, port int, api HttpServerApi) *HttpServer {
-	return &HttpServer{path: path, port: port, api: api}
+type HttpServerOptions struct {
+	Blockstore               blockstore.Blockstore
+	ServePieces              bool
+	SupportedResponseFormats []string
+}
+
+func NewHttpServer(path string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
+	if opts == nil {
+		opts = &HttpServerOptions{ServePieces: true}
+	}
+	return &HttpServer{path: path, port: port, api: api, opts: *opts, idxPage: parseTemplate(*opts)}
 }
 
 func (s *HttpServer) pieceBasePath() string {
@@ -80,7 +90,7 @@ func (s *HttpServer) Start(ctx context.Context) error {
 
 	if s.opts.Blockstore != nil {
 		blockService := blockservice.New(s.opts.Blockstore, offline.Exchange(s.opts.Blockstore))
-		gw, err := gateway.NewBlocksBackend(blockService)
+		gw, err := NewBlocksGateway(blockService, nil)
 		if err != nil {
 			return fmt.Errorf("creating blocks gateway: %w", err)
 		}
@@ -92,7 +102,7 @@ func (s *HttpServer) Start(ctx context.Context) error {
 	handler.HandleFunc("/info", s.handleInfo)
 	handler.Handle("/metrics", metrics.Exporter("booster_http")) // metrics
 	s.server = &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", s.listenAddr, s.port),
+		Addr:    fmt.Sprintf(":%d", s.port),
 		Handler: handler,
 		// This context will be the parent of the context associated with all
 		// incoming requests
@@ -114,27 +124,6 @@ func (s *HttpServer) Stop() error {
 	s.cancel()
 	return s.server.Close()
 }
-
-const idxPage = `
-<html>
-  <body>
-    <h4>Booster HTTP Server</h4>
-    Endpoints:
-    <table>
-      <tbody>
-      <tr>
-        <td>
-          Download a raw piece by its piece CID
-        </td>
-        <td>
-          <a href="/piece/bafySomePieceCid">/piece/<piece cid></a>
-        </td>
-      </tr>
-      </tbody>
-    </table>
-  </body>
-</html>
-`
 
 func (s *HttpServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
@@ -306,7 +295,7 @@ func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.
 }
 
 func (s *HttpServer) unsealedDeal(ctx context.Context, pieceCid cid.Cid, pieceDeals []model.DealInfo) (*model.DealInfo, error) {
-	// There should always been deals in the PieceInfo, but check just in case
+	// There should always be deals in the PieceInfo, but check just in case
 	if len(pieceDeals) == 0 {
 		return nil, fmt.Errorf("there are no deals containing piece %s: %w", pieceCid, ErrNotFound)
 	}

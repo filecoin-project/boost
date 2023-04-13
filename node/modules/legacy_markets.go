@@ -2,6 +2,8 @@ package modules
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"path/filepath"
 
 	piecefilestore "github.com/filecoin-project/boost-gfm/filestore"

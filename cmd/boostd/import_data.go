@@ -67,6 +67,9 @@ var importDataCmd = &cli.Command{
 		// If the user has supplied a signed proposal cid
 		deleteAfterImport := cctx.Bool("delete-after-import")
 		if proposalCid != nil {
+			if deleteAfterImport {
+				return fmt.Errorf("legacy deal data cannot be automatically deleted after import (only new deals)")
+			}
 
 			// Look up the deal in the boost database
 			deal, err := napi.BoostDealBySignedProposalCid(cctx.Context, *proposalCid)

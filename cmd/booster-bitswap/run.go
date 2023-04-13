@@ -5,9 +5,9 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
-	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
-	"github.com/filecoin-project/boost/cmd/booster-bitswap/remoteblockstore"
 	"github.com/filecoin-project/boost/cmd/lib"
+	"github.com/filecoin-project/boost/cmd/lib/filters"
+	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
@@ -165,6 +165,20 @@ var runCmd = &cli.Command{
 		}
 
 		// Create the bitswap host
+		bitswapBlockMetrics := remoteblockstore.BlockMetrics{
+			GetRequestCount:             metrics.BitswapRblsGetRequestCount,
+			GetFailResponseCount:        metrics.BitswapRblsGetFailResponseCount,
+			GetSuccessResponseCount:     metrics.BitswapRblsGetSuccessResponseCount,
+			BytesSentCount:              metrics.BitswapRblsBytesSentCount,
+			HasRequestCount:             metrics.BitswapRblsHasRequestCount,
+			HasFailResponseCount:        metrics.BitswapRblsHasFailResponseCount,
+			HasSuccessResponseCount:     metrics.BitswapRblsHasSuccessResponseCount,
+			GetSizeRequestCount:         metrics.BitswapRblsGetSizeRequestCount,
+			GetSizeFailResponseCount:    metrics.BitswapRblsGetSizeFailResponseCount,
+			GetSizeSuccessResponseCount: metrics.BitswapRblsGetSizeSuccessResponseCount,
+		}
+
+		// Create the server API
 		port := cctx.Int("port")
 		repoDir, err := homedir.Expand(cctx.String(FlagRepo.Name))
 		if err != nil {
@@ -183,7 +197,7 @@ var runCmd = &cli.Command{
 		}
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
 		piecedirectory := piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
-		remoteStore := remoteblockstore.NewRemoteBlockstore(piecedirectory)
+		remoteStore := remoteblockstore.NewRemoteBlockstore(piecedirectory, &bitswapBlockMetrics)
 		server := NewBitswapServer(remoteStore, host, multiFilter)
 
 		var proxyAddrInfo *peer.AddrInfo

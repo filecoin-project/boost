@@ -2,11 +2,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/ipfs/go-libipfs/gateway"
 	"mime"
 	"net/http"
 	"strings"
-
-	"github.com/ipfs/boxo/gateway"
 )
 
 type gatewayHandler struct {
@@ -14,7 +13,7 @@ type gatewayHandler struct {
 	supportedFormats map[string]struct{}
 }
 
-func newGatewayHandler(gw *gateway.BlocksBackend, supportedFormats []string) http.Handler {
+func newGatewayHandler(gw *BlocksGateway, supportedFormats []string) http.Handler {
 	headers := map[string][]string{}
 	gateway.AddAccessControlHeaders(headers)
 
@@ -24,10 +23,7 @@ func newGatewayHandler(gw *gateway.BlocksBackend, supportedFormats []string) htt
 	}
 
 	return &gatewayHandler{
-		gwh: gateway.NewHandler(gateway.Config{
-			Headers:               headers,
-			DeserializedResponses: true,
-		}, gw),
+		gwh:              gateway.NewHandler(gateway.Config{Headers: headers}, gw),
 		supportedFormats: fmtsMap,
 	}
 }
