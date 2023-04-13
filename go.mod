@@ -39,9 +39,9 @@ require (
 	github.com/filecoin-project/go-legs v0.4.9
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.10.0
+	github.com/filecoin-project/go-state-types v0.11.0-rc1
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/lotus v1.21.0-rc2
+	github.com/filecoin-project/lotus v1.22.0-rc2
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
 	github.com/golang/mock v1.6.0
@@ -355,9 +355,13 @@ require (
 
 require (
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
+	github.com/filecoin-project/index-provider v0.9.1 // indirect
+	github.com/filecoin-project/storetheindex v0.4.30-0.20221114113647-683091f8e893 // indirect
+	github.com/go-kit/kit v0.12.0 // indirect
 	github.com/google/pprof v0.0.0-20221203041831-ce31453925ec // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
+	github.com/libp2p/go-libp2p-core v0.20.1 // indirect
 	github.com/onsi/ginkgo/v2 v2.5.1 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/qtls-go1-19 v0.2.1 // indirect
@@ -366,6 +370,5 @@ require (
 	github.com/quic-go/webtransport-go v0.5.2 // indirect
 	github.com/tidwall/gjson v1.14.0 // indirect
 	github.com/ucarion/urlpath v0.0.0-20200424170820-7ccc79b76bbb // indirect
-	github.com/zyedidia/generic v1.2.1 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
