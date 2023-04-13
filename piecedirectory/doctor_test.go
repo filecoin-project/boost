@@ -34,12 +34,12 @@ func TestPieceDoctor(t *testing.T) {
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
 
-		port := 8050
-		err = bdsvc.Start(ctx, port)
+		addr := "localhost:8050"
+		err = bdsvc.Start(ctx, addr)
 		require.NoError(t, err)
 
 		cl := client.NewStore()
-		err = cl.Dial(ctx, fmt.Sprintf("http://localhost:%d", port))
+		err = cl.Dial(ctx, fmt.Sprintf("http://%s", addr))
 		require.NoError(t, err)
 		defer cl.Close(ctx)
 
@@ -65,12 +65,12 @@ func TestPieceDoctor(t *testing.T) {
 		svc.SetupCouchbase(t, testCouchSettings)
 		bdsvc := svc.NewCouchbase(testCouchSettings)
 
-		port := 8051
-		err := bdsvc.Start(ctx, port)
+		addr := "localhost:8051"
+		err := bdsvc.Start(ctx, addr)
 		require.NoError(t, err)
 
 		cl := client.NewStore()
-		err = cl.Dial(ctx, fmt.Sprintf("http://localhost:%d", port))
+		err = cl.Dial(ctx, fmt.Sprintf("http://%s", addr))
 		require.NoError(t, err)
 		defer cl.Close(ctx)
 

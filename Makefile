@@ -93,6 +93,12 @@ boost: $(BUILD_DEPS)
 .PHONY: boost
 BINS+=boost boostx boostd
 
+boostd-data:
+	$(MAKE) -C ./extern/boostd-data
+	install -C ./extern/boostd-data/boostd-data ./boostd-data
+.PHONY: boostd-data
+BINS+=boostd-data
+
 booster-http: $(BUILD_DEPS)
 	rm -f booster-http
 	$(GOCC) build $(GOFLAGS) -o booster-http ./cmd/booster-http
@@ -141,6 +147,7 @@ install-boost:
 	install -C ./boost /usr/local/bin/boost
 	install -C ./boostd /usr/local/bin/boostd
 	install -C ./boostx /usr/local/bin/boostx
+	install -C ./extern/boostd-data /usr/local/bin/boostd-data
 
 install-devnet:
 	install -C ./devnet /usr/local/bin/devnet
