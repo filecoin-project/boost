@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/filecoin-project/boost/cmd/booster-bitswap/filters"
+	"github.com/filecoin-project/boost/cmd/lib/filters"
 	"github.com/ipfs/go-cid"
-	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -96,7 +96,7 @@ func TestConfigFilter(t *testing.T) {
 						"PeerIDs": ["apples", "QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N"]
 				}
 			}`,
-			expectedParseError: errors.New("parsing response: failed to parse peer ID: selected encoding not supported"),
+			expectedParseError: errors.New("parsing response: failed to parse peer ID: invalid cid: selected encoding not supported"),
 		},
 	}
 	for _, testCase := range testCases {

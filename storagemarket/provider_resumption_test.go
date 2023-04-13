@@ -35,7 +35,7 @@ func TestDealCompletionOnProcessResumption(t *testing.T) {
 		},
 		"resume after finishing transfer": {
 			dealBuilderF: func(h *ProviderHarness) *testDeal {
-				return h.newDealBuilder(t, 1).withCommpBlocking().withNormalHttpServer().build()
+				return h.newDealBuilder(t, 1).withCommpBlocking(true).withNormalHttpServer().build()
 			},
 			stubAfterResumeF: func(tb *testDealBuilder) *testDeal {
 				return tb.withAllMinerCallsNonBlocking().build()

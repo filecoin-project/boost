@@ -23,12 +23,13 @@ var log = logging.Logger("gql")
 
 type Server struct {
 	resolver *resolver
+	bstore   BlockGetter
 	srv      *http.Server
 	wg       sync.WaitGroup
 }
 
-func NewServer(resolver *resolver) *Server {
-	return &Server{resolver: resolver}
+func NewServer(resolver *resolver, bstore BlockGetter) *Server {
+	return &Server{resolver: resolver, bstore: bstore}
 }
 
 //go:embed schema.graphql
@@ -57,10 +58,14 @@ func (s *Server) Start(ctx context.Context) error {
 	// Allow resolving directly to fields (instead of requiring resolvers to
 	// have a method for every GraphQL field)
 	opts := []graphql.SchemaOpt{graphql.UseFieldResolvers()}
-	schema, err := graphql.ParseSchema(string(schemaGraqhql), s.resolver, opts...)
+	schema, err := graphql.ParseSchema(schemaGraqhql, s.resolver, opts...)
 	if err != nil {
 		return err
 	}
+
+	// Serve /downloads (for downloading raw data for debugging purposes)
+	srvCtx, cancelSrvCtx := context.WithCancel(context.Background())
+	serveDownload(srvCtx, mux, s.bstore)
 
 	// GraphQL handler
 	queryHandler := &relay.Handler{Schema: schema}
@@ -81,6 +86,7 @@ func (s *Server) Start(ctx context.Context) error {
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
+		defer cancelSrvCtx()
 
 		if err := s.srv.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("gql.ListenAndServe(): %v", err)

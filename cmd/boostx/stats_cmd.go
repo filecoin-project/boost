@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	transports_types "github.com/filecoin-project/boost/retrievalmarket/types"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -152,6 +153,7 @@ var statsCmd = &cli.Command{
 					if !ok {
 						return fmt.Errorf("AgentVersion for peer %s is not a string: type %T", addrInfo.ID, agentVersionI)
 					}
+					agentVersionShort := shortAgentVersion(agentVersion)
 
 					// Get SP's supported transports
 					var transports *transports_types.QueryResponse
@@ -172,7 +174,7 @@ var statsCmd = &cli.Command{
 						boostNodes++
 						boostQualityAdjPower = big.Add(boostQualityAdjPower, minerToMinerPower[maddr].QualityAdjPower)
 						boostRawBytePower = big.Add(boostRawBytePower, minerToMinerPower[maddr].RawBytePower)
-						agentVersions[agentVersion]++
+						agentVersions[agentVersionShort]++
 						if transports != nil {
 							for _, p := range transports.Protocols {
 								transportProtos[p.Name]++
@@ -180,7 +182,7 @@ var statsCmd = &cli.Command{
 						}
 					} else if contains(protostrs, "/fil/storage/mk/1.1.0") {
 						out += " is running markets"
-						agentVersions[agentVersion]++
+						agentVersions[agentVersionShort]++
 						marketsNodes++
 					} else {
 						out += " is not running markets or boost"
@@ -257,4 +259,10 @@ func contains(sl []string, substr string) bool {
 	}
 
 	return false
+}
+
+var agentVersionRegExp = regexp.MustCompile(`^(.+)\+.+$`)
+
+func shortAgentVersion(av string) string {
+	return agentVersionRegExp.ReplaceAllString(av, "$1")
 }

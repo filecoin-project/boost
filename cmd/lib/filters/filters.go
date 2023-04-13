@@ -1,5 +1,7 @@
 package filters
 
+//go:generate go run github.com/golang/mock/mockgen -destination=mock/filters.go -package=mock . Filter
+
 import (
 	"context"
 	"fmt"
@@ -59,11 +61,15 @@ func FetcherForHTTPEndpoint(endpoint string, authHeader string) Fetcher {
 	}
 }
 
-type Handler interface {
-	ParseUpdate(io.Reader) error
+type Filter interface {
 	// FulfillRequest returns true if a request should be fulfilled
 	// error indicates an error in processing
 	FulfillRequest(p peer.ID, c cid.Cid) (bool, error)
+}
+
+type Handler interface {
+	ParseUpdate(io.Reader) error
+	Filter
 }
 
 type FilterDefinition struct {

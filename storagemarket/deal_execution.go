@@ -215,9 +215,9 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 	}
 
 	// as deal has already been handed to the sealer, we can remove the inbound file and reclaim the tagged space
-	if !deal.IsOffline {
+	if deal.CleanupData {
 		_ = os.Remove(deal.InboundFilePath)
-		p.dealLogger.Infow(deal.DealUuid, "removed inbound file as deal handed to sealer", "path", deal.InboundFilePath)
+		p.dealLogger.Infow(deal.DealUuid, "removed piece data from disk as deal has been added to a sector", "path", deal.InboundFilePath)
 	}
 	if err := p.untagStorageSpaceAfterSealing(ctx, deal); err != nil {
 		// If there's an error untagging storage space we should still try to continue,
