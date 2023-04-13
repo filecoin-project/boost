@@ -478,7 +478,7 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (Couc
 // GetOffsetSize gets the offset and size of the multihash in the given piece.
 // Note that recordCount is needed in order to determine which shard the multihash is in.
 func (db *DB) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash multihash.Multihash, recordCount int) (*model.OffsetSize, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "db.get_offset_size")
+	_, span := tracing.Tracer.Start(ctx, "db.get_offset_size")
 	defer span.End()
 
 	// Get the prefix for the shard that the multihash is in
@@ -1161,7 +1161,7 @@ func (db *DB) RemoveDealForPiece(ctx context.Context, dealId string, pieceCid ci
 		// Remove Metadata if removed deal was last one
 		if len(metadata.Deals) == 0 {
 			if err := db.RemovePieceMetadata(ctx, pieceCid); err != nil {
-				fmt.Errorf("Failed to remove the Metadata after removing the last deal: %w", err)
+				return fmt.Errorf("failed to remove the Metadata after removing the last deal: %w", err)
 			}
 			return nil
 		}
