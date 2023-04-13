@@ -1,4 +1,4 @@
-create keyspace if not exists bench with replication = { 'class' : 'NetworkTopologyStrategy', 'replication_factor' : 1 };
+create keyspace if not exists bench with replication = { 'class' : 'NetworkTopologyStrategy' };
 
 CREATE TABLE bench.PayloadToPieces (
     PayloadMultihash BLOB PRIMARY KEY,
