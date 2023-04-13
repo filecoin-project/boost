@@ -39,10 +39,12 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
+	"github.com/filecoin-project/go-state-types/crypto"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
 	test "github.com/filecoin-project/lotus/chain/events/state/mock"
+	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/repo"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
@@ -705,6 +707,74 @@ func TestDealRestartAfterManualRecoverableErrors(t *testing.T) {
 	}
 }
 
+func TestDealRestartFailExpiredDeal(t *testing.T) {
+	ctx := context.Background()
+
+	tcs := []struct {
+		name      string
+		isOffline bool
+	}{{
+		name:      "online",
+		isOffline: false,
+	}, {
+		name:      "offline",
+		isOffline: true,
+	}}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup the provider test harness
+			var chainHead *chaintypes.TipSet
+			harness := NewHarness(t, withChainHeadFunction(func(ctx context.Context) (*chaintypes.TipSet, error) {
+				return chainHead, nil
+			}))
+
+			chainHead, err := mockTipset(harness.MinerAddr, 5)
+			require.NoError(t, err)
+
+			// start the provider test harness
+			harness.Start(t, ctx)
+			defer harness.Stop()
+
+			// build the deal proposal
+			opts := []dealProposalOpt{}
+			if tc.isOffline {
+				opts = append(opts, withOfflineDeal())
+			}
+			td := harness.newDealBuilder(t, 1, opts...).withCommpBlocking(true).build()
+
+			// execute deal
+			err = td.executeAndSubscribe()
+			require.NoError(t, err)
+
+			err = td.waitForCheckpoint(dealcheckpoints.Accepted)
+			require.NoError(t, err)
+
+			// shutdown the existing provider and create a new provider
+			harness.shutdownAndCreateNewProvider(t)
+
+			// update the test deal state with the new provider
+			_ = td.updateWithRestartedProvider(harness)
+
+			// simulate a chain height that is greater that the epoch by which
+			// the deal should have been sealed
+			chainHead, err = mockTipset(harness.MinerAddr, td.params.ClientDealProposal.Proposal.StartEpoch+10)
+			require.NoError(t, err)
+
+			// start the provider
+			err = harness.Provider.Start()
+			require.NoError(t, err)
+
+			// expect the deal to fail on startup because it has expired
+			require.Eventually(t, func() bool {
+				dl, err := harness.Provider.Deal(ctx, td.params.DealUUID)
+				require.NoError(t, err)
+				return strings.Contains(dl.Err, "expired")
+			}, 5*time.Second, 100*time.Millisecond)
+		})
+	}
+}
+
 // Tests scenario that a contract deal fails fatally when PublishStorageDeal fails.
 func TestContractDealFatalFailAfterPublishError(t *testing.T) {
 	ctx := context.Background()
@@ -1283,6 +1353,8 @@ type ProviderHarness struct {
 	DAGStore *shared_testutil.MockDagStoreWrapper
 }
 
+type ChainHeadFn func(ctx context.Context) (*chaintypes.TipSet, error)
+
 type providerConfig struct {
 	mockCtrl *gomock.Controller
 
@@ -1303,8 +1375,9 @@ type providerConfig struct {
 	minPieceSize  abi.PaddedPieceSize
 	maxPieceSize  abi.PaddedPieceSize
 
-	localCommp bool
-	dealFilter dealfilter.StorageDealFilter
+	localCommp  bool
+	dealFilter  dealfilter.StorageDealFilter
+	chainHeadFn ChainHeadFn
 }
 
 type harnessOpt func(pc *providerConfig)
@@ -1379,6 +1452,12 @@ func withStateMarketBalance(locked, escrow abi.TokenAmount) harnessOpt {
 func withDealFilter(filter dealfilter.StorageDealFilter) harnessOpt {
 	return func(pc *providerConfig) {
 		pc.dealFilter = filter
+	}
+}
+
+func withChainHeadFunction(fn ChainHeadFn) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.chainHeadFn = fn
 	}
 }
 
@@ -1544,10 +1623,17 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	require.NoError(t, err)
 	ph.Provider = prov
 
-	// Creates chain tipset with height 5
-	chainHead, err := test.MockTipset(minerAddr, 1)
-	require.NoError(t, err)
-	fn.EXPECT().ChainHead(gomock.Any()).Return(chainHead, nil).AnyTimes()
+	chainHeadFn := pc.chainHeadFn
+	if chainHeadFn == nil {
+		// Creates chain tipset with height 5
+		chainHead, err := test.MockTipset(minerAddr, 1)
+		require.NoError(t, err)
+		chainHeadFn = func(ctx context.Context) (*chaintypes.TipSet, error) {
+			return chainHead, nil
+		}
+	}
+	fn.EXPECT().ChainHead(gomock.Any()).DoAndReturn(chainHeadFn).AnyTimes()
+
 	fn.EXPECT().StateDealProviderCollateralBounds(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(lapi.DealCollateralBounds{
 		Min: abi.NewTokenAmount(1),
 		Max: abi.NewTokenAmount(1),
@@ -2295,4 +2381,18 @@ func copyFile(source string, dest string) error {
 	}
 
 	return nil
+}
+
+func mockTipset(minerAddr address.Address, height abi.ChainEpoch) (*chaintypes.TipSet, error) {
+	dummyCid, _ := cid.Parse("bafkqaaa")
+	return chaintypes.NewTipSet([]*chaintypes.BlockHeader{{
+		Miner:                 minerAddr,
+		Height:                height,
+		ParentStateRoot:       dummyCid,
+		Messages:              dummyCid,
+		ParentMessageReceipts: dummyCid,
+		BlockSig:              &crypto.Signature{Type: crypto.SigTypeBLS},
+		BLSAggregate:          &crypto.Signature{Type: crypto.SigTypeBLS},
+		Timestamp:             1,
+	}})
 }
