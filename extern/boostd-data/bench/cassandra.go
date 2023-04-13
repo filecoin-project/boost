@@ -125,21 +125,21 @@ func (c *CassandraDB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, rec
 		return nil
 	}
 
-	batchEntries := make([]gocql.BatchEntry, 0, 2*len(recs))
-
 	// Add payload to pieces index
+	insertPayloadPiecesQry := c.session.Query(`INSERT INTO bench.PayloadToPieces (PayloadMultihash, PieceCids) VALUES (?, ?)`)
 	for _, rec := range recs {
-		batchEntries = append(batchEntries, gocql.BatchEntry{
-			Stmt:       `INSERT INTO bench.PayloadToPieces (PayloadMultihash, PieceCids) VALUES (?, ?)`,
-			Args:       []interface{}{rec.Cid.Hash(), pieceCid.Bytes()},
-			Idempotent: true,
-		})
+		err := insertPayloadPiecesQry.Bind(rec.Cid.Hash(), pieceCid.Bytes()).Exec()
+		if err != nil {
+			return fmt.Errorf("inserting into PayloadToPieces: %w", err)
+		}
 	}
 
 	// Add piece to block info index
+	batchEntries := make([]gocql.BatchEntry, 0, len(recs))
+	insertPieceOffsetsQry := `INSERT INTO bench.PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES (?, ?, ?, ?)`
 	for _, rec := range recs {
 		batchEntries = append(batchEntries, gocql.BatchEntry{
-			Stmt:       `INSERT INTO bench.PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES (?, ?, ?, ?)`,
+			Stmt:       insertPieceOffsetsQry,
 			Args:       []interface{}{pieceCid.Bytes(), rec.Cid.Hash(), rec.Offset, rec.Size},
 			Idempotent: true,
 		})
