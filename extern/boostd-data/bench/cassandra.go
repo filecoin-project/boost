@@ -4,6 +4,10 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
+	"time"
+
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2/index"
@@ -11,8 +15,6 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/yugabyte/gocql"
 	"golang.org/x/sync/errgroup"
-	"strings"
-	"time"
 )
 
 var cassandraCmd = &cli.Command{
@@ -42,6 +44,8 @@ type CassandraDB struct {
 func NewCassandraDB(connectString string, payloadPiecesParallelism int) (*CassandraDB, error) {
 	cluster := gocql.NewCluster(connectString)
 	cluster.Consistency = gocql.Quorum
+	cluster.Timeout = 30 * time.Second
+	cluster.ConnectTimeout = 30 * time.Second
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return nil, fmt.Errorf("creating cluster: %w", err)
@@ -133,6 +137,7 @@ func (c *CassandraDB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, rec
 		return nil
 	}
 
+	timeQueryBind := time.Now()
 	// Add payload to pieces index
 	startPayloadToPieces := time.Now()
 	queue := make(chan []byte, len(recs))
@@ -171,6 +176,9 @@ func (c *CassandraDB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, rec
 	duration := time.Since(startPayloadToPieces)
 	log.Debugw("insert payload-to-pieces complete", "duration", duration.String(), "duration-ms", duration.Milliseconds())
 
+	metrics.GetOrRegisterResettingTimer("csql.query.bind", nil).UpdateSince(timeQueryBind)
+
+	timePrepareInsert := time.Now()
 	// Add piece to block info index
 	startPieceBlockInfo := time.Now()
 	batchEntries := make([]gocql.BatchEntry, 0, len(recs))
@@ -182,14 +190,17 @@ func (c *CassandraDB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, rec
 			Idempotent: true,
 		})
 	}
+	metrics.GetOrRegisterResettingTimer("csql.prepare.insert", nil).UpdateSince(timePrepareInsert)
 
 	// Cassandra has a 50k limit on batch statements. Keeping batch size small
 	// makes sure we're under the limit.
-	const batchSize = 128
+	const batchSize = 49000
 	var batch *gocql.Batch
 	for allIdx, entry := range batchEntries {
 		if batch == nil {
+			timeNewBatch := time.Now()
 			batch = c.session.NewBatch(gocql.UnloggedBatch).WithContext(ctx).RetryPolicy(&gocql.ExponentialBackoffRetryPolicy{Max: 120 * time.Second, NumRetries: 25})
+			metrics.GetOrRegisterResettingTimer("csql.batch.new", nil).UpdateSince(timeNewBatch)
 		}
 
 		batch.Entries = append(batch.Entries, entry)
@@ -197,10 +208,13 @@ func (c *CassandraDB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, rec
 		if allIdx == len(batchEntries)-1 || len(batch.Entries) == batchSize {
 			var err error
 			for i := 0; i < 30; i++ {
+				st := time.Now()
 				err = c.session.ExecuteBatch(batch)
 				if err == nil {
+					metrics.GetOrRegisterResettingTimer("csql.session.execute", nil).UpdateSince(st)
 					break
 				}
+				metrics.GetOrRegisterResettingTimer("csql.session.execute.err", nil).UpdateSince(st)
 
 				log.Warnf("error executing batch: %s", err)
 				time.Sleep(1 * time.Second)
