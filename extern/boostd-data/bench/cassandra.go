@@ -110,24 +110,22 @@ func (c *CassandraDB) GetBlockSample(ctx context.Context, count int) ([]pieceBlo
 		if err != nil {
 			return nil, fmt.Errorf("scanning piece cid: %w", err)
 		}
-		_, pmh, err := multihash.MHFromBytes(payloadMHBz)
+
+		cp := make([]byte, len(payloadMHBz))
+		copy(cp, payloadMHBz)
+		_, mh, err := multihash.MHFromBytes(cp)
 		if err != nil {
-			return nil, fmt.Errorf("scanning mulithash: %w", err)
+			return nil, fmt.Errorf("scanning multihash: %w", err)
 		}
 
 		pbs = append(pbs, pieceBlock{
 			PieceCid:         pcid,
-			PayloadMultihash: pmh,
+			PayloadMultihash: mh,
 		})
 	}
 	if err := iter.Close(); err != nil {
 		return nil, err
 	}
-
-	//log.Debug("got pbs:")
-	//for _, pb := range pbs {
-	//	log.Debugf("  %s %s", pb.PieceCid, pb.PayloadMultihash)
-	//}
 
 	return pbs, nil
 }
