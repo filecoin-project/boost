@@ -13,7 +13,6 @@ require (
 	github.com/filecoin-project/go-address v1.0.0
 	github.com/filecoin-project/go-jsonrpc v0.1.8
 	github.com/filecoin-project/go-state-types v0.1.10
-	github.com/gocql/gocql v1.3.1
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/influxdata/influxdb v1.8.3
@@ -29,6 +28,7 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/urfave/cli/v2 v2.24.4
+	github.com/yugabyte/gocql v0.0.0-20221110041640-6fc475c5aeb0
 	go.opentelemetry.io/otel v1.13.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.13.0
 	go.opentelemetry.io/otel/sdk v1.13.0
