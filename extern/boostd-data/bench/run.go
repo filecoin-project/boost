@@ -186,7 +186,7 @@ func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int,
 					}
 
 					start := time.Now()
-					err := db.AddIndexRecords(ctx, pcid, recs)
+					err = db.AddIndexRecords(ctx, pcid, recs)
 					if err != nil {
 						return err
 					}
