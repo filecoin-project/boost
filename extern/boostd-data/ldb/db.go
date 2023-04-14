@@ -321,7 +321,7 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, sourceErr 
 		return nil
 	}
 
-	md.Error = err.Error()
+	md.Error = sourceErr.Error()
 	md.ErrorType = fmt.Sprintf("%T", sourceErr)
 
 	return db.SetPieceCidToMetadata(ctx, pieceCid, md)
