@@ -10,6 +10,7 @@ import (
 	"github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/sync/errgroup"
 	"strings"
 	"time"
 )
@@ -20,28 +21,35 @@ var cassandraCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		initCmd(createCassandra),
 		dropCmd(createCassandra),
-		loadCmd(createCassandra),
+		loadCmd(createCassandra, &cli.IntFlag{
+			Name:  "payload-pieces-parallelism",
+			Value: 16,
+		}),
 		bitswapCmd(createCassandra),
 		graphsyncCmd(createCassandra),
 	},
 }
 
 func createCassandra(ctx context.Context, cctx *cli.Context) (BenchDB, error) {
-	return NewCassandraDB(cctx.String("connect-string"))
+	return NewCassandraDB(cctx.String("connect-string"), cctx.Int("payload-pieces-parallelism"))
 }
 
 type CassandraDB struct {
-	session *gocql.Session
+	session                  *gocql.Session
+	payloadPiecesParallelism int
 }
 
-func NewCassandraDB(connectString string) (*CassandraDB, error) {
+func NewCassandraDB(connectString string, payloadPiecesParallelism int) (*CassandraDB, error) {
 	cluster := gocql.NewCluster(connectString)
 	cluster.Consistency = gocql.Quorum
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return nil, fmt.Errorf("creating cluster: %w", err)
 	}
-	return &CassandraDB{session: session}, nil
+	return &CassandraDB{
+		session:                  session,
+		payloadPiecesParallelism: payloadPiecesParallelism,
+	}, nil
 }
 
 func (c *CassandraDB) Name() string {
@@ -126,15 +134,45 @@ func (c *CassandraDB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, rec
 	}
 
 	// Add payload to pieces index
-	insertPayloadPiecesQry := c.session.Query(`INSERT INTO bench.PayloadToPieces (PayloadMultihash, PieceCids) VALUES (?, ?)`)
+	startPayloadToPieces := time.Now()
+	queue := make(chan []byte, len(recs))
 	for _, rec := range recs {
-		err := insertPayloadPiecesQry.Bind(rec.Cid.Hash(), pieceCid.Bytes()).Exec()
-		if err != nil {
-			return fmt.Errorf("inserting into PayloadToPieces: %w", err)
-		}
+		queue <- rec.Cid.Hash()
 	}
+	close(queue)
+
+	var eg errgroup.Group
+	for i := 0; i < c.payloadPiecesParallelism; i++ {
+		eg.Go(func() error {
+			for ctx.Err() == nil {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case multihashBytes, ok := <-queue:
+					if !ok {
+						return nil
+					}
+
+					q := `INSERT INTO bench.PayloadToPieces (PayloadMultihash, PieceCids) VALUES (?, ?)`
+					err := c.session.Query(q, multihashBytes, pieceCid.Bytes()).Exec()
+					if err != nil {
+						return fmt.Errorf("inserting into PayloadToPieces: %w", err)
+					}
+				}
+			}
+
+			return ctx.Err()
+		})
+	}
+	err := eg.Wait()
+	if err != nil {
+		return err
+	}
+	duration := time.Since(startPayloadToPieces)
+	log.Debugw("insert payload-to-pieces complete", "duration", duration.String(), "duration-ms", duration.Milliseconds())
 
 	// Add piece to block info index
+	startPieceBlockInfo := time.Now()
 	batchEntries := make([]gocql.BatchEntry, 0, len(recs))
 	insertPieceOffsetsQry := `INSERT INTO bench.PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES (?, ?, ?, ?)`
 	for _, rec := range recs {
@@ -174,6 +212,9 @@ func (c *CassandraDB) AddIndexRecords(ctx context.Context, pieceCid cid.Cid, rec
 			continue
 		}
 	}
+	duration = time.Since(startPieceBlockInfo)
+	log.Debugw("insert piece block info complete", "duration", duration.String(), "duration-ms", duration.Milliseconds())
+
 	return nil
 }
 

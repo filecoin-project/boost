@@ -24,7 +24,10 @@ var postgresCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		initCmd(createPostgres),
 		dropCmd(createPostgres),
-		loadCmd(createPostgres),
+		loadCmd(createPostgres, &cli.BoolFlag{
+			Name:  "insert-tmp-table",
+			Value: false,
+		}),
 		bitswapCmd(createPostgres),
 		graphsyncCmd(createPostgres),
 	},

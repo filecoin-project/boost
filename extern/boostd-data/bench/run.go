@@ -102,14 +102,11 @@ func dropCmd(createDB func(context.Context, *cli.Context) (BenchDB, error)) *cli
 	}
 }
 
-func loadCmd(createDB func(context.Context, *cli.Context) (BenchDB, error)) *cli.Command {
+func loadCmd(createDB func(context.Context, *cli.Context) (BenchDB, error), extraFlags ...cli.Flag) *cli.Command {
 	return &cli.Command{
 		Name:   "load",
 		Before: before,
-		Flags: append([]cli.Flag{connectStringFlag, &cli.BoolFlag{
-			Name:  "insert-tmp-table",
-			Value: false,
-		}}, loadFlags...),
+		Flags:  append(append([]cli.Flag{connectStringFlag}, loadFlags...), extraFlags...),
 		Action: func(cctx *cli.Context) error {
 			metrics.GetOrRegisterCounter("load", nil).Inc(1)
 			defer func(now time.Time) {
@@ -135,7 +132,7 @@ func loadCmd(createDB func(context.Context, *cli.Context) (BenchDB, error)) *cli
 }
 
 func addPieces(ctx context.Context, db BenchDB, parallelism int, pieceCount int, blocksPerPiece int) error {
-	log.Infow("Adding pieces", "pieceCount", pieceCount, "blocksPerPiece", blocksPerPiece)
+	log.Infow("Adding pieces", "pieceCount", pieceCount, "blocksPerPiece", blocksPerPiece, "parallelism", parallelism)
 
 	queue := make(chan struct{}, pieceCount)
 	for i := 0; i < pieceCount; i++ {
