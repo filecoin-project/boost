@@ -307,7 +307,7 @@ func (db *DB) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) err
 	return db.SetPieceCidToMetadata(ctx, pieceCid, md)
 }
 
-func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error {
+func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, sourceErr error) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
 	defer span.End()
 
@@ -321,8 +321,8 @@ func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error)
 		return nil
 	}
 
-	md.Error = err.Error()
-	md.ErrorType = fmt.Sprintf("%T", err)
+	md.Error = sourceErr.Error()
+	md.ErrorType = fmt.Sprintf("%T", sourceErr)
 
 	return db.SetPieceCidToMetadata(ctx, pieceCid, md)
 }
@@ -360,7 +360,7 @@ func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, er
 		kcid := cid.NewCidV1(cid.Raw, m)
 
 		offset, n := binary.Uvarint(r.Value)
-		size, n := binary.Uvarint(r.Value[n:])
+		size, _ := binary.Uvarint(r.Value[n:])
 
 		records = append(records, model.Record{
 			Cid: kcid,
@@ -401,7 +401,7 @@ func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihas
 	}
 
 	offset, n := binary.Uvarint(b)
-	size, n := binary.Uvarint(b[n:])
+	size, _ := binary.Uvarint(b[n:])
 	return &model.OffsetSize{
 		Offset: offset,
 		Size:   size,

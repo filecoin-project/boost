@@ -49,8 +49,7 @@ func MakeLevelDBDir(repoPath string) (string, error) {
 	return repoPath, nil
 }
 
-func (s *Service) Start(ctx context.Context, port int) error {
-	addr := fmt.Sprintf("localhost:%d", port)
+func (s *Service) Start(ctx context.Context, addr string) error {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("setting up listener for local index directory service: %w", err)

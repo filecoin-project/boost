@@ -86,13 +86,14 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 				}
 
 				// Start the embedded local index directory service
-				err := bdsvc.Start(svcCtx, port)
+				addr := fmt.Sprintf("localhost:%d", port)
+				err := bdsvc.Start(svcCtx, addr)
 				if err != nil {
 					return fmt.Errorf("starting local index directory service: %w", err)
 				}
 
 				// Connect to the embedded service
-				return client.Dial(ctx, fmt.Sprintf("http://localhost:%d", port))
+				return client.Dial(ctx, fmt.Sprintf("http://%s", addr))
 			},
 			OnStop: func(ctx context.Context) error {
 				cancel()

@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
-	"net/http"
 )
 
 var runCmd = &cli.Command{
@@ -21,10 +22,10 @@ var runCmd = &cli.Command{
 }
 
 var runFlags = []cli.Flag{
-	&cli.UintFlag{
-		Name:  "port",
-		Usage: "the port the boostd-data listens on",
-		Value: 8042,
+	&cli.StringFlag{
+		Name:  "addr",
+		Usage: "the address the boostd-data listens on",
+		Value: "localhost:8042",
 	},
 	&cli.BoolFlag{
 		Name:  "pprof",
@@ -130,14 +131,14 @@ func runAction(cctx *cli.Context, dbType string, store *svc.Service) error {
 	}
 
 	// Start the server
-	port := cctx.Int("port")
-	err = store.Start(ctx, port)
+	addr := cctx.String("addr")
+	err = store.Start(ctx, addr)
 	if err != nil {
 		return fmt.Errorf("starting %s store: %w", dbType, err)
 	}
 
-	log.Infof("Started boostd-data %s service on port %d",
-		dbType, port)
+	log.Infof("Started boostd-data %s service on address %s",
+		dbType, addr)
 
 	// Monitor for shutdown.
 	<-ctx.Done()
