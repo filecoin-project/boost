@@ -3,6 +3,7 @@ package piecedirectory
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -41,11 +42,12 @@ func TestPieceDirectory(t *testing.T) {
 }
 
 func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
-	err := bdsvc.Start(ctx, 8044)
+	addr := "localhost:8044"
+	err := bdsvc.Start(ctx, addr)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(ctx, "http://localhost:8044")
+	err = cl.Dial(ctx, fmt.Sprintf("http://%s", addr))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 

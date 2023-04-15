@@ -52,7 +52,7 @@ func TestService(t *testing.T) {
 		defer cancel()
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
-		testService(ctx, t, bdsvc, 8042)
+		testService(ctx, t, bdsvc, "localhost:8042")
 	})
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
@@ -64,16 +64,16 @@ func TestService(t *testing.T) {
 		defer cancel()
 		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
-		testService(ctx, t, bdsvc, 8043)
+		testService(ctx, t, bdsvc, "localhost:8043")
 	})
 }
 
-func testService(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
-	err := bdsvc.Start(ctx, port)
+func testService(ctx context.Context, t *testing.T, bdsvc *Service, addr string) {
+	err := bdsvc.Start(ctx, addr)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), fmt.Sprintf("http://localhost:%d", port))
+	err = cl.Dial(context.Background(), fmt.Sprintf("http://%s", addr))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
@@ -162,7 +162,7 @@ func TestServiceFuzz(t *testing.T) {
 	t.Run("level db", func(t *testing.T) {
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
-		testServiceFuzz(ctx, t, bdsvc, 8042)
+		testServiceFuzz(ctx, t, bdsvc, "localhost:8042")
 	})
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
@@ -170,12 +170,12 @@ func TestServiceFuzz(t *testing.T) {
 		t.Skip()
 		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
-		testServiceFuzz(ctx, t, bdsvc, 8043)
+		testServiceFuzz(ctx, t, bdsvc, "localhost:8043")
 	})
 }
 
-func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
-	err := bdsvc.Start(ctx, port)
+func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service, addr string) {
+	err := bdsvc.Start(ctx, addr)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
@@ -379,7 +379,7 @@ func TestCleanup(t *testing.T) {
 	t.Run("level db", func(t *testing.T) {
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
-		testCleanup(ctx, t, bdsvc, 8042)
+		testCleanup(ctx, t, bdsvc, "localhost:8042")
 	})
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
@@ -387,16 +387,16 @@ func TestCleanup(t *testing.T) {
 		t.Skip()
 		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
-		testCleanup(ctx, t, bdsvc, 8043)
+		testCleanup(ctx, t, bdsvc, "localhost:8043")
 	})
 }
 
-func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, port int) {
-	err := bdsvc.Start(ctx, port)
+func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, addr string) {
+	err := bdsvc.Start(ctx, addr)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), fmt.Sprintf("http://localhost:%d", port))
+	err = cl.Dial(context.Background(), fmt.Sprintf("http://%s", addr))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 

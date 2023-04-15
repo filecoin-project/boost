@@ -24,7 +24,10 @@ import (
 var tlog = logging.Logger("cbtest")
 
 func init() {
-	logging.SetLogLevel("cbtest", "debug")
+	err := logging.SetLogLevel("cbtest", "debug")
+	if err != nil {
+		panic(err)
+	}
 }
 
 func SetupCouchbase(t *testing.T, dbSettings couchbase.DBSettings) {
@@ -167,7 +170,7 @@ func awaitServicesReady(t *testing.T, settings couchbase.DBSettings, duration ti
 			return
 		}
 
-		if time.Now().Sub(start) > duration {
+		if time.Since(start) > duration {
 			require.Fail(t, "timed out waiting for couchbase services to come up after "+duration.String())
 		}
 		time.Sleep(time.Second)
@@ -199,7 +202,7 @@ func awaitBucketCreationReady(t *testing.T, settings couchbase.DBSettings, durat
 			return
 		}
 
-		if time.Now().Sub(start) > duration {
+		if time.Since(start) > duration {
 			require.Fail(t, "timed out trying to create dummy bucket after "+duration.String())
 		}
 
@@ -229,7 +232,7 @@ func waitForOkResponse(t *testing.T, path string, duration time.Duration) {
 			}
 		}
 
-		if time.Now().Sub(start) > duration {
+		if time.Since(start) > duration {
 			msg := "failed to GET " + fullPath + " after " + duration.String()
 			if resp != nil {
 				msg += fmt.Sprintf(": %d - %s", resp.StatusCode, resp.Status)

@@ -72,7 +72,7 @@ COPY --from=react-builder /src/react/build /go/src/react/build
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-      make debug
+      make debug boostd-data booster-http booster-bitswap
 #########################################################################################
 FROM ubuntu:20.04 as runner
 
