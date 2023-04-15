@@ -2,6 +2,8 @@ package indexprovider
 
 import (
 	"context"
+	"testing"
+
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/db/migrations"
@@ -15,7 +17,6 @@ import (
 	"github.com/ipni/index-provider/metadata"
 	mock_provider "github.com/ipni/index-provider/mock"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // Empty response from MinerAPI.StorageList()
@@ -324,6 +325,10 @@ var _ ApiStorageMiner = (*mockApiStorageMiner)(nil)
 
 func (m mockApiStorageMiner) StorageList(ctx context.Context) (map[storiface.ID][]storiface.Decl, error) {
 	return m.storageList, nil
+}
+
+func (m mockApiStorageMiner) StorageRedeclareLocal(ctx context.Context, id *storiface.ID, dropMissing bool) error {
+	return nil
 }
 
 type meshCreatorStub struct {
