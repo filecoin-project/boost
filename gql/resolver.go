@@ -528,12 +528,17 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 	switch checkpoint {
 	case dealcheckpoints.Accepted:
 		if dr.IsOffline {
+			if dr.ProviderDealState.InboundFilePath != "" {
+				return "Verifying Commp"
+			}
 			return "Awaiting Offline Data Import"
 		}
+
 		var pct uint64 = math.MaxUint64
 		if dr.ProviderDealState.Transfer.Size > 0 {
 			pct = (100 * dr.transferred) / dr.ProviderDealState.Transfer.Size
 		}
+
 		switch {
 		case dr.transferred == 0 && !dr.provider.IsTransferStalled(dr.DealUuid):
 			return "Transfer Queued"

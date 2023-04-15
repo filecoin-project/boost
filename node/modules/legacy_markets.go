@@ -2,6 +2,8 @@ package modules
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"path/filepath"
 
 	piecefilestore "github.com/filecoin-project/boost-gfm/filestore"
@@ -40,6 +42,10 @@ func StorageProvider(minerAddress lotus_dtypes.MinerAddress,
 	net := smnet.NewFromLibp2pHost(h)
 
 	dir := filepath.Join(r.Path(), lotus_modules.StagingAreaDirName)
+	err := os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
+		return nil, fmt.Errorf("creating directory for staging legacy markets deals %s: %w", dir, err)
+	}
 
 	store, err := piecefilestore.NewLocalFileStore(piecefilestore.OsPath(dir))
 	if err != nil {
