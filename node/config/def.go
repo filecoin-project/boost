@@ -59,7 +59,9 @@ func DefaultBoost() *Boost {
 		Common: defCommon(),
 
 		Storage: StorageConfig{
-			ParallelFetchLimit: 10,
+			ParallelFetchLimit:            10,
+			StorageListRefreshDuration:    Duration(time.Hour * 12),
+			RedeclareOnStorageListRefresh: true,
 		},
 
 		Graphql: GraphqlConfig{

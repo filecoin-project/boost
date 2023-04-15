@@ -8,6 +8,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/filecoin-project/boost/indexprovider/mock"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
@@ -313,7 +314,9 @@ func setup(t *testing.T) (*UnsealedStateManager, *mock.MockStorageProvider, *moc
 		prov:        prov,
 		meshCreator: &meshCreatorStub{},
 	}
-	usm := NewUnsealedStateManager(wrapper, storageProvider, dealsDB, sectorStateDB, storageMiner)
+
+	cfg := config.StorageConfig{}
+	usm := NewUnsealedStateManager(wrapper, storageProvider, dealsDB, sectorStateDB, storageMiner, cfg)
 	return usm, storageProvider, storageMiner, prov
 }
 

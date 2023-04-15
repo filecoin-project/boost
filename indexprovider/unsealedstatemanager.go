@@ -8,6 +8,7 @@ import (
 
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -32,21 +33,24 @@ type UnsealedStateManager struct {
 	dealsDB    *db.DealsDB
 	sdb        *db.SectorStateDB
 	api        ApiStorageMiner
+	cfg        config.StorageConfig
 }
 
-func NewUnsealedStateManager(idxprov *Wrapper, legacyProv storagemarket.StorageProvider, dealsDB *db.DealsDB, sdb *db.SectorStateDB, api ApiStorageMiner) *UnsealedStateManager {
+func NewUnsealedStateManager(idxprov *Wrapper, legacyProv storagemarket.StorageProvider, dealsDB *db.DealsDB, sdb *db.SectorStateDB, api ApiStorageMiner, cfg config.StorageConfig) *UnsealedStateManager {
 	return &UnsealedStateManager{
 		idxprov:    idxprov,
 		legacyProv: legacyProv,
 		dealsDB:    dealsDB,
 		sdb:        sdb,
 		api:        api,
+		cfg:        cfg,
 	}
 }
 
 func (m *UnsealedStateManager) Run(ctx context.Context) {
-	usmlog.Info("starting unsealed state manager")
-	ticker := time.NewTicker(time.Hour)
+	duration := time.Duration(m.cfg.StorageListRefreshDuration)
+	usmlog.Infof("starting unsealed state manager running on interval %s", duration.String())
+	ticker := time.NewTicker(duration)
 	defer ticker.Stop()
 
 	// Check immediately
@@ -71,6 +75,16 @@ func (m *UnsealedStateManager) Run(ctx context.Context) {
 
 func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 	usmlog.Info("checking for sector state updates")
+
+	// Tell lotus to update it's storage list and remove any removed sectors
+	if m.cfg.RedeclareOnStorageListRefresh {
+		usmlog.Info("redeclaring storage")
+		err := m.api.StorageRedeclareLocal(ctx, nil, true)
+		if err != nil {
+			log.Errorf("redeclaring local storage on lotus miner: %w", err)
+		}
+	}
+
 	stateUpdates, err := m.getStateUpdates(ctx)
 	if err != nil {
 		return err
@@ -153,13 +167,6 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 }
 
 func (m *UnsealedStateManager) getStateUpdates(ctx context.Context) (map[abi.SectorID]db.SealState, error) {
-	// TODO: put this behind a flag and maybe move it out of this function
-	// Tell lotus-miner to update it's storage list and remove any removed sectors
-	err := m.api.StorageRedeclareLocal(ctx, nil, true)
-	if err != nil {
-		log.Errorf("redeclaring local storage on lotus miner: %w", err)
-	}
-
 	// Get the current unsealed state of all sectors from lotus
 	storageList, err := m.api.StorageList(ctx)
 	if err != nil {
