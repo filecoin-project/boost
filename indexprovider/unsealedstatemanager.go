@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/go-address"
@@ -13,7 +15,6 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/metadata"
-	"time"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -destination=./mock/mock.go -package=mock github.com/filecoin-project/boost-gfm/storagemarket StorageProvider
@@ -22,6 +23,7 @@ var usmlog = logging.Logger("unsmgr")
 
 type ApiStorageMiner interface {
 	StorageList(ctx context.Context) (map[storiface.ID][]storiface.Decl, error)
+	StorageRedeclareLocal(ctx context.Context, id *storiface.ID, dropMissing bool) error
 }
 
 type UnsealedStateManager struct {
@@ -79,6 +81,8 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 		return fmt.Errorf("getting legacy deals from datastore: %w", err)
 	}
 
+	usmlog.Debugf("checking for sector state updates for %d states", len(stateUpdates))
+
 	// For each sector
 	for sectorID, sectorSealState := range stateUpdates {
 		// Get the deals in the sector
@@ -86,6 +90,7 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("getting deals for miner %d / sector %d: %w", sectorID.Miner, sectorID.Number, err)
 		}
+		usmlog.Debugf("sector %d has %d deals, seal status %s", sectorID, len(deals), sectorSealState)
 
 		// For each deal in the sector
 		for _, deal := range deals {
@@ -148,6 +153,13 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 }
 
 func (m *UnsealedStateManager) getStateUpdates(ctx context.Context) (map[abi.SectorID]db.SealState, error) {
+	// TODO: put this behind a flag and maybe move it out of this function
+	// Tell lotus-miner to update it's storage list and remove any removed sectors
+	err := m.api.StorageRedeclareLocal(ctx, nil, true)
+	if err != nil {
+		log.Errorf("redeclaring local storage on lotus miner: %w", err)
+	}
+
 	// Get the current unsealed state of all sectors from lotus
 	storageList, err := m.api.StorageList(ctx)
 	if err != nil {
