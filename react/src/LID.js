@@ -628,7 +628,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                     <tr key="data root cid">
                         <th>Data Root CID</th>
                         <td>
-                            { searchIsRootCid ? <strong>{rootCid}</strong> : <span>rootCid</span> }
+                            { searchIsRootCid ? <strong>{rootCid}</strong> : <span>{rootCid}</span> }
                             <a className="download" target="_blank" href={"/download/block/"+rootCid}>
                                 Download block
                             </a>
