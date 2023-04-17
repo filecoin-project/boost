@@ -24,7 +24,7 @@ func GenerateDeals() ([]types.ProviderDealState, error) {
 }
 
 func GenerateNDeals(count int) ([]types.ProviderDealState, error) {
-	provAddr, err := address.NewActorAddress([]byte("f1523"))
+	provAddr, err := address.NewIDAddress(1523)
 	if err != nil {
 		return nil, err
 	}
@@ -93,8 +93,8 @@ func GenerateNDeals(count int) ([]types.ProviderDealState, error) {
 				Checkpoint:     dealcheckpoints.Accepted,
 				Retry:          types.DealRetryAuto,
 				Err:            dealErr,
-				FastRetrieval:  false,
-				AnnounceToIPNI: false,
+				FastRetrieval:  true,
+				AnnounceToIPNI: true,
 			}
 
 			deals = append(deals, deal)

@@ -368,6 +368,10 @@ func HandleRetrieval(host host.Host, lc fx.Lifecycle, m retrievalmarket.Retrieva
 	})
 }
 
+func NewSectorStateDB(sqldb *sql.DB) *db.SectorStateDB {
+	return db.NewSectorStateDB(sqldb)
+}
+
 func HandleLegacyDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, lsp gfm_storagemarket.StorageProvider) error {
 	log.Info("starting legacy storage provider")
 	ctx := helpers.LifecycleCtx(mctx, lc)

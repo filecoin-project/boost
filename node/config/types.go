@@ -290,6 +290,14 @@ func (c *FeeConfig) Legacy() lotus_config.MinerFeeConfig {
 type StorageConfig struct {
 	// The maximum number of concurrent fetch operations to the storage subsystem
 	ParallelFetchLimit int
+	// How frequently Boost should refresh the state of sectors with Lotus. (default: 1hour)
+	// When run, Boost will trigger a storage redeclare on the miner in addition to a storage list.
+	// This ensures that index metadata for sectors reflects their status (removed, unsealed, etc).
+	StorageListRefreshDuration Duration
+	// Whether or not Boost should have lotus redeclare its storage list (default: true).
+	// Disable this if you wish to manually handle the refresh. If manually managing the redeclare
+	// and it is not triggered, retrieval quality for users will be impacted.
+	RedeclareOnStorageListRefresh bool
 }
 
 type LocalIndexDirectoryCouchbaseBucketConfig struct {
