@@ -67,6 +67,7 @@ func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("cfg", "INFO")
 	_ = logging.SetLogLevel("boost-storage-deal", "INFO")
 	_ = logging.SetLogLevel("index-provider-wrapper", "INFO")
+	_ = logging.SetLogLevel("unsmgr", "INFO")
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostd", "DEBUG")
@@ -78,6 +79,7 @@ func before(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("boost-migrator", "DEBUG")
 		_ = logging.SetLogLevel("dagstore", "DEBUG")
 		_ = logging.SetLogLevel("migrator", "DEBUG")
+		_ = logging.SetLogLevel("unsmgr", "DEBUG")
 	}
 
 	return nil

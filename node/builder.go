@@ -426,6 +426,7 @@ var BoostNode = Options(
 	Override(new(*db.LogsDB), modules.NewLogsDB),
 	Override(new(*db.ProposalLogsDB), modules.NewProposalLogsDB),
 	Override(new(*db.FundsDB), modules.NewFundsDB),
+	Override(new(*db.SectorStateDB), modules.NewSectorStateDB),
 	Override(new(*rtvllog.RetrievalLogDB), modules.NewRetrievalLogDB),
 )
 
