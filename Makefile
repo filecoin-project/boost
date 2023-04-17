@@ -132,7 +132,7 @@ update-react: validate-node-version
 	npm run --prefix react build
 .PHONY: react
 
-build-go: boost devnet
+build-go: boost boostd-data devnet
 .PHONY: build-go
 
 build: react build-go
@@ -147,7 +147,7 @@ install-boost:
 	install -C ./boost /usr/local/bin/boost
 	install -C ./boostd /usr/local/bin/boostd
 	install -C ./boostx /usr/local/bin/boostx
-	install -C ./extern/boostd-data /usr/local/bin/boostd-data
+	install -C ./boostd-data /usr/local/bin/boostd-data
 
 install-devnet:
 	install -C ./devnet /usr/local/bin/devnet
