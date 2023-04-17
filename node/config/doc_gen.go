@@ -532,7 +532,7 @@ see https://boost.filecoin.io/configuration/deal-filters for more details`,
 			Name: "StorageListRefreshDuration",
 			Type: "Duration",
 
-			Comment: `How frequently Boost should refresh the state of sectors with Lotus. (default: 12hours)
+			Comment: `How frequently Boost should refresh the state of sectors with Lotus. (default: 1hour)
 When run, Boost will trigger a storage redeclare on the miner in addition to a storage list.
 This ensures that index metadata for sectors reflects their status (removed, unsealed, etc).`,
 		},

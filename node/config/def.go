@@ -60,7 +60,7 @@ func DefaultBoost() *Boost {
 
 		Storage: StorageConfig{
 			ParallelFetchLimit:            10,
-			StorageListRefreshDuration:    Duration(time.Hour * 12),
+			StorageListRefreshDuration:    Duration(time.Hour * 1),
 			RedeclareOnStorageListRefresh: true,
 		},
 
