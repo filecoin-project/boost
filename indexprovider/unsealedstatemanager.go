@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -13,7 +16,6 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/metadata"
-	"time"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -destination=./mock/mock.go -package=mock github.com/filecoin-project/boost-gfm/storagemarket StorageProvider
@@ -22,6 +24,7 @@ var usmlog = logging.Logger("unsmgr")
 
 type ApiStorageMiner interface {
 	StorageList(ctx context.Context) (map[storiface.ID][]storiface.Decl, error)
+	StorageRedeclareLocal(ctx context.Context, id *storiface.ID, dropMissing bool) error
 }
 
 type UnsealedStateManager struct {
@@ -30,21 +33,24 @@ type UnsealedStateManager struct {
 	dealsDB    *db.DealsDB
 	sdb        *db.SectorStateDB
 	api        ApiStorageMiner
+	cfg        config.StorageConfig
 }
 
-func NewUnsealedStateManager(idxprov *Wrapper, legacyProv storagemarket.StorageProvider, dealsDB *db.DealsDB, sdb *db.SectorStateDB, api ApiStorageMiner) *UnsealedStateManager {
+func NewUnsealedStateManager(idxprov *Wrapper, legacyProv storagemarket.StorageProvider, dealsDB *db.DealsDB, sdb *db.SectorStateDB, api ApiStorageMiner, cfg config.StorageConfig) *UnsealedStateManager {
 	return &UnsealedStateManager{
 		idxprov:    idxprov,
 		legacyProv: legacyProv,
 		dealsDB:    dealsDB,
 		sdb:        sdb,
 		api:        api,
+		cfg:        cfg,
 	}
 }
 
 func (m *UnsealedStateManager) Run(ctx context.Context) {
-	usmlog.Info("starting unsealed state manager")
-	ticker := time.NewTicker(time.Hour)
+	duration := time.Duration(m.cfg.StorageListRefreshDuration)
+	usmlog.Infof("starting unsealed state manager running on interval %s", duration.String())
+	ticker := time.NewTicker(duration)
 	defer ticker.Stop()
 
 	// Check immediately
@@ -69,6 +75,16 @@ func (m *UnsealedStateManager) Run(ctx context.Context) {
 
 func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 	usmlog.Info("checking for sector state updates")
+
+	// Tell lotus to update it's storage list and remove any removed sectors
+	if m.cfg.RedeclareOnStorageListRefresh {
+		usmlog.Info("redeclaring storage")
+		err := m.api.StorageRedeclareLocal(ctx, nil, true)
+		if err != nil {
+			log.Errorf("redeclaring local storage on lotus miner: %w", err)
+		}
+	}
+
 	stateUpdates, err := m.getStateUpdates(ctx)
 	if err != nil {
 		return err
@@ -79,6 +95,8 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 		return fmt.Errorf("getting legacy deals from datastore: %w", err)
 	}
 
+	usmlog.Debugf("checking for sector state updates for %d states", len(stateUpdates))
+
 	// For each sector
 	for sectorID, sectorSealState := range stateUpdates {
 		// Get the deals in the sector
@@ -86,6 +104,7 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("getting deals for miner %d / sector %d: %w", sectorID.Miner, sectorID.Number, err)
 		}
+		usmlog.Debugf("sector %d has %d deals, seal status %s", sectorID, len(deals), sectorSealState)
 
 		// For each deal in the sector
 		for _, deal := range deals {
