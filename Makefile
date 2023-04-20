@@ -200,7 +200,7 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=v1.20.0-rc1
+lotus_version?=v1.22.0-rc4
 ffi_from_source?=0
 build_lotus?=0
 ifeq ($(build_lotus),1)
@@ -226,7 +226,7 @@ $(lotus_src_dir):
 	git clone --depth 1 --branch $(lotus_version) https://github.com/filecoin-project/lotus $@
 update/lotus: $(lotus_src_dir)
 	cd $(lotus_src_dir) && git pull
-.PHONY: update/lotus	
+.PHONY: update/lotus
 
 docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_src_dir)
 	cd $(lotus_src_dir) && $(docker_build_cmd) -f Dockerfile --target lotus-all-in-one \
