@@ -11,12 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -26,6 +25,7 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 var testCouchSettings = couchbase.DBSettings{
@@ -46,6 +46,10 @@ var testCouchSettings = couchbase.DBSettings{
 	TestMode: true,
 }
 
+var testYugaSettings = yugabyte.DBSettings{
+	ConnectString: "127.0.0.1",
+}
+
 func TestService(t *testing.T) {
 	_ = logging.SetLogLevel("*", "debug")
 
@@ -54,8 +58,14 @@ func TestService(t *testing.T) {
 		defer cancel()
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
+
+		addr := "localhost:8042"
+		err = bdsvc.Start(ctx, addr)
+		require.NoError(t, err)
+
 		testService(ctx, t, bdsvc, "localhost:8042")
 	})
+
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container in CI as part of the test
@@ -66,16 +76,39 @@ func TestService(t *testing.T) {
 		defer cancel()
 		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
-		testService(ctx, t, bdsvc, "localhost:8043")
+
+		addr := "localhost:8043"
+		err := bdsvc.Start(ctx, addr)
+		require.NoError(t, err)
+
+		testService(ctx, t, bdsvc, addr)
+	})
+
+	t.Run("yugabyte", func(t *testing.T) {
+		// Running couchbase tests may require download the docker container
+		// so set a high timeout
+		//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		bdsvc := NewYugabyte(testYugaSettings)
+
+		addr := "localhost:8044"
+		err := bdsvc.Start(ctx, addr)
+		require.NoError(t, err)
+
+		ybstore := bdsvc.impl.(*yugabyte.Store)
+		err = ybstore.Drop(ctx)
+		require.NoError(t, err)
+		err = ybstore.Create(ctx)
+		require.NoError(t, err)
+
+		testService(ctx, t, bdsvc, addr)
 	})
 }
 
 func testService(ctx context.Context, t *testing.T, bdsvc *Service, addr string) {
-	err := bdsvc.Start(ctx, addr)
-	require.NoError(t, err)
-
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), fmt.Sprintf("http://%s", addr))
+	err := cl.Dial(context.Background(), fmt.Sprintf("http://%s", addr))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
