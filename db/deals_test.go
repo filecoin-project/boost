@@ -294,7 +294,7 @@ func TestSqlDbBkp(t *testing.T) {
 	require.NoError(t, f.Close())
 
 	dir := t.TempDir()
-	err = SqlBackup(sqldb, dir, "test_db.db")
+	err = SqlBackup(ctx, sqldb, dir, "test_db.db")
 	require.NoError(t, err)
 
 	bdb, err := SqlDB(path.Join(dir, "test_db.db"))
