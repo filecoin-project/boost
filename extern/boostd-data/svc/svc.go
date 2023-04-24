@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/gorilla/mux"
 	logging "github.com/ipfs/go-log/v2"
@@ -23,6 +24,10 @@ var (
 
 type Service struct {
 	impl types.ServiceImpl
+}
+
+func NewYugabyte(settings yugabyte.DBSettings) *Service {
+	return &Service{impl: yugabyte.NewStore(settings)}
 }
 
 func NewCouchbase(settings couchbase.DBSettings) *Service {
