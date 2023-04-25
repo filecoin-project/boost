@@ -85,11 +85,13 @@ func TestService(t *testing.T) {
 	})
 
 	t.Run("yugabyte", func(t *testing.T) {
-		// Running couchbase tests may require download the docker container
+		// Running yugabyte tests may require download the docker container
 		// so set a high timeout
-		//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
+
+		SetupYugabyte(t)
+
 		bdsvc := NewYugabyte(testYugaSettings)
 
 		addr := "localhost:8044"
@@ -151,6 +153,24 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service, addr string)
 	require.Len(t, dis, 1)
 	require.Equal(t, di, dis[0])
 
+	// Add a second deal
+	di2 := model.DealInfo{
+		DealUuid:    uuid.NewString(),
+		SectorID:    abi.SectorNumber(11),
+		PieceOffset: 11,
+		PieceLength: 12,
+		CarLength:   13,
+	}
+	err = cl.AddDealForPiece(ctx, pieceCid, di2)
+	require.NoError(t, err)
+
+	// There should now be two deals
+	dis, err = cl.GetPieceDeals(ctx, pieceCid)
+	require.NoError(t, err)
+	require.Len(t, dis, 2)
+	require.Contains(t, dis, di)
+	require.Contains(t, dis, di2)
+
 	b, err := hex.DecodeString("1220ff63d7689e2d9567d1a90a7a68425f430137142e1fbc28fe4780b9ee8a5ef842")
 	require.NoError(t, err)
 
@@ -197,24 +217,45 @@ func TestServiceFuzz(t *testing.T) {
 	t.Run("level db", func(t *testing.T) {
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
-		testServiceFuzz(ctx, t, bdsvc, "localhost:8042")
+		addr := "localhost:8042"
+		err = bdsvc.Start(ctx, addr)
+		require.NoError(t, err)
+		testServiceFuzz(ctx, t, addr)
 	})
+
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container in CI as part of the test
 		t.Skip()
 		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
-		testServiceFuzz(ctx, t, bdsvc, "localhost:8043")
+		addr := "localhost:8043"
+		err := bdsvc.Start(ctx, addr)
+		require.NoError(t, err)
+		testServiceFuzz(ctx, t, addr)
+	})
+
+	t.Run("yugabyte", func(t *testing.T) {
+		SetupYugabyte(t)
+		bdsvc := NewYugabyte(testYugaSettings)
+
+		addr := "localhost:8044"
+		err := bdsvc.Start(ctx, addr)
+		require.NoError(t, err)
+
+		ybstore := bdsvc.impl.(*yugabyte.Store)
+		err = ybstore.Drop(ctx)
+		require.NoError(t, err)
+		err = ybstore.Create(ctx)
+		require.NoError(t, err)
+
+		testServiceFuzz(ctx, t, addr)
 	})
 }
 
-func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service, addr string) {
-	err := bdsvc.Start(ctx, addr)
-	require.NoError(t, err)
-
+func testServiceFuzz(ctx context.Context, t *testing.T, addr string) {
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), "http://localhost:8042")
+	err := cl.Dial(context.Background(), "http://"+addr)
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
