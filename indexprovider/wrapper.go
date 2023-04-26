@@ -41,9 +41,11 @@ type Wrapper struct {
 	piecedirectory *piecedirectory.PieceDirectory
 	meshCreator    idxprov.MeshCreator
 	h              host.Host
+	usm            *UnsealedStateManager
 	// bitswapEnabled records whether to announce bitswap as an available
 	// protocol to the network indexer
 	bitswapEnabled bool
+	stop           context.CancelFunc
 }
 
 func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
@@ -76,31 +78,32 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 			piecedirectory: piecedirectory,
 			bitswapEnabled: bitswapEnabled,
 		}
-
-		runCtx, runCancel := context.WithCancel(context.Background())
-		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				// Watch for changes in sector unseal state and update the
-				// indexer when there are changes
-				usm := NewUnsealedStateManager(w, legacyProv, dealsDB, ssDB, storageService, w.cfg.Storage)
-				go usm.Run(runCtx)
-
-				// Announce all deals on startup in case of a config change
-				go func() {
-					err := w.AnnounceExtendedProviders(ctx)
-					if err != nil {
-						log.Warnf("announcing extended providers: %w", err)
-					}
-				}()
-				return nil
-			},
-			OnStop: func(ctx context.Context) error {
-				runCancel()
-				return nil
-			},
-		})
+		w.usm = NewUnsealedStateManager(w, legacyProv, dealsDB, ssDB, storageService, w.cfg.Storage)
 		return w, nil
 	}
+}
+
+func (w *Wrapper) Start(ctx context.Context) {
+	w.prov.RegisterMultihashLister(w.MultihashLister)
+
+	runCtx, runCancel := context.WithCancel(context.Background())
+	w.stop = runCancel
+
+	// Watch for changes in sector unseal state and update the
+	// indexer when there are changes
+	go w.usm.Run(runCtx)
+
+	// Announce all deals on startup in case of a config change
+	go func() {
+		err := w.AnnounceExtendedProviders(runCtx)
+		if err != nil {
+			log.Warnf("announcing extended providers: %w", err)
+		}
+	}()
+}
+
+func (w *Wrapper) Stop() {
+	w.stop()
 }
 
 func (w *Wrapper) Enabled() bool {
@@ -276,10 +279,6 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 
 	log.Infow("finished announcing all boost deals to Indexer", "number of deals", nSuccess, "number of shards", len(shards))
 	return merr
-}
-
-func (w *Wrapper) Start(ctx context.Context) {
-	w.prov.RegisterMultihashLister(w.MultihashLister)
 }
 
 func (w *Wrapper) MultihashLister(ctx context.Context, prov peer.ID, contextID []byte) (provider.MultihashIterator, error) {
