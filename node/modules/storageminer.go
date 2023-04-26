@@ -408,31 +408,21 @@ func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Pr
 				}
 				log.Info("legacy storage provider started successfully")
 
-				// Start the Boost SP
-				log.Info("starting boost storage provider")
-				err = prov.Start()
-				if err != nil {
-					return fmt.Errorf("starting storage provider: %w", err)
-				}
-				lp2pnet.Start(ctx)
-				log.Info("boost storage provider started successfully")
-
-				// Start the Boost Index Provider.
-				// It overrides the multihash lister registered by the legacy
-				// index provider so it must start after the legacy SP.
-				log.Info("starting boost index provider wrapper")
-				idxProv.Start(ctx)
-				log.Info("boost index provider wrapper started successfully")
-				return nil
-			},
-			OnStop: func(ctx context.Context) error {
-				lp2pnet.Stop()
-				prov.Stop()
-				idxProv.Stop()
-				return nil
-			},
-		})
-	}
+			// Start the Boost Index Provider.
+			// It overrides the multihash lister registered by the legacy
+			// index provider so it must start after the legacy SP.
+			log.Info("starting boost index provider wrapper")
+			idxProv.Start(ctx)
+			log.Info("boost index provider wrapper started successfully")
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			lp2pnet.Stop()
+			prov.Stop()
+			idxProv.Stop()
+			return nil
+		},
+	})
 }
 
 func HandleContractDeals(c *config.ContractDealsConfig) func(mctx helpers.MetricsCtx, lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode, subCh *gateway.EthSubHandler, maddr lotus_dtypes.MinerAddress) {
