@@ -133,7 +133,7 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 					usmlog.Infow("announced to index provider that deal has been removed",
 						"deal id", deal.DealID, "sector id", deal.SectorID.Number, "announce cid", announceCid.String())
 				}
-			} else {
+			} else if sectorSealState != db.SealStateCache {
 				// Announce deals that have changed seal state to indexer
 				md := metadata.GraphsyncFilecoinV1{
 					PieceCID:      deal.DealProposal.Proposal.PieceCID,
@@ -174,17 +174,24 @@ func (m *UnsealedStateManager) getStateUpdates(ctx context.Context) (map[abi.Sec
 	}
 
 	// Convert to a map of <sector id> => <seal state>
-	sectorStates := make(map[abi.SectorID]db.SealState, len(storageList))
+	sectorStates := make(map[abi.SectorID]db.SealState)
 	for _, storageStates := range storageList {
 		for _, storageState := range storageStates {
-			var sealState db.SealState
+			// Explicity set the sector state if its Sealed or Unsealed
 			switch {
 			case storageState.SectorFileType.Has(storiface.FTUnsealed):
-				sealState = db.SealStateUnsealed
+				sectorStates[storageState.SectorID] = db.SealStateUnsealed
 			case storageState.SectorFileType.Has(storiface.FTSealed):
-				sealState = db.SealStateSealed
+				if state, ok := sectorStates[storageState.SectorID]; !ok || state != db.SealStateUnsealed {
+					sectorStates[storageState.SectorID] = db.SealStateSealed
+				}
 			}
-			sectorStates[storageState.SectorID] = sealState
+
+			// If the state hasnt been set it should be in the cache, mark it so we dont remove
+			// This may get overriden by the sealed status if it comes after in the list, which is fine
+			if _, ok := sectorStates[storageState.SectorID]; !ok {
+				sectorStates[storageState.SectorID] = db.SealStateCache
+			}
 		}
 	}
 
@@ -199,8 +206,8 @@ func (m *UnsealedStateManager) getStateUpdates(ctx context.Context) (map[abi.Sec
 	for _, previousSectorState := range previousSectorStates {
 		sealState, ok := sectorStates[previousSectorState.SectorID]
 		if ok {
-			// Check if the state has changed
-			if previousSectorState.SealState != sealState {
+			// Check if the state has changed, ignore if the new state is cache
+			if previousSectorState.SealState != sealState && sealState != db.SealStateCache {
 				sealStateUpdates[previousSectorState.SectorID] = sealState
 			}
 			// Delete the sector from the map - at the end the remaining
