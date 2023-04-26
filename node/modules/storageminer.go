@@ -429,6 +429,7 @@ func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Pr
 		OnStop: func(ctx context.Context) error {
 			lp2pnet.Stop()
 			prov.Stop()
+			idxProv.Stop()
 			return nil
 		},
 	})

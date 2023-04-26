@@ -43,9 +43,11 @@ type Wrapper struct {
 	dagStore    *dagstore.Wrapper
 	meshCreator idxprov.MeshCreator
 	h           host.Host
+	usm         *UnsealedStateManager
 	// bitswapEnabled records whether to announce bitswap as an available
 	// protocol to the network indexer
 	bitswapEnabled bool
+	stop           context.CancelFunc
 }
 
 func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
@@ -76,31 +78,13 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 			bitswapEnabled: bitswapEnabled,
 			enabled:        !isDisabled,
 		}
-
-		runCtx, runCancel := context.WithCancel(context.Background())
-		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				// Watch for changes in sector unseal state and update the
-				// indexer when there are changes
-				usm := NewUnsealedStateManager(w, legacyProv, dealsDB, ssDB, storageService, w.cfg.Storage)
-				go usm.Run(runCtx)
-
-				// Announce all deals on startup in case of a config change
-				go func() {
-					err := w.AnnounceExtendedProviders(ctx)
-					if err != nil {
-						log.Warnf("announcing extended providers: %w", err)
-					}
-				}()
-				return nil
-			},
-			OnStop: func(ctx context.Context) error {
-				runCancel()
-				return nil
-			},
-		})
+		w.usm = NewUnsealedStateManager(w, legacyProv, dealsDB, ssDB, storageService, w.cfg.Storage)
 		return w, nil
 	}
+}
+
+func (w *Wrapper) Stop() {
+	w.stop()
 }
 
 func (w *Wrapper) Enabled() bool {
@@ -320,6 +304,21 @@ func (w *Wrapper) Start(ctx context.Context) {
 
 		return nil, fmt.Errorf("failed to look up deal in Boost, err=%s and Legacy Markets, err=%s", boostErr, legacyErr)
 	})
+
+	runCtx, runCancel := context.WithCancel(context.Background())
+	w.stop = runCancel
+
+	// Watch for changes in sector unseal state and update the
+	// indexer when there are changes
+	go w.usm.Run(runCtx)
+
+	// Announce all deals on startup in case of a config change
+	go func() {
+		err := w.AnnounceExtendedProviders(runCtx)
+		if err != nil {
+			log.Warnf("announcing extended providers: %w", err)
+		}
+	}()
 }
 
 func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, deal *types.ProviderDealState) (cid.Cid, error) {

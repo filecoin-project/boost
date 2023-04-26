@@ -3,8 +3,9 @@ package db
 import (
 	"context"
 	"database/sql"
-	"github.com/filecoin-project/go-state-types/abi"
 	"time"
+
+	"github.com/filecoin-project/go-state-types/abi"
 )
 
 type SealState string
@@ -12,6 +13,7 @@ type SealState string
 const SealStateSealed SealState = "Sealed"
 const SealStateUnsealed SealState = "Unsealed"
 const SealStateRemoved SealState = "Removed"
+const SealStateCache SealState = "Cache"
 
 type SectorState struct {
 	SectorID  abi.SectorID
