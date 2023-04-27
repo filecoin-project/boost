@@ -47,7 +47,8 @@ var testCouchSettings = couchbase.DBSettings{
 }
 
 var testYugaSettings = yugabyte.DBSettings{
-	ConnectString: "127.0.0.1",
+	Hosts:         []string{"127.0.0.1"},
+	ConnectString: "postgresql://postgres:postgres@localhost",
 }
 
 func TestService(t *testing.T) {
@@ -98,7 +99,7 @@ func TestService(t *testing.T) {
 		err := bdsvc.Start(ctx, addr)
 		require.NoError(t, err)
 
-		ybstore := bdsvc.impl.(*yugabyte.Store)
+		ybstore := bdsvc.Impl.(*yugabyte.Store)
 		err = ybstore.Drop(ctx)
 		require.NoError(t, err)
 		err = ybstore.Create(ctx)
@@ -243,7 +244,7 @@ func TestServiceFuzz(t *testing.T) {
 		err := bdsvc.Start(ctx, addr)
 		require.NoError(t, err)
 
-		ybstore := bdsvc.impl.(*yugabyte.Store)
+		ybstore := bdsvc.Impl.(*yugabyte.Store)
 		err = ybstore.Drop(ctx)
 		require.NoError(t, err)
 		err = ybstore.Create(ctx)

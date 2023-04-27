@@ -7,11 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
+	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -28,9 +30,6 @@ func TestPieceDoctor(t *testing.T) {
 		prev := ldb.MinPieceCheckPeriod
 		ldb.MinPieceCheckPeriod = 1 * time.Second
 
-		prevp := ldb.PiecesToTrackerBatchSize
-		ldb.PiecesToTrackerBatchSize = 4
-
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
 
@@ -44,7 +43,11 @@ func TestPieceDoctor(t *testing.T) {
 		defer cl.Close(ctx)
 
 		t.Run("next pieces pagination", func(t *testing.T) {
-			testNextPiecesPagination(ctx, t, cl, ldb.MinPieceCheckPeriod)
+			prevp := ldb.PiecesToTrackerBatchSize
+			testNextPiecesPagination(ctx, t, cl, func(pageSize int) {
+				ldb.PiecesToTrackerBatchSize = pageSize
+			})
+			ldb.PiecesToTrackerBatchSize = prevp
 		})
 
 		t.Run("check pieces", func(t *testing.T) {
@@ -52,8 +55,8 @@ func TestPieceDoctor(t *testing.T) {
 		})
 
 		ldb.MinPieceCheckPeriod = prev
-		ldb.PiecesToTrackerBatchSize = prevp
 	})
+
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container in CI
@@ -84,6 +87,51 @@ func TestPieceDoctor(t *testing.T) {
 
 		couchbase.MinPieceCheckPeriod = prev
 	})
+
+	t.Run("yugabyte", func(t *testing.T) {
+		prev := yugabyte.MinPieceCheckPeriod
+		yugabyte.MinPieceCheckPeriod = 1 * time.Second
+
+		svc.SetupYugabyte(t)
+
+		bdsvc := svc.NewYugabyte(yugabyte.DBSettings{
+			Hosts:         []string{"127.0.0.1"},
+			ConnectString: "postgresql://postgres:postgres@localhost",
+		})
+
+		addr := "localhost:8044"
+		err := bdsvc.Start(ctx, addr)
+		require.NoError(t, err)
+
+		ybstore := bdsvc.Impl.(*yugabyte.Store)
+		err = ybstore.Drop(ctx)
+		require.NoError(t, err)
+		err = ybstore.Create(ctx)
+		require.NoError(t, err)
+
+		cl := client.NewStore()
+		err = cl.Dial(ctx, fmt.Sprintf("http://%s", addr))
+		require.NoError(t, err)
+		defer cl.Close(ctx)
+
+		t.Run("next pieces", func(t *testing.T) {
+			testNextPieces(ctx, t, cl, yugabyte.MinPieceCheckPeriod)
+		})
+
+		t.Run("next pieces pagination", func(t *testing.T) {
+			prevp := yugabyte.TrackerCheckBatchSize
+			testNextPiecesPagination(ctx, t, cl, func(pageSize int) {
+				yugabyte.TrackerCheckBatchSize = pageSize
+			})
+			yugabyte.TrackerCheckBatchSize = prevp
+		})
+
+		t.Run("check pieces", func(t *testing.T) {
+			testCheckPieces(ctx, t, cl)
+		})
+
+		yugabyte.MinPieceCheckPeriod = prev
+	})
 }
 
 // Verify that after a new piece is added
@@ -92,7 +140,6 @@ func TestPieceDoctor(t *testing.T) {
 func testNextPieces(ctx context.Context, t *testing.T, cl *client.Store, pieceCheckPeriod time.Duration) {
 	// Add a new piece
 	pieceCid := blocks.NewBlock([]byte(fmt.Sprintf("%d", time.Now().UnixMilli()))).Cid()
-	fmt.Println(pieceCid)
 	di := model.DealInfo{
 		DealUuid:    uuid.New().String(),
 		ChainDealID: 1,
@@ -127,14 +174,14 @@ func testNextPieces(ctx context.Context, t *testing.T, cl *client.Store, pieceCh
 	require.Contains(t, pcids, pieceCid)
 }
 
-func testNextPiecesPagination(ctx context.Context, t *testing.T, cl *client.Store, pieceCheckPeriod time.Duration) {
-	// Add 8 pieces
-	allPcids := make(map[cid.Cid]struct{})
+func testNextPiecesPagination(ctx context.Context, t *testing.T, cl *client.Store, setPageSize func(int)) {
+	setPageSize(4)
+
+	// Add 9 pieces
 	seen := make(map[cid.Cid]int)
 
 	for i := 1; i <= 9; i++ {
-		pieceCid := blocks.NewBlock([]byte(fmt.Sprintf("%d%d", time.Now().UnixMilli(), i))).Cid()
-		fmt.Println(pieceCid)
+		pieceCid := testutil.GenerateCid()
 		di := model.DealInfo{
 			DealUuid:    uuid.New().String(),
 			ChainDealID: abi.DealID(i),
@@ -144,8 +191,6 @@ func testNextPiecesPagination(ctx context.Context, t *testing.T, cl *client.Stor
 		}
 		err := cl.AddDealForPiece(ctx, pieceCid, di)
 		require.NoError(t, err)
-
-		allPcids[pieceCid] = struct{}{}
 	}
 
 	// expect to get 4 pieces
@@ -191,19 +236,16 @@ func testNextPiecesPagination(ctx context.Context, t *testing.T, cl *client.Stor
 
 	// Add 1 more piece
 	for i := 1; i <= 1; i++ {
-		pieceCid := blocks.NewBlock([]byte(fmt.Sprintf("%d%d", time.Now().UnixMilli(), i))).Cid()
-		fmt.Println(pieceCid)
+		pieceCid := testutil.GenerateCid()
 		di := model.DealInfo{
 			DealUuid:    uuid.New().String(),
-			ChainDealID: abi.DealID(i),
-			SectorID:    abi.SectorNumber(i),
+			ChainDealID: abi.DealID(100),
+			SectorID:    abi.SectorNumber(100),
 			PieceOffset: 0,
 			PieceLength: 2048,
 		}
 		err := cl.AddDealForPiece(ctx, pieceCid, di)
 		require.NoError(t, err)
-
-		allPcids[pieceCid] = struct{}{}
 	}
 
 	// wait to reset the interval and start from scratch
