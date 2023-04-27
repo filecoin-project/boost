@@ -23,15 +23,15 @@ var (
 )
 
 type Service struct {
-	impl types.ServiceImpl
+	Impl types.ServiceImpl
 }
 
 func NewYugabyte(settings yugabyte.DBSettings) *Service {
-	return &Service{impl: yugabyte.NewStore(settings)}
+	return &Service{Impl: yugabyte.NewStore(settings)}
 }
 
 func NewCouchbase(settings couchbase.DBSettings) *Service {
-	return &Service{impl: couchbase.NewStore(settings)}
+	return &Service{Impl: couchbase.NewStore(settings)}
 }
 
 func NewLevelDB(repoPath string) (*Service, error) {
@@ -43,7 +43,7 @@ func NewLevelDB(repoPath string) (*Service, error) {
 		}
 	}
 
-	return &Service{impl: ldb.NewStore(repoPath)}, nil
+	return &Service{Impl: ldb.NewStore(repoPath)}, nil
 }
 
 func MakeLevelDBDir(repoPath string) (string, error) {
@@ -60,13 +60,13 @@ func (s *Service) Start(ctx context.Context, addr string) error {
 		return fmt.Errorf("setting up listener for local index directory service: %w", err)
 	}
 
-	err = s.impl.Start(ctx)
+	err = s.Impl.Start(ctx)
 	if err != nil {
 		return fmt.Errorf("starting local index directory service: %w", err)
 	}
 
 	server := jsonrpc.NewServer()
-	server.Register("boostddata", s.impl)
+	server.Register("boostddata", s.Impl)
 	router := mux.NewRouter()
 	router.Handle("/", server)
 

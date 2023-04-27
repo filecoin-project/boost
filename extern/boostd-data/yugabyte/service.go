@@ -13,7 +13,7 @@ import (
 	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/yugabyte/gocql"
-	"go.opentelemetry.io/otel/attribute"
+	"github.com/yugabyte/pgx/v4/pgxpool"
 	"golang.org/x/sync/errgroup"
 	"time"
 )
@@ -25,7 +25,11 @@ var log = logging.Logger("boostd-data-yb")
 const pieceMetadataVersion = "1"
 
 type DBSettings struct {
-	ConnectString            string
+	// The cassandra hosts to connect to
+	Hosts []string
+	// The postgres connect string
+	ConnectString string
+	// The number of threads to use when inserting into the PayloadToPieces index
 	PayloadPiecesParallelism int
 }
 
@@ -33,6 +37,7 @@ type Store struct {
 	settings DBSettings
 	cluster  *gocql.ClusterConfig
 	session  *gocql.Session
+	db       *pgxpool.Pool
 }
 
 var _ types.ServiceImpl = (*Store)(nil)
@@ -42,7 +47,7 @@ func NewStore(settings DBSettings) *Store {
 		settings.PayloadPiecesParallelism = 16
 	}
 
-	cluster := gocql.NewCluster(settings.ConnectString)
+	cluster := gocql.NewCluster(settings.Hosts...)
 	//cluster.Timeout = 30 * time.Second
 	//cluster.ConnectTimeout = 30 * time.Second
 	return &Store{
@@ -57,6 +62,13 @@ func (s *Store) Start(ctx context.Context) error {
 		return fmt.Errorf("creating yugabyte cluster: %w", err)
 	}
 	s.session = session
+
+	db, err := pgxpool.Connect(context.Background(), s.settings.ConnectString)
+	if err != nil {
+		return fmt.Errorf("connecting to database: %w", err)
+	}
+	s.db = db
+
 	return nil
 }
 
@@ -85,8 +97,8 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 }
 
 func (s *Store) createPieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
-	qry := `INSERT INTO idx.PieceMetadata (PieceCid, Version) VALUES (?, ?) IF NOT EXISTS`
-	err := s.session.Query(qry, pieceCid.String(), pieceMetadataVersion).WithContext(ctx).Exec()
+	qry := `INSERT INTO idx.PieceMetadata (PieceCid, Version, CreatedAt) VALUES (?, ?, ?) IF NOT EXISTS`
+	err := s.session.Query(qry, pieceCid.String(), pieceMetadataVersion, time.Now()).WithContext(ctx).Exec()
 	if err != nil {
 		return fmt.Errorf("inserting piece metadata for piece %s: %w", pieceCid, err)
 	}
@@ -413,50 +425,6 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	}
 
 	return pcids, nil
-}
-
-func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "store.next_pieces_to_check")
-	defer span.End()
-
-	return nil, nil
-}
-
-func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
-	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
-	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
-	defer span.End()
-
-	return nil
-}
-
-func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
-	ctx, span := tracing.Tracer.Start(ctx, "store.unflag_piece")
-	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
-	defer span.End()
-
-	return nil
-}
-
-func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces")
-	var spanCursor int
-	if cursor != nil {
-		spanCursor = int(cursor.UnixMilli())
-	}
-	span.SetAttributes(attribute.Int("cursor", spanCursor))
-	span.SetAttributes(attribute.Int("offset", offset))
-	span.SetAttributes(attribute.Int("limit", limit))
-	defer span.End()
-
-	return nil, nil
-}
-
-func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_count")
-	defer span.End()
-
-	return 0, nil
 }
 
 // RemoveDealForPiece removes Single deal for pieceCID. If []Deals is empty then Metadata is removed as well

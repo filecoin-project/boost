@@ -10,32 +10,53 @@ import (
 //go:embed create.cql
 var createCQL string
 
+//go:embed create.sql
+var createSQL string
+
 func (s *Store) Create(ctx context.Context) error {
-	createTablesLines := strings.Split(createCQL, ";")
-	for _, line := range createTablesLines {
+	err := s.execScript(ctx, createCQL, s.execCQL)
+	if err != nil {
+		return err
+	}
+	return s.execScript(ctx, createSQL, s.execSQL)
+}
+
+//go:embed drop.cql
+var dropCQL string
+
+//go:embed drop.sql
+var dropSQL string
+
+func (s *Store) Drop(ctx context.Context) error {
+	err := s.execScript(ctx, dropCQL, s.execCQL)
+	if err != nil {
+		return err
+	}
+	return s.execScript(ctx, dropSQL, s.execSQL)
+}
+
+func (s *Store) execScript(ctx context.Context, cqlstr string, exec func(context.Context, string) error) error {
+	lines := strings.Split(cqlstr, ";")
+	for _, line := range lines {
 		line = strings.Trim(line, "\n \t")
 		if line == "" {
 			continue
 		}
 		log.Debug(line)
-		err := s.session.Query(line).WithContext(ctx).Exec()
+		err := exec(ctx, line)
 		if err != nil {
-			return fmt.Errorf("creating tables: executing\n%s\n%w", line, err)
+			return fmt.Errorf("executing\n%s\n%w", line, err)
 		}
 	}
 
 	return nil
 }
 
-func (s *Store) Drop(ctx context.Context) error {
-	tables := []string{`PayloadToPieces`, `PieceBlockOffsetSize`, `PieceMetadata`, `PieceDeal`}
-	for _, tbl := range tables {
-		qry := `drop table if exists idx.` + tbl
-		log.Debug(qry)
-		err := s.session.Query(qry).WithContext(ctx).Exec()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+func (s *Store) execCQL(ctx context.Context, query string) error {
+	return s.session.Query(query).WithContext(ctx).Exec()
+}
+
+func (s *Store) execSQL(ctx context.Context, query string) error {
+	_, err := s.db.Exec(ctx, query)
+	return err
 }

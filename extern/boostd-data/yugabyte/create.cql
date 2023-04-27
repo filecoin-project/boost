@@ -14,13 +14,16 @@ CREATE TABLE idx.PieceBlockOffsetSize (
 );
 
 CREATE TABLE idx.PieceMetadata (
-    PieceCid BLOB PRIMARY KEY,
+    PieceCid TEXT PRIMARY KEY,
     Version TEXT,
+    CreatedAt TIMESTAMP,
     IndexedAt TIMESTAMP,
     CompleteIndex BOOLEAN,
     Error TEXT,
     ErrorType Text
-);
+) WITH transactions = { 'enabled' : true };
+
+CREATE INDEX PieceMetadataCreatedAt ON idx.PieceMetadata (CreatedAt);
 
 CREATE TABLE idx.PieceDeal (
     DealUuid TEXT PRIMARY KEY,
