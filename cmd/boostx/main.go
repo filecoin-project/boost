@@ -38,6 +38,7 @@ func main() {
 			marketWithdrawCmd,
 			statsCmd,
 			sectorCmd,
+			disasterRecoveryCmd,
 		},
 	}
 	app.Setup()
@@ -49,6 +50,7 @@ func main() {
 
 func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("boostx", "INFO")
+	_ = logging.SetLogLevel("sectoraccessor", "DEBUG")
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostx", "DEBUG")
