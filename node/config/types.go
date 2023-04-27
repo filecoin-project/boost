@@ -73,6 +73,8 @@ type WalletsConfig struct {
 }
 
 type GraphqlConfig struct {
+	// The ip address the GraphQL server will bind to. Default: 0.0.0.0
+	ListenAddress string
 	// The port that the graphql server listens on
 	Port uint64
 }

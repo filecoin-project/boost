@@ -65,7 +65,8 @@ func DefaultBoost() *Boost {
 		},
 
 		Graphql: GraphqlConfig{
-			Port: 8080,
+			ListenAddress: "0.0.0.0",
+			Port:          8080,
 		},
 
 		Tracing: TracingConfig{
