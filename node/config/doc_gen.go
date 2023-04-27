@@ -424,6 +424,12 @@ for any other deal.`,
 	},
 	"GraphqlConfig": []DocField{
 		{
+			Name: "ListenAddress",
+			Type: "string",
+
+			Comment: `The ip address the GraphQL server will bind to. Default: 0.0.0.0`,
+		},
+		{
 			Name: "Port",
 			Type: "uint64",
 
