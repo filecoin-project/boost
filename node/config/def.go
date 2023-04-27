@@ -125,6 +125,7 @@ func DefaultBoost() *Boost {
 			HttpTransferStallCheckPeriod:       Duration(30 * time.Second),
 			DealLogDurationDays:                30,
 			SealingPipelineCacheTimeout:        Duration(30 * time.Second),
+			FundsTaggingEnabled:                true,
 		},
 
 		LotusDealmaking: lotus_config.DealmakingConfig{
