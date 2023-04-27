@@ -1569,6 +1569,7 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 
 	// fund manager
 	fminitF := fundmanager.New(fundmanager.Config{
+		Enabled:      true,
 		PubMsgBalMin: ph.MinPublishFees,
 		PubMsgWallet: pw,
 		CollatWallet: pcw,

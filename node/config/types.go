@@ -74,6 +74,8 @@ type WalletsConfig struct {
 }
 
 type GraphqlConfig struct {
+	// The ip address the GraphQL server will bind to. Default: 0.0.0.0
+	ListenAddress string
 	// The port that the graphql server listens on
 	Port uint64
 }
@@ -260,6 +262,11 @@ type DealmakingConfig struct {
 	// lotus-miner API. SealingPipelineCacheTimeout defines cache timeout value in seconds. Default is 30 seconds.
 	// Any value less than 0 will result in use of default
 	SealingPipelineCacheTimeout Duration
+
+	// Whether to enable tagging of funds. If enabled, each time a deal is
+	// accepted boost will tag funds for that deal so that they cannot be used
+	// for any other deal.
+	FundsTaggingEnabled bool
 }
 
 type ContractDealsConfig struct {

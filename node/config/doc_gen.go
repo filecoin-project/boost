@@ -405,6 +405,14 @@ to keep the size of logsDB in check. Set the value as "0" to disable log cleanup
 lotus-miner API. SealingPipelineCacheTimeout defines cache timeout value in seconds. Default is 30 seconds.
 Any value less than 0 will result in use of default`,
 		},
+		{
+			Name: "FundsTaggingEnabled",
+			Type: "bool",
+
+			Comment: `Whether to enable tagging of funds. If enabled, each time a deal is
+accepted boost will tag funds for that deal so that they cannot be used
+for any other deal.`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{
@@ -421,6 +429,12 @@ Any value less than 0 will result in use of default`,
 		},
 	},
 	"GraphqlConfig": []DocField{
+		{
+			Name: "ListenAddress",
+			Type: "string",
+
+			Comment: `The ip address the GraphQL server will bind to. Default: 0.0.0.0`,
+		},
 		{
 			Name: "Port",
 			Type: "uint64",

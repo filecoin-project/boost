@@ -65,7 +65,8 @@ func DefaultBoost() *Boost {
 		},
 
 		Graphql: GraphqlConfig{
-			Port: 8080,
+			ListenAddress: "0.0.0.0",
+			Port:          8080,
 		},
 
 		Tracing: TracingConfig{
@@ -139,6 +140,7 @@ func DefaultBoost() *Boost {
 			HttpTransferStallCheckPeriod:       Duration(30 * time.Second),
 			DealLogDurationDays:                30,
 			SealingPipelineCacheTimeout:        Duration(30 * time.Second),
+			FundsTaggingEnabled:                true,
 		},
 
 		LotusDealmaking: lotus_config.DealmakingConfig{

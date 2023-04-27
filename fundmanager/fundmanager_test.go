@@ -32,6 +32,7 @@ func TestFundManager(t *testing.T) {
 		api: api,
 		db:  fundsDB,
 		cfg: Config{
+			Enabled:      true,
 			StorageMiner: address.TestAddress,
 			PubMsgWallet: address.TestAddress2,
 			PubMsgBalMin: abi.NewTokenAmount(10),
@@ -105,6 +106,65 @@ func TestFundManager(t *testing.T) {
 	req.NoError(err)
 	req.EqualValues(3, total.Collateral.Int64())
 	req.EqualValues(10, total.PubMsg.Int64())
+}
+
+func TestFundManagerDisabled(t *testing.T) {
+	_ = logging.SetLogLevel("funds", "debug")
+
+	req := require.New(t)
+	ctx := context.Background()
+
+	sqldb := db.CreateTestTmpDB(t)
+	require.NoError(t, db.CreateAllBoostTables(ctx, sqldb, sqldb))
+
+	fundsDB := db.NewFundsDB(sqldb)
+
+	api := &mockApi{}
+	fm := &FundManager{
+		api: api,
+		db:  fundsDB,
+		cfg: Config{
+			Enabled:      false,
+			StorageMiner: address.TestAddress,
+			PubMsgWallet: address.TestAddress2,
+			PubMsgBalMin: abi.NewTokenAmount(10),
+		},
+	}
+
+	// There should be nothing tagged to start with
+	deals, err := db.GenerateDeals()
+	req.NoError(err)
+
+	// Tag funds for a deal with collateral 3
+	deal := deals[0]
+	prop := deal.ClientDealProposal.Proposal
+	prop.ProviderCollateral = abi.NewTokenAmount(3)
+	rsp, err := fm.TagFunds(ctx, deal.DealUuid, prop)
+	req.NoError(err)
+	req.NotNil(rsp)
+	b, err := api.WalletBalance(ctx, address.TestAddress2)
+	req.NoError(err)
+	mb, err := api.StateMarketBalance(ctx, address.TestAddress2, types.TipSetKey{})
+	req.NoError(err)
+	avail := big.Sub(mb.Escrow, mb.Locked)
+
+	ex := &TagFundsResp{
+		Collateral:     abi.NewTokenAmount(0),
+		PublishMessage: abi.NewTokenAmount(0),
+
+		TotalCollateral:     abi.NewTokenAmount(0),
+		TotalPublishMessage: abi.NewTokenAmount(0),
+
+		AvailableCollateral:     avail,
+		AvailablePublishMessage: b,
+	}
+	req.Equal(ex, rsp)
+
+	total, err := fm.TotalTagged(ctx)
+	req.NoError(err)
+	// Total tagged for collateral and publish message should be 0
+	req.EqualValues(0, total.Collateral.Int64())
+	req.EqualValues(0, total.PubMsg.Int64())
 }
 
 type mockApi struct {
