@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	retrievalimpl "github.com/filecoin-project/boost-gfm/retrievalmarket/impl"
@@ -23,7 +25,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.opencensus.io/stats"
-	"sync"
 )
 
 var log = logging.Logger("boostgs")
@@ -133,6 +134,8 @@ func (g *GraphsyncUnpaidRetrieval) untrackTransfer(p peer.ID, id datatransfer.Tr
 }
 
 func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatransfer.TransferID, p *peer.ID) error {
+	g.activeRetrievalsLk.Lock()
+
 	var state *retrievalState
 	if p != nil {
 		state = g.activeRetrievals[reqId{p: *p, id: id}]
@@ -148,10 +151,15 @@ func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatr
 	}
 
 	if state == nil {
+		g.activeRetrievalsLk.Unlock()
 		return fmt.Errorf("no transfer with id %d", id)
 	}
 
-	err := g.dtnet.SendMessage(ctx, state.cs.recipient, message.CancelResponse(state.cs.transferID))
+	rcpt := state.cs.recipient
+	tID := state.cs.transferID
+	g.activeRetrievalsLk.Unlock()
+
+	err := g.dtnet.SendMessage(ctx, rcpt, message.CancelResponse(tID))
 	g.failTransfer(state, errors.New("transfer cancelled by provider"))
 
 	if err != nil {
@@ -162,6 +170,9 @@ func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatr
 }
 
 func (g *GraphsyncUnpaidRetrieval) List() []retrievalState {
+	g.activeRetrievalsLk.Lock()
+	defer g.activeRetrievalsLk.Unlock()
+
 	values := make([]retrievalState, 0, len(g.activeRetrievals))
 
 	for _, value := range g.activeRetrievals {
