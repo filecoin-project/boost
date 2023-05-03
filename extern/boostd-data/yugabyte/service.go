@@ -48,8 +48,6 @@ func NewStore(settings DBSettings) *Store {
 	}
 
 	cluster := gocql.NewCluster(settings.Hosts...)
-	//cluster.Timeout = 30 * time.Second
-	//cluster.ConnectTimeout = 30 * time.Second
 	return &Store{
 		settings: settings,
 		cluster:  cluster,
@@ -105,17 +103,6 @@ func (s *Store) createPieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 	return nil
 }
 
-// TODO: I don't think we're using this functionality anymore, we can probably
-// just remove it from the interface and data model
-func (s *Store) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
-	ctx, span := tracing.Tracer.Start(ctx, "store.set-car-size")
-	defer span.End()
-
-	//err := s.db.SetCarSize(ctx, pieceCid, size)
-	//return normalizePieceCidError(pieceCid, err)
-	return nil
-}
-
 // TODO: Do we need this?
 func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr string) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.mark-piece-index-errored")
@@ -149,7 +136,7 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
 	md, err := s.getPieceMetadata(ctx, pieceCid)
 	if err != nil {
-		return md, nil
+		return md, err
 	}
 
 	deals, err := s.GetPieceDeals(ctx, pieceCid)
@@ -208,6 +195,15 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 		return nil, fmt.Errorf("getting piece deals: %w", err)
 	}
 
+	// For correctness, we should always return a not found error if there is
+	// no piece with the piece cid
+	if len(deals) == 0 {
+		_, err := s.getPieceMetadata(ctx, pieceCid)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return deals, nil
 }
 
@@ -253,6 +249,15 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 	}
 	if err := iter.Close(); err != nil {
 		return nil, fmt.Errorf("getting piece index for piece %s: %w", pieceCid, err)
+	}
+
+	// For correctness, we should always return a not found error if there is
+	// no piece with the piece cid
+	if len(records) == 0 {
+		_, err := s.getPieceMetadata(ctx, pieceCid)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return records, nil
@@ -388,6 +393,9 @@ func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, er
 func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
 	t, err := s.IndexedAt(ctx, pieceCid)
 	if err != nil {
+		if isNotFoundErr(err) {
+			return false, nil
+		}
 		return false, err
 	}
 	return !t.IsZero(), nil
@@ -399,6 +407,9 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 
 	md, err := s.getPieceMetadata(ctx, pieceCid)
 	if err != nil {
+		if isNotFoundErr(err) {
+			return time.Time{}, nil
+		}
 		return time.Time{}, err
 	}
 
