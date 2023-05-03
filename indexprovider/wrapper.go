@@ -58,6 +58,7 @@ type Wrapper struct {
 	// bitswapEnabled records whether to announce bitswap as an available
 	// protocol to the network indexer
 	bitswapEnabled bool
+	httpEnabled    bool
 	stop           context.CancelFunc
 }
 
@@ -79,6 +80,8 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 
 		// bitswap is enabled if there is a bitswap peer id
 		bitswapEnabled := cfg.Dealmaking.BitswapPeerID != ""
+		// http is considered enabled if there is an http retrieval multiaddr set
+		httpEnabled := cfg.Dealmaking.HTTPRetrievalMultiaddr != ""
 
 		// setup bitswap extended provider if there is a public multi addr for bitswap
 		w := &Wrapper{
@@ -91,6 +94,7 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 			enabled:        !isDisabled,
 			piecedirectory: piecedirectory,
 			bitswapEnabled: bitswapEnabled,
+			httpEnabled:    httpEnabled,
 			ssm:            ssm,
 		}
 		return w, nil
@@ -305,6 +309,41 @@ func (w *Wrapper) AnnounceExtendedProviders(ctx context.Context) error {
 	key := w.h.Peerstore().PrivKey(w.h.ID())
 	adBuilder := xproviders.NewAdBuilder(w.h.ID(), key, w.h.Addrs())
 
+	err := w.appendExtendedProviders(ctx, adBuilder, key)
+	if err != nil {
+		return err
+	}
+
+	last, _, err := w.prov.GetLatestAdv(ctx)
+	if err != nil {
+		return err
+	}
+	adBuilder.WithLastAdID(last)
+	ad, err := adBuilder.BuildAndSign()
+	if err != nil {
+		return err
+	}
+
+	// make sure we're connected to the mesh so that the message will go through
+	// pubsub and reach the indexer
+	err = w.meshCreator.Connect(ctx)
+	if err != nil {
+		log.Warnf("could not connect to pubsub mesh before announcing extended provider: %w", err)
+	}
+
+	// publish the extended providers announcement
+	adCid, err := w.prov.Publish(ctx, *ad)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("announced endpoint to indexer with advertisement cid %s", adCid)
+
+	return nil
+}
+
+func (w *Wrapper) appendExtendedProviders(ctx context.Context, adBuilder *xproviders.AdBuilder, key crypto.PrivKey) error {
+
 	if !w.bitswapEnabled {
 		// If bitswap is completely disabled, publish an advertisement with empty extended providers
 		// which should override previously published extended providers associated to w.h.ID().
@@ -366,30 +405,24 @@ func (w *Wrapper) AnnounceExtendedProviders(ctx context.Context) error {
 		adBuilder.WithExtendedProviders(ep)
 	}
 
-	last, _, err := w.prov.GetLatestAdv(ctx)
-	if err != nil {
-		return err
-	}
-	adBuilder.WithLastAdID(last)
-	ad, err := adBuilder.BuildAndSign()
-	if err != nil {
-		return err
-	}
+	if !w.httpEnabled {
+		log.Info("Dealmaking.HTTPRetrievalMultiaddr is not set - announcing http disabled to Indexer")
+	} else {
+		// marshal http metadata
+		meta := metadata.Default.New(metadata.IpfsGatewayHttp{})
+		mbytes, err := meta.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		var ep = xproviders.Info{
+			Addrs:    []string{w.cfg.Dealmaking.HTTPRetrievalMultiaddr},
+			Metadata: mbytes,
+		}
 
-	// make sure we're connected to the mesh so that the message will go through
-	// pubsub and reach the indexer
-	err = w.meshCreator.Connect(ctx)
-	if err != nil {
-		log.Warnf("could not connect to pubsub mesh before announcing extended provider: %w", err)
-	}
+		log.Infof("announcing http endpoint to indexer as extended provider: %s", ep.Addrs)
 
-	// publish the extended providers announcement
-	adCid, err := w.prov.Publish(ctx, *ad)
-	if err != nil {
-		return err
+		adBuilder.WithExtendedProviders(ep)
 	}
-
-	log.Infof("announced endpoint to indexer with advertisement cid %s", adCid)
 
 	return nil
 }
