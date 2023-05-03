@@ -18,7 +18,7 @@ import columnsGapImg from './bootstrap-icons/icons/columns-gap.svg'
 import xImg from './bootstrap-icons/icons/x-lg.svg'
 import './Deals.css'
 import {Pagination} from "./Pagination";
-import {DealActions, IsPaused, IsTransferring} from "./DealDetail";
+import {DealActions, IsPaused, IsTransferring, IsOfflineWaitingForData} from "./DealDetail";
 import {humanTransferRate} from "./DealTransfers";
 
 const dealsBasePath = '/storage-deals'
@@ -290,7 +290,7 @@ function DealRow(props) {
         }
     }
 
-    const showActions = (IsPaused(deal) || IsTransferring(deal))
+    const showActions = (IsPaused(deal) || IsTransferring(deal) || IsOfflineWaitingForData(deal))
     var rowClassName = ''
     if (showActions) {
         rowClassName = 'show-actions'
