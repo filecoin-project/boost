@@ -2,7 +2,7 @@
 
 import React, {useEffect, useState} from "react";
 import {useMutation, useQuery, useSubscription} from "@apollo/react-hooks";
-import {DealCancelMutation, DealFailPausedMutation, DealRetryPausedMutation, DealSubscription, EpochQuery} from "./gql";
+import {DealCancelMutation, DealFailPausedMutation, DealRetryPausedMutation, DealSubscription, EpochQuery, CancelOfflineDealAwaitingData} from "./gql";
 import {useNavigate, useParams, Link} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";
@@ -357,9 +357,16 @@ export function DealActions(props) {
         variables: {id: deal.ID}
     })
 
+    // Terminate offline deal waiting for data
+    const [cancelOfflineDealAwaitingData] = useMutation(CancelOfflineDealAwaitingData, {
+        refetchQueries: props.refetchQueries,
+        variables: {id: deal.ID}
+    })
+
     const showRetryFailButtons = IsPaused(deal)
     const showCancelButton = !showRetryFailButtons && IsTransferring(deal)
-    if (!showCancelButton && !showRetryFailButtons) {
+    const showCancelOfflineWaitingForData = !showRetryFailButtons && !showCancelButton && IsOfflineWaitingForData(deal)
+    if (!showCancelButton && !showRetryFailButtons && !showCancelOfflineWaitingForData) {
         return null
     }
 
@@ -370,6 +377,11 @@ export function DealActions(props) {
                     {compact ? '' : 'Cancel Transfer'}
                 </div>
             ) : null}
+            {showCancelOfflineWaitingForData ? (
+                <div className="button cancel offline" title="Cancel Offline Deal" onClick={cancelOfflineDealAwaitingData}>
+                    {compact ? '' : 'Cancel Offline Deal'}
+                </div>
+            ) : null }
             {showRetryFailButtons ? (
                 <>
                     <div className="button retry" title="Retry Deal" onClick={retryPausedDeal}>
@@ -390,6 +402,10 @@ export function IsPaused(deal) {
 
 export function IsTransferring(deal) {
     return deal.Checkpoint === 'Accepted' && !deal.IsOffline
+}
+
+export function IsOfflineWaitingForData(deal) {
+    return deal.IsOffline && deal.Checkpoint === 'Accepted'
 }
 
 function DealLog(props) {

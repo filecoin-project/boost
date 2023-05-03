@@ -313,6 +313,12 @@ const DealFailPausedMutation = gql`
     }
 `;
 
+const CancelOfflineDealAwaitingData = gql`
+   mutation AppCancelOfflineDealAwaitingData($id: ID!) {
+       cancelOfflineDealAwaitingData(id: $id)
+   }
+`;
+
 const NewDealsSubscription = gql`
     subscription AppNewDealsSubscription {
         dealNew {
@@ -669,6 +675,7 @@ export {
     DealCancelMutation,
     DealRetryPausedMutation,
     DealFailPausedMutation,
+    CancelOfflineDealAwaitingData,
     NewDealsSubscription,
     ProposalLogsListQuery,
     ProposalLogsCountQuery,

@@ -293,6 +293,17 @@ func (r *resolver) DealFailPaused(_ context.Context, args struct{ ID graphql.ID 
 	return args.ID, err
 }
 
+// mutation: cancelOfflineDealAwaitingData(id): ID
+func (r *resolver) CancelOfflineDealAwaitingData(_ context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
+	dealUuid, err := toUuid(args.ID)
+	if err != nil {
+		return args.ID, err
+	}
+
+	err = r.provider.CancelOfflineDealAwaitingImport(dealUuid)
+	return args.ID, err
+}
+
 func (r *resolver) dealByID(ctx context.Context, dealUuid uuid.UUID) (*types.ProviderDealState, error) {
 	deal, err := r.dealsDB.ByID(ctx, dealUuid)
 	if err != nil {

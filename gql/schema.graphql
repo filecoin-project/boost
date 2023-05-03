@@ -502,6 +502,9 @@ type RootMutation {
 
   """Update the Storage Ask (price of doing a storage deal)"""
   storageAskUpdate(update: StorageAskUpdate!): Boolean!
+
+  """Cancel an offline deal awaiting data import"""
+  cancelOfflineDealAwaitingData(id: ID!): ID!
 }
 
 type RootSubscription {
