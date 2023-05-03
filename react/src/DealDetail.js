@@ -357,12 +357,6 @@ export function DealActions(props) {
         variables: {id: deal.ID}
     })
 
-    // Terminate offline deal waiting for data
-    const [cancelOfflineDealAwaitingData] = useMutation(CancelOfflineDealAwaitingData, {
-        refetchQueries: props.refetchQueries,
-        variables: {id: deal.ID}
-    })
-
     const showRetryFailButtons = IsPaused(deal)
     const showCancelButton = !showRetryFailButtons && IsTransferring(deal)
     const showCancelOfflineWaitingForData = !showRetryFailButtons && !showCancelButton && IsOfflineWaitingForData(deal)
@@ -378,7 +372,7 @@ export function DealActions(props) {
                 </div>
             ) : null}
             {showCancelOfflineWaitingForData ? (
-                <div className="button cancel offline" title="Cancel Offline Deal" onClick={cancelOfflineDealAwaitingData}>
+                <div className="button cancel offline" title="Cancel Offline Deal" onClick={cancelDeal}>
                     {compact ? '' : 'Cancel Offline Deal'}
                 </div>
             ) : null }

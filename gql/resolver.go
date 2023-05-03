@@ -261,9 +261,19 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 }
 
 // mutation: dealCancel(id): ID
-func (r *resolver) DealCancel(_ context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
+func (r *resolver) DealCancel(ctx context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
 	dealUuid, err := toUuid(args.ID)
 	if err != nil {
+		return args.ID, err
+	}
+
+	deal, err := r.dealsDB.ByID(ctx, dealUuid)
+	if err != nil {
+		return args.ID, err
+	}
+
+	if deal.IsOffline {
+		err = r.provider.CancelOfflineDealAwaitingImport(dealUuid)
 		return args.ID, err
 	}
 
@@ -290,17 +300,6 @@ func (r *resolver) DealFailPaused(_ context.Context, args struct{ ID graphql.ID 
 	}
 
 	err = r.provider.FailPausedDeal(dealUuid)
-	return args.ID, err
-}
-
-// mutation: cancelOfflineDealAwaitingData(id): ID
-func (r *resolver) CancelOfflineDealAwaitingData(_ context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
-	dealUuid, err := toUuid(args.ID)
-	if err != nil {
-		return args.ID, err
-	}
-
-	err = r.provider.CancelOfflineDealAwaitingImport(dealUuid)
 	return args.ID, err
 }
 
