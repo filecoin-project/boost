@@ -17,6 +17,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
+	sealing_mock "github.com/filecoin-project/boost/storagemarket/sealingpipeline/mock"
 )
 
 type MinerStub struct {
@@ -25,6 +26,7 @@ type MinerStub struct {
 	*mock_types.MockPieceAdder
 	*mock_types.MockCommpCalculator
 	*mock_types.MockIndexProvider
+	*sealing_mock.MockAPI
 
 	lk                    sync.Mutex
 	unblockCommp          map[uuid.UUID]chan struct{}
@@ -41,6 +43,7 @@ func NewMinerStub(ctrl *gomock.Controller) *MinerStub {
 		MockChainDealManager: mock_types.NewMockChainDealManager(ctrl),
 		MockPieceAdder:       mock_types.NewMockPieceAdder(ctrl),
 		MockIndexProvider:    mock_types.NewMockIndexProvider(ctrl),
+		MockAPI: sealing_mock.NewMockAPI(ctrl),
 
 		unblockCommp:          make(map[uuid.UUID]chan struct{}),
 		unblockPublish:        make(map[uuid.UUID]chan struct{}),
@@ -368,4 +371,8 @@ type StubbedMinerOutput struct {
 	SealedBytes     *[]byte
 	SectorID        abi.SectorNumber
 	Offset          abi.PaddedPieceSize
+}
+
+func (mb *MinerStubBuilder) SetupSectorStatus(blocking bool, announce bool) *MinerStubBuilder {
+	mb.stub.
 }

@@ -1163,6 +1163,22 @@ func TestDealFilter(t *testing.T) {
 	require.EqualValues(t, 10000000000, dealFilterParams.StorageState.TotalAvailable)
 }
 
+func TestFinalSealingState(t *testing.T) {
+	ctx := context.Background()
+	//harness := NewHarness(t, withSimulateFailedSealing(true))
+	harness := NewHarness(t)
+
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	td := harness.newDealBuilder(t, 1).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
+	require.NoError(t, td.executeAndSubscribe())
+
+	err := td.waitForError("deal could not be found is the sector", types.DealRetryFatal)
+	require.NoError(t, err)
+
+}
+
 func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals int,
 	buildDeal func(i int) *testDeal, waitF func(i int, td *testDeal) error) []*testDeal {
 	tds := make([]*testDeal, 0, nDeals)
@@ -1379,6 +1395,8 @@ type providerConfig struct {
 	localCommp  bool
 	dealFilter  dealfilter.StorageDealFilter
 	chainHeadFn ChainHeadFn
+
+	simulateFailedSealing bool
 }
 
 type harnessOpt func(pc *providerConfig)
@@ -1459,6 +1477,12 @@ func withDealFilter(filter dealfilter.StorageDealFilter) harnessOpt {
 func withChainHeadFunction(fn ChainHeadFn) harnessOpt {
 	return func(pc *providerConfig) {
 		pc.chainHeadFn = fn
+	}
+}
+
+func withSimulateFailedSealing(f bool) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.simulateFailedSealing = true
 	}
 }
 
@@ -1649,6 +1673,10 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	ph.MockSealingPipelineAPI.EXPECT().SectorsSummary(gomock.Any()).Return(sealingpipelineStatus, nil).AnyTimes()
 
 	secInfo := lapi.SectorInfo{State: lapi.SectorState(sealing.Proving)}
+	if !pc.simulateFailedSealing {
+		secInfo.Deals = []abi.DealID{abi.DealID(0)}
+	}
+
 	ph.MockSealingPipelineAPI.EXPECT().SectorsStatus(gomock.Any(), gomock.Any(), false).Return(secInfo, nil).AnyTimes()
 
 	ph.DAGStore = dagStore

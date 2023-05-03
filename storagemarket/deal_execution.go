@@ -129,7 +129,9 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (d
 
 	// Watch the sealing status of the deal and fire events for each change
 	p.dealLogger.Infow(deal.DealUuid, "watching deal sealing state changes")
-	p.fireSealingUpdateEvents(dh, deal.DealUuid, deal.SectorID)
+	if derr := p.fireSealingUpdateEvents(dh, deal.DealUuid, deal.SectorID); derr != nil {
+		return derr
+	}
 	p.cleanupDealHandler(deal.DealUuid)
 	p.dealLogger.Infow(deal.DealUuid, "deal sealing reached termination state")
 
@@ -685,66 +687,88 @@ func (p *Provider) registerShardSync(ctx context.Context, pc cid.Cid) error {
 
 // fireSealingUpdateEvents periodically checks the sealing status of the deal
 // and fires events for each change
-func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, sectorNum abi.SectorNumber) {
-	var lastSealingState lapi.SectorState
-	checkStatus := func(force bool) lapi.SectorState {
+func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, sectorNum abi.SectorNumber) *dealMakingError {
+	var sectorInfo lapi.SectorInfo
+	var deal *types.ProviderDealState
+	checkStatus := func(force bool) lapi.SectorInfo {
 		// To avoid overloading the sealing service, only get the sector status
 		// if there's at least one subscriber to the event that will be published
 		if !force && !dh.hasActiveSubscribers() {
-			return ""
+			return lapi.SectorInfo{}
 		}
 
 		// Get the sector status
 		si, err := p.sps.SectorsStatus(p.ctx, sectorNum, false)
-		if err == nil && si.State != lastSealingState {
-			lastSealingState = si.State
+		if err == nil && si.State != sectorInfo.State {
+			sectorInfo.State = si.State
 
 			// Sector status has changed, fire an update event
-			deal, err := p.dealsDB.ByID(p.ctx, dealUuid)
+			deal, err = p.dealsDB.ByID(p.ctx, dealUuid)
 			if err != nil {
 				log.Errorf("getting deal %s with sealing update: %w", dealUuid, err)
-				return si.State
+				return si
 			}
 
 			p.dealLogger.Infow(dealUuid, "current sealing state", "state", si.State)
 			p.fireEventDealUpdate(dh.Publisher, deal)
 		}
-		return si.State
+		return si
+	}
+
+	retErr := &dealMakingError{
+		retry: types.DealRetryFatal,
+		error: ErrDealNotSealed,
 	}
 
 	// Check status immediately
-	state := checkStatus(true)
-	if isFinalSealingState(state) {
-		return
+	info := checkStatus(true)
+	if IsFinalSealingState(info.State) {
+		if len(info.Deals) > 0 {
+			for _, d := range info.Deals {
+				if d == deal.ChainDealID {
+					return nil
+				}
+			}
+			return retErr
+		}
+		return retErr
 	}
 
-	// Check status every second
-	ticker := time.NewTicker(time.Second)
+	// Check status every 5 second. There is no advantage of checking it every second
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	count := 0
 	forceCount := 60
 	for {
 		select {
 		case <-p.ctx.Done():
-			return
+			return nil
 		case <-ticker.C:
 			count++
 			// Force a status check every forceCount seconds, even if there
 			// are no subscribers (so that we can stop checking altogether
 			// if the sector reaches a final sealing state)
-			state := checkStatus(count >= forceCount)
+			info = checkStatus(count >= forceCount)
 			if count >= forceCount {
 				count = 0
 			}
 
-			if isFinalSealingState(state) {
-				return
+			if IsFinalSealingState(info.State) {
+				if len(info.Deals) > 0 {
+					for _, d := range info.Deals {
+						if d == deal.ChainDealID {
+							return nil
+						}
+					}
+					return retErr
+				}
+				return retErr
 			}
 		}
 	}
 }
 
-func isFinalSealingState(state lapi.SectorState) bool {
+func IsFinalSealingState(state lapi.SectorState) bool {
 	switch sealing.SectorState(state) {
 	case
 		sealing.Proving,
