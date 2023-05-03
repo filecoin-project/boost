@@ -571,9 +571,18 @@ func (p *Provider) FailPausedDeal(dealUuid uuid.UUID) error {
 	return p.updateRetryState(dealUuid, false)
 }
 
-// CancelOfflineDealAwaitingImport moves an offline deal from waiting for data state to the fialed state
+// CancelOfflineDealAwaitingImport moves an offline deal from waiting for data state to the failed state
 func (p *Provider) CancelOfflineDealAwaitingImport(dealUuid uuid.UUID) error {
-	return p.updateRetryState(dealUuid, false)
+	dh := p.getDealHandler(dealUuid)
+	if dh == nil {
+		return ErrDealHandlerNotFound
+	}
+
+	if !dh.isRunning() {
+		return p.updateRetryState(dealUuid, false)
+	}
+
+	return errors.New("deal is already running")
 }
 
 // updateRetryState either retries the deal or terminates the deal
