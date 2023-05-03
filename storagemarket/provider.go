@@ -573,6 +573,18 @@ func (p *Provider) FailPausedDeal(dealUuid uuid.UUID) error {
 
 // CancelOfflineDealAwaitingImport moves an offline deal from waiting for data state to the failed state
 func (p *Provider) CancelOfflineDealAwaitingImport(dealUuid uuid.UUID) error {
+	pds, err := p.dealsDB.ByID(p.ctx, dealUuid)
+	if err != nil {
+		return fmt.Errorf("failed to lookup deal in DB: %w", err)
+	}
+	if !pds.IsOffline {
+		return errors.New("cannot cancel an online deal")
+	}
+
+	if pds.InboundFilePath != "" {
+		return errors.New("deal has already started importing data")
+	}
+
 	dh := p.getDealHandler(dealUuid)
 	if dh == nil {
 		return ErrDealHandlerNotFound
