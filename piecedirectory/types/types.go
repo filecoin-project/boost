@@ -40,7 +40,6 @@ type Store interface {
 	ListPieces(ctx context.Context) ([]cid.Cid, error)
 	GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error)
 	PiecesContainingMultihash(ctx context.Context, m multihash.Multihash) ([]cid.Cid, error)
-	MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err string) error
 	RemoveDealForPiece(context.Context, cid.Cid, string) error
 	RemovePieceMetadata(context.Context, cid.Cid) error
 	RemoveIndexes(context.Context, cid.Cid) error

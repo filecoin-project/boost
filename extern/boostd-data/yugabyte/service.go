@@ -103,20 +103,6 @@ func (s *Store) createPieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 	return nil
 }
 
-// TODO: Do we need this?
-func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr string) error {
-	ctx, span := tracing.Tracer.Start(ctx, "store.mark-piece-index-errored")
-	defer span.End()
-
-	//err := s.db.MarkIndexErrored(ctx, pieceCid, errors.New(idxErr))
-	//if err != nil {
-	//	return normalizePieceCidError(pieceCid, err)
-	//}
-	//
-	//return s.FlagPiece(ctx, pieceCid)
-	return nil
-}
-
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_offset_size")
 	defer span.End()
@@ -155,10 +141,9 @@ func (s *Store) getPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.M
 
 	// Get piece metadata
 	var md model.Metadata
-	qry := `SELECT Version, IndexedAt, CompleteIndex, Error, ErrorType ` +
-		`FROM idx.PieceMetadata WHERE PieceCid = ?`
+	qry := `SELECT Version, IndexedAt, CompleteIndex FROM idx.PieceMetadata WHERE PieceCid = ?`
 	err := s.session.Query(qry, pieceCid.String()).WithContext(ctx).
-		Scan(&md.Version, &md.IndexedAt, &md.CompleteIndex, &md.Error, &md.ErrorType)
+		Scan(&md.Version, &md.IndexedAt, &md.CompleteIndex)
 	if err != nil {
 		err = normalizePieceCidError(pieceCid, err)
 		return md, fmt.Errorf("getting piece metadata: %w", err)
@@ -293,7 +278,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, recs []model.Rec
 
 	// Mark indexing as complete for the piece
 	qry := `UPDATE idx.PieceMetadata ` +
-		`SET IndexedAt = ?, CompleteIndex = ?, Error = '', ErrorType = '' ` +
+		`SET IndexedAt = ?, CompleteIndex = ? ` +
 		`WHERE PieceCid = ?`
 	err = s.session.Query(qry, time.Now(), isCompleteIndex, pieceCid.String()).WithContext(ctx).Exec()
 	if err != nil {

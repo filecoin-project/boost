@@ -338,20 +338,6 @@ func (mr *MockStoreMockRecorder) ListPieces(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPieces", reflect.TypeOf((*MockStore)(nil).ListPieces), arg0)
 }
 
-// MarkIndexErrored mocks base method.
-func (m *MockStore) MarkIndexErrored(arg0 context.Context, arg1 cid.Cid, arg2 string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MarkIndexErrored", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// MarkIndexErrored indicates an expected call of MarkIndexErrored.
-func (mr *MockStoreMockRecorder) MarkIndexErrored(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkIndexErrored", reflect.TypeOf((*MockStore)(nil).MarkIndexErrored), arg0, arg1, arg2)
-}
-
 // NextPiecesToCheck mocks base method.
 func (m *MockStore) NextPiecesToCheck(arg0 context.Context) ([]cid.Cid, error) {
 	m.ctrl.T.Helper()

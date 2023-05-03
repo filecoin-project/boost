@@ -290,26 +290,6 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (Leve
 	return metadata, nil
 }
 
-func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, sourceErr error) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
-	defer span.End()
-
-	md, err := db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil {
-		return fmt.Errorf("getting piece metadata for piece %s: %w", pieceCid, err)
-	}
-
-	if md.Error != "" {
-		// If the error state has already been set, don't over-write the existing error
-		return nil
-	}
-
-	md.Error = sourceErr.Error()
-	md.ErrorType = fmt.Sprintf("%T", sourceErr)
-
-	return db.SetPieceCidToMetadata(ctx, pieceCid, md)
-}
-
 // AllRecords
 func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.all_records")

@@ -43,8 +43,6 @@ type Metadata struct {
 	// offsets).
 	CompleteIndex bool       `json:"c"`
 	Deals         []DealInfo `json:"d"`
-	Error         string     `json:"e"`
-	ErrorType     string     `json:"t"`
 }
 
 // Record is the information stored in the index for each block in a piece
