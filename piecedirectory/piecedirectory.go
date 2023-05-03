@@ -269,10 +269,6 @@ func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.C
 	return nil
 }
 
-func (ps *PieceDirectory) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err string) error {
-	return ps.store.MarkIndexErrored(ctx, pieceCid, err)
-}
-
 //func (ps *piecedirectory) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
 // TODO: Maybe mark for GC instead of deleting immediately
 
@@ -505,20 +501,6 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 	}
 
 	return bs, nil
-}
-
-// countReader just counts the number of bytes read
-type countReader struct {
-	r     *bufio.Reader
-	count uint64
-}
-
-func (c *countReader) ReadByte() (byte, error) {
-	b, err := c.r.ReadByte()
-	if err == nil {
-		c.count++
-	}
-	return b, err
 }
 
 type SectorAccessorAsPieceReader struct {
