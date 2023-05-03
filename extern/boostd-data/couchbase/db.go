@@ -337,23 +337,6 @@ func (db *DB) setPieceCidsForMultihash(ctx context.Context, mh multihash.Multiha
 	return nil
 }
 
-func (db *DB) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.set_car_size")
-	defer span.End()
-
-	return db.mutatePieceMetadata(ctx, pieceCid, "set-car-size", func(metadata CouchbaseMetadata) *CouchbaseMetadata {
-		// Set the car size on each deal (should be the same for all deals)
-		var deals []model.DealInfo
-		for _, dl := range metadata.Deals {
-			dl.CarLength = size
-
-			deals = append(deals, dl)
-		}
-		metadata.Deals = deals
-		return &metadata
-	})
-}
-
 func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr error) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
 	defer span.End()

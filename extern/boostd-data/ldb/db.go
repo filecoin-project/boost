@@ -290,23 +290,6 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (Leve
 	return metadata, nil
 }
 
-func (db *DB) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.set_car_size")
-	defer span.End()
-
-	md, err := db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil {
-		return fmt.Errorf("getting piece metadata for piece %s: %w", pieceCid, err)
-	}
-
-	// Set the car size on each deal (should be the same for all deals)
-	for _, dl := range md.Deals {
-		dl.CarLength = size
-	}
-
-	return db.SetPieceCidToMetadata(ctx, pieceCid, md)
-}
-
 func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, sourceErr error) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
 	defer span.End()

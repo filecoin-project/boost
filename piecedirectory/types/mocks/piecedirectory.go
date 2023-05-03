@@ -424,20 +424,6 @@ func (mr *MockStoreMockRecorder) RemovePieceMetadata(arg0, arg1 interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemovePieceMetadata", reflect.TypeOf((*MockStore)(nil).RemovePieceMetadata), arg0, arg1)
 }
 
-// SetCarSize mocks base method.
-func (m *MockStore) SetCarSize(arg0 context.Context, arg1 cid.Cid, arg2 uint64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetCarSize", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetCarSize indicates an expected call of SetCarSize.
-func (mr *MockStoreMockRecorder) SetCarSize(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCarSize", reflect.TypeOf((*MockStore)(nil).SetCarSize), arg0, arg1, arg2)
-}
-
 // UnflagPiece mocks base method.
 func (m *MockStore) UnflagPiece(arg0 context.Context, arg1 cid.Cid) error {
 	m.ctrl.T.Helper()
