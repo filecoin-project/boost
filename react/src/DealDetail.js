@@ -2,7 +2,7 @@
 
 import React, {useEffect, useState} from "react";
 import {useMutation, useQuery, useSubscription} from "@apollo/react-hooks";
-import {DealCancelMutation, DealFailPausedMutation, DealRetryPausedMutation, DealSubscription, EpochQuery, CancelOfflineDealAwaitingData} from "./gql";
+import {DealCancelMutation, DealFailPausedMutation, DealRetryPausedMutation, DealSubscription, EpochQuery} from "./gql";
 import {useNavigate, useParams, Link} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import moment from "moment";
