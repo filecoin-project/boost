@@ -15,7 +15,6 @@ import (
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -44,11 +43,6 @@ var testCouchSettings = couchbase.DBSettings{
 		RAMQuotaMB: 128,
 	},
 	TestMode: true,
-}
-
-var testYugaSettings = yugabyte.DBSettings{
-	Hosts:         []string{"127.0.0.1"},
-	ConnectString: "postgresql://postgres:postgres@localhost",
 }
 
 func TestService(t *testing.T) {
@@ -86,7 +80,7 @@ func TestService(t *testing.T) {
 
 		SetupYugabyte(t)
 
-		bdsvc := NewYugabyte(testYugaSettings)
+		bdsvc := NewYugabyte(TestYugabyteSettings)
 
 		addr := "localhost:8044"
 		testService(ctx, t, bdsvc, addr)
@@ -225,7 +219,7 @@ func TestServiceFuzz(t *testing.T) {
 
 	t.Run("yugabyte", func(t *testing.T) {
 		SetupYugabyte(t)
-		bdsvc := NewYugabyte(testYugaSettings)
+		bdsvc := NewYugabyte(TestYugabyteSettings)
 
 		addr := "localhost:8044"
 		err := bdsvc.Start(ctx, addr)
@@ -460,7 +454,7 @@ func TestCleanup(t *testing.T) {
 
 		SetupYugabyte(t)
 
-		bdsvc := NewYugabyte(testYugaSettings)
+		bdsvc := NewYugabyte(TestYugabyteSettings)
 		testCleanup(ctx, t, bdsvc, "localhost:8044")
 	})
 }
