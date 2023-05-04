@@ -31,10 +31,8 @@ func TestPieceDirectory(t *testing.T) {
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
 		addr := "localhost:8042"
-		err = bdsvc.Start(ctx, addr)
-		require.NoError(t, err)
 
-		testPieceDirectory(ctx, t, addr)
+		testPieceDirectory(ctx, t, bdsvc, addr)
 	})
 
 	t.Run("couchbase", func(t *testing.T) {
@@ -44,10 +42,7 @@ func TestPieceDirectory(t *testing.T) {
 		svc.SetupCouchbase(t, testCouchSettings)
 		bdsvc := svc.NewCouchbase(testCouchSettings)
 		addr := "localhost:8043"
-		err := bdsvc.Start(ctx, addr)
-		require.NoError(t, err)
-
-		testPieceDirectory(ctx, t, addr)
+		testPieceDirectory(ctx, t, bdsvc, addr)
 	})
 
 	t.Run("yugabyte", func(t *testing.T) {
@@ -59,22 +54,16 @@ func TestPieceDirectory(t *testing.T) {
 		})
 
 		addr := "localhost:8044"
-		err := bdsvc.Start(ctx, addr)
-		require.NoError(t, err)
-
-		ybstore := bdsvc.Impl.(*yugabyte.Store)
-		err = ybstore.Drop(ctx)
-		require.NoError(t, err)
-		err = ybstore.Create(ctx)
-		require.NoError(t, err)
-
-		testPieceDirectory(ctx, t, addr)
+		testPieceDirectory(ctx, t, bdsvc, addr)
 	})
 }
 
-func testPieceDirectory(ctx context.Context, t *testing.T, addr string) {
+func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service, addr string) {
+	err := bdsvc.Start(ctx, addr)
+	require.NoError(t, err)
+
 	cl := client.NewStore()
-	err := cl.Dial(ctx, fmt.Sprintf("http://%s", addr))
+	err = cl.Dial(ctx, fmt.Sprintf("http://%s", addr))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 

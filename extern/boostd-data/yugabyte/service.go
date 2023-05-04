@@ -15,6 +15,7 @@ import (
 	"github.com/yugabyte/gocql"
 	"github.com/yugabyte/pgx/v4/pgxpool"
 	"golang.org/x/sync/errgroup"
+	"sync"
 	"time"
 )
 
@@ -34,10 +35,11 @@ type DBSettings struct {
 }
 
 type Store struct {
-	settings DBSettings
-	cluster  *gocql.ClusterConfig
-	session  *gocql.Session
-	db       *pgxpool.Pool
+	settings  DBSettings
+	cluster   *gocql.ClusterConfig
+	session   *gocql.Session
+	db        *pgxpool.Pool
+	startOnce sync.Once
 }
 
 var _ types.ServiceImpl = (*Store)(nil)
@@ -54,20 +56,25 @@ func NewStore(settings DBSettings) *Store {
 	}
 }
 
-func (s *Store) Start(ctx context.Context) error {
-	session, err := s.cluster.CreateSession()
-	if err != nil {
-		return fmt.Errorf("creating yugabyte cluster: %w", err)
-	}
-	s.session = session
+func (s *Store) Start(_ context.Context) error {
+	var startErr error
+	s.startOnce.Do(func() {
+		session, err := s.cluster.CreateSession()
+		if err != nil {
+			startErr = fmt.Errorf("creating yugabyte cluster: %w", err)
+			return
+		}
+		s.session = session
 
-	db, err := pgxpool.Connect(context.Background(), s.settings.ConnectString)
-	if err != nil {
-		return fmt.Errorf("connecting to database: %w", err)
-	}
-	s.db = db
+		db, err := pgxpool.Connect(context.Background(), s.settings.ConnectString)
+		if err != nil {
+			startErr = fmt.Errorf("connecting to database: %w", err)
+			return
+		}
+		s.db = db
+	})
 
-	return nil
+	return startErr
 }
 
 func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
@@ -197,15 +204,28 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_containing_multihash")
 	defer span.End()
 
+	// Get all piece cids referred to by the multihash
+	pcids := make([]cid.Cid, 0, 1)
 	var bz []byte
-	qry := `SELECT PieceCids FROM idx.PayloadToPieces WHERE PayloadMultihash = ?`
-	err := s.session.Query(qry, trimMultihash(m)).WithContext(ctx).Scan(&bz)
-	if err != nil {
-		err = normalizeMultihashError(m, err)
-		return nil, fmt.Errorf("getting pieces containing multihash: %w", err)
+	qry := `SELECT PieceCid FROM idx.PayloadToPieces WHERE PayloadMultihash = ?`
+	iter := s.session.Query(qry, trimMultihash(m)).WithContext(ctx).Iter()
+	for iter.Scan(&bz) {
+		pcid, err := cid.Parse(bz)
+		if err != nil {
+			return nil, fmt.Errorf("parsing piece cid: %w", err)
+		}
+		pcids = append(pcids, pcid)
+	}
+	if err := iter.Close(); err != nil {
+		return nil, fmt.Errorf("getting pieces containing multihash %s: %w", m, err)
 	}
 
-	return bytesToCids(bz)
+	// No pieces found for multihash, return a "not found" error
+	if len(pcids) == 0 {
+		return nil, normalizeMultihashError(m, types.ErrNotFound)
+	}
+
+	return pcids, nil
 }
 
 func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
@@ -292,37 +312,15 @@ func (s *Store) addMultihashesToPieces(ctx context.Context, pieceCid cid.Cid, re
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_index.payloadpiece")
 	defer span.End()
 
-	queue := make(chan []byte, len(recs))
-	for _, rec := range recs {
-		queue <- rec.Cid.Hash()
-	}
-	close(queue)
-
-	var eg errgroup.Group
-	for i := 0; i < s.settings.PayloadPiecesParallelism; i++ {
-		eg.Go(func() error {
-			for ctx.Err() == nil {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case multihashBytes, ok := <-queue:
-					if !ok {
-						// Finished adding all the queued items, exit the thread
-						return nil
-					}
-
-					q := `INSERT INTO idx.PayloadToPieces (PayloadMultihash, PieceCids) VALUES (?, ?)`
-					err := s.session.Query(q, trimMultihash(multihashBytes), pieceCid.Bytes()).Exec()
-					if err != nil {
-						return fmt.Errorf("inserting into PayloadToPieces: %w", err)
-					}
-				}
-			}
-
-			return ctx.Err()
-		})
-	}
-	return eg.Wait()
+	return s.execParallel(ctx, recs, s.settings.PayloadPiecesParallelism, func(rec model.Record) error {
+		multihashBytes := rec.Cid.Hash()
+		q := `INSERT INTO idx.PayloadToPieces (PayloadMultihash, PieceCid) VALUES (?, ?)`
+		err := s.session.Query(q, trimMultihash(multihashBytes), pieceCid.Bytes()).Exec()
+		if err != nil {
+			return fmt.Errorf("inserting into PayloadToPieces: %w", err)
+		}
+		return nil
+	})
 }
 
 func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
@@ -423,29 +421,112 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	return pcids, nil
 }
 
-// RemoveDealForPiece removes Single deal for pieceCID. If []Deals is empty then Metadata is removed as well
+// RemoveDealForPiece removes Single deal for pieceCID.
 func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId string) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
 	defer span.End()
 
+	qry := `DELETE FROM idx.PieceDeal WHERE DealUuid = ?`
+	err := s.session.Query(qry, dealId).WithContext(ctx).Exec()
+	if err != nil {
+		return fmt.Errorf("removing deal %s for piece %s: %w", dealId, pieceCid, err)
+	}
+
+	dls, err := s.GetPieceDeals(ctx, pieceCid)
+	if err != nil {
+		return fmt.Errorf("getting remaining deals in remove deal for piece %s: %w", pieceCid, err)
+	}
+
+	if len(dls) > 0 {
+		return nil
+	}
+
+	err = s.RemoveIndexes(ctx, pieceCid)
+	if err != nil {
+		return fmt.Errorf("removing deal: %w", err)
+	}
+
+	err = s.RemovePieceMetadata(ctx, pieceCid)
+	if err != nil {
+		return fmt.Errorf("removing deal: %w", err)
+	}
+
 	return nil
 }
 
-// RemovePieceMetadata removes all Metadata for pieceCID. To be used manually in case of failure
-// in RemoveDealForPiece
+// RemovePieceMetadata removes all Metadata for pieceCID.
 func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_piece_metadata")
 	defer span.End()
 
+	qry := `DELETE FROM idx.PieceMetadata WHERE PieceCid = ?`
+	err := s.session.Query(qry, pieceCid.String()).WithContext(ctx).Exec()
+	if err != nil {
+		return fmt.Errorf("removing piece metadata for piece %s: %w", pieceCid, err)
+	}
+
 	return nil
 }
 
-// RemoveIndexes removes all MultiHashes for pieceCID. To be used manually in case of failure
-// in RemoveDealForPiece or RemovePieceMetadata. Metadata for the piece must be
-// present in the database
+// RemoveIndexes removes all multihash -> piece cid mappings, and all
+// offset / size information for the piece.
 func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_indexes")
 	defer span.End()
 
+	recs, err := s.GetIndex(ctx, pieceCid)
+	if err != nil {
+		return fmt.Errorf("removing indexes for piece %s: getting recs: %w", pieceCid, err)
+	}
+
+	err = s.execParallel(ctx, recs, s.settings.PayloadPiecesParallelism, func(rec model.Record) error {
+		multihashBytes := rec.Cid.Hash()
+		q := `DELETE FROM idx.PayloadToPieces WHERE PayloadMultihash = ? AND PieceCid = ?`
+		err := s.session.Query(q, trimMultihash(multihashBytes), pieceCid.Bytes()).Exec()
+		if err != nil {
+			return fmt.Errorf("inserting into PayloadToPieces: %w", err)
+		}
+		return nil
+	})
+
+	qry := `DELETE FROM idx.PieceBlockOffsetSize WHERE PieceCid = ?`
+	err = s.session.Query(qry, pieceCid.Bytes()).WithContext(ctx).Exec()
+	if err != nil {
+		return fmt.Errorf("removing indexes for piece %s: deleting offset / size info: %w", pieceCid, err)
+	}
+
 	return nil
+}
+
+func (s *Store) execParallel(ctx context.Context, recs []model.Record, parallelism int, f func(record model.Record) error) error {
+	queue := make(chan model.Record, len(recs))
+	for _, rec := range recs {
+		queue <- rec
+	}
+	close(queue)
+
+	var eg errgroup.Group
+	for i := 0; i < parallelism; i++ {
+		eg.Go(func() error {
+			for ctx.Err() == nil {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case rec, ok := <-queue:
+					if !ok {
+						// Finished adding all the queued items, exit the thread
+						return nil
+					}
+
+					err := f(rec)
+					if err != nil {
+						return err
+					}
+				}
+			}
+
+			return ctx.Err()
+		})
+	}
+	return eg.Wait()
 }

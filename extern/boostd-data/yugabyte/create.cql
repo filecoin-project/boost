@@ -1,8 +1,14 @@
 create keyspace if not exists idx with replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };
 
 CREATE TABLE idx.PayloadToPieces (
-    PayloadMultihash BLOB PRIMARY KEY,
-    PieceCids BLOB
+    PayloadMultihash BLOB,
+    PieceCid BLOB,
+    -- PayloadMultihash is the partition key: the key that determines which
+    -- node the row is sent to.
+    -- PieceCid is the clustering key: the data is sorted by this key.
+    -- We want both of these to be in the primary key because
+    -- the piece cids should be a unique set.
+    PRIMARY KEY (PayloadMultihash, PieceCid)
 );
 
 CREATE TABLE idx.PieceBlockOffsetSize (

@@ -6,6 +6,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	dockercl "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/stretchr/testify/require"
 	"github.com/yugabyte/gocql"
 	"golang.org/x/net/context"
@@ -66,6 +67,22 @@ func SetupYugabyte(t *testing.T) {
 	tlog.Info("wait for yugabyte start...")
 	awaitYugabyteUp(t, time.Minute)
 	tlog.Info("yugabyte started")
+
+	store := yugabyte.NewStore(yugabyte.DBSettings{
+		Hosts:         []string{"127.0.0.1"},
+		ConnectString: "postgresql://postgres:postgres@localhost",
+	})
+	err = store.Start(ctx)
+	require.NoError(t, err)
+
+	RecreateTables(ctx, t, store)
+}
+
+func RecreateTables(ctx context.Context, t *testing.T, store *yugabyte.Store) {
+	err := store.Drop(ctx)
+	require.NoError(t, err)
+	err = store.Create(ctx)
+	require.NoError(t, err)
 }
 
 func awaitYugabyteUp(t *testing.T, duration time.Duration) {

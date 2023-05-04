@@ -108,21 +108,15 @@ func TestPieceDoctor(t *testing.T) {
 		require.NoError(t, err)
 		defer cl.Close(ctx)
 
-		resetTables := func() {
-			ybstore := bdsvc.Impl.(*yugabyte.Store)
-			err = ybstore.Drop(ctx)
-			require.NoError(t, err)
-			err = ybstore.Create(ctx)
-			require.NoError(t, err)
-		}
+		ybstore := bdsvc.Impl.(*yugabyte.Store)
 
 		t.Run("next pieces", func(t *testing.T) {
-			resetTables()
+			svc.RecreateTables(ctx, t, ybstore)
 			testNextPieces(ctx, t, cl, yugabyte.MinPieceCheckPeriod)
 		})
 
 		t.Run("next pieces pagination", func(t *testing.T) {
-			resetTables()
+			svc.RecreateTables(ctx, t, ybstore)
 			prevp := yugabyte.TrackerCheckBatchSize
 			testNextPiecesPagination(ctx, t, cl, func(pageSize int) {
 				yugabyte.TrackerCheckBatchSize = pageSize
@@ -131,7 +125,7 @@ func TestPieceDoctor(t *testing.T) {
 		})
 
 		t.Run("check pieces", func(t *testing.T) {
-			resetTables()
+			svc.RecreateTables(ctx, t, ybstore)
 			testCheckPieces(ctx, t, cl)
 		})
 
