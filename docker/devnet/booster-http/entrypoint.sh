@@ -10,4 +10,4 @@ echo $MINER_API_INFO
 echo $BOOST_API_INFO
 
 echo Starting booster-http...
-exec booster-http run --api-boost=$BOOST_API_INFO --api-fullnode=$FULLNODE_API_INFO --api-storage=$MINER_API_INFO --tracing
+exec booster-http run --serve-files=true --api-boost=$BOOST_API_INFO --api-fullnode=$FULLNODE_API_INFO --api-storage=$MINER_API_INFO --tracing
