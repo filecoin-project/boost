@@ -1165,13 +1165,13 @@ func TestDealFilter(t *testing.T) {
 
 func TestFinalSealingState(t *testing.T) {
 	ctx := context.Background()
-	//harness := NewHarness(t, withSimulateFailedSealing(true))
-	harness := NewHarness(t)
+	harness := NewHarness(t, withSimulateFailedSealing(false))
+	//harness := NewHarness(t)
 
 	harness.Start(t, ctx)
 	defer harness.Stop()
 
-	td := harness.newDealBuilder(t, 1).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
+	td := harness.newDealBuilder(t, 1, withOnChainDealId(abi.DealID(10))).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
 	require.NoError(t, td.executeAndSubscribe())
 
 	err := td.waitForError("deal could not be found is the sector", types.DealRetryFatal)
@@ -1673,8 +1673,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	ph.MockSealingPipelineAPI.EXPECT().SectorsSummary(gomock.Any()).Return(sealingpipelineStatus, nil).AnyTimes()
 
 	secInfo := lapi.SectorInfo{State: lapi.SectorState(sealing.Proving)}
-	if !pc.simulateFailedSealing {
-		secInfo.Deals = []abi.DealID{abi.DealID(0)}
+	if pc.simulateFailedSealing {
+		secInfo.Deals = []abi.DealID{abi.DealID(10)} // To ensure there is a mismatch
 	}
 
 	ph.MockSealingPipelineAPI.EXPECT().SectorsStatus(gomock.Any(), gomock.Any(), false).Return(secInfo, nil).AnyTimes()
@@ -1684,6 +1684,18 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 
 	return ph
 }
+
+//func sectorStatus(ctx context.Context, p *Provider, dealId uuid.UUID) interface{} {
+//	deal, err := p.dealsDB.ByID(ctx, dealId)
+//	if err != nil {
+//		return lapi.SectorInfo{}
+//	}
+//	return lapi.SectorInfo{
+//		SectorID: deal.SectorID,
+//		State:    lapi.SectorState(sealing.Proving),
+//		Deals:    []abi.DealID{deal.ChainDealID},
+//	}
+//}
 
 func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...harnessOpt) {
 	pc := &providerConfig{
@@ -1755,6 +1767,7 @@ type dealProposalConfig struct {
 	endEpoch           abi.ChainEpoch
 	label              market.DealLabel
 	carVersion         CarVersion
+	onChainDealId      abi.DealID
 }
 
 // dealProposalOpt allows configuration of the deal proposal
@@ -1832,6 +1845,13 @@ func withEpochs(start, end abi.ChainEpoch) dealProposalOpt {
 	return func(dc *dealProposalConfig) {
 		dc.startEpoch = start
 		dc.endEpoch = end
+	}
+}
+
+// To ensure there is a mismatch
+func withOnChainDealId(id abi.DealID) dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.onChainDealId = id
 	}
 }
 
@@ -1955,6 +1975,9 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	publishCid := testutil.GenerateCid()
 	finalPublishCid := testutil.GenerateCid()
 	dealId := abi.DealID(rand.Intn(100))
+	if dc.onChainDealId > abi.DealID(0) {
+		dealId = dc.onChainDealId
+	}
 	sectorId := abi.SectorNumber(rand.Intn(100))
 	offset := abi.PaddedPieceSize(rand.Intn(100))
 
