@@ -56,7 +56,7 @@ func NewStore(settings DBSettings) *Store {
 	}
 }
 
-func (s *Store) Start(_ context.Context) error {
+func (s *Store) Start(ctx context.Context) error {
 	var startErr error
 	s.startOnce.Do(func() {
 		session, err := s.cluster.CreateSession()
@@ -72,6 +72,8 @@ func (s *Store) Start(_ context.Context) error {
 			return
 		}
 		s.db = db
+
+		startErr = s.Create(ctx)
 	})
 
 	return startErr
