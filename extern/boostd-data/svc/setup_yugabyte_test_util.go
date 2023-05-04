@@ -21,7 +21,7 @@ func SetupYugabyte(t *testing.T) {
 	cli, err := dockercl.NewClientWithOpts(dockercl.FromEnv)
 	require.NoError(t, err)
 
-	imageName := "public.ecr.aws/n6b0k8i7/yugabyte-test:aarch64-2.17.2.0"
+	imageName := "yugabytedb/yugabyte:2.17.2.0-b216"
 	out, err := cli.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	require.NoError(t, err)
 
