@@ -16,6 +16,11 @@ import (
 	"time"
 )
 
+var TestYugabyteSettings = yugabyte.DBSettings{
+	Hosts:         []string{"127.0.0.1"},
+	ConnectString: "postgresql://postgres:postgres@localhost",
+}
+
 func SetupYugabyte(t *testing.T) {
 	ctx := context.Background()
 	cli, err := dockercl.NewClientWithOpts(dockercl.FromEnv)
@@ -68,10 +73,7 @@ func SetupYugabyte(t *testing.T) {
 	awaitYugabyteUp(t, time.Minute)
 	tlog.Info("yugabyte started")
 
-	store := yugabyte.NewStore(yugabyte.DBSettings{
-		Hosts:         []string{"127.0.0.1"},
-		ConnectString: "postgresql://postgres:postgres@localhost",
-	})
+	store := yugabyte.NewStore(TestYugabyteSettings)
 	err = store.Start(ctx)
 	require.NoError(t, err)
 

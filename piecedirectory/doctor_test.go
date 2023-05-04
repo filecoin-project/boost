@@ -94,10 +94,7 @@ func TestPieceDoctor(t *testing.T) {
 
 		svc.SetupYugabyte(t)
 
-		bdsvc := svc.NewYugabyte(yugabyte.DBSettings{
-			Hosts:         []string{"127.0.0.1"},
-			ConnectString: "postgresql://postgres:postgres@localhost",
-		})
+		bdsvc := svc.NewYugabyte(svc.TestYugabyteSettings)
 
 		addr := "localhost:8044"
 		err := bdsvc.Start(ctx, addr)
