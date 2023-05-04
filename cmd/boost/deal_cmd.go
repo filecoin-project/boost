@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	cid "github.com/ipfs/go-cid/_rsrch/cidiface"
 	"strings"
 
 	bcli "github.com/filecoin-project/boost/cli"
@@ -12,7 +13,6 @@ import (
 	"github.com/filecoin-project/boost/cmd"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	types2 "github.com/filecoin-project/boost/transport/types"
-	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -21,7 +21,6 @@ import (
 	chain_types "github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/google/uuid"
-	"github.com/ipfs/go-cid"
 	inet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/urfave/cli/v2"
 )
@@ -192,15 +191,15 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		return fmt.Errorf("parsing payload cid %s: %w", payloadCidStr, err)
 	}
 
-	carFileSize := cctx.Uint64("car-size")
-	if carFileSize == 0 {
-		return fmt.Errorf("size of car file cannot be 0")
-	}
-
-	transfer := types.Transfer{
-		Size: carFileSize,
-	}
+	transfer := types.Transfer{}
 	if isOnline {
+
+		carFileSize := cctx.Uint64("car-size")
+		if carFileSize == 0 {
+			return fmt.Errorf("size of car file cannot be 0")
+		}
+
+		transfer.Size = carFileSize
 		// Store the path to the CAR file as a transfer parameter
 		transferParams := &types2.HttpRequest{URL: cctx.String("http-url")}
 
