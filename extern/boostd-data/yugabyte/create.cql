@@ -1,6 +1,6 @@
 create keyspace if not exists idx with replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };
 
-CREATE TABLE idx.PayloadToPieces (
+CREATE TABLE IF NOT EXISTS idx.PayloadToPieces (
     PayloadMultihash BLOB,
     PieceCid BLOB,
     -- PayloadMultihash is the partition key: the key that determines which
@@ -11,7 +11,7 @@ CREATE TABLE idx.PayloadToPieces (
     PRIMARY KEY (PayloadMultihash, PieceCid)
 );
 
-CREATE TABLE idx.PieceBlockOffsetSize (
+CREATE TABLE IF NOT EXISTS idx.PieceBlockOffsetSize (
     PieceCid BLOB,
     PayloadMultihash BLOB,
     BlockOffset BIGINT,
@@ -19,7 +19,7 @@ CREATE TABLE idx.PieceBlockOffsetSize (
     PRIMARY KEY (PieceCid, PayloadMultihash)
 );
 
-CREATE TABLE idx.PieceMetadata (
+CREATE TABLE IF NOT EXISTS idx.PieceMetadata (
     PieceCid TEXT PRIMARY KEY,
     Version TEXT,
     CreatedAt TIMESTAMP,
@@ -29,9 +29,9 @@ CREATE TABLE idx.PieceMetadata (
     ErrorType Text
 ) WITH transactions = { 'enabled' : true };
 
-CREATE INDEX PieceMetadataCreatedAt ON idx.PieceMetadata (CreatedAt);
+CREATE INDEX IF NOT EXISTS PieceMetadataCreatedAt ON idx.PieceMetadata (CreatedAt);
 
-CREATE TABLE idx.PieceDeal (
+CREATE TABLE IF NOT EXISTS idx.PieceDeal (
     DealUuid TEXT PRIMARY KEY,
     PieceCid BLOB,
     IsLegacy BOOLEAN,

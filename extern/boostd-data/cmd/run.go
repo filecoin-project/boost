@@ -9,6 +9,7 @@ import (
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boostd-data/svc"
+	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 )
@@ -18,6 +19,7 @@ var runCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		leveldbCmd,
 		couchbaseCmd,
+		yugabyteCmd,
 	},
 }
 
@@ -103,6 +105,35 @@ var couchbaseCmd = &cli.Command{
 
 		bdsvc := svc.NewCouchbase(settings)
 		return runAction(cctx, "couchbase", bdsvc)
+	},
+}
+
+var yugabyteCmd = &cli.Command{
+	Name:   "yugabyte",
+	Usage:  "Run boostd-data with a yugabyte database",
+	Before: before,
+	Flags: append([]cli.Flag{
+		&cli.StringSliceFlag{
+			Name:     "hosts",
+			Usage:    "yugabyte hosts to connect to over cassandra interface eg '127.0.0.1'",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "connect-string",
+			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
+			Required: true,
+		}},
+		runFlags...,
+	),
+	Action: func(cctx *cli.Context) error {
+		// Create a yugabyte data service
+		settings := yugabyte.DBSettings{
+			Hosts:         cctx.StringSlice("hosts"),
+			ConnectString: cctx.String("connect-string"),
+		}
+
+		bdsvc := svc.NewYugabyte(settings)
+		return runAction(cctx, "yugabyte", bdsvc)
 	},
 }
 

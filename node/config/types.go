@@ -323,7 +323,16 @@ type LocalIndexDirectoryCouchbaseConfig struct {
 	PieceOffsetsBucket      LocalIndexDirectoryCouchbaseBucketConfig
 }
 
+type LocalIndexDirectoryYugabyteConfig struct {
+	Enabled bool
+	// The yugabyte postgres connect string eg "postgresql://postgres:postgres@localhost"
+	ConnectString string
+	// The yugabyte cassandra hosts eg ["127.0.0.1"]
+	Hosts []string
+}
+
 type LocalIndexDirectoryConfig struct {
+	Yugabyte  LocalIndexDirectoryYugabyteConfig
 	Couchbase LocalIndexDirectoryCouchbaseConfig
 	// The maximum number of add index operations allowed to execute in parallel.
 	// The add index operation is executed when a new deal is created - it fetches

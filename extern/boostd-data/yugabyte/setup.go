@@ -14,10 +14,13 @@ var createCQL string
 var createSQL string
 
 func (s *Store) Create(ctx context.Context) error {
+	log.Infow("creating cassandra tables")
 	err := s.execScript(ctx, createCQL, s.execCQL)
 	if err != nil {
 		return err
 	}
+
+	log.Infow("creating postgres tables")
 	return s.execScript(ctx, createSQL, s.execSQL)
 }
 
