@@ -329,14 +329,7 @@ func (p *DealProvider) getDealStatus(req types.DealStatusRequest) types.DealStat
 	var found bool
 
 	if storagemarket.IsFinalSealingState(si.State) {
-		if len(si.Deals) > 0 {
-			for _, d := range si.Deals {
-				if d == pds.ChainDealID {
-					found = true
-					break
-				}
-			}
-		}
+		found = storagemarket.HasDeal(si.Deals, pds.ChainDealID)
 	}
 
 	if !found {

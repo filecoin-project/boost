@@ -1179,7 +1179,7 @@ func TestFinalSealingState(t *testing.T) {
 	td := harness.newDealBuilder(t, 1, withSectorStatusDealId(sectorsStatusDealId)).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
 	require.NoError(t, td.executeAndSubscribe())
 
-	err := td.waitForError("deal could not be found is the sector", types.DealRetryFatal)
+	err := td.waitForError("storage failed - deal not found in sector", types.DealRetryFatal)
 	require.NoError(t, err)
 
 }
@@ -1675,18 +1675,6 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	return ph
 }
 
-//func sectorStatus(ctx context.Context, p *Provider, dealId uuid.UUID) interface{} {
-//	deal, err := p.dealsDB.ByID(ctx, dealId)
-//	if err != nil {
-//		return lapi.SectorInfo{}
-//	}
-//	return lapi.SectorInfo{
-//		SectorID: deal.SectorID,
-//		State:    lapi.SectorState(sealing.Proving),
-//		Deals:    []abi.DealID{deal.ChainDealID},
-//	}
-//}
-
 func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...harnessOpt) {
 	pc := &providerConfig{
 		minPublishFees:       abi.NewTokenAmount(100),
@@ -1965,11 +1953,13 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 
 	publishCid := testutil.GenerateCid()
 	finalPublishCid := testutil.GenerateCid()
+
 	dealId := abi.DealID(1)
 	sectorsStatusDealId := dealId
 	if dc.sectorsStatusDealId > abi.DealID(0) {
 		dealId = dc.sectorsStatusDealId
 	}
+
 	sectorId := abi.SectorNumber(rand.Intn(100))
 	offset := abi.PaddedPieceSize(rand.Intn(100))
 

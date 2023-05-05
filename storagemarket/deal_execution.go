@@ -723,10 +723,8 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 	// Check status immediately
 	info := checkStatus(true)
 	if IsFinalSealingState(info.State) {
-		for _, d := range info.Deals {
-			if d == deal.ChainDealID {
-				return nil
-			}
+		if HasDeal(info.Deals, deal.ChainDealID) {
+			return nil
 		}
 		return retErr
 	}
@@ -751,10 +749,8 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 			}
 
 			if IsFinalSealingState(info.State) {
-				for _, d := range info.Deals {
-					if d == deal.ChainDealID {
-						return nil
-					}
+				if HasDeal(info.Deals, deal.ChainDealID) {
+					return nil
 				}
 				return retErr
 			}
@@ -778,6 +774,17 @@ func IsFinalSealingState(state lapi.SectorState) bool {
 		return true
 	}
 	return false
+}
+
+func HasDeal(deals []abi.DealID, pdsDealId abi.DealID) bool {
+	var ret bool
+	for _, d := range deals {
+		if d == pdsDealId {
+			ret = true
+			break
+		}
+	}
+	return ret
 }
 
 func (p *Provider) failDeal(pub event.Emitter, deal *smtypes.ProviderDealState, err error, cancelled bool) {
