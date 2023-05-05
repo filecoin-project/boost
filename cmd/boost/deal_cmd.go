@@ -46,7 +46,7 @@ var dealFlags = []cli.Flag{
 	},
 	&cli.Uint64Flag{
 		Name:     "car-size",
-		Usage:    "size of the CAR file",
+		Usage:    "size of the CAR file: required for online deals",
 		Required: false,
 	},
 	&cli.StringFlag{
@@ -195,6 +195,9 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 	transfer := types.Transfer{}
 	if isOnline {
 
+		if !cctx.IsSet("car-size") {
+			return fmt.Errorf("car size is required for online deals")
+		}
 		carFileSize := cctx.Uint64("car-size")
 		if carFileSize == 0 {
 			return fmt.Errorf("size of car file cannot be 0")
