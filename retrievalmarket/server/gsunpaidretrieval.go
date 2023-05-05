@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/boost-gfm/stores"
 	graphsync "github.com/filecoin-project/boost-graphsync"
 	"github.com/filecoin-project/boost/metrics"
+	"github.com/filecoin-project/boost/retrievalmarket/types"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-data-transfer/encoding"
 	"github.com/filecoin-project/go-data-transfer/message"
@@ -87,6 +88,10 @@ func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtn
 		return nil, err
 	}
 	err = typeRegistry.Register(&migrations.DealProposal0{}, nil)
+	if err != nil {
+		return nil, err
+	}
+	err = typeRegistry.Register(&types.LegsVoucher{}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -237,22 +242,34 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 		// (the legacy retrieval code recognizes some vouchers that we are not
 		// interested in, eg LegsVoucher for downloading announcement deal
 		// cids)
-		if errors.Is(decodeErr, unknownVoucherErr) {
-			return false, nil
+		if !errors.Is(decodeErr, unknownVoucherErr) {
+			return false, fmt.Errorf("decoding new request voucher: %w", decodeErr)
 		}
-		return false, fmt.Errorf("decoding new request voucher: %w", decodeErr)
 	}
 
-	proposal, ok := voucher.(*retrievalmarket.DealProposal)
-	if !ok {
-		legacyProposal, ok := voucher.(*migrations.DealProposal0)
-		if !ok {
-			return false, errors.New("wrong voucher type")
+	switch v := voucher.(type) {
+	case *types.LegsVoucher:
+		params, err := retrievalmarket.NewParamsV1(abi.NewTokenAmount(0), 0, 0, request.Selector(), nil, abi.NewTokenAmount(0))
+		if err != nil {
+			return false, err
 		}
-		newProposal := migrations.MigrateDealProposal0To1(*legacyProposal)
-		proposal = &newProposal
+		proposal := retrievalmarket.DealProposal{
+			PayloadCID: request.Root(),
+			Params:     params,
+		}
+		return g.handleRetrievalDeal(p, msg, proposal, request)
+	case *retrievalmarket.DealProposal:
+		proposal := *v
+		return g.handleRetrievalDeal(p, msg, proposal, request)
+	case *migrations.DealProposal0:
+		proposal := migrations.MigrateDealProposal0To1(*v)
+		return g.handleRetrievalDeal(p, msg, proposal, request)
 	}
 
+	return false, nil
+}
+
+func (g *GraphsyncUnpaidRetrieval) handleRetrievalDeal(peerID peer.ID, msg datatransfer.Message, proposal retrievalmarket.DealProposal, request graphsync.RequestData) (bool, error) {
 	// If it's a paid retrieval, do not intercept it
 	if !proposal.UnsealPrice.IsZero() || !proposal.PricePerByte.IsZero() {
 		return false, nil
@@ -269,16 +286,16 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 		baseCid:    request.Root(),
 		selector:   &cbg.Deferred{Raw: selBytes},
 		sender:     g.peerID,
-		recipient:  p,
+		recipient:  peerID,
 		status:     datatransfer.Requested,
 		isPull:     true,
 	}
 
 	mktsState := &retrievalmarket.ProviderDealState{
-		DealProposal:  *proposal,
-		ChannelID:     &datatransfer.ChannelID{ID: msg.TransferID(), Initiator: p, Responder: g.peerID},
+		DealProposal:  proposal,
+		ChannelID:     &datatransfer.ChannelID{ID: msg.TransferID(), Initiator: peerID, Responder: g.peerID},
 		Status:        retrievalmarket.DealStatusNew,
-		Receiver:      p,
+		Receiver:      peerID,
 		FundsReceived: abi.NewTokenAmount(0),
 	}
 	state := &retrievalState{
@@ -288,7 +305,7 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 
 	// Record the data transfer ID so that we can intercept future
 	// events for this transfer
-	g.trackTransfer(p, msg.TransferID(), state)
+	g.trackTransfer(peerID, msg.TransferID(), state)
 
 	// Fire transfer queued event
 	g.publishDTEvent(datatransfer.TransferRequestQueued, "", cs)
@@ -325,7 +342,15 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 			}
 
 			// Validate the request
-			res, validateErr := g.validator.validatePullRequest(msg.IsRestart(), p, voucher, request.Root(), request.Selector())
+			var res datatransfer.VoucherResult
+			var validateErr error
+
+			if _, ok := voucher.(*types.LegsVoucher); ok {
+				res = &types.LegsVoucherResult{}
+				validateErr = nil
+			} else {
+				res, validateErr = g.validator.validatePullRequest(msg.IsRestart(), p, voucher, request.Root(), request.Selector())
+			}
 			isAccepted := validateErr == nil
 			const isPaused = false // There are no payments required, so never pause
 			resultType := datatransfer.EmptyTypeIdentifier
@@ -433,6 +458,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterCompletedResponseListener(listener gr
 		state.mkts.Status = retrievalmarket.DealStatusBlocksComplete
 		g.publishMktsEvent(retrievalmarket.ProviderEventBlocksCompleted, *state.mkts)
 
+		// TODO: Handle non deal proposals
 		// Include a markets protocol Completed message in the response
 		voucher := &retrievalmarket.DealResponse{
 			ID:     state.mkts.DealProposal.ID,
