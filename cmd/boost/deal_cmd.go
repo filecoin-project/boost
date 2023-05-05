@@ -47,7 +47,7 @@ var dealFlags = []cli.Flag{
 	&cli.Uint64Flag{
 		Name:     "car-size",
 		Usage:    "size of the CAR file",
-		Required: true,
+		Required: false,
 	},
 	&cli.StringFlag{
 		Name:     "payload-cid",
