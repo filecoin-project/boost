@@ -354,9 +354,13 @@ func (w *Wrapper) announceBoostDealMetadata(ctx context.Context, md metadata.Gra
 	fm := metadata.Default.New(&md)
 	annCid, err := w.prov.NotifyPut(ctx, nil, propCid.Bytes(), fm)
 	if err != nil {
-		return cid.Undef, fmt.Errorf("failed to announce deal to index provider: %w", err)
+		// Check if the error is because the deal was already advertised
+		// (we can safely ignore this error)
+		if !errors.Is(err, provider.ErrAlreadyAdvertised) {
+			return cid.Undef, fmt.Errorf("failed to announce deal to index provider: %w", err)
+		}
 	}
-	return annCid, err
+	return annCid, nil
 }
 
 func (w *Wrapper) AnnounceBoostDealRemoved(ctx context.Context, propCid cid.Cid) (cid.Cid, error) {

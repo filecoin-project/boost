@@ -141,17 +141,12 @@ func (m *UnsealedStateManager) checkForUpdates(ctx context.Context) error {
 					VerifiedDeal:  deal.DealProposal.Proposal.VerifiedDeal,
 				}
 				announceCid, err := m.idxprov.announceBoostDealMetadata(ctx, md, propCid)
-				if err != nil {
-					// Check if the error is because the deal was already advertised
-					if !errors.Is(err, provider.ErrAlreadyAdvertised) {
-						// There was some other error, write it to the log
-						usmlog.Errorf("announcing deal %s to index provider: %w", deal.DealID, err)
-						continue
-					}
-				} else {
+				if err == nil {
 					usmlog.Infow("announced deal seal state to index provider",
 						"deal id", deal.DealID, "sector id", deal.SectorID.Number,
 						"seal state", sectorSealState, "announce cid", announceCid.String())
+				} else {
+					usmlog.Errorf("announcing deal %s to index provider: %w", deal.DealID, err)
 				}
 			}
 		}
