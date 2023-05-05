@@ -688,8 +688,8 @@ func (p *Provider) registerShardSync(ctx context.Context, pc cid.Cid) error {
 // fireSealingUpdateEvents periodically checks the sealing status of the deal
 // and fires events for each change
 func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, sectorNum abi.SectorNumber) *dealMakingError {
-	var sectorInfo lapi.SectorInfo
 	var deal *types.ProviderDealState
+	var lastSealingState lapi.SectorState
 	checkStatus := func(force bool) lapi.SectorInfo {
 		// To avoid overloading the sealing service, only get the sector status
 		// if there's at least one subscriber to the event that will be published
@@ -699,8 +699,8 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 
 		// Get the sector status
 		si, err := p.sps.SectorsStatus(p.ctx, sectorNum, false)
-		if err == nil && si.State != sectorInfo.State {
-			sectorInfo.State = si.State
+		if err == nil && si.State != lastSealingState {
+			lastSealingState = si.State
 
 			// Sector status has changed, fire an update event
 			deal, err = p.dealsDB.ByID(p.ctx, dealUuid)
@@ -723,29 +723,26 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 	// Check status immediately
 	info := checkStatus(true)
 	if IsFinalSealingState(info.State) {
-		if len(info.Deals) > 0 {
-			for _, d := range info.Deals {
-				if d == deal.ChainDealID {
-					return nil
-				}
+		for _, d := range info.Deals {
+			if d == deal.ChainDealID {
+				return nil
 			}
-			return retErr
 		}
 		return retErr
 	}
 
-	// Check status every 5 second. There is no advantage of checking it every second
-	ticker := time.NewTicker(5 * time.Second)
+	// Check status every 10 second. There is no advantage of checking it every second
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	count := 0
-	forceCount := 60
+	forceCount := 12
 	for {
 		select {
 		case <-p.ctx.Done():
 			return nil
 		case <-ticker.C:
 			count++
-			// Force a status check every forceCount seconds, even if there
+			// Force a status check every (ticker * forceCount) seconds, even if there
 			// are no subscribers (so that we can stop checking altogether
 			// if the sector reaches a final sealing state)
 			info = checkStatus(count >= forceCount)
@@ -754,13 +751,10 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 			}
 
 			if IsFinalSealingState(info.State) {
-				if len(info.Deals) > 0 {
-					for _, d := range info.Deals {
-						if d == deal.ChainDealID {
-							return nil
-						}
+				for _, d := range info.Deals {
+					if d == deal.ChainDealID {
+						return nil
 					}
-					return retErr
 				}
 				return retErr
 			}

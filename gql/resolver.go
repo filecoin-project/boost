@@ -601,15 +601,12 @@ func (dr *dealResolver) sealingState(ctx context.Context) string {
 		log.Warnw("error getting sealing status for sector", "sector", dr.SectorID, "error", err)
 		return "Sealer: Sealing"
 	}
-	if len(si.Deals) > 0 {
-		for _, d := range si.Deals {
-			if d == dr.ProviderDealState.ChainDealID {
-				return "Sealer: " + string(si.State)
-			}
+	for _, d := range si.Deals {
+		if d == dr.ProviderDealState.ChainDealID {
+			return "Sealer: " + string(si.State)
 		}
-		return "Sealer: failed - deal not found in sector"
 	}
-	return "Sealer: failed - deal not found in sector"
+	return fmt.Sprintf("Sealer: failed - deal not found in sector %d", si.SectorID)
 }
 
 func (dr *dealResolver) Logs(ctx context.Context) ([]*logsResolver, error) {

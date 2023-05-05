@@ -45,7 +45,7 @@ import (
 var (
 	ErrDealNotFound        = fmt.Errorf("deal not found")
 	ErrDealHandlerNotFound = errors.New("deal handler not found")
-	ErrDealNotSealed       = errors.New("deal could not be found is the sector")
+	ErrDealNotSealed       = errors.New("storage failed - deal not found in sector")
 )
 
 var (
