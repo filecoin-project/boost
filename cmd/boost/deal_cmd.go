@@ -44,11 +44,6 @@ var dealFlags = []cli.Flag{
 		Usage:    "size of the CAR file as a padded piece",
 		Required: true,
 	},
-	&cli.Uint64Flag{
-		Name:     "car-size",
-		Usage:    "size of the CAR file: required for online deals",
-		Required: false,
-	},
 	&cli.StringFlag{
 		Name:     "payload-cid",
 		Usage:    "root CID of the CAR file",
@@ -109,6 +104,11 @@ var dealCmd = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:  "http-headers",
 			Usage: "http headers to be passed with the request (e.g key=value)",
+		},
+		&cli.Uint64Flag{
+			Name:     "car-size",
+			Usage:    "size of the CAR file: required for online deals",
+			Required: true,
 		},
 	}, dealFlags...),
 	Before: before,
