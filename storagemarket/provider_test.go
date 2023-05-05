@@ -1165,13 +1165,18 @@ func TestDealFilter(t *testing.T) {
 
 func TestFinalSealingState(t *testing.T) {
 	ctx := context.Background()
-	harness := NewHarness(t, withSimulateFailedSealing(false))
-	//harness := NewHarness(t)
+	harness := NewHarness(t)
 
 	harness.Start(t, ctx)
 	defer harness.Stop()
 
-	td := harness.newDealBuilder(t, 1, withOnChainDealId(abi.DealID(10))).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
+	// The deal ID returned from Publish Storage Deals is hard-coded to 1 for
+	// these tests.
+	// Set the deal ID that is returned from the call to SectorsStatus
+	// to be different so that there is a mismatch when checking the sealing
+	// state.
+	sectorsStatusDealId := abi.DealID(10)
+	td := harness.newDealBuilder(t, 1, withSectorStatusDealId(sectorsStatusDealId)).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
 	require.NoError(t, td.executeAndSubscribe())
 
 	err := td.waitForError("deal could not be found is the sector", types.DealRetryFatal)
@@ -1395,8 +1400,6 @@ type providerConfig struct {
 	localCommp  bool
 	dealFilter  dealfilter.StorageDealFilter
 	chainHeadFn ChainHeadFn
-
-	simulateFailedSealing bool
 }
 
 type harnessOpt func(pc *providerConfig)
@@ -1480,12 +1483,6 @@ func withChainHeadFunction(fn ChainHeadFn) harnessOpt {
 	}
 }
 
-func withSimulateFailedSealing(f bool) harnessOpt {
-	return func(pc *providerConfig) {
-		pc.simulateFailedSealing = true
-	}
-}
-
 func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	ctrl := gomock.NewController(t)
 	pc := &providerConfig{
@@ -1526,7 +1523,7 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	// setup mocks
 	fn := lotusmocks.NewMockFullNode(ctrl)
 	minerStub := smtestutil.NewMinerStub(ctrl)
-	sps := mock_sealingpipeline.NewMockAPI(ctrl)
+	sps := minerStub.MockAPI
 
 	// setup client and miner addrs
 	minerAddr, err := address.NewIDAddress(1011)
@@ -1672,13 +1669,6 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 
 	ph.MockSealingPipelineAPI.EXPECT().SectorsSummary(gomock.Any()).Return(sealingpipelineStatus, nil).AnyTimes()
 
-	secInfo := lapi.SectorInfo{State: lapi.SectorState(sealing.Proving)}
-	if pc.simulateFailedSealing {
-		secInfo.Deals = []abi.DealID{abi.DealID(10)} // To ensure there is a mismatch
-	}
-
-	ph.MockSealingPipelineAPI.EXPECT().SectorsStatus(gomock.Any(), gomock.Any(), false).Return(secInfo, nil).AnyTimes()
-
 	ph.DAGStore = dagStore
 	ph.MockFullNode = fn
 
@@ -1754,20 +1744,20 @@ func (h *ProviderHarness) Stop() {
 }
 
 type dealProposalConfig struct {
-	normalFileSize     int
-	offlineDeal        bool
-	verifiedDeal       bool
-	providerCollateral abi.TokenAmount
-	clientAddr         address.Address
-	minerAddr          address.Address
-	pieceCid           cid.Cid
-	pieceSize          abi.PaddedPieceSize
-	undefinedPieceCid  bool
-	startEpoch         abi.ChainEpoch
-	endEpoch           abi.ChainEpoch
-	label              market.DealLabel
-	carVersion         CarVersion
-	onChainDealId      abi.DealID
+	normalFileSize      int
+	offlineDeal         bool
+	verifiedDeal        bool
+	providerCollateral  abi.TokenAmount
+	clientAddr          address.Address
+	minerAddr           address.Address
+	pieceCid            cid.Cid
+	pieceSize           abi.PaddedPieceSize
+	undefinedPieceCid   bool
+	startEpoch          abi.ChainEpoch
+	endEpoch            abi.ChainEpoch
+	label               market.DealLabel
+	carVersion          CarVersion
+	sectorsStatusDealId abi.DealID
 }
 
 // dealProposalOpt allows configuration of the deal proposal
@@ -1848,10 +1838,10 @@ func withEpochs(start, end abi.ChainEpoch) dealProposalOpt {
 	}
 }
 
-// To ensure there is a mismatch
-func withOnChainDealId(id abi.DealID) dealProposalOpt {
+// Set the id of the deal that is returned from the call to SectorsStatus
+func withSectorStatusDealId(id abi.DealID) dealProposalOpt {
 	return func(dc *dealProposalConfig) {
-		dc.onChainDealId = id
+		dc.sectorsStatusDealId = id
 	}
 }
 
@@ -1974,14 +1964,15 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 
 	publishCid := testutil.GenerateCid()
 	finalPublishCid := testutil.GenerateCid()
-	dealId := abi.DealID(rand.Intn(100))
-	if dc.onChainDealId > abi.DealID(0) {
-		dealId = dc.onChainDealId
+	dealId := abi.DealID(1)
+	sectorsStatusDealId := dealId
+	if dc.sectorsStatusDealId > abi.DealID(0) {
+		dealId = dc.sectorsStatusDealId
 	}
 	sectorId := abi.SectorNumber(rand.Intn(100))
 	offset := abi.PaddedPieceSize(rand.Intn(100))
 
-	tbuilder.ms = tbuilder.ph.MinerStub.ForDeal(dealParams, publishCid, finalPublishCid, dealId, sectorId, offset)
+	tbuilder.ms = tbuilder.ph.MinerStub.ForDeal(dealParams, publishCid, finalPublishCid, dealId, sectorsStatusDealId, sectorId, offset)
 	tbuilder.td = td
 	return tbuilder
 }
@@ -2329,7 +2320,7 @@ func (td *testDeal) updateWithRestartedProvider(ph *ProviderHarness) *testDealBu
 
 	td.tBuilder.ph = ph
 	td.tBuilder.td = td
-	td.tBuilder.ms = ph.MinerStub.ForDeal(td.params, old.PublishCid, old.FinalPublishCid, old.DealID, old.SectorID, old.Offset)
+	td.tBuilder.ms = ph.MinerStub.ForDeal(td.params, old.PublishCid, old.FinalPublishCid, old.DealID, old.SectorsStatusDealID, old.SectorID, old.Offset)
 
 	return td.tBuilder
 }
