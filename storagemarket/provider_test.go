@@ -1703,6 +1703,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	// shutdown old provider
 	h.Provider.Stop()
 	h.MinerStub = smtestutil.NewMinerStub(h.GoMockCtrl)
+	h.MockSealingPipelineAPI = h.MinerStub.MockAPI
 	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
 	df := func(ctx context.Context, deal dealfilter.DealFilterParams) (bool, string, error) {
 		return true, "", nil
