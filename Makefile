@@ -7,6 +7,7 @@ unexport GOFLAGS
 
 GOCC?=go
 
+ARCH?=$(shell arch)
 GOVERSION:=$(shell $(GOCC) version | tr ' ' '\n' | grep go1 | sed 's/^go//' | awk -F. '{printf "%d%03d%03d", $$1, $$2, $$3}')
 ifeq ($(shell expr $(GOVERSION) \< 1016000), 1)
 $(warning Your Golang version is go$(shell expr $(GOVERSION) / 1000000).$(shell expr $(GOVERSION) % 1000000 / 1000).$(shell expr $(GOVERSION) % 1000))
@@ -258,6 +259,9 @@ docker/booster-bitswap:
 docker/all: $(lotus_build_cmd) docker/boost docker/booster-http docker/booster-bitswap \
 	docker/lotus docker/lotus-miner
 .PHONY: docker/all
+
+test-lid:
+	cd ./extern/boostd-data && ARCH=$(ARCH) docker-compose up --build --exit-code-from go-tests
 
 devnet/up:
 	rm -rf ./docker/devnet/data && docker compose -f ./docker/devnet/docker-compose.yaml up -d
