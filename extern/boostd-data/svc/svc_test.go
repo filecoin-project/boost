@@ -47,8 +47,10 @@ var testCouchSettings = couchbase.DBSettings{
 }
 
 var testYugaSettings = yugabyte.DBSettings{
-	Hosts:         []string{"127.0.0.1"},
-	ConnectString: "postgresql://postgres:postgres@localhost",
+	//Hosts:         []string{"127.0.0.1"},
+	Hosts: []string{"yugabyte"},
+	//ConnectString: "postgresql://postgres:postgres@localhost",
+	ConnectString: "postgresql://postgres:postgres@yugabyte:5433",
 }
 
 func TestService(t *testing.T) {
