@@ -1,3 +1,6 @@
+//go:build test_lid
+// +build test_lid
+
 package piecedirectory
 
 import (
@@ -94,10 +97,7 @@ func TestPieceDoctor(t *testing.T) {
 
 		svc.SetupYugabyte(t)
 
-		bdsvc := svc.NewYugabyte(yugabyte.DBSettings{
-			Hosts:         []string{"yugabyte"},
-			ConnectString: "postgresql://postgres:postgres@yugabyte:5433",
-		})
+		bdsvc := svc.NewYugabyte(svc.TestYugabyteSettings)
 
 		addr := "localhost:8044"
 		err := bdsvc.Start(ctx, addr)

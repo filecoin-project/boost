@@ -1,3 +1,6 @@
+//go:build test_lid
+// +build test_lid
+
 package piecedirectory
 
 import (
@@ -14,7 +17,6 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/boostd-data/svc/types"
-	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -48,11 +50,7 @@ func TestPieceDirectory(t *testing.T) {
 	t.Run("yugabyte", func(t *testing.T) {
 		svc.SetupYugabyte(t)
 
-		bdsvc := svc.NewYugabyte(yugabyte.DBSettings{
-			Hosts:         []string{"yugabyte"},
-			ConnectString: "postgresql://postgres:postgres@yugabyte:5433",
-		})
-
+		bdsvc := svc.NewYugabyte(svc.TestYugabyteSettings)
 		addr := "localhost:8044"
 		testPieceDirectory(ctx, t, bdsvc, addr)
 	})
