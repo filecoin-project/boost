@@ -2,6 +2,9 @@ package modules
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	retrievalimpl "github.com/filecoin-project/boost-gfm/retrievalmarket/impl"
 	"github.com/filecoin-project/boost-gfm/stores"
@@ -15,12 +18,15 @@ import (
 	"github.com/filecoin-project/lotus/metrics"
 	lotus_helpers "github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/ipfs/kubo/core/node/helpers"
+	"github.com/ipld/go-ipld-prime/linking"
+	provider "github.com/ipni/index-provider"
+	"github.com/ipni/index-provider/engine"
 	"github.com/libp2p/go-libp2p/core/host"
 	"go.opencensus.io/stats"
 	"go.uber.org/fx"
-	"sync"
-	"time"
 )
+
+var _ server.AskGetter = (*ProxyAskGetter)(nil)
 
 // ProxyAskGetter is used to avoid circular dependencies:
 // RetrievalProvider depends on RetrievalGraphsync, which depends on RetrievalProvider's
@@ -49,9 +55,25 @@ func SetAskGetter(proxy *ProxyAskGetter, rp retrievalmarket.RetrievalProvider) {
 	proxy.AskGetter = rp
 }
 
+var _ linking.LinkSystem = (*ProxyLinkSystem)(nil)
+
+// ProxyProvider is used to avoid circular dependencies
+type ProxyLinkSystem struct {
+	linking.LinkSystem
+}
+
+func NewLinkSystem() *ProxyLinkSystem {
+	return &ProxyLinkSystem{}
+}
+
+func SetLinkSystem(proxy *ProxyLinkSystem, prov provider.Interface) {
+	e := prov.(*engine.Engine)
+	proxy.LinkSystem = *e.LinkSystem()
+}
+
 // RetrievalGraphsync creates a graphsync instance used to serve retrievals.
-func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, dagStore stores.DAGStoreWrapper, pstore dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
-	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, dagStore stores.DAGStoreWrapper, pstore dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter) (*server.GraphsyncUnpaidRetrieval, error) {
+func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, dagStore stores.DAGStoreWrapper, pstore dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter, ls linking.LinkSystem) (*server.GraphsyncUnpaidRetrieval, error) {
+	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.IndexBackedBlockstore, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, dagStore stores.DAGStoreWrapper, pstore dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter, ls linking.LinkSystem) (*server.GraphsyncUnpaidRetrieval, error) {
 		// Create a Graphsync instance
 		mkgs := Graphsync(parallelTransfersForStorage, parallelTransfersForStoragePerPeer, parallelTransfersForRetrieval)
 		gs := mkgs(mctx, lc, ibs, h)
@@ -64,7 +86,7 @@ func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersFor
 			SectorAccessor: sa,
 			AskStore:       askGetter,
 		}
-		gsupr, err := server.NewGraphsyncUnpaidRetrieval(h.ID(), gs, net, vdeps)
+		gsupr, err := server.NewGraphsyncUnpaidRetrieval(h.ID(), gs, net, vdeps, ls)
 
 		// Set up a context that is cancelled when the boostd process exits
 		gsctx, cancel := context.WithCancel(context.Background())

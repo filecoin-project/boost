@@ -23,6 +23,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hannahhoward/go-pubsub"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipld/go-ipld-prime/linking"
 	"github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.opencensus.io/stats"
@@ -53,6 +54,7 @@ type GraphsyncUnpaidRetrieval struct {
 	validator  *requestValidator
 	pubSubDT   *pubsub.PubSub
 	pubSubMkts *pubsub.PubSub
+	linkSystem linking.LinkSystem
 
 	activeRetrievalsLk sync.RWMutex
 	activeRetrievals   map[reqId]*retrievalState
@@ -81,7 +83,7 @@ type ValidationDeps struct {
 	AskStore       AskGetter
 }
 
-func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtnet network.DataTransferNetwork, vdeps ValidationDeps) (*GraphsyncUnpaidRetrieval, error) {
+func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtnet network.DataTransferNetwork, vdeps ValidationDeps, ls linking.LinkSystem) (*GraphsyncUnpaidRetrieval, error) {
 	typeRegistry := registry.NewRegistry()
 	err := typeRegistry.Register(&retrievalmarket.DealProposal{}, nil)
 	if err != nil {
@@ -105,12 +107,17 @@ func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtn
 		pubSubMkts:       pubsub.New(eventDispatcherMkts),
 		validator:        newRequestValidator(vdeps),
 		activeRetrievals: make(map[reqId]*retrievalState),
+		linkSystem:       ls,
 	}, nil
 }
 
 func (g *GraphsyncUnpaidRetrieval) Start(ctx context.Context) {
 	g.ctx = ctx
 	g.validator.ctx = ctx
+	err := g.RegisterPersistenceOption("indexstore", g.linkSystem)
+	if err == nil {
+		log.Errorw("setting persistence option for index advertisement retrieval", "err", err)
+	}
 }
 
 // Called when a new request is received
@@ -348,6 +355,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 			if _, ok := voucher.(*types.LegsVoucher); ok {
 				res = &types.LegsVoucherResult{}
 				validateErr = nil
+				hookActions.UsePersistenceOption("indexstore")
 			} else {
 				res, validateErr = g.validator.validatePullRequest(msg.IsRestart(), p, voucher, request.Root(), request.Selector())
 			}

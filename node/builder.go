@@ -67,6 +67,7 @@ import (
 	"github.com/filecoin-project/lotus/system"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipfs/go-metrics-interface"
+	"github.com/ipld/go-ipld-prime/linking"
 	provider "github.com/ipni/index-provider"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -169,6 +170,7 @@ const (
 	SettlePaymentChannelsKey
 	RunPeerTaggerKey
 	SetupFallbackBlockstoresKey
+	HandleSetLinkSystem
 
 	SetApiEndpointKey
 
@@ -524,6 +526,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
 		Override(new(*modules.ProxyAskGetter), modules.NewAskGetter),
 		Override(new(server.AskGetter), From(new(*modules.ProxyAskGetter))),
+		Override(new(*modules.ProxyLinkSystem), modules.NewLinkSystem),
+		Override(new(linking.LinkSystem), From(new(*modules.ProxyLinkSystem))),
 		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
 		Override(new(dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
 		Override(new(dtypes.ProviderPieceStore), modules.NewProviderPieceStore),
@@ -575,6 +579,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(HandleBoostDealsKey, modules.HandleBoostLibp2pDeals),
 		Override(HandleContractDealsKey, modules.HandleContractDeals(&cfg.ContractDeals)),
 		Override(HandleProposalLogCleanerKey, modules.HandleProposalLogCleaner(time.Duration(cfg.Dealmaking.DealProposalLogDuration))),
+		Override(HandleSetLinkSystem, modules.SetLinkSystem),
 
 		// Boost storage deal filter
 		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),
