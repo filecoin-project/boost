@@ -3,7 +3,6 @@ package modules
 import (
 	"context"
 	"fmt"
-
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
@@ -94,6 +93,9 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			ma := address.Address(maddr)
 			opts = append(opts,
 				engine.WithPublisherKind(engine.DataTransferPublisher),
+				engine.WithDataTransfer(dtV1ToIndexerDT(dt, func() ipld.LinkSystem {
+					return *e.LinkSystem()
+				})),
 				engine.WithExtraGossipData(ma.Bytes()),
 				engine.WithTopic(t),
 			)
@@ -131,6 +133,14 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 		})
 		return e, nil
 	}
+}
+
+// The index provider needs to set up some go-data-transfer voucher code.
+// Below we write a shim for the specific use case of index provider, that
+// translates between the go-data-transfer v2 use case that the index provider
+// implements and the go-data-transfer v1 code that boost imports.
+func dtV1ToIndexerDT(dt dtypes.ProviderDataTransfer, linksys func() ipld.LinkSystem) datatransferv2.Manager {
+	return &indexerDT{dt: dt, linksys: linksys}
 }
 
 type indexerDT struct {
