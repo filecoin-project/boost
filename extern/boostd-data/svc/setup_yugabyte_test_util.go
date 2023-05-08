@@ -23,10 +23,7 @@ func SetupYugabyte(t *testing.T) {
 	awaitYugabyteUp(t, time.Minute)
 	tlog.Info("yugabyte started")
 
-	store := yugabyte.NewStore(yugabyte.DBSettings{
-		Hosts:         []string{"yugabyte"},
-		ConnectString: "postgresql://postgres:postgres@yugabyte:5433",
-	})
+	store := yugabyte.NewStore(TestYugabyteSettings)
 	err := store.Start(ctx)
 	require.NoError(t, err)
 
@@ -56,5 +53,6 @@ func awaitYugabyteUp(t *testing.T, duration time.Duration) {
 		if time.Since(start) > duration {
 			t.Fatalf("failed to start yugabyte within %s", duration)
 		}
+		time.Sleep(time.Second)
 	}
 }
