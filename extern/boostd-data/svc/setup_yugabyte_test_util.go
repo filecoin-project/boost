@@ -9,6 +9,7 @@ import (
 	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/stretchr/testify/require"
 	"github.com/yugabyte/gocql"
+	"github.com/yugabyte/pgx/v4/pgxpool"
 	"golang.org/x/net/context"
 	"io"
 	"os"
@@ -46,7 +47,9 @@ func SetupYugabyte(t *testing.T) {
 		PortBindings: map[nat.Port][]nat.PortBinding{
 			"7000": {{HostIP: "127.0.0.1", HostPort: "7001"}},
 			"9000": {{HostIP: "127.0.0.1", HostPort: "9000"}},
-			"5433": {{HostIP: "127.0.0.1", HostPort: "5433"}},
+			// Yugabyte's postgres interface in docker runs on 5433
+			// whereas the standard postgres port is 5432
+			"5433": {{HostIP: "127.0.0.1", HostPort: "5432"}},
 			"9042": {{HostIP: "127.0.0.1", HostPort: "9042"}},
 		},
 	}, nil, nil, "")
@@ -89,13 +92,15 @@ func RecreateTables(ctx context.Context, t *testing.T, store *yugabyte.Store) {
 
 func awaitYugabyteUp(t *testing.T, duration time.Duration) {
 	start := time.Now()
-	cluster := gocql.NewCluster("127.0.0.1")
+	cluster := gocql.NewCluster(TestYugabyteSettings.Hosts[0])
 	for {
-		session, err := cluster.CreateSession()
+		_, err := cluster.CreateSession()
 		if err == nil {
-			return
+			_, err = pgxpool.Connect(context.Background(), TestYugabyteSettings.ConnectString)
+			if err == nil {
+				return
+			}
 		}
-		_ = session
 
 		tlog.Debugf("waiting for yugabyte: %s", err)
 		if time.Since(start) > duration {
