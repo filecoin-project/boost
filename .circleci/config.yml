@@ -94,8 +94,7 @@ jobs:
           name: local index directory docker compose tests
           command: |
             set -x
-            cd ./extern/boostd-data
-            docker-compose up --build --exit-code-from go-tests
+            make test-lid
 
   test:
     description: |

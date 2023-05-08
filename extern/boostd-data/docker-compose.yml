@@ -3,8 +3,7 @@ version: '3.7'
 services:
 
   yugabyte:
-    image: public.ecr.aws/n6b0k8i7/yugabyte-test:x86_64-2.17.2.0
-    #image: public.ecr.aws/n6b0k8i7/yugabyte-test:aarch64-2.17.2.0
+    image: public.ecr.aws/n6b0k8i7/yugabyte-test:${ARCH}-2.17.2.0
     restart: on-failure
 
   go-tests:
