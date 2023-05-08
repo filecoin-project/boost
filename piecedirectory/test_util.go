@@ -9,7 +9,6 @@ import (
 	"github.com/filecoin-project/boost/piecedirectory/types"
 	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -17,24 +16,6 @@ import (
 	"github.com/ipld/go-car/v2"
 	"github.com/stretchr/testify/require"
 )
-
-var testCouchSettings = couchbase.DBSettings{
-	ConnectString: "couchbase://localhost",
-	Auth: couchbase.DBSettingsAuth{
-		Username: "Administrator",
-		Password: "boostdemo",
-	},
-	PieceMetadataBucket: couchbase.DBSettingsBucket{
-		RAMQuotaMB: 128,
-	},
-	MultihashToPiecesBucket: couchbase.DBSettingsBucket{
-		RAMQuotaMB: 128,
-	},
-	PieceOffsetsBucket: couchbase.DBSettingsBucket{
-		RAMQuotaMB: 128,
-	},
-	TestMode: true,
-}
 
 // Get the index records from the CAR file
 func GetRecords(t *testing.T, reader car.SectionReader) []model.Record {

@@ -25,6 +25,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testCouchSettings = couchbase.DBSettings{
+	ConnectString: "couchbase://localhost",
+	Auth: couchbase.DBSettingsAuth{
+		Username: "Administrator",
+		Password: "boostdemo",
+	},
+	PieceMetadataBucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	MultihashToPiecesBucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	PieceOffsetsBucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	TestMode: true,
+}
+
 func TestPieceDirectory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
