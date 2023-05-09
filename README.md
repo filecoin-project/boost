@@ -211,15 +211,15 @@ Note also that the provider address is `t01000` and you will need to supply an a
 1. Build images from the root of the Boost repository
 
 ```
-make docker/all
+make clean docker/all
 ```
 
 On ARM-based systems (*Apple M1/M2*) you need to force building Filecoin's Rust libraries from the source
 ```
-make docker/all ffi_from_source=1 build_lotus=1
+make clean docker/all ffi_from_source=1 build_lotus=1
 ```
 
-If you need to build containers using a specific version of lotus then provide the version as a parameter, e.g. `make docker/all lotus_version=v1.20.0-rc2 build_lotus=1`. The version must be a tag or a remote branch name of [Lotus git repo](https://github.com/filecoin-project/lotus).
+If you need to build containers using a specific version of lotus then provide the version as a parameter, e.g. `make clean docker/all lotus_version=v1.20.0-rc2 build_lotus=1`. The version must be a tag or a remote branch name of [Lotus git repo](https://github.com/filecoin-project/lotus).
 
 ### Start devnet docker stack
 
@@ -235,7 +235,7 @@ The initial setup could take up to 20 min or more as it needs to download Fileco
 
 2. Try opening the Boost GUI http://localhost:8080 . Devnet is ready to operate when the URL opens and indicates no errors on the startup page.
 
-You can inspect the status using `docker compose logs -f`.
+You can inspect the status using `cd docker/devnet && docker compose logs -f`.
 
 ### Start monitoring docker stack
 
