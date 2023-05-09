@@ -67,7 +67,6 @@ import (
 	"github.com/filecoin-project/lotus/system"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipfs/go-metrics-interface"
-	"github.com/ipld/go-ipld-prime/linking"
 	provider "github.com/ipni/index-provider"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -526,8 +525,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(dtypes.ProviderTransferNetwork), modules.NewProviderTransferNetwork),
 		Override(new(*modules.ProxyAskGetter), modules.NewAskGetter),
 		Override(new(server.AskGetter), From(new(*modules.ProxyAskGetter))),
-		Override(new(*modules.ProxyLinkSystem), modules.NewLinkSystem),
-		Override(new(linking.LinkSystem), From(new(*modules.ProxyLinkSystem))),
+		Override(new(*modules.LinkSystemProv), modules.NewLinkSystemProvider),
+		Override(new(server.LinkSystemProvider), From(new(*modules.LinkSystemProv))),
 		Override(new(*server.GraphsyncUnpaidRetrieval), modules.RetrievalGraphsync(cfg.LotusDealmaking.SimultaneousTransfersForStorage, cfg.LotusDealmaking.SimultaneousTransfersForStoragePerClient, cfg.LotusDealmaking.SimultaneousTransfersForRetrieval)),
 		Override(new(dtypes.StagingGraphsync), From(new(*server.GraphsyncUnpaidRetrieval))),
 		Override(new(dtypes.ProviderPieceStore), modules.NewProviderPieceStore),

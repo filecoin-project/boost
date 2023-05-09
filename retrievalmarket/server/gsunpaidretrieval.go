@@ -23,7 +23,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hannahhoward/go-pubsub"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-ipld-prime/linking"
+	"github.com/ipld/go-ipld-prime"
 	"github.com/libp2p/go-libp2p/core/peer"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.opencensus.io/stats"
@@ -42,6 +42,10 @@ type reqId struct {
 	id datatransfer.TransferID
 }
 
+type LinkSystemProvider interface {
+	LinkSys() *ipld.LinkSystem
+}
+
 // GraphsyncUnpaidRetrieval intercepts incoming requests to Graphsync.
 // If the request is for a paid retrieval, it is forwarded to the existing
 // Graphsync implementation.
@@ -54,7 +58,7 @@ type GraphsyncUnpaidRetrieval struct {
 	validator  *requestValidator
 	pubSubDT   *pubsub.PubSub
 	pubSubMkts *pubsub.PubSub
-	linkSystem linking.LinkSystem
+	linkSystem LinkSystemProvider
 
 	activeRetrievalsLk sync.RWMutex
 	activeRetrievals   map[reqId]*retrievalState
@@ -83,7 +87,7 @@ type ValidationDeps struct {
 	AskStore       AskGetter
 }
 
-func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtnet network.DataTransferNetwork, vdeps ValidationDeps, ls linking.LinkSystem) (*GraphsyncUnpaidRetrieval, error) {
+func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtnet network.DataTransferNetwork, vdeps ValidationDeps, ls LinkSystemProvider) (*GraphsyncUnpaidRetrieval, error) {
 	typeRegistry := registry.NewRegistry()
 	err := typeRegistry.Register(&retrievalmarket.DealProposal{}, nil)
 	if err != nil {
@@ -93,7 +97,7 @@ func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtn
 	if err != nil {
 		return nil, err
 	}
-	err = typeRegistry.Register(&types.LegsVoucher{}, nil)
+	err = typeRegistry.Register(&types.LegsVoucherDTv1{}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -111,13 +115,20 @@ func NewGraphsyncUnpaidRetrieval(peerID peer.ID, gs graphsync.GraphExchange, dtn
 	}, nil
 }
 
-func (g *GraphsyncUnpaidRetrieval) Start(ctx context.Context) {
+func (g *GraphsyncUnpaidRetrieval) Start(ctx context.Context) error {
 	g.ctx = ctx
 	g.validator.ctx = ctx
-	err := g.RegisterPersistenceOption("indexstore", g.linkSystem)
-	if err == nil {
-		log.Errorw("setting persistence option for index advertisement retrieval", "err", err)
+
+	if g.linkSystem != nil {
+		// The index provider uses graphsync to fetch advertisements.
+		// We need to tell graphsync to use a different IPLD Link System to provide
+		// the advertisements (instead of using the blockstore).
+		err := g.RegisterPersistenceOption("indexstore", *g.linkSystem.LinkSys())
+		if err != nil {
+			return fmt.Errorf("setting persistence option for index advertisement retrieval: %w", err)
+		}
 	}
+	return nil
 }
 
 // Called when a new request is received
@@ -194,6 +205,7 @@ func (g *GraphsyncUnpaidRetrieval) List() []retrievalState {
 	return values
 }
 
+// Called when a transfer is received by graphsync and queued for processing
 func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestQueuedHook(hook graphsync.OnIncomingRequestQueuedHook) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterIncomingRequestQueuedHook(func(p peer.ID, request graphsync.RequestData, hookActions graphsync.RequestQueuedHookActions) {
 		stats.Record(g.ctx, metrics.GraphsyncRequestQueuedCount.M(1))
@@ -245,17 +257,19 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 	// for an unpaid retrieval
 	voucher, decodeErr := g.decodeVoucher(dtRequest, g.decoder)
 	if decodeErr != nil {
-		// If we don't recognize the voucher, don't intercept the retrieval
-		// (the legacy retrieval code recognizes some vouchers that we are not
-		// interested in, eg LegsVoucher for downloading announcement deal
-		// cids)
+		// If we don't recognize the voucher, don't intercept the retrieval.
+		// Instead it will be passed through to the legacy code for processing.
 		if !errors.Is(decodeErr, unknownVoucherErr) {
 			return false, fmt.Errorf("decoding new request voucher: %w", decodeErr)
 		}
 	}
 
 	switch v := voucher.(type) {
-	case *types.LegsVoucher:
+	case *types.LegsVoucherDTv1:
+		// This is a go-legs voucher (used by the network indexer to retrieve
+		// deal announcements)
+
+		// Treat it the same way as a retrieval deal proposal with no payment
 		params, err := retrievalmarket.NewParamsV1(abi.NewTokenAmount(0), 0, 0, request.Selector(), nil, abi.NewTokenAmount(0))
 		if err != nil {
 			return false, err
@@ -264,19 +278,21 @@ func (g *GraphsyncUnpaidRetrieval) interceptRetrieval(p peer.ID, request graphsy
 			PayloadCID: request.Root(),
 			Params:     params,
 		}
-		return g.handleRetrievalDeal(p, msg, proposal, request)
+		return g.handleRetrievalDeal(p, msg, proposal, request, RetrievalTypeLegs)
 	case *retrievalmarket.DealProposal:
+		// This is a retrieval deal
 		proposal := *v
-		return g.handleRetrievalDeal(p, msg, proposal, request)
+		return g.handleRetrievalDeal(p, msg, proposal, request, RetrievalTypeDeal)
 	case *migrations.DealProposal0:
+		// This is a retrieval deal with an older format
 		proposal := migrations.MigrateDealProposal0To1(*v)
-		return g.handleRetrievalDeal(p, msg, proposal, request)
+		return g.handleRetrievalDeal(p, msg, proposal, request, RetrievalTypeDeal)
 	}
 
 	return false, nil
 }
 
-func (g *GraphsyncUnpaidRetrieval) handleRetrievalDeal(peerID peer.ID, msg datatransfer.Message, proposal retrievalmarket.DealProposal, request graphsync.RequestData) (bool, error) {
+func (g *GraphsyncUnpaidRetrieval) handleRetrievalDeal(peerID peer.ID, msg datatransfer.Message, proposal retrievalmarket.DealProposal, request graphsync.RequestData, retType RetrievalType) (bool, error) {
 	// If it's a paid retrieval, do not intercept it
 	if !proposal.UnsealPrice.IsZero() || !proposal.PricePerByte.IsZero() {
 		return false, nil
@@ -306,8 +322,9 @@ func (g *GraphsyncUnpaidRetrieval) handleRetrievalDeal(peerID peer.ID, msg datat
 		FundsReceived: abi.NewTokenAmount(0),
 	}
 	state := &retrievalState{
-		cs:   cs,
-		mkts: mktsState,
+		retType: retType,
+		cs:      cs,
+		mkts:    mktsState,
 	}
 
 	// Record the data transfer ID so that we can intercept future
@@ -322,12 +339,15 @@ func (g *GraphsyncUnpaidRetrieval) handleRetrievalDeal(peerID peer.ID, msg datat
 	return true, nil
 }
 
+// Called by graphsync when an incoming request is processed
 func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.OnIncomingRequestHook) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterIncomingRequestHook(func(p peer.ID, request graphsync.RequestData, hookActions graphsync.IncomingRequestHookActions) {
 		stats.Record(g.ctx, metrics.GraphsyncRequestStartedCount.M(1))
 
+		// Check if this is a request for a retrieval that we should handle
 		msg, state, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
 		if !intercept {
+			// Otherwise pass it through to the legacy code
 			hook(p, request, hookActions)
 			stats.Record(g.ctx, metrics.GraphsyncRequestStartedPaidCount.M(1))
 			return
@@ -335,7 +355,12 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 
 		stats.Record(g.ctx, metrics.GraphsyncRequestStartedUnpaidCount.M(1))
 
-		dtOpenMsg := "unpaid"
+		var dtOpenMsg string
+		if state.retType == RetrievalTypeLegs {
+			dtOpenMsg = "request from network indexer"
+		} else {
+			dtOpenMsg = "unpaid retrieval"
+		}
 		if msg.IsRestart() {
 			dtOpenMsg += " (restart)"
 		}
@@ -352,8 +377,11 @@ func (g *GraphsyncUnpaidRetrieval) RegisterIncomingRequestHook(hook graphsync.On
 			var res datatransfer.VoucherResult
 			var validateErr error
 
-			if _, ok := voucher.(*types.LegsVoucher); ok {
-				res = &types.LegsVoucherResult{}
+			if _, ok := voucher.(*types.LegsVoucherDTv1); ok {
+				// It's a go-legs voucher, so we need to tell Graphsync to
+				// use a different IPLD Link System to serve the data (instead
+				// of using the regular blockstore)
+				res = &types.LegsVoucherResultDtv1{}
 				validateErr = nil
 				hookActions.UsePersistenceOption("indexstore")
 			} else {
@@ -466,16 +494,25 @@ func (g *GraphsyncUnpaidRetrieval) RegisterCompletedResponseListener(listener gr
 		state.mkts.Status = retrievalmarket.DealStatusBlocksComplete
 		g.publishMktsEvent(retrievalmarket.ProviderEventBlocksCompleted, *state.mkts)
 
-		// TODO: Handle non deal proposals
 		// Include a markets protocol Completed message in the response
-		voucher := &retrievalmarket.DealResponse{
-			ID:     state.mkts.DealProposal.ID,
-			Status: retrievalmarket.DealStatusCompleted,
+		var voucherResult encoding.Encodable
+		var voucherType datatransfer.TypeIdentifier
+		if state.retType == RetrievalTypeDeal {
+			dealResponse := &retrievalmarket.DealResponse{
+				ID:     state.mkts.DealProposal.ID,
+				Status: retrievalmarket.DealStatusCompleted,
+			}
+			voucherResult = dealResponse
+			voucherType = dealResponse.Type()
+		} else {
+			legsResponse := &types.LegsVoucherResultDtv1{}
+			voucherResult = legsResponse
+			voucherType = legsResponse.Type()
 		}
 
 		const isAccepted = true
 		const isPaused = false
-		respMsg, err := message.CompleteResponse(msg.TransferID(), isAccepted, isPaused, voucher.Type(), voucher)
+		respMsg, err := message.CompleteResponse(msg.TransferID(), isAccepted, isPaused, voucherType, voucherResult)
 		if err != nil {
 			g.failTransfer(state, fmt.Errorf("getting complete response: %w", err))
 			return
@@ -568,7 +605,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterNetworkErrorListener(listener graphsy
 			return
 		}
 
-		// Consider network errors as fatal, clients can sent a new request if they wish
+		// Consider network errors as fatal, clients can send a new request if they wish
 
 		// Cancel the graphsync retrieval
 		cancelErr := g.GraphExchange.Cancel(g.ctx, request.ID())

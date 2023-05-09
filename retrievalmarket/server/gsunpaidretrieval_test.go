@@ -231,7 +231,8 @@ func runRequestTest(t *testing.T, tc testCase) {
 	gsupr.SubscribeToDataTransferEvents(func(event datatransfer.Event, channelState datatransfer.ChannelState) {
 		tlog.Debugf("prov dt: %s %s / %s", datatransfer.Events[event.Code], event.Message, datatransfer.Statuses[channelState.Status()])
 	})
-	gsupr.Start(ctx)
+	err = gsupr.Start(ctx)
+	require.NoError(t, err)
 	tut.StartAndWaitForReady(ctx, t, provider)
 
 	// Create a retrieval client

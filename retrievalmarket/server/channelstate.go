@@ -13,9 +13,15 @@ import (
 	cbg "github.com/whyrusleeping/cbor-gen"
 )
 
+type RetrievalType string
+
+const RetrievalTypeDeal RetrievalType = "Deal"
+const RetrievalTypeLegs RetrievalType = "Legs"
+
 type retrievalState struct {
-	cs   *channelState
-	mkts *retrievalmarket.ProviderDealState
+	retType RetrievalType
+	cs      *channelState
+	mkts    *retrievalmarket.ProviderDealState
 }
 
 func (r retrievalState) ChannelState() channelState                           { return *r.cs }
