@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-jsonrpc/auth"
+	apitypes "github.com/filecoin-project/lotus/api/types"
 	"github.com/gbrlsnchs/jwt/v3"
 	"github.com/google/uuid"
 	logging "github.com/ipfs/go-log/v2"
@@ -78,4 +79,8 @@ func (a *CommonAPI) Session(ctx context.Context) (uuid.UUID, error) {
 
 func (a *CommonAPI) Closing(ctx context.Context) (<-chan struct{}, error) {
 	return make(chan struct{}), nil // relies on jsonrpc closing
+}
+
+func (a *CommonAPI) Discover(ctx context.Context) (apitypes.OpenRPCDocument, error) {
+	return build.OpenRPCDiscoverJSON_Boost(), nil
 }
