@@ -326,14 +326,11 @@ func (p *DealProvider) getDealStatus(req types.DealStatusRequest) types.DealStat
 	}
 
 	sealingStatus := string(si.State)
-	var found bool
 
 	if storagemarket.IsFinalSealingState(si.State) {
-		found = storagemarket.HasDeal(si.Deals, pds.ChainDealID)
-	}
-
-	if !found {
-		sealingStatus = storagemarket.ErrDealNotFound.Error()
+		if !storagemarket.HasDeal(si.Deals, pds.ChainDealID) {
+			sealingStatus = storagemarket.ErrDealNotFound.Error()
+		}
 	}
 
 	return types.DealStatusResponse{
