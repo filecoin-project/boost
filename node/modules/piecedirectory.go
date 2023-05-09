@@ -8,6 +8,7 @@ import (
 	"github.com/filecoin-project/boost-gfm/shared"
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost-gfm/stores"
+	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
@@ -26,6 +27,7 @@ import (
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/ipfs/go-cid"
 	bstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/ipfs/go-libipfs/blocks"
 	carindex "github.com/ipld/go-car/v2/index"
 	"go.uber.org/fx"
 )
@@ -283,4 +285,21 @@ type closableBlockstore struct {
 
 func (c closableBlockstore) Close() error {
 	return nil
+}
+
+func NewBlockGetter(pd *piecedirectory.PieceDirectory) gql.BlockGetter {
+	return &pdBlockGetter{pd: pd}
+}
+
+type pdBlockGetter struct {
+	pd *piecedirectory.PieceDirectory
+}
+
+func (p *pdBlockGetter) Get(ctx context.Context, c cid.Cid) (blocks.Block, error) {
+	bz, err := p.pd.BlockstoreGet(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+
+	return blocks.NewBlockWithCid(bz, c)
 }
