@@ -45,6 +45,7 @@ import (
 var (
 	ErrDealNotFound        = fmt.Errorf("deal not found")
 	ErrDealHandlerNotFound = errors.New("deal handler not found")
+	ErrDealNotSealed       = errors.New("storage failed - deal not found in sector")
 )
 
 var (
@@ -446,7 +447,7 @@ func (p *Provider) Start() error {
 		// Check if deal is already proving
 		if deal.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
 			si, err := p.sps.SectorsStatus(p.ctx, deal.SectorID, false)
-			if err != nil || isFinalSealingState(si.State) {
+			if err != nil || IsFinalSealingState(si.State) {
 				continue
 			}
 		}
