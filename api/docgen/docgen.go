@@ -20,7 +20,7 @@ import (
 	"github.com/filecoin-project/go-jsonrpc/auth"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	graphsync "github.com/ipfs/go-graphsync"
+	"github.com/ipfs/go-graphsync"
 	textselector "github.com/ipld/go-ipld-selector-text-lite"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
@@ -265,7 +265,7 @@ func init() {
 	addExample(apitypes.OpenRPCDocument{
 		"openrpc": "1.2.6",
 		"info": map[string]interface{}{
-			"title":   "Lotus RPC API",
+			"title":   "Boost RPC API",
 			"version": "1.2.1/generated=2020-11-22T08:22:42-06:00",
 		},
 		"methods": []interface{}{}},

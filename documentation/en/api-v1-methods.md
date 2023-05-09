@@ -108,7 +108,7 @@ Response:
 ```json
 {
   "info": {
-    "title": "Lotus RPC API",
+    "title": "Boost RPC API",
     "version": "1.2.1/generated=2020-11-22T08:22:42-06:00"
   },
   "methods": [],
