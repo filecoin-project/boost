@@ -18,6 +18,9 @@ var ErrNotFound = errors.New("not found")
 // We have to do string matching so that it can be used on errors that
 // cross the RPC boundary (we can't use errors.Is)
 func IsNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
 	return strings.Contains(err.Error(), ErrNotFound.Error())
 }
 
@@ -31,7 +34,6 @@ type Service interface {
 	ListPieces(ctx context.Context) ([]cid.Cid, error)
 	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
 	GetPieceDeals(context.Context, cid.Cid) ([]model.DealInfo, error)
-	SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error
 	IndexedAt(context.Context, cid.Cid) (time.Time, error)
 	PiecesContainingMultihash(context.Context, mh.Multihash) ([]cid.Cid, error)
 	RemoveDealForPiece(context.Context, cid.Cid, string) error

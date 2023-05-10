@@ -129,8 +129,6 @@ type BoostStruct struct {
 
 		PdBuildIndexForPieceCid func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
 
-		PdMarkIndexErrored func(p0 context.Context, p1 cid.Cid, p2 string) error `perm:"admin"`
-
 		RuntimeSubsystems func(p0 context.Context) (lapi.MinerSubsystems, error) `perm:"read"`
 
 		SectorsRefs func(p0 context.Context) (map[string][]lapi.SealedRef, error) `perm:"read"`
@@ -774,17 +772,6 @@ func (s *BoostStruct) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) er
 }
 
 func (s *BoostStub) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) PdMarkIndexErrored(p0 context.Context, p1 cid.Cid, p2 string) error {
-	if s.Internal.PdMarkIndexErrored == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.PdMarkIndexErrored(p0, p1, p2)
-}
-
-func (s *BoostStub) PdMarkIndexErrored(p0 context.Context, p1 cid.Cid, p2 string) error {
 	return ErrNotSupported
 }
 

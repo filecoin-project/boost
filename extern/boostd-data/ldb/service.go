@@ -121,44 +121,6 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	return nil
 }
 
-func (s *Store) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
-	log.Debugw("handle.set-car-size", "piece-cid", pieceCid, "size", size)
-
-	ctx, span := tracing.Tracer.Start(ctx, "store.set-car-size")
-	defer span.End()
-
-	defer func(now time.Time) {
-		log.Debugw("handled.set-car-size", "took", time.Since(now).String())
-	}(time.Now())
-
-	s.Lock()
-	defer s.Unlock()
-
-	err := s.db.SetCarSize(ctx, pieceCid, size)
-	return normalizePieceCidError(pieceCid, err)
-}
-
-func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr string) error {
-	log.Debugw("handle.mark-piece-index-errored", "piece-cid", pieceCid, "err", idxErr)
-
-	ctx, span := tracing.Tracer.Start(ctx, "store.mark-piece-index-errored")
-	defer span.End()
-
-	defer func(now time.Time) {
-		log.Debugw("handled.mark-piece-index-errored", "took", time.Since(now).String())
-	}(time.Now())
-
-	s.Lock()
-	defer s.Unlock()
-
-	err := s.db.MarkIndexErrored(ctx, pieceCid, errors.New(idxErr))
-	if err != nil {
-		return normalizePieceCidError(pieceCid, err)
-	}
-
-	return s.FlagPiece(ctx, pieceCid)
-}
-
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
 	log.Debugw("handle.get-offset-size", "piece-cid", pieceCid)
 
@@ -354,8 +316,6 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 	md.Cursor = cursor
 	md.IndexedAt = time.Now()
 	md.CompleteIndex = isCompleteIndex
-	md.Error = ""
-	md.ErrorType = ""
 
 	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
 	if err != nil {

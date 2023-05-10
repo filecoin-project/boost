@@ -3,7 +3,6 @@ package piecedirectory
 import (
 	"bufio"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -109,84 +108,6 @@ func (ps *PieceDirectory) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, h
 	defer span.End()
 
 	return ps.store.GetOffsetSize(ctx, pieceCid, hash)
-}
-
-func (ps *PieceDirectory) GetCarSize(ctx context.Context, pieceCid cid.Cid) (uint64, error) {
-	// Get the deals for the piece
-	dls, err := ps.GetPieceDeals(ctx, pieceCid)
-	if err != nil {
-		return 0, fmt.Errorf("getting piece deals for piece %s: %w", pieceCid, err)
-	}
-
-	if len(dls) == 0 {
-		return 0, fmt.Errorf("no deals for piece %s in index: piece not found", pieceCid)
-	}
-
-	// The size of the CAR should be the same for any deal, so just return the
-	// first non-zero CAR size
-	for _, dl := range dls {
-		if dl.CarLength > 0 {
-			return dl.CarLength, nil
-		}
-	}
-
-	// There are no deals with a non-zero CAR size.
-	// The CAR size is zero if it's been imported from the dagstore (the
-	// dagstore doesn't store CAR size information). So instead work out the
-	// size of the CAR by getting the offset of the last section in the CAR
-	// file, then reading the section information.
-
-	// Get the offset of the last section in the CAR file from the index.
-	var lastSectionOffset uint64
-	idx, err := ps.GetIterableIndex(ctx, pieceCid)
-	if err != nil {
-		return 0, fmt.Errorf("getting index for piece %s: %w", pieceCid, err)
-	}
-	err = idx.ForEach(func(_ mh.Multihash, offset uint64) error {
-		if offset > lastSectionOffset {
-			lastSectionOffset = offset
-		}
-		return nil
-	})
-	if err != nil {
-		return 0, fmt.Errorf("iterating index for piece %s: %w", pieceCid, err)
-	}
-
-	// Get a reader over the piece
-	pieceReader, err := ps.GetPieceReader(ctx, pieceCid)
-	if err != nil {
-		return 0, fmt.Errorf("getting piece reader for piece %s: %w", pieceCid, err)
-	}
-
-	// Seek to the last section
-	_, err = pieceReader.Seek(int64(lastSectionOffset), io.SeekStart)
-	if err != nil {
-		return 0, fmt.Errorf("seeking to offset %d in piece data: %w", lastSectionOffset, err)
-	}
-
-	// A section consists of
-	// <size of cid+block><cid><block>
-
-	// Get <size of cid+block>
-	cr := &countReader{r: bufio.NewReader(pieceReader)}
-	dataLength, err := binary.ReadUvarint(cr)
-	if err != nil {
-		return 0, fmt.Errorf("reading CAR section length: %w", err)
-	}
-
-	// The number of bytes in the uvarint that records <size of cid+block>
-	dataLengthUvarSize := cr.count
-
-	// Get the size of the (unpadded) CAR file
-	unpaddedCarSize := lastSectionOffset + dataLengthUvarSize + dataLength
-
-	// Write the CAR size back to the store so that it's cached for next time
-	err = ps.store.SetCarSize(ctx, pieceCid, unpaddedCarSize)
-	if err != nil {
-		log.Errorw("writing CAR size to local index directory store", "pieceCid", pieceCid, "err", err)
-	}
-
-	return unpaddedCarSize, nil
 }
 
 func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
@@ -346,10 +267,6 @@ func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.C
 		return fmt.Errorf("deleting deal from piece metadata: %w", err)
 	}
 	return nil
-}
-
-func (ps *PieceDirectory) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err string) error {
-	return ps.store.MarkIndexErrored(ctx, pieceCid, err)
 }
 
 //func (ps *piecedirectory) deleteIndexForPiece(pieceCid cid.Cid) interface{} {
@@ -584,20 +501,6 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 	}
 
 	return bs, nil
-}
-
-// countReader just counts the number of bytes read
-type countReader struct {
-	r     *bufio.Reader
-	count uint64
-}
-
-func (c *countReader) ReadByte() (byte, error) {
-	b, err := c.r.ReadByte()
-	if err == nil {
-		c.count++
-	}
-	return b, err
 }
 
 type SectorAccessorAsPieceReader struct {
