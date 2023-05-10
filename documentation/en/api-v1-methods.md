@@ -87,7 +87,6 @@
   * [OnlineBackup](#onlinebackup)
 * [Pd](#pd)
   * [PdBuildIndexForPieceCid](#pdbuildindexforpiececid)
-  * [PdMarkIndexErrored](#pdmarkindexerrored)
 * [Runtime](#runtime)
   * [RuntimeSubsystems](#runtimesubsystems)
 * [Sectors](#sectors)
@@ -1786,23 +1785,6 @@ Inputs:
   {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   }
-]
-```
-
-Response: `{}`
-
-### PdMarkIndexErrored
-
-
-Perms: admin
-
-Inputs:
-```json
-[
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
-  "string value"
 ]
 ```
 

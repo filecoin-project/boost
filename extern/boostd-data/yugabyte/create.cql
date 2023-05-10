@@ -41,6 +41,4 @@ CREATE TABLE IF NOT EXISTS idx.PieceDeal (
     PieceOffset BIGINT,
     PieceLength BIGINT,
     CarLength BIGINT
-) WITH transactions = { 'enabled' : true };
-
-CREATE INDEX IF NOT EXISTS PieceDealPieceCid ON idx.PieceDeal (PieceCid);
+);

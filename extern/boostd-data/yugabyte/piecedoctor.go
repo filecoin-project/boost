@@ -3,15 +3,13 @@ package yugabyte
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
-	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/ipfs/go-cid"
 	"github.com/jackc/pgtype"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
+	"time"
 )
 
 var TrackerCheckBatchSize = 1024
@@ -167,7 +165,7 @@ func (s *Store) execWithConcurrency(ctx context.Context, pcids []pieceCreated, c
 }
 
 // The minimum frequency with which to check pieces for errors (eg bad index)
-var MinPieceCheckPeriod = 5 * time.Minute
+var MinPieceCheckPeriod = 30 * time.Second
 
 // Work out how frequently to check each piece, based on how many pieces
 // there are: if there are many pieces, each piece will be checked
@@ -180,10 +178,10 @@ func (s *Store) getPieceCheckPeriod(ctx context.Context) (time.Duration, error) 
 	}
 
 	// Check period:
-	// - 1k pieces;   every 100s (5 minutes because of MinPieceCheckPeriod)
-	// - 100k pieces; every 150m
-	// - 1m pieces;   every 20 hours
-	period := time.Duration(count*100) * time.Millisecond
+	// - 1k pieces;   every 10s
+	// - 100k pieces; every 15m
+	// - 1m pieces;   every 2 hours
+	period := time.Duration(count*10) * time.Millisecond
 	if period < MinPieceCheckPeriod {
 		period = MinPieceCheckPeriod
 	}
@@ -191,16 +189,16 @@ func (s *Store) getPieceCheckPeriod(ctx context.Context) (time.Duration, error) 
 	return period, nil
 }
 
-func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool) error {
+func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
 	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
 	defer span.End()
 
 	now := time.Now()
-	qry := `INSERT INTO PieceFlagged (PieceCid, CreatedAt, UpdatedAt, HasUnsealedCopy) ` +
-		`VALUES ($1, $2, $3, $4) ` +
+	qry := `INSERT INTO PieceFlagged (PieceCid, CreatedAt, UpdatedAt) ` +
+		`VALUES ($1, $2, $3) ` +
 		`ON CONFLICT (PieceCid) DO UPDATE SET UpdatedAt = excluded.UpdatedAt`
-	_, err := s.db.Exec(ctx, qry, pieceCid.String(), now, now, hasUnsealedCopy)
+	_, err := s.db.Exec(ctx, qry, pieceCid.String(), now, now)
 	if err != nil {
 		return fmt.Errorf("flagging piece %s: %w", pieceCid, err)
 	}
@@ -221,7 +219,7 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	return nil
 }
 
-func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces")
 	var spanCursor int
 	if cursor != nil {
@@ -234,24 +232,12 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 
 	var args []interface{}
 	idx := 0
-	qry := `SELECT PieceCid, CreatedAt, UpdatedAt, HasUnsealedCopy from PieceFlagged `
-	where := ""
+	qry := `SELECT PieceCid, CreatedAt from PieceFlagged `
 	if cursor != nil {
-		where += `WHERE CreatedAt < $1 `
+		qry += `WHERE CreatedAt < $1 `
 		args = append(args, cursor)
 		idx++
 	}
-	if filter != nil {
-		if where == "" {
-			where += `WHERE `
-		} else {
-			where += `AND `
-		}
-		where += fmt.Sprintf(`HasUnsealedCopy = $%d `, idx+1)
-		args = append(args, filter.HasUnsealedCopy)
-		idx++
-	}
-	qry += where
 	qry += `ORDER BY CreatedAt desc `
 
 	qry += fmt.Sprintf(`LIMIT $%d OFFSET $%d`, idx+1, idx+2)
@@ -266,10 +252,8 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 	var pieces []model.FlaggedPiece
 	var pcid string
 	var createdAt time.Time
-	var updatedAt time.Time
-	var hasUnsealedCopy bool
 	for rows.Next() {
-		err := rows.Scan(&pcid, &createdAt, &updatedAt, &hasUnsealedCopy)
+		err := rows.Scan(&pcid, &createdAt)
 		if err != nil {
 			return nil, fmt.Errorf("scanning flagged piece: %w", err)
 		}
@@ -278,7 +262,7 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 		if err != nil {
 			return nil, fmt.Errorf("parsing flagged piece cid %s: %w", pcid, err)
 		}
-		pieces = append(pieces, model.FlaggedPiece{PieceCid: c, CreatedAt: createdAt, UpdatedAt: updatedAt, HasUnsealedCopy: hasUnsealedCopy})
+		pieces = append(pieces, model.FlaggedPiece{PieceCid: c, CreatedAt: createdAt})
 	}
 
 	if err := rows.Err(); err != nil {
@@ -288,19 +272,13 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 	return pieces, nil
 }
 
-func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error) {
+func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_count")
 	defer span.End()
 
-	var args []interface{}
 	var count int
 	qry := `SELECT COUNT(*) FROM PieceFlagged`
-	if filter != nil {
-		qry += ` WHERE HasUnsealedCopy = $1`
-		args = append(args, filter.HasUnsealedCopy)
-	}
-
-	err := s.db.QueryRow(ctx, qry, args...).Scan(&count)
+	err := s.db.QueryRow(ctx, qry).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("getting flagged pieces count: %w", err)
 	}

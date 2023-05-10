@@ -16,6 +16,7 @@ import (
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
+	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-address"
@@ -52,9 +53,20 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 				}
 
 				svcCtx, cancel = context.WithCancel(ctx)
-
 				var bdsvc *svc.Service
-				if cfg.LocalIndexDirectory.Couchbase.ConnectString != "" {
+				switch {
+				case cfg.LocalIndexDirectory.Yugabyte.Enabled:
+					log.Infow("local index directory: connecting to yugabyte server",
+						"connect-string", cfg.LocalIndexDirectory.Yugabyte.ConnectString,
+						"hosts", cfg.LocalIndexDirectory.Yugabyte.Hosts)
+
+					// Set up a local index directory service that connects to the yugabyte db
+					bdsvc = svc.NewYugabyte(yugabyte.DBSettings{
+						Hosts:         cfg.LocalIndexDirectory.Yugabyte.Hosts,
+						ConnectString: cfg.LocalIndexDirectory.Yugabyte.ConnectString,
+					})
+
+				case cfg.LocalIndexDirectory.Couchbase.ConnectString != "":
 					log.Infow("local index directory: connecting to couchbase server",
 						"connect-string", cfg.LocalIndexDirectory.Couchbase.ConnectString)
 
@@ -76,7 +88,8 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 							RAMQuotaMB: cfg.LocalIndexDirectory.Couchbase.PieceOffsetsBucket.RAMQuotaMB,
 						},
 					})
-				} else {
+
+				default:
 					log.Infow("local index directory: connecting to leveldb instance")
 
 					// Setup a local index directory service that connects to the leveldb

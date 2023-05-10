@@ -1,3 +1,6 @@
+//go:build test_lid
+// +build test_lid
+
 package svc
 
 import (
@@ -8,8 +11,6 @@ import (
 	"os"
 	"testing"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"
@@ -24,6 +25,7 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 var testCouchSettings = couchbase.DBSettings{
@@ -52,8 +54,10 @@ func TestService(t *testing.T) {
 		defer cancel()
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
+
 		testService(ctx, t, bdsvc, "localhost:8042")
 	})
+
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container in CI as part of the test
@@ -64,7 +68,23 @@ func TestService(t *testing.T) {
 		defer cancel()
 		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
-		testService(ctx, t, bdsvc, "localhost:8043")
+
+		addr := "localhost:8043"
+		testService(ctx, t, bdsvc, addr)
+	})
+
+	t.Run("yugabyte", func(t *testing.T) {
+		// Running yugabyte tests may require download the docker container
+		// so set a high timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+
+		SetupYugabyte(t)
+
+		bdsvc := NewYugabyte(TestYugabyteSettings)
+
+		addr := "localhost:8044"
+		testService(ctx, t, bdsvc, addr)
 	})
 }
 
@@ -116,6 +136,24 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service, addr string)
 	require.Len(t, dis, 1)
 	require.Equal(t, di, dis[0])
 
+	// Add a second deal
+	di2 := model.DealInfo{
+		DealUuid:    uuid.NewString(),
+		SectorID:    abi.SectorNumber(11),
+		PieceOffset: 11,
+		PieceLength: 12,
+		CarLength:   13,
+	}
+	err = cl.AddDealForPiece(ctx, pieceCid, di2)
+	require.NoError(t, err)
+
+	// There should now be two deals
+	dis, err = cl.GetPieceDeals(ctx, pieceCid)
+	require.NoError(t, err)
+	require.Len(t, dis, 2)
+	require.Contains(t, dis, di)
+	require.Contains(t, dis, di2)
+
 	b, err := hex.DecodeString("1220ff63d7689e2d9567d1a90a7a68425f430137142e1fbc28fe4780b9ee8a5ef842")
 	require.NoError(t, err)
 
@@ -162,24 +200,39 @@ func TestServiceFuzz(t *testing.T) {
 	t.Run("level db", func(t *testing.T) {
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
-		testServiceFuzz(ctx, t, bdsvc, "localhost:8042")
+		addr := "localhost:8042"
+		err = bdsvc.Start(ctx, addr)
+		require.NoError(t, err)
+		testServiceFuzz(ctx, t, addr)
 	})
+
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container in CI as part of the test
 		t.Skip()
 		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
-		testServiceFuzz(ctx, t, bdsvc, "localhost:8043")
+		addr := "localhost:8043"
+		err := bdsvc.Start(ctx, addr)
+		require.NoError(t, err)
+		testServiceFuzz(ctx, t, addr)
+	})
+
+	t.Run("yugabyte", func(t *testing.T) {
+		SetupYugabyte(t)
+		bdsvc := NewYugabyte(TestYugabyteSettings)
+
+		addr := "localhost:8044"
+		err := bdsvc.Start(ctx, addr)
+		require.NoError(t, err)
+
+		testServiceFuzz(ctx, t, addr)
 	})
 }
 
-func testServiceFuzz(ctx context.Context, t *testing.T, bdsvc *Service, addr string) {
-	err := bdsvc.Start(ctx, addr)
-	require.NoError(t, err)
-
+func testServiceFuzz(ctx context.Context, t *testing.T, addr string) {
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), "http://localhost:8042")
+	err := cl.Dial(context.Background(), "http://"+addr)
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
@@ -381,6 +434,7 @@ func TestCleanup(t *testing.T) {
 		require.NoError(t, err)
 		testCleanup(ctx, t, bdsvc, "localhost:8042")
 	})
+
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container in CI as part of the test
@@ -388,6 +442,18 @@ func TestCleanup(t *testing.T) {
 		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
 		testCleanup(ctx, t, bdsvc, "localhost:8043")
+	})
+
+	t.Run("yugabyte", func(t *testing.T) {
+		// Running yugabyte tests may require download the docker container
+		// so set a high timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+
+		SetupYugabyte(t)
+
+		bdsvc := NewYugabyte(TestYugabyteSettings)
+		testCleanup(ctx, t, bdsvc, "localhost:8044")
 	})
 }
 
@@ -411,29 +477,41 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, addr string)
 	records, err := getRecords(subject)
 	require.NoError(t, err)
 
-	randomuuid, err := uuid.Parse("4d8f5ce6-dbfd-40dc-8b03-29308e97357b")
-	require.NoError(t, err)
-
 	err = cl.AddIndex(ctx, pieceCid, records, true)
 	require.NoError(t, err)
 
 	di := model.DealInfo{
-		DealUuid:    randomuuid.String(),
+		DealUuid:    uuid.NewString(),
 		SectorID:    abi.SectorNumber(1),
 		PieceOffset: 1,
 		PieceLength: 2,
 		CarLength:   3,
 	}
+	di2 := model.DealInfo{
+		DealUuid:    uuid.NewString(),
+		SectorID:    abi.SectorNumber(10),
+		PieceOffset: 11,
+		PieceLength: 12,
+		CarLength:   13,
+	}
 
-	// Add a deal for the piece
+	// Add two deals for the piece
 	err = cl.AddDealForPiece(ctx, pieceCid, di)
 	require.NoError(t, err)
+	err = cl.AddDealForPiece(ctx, pieceCid, di2)
+	require.NoError(t, err)
 
-	// There should only be one deal
 	dis, err := cl.GetPieceDeals(ctx, pieceCid)
 	require.NoError(t, err)
+	require.Len(t, dis, 2)
+
+	// Remove one deal for the piece
+	err = cl.RemoveDealForPiece(ctx, pieceCid, di.DealUuid)
+	require.NoError(t, err)
+
+	dis, err = cl.GetPieceDeals(ctx, pieceCid)
+	require.NoError(t, err)
 	require.Len(t, dis, 1)
-	require.Equal(t, di, dis[0])
 
 	b, err := hex.DecodeString("1220ff63d7689e2d9567d1a90a7a68425f430137142e1fbc28fe4780b9ee8a5ef842")
 	require.NoError(t, err)
@@ -444,7 +522,6 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, addr string)
 	offset, err := cl.GetOffsetSize(ctx, pieceCid, mhash)
 	require.NoError(t, err)
 	require.EqualValues(t, 3039040395, offset.Offset)
-	require.EqualValues(t, 0, offset.Size)
 
 	pcids, err := cl.PiecesContainingMultihash(ctx, mhash)
 	require.NoError(t, err)
@@ -455,18 +532,10 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, addr string)
 	require.NoError(t, err)
 	require.True(t, indexed)
 
-	recs, err := cl.GetRecords(ctx, pieceCid)
-	require.NoError(t, err)
-	require.Equal(t, len(records), len(recs))
-
-	loadedSubject, err := cl.GetIndex(ctx, pieceCid)
-	require.NoError(t, err)
-
-	ok, err := compareIndices(subject, loadedSubject)
-	require.NoError(t, err)
-	require.True(t, ok)
-
-	err = cl.RemoveDealForPiece(ctx, pieceCid, di.DealUuid)
+	// Remove the other deal for the piece.
+	// After this call there are no deals left, so it should also cause the
+	// piece metadata and indexes to be removed.
+	err = cl.RemoveDealForPiece(ctx, pieceCid, di2.DealUuid)
 	require.NoError(t, err)
 
 	_, err = cl.GetPieceDeals(ctx, pieceCid)

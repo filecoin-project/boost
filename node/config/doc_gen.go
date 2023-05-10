@@ -457,6 +457,12 @@ them disabled. These will be completely deprecated soon.`,
 	},
 	"LocalIndexDirectoryConfig": []DocField{
 		{
+			Name: "Yugabyte",
+			Type: "LocalIndexDirectoryYugabyteConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "Couchbase",
 			Type: "LocalIndexDirectoryCouchbaseConfig",
 
@@ -532,6 +538,26 @@ If empty, a leveldb database is used instead.`,
 			Type: "LocalIndexDirectoryCouchbaseBucketConfig",
 
 			Comment: ``,
+		},
+	},
+	"LocalIndexDirectoryYugabyteConfig": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: ``,
+		},
+		{
+			Name: "ConnectString",
+			Type: "string",
+
+			Comment: `The yugabyte postgres connect string eg "postgresql://postgres:postgres@localhost"`,
+		},
+		{
+			Name: "Hosts",
+			Type: "[]string",
+
+			Comment: `The yugabyte cassandra hosts eg ["127.0.0.1"]`,
 		},
 	},
 	"LotusDealmakingConfig": []DocField{

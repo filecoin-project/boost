@@ -337,42 +337,6 @@ func (db *DB) setPieceCidsForMultihash(ctx context.Context, mh multihash.Multiha
 	return nil
 }
 
-func (db *DB) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.set_car_size")
-	defer span.End()
-
-	return db.mutatePieceMetadata(ctx, pieceCid, "set-car-size", func(metadata CouchbaseMetadata) *CouchbaseMetadata {
-		// Set the car size on each deal (should be the same for all deals)
-		var deals []model.DealInfo
-		for _, dl := range metadata.Deals {
-			dl.CarLength = size
-
-			deals = append(deals, dl)
-		}
-		metadata.Deals = deals
-		return &metadata
-	})
-}
-
-func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr error) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
-	defer span.End()
-
-	return db.mutatePieceMetadata(ctx, pieceCid, "mark-index-errored", func(metadata CouchbaseMetadata) *CouchbaseMetadata {
-		// If the error was already set, don't overwrite it
-		if metadata.Error != "" {
-			// If the error state has already been set, don't over-write the existing error
-			return nil
-		}
-
-		// Set the error state
-		metadata.Error = idxErr.Error()
-		metadata.ErrorType = fmt.Sprintf("%T", idxErr)
-
-		return &metadata
-	})
-}
-
 func (db *DB) MarkIndexingComplete(ctx context.Context, pieceCid cid.Cid, blockCount int, isCompleteIndex bool) error {
 	ctx, span := tracing.Tracer.Start(ctx, "db.mark_indexing_complete")
 	defer span.End()
@@ -382,8 +346,6 @@ func (db *DB) MarkIndexingComplete(ctx context.Context, pieceCid cid.Cid, blockC
 		metadata.IndexedAt = time.Now()
 		metadata.CompleteIndex = isCompleteIndex
 		metadata.BlockCount = blockCount
-		metadata.Error = ""
-		metadata.ErrorType = ""
 		if metadata.Deals == nil {
 			metadata.Deals = []model.DealInfo{}
 		}

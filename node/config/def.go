@@ -80,6 +80,9 @@ func DefaultBoost() *Boost {
 		},
 
 		LocalIndexDirectory: LocalIndexDirectoryConfig{
+			Yugabyte: LocalIndexDirectoryYugabyteConfig{
+				Enabled: false,
+			},
 			Couchbase: LocalIndexDirectoryCouchbaseConfig{
 				ConnectString:           "",
 				Username:                "",

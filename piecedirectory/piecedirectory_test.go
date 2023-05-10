@@ -1,3 +1,6 @@
+//go:build test_lid
+// +build test_lid
+
 package piecedirectory
 
 import (
@@ -22,6 +25,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testCouchSettings = couchbase.DBSettings{
+	ConnectString: "couchbase://localhost",
+	Auth: couchbase.DBSettingsAuth{
+		Username: "Administrator",
+		Password: "boostdemo",
+	},
+	PieceMetadataBucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	MultihashToPiecesBucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	PieceOffsetsBucket: couchbase.DBSettingsBucket{
+		RAMQuotaMB: 128,
+	},
+	TestMode: true,
+}
+
 func TestPieceDirectory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
@@ -29,20 +50,31 @@ func TestPieceDirectory(t *testing.T) {
 	t.Run("leveldb", func(t *testing.T) {
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
-		testPieceDirectory(ctx, t, bdsvc)
+		addr := "localhost:8042"
+
+		testPieceDirectory(ctx, t, bdsvc, addr)
 	})
+
 	t.Run("couchbase", func(t *testing.T) {
 		// TODO: Unskip this test once the couchbase instance can be created
 		//  from a docker container in CI as part of the test
 		t.Skip()
 		svc.SetupCouchbase(t, testCouchSettings)
 		bdsvc := svc.NewCouchbase(testCouchSettings)
-		testPieceDirectory(ctx, t, bdsvc)
+		addr := "localhost:8043"
+		testPieceDirectory(ctx, t, bdsvc, addr)
+	})
+
+	t.Run("yugabyte", func(t *testing.T) {
+		svc.SetupYugabyte(t)
+
+		bdsvc := svc.NewYugabyte(svc.TestYugabyteSettings)
+		addr := "localhost:8044"
+		testPieceDirectory(ctx, t, bdsvc, addr)
 	})
 }
 
-func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
-	addr := "localhost:8044"
+func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service, addr string) {
 	err := bdsvc.Start(ctx, addr)
 	require.NoError(t, err)
 
@@ -61,10 +93,6 @@ func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
 
 	t.Run("imported index", func(t *testing.T) {
 		testImportedIndex(ctx, t, cl)
-	})
-
-	t.Run("car file size", func(t *testing.T) {
-		testCarFileSize(ctx, t, cl)
 	})
 
 	t.Run("flagging pieces", func(t *testing.T) {
@@ -250,55 +278,6 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	sz, err := pm.BlockstoreGetSize(ctx, rec.Cid)
 	require.NoError(t, err)
 	require.Equal(t, len(blk.RawData()), sz)
-}
-
-// Verify that if the deal info has been imported from the DAG store, meaning
-// it does not have CAR size information, GetCarSize will correctly calculate
-// the CAR size from the index + piece data
-func testCarFileSize(ctx context.Context, t *testing.T, cl *client.Store) {
-	// Create a random CAR file
-	carFilePath := CreateCarFile(t)
-	carFile, err := os.Open(carFilePath)
-	require.NoError(t, err)
-	defer carFile.Close()
-
-	carReader, err := car.OpenReader(carFilePath)
-	require.NoError(t, err)
-	defer carReader.Close()
-	carv1Reader, err := carReader.DataReader()
-	require.NoError(t, err)
-
-	// Read the CAR bytes
-	carBytes, err := io.ReadAll(carv1Reader)
-	require.NoError(t, err)
-
-	// Any calls to get a reader over data should return a reader over the random CAR file
-	pr := CreateMockPieceReader(t, carv1Reader)
-
-	recs := GetRecords(t, carv1Reader)
-	commpCalc := CalculateCommp(t, carv1Reader)
-	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs, false)
-	require.NoError(t, err)
-
-	// Add deal info for the piece without a CAR file
-	di := model.DealInfo{
-		DealUuid:    uuid.New().String(),
-		ChainDealID: 1,
-		SectorID:    1,
-		PieceOffset: 0,
-		PieceLength: commpCalc.PieceSize,
-	}
-	err = cl.AddDealForPiece(ctx, commpCalc.PieceCID, di)
-	require.NoError(t, err)
-
-	// Verify that getting the size of the CAR file works correctly:
-	// There is no CAR size information in the deal info, so the piece
-	// directory should work it out from the index and piece data.
-	pm := NewPieceDirectory(cl, pr, 1)
-	pm.Start(ctx)
-	size, err := pm.GetCarSize(ctx, commpCalc.PieceCID)
-	require.NoError(t, err)
-	require.Equal(t, len(carBytes), int(size))
 }
 
 func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {

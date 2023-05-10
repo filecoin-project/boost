@@ -367,9 +367,6 @@ func (r *resolver) getIndexStatus(ctx context.Context, pieceCid cid.Cid, md pdty
 		idxerr = mdErr.Error()
 	case md.Indexing:
 		idxst = IndexStatusIndexing
-	case md.Error != "":
-		idxst = IndexStatusFailed
-		idxerr = md.Error
 	case md.IndexedAt.IsZero():
 		idxst = IndexStatusRegistered
 	default:

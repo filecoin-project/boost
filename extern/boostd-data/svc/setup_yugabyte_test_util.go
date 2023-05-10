@@ -1,28 +1,19 @@
 package svc
 
 import (
+	"testing"
+	"time"
+
 	"github.com/filecoin-project/boostd-data/yugabyte"
-	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
 	"github.com/yugabyte/gocql"
 	"github.com/yugabyte/pgx/v4/pgxpool"
 	"golang.org/x/net/context"
-	"testing"
-	"time"
 )
-
-var tlog = logging.Logger("ybtest")
 
 var TestYugabyteSettings = yugabyte.DBSettings{
 	Hosts:         []string{"yugabyte"},
 	ConnectString: "postgresql://postgres:postgres@yugabyte:5433",
-}
-
-// Use when testing against a local yugabyte instance.
-// Warning: This will delete all tables in the local yugabyte instance.
-var TestYugabyteSettingsLocal = yugabyte.DBSettings{
-	Hosts:         []string{"localhost"},
-	ConnectString: "postgresql://postgres:postgres@localhost:5433",
 }
 
 func SetupYugabyte(t *testing.T) {

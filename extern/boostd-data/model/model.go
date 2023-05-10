@@ -39,11 +39,10 @@ type Metadata struct {
 	IndexedAt time.Time `json:"i"`
 	// CompleteIndex indicates whether the index has all information or is
 	// missing block size information. Note that indexes imported from the
-	// dagstore do not have block size information.
+	// dagstore do not have block size information (they only have block
+	// offsets).
 	CompleteIndex bool       `json:"c"`
 	Deals         []DealInfo `json:"d"`
-	Error         string     `json:"e"`
-	ErrorType     string     `json:"t"`
 }
 
 // Record is the information stored in the index for each block in a piece

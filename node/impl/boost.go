@@ -543,10 +543,6 @@ func (sm *BoostAPI) PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Ci
 	return sm.Pd.BuildIndexForPiece(ctx, piececid)
 }
 
-func (sm *BoostAPI) PdMarkIndexErrored(ctx context.Context, piececid cid.Cid, err string) error {
-	return sm.Pd.MarkIndexErrored(ctx, piececid, err)
-}
-
 func (sm *BoostAPI) OnlineBackup(ctx context.Context, dstDir string) error {
 	return sm.Bkp.Backup(ctx, dstDir)
 }
