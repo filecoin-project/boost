@@ -76,11 +76,8 @@ func (dr *DisasterRecovery) IsDone(s abi.SectorNumber) bool {
 	f := fmt.Sprintf("%s/%d", dr.DoneDir, s)
 
 	_, err := os.Stat(f)
-	if os.IsNotExist(err) {
-		return false
-	}
 
-	return true
+	return !os.IsNotExist(err)
 }
 
 func (dr *DisasterRecovery) MarkSectorInProgress(s abi.SectorNumber) error {
@@ -331,7 +328,10 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 
 	sectorid := info.SectorNumber
 
-	dr.MarkSectorInProgress(sectorid)
+	err := dr.MarkSectorInProgress(sectorid)
+	if err != nil {
+		return false, false, err
+	}
 
 	nextoffset := uint64(0)
 	for _, did := range info.DealIDs {
@@ -352,12 +352,18 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 			}
 		}
 
-		processPiece(ctx, sectorid, marketDeal.Proposal.PieceCID, marketDeal.Proposal.PieceSize, abi.UnpaddedPieceSize(nextoffset), l)
+		err = processPiece(ctx, sectorid, marketDeal.Proposal.PieceCID, marketDeal.Proposal.PieceSize, abi.UnpaddedPieceSize(nextoffset), l)
+		if err != nil {
+			return false, false, err
+		}
 
 		nextoffset += uint64(marketDeal.Proposal.PieceSize.Unpadded())
 	}
 
-	dr.CompleteSector(sectorid)
+	err = dr.CompleteSector(sectorid)
+	if err != nil {
+		return false, false, err
+	}
 
 	fmt.Println("processed sector number: ", info.SectorNumber, "; took: ", time.Since(start))
 
