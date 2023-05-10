@@ -8,6 +8,7 @@ import (
 
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
+	"github.com/ipld/go-car/v2/index"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -24,10 +25,15 @@ func IsNotFound(err error) bool {
 	return strings.Contains(err.Error(), ErrNotFound.Error())
 }
 
+type IndexRecord struct {
+	index.Record
+	Error error
+}
+
 type Service interface {
 	AddDealForPiece(context.Context, cid.Cid, model.DealInfo) error
 	AddIndex(context.Context, cid.Cid, []model.Record, bool) error
-	GetIndex(context.Context, cid.Cid) ([]model.Record, error)
+	GetIndex(context.Context, cid.Cid) (<-chan IndexRecord, error)
 	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
 	IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, error)
 	GetOffsetSize(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)

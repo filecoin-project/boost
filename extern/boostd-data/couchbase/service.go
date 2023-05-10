@@ -3,6 +3,7 @@ package couchbase
 import (
 	"context"
 	"fmt"
+	"github.com/ipld/go-car/v2/index"
 	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
@@ -128,7 +129,7 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	return pcids, normalizeMultihashError(m, err)
 }
 
-func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
+func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.IndexRecord, error) {
 	log.Debugw("handle.get-index", "pieceCid", pieceCid)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_index")
@@ -152,7 +153,18 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 
 	log.Debugw("handle.get-index.records", "len(records)", len(records))
 
-	return records, nil
+	recs := make(chan types.IndexRecord, len(records))
+	for _, r := range records {
+		recs <- types.IndexRecord{
+			Record: index.Record{
+				Cid:    r.Cid,
+				Offset: r.Offset,
+			},
+		}
+	}
+	close(recs)
+
+	return recs, nil
 }
 
 func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {

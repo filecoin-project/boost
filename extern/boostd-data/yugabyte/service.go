@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/yugabyte/gocql"
@@ -230,37 +231,61 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	return pcids, nil
 }
 
-func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
+func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.IndexRecord, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_index")
 	defer span.End()
 
 	qry := `SELECT PayloadMultihash, BlockOffset, BlockSize FROM idx.PieceBlockOffsetSize WHERE PieceCid = ?`
 	iter := s.session.Query(qry, pieceCid.Bytes()).WithContext(ctx).Iter()
 
-	var records []model.Record
-	var payloadMHBz []byte
-	var offset, size uint64
-	for iter.Scan(&payloadMHBz, &offset, &size) {
-		_, pmh, err := multihash.MHFromBytes(payloadMHBz)
-		if err != nil {
-			return nil, fmt.Errorf("scanning mulithash: %w", err)
+	scannedRecordCh := make(chan struct{}, 1)
+	records := make(chan types.IndexRecord)
+	go func() {
+		defer close(scannedRecordCh)
+		defer close(records)
+
+		var payloadMHBz []byte
+		var offset, size uint64
+		for iter.Scan(&payloadMHBz, &offset, &size) {
+			// The scan was successful, which means there is at least one
+			// record
+			select {
+			case scannedRecordCh <- struct{}{}:
+			default:
+			}
+
+			// Parse the multihash bytes
+			_, pmh, err := multihash.MHFromBytes(payloadMHBz)
+			if err != nil {
+				records <- types.IndexRecord{Error: err}
+				return
+			}
+
+			records <- types.IndexRecord{
+				Record: index.Record{
+					Cid:    cid.NewCidV1(cid.Raw, pmh),
+					Offset: offset,
+				},
+			}
 		}
+		if err := iter.Close(); err != nil {
+			err = fmt.Errorf("getting piece index for piece %s: %w", pieceCid, err)
+			records <- types.IndexRecord{Error: err}
+		}
+	}()
 
-		records = append(records, model.Record{
-			Cid: cid.NewCidV1(cid.Raw, pmh),
-			OffsetSize: model.OffsetSize{
-				Offset: offset,
-				Size:   size,
-			},
-		})
-	}
-	if err := iter.Close(); err != nil {
-		return nil, fmt.Errorf("getting piece index for piece %s: %w", pieceCid, err)
+	// Check if there were any records for this piece cid
+	var pieceHasRecords bool
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case _, pieceHasRecords = <-scannedRecordCh:
 	}
 
-	// For correctness, we should always return a not found error if there is
-	// no piece with the piece cid
-	if len(records) == 0 {
+	if !pieceHasRecords {
+		// For correctness, we should always return a not found error if there
+		// is no piece with the piece cid. Call getPieceMetadata which returns
+		// not found if it can't find the piece.
 		_, err := s.getPieceMetadata(ctx, pieceCid)
 		if err != nil {
 			return nil, err
@@ -481,7 +506,15 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 		return fmt.Errorf("removing indexes for piece %s: getting recs: %w", pieceCid, err)
 	}
 
-	err = s.execParallel(ctx, recs, s.settings.PayloadPiecesParallelism, func(rec model.Record) error {
+	var records []model.Record
+	for r := range recs {
+		records = append(records, model.Record{
+			Cid:        r.Cid,
+			OffsetSize: model.OffsetSize{Offset: r.Offset},
+		})
+	}
+
+	err = s.execParallel(ctx, records, s.settings.PayloadPiecesParallelism, func(rec model.Record) error {
 		multihashBytes := rec.Cid.Hash()
 		q := `DELETE FROM idx.PayloadToPieces WHERE PayloadMultihash = ? AND PieceCid = ?`
 		err := s.session.Query(q, trimMultihash(multihashBytes), pieceCid.Bytes()).Exec()

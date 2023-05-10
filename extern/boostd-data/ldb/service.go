@@ -201,7 +201,7 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	return pcs, normalizeMultihashError(m, err)
 }
 
-func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
+func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.IndexRecord, error) {
 	log.Warnw("handle.get-index", "pieceCid", pieceCid)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_index")
@@ -227,7 +227,18 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 
 	log.Warnw("handle.get-index.records", "len(records)", len(records))
 
-	return records, nil
+	recs := make(chan types.IndexRecord, len(records))
+	for _, r := range records {
+		recs <- types.IndexRecord{
+			Record: carindex.Record{
+				Cid:    r.Cid,
+				Offset: r.Offset,
+			},
+		}
+	}
+	close(recs)
+
+	return recs, nil
 }
 
 func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {

@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"github.com/filecoin-project/boostd-data/svc/types"
 	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
@@ -21,7 +22,7 @@ type Store struct {
 		AddIndex                  func(context.Context, cid.Cid, []model.Record, bool) error
 		IsIndexed                 func(ctx context.Context, pieceCid cid.Cid) (bool, error)
 		IsCompleteIndex           func(ctx context.Context, pieceCid cid.Cid) (bool, error)
-		GetIndex                  func(context.Context, cid.Cid) ([]model.Record, error)
+		GetIndex                  func(context.Context, cid.Cid) (<-chan types.IndexRecord, error)
 		GetOffsetSize             func(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
 		ListPieces                func(ctx context.Context) ([]cid.Cid, error)
 		GetPieceMetadata          func(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
@@ -66,7 +67,7 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (index.Index, er
 	}
 
 	var records []index.Record
-	for _, r := range resp {
+	for r := range resp {
 		records = append(records, index.Record{
 			Cid:    r.Cid,
 			Offset: r.Offset,
@@ -90,7 +91,15 @@ func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Recor
 
 	log.Debugw("get-records", "piece-cid", pieceCid, "records", len(resp))
 
-	return resp, nil
+	var records []model.Record
+	for r := range resp {
+		records = append(records, model.Record{
+			Cid:        r.Cid,
+			OffsetSize: model.OffsetSize{Offset: r.Offset},
+		})
+	}
+
+	return records, nil
 }
 
 func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
