@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	lotus_api "github.com/filecoin-project/lotus/api"
+	apitypes "github.com/filecoin-project/lotus/api/types"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -164,6 +165,8 @@ type CommonStruct struct {
 		AuthNew func(p0 context.Context, p1 []auth.Permission) ([]byte, error) `perm:"admin"`
 
 		AuthVerify func(p0 context.Context, p1 string) ([]auth.Permission, error) `perm:"read"`
+
+		Discover func(p0 context.Context) (apitypes.OpenRPCDocument, error) `perm:"read"`
 
 		LogList func(p0 context.Context) ([]string, error) `perm:"write"`
 
@@ -879,6 +882,17 @@ func (s *CommonStruct) AuthVerify(p0 context.Context, p1 string) ([]auth.Permiss
 
 func (s *CommonStub) AuthVerify(p0 context.Context, p1 string) ([]auth.Permission, error) {
 	return *new([]auth.Permission), ErrNotSupported
+}
+
+func (s *CommonStruct) Discover(p0 context.Context) (apitypes.OpenRPCDocument, error) {
+	if s.Internal.Discover == nil {
+		return *new(apitypes.OpenRPCDocument), ErrNotSupported
+	}
+	return s.Internal.Discover(p0)
+}
+
+func (s *CommonStub) Discover(p0 context.Context) (apitypes.OpenRPCDocument, error) {
+	return *new(apitypes.OpenRPCDocument), ErrNotSupported
 }
 
 func (s *CommonStruct) LogList(p0 context.Context) ([]string, error) {

@@ -1,4 +1,6 @@
 # Groups
+* [](#)
+  * [Discover](#discover)
 * [Actor](#actor)
   * [ActorSectorSize](#actorsectorsize)
 * [Auth](#auth)
@@ -92,6 +94,28 @@
   * [RuntimeSubsystems](#runtimesubsystems)
 * [Sectors](#sectors)
   * [SectorsRefs](#sectorsrefs)
+## 
+
+
+### Discover
+
+
+Perms: read
+
+Inputs: `null`
+
+Response:
+```json
+{
+  "info": {
+    "title": "Boost RPC API",
+    "version": "1.2.1/generated=2020-11-22T08:22:42-06:00"
+  },
+  "methods": [],
+  "openrpc": "1.2.6"
+}
+```
+
 ## Actor
 
 
