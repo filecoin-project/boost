@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/cmd/lib"
+	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/filecoin-project/go-jsonrpc"
@@ -20,6 +22,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/markets/dagstore"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-cidutil/cidenc"
 	carv2 "github.com/ipld/go-car/v2"
@@ -33,6 +36,8 @@ var (
 	dr          *DisasterRecovery
 	sa          dagstore.SectorAccessor
 	fullnodeApi v1api.FullNode
+	pd          *piecedirectory.PieceDirectory
+	maddr       address.Address
 
 	ignoreCommp bool
 )
@@ -128,6 +133,11 @@ var restorePieceStoreCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.StringFlag{
+			Name:  "api-lid",
+			Usage: "the endpoint for the LID API",
+			//Required: true,
+		},
+		&cli.StringFlag{
 			Name:  "disaster-recovery-dir",
 			Usage: "location to store progress of disaster recovery",
 			Value: "~/.boost-disaster-recovery",
@@ -135,6 +145,11 @@ var restorePieceStoreCmd = &cli.Command{
 		&cli.IntFlag{
 			Name:  "sector-id",
 			Usage: "sector-id",
+		},
+		&cli.IntFlag{
+			Name:  "add-index-throttle",
+			Usage: "",
+			Value: 4,
 		},
 		&cli.BoolFlag{
 			Name:  "ignore-commp",
@@ -177,7 +192,17 @@ var restorePieceStoreCmd = &cli.Command{
 		}
 		defer storageCloser()
 
-		maddr, err := getActorAddress(ctx, cctx)
+		// Connect to the local index directory service
+		pdClient := piecedirectory.NewStore()
+		defer pdClient.Close(ctx)
+		err = pdClient.Dial(ctx, cctx.String("api-lid"))
+		if err != nil {
+			return fmt.Errorf("connecting to local index directory service: %w", err)
+		}
+		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
+		pd = piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
+
+		maddr, err = getActorAddress(ctx, cctx)
 		if err != nil {
 			return err
 		}
@@ -259,7 +284,7 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 	}
 }
 
-func processPiece(ctx context.Context, sectorid abi.SectorNumber, piececid cid.Cid, piecesize abi.PaddedPieceSize, offset abi.UnpaddedPieceSize, l string) error {
+func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID abi.DealID, piececid cid.Cid, piecesize abi.PaddedPieceSize, offset abi.UnpaddedPieceSize, l string) error {
 	fmt.Println("sector: ", sectorid, "piece cid: ", piececid, "; piece size: ", piecesize, "; offset: ", offset, "label: ", l)
 
 	start := time.Now()
@@ -287,11 +312,20 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, piececid cid.C
 	}
 
 	// populate LID
-	//err := pd.AddDealForPiece(ctx, piececid, dealinfo)
-	//if err != nil {
-	//return err
-	//}
-	fmt.Println("TODO: pass car to index service and to yugabyte")
+	di := model.DealInfo{
+		DealUuid:    uuid.NewString(),
+		IsLegacy:    false,
+		ChainDealID: chainDealID,
+		MinerAddr:   maddr,
+		SectorID:    sectorid,
+		PieceOffset: offset.Padded(), // TODO: confirm that this is correct...?
+		PieceLength: piecesize,
+	}
+
+	err = pd.AddDealForPiece(ctx, piececid, di)
+	if err != nil {
+		return err
+	}
 
 	if !ignoreCommp {
 		// commp over data reader
@@ -352,7 +386,7 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 			}
 		}
 
-		err = processPiece(ctx, sectorid, marketDeal.Proposal.PieceCID, marketDeal.Proposal.PieceSize, abi.UnpaddedPieceSize(nextoffset), l)
+		err = processPiece(ctx, sectorid, did, marketDeal.Proposal.PieceCID, marketDeal.Proposal.PieceSize, abi.UnpaddedPieceSize(nextoffset), l)
 		if err != nil {
 			fmt.Println("piece error:", err)
 			continue
