@@ -354,7 +354,8 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 
 		err = processPiece(ctx, sectorid, marketDeal.Proposal.PieceCID, marketDeal.Proposal.PieceSize, abi.UnpaddedPieceSize(nextoffset), l)
 		if err != nil {
-			return false, false, err
+			fmt.Println("piece error:", err)
+			continue
 		}
 
 		nextoffset += uint64(marketDeal.Proposal.PieceSize.Unpadded())
