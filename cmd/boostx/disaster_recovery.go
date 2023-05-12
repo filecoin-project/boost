@@ -330,7 +330,7 @@ func (dr *DisasterRecovery) MarkSectorInProgress(s abi.SectorNumber) error {
 }
 
 func (dr *DisasterRecovery) WriteReport() error {
-	f, err := os.Create(fmt.Sprintf("%s/report-%s", dr.Dir, time.Now().UnixNano()))
+	f, err := os.Create(fmt.Sprintf("%s/report-%d", dr.Dir, time.Now().UnixNano()))
 	if err != nil {
 		return err
 	}
