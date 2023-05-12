@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boostd-data/model"
@@ -40,74 +41,8 @@ var (
 	maddr       address.Address
 
 	ignoreCommp bool
+	ignoreLID   bool
 )
-
-type DisasterRecovery struct {
-	Dir     string // main disaster recovery dir - keeps progress on recovery
-	DoneDir string
-}
-
-func NewDisasterRecovery(dir string) (*DisasterRecovery, error) {
-	drDir, err := homedir.Expand(dir)
-	if err != nil {
-		return nil, fmt.Errorf("expanding disaster recovery dir path: %w", err)
-	}
-	if drDir == "" {
-		return nil, errors.New("disaster-recovery-dir is a required flag")
-	}
-
-	d, err := os.Stat(drDir)
-	if err == nil {
-		if d.IsDir() {
-			fmt.Println("WARNING: disaster recovery dir exists, so tool will continue from where it left off previously!!!")
-		}
-	}
-
-	err = os.MkdirAll(drDir, 0755)
-	if err != nil {
-		return nil, err
-	}
-
-	doneDir := path.Join(drDir, "done")
-	err = os.MkdirAll(doneDir, 0755)
-	if err != nil {
-		return nil, err
-	}
-
-	return &DisasterRecovery{Dir: drDir, DoneDir: doneDir}, nil
-}
-
-func (dr *DisasterRecovery) IsDone(s abi.SectorNumber) bool {
-	f := fmt.Sprintf("%s/%d", dr.DoneDir, s)
-
-	_, err := os.Stat(f)
-
-	return !os.IsNotExist(err)
-}
-
-func (dr *DisasterRecovery) MarkSectorInProgress(s abi.SectorNumber) error {
-	f := fmt.Sprintf("%s/sector-%d-in-progress", dr.Dir, s)
-
-	_, err := os.Stat(f)
-	if os.IsNotExist(err) {
-		file, err := os.Create(f)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-	} else {
-		return fmt.Errorf("sector %d already marked as in progress", s)
-	}
-
-	return nil
-}
-
-func (dr *DisasterRecovery) CompleteSector(s abi.SectorNumber) error {
-	oldLocation := fmt.Sprintf("%s/sector-%d-in-progress", dr.Dir, s)
-	newLocation := fmt.Sprintf("%s/%d", dr.DoneDir, s)
-
-	return os.Rename(oldLocation, newLocation)
-}
 
 var disasterRecoveryCmd = &cli.Command{
 	Name:  "disaster-recovery",
@@ -156,9 +91,20 @@ var restorePieceStoreCmd = &cli.Command{
 			Usage: "whether we should ignore sanity check of local data vs chain data",
 			Value: false,
 		},
+		&cli.BoolFlag{
+			Name:  "ignore-lid",
+			Usage: "whether we should ignore lid",
+			Value: false,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := lcli.ReqContext(cctx)
+
+		var err error
+		dr, err = NewDisasterRecovery(cctx.String("disaster-recovery-dir"))
+		if err != nil {
+			return err
+		}
 
 		var sectorid abi.SectorNumber
 		if cctx.IsSet("sector-id") {
@@ -167,12 +113,7 @@ var restorePieceStoreCmd = &cli.Command{
 		}
 
 		ignoreCommp = cctx.Bool("ignore-commp")
-
-		var err error
-		dr, err = NewDisasterRecovery(cctx.String("disaster-recovery-dir"))
-		if err != nil {
-			return err
-		}
+		ignoreLID = cctx.Bool("ignore-lid")
 
 		// Connect to the full node API
 		fnApiInfo := cctx.String("api-fullnode")
@@ -193,14 +134,18 @@ var restorePieceStoreCmd = &cli.Command{
 		defer storageCloser()
 
 		// Connect to the local index directory service
-		pdClient := piecedirectory.NewStore()
-		defer pdClient.Close(ctx)
-		err = pdClient.Dial(ctx, cctx.String("api-lid"))
-		if err != nil {
-			return fmt.Errorf("connecting to local index directory service: %w", err)
+		if ignoreLID {
+			pd = nil
+		} else {
+			pdClient := piecedirectory.NewStore()
+			defer pdClient.Close(ctx)
+			err = pdClient.Dial(ctx, cctx.String("api-lid"))
+			if err != nil {
+				return fmt.Errorf("connecting to local index directory service: %w", err)
+			}
+			pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
+			pd = piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
 		}
-		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		pd = piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
 
 		maddr, err = getActorAddress(ctx, cctx)
 		if err != nil {
@@ -212,24 +157,37 @@ var restorePieceStoreCmd = &cli.Command{
 			return err
 		}
 
+		dr.TotalSectors = len(sectors)
+
+		var sectorsWithDeals []*miner.SectorOnChainInfo
+
 		for _, info := range sectors {
 			if cctx.IsSet("sector-id") && info.SectorNumber != sectorid {
 				continue
 			}
 
+			// ignore sector 0
 			if info.SectorNumber == abi.SectorNumber(0) {
-				// TODO: ignore sector 0
 				continue
 			}
 
 			if len(info.DealIDs) < 1 {
 				fmt.Println("no deals in sector", info.SectorNumber)
-				// TODO: record that there are no deals in this sector
+
+				dr.SectorsWithoutDeals = append(dr.SectorsWithoutDeals, uint64(info.SectorNumber))
 				continue
 			}
 
+			dr.SectorsWithDeals = append(dr.SectorsWithDeals, uint64(info.SectorNumber))
+			sectorsWithDeals = append(sectorsWithDeals, info)
+		}
+
+		for _, info := range sectorsWithDeals {
+			dr.Sectors[uint64(info.SectorNumber)] = &SectorStatus{}
+
 			if dr.IsDone(info.SectorNumber) {
 				fmt.Println("sector already processed", info.SectorNumber)
+				dr.Sectors[uint64(info.SectorNumber)].AlreadyProcessed = true
 				continue
 			}
 
@@ -246,9 +204,128 @@ var restorePieceStoreCmd = &cli.Command{
 			}
 		}
 
-		// TODO: print report in json file?
+		err = dr.WriteReport()
+		if err != nil {
+			return err
+		}
+
 		return nil
 	},
+}
+
+type DisasterRecovery struct {
+	Dir     string // main disaster recovery dir - keeps progress on recovery
+	DoneDir string
+
+	TotalSectors int
+	PieceErrors  int
+
+	SectorsWithDeals    []uint64
+	SectorsWithoutDeals []uint64
+
+	Sectors map[uint64]*SectorStatus
+}
+
+type SectorStatus struct {
+	AlreadyProcessed bool
+
+	Deals map[uint64]*PieceStatus
+
+	ProcessingTook time.Duration
+}
+
+type PieceStatus struct {
+	PieceCID      cid.Cid
+	PieceSize     abi.PaddedPieceSize
+	PieceOffset   abi.UnpaddedPieceSize
+	IsUnsealed    bool
+	GotDataReader bool
+	Error         string
+
+	ProcessingTook time.Duration
+}
+
+func NewDisasterRecovery(dir string) (*DisasterRecovery, error) {
+	drDir, err := homedir.Expand(dir)
+	if err != nil {
+		return nil, fmt.Errorf("expanding disaster recovery dir path: %w", err)
+	}
+	if drDir == "" {
+		return nil, errors.New("disaster-recovery-dir is a required flag")
+	}
+
+	d, err := os.Stat(drDir)
+	if err == nil {
+		if d.IsDir() {
+			fmt.Println("WARNING: disaster recovery dir exists, so tool will continue from where it left off previously!!!")
+		}
+	}
+
+	err = os.MkdirAll(drDir, 0755)
+	if err != nil {
+		return nil, err
+	}
+
+	doneDir := path.Join(drDir, "done")
+	err = os.MkdirAll(doneDir, 0755)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DisasterRecovery{
+		Dir:     drDir,
+		DoneDir: doneDir,
+		Sectors: make(map[uint64]*SectorStatus),
+	}, nil
+}
+
+func (dr *DisasterRecovery) IsDone(s abi.SectorNumber) bool {
+	f := fmt.Sprintf("%s/%d", dr.DoneDir, s)
+
+	_, err := os.Stat(f)
+
+	return !os.IsNotExist(err)
+}
+
+func (dr *DisasterRecovery) MarkSectorInProgress(s abi.SectorNumber) error {
+	f := fmt.Sprintf("%s/sector-%d-in-progress", dr.Dir, s)
+
+	_, err := os.Stat(f)
+	if os.IsNotExist(err) {
+		file, err := os.Create(f)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+	} else {
+		return fmt.Errorf("sector %d already marked as in progress", s)
+	}
+
+	return nil
+}
+
+func (dr *DisasterRecovery) WriteReport() error {
+	f, err := os.Create(fmt.Sprintf("%s/report-%s", dr.Dir, time.Now().UnixNano()))
+	if err != nil {
+		return err
+	}
+
+	_, err = f.WriteString(spew.Sdump(dr))
+	if err != nil {
+		return err
+	}
+	err = f.Sync()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (dr *DisasterRecovery) CompleteSector(s abi.SectorNumber) error {
+	oldLocation := fmt.Sprintf("%s/sector-%d-in-progress", dr.Dir, s)
+	newLocation := fmt.Sprintf("%s/%d", dr.DoneDir, s)
+
+	return os.Rename(oldLocation, newLocation)
 }
 
 func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi.UnpaddedPieceSize, piecesize abi.PaddedPieceSize) (io.ReadCloser, bool, error) {
@@ -287,6 +364,16 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID abi.DealID, piececid cid.Cid, piecesize abi.PaddedPieceSize, offset abi.UnpaddedPieceSize, l string) error {
 	fmt.Println("sector: ", sectorid, "piece cid: ", piececid, "; piece size: ", piecesize, "; offset: ", offset, "label: ", l)
 
+	cdi := uint64(chainDealID)
+	sid := uint64(sectorid)
+
+	dr.Sectors[sid].Deals[cdi] = &PieceStatus{
+		PieceCID:    piececid,
+		PieceSize:   piecesize,
+		PieceOffset: offset,
+		IsUnsealed:  false,
+	}
+
 	start := time.Now()
 
 	reader, isUnsealed, err := safeUnsealSector(ctx, sectorid, offset, piecesize)
@@ -298,6 +385,8 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 		return nil
 	}
 
+	dr.Sectors[sid].Deals[cdi].IsUnsealed = true
+
 	readerAt := reader.(Reader)
 
 	opts := []carv2.Option{carv2.ZeroLengthSectionAsEOF(true)}
@@ -306,31 +395,33 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 		return err
 	}
 
-	dr, err := rr.DataReader()
+	drr, err := rr.DataReader()
 	if err != nil {
 		return err
 	}
 
-	// populate LID
-	di := model.DealInfo{
-		DealUuid:    uuid.NewString(),
-		IsLegacy:    false,
-		ChainDealID: chainDealID,
-		MinerAddr:   maddr,
-		SectorID:    sectorid,
-		PieceOffset: offset.Padded(), // TODO: confirm that this is correct...?
-		PieceLength: piecesize,
+	dr.Sectors[sid].Deals[cdi].GotDataReader = true
+
+	if !ignoreLID { // populate LID
+		di := model.DealInfo{
+			DealUuid:    uuid.NewString(),
+			IsLegacy:    false,
+			ChainDealID: chainDealID,
+			MinerAddr:   maddr,
+			SectorID:    sectorid,
+			PieceOffset: offset.Padded(), // TODO: confirm that this is correct...?
+			PieceLength: piecesize,
+		}
+
+		err = pd.AddDealForPiece(ctx, piececid, di)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = pd.AddDealForPiece(ctx, piececid, di)
-	if err != nil {
-		return err
-	}
-
-	if !ignoreCommp {
-		// commp over data reader
+	if !ignoreCommp { // commp over data reader
 		w := &writer.Writer{}
-		_, err = io.CopyBuffer(w, dr, make([]byte, writer.CommPBuf))
+		_, err = io.CopyBuffer(w, drr, make([]byte, writer.CommPBuf))
 		if err != nil {
 			return fmt.Errorf("copy into commp writer: %w", err)
 		}
@@ -350,7 +441,9 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 		}
 	}
 
-	fmt.Println("processed sector: ", sectorid, "piece cid: ", piececid, "; took: ", time.Since(start))
+	took := time.Since(start)
+	dr.Sectors[sid].Deals[cdi].ProcessingTook = took
+	fmt.Println("processed sector: ", sectorid, "piece cid: ", piececid, "; took: ", took)
 
 	return nil
 }
@@ -361,11 +454,14 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 	fmt.Println("sector number: ", info.SectorNumber, "; deals: ", info.DealIDs)
 
 	sectorid := info.SectorNumber
+	sid := uint64(sectorid)
 
 	err := dr.MarkSectorInProgress(sectorid)
 	if err != nil {
 		return false, false, err
 	}
+
+	dr.Sectors[sid].Deals = make(map[uint64]*PieceStatus)
 
 	nextoffset := uint64(0)
 	for _, did := range info.DealIDs {
@@ -388,6 +484,8 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 
 		err = processPiece(ctx, sectorid, did, marketDeal.Proposal.PieceCID, marketDeal.Proposal.PieceSize, abi.UnpaddedPieceSize(nextoffset), l)
 		if err != nil {
+			dr.Sectors[sid].Deals[uint64(did)].Error = err.Error()
+			dr.PieceErrors++
 			fmt.Println("piece error:", err)
 			continue
 		}
@@ -400,7 +498,9 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 		return false, false, err
 	}
 
-	fmt.Println("processed sector number: ", info.SectorNumber, "; took: ", time.Since(start))
+	took := time.Since(start)
+	dr.Sectors[sid].ProcessingTook = took
+	fmt.Println("processed sector number: ", info.SectorNumber, "; took: ", took)
 
 	return true, true, nil
 }
