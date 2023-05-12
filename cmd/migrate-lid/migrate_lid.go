@@ -43,10 +43,12 @@ import (
 type StoreMigrationApi interface {
 	Start(ctx context.Context) error
 	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
+	GetIndex(context.Context, cid.Cid) ([]model.Record, error)
 	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error
 	AddDealForPiece(ctx context.Context, pcid cid.Cid, info model.DealInfo) error
 	ListPieces(ctx context.Context) ([]cid.Cid, error)
 	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
+	GetPieceDeals(context.Context, cid.Cid) ([]model.DealInfo, error)
 }
 
 var desc = "It is recommended to do the dagstore migration while boost is running. " +
