@@ -76,20 +76,6 @@ func TestService(t *testing.T) {
 	})
 
 	t.Run("yugabyte", func(t *testing.T) {
-		// Running yugabyte tests may require download the docker container
-		// so set a high timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		defer cancel()
-
-		SetupYugabyte(t)
-
-		bdsvc := NewYugabyte(TestYugabyteSettings)
-
-		addr := "localhost:8044"
-		testService(ctx, t, bdsvc, addr)
-	})
-
-	t.Run("yugabyte", func(t *testing.T) {
 		_ = logging.SetLogLevel("boostd-data-yb", "debug")
 
 		// Running yugabyte tests may require download the docker container

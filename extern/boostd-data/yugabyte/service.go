@@ -366,7 +366,7 @@ func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []mode
 
 	// The Cassandra driver has a 50k limit on batch statements. Keeping
 	// batch size small makes sure we're under the limit.
-	const batchSize = 49000
+	const batchSize = 5000
 	var batch *gocql.Batch
 	for allIdx, entry := range batchEntries {
 		if batch == nil {

@@ -43,6 +43,7 @@ func main() {
 			migrateLevelDBCmd,
 			migrateCouchDBCmd,
 			migrateReverseCmd,
+			migrateCouchToYugaCmd,
 		},
 	}
 	app.Setup()

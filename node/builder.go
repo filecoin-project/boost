@@ -515,7 +515,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner, cfg)),
 
 		// GraphQL server
-		Override(new(gql.BlockGetter), From(new(dtypes.IndexBackedBlockstore))),
+		Override(new(gql.BlockGetter), modules.NewBlockGetter),
 		Override(new(*gql.Server), modules.NewGraphqlServer(cfg)),
 
 		// Tracing
