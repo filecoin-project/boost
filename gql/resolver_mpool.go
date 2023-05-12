@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/filecoin-project/lotus/chain/consensus"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
@@ -67,7 +68,7 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 		method := m.Message.Method.String()
 		toact, err := r.fullNode.StateGetActor(ctx, m.Message.To, types.EmptyTSK)
 		if err == nil {
-			consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method].Params.Name()
+			method = consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method].Params.Name()
 		}
 
 		var params string

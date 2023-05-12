@@ -42,6 +42,7 @@ import (
 var (
 	ErrDealNotFound        = fmt.Errorf("deal not found")
 	ErrDealHandlerNotFound = errors.New("deal handler not found")
+	ErrDealNotSealed       = errors.New("storage failed - deal not found in sector")
 )
 
 var (
@@ -439,7 +440,7 @@ func (p *Provider) Start() error {
 		// Check if deal is already proving
 		if deal.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
 			si, err := p.sps.SectorsStatus(p.ctx, deal.SectorID, false)
-			if err != nil || isFinalSealingState(si.State) {
+			if err != nil || IsFinalSealingState(si.State) {
 				continue
 			}
 		}
@@ -562,6 +563,32 @@ func (p *Provider) RetryPausedDeal(dealUuid uuid.UUID) error {
 // FailPausedDeal moves a deal from the paused state to the failed state
 func (p *Provider) FailPausedDeal(dealUuid uuid.UUID) error {
 	return p.updateRetryState(dealUuid, false)
+}
+
+// CancelOfflineDealAwaitingImport moves an offline deal from waiting for data state to the failed state
+func (p *Provider) CancelOfflineDealAwaitingImport(dealUuid uuid.UUID) error {
+	pds, err := p.dealsDB.ByID(p.ctx, dealUuid)
+	if err != nil {
+		return fmt.Errorf("failed to lookup deal in DB: %w", err)
+	}
+	if !pds.IsOffline {
+		return errors.New("cannot cancel an online deal")
+	}
+
+	if pds.InboundFilePath != "" {
+		return errors.New("deal has already started importing data")
+	}
+
+	dh := p.getDealHandler(dealUuid)
+	if dh == nil {
+		return ErrDealHandlerNotFound
+	}
+
+	if !dh.isRunning() {
+		return p.updateRetryState(dealUuid, false)
+	}
+
+	return errors.New("deal is already running")
 }
 
 // updateRetryState either retries the deal or terminates the deal

@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/boost-gfm/storagemarket"
+	mock_sealingpipeline "github.com/filecoin-project/boost/storagemarket/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/mock_types"
 	"github.com/filecoin-project/boost/testutil"
@@ -14,6 +15,7 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/lotus/api"
 	lapi "github.com/filecoin-project/lotus/api"
+	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -25,6 +27,7 @@ type MinerStub struct {
 	*mock_types.MockPieceAdder
 	*mock_types.MockCommpCalculator
 	*mock_types.MockIndexProvider
+	*mock_sealingpipeline.MockAPI
 
 	lk                    sync.Mutex
 	unblockCommp          map[uuid.UUID]chan struct{}
@@ -41,6 +44,7 @@ func NewMinerStub(ctrl *gomock.Controller) *MinerStub {
 		MockChainDealManager: mock_types.NewMockChainDealManager(ctrl),
 		MockPieceAdder:       mock_types.NewMockPieceAdder(ctrl),
 		MockIndexProvider:    mock_types.NewMockIndexProvider(ctrl),
+		MockAPI:              mock_sealingpipeline.NewMockAPI(ctrl),
 
 		unblockCommp:          make(map[uuid.UUID]chan struct{}),
 		unblockPublish:        make(map[uuid.UUID]chan struct{}),
@@ -77,17 +81,18 @@ func (ms *MinerStub) UnblockAddPiece(id uuid.UUID) {
 	close(ch)
 }
 
-func (ms *MinerStub) ForDeal(dp *types.DealParams, publishCid, finalPublishCid cid.Cid, dealId abi.DealID, sectorId abi.SectorNumber,
+func (ms *MinerStub) ForDeal(dp *types.DealParams, publishCid, finalPublishCid cid.Cid, dealId abi.DealID, sectorsStatusDealId abi.DealID, sectorId abi.SectorNumber,
 	offset abi.PaddedPieceSize) *MinerStubBuilder {
 	return &MinerStubBuilder{
 		stub: ms,
 		dp:   dp,
 
-		publishCid:      publishCid,
-		finalPublishCid: finalPublishCid,
-		dealId:          dealId,
-		sectorId:        sectorId,
-		offset:          offset,
+		publishCid:          publishCid,
+		finalPublishCid:     finalPublishCid,
+		dealId:              dealId,
+		sectorsStatusDealId: sectorsStatusDealId,
+		sectorId:            sectorId,
+		offset:              offset,
 	}
 }
 
@@ -96,8 +101,9 @@ type MinerStubBuilder struct {
 	dp         *types.DealParams
 	publishCid cid.Cid
 
-	finalPublishCid cid.Cid
-	dealId          abi.DealID
+	finalPublishCid     cid.Cid
+	dealId              abi.DealID
+	sectorsStatusDealId abi.DealID
 
 	sectorId abi.SectorNumber
 	offset   abi.PaddedPieceSize
@@ -130,6 +136,11 @@ func (mb *MinerStubBuilder) SetupNoOp() *MinerStubBuilder {
 	mb.stub.MockIndexProvider.EXPECT().Enabled().Return(true).AnyTimes()
 	mb.stub.MockIndexProvider.EXPECT().Start(gomock.Any()).AnyTimes()
 	mb.stub.MockIndexProvider.EXPECT().AnnounceBoostDeal(gomock.Any(), gomock.Any()).Return(testutil.GenerateCid(), nil).AnyTimes()
+	secInfo := lapi.SectorInfo{
+		State: lapi.SectorState(sealing.Proving),
+		Deals: []abi.DealID{mb.sectorsStatusDealId},
+	}
+	mb.stub.MockAPI.EXPECT().SectorsStatus(gomock.Any(), gomock.Any(), false).Return(secInfo, nil).AnyTimes()
 
 	return mb
 }
@@ -347,25 +358,37 @@ func (mb *MinerStubBuilder) SetupAnnounce(blocking bool, announce bool) *MinerSt
 
 		return testutil.GenerateCid(), nil
 	})
+
+	// Note: The sealing state checks happen after the announce stage has
+	// completed. So we would only expect to get calls to SectorsStatus
+	// after announce.
+	secInfo := lapi.SectorInfo{
+		State: lapi.SectorState(sealing.Proving),
+		Deals: []abi.DealID{mb.sectorsStatusDealId},
+	}
+	mb.stub.MockAPI.EXPECT().SectorsStatus(gomock.Any(), gomock.Any(), false).Return(secInfo, nil).AnyTimes()
+
 	return mb
 }
 
 func (mb *MinerStubBuilder) Output() *StubbedMinerOutput {
 	return &StubbedMinerOutput{
-		PublishCid:      mb.publishCid,
-		FinalPublishCid: mb.finalPublishCid,
-		DealID:          mb.dealId,
-		SealedBytes:     mb.rb,
-		SectorID:        mb.sectorId,
-		Offset:          mb.offset,
+		PublishCid:          mb.publishCid,
+		FinalPublishCid:     mb.finalPublishCid,
+		DealID:              mb.dealId,
+		SectorsStatusDealID: mb.sectorsStatusDealId,
+		SealedBytes:         mb.rb,
+		SectorID:            mb.sectorId,
+		Offset:              mb.offset,
 	}
 }
 
 type StubbedMinerOutput struct {
-	PublishCid      cid.Cid
-	FinalPublishCid cid.Cid
-	DealID          abi.DealID
-	SealedBytes     *[]byte
-	SectorID        abi.SectorNumber
-	Offset          abi.PaddedPieceSize
+	PublishCid          cid.Cid
+	FinalPublishCid     cid.Cid
+	DealID              abi.DealID
+	SectorsStatusDealID abi.DealID
+	SealedBytes         *[]byte
+	SectorID            abi.SectorNumber
+	Offset              abi.PaddedPieceSize
 }

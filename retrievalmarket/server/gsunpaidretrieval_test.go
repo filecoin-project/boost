@@ -5,6 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"testing"
+	"time"
+
 	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	retrievalimpl "github.com/filecoin-project/boost-gfm/retrievalmarket/impl"
@@ -33,10 +38,6 @@ import (
 	"github.com/ipld/go-ipld-prime/traversal/selector"
 	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
 	"github.com/stretchr/testify/require"
-	"io"
-	"os"
-	"testing"
-	"time"
 )
 
 var tlog = logging.Logger("testgs")
@@ -220,7 +221,7 @@ func runRequestTest(t *testing.T, tc testCase) {
 	// Wrap graphsync with the graphsync unpaid retrieval interceptor
 	linkSystem2 := storeutil.LinkSystemForBlockstore(carDataBs)
 	gs2 := graphsyncimpl.New(ctx, network.NewFromLibp2pHost(testData.Host2), linkSystem2)
-	gsupr, err := NewGraphsyncUnpaidRetrieval(testData.Host2.ID(), gs2, testData.DTNet2, vdeps)
+	gsupr, err := NewGraphsyncUnpaidRetrieval(testData.Host2.ID(), gs2, testData.DTNet2, vdeps, nil)
 	require.NoError(t, err)
 
 	// Create the retrieval provider with the graphsync unpaid retrieval interceptor
@@ -230,7 +231,8 @@ func runRequestTest(t *testing.T, tc testCase) {
 	gsupr.SubscribeToDataTransferEvents(func(event datatransfer.Event, channelState datatransfer.ChannelState) {
 		tlog.Debugf("prov dt: %s %s / %s", datatransfer.Events[event.Code], event.Message, datatransfer.Statuses[channelState.Status()])
 	})
-	gsupr.Start(ctx)
+	err = gsupr.Start(ctx)
+	require.NoError(t, err)
 	tut.StartAndWaitForReady(ctx, t, provider)
 
 	// Create a retrieval client

@@ -315,6 +315,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                         <th>Searched CID (non-root)</th>
                         <td>
                             <span><strong>{searchQuery}</strong></span>
+                            &nbsp;
                             <a className="download" target="_blank" href={"/download/block/"+searchQuery}>
                                 Download block
                             </a>
@@ -326,6 +327,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                         <th>Data Root CID</th>
                         <td>
                             { searchIsRootCid ? <strong>{rootCid}</strong> : <span>{rootCid}</span> }
+                            &nbsp;
                             <a className="download" target="_blank" href={"/download/block/"+rootCid}>
                                 Download block
                             </a>

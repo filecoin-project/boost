@@ -44,11 +44,6 @@ var dealFlags = []cli.Flag{
 		Usage:    "size of the CAR file as a padded piece",
 		Required: true,
 	},
-	&cli.Uint64Flag{
-		Name:     "car-size",
-		Usage:    "size of the CAR file",
-		Required: true,
-	},
 	&cli.StringFlag{
 		Name:     "payload-cid",
 		Usage:    "root CID of the CAR file",
@@ -109,6 +104,11 @@ var dealCmd = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:  "http-headers",
 			Usage: "http headers to be passed with the request (e.g key=value)",
+		},
+		&cli.Uint64Flag{
+			Name:     "car-size",
+			Usage:    "size of the CAR file: required for online deals",
+			Required: true,
 		},
 	}, dealFlags...),
 	Before: before,
@@ -192,15 +192,15 @@ func dealCmdAction(cctx *cli.Context, isOnline bool) error {
 		return fmt.Errorf("parsing payload cid %s: %w", payloadCidStr, err)
 	}
 
-	carFileSize := cctx.Uint64("car-size")
-	if carFileSize == 0 {
-		return fmt.Errorf("size of car file cannot be 0")
-	}
-
-	transfer := types.Transfer{
-		Size: carFileSize,
-	}
+	transfer := types.Transfer{}
 	if isOnline {
+
+		carFileSize := cctx.Uint64("car-size")
+		if carFileSize == 0 {
+			return fmt.Errorf("size of car file cannot be 0")
+		}
+
+		transfer.Size = carFileSize
 		// Store the path to the CAR file as a transfer parameter
 		transferParams := &types2.HttpRequest{URL: cctx.String("http-url")}
 

@@ -325,12 +325,20 @@ func (p *DealProvider) getDealStatus(req types.DealStatusRequest) types.DealStat
 		return errResp("getting sector status from sealer")
 	}
 
+	sealingStatus := string(si.State)
+
+	if storagemarket.IsFinalSealingState(si.State) {
+		if !storagemarket.HasDeal(si.Deals, pds.ChainDealID) {
+			sealingStatus = storagemarket.ErrDealNotFound.Error()
+		}
+	}
+
 	return types.DealStatusResponse{
 		DealUUID: req.DealUUID,
 		DealStatus: &types.DealStatus{
 			Error:             pds.Err,
 			Status:            pds.Checkpoint.String(),
-			SealingStatus:     string(si.State),
+			SealingStatus:     sealingStatus,
 			Proposal:          pds.ClientDealProposal.Proposal,
 			SignedProposalCid: signedPropCid,
 			PublishCid:        pds.PublishCID,
