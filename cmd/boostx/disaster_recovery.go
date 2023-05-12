@@ -399,7 +399,11 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 		IsUnsealed:  false,
 	}
 
-	start := time.Now()
+	defer func(start time.Time) {
+		took := time.Since(start)
+		dr.Sectors[sid].Deals[cdi].ProcessingTook = took
+		fmt.Println("processed piece cid: ", piececid, "sector: ", sectorid, "took: ", took)
+	}(time.Now())
 
 	reader, isUnsealed, err := safeUnsealSector(ctx, sectorid, offset, piecesize)
 	if err != nil {
@@ -466,20 +470,20 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 		}
 	}
 
-	took := time.Since(start)
-	dr.Sectors[sid].Deals[cdi].ProcessingTook = took
-	fmt.Println("processed sector: ", sectorid, "piece cid: ", piececid, "; took: ", took)
-
 	return nil
 }
 
 func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bool, error) { // ok, isUnsealed, error
-	start := time.Now()
-
 	fmt.Println("sector number: ", info.SectorNumber, "; deals: ", info.DealIDs)
 
 	sectorid := info.SectorNumber
 	sid := uint64(sectorid)
+
+	defer func(start time.Time) {
+		took := time.Since(start)
+		dr.Sectors[sid].ProcessingTook = took
+		fmt.Println("processed sector number: ", info.SectorNumber, "; took: ", took)
+	}(time.Now())
 
 	err := dr.MarkSectorInProgress(sectorid)
 	if err != nil {
@@ -522,10 +526,6 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 	if err != nil {
 		return false, false, err
 	}
-
-	took := time.Since(start)
-	dr.Sectors[sid].ProcessingTook = took
-	fmt.Println("processed sector number: ", info.SectorNumber, "; took: ", took)
 
 	return true, true, nil
 }
