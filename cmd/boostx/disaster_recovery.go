@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -98,119 +100,142 @@ var restorePieceStoreCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		ctx := lcli.ReqContext(cctx)
+		c := make(chan os.Signal)
+		errc := make(chan error)
+
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+		go func() {
+			errc <- action(cctx)
+		}()
 
 		var err error
-		dr, err = NewDisasterRecovery(cctx.String("disaster-recovery-dir"))
-		if err != nil {
-			return err
+		select {
+		case <-c:
+		case err = <-errc:
 		}
 
-		var sectorid abi.SectorNumber
-		if cctx.IsSet("sector-id") {
-			sectorid = abi.SectorNumber(cctx.Uint64("sector-id"))
-			fmt.Println("sector id: ", sectorid)
+		err2 := dr.WriteReport()
+		if err2 != nil {
+			return err2
 		}
 
-		ignoreCommp = cctx.Bool("ignore-commp")
-		ignoreLID = cctx.Bool("ignore-lid")
-
-		// Connect to the full node API
-		fnApiInfo := cctx.String("api-fullnode")
-		var ncloser jsonrpc.ClientCloser
-		fullnodeApi, ncloser, err = lib.GetFullNodeApi(ctx, fnApiInfo, log)
-		if err != nil {
-			return fmt.Errorf("getting full node API: %w", err)
-		}
-		defer ncloser()
-
-		// Connect to the storage API and create a sector accessor
-		storageApiInfo := cctx.String("api-storage")
-		var storageCloser jsonrpc.ClientCloser
-		sa, storageCloser, err = lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
-		if err != nil {
-			return err
-		}
-		defer storageCloser()
-
-		// Connect to the local index directory service
-		if ignoreLID {
-			pd = nil
-		} else {
-			pdClient := piecedirectory.NewStore()
-			defer pdClient.Close(ctx)
-			err = pdClient.Dial(ctx, cctx.String("api-lid"))
-			if err != nil {
-				return fmt.Errorf("connecting to local index directory service: %w", err)
-			}
-			pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-			pd = piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
-		}
-
-		maddr, err = getActorAddress(ctx, cctx)
-		if err != nil {
-			return err
-		}
-
-		sectors, err := fullnodeApi.StateMinerSectors(ctx, maddr, nil, types.EmptyTSK)
-		if err != nil {
-			return err
-		}
-
-		dr.TotalSectors = len(sectors)
-
-		var sectorsWithDeals []*miner.SectorOnChainInfo
-
-		for _, info := range sectors {
-			if cctx.IsSet("sector-id") && info.SectorNumber != sectorid {
-				continue
-			}
-
-			// ignore sector 0
-			if info.SectorNumber == abi.SectorNumber(0) {
-				continue
-			}
-
-			if len(info.DealIDs) < 1 {
-				fmt.Println("no deals in sector", info.SectorNumber)
-
-				dr.SectorsWithoutDeals = append(dr.SectorsWithoutDeals, uint64(info.SectorNumber))
-				continue
-			}
-
-			dr.SectorsWithDeals = append(dr.SectorsWithDeals, uint64(info.SectorNumber))
-			sectorsWithDeals = append(sectorsWithDeals, info)
-		}
-
-		for _, info := range sectorsWithDeals {
-			dr.Sectors[uint64(info.SectorNumber)] = &SectorStatus{}
-
-			if dr.IsDone(info.SectorNumber) {
-				fmt.Println("sector already processed", info.SectorNumber)
-				dr.Sectors[uint64(info.SectorNumber)].AlreadyProcessed = true
-				continue
-			}
-
-			ok, isUnsealed, err := processSector(ctx, info)
-			if err != nil {
-				return err
-			}
-			if !isUnsealed {
-				fmt.Println("sector is not unsealed", info.SectorNumber)
-				continue
-			}
-			if !ok {
-				return errors.New("weird -- not ok, but sector is unsealed and no error?!")
-			}
-		}
-
-		err = dr.WriteReport()
 		if err != nil {
 			return err
 		}
 
 		return nil
 	},
+}
+
+func action(cctx *cli.Context) error {
+	ctx := lcli.ReqContext(cctx)
+
+	var err error
+	dr, err = NewDisasterRecovery(cctx.String("disaster-recovery-dir"))
+	if err != nil {
+		return err
+	}
+
+	var sectorid abi.SectorNumber
+	if cctx.IsSet("sector-id") {
+		sectorid = abi.SectorNumber(cctx.Uint64("sector-id"))
+		fmt.Println("sector id: ", sectorid)
+	}
+
+	ignoreCommp = cctx.Bool("ignore-commp")
+	ignoreLID = cctx.Bool("ignore-lid")
+
+	// Connect to the full node API
+	fnApiInfo := cctx.String("api-fullnode")
+	var ncloser jsonrpc.ClientCloser
+	fullnodeApi, ncloser, err = lib.GetFullNodeApi(ctx, fnApiInfo, log)
+	if err != nil {
+		return fmt.Errorf("getting full node API: %w", err)
+	}
+	defer ncloser()
+
+	// Connect to the storage API and create a sector accessor
+	storageApiInfo := cctx.String("api-storage")
+	var storageCloser jsonrpc.ClientCloser
+	sa, storageCloser, err = lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
+	if err != nil {
+		return err
+	}
+	defer storageCloser()
+
+	// Connect to the local index directory service
+	if ignoreLID {
+		pd = nil
+	} else {
+		pdClient := piecedirectory.NewStore()
+		defer pdClient.Close(ctx)
+		err = pdClient.Dial(ctx, cctx.String("api-lid"))
+		if err != nil {
+			return fmt.Errorf("connecting to local index directory service: %w", err)
+		}
+		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
+		pd = piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
+	}
+
+	maddr, err = getActorAddress(ctx, cctx)
+	if err != nil {
+		return err
+	}
+
+	sectors, err := fullnodeApi.StateMinerSectors(ctx, maddr, nil, types.EmptyTSK)
+	if err != nil {
+		return err
+	}
+
+	dr.TotalSectors = len(sectors)
+
+	var sectorsWithDeals []*miner.SectorOnChainInfo
+
+	for _, info := range sectors {
+		if cctx.IsSet("sector-id") && info.SectorNumber != sectorid {
+			continue
+		}
+
+		// ignore sector 0
+		if info.SectorNumber == abi.SectorNumber(0) {
+			continue
+		}
+
+		if len(info.DealIDs) < 1 {
+			fmt.Println("no deals in sector", info.SectorNumber)
+
+			dr.SectorsWithoutDeals = append(dr.SectorsWithoutDeals, uint64(info.SectorNumber))
+			continue
+		}
+
+		dr.SectorsWithDeals = append(dr.SectorsWithDeals, uint64(info.SectorNumber))
+		sectorsWithDeals = append(sectorsWithDeals, info)
+	}
+
+	for _, info := range sectorsWithDeals {
+		dr.Sectors[uint64(info.SectorNumber)] = &SectorStatus{}
+
+		if dr.IsDone(info.SectorNumber) {
+			fmt.Println("sector already processed", info.SectorNumber)
+			dr.Sectors[uint64(info.SectorNumber)].AlreadyProcessed = true
+			continue
+		}
+
+		ok, isUnsealed, err := processSector(ctx, info)
+		if err != nil {
+			return err
+		}
+		if !isUnsealed {
+			fmt.Println("sector is not unsealed", info.SectorNumber)
+			continue
+		}
+		if !ok {
+			return errors.New("weird -- not ok, but sector is unsealed and no error?!")
+		}
+	}
+
+	return nil
 }
 
 type DisasterRecovery struct {
