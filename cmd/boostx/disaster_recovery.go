@@ -323,7 +323,7 @@ func (dr *DisasterRecovery) MarkSectorInProgress(s abi.SectorNumber) error {
 		}
 		defer file.Close()
 	} else {
-		return fmt.Errorf("sector %d already marked as in progress", s)
+		//return fmt.Errorf("sector %d already marked as in progress", s)
 	}
 
 	return nil
