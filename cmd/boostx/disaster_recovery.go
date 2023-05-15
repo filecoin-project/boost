@@ -727,11 +727,11 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 			}
 		}
 
-		if nextoffset%uint64(marketDeal.Proposal.PieceSize) != 0 {
+		if nextoffset%uint64(marketDeal.Proposal.PieceSize.Unpadded()) != 0 {
 			currentoffset := nextoffset
 			nextoffset = 0
 			for nextoffset < currentoffset {
-				nextoffset += uint64(marketDeal.Proposal.PieceSize)
+				nextoffset += uint64(marketDeal.Proposal.PieceSize.Unpadded())
 			}
 		}
 
