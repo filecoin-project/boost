@@ -543,7 +543,7 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 	if dr.HaveBoostDealsAndPieceStore { // sanity check on piece store / piece info vs chain data and infered piece size / offset data
 		pi, err := ps.GetPieceInfo(piececid)
 		if err != nil {
-			logger.Errorw("cant get piece info from piece store", "piececid", piececid, "err", err)
+			logger.Errorw("cant get piece info from piece store", "piececid", piececid, "sector", sid, "err", err)
 		} else {
 			var found bool
 			for _, di := range pi.Deals {
@@ -551,18 +551,18 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 					found = true
 
 					if di.SectorID != sectorid {
-						logger.Errorw("sector mismatch", "piececid", piececid, "chain-deal-id", chainDealID, "got", di.SectorID)
+						logger.Errorw("sector mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "got", di.SectorID)
 					}
 					if di.Offset != offset.Padded() {
-						logger.Errorw("offset mismatch", "piececid", piececid, "chain-deal-id", chainDealID, "expected", offset.Padded(), "got", di.Offset)
+						logger.Errorw("offset mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "expected", offset.Padded(), "got", di.Offset)
 					}
 					if di.Length != piecesize {
-						logger.Errorw("length/piece size mismatch", "piececid", piececid, "chain-deal-id", chainDealID, "expected", piecesize, "got", di.Length)
+						logger.Errorw("length/piece size mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "expected", piecesize, "got", di.Length)
 					}
 				}
 			}
 			if !found {
-				logger.Errorw("chain deal not found in piece info", "piececid", piececid, "chain-deal-id", chainDealID, "pi", spew.Sdump(pi))
+				logger.Errorw("chain deal not found in piece info", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "pi", spew.Sdump(pi))
 			}
 		}
 	}
