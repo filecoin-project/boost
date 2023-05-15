@@ -478,7 +478,7 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 		logger.Errorw("storage find sector", "err", err)
 	}
 
-	logger.Debugw("u len", "sector", sectorid, "len u", len(u))
+	//logger.Debugw("u len", "sector", sectorid, "len u", len(u))
 
 	var reader io.ReadCloser
 	var isUnsealed bool
