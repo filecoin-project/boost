@@ -158,7 +158,7 @@ func action(cctx *cli.Context) error {
 	var sectorid abi.SectorNumber
 	if cctx.IsSet("sector-id") {
 		sectorid = abi.SectorNumber(cctx.Uint64("sector-id"))
-		logger.Info("running disaster recovery tool on a single sector", "sector", sectorid)
+		logger.Infow("running disaster recovery tool on a single sector", "sector", sectorid)
 	}
 
 	ignoreCommp = cctx.Bool("ignore-commp")
@@ -221,7 +221,7 @@ func action(cctx *cli.Context) error {
 		}
 
 		if len(info.DealIDs) < 1 {
-			fmt.Println("no deals in sector", info.SectorNumber)
+			logger.Infow("no deals in sector", "sector", info.SectorNumber)
 
 			dr.SectorsWithoutDeals = append(dr.SectorsWithoutDeals, uint64(info.SectorNumber))
 			continue
@@ -235,7 +235,7 @@ func action(cctx *cli.Context) error {
 		dr.Sectors[uint64(info.SectorNumber)] = &SectorStatus{}
 
 		if dr.IsDone(info.SectorNumber) {
-			fmt.Println("sector already processed", info.SectorNumber)
+			logger.Infow("sector already processed", "sector", info.SectorNumber)
 			dr.Sectors[uint64(info.SectorNumber)].AlreadyProcessed = true
 			continue
 		}
@@ -245,11 +245,12 @@ func action(cctx *cli.Context) error {
 			return err
 		}
 		if !isUnsealed {
-			fmt.Println("sector is not unsealed", info.SectorNumber)
+			logger.Errorw("sector is not unsealed", "sector", info.SectorNumber)
 			continue
 		}
 		if !ok {
-			return errors.New("weird -- not ok, but sector is unsealed and no error?!")
+			logger.Errorw("unexpected state - not ok, but sector is unsealed and we got no errors", "sector", info.SectorNumber)
+			return errors.New("unexpected state - not ok, but sector is unsealed and no error")
 		}
 	}
 
@@ -306,7 +307,7 @@ func NewDisasterRecovery(ctx context.Context, dir, repodir string) (*DisasterRec
 	d, err := os.Stat(drDir)
 	if err == nil {
 		if d.IsDir() {
-			fmt.Println("WARNING: disaster recovery dir exists, so tool will continue from where it left off previously!!!")
+			logger.Warn("disaster recovery directory exists, so will continue from where recovery left off perviously")
 		}
 	}
 
@@ -474,7 +475,7 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 }
 
 func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID abi.DealID, piececid cid.Cid, piecesize abi.PaddedPieceSize, offset abi.UnpaddedPieceSize, l string) error {
-	fmt.Println("sector: ", sectorid, "piece cid: ", piececid, "; piece size: ", piecesize, "; offset: ", offset, "label: ", l)
+	logger.Debugw("processing piece", "sector", sectorid, "piececid", piececid, "piecesize", piecesize, "offset", offset, "label", l)
 
 	cdi := uint64(chainDealID)
 	sid := uint64(sectorid)
@@ -489,7 +490,7 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 	defer func(start time.Time) {
 		took := time.Since(start)
 		dr.Sectors[sid].Deals[cdi].ProcessingTook = took
-		fmt.Println("processed piece cid: ", piececid, "sector: ", sectorid, "took: ", took)
+		logger.Debugw("processed piece", "took", took, "sector", sectorid, "piececid", piececid, "piecesize", piecesize, "offset", offset, "label", l)
 	}(time.Now())
 
 	reader, isUnsealed, err := safeUnsealSector(ctx, sectorid, offset, piecesize)
@@ -589,9 +590,10 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 		}
 
 		encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
+		_ = encoder
 
-		fmt.Println("CommP CID: ", encoder.Encode(commp.PieceCID))
-		fmt.Println("Piece size: ", types.NewInt(uint64(commp.PieceSize.Unpadded().Padded())))
+		//fmt.Println("CommP CID: ", encoder.Encode(commp.PieceCID))
+		//fmt.Println("Piece size: ", types.NewInt(uint64(commp.PieceSize.Unpadded().Padded())))
 
 		if !commp.PieceCID.Equals(piececid) {
 			return fmt.Errorf("calculated commp doesnt match on-chain data, expected %s, got %s", piececid, commp.PieceCID)
@@ -602,7 +604,7 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 }
 
 func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bool, error) { // ok, isUnsealed, error
-	fmt.Println("sector number: ", info.SectorNumber, "; deals: ", info.DealIDs)
+	logger.Debugw("processing sector", "sector", info.SectorNumber, "deals", info.DealIDs)
 
 	sectorid := info.SectorNumber
 	sid := uint64(sectorid)
@@ -610,7 +612,7 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 	defer func(start time.Time) {
 		took := time.Since(start)
 		dr.Sectors[sid].ProcessingTook = took
-		fmt.Println("processed sector number: ", info.SectorNumber, "; took: ", took)
+		logger.Debugw("processing sector", "sector", sectorid, "took", took, "deals", info.DealIDs)
 	}(time.Now())
 
 	err := dr.MarkSectorInProgress(sectorid)
@@ -625,7 +627,7 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 		marketDeal, err := fullnodeApi.StateMarketStorageDeal(ctx, did, types.EmptyTSK)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
-				fmt.Println("ERROR: deal mentioned in sector but not found in state; ", err)
+				logger.Warnw("deal present in sector, but not in market actor state", "sector", sectorid, "deal", did, "err", err)
 				continue
 			}
 			return false, false, err
@@ -643,7 +645,7 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 		if err != nil {
 			dr.Sectors[sid].Deals[uint64(did)].Error = err.Error()
 			dr.PieceErrors++
-			fmt.Println("piece error:", err)
+			logger.Errorw("got piece error", "sector", sectorid, "deal", did, "err", err)
 			continue
 		}
 
@@ -795,7 +797,8 @@ func getLegacyDealsFSM(ctx context.Context, ds *backupds.Datastore) (fsm.Group, 
 
 func createLogger(logPath string) (*zap.SugaredLogger, error) {
 	logCfg := zap.NewDevelopmentConfig()
-	logCfg.OutputPaths = []string{logPath}
+	logCfg.OutputPaths = []string{"stdout", logPath}
+	logCfg.ErrorOutputPaths = []string{"stdout", logPath}
 	zl, err := logCfg.Build()
 	if err != nil {
 		return nil, err
