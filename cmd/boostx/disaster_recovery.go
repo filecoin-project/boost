@@ -554,10 +554,10 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 						logger.Errorw("sector mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "got", di.SectorID)
 					}
 					if di.Offset != offset.Padded() {
-						logger.Errorw("offset mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "expected", offset.Padded(), "got", di.Offset)
+						logger.Errorw("offset mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "calculated", offset.Padded(), "got from ps", di.Offset)
 					}
 					if di.Length != piecesize {
-						logger.Errorw("length/piece size mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "expected", piecesize, "got", di.Length)
+						logger.Errorw("length/piece size mismatch", "sector", sid, "piececid", piececid, "chain-deal-id", chainDealID, "expected", piecesize, "got from ps", di.Length)
 					}
 				}
 			}
@@ -736,6 +736,7 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 		}
 
 		err = processPiece(ctx, sectorid, did, marketDeal.Proposal.PieceCID, marketDeal.Proposal.PieceSize, abi.UnpaddedPieceSize(nextoffset), l)
+		nextoffset += uint64(marketDeal.Proposal.PieceSize.Unpadded())
 		if err != nil {
 			dr.Sectors[sid].Deals[uint64(did)].Error = err.Error()
 			dr.PieceErrors++
@@ -743,8 +744,6 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 			logger.Errorw("got piece error", "sector", sectorid, "deal", did, "err", err)
 			continue
 		}
-
-		nextoffset += uint64(marketDeal.Proposal.PieceSize.Unpadded())
 	}
 
 	err = dr.CompleteSector(sectorid)
