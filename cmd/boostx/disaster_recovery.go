@@ -713,10 +713,11 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 		marketDeal, err := fullnodeApi.StateMarketStorageDeal(ctx, did, types.EmptyTSK)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
-				logger.Warnw("deal present in sector, but not in market actor state", "sector", sectorid, "deal", did, "err", err)
-				continue
+				logger.Warnw("deal present in sector, but not in market actor state, so probably expired", "sector", sectorid, "deal", did, "err", err)
+				break
+			} else {
+				return false, false, err
 			}
-			return false, false, err
 		}
 
 		l := "(not a string)"
