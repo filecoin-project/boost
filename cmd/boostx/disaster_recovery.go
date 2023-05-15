@@ -804,6 +804,7 @@ func createLogger(logPath string) (*zap.SugaredLogger, error) {
 	logCfg := zap.NewDevelopmentConfig()
 	logCfg.OutputPaths = []string{"stdout", logPath}
 	logCfg.ErrorOutputPaths = []string{"stdout", logPath}
+	logCfg.DisableStacktrace = true
 	zl, err := logCfg.Build()
 	if err != nil {
 		return nil, err
