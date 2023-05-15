@@ -52,6 +52,7 @@ var (
 	fullnodeApi v1api.FullNode
 	pd          *piecedirectory.PieceDirectory
 	maddr       address.Address
+	ps          piecestore.PieceStore
 
 	ignoreCommp bool
 	ignoreLID   bool
@@ -273,7 +274,6 @@ type DisasterRecovery struct {
 	PieceStoreLoadError         string                 // error in case we failed to load piece store
 	BoostDeals                  map[abi.DealID]string  // deals from boost sqlite db
 	PropCidByChainDealID        map[abi.DealID]cid.Cid // proposal cid by chain deal id (legacy deals)
-	PieceStore                  piecestore.PieceStore
 }
 
 type SectorStatus struct {
@@ -366,7 +366,7 @@ func (dr *DisasterRecovery) loadPieceStoreAndBoostDB(ctx context.Context, repoDi
 		return fmt.Errorf("building chain deal id -> proposal cid map: %w", err)
 	}
 
-	dr.PieceStore, err = openPieceStore(ctx, ds)
+	ps, err = openPieceStore(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("opening piece store: %w", err)
 	}
