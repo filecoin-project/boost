@@ -617,7 +617,7 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 	defer func(start time.Time) {
 		took := time.Since(start)
 		dr.Sectors[sid].ProcessingTook = took
-		logger.Debugw("processing sector", "sector", sectorid, "took", took, "deals", info.DealIDs)
+		logger.Debugw("processed sector", "sector", sectorid, "took", took, "deals", info.DealIDs)
 	}(time.Now())
 
 	err := dr.MarkSectorInProgress(sectorid)
