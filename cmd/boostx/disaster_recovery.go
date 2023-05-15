@@ -470,7 +470,7 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 		logger.Errorw("storage find sector", "err", err)
 	}
 
-	logger.Debugw("u len", "sector", sectorid, "len u", len(u), "u", spew.Sdump(u))
+	logger.Debugw("u len", "sector", sectorid, "len u", len(u))
 
 	var reader io.ReadCloser
 	var isUnsealed bool
@@ -491,8 +491,8 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 
 	select {
 	case <-doneIsUnsealed:
-	case <-time.After(300 * time.Millisecond):
-		return nil, false, errors.New("timeout on isUnsealed sector after 300 milliseconds")
+	case <-time.After(3000 * time.Millisecond):
+		return nil, false, errors.New("timeout on isUnsealed sector after 3 seconds")
 	}
 
 	if !isUnsealed {
@@ -514,8 +514,8 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 	select {
 	case <-done:
 		return reader, isUnsealed, err
-	case <-time.After(2 * time.Second):
-		return nil, false, errors.New("timeout on unseal sector after 2 seconds")
+	case <-time.After(3 * time.Second):
+		return nil, false, errors.New("timeout on unseal sector after 3 seconds")
 	}
 }
 
