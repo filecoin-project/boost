@@ -304,10 +304,11 @@ func NewDisasterRecovery(ctx context.Context, dir, repodir string) (*DisasterRec
 		return nil, errors.New("disaster-recovery-dir is a required flag")
 	}
 
+	var recoverRanPreviously bool
 	d, err := os.Stat(drDir)
 	if err == nil {
 		if d.IsDir() {
-			logger.Warn("disaster recovery directory exists, so will continue from where recovery left off perviously")
+			recoverRanPreviously = true
 		}
 	}
 
@@ -333,6 +334,10 @@ func NewDisasterRecovery(ctx context.Context, dir, repodir string) (*DisasterRec
 	logger, err = createLogger(fmt.Sprintf("%s/output-%d.log", drr.Dir, time.Now().UnixNano()))
 	if err != nil {
 		return nil, err
+	}
+
+	if recoverRanPreviously {
+		logger.Warn("disaster recovery directory exists, so will continue from where recovery left off perviously")
 	}
 
 	err = drr.loadPieceStoreAndBoostDB(ctx, repodir)
