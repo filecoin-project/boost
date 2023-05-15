@@ -27,12 +27,14 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/miner"
 	"github.com/filecoin-project/go-statemachine/fsm"
+	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/backupds"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/repo"
+	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-cidutil/cidenc"
@@ -50,6 +52,7 @@ var (
 	dr          *DisasterRecovery
 	sa          dagstore.SectorAccessor
 	fullnodeApi v1api.FullNode
+	minerApi    api.StorageMiner
 	pd          *piecedirectory.PieceDirectory
 	maddr       address.Address
 	ps          piecestore.PieceStore
@@ -173,6 +176,14 @@ func action(cctx *cli.Context) error {
 		return fmt.Errorf("getting full node API: %w", err)
 	}
 	defer ncloser()
+
+	//TODO: refactor to use api-miner
+	var mcloser jsonrpc.ClientCloser
+	minerApi, mcloser, err = lcli.GetStorageMinerAPI(cctx)
+	if err != nil {
+		return err
+	}
+	defer mcloser()
 
 	// Connect to the storage API and create a sector accessor
 	storageApiInfo := cctx.String("api-storage")
@@ -462,6 +473,25 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 		if !isUnsealed {
 			return
 		}
+
+		logger.Debugw("sa.IsUnsealed return true", "sector", sectorid)
+
+		mid, err := address.IDFromAddress(maddr)
+		if err != nil {
+			return
+		}
+
+		sid := abi.SectorID{
+			Miner:  abi.ActorID(mid),
+			Number: sectorid,
+		}
+
+		u, err := minerApi.StorageFindSector(ctx, sid, storiface.FTUnsealed, 0, false)
+		if err != nil {
+			return
+		}
+
+		logger.Debugw("u len", "sector", sectorid, "len u", len(u), "u", spew.Sdump(u))
 
 		reader, err = sa.UnsealSector(ctx, sectorid, offset, piecesize.Unpadded())
 		if err != nil {
