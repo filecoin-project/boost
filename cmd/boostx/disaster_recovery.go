@@ -410,8 +410,7 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 		return err
 	}
 	if !isUnsealed {
-		//TODO: record
-		return nil
+		return fmt.Errorf("sector %d is not unsealed", sid)
 	}
 
 	dr.Sectors[sid].Deals[cdi].IsUnsealed = true
