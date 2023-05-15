@@ -329,7 +329,7 @@ func NewDisasterRecovery(ctx context.Context, dir, repodir string) (*DisasterRec
 
 	// Create a logger for the migration that outputs to a file in the
 	// current working directory
-	logger, err = createLogger(fmt.Sprintf("%s/output-%d.log", dr.Dir, time.Now().UnixNano()))
+	logger, err = createLogger(fmt.Sprintf("%s/output-%d.log", drr.Dir, time.Now().UnixNano()))
 	if err != nil {
 		return nil, err
 	}
