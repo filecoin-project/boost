@@ -13,25 +13,36 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/filecoin-project/boost-gfm/piecestore"
+	piecestoreimpl "github.com/filecoin-project/boost-gfm/piecestore/impl"
+	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/cmd/lib"
+	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-commp-utils/writer"
+	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/miner"
+	"github.com/filecoin-project/go-statemachine/fsm"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/filecoin-project/lotus/lib/backupds"
 	"github.com/filecoin-project/lotus/markets/dagstore"
+	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-cidutil/cidenc"
+	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/namespace"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/mitchellh/go-homedir"
 	"github.com/multiformats/go-multibase"
 	"github.com/urfave/cli/v2"
+	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 )
 
@@ -44,6 +55,8 @@ var (
 
 	ignoreCommp bool
 	ignoreLID   bool
+
+	logger *zap.SugaredLogger
 )
 
 var disasterRecoveryCmd = &cli.Command{
@@ -78,6 +91,11 @@ var restorePieceStoreCmd = &cli.Command{
 			Name:  "disaster-recovery-dir",
 			Usage: "location to store progress of disaster recovery",
 			Value: "~/.boost-disaster-recovery",
+		},
+		&cli.StringFlag{
+			Name:  "repo",
+			Usage: "location to boost repo",
+			Value: "~/.boost",
 		},
 		&cli.IntFlag{
 			Name:  "sector-id",
@@ -132,7 +150,7 @@ func action(cctx *cli.Context) error {
 	ctx := lcli.ReqContext(cctx)
 
 	var err error
-	dr, err = NewDisasterRecovery(cctx.String("disaster-recovery-dir"))
+	dr, err = NewDisasterRecovery(ctx, cctx.String("disaster-recovery-dir"), cctx.String("repo"))
 	if err != nil {
 		return err
 	}
@@ -249,6 +267,12 @@ type DisasterRecovery struct {
 	SectorsWithoutDeals []uint64
 
 	Sectors map[uint64]*SectorStatus
+
+	HaveBoostDealsAndPieceStore bool                   // flag whether we managed to load boost sqlite db and piece store
+	PieceStoreLoadError         string                 // error in case we failed to load piece store
+	BoostDeals                  map[abi.DealID]string  // deals from boost sqlite db
+	PropCidByChainDealID        map[abi.DealID]cid.Cid // proposal cid by chain deal id (legacy deals)
+	PieceStore                  piecestore.PieceStore
 }
 
 type SectorStatus struct {
@@ -270,7 +294,7 @@ type PieceStatus struct {
 	ProcessingTook time.Duration
 }
 
-func NewDisasterRecovery(dir string) (*DisasterRecovery, error) {
+func NewDisasterRecovery(ctx context.Context, dir, repodir string) (*DisasterRecovery, error) {
 	drDir, err := homedir.Expand(dir)
 	if err != nil {
 		return nil, fmt.Errorf("expanding disaster recovery dir path: %w", err)
@@ -297,11 +321,76 @@ func NewDisasterRecovery(dir string) (*DisasterRecovery, error) {
 		return nil, err
 	}
 
-	return &DisasterRecovery{
+	drr := &DisasterRecovery{
 		Dir:     drDir,
 		DoneDir: doneDir,
 		Sectors: make(map[uint64]*SectorStatus),
-	}, nil
+	}
+
+	// Create a logger for the migration that outputs to a file in the
+	// current working directory
+	logger, err = createLogger(fmt.Sprintf("%s/output-%d.log", dr.Dir, time.Now().UnixNano()))
+	if err != nil {
+		return nil, err
+	}
+
+	err = drr.loadPieceStoreAndBoostDB(ctx, repodir)
+	if err != nil {
+		drr.HaveBoostDealsAndPieceStore = false
+		drr.PieceStoreLoadError = err.Error()
+	} else {
+		drr.HaveBoostDealsAndPieceStore = true
+	}
+
+	return drr, nil
+}
+
+func (dr *DisasterRecovery) loadPieceStoreAndBoostDB(ctx context.Context, repoDir string) error {
+	// Open the datastore in the existing repo
+	ds, err := openDataStore(repoDir)
+	if err != nil {
+		return fmt.Errorf("creating piece store from repo %s: %w", repoDir, err)
+	}
+
+	// Create a mapping of on-chain deal ID to deal proposal cid.
+	// This is needed below so that we can map from the legacy piece store
+	// info to a legacy deal.
+	dr.PropCidByChainDealID, err = getPropCidByChainDealID(ctx, ds)
+	if err != nil {
+		return fmt.Errorf("building chain deal id -> proposal cid map: %w", err)
+	}
+
+	dr.PieceStore, err = openPieceStore(ctx, ds)
+	if err != nil {
+		return fmt.Errorf("opening piece store: %w", err)
+	}
+
+	dbPath := path.Join(repoDir, "boost.db?cache=shared")
+	sqldb, err := db.SqlDB(dbPath)
+	if err != nil {
+		return fmt.Errorf("opening boost sqlite db: %w", err)
+	}
+
+	qry := "SELECT ID, ChainDealID FROM Deals"
+	rows, err := sqldb.QueryContext(ctx, qry)
+	if err != nil {
+		return fmt.Errorf("executing select on Deals: %w", err)
+	}
+
+	dr.BoostDeals = make(map[abi.DealID]string)
+	for rows.Next() {
+		var uuid string
+		var chainDealId abi.DealID
+
+		err := rows.Scan(&uuid, &chainDealId)
+		if err != nil {
+			return fmt.Errorf("executing row scan: %w", err)
+		}
+
+		dr.BoostDeals[chainDealId] = uuid
+	}
+
+	return nil
 }
 
 func (dr *DisasterRecovery) IsDone(s abi.SectorNumber) bool {
@@ -322,8 +411,6 @@ func (dr *DisasterRecovery) MarkSectorInProgress(s abi.SectorNumber) error {
 			return err
 		}
 		defer file.Close()
-	} else {
-		//return fmt.Errorf("sector %d already marked as in progress", s)
 	}
 
 	return nil
@@ -431,19 +518,61 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 	dr.Sectors[sid].Deals[cdi].GotDataReader = true
 
 	if !ignoreLID { // populate LID
-		di := model.DealInfo{
-			DealUuid:    uuid.NewString(),
-			IsLegacy:    false,
-			ChainDealID: chainDealID,
-			MinerAddr:   maddr,
-			SectorID:    sectorid,
-			PieceOffset: offset.Padded(), // TODO: confirm that this is correct...?
-			PieceLength: piecesize,
+		var shouldGenerateNewDeal bool
+
+		if dr.HaveBoostDealsAndPieceStore { // successfully loaded boost sqlite db and piece store => try to infer dealinfo
+			// Find the deal corresponding to the deal info's DealID
+			proposalCid, okLegacy := dr.PropCidByChainDealID[chainDealID]
+			uuid, okBoost := dr.BoostDeals[chainDealID]
+
+			if !okLegacy && !okBoost {
+				logger.Errorw("cant find boost deal or legacy deal",
+					"piececid", piececid, "chain-deal-id", chainDealID, "err", err)
+
+				shouldGenerateNewDeal = true
+			} else {
+				isLegacy := false
+				if uuid == "" {
+					uuid = proposalCid.String()
+					isLegacy = true
+				}
+
+				di := model.DealInfo{
+					DealUuid:    uuid,
+					IsLegacy:    isLegacy,
+					ChainDealID: chainDealID,
+					MinerAddr:   maddr,
+					SectorID:    sectorid,
+					PieceOffset: offset.Padded(),
+					PieceLength: piecesize,
+				}
+
+				err = pd.AddDealForPiece(ctx, piececid, di)
+				if err != nil {
+					logger.Errorw("cant add deal info for piece", "piececid", piececid, "chain-deal-id", chainDealID, "err", err)
+
+					return err
+				}
+			}
 		}
 
-		err = pd.AddDealForPiece(ctx, piececid, di)
-		if err != nil {
-			return err
+		if !dr.HaveBoostDealsAndPieceStore || shouldGenerateNewDeal { // missing boost sqlite db and piece store, so generate new dealinfo
+			//TODO: regenerate boost db sqlite??
+
+			di := model.DealInfo{
+				DealUuid:    uuid.NewString(),
+				IsLegacy:    false,
+				ChainDealID: chainDealID,
+				MinerAddr:   maddr,
+				SectorID:    sectorid,
+				PieceOffset: offset.Padded(), // TODO: confirm that this is correct...?
+				PieceLength: piecesize,
+			}
+
+			err = pd.AddDealForPiece(ctx, piececid, di)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -557,4 +686,120 @@ type Reader interface {
 	io.Reader
 	io.ReaderAt
 	io.Seeker
+}
+
+func openDataStore(path string) (*backupds.Datastore, error) {
+	ctx := context.Background()
+
+	rpo, err := repo.NewFS(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not open repo %s: %w", path, err)
+	}
+
+	exists, err := rpo.Exists()
+	if err != nil {
+		return nil, fmt.Errorf("checking repo %s exists: %w", path, err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("repo does not exist: %s", path)
+	}
+
+	lr, err := rpo.Lock(repo.StorageMiner)
+	if err != nil {
+		return nil, fmt.Errorf("locking repo %s: %w", path, err)
+	}
+
+	mds, err := lr.Datastore(ctx, "/metadata")
+	if err != nil {
+		return nil, err
+	}
+
+	bds, err := backupds.Wrap(mds, "")
+	if err != nil {
+		return nil, fmt.Errorf("opening backupds: %w", err)
+	}
+
+	return bds, nil
+}
+
+func getPropCidByChainDealID(ctx context.Context, ds *backupds.Datastore) (map[abi.DealID]cid.Cid, error) {
+	deals, err := getLegacyDealsFSM(ctx, ds)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build a mapping of chain deal ID to proposal CID
+	var list []storagemarket.MinerDeal
+	if err := deals.List(&list); err != nil {
+		return nil, err
+	}
+
+	byChainDealID := make(map[abi.DealID]cid.Cid, len(list))
+	for _, d := range list {
+		if d.DealID != 0 {
+			byChainDealID[d.DealID] = d.ProposalCid
+		}
+	}
+
+	return byChainDealID, nil
+}
+
+func openPieceStore(ctx context.Context, ds *backupds.Datastore) (piecestore.PieceStore, error) {
+	// Open the piece store
+	ps, err := piecestoreimpl.NewPieceStore(namespace.Wrap(ds, datastore.NewKey("/storagemarket")))
+	if err != nil {
+		return nil, fmt.Errorf("creating piece store from datastore : %w", err)
+	}
+
+	// Wait for the piece store to be ready
+	ch := make(chan error, 1)
+	ps.OnReady(func(e error) {
+		ch <- e
+	})
+
+	err = ps.Start(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("starting piece store: %w", err)
+	}
+
+	select {
+	case err = <-ch:
+		if err != nil {
+			return nil, fmt.Errorf("waiting for piece store to be ready: %w", err)
+		}
+	case <-ctx.Done():
+		return nil, errors.New("cancelled while waiting for piece store to be ready")
+	}
+
+	return ps, nil
+}
+
+func getLegacyDealsFSM(ctx context.Context, ds *backupds.Datastore) (fsm.Group, error) {
+	// Get the deals FSM
+	provDS := namespace.Wrap(ds, datastore.NewKey("/deals/provider"))
+	deals, migrate, err := vfsm.NewVersionedFSM(provDS, fsm.Parameters{
+		StateType:     storagemarket.MinerDeal{},
+		StateKeyField: "State",
+	}, nil, "2")
+	if err != nil {
+		return nil, fmt.Errorf("reading legacy deals from datastore: %w", err)
+	}
+
+	err = migrate(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("running provider fsm migration script: %w", err)
+	}
+
+	return deals, err
+}
+
+func createLogger(logPath string) (*zap.SugaredLogger, error) {
+	logCfg := zap.NewDevelopmentConfig()
+	logCfg.OutputPaths = []string{logPath}
+	zl, err := logCfg.Build()
+	if err != nil {
+		return nil, err
+	}
+	defer zl.Sync() //nolint:errcheck
+	return zl.Sugar(), err
 }
