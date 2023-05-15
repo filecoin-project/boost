@@ -458,43 +458,53 @@ func (dr *DisasterRecovery) CompleteSector(s abi.SectorNumber) error {
 }
 
 func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi.UnpaddedPieceSize, piecesize abi.PaddedPieceSize) (io.ReadCloser, bool, error) {
+	mid, _ := address.IDFromAddress(maddr)
+
+	sid := abi.SectorID{
+		Miner:  abi.ActorID(mid),
+		Number: sectorid,
+	}
+
+	u, err := minerApi.StorageFindSector(ctx, sid, storiface.FTUnsealed, 0, false)
+	if err != nil {
+		logger.Errorw("storage find sector", "err", err)
+	}
+
+	logger.Debugw("u len", "sector", sectorid, "len u", len(u), "u", spew.Sdump(u))
+
 	var reader io.ReadCloser
 	var isUnsealed bool
-	var err error
+	//var err error
 
 	done := make(chan struct{})
+	doneIsUnsealed := make(chan struct{})
 
 	go func() {
 		isUnsealed, err = sa.IsUnsealed(ctx, sectorid, offset, piecesize.Unpadded())
 		if err != nil {
+			logger.Errorw("sa.IsUnseaed return error", "sector", sectorid, "err", err)
 			return
 		}
 
-		if !isUnsealed {
-			return
-		}
+		doneIsUnsealed <- struct{}{}
+	}()
 
+	select {
+	case <-doneIsUnsealed:
+	case <-time.After(300 * time.Millisecond):
+		return nil, false, errors.New("timeout on isUnsealed sector after 300 milliseconds")
+	}
+
+	if !isUnsealed {
+		return nil, false, nil
+	}
+
+	go func() {
 		logger.Debugw("sa.IsUnsealed return true", "sector", sectorid)
-
-		mid, err := address.IDFromAddress(maddr)
-		if err != nil {
-			return
-		}
-
-		sid := abi.SectorID{
-			Miner:  abi.ActorID(mid),
-			Number: sectorid,
-		}
-
-		u, err := minerApi.StorageFindSector(ctx, sid, storiface.FTUnsealed, 0, false)
-		if err != nil {
-			return
-		}
-
-		logger.Debugw("u len", "sector", sectorid, "len u", len(u), "u", spew.Sdump(u))
 
 		reader, err = sa.UnsealSector(ctx, sectorid, offset, piecesize.Unpadded())
 		if err != nil {
+			logger.Errorw("sa.UnsealSector return error", "sector", sectorid, "err", err)
 			return
 		}
 
@@ -504,8 +514,8 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 	select {
 	case <-done:
 		return reader, isUnsealed, err
-	case <-time.After(3 * time.Second):
-		return nil, false, errors.New("timeout on unseal sector after 3 seconds")
+	case <-time.After(2 * time.Second):
+		return nil, false, errors.New("timeout on unseal sector after 2 seconds")
 	}
 }
 
