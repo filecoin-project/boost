@@ -681,10 +681,16 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 	sectorid := info.SectorNumber
 	sid := uint64(sectorid)
 
+	var gotErr bool
+
 	defer func(start time.Time) {
 		took := time.Since(start)
 		dr.Sectors[sid].ProcessingTook = took
-		logger.Debugw("processed sector", "sector", sectorid, "took", took, "deals", info.DealIDs)
+		if gotErr {
+			logger.Debugw("processed sector with errors", "sector", sectorid, "took", took, "deals", info.DealIDs)
+		} else {
+			logger.Debugw("successfully processed sector", "sector", sectorid, "took", took, "deals", info.DealIDs)
+		}
 	}(time.Now())
 
 	err := dr.MarkSectorInProgress(sectorid)
@@ -717,6 +723,7 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 		if err != nil {
 			dr.Sectors[sid].Deals[uint64(did)].Error = err.Error()
 			dr.PieceErrors++
+			gotErr = true
 			logger.Errorw("got piece error", "sector", sectorid, "deal", did, "err", err)
 			continue
 		}
