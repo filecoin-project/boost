@@ -158,7 +158,7 @@ func action(cctx *cli.Context) error {
 	var sectorid abi.SectorNumber
 	if cctx.IsSet("sector-id") {
 		sectorid = abi.SectorNumber(cctx.Uint64("sector-id"))
-		fmt.Println("sector id: ", sectorid)
+		logger.Info("running disaster recovery tool on a single sector", "sector", sectorid)
 	}
 
 	ignoreCommp = cctx.Bool("ignore-commp")
