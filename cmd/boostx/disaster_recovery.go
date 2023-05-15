@@ -727,6 +727,14 @@ func processSector(ctx context.Context, info *miner.SectorOnChainInfo) (bool, bo
 			}
 		}
 
+		if nextoffset%uint64(marketDeal.Proposal.PieceSize) != 0 {
+			currentoffset := nextoffset
+			nextoffset = 0
+			for nextoffset < currentoffset {
+				nextoffset += uint64(marketDeal.Proposal.PieceSize)
+			}
+		}
+
 		err = processPiece(ctx, sectorid, did, marketDeal.Proposal.PieceCID, marketDeal.Proposal.PieceSize, abi.UnpaddedPieceSize(nextoffset), l)
 		if err != nil {
 			dr.Sectors[sid].Deals[uint64(did)].Error = err.Error()
