@@ -315,6 +315,14 @@ func NewDisasterRecovery(ctx context.Context, dir, repodir string) (*DisasterRec
 		return nil, errors.New("disaster-recovery-dir is a required flag")
 	}
 
+	repodir, err = homedir.Expand(repodir)
+	if err != nil {
+		return nil, fmt.Errorf("expanding repo dir path: %w", err)
+	}
+	if repodir == "" {
+		return nil, errors.New("repo is a required flag")
+	}
+
 	var recoverRanPreviously bool
 	d, err := os.Stat(drDir)
 	if err == nil {
