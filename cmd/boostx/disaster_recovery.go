@@ -482,7 +482,6 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 
 	var reader io.ReadCloser
 	var isUnsealed bool
-	//var err error
 
 	done := make(chan struct{})
 	doneIsUnsealed := make(chan struct{})
@@ -492,6 +491,10 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 		if err != nil {
 			logger.Errorw("sa.IsUnseaed return error", "sector", sectorid, "err", err)
 			return
+		}
+
+		if !isUnsealed && len(u) > 0 {
+			logger.Errorw("isUnsealed returned false, but `storage find` returns an unsealed copy", "sector", sectorid)
 		}
 
 		doneIsUnsealed <- struct{}{}
