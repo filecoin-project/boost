@@ -2,6 +2,7 @@ package rtvllog
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -295,22 +296,31 @@ func (r *RetrievalLog) gcRetrievals(ctx context.Context) {
 				continue
 			}
 
+			var wg sync.WaitGroup
 			for _, row := range rows {
-				chid := datatransfer.ChannelID{Initiator: row.PeerID, Responder: row.LocalPeerID, ID: row.TransferID}
-				// Try to cancel via unpaid graphsync first
-				err := r.gsur.CancelTransfer(ctx, row.TransferID, &row.PeerID)
-
-				if err != nil {
-					// Attempt to terminate legacy, paid retrievals if we didnt cancel a free retrieval
-					err = r.dataTransfer.CloseDataTransferChannel(ctx, chid)
+				if row.TransferID <= 0 {
+					continue
 				}
+				wg.Add(1)
+				go func(s RetrievalDealState) {
+					defer wg.Done()
+					chid := datatransfer.ChannelID{Initiator: s.PeerID, Responder: s.LocalPeerID, ID: s.TransferID}
+					// Try to cancel via unpaid graphsync first
+					err := r.gsur.CancelTransfer(ctx, s.TransferID, &s.PeerID)
 
-				if err != nil {
-					log.Debugw("error canceling retrieval", "dealID", row.DealID, "err", err)
-				} else {
-					log.Infof("Canceled retrieval %s, older than %s", row.DealID, r.stalledTimeout)
-				}
+					if err != nil && strings.Contains(err.Error(), "No channel for channel ID") {
+						// Attempt to terminate legacy, paid retrievals if we didnt cancel a free retrieval
+						err = r.dataTransfer.CloseDataTransferChannel(ctx, chid)
+					}
+
+					if err != nil {
+						log.Debugw("error canceling retrieval", "dealID", s.DealID, "err", err)
+					} else {
+						log.Infof("Canceled retrieval %s, older than %s", s.DealID, r.stalledTimeout)
+					}
+				}(row)
 			}
+			wg.Wait()
 		}
 	}
 }

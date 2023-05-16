@@ -98,7 +98,7 @@ func DefaultBoost() *Boost {
 
 			DealProposalLogDuration: Duration(time.Hour * 24),
 			RetrievalLogDuration:    Duration(time.Hour * 24),
-			StalledRetrievalTimeout: Duration(time.Minute * 30),
+			StalledRetrievalTimeout: Duration(time.Second * 30),
 
 			RetrievalPricing: &lotus_config.RetrievalPricing{
 				Strategy: RetrievalPricingDefaultMode,
