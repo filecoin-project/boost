@@ -2,7 +2,8 @@ package rtvllog
 
 import (
 	"context"
-	"strings"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	logging "github.com/ipfs/go-log/v2"
 )
+
+var ErrRetrievalNotFound = fmt.Errorf("No channel")
 
 var log = logging.Logger("rtrvlog")
 
@@ -303,14 +306,16 @@ func (r *RetrievalLog) gcRetrievals(ctx context.Context) {
 				}
 				wg.Add(1)
 				go func(s RetrievalDealState) {
+					cctx, cancel := context.WithTimeout(ctx, time.Second*5)
+					defer cancel()
 					defer wg.Done()
 					chid := datatransfer.ChannelID{Initiator: s.PeerID, Responder: s.LocalPeerID, ID: s.TransferID}
 					// Try to cancel via unpaid graphsync first
-					err := r.gsur.CancelTransfer(ctx, s.TransferID, &s.PeerID)
+					err := r.gsur.CancelTransfer(cctx, s.TransferID, &s.PeerID)
 
-					if err != nil && strings.Contains(err.Error(), "No channel for channel ID") {
+					if err != nil && errors.Is(err, ErrRetrievalNotFound) {
 						// Attempt to terminate legacy, paid retrievals if we didnt cancel a free retrieval
-						err = r.dataTransfer.CloseDataTransferChannel(ctx, chid)
+						err = r.dataTransfer.CloseDataTransferChannel(cctx, chid)
 					}
 
 					if err != nil {
