@@ -236,7 +236,7 @@ func TestServiceFuzz(t *testing.T) {
 
 func testServiceFuzz(ctx context.Context, t *testing.T, addr string) {
 	cl := client.NewStore()
-	err := cl.Dial(context.Background(), "http://"+addr)
+	err := cl.Dial(context.Background(), "ws://"+addr)
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
@@ -432,15 +432,15 @@ func compareIndices(subject, subjectDb index.Index) (bool, error) {
 		b, okb := toEntries(subjectDb)
 		if oka && okb {
 			if len(a) != len(b) {
-				fmt.Println("index length mismatch", "first length", len(a), "second length", len(b))
+				return false, fmt.Errorf("index length mismatch: first %d / second %d", len(a), len(b))
 			}
 			for mh, oa := range a {
 				ob, ok := b[mh]
 				if !ok {
-					fmt.Println("second index missing multihash", "multihash", mh)
+					return false, fmt.Errorf("second index missing multihash %s", mh)
 				}
 				if oa != ob {
-					fmt.Println("offset mismatch", "multihash", mh, "first offset", oa, "second offset", ob)
+					return false, fmt.Errorf("offset mismatch for multihash %s: first %d / second %d", mh, oa, ob)
 				}
 			}
 		}
@@ -505,7 +505,7 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, addr string)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), fmt.Sprintf("http://%s", addr))
+	err = cl.Dial(context.Background(), fmt.Sprintf("ws://%s", addr))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 

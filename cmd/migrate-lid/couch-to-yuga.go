@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/filecoin-project/boostd-data/couchbase"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/yugabyte"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-cid"
@@ -211,16 +212,26 @@ func migrateLidToLidIndex(ctx context.Context, pieceCid cid.Cid, source StoreMig
 	}
 
 	// Load the index from the source store
-	records, err := source.GetIndex(ctx, pieceCid)
+	idx, err := source.GetIndex(ctx, pieceCid)
 	if err != nil {
 		return false, fmt.Errorf("loading index %s: %w", pieceCid, err)
 	}
 
+	var records []model.Record
+	for r := range idx {
+		if r.Error != nil {
+			return false, r.Error
+		}
+		records = append(records, r.Record)
+	}
+
 	// Add the index to the destination store
 	addStart := time.Now()
-	err = dest.AddIndex(ctx, pieceCid, records, true)
-	if err != nil {
-		return false, fmt.Errorf("adding index %s to store: %w", pieceCid, err)
+	respch := dest.AddIndex(ctx, pieceCid, records, true)
+	for resp := range respch {
+		if resp.Err != "" {
+			return false, fmt.Errorf("adding index %s to store: %s", pieceCid, err)
+		}
 	}
 	log.Debugw("AddIndex", "took", time.Since(addStart).String())
 

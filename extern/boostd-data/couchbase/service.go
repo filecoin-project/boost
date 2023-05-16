@@ -3,7 +3,6 @@ package couchbase
 import (
 	"context"
 	"fmt"
-	"github.com/ipld/go-car/v2/index"
 	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
@@ -155,12 +154,7 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.In
 
 	recs := make(chan types.IndexRecord, len(records))
 	for _, r := range records {
-		recs <- types.IndexRecord{
-			Record: index.Record{
-				Cid:    r.Cid,
-				Offset: r.Offset,
-			},
-		}
+		recs <- types.IndexRecord{Record: r}
 	}
 	close(recs)
 
@@ -193,7 +187,7 @@ func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, er
 	return md.CompleteIndex, nil
 }
 
-func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error {
+func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) <-chan types.AddIndexProgress {
 	log.Debugw("handle.add-index", "records", len(records))
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_index")
@@ -209,22 +203,32 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 		mhs = append(mhs, r.Cid.Hash())
 	}
 
-	setMhStart := time.Now()
-	err := s.db.SetMultihashesToPieceCid(ctx, mhs, pieceCid)
-	if err != nil {
-		return fmt.Errorf("failed to add entry from mh to pieceCid: %w", err)
-	}
-	log.Debugw("handled.add-index SetMultihashesToPieceCid", "took", time.Since(setMhStart).String())
+	progress := make(chan types.AddIndexProgress, 1)
+	go func() {
+		defer close(progress)
+		progress <- types.AddIndexProgress{Progress: 0}
 
-	// Add a mapping from piece cid -> offset / size of each block so that
-	// clients can get the block info for all blocks in a piece
-	addOffsetsStart := time.Now()
-	if err := s.db.AddIndexRecords(ctx, pieceCid, records); err != nil {
-		return err
-	}
-	log.Debugw("handled.add-index AddIndexRecords", "took", time.Since(addOffsetsStart).String())
+		setMhStart := time.Now()
+		err := s.db.SetMultihashesToPieceCid(ctx, mhs, pieceCid)
+		if err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
+		}
+		log.Debugw("handled.add-index SetMultihashesToPieceCid", "took", time.Since(setMhStart).String())
+		progress <- types.AddIndexProgress{Progress: 0.5}
 
-	return s.db.MarkIndexingComplete(ctx, pieceCid, len(records), isCompleteIndex)
+		// Add a mapping from piece cid -> offset / size of each block so that
+		// clients can get the block info for all blocks in a piece
+		addOffsetsStart := time.Now()
+		if err := s.db.AddIndexRecords(ctx, pieceCid, records); err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
+		}
+		log.Debugw("handled.add-index AddIndexRecords", "took", time.Since(addOffsetsStart).String())
+		progress <- types.AddIndexProgress{Progress: 1}
+	}()
+
+	return progress
 }
 
 func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, error) {
