@@ -176,7 +176,7 @@ func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatr
 
 	if state == nil {
 		g.activeRetrievalsLk.Unlock()
-		return fmt.Errorf("%w with id: %d", ErrRetrievalNotFound, id)
+		return fmt.Errorf("failed to cancel with id %d: %w", id, ErrRetrievalNotFound)
 	}
 
 	rcpt := state.cs.recipient
