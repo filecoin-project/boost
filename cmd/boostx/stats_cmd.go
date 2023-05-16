@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
-	transports_types "github.com/filecoin-project/boost/retrievalmarket/types"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
+	transports_types "github.com/filecoin-project/boost/retrievalmarket/types"
 
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
@@ -223,7 +224,7 @@ var statsCmd = &cli.Command{
 		fmt.Println("Total Boost nodes:", boostNodes)
 		fmt.Println("Total Boost raw power:", boostRawBytePower)
 		fmt.Println("Total Boost quality adj power:", boostQualityAdjPower)
-		fmt.Println("Total Lotus Markets nodes:", marketsNodes)
+		fmt.Println("Total Markets nodes:", marketsNodes)
 		fmt.Println("Total SPs with minimum power: ", len(withMinPower))
 		fmt.Println("Total Indexer nodes:", indexerNodes)
 
