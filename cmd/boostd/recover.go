@@ -169,16 +169,16 @@ func action(cctx *cli.Context) error {
 	}
 	defer ncloser()
 
-	//TODO: refactor to use api-miner
+	// Connect to the storage API and create a sector accessor
+	storageApiInfo := cctx.String("api-storage")
+
 	var mcloser jsonrpc.ClientCloser
-	minerApi, mcloser, err = lcli.GetStorageMinerAPI(cctx)
+	minerApi, mcloser, err = lib.GetMinerApi(ctx, storageApiInfo, log)
 	if err != nil {
 		return err
 	}
 	defer mcloser()
 
-	// Connect to the storage API and create a sector accessor
-	storageApiInfo := cctx.String("api-storage")
 	var storageCloser jsonrpc.ClientCloser
 	sa, storageCloser, err = lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
 	if err != nil {
