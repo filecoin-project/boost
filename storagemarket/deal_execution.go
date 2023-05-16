@@ -744,6 +744,9 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 
 	// Force the first check
 	dh.sealingSt = checkStatus(true)
+	if dh.sealingSt.finalState {
+		return
+	}
 
 	// Check status every 10 second. There is no advantage of checking it every second
 	ticker := time.NewTicker(10 * time.Second)
@@ -760,6 +763,9 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 			// are no subscribers (so that we can stop checking altogether
 			// if the sector reaches a final sealing state)
 			dh.sealingSt = checkStatus(count >= forceCount)
+			if dh.sealingSt.finalState {
+				return
+			}
 			if count >= forceCount {
 				count = 0
 			}
@@ -800,15 +806,18 @@ func (p *Provider) watchSealingState(dh *dealHandler) *dealMakingError {
 	if dh.sealingSt.finalState && dh.sealingSt.err != nil {
 		return dh.sealingSt.err
 	}
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-p.ctx.Done():
 			return nil
 		case <-ticker.C:
-			if dh.sealingSt.finalState && dh.sealingSt.err != nil {
-				return dh.sealingSt.err
+			if dh.sealingSt.finalState {
+				if dh.sealingSt.err != nil {
+					return dh.sealingSt.err
+				}
+				return nil
 			}
 		}
 	}
