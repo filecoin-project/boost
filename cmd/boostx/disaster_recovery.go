@@ -494,7 +494,7 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 		}
 
 		if !isUnsealed && len(u) > 0 {
-			logger.Errorw(fmt.Sprintf("isUnsealed(%d, %d, %d) returned false, but `storage find` returns an unsealed copy", sectorid, offset, piecesize.Unpadded()), "sector", sectorid)
+			logger.Errorw(fmt.Sprintf("isUnsealed(%d, %d, %d) returned false, but `storage find` returns an unsealed copy; most probably unsealed copy is full of 0x00 and is corrupted (confirm with xxd)", sectorid, offset, piecesize.Unpadded()), "sector", sectorid)
 		}
 
 		doneIsUnsealed <- struct{}{}
