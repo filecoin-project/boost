@@ -57,6 +57,11 @@ func (p *Provider) isRunning(dealUuid uuid.UUID) bool {
 	return dh.isRunning()
 }
 
+type sealingState struct {
+	err        *dealMakingError
+	finalState bool
+}
+
 // dealHandler keeps track of the deal while it's executing
 type dealHandler struct {
 	providerCtx context.Context
@@ -80,6 +85,8 @@ type dealHandler struct {
 
 	runningLk sync.RWMutex
 	running   bool
+
+	sealingSt sealingState
 }
 
 func newDealHandler(ctx context.Context, dealUuid uuid.UUID) (*dealHandler, error) {

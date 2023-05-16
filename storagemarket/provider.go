@@ -444,11 +444,17 @@ func (p *Provider) Start() error {
 
 	// Restart active deals
 	for _, deal := range activeDeals {
-		// Check if deal is already proving
+		// Check if deal is already proving and ensure sector contains the deals
 		if deal.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
 			si, err := p.sps.SectorsStatus(p.ctx, deal.SectorID, false)
-			if err != nil || IsFinalSealingState(si.State) {
+			if err != nil {
 				continue
+			}
+
+			if IsFinalSealingState(si.State) {
+				if HasDeal(si.Deals, deal.ChainDealID) {
+					continue
+				}
 			}
 		}
 

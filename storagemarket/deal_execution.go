@@ -129,7 +129,7 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (d
 
 	// Watch the sealing status of the deal and fire events for each change
 	p.dealLogger.Infow(deal.DealUuid, "watching deal sealing state changes")
-	if derr := p.fireSealingUpdateEvents(dh, deal.DealUuid, deal.SectorID); derr != nil {
+	if derr := p.watchSealingState(dh); derr != nil {
 		return derr
 	}
 	p.cleanupDealHandler(deal.DealUuid)
@@ -231,9 +231,12 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 		p.dealLogger.Infow(deal.DealUuid, "storage space successfully untagged for deal after it was handed to sealer")
 	}
 
+	// Start the goroutine to monitor sealing status of the deal
+	go p.fireSealingUpdateEvents(dh, deal.DealUuid, deal.SectorID)
+
 	// Index deal in DAGStore and Announce deal
 	if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
-		if err := p.indexAndAnnounce(ctx, pub, deal); err != nil {
+		if err := p.indexAndAnnounce(ctx, dh, pub, deal); err != nil {
 			err.error = fmt.Errorf("failed to add index and announce deal: %w", err.error)
 			return err
 		}
@@ -602,7 +605,10 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	return nil
 }
 
-func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
+func (p *Provider) indexAndAnnounce(ctx context.Context, dh *dealHandler, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
+	if dh.sealingSt.err != nil {
+		return dh.sealingSt.err
+	}
 	pc := deal.ClientDealProposal.Proposal.PieceCID
 	propCid, err := deal.ClientDealProposal.Proposal.Cid()
 	if err != nil {
@@ -637,6 +643,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 			}
 		}
 		p.dealLogger.Infow(deal.DealUuid, "deal has previously been registered in dagstore")
+
 	} else {
 		p.dealLogger.Infow(deal.DealUuid, "deal has successfully been registered in the dagstore")
 	}
@@ -687,14 +694,25 @@ func (p *Provider) registerShardSync(ctx context.Context, pc cid.Cid) error {
 
 // fireSealingUpdateEvents periodically checks the sealing status of the deal
 // and fires events for each change
-func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, sectorNum abi.SectorNumber) *dealMakingError {
+func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, sectorNum abi.SectorNumber) {
 	var deal *types.ProviderDealState
 	var lastSealingState lapi.SectorState
-	checkStatus := func(force bool) lapi.SectorInfo {
+
+	checkStatus := func(force bool) sealingState {
+		retErr := &dealMakingError{
+			retry: types.DealRetryFatal,
+			error: ErrDealNotSealed,
+		}
+
+		ret := sealingState{
+			err:        nil,
+			finalState: false,
+		}
+
 		// To avoid overloading the sealing service, only get the sector status
 		// if there's at least one subscriber to the event that will be published
 		if !force && !dh.hasActiveSubscribers() {
-			return lapi.SectorInfo{}
+			return ret
 		}
 
 		// Get the sector status
@@ -706,28 +724,26 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 			deal, err = p.dealsDB.ByID(p.ctx, dealUuid)
 			if err != nil {
 				log.Errorf("getting deal %s with sealing update: %w", dealUuid, err)
-				return si
+				// Return no err as we can retry this in next run
+				return ret
 			}
 
 			p.dealLogger.Infow(dealUuid, "current sealing state", "state", si.State)
 			p.fireEventDealUpdate(dh.Publisher, deal)
+			if IsFinalSealingState(si.State) {
+				ret.finalState = true
+				if HasDeal(si.Deals, deal.ChainDealID) {
+					return ret
+				}
+				ret.err = retErr
+				return ret
+			}
 		}
-		return si
+		return ret
 	}
 
-	retErr := &dealMakingError{
-		retry: types.DealRetryFatal,
-		error: ErrDealNotSealed,
-	}
-
-	// Check status immediately
-	info := checkStatus(true)
-	if IsFinalSealingState(info.State) {
-		if HasDeal(info.Deals, deal.ChainDealID) {
-			return nil
-		}
-		return retErr
-	}
+	// Force the first check
+	dh.sealingSt = checkStatus(true)
 
 	// Check status every 10 second. There is no advantage of checking it every second
 	ticker := time.NewTicker(10 * time.Second)
@@ -737,22 +753,15 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 	for {
 		select {
 		case <-p.ctx.Done():
-			return nil
+			return
 		case <-ticker.C:
 			count++
 			// Force a status check every (ticker * forceCount) seconds, even if there
 			// are no subscribers (so that we can stop checking altogether
 			// if the sector reaches a final sealing state)
-			info = checkStatus(count >= forceCount)
+			dh.sealingSt = checkStatus(count >= forceCount)
 			if count >= forceCount {
 				count = 0
-			}
-
-			if IsFinalSealingState(info.State) {
-				if HasDeal(info.Deals, deal.ChainDealID) {
-					return nil
-				}
-				return retErr
 			}
 		}
 	}
@@ -785,6 +794,24 @@ func HasDeal(deals []abi.DealID, pdsDealId abi.DealID) bool {
 		}
 	}
 	return ret
+}
+
+func (p *Provider) watchSealingState(dh *dealHandler) *dealMakingError {
+	if dh.sealingSt.finalState && dh.sealingSt.err != nil {
+		return dh.sealingSt.err
+	}
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-p.ctx.Done():
+			return nil
+		case <-ticker.C:
+			if dh.sealingSt.finalState && dh.sealingSt.err != nil {
+				return dh.sealingSt.err
+			}
+		}
+	}
 }
 
 func (p *Provider) failDeal(pub event.Emitter, deal *smtypes.ProviderDealState, err error, cancelled bool) {
