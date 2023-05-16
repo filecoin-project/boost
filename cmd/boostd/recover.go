@@ -340,8 +340,7 @@ func NewDisasterRecovery(ctx context.Context, dir, repodir string) (*DisasterRec
 		Sectors: make(map[uint64]*SectorStatus),
 	}
 
-	// Create a logger for the migration that outputs to a file in the
-	// current working directory
+	// logger for the recovery that outputs to a file and stdout
 	logger, err = createLogger(fmt.Sprintf("%s/output-%d.log", drr.Dir, time.Now().UnixNano()))
 	if err != nil {
 		return nil, err
@@ -363,15 +362,12 @@ func NewDisasterRecovery(ctx context.Context, dir, repodir string) (*DisasterRec
 }
 
 func (dr *DisasterRecovery) loadPieceStoreAndBoostDB(ctx context.Context, repoDir string) error {
-	// Open the datastore in the existing repo
 	ds, err := lib.OpenDataStore(repoDir)
 	if err != nil {
 		return fmt.Errorf("creating piece store from repo %s: %w", repoDir, err)
 	}
 
-	// Create a mapping of on-chain deal ID to deal proposal cid.
-	// This is needed below so that we can map from the legacy piece store
-	// info to a legacy deal.
+	// create a mapping of on-chain deal ID to deal proposal cid (legacy deals)
 	dr.PropCidByChainDealID, err = lib.GetPropCidByChainDealID(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("building chain deal id -> proposal cid map: %w", err)
@@ -457,6 +453,7 @@ func (dr *DisasterRecovery) CompleteSector(s abi.SectorNumber) error {
 	return os.Rename(oldLocation, newLocation)
 }
 
+// safeUnsealSector tries to return a reader to an unsealed sector or times out
 func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi.UnpaddedPieceSize, piecesize abi.PaddedPieceSize) (io.ReadCloser, bool, error) {
 	mid, _ := address.IDFromAddress(maddr)
 
@@ -469,8 +466,6 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 	if err != nil {
 		logger.Errorw("storage find sector", "err", err)
 	}
-
-	//logger.Debugw("u len", "sector", sectorid, "len u", len(u))
 
 	var reader io.ReadCloser
 	var isUnsealed bool
@@ -502,9 +497,9 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 		return nil, false, nil
 	}
 
-	go func() {
-		logger.Debugw("sa.IsUnsealed return true", "sector", sectorid)
+	logger.Debugw("sa.IsUnsealed return true", "sector", sectorid)
 
+	go func() {
 		reader, err = sa.UnsealSector(ctx, sectorid, offset, piecesize.Unpadded())
 		if err != nil {
 			logger.Errorw("sa.UnsealSector return error", "sector", sectorid, "err", err)
@@ -517,7 +512,7 @@ func safeUnsealSector(ctx context.Context, sectorid abi.SectorNumber, offset abi
 	select {
 	case <-done:
 		return reader, isUnsealed, err
-	case <-time.After(3 * time.Second):
+	case <-time.After(3000 * time.Millisecond):
 		return nil, false, errors.New("timeout on unseal sector after 3 seconds")
 	}
 }
@@ -647,6 +642,8 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 
 			err = pd.AddDealForPiece(ctx, piececid, di)
 			if err != nil {
+				logger.Errorw("cant add deal info for piece", "piececid", piececid, "chain-deal-id", chainDealID, "err", err)
+
 				return err
 			}
 		}
