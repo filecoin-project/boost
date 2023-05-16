@@ -591,6 +591,8 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 	if !ignoreLID { // populate LID
 		var shouldGenerateNewDeal bool
 
+		var di model.DealInfo
+
 		if dr.HaveBoostDealsAndPieceStore { // successfully loaded boost sqlite db and piece store => try to infer dealinfo
 			// find the deal corresponding to the deal info's DealID
 			proposalCid, okLegacy := dr.PropCidByChainDealID[chainDealID]
@@ -608,7 +610,7 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 					isLegacy = true
 				}
 
-				di := model.DealInfo{
+				di = model.DealInfo{
 					DealUuid:    uuid,
 					IsLegacy:    isLegacy,
 					ChainDealID: chainDealID,
@@ -617,20 +619,13 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 					PieceOffset: offset.Padded(),
 					PieceLength: piecesize,
 				}
-
-				err = pd.AddDealForPiece(ctx, piececid, di)
-				if err != nil {
-					logger.Errorw("cant add deal info for piece", "piececid", piececid, "chain-deal-id", chainDealID, "err", err)
-
-					return err
-				}
 			}
 		}
 
 		if !dr.HaveBoostDealsAndPieceStore || shouldGenerateNewDeal { // missing boost sqlite db and piece store, so generate new dealinfo
 			// in the future we could also regenerate boost db sqlite??
 
-			di := model.DealInfo{
+			di = model.DealInfo{
 				DealUuid:    uuid.NewString(),
 				IsLegacy:    false,
 				ChainDealID: chainDealID,
@@ -639,14 +634,18 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 				PieceOffset: offset.Padded(),
 				PieceLength: piecesize,
 			}
-
-			err = pd.AddDealForPiece(ctx, piececid, di)
-			if err != nil {
-				logger.Errorw("cant add deal info for piece", "piececid", piececid, "chain-deal-id", chainDealID, "err", err)
-
-				return err
-			}
 		}
+
+		timeAddIndex := time.Now()
+
+		err = pd.AddDealForPiece(ctx, piececid, di)
+		if err != nil {
+			logger.Errorw("cant add deal info for piece", "piececid", piececid, "chain-deal-id", chainDealID, "err", err)
+
+			return err
+		}
+
+		logger.Infow("added index", "took", time.Since(timeAddIndex), "sector", di.SectorID, "piececid", piececid, "chain-deal-id", di.ChainDealID, "uuid", di.DealUuid)
 	}
 
 	if !ignoreCommp { // commp over data reader
