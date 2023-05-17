@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
+	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/hashicorp/go-multierror"
@@ -41,8 +42,8 @@ type PieceDirectory struct {
 	addIdxOpByCid      sync.Map
 }
 
-func NewStore() *client.Store {
-	return client.NewStore()
+func NewStore(dialOpts ...jsonrpc.Option) *client.Store {
+	return client.NewStore(dialOpts...)
 }
 
 func NewPieceDirectory(store types.Store, pr types.PieceReader, addIndexThrottleSize int) *PieceDirectory {

@@ -15,6 +15,7 @@ import (
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
+	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-address"
 	vfsm "github.com/filecoin-project/go-ds-versioning/pkg/fsm"
 	"github.com/filecoin-project/go-fil-markets/piecestore"
@@ -43,8 +44,8 @@ import (
 type StoreMigrationApi interface {
 	Start(ctx context.Context) error
 	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
-	GetIndex(context.Context, cid.Cid) ([]model.Record, error)
-	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error
+	GetIndex(context.Context, cid.Cid) (<-chan types.IndexRecord, error)
+	AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) <-chan types.AddIndexProgress
 	AddDealForPiece(ctx context.Context, pcid cid.Cid, info model.DealInfo) error
 	ListPieces(ctx context.Context) ([]cid.Cid, error)
 	GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
@@ -333,9 +334,11 @@ func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, f
 
 	// Add the index to the store
 	addStart := time.Now()
-	err = store.AddIndex(ctx, pieceCid, records, false)
-	if err != nil {
-		return false, fmt.Errorf("adding index %s to store: %w", ipath.path, err)
+	respch := store.AddIndex(ctx, pieceCid, records, false)
+	for resp := range respch {
+		if resp.Err != "" {
+			return false, fmt.Errorf("adding index %s to store: %s", ipath.path, err)
+		}
 	}
 	log.Debugw("AddIndex", "took", time.Since(addStart).String())
 

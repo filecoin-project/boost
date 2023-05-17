@@ -201,7 +201,7 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	return pcs, normalizeMultihashError(m, err)
 }
 
-func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
+func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.IndexRecord, error) {
 	log.Warnw("handle.get-index", "pieceCid", pieceCid)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_index")
@@ -262,7 +262,7 @@ func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, er
 	return md.CompleteIndex, nil
 }
 
-func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error {
+func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) <-chan types.AddIndexProgress {
 	log.Debugw("handle.add-index", "records", len(records))
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_index")
@@ -272,124 +272,84 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 		log.Debugw("handled.add-index", "took", time.Since(now).String())
 	}(time.Now())
 
-	s.Lock()
-	defer s.Unlock()
+	progress := make(chan types.AddIndexProgress, 1)
+	go func() {
+		defer close(progress)
 
-	var recs []carindex.Record
-	for _, r := range records {
-		recs = append(recs, carindex.Record{
-			Cid:    r.Cid,
-			Offset: r.Offset,
-		})
-	}
+		s.Lock()
+		defer s.Unlock()
 
-	return md.IndexedAt, nil
-}
+		var recs []carindex.Record
+		for _, r := range records {
+			recs = append(recs, carindex.Record{
+				Cid:    r.Cid,
+				Offset: r.Offset,
+			})
+		}
 
-func (s *Store) PiecesCount(ctx context.Context) (int, error) {
-	log.Debugw("handle.pieces-count")
-
-	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
-	defer span.End()
-
-	defer func(now time.Time) {
-		log.Debugw("handled.pieces-count", "took", time.Since(now).String())
-	}(time.Now())
-
-	return s.db.PiecesCount(ctx)
-}
-
-func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
-	log.Debugw("handle.list-pieces")
-
-	ctx, span := tracing.Tracer.Start(ctx, "store.list_pieces")
-	defer span.End()
-
-	defer func(now time.Time) {
-		log.Debugw("handled.list-pieces", "took", time.Since(now).String())
-	}(time.Now())
-
-	return s.db.ListPieces(ctx)
-}
-
-func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "store.next_pieces_to_check")
-	defer span.End()
-
-	defer func(now time.Time) {
-		log.Debugw("handled.next-pieces-to-check", "took", time.Since(now).String())
-	}(time.Now())
-
-	return s.db.NextPiecesToCheck(ctx)
-}
-
-func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool) error {
-	log.Debugw("handle.flag-piece", "piece-cid", pieceCid, "hasUnsealedCopy", hasUnsealedCopy)
-
-	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
-	defer span.End()
-
-	defer func(now time.Time) {
-		log.Debugw("handled.flag-piece", "took", time.Since(now).String())
-	}(time.Now())
-
-	s.Lock()
-	defer s.Unlock()
-
-	now := time.Now()
-
-	// Get the existing deals for the piece
-	fm, err := s.db.GetPieceCidToFlagged(ctx, pieceCid)
-	if err != nil {
-		return fmt.Errorf("failed to add entry from mh to pieceCid: %w", err)
-	}
-
-	// get and set next cursor (handle synchronization, maybe with CAS)
-	cursor, keyCursorPrefix, err := s.db.NextCursor(ctx)
-	if err != nil {
-		return fmt.Errorf("couldnt generate next cursor: %w", err)
-	}
-
-	// allocate metadata for pieceCid
-	err = s.db.SetNextCursor(ctx, cursor+1)
-	if err != nil {
-		return err
-	}
-
-	// process index and store entries
-	for _, rec := range records {
-		err := s.db.AddIndexRecord(ctx, keyCursorPrefix, rec)
+		err := s.db.SetMultihashesToPieceCid(ctx, recs, pieceCid)
 		if err != nil {
-			return err
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
 		}
-	}
+		progress <- types.AddIndexProgress{Progress: 0.45}
 
-	// get the metadata for the piece
-	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil {
-		if !errors.Is(err, ds.ErrNotFound) {
-			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
+		// get and set next cursor (handle synchronization, maybe with CAS)
+		cursor, keyCursorPrefix, err := s.db.NextCursor(ctx)
+		if err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
 		}
-		// there isn't yet any metadata, so create new metadata
-		md = newLeveldbMetadata()
-	}
 
-	// mark indexing as complete
-	md.Cursor = cursor
-	md.IndexedAt = time.Now()
-	md.CompleteIndex = isCompleteIndex
+		// allocate metadata for pieceCid
+		err = s.db.SetNextCursor(ctx, cursor+1)
+		if err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
+		}
 
-	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
-	if err != nil {
-		return err
-	}
+		// process index and store entries
+		for _, rec := range records {
+			err := s.db.AddIndexRecord(ctx, keyCursorPrefix, rec)
+			if err != nil {
+				progress <- types.AddIndexProgress{Err: err.Error()}
+				return
+			}
+		}
+		progress <- types.AddIndexProgress{Progress: 0.9}
 
-	err = s.db.Sync(ctx, ds.NewKey(fmt.Sprintf("%d", cursor)))
-	if err != nil {
-		return err
-	}
+		// get the metadata for the piece
+		md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+		if err != nil {
+			if !errors.Is(err, ds.ErrNotFound) {
+				progress <- types.AddIndexProgress{Err: err.Error()}
+				return
+			}
+			// there isn't yet any metadata, so create new metadata
+			md = newLeveldbMetadata()
+		}
 
-	return nil
+		// mark indexing as complete
+		md.Cursor = cursor
+		md.IndexedAt = time.Now()
+		md.CompleteIndex = isCompleteIndex
+
+		err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
+		if err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
+		}
+		progress <- types.AddIndexProgress{Progress: 0.95}
+
+		err = s.db.Sync(ctx, ds.NewKey(fmt.Sprintf("%d", cursor)))
+		if err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
+		}
+		progress <- types.AddIndexProgress{Progress: 1}
+	}()
+
+	return progress
 }
 
 func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, error) {

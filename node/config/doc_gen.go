@@ -489,8 +489,14 @@ Set this value to zero to disable the embedded local index directory data servic
 			Name: "ServiceApiInfo",
 			Type: "string",
 
-			Comment: `The connect string for the local index directory data service RPC API eg "http://localhost:8042"
+			Comment: `The connect string for the local index directory data service RPC API eg "ws://localhost:8042"
 Set this value to "" if the local index directory data service is embedded.`,
+		},
+		{
+			Name: "ServiceRPCTimeout",
+			Type: "Duration",
+
+			Comment: `The RPC timeout when making requests to the boostd-data service`,
 		},
 	},
 	"LocalIndexDirectoryCouchbaseBucketConfig": []DocField{

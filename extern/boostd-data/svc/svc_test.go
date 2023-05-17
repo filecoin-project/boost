@@ -47,7 +47,7 @@ var testCouchSettings = couchbase.DBSettings{
 }
 
 func TestService(t *testing.T) {
-	_ = logging.SetLogLevel("*", "debug")
+	_ = logging.SetLogLevel("cbtest", "debug")
 
 	t.Run("leveldb", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -74,6 +74,8 @@ func TestService(t *testing.T) {
 	})
 
 	t.Run("yugabyte", func(t *testing.T) {
+		_ = logging.SetLogLevel("boostd-data-yb", "debug")
+
 		// Running yugabyte tests may require download the docker container
 		// so set a high timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -93,7 +95,7 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service, addr string)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), fmt.Sprintf("http://%s", addr))
+	err = cl.Dial(context.Background(), fmt.Sprintf("ws://%s", addr))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
@@ -232,7 +234,7 @@ func TestServiceFuzz(t *testing.T) {
 
 func testServiceFuzz(ctx context.Context, t *testing.T, addr string) {
 	cl := client.NewStore()
-	err := cl.Dial(context.Background(), "http://"+addr)
+	err := cl.Dial(context.Background(), "ws://"+addr)
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
@@ -418,9 +420,45 @@ func compareIndices(subject, subjectDb index.Index) (bool, error) {
 		return false, err
 	}
 
-	res := bytes.Compare(b.Bytes(), b2.Bytes())
+	equal := bytes.Equal(b.Bytes(), b2.Bytes())
 
-	return res == 0, nil
+	if !equal {
+		a, oka := toEntries(subject)
+		b, okb := toEntries(subjectDb)
+		if oka && okb {
+			if len(a) != len(b) {
+				return false, fmt.Errorf("index length mismatch: first %d / second %d", len(a), len(b))
+			}
+			for mh, oa := range a {
+				ob, ok := b[mh]
+				if !ok {
+					return false, fmt.Errorf("second index missing multihash %s", mh)
+				}
+				if oa != ob {
+					return false, fmt.Errorf("offset mismatch for multihash %s: first %d / second %d", mh, oa, ob)
+				}
+			}
+		}
+	}
+
+	return equal, nil
+}
+
+func toEntries(idx index.Index) (map[string]uint64, bool) {
+	it, ok := idx.(index.IterableIndex)
+	if !ok {
+		return nil, false
+	}
+
+	entries := make(map[string]uint64)
+	err := it.ForEach(func(mh multihash.Multihash, o uint64) error {
+		entries[mh.String()] = o
+		return nil
+	})
+	if err != nil {
+		return nil, false
+	}
+	return entries, true
 }
 
 func TestCleanup(t *testing.T) {
@@ -462,7 +500,7 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, addr string)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), fmt.Sprintf("http://%s", addr))
+	err = cl.Dial(context.Background(), fmt.Sprintf("ws://%s", addr))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 

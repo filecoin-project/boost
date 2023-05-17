@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/ipfs/go-cid"
 	logger "github.com/ipfs/go-log/v2"
@@ -18,10 +19,10 @@ var log = logger.Logger("boostd-data-client")
 type Store struct {
 	client struct {
 		AddDealForPiece           func(context.Context, cid.Cid, model.DealInfo) error
-		AddIndex                  func(context.Context, cid.Cid, []model.Record, bool) error
+		AddIndex                  func(context.Context, cid.Cid, []model.Record, bool) <-chan types.AddIndexProgress
 		IsIndexed                 func(ctx context.Context, pieceCid cid.Cid) (bool, error)
 		IsCompleteIndex           func(ctx context.Context, pieceCid cid.Cid) (bool, error)
-		GetIndex                  func(context.Context, cid.Cid) ([]model.Record, error)
+		GetIndex                  func(context.Context, cid.Cid) (<-chan types.IndexRecord, error)
 		GetOffsetSize             func(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
 		ListPieces                func(ctx context.Context) ([]cid.Cid, error)
 		GetPieceMetadata          func(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
@@ -37,16 +38,17 @@ type Store struct {
 		FlaggedPiecesList         func(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)
 		FlaggedPiecesCount        func(ctx context.Context) (int, error)
 	}
-	closer jsonrpc.ClientCloser
+	closer   jsonrpc.ClientCloser
+	dialOpts []jsonrpc.Option
 }
 
-func NewStore() *Store {
-	return &Store{}
+func NewStore(dialOpts ...jsonrpc.Option) *Store {
+	return &Store{dialOpts: dialOpts}
 }
 
 func (s *Store) Dial(ctx context.Context, addr string) error {
 	var err error
-	s.closer, err = jsonrpc.NewClient(ctx, addr, "boostddata", &s.client, nil)
+	s.closer, err = jsonrpc.NewMergeClient(ctx, addr, "boostddata", []interface{}{&s.client}, nil, s.dialOpts...)
 	if err != nil {
 		return fmt.Errorf("dialing local index directory server: %w", err)
 	}
@@ -93,7 +95,15 @@ func (s *Store) GetRecords(ctx context.Context, pieceCid cid.Cid) ([]model.Recor
 
 	log.Debugw("get-records", "piece-cid", pieceCid, "records", len(resp))
 
-	return resp, nil
+	var records []model.Record
+	for r := range resp {
+		if r.Error != nil {
+			return nil, r.Error
+		}
+		records = append(records, r.Record)
+	}
+
+	return records, nil
 }
 
 func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
@@ -115,7 +125,14 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error {
 	log.Debugw("add-index", "piece-cid", pieceCid, "records", len(records))
 
-	return s.client.AddIndex(ctx, pieceCid, records, isCompleteIndex)
+	respch := s.client.AddIndex(ctx, pieceCid, records, isCompleteIndex)
+	for resp := range respch {
+		if resp.Err != "" {
+			return fmt.Errorf("add index with piece cid %s: %s", pieceCid, resp.Err)
+		}
+		//fmt.Printf("%s: Percent complete: %f%%\n", time.Now(), resp.Progress*100)
+	}
+	return nil
 }
 
 func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {

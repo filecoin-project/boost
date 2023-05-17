@@ -438,7 +438,9 @@ type LocalIndexDirectoryConfig struct {
 	// Set this value to zero to disable the embedded local index directory data service
 	// (in that case the local index directory data service must be running externally)
 	EmbeddedServicePort uint64
-	// The connect string for the local index directory data service RPC API eg "http://localhost:8042"
+	// The connect string for the local index directory data service RPC API eg "ws://localhost:8042"
 	// Set this value to "" if the local index directory data service is embedded.
 	ServiceApiInfo string
+	// The RPC timeout when making requests to the boostd-data service
+	ServiceRPCTimeout Duration
 }
