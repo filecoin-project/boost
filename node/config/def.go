@@ -90,6 +90,7 @@ func DefaultBoost() *Boost {
 			ParallelAddIndexLimit: 4,
 			EmbeddedServicePort:   8042,
 			ServiceApiInfo:        "",
+			ServiceRPCTimeout:     Duration(15 * time.Minute),
 		},
 
 		ContractDeals: ContractDealsConfig{

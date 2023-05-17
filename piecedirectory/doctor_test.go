@@ -41,7 +41,7 @@ func TestPieceDoctor(t *testing.T) {
 		require.NoError(t, err)
 
 		cl := client.NewStore()
-		err = cl.Dial(ctx, fmt.Sprintf("http://%s", addr))
+		err = cl.Dial(ctx, fmt.Sprintf("ws://%s", addr))
 		require.NoError(t, err)
 		defer cl.Close(ctx)
 
@@ -76,7 +76,7 @@ func TestPieceDoctor(t *testing.T) {
 		require.NoError(t, err)
 
 		cl := client.NewStore()
-		err = cl.Dial(ctx, fmt.Sprintf("http://%s", addr))
+		err = cl.Dial(ctx, fmt.Sprintf("ws://%s", addr))
 		require.NoError(t, err)
 		defer cl.Close(ctx)
 
@@ -104,7 +104,7 @@ func TestPieceDoctor(t *testing.T) {
 		require.NoError(t, err)
 
 		cl := client.NewStore()
-		err = cl.Dial(ctx, fmt.Sprintf("http://%s", addr))
+		err = cl.Dial(ctx, fmt.Sprintf("ws://%s", addr))
 		require.NoError(t, err)
 		defer cl.Close(ctx)
 

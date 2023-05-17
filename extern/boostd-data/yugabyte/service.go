@@ -230,37 +230,64 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	return pcids, nil
 }
 
-func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
+func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.IndexRecord, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_index")
 	defer span.End()
 
 	qry := `SELECT PayloadMultihash, BlockOffset, BlockSize FROM idx.PieceBlockOffsetSize WHERE PieceCid = ?`
 	iter := s.session.Query(qry, pieceCid.Bytes()).WithContext(ctx).Iter()
 
-	var records []model.Record
-	var payloadMHBz []byte
-	var offset, size uint64
-	for iter.Scan(&payloadMHBz, &offset, &size) {
-		_, pmh, err := multihash.MHFromBytes(payloadMHBz)
-		if err != nil {
-			return nil, fmt.Errorf("scanning mulithash: %w", err)
+	scannedRecordCh := make(chan struct{}, 1)
+	records := make(chan types.IndexRecord)
+	go func() {
+		defer close(scannedRecordCh)
+		defer close(records)
+
+		var payloadMHBz []byte
+		var offset, size uint64
+		for iter.Scan(&payloadMHBz, &offset, &size) {
+			// The scan was successful, which means there is at least one
+			// record
+			select {
+			case scannedRecordCh <- struct{}{}:
+			default:
+			}
+
+			// Parse the multihash bytes
+			_, pmh, err := multihash.MHFromBytes(payloadMHBz)
+			if err != nil {
+				records <- types.IndexRecord{Error: err}
+				return
+			}
+
+			records <- types.IndexRecord{
+				Record: model.Record{
+					Cid: cid.NewCidV1(cid.Raw, pmh),
+					OffsetSize: model.OffsetSize{
+						Offset: offset,
+						Size:   size,
+					},
+				},
+			}
 		}
+		if err := iter.Close(); err != nil {
+			err = fmt.Errorf("getting piece index for piece %s: %w", pieceCid, err)
+			records <- types.IndexRecord{Error: err}
+		}
+	}()
 
-		records = append(records, model.Record{
-			Cid: cid.NewCidV1(cid.Raw, pmh),
-			OffsetSize: model.OffsetSize{
-				Offset: offset,
-				Size:   size,
-			},
-		})
-	}
-	if err := iter.Close(); err != nil {
-		return nil, fmt.Errorf("getting piece index for piece %s: %w", pieceCid, err)
+	// Check if there were any records for this piece cid
+	var pieceHasRecords bool
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case _, pieceHasRecords = <-scannedRecordCh:
 	}
 
-	// For correctness, we should always return a not found error if there is
-	// no piece with the piece cid
-	if len(records) == 0 {
+	if !pieceHasRecords {
+		// For correctness, we should always return a not found error if there
+		// is no piece with the piece cid. Call getPieceMetadata which returns
+		// not found if it can't find the piece.
 		_, err := s.getPieceMetadata(ctx, pieceCid)
 		if err != nil {
 			return nil, err
@@ -270,50 +297,116 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 	return records, nil
 }
 
-func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, recs []model.Record, isCompleteIndex bool) error {
+func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, recs []model.Record, isCompleteIndex bool) <-chan types.AddIndexProgress {
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_index")
 	defer span.End()
 
+	// Set up the progress channel
+	progress := make(chan types.AddIndexProgress, 2)
 	if len(recs) == 0 {
-		return nil
+		// If there are no records, set progress to 100% and close the channel
+		progress <- types.AddIndexProgress{Progress: 1}
+		close(progress)
+		return progress
 	}
 
-	// Add a mapping from multihash -> piece cid so that clients can look up
-	// which pieces contain a multihash
-	err := s.addMultihashesToPieces(ctx, pieceCid, recs)
-	if err != nil {
-		return err
+	// Start by sending a progress update of zero
+	progress <- types.AddIndexProgress{Progress: 0}
+	lastUpdateTime := time.Now()
+
+	var lastUpdateValue *float64
+	updateProgress := func(prg float64) {
+		// Don't send updates more than once every few seconds
+		if time.Since(lastUpdateTime) < 5*time.Second {
+			lastUpdateValue = &prg
+			return
+		}
+
+		// If the channel is full, don't send this progress update, just
+		// wait for the next one.
+		select {
+		case progress <- types.AddIndexProgress{Progress: prg}:
+			lastUpdateTime = time.Now()
+			lastUpdateValue = nil
+		default:
+			lastUpdateValue = &prg
+		}
 	}
 
-	// Add a mapping from piece cid -> offset / size of each block so that
-	// clients can get the block info for all blocks in a piece
-	err = s.addPieceInfos(ctx, pieceCid, recs)
-	if err != nil {
-		return err
+	completeProgress := func(err error) {
+		var lastProg *types.AddIndexProgress
+		if err != nil {
+			// If there was an error, send it as the last progress update
+			lastProg = &types.AddIndexProgress{Err: err.Error()}
+		} else if lastUpdateValue != nil {
+			// If there is an outstanding update that hasn't been sent out
+			// yet, make sure it gets sent
+			lastProg = &types.AddIndexProgress{Progress: *lastUpdateValue}
+		}
+
+		if lastProg != nil {
+			select {
+			case progress <- *lastProg:
+			case <-time.After(5 * time.Second):
+			}
+		}
+
+		// Close the channel
+		close(progress)
 	}
 
-	// Ensure the piece metadata exists
-	err = s.createPieceMetadata(ctx, pieceCid)
-	if err != nil {
-		return err
-	}
+	go func() {
+		// Add a mapping from multihash -> piece cid so that clients can look up
+		// which pieces contain a multihash
+		err := s.addMultihashesToPieces(ctx, pieceCid, recs, func(addProgress float64) {
+			// The first 45% of progress is for adding multihash -> pieces index
+			updateProgress(0.45 * addProgress)
+		})
+		if err != nil {
+			completeProgress(err)
+			return
+		}
 
-	// Mark indexing as complete for the piece
-	qry := `UPDATE idx.PieceMetadata ` +
-		`SET IndexedAt = ?, CompleteIndex = ? ` +
-		`WHERE PieceCid = ?`
-	err = s.session.Query(qry, time.Now(), isCompleteIndex, pieceCid.String()).WithContext(ctx).Exec()
-	if err != nil {
-		return fmt.Errorf("marking indexing as complete for piece %s", pieceCid)
-	}
+		// Add a mapping from piece cid -> offset / size of each block so that
+		// clients can get the block info for all blocks in a piece
+		err = s.addPieceInfos(ctx, pieceCid, recs, func(addProgress float64) {
+			// From 45% - 90% of progress is for adding piece infos
+			updateProgress(0.45 + 0.45*addProgress)
+		})
+		if err != nil {
+			completeProgress(err)
+			return
+		}
 
-	return nil
+		// Ensure the piece metadata exists
+		err = s.createPieceMetadata(ctx, pieceCid)
+		if err != nil {
+			completeProgress(err)
+			return
+		}
+		updateProgress(0.95)
+
+		// Mark indexing as complete for the piece
+		qry := `UPDATE idx.PieceMetadata ` +
+			`SET IndexedAt = ?, CompleteIndex = ? ` +
+			`WHERE PieceCid = ?`
+		err = s.session.Query(qry, time.Now(), isCompleteIndex, pieceCid.String()).WithContext(ctx).Exec()
+		if err != nil {
+			completeProgress(err)
+			return
+		}
+		updateProgress(1)
+		completeProgress(nil)
+	}()
+
+	return progress
 }
 
-func (s *Store) addMultihashesToPieces(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
+func (s *Store) addMultihashesToPieces(ctx context.Context, pieceCid cid.Cid, recs []model.Record, progress func(addProgress float64)) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_index.payloadpiece")
 	defer span.End()
 
+	var count float64
 	return s.execParallel(ctx, recs, s.settings.PayloadPiecesParallelism, func(rec model.Record) error {
 		multihashBytes := rec.Cid.Hash()
 		q := `INSERT INTO idx.PayloadToPieces (PayloadMultihash, PieceCid) VALUES (?, ?)`
@@ -321,11 +414,14 @@ func (s *Store) addMultihashesToPieces(ctx context.Context, pieceCid cid.Cid, re
 		if err != nil {
 			return fmt.Errorf("inserting into PayloadToPieces: %w", err)
 		}
+
+		count++
+		progress(count / float64(len(recs)))
 		return nil
 	})
 }
 
-func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []model.Record) error {
+func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []model.Record, progress func(addProgress float64)) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_index.pieceinfo")
 	defer span.End()
 
@@ -356,7 +452,8 @@ func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []mode
 				return fmt.Errorf("executing offset / size batch insert for piece %s: %w", pieceCid, err)
 			}
 			batch = nil
-			continue
+
+			progress((float64(allIdx+1) / float64(len(batchEntries))))
 		}
 	}
 
@@ -476,21 +573,44 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_indexes")
 	defer span.End()
 
+	// Get multihashes for piece
 	recs, err := s.GetIndex(ctx, pieceCid)
 	if err != nil {
 		return fmt.Errorf("removing indexes for piece %s: getting recs: %w", pieceCid, err)
 	}
 
-	err = s.execParallel(ctx, recs, s.settings.PayloadPiecesParallelism, func(rec model.Record) error {
-		multihashBytes := rec.Cid.Hash()
-		q := `DELETE FROM idx.PayloadToPieces WHERE PayloadMultihash = ? AND PieceCid = ?`
-		err := s.session.Query(q, trimMultihash(multihashBytes), pieceCid.Bytes()).Exec()
-		if err != nil {
-			return fmt.Errorf("inserting into PayloadToPieces: %w", err)
-		}
-		return nil
-	})
+	// Delete from multihash -> piece cids index
+	var eg errgroup.Group
+	for i := 0; i < s.settings.PayloadPiecesParallelism; i++ {
+		eg.Go(func() error {
+			for ctx.Err() == nil {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case rec, ok := <-recs:
+					if !ok {
+						// Finished adding all the queued items, exit the thread
+						return nil
+					}
 
+					multihashBytes := rec.Cid.Hash()
+					q := `DELETE FROM idx.PayloadToPieces WHERE PayloadMultihash = ? AND PieceCid = ?`
+					err := s.session.Query(q, trimMultihash(multihashBytes), pieceCid.Bytes()).Exec()
+					if err != nil {
+						return fmt.Errorf("deleting from PayloadToPieces: %w", err)
+					}
+				}
+			}
+
+			return ctx.Err()
+		})
+	}
+	err = eg.Wait()
+	if err != nil {
+		return err
+	}
+
+	// Delete from piece offsets index
 	qry := `DELETE FROM idx.PieceBlockOffsetSize WHERE PieceCid = ?`
 	err = s.session.Query(qry, pieceCid.Bytes()).WithContext(ctx).Exec()
 	if err != nil {

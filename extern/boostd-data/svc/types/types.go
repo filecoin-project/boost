@@ -24,10 +24,20 @@ func IsNotFound(err error) bool {
 	return strings.Contains(err.Error(), ErrNotFound.Error())
 }
 
+type IndexRecord struct {
+	model.Record
+	Error error `json:"e,omitempty"`
+}
+
+type AddIndexProgress struct {
+	Progress float64 `json:"p"`
+	Err      string  `json:"e,omitempty"`
+}
+
 type Service interface {
 	AddDealForPiece(context.Context, cid.Cid, model.DealInfo) error
-	AddIndex(context.Context, cid.Cid, []model.Record, bool) error
-	GetIndex(context.Context, cid.Cid) ([]model.Record, error)
+	AddIndex(context.Context, cid.Cid, []model.Record, bool) <-chan AddIndexProgress
+	GetIndex(context.Context, cid.Cid) (<-chan IndexRecord, error)
 	IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error)
 	IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, error)
 	GetOffsetSize(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)

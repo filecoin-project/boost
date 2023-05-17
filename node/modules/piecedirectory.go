@@ -3,6 +3,7 @@ package modules
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/shared"
@@ -20,6 +21,7 @@ import (
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/lotus/api/v1api"
 	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -35,7 +37,10 @@ import (
 
 func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) types.Store {
 	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) types.Store {
-		client := piecedirectory.NewStore()
+		svcDialOpts := []jsonrpc.Option{
+			jsonrpc.WithTimeout(time.Duration(cfg.LocalIndexDirectory.ServiceRPCTimeout)),
+		}
+		client := piecedirectory.NewStore(svcDialOpts...)
 
 		var cancel context.CancelFunc
 		var svcCtx context.Context
@@ -108,7 +113,7 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 				}
 
 				// Connect to the embedded service
-				return client.Dial(ctx, fmt.Sprintf("http://%s", addr))
+				return client.Dial(ctx, fmt.Sprintf("ws://%s", addr))
 			},
 			OnStop: func(ctx context.Context) error {
 				cancel()
