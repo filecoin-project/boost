@@ -94,6 +94,7 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 					engine.WithPublisherKind(engine.HttpPublisher),
 					engine.WithHttpPublisherListenAddr(fmt.Sprintf("0.0.0.0:%d", cfg.HttpPublisher.Port)),
 					engine.WithHttpPublisherAnnounceAddr(announceAddr.String()),
+					engine.WithDirectAnnounce(cfg.HttpPublisher.DirectAnnounceURLs...),
 				)
 				llog = llog.With("publisher", "http", "announceAddr", announceAddr)
 			} else {

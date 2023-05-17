@@ -321,6 +321,11 @@ type IndexProviderHttpPublisherConfig struct {
 	// Set the port on which to listen for index provider requests over HTTP.
 	// Note that this port must be open on the firewall.
 	Port int
+	// The HTTP publisher makes announcements directly to the indexing
+	// nodes (whereas the data transfer publisher publishes on gossipsub)
+	// DirectAnnounceURLs is the list of URLs of indexing nodes to
+	// announce to.
+	DirectAnnounceURLs []string
 }
 
 type FeeConfig struct {

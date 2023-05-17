@@ -181,9 +181,10 @@ func DefaultBoost() *Boost {
 			PurgeCacheOnStart: false,
 
 			HttpPublisher: IndexProviderHttpPublisherConfig{
-				Enabled:        false,
-				PublicHostname: "",
-				Port:           3104,
+				Enabled:            false,
+				PublicHostname:     "",
+				Port:               3104,
+				DirectAnnounceURLs: []string{"https://cid.contact"},
 			},
 		},
 	}
