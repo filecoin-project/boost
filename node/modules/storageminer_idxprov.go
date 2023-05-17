@@ -95,7 +95,7 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 					engine.WithHttpPublisherListenAddr(fmt.Sprintf("0.0.0.0:%d", cfg.HttpPublisher.Port)),
 					engine.WithHttpPublisherAnnounceAddr(announceAddr.String()),
 				)
-				llog = llog.With("publisher", "http")
+				llog = llog.With("publisher", "http", "announceAddr", announceAddr)
 			} else {
 				// Join the indexer topic using the market's pubsub instance. Otherwise, the provider
 				// engine would create its own instance of pubsub down the line in go-legs, which has
