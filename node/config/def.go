@@ -180,9 +180,10 @@ func DefaultBoost() *Boost {
 			TopicName:         "",
 			PurgeCacheOnStart: false,
 
-			HttpEndpoint: IndexProviderHttpEndpointConfig{
-				PublicIP: "",
-				Port:     3104,
+			HttpPublisher: IndexProviderHttpPublisherConfig{
+				Enabled:        false,
+				PublicHostname: "",
+				Port:           3104,
 			},
 		},
 	}

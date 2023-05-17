@@ -308,16 +308,16 @@ type IndexProviderConfig struct {
 	// datastore if any is present.
 	PurgeCacheOnStart bool
 
-	HttpEndpoint IndexProviderHttpEndpointConfig
+	HttpPublisher IndexProviderHttpPublisherConfig
 }
 
-type IndexProviderHttpEndpointConfig struct {
-	// Set the public IPv4 endpoint for the index provider listener.
+type IndexProviderHttpPublisherConfig struct {
+	// If not enabled, requests are served over graphsync instead.
+	Enabled bool
+	// Set the public hostname / IP for the index provider listener.
 	// eg "82.129.73.111"
-	// This is usually the same as the public IP for the boost node.
-	// If PublicIP is the empty string, requests are served over graphsync
-	// instead.
-	PublicIP string
+	// This is usually the same as the for the boost node.
+	PublicHostname string
 	// Set the port on which to listen for index provider requests over HTTP.
 	// Note that this port must be open on the firewall.
 	Port int
