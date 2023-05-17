@@ -481,22 +481,26 @@ starts. By default, the cache is rehydrated from previously cached entries store
 datastore if any is present.`,
 		},
 		{
-			Name: "HttpEndpoint",
-			Type: "IndexProviderHttpEndpointConfig",
+			Name: "HttpPublisher",
+			Type: "IndexProviderHttpPublisherConfig",
 
 			Comment: ``,
 		},
 	},
-	"IndexProviderHttpEndpointConfig": []DocField{
+	"IndexProviderHttpPublisherConfig": []DocField{
 		{
-			Name: "PublicIP",
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: `If not enabled, requests are served over graphsync instead.`,
+		},
+		{
+			Name: "PublicHostname",
 			Type: "string",
 
-			Comment: `Set the public IPv4 endpoint for the index provider listener.
+			Comment: `Set the public hostname / IP for the index provider listener.
 eg "82.129.73.111"
-This is usually the same as the public IP for the boost node.
-If PublicIP is the empty string, requests are served over graphsync
-instead.`,
+This is usually the same as the for the boost node.`,
 		},
 		{
 			Name: "Port",
