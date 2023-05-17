@@ -198,6 +198,7 @@ func action(cctx *cli.Context) error {
 		}
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
 		pd = piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
+		pd.Start(ctx)
 	}
 
 	maddr, err = getActorAddress(ctx, cctx)
