@@ -171,7 +171,7 @@ func DefaultBoost() *Boost {
 			MaxConcurrencyStorageCalls: 100,
 			GCInterval:                 lotus_config.Duration(1 * time.Minute),
 		},
-		IndexProvider: lotus_config.IndexProviderConfig{
+		IndexProvider: IndexProviderConfig{
 			Enable:               true,
 			EntriesCacheCapacity: 1024,
 			EntriesChunkSize:     16384,
@@ -179,6 +179,11 @@ func DefaultBoost() *Boost {
 			// format: "/indexer/ingest/<network-name>"
 			TopicName:         "",
 			PurgeCacheOnStart: false,
+
+			HttpEndpoint: IndexProviderHttpEndpointConfig{
+				PublicIP: "",
+				Port:     3104,
+			},
 		},
 	}
 	return cfg

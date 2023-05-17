@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-data-transfer/transport/graphsync"
 	datatransferv2 "github.com/filecoin-project/go-data-transfer/v2"
-	"github.com/filecoin-project/lotus/node/config"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -93,13 +93,25 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			// The extra data is required by the lotus-specific index-provider gossip message validators.
 			ma := address.Address(maddr)
 			opts = append(opts,
-				engine.WithPublisherKind(engine.DataTransferPublisher),
 				engine.WithDataTransfer(dtV1ToIndexerDT(dt, func() ipld.LinkSystem {
 					return *e.LinkSystem()
 				})),
 				engine.WithExtraGossipData(ma.Bytes()),
 				engine.WithTopic(t),
 			)
+
+			// Advertisements can be served over the data transfer protocol
+			// (on graphsync) or over HTTP
+			if cfg.HttpEndpoint.PublicIP != "" {
+				opts = append(opts,
+					engine.WithPublisherKind(engine.HttpPublisher),
+					engine.WithHttpPublisherListenAddr(fmt.Sprintf("0.0.0.0:%d", cfg.HttpEndpoint.Port)),
+					engine.WithHttpPublisherAnnounceAddr(fmt.Sprintf("/ip4/%s/tcp/%d/http", cfg.HttpEndpoint.PublicIP, cfg.HttpEndpoint.Port)),
+				)
+			} else {
+				opts = append(opts, engine.WithPublisherKind(engine.DataTransferPublisher))
+			}
+
 			llog = llog.With("extraGossipData", ma, "publisher", "data-transfer")
 		} else {
 			opts = append(opts, engine.WithPublisherKind(engine.NoPublisher))
