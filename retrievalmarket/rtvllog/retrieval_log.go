@@ -303,16 +303,19 @@ func (r *RetrievalLog) gcRetrievals(ctx context.Context) {
 				}
 				wg.Add(1)
 				go func(s RetrievalDealState) {
-					cctx, cancel := context.WithTimeout(ctx, time.Second*5)
+					// Don't wait for more than 5 seconds for the cancel
+					// message to be sent when cancelling an unpaid retrieval
+					unpaidRtrvCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 					defer cancel()
 					defer wg.Done()
-					chid := datatransfer.ChannelID{Initiator: s.PeerID, Responder: s.LocalPeerID, ID: s.TransferID}
-					// Try to cancel via unpaid graphsync first
-					err := r.gsur.CancelTransfer(cctx, s.TransferID, &s.PeerID)
 
+					// Try to cancel an unpaid retrieval with the given transfer id first
+					err := r.gsur.CancelTransfer(unpaidRtrvCtx, s.TransferID, &s.PeerID)
 					if err != nil && errors.Is(err, server.ErrRetrievalNotFound) {
-						// Attempt to terminate legacy, paid retrievals if we didnt cancel a free retrieval
-						err = r.dataTransfer.CloseDataTransferChannel(cctx, chid)
+						// Couldn't find an unpaid retrieval with that id, try
+						// to cancel a legacy, paid retrieval
+						chid := datatransfer.ChannelID{Initiator: s.PeerID, Responder: s.LocalPeerID, ID: s.TransferID}
+						err = r.dataTransfer.CloseDataTransferChannel(ctx, chid)
 					}
 
 					if err != nil {
