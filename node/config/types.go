@@ -308,7 +308,19 @@ type IndexProviderConfig struct {
 	// datastore if any is present.
 	PurgeCacheOnStart bool
 
+	Announce IndexProviderAnnounceConfig
+
 	HttpPublisher IndexProviderHttpPublisherConfig
+}
+
+type IndexProviderAnnounceConfig struct {
+	// Make a direct announcement to a list of indexing nodes over http.
+	// Note that announcements are already made over pubsub regardless
+	// of this setting.
+	AnnounceOverHttp bool
+
+	// The list of URLs of indexing nodes to announce to.
+	DirectAnnounceURLs []string
 }
 
 type IndexProviderHttpPublisherConfig struct {
@@ -321,11 +333,6 @@ type IndexProviderHttpPublisherConfig struct {
 	// Set the port on which to listen for index provider requests over HTTP.
 	// Note that this port must be open on the firewall.
 	Port int
-	// The HTTP publisher makes announcements directly to the indexing
-	// nodes (whereas the data transfer publisher publishes on gossipsub)
-	// DirectAnnounceURLs is the list of URLs of indexing nodes to
-	// announce to.
-	DirectAnnounceURLs []string
 }
 
 type FeeConfig struct {

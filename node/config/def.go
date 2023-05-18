@@ -180,11 +180,15 @@ func DefaultBoost() *Boost {
 			TopicName:         "",
 			PurgeCacheOnStart: false,
 
-			HttpPublisher: IndexProviderHttpPublisherConfig{
-				Enabled:            false,
-				PublicHostname:     "",
-				Port:               3104,
+			Announce: IndexProviderAnnounceConfig{
+				AnnounceOverHttp:   false,
 				DirectAnnounceURLs: []string{"https://cid.contact"},
+			},
+
+			HttpPublisher: IndexProviderHttpPublisherConfig{
+				Enabled:        false,
+				PublicHostname: "",
+				Port:           3104,
 			},
 		},
 	}

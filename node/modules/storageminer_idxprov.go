@@ -82,6 +82,26 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 		// If announcements to the network are enabled, then set options for the publisher.
 		var e *engine.Engine
 		if cfg.Enable {
+			// Join the indexer topic using the market's pubsub instance. Otherwise, the provider
+			// engine would create its own instance of pubsub down the line in go-legs, which has
+			// no validators by default.
+			t, err := ps.Join(topicName)
+			if err != nil {
+				llog.Errorw("Failed to join indexer topic", "err", err)
+				return nil, xerrors.Errorf("joining indexer topic %s: %w", topicName, err)
+			}
+
+			// Get the miner ID and set as extra gossip data.
+			// The extra data is required by the lotus-specific index-provider gossip message validators.
+			ma := address.Address(maddr)
+			opts = append(opts,
+				engine.WithTopic(t),
+				engine.WithExtraGossipData(ma.Bytes()),
+			)
+			if cfg.Announce.AnnounceOverHttp {
+				opts = append(opts, engine.WithDirectAnnounce(cfg.Announce.DirectAnnounceURLs...))
+			}
+
 			// Advertisements can be served over the data transfer protocol
 			// (on graphsync) or over HTTP
 			if cfg.HttpPublisher.Enabled {
@@ -94,29 +114,14 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 					engine.WithPublisherKind(engine.HttpPublisher),
 					engine.WithHttpPublisherListenAddr(fmt.Sprintf("0.0.0.0:%d", cfg.HttpPublisher.Port)),
 					engine.WithHttpPublisherAnnounceAddr(announceAddr.String()),
-					engine.WithDirectAnnounce(cfg.HttpPublisher.DirectAnnounceURLs...),
 				)
 				llog = llog.With("publisher", "http", "announceAddr", announceAddr)
 			} else {
-				// Join the indexer topic using the market's pubsub instance. Otherwise, the provider
-				// engine would create its own instance of pubsub down the line in go-legs, which has
-				// no validators by default.
-				t, err := ps.Join(topicName)
-				if err != nil {
-					llog.Errorw("Failed to join indexer topic", "err", err)
-					return nil, xerrors.Errorf("joining indexer topic %s: %w", topicName, err)
-				}
-
-				// Get the miner ID and set as extra gossip data.
-				// The extra data is required by the lotus-specific index-provider gossip message validators.
-				ma := address.Address(maddr)
 				opts = append(opts,
-					engine.WithTopic(t),
 					engine.WithPublisherKind(engine.DataTransferPublisher),
 					engine.WithDataTransfer(dtV1ToIndexerDT(dt, func() ipld.LinkSystem {
 						return *e.LinkSystem()
 					})),
-					engine.WithExtraGossipData(ma.Bytes()),
 				)
 				llog = llog.With("extraGossipData", ma, "publisher", "data-transfer")
 			}
