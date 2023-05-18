@@ -436,6 +436,22 @@ for any other deal.`,
 			Comment: `The port that the graphql server listens on`,
 		},
 	},
+	"IndexProviderAnnounceConfig": []DocField{
+		{
+			Name: "AnnounceOverHttp",
+			Type: "bool",
+
+			Comment: `Make a direct announcement to a list of indexing nodes over http.
+Note that announcements are already made over pubsub regardless
+of this setting.`,
+		},
+		{
+			Name: "DirectAnnounceURLs",
+			Type: "[]string",
+
+			Comment: `The list of URLs of indexing nodes to announce to.`,
+		},
+	},
 	"IndexProviderConfig": []DocField{
 		{
 			Name: "Enable",
@@ -481,6 +497,12 @@ starts. By default, the cache is rehydrated from previously cached entries store
 datastore if any is present.`,
 		},
 		{
+			Name: "Announce",
+			Type: "IndexProviderAnnounceConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "HttpPublisher",
 			Type: "IndexProviderHttpPublisherConfig",
 
@@ -508,15 +530,6 @@ This is usually the same as the for the boost node.`,
 
 			Comment: `Set the port on which to listen for index provider requests over HTTP.
 Note that this port must be open on the firewall.`,
-		},
-		{
-			Name: "DirectAnnounceURLs",
-			Type: "[]string",
-
-			Comment: `The HTTP publisher makes announcements directly to the indexing
-nodes (whereas the data transfer publisher publishes on gossipsub)
-DirectAnnounceURLs is the list of URLs of indexing nodes to
-announce to.`,
 		},
 	},
 	"LotusDealmakingConfig": []DocField{
