@@ -69,6 +69,10 @@ type BoostStruct struct {
 
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
 
+		BoostIndexerAnnounceLatest func(p0 context.Context) (cid.Cid, error) `perm:"admin"`
+
+		BoostIndexerAnnounceLatestHttp func(p0 context.Context, p1 []string) (cid.Cid, error) `perm:"admin"`
+
 		BoostMakeDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"write"`
 
 		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) `perm:"admin"`
@@ -442,6 +446,28 @@ func (s *BoostStruct) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 
 func (s *BoostStub) BoostIndexerAnnounceAllDeals(p0 context.Context) error {
 	return ErrNotSupported
+}
+
+func (s *BoostStruct) BoostIndexerAnnounceLatest(p0 context.Context) (cid.Cid, error) {
+	if s.Internal.BoostIndexerAnnounceLatest == nil {
+		return *new(cid.Cid), ErrNotSupported
+	}
+	return s.Internal.BoostIndexerAnnounceLatest(p0)
+}
+
+func (s *BoostStub) BoostIndexerAnnounceLatest(p0 context.Context) (cid.Cid, error) {
+	return *new(cid.Cid), ErrNotSupported
+}
+
+func (s *BoostStruct) BoostIndexerAnnounceLatestHttp(p0 context.Context, p1 []string) (cid.Cid, error) {
+	if s.Internal.BoostIndexerAnnounceLatestHttp == nil {
+		return *new(cid.Cid), ErrNotSupported
+	}
+	return s.Internal.BoostIndexerAnnounceLatestHttp(p0, p1)
+}
+
+func (s *BoostStub) BoostIndexerAnnounceLatestHttp(p0 context.Context, p1 []string) (cid.Cid, error) {
+	return *new(cid.Cid), ErrNotSupported
 }
 
 func (s *BoostStruct) BoostMakeDeal(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) {
