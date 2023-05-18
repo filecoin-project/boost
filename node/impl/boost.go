@@ -149,6 +149,10 @@ func (sm *BoostAPI) BoostIndexerAnnounceLatest(ctx context.Context) (cid.Cid, er
 	return sm.IndexProvider.IndexerAnnounceLatest(ctx)
 }
 
+func (sm *BoostAPI) BoostIndexerAnnounceLatestHttp(ctx context.Context, announceUrls []string) (cid.Cid, error) {
+	return sm.IndexProvider.IndexerAnnounceLatestHttp(ctx, announceUrls)
+}
+
 func (sm *BoostAPI) BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (*api.ProviderDealRejectionInfo, error) {
 	res, err := sm.StorageProvider.ImportOfflineDealData(ctx, dealUuid, filePath, delAfterImport)
 	return res, err

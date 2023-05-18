@@ -24,6 +24,7 @@
   * [BoostDummyDeal](#boostdummydeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
   * [BoostIndexerAnnounceLatest](#boostindexerannouncelatest)
+  * [BoostIndexerAnnounceLatestHttp](#boostindexerannouncelatesthttp)
   * [BoostMakeDeal](#boostmakedeal)
   * [BoostOfflineDealWithData](#boostofflinedealwithdata)
 * [Deals](#deals)
@@ -570,6 +571,27 @@ Response: `{}`
 Perms: admin
 
 Inputs: `null`
+
+Response:
+```json
+{
+  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+}
+```
+
+### BoostIndexerAnnounceLatestHttp
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  [
+    "string value"
+  ]
+]
+```
 
 Response:
 ```json

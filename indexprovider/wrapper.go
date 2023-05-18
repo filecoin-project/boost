@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -269,6 +270,27 @@ func (w *Wrapper) IndexerAnnounceLatest(ctx context.Context) (cid.Cid, error) {
 		return cid.Undef, fmt.Errorf("index provider is disabled")
 	}
 	return e.PublishLatest(ctx)
+}
+
+func (w *Wrapper) IndexerAnnounceLatestHttp(ctx context.Context, announceUrls []string) (cid.Cid, error) {
+	e, ok := w.prov.(*engine.Engine)
+	if !ok {
+		return cid.Undef, fmt.Errorf("index provider is disabled")
+	}
+
+	if len(announceUrls) == 0 {
+		announceUrls = w.cfg.IndexProvider.Announce.DirectAnnounceURLs
+	}
+
+	urls := make([]*url.URL, 0, len(announceUrls))
+	for _, us := range announceUrls {
+		u, err := url.Parse(us)
+		if err != nil {
+			return cid.Undef, fmt.Errorf("parsing url %s: %w", us, err)
+		}
+		urls = append(urls, u)
+	}
+	return e.PublishLatestHTTP(ctx, urls...)
 }
 
 func (w *Wrapper) Start(ctx context.Context) {
