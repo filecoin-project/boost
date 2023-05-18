@@ -7,9 +7,10 @@ import (
 
 func TestToHttpMultiaddr(t *testing.T) {
 	tcs := []struct {
-		hostname string
-		port     int
-		expected string
+		hostname  string
+		port      int
+		expected  string
+		expectErr bool
 	}{{
 		hostname: "192.168.1.1",
 		port:     1234,
@@ -22,13 +23,22 @@ func TestToHttpMultiaddr(t *testing.T) {
 		hostname: "example.com",
 		port:     1234,
 		expected: "/dns/example.com/tcp/1234/http",
+	}, {
+		hostname:  "",
+		port:      1234,
+		expected:  "",
+		expectErr: true,
 	}}
 
 	for _, tc := range tcs {
 		t.Run("", func(t *testing.T) {
 			ma, err := ToHttpMultiaddr(tc.hostname, tc.port)
-			require.NoError(t, err)
-			require.Equal(t, tc.expected, ma.String())
+			if tc.expectErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expected, ma.String())
+			}
 		})
 	}
 }

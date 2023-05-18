@@ -8,6 +8,10 @@ import (
 )
 
 func ToHttpMultiaddr(hostname string, port int) (ma.Multiaddr, error) {
+	if hostname == "" {
+		return nil, fmt.Errorf("hostname is empty")
+	}
+
 	var saddr string
 	if n := net.ParseIP(hostname); n != nil {
 		ipVersion := "ip4"
