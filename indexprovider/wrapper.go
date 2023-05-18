@@ -22,6 +22,7 @@ import (
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	provider "github.com/ipni/index-provider"
+	"github.com/ipni/index-provider/engine"
 	"github.com/ipni/index-provider/engine/xproviders"
 	"github.com/ipni/index-provider/metadata"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -260,6 +261,14 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 
 	log.Infow("finished announcing all boost deals to Indexer", "number of deals", nSuccess, "number of shards", len(shards))
 	return merr
+}
+
+func (w *Wrapper) IndexerAnnounceLatest(ctx context.Context) (cid.Cid, error) {
+	e, ok := w.prov.(*engine.Engine)
+	if !ok {
+		return cid.Undef, fmt.Errorf("index provider is disabled")
+	}
+	return e.PublishLatest(ctx)
 }
 
 func (w *Wrapper) Start(ctx context.Context) {
