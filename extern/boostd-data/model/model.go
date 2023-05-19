@@ -12,8 +12,8 @@ import (
 )
 
 // DealInfo is information about a single deal for a given piece
-//                      PieceOffset
-//                      v
+// .                    PieceOffset
+// .                    v
 // Sector        [..........................]
 // Piece          ......[            ]......
 // CAR            ......[      ]............
@@ -39,25 +39,24 @@ type Metadata struct {
 	IndexedAt time.Time `json:"i"`
 	// CompleteIndex indicates whether the index has all information or is
 	// missing block size information. Note that indexes imported from the
-	// dagstore do not have block size information.
+	// dagstore do not have block size information (they only have block
+	// offsets).
 	CompleteIndex bool       `json:"c"`
 	Deals         []DealInfo `json:"d"`
-	Error         string     `json:"e"`
-	ErrorType     string     `json:"t"`
 }
 
 // Record is the information stored in the index for each block in a piece
 type Record struct {
-	Cid cid.Cid
+	Cid cid.Cid `json:"c"`
 	OffsetSize
 }
 
 type OffsetSize struct {
 	// Offset is the offset into the CAR file of the section, where a section
 	// is <section size><cid><block data>
-	Offset uint64
+	Offset uint64 `json:"o"`
 	// Size is the size of the block data (not the whole section)
-	Size uint64
+	Size uint64 `json:"s"`
 }
 
 func (ofsz *OffsetSize) MarshallBase64() string {

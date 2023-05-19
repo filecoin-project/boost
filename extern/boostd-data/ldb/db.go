@@ -290,43 +290,6 @@ func (db *DB) GetPieceCidToMetadata(ctx context.Context, pieceCid cid.Cid) (Leve
 	return metadata, nil
 }
 
-func (db *DB) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.set_car_size")
-	defer span.End()
-
-	md, err := db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil {
-		return fmt.Errorf("getting piece metadata for piece %s: %w", pieceCid, err)
-	}
-
-	// Set the car size on each deal (should be the same for all deals)
-	for _, dl := range md.Deals {
-		dl.CarLength = size
-	}
-
-	return db.SetPieceCidToMetadata(ctx, pieceCid, md)
-}
-
-func (db *DB) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, err error) error {
-	ctx, span := tracing.Tracer.Start(ctx, "db.mark_piece_index_errored")
-	defer span.End()
-
-	md, err := db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil {
-		return fmt.Errorf("getting piece metadata for piece %s: %w", pieceCid, err)
-	}
-
-	if md.Error != "" {
-		// If the error state has already been set, don't over-write the existing error
-		return nil
-	}
-
-	md.Error = err.Error()
-	md.ErrorType = fmt.Sprintf("%T", err)
-
-	return db.SetPieceCidToMetadata(ctx, pieceCid, md)
-}
-
 // AllRecords
 func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.all_records")
@@ -360,7 +323,7 @@ func (db *DB) AllRecords(ctx context.Context, cursor uint64) ([]model.Record, er
 		kcid := cid.NewCidV1(cid.Raw, m)
 
 		offset, n := binary.Uvarint(r.Value)
-		size, n := binary.Uvarint(r.Value[n:])
+		size, _ := binary.Uvarint(r.Value[n:])
 
 		records = append(records, model.Record{
 			Cid: kcid,
@@ -401,7 +364,7 @@ func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihas
 	}
 
 	offset, n := binary.Uvarint(b)
-	size, n := binary.Uvarint(b[n:])
+	size, _ := binary.Uvarint(b[n:])
 	return &model.OffsetSize{
 		Offset: offset,
 		Size:   size,

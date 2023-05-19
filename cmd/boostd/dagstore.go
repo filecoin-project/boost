@@ -196,7 +196,7 @@ var dagstoreInitializeAllCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		concurrency := cctx.Uint("concurrency")
-		sealed := cctx.Bool("sealed")
+		sealed := cctx.Bool("include-sealed")
 
 		ctx := lcli.ReqContext(cctx)
 

@@ -70,6 +70,7 @@ func BoostHandler(a api.Boost, permissioned bool) (http.Handler, error) {
 	readerHandler, readerServerOpt := rpcenc.ReaderParamDecoder()
 	rpcServer := jsonrpc.NewServer(readerServerOpt)
 	rpcServer.Register("Filecoin", mapi)
+	rpcServer.AliasMethod("rpc.discover", "Filecoin.Discover")
 
 	m.Handle("/rpc/v0", rpcServer)
 	m.Handle("/rpc/streams/v0/push/{uuid}", readerHandler)

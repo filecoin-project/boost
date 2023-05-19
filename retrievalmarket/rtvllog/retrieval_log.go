@@ -58,6 +58,33 @@ func (r *RetrievalLog) OnQueryEvent(evt retrievalmarket.ProviderQueryEvent) {
 		"status", evt.Response.Status,
 		"msg", evt.Response.Message,
 		"err", evt.Error)
+
+	// Log failures to DB
+	st := &RetrievalDealState{
+		UnsealPrice: evt.Response.UnsealPrice,
+		Message:     evt.Response.Message,
+	}
+	if evt.Error != nil {
+		st.Status = "Failed"
+		if evt.Response.Message == "" {
+			st.Message = evt.Error.Error()
+		}
+	} else {
+		if evt.Response.Status == retrievalmarket.QueryResponseUnavailable {
+			st.Status = "unavailable"
+		}
+		if evt.Response.Status == retrievalmarket.QueryResponseError {
+			st.Status = "errored"
+		}
+	}
+	if st.Status != "" {
+		r.dbUpdate(func() {
+			err := r.db.Insert(r.ctx, st)
+			if err != nil {
+				log.Errorw("failed to update retrieval deal logger db", "err", err)
+			}
+		})
+	}
 }
 
 // Called when there is a validation event.

@@ -29,6 +29,8 @@ type fundManagerAPI interface {
 }
 
 type Config struct {
+	// Whether to enable fund tagging
+	Enabled bool
 	// The address of the storage miner, used as the target address when
 	// moving funds to escrow
 	StorageMiner address.Address
@@ -58,13 +60,19 @@ func New(cfg Config) func(api v1api.FullNode, fundsDB *db.FundsDB) *FundManager 
 }
 
 type TagFundsResp struct {
-	Collateral     abi.TokenAmount
+	// The amount of deal collateral tagged for this deal
+	Collateral abi.TokenAmount
+	// The amount of publish message funds tagged for this deal
 	PublishMessage abi.TokenAmount
 
-	TotalCollateral     abi.TokenAmount
+	// The total amount of deal collateral tagged for all deals so far
+	TotalCollateral abi.TokenAmount
+	// The total amount of funds tagged for all publish messages so far
 	TotalPublishMessage abi.TokenAmount
 
-	AvailableCollateral     abi.TokenAmount
+	// The total available funds for deal collateral
+	AvailableCollateral abi.TokenAmount
+	// The total available funds for deal publishing
 	AvailablePublishMessage abi.TokenAmount
 }
 
@@ -92,39 +100,44 @@ func (m *FundManager) TagFunds(ctx context.Context, dealUuid uuid.UUID, proposal
 		return nil, fmt.Errorf("getting total tagged: %w", err)
 	}
 
-	dealCollateral := proposal.ProviderBalanceRequirement()
+	dealCollateralTag := abi.NewTokenAmount(0)
+	pubMsgTag := abi.NewTokenAmount(0)
 	availForDealCollat := big.Sub(marketBal.Available, tagged.Collateral)
-	if availForDealCollat.LessThan(dealCollateral) {
-		err := fmt.Errorf("%w: available funds %d is less than collateral needed for deal %d: "+
-			"available = funds in escrow %d - amount reserved for other deals %d",
-			ErrInsufficientFunds, availForDealCollat, dealCollateral, marketBal.Available, tagged.Collateral)
-		return nil, err
-	}
-
-	// Check that the provider has enough funds to send a PublishStorageDeals message
 	availForPubMsg := big.Sub(pubMsgBal, tagged.PubMsg)
-	if availForPubMsg.LessThan(m.cfg.PubMsgBalMin) {
-		err := fmt.Errorf("%w: available funds %d is less than needed for publish deals message %d: "+
-			"available = funds in publish deals wallet %d - amount reserved for other deals %d",
-			ErrInsufficientFunds, availForPubMsg, m.cfg.PubMsgBalMin, pubMsgBal, tagged.PubMsg)
-		return nil, err
-	}
+	if m.cfg.Enabled {
+		dealCollateralTag = proposal.ProviderBalanceRequirement()
+		if availForDealCollat.LessThan(dealCollateralTag) {
+			err := fmt.Errorf("%w: available funds %d is less than collateral needed for deal %d: "+
+				"available = funds in escrow %d - amount reserved for other deals %d",
+				ErrInsufficientFunds, availForDealCollat, dealCollateralTag, marketBal.Available, tagged.Collateral)
+			return nil, err
+		}
 
-	// Provider has enough funds to make deal, so persist tagged funds
-	err = m.persistTagged(ctx, dealUuid, dealCollateral, m.cfg.PubMsgBalMin)
-	if err != nil {
-		return nil, fmt.Errorf("saving total tagged: %w", err)
+		// Check that the provider has enough funds to send a PublishStorageDeals message
+		pubMsgTag = m.cfg.PubMsgBalMin
+		if availForPubMsg.LessThan(pubMsgTag) {
+			err := fmt.Errorf("%w: available funds %d is less than needed for publish deals message %d: "+
+				"available = funds in publish deals wallet %d - amount reserved for other deals %d",
+				ErrInsufficientFunds, availForPubMsg, pubMsgTag, pubMsgBal, tagged.PubMsg)
+			return nil, err
+		}
+
+		// Provider has enough funds to make deal, so persist tagged funds
+		err = m.persistTagged(ctx, dealUuid, dealCollateralTag, pubMsgTag)
+		if err != nil {
+			return nil, fmt.Errorf("saving total tagged: %w", err)
+		}
 	}
 
 	return &TagFundsResp{
-		Collateral:     dealCollateral,
-		PublishMessage: m.cfg.PubMsgBalMin,
+		Collateral:     dealCollateralTag,
+		PublishMessage: pubMsgTag,
 
-		TotalPublishMessage: big.Add(tagged.PubMsg, m.cfg.PubMsgBalMin),
-		TotalCollateral:     big.Add(tagged.Collateral, dealCollateral),
+		TotalPublishMessage: big.Add(tagged.PubMsg, pubMsgTag),
+		TotalCollateral:     big.Add(tagged.Collateral, dealCollateralTag),
 
-		AvailablePublishMessage: big.Sub(availForPubMsg, m.cfg.PubMsgBalMin),
-		AvailableCollateral:     big.Sub(availForDealCollat, dealCollateral),
+		AvailablePublishMessage: big.Sub(availForPubMsg, pubMsgTag),
+		AvailableCollateral:     big.Sub(availForDealCollat, dealCollateralTag),
 	}, nil
 }
 

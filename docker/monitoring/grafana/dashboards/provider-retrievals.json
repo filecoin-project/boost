@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 5,
+  "id": 3,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -2011,6 +2011,424 @@
         "x": 0,
         "y": 65
       },
+      "id": 72,
+      "panels": [],
+      "title": "booster-http: ipfs gateway",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom1234"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 66
+      },
+      "id": 74,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom1234"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "irate(booster_http_http_rbls_bytes_sent_count{}[$__rate_interval]) * 15",
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Http Gateway Bytes Served",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom1234"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 73
+      },
+      "id": 76,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom1234"
+          },
+          "editorMode": "code",
+          "expr": "irate(booster_http_http_rbls_get_request_count{}[$__rate_interval]) * 15",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Http Gateway Block Get Requests",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom1234"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 73
+      },
+      "id": 78,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom1234"
+          },
+          "editorMode": "code",
+          "expr": "irate(booster_http_http_rbls_get_success_response_count{}[$__rate_interval]) * 15",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom1234"
+          },
+          "editorMode": "code",
+          "expr": "irate(booster_http_http_rbls_get_fail_response_count{}[$__rate_interval]) * 15",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Http Gateway Block Get Response Counts",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom1234"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 73
+      },
+      "id": 80,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom1234"
+          },
+          "editorMode": "code",
+          "expr": "(irate(booster_http_http_rbls_get_success_response_count{}[$__rate_interval]) * 15) / (irate(booster_http_http_rbls_get_request_count{}[$__rate_interval]) * 15)",
+          "legendFormat": "Success",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom1234"
+          },
+          "editorMode": "code",
+          "expr": "(irate(booster_http_http_rbls_get_fail_response_count{}[$__rate_interval]) * 15) / (irate(booster_http_http_rbls_get_request_count{}[$__rate_interval]) * 15)",
+          "hide": false,
+          "legendFormat": "Fail",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Http Block Get Success / Failure Rate",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 81
+      },
       "id": 30,
       "panels": [],
       "title": "booster-http",
@@ -2103,7 +2521,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 66
+        "y": 82
       },
       "id": 2,
       "options": {
@@ -2224,7 +2642,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 66
+        "y": 82
       },
       "id": 3,
       "options": {
@@ -2320,7 +2738,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 73
+        "y": 89
       },
       "id": 36,
       "options": {
@@ -2451,7 +2869,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 73
+        "y": 89
       },
       "id": 37,
       "options": {
@@ -2578,7 +2996,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 81
+        "y": 97
       },
       "id": 5,
       "options": {
@@ -2695,7 +3113,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 81
+        "y": 97
       },
       "id": 6,
       "options": {
@@ -2814,7 +3232,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 88
+        "y": 104
       },
       "id": 9,
       "links": [],
@@ -2853,7 +3271,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 96
+        "y": 112
       },
       "id": 39,
       "panels": [],
@@ -2922,7 +3340,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 97
+        "y": 113
       },
       "id": 49,
       "options": {
@@ -3019,7 +3437,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 97
+        "y": 113
       },
       "id": 50,
       "options": {
@@ -3115,7 +3533,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 105
+        "y": 121
       },
       "id": 51,
       "options": {
@@ -3211,7 +3629,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 105
+        "y": 121
       },
       "id": 52,
       "options": {
@@ -3306,7 +3724,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 113
+        "y": 129
       },
       "id": 54,
       "options": {
@@ -3401,7 +3819,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 113
+        "y": 129
       },
       "id": 57,
       "options": {
@@ -3497,7 +3915,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 121
+        "y": 137
       },
       "id": 56,
       "options": {
@@ -3593,7 +4011,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 121
+        "y": 137
       },
       "id": 55,
       "options": {
@@ -3670,6 +4088,6 @@
   "timezone": "",
   "title": "Provider Retrievals",
   "uid": "VG2IXa4Vk",
-  "version": 15,
+  "version": 16,
   "weekStart": ""
 }

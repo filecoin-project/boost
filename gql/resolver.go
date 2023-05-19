@@ -265,9 +265,19 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 }
 
 // mutation: dealCancel(id): ID
-func (r *resolver) DealCancel(_ context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
+func (r *resolver) DealCancel(ctx context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
 	dealUuid, err := toUuid(args.ID)
 	if err != nil {
+		return args.ID, err
+	}
+
+	deal, err := r.dealsDB.ByID(ctx, dealUuid)
+	if err != nil {
+		return args.ID, err
+	}
+
+	if deal.IsOffline {
+		err = r.provider.CancelOfflineDealAwaitingImport(dealUuid)
 		return args.ID, err
 	}
 
@@ -532,12 +542,17 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 	switch checkpoint {
 	case dealcheckpoints.Accepted:
 		if dr.IsOffline {
+			if dr.ProviderDealState.InboundFilePath != "" {
+				return "Verifying Commp"
+			}
 			return "Awaiting Offline Data Import"
 		}
+
 		var pct uint64 = math.MaxUint64
 		if dr.ProviderDealState.Transfer.Size > 0 {
 			pct = (100 * dr.transferred) / dr.ProviderDealState.Transfer.Size
 		}
+
 		switch {
 		case dr.transferred == 0 && !dr.provider.IsTransferStalled(dr.DealUuid):
 			return "Transfer Queued"
@@ -600,8 +615,12 @@ func (dr *dealResolver) sealingState(ctx context.Context) string {
 		log.Warnw("error getting sealing status for sector", "sector", dr.SectorID, "error", err)
 		return "Sealer: Sealing"
 	}
-
-	return "Sealer: " + string(si.State)
+	for _, d := range si.Deals {
+		if d == dr.ProviderDealState.ChainDealID {
+			return "Sealer: " + string(si.State)
+		}
+	}
+	return fmt.Sprintf("Sealer: failed - deal not found in sector %d", si.SectorID)
 }
 
 func (dr *dealResolver) Logs(ctx context.Context) ([]*logsResolver, error) {

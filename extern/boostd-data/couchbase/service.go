@@ -2,7 +2,6 @@ package couchbase
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -46,46 +45,14 @@ func (s *Store) Start(ctx context.Context) error {
 func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	log.Debugw("handle.add-deal-for-piece", "piece-cid", pieceCid)
 
-	ctx, span := tracing.Tracer.Start(context.Background(), "store.add_deal_for_piece")
+	ctx, span := tracing.Tracer.Start(ctx, "store.add_deal_for_piece")
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.add-deal-for-piece", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.add-deal-for-piece", "took", time.Since(now).String())
 	}(time.Now())
 
 	return s.db.AddDealForPiece(ctx, pieceCid, dealInfo)
-}
-
-func (s *Store) SetCarSize(ctx context.Context, pieceCid cid.Cid, size uint64) error {
-	log.Debugw("handle.set-car-size", "piece-cid", pieceCid, "size", size)
-
-	ctx, span := tracing.Tracer.Start(context.Background(), "store.set-car-size")
-	defer span.End()
-
-	defer func(now time.Time) {
-		log.Debugw("handled.set-car-size", "took", fmt.Sprintf("%s", time.Since(now)))
-	}(time.Now())
-
-	err := s.db.SetCarSize(ctx, pieceCid, size)
-	return normalizePieceCidError(pieceCid, err)
-}
-
-func (s *Store) MarkIndexErrored(ctx context.Context, pieceCid cid.Cid, idxErr string) error {
-	log.Debugw("handle.mark-piece-index-errored", "piece-cid", pieceCid, "err", idxErr)
-
-	ctx, span := tracing.Tracer.Start(ctx, "store.mark-piece-index-errored")
-	defer span.End()
-
-	defer func(now time.Time) {
-		log.Debugw("handled.mark-piece-index-errored", "took", fmt.Sprintf("%s", time.Since(now)))
-	}(time.Now())
-
-	err := s.db.MarkIndexErrored(ctx, pieceCid, errors.New(idxErr))
-	if err != nil {
-		return normalizePieceCidError(pieceCid, err)
-	}
-
-	return s.FlagPiece(ctx, pieceCid)
 }
 
 func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
@@ -95,7 +62,7 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-offset-size", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-offset-size", "took", time.Since(now).String())
 	}(time.Now())
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -115,7 +82,7 @@ func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.M
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-piece-metadata", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-piece-metadata", "took", time.Since(now).String())
 	}(time.Now())
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -134,7 +101,7 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-piece-deals", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-piece-deals", "took", time.Since(now).String())
 	}(time.Now())
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -154,21 +121,21 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.pieces-containing-mh", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.pieces-containing-mh", "took", time.Since(now).String())
 	}(time.Now())
 
 	pcids, err := s.db.GetPieceCidsByMultihash(ctx, m)
 	return pcids, normalizeMultihashError(m, err)
 }
 
-func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record, error) {
+func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.IndexRecord, error) {
 	log.Debugw("handle.get-index", "pieceCid", pieceCid)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_index")
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-index", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-index", "took", time.Since(now).String())
 	}(time.Now())
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -185,7 +152,13 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) ([]model.Record,
 
 	log.Debugw("handle.get-index.records", "len(records)", len(records))
 
-	return records, nil
+	recs := make(chan types.IndexRecord, len(records))
+	for _, r := range records {
+		recs <- types.IndexRecord{Record: r}
+	}
+	close(recs)
+
+	return recs, nil
 }
 
 func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
@@ -203,7 +176,7 @@ func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, er
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.is-complete-index", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.is-complete-index", "took", time.Since(now).String())
 	}(time.Now())
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -214,7 +187,7 @@ func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, er
 	return md.CompleteIndex, nil
 }
 
-func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error {
+func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) <-chan types.AddIndexProgress {
 	log.Debugw("handle.add-index", "records", len(records))
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.add_index")
@@ -230,22 +203,32 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.
 		mhs = append(mhs, r.Cid.Hash())
 	}
 
-	setMhStart := time.Now()
-	err := s.db.SetMultihashesToPieceCid(ctx, mhs, pieceCid)
-	if err != nil {
-		return fmt.Errorf("failed to add entry from mh to pieceCid: %w", err)
-	}
-	log.Debugw("handled.add-index SetMultihashesToPieceCid", "took", time.Since(setMhStart).String())
+	progress := make(chan types.AddIndexProgress, 1)
+	go func() {
+		defer close(progress)
+		progress <- types.AddIndexProgress{Progress: 0}
 
-	// Add a mapping from piece cid -> offset / size of each block so that
-	// clients can get the block info for all blocks in a piece
-	addOffsetsStart := time.Now()
-	if err := s.db.AddIndexRecords(ctx, pieceCid, records); err != nil {
-		return err
-	}
-	log.Debugw("handled.add-index AddIndexRecords", "took", time.Since(addOffsetsStart).String())
+		setMhStart := time.Now()
+		err := s.db.SetMultihashesToPieceCid(ctx, mhs, pieceCid)
+		if err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
+		}
+		log.Debugw("handled.add-index SetMultihashesToPieceCid", "took", time.Since(setMhStart).String())
+		progress <- types.AddIndexProgress{Progress: 0.5}
 
-	return s.db.MarkIndexingComplete(ctx, pieceCid, len(records), isCompleteIndex)
+		// Add a mapping from piece cid -> offset / size of each block so that
+		// clients can get the block info for all blocks in a piece
+		addOffsetsStart := time.Now()
+		if err := s.db.AddIndexRecords(ctx, pieceCid, records); err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
+		}
+		log.Debugw("handled.add-index AddIndexRecords", "took", time.Since(addOffsetsStart).String())
+		progress <- types.AddIndexProgress{Progress: 1}
+	}()
+
+	return progress
 }
 
 func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, error) {
@@ -255,7 +238,7 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.indexed-at", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.indexed-at", "took", time.Since(now).String())
 	}(time.Now())
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
@@ -273,7 +256,7 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.list-pieces", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.list-pieces", "took", time.Since(now).String())
 	}(time.Now())
 
 	return s.db.ListPieces(ctx)

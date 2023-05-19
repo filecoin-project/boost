@@ -267,6 +267,10 @@ export function DealDetail(props) {
                     <th>Inbound File Path</th>
                     <td>{deal.InboundFilePath}</td>
                 </tr>
+                <tr>
+                    <th>Delete After Add Piece</th>
+                    <td>{deal.CleanupData ? 'Yes' : 'No'}</td>
+                </tr>
                 {deal.Sector.ID > 0 ? (
                     <>
                     <tr>
@@ -355,7 +359,8 @@ export function DealActions(props) {
 
     const showRetryFailButtons = IsPaused(deal)
     const showCancelButton = !showRetryFailButtons && IsTransferring(deal)
-    if (!showCancelButton && !showRetryFailButtons) {
+    const showCancelOfflineWaitingForData = !showRetryFailButtons && !showCancelButton && IsOfflineWaitingForData(deal)
+    if (!showCancelButton && !showRetryFailButtons && !showCancelOfflineWaitingForData) {
         return null
     }
 
@@ -366,6 +371,11 @@ export function DealActions(props) {
                     {compact ? '' : 'Cancel Transfer'}
                 </div>
             ) : null}
+            {showCancelOfflineWaitingForData ? (
+                <div className="button cancel offline" title="Cancel Offline Deal" onClick={cancelDeal}>
+                    {compact ? '' : 'Cancel Offline Deal'}
+                </div>
+            ) : null }
             {showRetryFailButtons ? (
                 <>
                     <div className="button retry" title="Retry Deal" onClick={retryPausedDeal}>
@@ -386,6 +396,10 @@ export function IsPaused(deal) {
 
 export function IsTransferring(deal) {
     return deal.Checkpoint === 'Accepted' && !deal.IsOffline
+}
+
+export function IsOfflineWaitingForData(deal) {
+    return deal.IsOffline && deal.Checkpoint === 'Accepted'
 }
 
 function DealLog(props) {

@@ -27,20 +27,33 @@ func TestDealAnnounceToIPNI(t *testing.T) {
 	deals, err := db.GenerateNDeals(1)
 	req.NoError(err)
 
-	// Insert the deals in DB
-	err = dealsDB.Insert(ctx, &deals[0])
-	require.NoError(t, err)
+	// Insert the deal into the DB
+	deal := deals[0]
+	deal.AnnounceToIPNI = false
 
-	// Get deal state
+	_, err = sqldb.Exec(`INSERT INTO Deals ("ID", "CreatedAt", "DealProposalSignature", "PieceCID", "PieceSize",
+                   "VerifiedDeal", "IsOffline", "ClientAddress", "ProviderAddress","Label", "StartEpoch", "EndEpoch",
+                   "StoragePricePerEpoch", "ProviderCollateral", "ClientCollateral", "ClientPeerID", "DealDataRoot",
+                   "InboundFilePath", "TransferType", "TransferParams", "TransferSize", "ChainDealID", "PublishCID",
+                   "SectorID", "Offset", "Length", "Checkpoint", "CheckpointAt", "Error", "Retry", "SignedProposalCID",
+                   "FastRetrieval","AnnounceToIPNI")
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		deal.DealUuid, deal.CreatedAt, []byte("test"), deal.ClientDealProposal.Proposal.PieceCID.String(),
+		deal.ClientDealProposal.Proposal.PieceSize, deal.ClientDealProposal.Proposal.VerifiedDeal, deal.IsOffline,
+		deal.ClientDealProposal.Proposal.Client.String(), deal.ClientDealProposal.Proposal.Provider.String(), "test",
+		deal.ClientDealProposal.Proposal.StartEpoch, deal.ClientDealProposal.Proposal.EndEpoch, deal.ClientDealProposal.Proposal.StoragePricePerEpoch.Uint64(),
+		deal.ClientDealProposal.Proposal.ProviderCollateral.Int64(), deal.ClientDealProposal.Proposal.ClientCollateral.Uint64(), deal.ClientPeerID.String(),
+		deal.DealDataRoot.String(), deal.InboundFilePath, deal.Transfer.Type, deal.Transfer.Params, deal.Transfer.Size, deal.ChainDealID,
+		deal.PublishCID.String(), deal.SectorID, deal.Offset, deal.Length, deal.Checkpoint.String(), deal.CheckpointAt, deal.Err, deal.Retry, []byte("test"),
+		deal.FastRetrieval, deal.AnnounceToIPNI)
+
+	req.NoError(err)
+
+	// Run migration
+	req.NoError(goose.Up(sqldb, "."))
+
+	// Get the deal state
 	dealState, err := dealsDB.ByID(ctx, deals[0].DealUuid)
-	require.NoError(t, err)
-	require.False(t, dealState.AnnounceToIPNI)
-
-	//Run migration
-	req.NoError(goose.UpByOne(sqldb, "."))
-
-	// Check the deal state again
-	dealState, err = dealsDB.ByID(ctx, deals[0].DealUuid)
 	require.NoError(t, err)
 	require.True(t, dealState.AnnounceToIPNI)
 }

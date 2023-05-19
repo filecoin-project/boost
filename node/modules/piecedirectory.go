@@ -3,11 +3,13 @@ package modules
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/shared"
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost-gfm/stores"
+	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
@@ -15,9 +17,11 @@ import (
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
+	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/lotus/api/v1api"
 	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -26,13 +30,17 @@ import (
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/ipfs/go-cid"
 	bstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/ipfs/go-libipfs/blocks"
 	carindex "github.com/ipld/go-car/v2/index"
 	"go.uber.org/fx"
 )
 
 func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) types.Store {
 	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) types.Store {
-		client := piecedirectory.NewStore()
+		svcDialOpts := []jsonrpc.Option{
+			jsonrpc.WithTimeout(time.Duration(cfg.LocalIndexDirectory.ServiceRPCTimeout)),
+		}
+		client := piecedirectory.NewStore(svcDialOpts...)
 
 		var cancel context.CancelFunc
 		var svcCtx context.Context
@@ -50,9 +58,20 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 				}
 
 				svcCtx, cancel = context.WithCancel(ctx)
-
 				var bdsvc *svc.Service
-				if cfg.LocalIndexDirectory.Couchbase.ConnectString != "" {
+				switch {
+				case cfg.LocalIndexDirectory.Yugabyte.Enabled:
+					log.Infow("local index directory: connecting to yugabyte server",
+						"connect-string", cfg.LocalIndexDirectory.Yugabyte.ConnectString,
+						"hosts", cfg.LocalIndexDirectory.Yugabyte.Hosts)
+
+					// Set up a local index directory service that connects to the yugabyte db
+					bdsvc = svc.NewYugabyte(yugabyte.DBSettings{
+						Hosts:         cfg.LocalIndexDirectory.Yugabyte.Hosts,
+						ConnectString: cfg.LocalIndexDirectory.Yugabyte.ConnectString,
+					})
+
+				case cfg.LocalIndexDirectory.Couchbase.ConnectString != "":
 					log.Infow("local index directory: connecting to couchbase server",
 						"connect-string", cfg.LocalIndexDirectory.Couchbase.ConnectString)
 
@@ -74,7 +93,8 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 							RAMQuotaMB: cfg.LocalIndexDirectory.Couchbase.PieceOffsetsBucket.RAMQuotaMB,
 						},
 					})
-				} else {
+
+				default:
 					log.Infow("local index directory: connecting to leveldb instance")
 
 					// Setup a local index directory service that connects to the leveldb
@@ -86,13 +106,14 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 				}
 
 				// Start the embedded local index directory service
-				err := bdsvc.Start(svcCtx, port)
+				addr := fmt.Sprintf("localhost:%d", port)
+				err := bdsvc.Start(svcCtx, addr)
 				if err != nil {
 					return fmt.Errorf("starting local index directory service: %w", err)
 				}
 
 				// Connect to the embedded service
-				return client.Dial(ctx, fmt.Sprintf("http://localhost:%d", port))
+				return client.Dial(ctx, fmt.Sprintf("ws://%s", addr))
 			},
 			OnStop: func(ctx context.Context) error {
 				cancel()
@@ -282,4 +303,21 @@ type closableBlockstore struct {
 
 func (c closableBlockstore) Close() error {
 	return nil
+}
+
+func NewBlockGetter(pd *piecedirectory.PieceDirectory) gql.BlockGetter {
+	return &pdBlockGetter{pd: pd}
+}
+
+type pdBlockGetter struct {
+	pd *piecedirectory.PieceDirectory
+}
+
+func (p *pdBlockGetter) Get(ctx context.Context, c cid.Cid) (blocks.Block, error) {
+	bz, err := p.pd.BlockstoreGet(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+
+	return blocks.NewBlockWithCid(bz, c)
 }

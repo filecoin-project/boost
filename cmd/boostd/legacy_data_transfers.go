@@ -33,8 +33,9 @@ var dataTransfersCmd = &cli.Command{
 }
 
 var marketRestartTransfer = &cli.Command{
-	Name:  "restart",
-	Usage: "Force restart a stalled data transfer",
+	Name:      "restart",
+	Usage:     "Force restart a stalled data transfer",
+	ArgsUsage: "<transfer id>",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "peerid",
@@ -93,8 +94,9 @@ var marketRestartTransfer = &cli.Command{
 }
 
 var marketCancelTransfer = &cli.Command{
-	Name:  "cancel",
-	Usage: "Force cancel a data transfer",
+	Name:      "cancel",
+	Usage:     "Force cancel a data transfer",
+	ArgsUsage: "<transfer id>",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "peerid",
@@ -290,9 +292,10 @@ func toDTv2Logs(logs []*datatransfer.Log) []*datatransferv2.Log {
 }
 
 var transfersDiagnosticsCmd = &cli.Command{
-	Name:  "diagnostics",
-	Usage: "Get detailed diagnostics on active transfers with a specific peer",
-	Flags: []cli.Flag{},
+	Name:      "diagnostics",
+	Usage:     "Get detailed diagnostics on active transfers with a specific peer",
+	ArgsUsage: "<peer id>",
+	Flags:     []cli.Flag{},
 	Action: func(cctx *cli.Context) error {
 		if !cctx.Args().Present() {
 			return cli.ShowCommandHelp(cctx, cctx.Command.Name)

@@ -405,6 +405,14 @@ to keep the size of logsDB in check. Set the value as "0" to disable log cleanup
 lotus-miner API. SealingPipelineCacheTimeout defines cache timeout value in seconds. Default is 30 seconds.
 Any value less than 0 will result in use of default`,
 		},
+		{
+			Name: "FundsTaggingEnabled",
+			Type: "bool",
+
+			Comment: `Whether to enable tagging of funds. If enabled, each time a deal is
+accepted boost will tag funds for that deal so that they cannot be used
+for any other deal.`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{
@@ -422,6 +430,12 @@ Any value less than 0 will result in use of default`,
 	},
 	"GraphqlConfig": []DocField{
 		{
+			Name: "ListenAddress",
+			Type: "string",
+
+			Comment: `The ip address the GraphQL server will bind to. Default: 0.0.0.0`,
+		},
+		{
 			Name: "Port",
 			Type: "uint64",
 
@@ -429,6 +443,12 @@ Any value less than 0 will result in use of default`,
 		},
 	},
 	"LocalIndexDirectoryConfig": []DocField{
+		{
+			Name: "Yugabyte",
+			Type: "LocalIndexDirectoryYugabyteConfig",
+
+			Comment: ``,
+		},
 		{
 			Name: "Couchbase",
 			Type: "LocalIndexDirectoryCouchbaseConfig",
@@ -456,8 +476,14 @@ Set this value to zero to disable the embedded local index directory data servic
 			Name: "ServiceApiInfo",
 			Type: "string",
 
-			Comment: `The connect string for the local index directory data service RPC API eg "http://localhost:8042"
+			Comment: `The connect string for the local index directory data service RPC API eg "ws://localhost:8042"
 Set this value to "" if the local index directory data service is embedded.`,
+		},
+		{
+			Name: "ServiceRPCTimeout",
+			Type: "Duration",
+
+			Comment: `The RPC timeout when making requests to the boostd-data service`,
 		},
 	},
 	"LocalIndexDirectoryCouchbaseBucketConfig": []DocField{
@@ -505,6 +531,26 @@ If empty, a leveldb database is used instead.`,
 			Type: "LocalIndexDirectoryCouchbaseBucketConfig",
 
 			Comment: ``,
+		},
+	},
+	"LocalIndexDirectoryYugabyteConfig": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: ``,
+		},
+		{
+			Name: "ConnectString",
+			Type: "string",
+
+			Comment: `The yugabyte postgres connect string eg "postgresql://postgres:postgres@localhost"`,
+		},
+		{
+			Name: "Hosts",
+			Type: "[]string",
+
+			Comment: `The yugabyte cassandra hosts eg ["127.0.0.1"]`,
 		},
 	},
 	"LotusDealmakingConfig": []DocField{
@@ -612,6 +658,22 @@ see https://boost.filecoin.io/configuration/deal-filters for more details`,
 			Type: "int",
 
 			Comment: `The maximum number of concurrent fetch operations to the storage subsystem`,
+		},
+		{
+			Name: "StorageListRefreshDuration",
+			Type: "Duration",
+
+			Comment: `How frequently Boost should refresh the state of sectors with Lotus. (default: 1hour)
+When run, Boost will trigger a storage redeclare on the miner in addition to a storage list.
+This ensures that index metadata for sectors reflects their status (removed, unsealed, etc).`,
+		},
+		{
+			Name: "RedeclareOnStorageListRefresh",
+			Type: "bool",
+
+			Comment: `Whether or not Boost should have lotus redeclare its storage list (default: true).
+Disable this if you wish to manually handle the refresh. If manually managing the redeclare
+and it is not triggered, retrieval quality for users will be impacted.`,
 		},
 	},
 	"TracingConfig": []DocField{

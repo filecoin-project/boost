@@ -16,7 +16,6 @@ var pieceDirCmd = &cli.Command{
 	Usage: "Manage Local Index Directory",
 	Subcommands: []*cli.Command{
 		pdIndexGenerate,
-		pdIndexMarkErroredCmd,
 	},
 }
 
@@ -52,48 +51,6 @@ var pdIndexGenerate = &cli.Command{
 		}
 
 		fmt.Println("Generated index in", time.Since(addStart).String())
-
-		return nil
-	},
-}
-
-var pdIndexMarkErroredCmd = &cli.Command{
-	Name:  "mark-index",
-	Usage: "Mark an index errored for a given piece in the local index directory",
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:     "piece-cid",
-			Usage:    "piece-cid of the index that will be marked as errored",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "error",
-			Usage:    "error message",
-			Required: true,
-		},
-	},
-	Action: func(cctx *cli.Context) error {
-		ctx := lcli.ReqContext(cctx)
-
-		// parse piececid
-		piececid, err := cid.Decode(cctx.String("piece-cid"))
-		if err != nil {
-			return err
-		}
-
-		boostApi, ncloser, err := bcli.GetBoostAPI(cctx)
-		if err != nil {
-			return fmt.Errorf("getting boost api: %w", err)
-		}
-		defer ncloser()
-
-		errMsg := cctx.String("error")
-		err = boostApi.PdMarkIndexErrored(ctx, piececid, errMsg)
-		if err != nil {
-			return err
-		}
-
-		fmt.Printf("Marked %s as errored with \"%s\"\n", piececid, errMsg)
 
 		return nil
 	},

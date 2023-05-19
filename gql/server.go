@@ -23,12 +23,13 @@ var log = logging.Logger("gql")
 
 type Server struct {
 	resolver *resolver
+	bstore   BlockGetter
 	srv      *http.Server
 	wg       sync.WaitGroup
 }
 
-func NewServer(resolver *resolver) *Server {
-	return &Server{resolver: resolver}
+func NewServer(resolver *resolver, bstore BlockGetter) *Server {
+	return &Server{resolver: resolver, bstore: bstore}
 }
 
 //go:embed schema.graphql
@@ -46,6 +47,8 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// Serve dummy deals
 	port := int(s.resolver.cfg.Graphql.Port)
+	bindAddress := s.resolver.cfg.Graphql.ListenAddress
+
 	err = serveDummyDeals(mux, port)
 	if err != nil {
 		return err
@@ -57,10 +60,14 @@ func (s *Server) Start(ctx context.Context) error {
 	// Allow resolving directly to fields (instead of requiring resolvers to
 	// have a method for every GraphQL field)
 	opts := []graphql.SchemaOpt{graphql.UseFieldResolvers()}
-	schema, err := graphql.ParseSchema(string(schemaGraqhql), s.resolver, opts...)
+	schema, err := graphql.ParseSchema(schemaGraqhql, s.resolver, opts...)
 	if err != nil {
 		return err
 	}
+
+	// Serve /downloads (for downloading raw data for debugging purposes)
+	srvCtx, cancelSrvCtx := context.WithCancel(context.Background())
+	serveDownload(srvCtx, mux, s.bstore)
 
 	// GraphQL handler
 	queryHandler := &relay.Handler{Schema: schema}
@@ -72,7 +79,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	wsHandler := graphqlws.NewHandlerFunc(schema, queryHandler, wsOpts...)
 
-	listenAddr := fmt.Sprintf(":%d", port)
+	listenAddr := fmt.Sprintf("%s:%d", bindAddress, port)
 	s.srv = &http.Server{Addr: listenAddr, Handler: mux}
 	fmt.Printf("Graphql server listening on %s\n", listenAddr)
 	mux.Handle("/graphql/subscription", &corsHandler{wsHandler})
@@ -81,6 +88,7 @@ func (s *Server) Start(ctx context.Context) error {
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
+		defer cancelSrvCtx()
 
 		if err := s.srv.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("gql.ListenAndServe(): %v", err)

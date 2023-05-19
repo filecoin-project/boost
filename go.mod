@@ -30,7 +30,7 @@ require (
 	github.com/filecoin-project/go-address v1.1.0
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-cbor-util v0.0.1
-	github.com/filecoin-project/go-commp-utils v0.1.3
+	github.com/filecoin-project/go-commp-utils v0.1.4
 	github.com/filecoin-project/go-data-transfer v1.15.4-boost
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
@@ -39,9 +39,9 @@ require (
 	github.com/filecoin-project/go-legs v0.4.9
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.10.0
+	github.com/filecoin-project/go-state-types v0.11.1
 	github.com/filecoin-project/go-statestore v0.2.0
-	github.com/filecoin-project/lotus v1.21.0-rc1
+	github.com/filecoin-project/lotus v1.23.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
 	github.com/golang/mock v1.6.0
@@ -53,7 +53,7 @@ require (
 	github.com/hnlq715/golang-lru v0.3.0
 	github.com/ipfs/go-block-format v0.1.1 // indirect
 	github.com/ipfs/go-blockservice v0.5.0
-	github.com/ipfs/go-cid v0.3.2
+	github.com/ipfs/go-cid v0.4.0
 	github.com/ipfs/go-cidutil v0.1.0
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-graphsync v0.14.3
@@ -67,7 +67,7 @@ require (
 	github.com/ipfs/go-ipfs-routing v0.3.0
 	github.com/ipfs/go-ipld-format v0.4.0
 	github.com/ipfs/go-ipld-legacy v0.1.1
-	github.com/ipfs/go-libipfs v0.5.0
+	github.com/ipfs/go-libipfs v0.7.0
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/ipfs/go-merkledag v0.9.0
 	github.com/ipfs/go-metrics-interface v0.0.1
@@ -118,7 +118,7 @@ require (
 	golang.org/x/text v0.7.0
 	golang.org/x/tools v0.3.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
-	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect
+	google.golang.org/genproto v0.0.0-20221118155620-16455021b5e6 // indirect
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
 )
 
@@ -232,11 +232,11 @@ require (
 	github.com/ipfs/go-ipld-cbor v0.0.6
 	github.com/ipfs/go-ipns v0.3.0 // indirect
 	github.com/ipfs/go-log v1.0.5 // indirect
-	github.com/ipfs/go-path v0.3.0 // indirect
+	github.com/ipfs/go-path v0.3.1
 	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
 	github.com/ipfs/go-unixfsnode v1.5.2
 	github.com/ipfs/go-verifcid v0.0.2 // indirect
-	github.com/ipfs/interface-go-ipfs-core v0.11.1 // indirect
+	github.com/ipfs/interface-go-ipfs-core v0.11.1
 	github.com/ipld/go-codec-dagpb v1.5.0
 	github.com/ipld/go-ipld-adl-hamt v0.0.0-20220616142416-9004dbd839e0 // indirect
 	github.com/ipsn/go-secp256k1 v0.0.0-20180726113642-9d62b9f0bc52 // indirect
@@ -272,7 +272,7 @@ require (
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
-	github.com/mattn/go-runewidth v0.0.13 // indirect
+	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
@@ -325,10 +325,10 @@ require (
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/mod v0.7.0 // indirect
 	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/term v0.5.0
+	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/term v0.6.0
 	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9 // indirect
-	google.golang.org/grpc v1.47.0 // indirect
+	google.golang.org/grpc v1.52.3 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -339,9 +339,19 @@ require (
 require (
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/filecoin-project/boostd-data v0.0.0-00010101000000-000000000000
+	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
 	github.com/ipfs/go-ds-flatfs v0.5.1
+	github.com/ipfs/go-fetcher v1.6.1
+	github.com/ipfs/go-ipfs-redirects-file v0.1.1 // indirect
+	github.com/ipfs/go-namesys v0.7.0
+)
+
+require (
+	github.com/filecoin-project/boost-gfm v1.26.5
+	github.com/filecoin-project/boost-graphsync v0.13.6
+	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc4
 	github.com/ipfs/kubo v0.18.1
-	github.com/schollz/progressbar/v3 v3.11.0
+	github.com/schollz/progressbar/v3 v3.13.1
 )
 
 require (
@@ -352,9 +362,6 @@ require (
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/docker v20.10.21+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
-	github.com/filecoin-project/boost-gfm v1.26.5
-	github.com/filecoin-project/boost-graphsync v0.13.6
-	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc4
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799 // indirect
@@ -362,13 +369,28 @@ require (
 
 require (
 	github.com/google/pprof v0.0.0-20221203041831-ce31453925ec // indirect
+	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
+	github.com/hashicorp/go-uuid v1.0.2 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
+	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
+	github.com/jackc/pgconn v1.11.0 // indirect
+	github.com/jackc/pgio v1.0.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgproto3/v2 v2.2.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
+	github.com/jackc/pgtype v1.10.0 // indirect
+	github.com/jackc/puddle v1.2.1 // indirect
 	github.com/onsi/ginkgo/v2 v2.5.1 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/qtls-go1-19 v0.2.1 // indirect
 	github.com/quic-go/qtls-go1-20 v0.1.1 // indirect
 	github.com/quic-go/quic-go v0.33.0 // indirect
 	github.com/quic-go/webtransport-go v0.5.2 // indirect
+	github.com/tidwall/gjson v1.14.0 // indirect
+	github.com/ucarion/urlpath v0.0.0-20200424170820-7ccc79b76bbb // indirect
+	github.com/yugabyte/gocql v0.0.0-20221110041640-6fc475c5aeb0 // indirect
+	github.com/yugabyte/pgx/v4 v4.14.5 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
+	gopkg.in/inf.v0 v0.9.1 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )

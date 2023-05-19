@@ -39,10 +39,12 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
+	"github.com/filecoin-project/go-state-types/crypto"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	lotusmocks "github.com/filecoin-project/lotus/api/mocks"
 	test "github.com/filecoin-project/lotus/chain/events/state/mock"
+	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/repo"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
@@ -591,7 +593,7 @@ func TestOfflineDealRestartAfterManualRecoverableErrors(t *testing.T) {
 			require.NoError(t, err)
 
 			// execute deal
-			err = td.executeAndSubscribeImportOfflineDeal()
+			err = td.executeAndSubscribeImportOfflineDeal(false)
 			require.NoError(t, err)
 
 			// expect recoverable error with retry type Manual
@@ -701,6 +703,74 @@ func TestDealRestartAfterManualRecoverableErrors(t *testing.T) {
 
 			// assert funds and storage are no longer tagged
 			harness.EventuallyAssertNoTagged(t, ctx)
+		})
+	}
+}
+
+func TestDealRestartFailExpiredDeal(t *testing.T) {
+	ctx := context.Background()
+
+	tcs := []struct {
+		name      string
+		isOffline bool
+	}{{
+		name:      "online",
+		isOffline: false,
+	}, {
+		name:      "offline",
+		isOffline: true,
+	}}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup the provider test harness
+			var chainHead *chaintypes.TipSet
+			harness := NewHarness(t, withChainHeadFunction(func(ctx context.Context) (*chaintypes.TipSet, error) {
+				return chainHead, nil
+			}))
+
+			chainHead, err := mockTipset(harness.MinerAddr, 5)
+			require.NoError(t, err)
+
+			// start the provider test harness
+			harness.Start(t, ctx)
+			defer harness.Stop()
+
+			// build the deal proposal
+			opts := []dealProposalOpt{}
+			if tc.isOffline {
+				opts = append(opts, withOfflineDeal())
+			}
+			td := harness.newDealBuilder(t, 1, opts...).withCommpBlocking(true).build()
+
+			// execute deal
+			err = td.executeAndSubscribe()
+			require.NoError(t, err)
+
+			err = td.waitForCheckpoint(dealcheckpoints.Accepted)
+			require.NoError(t, err)
+
+			// shutdown the existing provider and create a new provider
+			harness.shutdownAndCreateNewProvider(t)
+
+			// update the test deal state with the new provider
+			_ = td.updateWithRestartedProvider(harness)
+
+			// simulate a chain height that is greater that the epoch by which
+			// the deal should have been sealed
+			chainHead, err = mockTipset(harness.MinerAddr, td.params.ClientDealProposal.Proposal.StartEpoch+10)
+			require.NoError(t, err)
+
+			// start the provider
+			err = harness.Provider.Start()
+			require.NoError(t, err)
+
+			// expect the deal to fail on startup because it has expired
+			require.Eventually(t, func() bool {
+				dl, err := harness.Provider.Deal(ctx, td.params.DealUUID)
+				require.NoError(t, err)
+				return strings.Contains(dl.Err, "expired")
+			}, 5*time.Second, 100*time.Millisecond)
 		})
 	}
 }
@@ -1092,6 +1162,27 @@ func TestDealFilter(t *testing.T) {
 	require.EqualValues(t, 10000000000, dealFilterParams.StorageState.TotalAvailable)
 }
 
+func TestFinalSealingState(t *testing.T) {
+	ctx := context.Background()
+	harness := NewHarness(t)
+
+	harness.Start(t, ctx)
+	defer harness.Stop()
+
+	// The deal ID returned from Publish Storage Deals is hard-coded to 1 for
+	// these tests.
+	// Set the deal ID that is returned from the call to SectorsStatus
+	// to be different so that there is a mismatch when checking the sealing
+	// state.
+	sectorsStatusDealId := abi.DealID(10)
+	td := harness.newDealBuilder(t, 1, withSectorStatusDealId(sectorsStatusDealId)).withAllMinerCallsNonBlocking().withNormalHttpServer().build()
+	require.NoError(t, td.executeAndSubscribe())
+
+	err := td.waitForError("storage failed - deal not found in sector", types.DealRetryFatal)
+	require.NoError(t, err)
+
+}
+
 func (h *ProviderHarness) executeNDealsConcurrentAndWaitFor(t *testing.T, nDeals int,
 	buildDeal func(i int) *testDeal, waitF func(i int, td *testDeal) error) []*testDeal {
 	tds := make([]*testDeal, 0, nDeals)
@@ -1217,10 +1308,11 @@ func (h *ProviderHarness) AssertEventuallyDealCleanedup(t *testing.T, ctx contex
 			return false
 		}
 
-		// the deal inbound file should no longer exist if it is an online deal
-		if !dp.IsOffline {
+		// the deal inbound file should no longer exist if it is an online deal,
+		// or if it is an offline deal with the delete after import flag set
+		if dbState.CleanupData {
 			_, statErr := os.Stat(dbState.InboundFilePath)
-			return statErr != nil
+			return os.IsNotExist(statErr)
 		}
 		return true
 	}, 5*time.Second, 200*time.Millisecond)
@@ -1282,6 +1374,8 @@ type ProviderHarness struct {
 	DAGStore *shared_testutil.MockDagStoreWrapper
 }
 
+type ChainHeadFn func(ctx context.Context) (*chaintypes.TipSet, error)
+
 type providerConfig struct {
 	mockCtrl *gomock.Controller
 
@@ -1302,8 +1396,9 @@ type providerConfig struct {
 	minPieceSize  abi.PaddedPieceSize
 	maxPieceSize  abi.PaddedPieceSize
 
-	localCommp bool
-	dealFilter dealfilter.StorageDealFilter
+	localCommp  bool
+	dealFilter  dealfilter.StorageDealFilter
+	chainHeadFn ChainHeadFn
 }
 
 type harnessOpt func(pc *providerConfig)
@@ -1381,6 +1476,12 @@ func withDealFilter(filter dealfilter.StorageDealFilter) harnessOpt {
 	}
 }
 
+func withChainHeadFunction(fn ChainHeadFn) harnessOpt {
+	return func(pc *providerConfig) {
+		pc.chainHeadFn = fn
+	}
+}
+
 func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	ctrl := gomock.NewController(t)
 	pc := &providerConfig{
@@ -1421,7 +1522,7 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	// setup mocks
 	fn := lotusmocks.NewMockFullNode(ctrl)
 	minerStub := smtestutil.NewMinerStub(ctrl)
-	sps := mock_sealingpipeline.NewMockAPI(ctrl)
+	sps := minerStub.MockAPI
 
 	// setup client and miner addrs
 	minerAddr, err := address.NewIDAddress(1011)
@@ -1489,6 +1590,7 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 
 	// fund manager
 	fminitF := fundmanager.New(fundmanager.Config{
+		Enabled:      true,
 		PubMsgBalMin: ph.MinPublishFees,
 		PubMsgWallet: pw,
 		CollatWallet: pcw,
@@ -1543,10 +1645,17 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	require.NoError(t, err)
 	ph.Provider = prov
 
-	// Creates chain tipset with height 5
-	chainHead, err := test.MockTipset(minerAddr, 1)
-	require.NoError(t, err)
-	fn.EXPECT().ChainHead(gomock.Any()).Return(chainHead, nil).AnyTimes()
+	chainHeadFn := pc.chainHeadFn
+	if chainHeadFn == nil {
+		// Creates chain tipset with height 5
+		chainHead, err := test.MockTipset(minerAddr, 1)
+		require.NoError(t, err)
+		chainHeadFn = func(ctx context.Context) (*chaintypes.TipSet, error) {
+			return chainHead, nil
+		}
+	}
+	fn.EXPECT().ChainHead(gomock.Any()).DoAndReturn(chainHeadFn).AnyTimes()
+
 	fn.EXPECT().StateDealProviderCollateralBounds(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(lapi.DealCollateralBounds{
 		Min: abi.NewTokenAmount(1),
 		Max: abi.NewTokenAmount(1),
@@ -1588,6 +1697,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	// shutdown old provider
 	h.Provider.Stop()
 	h.MinerStub = smtestutil.NewMinerStub(h.GoMockCtrl)
+	h.MockSealingPipelineAPI = h.MinerStub.MockAPI
 	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
 	df := func(ctx context.Context, deal dealfilter.DealFilterParams) (bool, string, error) {
 		return true, "", nil
@@ -1621,19 +1731,20 @@ func (h *ProviderHarness) Stop() {
 }
 
 type dealProposalConfig struct {
-	normalFileSize     int
-	offlineDeal        bool
-	verifiedDeal       bool
-	providerCollateral abi.TokenAmount
-	clientAddr         address.Address
-	minerAddr          address.Address
-	pieceCid           cid.Cid
-	pieceSize          abi.PaddedPieceSize
-	undefinedPieceCid  bool
-	startEpoch         abi.ChainEpoch
-	endEpoch           abi.ChainEpoch
-	label              market.DealLabel
-	carVersion         CarVersion
+	normalFileSize      int
+	offlineDeal         bool
+	verifiedDeal        bool
+	providerCollateral  abi.TokenAmount
+	clientAddr          address.Address
+	minerAddr           address.Address
+	pieceCid            cid.Cid
+	pieceSize           abi.PaddedPieceSize
+	undefinedPieceCid   bool
+	startEpoch          abi.ChainEpoch
+	endEpoch            abi.ChainEpoch
+	label               market.DealLabel
+	carVersion          CarVersion
+	sectorsStatusDealId abi.DealID
 }
 
 // dealProposalOpt allows configuration of the deal proposal
@@ -1711,6 +1822,13 @@ func withEpochs(start, end abi.ChainEpoch) dealProposalOpt {
 	return func(dc *dealProposalConfig) {
 		dc.startEpoch = start
 		dc.endEpoch = end
+	}
+}
+
+// Set the id of the deal that is returned from the call to SectorsStatus
+func withSectorStatusDealId(id abi.DealID) dealProposalOpt {
+	return func(dc *dealProposalConfig) {
+		dc.sectorsStatusDealId = id
 	}
 }
 
@@ -1817,20 +1935,33 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 		RemoveUnsealedCopy: true,
 	}
 
+	// Create a copy of the car file so that if the original car file gets
+	// cleaned up after the deal is added to a sector, we still have a copy
+	// we can use to compare with the contents of the unsealed file.
+	carFileCopyPath := carFilePath + ".copy"
+	err = copyFile(carFilePath, carFileCopyPath)
+	require.NoError(tbuilder.t, err)
 	td := &testDeal{
-		ph:            tbuilder.ph,
-		params:        dealParams,
-		carv2FilePath: carFilePath,
-		carv2FileName: name,
+		ph:                tbuilder.ph,
+		params:            dealParams,
+		carv2FilePath:     carFilePath,
+		carv2CopyFilePath: carFileCopyPath,
+		carv2FileName:     name,
 	}
 
 	publishCid := testutil.GenerateCid()
 	finalPublishCid := testutil.GenerateCid()
-	dealId := abi.DealID(rand.Intn(100))
+
+	dealId := abi.DealID(1)
+	sectorsStatusDealId := dealId
+	if dc.sectorsStatusDealId > abi.DealID(0) {
+		dealId = dc.sectorsStatusDealId
+	}
+
 	sectorId := abi.SectorNumber(rand.Intn(100))
 	offset := abi.PaddedPieceSize(rand.Intn(100))
 
-	tbuilder.ms = tbuilder.ph.MinerStub.ForDeal(dealParams, publishCid, finalPublishCid, dealId, sectorId, offset)
+	tbuilder.ms = tbuilder.ph.MinerStub.ForDeal(dealParams, publishCid, finalPublishCid, dealId, sectorsStatusDealId, sectorId, offset)
 	tbuilder.td = td
 	return tbuilder
 }
@@ -1838,6 +1969,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 type minerStubCall struct {
 	err      error
 	blocking bool
+	optional bool
 }
 
 type testDealBuilder struct {
@@ -1874,8 +2006,12 @@ func (tbuilder *testDealBuilder) withCommpFailing(err error) *testDealBuilder {
 	return tbuilder
 }
 
-func (tbuilder *testDealBuilder) withCommpBlocking() *testDealBuilder {
-	tbuilder.msCommp = &minerStubCall{blocking: true}
+func (tbuilder *testDealBuilder) withCommpBlocking(optional ...bool) *testDealBuilder {
+	isOptional := false
+	if len(optional) > 0 {
+		isOptional = optional[0]
+	}
+	tbuilder.msCommp = &minerStubCall{blocking: true, optional: isOptional}
 	return tbuilder
 }
 
@@ -1998,7 +2134,7 @@ func (tbuilder *testDealBuilder) buildCommp() *testDealBuilder {
 		if err := tbuilder.msCommp.err; err != nil {
 			tbuilder.ms.SetupCommpFailure(err)
 		} else {
-			tbuilder.ms.SetupCommp(tbuilder.msCommp.blocking)
+			tbuilder.ms.SetupCommp(tbuilder.msCommp.blocking, tbuilder.msCommp.optional)
 		}
 	}
 
@@ -2048,18 +2184,19 @@ func (tbuilder *testDealBuilder) buildAnnounce() *testDealBuilder {
 }
 
 type testDeal struct {
-	ph            *ProviderHarness
-	params        *types.DealParams
-	carv2FilePath string
-	carv2FileName string
-	stubOutput    *smtestutil.StubbedMinerOutput
-	sub           event.Subscription
+	ph                *ProviderHarness
+	params            *types.DealParams
+	carv2FilePath     string
+	carv2FileName     string
+	carv2CopyFilePath string
+	stubOutput        *smtestutil.StubbedMinerOutput
+	sub               event.Subscription
 
 	tBuilder *testDealBuilder
 }
 
-func (td *testDeal) executeAndSubscribeImportOfflineDeal() error {
-	pi, err := td.ph.Provider.ImportOfflineDealData(context.Background(), td.params.DealUUID, td.carv2FilePath)
+func (td *testDeal) executeAndSubscribeImportOfflineDeal(delAfterImport bool) error {
+	pi, err := td.ph.Provider.ImportOfflineDealData(context.Background(), td.params.DealUUID, td.carv2FilePath, delAfterImport)
 	if err != nil {
 		return err
 	}
@@ -2172,7 +2309,7 @@ func (td *testDeal) updateWithRestartedProvider(ph *ProviderHarness) *testDealBu
 
 	td.tBuilder.ph = ph
 	td.tBuilder.td = td
-	td.tBuilder.ms = ph.MinerStub.ForDeal(td.params, old.PublishCid, old.FinalPublishCid, old.DealID, old.SectorID, old.Offset)
+	td.tBuilder.ms = ph.MinerStub.ForDeal(td.params, old.PublishCid, old.FinalPublishCid, old.DealID, old.SectorsStatusDealID, old.SectorID, old.Offset)
 
 	return td.tBuilder
 }
@@ -2190,7 +2327,7 @@ func (td *testDeal) waitForAndAssert(t *testing.T, ctx context.Context, cp dealc
 	case dealcheckpoints.PublishConfirmed:
 		td.ph.AssertPublishConfirmed(t, ctx, td.params, td.stubOutput)
 	case dealcheckpoints.AddedPiece:
-		td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2FilePath)
+		td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2CopyFilePath)
 	case dealcheckpoints.IndexedAndAnnounced:
 		td.ph.AssertDealIndexed(t, ctx, td.params, td.stubOutput)
 	default:
@@ -2219,7 +2356,7 @@ func (td *testDeal) unblockAddPiece() {
 }
 
 func (td *testDeal) assertPieceAdded(t *testing.T, ctx context.Context) {
-	td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2FilePath)
+	td.ph.AssertPieceAdded(t, ctx, td.params, td.stubOutput, td.carv2CopyFilePath)
 }
 
 func (td *testDeal) assertDealFailedTransferNonRecoverable(t *testing.T, ctx context.Context, errStr string) {
@@ -2267,4 +2404,32 @@ type mockSignatureVerifier struct {
 
 func (m *mockSignatureVerifier) VerifySignature(ctx context.Context, sig acrypto.Signature, addr address.Address, input []byte) (bool, error) {
 	return m.valid, m.err
+}
+
+func copyFile(source string, dest string) error {
+	input, err := os.ReadFile(source)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(dest, input, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func mockTipset(minerAddr address.Address, height abi.ChainEpoch) (*chaintypes.TipSet, error) {
+	dummyCid, _ := cid.Parse("bafkqaaa")
+	return chaintypes.NewTipSet([]*chaintypes.BlockHeader{{
+		Miner:                 minerAddr,
+		Height:                height,
+		ParentStateRoot:       dummyCid,
+		Messages:              dummyCid,
+		ParentMessageReceipts: dummyCid,
+		BlockSig:              &crypto.Signature{Type: crypto.SigTypeBLS},
+		BLSAggregate:          &crypto.Signature{Type: crypto.SigTypeBLS},
+		Timestamp:             1,
+	}})
 }

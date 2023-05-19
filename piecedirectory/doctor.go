@@ -86,16 +86,6 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 		return fmt.Errorf("failed to get piece %s from local index directory: %w", pieceCid, err)
 	}
 
-	// Check if the piece is in an error state
-	if md.Error != "" {
-		err = d.store.FlagPiece(ctx, pieceCid)
-		if err != nil {
-			return fmt.Errorf("failed to flag piece in error state %s: %w", pieceCid, err)
-		}
-		doclog.Debugw("piece is in error state", "err", md.Error)
-		return nil
-	}
-
 	// Check if piece has been indexed
 	isIndexed, err := d.store.IsIndexed(ctx, pieceCid)
 	if err != nil {

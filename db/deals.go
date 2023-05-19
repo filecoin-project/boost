@@ -9,6 +9,8 @@ import (
 	"github.com/filecoin-project/boost/db/fielddef"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
@@ -62,6 +64,7 @@ func newDealAccessor(db *sql.DB, deal *types.ProviderDealState) *dealAccessor {
 			"PieceSize":             &fielddef.FieldDef{F: &deal.ClientDealProposal.Proposal.PieceSize},
 			"VerifiedDeal":          &fielddef.FieldDef{F: &deal.ClientDealProposal.Proposal.VerifiedDeal},
 			"IsOffline":             &fielddef.FieldDef{F: &deal.IsOffline},
+			"CleanupData":           &fielddef.FieldDef{F: &deal.CleanupData},
 			"ClientAddress":         &fielddef.AddrFieldDef{F: &deal.ClientDealProposal.Proposal.Client},
 			"ProviderAddress":       &fielddef.AddrFieldDef{F: &deal.ClientDealProposal.Proposal.Provider},
 			"Label":                 &fielddef.LabelFieldDef{F: &deal.ClientDealProposal.Proposal.Label},
@@ -234,6 +237,15 @@ func (d *DealsDB) BySignedProposalCID(ctx context.Context, proposalCid cid.Cid) 
 	qry := "SELECT " + dealFieldsStr + " FROM Deals WHERE SignedProposalCID=?"
 	row := d.db.QueryRowContext(ctx, qry, proposalCid.String())
 	return d.scanRow(row)
+}
+
+func (d *DealsDB) BySectorID(ctx context.Context, sectorID abi.SectorID) ([]*types.ProviderDealState, error) {
+	addr, err := address.NewIDAddress(uint64(sectorID.Miner))
+	if err != nil {
+		return nil, fmt.Errorf("creating address from ID %d: %w", sectorID.Miner, err)
+	}
+
+	return d.list(ctx, 0, 0, "ProviderAddress=? AND SectorID=?", addr.String(), sectorID.Number)
 }
 
 func (d *DealsDB) Count(ctx context.Context, query string, filter *FilterOptions) (int, error) {

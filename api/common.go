@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/go-jsonrpc/auth"
+	apitypes "github.com/filecoin-project/lotus/api/types"
 )
 
 //                       MODIFYING THE API INTERFACE
@@ -38,8 +39,8 @@ type Common interface {
 	//// Version provides information about API provider
 	//Version(context.Context) (APIVersion, error) //perm:read
 
-	//// Discover returns an OpenRPC document describing an RPC API.
-	//Discover(ctx context.Context) (apitypes.OpenRPCDocument, error) //perm:read
+	// Discover returns an OpenRPC document describing an RPC API.
+	Discover(ctx context.Context) (apitypes.OpenRPCDocument, error) //perm:read
 
 	//// trigger graceful shutdown
 	//Shutdown(context.Context) error //perm:admin

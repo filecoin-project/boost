@@ -73,5 +73,10 @@ if [ ! -f $BOOST_PATH/.register.boost ]; then
 	echo Super. DONE! Boostd is now configured and will be started soon
 fi
 
-echo Starting boost in dev mode...
-exec boostd -vv run --nosync=true
+## Override config options
+echo Updating config values
+sed -i 's|ServiceApiInfo = ""|ServiceApiInfo = "http://localhost:8042"|g' $BOOST_PATH/config.toml
+
+echo Starting LID service and boost in dev mode...
+trap 'kill %1' SIGINT
+exec boostd-data run leveldb --addr=0.0.0.0:8042 & boostd -vv run --nosync=true

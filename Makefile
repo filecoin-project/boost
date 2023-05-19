@@ -7,18 +7,20 @@ unexport GOFLAGS
 
 GOCC?=go
 
+ARCH?=$(shell arch)
 GOVERSION:=$(shell $(GOCC) version | tr ' ' '\n' | grep go1 | sed 's/^go//' | awk -F. '{printf "%d%03d%03d", $$1, $$2, $$3}')
 ifeq ($(shell expr $(GOVERSION) \< 1016000), 1)
 $(warning Your Golang version is go$(shell expr $(GOVERSION) / 1000000).$(shell expr $(GOVERSION) % 1000000 / 1000).$(shell expr $(GOVERSION) % 1000))
 $(error Update Golang to version to at least 1.16.0)
 endif
 
-LTS_NODE_VER=16
-NODE_VER=$(shell node -v)
-ifeq ($(patsubst v$(LTS_NODE_VER).%,matched,$(NODE_VER)), matched)
-	NODE_LTS=true
+ALLOWED_NODE_VERSIONS := 16 18
+validate-node-version:
+ifeq ($(filter $(shell node -v | cut -c2-3),$(ALLOWED_NODE_VERSIONS)),)
+	@echo "Unsupported Node.js version. Please install one of the following versions: $(ALLOWED_NODE_VERSIONS)"
+	exit 1
 else
-	NODE_LTS=false
+	@echo "Node.js version $(shell node -v) is supported."
 endif
 
 # git modules that need to be loaded
@@ -92,6 +94,12 @@ boost: $(BUILD_DEPS)
 .PHONY: boost
 BINS+=boost boostx boostd
 
+boostd-data:
+	$(MAKE) -C ./extern/boostd-data
+	install -C ./extern/boostd-data/boostd-data ./boostd-data
+.PHONY: boostd-data
+BINS+=boostd-data
+
 booster-http: $(BUILD_DEPS)
 	rm -f booster-http
 	$(GOCC) build $(GOFLAGS) -o booster-http ./cmd/booster-http
@@ -115,22 +123,17 @@ boostci: $(BUILD_DEPS)
 	$(GOCC) build $(GOFLAGS) -o boostci ./cmd/boostci
 .PHONY: boostci
 
-react: check-node-lts
+react: validate-node-version
 	npm_config_legacy_peer_deps=yes npm ci --no-audit --prefix react
 	npm run --prefix react build
 .PHONY: react
 
-update-react: check-node-lts
+update-react: validate-node-version
 	npm_config_legacy_peer_deps=yes npm install --no-audit --prefix react
 	npm run --prefix react build
 .PHONY: react
 
-.PHONY: check-node-lts
-check-node-lts:
-	@$(NODE_LTS) || echo Build requires Node v$(LTS_NODE_VER) \(detected Node $(NODE_VER)\)
-	@$(NODE_LTS) && echo Building using Node v$(LTS_NODE_VER)
-
-build-go: boost devnet
+build-go: boost boostd-data devnet
 .PHONY: build-go
 
 build: react build-go
@@ -145,6 +148,7 @@ install-boost:
 	install -C ./boost /usr/local/bin/boost
 	install -C ./boostd /usr/local/bin/boostd
 	install -C ./boostx /usr/local/bin/boostx
+	install -C ./boostd-data /usr/local/bin/boostd-data
 
 install-devnet:
 	install -C ./devnet /usr/local/bin/devnet
@@ -200,7 +204,7 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=v1.20.0-rc1
+lotus_version?=v1.23.0-rc1
 ffi_from_source?=0
 build_lotus?=0
 ifeq ($(build_lotus),1)
@@ -255,6 +259,9 @@ docker/booster-bitswap:
 docker/all: $(lotus_build_cmd) docker/boost docker/booster-http docker/booster-bitswap \
 	docker/lotus docker/lotus-miner
 .PHONY: docker/all
+
+test-lid:
+	cd ./extern/boostd-data && ARCH=$(ARCH) docker-compose up --build --exit-code-from go-tests
 
 devnet/up:
 	rm -rf ./docker/devnet/data && docker compose -f ./docker/devnet/docker-compose.yaml up -d

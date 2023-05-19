@@ -4,10 +4,12 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
 	"github.com/filecoin-project/boostd-data/model"
@@ -18,13 +20,14 @@ import (
 const testFile = "test/test_file"
 
 func TestNewHttpServer(t *testing.T) {
-
 	// Create a new mock Http server
 	ctrl := gomock.NewController(t)
-	httpServer := NewHttpServer("", 7777, mocks_booster_http.NewMockHttpServerApi(ctrl))
-	httpServer.Start(context.Background())
+	httpServer := NewHttpServer("", 7777, mocks_booster_http.NewMockHttpServerApi(ctrl), nil)
+	err := httpServer.Start(context.Background())
+	require.NoError(t, err)
+	waitServerUp(t, 7777)
 
-	// Check that server is up
+	// Check that server is responding with 200 status code
 	resp, err := http.Get("http://localhost:7777/")
 	require.NoError(t, err)
 	require.Equal(t, 200, resp.StatusCode)
@@ -35,12 +38,13 @@ func TestNewHttpServer(t *testing.T) {
 }
 
 func TestHttpGzipResponse(t *testing.T) {
-
 	// Create a new mock Http server with custom functions
 	ctrl := gomock.NewController(t)
 	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
-	httpServer := NewHttpServer("", 7778, mockHttpServer)
-	httpServer.Start(context.Background())
+	httpServer := NewHttpServer("", 7777, mockHttpServer, nil)
+	err := httpServer.Start(context.Background())
+	require.NoError(t, err)
+	waitServerUp(t, 7777)
 
 	// Create mock unsealed file for piece/car
 	f, _ := os.Open(testFile)
@@ -65,7 +69,7 @@ func TestHttpGzipResponse(t *testing.T) {
 
 	//Create a client and make request with Encoding header
 	client := new(http.Client)
-	request, err := http.NewRequest("GET", "http://localhost:7778/piece/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
+	request, err := http.NewRequest("GET", "http://localhost:7777/piece/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
 	require.NoError(t, err)
 	request.Header.Add("Accept-Encoding", "gzip")
 
@@ -95,17 +99,26 @@ func TestHttpInfo(t *testing.T) {
 
 	// Create a new mock Http server
 	ctrl := gomock.NewController(t)
-	httpServer := NewHttpServer("", 7780, mocks_booster_http.NewMockHttpServerApi(ctrl))
-	httpServer.Start(context.Background())
+	httpServer := NewHttpServer("", 7777, mocks_booster_http.NewMockHttpServerApi(ctrl), nil)
+	err := httpServer.Start(context.Background())
+	require.NoError(t, err)
+	waitServerUp(t, 7777)
 
-	response, err := http.Get("http://localhost:7780/info")
+	response, err := http.Get("http://localhost:7777/info")
 	require.NoError(t, err)
 	defer response.Body.Close()
 
 	json.NewDecoder(response.Body).Decode(&v) //nolint:errcheck
-	require.Equal(t, "0.2.0", v.Version)
+	require.Equal(t, "0.3.0", v.Version)
 
 	// Stop the server
 	err = httpServer.Stop()
 	require.NoError(t, err)
+}
+
+func waitServerUp(t *testing.T, port int) {
+	require.Eventually(t, func() bool {
+		_, err := http.Get(fmt.Sprintf("http://localhost:%d", port))
+		return err == nil
+	}, time.Second, 100*time.Millisecond)
 }

@@ -125,7 +125,7 @@ func (b *BackupMgr) takeBackup(ctx context.Context, bkpDir string) error {
 	}
 
 	// Backup the SQL DBs
-	if err := boostdb.SqlBackup(b.db, bkpDir, b.dbName); err != nil {
+	if err := boostdb.SqlBackup(ctx, b.db, bkpDir, b.dbName); err != nil {
 		return err
 	}
 

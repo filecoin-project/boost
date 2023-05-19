@@ -74,6 +74,8 @@ type WalletsConfig struct {
 }
 
 type GraphqlConfig struct {
+	// The ip address the GraphQL server will bind to. Default: 0.0.0.0
+	ListenAddress string
 	// The port that the graphql server listens on
 	Port uint64
 }
@@ -260,6 +262,11 @@ type DealmakingConfig struct {
 	// lotus-miner API. SealingPipelineCacheTimeout defines cache timeout value in seconds. Default is 30 seconds.
 	// Any value less than 0 will result in use of default
 	SealingPipelineCacheTimeout Duration
+
+	// Whether to enable tagging of funds. If enabled, each time a deal is
+	// accepted boost will tag funds for that deal so that they cannot be used
+	// for any other deal.
+	FundsTaggingEnabled bool
 }
 
 type ContractDealsConfig struct {
@@ -290,6 +297,14 @@ func (c *FeeConfig) Legacy() lotus_config.MinerFeeConfig {
 type StorageConfig struct {
 	// The maximum number of concurrent fetch operations to the storage subsystem
 	ParallelFetchLimit int
+	// How frequently Boost should refresh the state of sectors with Lotus. (default: 1hour)
+	// When run, Boost will trigger a storage redeclare on the miner in addition to a storage list.
+	// This ensures that index metadata for sectors reflects their status (removed, unsealed, etc).
+	StorageListRefreshDuration Duration
+	// Whether or not Boost should have lotus redeclare its storage list (default: true).
+	// Disable this if you wish to manually handle the refresh. If manually managing the redeclare
+	// and it is not triggered, retrieval quality for users will be impacted.
+	RedeclareOnStorageListRefresh bool
 }
 
 type LocalIndexDirectoryCouchbaseBucketConfig struct {
@@ -308,7 +323,16 @@ type LocalIndexDirectoryCouchbaseConfig struct {
 	PieceOffsetsBucket      LocalIndexDirectoryCouchbaseBucketConfig
 }
 
+type LocalIndexDirectoryYugabyteConfig struct {
+	Enabled bool
+	// The yugabyte postgres connect string eg "postgresql://postgres:postgres@localhost"
+	ConnectString string
+	// The yugabyte cassandra hosts eg ["127.0.0.1"]
+	Hosts []string
+}
+
 type LocalIndexDirectoryConfig struct {
+	Yugabyte  LocalIndexDirectoryYugabyteConfig
 	Couchbase LocalIndexDirectoryCouchbaseConfig
 	// The maximum number of add index operations allowed to execute in parallel.
 	// The add index operation is executed when a new deal is created - it fetches
@@ -319,7 +343,9 @@ type LocalIndexDirectoryConfig struct {
 	// Set this value to zero to disable the embedded local index directory data service
 	// (in that case the local index directory data service must be running externally)
 	EmbeddedServicePort uint64
-	// The connect string for the local index directory data service RPC API eg "http://localhost:8042"
+	// The connect string for the local index directory data service RPC API eg "ws://localhost:8042"
 	// Set this value to "" if the local index directory data service is embedded.
 	ServiceApiInfo string
+	// The RPC timeout when making requests to the boostd-data service
+	ServiceRPCTimeout Duration
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	lotus_api "github.com/filecoin-project/lotus/api"
+	apitypes "github.com/filecoin-project/lotus/api/types"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -71,7 +72,7 @@ type BoostStruct struct {
 
 		BoostMakeDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"write"`
 
-		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) `perm:"admin"`
+		BoostOfflineDealWithData func(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
 		DealsConsiderOfflineRetrievalDeals func(p0 context.Context) (bool, error) `perm:"admin"`
 
@@ -129,8 +130,6 @@ type BoostStruct struct {
 
 		PdBuildIndexForPieceCid func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
 
-		PdMarkIndexErrored func(p0 context.Context, p1 cid.Cid, p2 string) error `perm:"admin"`
-
 		RuntimeSubsystems func(p0 context.Context) (lapi.MinerSubsystems, error) `perm:"read"`
 
 		SectorsRefs func(p0 context.Context) (map[string][]lapi.SealedRef, error) `perm:"read"`
@@ -159,6 +158,8 @@ type CommonStruct struct {
 		AuthNew func(p0 context.Context, p1 []auth.Permission) ([]byte, error) `perm:"admin"`
 
 		AuthVerify func(p0 context.Context, p1 string) ([]auth.Permission, error) `perm:"read"`
+
+		Discover func(p0 context.Context) (apitypes.OpenRPCDocument, error) `perm:"read"`
 
 		LogList func(p0 context.Context) ([]string, error) `perm:"write"`
 
@@ -458,14 +459,14 @@ func (s *BoostStub) BoostMakeDeal(p0 context.Context, p1 smtypes.DealParams) (*P
 	return nil, ErrNotSupported
 }
 
-func (s *BoostStruct) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) {
+func (s *BoostStruct) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) {
 	if s.Internal.BoostOfflineDealWithData == nil {
 		return nil, ErrNotSupported
 	}
-	return s.Internal.BoostOfflineDealWithData(p0, p1, p2)
+	return s.Internal.BoostOfflineDealWithData(p0, p1, p2, p3)
 }
 
-func (s *BoostStub) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string) (*ProviderDealRejectionInfo, error) {
+func (s *BoostStub) BoostOfflineDealWithData(p0 context.Context, p1 uuid.UUID, p2 string, p3 bool) (*ProviderDealRejectionInfo, error) {
 	return nil, ErrNotSupported
 }
 
@@ -777,17 +778,6 @@ func (s *BoostStub) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) erro
 	return ErrNotSupported
 }
 
-func (s *BoostStruct) PdMarkIndexErrored(p0 context.Context, p1 cid.Cid, p2 string) error {
-	if s.Internal.PdMarkIndexErrored == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.PdMarkIndexErrored(p0, p1, p2)
-}
-
-func (s *BoostStub) PdMarkIndexErrored(p0 context.Context, p1 cid.Cid, p2 string) error {
-	return ErrNotSupported
-}
-
 func (s *BoostStruct) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystems, error) {
 	if s.Internal.RuntimeSubsystems == nil {
 		return *new(lapi.MinerSubsystems), ErrNotSupported
@@ -852,6 +842,17 @@ func (s *CommonStruct) AuthVerify(p0 context.Context, p1 string) ([]auth.Permiss
 
 func (s *CommonStub) AuthVerify(p0 context.Context, p1 string) ([]auth.Permission, error) {
 	return *new([]auth.Permission), ErrNotSupported
+}
+
+func (s *CommonStruct) Discover(p0 context.Context) (apitypes.OpenRPCDocument, error) {
+	if s.Internal.Discover == nil {
+		return *new(apitypes.OpenRPCDocument), ErrNotSupported
+	}
+	return s.Internal.Discover(p0)
+}
+
+func (s *CommonStub) Discover(p0 context.Context) (apitypes.OpenRPCDocument, error) {
+	return *new(apitypes.OpenRPCDocument), ErrNotSupported
 }
 
 func (s *CommonStruct) LogList(p0 context.Context) ([]string, error) {

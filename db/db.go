@@ -61,7 +61,7 @@ func CreateTestTmpDB(t *testing.T) *sql.DB {
 	return d
 }
 
-func SqlBackup(srcDB *sql.DB, dstDir, dbFileName string) error {
+func SqlBackup(ctx context.Context, srcDB *sql.DB, dstDir, dbFileName string) error {
 	dbPath := path.Join(dstDir, dbFileName+"?cache=shared")
 	dstDB, err := SqlDB(dbPath)
 	if err != nil {
@@ -72,20 +72,24 @@ func SqlBackup(srcDB *sql.DB, dstDir, dbFileName string) error {
 
 	err = dstDB.Ping()
 	if err != nil {
-		return fmt.Errorf("failed to open source sql db for backup: %w", err)
+		return fmt.Errorf("failed to open destination sql db for backup: %w", err)
 	}
-
-	ctx := context.Background()
 
 	destConn, err := dstDB.Conn(ctx)
 	if err != nil {
 		return err
 	}
 
+	// Conn must be closed explicitly otherwise, DB conn hangs
+	defer destConn.Close()
+
 	srcConn, err := srcDB.Conn(ctx)
 	if err != nil {
 		return err
 	}
+
+	// Conn must be closed explicitly otherwise, DB conn hangs
+	defer srcConn.Close()
 
 	return destConn.Raw(func(destConn interface{}) error {
 		return srcConn.Raw(func(srcConn interface{}) error {
