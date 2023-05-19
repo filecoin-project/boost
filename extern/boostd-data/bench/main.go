@@ -31,7 +31,7 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			cassandraCmd,
-			foundationCmd,
+			//foundationCmd,
 			postgresCmd,
 		},
 	}

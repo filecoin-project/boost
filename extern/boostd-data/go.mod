@@ -3,7 +3,6 @@ module github.com/filecoin-project/boostd-data
 go 1.18
 
 require (
-	github.com/apple/foundationdb/bindings/go v0.0.0-20221026173525-97cc643cef69
 	github.com/couchbase/gocb/v2 v2.5.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/docker v20.10.7+incompatible
