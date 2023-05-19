@@ -17,7 +17,6 @@ import (
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/piecedirectory"
-	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-commp-utils/writer"
@@ -191,14 +190,14 @@ func action(cctx *cli.Context) error {
 	if ignoreLID {
 		pd = nil
 	} else {
-		cl := bdclient.NewStore()
-		defer cl.Close(ctx)
-		err = cl.Dial(ctx, cctx.String("api-lid"))
+		pdClient := piecedirectory.NewStore()
+		defer pdClient.Close(ctx)
+		err = pdClient.Dial(ctx, cctx.String("api-lid"))
 		if err != nil {
 			return fmt.Errorf("connecting to local index directory service: %w", err)
 		}
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		pd = piecedirectory.NewPieceDirectory(cl, pr, cctx.Int("add-index-throttle"))
+		pd = piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
 		pd.Start(ctx)
 	}
 

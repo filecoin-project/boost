@@ -50,6 +50,7 @@ func main() {
 			dagstoreCmd,
 			netCmd,
 			pieceDirCmd,
+			recoverCmd,
 		},
 	}
 	app.Setup()
