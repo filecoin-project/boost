@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/filecoin-project/dagstore/index"
 	"github.com/ipfs/go-datastore"
+	"github.com/ipld/go-ipld-prime"
 	"io/fs"
 	"math"
 	"os"
@@ -273,7 +274,7 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 var ErrStringSkipAdIngest = "content not found"
 
 func skipError(err error) error {
-	return fmt.Errorf("%s: %w", ErrStringSkipAdIngest, err)
+	return fmt.Errorf("%s: %s: %w", ErrStringSkipAdIngest, err.Error(), ipld.ErrNotExists{})
 }
 
 func (w *Wrapper) Start(ctx context.Context) {
