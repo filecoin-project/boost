@@ -117,7 +117,7 @@ require (
 	go.uber.org/fx v1.18.2
 	go.uber.org/multierr v1.9.0
 	golang.org/x/crypto v0.5.0
-	golang.org/x/exp v0.0.0-20230129154200-a960b3787bd2
+	golang.org/x/exp v0.0.0-20230206171751-46f607a40771
 	golang.org/x/sync v0.1.0
 	golang.org/x/text v0.7.0
 	golang.org/x/tools v0.3.0
