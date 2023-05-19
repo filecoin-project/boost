@@ -10,7 +10,6 @@ import (
 	"math/rand"
 	"net/http/httptest"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -1869,13 +1868,13 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 		require.NoError(tbuilder.t, err)
 		carData, err := io.ReadAll(r)
 		require.NoError(tbuilder.t, err)
-		carv1Path := path.Join(tbuilder.ph.TempDir, "v1.car")
-		err = os.WriteFile(carv1Path, carData, 0644)
+		carv1File, err := os.CreateTemp(tbuilder.ph.TempDir, "v1.car")
 		require.NoError(tbuilder.t, err)
-		rd, err := carv2.OpenReader(carv1Path)
+		_, err = carv1File.Write(carData)
 		require.NoError(tbuilder.t, err)
-		defer rd.Close()
-		carFilePath = carv1Path
+		err = carv1File.Close()
+		require.NoError(tbuilder.t, err)
+		carFilePath = carv1File.Name()
 	}
 
 	// generate CommP of the CARv2 file
