@@ -1677,9 +1677,6 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 
 	ph.MockSealingPipelineAPI.EXPECT().SectorsSummary(gomock.Any()).Return(sealingpipelineStatus, nil).AnyTimes()
 
-	secInfo := lapi.SectorInfo{State: lapi.SectorState(sealing.Proving)}
-	ph.MockSealingPipelineAPI.EXPECT().SectorsStatus(gomock.Any(), gomock.Any(), false).Return(secInfo, nil).AnyTimes()
-
 	ph.MockFullNode = fn
 
 	return ph
