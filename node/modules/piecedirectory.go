@@ -47,6 +47,7 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				if cfg.LocalIndexDirectory.ServiceApiInfo != "" {
+					log.Infow("local index directory: dialing the service api", "service-api-info", cfg.LocalIndexDirectory.ServiceApiInfo)
 					return client.Dial(ctx, cfg.LocalIndexDirectory.ServiceApiInfo)
 				}
 
