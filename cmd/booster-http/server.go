@@ -42,11 +42,12 @@ type apiVersion struct {
 }
 
 type HttpServer struct {
-	path    string
-	port    int
-	api     HttpServerApi
-	opts    HttpServerOptions
-	idxPage string
+	path       string
+	listenAddr string
+	port       int
+	api        HttpServerApi
+	opts       HttpServerOptions
+	idxPage    string
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -65,11 +66,11 @@ type HttpServerOptions struct {
 	SupportedResponseFormats []string
 }
 
-func NewHttpServer(path string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
+func NewHttpServer(path string, listenAddr string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
 	if opts == nil {
 		opts = &HttpServerOptions{ServePieces: true}
 	}
-	return &HttpServer{path: path, port: port, api: api, opts: *opts, idxPage: parseTemplate(*opts)}
+	return &HttpServer{path: path, listenAddr: listenAddr, port: port, api: api, opts: *opts, idxPage: parseTemplate(*opts)}
 }
 
 func (s *HttpServer) pieceBasePath() string {
@@ -102,7 +103,7 @@ func (s *HttpServer) Start(ctx context.Context) error {
 	handler.HandleFunc("/info", s.handleInfo)
 	handler.Handle("/metrics", metrics.Exporter("booster_http")) // metrics
 	s.server = &http.Server{
-		Addr:    fmt.Sprintf(":%d", s.port),
+		Addr:    fmt.Sprintf("%s:%d", s.listenAddr, s.port),
 		Handler: handler,
 		// This context will be the parent of the context associated with all
 		// incoming requests
