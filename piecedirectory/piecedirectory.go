@@ -384,6 +384,8 @@ func (ps *PieceDirectory) WithCachedReader(ctx context.Context, pieceCid cid.Cid
 
 			return cb(cr.sr)
 		}
+
+		ps.prCacheLk.Lock()
 	}
 
 	readyCh := make(chan struct{})
