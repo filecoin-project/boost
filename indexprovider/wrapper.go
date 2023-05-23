@@ -5,13 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
+	"math"
+	"net/url"
+	"os"
+	"path/filepath"
+
 	"github.com/filecoin-project/dagstore/index"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipld/go-ipld-prime"
-	"io/fs"
-	"math"
-	"os"
-	"path/filepath"
 
 	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
@@ -27,10 +29,11 @@ import (
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	provider "github.com/ipni/index-provider"
+	"github.com/ipni/index-provider/engine"
 	"github.com/ipni/index-provider/engine/xproviders"
 	"github.com/ipni/index-provider/metadata"
 	"github.com/libp2p/go-libp2p/core/crypto"
-	host "github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/fx"
 )
@@ -275,6 +278,35 @@ var ErrStringSkipAdIngest = "content not found"
 
 func skipError(err error) error {
 	return fmt.Errorf("%s: %s: %w", ErrStringSkipAdIngest, err.Error(), ipld.ErrNotExists{})
+}
+
+func (w *Wrapper) IndexerAnnounceLatest(ctx context.Context) (cid.Cid, error) {
+	e, ok := w.prov.(*engine.Engine)
+	if !ok {
+		return cid.Undef, fmt.Errorf("index provider is disabled")
+	}
+	return e.PublishLatest(ctx)
+}
+
+func (w *Wrapper) IndexerAnnounceLatestHttp(ctx context.Context, announceUrls []string) (cid.Cid, error) {
+	e, ok := w.prov.(*engine.Engine)
+	if !ok {
+		return cid.Undef, fmt.Errorf("index provider is disabled")
+	}
+
+	if len(announceUrls) == 0 {
+		announceUrls = w.cfg.IndexProvider.Announce.DirectAnnounceURLs
+	}
+
+	urls := make([]*url.URL, 0, len(announceUrls))
+	for _, us := range announceUrls {
+		u, err := url.Parse(us)
+		if err != nil {
+			return cid.Undef, fmt.Errorf("parsing url %s: %w", us, err)
+		}
+		urls = append(urls, u)
+	}
+	return e.PublishLatestHTTP(ctx, urls...)
 }
 
 func (w *Wrapper) Start(ctx context.Context) {

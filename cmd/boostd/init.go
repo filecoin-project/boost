@@ -493,7 +493,13 @@ func migrateMarketsConfig(cctx *cli.Context, mktsRepo lotus_repo.LockedRepo, boo
 		// Clear the DAG store root dir config, because the DAG store is no longer configurable in Boost
 		// (it is always at <repo path>/dagstore
 		rcfg.DAGStore.RootDir = ""
-		rcfg.IndexProvider = mktsCfg.IndexProvider
+		rcfg.IndexProvider = config.IndexProviderConfig{
+			Enable:               mktsCfg.IndexProvider.Enable,
+			EntriesCacheCapacity: mktsCfg.IndexProvider.EntriesCacheCapacity,
+			EntriesChunkSize:     mktsCfg.IndexProvider.EntriesChunkSize,
+			TopicName:            mktsCfg.IndexProvider.TopicName,
+			PurgeCacheOnStart:    mktsCfg.IndexProvider.PurgeCacheOnStart,
+		}
 		rcfg.IndexProvider.Enable = true // Enable index provider in Boost by default
 
 		if fromMonolith {
