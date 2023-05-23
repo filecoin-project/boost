@@ -22,9 +22,11 @@ import (
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc"
+	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
@@ -153,8 +155,8 @@ func NewPieceStore(pm *piecedirectory.PieceDirectory, maddr address.Address) pie
 	return &boostPieceStoreWrapper{piecedirectory: pm, maddr: maddr}
 }
 
-func NewPieceDoctor(lc fx.Lifecycle, store types.Store, sapi mktsdagstore.SectorAccessor) *piecedirectory.Doctor {
-	doc := piecedirectory.NewDoctor(store, sapi)
+func NewPieceDoctor(lc fx.Lifecycle, store types.Store, sapi mktsdagstore.SectorAccessor, fullnodeApi api.FullNode, maddr lotus_dtypes.MinerAddress) *piecedirectory.Doctor {
+	doc := piecedirectory.NewDoctor(store, sapi, fullnodeApi, address.Address(maddr))
 	docctx, cancel := context.WithCancel(context.Background())
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
