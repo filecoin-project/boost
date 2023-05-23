@@ -15,8 +15,10 @@ import (
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/lib/readerutil"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/hashicorp/go-multierror"
+	lru "github.com/hashicorp/golang-lru/v2"
 	bstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
 	format "github.com/ipfs/go-ipld-format"
@@ -31,9 +33,14 @@ import (
 
 var log = logging.Logger("piecedirectory")
 
+var MaxOpenReaders = 128
+
 type PieceDirectory struct {
 	store       *bdclient.Store
 	pieceReader types.PieceReader
+
+	pieceReaderCache *lru.Cache[cid.Cid, *cachedSectionReader]
+	prCacheLk        sync.Mutex
 
 	ctx context.Context
 
@@ -42,13 +49,45 @@ type PieceDirectory struct {
 	addIdxOpByCid      sync.Map
 }
 
+type cachedSectionReader struct {
+	sr types.SectionReader
+
+	ready chan struct{}
+
+	// refs tracks the number of times this reader is referenced. One ref when in
+	// the cache, one ref for each active read. When refs drops to zero, the
+	// reader is closed.
+	// only accessed under prCacheLk.
+	refs int
+}
+
+func (r *cachedSectionReader) freeRef() {
+	r.refs--
+	if r.refs == 0 {
+		err := r.sr.Close()
+		if err != nil {
+			log.Errorw("error closing cached section reader", "error", err)
+		}
+	}
+}
+
 func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThrottleSize int) *PieceDirectory {
-	return &PieceDirectory{
+	ps := &PieceDirectory{
 		store:              store,
 		pieceReader:        pr,
 		addIdxThrottleSize: addIndexThrottleSize,
 		addIdxThrottle:     make(chan struct{}, addIndexThrottleSize),
 	}
+
+	prCache, _ := lru.NewWithEvict[cid.Cid, *cachedSectionReader](MaxOpenReaders, func(k cid.Cid, r *cachedSectionReader) {
+		// note: the cache in accessed with ps.prCacheLk, so we don't need to
+		// lock here.
+		r.freeRef()
+	})
+
+	ps.pieceReaderCache = prCache
+
+	return ps
 }
 
 func (ps *PieceDirectory) Start(ctx context.Context) {
@@ -323,6 +362,64 @@ func (ps *PieceDirectory) GetPieceReader(ctx context.Context, pieceCid cid.Cid) 
 	return nil, merr
 }
 
+func (ps *PieceDirectory) WithCachedReader(ctx context.Context, pieceCid cid.Cid, cb func(at io.ReaderAt) error) error {
+	ps.prCacheLk.Lock()
+	cr, ok := ps.pieceReaderCache.Get(pieceCid)
+	if ok {
+		cr.refs++
+		ps.prCacheLk.Unlock()
+
+		select {
+		case <-cr.ready:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+
+		if cr.sr != nil {
+			defer func() {
+				ps.prCacheLk.Lock()
+				cr.freeRef()
+				ps.prCacheLk.Unlock()
+			}()
+
+			return cb(cr.sr)
+		}
+	}
+
+	readyCh := make(chan struct{})
+
+	csr := &cachedSectionReader{
+		ready: readyCh,
+
+		refs: 2, // lr + callback
+	}
+	ps.pieceReaderCache.Remove(pieceCid) // upsert
+	ps.pieceReaderCache.Add(pieceCid, csr)
+	ps.prCacheLk.Unlock()
+
+	sr, err := ps.GetPieceReader(ctx, pieceCid)
+	// even if there was an error, we want to signal that the reader get was attempted
+	csr.sr = sr
+	close(readyCh)
+
+	if err != nil {
+		// this cache entry is of no use
+		ps.prCacheLk.Lock()
+		ps.pieceReaderCache.Remove(pieceCid)
+		ps.prCacheLk.Unlock()
+
+		return err
+	}
+
+	defer func() {
+		ps.prCacheLk.Lock()
+		csr.freeRef()
+		ps.prCacheLk.Unlock()
+	}()
+
+	return cb(sr)
+}
+
 // Get all pieces that contain a multihash (used when retrieving by payload CID)
 func (ps *PieceDirectory) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.pieces_containing_multihash")
@@ -372,32 +469,25 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 	// Get a reader over one of the pieces and extract the block data
 	var merr error
 	for i, pieceCid := range pieces {
-		data, err := func() ([]byte, error) {
-			// Get a reader over the piece data
-			reader, err := ps.GetPieceReader(ctx, pieceCid)
-			if err != nil {
-				return nil, fmt.Errorf("getting piece reader: %w", err)
-			}
-			defer reader.Close()
+		data, err := func() (data []byte, err error) {
+			err = ps.WithCachedReader(ctx, pieceCid, func(at io.ReaderAt) error {
+				// Get the offset of the block within the piece (CAR file)
+				offsetSize, err := ps.GetOffsetSize(ctx, pieceCid, c.Hash())
+				if err != nil {
+					return fmt.Errorf("getting offset/size for cid %s in piece %s: %w", c, pieceCid, err)
+				}
 
-			// Get the offset of the block within the piece (CAR file)
-			offsetSize, err := ps.GetOffsetSize(ctx, pieceCid, c.Hash())
-			if err != nil {
-				return nil, fmt.Errorf("getting offset/size for cid %s in piece %s: %w", c, pieceCid, err)
-			}
+				reader := readerutil.NewReadSeekerFromReaderAt(at, int64(offsetSize.Offset))
 
-			// Seek to the block offset
-			_, err = reader.Seek(int64(offsetSize.Offset), io.SeekStart)
-			if err != nil {
-				return nil, fmt.Errorf("seeking to offset %d in piece reader: %w", int64(offsetSize.Offset), err)
-			}
+				// Read the block data
+				_, data, err = util.ReadNode(bufio.NewReader(reader))
+				if err != nil {
+					return fmt.Errorf("reading data for block %s from reader for piece %s: %w", c, pieceCid, err)
+				}
 
-			// Read the block data
-			_, data, err := util.ReadNode(bufio.NewReader(reader))
-			if err != nil {
-				return nil, fmt.Errorf("reading data for block %s from reader for piece %s: %w", c, pieceCid, err)
-			}
-			return data, nil
+				return nil
+			})
+			return data, err
 		}()
 		if err != nil {
 			if i < 3 {
