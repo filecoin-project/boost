@@ -30,6 +30,7 @@ import (
 )
 
 var log = logging.Logger("boostgs")
+var ErrRetrievalNotFound = fmt.Errorf("no transfer found")
 
 var incomingReqExtensions = []graphsync.ExtensionName{
 	extension.ExtensionIncomingRequest1_1,
@@ -175,7 +176,7 @@ func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatr
 
 	if state == nil {
 		g.activeRetrievalsLk.Unlock()
-		return fmt.Errorf("no transfer with id %d", id)
+		return fmt.Errorf("failed to cancel with id %d: %w", id, ErrRetrievalNotFound)
 	}
 
 	rcpt := state.cs.recipient
