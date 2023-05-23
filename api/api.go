@@ -35,6 +35,8 @@ type Boost interface {
 
 	// MethodGroup: Boost
 	BoostIndexerAnnounceAllDeals(ctx context.Context) error                                                                                     //perm:admin
+	BoostIndexerAnnounceLatest(ctx context.Context) (cid.Cid, error)                                                                            //perm:admin
+	BoostIndexerAnnounceLatestHttp(ctx context.Context, urls []string) (cid.Cid, error)                                                         //perm:admin
 	BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (*ProviderDealRejectionInfo, error) //perm:admin
 	BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                                                      //perm:admin
 	BoostDealBySignedProposalCid(ctx context.Context, proposalCid cid.Cid) (*smtypes.ProviderDealState, error)                                  //perm:admin
