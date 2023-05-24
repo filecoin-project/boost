@@ -58,54 +58,61 @@ func (d *Doctor) Run(ctx context.Context) {
 		case <-timer.C:
 		}
 
-		sectors, err := d.fullnodeApi.StateMinerSectors(ctx, d.maddr, nil, lotuschaintypes.EmptyTSK)
-		if err != nil {
-			return
-		}
+		err := func() error {
+			sectors, err := d.fullnodeApi.StateMinerSectors(ctx, d.maddr, nil, lotuschaintypes.EmptyTSK)
+			if err != nil {
+				return err
+			}
 
-		d.allSectors = make(map[abi.SectorNumber]*miner.SectorOnChainInfo)
-		for _, info := range sectors {
-			d.allSectors[info.SectorNumber] = info
-		}
+			d.allSectors = make(map[abi.SectorNumber]*miner.SectorOnChainInfo)
+			for _, info := range sectors {
+				d.allSectors[info.SectorNumber] = info
+			}
 
-		head, err := d.fullnodeApi.ChainHead(ctx)
-		if err != nil {
-			return
-		}
+			head, err := d.fullnodeApi.ChainHead(ctx)
+			if err != nil {
+				return err
+			}
 
-		activeSet, err := d.fullnodeApi.StateMinerActiveSectors(ctx, d.maddr, head.Key())
-		if err != nil {
-			return
-		}
-		d.activeSectors = make(map[abi.SectorNumber]struct{}, len(activeSet))
-		for _, info := range activeSet {
-			d.activeSectors[info.SectorNumber] = struct{}{}
-		}
+			activeSet, err := d.fullnodeApi.StateMinerActiveSectors(ctx, d.maddr, head.Key())
+			if err != nil {
+				return err
+			}
+			d.activeSectors = make(map[abi.SectorNumber]struct{}, len(activeSet))
+			for _, info := range activeSet {
+				d.activeSectors[info.SectorNumber] = struct{}{}
+			}
 
-		// Get the next pieces to check (eg pieces that haven't been checked
-		// for a while) from the local index directory
-		pcids, err := d.store.NextPiecesToCheck(ctx)
+			// Get the next pieces to check (eg pieces that haven't been checked
+			// for a while) from the local index directory
+			pcids, err := d.store.NextPiecesToCheck(ctx)
+			if err != nil {
+				return err
+			}
+
+			// Check each piece for problems
+			doclog.Debugw("piece doctor: checking pieces", "count", len(pcids), "all sectors", len(d.allSectors), "active sectors", len(d.activeSectors))
+			for _, pcid := range pcids {
+				err := d.checkPiece(ctx, pcid)
+				if err != nil {
+					if errors.Is(err, context.Canceled) {
+						return err
+					}
+					doclog.Errorw("checking piece", "piece", pcid, "err", err)
+				}
+			}
+			doclog.Debugw("piece doctor: completed checking pieces", "count", len(pcids))
+
+			return nil
+		}()
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
+				doclog.Errorw("piece doctor: context canceled, stopping doctor", "error", err)
 				return
 			}
-			doclog.Errorw("getting next pieces to check", "err", err)
-			time.Sleep(time.Minute)
-			continue
-		}
 
-		// Check each piece for problems
-		doclog.Debugw("piece doctor: checking pieces", "count", len(pcids), "all sectors", len(d.allSectors), "active sectors", len(d.activeSectors))
-		for _, pcid := range pcids {
-			err := d.checkPiece(ctx, pcid)
-			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					return
-				}
-				doclog.Errorw("checking piece", "piece", pcid, "err", err)
-			}
+			doclog.Errorw("piece doctor: iteration got error", "error", err)
 		}
-		doclog.Debugw("piece doctor: completed checking pieces", "count", len(pcids))
 
 		// Sleep for a few seconds between ticks.
 		// The time to sleep is randomized, so that if there are multiple doctor
