@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/filecoin-project/boost/piecedirectory/types"
@@ -109,8 +110,7 @@ func (d *Doctor) Run(ctx context.Context) {
 		// Sleep for a few seconds between ticks.
 		// The time to sleep is randomized, so that if there are multiple doctor
 		// processes they will each process some pieces some of the time.
-		sleepTime := avgCheckInterval / 2
-
+		sleepTime := avgCheckInterval/2 + time.Duration(rand.Intn(int(avgCheckInterval)))
 		timer.Reset(sleepTime)
 	}
 }
