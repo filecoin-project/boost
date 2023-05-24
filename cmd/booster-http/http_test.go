@@ -23,7 +23,7 @@ const testFile = "test/test_file"
 func TestNewHttpServer(t *testing.T) {
 	// Create a new mock Http server
 	ctrl := gomock.NewController(t)
-	httpServer := NewHttpServer("", 7777, mocks_booster_http.NewMockHttpServerApi(ctrl), nil)
+	httpServer := NewHttpServer("", "0.0.0.0", 7777, mocks_booster_http.NewMockHttpServerApi(ctrl), nil)
 	err := httpServer.Start(context.Background())
 	require.NoError(t, err)
 	waitServerUp(t, 7777)
@@ -42,7 +42,7 @@ func TestHttpGzipResponse(t *testing.T) {
 	// Create a new mock Http server with custom functions
 	ctrl := gomock.NewController(t)
 	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
-	httpServer := NewHttpServer("", 7777, mockHttpServer, nil)
+	httpServer := NewHttpServer("", "0.0.0.0", 7777, mockHttpServer, nil)
 	err := httpServer.Start(context.Background())
 	require.NoError(t, err)
 	waitServerUp(t, 7777)
@@ -109,7 +109,7 @@ func TestHttpInfo(t *testing.T) {
 
 	// Create a new mock Http server
 	ctrl := gomock.NewController(t)
-	httpServer := NewHttpServer("", 7777, mocks_booster_http.NewMockHttpServerApi(ctrl), nil)
+	httpServer := NewHttpServer("", "0.0.0.0", 7777, mocks_booster_http.NewMockHttpServerApi(ctrl), nil)
 	err := httpServer.Start(context.Background())
 	require.NoError(t, err)
 	waitServerUp(t, 7777)

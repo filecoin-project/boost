@@ -42,6 +42,12 @@ var runCmd = &cli.Command{
 			Usage: "the base path at which to run the web server",
 			Value: "",
 		},
+		&cli.StringFlag{
+			Name:    "address",
+			Aliases: []string{"addr"},
+			Usage:   "the listen address for the web server",
+			Value:   "0.0.0.0",
+		},
 		&cli.UintFlag{
 			Name:  "port",
 			Usage: "the port the web server listens on",
@@ -201,14 +207,15 @@ var runCmd = &cli.Command{
 		sapi := serverApi{ctx: ctx, bapi: bapi, sa: sa}
 		server := NewHttpServer(
 			cctx.String("base-path"),
+			cctx.String("address"),
 			cctx.Int("port"),
 			sapi,
 			opts,
 		)
 
 		// Start the server
-		log.Infof("Starting booster-http node on port %d with base path '%s'",
-			cctx.Int("port"), cctx.String("base-path"))
+		log.Infof("Starting booster-http node on listen address %s and port %d with base path '%s'",
+			cctx.String("address"), cctx.Int("port"), cctx.String("base-path"))
 		err = server.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("starting http server: %w", err)
