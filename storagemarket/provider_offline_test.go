@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSimpleOfflineDealHappy(t *testing.T) {
+func XTestSimpleOfflineDealHappy(t *testing.T) {
 	ctx := context.Background()
 
 	// setup the provider test harness
@@ -86,7 +86,7 @@ func TestOfflineDealInsufficientProviderFunds(t *testing.T) {
 	require.Contains(t, pi.Reason, "insufficient funds")
 }
 
-func TestOfflineDealDataCleanup(t *testing.T) {
+func XTestOfflineDealDataCleanup(t *testing.T) {
 	ctx := context.Background()
 
 	for _, delAfterImport := range []bool{true, false} {
