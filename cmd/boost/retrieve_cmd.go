@@ -21,10 +21,10 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
-	"github.com/ipfs/go-libipfs/files"
 	"github.com/ipfs/go-merkledag"
 	unixfile "github.com/ipfs/go-unixfs/file"
 	"github.com/ipld/go-car"
@@ -165,7 +165,7 @@ var retrieveCmd = &cli.Command{
 		defer os.RemoveAll(bstoreTmpDir)
 
 		bstoreDatastore, err := flatfs.CreateOrOpen(bstoreTmpDir, flatfs.NextToLast(3), false)
-		bstore := blockstore.NewBlockstoreNoPrefix(bstoreDatastore)
+		bstore := blockstore.NewBlockstore(bstoreDatastore, blockstore.NoPrefix())
 		if err != nil {
 			return fmt.Errorf("could not open blockstore: %w", err)
 		}

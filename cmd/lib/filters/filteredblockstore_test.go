@@ -43,7 +43,7 @@ func TestFilteredBlockstore(t *testing.T) {
 		filter.EXPECT().FulfillRequest(gomock.Any(), blk.Cid()).Return(true, nil)
 		gotBlk, err := fbs.Get(ctx, blk.Cid())
 		require.NoError(t, err)
-		require.Equal(t, blk, gotBlk)
+		require.Equal(t, blk.RawData(), gotBlk.RawData())
 
 		// Filter rejects cid
 		filter.EXPECT().FulfillRequest(gomock.Any(), blk.Cid()).Return(false, nil)
