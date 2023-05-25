@@ -41,7 +41,6 @@ type Wrapper struct {
 	piecedirectory *piecedirectory.PieceDirectory
 	meshCreator    idxprov.MeshCreator
 	h              host.Host
-	usm            *UnsealedStateManager
 	// bitswapEnabled records whether to announce bitswap as an available
 	// protocol to the network indexer
 	bitswapEnabled bool
@@ -78,7 +77,6 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 			piecedirectory: piecedirectory,
 			bitswapEnabled: bitswapEnabled,
 		}
-		w.usm = NewUnsealedStateManager(w, legacyProv, dealsDB, ssDB, storageService, w.cfg.Storage)
 		return w, nil
 	}
 }
@@ -88,10 +86,6 @@ func (w *Wrapper) Start(ctx context.Context) {
 
 	runCtx, runCancel := context.WithCancel(context.Background())
 	w.stop = runCancel
-
-	// Watch for changes in sector unseal state and update the
-	// indexer when there are changes
-	go w.usm.Run(runCtx)
 
 	// Announce all deals on startup in case of a config change
 	go func() {
@@ -342,10 +336,10 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, deal *types.ProviderDea
 		FastRetrieval: deal.FastRetrieval,
 		VerifiedDeal:  deal.ClientDealProposal.Proposal.VerifiedDeal,
 	}
-	return w.announceBoostDealMetadata(ctx, md, propCid)
+	return w.AnnounceBoostDealMetadata(ctx, md, propCid)
 }
 
-func (w *Wrapper) announceBoostDealMetadata(ctx context.Context, md metadata.GraphsyncFilecoinV1, propCid cid.Cid) (cid.Cid, error) {
+func (w *Wrapper) AnnounceBoostDealMetadata(ctx context.Context, md metadata.GraphsyncFilecoinV1, propCid cid.Cid) (cid.Cid, error) {
 	if !w.enabled {
 		return cid.Undef, errors.New("cannot announce deal: index provider is disabled")
 	}

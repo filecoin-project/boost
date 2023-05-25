@@ -34,6 +34,7 @@ import (
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
+	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
@@ -508,6 +509,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		// Sealing Pipeline State API
 		Override(new(sealingpipeline.API), From(new(lotus_modules.MinerStorageService))),
 
+		Override(new(*sectorstatemgr.SectorStateMgr), sectorstatemgr.NewSectorStateMgr),
 		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg)),
 
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
