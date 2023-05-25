@@ -7,21 +7,16 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/filecoin-project/boost/piecedirectory/types"
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/sectorstatemgr"
+	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v9/miner"
-	"github.com/filecoin-project/lotus/api"
-	lotuschaintypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 )
 
 var doclog = logging.Logger("piecedoc")
-
-type SealingApi interface {
-	IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error)
-}
 
 // The Doctor periodically queries the local index directory for piece cids, and runs
 // checks against those pieces. If there is a problem with a piece, it is
@@ -29,17 +24,12 @@ type SealingApi interface {
 // Note that multiple Doctor processes can run in parallel. The logic for which
 // pieces to give to the Doctor to check is in the local index directory.
 type Doctor struct {
-	store       types.Store
-	sapi        SealingApi
-	fullnodeApi api.FullNode
-	maddr       address.Address
-
-	allSectors    map[abi.SectorNumber]*miner.SectorOnChainInfo
-	activeSectors map[abi.SectorNumber]struct{}
+	store *bdclient.Store
+	ssm   *sectorstatemgr.SectorStateMgr
 }
 
-func NewDoctor(store types.Store, sapi SealingApi, fullnodeApi api.FullNode, maddr address.Address) *Doctor {
-	return &Doctor{store: store, sapi: sapi, fullnodeApi: fullnodeApi, maddr: maddr}
+func NewDoctor(store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr) *Doctor {
+	return &Doctor{store: store, ssm: ssm}
 }
 
 // The average interval between calls to NextPiecesToCheck
@@ -59,30 +49,6 @@ func (d *Doctor) Run(ctx context.Context) {
 		}
 
 		err := func() error {
-			sectors, err := d.fullnodeApi.StateMinerSectors(ctx, d.maddr, nil, lotuschaintypes.EmptyTSK)
-			if err != nil {
-				return err
-			}
-
-			d.allSectors = make(map[abi.SectorNumber]*miner.SectorOnChainInfo)
-			for _, info := range sectors {
-				d.allSectors[info.SectorNumber] = info
-			}
-
-			head, err := d.fullnodeApi.ChainHead(ctx)
-			if err != nil {
-				return err
-			}
-
-			activeSet, err := d.fullnodeApi.StateMinerActiveSectors(ctx, d.maddr, head.Key())
-			if err != nil {
-				return err
-			}
-			d.activeSectors = make(map[abi.SectorNumber]struct{}, len(activeSet))
-			for _, info := range activeSet {
-				d.activeSectors[info.SectorNumber] = struct{}{}
-			}
-
 			// Get the next pieces to check (eg pieces that haven't been checked
 			// for a while) from the local index directory
 			pcids, err := d.store.NextPiecesToCheck(ctx)
@@ -91,7 +57,7 @@ func (d *Doctor) Run(ctx context.Context) {
 			}
 
 			// Check each piece for problems
-			doclog.Debugw("piece doctor: checking pieces", "count", len(pcids), "all sectors", len(d.allSectors), "active sectors", len(d.activeSectors))
+			doclog.Debugw("piece doctor: checking pieces", "count", len(pcids))
 			for _, pcid := range pcids {
 				err := d.checkPiece(ctx, pcid)
 				if err != nil {
@@ -148,23 +114,25 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 
 	// Check whether the piece is present in active sector
 	lacksActiveSector := true
+
 	dls := md.Deals
 	for _, dl := range dls {
+		mid, err := address.IDFromAddress(dl.MinerAddr)
+		if err != nil {
+			return err
+		}
+
+		sectorID := abi.SectorID{
+			Miner:  abi.ActorID(mid),
+			Number: dl.SectorID,
+		}
 
 		// check if we have an active sector
-		if _, ok := d.activeSectors[dl.SectorID]; ok {
+		if _, ok := d.ssm.ActiveSectors[sectorID]; ok {
 			lacksActiveSector = false
 		}
 
-		isUnsealedCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		isUnsealed, err := d.sapi.IsUnsealed(isUnsealedCtx, dl.SectorID, dl.PieceOffset.Unpadded(), dl.PieceLength.Unpadded())
-		cancel()
-		if err != nil {
-			return fmt.Errorf("failed to check unsealed status of piece %s (sector %d, offset %d, length %d): %w",
-				pieceCid, dl.SectorID, dl.PieceOffset.Unpadded(), dl.PieceLength.Unpadded(), err)
-		}
-
-		if isUnsealed {
+		if d.ssm.SectorStates[sectorID] == db.SealStateUnsealed {
 			hasUnsealedDeal = true
 			break
 		}

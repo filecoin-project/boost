@@ -29,7 +29,6 @@ import (
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/piecedirectory"
-	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -40,6 +39,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
+	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
@@ -509,7 +509,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		// Sealing Pipeline State API
 		Override(new(sealingpipeline.API), From(new(lotus_modules.MinerStorageService))),
 
-		Override(new(*sectorstatemgr.SectorStateMgr), sectorstatemgr.NewSectorStateMgr),
+		Override(new(*sectorstatemgr.SectorStateMgr), sectorstatemgr.NewSectorStateMgr(cfg)),
 		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg)),
 
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
@@ -557,7 +557,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*dagstore.DAGStore), func() *dagstore.DAGStore { return nil }),
 		Override(new(*mdagstore.Wrapper), func() *mdagstore.Wrapper { return nil }),
 
-		Override(new(pdtypes.Store), modules.NewPieceDirectoryStore(cfg)),
+		Override(new(*bdclient.Store), modules.NewPieceDirectoryStore(cfg)),
 		Override(new(*piecedirectory.PieceDirectory), modules.NewPieceDirectory(cfg)),
 		Override(DAGStoreKey, modules.NewDAGStoreWrapper),
 		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),

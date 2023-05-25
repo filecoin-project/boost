@@ -6,14 +6,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/filecoin-project/boost-gfm/storagemarket"
 	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/go-address"
+	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-state-types/abi"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/hashicorp/go-multierror"
@@ -33,12 +39,14 @@ var log = logging.Logger("index-provider-wrapper")
 var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
+	enabled bool
+
 	cfg            *config.Boost
-	enabled        bool
 	dealsDB        *db.DealsDB
 	legacyProv     gfm_storagemarket.StorageProvider
 	prov           provider.Interface
 	piecedirectory *piecedirectory.PieceDirectory
+	ssm            *sectorstatemgr.SectorStateMgr
 	meshCreator    idxprov.MeshCreator
 	h              host.Host
 	// bitswapEnabled records whether to announce bitswap as an available
@@ -49,11 +57,12 @@ type Wrapper struct {
 
 func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
 	ssDB *db.SectorStateDB, legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface,
-	piecedirectory *piecedirectory.PieceDirectory, meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
+	piecedirectory *piecedirectory.PieceDirectory, ssm *sectorstatemgr.SectorStateMgr, meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
 
 	return func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
 		ssDB *db.SectorStateDB, legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface,
 		piecedirectory *piecedirectory.PieceDirectory,
+		ssm *sectorstatemgr.SectorStateMgr,
 		meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
 
 		if cfg.DAGStore.RootDir == "" {
@@ -76,6 +85,7 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 			enabled:        !isDisabled,
 			piecedirectory: piecedirectory,
 			bitswapEnabled: bitswapEnabled,
+			ssm:            ssm,
 		}
 		return w, nil
 	}
@@ -84,7 +94,7 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 func (w *Wrapper) Start(ctx context.Context) {
 	w.prov.RegisterMultihashLister(w.MultihashLister)
 
-	runCtx, runCancel := context.WithCancel(context.Background())
+	runCtx, runCancel := context.WithCancel(ctx)
 	w.stop = runCancel
 
 	// Announce all deals on startup in case of a config change
@@ -94,6 +104,161 @@ func (w *Wrapper) Start(ctx context.Context) {
 			log.Warnf("announcing extended providers: %w", err)
 		}
 	}()
+
+	go func() {
+		duration := time.Duration(w.cfg.Storage.StorageListRefreshDuration)
+		log.Infof("starting index provider update interval %s", duration.String())
+		ticker := time.NewTicker(duration)
+		defer ticker.Stop()
+
+		// Check immediately
+		err := w.checkForUpdates(ctx)
+		if err != nil {
+			log.Errorw("checking for state updates", "err", err)
+		}
+
+		// Check every tick
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				err := w.checkForUpdates(ctx)
+				if err != nil {
+					log.Errorw("checking for state updates", "err", err)
+				}
+			}
+		}
+	}()
+}
+
+func (w *Wrapper) checkForUpdates(ctx context.Context) error {
+	legacyDeals, err := w.legacyDealsBySectorID(w.ssm.StateUpdates)
+	if err != nil {
+		return fmt.Errorf("getting legacy deals from datastore: %w", err)
+	}
+
+	log.Debugf("checking for sector state updates for %d states", len(w.ssm.StateUpdates))
+
+	// For each sector
+	for sectorID, sectorSealState := range w.ssm.StateUpdates {
+		// Get the deals in the sector
+		deals, err := w.dealsBySectorID(ctx, legacyDeals, sectorID)
+		if err != nil {
+			return fmt.Errorf("getting deals for miner %d / sector %d: %w", sectorID.Miner, sectorID.Number, err)
+		}
+		log.Debugf("sector %d has %d deals, seal status %s", sectorID, len(deals), sectorSealState)
+
+		// For each deal in the sector
+		for _, deal := range deals {
+			if !deal.AnnounceToIPNI {
+				continue
+			}
+
+			propnd, err := cborutil.AsIpld(&deal.DealProposal)
+			if err != nil {
+				return fmt.Errorf("failed to compute signed deal proposal ipld node: %w", err)
+			}
+			propCid := propnd.Cid()
+
+			if sectorSealState == db.SealStateRemoved {
+				// Announce deals that are no longer unsealed to indexer
+				announceCid, err := w.AnnounceBoostDealRemoved(ctx, propCid)
+				if err != nil {
+					// Check if the error is because the deal wasn't previously announced
+					if !errors.Is(err, provider.ErrContextIDNotFound) {
+						// There was some other error, write it to the log
+						log.Errorw("announcing deal removed to index provider",
+							"deal id", deal.DealID, "error", err)
+						continue
+					}
+				} else {
+					log.Infow("announced to index provider that deal has been removed",
+						"deal id", deal.DealID, "sector id", deal.SectorID.Number, "announce cid", announceCid.String())
+				}
+			} else if sectorSealState != db.SealStateCache {
+				// Announce deals that have changed seal state to indexer
+				md := metadata.GraphsyncFilecoinV1{
+					PieceCID:      deal.DealProposal.Proposal.PieceCID,
+					FastRetrieval: sectorSealState == db.SealStateUnsealed,
+					VerifiedDeal:  deal.DealProposal.Proposal.VerifiedDeal,
+				}
+				announceCid, err := w.AnnounceBoostDealMetadata(ctx, md, propCid)
+				if err == nil {
+					log.Infow("announced deal seal state to index provider",
+						"deal id", deal.DealID, "sector id", deal.SectorID.Number,
+						"seal state", sectorSealState, "announce cid", announceCid.String())
+				} else {
+					log.Errorf("announcing deal %s to index provider: %w", deal.DealID, err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// Get deals by sector ID, whether they're legacy or boost deals
+func (w *Wrapper) dealsBySectorID(ctx context.Context, legacyDeals map[abi.SectorID][]storagemarket.MinerDeal, sectorID abi.SectorID) ([]basicDealInfo, error) {
+	// First query the boost database
+	deals, err := w.dealsDB.BySectorID(ctx, sectorID)
+	if err != nil {
+		return nil, fmt.Errorf("getting deals from boost database: %w", err)
+	}
+
+	basicDeals := make([]basicDealInfo, 0, len(deals))
+	for _, dl := range deals {
+		basicDeals = append(basicDeals, basicDealInfo{
+			AnnounceToIPNI: dl.AnnounceToIPNI,
+			DealID:         dl.DealUuid.String(),
+			SectorID:       sectorID,
+			DealProposal:   dl.ClientDealProposal,
+		})
+	}
+
+	// Then check the legacy deals
+	legDeals, ok := legacyDeals[sectorID]
+	if ok {
+		for _, dl := range legDeals {
+			basicDeals = append(basicDeals, basicDealInfo{
+				AnnounceToIPNI: true,
+				DealID:         dl.ProposalCid.String(),
+				SectorID:       sectorID,
+				DealProposal:   dl.ClientDealProposal,
+			})
+		}
+	}
+
+	return basicDeals, nil
+}
+
+// Iterate over all legacy deals and make a map of sector ID -> legacy deal.
+// To save memory, only include legacy deals with a sector ID that we know
+// we're going to query, ie the set of sector IDs in the stateUpdates map.
+func (w *Wrapper) legacyDealsBySectorID(stateUpdates map[abi.SectorID]db.SealState) (map[abi.SectorID][]storagemarket.MinerDeal, error) {
+	legacyDeals, err := w.legacyProv.ListLocalDeals()
+	if err != nil {
+		return nil, err
+	}
+
+	bySectorID := make(map[abi.SectorID][]storagemarket.MinerDeal, len(legacyDeals))
+	for _, deal := range legacyDeals {
+		minerID, err := address.IDFromAddress(deal.Proposal.Provider)
+		if err != nil {
+			// just skip the deal if we can't convert its address to an ID address
+			continue
+		}
+		sectorID := abi.SectorID{
+			Miner:  abi.ActorID(minerID),
+			Number: deal.SectorNumber,
+		}
+		_, ok := w.ssm.StateUpdates[sectorID]
+		if ok {
+			bySectorID[sectorID] = append(bySectorID[sectorID], deal)
+		}
+	}
+
+	return bySectorID, nil
 }
 
 func (w *Wrapper) Stop() {
@@ -380,4 +545,11 @@ func (w *Wrapper) AnnounceBoostDealRemoved(ctx context.Context, propCid cid.Cid)
 		return cid.Undef, fmt.Errorf("failed to announce deal removal to index provider: %w", err)
 	}
 	return annCid, err
+}
+
+type basicDealInfo struct {
+	AnnounceToIPNI bool
+	DealID         string
+	SectorID       abi.SectorID
+	DealProposal   storagemarket.ClientDealProposal
 }

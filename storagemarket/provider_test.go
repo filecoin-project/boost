@@ -21,7 +21,6 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/piecedirectory"
-	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -34,6 +33,7 @@ import (
 	"github.com/filecoin-project/boost/transport/httptransport"
 	"github.com/filecoin-project/boost/transport/mocks"
 	tspttypes "github.com/filecoin-project/boost/transport/types"
+	bdclientutil "github.com/filecoin-project/boostd-data/clientutil"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -1619,12 +1619,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	askStore := &mockAskStore{}
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
-	store := mock_piecedirectory.NewMockStore(ctrl)
-	store.EXPECT().IsIndexed(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
-	store.EXPECT().AddDealForPiece(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-
 	pdctx, cancel := context.WithCancel(context.Background())
-	pm := piecedirectory.NewPieceDirectory(store, nil, 1)
+	pm := piecedirectory.NewPieceDirectory(bdclientutil.NewTestStore(pdctx), nil, 1)
 	pm.Start(pdctx)
 	t.Cleanup(cancel)
 

@@ -2,89 +2,77 @@ package sectorstatemgr
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boost/indexprovider"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-address"
-	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
+	lotus_modules "github.com/filecoin-project/lotus/node/modules"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	logging "github.com/ipfs/go-log/v2"
-	provider "github.com/ipni/index-provider"
-	"github.com/ipni/index-provider/metadata"
 	"go.uber.org/fx"
 )
 
 var log = logging.Logger("sectorstatemgr")
-
-type ApiStorageMiner interface {
-	StorageList(ctx context.Context) (map[storiface.ID][]storiface.Decl, error)
-	StorageRedeclareLocal(ctx context.Context, id *storiface.ID, dropMissing bool) error
-}
 
 type SectorStateMgr struct {
 	sync.Mutex
 
 	cfg           config.StorageConfig
 	fullnodeApi   api.FullNode
-	minerApi      ApiStorageMiner
+	minerApi      api.StorageMiner
 	Maddr         address.Address
 	StateUpdates  map[abi.SectorID]db.SealState
-	ActiveSectors map[abi.SectorNumber]struct{}
+	SectorStates  map[abi.SectorID]db.SealState
+	ActiveSectors map[abi.SectorID]struct{}
 
-	idxprov    *indexprovider.Wrapper
-	legacyProv storagemarket.StorageProvider
-	dealsDB    *db.DealsDB
-	sdb        *db.SectorStateDB
+	sdb *db.SectorStateDB
 }
 
-func NewSectorStateMgr(lc fx.Lifecycle, idxprov *indexprovider.Wrapper, legacyProv storagemarket.StorageProvider, dealsDB *db.DealsDB, sdb *db.SectorStateDB, minerApi ApiStorageMiner, fullnodeApi api.FullNode, maddr address.Address, cfg config.StorageConfig) *SectorStateMgr {
-	mgr := &SectorStateMgr{
-		cfg:           cfg,
-		minerApi:      minerApi,
-		fullnodeApi:   fullnodeApi,
-		Maddr:         maddr,
-		StateUpdates:  make(map[abi.SectorID]db.SealState),
-		ActiveSectors: make(map[abi.SectorNumber]struct{}),
+func NewSectorStateMgr(cfg *config.Boost) func(lc fx.Lifecycle, sdb *db.SectorStateDB, minerApi lotus_modules.MinerStorageService, fullnodeApi api.FullNode, maddr lotus_dtypes.MinerAddress) *SectorStateMgr {
+	return func(lc fx.Lifecycle, sdb *db.SectorStateDB, minerApi lotus_modules.MinerStorageService, fullnodeApi api.FullNode, maddr lotus_dtypes.MinerAddress) *SectorStateMgr {
+		mgr := &SectorStateMgr{
+			cfg:           cfg.Storage,
+			minerApi:      minerApi,
+			fullnodeApi:   fullnodeApi,
+			Maddr:         address.Address(maddr),
+			StateUpdates:  make(map[abi.SectorID]db.SealState),
+			ActiveSectors: make(map[abi.SectorID]struct{}),
 
-		idxprov:    idxprov,
-		legacyProv: legacyProv,
-		dealsDB:    dealsDB,
-		sdb:        sdb,
+			sdb: sdb,
+		}
+
+		cctx, cancel := context.WithCancel(context.Background())
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				go mgr.Run(cctx)
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				cancel()
+				return nil
+			},
+		})
+
+		return mgr
 	}
-
-	cctx, cancel := context.WithCancel(context.Background())
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			go mgr.Run(cctx)
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			cancel()
-			return nil
-		},
-	})
-
-	return mgr
 }
 
 func (m *SectorStateMgr) Run(ctx context.Context) {
 	duration := time.Duration(m.cfg.StorageListRefreshDuration)
-	log.Infof("starting unsealed state manager running on interval %s", duration.String())
+	log.Infof("starting sector state manager running on interval %s", duration.String())
 	ticker := time.NewTicker(duration)
 	defer ticker.Stop()
 
 	// Check immediately
 	err := m.checkForUpdates(ctx)
 	if err != nil {
-		log.Errorf("error checking for unsealed state updates: %s", err)
+		log.Errorw("checking for state updates", "err", err)
 	}
 
 	// Check every tick
@@ -95,25 +83,27 @@ func (m *SectorStateMgr) Run(ctx context.Context) {
 		case <-ticker.C:
 			err := m.checkForUpdates(ctx)
 			if err != nil {
-				log.Errorf("error checking for unsealed state updates: %s", err)
+				log.Errorw("checking for state updates", "err", err)
 			}
 		}
 	}
 }
 
 func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
-	log.Info("checking for sector state updates")
+	log.Debug("checking for sector state updates")
+
+	defer func(start time.Time) { log.Debugw("checkForUpdates", "took", time.Since(start)) }(time.Now())
 
 	// Tell lotus to update it's storage list and remove any removed sectors
 	if m.cfg.RedeclareOnStorageListRefresh {
 		log.Info("redeclaring storage")
 		err := m.minerApi.StorageRedeclareLocal(ctx, nil, true)
 		if err != nil {
-			log.Errorf("redeclaring local storage on lotus miner: %w", err)
+			log.Errorw("redeclaring local storage on lotus miner", "err", err)
 		}
 	}
 
-	stateUpdates, err := m.getStateUpdates(ctx)
+	stateUpdates, sectorStates, err := m.refreshState(ctx)
 	if err != nil {
 		return err
 	}
@@ -127,77 +117,28 @@ func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	activeSectors := make(map[abi.SectorNumber]struct{}, len(activeSet))
+
+	mid, err := address.IDFromAddress(m.Maddr)
+	if err != nil {
+		return err
+	}
+	activeSectors := make(map[abi.SectorID]struct{}, len(activeSet))
 	for _, info := range activeSet {
-		activeSectors[info.SectorNumber] = struct{}{}
+		sectorID := abi.SectorID{
+			Miner:  abi.ActorID(mid),
+			Number: info.SectorNumber,
+		}
+
+		activeSectors[sectorID] = struct{}{}
 	}
 
 	m.Lock()
 	m.StateUpdates = stateUpdates
+	m.SectorStates = sectorStates
 	m.ActiveSectors = activeSectors
 	m.Unlock()
 
-	legacyDeals, err := m.legacyDealsBySectorID(stateUpdates)
-	if err != nil {
-		return fmt.Errorf("getting legacy deals from datastore: %w", err)
-	}
-
-	log.Debugf("checking for sector state updates for %d states", len(stateUpdates))
-
-	// For each sector
 	for sectorID, sectorSealState := range stateUpdates {
-		// Get the deals in the sector
-		deals, err := m.dealsBySectorID(ctx, legacyDeals, sectorID)
-		if err != nil {
-			return fmt.Errorf("getting deals for miner %d / sector %d: %w", sectorID.Miner, sectorID.Number, err)
-		}
-		log.Debugf("sector %d has %d deals, seal status %s", sectorID, len(deals), sectorSealState)
-
-		// For each deal in the sector
-		for _, deal := range deals {
-			if !deal.AnnounceToIPNI {
-				continue
-			}
-
-			propnd, err := cborutil.AsIpld(&deal.DealProposal)
-			if err != nil {
-				return fmt.Errorf("failed to compute signed deal proposal ipld node: %w", err)
-			}
-			propCid := propnd.Cid()
-
-			if sectorSealState == db.SealStateRemoved {
-				// Announce deals that are no longer unsealed to indexer
-				announceCid, err := m.idxprov.AnnounceBoostDealRemoved(ctx, propCid)
-				if err != nil {
-					// Check if the error is because the deal wasn't previously announced
-					if !errors.Is(err, provider.ErrContextIDNotFound) {
-						// There was some other error, write it to the log
-						log.Errorw("announcing deal removed to index provider",
-							"deal id", deal.DealID, "error", err)
-						continue
-					}
-				} else {
-					log.Infow("announced to index provider that deal has been removed",
-						"deal id", deal.DealID, "sector id", deal.SectorID.Number, "announce cid", announceCid.String())
-				}
-			} else if sectorSealState != db.SealStateCache {
-				// Announce deals that have changed seal state to indexer
-				md := metadata.GraphsyncFilecoinV1{
-					PieceCID:      deal.DealProposal.Proposal.PieceCID,
-					FastRetrieval: sectorSealState == db.SealStateUnsealed,
-					VerifiedDeal:  deal.DealProposal.Proposal.VerifiedDeal,
-				}
-				announceCid, err := m.idxprov.AnnounceBoostDealMetadata(ctx, md, propCid)
-				if err == nil {
-					log.Infow("announced deal seal state to index provider",
-						"deal id", deal.DealID, "sector id", deal.SectorID.Number,
-						"seal state", sectorSealState, "announce cid", announceCid.String())
-				} else {
-					log.Errorf("announcing deal %s to index provider: %w", deal.DealID, err)
-				}
-			}
-		}
-
 		// Update the sector seal state in the database
 		err = m.sdb.Update(ctx, sectorID, sectorSealState)
 		if err != nil {
@@ -208,11 +149,13 @@ func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 	return nil
 }
 
-func (m *SectorStateMgr) getStateUpdates(ctx context.Context) (map[abi.SectorID]db.SealState, error) {
+func (m *SectorStateMgr) refreshState(ctx context.Context) (map[abi.SectorID]db.SealState, map[abi.SectorID]db.SealState, error) {
+	defer func(start time.Time) { log.Debugw("refreshState", "took", time.Since(start)) }(time.Now())
+
 	// Get the current unsealed state of all sectors from lotus
 	storageList, err := m.minerApi.StorageList(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("getting sectors state from lotus: %w", err)
+		return nil, nil, fmt.Errorf("getting sectors state from lotus: %w", err)
 	}
 
 	// Convert to a map of <sector id> => <seal state>
@@ -240,7 +183,7 @@ func (m *SectorStateMgr) getStateUpdates(ctx context.Context) (map[abi.SectorID]
 	// Get the previously known state of all sectors in the database
 	previousSectorStates, err := m.sdb.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("getting sectors state from database: %w", err)
+		return nil, nil, fmt.Errorf("getting sectors state from database: %w", err)
 	}
 
 	// Check which sectors have changed state since the last time we checked
@@ -266,75 +209,5 @@ func (m *SectorStateMgr) getStateUpdates(ctx context.Context) (map[abi.SectorID]
 		sealStateUpdates[sectorID] = sealState
 	}
 
-	return sealStateUpdates, nil
-}
-
-type basicDealInfo struct {
-	AnnounceToIPNI bool
-	DealID         string
-	SectorID       abi.SectorID
-	DealProposal   storagemarket.ClientDealProposal
-}
-
-// Get deals by sector ID, whether they're legacy or boost deals
-func (m *SectorStateMgr) dealsBySectorID(ctx context.Context, legacyDeals map[abi.SectorID][]storagemarket.MinerDeal, sectorID abi.SectorID) ([]basicDealInfo, error) {
-	// First query the boost database
-	deals, err := m.dealsDB.BySectorID(ctx, sectorID)
-	if err != nil {
-		return nil, fmt.Errorf("getting deals from boost database: %w", err)
-	}
-
-	basicDeals := make([]basicDealInfo, 0, len(deals))
-	for _, dl := range deals {
-		basicDeals = append(basicDeals, basicDealInfo{
-			AnnounceToIPNI: dl.AnnounceToIPNI,
-			DealID:         dl.DealUuid.String(),
-			SectorID:       sectorID,
-			DealProposal:   dl.ClientDealProposal,
-		})
-	}
-
-	// Then check the legacy deals
-	legDeals, ok := legacyDeals[sectorID]
-	if ok {
-		for _, dl := range legDeals {
-			basicDeals = append(basicDeals, basicDealInfo{
-				AnnounceToIPNI: true,
-				DealID:         dl.ProposalCid.String(),
-				SectorID:       sectorID,
-				DealProposal:   dl.ClientDealProposal,
-			})
-		}
-	}
-
-	return basicDeals, nil
-}
-
-// Iterate over all legacy deals and make a map of sector ID -> legacy deal.
-// To save memory, only include legacy deals with a sector ID that we know
-// we're going to query, ie the set of sector IDs in the stateUpdates map.
-func (m *SectorStateMgr) legacyDealsBySectorID(stateUpdates map[abi.SectorID]db.SealState) (map[abi.SectorID][]storagemarket.MinerDeal, error) {
-	legacyDeals, err := m.legacyProv.ListLocalDeals()
-	if err != nil {
-		return nil, err
-	}
-
-	bySectorID := make(map[abi.SectorID][]storagemarket.MinerDeal, len(legacyDeals))
-	for _, deal := range legacyDeals {
-		minerID, err := address.IDFromAddress(deal.Proposal.Provider)
-		if err != nil {
-			// just skip the deal if we can't convert its address to an ID address
-			continue
-		}
-		sectorID := abi.SectorID{
-			Miner:  abi.ActorID(minerID),
-			Number: deal.SectorNumber,
-		}
-		_, ok := stateUpdates[sectorID]
-		if ok {
-			bySectorID[sectorID] = append(bySectorID[sectorID], deal)
-		}
-	}
-
-	return bySectorID, nil
+	return sealStateUpdates, sectorStates, nil
 }

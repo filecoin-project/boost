@@ -4,16 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+	"math/rand"
+	"testing"
+	"time"
+
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipld/go-car/v2/index"
+	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
-	"math"
-	"math/rand"
-	"testing"
-	"time"
 )
 
 var tlg = logging.Logger("tlg")
@@ -33,7 +36,7 @@ func TestSizeLimit(t *testing.T) {
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
 
-		testSizeLimit(ctx, t, bdsvc, "localhost:8042")
+		testSizeLimit(ctx, t, bdsvc, "localhost:0")
 	})
 
 	t.Run("yugabyte", func(t *testing.T) {
@@ -43,17 +46,17 @@ func TestSizeLimit(t *testing.T) {
 
 		bdsvc := NewYugabyte(TestYugabyteSettings)
 
-		addr := "localhost:8044"
+		addr := "localhost:0"
 		testSizeLimit(ctx, t, bdsvc, addr)
 	})
 }
 
 func testSizeLimit(ctx context.Context, t *testing.T, bdsvc *Service, addr string) {
-	err := bdsvc.Start(ctx, addr)
+	ln, err := bdsvc.Start(ctx, addr)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), fmt.Sprintf("ws://%s", addr))
+	err = cl.Dial(context.Background(), fmt.Sprintf("ws://%s", ln.String()))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
@@ -118,4 +121,21 @@ func generateRandomCid(baseCid []byte) (cid.Cid, error) {
 	}
 
 	return c, nil
+}
+
+func toEntries(idx index.Index) (map[string]uint64, bool) {
+	it, ok := idx.(index.IterableIndex)
+	if !ok {
+		return nil, false
+	}
+
+	entries := make(map[string]uint64)
+	err := it.ForEach(func(mh multihash.Multihash, o uint64) error {
+		entries[mh.String()] = o
+		return nil
+	})
+	if err != nil {
+		return nil, false
+	}
+	return entries, true
 }
