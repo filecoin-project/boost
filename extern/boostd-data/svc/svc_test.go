@@ -57,7 +57,7 @@ func TestService(t *testing.T) {
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
 
-		testService(ctx, t, bdsvc, "localhost:8042")
+		testService(ctx, t, bdsvc, "localhost:0")
 	})
 
 	t.Run("couchbase", func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestService(t *testing.T) {
 		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
 
-		addr := "localhost:8043"
+		addr := "localhost:0"
 		testService(ctx, t, bdsvc, addr)
 	})
 
@@ -87,17 +87,17 @@ func TestService(t *testing.T) {
 
 		bdsvc := NewYugabyte(TestYugabyteSettings)
 
-		addr := "localhost:8044"
+		addr := "localhost:0"
 		testService(ctx, t, bdsvc, addr)
 	})
 }
 
 func testService(ctx context.Context, t *testing.T, bdsvc *Service, addr string) {
-	err := bdsvc.Start(ctx, addr)
+	ln, err := bdsvc.Start(ctx, addr)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), fmt.Sprintf("ws://%s", addr))
+	err = cl.Dial(context.Background(), fmt.Sprintf("ws://%s", ln))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
@@ -201,13 +201,13 @@ func TestServiceFuzz(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	t.Run("level db", func(t *testing.T) {
+	t.Run("leveldb", func(t *testing.T) {
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
-		addr := "localhost:8042"
-		err = bdsvc.Start(ctx, addr)
+		addr := "localhost:0"
+		ln, err := bdsvc.Start(ctx, addr)
 		require.NoError(t, err)
-		testServiceFuzz(ctx, t, addr)
+		testServiceFuzz(ctx, t, ln.String())
 	})
 
 	t.Run("couchbase", func(t *testing.T) {
@@ -216,21 +216,21 @@ func TestServiceFuzz(t *testing.T) {
 		t.Skip()
 		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
-		addr := "localhost:8043"
-		err := bdsvc.Start(ctx, addr)
+		addr := "localhost:0"
+		ln, err := bdsvc.Start(ctx, addr)
 		require.NoError(t, err)
-		testServiceFuzz(ctx, t, addr)
+		testServiceFuzz(ctx, t, ln.String())
 	})
 
 	t.Run("yugabyte", func(t *testing.T) {
 		SetupYugabyte(t)
 		bdsvc := NewYugabyte(TestYugabyteSettings)
 
-		addr := "localhost:8044"
-		err := bdsvc.Start(ctx, addr)
+		addr := "localhost:0"
+		ln, err := bdsvc.Start(ctx, addr)
 		require.NoError(t, err)
 
-		testServiceFuzz(ctx, t, addr)
+		testServiceFuzz(ctx, t, ln.String())
 	})
 }
 
@@ -458,7 +458,7 @@ func TestCleanup(t *testing.T) {
 	t.Run("level db", func(t *testing.T) {
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
-		testCleanup(ctx, t, bdsvc, "localhost:8042")
+		testCleanup(ctx, t, bdsvc, "localhost:0")
 	})
 
 	t.Run("couchbase", func(t *testing.T) {
@@ -467,7 +467,7 @@ func TestCleanup(t *testing.T) {
 		t.Skip()
 		SetupCouchbase(t, testCouchSettings)
 		bdsvc := NewCouchbase(testCouchSettings)
-		testCleanup(ctx, t, bdsvc, "localhost:8043")
+		testCleanup(ctx, t, bdsvc, "localhost:0")
 	})
 
 	t.Run("yugabyte", func(t *testing.T) {
@@ -479,16 +479,16 @@ func TestCleanup(t *testing.T) {
 		SetupYugabyte(t)
 
 		bdsvc := NewYugabyte(TestYugabyteSettings)
-		testCleanup(ctx, t, bdsvc, "localhost:8044")
+		testCleanup(ctx, t, bdsvc, "localhost:0")
 	})
 }
 
 func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, addr string) {
-	err := bdsvc.Start(ctx, addr)
+	ln, err := bdsvc.Start(ctx, addr)
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(context.Background(), fmt.Sprintf("ws://%s", addr))
+	err = cl.Dial(context.Background(), fmt.Sprintf("ws://%s", ln))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
