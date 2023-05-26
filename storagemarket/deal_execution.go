@@ -84,6 +84,7 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (d
 	defer func() {
 		if err := recover(); err != nil {
 			// TODO: it'd be nice to expose and log these errors in tests
+			fmt.Println("panic: ", err, string(debug.Stack()))
 			dmerr = &dealMakingError{
 				error: fmt.Errorf("Caught panic in deal execution: %s\n%s", err, debug.Stack()),
 				retry: smtypes.DealRetryManual,
