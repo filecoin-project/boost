@@ -91,10 +91,10 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 	}
 }
 
-func (w *Wrapper) Start(ctx context.Context) {
+func (w *Wrapper) Start(_ context.Context) {
 	w.prov.RegisterMultihashLister(w.MultihashLister)
 
-	runCtx, runCancel := context.WithCancel(ctx)
+	runCtx, runCancel := context.WithCancel(context.Background())
 	w.stop = runCancel
 
 	// Announce all deals on startup in case of a config change
@@ -112,7 +112,7 @@ func (w *Wrapper) Start(ctx context.Context) {
 		defer ticker.Stop()
 
 		// Check immediately
-		err := w.checkForUpdates(ctx)
+		err := w.checkForUpdates(runCtx)
 		if err != nil {
 			log.Errorw("checking for state updates", "err", err)
 		}
@@ -120,10 +120,10 @@ func (w *Wrapper) Start(ctx context.Context) {
 		// Check every tick
 		for {
 			select {
-			case <-ctx.Done():
+			case <-runCtx.Done():
 				return
 			case <-ticker.C:
-				err := w.checkForUpdates(ctx)
+				err := w.checkForUpdates(runCtx)
 				if err != nil {
 					log.Errorw("checking for state updates", "err", err)
 				}
