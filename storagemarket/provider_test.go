@@ -139,6 +139,8 @@ func TestSimpleDealHappy(t *testing.T) {
 }
 
 func TestMultipleDealsConcurrent(t *testing.T) {
+	//logging.SetLogLevel("boost-provider", "debug")
+	//logging.SetLogLevel("boost-storage-deal", "debug")
 	nDeals := 10
 	ctx := context.Background()
 

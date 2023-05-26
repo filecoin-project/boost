@@ -349,20 +349,14 @@ func (mb *MinerStubBuilder) SetupAnnounce(blocking bool, announce bool) *MinerSt
 	// When boost finishes adding the piece to a sector, it creates an index
 	// of the piece data and then announces the index. We need to mock a piece
 	// reader that returns the CAR file.
-	carReader, err := car.OpenReader(mb.carFilePath)
-	if err != nil {
-		panic(fmt.Sprintf("opening car file %s: %s", mb.carFilePath, err))
+	getReader := func(_ context.Context, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (pdtypes.SectionReader, error) {
+		readerWithClose, err := toPieceDirSectionReader(mb.carFilePath)
+		if err != nil {
+			panic(fmt.Sprintf("creating piece dir section reader: %s", err))
+		}
+		return readerWithClose, nil
 	}
-	carv1Reader, err := carReader.DataReader()
-	if err != nil {
-		panic(fmt.Sprintf("opening car v1 reader %s: %s", mb.carFilePath, err))
-	}
-	readerWithClose, err := toPieceDirSectionReader(carv1Reader)
-	if err != nil {
-		panic(fmt.Sprintf("creating piece dir section reader: %s", err))
-	}
-
-	mb.stub.MockPieceReader.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(readerWithClose, nil)
+	mb.stub.MockPieceReader.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(getReader)
 
 	mb.stub.MockIndexProvider.EXPECT().Enabled().AnyTimes().Return(true)
 	mb.stub.MockIndexProvider.EXPECT().Start(gomock.Any()).AnyTimes()
@@ -421,10 +415,18 @@ type StubbedMinerOutput struct {
 	CarFilePath         string
 }
 
-func toPieceDirSectionReader(reader car.SectionReader) (pdtypes.SectionReader, error) {
-	bz, err := io.ReadAll(reader)
+func toPieceDirSectionReader(carFilePath string) (pdtypes.SectionReader, error) {
+	carReader, err := car.OpenReader(carFilePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("opening car file %s: %w", carFilePath, err)
+	}
+	carv1Reader, err := carReader.DataReader()
+	if err != nil {
+		return nil, fmt.Errorf("opening car v1 reader %s: %s", carFilePath, err)
+	}
+	bz, err := io.ReadAll(carv1Reader)
+	if err != nil {
+		return nil, fmt.Errorf("reader car v1 reader %s: %s", carFilePath, err)
 	}
 	return &sectionReaderWithClose{Reader: bytes.NewReader(bz)}, nil
 }
