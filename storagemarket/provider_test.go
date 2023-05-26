@@ -1961,7 +1961,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	sectorId := abi.SectorNumber(rand.Intn(100))
 	offset := abi.PaddedPieceSize(rand.Intn(100))
 
-	tbuilder.ms = tbuilder.ph.MinerStub.ForDeal(dealParams, publishCid, finalPublishCid, dealId, sectorsStatusDealId, sectorId, offset, carFilePath)
+	tbuilder.ms = tbuilder.ph.MinerStub.ForDeal(dealParams, publishCid, finalPublishCid, dealId, sectorsStatusDealId, sectorId, offset, carFileCopyPath)
 	tbuilder.td = td
 	return tbuilder
 }
