@@ -190,6 +190,7 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (map[abi.SectorID]db.
 
 	// Convert to a map of <sector id> => <seal state>
 	sectorStates := make(map[abi.SectorID]db.SealState)
+	allSectorStates := make(map[abi.SectorID]db.SealState)
 	for _, storageStates := range storageList {
 		for _, storageState := range storageStates {
 			// Explicity set the sector state if its Sealed or Unsealed
@@ -207,6 +208,7 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (map[abi.SectorID]db.
 			if _, ok := sectorStates[storageState.SectorID]; !ok {
 				sectorStates[storageState.SectorID] = db.SealStateCache
 			}
+			allSectorStates[storageState.SectorID] = sectorStates[storageState.SectorID]
 		}
 	}
 
@@ -239,5 +241,5 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (map[abi.SectorID]db.
 		sealStateUpdates[sectorID] = sealState
 	}
 
-	return sealStateUpdates, sectorStates, nil
+	return sealStateUpdates, allSectorStates, nil
 }

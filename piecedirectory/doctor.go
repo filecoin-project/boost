@@ -156,11 +156,12 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 			return fmt.Errorf("failed to flag piece %s with no unsealed deal: %w", pieceCid, err)
 		}
 
-		doclog.Debugw("flagging piece as having no unsealed copy", "piece", pieceCid)
+		doclog.Debugw("flagging piece as having no unsealed copy", "piece", pieceCid, "hasUnsealedDeal", hasUnsealedDeal, "lacksActiveSector", lacksActiveSector, "len(activeSectors)", len(as), "len(sectorStates)", len(ss))
 		return nil
 	}
 
 	// There are no known issues with the piece, so unflag it
+	doclog.Debugw("unflagging piece", "piece", pieceCid)
 	err = d.store.UnflagPiece(ctx, pieceCid)
 	if err != nil {
 		return fmt.Errorf("failed to unflag piece %s: %w", pieceCid, err)
