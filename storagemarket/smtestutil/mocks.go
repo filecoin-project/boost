@@ -1,6 +1,7 @@
 package smtestutil
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -356,7 +357,10 @@ func (mb *MinerStubBuilder) SetupAnnounce(blocking bool, announce bool) *MinerSt
 	if err != nil {
 		panic(fmt.Sprintf("opening car v1 reader %s: %s", mb.carFilePath, err))
 	}
-	readerWithClose := withClose(carv1Reader)
+	readerWithClose, err := toPieceDirSectionReader(carv1Reader)
+	if err != nil {
+		panic(fmt.Sprintf("creating piece dir section reader: %s", err))
+	}
 
 	mb.stub.MockPieceReader.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(readerWithClose, nil)
 
@@ -417,12 +421,16 @@ type StubbedMinerOutput struct {
 	CarFilePath         string
 }
 
-func withClose(reader car.SectionReader) pdtypes.SectionReader {
-	return &sectionReaderWithClose{SectionReader: reader}
+func toPieceDirSectionReader(reader car.SectionReader) (pdtypes.SectionReader, error) {
+	bz, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	return &sectionReaderWithClose{Reader: bytes.NewReader(bz)}, nil
 }
 
 type sectionReaderWithClose struct {
-	car.SectionReader
+	*bytes.Reader
 }
 
 func (s *sectionReaderWithClose) Close() error {
