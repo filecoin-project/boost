@@ -116,6 +116,10 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 	lacksActiveSector := true
 
 	dls := md.Deals
+
+	as := d.ssm.GetActiveSectors()
+	ss := d.ssm.GetSectorStates()
+
 	for _, dl := range dls {
 		mid, err := address.IDFromAddress(dl.MinerAddr)
 		if err != nil {
@@ -128,11 +132,11 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 		}
 
 		// check if we have an active sector
-		if _, ok := d.ssm.ActiveSectors[sectorID]; ok {
+		if _, ok := as[sectorID]; ok {
 			lacksActiveSector = false
 		}
 
-		if d.ssm.SectorStates[sectorID] == db.SealStateUnsealed {
+		if ss[sectorID] == db.SealStateUnsealed {
 			hasUnsealedDeal = true
 			break
 		}

@@ -27,9 +27,9 @@ type SectorStateMgr struct {
 	fullnodeApi   api.FullNode
 	minerApi      api.StorageMiner
 	Maddr         address.Address
-	StateUpdates  map[abi.SectorID]db.SealState
-	SectorStates  map[abi.SectorID]db.SealState
-	ActiveSectors map[abi.SectorID]struct{}
+	stateUpdates  map[abi.SectorID]db.SealState
+	sectorStates  map[abi.SectorID]db.SealState
+	activeSectors map[abi.SectorID]struct{}
 
 	sdb *db.SectorStateDB
 }
@@ -41,8 +41,8 @@ func NewSectorStateMgr(cfg *config.Boost) func(lc fx.Lifecycle, sdb *db.SectorSt
 			minerApi:      minerApi,
 			fullnodeApi:   fullnodeApi,
 			Maddr:         address.Address(maddr),
-			StateUpdates:  make(map[abi.SectorID]db.SealState),
-			ActiveSectors: make(map[abi.SectorID]struct{}),
+			stateUpdates:  make(map[abi.SectorID]db.SealState),
+			activeSectors: make(map[abi.SectorID]struct{}),
 
 			sdb: sdb,
 		}
@@ -89,6 +89,27 @@ func (m *SectorStateMgr) Run(ctx context.Context) {
 	}
 }
 
+func (m *SectorStateMgr) GetStateUpdates() (r map[abi.SectorID]db.SealState) {
+	m.Lock()
+	r = m.stateUpdates
+	m.Unlock()
+	return
+}
+
+func (m *SectorStateMgr) GetSectorStates() (r map[abi.SectorID]db.SealState) {
+	m.Lock()
+	r = m.sectorStates
+	m.Unlock()
+	return
+}
+
+func (m *SectorStateMgr) GetActiveSectors() (r map[abi.SectorID]struct{}) {
+	m.Lock()
+	r = m.activeSectors
+	m.Unlock()
+	return
+}
+
 func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 	log.Debug("checking for sector state updates")
 
@@ -103,7 +124,7 @@ func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 		}
 	}
 
-	stateUpdates, sectorStates, err := m.refreshState(ctx)
+	su, ss, err := m.refreshState(ctx)
 	if err != nil {
 		return err
 	}
@@ -122,23 +143,23 @@ func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	activeSectors := make(map[abi.SectorID]struct{}, len(activeSet))
+	as := make(map[abi.SectorID]struct{}, len(activeSet))
 	for _, info := range activeSet {
 		sectorID := abi.SectorID{
 			Miner:  abi.ActorID(mid),
 			Number: info.SectorNumber,
 		}
 
-		activeSectors[sectorID] = struct{}{}
+		as[sectorID] = struct{}{}
 	}
 
 	m.Lock()
-	m.StateUpdates = stateUpdates
-	m.SectorStates = sectorStates
-	m.ActiveSectors = activeSectors
+	m.stateUpdates = su
+	m.sectorStates = ss
+	m.activeSectors = as
 	m.Unlock()
 
-	for sectorID, sectorSealState := range stateUpdates {
+	for sectorID, sectorSealState := range su {
 		// Update the sector seal state in the database
 		err = m.sdb.Update(ctx, sectorID, sectorSealState)
 		if err != nil {

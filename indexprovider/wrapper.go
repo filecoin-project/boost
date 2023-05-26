@@ -133,15 +133,16 @@ func (w *Wrapper) Start(_ context.Context) {
 }
 
 func (w *Wrapper) checkForUpdates(ctx context.Context) error {
-	legacyDeals, err := w.legacyDealsBySectorID(w.ssm.StateUpdates)
+	sus := w.ssm.GetStateUpdates()
+	legacyDeals, err := w.legacyDealsBySectorID(sus)
 	if err != nil {
 		return fmt.Errorf("getting legacy deals from datastore: %w", err)
 	}
 
-	log.Debugf("checking for sector state updates for %d states", len(w.ssm.StateUpdates))
+	log.Debugf("checking for sector state updates for %d states", len(sus))
 
 	// For each sector
-	for sectorID, sectorSealState := range w.ssm.StateUpdates {
+	for sectorID, sectorSealState := range sus {
 		// Get the deals in the sector
 		deals, err := w.dealsBySectorID(ctx, legacyDeals, sectorID)
 		if err != nil {
@@ -252,7 +253,7 @@ func (w *Wrapper) legacyDealsBySectorID(stateUpdates map[abi.SectorID]db.SealSta
 			Miner:  abi.ActorID(minerID),
 			Number: deal.SectorNumber,
 		}
-		_, ok := w.ssm.StateUpdates[sectorID]
+		_, ok := stateUpdates[sectorID]
 		if ok {
 			bySectorID[sectorID] = append(bySectorID[sectorID], deal)
 		}
