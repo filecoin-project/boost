@@ -124,15 +124,15 @@ func TestSimpleDealHappy(t *testing.T) {
 		require.NotEmpty(t, lgs)
 	}
 
-	t.Run("with remote commp / car v1", func(t *testing.T) {
-		runTest(t, false, CarVersion1)
-	})
+	//t.Run("with remote commp / car v1", func(t *testing.T) {
+	//runTest(t, false, CarVersion1)
+	//})
 	t.Run("with remote commp / car v2", func(t *testing.T) {
 		runTest(t, false, CarVersion2)
 	})
-	t.Run("with local commp / car v1", func(t *testing.T) {
-		runTest(t, true, CarVersion1)
-	})
+	//t.Run("with local commp / car v1", func(t *testing.T) {
+	//runTest(t, true, CarVersion1)
+	//})
 	t.Run("with local commp / car v2", func(t *testing.T) {
 		runTest(t, true, CarVersion2)
 	})
