@@ -373,7 +373,7 @@ func (db *DB) GetOffsetSize(ctx context.Context, cursorPrefix string, m multihas
 
 var (
 	// The minimum frequency with which to check pieces for errors (eg bad index)
-	MinPieceCheckPeriod = 30 * time.Second
+	MinPieceCheckPeriod = 5 * time.Minute
 
 	// in-memory cursor to the position we reached in the leveldb table with respect to piece cids to process for errors with the doctor
 	offset int
