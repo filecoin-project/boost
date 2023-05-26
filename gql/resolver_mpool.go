@@ -68,7 +68,7 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 		method := m.Message.Method.String()
 		toact, err := r.fullNode.StateGetActor(ctx, m.Message.To, types.EmptyTSK)
 		if err == nil {
-			method = consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method].Params.Name()
+			method = consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method].Name
 		}
 
 		var params string
