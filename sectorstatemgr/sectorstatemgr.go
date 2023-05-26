@@ -30,6 +30,7 @@ type SectorStateMgr struct {
 	stateUpdates  map[abi.SectorID]db.SealState
 	sectorStates  map[abi.SectorID]db.SealState
 	activeSectors map[abi.SectorID]struct{}
+	latestUpdate  time.Time
 
 	sdb *db.SectorStateDB
 }
@@ -110,6 +111,13 @@ func (m *SectorStateMgr) GetActiveSectors() (r map[abi.SectorID]struct{}) {
 	return
 }
 
+func (m *SectorStateMgr) GetLatestUpdate() (r time.Time) {
+	m.Lock()
+	r = m.latestUpdate
+	m.Unlock()
+	return
+}
+
 func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 	log.Debug("checking for sector state updates")
 
@@ -157,6 +165,7 @@ func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 	m.stateUpdates = su
 	m.sectorStates = ss
 	m.activeSectors = as
+	m.latestUpdate = time.Now()
 	m.Unlock()
 
 	for sectorID, sectorSealState := range su {

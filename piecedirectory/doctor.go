@@ -18,6 +18,8 @@ import (
 
 var doclog = logging.Logger("piecedoc")
 
+var zero = time.Time{}
+
 // The Doctor periodically queries the local index directory for piece cids, and runs
 // checks against those pieces. If there is a problem with a piece, it is
 // flagged, so that it can be surfaced to the user.
@@ -49,6 +51,12 @@ func (d *Doctor) Run(ctx context.Context) {
 		}
 
 		err := func() error {
+			latestUpdate := d.ssm.GetLatestUpdate()
+			if latestUpdate == zero {
+				doclog.Warn("sector state manager not yet updated")
+				return nil
+			}
+
 			// Get the next pieces to check (eg pieces that haven't been checked
 			// for a while) from the local index directory
 			pcids, err := d.store.NextPiecesToCheck(ctx)
