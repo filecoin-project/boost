@@ -1620,7 +1620,7 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
 	pdctx, cancel := context.WithCancel(context.Background())
-	pm := piecedirectory.NewPieceDirectory(bdclientutil.NewTestStore(pdctx), nil, 1)
+	pm := piecedirectory.NewPieceDirectory(bdclientutil.NewTestStore(pdctx), minerStub.MockPieceReader, 1)
 	pm.Start(pdctx)
 	t.Cleanup(cancel)
 
@@ -1953,7 +1953,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	sectorId := abi.SectorNumber(rand.Intn(100))
 	offset := abi.PaddedPieceSize(rand.Intn(100))
 
-	tbuilder.ms = tbuilder.ph.MinerStub.ForDeal(dealParams, publishCid, finalPublishCid, dealId, sectorsStatusDealId, sectorId, offset)
+	tbuilder.ms = tbuilder.ph.MinerStub.ForDeal(dealParams, publishCid, finalPublishCid, dealId, sectorsStatusDealId, sectorId, offset, carFilePath)
 	tbuilder.td = td
 	return tbuilder
 }
@@ -2301,7 +2301,7 @@ func (td *testDeal) updateWithRestartedProvider(ph *ProviderHarness) *testDealBu
 
 	td.tBuilder.ph = ph
 	td.tBuilder.td = td
-	td.tBuilder.ms = ph.MinerStub.ForDeal(td.params, old.PublishCid, old.FinalPublishCid, old.DealID, old.SectorsStatusDealID, old.SectorID, old.Offset)
+	td.tBuilder.ms = ph.MinerStub.ForDeal(td.params, old.PublishCid, old.FinalPublishCid, old.DealID, old.SectorsStatusDealID, old.SectorID, old.Offset, old.CarFilePath)
 
 	return td.tBuilder
 }

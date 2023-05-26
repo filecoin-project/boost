@@ -86,7 +86,7 @@ func TestOfflineDealInsufficientProviderFunds(t *testing.T) {
 	require.Contains(t, pi.Reason, "insufficient funds")
 }
 
-func XTestOfflineDealDataCleanup(t *testing.T) {
+func TestOfflineDealDataCleanup(t *testing.T) {
 	ctx := context.Background()
 
 	for _, delAfterImport := range []bool{true, false} {
