@@ -117,7 +117,11 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 				return client.Dial(ctx, fmt.Sprintf("ws://%s", addr))
 			},
 			OnStop: func(ctx context.Context) error {
-				cancel()
+				// cancel is nil if we use the service api (boostd-data process)
+				if cancel != nil {
+					cancel()
+				}
+
 				client.Close(ctx)
 				return nil
 			},
