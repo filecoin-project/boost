@@ -1695,10 +1695,16 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 		return true, "", nil
 	}
 
+	// Recreate the piece directory because we need to pass it the recreated mock piece reader
+	pdctx, cancel := context.WithCancel(context.Background())
+	pm := piecedirectory.NewPieceDirectory(bdclientutil.NewTestStore(pdctx), h.MinerStub.MockPieceReader, 1)
+	pm.Start(pdctx)
+	t.Cleanup(cancel)
+
 	// construct a new provider with pre-existing state
 	prov, err := NewProvider(h.Provider.config, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
-		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.piecedirectory, h.MinerStub, h.Provider.askGetter,
+		df, h.Provider.logsSqlDB, h.Provider.logsDB, pm, h.MinerStub, h.Provider.askGetter,
 		h.Provider.sigVerifier, h.Provider.dealLogger, h.Provider.Transport)
 
 	require.NoError(t, err)

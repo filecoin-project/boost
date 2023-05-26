@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func XTestSimpleOfflineDealHappy(t *testing.T) {
+func TestSimpleOfflineDealHappy(t *testing.T) {
 	ctx := context.Background()
 
 	// setup the provider test harness
