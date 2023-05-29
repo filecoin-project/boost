@@ -78,7 +78,7 @@ var importDataCmd = &cli.Command{
 				}
 
 				if deleteAfterImport {
-					return fmt.Errorf("legacy deal data cannot be automatically deleted after import (only new deals)")
+					return fmt.Errorf("cannot find boost deal with proposal cid %s and legacy deal data cannot be automatically deleted after import (only new deals)", proposalCid)
 				}
 
 				// The deal is not in the boost database, try the legacy
