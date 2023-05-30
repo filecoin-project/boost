@@ -427,7 +427,7 @@ for any other deal.`,
 			Name: "ListenAddress",
 			Type: "string",
 
-			Comment: `The ip address the GraphQL server will bind to. Default: 0.0.0.0`,
+			Comment: `The ip address the GraphQL server will bind to. Default: 127.0.0.1`,
 		},
 		{
 			Name: "Port",

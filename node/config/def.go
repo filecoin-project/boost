@@ -65,7 +65,7 @@ func DefaultBoost() *Boost {
 		},
 
 		Graphql: GraphqlConfig{
-			ListenAddress: "0.0.0.0",
+			ListenAddress: "127.0.0.1",
 			Port:          8080,
 		},
 
