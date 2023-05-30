@@ -34,7 +34,7 @@ func TestUnsealedStateManagerEmptyStorageList(t *testing.T) {
 
 // Only announce sectors for deals that are in the boost database or
 // legacy datastore
-func TestUnsealedStateManagerMatchingDealOnly(t *testing.T) {
+func TestSectorStateManagerMatchingDealOnly(t *testing.T) {
 	ctx := context.Background()
 
 	runTest := func(t *testing.T, wrapper *Wrapper, storageMiner *mockApiStorageMiner, prov *mock_provider.MockInterface, provAddr address.Address, sectorNum abi.SectorNumber) {
@@ -344,136 +344,133 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 }
 
 // Verify that multiple storage file types are handled from StorageList correctly
-//func XTestUnsealedStateManagerStorageList(t *testing.T) {
-//ctx := context.Background()
+func TestUnsealedStateManagerStorageList(t *testing.T) {
+	ctx := context.Background()
 
-//testCases := []struct {
-//name                string
-//sus map[abi.SectorID]db.SealState
-//storageListResponse func(sectorID abi.SectorID) []storiface.Decl
-//expect              func(*mock_provider.MockInterfaceMockRecorder, market.DealProposal)
-//}{
-//{
-//name: "unsealed and sealed status",
-//sus: func(sectorID abi.SectorID) map[abi.SectorID]db.SealState {
-//return map[abi.SectorID]db.SealState{
-//sectorID: SealStateUnsealed,
-//sectorID: SealStateCache,
-//}
-//},
-//storageListResponse: func(sectorID abi.SectorID) []storiface.Decl {
-//return []storiface.Decl{
-//{
-//SectorID:       sectorID,
-//SectorFileType: storiface.FTUnsealed,
-//},
-//{
-//SectorID:       sectorID,
-//SectorFileType: storiface.FTSealed,
-//},
-//}
-//},
-//expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
-//// Expect only one call to NotifyPut with fast retrieval = true (unsealed)
-//// because we ignore a state change to cache
-//prov.NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), metadata.Default.New(&metadata.GraphsyncFilecoinV1{
-//PieceCID:      prop.PieceCID,
-//VerifiedDeal:  prop.VerifiedDeal,
-//FastRetrieval: true,
-//})).Times(1)
-//},
-//}, {
-//name: "unsealed and cached status",
-//sus: func(sectorID abi.SectorID) map[abi.SectorID]db.SealState {
-//return map[abi.SectorID]db.SealState{
-//sectorID: SealStateUnsealed,
-//sectorID: SealStateCache,
-//},
-//},
-//storageListResponse: func(sectorID abi.SectorID) []storiface.Decl {
-//return []storiface.Decl{
-//{
-//SectorID:       sectorID,
-//SectorFileType: storiface.FTUnsealed,
-//},
-//{
-//SectorID:       sectorID,
-//SectorFileType: storiface.FTCache,
-//},
-//}
-//},
-//expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
-//// Expect only one call to NotifyPut with fast retrieval = true (unsealed)
-//// because we ignore a state change to cache
-//prov.NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), metadata.Default.New(&metadata.GraphsyncFilecoinV1{
-//PieceCID:      prop.PieceCID,
-//VerifiedDeal:  prop.VerifiedDeal,
-//FastRetrieval: true,
-//})).Times(1)
-//},
-//}, {
-//name: "sealed and cached status",
-//sus: map[abi.SectorID]db.SealState{
-//abi.SectorID{Miner: abi.ActorID(minerID), Number: deals[0].SectorID}: FTtoSealState[tc.storageListResponse,
-//},
-//storageListResponse: func(sectorID abi.SectorID) []storiface.Decl {
-//return []storiface.Decl{
-//{
-//SectorID:       sectorID,
-//SectorFileType: storiface.FTSealed,
-//},
-//{
-//SectorID:       sectorID,
-//SectorFileType: storiface.FTCache,
-//},
-//}
-//},
-//expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
-//// Expect only one call to NotifyPut with fast retrieval = true (unsealed)
-//// because we ignore a state change to cache
-//prov.NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), metadata.Default.New(&metadata.GraphsyncFilecoinV1{
-//PieceCID:      prop.PieceCID,
-//VerifiedDeal:  prop.VerifiedDeal,
-//FastRetrieval: false,
-//})).Times(1)
-//},
-//}}
+	testCases := []struct {
+		name         string
+		initialState func(sectorID abi.SectorID) []storiface.Decl
+		sus          func(sectorID abi.SectorID) map[abi.SectorID]db.SealState
+		expect       func(*mock_provider.MockInterfaceMockRecorder, market.DealProposal)
+	}{
+		{
+			name: "unsealed and sealed status",
+			sus: func(sectorID abi.SectorID) map[abi.SectorID]db.SealState {
+				return map[abi.SectorID]db.SealState{
+					sectorID: db.SealStateUnsealed,
+					sectorID: db.SealStateCache,
+				}
+			},
+			initialState: func(sectorID abi.SectorID) []storiface.Decl {
+				return []storiface.Decl{
+					{
+						SectorID:       sectorID,
+						SectorFileType: storiface.FTUnsealed,
+					},
+					{
+						SectorID:       sectorID,
+						SectorFileType: storiface.FTSealed,
+					},
+				}
+			},
+			expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
+				// Expect only one call to NotifyPut with fast retrieval = true (unsealed)
+				// because we ignore a state change to cache
+				//prov.NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), metadata.Default.New(&metadata.GraphsyncFilecoinV1{
+				//PieceCID:      prop.PieceCID,
+				//VerifiedDeal:  prop.VerifiedDeal,
+				//FastRetrieval: true,
+				//})).Times(1)
+			},
+		}, {
+			name: "unsealed and cached status",
+			sus: func(sectorID abi.SectorID) map[abi.SectorID]db.SealState {
+				return map[abi.SectorID]db.SealState{
+					sectorID: db.SealStateUnsealed,
+					sectorID: db.SealStateCache,
+				}
+			},
+			initialState: func(sectorID abi.SectorID) []storiface.Decl {
+				return []storiface.Decl{
+					{
+						SectorID:       sectorID,
+						SectorFileType: storiface.FTUnsealed,
+					},
+					{
+						SectorID:       sectorID,
+						SectorFileType: storiface.FTCache,
+					},
+				}
+			},
+			expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
+				// Expect only one call to NotifyPut with fast retrieval = true (unsealed)
+				// because we ignore a state change to cache
+				//prov.NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), metadata.Default.New(&metadata.GraphsyncFilecoinV1{
+				//PieceCID:      prop.PieceCID,
+				//VerifiedDeal:  prop.VerifiedDeal,
+				//FastRetrieval: true,
+				//})).Times(1)
+			},
+		}, {
+			name: "sealed and cached status",
+			sus: func(sectorID abi.SectorID) map[abi.SectorID]db.SealState {
+				return map[abi.SectorID]db.SealState{
+					sectorID: db.SealStateUnsealed,
+					sectorID: db.SealStateCache,
+				}
+			},
+			initialState: func(sectorID abi.SectorID) []storiface.Decl {
+				return []storiface.Decl{
+					{
+						SectorID:       sectorID,
+						SectorFileType: storiface.FTSealed,
+					},
+					{
+						SectorID:       sectorID,
+						SectorFileType: storiface.FTCache,
+					},
+				}
+			},
+			expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
+				// Expect only one call to NotifyPut with fast retrieval = true (unsealed)
+				// because we ignore a state change to cache
+				//prov.NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), metadata.Default.New(&metadata.GraphsyncFilecoinV1{
+				//PieceCID:      prop.PieceCID,
+				//VerifiedDeal:  prop.VerifiedDeal,
+				//FastRetrieval: false,
+				//})).Times(1)
+			},
+		}}
 
-//for _, tc := range testCases {
-//t.Run(tc.name, func(t *testing.T) {
-//wrapper, legacyStorageProvider, storageMiner, prov := setup(t)
-//legacyStorageProvider.EXPECT().ListLocalDeals().AnyTimes().Return(nil, nil)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			wrapper, legacyStorageProvider, storageMiner, prov := setup(t)
+			legacyStorageProvider.EXPECT().ListLocalDeals().AnyTimes().Return(nil, nil)
 
-//// Add a deal to the database
-//deals, err := db.GenerateNDeals(1)
-//require.NoError(t, err)
-//err = wrapper.dealsDB.Insert(ctx, &deals[0])
-//require.NoError(t, err)
+			// Add a deal to the database
+			deals, err := db.GenerateNDeals(1)
+			require.NoError(t, err)
+			err = wrapper.dealsDB.Insert(ctx, &deals[0])
+			require.NoError(t, err)
 
-//// Set up expectations (automatically verified when the test exits)
-//prop := deals[0].ClientDealProposal.Proposal
-//tc.expect(prov.EXPECT(), prop)
+			// Set up expectations (automatically verified when the test exits)
+			prop := deals[0].ClientDealProposal.Proposal
+			tc.expect(prov.EXPECT(), prop)
 
-//minerID, err := address.IDFromAddress(deals[0].ClientDealProposal.Proposal.Provider)
-//require.NoError(t, err)
+			minerID, err := address.IDFromAddress(deals[0].ClientDealProposal.Proposal.Provider)
+			require.NoError(t, err)
 
-//// Set the first response from MinerAPI.StorageList()
-//storageMiner.storageList = map[storiface.ID][]storiface.Decl{}
-//resp1 := tc.storageListResponse(abi.SectorID{Miner: abi.ActorID(minerID), Number: deals[0].SectorID})
-//storageMiner.storageList["uuid"] = resp1
+			// Set the first response from MinerAPI.StorageList()
+			storageMiner.storageList = map[storiface.ID][]storiface.Decl{}
+			resp1 := tc.initialState(abi.SectorID{Miner: abi.ActorID(minerID), Number: deals[0].SectorID})
+			storageMiner.storageList["uuid"] = resp1
 
-////FTtoSealState := map[SectorFileType]SealState{
-////FTUnsealed: SealStateUnsealed,
-////FTSealed:   SealStateSealed,
-////FTCache:    SealStateCache,
-////}
-
-//// Trigger check for updates
-//err = wrapper.handleUpdates(ctx, tc.sus)
-//require.NoError(t, err)
-//})
-//}
-//}
+			// Trigger check for updates
+			err = wrapper.handleUpdates(ctx, tc.sus(abi.SectorID{Miner: abi.ActorID(minerID), Number: deals[0].SectorID}))
+			require.NoError(t, err)
+		})
+	}
+}
 
 func setup(t *testing.T) (*Wrapper, *mock.MockStorageProvider, *mockApiStorageMiner, *mock_provider.MockInterface) {
 	ctx := context.Background()
