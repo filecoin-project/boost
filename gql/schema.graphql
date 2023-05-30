@@ -317,6 +317,25 @@ type SealingPipeline {
   Workers: [Worker]!
 }
 
+type SectorsList {
+  totalCount: Int!
+  sectors: [SectorStatus]!
+  more: Boolean!
+  at: Time!
+}
+
+type SectorStatus {
+  SectorNumber: Int!
+  Status: String!
+  Unsealed: Boolean!
+  DealCount: Int!
+  Active: Boolean!
+  DealWeight: BigInt!
+  VerifiedPower: BigInt!
+  Expiration: Uint64!
+  OnChain: Boolean!
+}
+
 type FundsEscrow {
   Available: BigInt!
   Locked: BigInt!
@@ -467,6 +486,9 @@ type RootQuery {
   """Get the indexes for a particular piece CID"""
   pieceIndexes(pieceCid: String!): [String!]!
 
+  """Get the status of sectors"""
+  sectorsList(cursor: Int, offset: Int, limit: Int): SectorsList!
+
   """Get storage space usage"""
   storage: Storage!
 
@@ -522,6 +544,9 @@ type RootMutation {
 
   """Update the Storage Ask (price of doing a storage deal)"""
   storageAskUpdate(update: StorageAskUpdate!): Boolean!
+
+  """Synchonously refresh the state of the sectors list"""
+  sectorsListRefresh: Boolean!
 }
 
 type RootSubscription {

@@ -8,7 +8,7 @@ import {FundsMenuItem} from "./Funds";
 import gridImg from './bootstrap-icons/icons/grid-3x3-gap.svg'
 import './Menu.css'
 import {SettingsMenuItem} from "./Settings";
-import {InspectMenuItem} from "./Inspect";
+import {LIDMenuItem} from "./LID";
 import {ProposalLogsMenuItem} from "./ProposalLogs";
 import {RetrievalLogsMenuItem} from "./RetrievalLogs";
 
@@ -27,7 +27,7 @@ export function Menu(props) {
             <FundsMenuItem />
             <DealPublishMenuItem />
             <DealTransfersMenuItem />
-            <InspectMenuItem />
+            <LIDMenuItem />
             <Link key="mpool" className="menu-item" to="/mpool">
                 <img className="icon" alt="" src={gridImg} />
                 <h3>Message Pool</h3>

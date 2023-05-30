@@ -1,3 +1,4 @@
+/* global BigInt */
 import {useMutation, useQuery} from "@apollo/react-hooks";
 import {
     FlaggedPiecesQuery, PieceBuildIndexMutation,
@@ -10,30 +11,292 @@ import {PageContainer, ShortDealLink} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import xImg from './bootstrap-icons/icons/x-lg.svg'
-import inspectImg from './bootstrap-icons/icons/wrench.svg'
+import lidImg from './bootstrap-icons/icons/wrench.svg'
+import repairImg from './bootstrap-icons/icons/wrench-white.svg'
+import './LID.css'
 import './Inspect.css'
 import {Pagination} from "./Pagination";
 import {Info, InfoListItem} from "./Info";
+import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
+import {addCommas, humanFileSize} from "./util";
 
-var inspectBasePath = '/inspect'
+var lidBasePath = '/lid'
 
-export function InspectMenuItem(props) {
+export function LIDMenuItem(props) {
     return (
-        <Link key="inspect" className="menu-item" to={inspectBasePath}>
-            <img className="icon" alt="" src={inspectImg} />
-            <h3>Inspect</h3>
+        <Link key="lid" className="menu-item" to={lidBasePath}>
+            <img className="icon" alt="" src={lidImg} />
+            <h3>Local Index Directory</h3>
         </Link>
     )
 }
 
-// Main page with flagged pieces
-export function InspectPage(props) {
-    return <PageContainer title="Inspect Piece metadata">
-        <InspectContent />
+// Landing page for LID
+export function LIDPage(props) {
+    return <PageContainer title="Local Index Directory">
+        <LIDContent />
     </PageContainer>
 }
 
-function InspectContent() {
+function LIDContent() {
+    return <div className="lid">
+        <BlockStatsSection />
+        <table className="lid-graphs">
+            <tbody>
+            <tr>
+                <td>
+                    <DealDataSection />
+                    <PiecesSection />
+                </td>
+                <td>
+                    <SectorUnsealedSection />
+                    <SectorProvingState />
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+}
+
+function BlockStatsSection() {
+    return <div>
+        <h3>Block Stats</h3>
+
+        <table className="block-stats">
+            <tbody>
+            <tr>
+                <th>Total blocks:</th>
+                <td>{addCommas(32129310123)}</td>
+            </tr>
+            <tr>
+                <th>Avg Block size:</th>
+                <td>{humanFileSize(256*1024)}</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+}
+
+function mockDealData() {
+    return {
+        data: {
+            storage: {
+                Indexed: BigInt(12345432343223),
+                Flagged: BigInt(1234512345423),
+                Sealed: BigInt(1634512345423),
+            }
+        }
+    }
+}
+
+function DealDataSection() {
+    // const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
+    const {loading, error, data} = mockDealData()
+
+    if (loading) {
+        return <div>Loading...</div>
+    }
+    if (error) {
+        return <div>Error: {error.message}</div>
+    }
+
+    var storage = data.storage
+
+    const bars = [{
+        name: 'Indexed',
+        className: 'indexed',
+        amount: storage.Indexed,
+        description: ''
+    }, {
+        name: 'Flagged',
+        className: 'flagged',
+        amount: storage.Flagged,
+        description: ''
+    }, {
+        name: 'Sealed Only',
+        className: 'sealed',
+        amount: storage.Sealed,
+        description: ''
+    }]
+
+    return <div>
+        <h3>Deal Data</h3>
+
+        <div className="storage-chart">
+            <CumulativeBarChart bars={bars} unit="byte" />
+            <CumulativeBarLabels bars={bars} unit="byte" />
+        </div>
+    </div>
+}
+
+function mockPiecesData() {
+    return {
+        data: {
+            storage: {
+                Indexed: BigInt(2132),
+                Flagged: BigInt(123),
+                Sealed: BigInt(213),
+            }
+        }
+    }
+}
+
+function PiecesSection() {
+    // const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
+    const {loading, error, data} = mockPiecesData()
+
+    if (loading) {
+        return <div>Loading...</div>
+    }
+    if (error) {
+        return <div>Error: {error.message}</div>
+    }
+
+    var storage = data.storage
+
+    const bars = [{
+        name: 'Indexed',
+        className: 'indexed',
+        amount: storage.Indexed,
+        description: ''
+    }, {
+        name: 'Flagged',
+        className: 'flagged',
+        amount: storage.Flagged,
+        description: ''
+    }, {
+        name: 'Sealed Only',
+        className: 'sealed',
+        amount: storage.Sealed,
+        description: ''
+    }]
+
+    return <div>
+        <h3>Pieces</h3>
+
+        <div className="storage-chart">
+            <CumulativeBarChart bars={bars} />
+            <CumulativeBarLabels bars={bars} />
+        </div>
+
+        <div className="flagged-pieces-link">
+            <h3>Flagged Pieces</h3>
+            <p>
+                <b>{addCommas(storage.Flagged)}</b> Flagged Pieces
+                <Link to={"/piece-doctor"} className="button"><img src={repairImg} /> Repair</Link>
+            </p>
+        </div>
+    </div>
+}
+
+function mockSectorUnsealedData() {
+    return {
+        data: {
+            sectors: {
+                Unsealed: BigInt(1334),
+                Sealed: BigInt(321),
+            }
+        }
+    }
+}
+
+function SectorUnsealedSection() {
+    // const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
+    const {loading, error, data} = mockSectorUnsealedData()
+
+    if (loading) {
+        return <div>Loading...</div>
+    }
+    if (error) {
+        return <div>Error: {error.message}</div>
+    }
+
+    var sectors = data.sectors
+
+    const bars = [{
+        name: 'Unsealed Copy',
+        className: 'unsealed',
+        amount: sectors.Unsealed,
+        description: ''
+    }, {
+        name: 'Sealed Only',
+        className: 'sealed',
+        amount: sectors.Sealed,
+        description: ''
+    }]
+
+    return <div>
+        <h3>Sector Unsealed Copies</h3>
+
+        <div className="storage-chart">
+            <CumulativeBarChart bars={bars} />
+            <CumulativeBarLabels bars={bars} />
+        </div>
+    </div>
+}
+
+function mockSectorProvingState() {
+    return {
+        data: {
+            sectors: {
+                Active: BigInt(1274),
+                Inactive: BigInt(381),
+            }
+        }
+    }
+}
+
+function SectorProvingState() {
+    // const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
+    const {loading, error, data} = mockSectorProvingState()
+
+    if (loading) {
+        return <div>Loading...</div>
+    }
+    if (error) {
+        return <div>Error: {error.message}</div>
+    }
+
+    var sectors = data.sectors
+
+    const bars = [{
+        name: 'Active',
+        className: 'active',
+        amount: sectors.Active,
+        description: ''
+    }, {
+        name: 'Inactive',
+        className: 'inactive',
+        amount: sectors.Inactive,
+        description: ''
+    }]
+
+    return <div>
+        <h3>Sector Proving State</h3>
+
+        <div className="storage-chart">
+            <CumulativeBarChart bars={bars} />
+            <CumulativeBarLabels bars={bars} />
+        </div>
+
+        <div className="sectors-list-link">
+            <h3>Sectors List</h3>
+            <p>
+                <b>{addCommas(sectors.Active + sectors.Inactive)}</b> Sectors
+                <Link to={"/sectors-list"} className="button">View Sectors</Link>
+            </p>
+        </div>
+    </div>
+}
+
+// Page listing pieces flagged by the piece doctor
+export function PieceDoctorPage(props) {
+    return <PageContainer title="Piece Doctor">
+        <PieceDoctorContent />
+    </PageContainer>
+}
+
+function PieceDoctorContent() {
     const params = useParams()
     const [searchQuery, setSearchQuery] = useState(params.query)
 
@@ -56,7 +319,7 @@ function FlaggedPieces({setSearchQuery}) {
         const val = parseInt(e.target.value)
         RowsPerPage.save(val)
         setRowsPerPage(val)
-        navigate(inspectBasePath)
+        navigate(lidBasePath)
         scrollTop()
     }
 
@@ -93,7 +356,7 @@ function FlaggedPieces({setSearchQuery}) {
     }
 
     const paginationParams = {
-        basePath: inspectBasePath,
+        basePath: lidBasePath,
         cursor, pageNum, totalCount,
         rowsPerPage: rowsPerPage,
         moreRows: moreRows,

@@ -635,11 +635,15 @@ func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo
 		ps dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, piecedirectory *piecedirectory.PieceDirectory, fullNode v1api.FullNode, bg gql.BlockGetter) *gql.Server {
 
 		resolverCtx, cancel := context.WithCancel(context.Background())
-		resolver := gql.NewResolver(resolverCtx, cfg, r, h, dealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyProv, legacyDT, ps, sa, piecedirectory, publisher, fullNode)
+		sectorsList := sealingpipeline.NewSectorsList(fullNode, spApi)
+		resolver := gql.NewResolver(resolverCtx, cfg, r, h, dealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyProv, legacyDT, ps, sa, piecedirectory, publisher, fullNode, sectorsList)
 		server := gql.NewServer(resolver, bg)
 
 		lc.Append(fx.Hook{
-			OnStart: server.Start,
+			OnStart: func(ctx context.Context) error {
+				go sectorsList.Run(resolverCtx)
+				return server.Start(ctx)
+			},
 			OnStop: func(ctx context.Context) error {
 				cancel()
 				return server.Stop(ctx)

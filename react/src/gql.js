@@ -294,6 +294,26 @@ const RetrievalLogsCountQuery = gql`
     }
 `;
 
+const SectorsListQuery = gql`
+    query AppSectorsListQuery($cursor: Int, $offset: Int, $limit: Int) {
+        sectorsList(cursor: $cursor, offset: $offset, limit: $limit) {
+            sectors {
+                SectorNumber
+                Status
+                Unsealed
+                DealCount
+                Active
+                DealWeight
+                VerifiedPower
+                Expiration
+                OnChain
+            }
+            totalCount
+            more
+            at
+        }
+    }
+`;
 
 const DealCancelMutation = gql`
     mutation AppDealCancelMutation($id: ID!) {
@@ -638,6 +658,12 @@ const DealPublishNowMutation = gql`
     }
 `;
 
+const SectorsListRefreshMutation = gql`
+    mutation AppSectorsListRefreshMutation {
+        sectorsListRefresh
+    }
+`;
+
 const FundsMoveToEscrow = gql`
     mutation AppDealPublishNowMutation($amount: BigInt!) {
         fundsMoveToEscrow(amount: $amount)
@@ -713,12 +739,14 @@ export {
     PieceBuildIndexMutation,
     PieceStatusQuery,
     FlaggedPiecesQuery,
+    SectorsListQuery,
     StorageQuery,
     LegacyStorageQuery,
     FundsQuery,
     FundsLogsQuery,
     DealPublishQuery,
     DealPublishNowMutation,
+    SectorsListRefreshMutation,
     FundsMoveToEscrow,
     StorageAskUpdate,
     TransfersQuery,
