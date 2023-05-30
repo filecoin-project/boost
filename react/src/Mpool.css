@@ -120,7 +120,7 @@
 }
 
 .mpool .params{
-    width: 350px;
+    width: 1080px;
     text-overflow: ellipsis;
     cursor: pointer;
     word-break: break-all;
