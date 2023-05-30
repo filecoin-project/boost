@@ -3,14 +3,11 @@ package indexprovider
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/db/migrations"
 	"github.com/filecoin-project/boost/indexprovider/mock"
-	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
@@ -482,7 +479,6 @@ func setup(t *testing.T) (*Wrapper, *mock.MockStorageProvider, *mockApiStorageMi
 	require.NoError(t, migrations.Migrate(sqldb))
 
 	dealsDB := db.NewDealsDB(sqldb)
-	sdb := db.NewSectorStateDB(sqldb)
 	storageMiner := &mockApiStorageMiner{}
 	storageProvider := mock.NewMockStorageProvider(ctrl)
 
@@ -494,25 +490,12 @@ func setup(t *testing.T) (*Wrapper, *mock.MockStorageProvider, *mockApiStorageMi
 		meshCreator: &meshCreatorStub{},
 	}
 
-	cfg := &config.Boost{
-		Storage: config.StorageConfig{
-			StorageListRefreshDuration: config.Duration(100 * time.Millisecond),
-		},
-	}
-	mockRefreshState := func(context.Context) (*sectorstatemgr.SectorStateUpdates, error) {
-		return nil, nil
-	}
-	ssm := sectorstatemgr.NewMockSectorStateMgr(cfg, sdb, mockRefreshState)
-
-	wrapper.ssm = ssm
 	return wrapper, storageProvider, storageMiner, prov
 }
 
 type mockApiStorageMiner struct {
 	storageList map[storiface.ID][]storiface.Decl
 }
-
-//var _ ApiStorageMiner = (*mockApiStorageMiner)(nil)
 
 func (m mockApiStorageMiner) StorageList(ctx context.Context) (map[storiface.ID][]storiface.Decl, error) {
 	return m.storageList, nil

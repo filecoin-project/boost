@@ -35,8 +35,6 @@ type SectorStateMgr struct {
 	minerApi    api.StorageMiner
 	Maddr       address.Address
 
-	_refreshState func(context.Context) (*SectorStateUpdates, error)
-
 	PubSub *PubSub
 
 	sdb *db.SectorStateDB
@@ -54,9 +52,6 @@ func NewSectorStateMgr(cfg *config.Boost) func(lc fx.Lifecycle, sdb *db.SectorSt
 
 			sdb: sdb,
 		}
-
-		// function pointer for test purpores, by default we use refreshState
-		mgr._refreshState = mgr.refreshState
 
 		cctx, cancel := context.WithCancel(context.Background())
 		lc.Append(fx.Hook{
@@ -107,7 +102,7 @@ func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 
 	defer func(start time.Time) { log.Debugw("checkForUpdates", "took", time.Since(start)) }(time.Now())
 
-	ssu, err := m._refreshState(ctx)
+	ssu, err := m.refreshState(ctx)
 	if err != nil {
 		return err
 	}
@@ -221,18 +216,4 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 	}
 
 	return &SectorStateUpdates{sealStateUpdates, as, allSectorStates, time.Now()}, nil
-}
-
-func NewMockSectorStateMgr(cfg *config.Boost, sdb *db.SectorStateDB, mockRefreshState func(context.Context) (*SectorStateUpdates, error)) *SectorStateMgr {
-	mgr := &SectorStateMgr{
-		cfg: cfg.Storage,
-
-		PubSub: NewPubSub(),
-
-		sdb: sdb,
-	}
-
-	mgr._refreshState = mockRefreshState
-
-	return mgr
 }
