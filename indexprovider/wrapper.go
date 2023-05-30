@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
@@ -105,35 +104,28 @@ func (w *Wrapper) Start(_ context.Context) {
 		}
 	}()
 
+	log.Info("starting index provider")
+
 	go func() {
-		duration := time.Duration(w.cfg.Storage.StorageListRefreshDuration)
-		log.Infof("starting index provider update interval %s", duration.String())
-		ticker := time.NewTicker(duration)
-		defer ticker.Stop()
+		updates := w.ssm.PubSub.Subscribe()
 
-		// Check immediately
-		err := w.checkForUpdates(runCtx)
-		if err != nil {
-			log.Errorw("checking for state updates", "err", err)
-		}
-
-		// Check every tick
 		for {
 			select {
+			case u := <-updates:
+				log.Debugw("got state updates from SectorStateMgr", "u", len(u.Updates))
+
+				err := w.handleUpdates(runCtx, u.Updates)
+				if err != nil {
+					log.Errorw("error while handling state updates", "err", err)
+				}
 			case <-runCtx.Done():
 				return
-			case <-ticker.C:
-				err := w.checkForUpdates(runCtx)
-				if err != nil {
-					log.Errorw("checking for state updates", "err", err)
-				}
 			}
 		}
 	}()
 }
 
-func (w *Wrapper) checkForUpdates(ctx context.Context) error {
-	sus := w.ssm.GetStateUpdates()
+func (w *Wrapper) handleUpdates(ctx context.Context, sus map[abi.SectorID]db.SealState) error {
 	legacyDeals, err := w.legacyDealsBySectorID(sus)
 	if err != nil {
 		return fmt.Errorf("getting legacy deals from datastore: %w", err)

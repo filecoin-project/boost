@@ -20,17 +20,22 @@ import (
 
 var log = logging.Logger("sectorstatemgr")
 
+type SectorStateUpdates struct {
+	Updates       map[abi.SectorID]db.SealState
+	ActiveSectors map[abi.SectorID]struct{}
+	SectorStates  map[abi.SectorID]db.SealState
+	UpdatedAt     time.Time
+}
+
 type SectorStateMgr struct {
 	sync.Mutex
 
-	cfg           config.StorageConfig
-	fullnodeApi   api.FullNode
-	minerApi      api.StorageMiner
-	Maddr         address.Address
-	stateUpdates  map[abi.SectorID]db.SealState
-	sectorStates  map[abi.SectorID]db.SealState
-	activeSectors map[abi.SectorID]struct{}
-	latestUpdate  time.Time
+	cfg         config.StorageConfig
+	fullnodeApi api.FullNode
+	minerApi    api.StorageMiner
+	Maddr       address.Address
+
+	PubSub *PubSub
 
 	sdb *db.SectorStateDB
 }
@@ -38,12 +43,12 @@ type SectorStateMgr struct {
 func NewSectorStateMgr(cfg *config.Boost) func(lc fx.Lifecycle, sdb *db.SectorStateDB, minerApi lotus_modules.MinerStorageService, fullnodeApi api.FullNode, maddr lotus_dtypes.MinerAddress) *SectorStateMgr {
 	return func(lc fx.Lifecycle, sdb *db.SectorStateDB, minerApi lotus_modules.MinerStorageService, fullnodeApi api.FullNode, maddr lotus_dtypes.MinerAddress) *SectorStateMgr {
 		mgr := &SectorStateMgr{
-			cfg:           cfg.Storage,
-			minerApi:      minerApi,
-			fullnodeApi:   fullnodeApi,
-			Maddr:         address.Address(maddr),
-			stateUpdates:  make(map[abi.SectorID]db.SealState),
-			activeSectors: make(map[abi.SectorID]struct{}),
+			cfg:         cfg.Storage,
+			minerApi:    minerApi,
+			fullnodeApi: fullnodeApi,
+			Maddr:       address.Address(maddr),
+
+			PubSub: NewPubSub(),
 
 			sdb: sdb,
 		}
@@ -90,34 +95,6 @@ func (m *SectorStateMgr) Run(ctx context.Context) {
 	}
 }
 
-func (m *SectorStateMgr) GetStateUpdates() (r map[abi.SectorID]db.SealState) {
-	m.Lock()
-	r = m.stateUpdates
-	m.Unlock()
-	return
-}
-
-func (m *SectorStateMgr) GetSectorStates() (r map[abi.SectorID]db.SealState) {
-	m.Lock()
-	r = m.sectorStates
-	m.Unlock()
-	return
-}
-
-func (m *SectorStateMgr) GetActiveSectors() (r map[abi.SectorID]struct{}) {
-	m.Lock()
-	r = m.activeSectors
-	m.Unlock()
-	return
-}
-
-func (m *SectorStateMgr) GetLatestUpdate() (r time.Time) {
-	m.Lock()
-	r = m.latestUpdate
-	m.Unlock()
-	return
-}
-
 func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 	log.Debug("checking for sector state updates")
 
@@ -132,43 +109,12 @@ func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 		}
 	}
 
-	su, ss, err := m.refreshState(ctx)
+	ssu, err := m.refreshState(ctx)
 	if err != nil {
 		return err
 	}
 
-	head, err := m.fullnodeApi.ChainHead(ctx)
-	if err != nil {
-		return err
-	}
-
-	activeSet, err := m.fullnodeApi.StateMinerActiveSectors(ctx, m.Maddr, head.Key())
-	if err != nil {
-		return err
-	}
-
-	mid, err := address.IDFromAddress(m.Maddr)
-	if err != nil {
-		return err
-	}
-	as := make(map[abi.SectorID]struct{}, len(activeSet))
-	for _, info := range activeSet {
-		sectorID := abi.SectorID{
-			Miner:  abi.ActorID(mid),
-			Number: info.SectorNumber,
-		}
-
-		as[sectorID] = struct{}{}
-	}
-
-	m.Lock()
-	m.stateUpdates = su
-	m.sectorStates = ss
-	m.activeSectors = as
-	m.latestUpdate = time.Now()
-	m.Unlock()
-
-	for sectorID, sectorSealState := range su {
+	for sectorID, sectorSealState := range ssu.Updates {
 		// Update the sector seal state in the database
 		err = m.sdb.Update(ctx, sectorID, sectorSealState)
 		if err != nil {
@@ -176,16 +122,18 @@ func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 		}
 	}
 
+	m.PubSub.Publish(ssu)
+
 	return nil
 }
 
-func (m *SectorStateMgr) refreshState(ctx context.Context) (map[abi.SectorID]db.SealState, map[abi.SectorID]db.SealState, error) {
+func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates, error) {
 	defer func(start time.Time) { log.Debugw("refreshState", "took", time.Since(start)) }(time.Now())
 
 	// Get the current unsealed state of all sectors from lotus
 	storageList, err := m.minerApi.StorageList(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting sectors state from lotus: %w", err)
+		return nil, fmt.Errorf("getting sectors state from lotus: %w", err)
 	}
 
 	// Convert to a map of <sector id> => <seal state>
@@ -215,7 +163,7 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (map[abi.SectorID]db.
 	// Get the previously known state of all sectors in the database
 	previousSectorStates, err := m.sdb.List(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting sectors state from database: %w", err)
+		return nil, fmt.Errorf("getting sectors state from database: %w", err)
 	}
 
 	// Check which sectors have changed state since the last time we checked
@@ -241,5 +189,29 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (map[abi.SectorID]db.
 		sealStateUpdates[sectorID] = sealState
 	}
 
-	return sealStateUpdates, allSectorStates, nil
+	head, err := m.fullnodeApi.ChainHead(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	activeSet, err := m.fullnodeApi.StateMinerActiveSectors(ctx, m.Maddr, head.Key())
+	if err != nil {
+		return nil, err
+	}
+
+	mid, err := address.IDFromAddress(m.Maddr)
+	if err != nil {
+		return nil, err
+	}
+	as := make(map[abi.SectorID]struct{}, len(activeSet))
+	for _, info := range activeSet {
+		sectorID := abi.SectorID{
+			Miner:  abi.ActorID(mid),
+			Number: info.SectorNumber,
+		}
+
+		as[sectorID] = struct{}{}
+	}
+
+	return &SectorStateUpdates{sealStateUpdates, as, allSectorStates, time.Now()}, nil
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/filecoin-project/boost/db"
@@ -18,8 +19,6 @@ import (
 
 var doclog = logging.Logger("piecedoc")
 
-var zero = time.Time{}
-
 // The Doctor periodically queries the local index directory for piece cids, and runs
 // checks against those pieces. If there is a problem with a piece, it is
 // flagged, so that it can be surfaced to the user.
@@ -28,6 +27,9 @@ var zero = time.Time{}
 type Doctor struct {
 	store *bdclient.Store
 	ssm   *sectorstatemgr.SectorStateMgr
+
+	latestUpdateMu sync.Mutex
+	latestUpdate   *sectorstatemgr.SectorStateUpdates
 }
 
 func NewDoctor(store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr) *Doctor {
@@ -40,6 +42,24 @@ const avgCheckInterval = 30 * time.Second
 func (d *Doctor) Run(ctx context.Context) {
 	doclog.Info("piece doctor: running")
 
+	go func() {
+		sub := d.ssm.PubSub.Subscribe()
+
+		for {
+			select {
+			case u := <-sub:
+				log.Debugw("got state updates from SectorStateMgr", "len(u.updates)", len(u.Updates), "len(u.active)", len(u.ActiveSectors), "u.updatedAt", u.UpdatedAt)
+
+				d.latestUpdateMu.Lock()
+				d.latestUpdate = u
+				d.latestUpdateMu.Unlock()
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
@@ -51,8 +71,11 @@ func (d *Doctor) Run(ctx context.Context) {
 		}
 
 		err := func() error {
-			latestUpdate := d.ssm.GetLatestUpdate()
-			if latestUpdate == zero {
+			var lu *sectorstatemgr.SectorStateUpdates
+			d.latestUpdateMu.Lock()
+			lu = d.latestUpdate
+			d.latestUpdateMu.Unlock()
+			if lu == nil {
 				doclog.Warn("sector state manager not yet updated")
 				return nil
 			}
@@ -67,7 +90,7 @@ func (d *Doctor) Run(ctx context.Context) {
 			// Check each piece for problems
 			doclog.Debugw("piece doctor: checking pieces", "count", len(pcids))
 			for _, pcid := range pcids {
-				err := d.checkPiece(ctx, pcid)
+				err := d.checkPiece(ctx, pcid, lu)
 				if err != nil {
 					if errors.Is(err, context.Canceled) {
 						return err
@@ -96,7 +119,7 @@ func (d *Doctor) Run(ctx context.Context) {
 	}
 }
 
-func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
+func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates) error {
 	md, err := d.store.GetPieceMetadata(ctx, pieceCid)
 	if err != nil {
 		return fmt.Errorf("failed to get piece %s from local index directory: %w", pieceCid, err)
@@ -125,9 +148,6 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 
 	dls := md.Deals
 
-	as := d.ssm.GetActiveSectors()
-	ss := d.ssm.GetSectorStates()
-
 	for _, dl := range dls {
 		mid, err := address.IDFromAddress(dl.MinerAddr)
 		if err != nil {
@@ -140,11 +160,11 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 		}
 
 		// check if we have an active sector
-		if _, ok := as[sectorID]; ok {
+		if _, ok := lu.ActiveSectors[sectorID]; ok {
 			lacksActiveSector = false
 		}
 
-		if ss[sectorID] == db.SealStateUnsealed {
+		if lu.SectorStates[sectorID] == db.SealStateUnsealed {
 			hasUnsealedDeal = true
 			break
 		}
@@ -156,7 +176,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid) error {
 			return fmt.Errorf("failed to flag piece %s with no unsealed deal: %w", pieceCid, err)
 		}
 
-		doclog.Debugw("flagging piece as having no unsealed copy", "piece", pieceCid, "hasUnsealedDeal", hasUnsealedDeal, "lacksActiveSector", lacksActiveSector, "len(activeSectors)", len(as), "len(sectorStates)", len(ss))
+		doclog.Debugw("flagging piece as having no unsealed copy", "piece", pieceCid, "hasUnsealedDeal", hasUnsealedDeal, "lacksActiveSector", lacksActiveSector, "len(activeSectors)", len(lu.ActiveSectors), "len(sectorStates)", len(lu.SectorStates))
 		return nil
 	}
 
