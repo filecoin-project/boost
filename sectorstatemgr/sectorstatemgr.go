@@ -35,6 +35,8 @@ type SectorStateMgr struct {
 	minerApi    api.StorageMiner
 	Maddr       address.Address
 
+	_refreshState func(context.Context) (*SectorStateUpdates, error)
+
 	PubSub *PubSub
 
 	sdb *db.SectorStateDB
@@ -52,6 +54,9 @@ func NewSectorStateMgr(cfg *config.Boost) func(lc fx.Lifecycle, sdb *db.SectorSt
 
 			sdb: sdb,
 		}
+
+		// function pointer for test purpores, by default we use refreshState
+		mgr._refreshState = mgr.refreshState
 
 		cctx, cancel := context.WithCancel(context.Background())
 		lc.Append(fx.Hook{
@@ -102,16 +107,7 @@ func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 
 	defer func(start time.Time) { log.Debugw("checkForUpdates", "took", time.Since(start)) }(time.Now())
 
-	// Tell lotus to update it's storage list and remove any removed sectors
-	if m.cfg.RedeclareOnStorageListRefresh {
-		log.Info("redeclaring storage")
-		err := m.minerApi.StorageRedeclareLocal(ctx, nil, true)
-		if err != nil {
-			log.Errorw("redeclaring local storage on lotus miner", "err", err)
-		}
-	}
-
-	ssu, err := m.refreshState(ctx)
+	ssu, err := m._refreshState(ctx)
 	if err != nil {
 		return err
 	}
@@ -131,6 +127,15 @@ func (m *SectorStateMgr) checkForUpdates(ctx context.Context) error {
 
 func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates, error) {
 	defer func(start time.Time) { log.Debugw("refreshState", "took", time.Since(start)) }(time.Now())
+
+	// Tell lotus to update it's storage list and remove any removed sectors
+	if m.cfg.RedeclareOnStorageListRefresh {
+		log.Info("redeclaring storage")
+		err := m.minerApi.StorageRedeclareLocal(ctx, nil, true)
+		if err != nil {
+			log.Errorw("redeclaring local storage on lotus miner", "err", err)
+		}
+	}
 
 	// Get the current unsealed state of all sectors from lotus
 	storageList, err := m.minerApi.StorageList(ctx)
@@ -216,4 +221,18 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 	}
 
 	return &SectorStateUpdates{sealStateUpdates, as, allSectorStates, time.Now()}, nil
+}
+
+func NewMockSectorStateMgr(cfg *config.Boost, sdb *db.SectorStateDB, mockRefreshState func(context.Context) (*SectorStateUpdates, error)) *SectorStateMgr {
+	mgr := &SectorStateMgr{
+		cfg: cfg.Storage,
+
+		PubSub: NewPubSub(),
+
+		sdb: sdb,
+	}
+
+	mgr._refreshState = mockRefreshState
+
+	return mgr
 }

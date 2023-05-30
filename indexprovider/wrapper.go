@@ -106,27 +106,29 @@ func (w *Wrapper) Start(_ context.Context) {
 
 	log.Info("starting index provider")
 
-	go func() {
-		updates := w.ssm.PubSub.Subscribe()
+	go w.checkForUpdates(runCtx)
+}
 
-		for {
-			select {
-			case u, ok := <-updates:
-				if !ok {
-					log.Debugw("state updates subscription closed")
-					return
-				}
-				log.Debugw("got state updates from SectorStateMgr", "u", len(u.Updates))
+func (w *Wrapper) checkForUpdates(ctx context.Context) {
+	updates := w.ssm.PubSub.Subscribe()
 
-				err := w.handleUpdates(runCtx, u.Updates)
-				if err != nil {
-					log.Errorw("error while handling state updates", "err", err)
-				}
-			case <-runCtx.Done():
+	for {
+		select {
+		case u, ok := <-updates:
+			if !ok {
+				log.Debugw("state updates subscription closed")
 				return
 			}
+			log.Debugw("got state updates from SectorStateMgr", "u", len(u.Updates))
+
+			err := w.handleUpdates(ctx, u.Updates)
+			if err != nil {
+				log.Errorw("error while handling state updates", "err", err)
+			}
+		case <-ctx.Done():
+			return
 		}
-	}()
+	}
 }
 
 func (w *Wrapper) handleUpdates(ctx context.Context, sus map[abi.SectorID]db.SealState) error {
