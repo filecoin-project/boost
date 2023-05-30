@@ -64,18 +64,24 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 			}
 		}
 
-		method := m.Message.Method.String()
+		var params string
+		methodName := m.Message.Method.String()
 		toact, err := r.fullNode.StateGetActor(ctx, m.Message.To, types.EmptyTSK)
 		if err == nil {
-			method = consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method].Name
-		}
+			method, ok := consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method]
+			if ok {
+				methodName = method.Name
 
-		params := string(m.Message.Params)
-		p := reflect.New(consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method].Params.Elem()).Interface().(cbg.CBORUnmarshaler)
-		if err := p.UnmarshalCBOR(bytes.NewReader(m.Message.Params)); err == nil {
-			b, err := json.MarshalIndent(p, "", "  ")
-			if err == nil {
-				params = string(b)
+				params = string(m.Message.Params)
+				p, ok := reflect.New(method.Params.Elem()).Interface().(cbg.CBORUnmarshaler)
+				if ok {
+					if err := p.UnmarshalCBOR(bytes.NewReader(m.Message.Params)); err == nil {
+						b, err := json.MarshalIndent(p, "", "  ")
+						if err == nil {
+							params = string(b)
+						}
+					}
+				}
 			}
 		}
 
@@ -87,7 +93,7 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 			GasFeeCap:  gqltypes.BigInt{Int: m.Message.GasFeeCap},
 			GasLimit:   gqltypes.Uint64(uint64(m.Message.GasLimit)),
 			GasPremium: gqltypes.BigInt{Int: m.Message.GasPremium},
-			Method:     method,
+			Method:     methodName,
 			Params:     params,
 			BaseFee:    gqltypes.BigInt{Int: baseFee},
 		})
