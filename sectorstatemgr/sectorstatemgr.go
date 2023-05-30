@@ -61,6 +61,7 @@ func NewSectorStateMgr(cfg *config.Boost) func(lc fx.Lifecycle, sdb *db.SectorSt
 			},
 			OnStop: func(ctx context.Context) error {
 				cancel()
+				mgr.PubSub.Close()
 				return nil
 			},
 		})
@@ -72,14 +73,15 @@ func NewSectorStateMgr(cfg *config.Boost) func(lc fx.Lifecycle, sdb *db.SectorSt
 func (m *SectorStateMgr) Run(ctx context.Context) {
 	duration := time.Duration(m.cfg.StorageListRefreshDuration)
 	log.Infof("starting sector state manager running on interval %s", duration.String())
-	ticker := time.NewTicker(duration)
-	defer ticker.Stop()
 
 	// Check immediately
 	err := m.checkForUpdates(ctx)
 	if err != nil {
 		log.Errorw("checking for state updates", "err", err)
 	}
+
+	ticker := time.NewTicker(duration)
+	defer ticker.Stop()
 
 	// Check every tick
 	for {

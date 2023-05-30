@@ -47,7 +47,11 @@ func (d *Doctor) Run(ctx context.Context) {
 
 		for {
 			select {
-			case u := <-sub:
+			case u, ok := <-sub:
+				if !ok {
+					log.Debugw("state updates subscription closed")
+					return
+				}
 				log.Debugw("got state updates from SectorStateMgr", "len(u.updates)", len(u.Updates), "len(u.active)", len(u.ActiveSectors), "u.updatedAt", u.UpdatedAt)
 
 				d.latestUpdateMu.Lock()

@@ -111,7 +111,11 @@ func (w *Wrapper) Start(_ context.Context) {
 
 		for {
 			select {
-			case u := <-updates:
+			case u, ok := <-updates:
+				if !ok {
+					log.Debugw("state updates subscription closed")
+					return
+				}
 				log.Debugw("got state updates from SectorStateMgr", "u", len(u.Updates))
 
 				err := w.handleUpdates(runCtx, u.Updates)
