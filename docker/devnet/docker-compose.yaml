@@ -53,7 +53,7 @@ services:
     container_name: boost
     image: ${BOOST_IMAGE}
     ports:
-      - "8085:8080"
+      - "8080:8080"
       - "1288:1288" # For the /metrics endpoint
       - "50000:50000" # Exposed libp2p port
     environment:
