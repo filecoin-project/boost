@@ -572,7 +572,7 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 	case dealcheckpoints.Transferred:
 		return "Ready to Publish"
 	case dealcheckpoints.Published:
-		elapsedEpochs := uint64(time.Now().Sub(checkpointAt).Seconds()) / build.BlockDelaySecs
+		elapsedEpochs := uint64(time.Since(checkpointAt).Seconds()) / build.BlockDelaySecs
 		confidenceEpochs := build.MessageConfidence * 2
 		return fmt.Sprintf("Awaiting Publish Confirmation (%d/%d)", elapsedEpochs, confidenceEpochs)
 	case dealcheckpoints.PublishConfirmed:
