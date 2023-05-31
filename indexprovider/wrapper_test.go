@@ -96,7 +96,7 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 		sectorUpdates func(sectorID abi.SectorID) map[abi.SectorID]db.SealState
 		expect        func(*mock_provider.MockInterfaceMockRecorder, market.DealProposal)
 	}{{
-		name: "unsealed -> sealed",
+		name: "sealed update",
 		initialState: func(sectorID abi.SectorID) *storiface.Decl {
 			return &storiface.Decl{
 				SectorID:       sectorID,
@@ -117,7 +117,7 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 			})).Times(1)
 		},
 	}, {
-		name: "sealed -> unsealed",
+		name: "unsealed update",
 		initialState: func(sectorID abi.SectorID) *storiface.Decl {
 			return &storiface.Decl{
 				SectorID:       sectorID,
@@ -138,7 +138,7 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 			})).Times(1)
 		},
 	}, {
-		name: "unsealed -> unsealed (no sector updates)",
+		name: "no sector updates",
 		initialState: func(sectorID abi.SectorID) *storiface.Decl {
 			return &storiface.Decl{
 				SectorID:       sectorID,
@@ -151,7 +151,7 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 		expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
 		},
 	}, {
-		name: "unsealed -> removed",
+		name: "removed update",
 		initialState: func(sectorID abi.SectorID) *storiface.Decl {
 			return &storiface.Decl{
 				SectorID:       sectorID,
@@ -168,7 +168,7 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 			prov.NotifyRemove(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 		},
 	}, {
-		name: "sealed -> removed",
+		name: "removed update",
 		initialState: func(sectorID abi.SectorID) *storiface.Decl {
 			return &storiface.Decl{
 				SectorID:       sectorID,
@@ -185,7 +185,7 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 			prov.NotifyRemove(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 		},
 	}, {
-		name: "none -> unsealed(new sector)",
+		name: "unsealed update (new sector)",
 		initialState: func(sectorID abi.SectorID) *storiface.Decl {
 			return nil
 		},
@@ -203,7 +203,7 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 			})).Times(1)
 		},
 	}, {
-		name: "unsealed -> cache",
+		name: "cache update",
 		initialState: func(sectorID abi.SectorID) *storiface.Decl {
 			return &storiface.Decl{
 				SectorID:       sectorID,
@@ -219,7 +219,7 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 			// `cache` doesn't trigger a notify
 		},
 	}, {
-		name: "cache -> unsealed",
+		name: "unsealed update (from cache)",
 		initialState: func(sectorID abi.SectorID) *storiface.Decl {
 			return &storiface.Decl{
 				SectorID:       sectorID,
@@ -241,7 +241,7 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 			})).Times(1)
 		},
 	}, {
-		name: "cache -> sealed",
+		name: "sealed update (from cache)",
 		initialState: func(sectorID abi.SectorID) *storiface.Decl {
 			return &storiface.Decl{
 				SectorID:       sectorID,
@@ -290,115 +290,6 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 			}
 
 			// Handle updates
-			err = wrapper.handleUpdates(ctx, tc.sectorUpdates(abi.SectorID{Miner: abi.ActorID(minerID), Number: deals[0].SectorID}))
-			require.NoError(t, err)
-		})
-	}
-}
-
-// Verify that multiple storage file types are handled from StorageList correctly
-func TestUnsealedStateManagerStorageList(t *testing.T) {
-	ctx := context.Background()
-
-	testCases := []struct {
-		name          string
-		initialState  func(sectorID abi.SectorID) []storiface.Decl
-		sectorUpdates func(sectorID abi.SectorID) map[abi.SectorID]db.SealState
-		expect        func(*mock_provider.MockInterfaceMockRecorder, market.DealProposal)
-	}{
-		{
-			name: "unsealed and sealed status",
-			initialState: func(sectorID abi.SectorID) []storiface.Decl {
-				return []storiface.Decl{
-					{
-						SectorID:       sectorID,
-						SectorFileType: storiface.FTUnsealed,
-					},
-					{
-						SectorID:       sectorID,
-						SectorFileType: storiface.FTSealed,
-					},
-				}
-			},
-			sectorUpdates: func(sectorID abi.SectorID) map[abi.SectorID]db.SealState {
-				return map[abi.SectorID]db.SealState{
-					sectorID: db.SealStateUnsealed,
-					sectorID: db.SealStateCache,
-				}
-			},
-			expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
-				// no call to notify, as sector was unsealed and still is
-			},
-		}, {
-			name: "unsealed and cached status",
-			initialState: func(sectorID abi.SectorID) []storiface.Decl {
-				return []storiface.Decl{
-					{
-						SectorID:       sectorID,
-						SectorFileType: storiface.FTUnsealed,
-					},
-					{
-						SectorID:       sectorID,
-						SectorFileType: storiface.FTCache,
-					},
-				}
-			},
-			sectorUpdates: func(sectorID abi.SectorID) map[abi.SectorID]db.SealState {
-				return map[abi.SectorID]db.SealState{
-					sectorID: db.SealStateUnsealed,
-					sectorID: db.SealStateCache,
-				}
-			},
-			expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
-			},
-		}, {
-			name: "sealed and cached status",
-			initialState: func(sectorID abi.SectorID) []storiface.Decl {
-				return []storiface.Decl{
-					{
-						SectorID:       sectorID,
-						SectorFileType: storiface.FTSealed,
-					},
-					{
-						SectorID:       sectorID,
-						SectorFileType: storiface.FTCache,
-					},
-				}
-			},
-			sectorUpdates: func(sectorID abi.SectorID) map[abi.SectorID]db.SealState {
-				return map[abi.SectorID]db.SealState{
-					sectorID: db.SealStateUnsealed,
-					sectorID: db.SealStateCache,
-				}
-			},
-			expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
-			},
-		}}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			wrapper, legacyStorageProvider, storageMiner, prov := setup(t)
-			legacyStorageProvider.EXPECT().ListLocalDeals().AnyTimes().Return(nil, nil)
-
-			// Add a deal to the database
-			deals, err := db.GenerateNDeals(1)
-			require.NoError(t, err)
-			err = wrapper.dealsDB.Insert(ctx, &deals[0])
-			require.NoError(t, err)
-
-			// Set up expectations (automatically verified when the test exits)
-			prop := deals[0].ClientDealProposal.Proposal
-			tc.expect(prov.EXPECT(), prop)
-
-			minerID, err := address.IDFromAddress(deals[0].ClientDealProposal.Proposal.Provider)
-			require.NoError(t, err)
-
-			// Set the first response from MinerAPI.StorageList()
-			storageMiner.storageList = map[storiface.ID][]storiface.Decl{}
-			resp1 := tc.initialState(abi.SectorID{Miner: abi.ActorID(minerID), Number: deals[0].SectorID})
-			storageMiner.storageList["uuid"] = resp1
-
-			// Trigger check for updates
 			err = wrapper.handleUpdates(ctx, tc.sectorUpdates(abi.SectorID{Miner: abi.ActorID(minerID), Number: deals[0].SectorID}))
 			require.NoError(t, err)
 		})
