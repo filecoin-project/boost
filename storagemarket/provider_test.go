@@ -138,7 +138,9 @@ func TestSimpleDealHappy(t *testing.T) {
 	})
 }
 
-func XTestMultipleDealsConcurrent(t *testing.T) {
+func TestMultipleDealsConcurrent(t *testing.T) {
+	t.Skip("TestMultipleDealsConcurrent is flaky, disabling for now")
+
 	//logging.SetLogLevel("boost-provider", "debug")
 	//logging.SetLogLevel("boost-storage-deal", "debug")
 	nDeals := 10
