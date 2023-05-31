@@ -141,24 +141,24 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 	// Convert to a map of <sector id> => <seal state>
 	sectorStates := make(map[abi.SectorID]db.SealState)
 	allSectorStates := make(map[abi.SectorID]db.SealState)
-	for _, storageStates := range storageList {
-		for _, storageState := range storageStates {
+	for _, loc := range storageList {
+		for _, sectorDecl := range loc {
 			// Explicity set the sector state if its Sealed or Unsealed
 			switch {
-			case storageState.SectorFileType.Has(storiface.FTUnsealed):
-				sectorStates[storageState.SectorID] = db.SealStateUnsealed
-			case storageState.SectorFileType.Has(storiface.FTSealed):
-				if state, ok := sectorStates[storageState.SectorID]; !ok || state != db.SealStateUnsealed {
-					sectorStates[storageState.SectorID] = db.SealStateSealed
+			case sectorDecl.SectorFileType.Has(storiface.FTUnsealed):
+				sectorStates[sectorDecl.SectorID] = db.SealStateUnsealed
+			case sectorDecl.SectorFileType.Has(storiface.FTSealed):
+				if state, ok := sectorStates[sectorDecl.SectorID]; !ok || state != db.SealStateUnsealed {
+					sectorStates[sectorDecl.SectorID] = db.SealStateSealed
 				}
 			}
 
 			// If the state hasnt been set it should be in the cache, mark it so we dont remove
 			// This may get overriden by the sealed status if it comes after in the list, which is fine
-			if _, ok := sectorStates[storageState.SectorID]; !ok {
-				sectorStates[storageState.SectorID] = db.SealStateCache
+			if _, ok := sectorStates[sectorDecl.SectorID]; !ok {
+				sectorStates[sectorDecl.SectorID] = db.SealStateCache
 			}
-			allSectorStates[storageState.SectorID] = sectorStates[storageState.SectorID]
+			allSectorStates[sectorDecl.SectorID] = sectorStates[sectorDecl.SectorID]
 		}
 	}
 
@@ -169,26 +169,26 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 	}
 
 	// Check which sectors have changed state since the last time we checked
-	sealStateUpdates := make(map[abi.SectorID]db.SealState)
-	for _, previousSectorState := range previousSectorStates {
-		sealState, ok := sectorStates[previousSectorState.SectorID]
+	sectorUpdates := make(map[abi.SectorID]db.SealState)
+	for _, pss := range previousSectorStates {
+		sealState, ok := sectorStates[pss.SectorID]
 		if ok {
 			// Check if the state has changed, ignore if the new state is cache
-			if previousSectorState.SealState != sealState && sealState != db.SealStateCache {
-				sealStateUpdates[previousSectorState.SectorID] = sealState
+			if pss.SealState != sealState && sealState != db.SealStateCache {
+				sectorUpdates[pss.SectorID] = sealState
 			}
 			// Delete the sector from the map - at the end the remaining
 			// sectors in the map are ones we didn't know about before
-			delete(sectorStates, previousSectorState.SectorID)
+			delete(sectorStates, pss.SectorID)
 		} else {
 			// The sector is no longer in the list, so it must have been removed
-			sealStateUpdates[previousSectorState.SectorID] = db.SealStateRemoved
+			sectorUpdates[pss.SectorID] = db.SealStateRemoved
 		}
 	}
 
 	// The remaining sectors in the map are ones we didn't know about before
 	for sectorID, sealState := range sectorStates {
-		sealStateUpdates[sectorID] = sealState
+		sectorUpdates[sectorID] = sealState
 	}
 
 	head, err := m.fullnodeApi.ChainHead(ctx)
@@ -205,15 +205,15 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 	if err != nil {
 		return nil, err
 	}
-	as := make(map[abi.SectorID]struct{}, len(activeSet))
+	activeSectors := make(map[abi.SectorID]struct{}, len(activeSet))
 	for _, info := range activeSet {
 		sectorID := abi.SectorID{
 			Miner:  abi.ActorID(mid),
 			Number: info.SectorNumber,
 		}
 
-		as[sectorID] = struct{}{}
+		activeSectors[sectorID] = struct{}{}
 	}
 
-	return &SectorStateUpdates{sealStateUpdates, as, allSectorStates, time.Now()}, nil
+	return &SectorStateUpdates{sectorUpdates, activeSectors, allSectorStates, time.Now()}, nil
 }
