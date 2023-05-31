@@ -1,5 +1,7 @@
 package sectorstatemgr
 
+//go:generate go run github.com/golang/mock/mockgen -destination=mock/sectorstatemgr.go -package=mock . StorageAPI
+
 import (
 	"context"
 	"fmt"
@@ -27,12 +29,17 @@ type SectorStateUpdates struct {
 	UpdatedAt     time.Time
 }
 
+type StorageAPI interface {
+	StorageRedeclareLocal(context.Context, *storiface.ID, bool) error
+	StorageList(context.Context) (map[storiface.ID][]storiface.Decl, error)
+}
+
 type SectorStateMgr struct {
 	sync.Mutex
 
 	cfg         config.StorageConfig
 	fullnodeApi api.FullNode
-	minerApi    api.StorageMiner
+	minerApi    StorageAPI
 	Maddr       address.Address
 
 	PubSub *PubSub
