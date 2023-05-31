@@ -32,9 +32,19 @@ var propLog = logging.Logger("boost-prop")
 const DealProtocolv120ID = "/fil/storage/mk/1.2.0"
 const DealProtocolv121ID = "/fil/storage/mk/1.2.1"
 const DealStatusV12ProtocolID = "/fil/storage/status/1.2.0"
+
+// The time limit to read a message from the client when the client opens a stream
 const providerReadDeadline = 10 * time.Second
+
+// The time limit to write a response to the client
 const providerWriteDeadline = 10 * time.Second
-const clientReadDeadline = 10 * time.Second
+
+// The time limit to wait for the provider to send a response to a client's request.
+// This includes the time it takes for the provider to process the request and
+// send a response.
+const clientReadDeadline = 60 * time.Second
+
+// The time limit to write a message to the provider
 const clientWriteDeadline = 10 * time.Second
 
 // DealClientOption is an option for configuring the libp2p storage deal client
@@ -196,14 +206,16 @@ func (p *DealProvider) Stop() {
 
 // Called when the client opens a libp2p stream with a new deal proposal
 func (p *DealProvider) handleNewDealStream(s network.Stream) {
-	defer s.Close()
-
 	start := time.Now()
 	reqLogUuid := uuid.New()
 	reqLog := log.With("reqlog-uuid", reqLogUuid.String(), "client-peer", s.Conn().RemotePeer())
 	reqLog.Debugw("new deal proposal request")
 
 	defer func() {
+		err := s.Close()
+		if err != nil {
+			reqLog.Infow("closing stream", "err", err)
+		}
 		reqLog.Debugw("handled deal proposal request", "duration", time.Since(start).String())
 	}()
 
@@ -263,14 +275,16 @@ func (p *DealProvider) handleNewDealStream(s network.Stream) {
 }
 
 func (p *DealProvider) handleNewDealStatusStream(s network.Stream) {
-	defer s.Close()
-
 	start := time.Now()
 	reqLogUuid := uuid.New()
 	reqLog := log.With("reqlog-uuid", reqLogUuid.String(), "client-peer", s.Conn().RemotePeer())
 	reqLog.Debugw("new deal status request")
 
 	defer func() {
+		err := s.Close()
+		if err != nil {
+			reqLog.Infow("closing stream", "err", err)
+		}
 		reqLog.Debugw("handled deal status request", "duration", time.Since(start).String())
 	}()
 
