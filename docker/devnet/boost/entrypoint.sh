@@ -40,6 +40,7 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
 
 	echo Setting port in boost config...
 	sed -i 's|ip4/0.0.0.0/tcp/0|ip4/0.0.0.0/tcp/50000|g' $BOOST_PATH/config.toml
+	sed -i 's|127.0.0.1|0.0.0.0|g' $BOOST_PATH/config.toml
 
 	echo Done
 	touch $BOOST_PATH/.init.boost
