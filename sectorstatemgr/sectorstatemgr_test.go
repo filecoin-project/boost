@@ -65,11 +65,12 @@ func TestRefreshState(t *testing.T) {
 				require.NoError(t, migrations.Migrate(sqldb))
 				mgr.sdb = db.NewSectorStateDB(sqldb)
 
-				deals, err := db.GenerateNDeals(3)
+				deals, err := db.GenerateNDeals(4)
 				require.NoError(t, err)
 				sid3 := abi.SectorID{Miner: aid, Number: deals[0].SectorID}
 				sid4 := abi.SectorID{Miner: aid, Number: deals[1].SectorID}
 				sid5 := abi.SectorID{Miner: aid, Number: deals[2].SectorID}
+				sid6 := abi.SectorID{Miner: aid, Number: deals[3].SectorID}
 
 				input_StorageList1 := map[storiface.ID][]storiface.Decl{
 					"storage-location-uuid1": {
@@ -81,6 +82,7 @@ func TestRefreshState(t *testing.T) {
 						{SectorID: sid4, SectorFileType: storiface.FTSealed},
 						{SectorID: sid4, SectorFileType: storiface.FTCache},
 						{SectorID: sid5, SectorFileType: storiface.FTUpdateCache},
+						{SectorID: sid6, SectorFileType: storiface.FTSealed},
 					},
 				}
 				input_StateMinerActiveSectors1 := []*miner.SectorOnChainInfo{
@@ -119,6 +121,7 @@ func TestRefreshState(t *testing.T) {
 					Updates: map[abi.SectorID]db.SealState{
 						sid3: db.SealStateUnsealed,
 						sid4: db.SealStateSealed,
+						sid6: db.SealStateRemoved,
 					},
 					ActiveSectors: map[abi.SectorID]struct{}{
 						sid3: struct{}{},
@@ -132,9 +135,11 @@ func TestRefreshState(t *testing.T) {
 				}
 
 				exerciseAndVerify := func() {
+					// setup initial state of db
 					err := mgr.checkForUpdates(ctx)
 					require.NoError(t, err)
 
+					// trigger refreshState and later verify resulting struct
 					got2, err := mgr.refreshState(ctx)
 					require.NoError(t, err)
 
