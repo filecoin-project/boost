@@ -119,7 +119,7 @@
     height: 0.5em;
 }
 
-.mpool .params{
+.mpool .params {
     width: 1080px;
     text-overflow: ellipsis;
     cursor: pointer;
@@ -128,8 +128,8 @@
     white-space: nowrap;
 }
 
-.mpool .params:hover{
+.mpool .params.expanded {
     overflow: visible;
-    white-space: normal;
     width: auto;
+    white-space: pre
 }
