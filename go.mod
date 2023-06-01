@@ -80,7 +80,7 @@ require (
 	github.com/ipld/go-car/v2 v2.7.0
 	github.com/ipld/go-ipld-prime v0.20.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
-	github.com/ipni/index-provider v0.11.1
+	github.com/ipni/index-provider v0.11.2
 	github.com/ipni/storetheindex v0.5.10
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0

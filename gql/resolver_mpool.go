@@ -5,15 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+
 	"github.com/filecoin-project/lotus/chain/consensus"
+	cbg "github.com/whyrusleeping/cbor-gen"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/lib/mpoolmonitor"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	stbig "github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/chain/types"
-	cbg "github.com/whyrusleeping/cbor-gen"
 )
 
 type msg struct {
@@ -56,38 +57,18 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Alerts bool }) (mpool
 			}
 		}
 
-		method := m.Message.Method.String()
+		var params string
+		methodName := m.Message.Method.String()
 		toact, err := r.fullNode.StateGetActor(ctx, m.Message.To, types.EmptyTSK)
 		if err == nil {
-			consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method].Params.Name()
-		}
-
-		var params string
-		paramsMsg, err := messageFromBytes(m.Message.Params)
-		if err != nil {
-			return mpoolmsg{}, err
-		}
-	} else {
-		msgs, err = r.mpool.Alerts(ctx)
-		if err != nil {
-			return mpoolmsg{}, err
-		}
-	}
-
-	// Convert params to human-readable and get method name
-	for _, m := range msgs {
-		var params string
-		methodName := m.SignedMessage.Message.Method.String()
-		toact, err := r.fullNode.StateGetActor(ctx, m.SignedMessage.Message.To, types.EmptyTSK)
-		if err == nil {
-			method, ok := consensus.NewActorRegistry().Methods[toact.Code][m.SignedMessage.Message.Method]
+			method, ok := consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method]
 			if ok {
 				methodName = method.Name
 
-				params = string(m.SignedMessage.Message.Params)
+				params = string(m.Message.Params)
 				p, ok := reflect.New(method.Params.Elem()).Interface().(cbg.CBORUnmarshaler)
 				if ok {
-					if err := p.UnmarshalCBOR(bytes.NewReader(m.SignedMessage.Message.Params)); err == nil {
+					if err := p.UnmarshalCBOR(bytes.NewReader(m.Message.Params)); err == nil {
 						b, err := json.MarshalIndent(p, "", "  ")
 						if err == nil {
 							params = string(b)
@@ -97,22 +78,21 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Alerts bool }) (mpool
 			}
 		}
 
-		ret = append(ret, &msg{
-			SentEpoch:  gqltypes.Uint64(m.Added),
-			To:         m.SignedMessage.Message.To.String(),
-			From:       m.SignedMessage.Message.From.String(),
-			Nonce:      gqltypes.Uint64(m.SignedMessage.Message.Nonce),
-			Value:      gqltypes.BigInt{Int: m.SignedMessage.Message.Value},
-			GasFeeCap:  gqltypes.BigInt{Int: m.SignedMessage.Message.GasFeeCap},
-			GasLimit:   gqltypes.Uint64(uint64(m.SignedMessage.Message.GasLimit)),
-			GasPremium: gqltypes.BigInt{Int: m.SignedMessage.Message.GasPremium},
+		gqlmsgs = append(gqlmsgs, &msg{
+			To:         m.Message.To.String(),
+			From:       m.Message.From.String(),
+			Nonce:      gqltypes.Uint64(m.Message.Nonce),
+			Value:      gqltypes.BigInt{Int: m.Message.Value},
+			GasFeeCap:  gqltypes.BigInt{Int: m.Message.GasFeeCap},
+			GasLimit:   gqltypes.Uint64(uint64(m.Message.GasLimit)),
+			GasPremium: gqltypes.BigInt{Int: m.Message.GasPremium},
 			Method:     methodName,
 			Params:     params,
 			BaseFee:    gqltypes.BigInt{Int: baseFee},
 		})
 	}
 
-	return mpoolmsg{Count: int32(len(msgs)), Messages: ret}, nil
+	return gqlmsgs, nil
 }
 
 func mockMessages() []*types.SignedMessage {

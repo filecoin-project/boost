@@ -313,9 +313,6 @@ type IndexProviderConfig struct {
 	// datastore if any is present.
 	PurgeCacheOnStart bool
 
-	// The network indexer host that the web UI should link to for published announcements
-	WebHost string
-
 	Announce IndexProviderAnnounceConfig
 
 	HttpPublisher IndexProviderHttpPublisherConfig

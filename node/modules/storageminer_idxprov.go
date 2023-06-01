@@ -13,7 +13,6 @@ import (
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-data-transfer/transport/graphsync"
 	datatransferv2 "github.com/filecoin-project/go-data-transfer/v2"
-	"github.com/filecoin-project/lotus/node/config"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -79,7 +78,8 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			"pid", marketHost.ID(),
 			"topic", topicName,
 			"retAddrs", marketHost.Addrs())
-		// If announcements to the network are enabled, then set options for datatransfer publisher.
+
+		// If announcements to the network are enabled, then set options for the publisher.
 		var e *engine.Engine
 		if cfg.Enable {
 			// Join the indexer topic using the market's pubsub instance. Otherwise, the provider
@@ -95,11 +95,6 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 			// The extra data is required by the lotus-specific index-provider gossip message validators.
 			ma := address.Address(maddr)
 			opts = append(opts,
-				engine.WithPublisherKind(engine.DataTransferPublisher),
-				engine.WithDataTransfer(dtV1ToIndexerDT(dt, func() ipld.LinkSystem {
-					return *e.LinkSystem()
-				})),
-				engine.WithExtraGossipData(ma.Bytes()),
 				engine.WithTopic(t),
 				engine.WithExtraGossipData(ma.Bytes()),
 			)

@@ -83,7 +83,7 @@ function MpoolMessage(props) {
         <tr key={i+"params"}>
             <td>Params</td>
             <td>
-                <div onClick={handleParamsClick} className="params">{msg.Params}</div>
+                <div className="params">{msg.Params}</div>
             </td>
         </tr>
         <tr key={i+"gas-fee-cap"}>

@@ -223,8 +223,8 @@ var runCmd = &cli.Command{
 		pd.Start(ctx)
 
 		// Start the server
-		log.Infof("Starting booster-http node on port %d with base path '%s'",
-			cctx.Int("port"), cctx.String("base-path"))
+		log.Infof("Starting booster-http node on listen address %s and port %d with base path '%s'",
+			cctx.String("address"), cctx.Int("port"), cctx.String("base-path"))
 		err = server.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("starting http server: %w", err)
