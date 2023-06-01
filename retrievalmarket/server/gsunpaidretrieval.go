@@ -30,6 +30,7 @@ import (
 )
 
 var log = logging.Logger("boostgs")
+var ErrRetrievalNotFound = fmt.Errorf("no transfer found")
 
 var incomingReqExtensions = []graphsync.ExtensionName{
 	extension.ExtensionIncomingRequest1_1,
@@ -175,13 +176,23 @@ func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatr
 
 	if state == nil {
 		g.activeRetrievalsLk.Unlock()
-		return fmt.Errorf("no transfer with id %d", id)
+		return fmt.Errorf("failed to cancel with id %d: %w", id, ErrRetrievalNotFound)
 	}
 
 	rcpt := state.cs.recipient
 	tID := state.cs.transferID
+	gsRequestID := state.gsReq
 	g.activeRetrievalsLk.Unlock()
 
+	// tell GraphSync to cancel the request
+	if (gsRequestID != graphsync.RequestID{}) {
+		err := g.Cancel(ctx, gsRequestID)
+		if err != nil {
+			log.Info("unable to force close graphsync request %s: %s", tID, err)
+		}
+	}
+
+	// send a message on data transfer
 	err := g.dtnet.SendMessage(ctx, rcpt, message.CancelResponse(tID))
 	g.failTransfer(state, errors.New("transfer cancelled by provider"))
 
@@ -325,6 +336,7 @@ func (g *GraphsyncUnpaidRetrieval) handleRetrievalDeal(peerID peer.ID, msg datat
 		retType: retType,
 		cs:      cs,
 		mkts:    mktsState,
+		gsReq:   request.ID(),
 	}
 
 	// Record the data transfer ID so that we can intercept future

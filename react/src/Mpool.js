@@ -67,7 +67,9 @@ function MpoolMessage(props) {
         </tr>
         <tr key={i+"params"}>
             <td>Params</td>
-            <td>{msg.Params}</td>
+            <td>
+                <div className="params">{msg.Params}</div>
+            </td>
         </tr>
         <tr key={i+"gas-fee-cap"}>
             <td>Gas Fee Cap</td>
