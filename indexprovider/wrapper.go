@@ -131,24 +131,22 @@ func (w *Wrapper) checkForUpdates(ctx context.Context) {
 	}
 }
 
-func (w *Wrapper) handleUpdates(ctx context.Context, sus map[abi.SectorID]db.SealState) error {
-	legacyDeals, err := w.legacyDealsBySectorID(sus)
+func (w *Wrapper) handleUpdates(ctx context.Context, sectorUpdates map[abi.SectorID]db.SealState) error {
+	legacyDeals, err := w.legacyDealsBySectorID(sectorUpdates)
 	if err != nil {
 		return fmt.Errorf("getting legacy deals from datastore: %w", err)
 	}
 
-	log.Debugf("checking for sector state updates for %d states", len(sus))
+	log.Debugf("checking for sector state updates for %d states", len(sectorUpdates))
 
-	// For each sector
-	for sectorID, sectorSealState := range sus {
-		// Get the deals in the sector
+	for sectorID, sectorSealState := range sectorUpdates {
+		// for all updated sectors, get all deals (legacy and boost) in the sector
 		deals, err := w.dealsBySectorID(ctx, legacyDeals, sectorID)
 		if err != nil {
 			return fmt.Errorf("getting deals for miner %d / sector %d: %w", sectorID.Miner, sectorID.Number, err)
 		}
 		log.Debugf("sector %d has %d deals, seal status %s", sectorID, len(deals), sectorSealState)
 
-		// For each deal in the sector
 		for _, deal := range deals {
 			if !deal.AnnounceToIPNI {
 				continue
@@ -161,12 +159,11 @@ func (w *Wrapper) handleUpdates(ctx context.Context, sus map[abi.SectorID]db.Sea
 			propCid := propnd.Cid()
 
 			if sectorSealState == db.SealStateRemoved {
-				// Announce deals that are no longer unsealed to indexer
+				// announce deals that are no longer unsealed as removed to indexer
 				announceCid, err := w.AnnounceBoostDealRemoved(ctx, propCid)
 				if err != nil {
-					// Check if the error is because the deal wasn't previously announced
+					// check if the error is because the deal wasn't previously announced
 					if !errors.Is(err, provider.ErrContextIDNotFound) {
-						// There was some other error, write it to the log
 						log.Errorw("announcing deal removed to index provider",
 							"deal id", deal.DealID, "error", err)
 						continue
@@ -176,19 +173,19 @@ func (w *Wrapper) handleUpdates(ctx context.Context, sus map[abi.SectorID]db.Sea
 						"deal id", deal.DealID, "sector id", deal.SectorID.Number, "announce cid", announceCid.String())
 				}
 			} else if sectorSealState != db.SealStateCache {
-				// Announce deals that have changed seal state to indexer
+				// announce deals that have changed seal state to indexer
 				md := metadata.GraphsyncFilecoinV1{
 					PieceCID:      deal.DealProposal.Proposal.PieceCID,
 					FastRetrieval: sectorSealState == db.SealStateUnsealed,
 					VerifiedDeal:  deal.DealProposal.Proposal.VerifiedDeal,
 				}
 				announceCid, err := w.AnnounceBoostDealMetadata(ctx, md, propCid)
-				if err == nil {
+				if err != nil {
+					log.Errorf("announcing deal %s to index provider: %w", deal.DealID, err)
+				} else {
 					log.Infow("announced deal seal state to index provider",
 						"deal id", deal.DealID, "sector id", deal.SectorID.Number,
 						"seal state", sectorSealState, "announce cid", announceCid.String())
-				} else {
-					log.Errorf("announcing deal %s to index provider: %w", deal.DealID, err)
 				}
 			}
 		}
