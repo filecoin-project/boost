@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost-gfm/piecestore"
@@ -26,6 +27,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/build"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
@@ -531,14 +533,14 @@ func (dr *dealResolver) Retry() string {
 }
 
 func (dr *dealResolver) Message(ctx context.Context) string {
-	msg := dr.message(ctx, dr.ProviderDealState.Checkpoint)
+	msg := dr.message(ctx, dr.ProviderDealState.Checkpoint, dr.ProviderDealState.CheckpointAt)
 	if dr.ProviderDealState.Retry != types.DealRetryFatal && dr.ProviderDealState.Err != "" {
 		msg = "Paused at '" + msg + "': " + dr.ProviderDealState.Err
 	}
 	return msg
 }
 
-func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.Checkpoint) string {
+func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.Checkpoint, checkpointAt time.Time) string {
 	switch checkpoint {
 	case dealcheckpoints.Accepted:
 		if dr.IsOffline {
@@ -574,7 +576,9 @@ func (dr *dealResolver) message(ctx context.Context, checkpoint dealcheckpoints.
 	case dealcheckpoints.Transferred:
 		return "Ready to Publish"
 	case dealcheckpoints.Published:
-		return "Awaiting Publish Confirmation"
+		elapsedEpochs := uint64(time.Since(checkpointAt).Seconds()) / build.BlockDelaySecs
+		confidenceEpochs := build.MessageConfidence * 2
+		return fmt.Sprintf("Awaiting Publish Confirmation (%d/%d epochs)", elapsedEpochs, confidenceEpochs)
 	case dealcheckpoints.PublishConfirmed:
 		return "Adding to Sector"
 	case dealcheckpoints.AddedPiece:

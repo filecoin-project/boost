@@ -2,11 +2,9 @@ package indexprovider
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
@@ -16,6 +14,7 @@ import (
 	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -23,15 +22,21 @@ import (
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipld/go-ipld-prime"
 	provider "github.com/ipni/index-provider"
+	"github.com/ipni/index-provider/engine"
 	"github.com/ipni/index-provider/engine/xproviders"
 	"github.com/ipni/index-provider/metadata"
 	"github.com/libp2p/go-libp2p/core/crypto"
-	host "github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multihash"
 	"go.uber.org/fx"
+	"net/url"
+	"os"
+	"path/filepath"
 )
 
 var log = logging.Logger("index-provider-wrapper")
@@ -436,50 +441,133 @@ func (w *Wrapper) IndexerAnnounceAllDeals(ctx context.Context) error {
 	return merr
 }
 
+// While ingesting cids for each piece, if there is an error the indexer
+// checks if the error contains the string "content not found":
+// - if so, the indexer skips the piece and continues ingestion
+// - if not, the indexer pauses ingestion
+var ErrStringSkipAdIngest = "content not found"
+
+func skipError(err error) error {
+	return fmt.Errorf("%s: %s: %w", ErrStringSkipAdIngest, err.Error(), ipld.ErrNotExists{})
+}
+
+func (w *Wrapper) IndexerAnnounceLatest(ctx context.Context) (cid.Cid, error) {
+	e, ok := w.prov.(*engine.Engine)
+	if !ok {
+		return cid.Undef, fmt.Errorf("index provider is disabled")
+	}
+	return e.PublishLatest(ctx)
+}
+
+func (w *Wrapper) IndexerAnnounceLatestHttp(ctx context.Context, announceUrls []string) (cid.Cid, error) {
+	e, ok := w.prov.(*engine.Engine)
+	if !ok {
+		return cid.Undef, fmt.Errorf("index provider is disabled")
+	}
+
+	if len(announceUrls) == 0 {
+		announceUrls = w.cfg.IndexProvider.Announce.DirectAnnounceURLs
+	}
+
+	urls := make([]*url.URL, 0, len(announceUrls))
+	for _, us := range announceUrls {
+		u, err := url.Parse(us)
+		if err != nil {
+			return cid.Undef, fmt.Errorf("parsing url %s: %w", us, err)
+		}
+		urls = append(urls, u)
+	}
+	return e.PublishLatestHTTP(ctx, urls...)
+}
+
 func (w *Wrapper) MultihashLister(ctx context.Context, prov peer.ID, contextID []byte) (provider.MultihashIterator, error) {
-	provideF := func(pieceCid cid.Cid) (provider.MultihashIterator, error) {
+	provideF := func(proposalCid cid.Cid, pieceCid cid.Cid) (provider.MultihashIterator, error) {
 		ii, err := w.piecedirectory.GetIterableIndex(ctx, pieceCid)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get iterable index: %w", err)
+			e := fmt.Errorf("failed to get iterable index: %w", err)
+			if bdtypes.IsNotFound(err) {
+				// If it's a not found error, skip over this piece and continue ingesting
+				log.Infow("skipping ingestion: piece not found", "piece", pieceCid, "propCid", proposalCid, "err", e)
+				return nil, skipError(e)
+			}
+
+			// Some other error, pause ingestion
+			log.Infow("pausing ingestion: error getting piece", "piece", pieceCid, "propCid", proposalCid, "err", e)
+			return nil, e
 		}
 
-		// Check if there are any records in the iterator. If there are no
-		// records, the multihash lister expects us to return an error.
+		// Check if there are any records in the iterator.
 		hasRecords := ii.ForEach(func(_ multihash.Multihash, _ uint64) error {
 			return fmt.Errorf("has at least one record")
 		})
 		if hasRecords == nil {
-			return nil, fmt.Errorf("no records found for piece %s", pieceCid)
+			// If there are no records, it's effectively the same as a not
+			// found error. Skip over this piece and continue ingesting.
+			e := fmt.Errorf("no records found for piece %s", pieceCid)
+			log.Infow("skipping ingestion: piece has no records", "piece", pieceCid, "propCid", proposalCid, "err", e)
+			return nil, skipError(e)
 		}
 
 		mhi, err := provider.CarMultihashIterator(ii)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get mhiterator: %w", err)
+			// Bad index, skip over this piece and continue ingesting
+			err = fmt.Errorf("failed to get mhiterator: %w", err)
+			log.Infow("skipping ingestion", "piece", pieceCid, "propCid", proposalCid, "err", err)
+			return nil, skipError(err)
 		}
+
+		log.Debugw("returning piece iterator", "piece", pieceCid, "propCid", proposalCid, "err", err)
 		return mhi, nil
 	}
 
 	// convert context ID to proposal Cid
 	proposalCid, err := cid.Cast(contextID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to cast context ID to a cid")
+		// Bad contextID, skip over this piece and continue ingesting
+		err = fmt.Errorf("failed to cast context ID to a cid")
+		log.Infow("skipping ingestion", "proposalCid", proposalCid, "err", err)
+		return nil, skipError(err)
 	}
 
-	// go from proposal cid -> piece cid by looking up deal in boost and if we can't find it there -> then markets
-	// check Boost deals DB
+	// Look up deal by proposal cid in the boost database.
+	// If we can't find it there check legacy markets DB.
 	pds, boostErr := w.dealsDB.BySignedProposalCID(ctx, proposalCid)
 	if boostErr == nil {
+		// Found the deal, get an iterator over the piece
 		pieceCid := pds.ClientDealProposal.Proposal.PieceCID
-		return provideF(pieceCid)
+		return provideF(proposalCid, pieceCid)
 	}
 
-	// check in legacy markets
+	// Check if it's a "not found" error
+	if !errors.Is(boostErr, sql.ErrNoRows) {
+		// It's not a "not found" error: there was a problem accessing the
+		// database. Pause ingestion until the user can fix the DB.
+		e := fmt.Errorf("getting deal with proposal cid %s from boost database: %w", proposalCid, boostErr)
+		log.Infow("pausing ingestion", "proposalCid", proposalCid, "err", e)
+		return nil, e
+	}
+
+	// Deal was not found in boost DB - check in legacy markets
 	md, legacyErr := w.legacyProv.GetLocalDeal(proposalCid)
 	if legacyErr == nil {
-		return provideF(md.Proposal.PieceCID)
+		// Found the deal, get an interator over the piece
+		return provideF(proposalCid, md.Proposal.PieceCID)
 	}
 
-	return nil, fmt.Errorf("failed to look up deal in Boost, err=%s and Legacy Markets, err=%s", boostErr, legacyErr)
+	// Check if it's a "not found" error
+	if !errors.Is(legacyErr, datastore.ErrNotFound) {
+		// It's not a "not found" error: there was a problem accessing the
+		// legacy database. Pause ingestion until the user can fix the legacy DB.
+		e := fmt.Errorf("getting deal with proposal cid %s from Legacy Markets: %w", proposalCid, legacyErr)
+		log.Infow("pausing ingestion", "proposalCid", proposalCid, "err", e)
+		return nil, e
+	}
+
+	// The deal was not found in the boost or legacy database.
+	// Skip this deal and continue ingestion.
+	err = fmt.Errorf("deal with proposal cid %s not found", proposalCid)
+	log.Infow("skipping ingestion", "proposalCid", proposalCid, "err", err)
+	return nil, skipError(err)
 }
 
 func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, deal *types.ProviderDealState) (cid.Cid, error) {

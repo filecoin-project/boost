@@ -319,6 +319,10 @@ func runRequestTest(t *testing.T, tc testCase) {
 	} else {
 		require.NoError(t, err)
 	}
+
+	// final verification -- the server has no active graphsync requests
+	stats := gsupr.Stats()
+	require.Equal(t, stats.IncomingRequests.Active, uint64(0))
 }
 
 func createRetrievalProvider(ctx context.Context, t *testing.T, testData *tut.Libp2pTestData, pieceStore *tut.TestPieceStore, sectorAccessor *testnodes.TestSectorAccessor, dagstoreWrapper *tut.MockDagStoreWrapper, gs graphsync.GraphExchange, paymentAddress address.Address) retrievalmarket.RetrievalProvider {
