@@ -163,7 +163,7 @@ func runAction(cctx *cli.Context, dbType string, store *svc.Service) error {
 
 	// Start the server
 	addr := cctx.String("addr")
-	err = store.Start(ctx, addr)
+	_, err = store.Start(ctx, addr)
 	if err != nil {
 		return fmt.Errorf("starting %s store: %w", dbType, err)
 	}

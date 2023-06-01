@@ -10,10 +10,9 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/piecedirectory/types"
-	"github.com/filecoin-project/boostd-data/client"
+	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
-	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/hashicorp/go-multierror"
@@ -32,7 +31,7 @@ import (
 var log = logging.Logger("piecedirectory")
 
 type PieceDirectory struct {
-	store       types.Store
+	store       *bdclient.Store
 	pieceReader types.PieceReader
 
 	ctx context.Context
@@ -42,11 +41,7 @@ type PieceDirectory struct {
 	addIdxOpByCid      sync.Map
 }
 
-func NewStore(dialOpts ...jsonrpc.Option) *client.Store {
-	return client.NewStore(dialOpts...)
-}
-
-func NewPieceDirectory(store types.Store, pr types.PieceReader, addIndexThrottleSize int) *PieceDirectory {
+func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThrottleSize int) *PieceDirectory {
 	return &PieceDirectory{
 		store:              store,
 		pieceReader:        pr,
