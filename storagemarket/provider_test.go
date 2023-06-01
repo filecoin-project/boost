@@ -21,7 +21,6 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/piecedirectory"
-	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -1624,12 +1623,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	askStore := &mockAskStore{}
 	askStore.SetAsk(pc.price, pc.verifiedPrice, pc.minPieceSize, pc.maxPieceSize)
 
-	store := mock_piecedirectory.NewMockStore(ctrl)
-	store.EXPECT().IsIndexed(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
-	store.EXPECT().AddDealForPiece(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-
 	pdctx, cancel := context.WithCancel(context.Background())
-	pm := piecedirectory.NewPieceDirectory(store, nil, 1)
+	pm := piecedirectory.NewPieceDirectory(bdclientutil.NewTestStore(pdctx), minerStub.MockPieceReader, 1)
 	pm.Start(pdctx)
 	t.Cleanup(cancel)
 
@@ -1713,7 +1708,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	// construct a new provider with pre-existing state
 	prov, err := NewProvider(h.Provider.config, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
 		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
-		df, h.Provider.logsSqlDB, h.Provider.logsDB, h.Provider.piecedirectory, h.MinerStub, h.Provider.askGetter,
+		df, h.Provider.logsSqlDB, h.Provider.logsDB, pm, h.MinerStub, h.Provider.askGetter,
 		h.Provider.sigVerifier, h.Provider.dealLogger, h.Provider.Transport)
 
 	require.NoError(t, err)

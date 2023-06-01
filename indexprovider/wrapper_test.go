@@ -14,7 +14,7 @@ import (
 	"github.com/filecoin-project/lotus/markets/idxprov"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/golang/mock/gomock"
-	"github.com/ipni/go-libipni/metadata"
+	"github.com/ipni/index-provider/metadata"
 	mock_provider "github.com/ipni/index-provider/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -261,75 +261,6 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 				FastRetrieval: false,
 			})).Times(1)
 		},
-	}, {
-		name: "unsealed -> cache",
-		storageListResponse1: func(sectorID abi.SectorID) *storiface.Decl {
-			return &storiface.Decl{
-				SectorID:       sectorID,
-				SectorFileType: storiface.FTUnsealed,
-			}
-		},
-		storageListResponse2: func(sectorID abi.SectorID) *storiface.Decl {
-			return &storiface.Decl{
-				SectorID:       sectorID,
-				SectorFileType: storiface.FTCache,
-			}
-		},
-		expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
-			// Expect only one call to NotifyPut with fast retrieval = true (unsealed)
-			// because we ignore a state change to cache
-			prov.NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), metadata.Default.New(&metadata.GraphsyncFilecoinV1{
-				PieceCID:      prop.PieceCID,
-				VerifiedDeal:  prop.VerifiedDeal,
-				FastRetrieval: true,
-			})).Times(1)
-		},
-	}, {
-		name: "cache -> unsealed",
-		storageListResponse1: func(sectorID abi.SectorID) *storiface.Decl {
-			return &storiface.Decl{
-				SectorID:       sectorID,
-				SectorFileType: storiface.FTCache,
-			}
-		},
-		storageListResponse2: func(sectorID abi.SectorID) *storiface.Decl {
-			return &storiface.Decl{
-				SectorID:       sectorID,
-				SectorFileType: storiface.FTUnsealed,
-			}
-		},
-		expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
-			// Expect only one call to NotifyPut with fast retrieval = true (unsealed)
-			// because we ignore a state change to cache
-			prov.NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), metadata.Default.New(&metadata.GraphsyncFilecoinV1{
-				PieceCID:      prop.PieceCID,
-				VerifiedDeal:  prop.VerifiedDeal,
-				FastRetrieval: true,
-			})).Times(1)
-		},
-	}, {
-		name: "cache -> sealed",
-		storageListResponse1: func(sectorID abi.SectorID) *storiface.Decl {
-			return &storiface.Decl{
-				SectorID:       sectorID,
-				SectorFileType: storiface.FTCache,
-			}
-		},
-		storageListResponse2: func(sectorID abi.SectorID) *storiface.Decl {
-			return &storiface.Decl{
-				SectorID:       sectorID,
-				SectorFileType: storiface.FTSealed,
-			}
-		},
-		expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
-			// Expect only one call to NotifyPut with fast retrieval = true (unsealed)
-			// because we ignore a state change to cache
-			prov.NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), metadata.Default.New(&metadata.GraphsyncFilecoinV1{
-				PieceCID:      prop.PieceCID,
-				VerifiedDeal:  prop.VerifiedDeal,
-				FastRetrieval: false,
-			})).Times(1)
-		},
 	}}
 
 	for _, tc := range testCases {
@@ -364,116 +295,7 @@ func TestSectorStateManagerStateChangeToIndexer(t *testing.T) {
 	}
 }
 
-// Verify that multiple storage file types are handled from StorageList correctly
-func TestUnsealedStateManagerStorageList(t *testing.T) {
-	ctx := context.Background()
-
-	testCases := []struct {
-		name                string
-		storageListResponse func(sectorID abi.SectorID) []storiface.Decl
-		expect              func(*mock_provider.MockInterfaceMockRecorder, market.DealProposal)
-	}{{
-		name: "unsealed and sealed status",
-		storageListResponse: func(sectorID abi.SectorID) []storiface.Decl {
-			return []storiface.Decl{
-				{
-					SectorID:       sectorID,
-					SectorFileType: storiface.FTUnsealed,
-				},
-				{
-					SectorID:       sectorID,
-					SectorFileType: storiface.FTSealed,
-				},
-			}
-		},
-		expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
-			// Expect only one call to NotifyPut with fast retrieval = true (unsealed)
-			// because we ignore a state change to cache
-			prov.NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), metadata.Default.New(&metadata.GraphsyncFilecoinV1{
-				PieceCID:      prop.PieceCID,
-				VerifiedDeal:  prop.VerifiedDeal,
-				FastRetrieval: true,
-			})).Times(1)
-		},
-	}, {
-		name: "unsealed and cached status",
-		storageListResponse: func(sectorID abi.SectorID) []storiface.Decl {
-			return []storiface.Decl{
-				{
-					SectorID:       sectorID,
-					SectorFileType: storiface.FTUnsealed,
-				},
-				{
-					SectorID:       sectorID,
-					SectorFileType: storiface.FTCache,
-				},
-			}
-		},
-		expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
-			// Expect only one call to NotifyPut with fast retrieval = true (unsealed)
-			// because we ignore a state change to cache
-			prov.NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), metadata.Default.New(&metadata.GraphsyncFilecoinV1{
-				PieceCID:      prop.PieceCID,
-				VerifiedDeal:  prop.VerifiedDeal,
-				FastRetrieval: true,
-			})).Times(1)
-		},
-	}, {
-		name: "sealed and cached status",
-		storageListResponse: func(sectorID abi.SectorID) []storiface.Decl {
-			return []storiface.Decl{
-				{
-					SectorID:       sectorID,
-					SectorFileType: storiface.FTSealed,
-				},
-				{
-					SectorID:       sectorID,
-					SectorFileType: storiface.FTCache,
-				},
-			}
-		},
-		expect: func(prov *mock_provider.MockInterfaceMockRecorder, prop market.DealProposal) {
-			// Expect only one call to NotifyPut with fast retrieval = true (unsealed)
-			// because we ignore a state change to cache
-			prov.NotifyPut(gomock.Any(), gomock.Any(), gomock.Any(), metadata.Default.New(&metadata.GraphsyncFilecoinV1{
-				PieceCID:      prop.PieceCID,
-				VerifiedDeal:  prop.VerifiedDeal,
-				FastRetrieval: false,
-			})).Times(1)
-		},
-	}}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			usm, legacyStorageProvider, storageMiner, prov := setup(t)
-			legacyStorageProvider.EXPECT().ListLocalDeals().AnyTimes().Return(nil, nil)
-
-			// Add a deal to the database
-			deals, err := db.GenerateNDeals(1)
-			require.NoError(t, err)
-			err = usm.dealsDB.Insert(ctx, &deals[0])
-			require.NoError(t, err)
-
-			// Set up expectations (automatically verified when the test exits)
-			prop := deals[0].ClientDealProposal.Proposal
-			tc.expect(prov.EXPECT(), prop)
-
-			minerID, err := address.IDFromAddress(deals[0].ClientDealProposal.Proposal.Provider)
-			require.NoError(t, err)
-
-			// Set the first response from MinerAPI.StorageList()
-			storageMiner.storageList = map[storiface.ID][]storiface.Decl{}
-			resp1 := tc.storageListResponse(abi.SectorID{Miner: abi.ActorID(minerID), Number: deals[0].SectorID})
-			storageMiner.storageList["uuid"] = resp1
-
-			// Trigger check for updates
-			err = usm.checkForUpdates(ctx)
-			require.NoError(t, err)
-		})
-	}
-}
-
-func setup(t *testing.T) (*UnsealedStateManager, *mock.MockStorageProvider, *mockApiStorageMiner, *mock_provider.MockInterface) {
+func setup(t *testing.T) (*Wrapper, *mock.MockStorageProvider, *mockApiStorageMiner, *mock_provider.MockInterface) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	prov := mock_provider.NewMockInterface(ctrl)

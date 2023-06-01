@@ -82,17 +82,3 @@ type MockSectionReader struct {
 }
 
 func (MockSectionReader) Close() error { return nil }
-
-func CreateMockDoctorSealingApi() *mockSealingApi {
-	return &mockSealingApi{isUnsealed: true}
-}
-
-type mockSealingApi struct {
-	isUnsealed bool
-}
-
-var _ SealingApi = (*mockSealingApi)(nil)
-
-func (m *mockSealingApi) IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error) {
-	return m.isUnsealed, nil
-}

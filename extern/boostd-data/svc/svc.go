@@ -54,15 +54,15 @@ func MakeLevelDBDir(repoPath string) (string, error) {
 	return repoPath, nil
 }
 
-func (s *Service) Start(ctx context.Context, addr string) error {
+func (s *Service) Start(ctx context.Context, addr string) (net.Addr, error) {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("setting up listener for local index directory service: %w", err)
+		return nil, fmt.Errorf("setting up listener for local index directory service: %w", err)
 	}
 
 	err = s.Impl.Start(ctx)
 	if err != nil {
-		return fmt.Errorf("starting local index directory service: %w", err)
+		return nil, fmt.Errorf("starting local index directory service: %w", err)
 	}
 
 	server := jsonrpc.NewServer()
@@ -97,5 +97,5 @@ func (s *Service) Start(ctx context.Context, addr string) error {
 		<-done
 	}()
 
-	return nil
+	return ln.Addr(), nil
 }

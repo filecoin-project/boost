@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/piecedirectory"
+	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore/mount"
@@ -133,9 +134,9 @@ var runCmd = &cli.Command{
 
 		// Connect to the local index directory service
 		ctx := lcli.ReqContext(cctx)
-		pdClient := piecedirectory.NewStore()
-		defer pdClient.Close(ctx)
-		err := pdClient.Dial(ctx, cctx.String("api-lid"))
+		cl := bdclient.NewStore()
+		defer cl.Close(ctx)
+		err := cl.Dial(ctx, cctx.String("api-lid"))
 		if err != nil {
 			return fmt.Errorf("connecting to local index directory service: %w", err)
 		}
@@ -174,7 +175,7 @@ var runCmd = &cli.Command{
 
 		// Create the server API
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		piecedirectory := piecedirectory.NewPieceDirectory(pdClient, pr, cctx.Int("add-index-throttle"))
+		pd := piecedirectory.NewPieceDirectory(cl, pr, cctx.Int("add-index-throttle"))
 
 		opts := &HttpServerOptions{
 			ServePieces:              servePieces,
@@ -205,11 +206,11 @@ var runCmd = &cli.Command{
 				GetSizeFailResponseCount:    metrics.HttpRblsGetSizeFailResponseCount,
 				GetSizeSuccessResponseCount: metrics.HttpRblsGetSizeSuccessResponseCount,
 			}
-			rbs := remoteblockstore.NewRemoteBlockstore(piecedirectory, &httpBlockMetrics)
+			rbs := remoteblockstore.NewRemoteBlockstore(pd, &httpBlockMetrics)
 			filtered := filters.NewFilteredBlockstore(rbs, multiFilter)
 			opts.Blockstore = filtered
 		}
-		sapi := serverApi{ctx: ctx, piecedirectory: piecedirectory, sa: sa}
+		sapi := serverApi{ctx: ctx, piecedirectory: pd, sa: sa}
 		server := NewHttpServer(
 			cctx.String("base-path"),
 			cctx.String("address"),
@@ -219,7 +220,7 @@ var runCmd = &cli.Command{
 		)
 
 		// Start the local index directory
-		piecedirectory.Start(ctx)
+		pd.Start(ctx)
 
 		// Start the server
 		log.Infof("Starting booster-http node on port %d with base path '%s'",

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"os"
+
+	"github.com/filecoin-project/boostd-data/build"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
-	"os"
 )
 
 var log = logging.Logger("boostd-data")
@@ -17,6 +19,7 @@ func main() {
 	app := &cli.App{
 		Name:                 "boostd-data",
 		Usage:                "Service that implements boostd data API",
+		Version:              build.UserVersion(),
 		EnableBashCompletion: true,
 		Flags: []cli.Flag{
 			cliutil.FlagVeryVerbose,

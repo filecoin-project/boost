@@ -13,7 +13,8 @@ import (
 	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
-	"github.com/filecoin-project/boost/piecedirectory/types"
+	"github.com/filecoin-project/boost/sectorstatemgr"
+	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
@@ -23,7 +24,6 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/lotus/api/v1api"
-	mktsdagstore "github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sealer"
@@ -35,12 +35,12 @@ import (
 	"go.uber.org/fx"
 )
 
-func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) types.Store {
-	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) types.Store {
+func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) *bdclient.Store {
+	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) *bdclient.Store {
 		svcDialOpts := []jsonrpc.Option{
 			jsonrpc.WithTimeout(time.Duration(cfg.LocalIndexDirectory.ServiceRPCTimeout)),
 		}
-		client := piecedirectory.NewStore(svcDialOpts...)
+		client := bdclient.NewStore(svcDialOpts...)
 
 		var cancel context.CancelFunc
 		var svcCtx context.Context
@@ -108,7 +108,7 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 
 				// Start the embedded local index directory service
 				addr := fmt.Sprintf("localhost:%d", port)
-				err := bdsvc.Start(svcCtx, addr)
+				_, err := bdsvc.Start(svcCtx, addr)
 				if err != nil {
 					return fmt.Errorf("starting local index directory service: %w", err)
 				}
@@ -117,7 +117,11 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 				return client.Dial(ctx, fmt.Sprintf("ws://%s", addr))
 			},
 			OnStop: func(ctx context.Context) error {
-				cancel()
+				// cancel is nil if we use the service api (boostd-data process)
+				if cancel != nil {
+					cancel()
+				}
+
 				client.Close(ctx)
 				return nil
 			},
@@ -127,8 +131,8 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 	}
 }
 
-func NewPieceDirectory(cfg *config.Boost) func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store types.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
-	return func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store types.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
+func NewPieceDirectory(cfg *config.Boost) func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store *bdclient.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
+	return func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store *bdclient.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
 		sa := sectoraccessor.NewSectorAccessor(maddr, secb, pp, full)
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
 		pd := piecedirectory.NewPieceDirectory(store, pr, cfg.LocalIndexDirectory.ParallelAddIndexLimit)
@@ -153,8 +157,8 @@ func NewPieceStore(pm *piecedirectory.PieceDirectory, maddr address.Address) pie
 	return &boostPieceStoreWrapper{piecedirectory: pm, maddr: maddr}
 }
 
-func NewPieceDoctor(lc fx.Lifecycle, store types.Store, sapi mktsdagstore.SectorAccessor) *piecedirectory.Doctor {
-	doc := piecedirectory.NewDoctor(store, sapi)
+func NewPieceDoctor(lc fx.Lifecycle, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr) *piecedirectory.Doctor {
+	doc := piecedirectory.NewDoctor(store, ssm)
 	docctx, cancel := context.WithCancel(context.Background())
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {

@@ -9,6 +9,9 @@ import (
 	"sync"
 
 	"github.com/filecoin-project/boost-gfm/storagemarket"
+	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
+	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
+	mock_sealingpipeline "github.com/filecoin-project/boost/storagemarket/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/mock_types"
 	"github.com/filecoin-project/boost/testutil"

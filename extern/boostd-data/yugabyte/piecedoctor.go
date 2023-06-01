@@ -3,13 +3,14 @@ package yugabyte
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/ipfs/go-cid"
 	"github.com/jackc/pgtype"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
-	"time"
 )
 
 var TrackerCheckBatchSize = 1024
@@ -165,7 +166,7 @@ func (s *Store) execWithConcurrency(ctx context.Context, pcids []pieceCreated, c
 }
 
 // The minimum frequency with which to check pieces for errors (eg bad index)
-var MinPieceCheckPeriod = 30 * time.Second
+var MinPieceCheckPeriod = 5 * time.Minute
 
 // Work out how frequently to check each piece, based on how many pieces
 // there are: if there are many pieces, each piece will be checked
@@ -178,10 +179,10 @@ func (s *Store) getPieceCheckPeriod(ctx context.Context) (time.Duration, error) 
 	}
 
 	// Check period:
-	// - 1k pieces;   every 10s
-	// - 100k pieces; every 15m
-	// - 1m pieces;   every 2 hours
-	period := time.Duration(count*10) * time.Millisecond
+	// - 1k pieces;   every 100s (5 minutes because of MinPieceCheckPeriod)
+	// - 100k pieces; every 150m
+	// - 1m pieces;   every 20 hours
+	period := time.Duration(count*100) * time.Millisecond
 	if period < MinPieceCheckPeriod {
 		period = MinPieceCheckPeriod
 	}

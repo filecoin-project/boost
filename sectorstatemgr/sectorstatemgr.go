@@ -12,7 +12,6 @@ import (
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/api"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -24,11 +23,10 @@ import (
 var log = logging.Logger("sectorstatemgr")
 
 type SectorStateUpdates struct {
-	Updates         map[abi.SectorID]db.SealState
-	ActiveSectors   map[abi.SectorID]struct{}
-	SectorWithDeals map[abi.SectorID]struct{}
-	SectorStates    map[abi.SectorID]db.SealState
-	UpdatedAt       time.Time
+	Updates       map[abi.SectorID]db.SealState
+	ActiveSectors map[abi.SectorID]struct{}
+	SectorStates  map[abi.SectorID]db.SealState
+	UpdatedAt     time.Time
 }
 
 type StorageAPI interface {
@@ -45,9 +43,6 @@ type SectorStateMgr struct {
 	Maddr       address.Address
 
 	PubSub *PubSub
-
-	LatestUpdateMu sync.Mutex
-	LatestUpdate   *SectorStateUpdates
 
 	sdb *db.SectorStateDB
 }
@@ -82,35 +77,9 @@ func NewSectorStateMgr(cfg *config.Boost) func(lc fx.Lifecycle, sdb *db.SectorSt
 	}
 }
 
-func (m *SectorStateMgr) UpdateLatest(ctx context.Context) {
-	go func() {
-		sub := m.PubSub.Subscribe()
-
-		for {
-			select {
-			case u, ok := <-sub:
-				if !ok {
-					log.Debugw("state updates subscription closed")
-					return
-				}
-				log.Debugw("got state updates from SectorStateMgr", "len(u.updates)", len(u.Updates), "len(u.active)", len(u.ActiveSectors), "u.updatedAt", u.UpdatedAt)
-
-				m.LatestUpdateMu.Lock()
-				m.LatestUpdate = u
-				m.LatestUpdateMu.Unlock()
-
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-}
-
 func (m *SectorStateMgr) Run(ctx context.Context) {
 	duration := time.Duration(m.cfg.StorageListRefreshDuration)
 	log.Infof("starting sector state manager running on interval %s", duration.String())
-
-	m.UpdateLatest(ctx)
 
 	// Check immediately
 	err := m.checkForUpdates(ctx)
@@ -239,16 +208,10 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 		return nil, err
 	}
 
-	allSet, err := m.fullnodeApi.StateMinerSectors(ctx, m.Maddr, nil, head.Key())
-	if err != nil {
-		return nil, err
-	}
-
 	mid, err := address.IDFromAddress(m.Maddr)
 	if err != nil {
 		return nil, err
 	}
-
 	activeSectors := make(map[abi.SectorID]struct{}, len(activeSet))
 	for _, info := range activeSet {
 		sectorID := abi.SectorID{
@@ -259,24 +222,5 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 		activeSectors[sectorID] = struct{}{}
 	}
 
-	sectorWithDeals := make(map[abi.SectorID]struct{})
-	zero := big.Zero()
-	for _, info := range allSet {
-		sectorID := abi.SectorID{
-			Miner:  abi.ActorID(mid),
-			Number: info.SectorNumber,
-		}
-
-		if info.DealWeight.GreaterThan(zero) {
-			sectorWithDeals[sectorID] = struct{}{}
-		}
-	}
-
-	for k := range allSectorStates {
-		if _, ok := activeSectors[k]; !ok {
-			log.Debugw("sector present in all sector states, but not active", "number", k)
-		}
-	}
-
-	return &SectorStateUpdates{sectorUpdates, activeSectors, sectorWithDeals, allSectorStates, time.Now()}, nil
+	return &SectorStateUpdates{sectorUpdates, activeSectors, allSectorStates, time.Now()}, nil
 }
