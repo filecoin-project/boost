@@ -58,7 +58,7 @@ func TestRefreshState(t *testing.T) {
 		f           func() fixtures
 	}{
 		{
-			description: "one sealed, one unsealed, one not active - update in local state",
+			description: "four deals - sealed->unsealed, unsealed->sealed, cached, removed",
 			f: func() fixtures {
 				sqldb := db.CreateTestTmpDB(t)
 				require.NoError(t, db.CreateAllBoostTables(ctx, sqldb, sqldb))
@@ -170,7 +170,6 @@ func TestRefreshState(t *testing.T) {
 				require.NoError(t, err)
 				sid1 := abi.SectorID{Miner: aid, Number: deals[0].SectorID}
 				sid2 := abi.SectorID{Miner: aid, Number: deals[1].SectorID}
-				// even though sector is not active, we continue to announce deal
 				sid3 := abi.SectorID{Miner: aid, Number: deals[2].SectorID}
 
 				input_StorageList := map[storiface.ID][]storiface.Decl{
