@@ -19,12 +19,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Empty response from MinerAPI.StorageList()
-func TestUnsealedStateManagerEmptyStorageList(t *testing.T) {
+func TestWrapperEmptyStorageListAndNoUpdates(t *testing.T) {
 	wrapper, legacyStorageProvider, _, _ := setup(t)
 	legacyStorageProvider.EXPECT().ListLocalDeals().AnyTimes().Return(nil, nil)
 
-	// Check for updates with an empty response from MinerAPI.StorageList()
+	// handleUpdates with an empty response from MinerAPI.StorageList() and no updates
 	err := wrapper.handleUpdates(context.Background(), nil)
 	require.NoError(t, err)
 }
