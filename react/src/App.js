@@ -46,6 +46,7 @@ function App(props) {
                                         <Route path="/retrieval-logs/from/:cursor/page/:pageNum" element={<RetrievalLogsPage />} />
                                         <Route path="/retrieval-logs/:peerID/:transferID" element={<RetrievalLogDetail />} />
                                         <Route path="/storage-space" element={<StorageSpacePage />} />
+                                        <Route path="/lid" element={<LIDPage />} />
                                         <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
                                         <Route path="/funds" element={<FundsPage />} />
                                         <Route path="/funds/from/:cursor/page/:pageNum" element={<FundsPage />} />
@@ -55,7 +56,6 @@ function App(props) {
                                         <Route path="/settings" element={<SettingsPage />} />
                                         <Route path="/deals/:dealID" element={<DealDetail />} />
                                         <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
-                                        <Route path="/lid" element={<LIDPage />} />
                                         <Route path="/sectors-list" element={<SectorsListPage />} />
                                         <Route path="/sectors-list/from/:cursor/page/:pageNum" element={<SectorsListPage />} />
                                         <Route path="/piece-doctor" element={<PieceDoctorPage />} />

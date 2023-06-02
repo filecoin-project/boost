@@ -22,12 +22,12 @@ export function Menu(props) {
             <StorageDealsMenuItem />
             <ProposalLogsMenuItem />
             <RetrievalLogsMenuItem />
+            <LIDMenuItem />
             <StorageSpaceMenuItem />
             <SealingPipelineMenuItem />
-            <FundsMenuItem />
             <DealPublishMenuItem />
+            <FundsMenuItem />
             <DealTransfersMenuItem />
-            <LIDMenuItem />
             <Link key="mpool" className="menu-item" to="/mpool">
                 <img className="icon" alt="" src={gridImg} />
                 <h3>Message Pool</h3>
