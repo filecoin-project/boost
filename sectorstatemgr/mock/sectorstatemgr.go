@@ -8,6 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	abi "github.com/filecoin-project/go-state-types/abi"
 	storiface "github.com/filecoin-project/lotus/storage/sealer/storiface"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -33,6 +34,21 @@ func NewMockStorageAPI(ctrl *gomock.Controller) *MockStorageAPI {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockStorageAPI) EXPECT() *MockStorageAPIMockRecorder {
 	return m.recorder
+}
+
+// SectorsList mocks base method.
+func (m *MockStorageAPI) SectorsList(arg0 context.Context) ([]abi.SectorNumber, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SectorsList", arg0)
+	ret0, _ := ret[0].([]abi.SectorNumber)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SectorsList indicates an expected call of SectorsList.
+func (mr *MockStorageAPIMockRecorder) SectorsList(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SectorsList", reflect.TypeOf((*MockStorageAPI)(nil).SectorsList), arg0)
 }
 
 // StorageList mocks base method.
