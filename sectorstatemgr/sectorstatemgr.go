@@ -13,11 +13,9 @@ import (
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/api"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
-	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
@@ -35,15 +33,15 @@ type SectorStateUpdates struct {
 }
 
 type Sector struct {
-	SectorNumber  abi.SectorNumber
-	State         api.SectorState
-	Unsealed      bool
-	Deals         []abi.DealID
-	Active        bool
-	DealWeight    big.Int
-	VerifiedPower big.Int
-	Expiration    abi.ChainEpoch
-	OnChain       bool
+	SectorNumber abi.SectorNumber
+	//State         api.SectorState
+	Unsealed bool
+	//Deals         []abi.DealID
+	Active bool
+	//DealWeight    big.Int
+	//VerifiedPower big.Int
+	//Expiration    abi.ChainEpoch
+	OnChain bool
 }
 
 type StorageAPI interface {
@@ -271,16 +269,16 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 			Number: sectorNumber,
 		}
 
-		st, err := m.minerApi.SectorsStatus(ctx, sectorNumber, true)
-		if err != nil {
-			return nil, err
-		}
+		//st, err := m.minerApi.SectorsStatus(ctx, sectorNumber, true)
+		//if err != nil {
+		//return nil, err
+		//}
 
 		s := Sector{
 			SectorNumber: sectorNumber,
-			State:        st.State,
-			Deals:        st.Deals,
-			Expiration:   st.Expiration,
+			//State:        st.State,
+			//Deals:        st.Deals,
+			//Expiration:   st.Expiration,
 		}
 
 		_, s.Active = activeSectors[sid]
@@ -293,29 +291,29 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 		//
 		// Copied from code for lotus-miner sectors list command
 		//
-		{
-			const verifiedPowerGainMul = 9
-			dw := big.NewInt(0)
-			vp := big.NewInt(0)
-			estimate := (st.Expiration-st.Activation <= 0) || sealing.IsUpgradeState(sealing.SectorState(st.State))
-			if !estimate {
-				rdw := big.Add(st.DealWeight, st.VerifiedDealWeight)
-				dw = big.Div(rdw, big.NewInt(int64(st.Expiration-st.Activation)))
-				vp = big.Div(big.Mul(st.VerifiedDealWeight, big.NewInt(verifiedPowerGainMul)), big.NewInt(int64(st.Expiration-st.Activation)))
-			} else {
-				for _, piece := range st.Pieces {
-					if piece.DealInfo != nil {
-						dw = big.Add(dw, big.NewInt(int64(piece.Piece.Size)))
-						if piece.DealInfo.DealProposal != nil && piece.DealInfo.DealProposal.VerifiedDeal {
-							vp = big.Add(vp, big.Mul(big.NewInt(int64(piece.Piece.Size)), big.NewInt(verifiedPowerGainMul)))
-						}
-					}
-				}
-			}
+		//{
+		//const verifiedPowerGainMul = 9
+		//dw := big.NewInt(0)
+		//vp := big.NewInt(0)
+		//estimate := (st.Expiration-st.Activation <= 0) || sealing.IsUpgradeState(sealing.SectorState(st.State))
+		//if !estimate {
+		//rdw := big.Add(st.DealWeight, st.VerifiedDealWeight)
+		//dw = big.Div(rdw, big.NewInt(int64(st.Expiration-st.Activation)))
+		//vp = big.Div(big.Mul(st.VerifiedDealWeight, big.NewInt(verifiedPowerGainMul)), big.NewInt(int64(st.Expiration-st.Activation)))
+		//} else {
+		//for _, piece := range st.Pieces {
+		//if piece.DealInfo != nil {
+		//dw = big.Add(dw, big.NewInt(int64(piece.Piece.Size)))
+		//if piece.DealInfo.DealProposal != nil && piece.DealInfo.DealProposal.VerifiedDeal {
+		//vp = big.Add(vp, big.Mul(big.NewInt(int64(piece.Piece.Size)), big.NewInt(verifiedPowerGainMul)))
+		//}
+		//}
+		//}
+		//}
 
-			s.DealWeight = dw
-			s.VerifiedPower = vp
-		}
+		//s.DealWeight = dw
+		//s.VerifiedPower = vp
+		//}
 
 		sectorsTable = append(sectorsTable, s)
 	}
