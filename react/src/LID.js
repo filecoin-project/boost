@@ -12,7 +12,7 @@ import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import xImg from './bootstrap-icons/icons/x-lg.svg'
 import lidImg from './bootstrap-icons/icons/wrench.svg'
-import repairImg from './bootstrap-icons/icons/wrench-white.svg'
+//import repairImg from './bootstrap-icons/icons/wrench-white.svg'
 import './LID.css'
 import './Inspect.css'
 import {Pagination} from "./Pagination";
@@ -183,7 +183,7 @@ function PiecesSection() {
             <h3>Flagged Pieces</h3>
             <p>
                 <b>{addCommas(storage.Flagged)}</b> Flagged Pieces
-                <Link to={"/piece-doctor"} className="button"><img src={repairImg} /> Repair</Link>
+                <Link to={"/piece-doctor"} className="button">Repair</Link>
             </p>
         </div>
     </div>
