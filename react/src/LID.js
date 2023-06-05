@@ -544,7 +544,7 @@ function PiecesWithPayload({payloadCid, pieceCids, setSearchQuery}) {
 
 function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
     // Re-build index
-    const [buildIndex] = useMutation(PieceBuildIndexMutation, {
+    const [buildIndex, buildIndexResp] = useMutation(PieceBuildIndexMutation, {
         // refetchQueries: props.refetchQueries,
         variables: {pieceCid: pieceCid}
     })
@@ -607,8 +607,11 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                         </span>
                         <br/>
                         {canReIndex ? (
-                            <div className="button build-index" title="Re-build index" onClick={buildIndex}>
-                                Re-index
+                            <div>
+                                <div className="button build-index" title="Re-build index" onClick={buildIndex}>
+                                    Re-index
+                                </div>
+                                {buildIndexResp.error ? <div>{buildIndexResp.error + ''}</div> : null}
                             </div>
                         ) : null}
                     </td>
