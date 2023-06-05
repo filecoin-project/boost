@@ -294,7 +294,6 @@ const RetrievalLogsCountQuery = gql`
     }
 `;
 
-
 const DealCancelMutation = gql`
     mutation AppDealCancelMutation($id: ID!) {
         dealCancel(id: $id)

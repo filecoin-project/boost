@@ -27,7 +27,7 @@ export function Pagination({basePath, cursor, pageNum, moreRows, totalCount, row
     var totalPages = Math.ceil(totalCount / rowsPerPage)
 
     var pageLinks = {}
-    if (cursor) {
+    if (cursor !== null && cursor !== "") {
         if (pageNum === 2) {
             pageLinks.prev = basePath
         } else if (pageNum > 2) {
