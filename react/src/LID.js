@@ -1,6 +1,7 @@
 /* global BigInt */
 import {useMutation, useQuery} from "@apollo/react-hooks";
 import {
+    LIDQuery,
     FlaggedPiecesQuery, PieceBuildIndexMutation,
     PieceStatusQuery, PiecesWithPayloadCidQuery, PiecesWithRootPayloadCidQuery
 } from "./gql";
@@ -39,18 +40,122 @@ export function LIDPage(props) {
 }
 
 function LIDContent() {
+    const {loading, error, data} = useQuery(LIDQuery, { pollInterval: 30000 })
+
+    if (loading) {
+        return <div>Loading...</div>
+    }
+    if (error) {
+        return <div>Error: {error.message}</div>
+    }
+
+    const d = data.lid
+
+    const dealDataBars = [{
+        name: 'Indexed',
+        className: 'indexed',
+        amount: d.DealData.Indexed,
+        description: ''
+    }, {
+        name: 'Flagged (unsealed)',
+        className: 'flagged',
+        amount: d.DealData.FlaggedUnsealed,
+        description: ''
+    }, {
+        name: 'Flagged (sealed only)',
+        className: 'sealed',
+        amount: d.DealData.FlaggedSealed,
+        description: ''
+    }]
+
+    const piecesBars = [{
+        name: 'Indexed',
+        className: 'indexed',
+        amount: d.Pieces.Indexed,
+        description: ''
+    }, {
+        name: 'Flagged (unsealed)',
+        className: 'flagged',
+        amount: d.Pieces.FlaggedUnsealed,
+        description: ''
+    }, {
+        name: 'Flagged (sealed only)',
+        className: 'sealed',
+        amount: d.Pieces.FlaggedSealed,
+        description: ''
+    }]
+
+    const barsSuc = [{
+        name: 'Unsealed Copy',
+        className: 'unsealed',
+        amount: d.SectorUnsealedCopies.Unsealed,
+        description: ''
+    }, {
+        name: 'Sealed Only',
+        className: 'sealed',
+        amount: d.SectorUnsealedCopies.Sealed,
+        description: ''
+    }]
+
+    const barsSps = [{
+        name: 'Active',
+        className: 'active',
+        amount: d.SectorProvingState.Active,
+        description: ''
+    }, {
+        name: 'Inactive',
+        className: 'inactive',
+        amount: d.SectorProvingState.Inactive,
+        description: ''
+    }]
+
     return <div className="lid">
         <BlockStatsSection />
         <table className="lid-graphs">
             <tbody>
             <tr>
                 <td width="50%">
-                    <DealDataSection />
-                    <PiecesSection />
+                  <div>
+                      <h3>Deal Data</h3>
+                      <div className="storage-chart">
+                          <CumulativeBarChart bars={dealDataBars} unit="byte" />
+                          <CumulativeBarLabels bars={dealDataBars} unit="byte" />
+                      </div>
+                  </div>
+                  <div>
+                      <h3>Pieces</h3>
+
+                      <div className="storage-chart">
+                          <CumulativeBarChart bars={piecesBars} />
+                          <CumulativeBarLabels bars={piecesBars} />
+                      </div>
+
+                      <div className="flagged-pieces-link">
+                          <h3>Flagged Pieces</h3>
+                          <p>
+                              <b>{addCommas(d.FlaggedPieces)}</b> Flagged Pieces
+                              <Link to={"/piece-doctor"} className="button">View Flagged Pieces</Link>
+                          </p>
+                      </div>
+                  </div>
                 </td>
                 <td>
-                    <SectorUnsealedSection />
-                    <SectorProvingState />
+                  <div>
+                      <h3>Sector Unsealed Copies</h3>
+
+                      <div className="storage-chart">
+                          <CumulativeBarChart bars={barsSuc} />
+                          <CumulativeBarLabels bars={barsSuc} />
+                      </div>
+                  </div>
+                  <div>
+                      <h3>Sector Proving State</h3>
+
+                      <div className="storage-chart">
+                          <CumulativeBarChart bars={barsSps} />
+                          <CumulativeBarLabels bars={barsSps} />
+                      </div>
+                  </div>
                 </td>
             </tr>
             </tbody>
@@ -74,210 +179,6 @@ function BlockStatsSection() {
             </tr>
             </tbody>
         </table>
-    </div>
-}
-
-function mockDealData() {
-    return {
-        data: {
-            storage: {
-                Indexed: BigInt(12345432343223),
-                Flagged: BigInt(1234512345423),
-                Sealed: BigInt(1634512345423),
-            }
-        }
-    }
-}
-
-function DealDataSection() {
-    // const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
-    const {loading, error, data} = mockDealData()
-
-    if (loading) {
-        return <div>Loading...</div>
-    }
-    if (error) {
-        return <div>Error: {error.message}</div>
-    }
-
-    var storage = data.storage
-
-    const bars = [{
-        name: 'Indexed',
-        className: 'indexed',
-        amount: storage.Indexed,
-        description: ''
-    }, {
-        name: 'Flagged',
-        className: 'flagged',
-        amount: storage.Flagged,
-        description: ''
-    }, {
-        name: 'Sealed Only',
-        className: 'sealed',
-        amount: storage.Sealed,
-        description: ''
-    }]
-
-    return <div>
-        <h3>Deal Data</h3>
-
-        <div className="storage-chart">
-            <CumulativeBarChart bars={bars} unit="byte" />
-            <CumulativeBarLabels bars={bars} unit="byte" />
-        </div>
-    </div>
-}
-
-function mockPiecesData() {
-    return {
-        data: {
-            storage: {
-                Indexed: BigInt(2132),
-                Flagged: BigInt(123),
-                Sealed: BigInt(213),
-            }
-        }
-    }
-}
-
-function PiecesSection() {
-    // const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
-    const {loading, error, data} = mockPiecesData()
-
-    if (loading) {
-        return <div>Loading...</div>
-    }
-    if (error) {
-        return <div>Error: {error.message}</div>
-    }
-
-    var storage = data.storage
-
-    const bars = [{
-        name: 'Indexed',
-        className: 'indexed',
-        amount: storage.Indexed,
-        description: ''
-    }, {
-        name: 'Flagged',
-        className: 'flagged',
-        amount: storage.Flagged,
-        description: ''
-    }, {
-        name: 'Sealed Only',
-        className: 'sealed',
-        amount: storage.Sealed,
-        description: ''
-    }]
-
-    return <div>
-        <h3>Pieces</h3>
-
-        <div className="storage-chart">
-            <CumulativeBarChart bars={bars} />
-            <CumulativeBarLabels bars={bars} />
-        </div>
-
-        <div className="flagged-pieces-link">
-            <h3>Flagged Pieces</h3>
-            <p>
-                <b>{addCommas(storage.Flagged)}</b> Flagged Pieces
-                <Link to={"/piece-doctor"} className="button">View Flagged Pieces</Link>
-            </p>
-        </div>
-    </div>
-}
-
-function mockSectorUnsealedData() {
-    return {
-        data: {
-            sectors: {
-                Unsealed: BigInt(1334),
-                Sealed: BigInt(321),
-            }
-        }
-    }
-}
-
-function SectorUnsealedSection() {
-    // const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
-    const {loading, error, data} = mockSectorUnsealedData()
-
-    if (loading) {
-        return <div>Loading...</div>
-    }
-    if (error) {
-        return <div>Error: {error.message}</div>
-    }
-
-    var sectors = data.sectors
-
-    const bars = [{
-        name: 'Unsealed Copy',
-        className: 'unsealed',
-        amount: sectors.Unsealed,
-        description: ''
-    }, {
-        name: 'Sealed Only',
-        className: 'sealed',
-        amount: sectors.Sealed,
-        description: ''
-    }]
-
-    return <div>
-        <h3>Sector Unsealed Copies</h3>
-
-        <div className="storage-chart">
-            <CumulativeBarChart bars={bars} />
-            <CumulativeBarLabels bars={bars} />
-        </div>
-    </div>
-}
-
-function mockSectorProvingState() {
-    return {
-        data: {
-            sectors: {
-                Active: BigInt(1274),
-                Inactive: BigInt(381),
-            }
-        }
-    }
-}
-
-function SectorProvingState() {
-    // const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
-    const {loading, error, data} = mockSectorProvingState()
-
-    if (loading) {
-        return <div>Loading...</div>
-    }
-    if (error) {
-        return <div>Error: {error.message}</div>
-    }
-
-    var sectors = data.sectors
-
-    const bars = [{
-        name: 'Active',
-        className: 'active',
-        amount: sectors.Active,
-        description: ''
-    }, {
-        name: 'Inactive',
-        className: 'inactive',
-        amount: sectors.Inactive,
-        description: ''
-    }]
-
-    return <div>
-        <h3>Sector Proving State</h3>
-
-        <div className="storage-chart">
-            <CumulativeBarChart bars={bars} />
-            <CumulativeBarLabels bars={bars} />
-        </div>
     </div>
 }
 

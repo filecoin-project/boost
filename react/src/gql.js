@@ -471,6 +471,32 @@ const PieceStatusQuery = gql`
     }
 `;
 
+const LIDQuery = gql`
+    query AppLIDQuery {
+        lid {
+            DealData {
+                Indexed
+                FlaggedUnsealed
+                FlaggedSealed
+            }
+            Pieces {
+                Indexed
+                FlaggedUnsealed
+                FlaggedSealed
+            }
+            SectorUnsealedCopies {
+                Unsealed
+                Sealed
+            }
+            SectorProvingState {
+                Active
+                Inactive
+            }
+            FlaggedPieces
+        }
+    }
+`;
+
 const StorageQuery = gql`
     query AppStorageQuery {
         storage {
@@ -712,6 +738,7 @@ export {
     PieceBuildIndexMutation,
     PieceStatusQuery,
     FlaggedPiecesQuery,
+    LIDQuery,
     StorageQuery,
     LegacyStorageQuery,
     FundsQuery,
