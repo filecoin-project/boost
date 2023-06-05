@@ -13,6 +13,7 @@ import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import xImg from './bootstrap-icons/icons/x-lg.svg'
 import lidImg from './bootstrap-icons/icons/wrench.svg'
+//import repairImg from './bootstrap-icons/icons/wrench-white.svg'
 import './LID.css'
 import './Inspect.css'
 import {Pagination} from "./Pagination";
@@ -20,11 +21,11 @@ import {Info, InfoListItem} from "./Info";
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import {addCommas, humanFileSize} from "./util";
 
-const lidBasePath = '/piece-doctor'
+var lidBasePath = '/lid'
 
 export function LIDMenuItem(props) {
     return (
-        <Link key="lid" className="menu-item" to={"/lid"}>
+        <Link key="lid" className="menu-item" to={lidBasePath}>
             <img className="icon" alt="" src={lidImg} />
             <h3>Local Index Directory</h3>
         </Link>
@@ -39,160 +40,23 @@ export function LIDPage(props) {
 }
 
 function LIDContent() {
-    const {loading, error, data} = useQuery(LIDQuery, { pollInterval: 30000 })
-
-    if (loading) {
-        return <div>Loading...</div>
-    }
-    if (error) {
-        return <div>Error: {error.message}</div>
-    }
-
-    const d = data.lid
-
-    const dealDataBars = [{
-        name: 'Indexed',
-        className: 'indexed',
-        amount: d.DealData.Indexed,
-        description: ''
-    }, {
-        name: 'Flagged (unsealed)',
-        className: 'flagged',
-        amount: d.DealData.FlaggedUnsealed,
-        description: ''
-    }, {
-        name: 'Flagged (sealed only)',
-        className: 'sealed',
-        amount: d.DealData.FlaggedSealed,
-        description: ''
-    }]
-
-    const piecesBars = [{
-        name: 'Indexed',
-        className: 'indexed',
-        amount: d.Pieces.Indexed,
-        description: ''
-    }, {
-        name: 'Flagged (unsealed)',
-        className: 'flagged',
-        amount: d.Pieces.FlaggedUnsealed,
-        description: ''
-    }, {
-        name: 'Flagged (sealed only)',
-        className: 'sealed',
-        amount: d.Pieces.FlaggedSealed,
-        description: ''
-    }]
-
-    const barsSuc = [{
-        name: 'Unsealed',
-        className: 'unsealed',
-        amount: d.SectorUnsealedCopies.Unsealed,
-        description: ''
-    }, {
-        name: 'Sealed Only',
-        className: 'sealed',
-        amount: d.SectorUnsealedCopies.Sealed,
-        description: ''
-    }]
-
-    const barsSps = [{
-        name: 'Active',
-        className: 'active',
-        amount: d.SectorProvingState.Active,
-        description: ''
-    }, {
-        name: 'Inactive',
-        className: 'inactive',
-        amount: d.SectorProvingState.Inactive,
-        description: ''
-    }]
-
     return <div className="lid">
+        <BlockStatsSection />
         <table className="lid-graphs">
             <tbody>
             <tr>
                 <td width="50%">
-                  <div>
-                      <h3>Pieces<PiecesInfo/></h3>
-
-                      <div className="storage-chart">
-                          <CumulativeBarChart bars={piecesBars} />
-                          <CumulativeBarLabels bars={piecesBars} />
-                      </div>
-
-                      <div className="flagged-pieces-link">
-                          <h3>
-                              Flagged Pieces
-                              <Info>
-                                  Flagged Pieces are pieces that have been flagged by the Piece Doctor because it was
-                                  not possible to index the piece data. This could be because there was no unsealed copy
-                                  of the piece data, or because the piece data was inaccessible or corrupted.
-                              </Info>
-                          </h3>
-                          <p>
-                              <b>{addCommas(d.FlaggedPieces)}</b> Flagged Pieces
-                              <Link to={"/piece-doctor"} className="button">View Flagged Pieces</Link>
-                          </p>
-                      </div>
-
-                      <div>
-                          <h3>
-                              Deal Sectors Copies
-                              <Info>
-                                  Deal Sectors Copies indicates how many sectors contain deals, and how many of those
-                                  sectors have an unsealed copy.
-                              </Info>
-                          </h3>
-
-                          <div className="storage-chart">
-                              <CumulativeBarChart bars={barsSuc} />
-                              <CumulativeBarLabels bars={barsSuc} />
-                          </div>
-                      </div>
-
-                      <div>
-                          <h3>
-                              Sectors Proving State
-                              <Info>
-                                Sectors Proving State indicates how many sectors this SP is actively proving on chain
-                              </Info>
-                          </h3>
-
-                          <div className="storage-chart">
-                              <CumulativeBarChart bars={barsSps} />
-                              <CumulativeBarLabels bars={barsSps} />
-                          </div>
-                      </div>
-                  </div>
+                    <DealDataSection />
+                    <PiecesSection />
+                </td>
+                <td>
+                    <SectorUnsealedSection />
+                    <SectorProvingState />
                 </td>
             </tr>
             </tbody>
         </table>
     </div>
-}
-
-function PiecesInfo() {
-    return <Info>
-        The pieces stored by the Local Index Directory are in one of these states:
-        <p>
-            <b>Indexed</b><br/>
-            The piece was successfully indexed and all CIDs within it are retrievable
-        </p>
-        <p>
-            <b>Flagged (unsealed)</b><br/>
-            Flagged by the Piece Doctor because there was some problem
-            creating an index. This could be because it was not possible
-            to read the data from the sealing subsystem, the data is
-            corrupt, etc.
-        </p>
-        <p>
-            <b>Flagged (sealed only)</b><br/>
-            Flagged by the Piece Doctor because there is no unsealed copy
-            of the piece data. This usually means the unsealed copy of the
-            sector containing the piece was deleted.
-        </p>
-    </Info>
 }
 
 function BlockStatsSection() {
@@ -211,6 +75,210 @@ function BlockStatsSection() {
             </tr>
             </tbody>
         </table>
+    </div>
+}
+
+function mockDealData() {
+    return {
+        data: {
+            storage: {
+                Indexed: BigInt(12345432343223),
+                Flagged: BigInt(1234512345423),
+                Sealed: BigInt(1634512345423),
+            }
+        }
+    }
+}
+
+function DealDataSection() {
+    // const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
+    const {loading, error, data} = mockDealData()
+
+    if (loading) {
+        return <div>Loading...</div>
+    }
+    if (error) {
+        return <div>Error: {error.message}</div>
+    }
+
+    var storage = data.storage
+
+    const bars = [{
+        name: 'Indexed',
+        className: 'indexed',
+        amount: storage.Indexed,
+        description: ''
+    }, {
+        name: 'Flagged',
+        className: 'flagged',
+        amount: storage.Flagged,
+        description: ''
+    }, {
+        name: 'Sealed Only',
+        className: 'sealed',
+        amount: storage.Sealed,
+        description: ''
+    }]
+
+    return <div>
+        <h3>Deal Data</h3>
+
+        <div className="storage-chart">
+            <CumulativeBarChart bars={bars} unit="byte" />
+            <CumulativeBarLabels bars={bars} unit="byte" />
+        </div>
+    </div>
+}
+
+function mockPiecesData() {
+    return {
+        data: {
+            storage: {
+                Indexed: BigInt(2132),
+                Flagged: BigInt(123),
+                Sealed: BigInt(213),
+            }
+        }
+    }
+}
+
+function PiecesSection() {
+    // const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
+    const {loading, error, data} = mockPiecesData()
+
+    if (loading) {
+        return <div>Loading...</div>
+    }
+    if (error) {
+        return <div>Error: {error.message}</div>
+    }
+
+    var storage = data.storage
+
+    const bars = [{
+        name: 'Indexed',
+        className: 'indexed',
+        amount: storage.Indexed,
+        description: ''
+    }, {
+        name: 'Flagged',
+        className: 'flagged',
+        amount: storage.Flagged,
+        description: ''
+    }, {
+        name: 'Sealed Only',
+        className: 'sealed',
+        amount: storage.Sealed,
+        description: ''
+    }]
+
+    return <div>
+        <h3>Pieces</h3>
+
+        <div className="storage-chart">
+            <CumulativeBarChart bars={bars} />
+            <CumulativeBarLabels bars={bars} />
+        </div>
+
+        <div className="flagged-pieces-link">
+            <h3>Flagged Pieces</h3>
+            <p>
+                <b>{addCommas(storage.Flagged)}</b> Flagged Pieces
+                <Link to={"/piece-doctor"} className="button">View Flagged Pieces</Link>
+            </p>
+        </div>
+    </div>
+}
+
+function mockSectorUnsealedData() {
+    return {
+        data: {
+            sectors: {
+                Unsealed: BigInt(1334),
+                Sealed: BigInt(321),
+            }
+        }
+    }
+}
+
+function SectorUnsealedSection() {
+    // const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
+    const {loading, error, data} = mockSectorUnsealedData()
+
+    if (loading) {
+        return <div>Loading...</div>
+    }
+    if (error) {
+        return <div>Error: {error.message}</div>
+    }
+
+    var sectors = data.sectors
+
+    const bars = [{
+        name: 'Unsealed Copy',
+        className: 'unsealed',
+        amount: sectors.Unsealed,
+        description: ''
+    }, {
+        name: 'Sealed Only',
+        className: 'sealed',
+        amount: sectors.Sealed,
+        description: ''
+    }]
+
+    return <div>
+        <h3>Sector Unsealed Copies</h3>
+
+        <div className="storage-chart">
+            <CumulativeBarChart bars={bars} />
+            <CumulativeBarLabels bars={bars} />
+        </div>
+    </div>
+}
+
+function mockSectorProvingState() {
+    return {
+        data: {
+            sectors: {
+                Active: BigInt(1274),
+                Inactive: BigInt(381),
+            }
+        }
+    }
+}
+
+function SectorProvingState() {
+    // const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
+    const {loading, error, data} = mockSectorProvingState()
+
+    if (loading) {
+        return <div>Loading...</div>
+    }
+    if (error) {
+        return <div>Error: {error.message}</div>
+    }
+
+    var sectors = data.sectors
+
+    const bars = [{
+        name: 'Active',
+        className: 'active',
+        amount: sectors.Active,
+        description: ''
+    }, {
+        name: 'Inactive',
+        className: 'inactive',
+        amount: sectors.Inactive,
+        description: ''
+    }]
+
+    return <div>
+        <h3>Sector Proving State</h3>
+
+        <div className="storage-chart">
+            <CumulativeBarChart bars={bars} />
+            <CumulativeBarLabels bars={bars} />
+        </div>
     </div>
 }
 
@@ -244,7 +312,7 @@ function FlaggedPieces({setSearchQuery}) {
         const val = parseInt(e.target.value)
         RowsPerPage.save(val)
         setRowsPerPage(val)
-        navigate("/piece-doctor")
+        navigate(lidBasePath)
         scrollTop()
     }
 
@@ -276,7 +344,7 @@ function FlaggedPieces({setSearchQuery}) {
     }
 
     const paginationParams = {
-        basePath: "/piece-doctor",
+        basePath: lidBasePath,
         cursor, pageNum, totalCount,
         rowsPerPage: rowsPerPage,
         moreRows: moreRows,
