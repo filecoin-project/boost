@@ -64,8 +64,8 @@ require (
 	github.com/ipfs/go-ipfs-exchange-offline v0.3.0
 	github.com/ipfs/go-ipfs-files v0.3.0 // indirect
 	github.com/ipfs/go-ipfs-routing v0.3.0
-	github.com/ipfs/go-ipld-format v0.4.0
-	github.com/ipfs/go-ipld-legacy v0.1.1
+	github.com/ipfs/go-ipld-format v0.4.1-0.20230530195241-c3da01c74a06
+	github.com/ipfs/go-ipld-legacy v0.1.2-0.20230530145437-25f06f837f87
 	github.com/ipfs/go-libipfs v0.7.0 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/ipfs/go-merkledag v0.10.0
@@ -102,8 +102,8 @@ require (
 	github.com/whyrusleeping/cbor-gen v0.0.0-20230126041949-52956bd4c9aa
 	go.opencensus.io v0.24.0
 	go.opentelemetry.io/otel v1.14.0
-	go.opentelemetry.io/otel/exporters/jaeger v1.13.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.13.0 // indirect
+	go.opentelemetry.io/otel/exporters/jaeger v1.14.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.14.0 // indirect
 	go.opentelemetry.io/otel/trace v1.14.0
 	go.uber.org/atomic v1.10.0
 	go.uber.org/fx v1.19.2
@@ -325,8 +325,8 @@ require (
 	golang.org/x/sys v0.7.0 // indirect
 	golang.org/x/term v0.6.0
 	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9 // indirect
-	google.golang.org/genproto v0.0.0-20221118155620-16455021b5e6 // indirect
-	google.golang.org/grpc v1.52.3 // indirect
+	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
+	google.golang.org/grpc v1.53.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -346,7 +346,7 @@ require (
 	github.com/filecoin-project/boost-gfm v1.26.6-0.20230525083105-ea9391adb3b4
 	github.com/filecoin-project/boost-graphsync v0.13.6
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
-	github.com/ipfs/boxo v0.8.0
+	github.com/ipfs/boxo v0.8.2-0.20230602131956-922a186d9cef
 	github.com/ipfs/kubo v0.18.1
 	github.com/ipni/go-libipni v0.0.8
 )
