@@ -44,7 +44,7 @@ function LIDContent() {
         <table className="lid-graphs">
             <tbody>
             <tr>
-                <td>
+                <td width="50%">
                     <DealDataSection />
                     <PiecesSection />
                 </td>
@@ -183,7 +183,7 @@ function PiecesSection() {
             <h3>Flagged Pieces</h3>
             <p>
                 <b>{addCommas(storage.Flagged)}</b> Flagged Pieces
-                <Link to={"/piece-doctor"} className="button">Repair</Link>
+                <Link to={"/piece-doctor"} className="button">View Flagged Pieces</Link>
             </p>
         </div>
     </div>
@@ -277,14 +277,6 @@ function SectorProvingState() {
         <div className="storage-chart">
             <CumulativeBarChart bars={bars} />
             <CumulativeBarLabels bars={bars} />
-        </div>
-
-        <div className="sectors-list-link">
-            <h3>Sectors List</h3>
-            <p>
-                <b>{addCommas(sectors.Active + sectors.Inactive)}</b> Sectors
-                <Link to={"/sectors-list"} className="button">View Sectors</Link>
-            </p>
         </div>
     </div>
 }
@@ -412,7 +404,7 @@ function FlaggedPieceRow({piece}) {
 
     return <tr>
         <td>
-            <Link to={"/inspect/piece/"+piece.PieceCid}>
+            <Link to={"/piece-doctor/piece/"+piece.PieceCid}>
                 {piece.PieceCid}
             </Link>
         </td>
@@ -544,7 +536,7 @@ function PiecesWithPayload({payloadCid, pieceCids, setSearchQuery}) {
         <div className="title">Pieces with payload CID {payloadCid}:</div>
         {pieceCids.map(pc => (
             <div key={pc} className="payload-cid">
-                <Link onClick={() => setSearchQuery(pc)} to={"/inspect/"+pc}>{pc}</Link>
+                <Link onClick={() => setSearchQuery(pc)} to={"/piece-doctor/"+pc}>{pc}</Link>
             </div>
         ))}
     </div>

@@ -21,7 +21,6 @@ import {ProposalLogsPage} from "./ProposalLogs";
 import {PieceDoctorPage, InspectPiecePage, LIDPage} from "./LID";
 import {RetrievalLogsPage} from "./RetrievalLogs";
 import {RetrievalLogDetail} from "./RetrievalLogDetail";
-import {SectorsListPage} from "./SectorsList";
 
 function App(props) {
     return (
@@ -56,12 +55,10 @@ function App(props) {
                                         <Route path="/settings" element={<SettingsPage />} />
                                         <Route path="/deals/:dealID" element={<DealDetail />} />
                                         <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
-                                        <Route path="/sectors-list" element={<SectorsListPage />} />
-                                        <Route path="/sectors-list/from/:cursor/page/:pageNum" element={<SectorsListPage />} />
                                         <Route path="/piece-doctor" element={<PieceDoctorPage />} />
-                                        <Route path="/inspect/piece/:pieceCID" element={<InspectPiecePage />} />
-                                        <Route path="/inspect/from/:cursor/page/:pageNum" element={<PieceDoctorPage />} />
-                                        <Route path="/inspect/:query" element={<PieceDoctorPage />} />
+                                        <Route path="/piece-doctor/piece/:pieceCID" element={<InspectPiecePage />} />
+                                        <Route path="/piece-doctor/from/:cursor/page/:pageNum" element={<PieceDoctorPage />} />
+                                        <Route path="/piece-doctor/:query" element={<PieceDoctorPage />} />
                                         <Route path="/" element={<StorageDealsPage />} />
                                     </Routes>
                                 </div>

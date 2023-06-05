@@ -176,7 +176,7 @@ function TableRow(props) {
                 </Link>
             </td>
             <td className="payload-cid">
-                <Link to={'/inspect/'+row.PayloadCID}>
+                <Link to={'/piece-doctor/'+row.PayloadCID}>
                     <ShortCID cid={row.PayloadCID} />
                 </Link>
             </td>
