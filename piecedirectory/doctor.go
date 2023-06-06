@@ -136,7 +136,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 	}
 
 	if !isIndexed {
-		err = d.store.FlagPiece(ctx, pieceCid)
+		err = d.store.FlagPiece(ctx, pieceCid, false)
 		if err != nil {
 			return fmt.Errorf("failed to flag unindexed piece %s: %w", pieceCid, err)
 		}
@@ -175,7 +175,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 	}
 
 	if !hasUnsealedDeal && !lacksActiveSector {
-		err = d.store.FlagPiece(ctx, pieceCid)
+		err = d.store.FlagPiece(ctx, pieceCid, false)
 		if err != nil {
 			return fmt.Errorf("failed to flag piece %s with no unsealed deal: %w", pieceCid, err)
 		}

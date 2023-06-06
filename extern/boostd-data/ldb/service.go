@@ -25,8 +25,9 @@ const pieceMetadataVersion = "1"
 var log = logging.Logger("boostd-data-ldb")
 
 type LeveldbFlaggedMetadata struct {
-	CreatedAt time.Time `json:"c"`
-	UpdatedAt time.Time `json:"u"`
+	CreatedAt       time.Time `json:"c"`
+	UpdatedAt       time.Time `json:"u"`
+	HasUnsealedCopy bool      `json:"huc"`
 }
 
 type LeveldbMetadata struct {
@@ -471,8 +472,8 @@ func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 	return s.db.NextPiecesToCheck(ctx)
 }
 
-func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
-	log.Debugw("handle.flag-piece", "piece-cid", pieceCid)
+func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool) error {
+	log.Debugw("handle.flag-piece", "piece-cid", pieceCid, "hasUnsealedCopy", hasUnsealedCopy)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
 	defer span.End()
@@ -497,6 +498,7 @@ func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	}
 
 	fm.UpdatedAt = now
+	fm.HasUnsealedCopy = hasUnsealedCopy
 
 	// Write the piece metadata back to the db
 	err = s.db.SetPieceCidToFlagged(ctx, pieceCid, fm)

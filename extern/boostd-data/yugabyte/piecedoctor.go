@@ -190,16 +190,16 @@ func (s *Store) getPieceCheckPeriod(ctx context.Context) (time.Duration, error) 
 	return period, nil
 }
 
-func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
+func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
 	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
 	defer span.End()
 
 	now := time.Now()
-	qry := `INSERT INTO PieceFlagged (PieceCid, CreatedAt, UpdatedAt) ` +
-		`VALUES ($1, $2, $3) ` +
+	qry := `INSERT INTO PieceFlagged (PieceCid, CreatedAt, UpdatedAt, HasUnsealedCopy) ` +
+		`VALUES ($1, $2, $3, $4) ` +
 		`ON CONFLICT (PieceCid) DO UPDATE SET UpdatedAt = excluded.UpdatedAt`
-	_, err := s.db.Exec(ctx, qry, pieceCid.String(), now, now)
+	_, err := s.db.Exec(ctx, qry, pieceCid.String(), now, now, hasUnsealedCopy)
 	if err != nil {
 		return fmt.Errorf("flagging piece %s: %w", pieceCid, err)
 	}
@@ -233,7 +233,7 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset
 
 	var args []interface{}
 	idx := 0
-	qry := `SELECT PieceCid, CreatedAt from PieceFlagged `
+	qry := `SELECT PieceCid, CreatedAt, UpdatedAt, HasUnsealedCopy from PieceFlagged`
 	if cursor != nil {
 		qry += `WHERE CreatedAt < $1 `
 		args = append(args, cursor)
@@ -253,8 +253,10 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset
 	var pieces []model.FlaggedPiece
 	var pcid string
 	var createdAt time.Time
+	var updatedAt time.Time
+	var hasUnsealedCopy bool
 	for rows.Next() {
-		err := rows.Scan(&pcid, &createdAt)
+		err := rows.Scan(&pcid, &createdAt, &updatedAt, &hasUnsealedCopy)
 		if err != nil {
 			return nil, fmt.Errorf("scanning flagged piece: %w", err)
 		}
@@ -263,7 +265,7 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset
 		if err != nil {
 			return nil, fmt.Errorf("parsing flagged piece cid %s: %w", pcid, err)
 		}
-		pieces = append(pieces, model.FlaggedPiece{PieceCid: c, CreatedAt: createdAt})
+		pieces = append(pieces, model.FlaggedPiece{PieceCid: c, CreatedAt: createdAt, UpdatedAt: updatedAt, HasUnsealedCopy: hasUnsealedCopy})
 	}
 
 	if err := rows.Err(); err != nil {
