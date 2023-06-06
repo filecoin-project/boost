@@ -101,3 +101,22 @@ func TestMigrate(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, v1FileContents, string(bz))
 }
+
+func TestConfigDiff(t *testing.T) {
+	repoDir := t.TempDir()
+	err := os.WriteFile(path.Join(repoDir, "config.toml"), []byte(mockV0Config), 0644)
+	require.NoError(t, err)
+
+	cgf, err := FromFile(path.Join(repoDir, "config.toml"), DefaultBoost())
+	require.NoError(t, err)
+
+	s, err := ConfigDiff(cgf, DefaultBoost(), false)
+	require.NoError(t, err)
+
+	require.False(t, strings.Contains(string(s), `The connect string for the sealing RPC API`))
+
+	s, err = ConfigDiff(cgf, DefaultBoost(), true)
+	require.NoError(t, err)
+
+	require.True(t, strings.Contains(string(s), `The connect string for the sealing RPC API`))
+}

@@ -2,13 +2,11 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/urfave/cli/v2"
-	"golang.org/x/xerrors"
+	"path/filepath"
 
 	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/node/repo"
-	lotus_repo "github.com/filecoin-project/lotus/node/repo"
+	"github.com/mitchellh/go-homedir"
+	"github.com/urfave/cli/v2"
 )
 
 var configCmd = &cli.Command{
@@ -22,17 +20,16 @@ var configCmd = &cli.Command{
 
 var configDefaultCmd = &cli.Command{
 	Name:  "default",
-	Usage: "Print default node config",
+	Usage: "Print config file defaults",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "no-comment",
-			Usage: "don't comment default values",
+			Usage: "don't include comments in the output",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		c := config.DefaultBoost()
 
-		cb, err := config.BoostConfigUpdate(c, nil, !cctx.Bool("no-comment"))
+		cb, err := config.ConfigUpdate(config.DefaultBoost(), nil, !cctx.Bool("no-comment"))
 		if err != nil {
 			return err
 		}
@@ -45,51 +42,43 @@ var configDefaultCmd = &cli.Command{
 
 var configUpdateCmd = &cli.Command{
 	Name:  "updated",
-	Usage: "Print updated node config",
+	Usage: "Print config file with updates (changes from the default config file)",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "no-comment",
-			Usage: "don't comment default values",
+			Usage: "don't include commented out default values in the output",
+		},
+		&cli.BoolFlag{
+			Name:  "diff",
+			Usage: "only display values different from default",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		r, err := lotus_repo.NewFS(cctx.String(FlagBoostRepo))
+		path, err := homedir.Expand(cctx.String(FlagBoostRepo))
 		if err != nil {
 			return err
 		}
 
-		ok, err := r.Exists()
+		configPath := filepath.Join(path, "config.toml")
+
+		cfgNode, err := config.FromFile(configPath, config.DefaultBoost())
 		if err != nil {
 			return err
 		}
 
-		if !ok {
-			return xerrors.Errorf("repo not initialized")
+		var output []byte
+
+		if cctx.Bool("diff") {
+			output, err = config.ConfigDiff(cfgNode, config.DefaultBoost(), !cctx.Bool("no-comment"))
+		} else {
+			output, err = config.ConfigUpdate(cfgNode, config.DefaultBoost(), !cctx.Bool("no-comment"))
 		}
 
-		lr, err := r.LockRO(repo.Boost)
-		if err != nil {
-			return xerrors.Errorf("locking repo: %w", err)
-		}
-
-		cfgNode, err := lr.Config()
-		if err != nil {
-			_ = lr.Close()
-			return xerrors.Errorf("getting node config: %w", err)
-		}
-
-		if err := lr.Close(); err != nil {
-			return err
-		}
-
-		cfgDef := config.DefaultBoost()
-
-		updated, err := config.BoostConfigUpdate(cfgNode, cfgDef, !cctx.Bool("no-comment"))
 		if err != nil {
 			return err
 		}
 
-		fmt.Print(string(updated))
+		fmt.Print(string(output))
 		return nil
 	},
 }
