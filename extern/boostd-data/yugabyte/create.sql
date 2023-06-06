@@ -10,7 +10,8 @@ CREATE INDEX IF NOT EXISTS PieceTrackerUpdatedAt ON PieceTracker (UpdatedAt);
 CREATE TABLE IF NOT EXISTS PieceFlagged (
     PieceCid TEXT PRIMARY KEY,
     CreatedAt TIMESTAMP,
-    UpdatedAt TIMESTAMP
+    UpdatedAt TIMESTAMP,
+    HasUnsealedCopy BOOLEAN
 );
 
 CREATE INDEX IF NOT EXISTS PieceFlaggedCreatedAt ON PieceFlagged (CreatedAt);

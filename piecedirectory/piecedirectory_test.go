@@ -319,7 +319,7 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.Equal(t, 0, len(pcids))
 
 	// Flag a piece
-	err = cl.FlagPiece(ctx, commpCalc.PieceCID)
+	err = cl.FlagPiece(ctx, commpCalc.PieceCID, false)
 	require.NoError(t, err)
 
 	// Count and list of pieces should contain one piece

@@ -269,7 +269,7 @@ func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 	return s.db.NextPiecesToCheck(ctx)
 }
 
-func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid) error {
+func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, _ bool) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
 	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))
 	defer span.End()
