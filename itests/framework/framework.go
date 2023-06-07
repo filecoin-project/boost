@@ -129,7 +129,7 @@ func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
 	fnOpts := []kit.NodeOpt{
 		kit.ConstructorOpts(
 			lnode.Override(new(lp2p.RawHost), func() (host.Host, error) {
-				return libp2p.New()
+				return libp2p.New(libp2p.DefaultTransports)
 			}),
 		),
 		kit.ThroughRPC(),
