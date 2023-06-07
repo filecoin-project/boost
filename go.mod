@@ -355,16 +355,10 @@ require (
 )
 
 require (
-	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
 	github.com/couchbase/gocb/v2 v2.5.0 // indirect
 	github.com/couchbase/gocbcore/v10 v10.1.2 // indirect
-	github.com/docker/distribution v2.8.1+incompatible // indirect
-	github.com/docker/docker v20.10.21+incompatible // indirect
-	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
-	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799 // indirect
 )
 
 require (

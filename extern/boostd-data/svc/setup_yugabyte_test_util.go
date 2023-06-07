@@ -1,15 +1,17 @@
 package svc
 
 import (
-	"testing"
-	"time"
-
 	"github.com/filecoin-project/boostd-data/yugabyte"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
 	"github.com/yugabyte/gocql"
 	"github.com/yugabyte/pgx/v4/pgxpool"
 	"golang.org/x/net/context"
+	"testing"
+	"time"
 )
+
+var tlog = logging.Logger("ybtest")
 
 var TestYugabyteSettings = yugabyte.DBSettings{
 	Hosts:         []string{"yugabyte"},
