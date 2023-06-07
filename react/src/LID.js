@@ -86,7 +86,7 @@ function LIDContent() {
     }]
 
     const barsSuc = [{
-        name: 'Unsealed Copy',
+        name: 'Unsealed',
         className: 'unsealed',
         amount: d.SectorUnsealedCopies.Unsealed,
         description: ''
@@ -141,7 +141,7 @@ function LIDContent() {
                 </td>
                 <td>
                   <div>
-                      <h3>Sector Unsealed Copies</h3>
+                      <h3>Sectors Copies</h3>
 
                       <div className="storage-chart">
                           <CumulativeBarChart bars={barsSuc} />
@@ -149,7 +149,7 @@ function LIDContent() {
                       </div>
                   </div>
                   <div>
-                      <h3>Sector Proving State</h3>
+                      <h3>Sectors Proving State</h3>
 
                       <div className="storage-chart">
                           <CumulativeBarChart bars={barsSps} />
