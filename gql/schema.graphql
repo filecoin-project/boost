@@ -347,37 +347,6 @@ type LID {
   FlaggedPieces: Int!
 }
 
-type IpniProviderInfo {
-  PeerID: String!
-  Config: String!
-}
-
-type IpniAdvertisementMetadata {
-  Protocol: String!
-  Metadata: String!
-}
-
-type IpniExtendedProviders {
-  ID: String!
-  Addresses: [String!]!
-  Metadata: [IpniAdvertisementMetadata]!
-}
-
-type IpniExtendedProvidersList {
-  Providers: [IpniExtendedProviders]!
-  Override: Boolean!
-}
-
-type IpniAdvertisement {
-  ContextID: String!
-  IsRemove: Boolean!
-  Metadata: [IpniAdvertisementMetadata]!
-  PreviousEntry: String!
-  Provider: String!
-  Addresses: [String!]!
-  ExtendedProviders: IpniExtendedProvidersList
-}
-
 type FundsEscrow {
   Available: BigInt!
   Locked: BigInt!
@@ -548,18 +517,6 @@ type RootQuery {
 
   """Get sealing pipeline state"""
   sealingpipeline: SealingPipeline!
-
-  """Get IPNI Provider configuration and state"""
-  ipniProviderInfo: IpniProviderInfo!
-
-  """Get IPNI advertisement"""
-  ipniAdvertisement(adCid: String!): IpniAdvertisement!
-
-  """Get entries for an IPNI advertisement"""
-  ipniAdvertisementEntries(adCid: String!): [String]!
-
-  """Get count of entries for an IPNI advertisement"""
-  ipniAdvertisementEntriesCount(adCid: String!): Int!
 
   """Get LID state"""
   lid: LID!

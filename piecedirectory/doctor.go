@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"sync"
 	"time"
 
 	"github.com/filecoin-project/boost/db"
@@ -27,9 +26,6 @@ var doclog = logging.Logger("piecedoc")
 type Doctor struct {
 	store *bdclient.Store
 	ssm   *sectorstatemgr.SectorStateMgr
-
-	latestUpdateMu sync.Mutex
-	latestUpdate   *sectorstatemgr.SectorStateUpdates
 }
 
 func NewDoctor(store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr) *Doctor {
@@ -41,28 +37,6 @@ const avgCheckInterval = 30 * time.Second
 
 func (d *Doctor) Run(ctx context.Context) {
 	doclog.Info("piece doctor: running")
-
-	go func() {
-		sub := d.ssm.PubSub.Subscribe()
-
-		for {
-			select {
-			case u, ok := <-sub:
-				if !ok {
-					log.Debugw("state updates subscription closed")
-					return
-				}
-				log.Debugw("got state updates from SectorStateMgr", "len(u.updates)", len(u.Updates), "len(u.active)", len(u.ActiveSectors), "u.updatedAt", u.UpdatedAt)
-
-				d.latestUpdateMu.Lock()
-				d.latestUpdate = u
-				d.latestUpdateMu.Unlock()
-
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
 
 	timer := time.NewTimer(0)
 	defer timer.Stop()
@@ -76,9 +50,9 @@ func (d *Doctor) Run(ctx context.Context) {
 
 		err := func() error {
 			var lu *sectorstatemgr.SectorStateUpdates
-			d.latestUpdateMu.Lock()
-			lu = d.latestUpdate
-			d.latestUpdateMu.Unlock()
+			d.ssm.LatestUpdateMu.Lock()
+			lu = d.ssm.LatestUpdate
+			d.ssm.LatestUpdateMu.Unlock()
 			if lu == nil {
 				doclog.Warn("sector state manager not yet updated")
 				return nil

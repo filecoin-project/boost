@@ -746,6 +746,7 @@ export {
     PieceBuildIndexMutation,
     PieceStatusQuery,
     FlaggedPiecesQuery,
+    LIDQuery,
     StorageQuery,
     LegacyStorageQuery,
     FundsQuery,

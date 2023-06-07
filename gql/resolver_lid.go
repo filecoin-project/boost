@@ -7,7 +7,6 @@ import (
 	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/sectorstatemgr"
-	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
 )
 
 type dealData struct {
@@ -49,41 +48,19 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 		r.ssm.LatestUpdateMu.Unlock()
 		if lu == nil {
 			time.Sleep(2 * time.Second)
-			log.Debug("LID sector states updates is nil, waiting for update...")
-		} else {
-			log.Debug("LID sector states updates set")
 		}
 	}
 
 	var sealed, unsealed int32
-	for id, s := range lu.SectorStates { // TODO: consider adding this data directly in SSM
-		_, sectorHasDeals := lu.SectorWithDeals[id]
-
+	for _, s := range lu.SectorStates { // TODO: consider adding this data directly in SSM
 		if s == db.SealStateUnsealed {
 			unsealed++
-		} else if s == db.SealStateSealed && sectorHasDeals {
+		} else if s == db.SealStateSealed {
 			sealed++
-
-			log.Debugw("LID only sealed sector", "miner", id.Miner, "sector_number", id.Number)
 		}
 	}
 
-	fp, err := r.piecedirectory.FlaggedPiecesCount(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	fpt, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{HasUnsealedCopy: true})
-	if err != nil {
-		return nil, err
-	}
-
-	fpf, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{HasUnsealedCopy: false})
-	if err != nil {
-		return nil, err
-	}
-
-	ap, err := r.piecedirectory.PiecesCount(ctx)
+	fp, err := r.piecedirectory.FlaggedPiecesCount(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -96,9 +73,9 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 			FlaggedSealed:   gqltypes.Uint64(18094627905536),
 		},
 		Pieces: pieces{
-			Indexed:         int32(ap - fp),
-			FlaggedUnsealed: int32(fpt),
-			FlaggedSealed:   int32(fpf),
+			Indexed:         360,
+			FlaggedUnsealed: 33,
+			FlaggedSealed:   480,
 		},
 		SectorUnsealedCopies: sectorUnsealedCopies{
 			Sealed:   sealed,

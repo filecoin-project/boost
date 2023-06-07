@@ -44,6 +44,9 @@ type SectorStateMgr struct {
 
 	PubSub *PubSub
 
+	LatestUpdateMu sync.Mutex
+	LatestUpdate   *SectorStateUpdates
+
 	sdb *db.SectorStateDB
 }
 
@@ -77,9 +80,35 @@ func NewSectorStateMgr(cfg *config.Boost) func(lc fx.Lifecycle, sdb *db.SectorSt
 	}
 }
 
+func (m *SectorStateMgr) UpdateLatest(ctx context.Context) {
+	go func() {
+		sub := m.PubSub.Subscribe()
+
+		for {
+			select {
+			case u, ok := <-sub:
+				if !ok {
+					log.Debugw("state updates subscription closed")
+					return
+				}
+				log.Debugw("got state updates from SectorStateMgr", "len(u.updates)", len(u.Updates), "len(u.active)", len(u.ActiveSectors), "u.updatedAt", u.UpdatedAt)
+
+				m.LatestUpdateMu.Lock()
+				m.LatestUpdate = u
+				m.LatestUpdateMu.Unlock()
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
 func (m *SectorStateMgr) Run(ctx context.Context) {
 	duration := time.Duration(m.cfg.StorageListRefreshDuration)
 	log.Infof("starting sector state manager running on interval %s", duration.String())
+
+	m.UpdateLatest(ctx)
 
 	// Check immediately
 	err := m.checkForUpdates(ctx)
