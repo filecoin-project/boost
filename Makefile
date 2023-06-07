@@ -260,7 +260,7 @@ docker/all: $(lotus_build_cmd) docker/boost docker/booster-http docker/booster-b
 	docker/lotus docker/lotus-miner
 .PHONY: docker/all
 
-test-lid:
+test-boostd-data:
 	cd ./extern/boostd-data && ARCH=$(ARCH) docker-compose up --build --exit-code-from go-tests
 
 devnet/up:

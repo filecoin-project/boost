@@ -83,18 +83,18 @@ jobs:
           paths:
             - linux
 
-  lid-docker-compose:
-    description: 'Run LID integration tests'
+  boostd-data-docker-compose:
+    description: 'Run boostd-data integration tests'
     machine:
       image: ubuntu-2004:202104-01
       resource_class: xlarge
     steps:
       - checkout
       - run:
-          name: local index directory docker compose tests
+          name: boostd-data docker compose tests
           command: |
             set -x
-            make test-lid
+            make test-boostd-data
 
   test:
     description: |
@@ -335,5 +335,5 @@ workflows:
           suite: all
           target: "`go list ./... | grep -v boost/itests`"
 
-      - lid-docker-compose
+      - boostd-data-docker-compose
 
