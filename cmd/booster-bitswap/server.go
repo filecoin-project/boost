@@ -8,9 +8,9 @@ import (
 	"github.com/filecoin-project/boost/protocolproxy"
 	bsnetwork "github.com/ipfs/boxo/bitswap/network"
 	"github.com/ipfs/boxo/bitswap/server"
+	blockstore "github.com/ipfs/boxo/blockstore"
+	nilrouting "github.com/ipfs/boxo/routing/none"
 	"github.com/ipfs/go-cid"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	nilrouting "github.com/ipfs/go-ipfs-routing/none"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
