@@ -8,6 +8,8 @@ replace github.com/filecoin-project/boostd-data => ./extern/boostd-data
 
 replace github.com/filecoin-project/lotus => github.com/Jorropo/lotus v1.23.0-rc1.0.20230606174208-64ea7cc47c6d
 
+replace github.com/filecoin-project/go-fil-markets => github.com/Jorropo/go-fil-markets v1.20.3-0.20230601173540-5e8a152f9466
+
 // replace github.com/filcoin-project/boost-graphsync => ../boost-graphsync
 
 // replace github.com/filecoin-project/go-data-transfer => ../go-data-transfer

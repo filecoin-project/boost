@@ -67,6 +67,8 @@ github.com/GeertJohan/go.rice v1.0.3 h1:k5viR+xGtIhF61125vCE1cmJ5957RQGXG6dmbaWZ
 github.com/GeertJohan/go.rice v1.0.3/go.mod h1:XVdrU4pW00M4ikZed5q56tPf1v2KwnIKeIdc9CBYNt4=
 github.com/Gurpartap/async v0.0.0-20180927173644-4f7f499dd9ee h1:8doiS7ib3zi6/K172oDhSKU0dJ/miJramo9NITOMyZQ=
 github.com/Gurpartap/async v0.0.0-20180927173644-4f7f499dd9ee/go.mod h1:W0GbEAA4uFNYOGG2cJpmFJ04E6SD1NLELPYZB57/7AY=
+github.com/Jorropo/go-fil-markets v1.20.3-0.20230601173540-5e8a152f9466 h1:1uileHY57f/sd2j+S6PluSM1Ty2xW5YQoCDOYKXUkPg=
+github.com/Jorropo/go-fil-markets v1.20.3-0.20230601173540-5e8a152f9466/go.mod h1:aT3uamq/Z7X0g7YxXQsvsZcdAuPGOCn9OPT/abwRrrI=
 github.com/Jorropo/lotus v1.23.0-rc1.0.20230606174208-64ea7cc47c6d h1:7XSpl+ik/oXptBXAPz1JFFec6+PfOIEJqgtZPDbMZKs=
 github.com/Jorropo/lotus v1.23.0-rc1.0.20230606174208-64ea7cc47c6d/go.mod h1:mbWEUO3cADEdB3zfnd6JbiSloEXr3lb+EFZXFFAq4Ow=
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
@@ -367,8 +369,6 @@ github.com/filecoin-project/go-fil-commcid v0.1.0 h1:3R4ds1A9r6cr8mvZBfMYxTS88Oq
 github.com/filecoin-project/go-fil-commcid v0.1.0/go.mod h1:Eaox7Hvus1JgPrL5+M3+h7aSPHc0cVqpSxA+TxIEpZQ=
 github.com/filecoin-project/go-fil-commp-hashhash v0.1.0 h1:imrrpZWEHRnNqqv0tN7LXep5bFEVOVmQWHJvl2mgsGo=
 github.com/filecoin-project/go-fil-commp-hashhash v0.1.0/go.mod h1:73S8WSEWh9vr0fDJVnKADhfIv/d6dCbAGaAGWbdJEI8=
-github.com/filecoin-project/go-fil-markets v1.28.2 h1:Ev9o8BYow+lo97Bwc6oOmZ2OxdiHeIDCQsfF/w/Vldc=
-github.com/filecoin-project/go-fil-markets v1.28.2/go.mod h1:qy9LNu9t77I184VB6Pa4WKRtGfB8Vl0t8zfOLHkDqWY=
 github.com/filecoin-project/go-hamt-ipld v0.1.5 h1:uoXrKbCQZ49OHpsTCkrThPNelC4W3LPEk0OrS/ytIBM=
 github.com/filecoin-project/go-hamt-ipld v0.1.5/go.mod h1:6Is+ONR5Cd5R6XZoCse1CWaXZc0Hdb/JeX+EQCQzX24=
 github.com/filecoin-project/go-hamt-ipld/v2 v2.0.0 h1:b3UDemBYN2HNfk3KOXNuxgTTxlWi3xVvbQP0IT38fvM=
