@@ -32,26 +32,22 @@ func TestPieceDirectory(t *testing.T) {
 	t.Run("leveldb", func(t *testing.T) {
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
-		addr := "localhost:8042"
-
-		testPieceDirectory(ctx, t, bdsvc, addr)
+		testPieceDirectory(ctx, t, bdsvc)
 	})
 
 	t.Run("yugabyte", func(t *testing.T) {
 		svc.SetupYugabyte(t)
-
 		bdsvc := svc.NewYugabyte(svc.TestYugabyteSettings)
-		addr := "localhost:8044"
-		testPieceDirectory(ctx, t, bdsvc, addr)
+		testPieceDirectory(ctx, t, bdsvc)
 	})
 }
 
-func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service, addr string) {
-	err := bdsvc.Start(ctx, addr)
+func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
+	ln, err := bdsvc.Start(ctx, "localhost:0")
 	require.NoError(t, err)
 
 	cl := client.NewStore()
-	err = cl.Dial(ctx, fmt.Sprintf("ws://%s", addr))
+	err = cl.Dial(ctx, fmt.Sprintf("ws://%s", ln))
 	require.NoError(t, err)
 	defer cl.Close(ctx)
 
