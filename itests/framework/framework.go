@@ -55,6 +55,7 @@ import (
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	ipldcbor "github.com/ipfs/go-ipld-cbor"
 	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 	dag "github.com/ipfs/go-merkledag"
@@ -715,7 +716,12 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 		require.NoError(t, err)
 	}
 
-	nd, err := ipld.Decode(b)
+	reg := ipld.Registry{}
+	reg.Register(cid.DagProtobuf, dag.DecodeProtobufBlock)
+	reg.Register(cid.DagCBOR, ipldcbor.DecodeBlock)
+	reg.Register(cid.Raw, dag.DecodeRawBlock)
+
+	nd, err := reg.Decode(b)
 	require.NoError(t, err)
 
 	dserv := dag.NewDAGService(bserv)
