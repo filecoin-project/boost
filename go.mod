@@ -70,8 +70,8 @@ require (
 	github.com/ipfs/go-merkledag v0.10.1-0.20230601163447-eceea556e7d4 // indirect
 	github.com/ipfs/go-metrics-interface v0.0.1
 	github.com/ipfs/go-unixfs v0.4.5 // indirect
-	github.com/ipld/go-car v0.5.0 // indirect
-	github.com/ipld/go-car/v2 v2.10.0 // indirect
+	github.com/ipld/go-car v0.5.0
+	github.com/ipld/go-car/v2 v2.10.0
 	github.com/ipld/go-ipld-prime v0.20.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
 	github.com/ipni/index-provider v0.12.0
@@ -215,7 +215,6 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3 // indirect
 	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/go-ds-measure v0.2.0 // indirect
-	github.com/ipfs/go-filestore v1.2.0 // indirect
 	github.com/ipfs/go-fs-lock v0.0.7 // indirect
 	github.com/ipfs/go-ipfs-cmds v0.9.0 // indirect
 	github.com/ipfs/go-ipfs-delay v0.0.1 // indirect
@@ -338,7 +337,7 @@ require (
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/filecoin-project/boost-gfm v1.26.6-0.20230525083105-ea9391adb3b4
+	github.com/filecoin-project/boost-gfm v1.26.6-0.20230607145507-b3394ae6980e
 	github.com/filecoin-project/boost-graphsync v0.13.6
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.2
