@@ -14,7 +14,6 @@ import (
 
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"
-	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
@@ -28,24 +27,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var testCouchSettings = couchbase.DBSettings{
-	ConnectString: "couchbase://localhost",
-	Auth: couchbase.DBSettingsAuth{
-		Username: "Administrator",
-		Password: "boostdemo",
-	},
-	PieceMetadataBucket: couchbase.DBSettingsBucket{
-		RAMQuotaMB: 128,
-	},
-	MultihashToPiecesBucket: couchbase.DBSettingsBucket{
-		RAMQuotaMB: 128,
-	},
-	PieceOffsetsBucket: couchbase.DBSettingsBucket{
-		RAMQuotaMB: 128,
-	},
-	TestMode: true,
-}
-
 func TestService(t *testing.T) {
 	_ = logging.SetLogLevel("cbtest", "debug")
 
@@ -56,21 +37,6 @@ func TestService(t *testing.T) {
 		require.NoError(t, err)
 
 		testService(ctx, t, bdsvc, "localhost:0")
-	})
-
-	t.Run("couchbase", func(t *testing.T) {
-		// TODO: Unskip this test once the couchbase instance can be created
-		//  from a docker container in CI as part of the test
-		t.Skip()
-		// Running couchbase tests may require download the docker container
-		// so set a high timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		defer cancel()
-		SetupCouchbase(t, testCouchSettings)
-		bdsvc := NewCouchbase(testCouchSettings)
-
-		addr := "localhost:0"
-		testService(ctx, t, bdsvc, addr)
 	})
 
 	t.Run("yugabyte", func(t *testing.T) {
@@ -202,18 +168,6 @@ func TestServiceFuzz(t *testing.T) {
 	t.Run("leveldb", func(t *testing.T) {
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
-		addr := "localhost:0"
-		ln, err := bdsvc.Start(ctx, addr)
-		require.NoError(t, err)
-		testServiceFuzz(ctx, t, ln.String())
-	})
-
-	t.Run("couchbase", func(t *testing.T) {
-		// TODO: Unskip this test once the couchbase instance can be created
-		//  from a docker container in CI as part of the test
-		t.Skip()
-		SetupCouchbase(t, testCouchSettings)
-		bdsvc := NewCouchbase(testCouchSettings)
 		addr := "localhost:0"
 		ln, err := bdsvc.Start(ctx, addr)
 		require.NoError(t, err)
@@ -450,18 +404,9 @@ func TestCleanup(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	t.Run("level db", func(t *testing.T) {
+	t.Run("leveldb", func(t *testing.T) {
 		bdsvc, err := NewLevelDB("")
 		require.NoError(t, err)
-		testCleanup(ctx, t, bdsvc, "localhost:0")
-	})
-
-	t.Run("couchbase", func(t *testing.T) {
-		// TODO: Unskip this test once the couchbase instance can be created
-		//  from a docker container in CI as part of the test
-		t.Skip()
-		SetupCouchbase(t, testCouchSettings)
-		bdsvc := NewCouchbase(testCouchSettings)
 		testCleanup(ctx, t, bdsvc, "localhost:0")
 	})
 
