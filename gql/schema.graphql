@@ -317,6 +317,36 @@ type SealingPipeline {
   Workers: [Worker]!
 }
 
+type DealData {
+  Indexed: Uint64!
+  FlaggedUnsealed: Uint64!
+  FlaggedSealed: Uint64!
+}
+
+type Pieces {
+  Indexed: Int!
+  FlaggedUnsealed: Int!
+  FlaggedSealed: Int!
+}
+
+type SectorUnsealedCopies {
+  Unsealed: Int!
+  Sealed: Int!
+}
+
+type SectorProvingState {
+  Active: Int!
+  Inactive: Int!
+}
+
+type LID {
+  DealData: DealData!
+  Pieces: Pieces!
+  SectorUnsealedCopies: SectorUnsealedCopies!
+  SectorProvingState: SectorProvingState!
+  FlaggedPieces: Int!
+}
+
 type FundsEscrow {
   Available: BigInt!
   Locked: BigInt!
@@ -475,6 +505,9 @@ type RootQuery {
 
   """Get sealing pipeline state"""
   sealingpipeline: SealingPipeline!
+
+  """Get LID state"""
+  lid: LID!
 
   """Get funds available"""
   funds: Funds!
