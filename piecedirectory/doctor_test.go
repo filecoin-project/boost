@@ -10,12 +10,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/boostd-data/yugabyte"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -35,12 +38,11 @@ func TestPieceDoctor(t *testing.T) {
 		bdsvc, err := svc.NewLevelDB("")
 		require.NoError(t, err)
 
-		addr := "localhost:8050"
-		err = bdsvc.Start(ctx, addr)
+		ln, err := bdsvc.Start(ctx, "localhost:0")
 		require.NoError(t, err)
 
 		cl := client.NewStore()
-		err = cl.Dial(ctx, fmt.Sprintf("ws://%s", addr))
+		err = cl.Dial(ctx, fmt.Sprintf("ws://%s", ln))
 		require.NoError(t, err)
 		defer cl.Close(ctx)
 
@@ -67,12 +69,11 @@ func TestPieceDoctor(t *testing.T) {
 
 		bdsvc := svc.NewYugabyte(svc.TestYugabyteSettings)
 
-		addr := "localhost:8044"
-		err := bdsvc.Start(ctx, addr)
+		ln, err := bdsvc.Start(ctx, "localhost:0")
 		require.NoError(t, err)
 
 		cl := client.NewStore()
-		err = cl.Dial(ctx, fmt.Sprintf("ws://%s", addr))
+		err = cl.Dial(ctx, fmt.Sprintf("ws://%s", ln))
 		require.NoError(t, err)
 		defer cl.Close(ctx)
 
@@ -259,22 +260,40 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	commpCalc := CalculateCommp(t, carv1Reader)
 
 	// Add deal info for the piece
+	minerActorID := abi.ActorID(1011)
+	minerAddr, err := address.NewIDAddress(uint64(minerActorID))
+	require.NoError(t, err)
 	di := model.DealInfo{
 		DealUuid:    uuid.New().String(),
 		ChainDealID: 1,
+		MinerAddr:   minerAddr,
 		SectorID:    1,
 		PieceOffset: 0,
 		PieceLength: commpCalc.PieceSize,
 	}
+	dlSectorID := abi.SectorID{
+		Miner:  minerActorID,
+		Number: di.SectorID,
+	}
 	err = cl.AddDealForPiece(ctx, commpCalc.PieceCID, di)
 	require.NoError(t, err)
 
+	// Initialize the sector state such that the deal's sector is active and
+	// there is an unsealed copy
+	ssu := &sectorstatemgr.SectorStateUpdates{
+		ActiveSectors: map[abi.SectorID]struct{}{
+			dlSectorID: struct{}{},
+		},
+		SectorStates: map[abi.SectorID]db.SealState{
+			dlSectorID: db.SealStateUnsealed,
+		},
+	}
+
 	// Create a doctor
-	sapi := CreateMockDoctorSealingApi()
-	doc := NewDoctor(cl, sapi)
+	doc := NewDoctor(cl, nil)
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu)
 	require.NoError(t, err)
 
 	// The piece should be flagged because there is no index for it
@@ -292,7 +311,7 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu)
 	require.NoError(t, err)
 
 	// The piece should no longer be flagged
@@ -304,11 +323,11 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pcids))
 
-	// Mark the piece as not being unsealed
-	sapi.isUnsealed = false
+	// Simulate deleting the unsealed copy
+	ssu.SectorStates[dlSectorID] = db.SealStateSealed
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu)
 	require.NoError(t, err)
 
 	// The piece should be flagged because there is no unsealed copy
@@ -320,11 +339,11 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(pcids))
 
-	// Mark the piece as being unsealed
-	sapi.isUnsealed = true
+	// Simulate a sector unseal
+	ssu.SectorStates[dlSectorID] = db.SealStateUnsealed
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu)
 	require.NoError(t, err)
 
 	// The piece should no longer be flagged
