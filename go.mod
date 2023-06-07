@@ -31,7 +31,8 @@ require (
 	github.com/filecoin-project/go-commp-utils v0.1.4
 	github.com/filecoin-project/go-data-transfer v1.15.4-boost
 	github.com/filecoin-project/go-fil-commcid v0.1.0
-	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
+	github.com/filecoin-project/go-fil-commp-hashhash v0.2.0
+	github.com/filecoin-project/go-fil-markets v1.28.3
 	github.com/filecoin-project/go-jsonrpc v0.3.1
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
@@ -106,7 +107,7 @@ require (
 	go.uber.org/fx v1.19.3
 	go.uber.org/multierr v1.11.0
 	golang.org/x/crypto v0.10.0
-	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
+	golang.org/x/exp v0.0.0-20230418202329-0354be287a23
 	golang.org/x/sync v0.2.0
 	golang.org/x/text v0.10.0
 	golang.org/x/tools v0.9.1
@@ -212,7 +213,6 @@ require (
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.1.0 // indirect
 	github.com/ipfs/go-ds-badger2 v0.1.3 // indirect
-	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/go-ds-measure v0.2.0 // indirect
 	github.com/ipfs/go-fs-lock v0.0.7 // indirect
 	github.com/ipfs/go-ipfs-cmds v0.9.0 // indirect
@@ -335,10 +335,11 @@ require (
 require (
 	github.com/filecoin-project/boost-gfm v1.26.7
 	github.com/filecoin-project/boost-graphsync v0.13.6
+	github.com/filecoin-project/go-data-segment v0.0.0-20230605095649-5d01fdd3e4a1
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
-	github.com/filecoin-project/go-fil-markets v1.28.3
 	github.com/filecoin-project/lotus v1.23.2-0.20230622154405-168d022018ce
 	github.com/ipfs/boxo v0.10.1
+	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/kubo v0.21.0-rc1
 	github.com/ipni/go-libipni v0.0.8
 	github.com/schollz/progressbar/v3 v3.13.1

@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/go-data-segment/datasegment"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/hashicorp/go-multierror"
@@ -200,13 +201,35 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
 
-	// Iterate over all the blocks in the piece to extract the index records
+	// Try to parse data as containing a data segment index
 	log.Debugw("add index: read index", "pieceCid", pieceCid)
+	recs, err := parseShardWithDataSegmentIndex(ctx, pieceCid, int64(dealInfo.PieceLength), reader)
+	if err != nil {
+		log.Debugw("add index: data segment check failed. falling back to car", "pieceCid", pieceCid, "err", err)
+		// Iterate over all the blocks in the piece to extract the index records
+		recs, err = parseRecordsFromCar(reader)
+		if err != nil {
+			return fmt.Errorf("for piece %s: %w", pieceCid, err)
+		}
+	}
+
+	// Add mh => piece index to store: "which piece contains the multihash?"
+	// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
+	log.Debugw("add index: store index in local index directory", "pieceCid", pieceCid)
+	if err := ps.store.AddIndex(ctx, pieceCid, recs, true); err != nil {
+		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
+	}
+
+	return nil
+}
+
+func parseRecordsFromCar(reader io.Reader) ([]model.Record, error) {
+	// Iterate over all the blocks in the piece to extract the index records
 	recs := make([]model.Record, 0)
 	opts := []carv2.Option{carv2.ZeroLengthSectionAsEOF(true)}
 	blockReader, err := carv2.NewBlockReader(reader, opts...)
 	if err != nil {
-		return fmt.Errorf("getting block reader over piece %s: %w", pieceCid, err)
+		return nil, fmt.Errorf("getting block reader over piece: %w", err)
 	}
 
 	blockMetadata, err := blockReader.SkipNext()
@@ -222,17 +245,44 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 		blockMetadata, err = blockReader.SkipNext()
 	}
 	if !errors.Is(err, io.EOF) {
-		return fmt.Errorf("generating index for piece %s: %w", pieceCid, err)
+		return nil, fmt.Errorf("generating index for piece: %w", err)
+	}
+	return recs, nil
+}
+
+func parseShardWithDataSegmentIndex(ctx context.Context, pieceCid cid.Cid, size int64, r types.SectionReader) ([]model.Record, error) {
+	ps := abi.UnpaddedPieceSize(size).Padded()
+	dsis := datasegment.DataSegmentIndexStartOffset(ps)
+	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
+		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
+	}
+	dataSegments, err := datasegment.ParseDataSegmentIndex(r)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse data segment index: %w", err)
+	}
+	segments, err := dataSegments.ValidEntries()
+	if err != nil {
+		return nil, fmt.Errorf("could not calculate valid entries: %w", err)
+	}
+	if len(segments) == 0 {
+		return nil, fmt.Errorf("no data segments found")
 	}
 
-	// Add mh => piece index to store: "which piece contains the multihash?"
-	// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
-	log.Debugw("add index: store index in local index directory", "pieceCid", pieceCid)
-	if err := ps.store.AddIndex(ctx, pieceCid, recs, true); err != nil {
-		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
+	recs := make([]model.Record, 0)
+	for _, s := range segments {
+		segOffset := s.UnpaddedOffest()
+		segSize := s.UnpaddedLength()
+
+		lr := io.NewSectionReader(r, int64(segOffset), int64(segSize))
+		subRecs, err := parseRecordsFromCar(lr)
+		if err != nil {
+			log.Debugw("Unexpected index format on generation in shard", "piece", pieceCid, "offset", segOffset)
+			continue
+		}
+		recs = append(recs, subRecs...)
 	}
 
-	return nil
+	return recs, nil
 }
 
 // BuildIndexForPiece builds indexes for a given piece CID. The piece must contain a valid deal
