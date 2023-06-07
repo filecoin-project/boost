@@ -12,7 +12,6 @@ import (
 
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boostd-data/client"
-	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
@@ -58,37 +57,6 @@ func TestPieceDoctor(t *testing.T) {
 		})
 
 		ldb.MinPieceCheckPeriod = prev
-	})
-
-	t.Run("couchbase", func(t *testing.T) {
-		// TODO: Unskip this test once the couchbase instance can be created
-		//  from a docker container in CI
-		t.Skip()
-
-		prev := couchbase.MinPieceCheckPeriod
-		couchbase.MinPieceCheckPeriod = 1 * time.Second
-
-		svc.SetupCouchbase(t, testCouchSettings)
-		bdsvc := svc.NewCouchbase(testCouchSettings)
-
-		addr := "localhost:8051"
-		err := bdsvc.Start(ctx, addr)
-		require.NoError(t, err)
-
-		cl := client.NewStore()
-		err = cl.Dial(ctx, fmt.Sprintf("ws://%s", addr))
-		require.NoError(t, err)
-		defer cl.Close(ctx)
-
-		t.Run("next pieces", func(t *testing.T) {
-			testNextPieces(ctx, t, cl, couchbase.MinPieceCheckPeriod)
-		})
-
-		t.Run("check pieces", func(t *testing.T) {
-			testCheckPieces(ctx, t, cl)
-		})
-
-		couchbase.MinPieceCheckPeriod = prev
 	})
 
 	t.Run("yugabyte", func(t *testing.T) {
