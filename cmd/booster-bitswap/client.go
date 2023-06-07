@@ -181,7 +181,8 @@ func getBlocks(ctx context.Context, bsClient *client.Client, c cid.Cid, throttle
 
 	// Read the links from the block to child nodes in the DAG
 	var count = uint64(1)
-	nd, err := ipldlegacy.DecodeNode(ctx, blk)
+	ipldDecoder := ipldlegacy.NewDecoder()
+	nd, err := ipldDecoder.DecodeNode(ctx, blk)
 	if err != nil {
 		return 0, 0, fmt.Errorf("decoding node %s: %w", c, err)
 	}
