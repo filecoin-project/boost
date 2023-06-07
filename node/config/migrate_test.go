@@ -110,12 +110,12 @@ func TestConfigDiff(t *testing.T) {
 	cgf, err := FromFile(path.Join(repoDir, "config.toml"), DefaultBoost())
 	require.NoError(t, err)
 
-	s, err := ConfigDiff(cgf, DefaultBoost(), false)
+	s, err := ConfigUpdate(cgf, DefaultBoost(), false, true)
 	require.NoError(t, err)
 
 	require.False(t, strings.Contains(string(s), `The connect string for the sealing RPC API`))
 
-	s, err = ConfigDiff(cgf, DefaultBoost(), true)
+	s, err = ConfigUpdate(cgf, DefaultBoost(), true, true)
 	require.NoError(t, err)
 
 	require.True(t, strings.Contains(string(s), `The connect string for the sealing RPC API`))

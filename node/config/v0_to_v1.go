@@ -21,7 +21,7 @@ func v0Tov1(cfgPath string) (string, error) {
 
 	// For the migration from v0 to v1 just add the config version and add
 	// comments to the file
-	bz, err := ConfigUpdate(boostCfg, DefaultBoost(), true)
+	bz, err := ConfigUpdate(boostCfg, DefaultBoost(), true, false)
 	if err != nil {
 		return "", fmt.Errorf("applying configuration: %w", err)
 	}

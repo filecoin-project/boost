@@ -29,7 +29,7 @@ var configDefaultCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 
-		cb, err := config.ConfigUpdate(config.DefaultBoost(), nil, !cctx.Bool("no-comment"))
+		cb, err := config.ConfigUpdate(config.DefaultBoost(), nil, !cctx.Bool("no-comment"), false)
 		if err != nil {
 			return err
 		}
@@ -66,14 +66,7 @@ var configUpdateCmd = &cli.Command{
 			return err
 		}
 
-		var output []byte
-
-		if cctx.Bool("diff") {
-			output, err = config.ConfigDiff(cfgNode, config.DefaultBoost(), !cctx.Bool("no-comment"))
-		} else {
-			output, err = config.ConfigUpdate(cfgNode, config.DefaultBoost(), !cctx.Bool("no-comment"))
-		}
-
+		output, err := config.ConfigUpdate(cfgNode, config.DefaultBoost(), !cctx.Bool("no-comment"), cctx.Bool("diff"))
 		if err != nil {
 			return err
 		}
