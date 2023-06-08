@@ -23,6 +23,7 @@ import (
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc"
+	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
@@ -157,8 +158,8 @@ func NewPieceStore(pm *piecedirectory.PieceDirectory, maddr address.Address) pie
 	return &boostPieceStoreWrapper{piecedirectory: pm, maddr: maddr}
 }
 
-func NewPieceDoctor(lc fx.Lifecycle, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr) *piecedirectory.Doctor {
-	doc := piecedirectory.NewDoctor(store, ssm)
+func NewPieceDoctor(lc fx.Lifecycle, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *piecedirectory.Doctor {
+	doc := piecedirectory.NewDoctor(store, ssm, fullnodeApi)
 	docctx, cancel := context.WithCancel(context.Background())
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
