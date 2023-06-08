@@ -48,6 +48,9 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 		r.ssm.LatestUpdateMu.Unlock()
 		if lu == nil {
 			time.Sleep(2 * time.Second)
+			log.Debug("LID sector states updates is nil, waiting for update...")
+		} else {
+			log.Debug("LID sector states updates set")
 		}
 	}
 
