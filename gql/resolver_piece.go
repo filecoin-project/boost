@@ -70,9 +70,10 @@ type flaggedPieceResolver struct {
 }
 
 type piecesFlaggedArgs struct {
-	Cursor *gqltypes.BigInt // CreatedAt in milli-seconds
-	Offset graphql.NullInt
-	Limit  graphql.NullInt
+	HasUnsealedCopy graphql.NullBool
+	Cursor          *gqltypes.BigInt // CreatedAt in milli-seconds
+	Offset          graphql.NullInt
+	Limit           graphql.NullInt
 }
 
 type flaggedPieceListResolver struct {
@@ -92,10 +93,15 @@ func (r *resolver) PiecesFlagged(ctx context.Context, args piecesFlaggedArgs) (*
 		limit = int(*args.Limit.Value)
 	}
 
+	var filter *types.FlaggedPiecesListFilter
+	if args.HasUnsealedCopy.Set && args.HasUnsealedCopy.Value != nil {
+		filter = &types.FlaggedPiecesListFilter{HasUnsealedCopy: *args.HasUnsealedCopy.Value}
+	}
+
 	// Fetch one extra row so that we can check if there are more rows
 	// beyond the limit
 	cursor := bigIntToTime(args.Cursor)
-	flaggedPieces, err := r.piecedirectory.FlaggedPiecesList(ctx, cursor, offset, limit+1)
+	flaggedPieces, err := r.piecedirectory.FlaggedPiecesList(ctx, filter, cursor, offset, limit+1)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +112,7 @@ func (r *resolver) PiecesFlagged(ctx context.Context, args piecesFlaggedArgs) (*
 	}
 
 	// Get the total row count
-	count, err := r.piecedirectory.FlaggedPiecesCount(ctx)
+	count, err := r.piecedirectory.FlaggedPiecesCount(ctx, filter)
 	if err != nil {
 		return nil, err
 	}

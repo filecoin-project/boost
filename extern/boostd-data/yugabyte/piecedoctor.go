@@ -7,6 +7,7 @@ import (
 
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
+	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/ipfs/go-cid"
 	"github.com/jackc/pgtype"
 	"go.opentelemetry.io/otel/attribute"
@@ -220,7 +221,7 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	return nil
 }
 
-func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces")
 	var spanCursor int
 	if cursor != nil {
@@ -233,12 +234,24 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset
 
 	var args []interface{}
 	idx := 0
-	qry := `SELECT PieceCid, CreatedAt, UpdatedAt, HasUnsealedCopy from PieceFlagged`
+	qry := `SELECT PieceCid, CreatedAt, UpdatedAt, HasUnsealedCopy from PieceFlagged `
+	where := ""
 	if cursor != nil {
-		qry += `WHERE CreatedAt < $1 `
+		where += `WHERE CreatedAt < $1 `
 		args = append(args, cursor)
 		idx++
 	}
+	if filter != nil {
+		if where == "" {
+			where += `WHERE `
+		} else {
+			where += `AND `
+		}
+		where += fmt.Sprintf(`HasUnsealedCopy = $%d `, idx+1)
+		args = append(args, filter.HasUnsealedCopy)
+		idx++
+	}
+	qry += where
 	qry += `ORDER BY CreatedAt desc `
 
 	qry += fmt.Sprintf(`LIMIT $%d OFFSET $%d`, idx+1, idx+2)
@@ -275,13 +288,19 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset
 	return pieces, nil
 }
 
-func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
+func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_count")
 	defer span.End()
 
+	var args []interface{}
 	var count int
 	qry := `SELECT COUNT(*) FROM PieceFlagged`
-	err := s.db.QueryRow(ctx, qry).Scan(&count)
+	if filter != nil {
+		qry += ` WHERE HasUnsealedCopy = $1`
+		args = append(args, filter.HasUnsealedCopy)
+	}
+
+	err := s.db.QueryRow(ctx, qry, args...).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("getting flagged pieces count: %w", err)
 	}

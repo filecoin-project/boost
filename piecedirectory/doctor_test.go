@@ -297,11 +297,11 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// The piece should be flagged because there is no index for it
-	count, err := cl.FlaggedPiecesCount(ctx)
+	count, err := cl.FlaggedPiecesCount(ctx, nil)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
-	pcids, err := cl.FlaggedPiecesList(ctx, nil, 0, 10)
+	pcids, err := cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(pcids))
 
@@ -315,11 +315,11 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// The piece should no longer be flagged
-	count, err = cl.FlaggedPiecesCount(ctx)
+	count, err = cl.FlaggedPiecesCount(ctx, nil)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
-	pcids, err = cl.FlaggedPiecesList(ctx, nil, 0, 10)
+	pcids, err = cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pcids))
 
@@ -331,11 +331,11 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// The piece should be flagged because there is no unsealed copy
-	count, err = cl.FlaggedPiecesCount(ctx)
+	count, err = cl.FlaggedPiecesCount(ctx, nil)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
-	pcids, err = cl.FlaggedPiecesList(ctx, nil, 0, 10)
+	pcids, err = cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(pcids))
 
@@ -347,11 +347,11 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// The piece should no longer be flagged
-	count, err = cl.FlaggedPiecesCount(ctx)
+	count, err = cl.FlaggedPiecesCount(ctx, nil)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
-	pcids, err = cl.FlaggedPiecesList(ctx, nil, 0, 10)
+	pcids, err = cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pcids))
 }

@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
+	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"
@@ -615,7 +617,7 @@ func (db *DB) RemoveIndexes(ctx context.Context, cursor uint64, pieceCid cid.Cid
 	return nil
 }
 
-func (db *DB) ListFlaggedPieces(ctx context.Context) ([]model.FlaggedPiece, error) {
+func (db *DB) ListFlaggedPieces(ctx context.Context, filter *types.FlaggedPiecesListFilter, cursor *time.Time, o int, limit int) ([]model.FlaggedPiece, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.list_flagged_pieces")
 	defer span.End()
 
@@ -647,19 +649,48 @@ func (db *DB) ListFlaggedPieces(ctx context.Context) ([]model.FlaggedPiece, erro
 			return nil, fmt.Errorf("failed to unmarshal LeveldbFlaggedMetadata: %w; %v", err, r.Value)
 		}
 
-		records = append(records, model.FlaggedPiece{CreatedAt: v.CreatedAt, PieceCid: pieceCid})
+		if filter != nil && filter.HasUnsealedCopy != v.HasUnsealedCopy {
+			continue
+		}
+
+		if cursor != nil && v.CreatedAt.Before(*cursor) {
+			continue
+		}
+
+		records = append(records, model.FlaggedPiece{
+			CreatedAt:       v.CreatedAt,
+			UpdatedAt:       v.UpdatedAt,
+			PieceCid:        pieceCid,
+			HasUnsealedCopy: v.HasUnsealedCopy,
+		})
+	}
+
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].CreatedAt.Before(records[j].CreatedAt)
+	})
+
+	if offset > 0 {
+		if offset >= len(records) {
+			records = []model.FlaggedPiece{}
+		} else {
+			records = records[offset:]
+		}
+	}
+
+	if len(records) > limit {
+		records = records[:limit]
 	}
 
 	return records, nil
 }
 
-func (db *DB) FlaggedPiecesCount(ctx context.Context) (int, error) {
+func (db *DB) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.flagged_pieces_count")
 	defer span.End()
 
 	q := query.Query{
 		Prefix:   "/" + sprefixPieceCidToFlagged + "/",
-		KeysOnly: true,
+		KeysOnly: filter == nil,
 	}
 	results, err := db.Query(ctx, q)
 	if err != nil {
@@ -668,9 +699,21 @@ func (db *DB) FlaggedPiecesCount(ctx context.Context) (int, error) {
 
 	var i int
 	for {
-		_, ok := results.NextSync()
+		r, ok := results.NextSync()
 		if !ok {
 			break
+		}
+
+		if filter != nil {
+			var v LeveldbFlaggedMetadata
+			err = json.Unmarshal(r.Value, &v)
+			if err != nil {
+				return 0, fmt.Errorf("failed to unmarshal LeveldbFlaggedMetadata: %w; %v", err, r.Value)
+			}
+
+			if filter.HasUnsealedCopy != v.HasUnsealedCopy {
+				continue
+			}
 		}
 
 		i++

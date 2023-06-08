@@ -285,7 +285,7 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	return s.db.UnflagPiece(ctx, pieceCid)
 }
 
-func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+func (s *Store) FlaggedPiecesList(ctx context.Context, f *types.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces")
 	var spanCursor int
 	if cursor != nil {
@@ -299,7 +299,7 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset
 	return s.db.FlaggedPiecesList(ctx, cursor, offset, limit)
 }
 
-func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
+func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_count")
 	defer span.End()
 

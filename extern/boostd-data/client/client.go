@@ -35,8 +35,8 @@ type Store struct {
 		NextPiecesToCheck         func(ctx context.Context) ([]cid.Cid, error)
 		FlagPiece                 func(ctx context.Context, pieceCid cid.Cid, hasUnsealedDeal bool) error
 		UnflagPiece               func(ctx context.Context, pieceCid cid.Cid) error
-		FlaggedPiecesList         func(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)
-		FlaggedPiecesCount        func(ctx context.Context) (int, error)
+		FlaggedPiecesList         func(ctx context.Context, filter *types.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)
+		FlaggedPiecesCount        func(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error)
 	}
 	closer   jsonrpc.ClientCloser
 	dialOpts []jsonrpc.Option
@@ -179,10 +179,10 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	return s.client.UnflagPiece(ctx, pieceCid)
 }
 
-func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
-	return s.client.FlaggedPiecesList(ctx, cursor, offset, limit)
+func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+	return s.client.FlaggedPiecesList(ctx, filter, cursor, offset, limit)
 }
 
-func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
-	return s.client.FlaggedPiecesCount(ctx)
+func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error) {
+	return s.client.FlaggedPiecesCount(ctx, filter)
 }
