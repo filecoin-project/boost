@@ -1737,8 +1737,7 @@ required to have expiration of at least the soonest-ending deal`,
 			Name: "MinTargetUpgradeSectorExpiration",
 			Type: "uint64",
 
-			Comment: `Setting this to a high value (for example to maximum deal duration - 1555200) will disable selection based on
-initial pledge - upgrade sectors will always be chosen based on longest expiration`,
+			Comment: `DEPRECATED: Target expiration is no longer used`,
 		},
 		{
 			Name: "CommittedCapacitySectorLifetime",
