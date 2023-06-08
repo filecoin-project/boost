@@ -100,6 +100,8 @@ func (d *Doctor) Run(ctx context.Context) {
 }
 
 func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates) error {
+	defer func(start time.Time) { log.Debugw("checkPiece processing", "took", time.Since(start)) }(time.Now())
+
 	////////////////////////////////////////////////
 	// Check if piece belongs to an active sector
 	////////////////////////////////////////////////
