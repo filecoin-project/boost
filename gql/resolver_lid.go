@@ -60,7 +60,7 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 
 		if s == db.SealStateUnsealed {
 			unsealed++
-		} else if s == db.SealStateSealed && sectorHasDeals == true {
+		} else if s == db.SealStateSealed && sectorHasDeals {
 			sealed++
 
 			log.Debugw("LID only sealed sector", "miner", id.Miner, "sector_number", id.Number)
