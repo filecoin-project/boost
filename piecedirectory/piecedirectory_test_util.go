@@ -232,6 +232,59 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.Equal(t, len(blk.RawData()), sz)
 }
 
+func testDataSegmentIndex(ctx context.Context, t *testing.T, cl *client.Store) {
+	// Any calls to get a reader over data should return a reader over the fixture
+	pr := CreateMockPieceReaderFromPath(t, "./testdata/deal.data")
+	fstat, err := os.Stat("./testdata/deal.data")
+	require.NoError(t, err)
+
+	pieceCid := CalculateCommp(t, pr).PieceCID
+
+	recs, err := parseShardWithDataSegmentIndex(ctx, pieceCid, fstat.Size, pr)
+	require.NoError(t, err)
+	err = cl.AddIndex(ctx, pieceCid, recs, false)
+	require.NoError(t, err)
+
+	// Add deal info for the piece - it doesn't matter what it is, the piece
+	// just needs to have at least one deal associated with it
+	di := model.DealInfo{
+		DealUuid:    uuid.New().String(),
+		ChainDealID: 1,
+		SectorID:    2,
+		PieceOffset: 0,
+		PieceLength: 0,
+	}
+	err = cl.AddDealForPiece(ctx, pieceCid, di)
+	require.NoError(t, err)
+
+	// Remove size information from the index records.
+	// This is to simulate what happens when an index is imported from the
+	// DAG store: only the offset information is imported (not size
+	// information)
+	for i, r := range recs {
+		recs[i] = model.Record{
+			Cid: r.Cid,
+			OffsetSize: model.OffsetSize{
+				Offset: r.Offset,
+				Size:   0,
+			},
+		}
+	}
+
+	// Add the index to the local index directory, marked as incomplete
+	err = cl.AddIndex(ctx, pieceCid, recs, false)
+	require.NoError(t, err)
+
+	// Verify that getting the size of a block works correctly:
+	// There is no size information in the index so the piece
+	// directory should re-build the index and then return the size.
+	pm := NewPieceDirectory(cl, pr, 1)
+	pm.Start(ctx)
+	sz, err := pm.BlockstoreGetSize(ctx, rec.Cid)
+	require.NoError(t, err)
+	require.Equal(t, len(blk.RawData()), sz)
+}
+
 func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Create a random CAR file
 	carFilePath := CreateCarFile(t)

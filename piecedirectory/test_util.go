@@ -3,6 +3,7 @@ package piecedirectory
 import (
 	"context"
 	"io"
+	"os"
 	"testing"
 	"time"
 
@@ -82,3 +83,15 @@ type MockSectionReader struct {
 }
 
 func (MockSectionReader) Close() error { return nil }
+
+// like `CreateMockPieceReader`, but returns a reader over the contents of a file.
+func CreateMockPieceReaderFromPath(t *testing.T, path string) *mock_piecedirectory.MockPieceReader {
+	ctrl := gomock.NewController(t)
+	pr := mock_piecedirectory.NewMockPieceReader(ctrl)
+	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
+		func(_ context.Context, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (types.SectionReader, error) {
+			f, err := os.Open(path)
+			return f, err
+		})
+	return pr
+}
