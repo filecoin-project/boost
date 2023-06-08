@@ -34,6 +34,10 @@ type AddIndexProgress struct {
 	Err      string  `json:"e,omitempty"`
 }
 
+type FlaggedPiecesListFilter struct {
+	HasUnsealedCopy bool
+}
+
 type Service interface {
 	AddDealForPiece(context.Context, cid.Cid, model.DealInfo) error
 	AddIndex(context.Context, cid.Cid, []model.Record, bool) <-chan AddIndexProgress
@@ -52,8 +56,8 @@ type Service interface {
 	NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error)
 	FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool) error
 	UnflagPiece(ctx context.Context, pieceCid cid.Cid) error
-	FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)
-	FlaggedPiecesCount(ctx context.Context) (int, error)
+	FlaggedPiecesList(ctx context.Context, filter *FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)
+	FlaggedPiecesCount(ctx context.Context, filter *FlaggedPiecesListFilter) (int, error)
 }
 
 type ServiceImpl interface {
