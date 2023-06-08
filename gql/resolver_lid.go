@@ -56,9 +56,11 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 
 	var sealed, unsealed int32
 	for id, s := range lu.SectorStates { // TODO: consider adding this data directly in SSM
+		_, sectorHasDeals := lu.SectorWithDeals[id]
+
 		if s == db.SealStateUnsealed {
 			unsealed++
-		} else if s == db.SealStateSealed {
+		} else if s == db.SealStateSealed && sectorHasDeals == true {
 			sealed++
 
 			log.Debugw("LID only sealed sector", "miner", id.Miner, "sector_number", id.Number)

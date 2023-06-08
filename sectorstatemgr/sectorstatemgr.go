@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/api"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -23,10 +24,11 @@ import (
 var log = logging.Logger("sectorstatemgr")
 
 type SectorStateUpdates struct {
-	Updates       map[abi.SectorID]db.SealState
-	ActiveSectors map[abi.SectorID]struct{}
-	SectorStates  map[abi.SectorID]db.SealState
-	UpdatedAt     time.Time
+	Updates         map[abi.SectorID]db.SealState
+	ActiveSectors   map[abi.SectorID]struct{}
+	SectorWithDeals map[abi.SectorID]struct{}
+	SectorStates    map[abi.SectorID]db.SealState
+	UpdatedAt       time.Time
 }
 
 type StorageAPI interface {
@@ -237,10 +239,16 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 		return nil, err
 	}
 
+	allSet, err := m.fullnodeApi.StateMinerSectors(ctx, m.Maddr, nil, head.Key())
+	if err != nil {
+		return nil, err
+	}
+
 	mid, err := address.IDFromAddress(m.Maddr)
 	if err != nil {
 		return nil, err
 	}
+
 	activeSectors := make(map[abi.SectorID]struct{}, len(activeSet))
 	for _, info := range activeSet {
 		sectorID := abi.SectorID{
@@ -251,5 +259,18 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 		activeSectors[sectorID] = struct{}{}
 	}
 
-	return &SectorStateUpdates{sectorUpdates, activeSectors, allSectorStates, time.Now()}, nil
+	sectorWithDeals := make(map[abi.SectorID]struct{})
+	zero := big.Zero()
+	for _, info := range allSet {
+		sectorID := abi.SectorID{
+			Miner:  abi.ActorID(mid),
+			Number: info.SectorNumber,
+		}
+
+		if info.DealWeight.GreaterThan(zero) {
+			sectorWithDeals[sectorID] = struct{}{}
+		}
+	}
+
+	return &SectorStateUpdates{sectorUpdates, activeSectors, sectorWithDeals, allSectorStates, time.Now()}, nil
 }
