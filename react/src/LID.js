@@ -141,7 +141,7 @@ function LIDContent() {
                 </td>
                 <td>
                   <div>
-                      <h3>Sectors Copies</h3>
+                      <h3>Deal Sectors Copies</h3>
 
                       <div className="storage-chart">
                           <CumulativeBarChart bars={barsSuc} />
