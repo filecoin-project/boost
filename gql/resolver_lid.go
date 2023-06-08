@@ -65,7 +65,7 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 		}
 	}
 
-	fp, err := r.piecedirectory.FlaggedPiecesCount(ctx)
+	fp, err := r.piecedirectory.FlaggedPiecesCount(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

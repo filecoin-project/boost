@@ -13,6 +13,7 @@ import (
 	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
+	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/hashicorp/go-multierror"
@@ -54,12 +55,12 @@ func (ps *PieceDirectory) Start(ctx context.Context) {
 	ps.ctx = ctx
 }
 
-func (ps *PieceDirectory) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
-	return ps.store.FlaggedPiecesList(ctx, cursor, offset, limit)
+func (ps *PieceDirectory) FlaggedPiecesList(ctx context.Context, filter *bdtypes.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+	return ps.store.FlaggedPiecesList(ctx, filter, cursor, offset, limit)
 }
 
-func (ps *PieceDirectory) FlaggedPiecesCount(ctx context.Context) (int, error) {
-	return ps.store.FlaggedPiecesCount(ctx)
+func (ps *PieceDirectory) FlaggedPiecesCount(ctx context.Context, filter *bdtypes.FlaggedPiecesListFilter) (int, error) {
+	return ps.store.FlaggedPiecesCount(ctx, filter)
 }
 
 // Get all metadata about a particular piece

@@ -529,7 +529,7 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	return nil
 }
 
-func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
 	log.Debugw("handle.flagged-pieces-list")
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_list")
@@ -539,10 +539,10 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, cursor *time.Time, offset
 		log.Debugw("handled.flagged-pieces-list", "took", time.Since(now).String())
 	}(time.Now())
 
-	return s.db.ListFlaggedPieces(ctx)
+	return s.db.ListFlaggedPieces(ctx, filter, cursor, offset, limit)
 }
 
-func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
+func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error) {
 	log.Debugw("handle.flagged-pieces-count")
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_count")
@@ -552,7 +552,7 @@ func (s *Store) FlaggedPiecesCount(ctx context.Context) (int, error) {
 		log.Debugw("handled.flagged-pieces-count", "took", time.Since(now).String())
 	}(time.Now())
 
-	return s.db.FlaggedPiecesCount(ctx)
+	return s.db.FlaggedPiecesCount(ctx, filter)
 }
 
 func normalizePieceCidError(pieceCid cid.Cid, err error) error {

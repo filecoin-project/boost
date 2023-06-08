@@ -278,11 +278,11 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// No pieces flagged, count and list of pieces should be empty
-	count, err := cl.FlaggedPiecesCount(ctx)
+	count, err := cl.FlaggedPiecesCount(ctx, nil)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
-	pcids, err := cl.FlaggedPiecesList(ctx, nil, 0, 10)
+	pcids, err := cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pcids))
 
@@ -291,24 +291,41 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// Count and list of pieces should contain one piece
-	count, err = cl.FlaggedPiecesCount(ctx)
+	count, err = cl.FlaggedPiecesCount(ctx, nil)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
-	pcids, err = cl.FlaggedPiecesList(ctx, nil, 0, 10)
+	pcids, err = cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(pcids))
+
+	// Test that setting the filter returns the correct results
+	count, err = cl.FlaggedPiecesCount(ctx, &types.FlaggedPiecesListFilter{HasUnsealedCopy: false})
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	count, err = cl.FlaggedPiecesCount(ctx, &types.FlaggedPiecesListFilter{HasUnsealedCopy: true})
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	pcids, err = cl.FlaggedPiecesList(ctx, &types.FlaggedPiecesListFilter{HasUnsealedCopy: false}, nil, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(pcids))
+
+	pcids, err = cl.FlaggedPiecesList(ctx, &types.FlaggedPiecesListFilter{HasUnsealedCopy: true}, nil, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(pcids))
 
 	// Unflag the piece
 	err = cl.UnflagPiece(ctx, commpCalc.PieceCID)
 	require.NoError(t, err)
 
 	// Count and list of pieces should be empty
-	count, err = cl.FlaggedPiecesCount(ctx)
+	count, err = cl.FlaggedPiecesCount(ctx, nil)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
-	pcids, err = cl.FlaggedPiecesList(ctx, nil, 0, 10)
+	pcids, err = cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pcids))
 }

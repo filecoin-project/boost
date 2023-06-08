@@ -495,7 +495,7 @@ type RootQuery {
   piecesFlaggedCount(hasUnsealedCopy: Boolean): Int!
 
   """Get a list of pieces that have been flagged as having problems"""
-  piecesFlagged(cursor: BigInt, offset: Int, limit: Int): FlaggedPiecesList!
+  piecesFlagged(hasUnsealedCopy: Boolean, cursor: BigInt, offset: Int, limit: Int): FlaggedPiecesList!
 
   """Get information about a piece from the piece store, DAG store and database"""
   pieceStatus(pieceCid: String!): PieceStatus!
