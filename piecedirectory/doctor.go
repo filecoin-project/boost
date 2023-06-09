@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 )
@@ -60,6 +61,11 @@ func (d *Doctor) Run(ctx context.Context) {
 				return nil
 			}
 
+			head, err := d.fullnodeApi.ChainHead(ctx)
+			if err != nil {
+				return err
+			}
+
 			// Get the next pieces to check (eg pieces that haven't been checked
 			// for a while) from the local index directory
 			pcids, err := d.store.NextPiecesToCheck(ctx)
@@ -70,7 +76,7 @@ func (d *Doctor) Run(ctx context.Context) {
 			// Check each piece for problems
 			doclog.Debugw("piece doctor: checking pieces", "count", len(pcids))
 			for _, pcid := range pcids {
-				err := d.checkPiece(ctx, pcid, lu)
+				err := d.checkPiece(ctx, pcid, lu, head)
 				if err != nil {
 					if errors.Is(err, context.Canceled) {
 						return err
@@ -99,7 +105,7 @@ func (d *Doctor) Run(ctx context.Context) {
 	}
 }
 
-func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates) error {
+func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates, head *types.TipSet) error {
 	defer func(start time.Time) { log.Debugw("checkPiece processing", "took", time.Since(start)) }(time.Now())
 
 	////////////////////////////////////////////////
@@ -144,11 +150,6 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 	/////////////////////////////////////////////////////////////////
 	// Check that Deal is actually on-chain for the active sectors
 	/////////////////////////////////////////////////////////////////
-	head, err := d.fullnodeApi.ChainHead(ctx)
-	if err != nil {
-		return err
-	}
-
 	found := false
 	for _, dealId := range chainDealIds {
 		_, err := d.fullnodeApi.StateMarketStorageDeal(ctx, dealId, head.Key())
