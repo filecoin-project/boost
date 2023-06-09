@@ -110,9 +110,11 @@ func TestRefreshState(t *testing.T) {
 				mockExpectations := func() {
 					minerApi.EXPECT().StorageList(gomock.Any()).Return(input_StorageList1, nil)
 					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Any(), gomock.Any()).Return(input_StateMinerActiveSectors1, nil)
+					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
 
 					minerApi.EXPECT().StorageList(gomock.Any()).Return(input_StorageList2, nil)
 					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Any(), gomock.Any()).Return(input_StateMinerActiveSectors2, nil)
+					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
 
 					fullnodeApi.EXPECT().ChainHead(gomock.Any()).Times(2)
 				}
@@ -132,6 +134,7 @@ func TestRefreshState(t *testing.T) {
 						sid4: db.SealStateSealed,
 						sid5: db.SealStateCache,
 					},
+					SectorWithDeals: map[abi.SectorID]struct{}{},
 				}
 
 				exerciseAndVerify := func() {
@@ -192,6 +195,7 @@ func TestRefreshState(t *testing.T) {
 				mockExpectations := func() {
 					minerApi.EXPECT().StorageList(gomock.Any()).Return(input_StorageList, nil)
 					fullnodeApi.EXPECT().ChainHead(gomock.Any()).Times(1)
+					fullnodeApi.EXPECT().StateMinerSectors(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
 					fullnodeApi.EXPECT().StateMinerActiveSectors(gomock.Any(), gomock.Any(), gomock.Any()).Return(input_StateMinerActiveSectors, nil)
 				}
 
@@ -210,6 +214,7 @@ func TestRefreshState(t *testing.T) {
 						sid2: db.SealStateSealed,
 						sid3: db.SealStateSealed,
 					},
+					SectorWithDeals: map[abi.SectorID]struct{}{},
 				}
 
 				exerciseAndVerify := func() {

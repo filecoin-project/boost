@@ -12,6 +12,8 @@ import (
 	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 )
@@ -24,12 +26,13 @@ var doclog = logging.Logger("piecedoc")
 // Note that multiple Doctor processes can run in parallel. The logic for which
 // pieces to give to the Doctor to check is in the local index directory.
 type Doctor struct {
-	store *bdclient.Store
-	ssm   *sectorstatemgr.SectorStateMgr
+	store       *bdclient.Store
+	ssm         *sectorstatemgr.SectorStateMgr
+	fullnodeApi api.FullNode
 }
 
-func NewDoctor(store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr) *Doctor {
-	return &Doctor{store: store, ssm: ssm}
+func NewDoctor(store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *Doctor {
+	return &Doctor{store: store, ssm: ssm, fullnodeApi: fullnodeApi}
 }
 
 // The average interval between calls to NextPiecesToCheck
@@ -58,6 +61,11 @@ func (d *Doctor) Run(ctx context.Context) {
 				return nil
 			}
 
+			head, err := d.fullnodeApi.ChainHead(ctx)
+			if err != nil {
+				return err
+			}
+
 			// Get the next pieces to check (eg pieces that haven't been checked
 			// for a while) from the local index directory
 			pcids, err := d.store.NextPiecesToCheck(ctx)
@@ -68,7 +76,7 @@ func (d *Doctor) Run(ctx context.Context) {
 			// Check each piece for problems
 			doclog.Debugw("piece doctor: checking pieces", "count", len(pcids))
 			for _, pcid := range pcids {
-				err := d.checkPiece(ctx, pcid, lu)
+				err := d.checkPiece(ctx, pcid, lu, head)
 				if err != nil {
 					if errors.Is(err, context.Canceled) {
 						return err
@@ -97,10 +105,68 @@ func (d *Doctor) Run(ctx context.Context) {
 	}
 }
 
-func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates) error {
+func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates, head *types.TipSet) error {
+	defer func(start time.Time) { log.Debugw("checkPiece processing", "took", time.Since(start)) }(time.Now())
+
+	// Check if piece belongs to an active sector
 	md, err := d.store.GetPieceMetadata(ctx, pieceCid)
 	if err != nil {
 		return fmt.Errorf("failed to get piece %s from local index directory: %w", pieceCid, err)
+	}
+
+	lacksActiveSector := true // check whether the piece is present in active sector
+
+	var chainDealIds []abi.DealID
+	for _, dl := range md.Deals {
+		mid, err := address.IDFromAddress(dl.MinerAddr)
+		if err != nil {
+			return err
+		}
+
+		sectorID := abi.SectorID{
+			Miner:  abi.ActorID(mid),
+			Number: dl.SectorID,
+		}
+
+		// check if we have an active sector
+		if _, ok := lu.ActiveSectors[sectorID]; ok {
+			lacksActiveSector = false
+			chainDealIds = append(chainDealIds, dl.ChainDealID)
+		}
+	}
+
+	if lacksActiveSector {
+		doclog.Debugw("ignoring and unflagging piece as it is not present in an active sector", "piece", pieceCid)
+
+		err = d.store.UnflagPiece(ctx, pieceCid)
+		if err != nil {
+			return fmt.Errorf("failed to unflag piece %s: %w", pieceCid, err)
+		}
+		return nil
+	}
+
+	// Check that Deal is actually on-chain for the active sectors
+	if d.fullnodeApi != nil { // nil in tests
+		found := false
+		for _, dealId := range chainDealIds {
+			doclog.Debugw("checking state for market deal", "piece", pieceCid, "deal", dealId)
+
+			_, err := d.fullnodeApi.StateMarketStorageDeal(ctx, dealId, head.Key())
+			if err == nil {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			doclog.Debugw("ignoring and unflagging piece as no deal id found on chain", "piece", pieceCid)
+
+			err = d.store.UnflagPiece(ctx, pieceCid)
+			if err != nil {
+				return fmt.Errorf("failed to unflag piece %s: %w", pieceCid, err)
+			}
+			return nil
+		}
 	}
 
 	// Check if piece has been indexed
@@ -118,15 +184,10 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 		return nil
 	}
 
-	// Check if there is an unsealed copy of the piece
+	// If piece is indexed and has active sector and active deal on chain, check for unsealed copy
 	var hasUnsealedDeal bool
 
-	// Check whether the piece is present in active sector
-	lacksActiveSector := true
-
-	dls := md.Deals
-
-	for _, dl := range dls {
+	for _, dl := range md.Deals {
 		mid, err := address.IDFromAddress(dl.MinerAddr)
 		if err != nil {
 			return err
@@ -137,24 +198,19 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 			Number: dl.SectorID,
 		}
 
-		// check if we have an active sector
-		if _, ok := lu.ActiveSectors[sectorID]; ok {
-			lacksActiveSector = false
-		}
-
 		if lu.SectorStates[sectorID] == db.SealStateUnsealed {
 			hasUnsealedDeal = true
 			break
 		}
 	}
 
-	if !hasUnsealedDeal && !lacksActiveSector {
+	if !hasUnsealedDeal {
 		err = d.store.FlagPiece(ctx, pieceCid, false)
 		if err != nil {
 			return fmt.Errorf("failed to flag piece %s with no unsealed deal: %w", pieceCid, err)
 		}
 
-		doclog.Debugw("flagging piece as having no unsealed copy", "piece", pieceCid, "hasUnsealedDeal", hasUnsealedDeal, "lacksActiveSector", lacksActiveSector, "len(activeSectors)", len(lu.ActiveSectors), "len(sectorStates)", len(lu.SectorStates))
+		doclog.Debugw("flagging piece as having no unsealed copy", "piece", pieceCid, "hasUnsealedDeal", hasUnsealedDeal, "len(activeSectors)", len(lu.ActiveSectors), "len(sectorStates)", len(lu.SectorStates))
 		return nil
 	}
 
