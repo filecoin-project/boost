@@ -503,13 +503,12 @@ func (s *Store) PiecesCount(ctx context.Context) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
 	defer span.End()
 
-	var args []interface{}
 	var count int
 	qry := `SELECT COUNT(*) FROM idx.PieceMetadata`
 
-	err := s.db.QueryRow(ctx, qry, args...).Scan(&count)
+	err := s.session.Query(qry).WithContext(ctx).Scan(&count)
 	if err != nil {
-		return 0, fmt.Errorf("getting pieces count: %w", err)
+		return -1, fmt.Errorf("getting pieces count: %w", err)
 	}
 
 	return count, nil
