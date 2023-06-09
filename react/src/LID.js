@@ -21,6 +21,8 @@ import {Info, InfoListItem} from "./Info";
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import {addCommas, humanFileSize} from "./util";
 
+const lidBasePath = '/piece-doctor'
+
 export function LIDMenuItem(props) {
     return (
         <Link key="lid" className="menu-item" to={"/lid"}>
@@ -257,6 +259,14 @@ function FlaggedPieces({setSearchQuery}) {
             Flagged pieces ({totalCount})
         </h3>
 
+        <table>
+            <tbody>
+            <tr>
+                <th>Piece CID</th>
+                <th>Index</th>
+                <th>Deals</th>
+            </tr>
+
         { totalCount ? (
             <>
             <table>
@@ -306,6 +316,29 @@ function NoUnsealedSectorLink() {
     </div>
 }
 
+function NoUnsealedSectorLink() {
+    const {loading, error, data} = useQuery(FlaggedPiecesCountQuery, {
+        pollInterval: 10000,
+        variables: {
+            hasUnsealedCopy: false,
+        },
+        fetchPolicy: 'network-only',
+    })
+
+    if (error) return <div>Error: {error.message}</div>
+    if (loading) {
+        return <div>&nbsp;</div>
+    }
+
+    if (!data.piecesFlaggedCount) {
+        return null
+    }
+
+    return <div>
+        <Link className="nav-link" to="/no-unsealed">See {data.piecesFlaggedCount} pieces with no unsealed copy ➜</Link>
+    </div>
+}
+
 function FlaggedPieceRow({piece}) {
     return <tr>
         <td>
@@ -314,7 +347,7 @@ function FlaggedPieceRow({piece}) {
             </Link>
         </td>
         <td>{piece.IndexStatus.Status}</td>
-        <td>{piece.DealCount}</td>
+        <td>{piece.Deals.length}</td>
     </tr>
 }
 
@@ -369,6 +402,12 @@ function NoUnsealedSectorPieces() {
     const totalCount = data.piecesFlagged.totalCount
     const moreRows = data.piecesFlagged.more
 
+    if (!totalCount) {
+        return <div className="flagged-pieces-none">
+            Boost doctor did not find any pieces that were flagged because there is no unsealed copy of the sector
+        </div>
+    }
+
     var cursor = params.cursor
     if (pageNum === 1 && rows.length) {
         cursor = rows[0].CreatedAt.getTime()
@@ -390,32 +429,24 @@ function NoUnsealedSectorPieces() {
             Pieces with no unsealed sector ({totalCount})
         </h3>
 
-        { totalCount ? (
-            <>
-            <table>
-                <tbody>
-                <tr>
-                    <th>Piece CID</th>
-                    <th>Index</th>
-                    <th>Deals</th>
-                </tr>
+        <table>
+            <tbody>
+            <tr>
+                <th>Piece CID</th>
+                <th>Index</th>
+                <th>Deals</th>
+            </tr>
 
-                {rows.map(piece => (
-                    <FlaggedPieceRow
-                        key={piece.PieceCid}
-                        piece={piece}
-                    />
-                ))}
-                </tbody>
-            </table>
+            {rows.map(piece => (
+                <FlaggedPieceRow
+                    key={piece.Piece.PieceCid}
+                    piece={piece.Piece}
+                />
+            ))}
+            </tbody>
+        </table>
 
-            <Pagination {...paginationParams} />
-            </>
-        ) : (
-            <div className="flagged-pieces-none">
-                Boost doctor did not find any pieces with no unsealed sector
-            </div>
-        )}
+        <Pagination {...paginationParams} />
     </div>
 }
 
@@ -431,6 +462,10 @@ function FlaggedPiecesLink() {
     if (error) return <div>Error: {error.message}</div>
     if (loading) {
         return <div>&nbsp;</div>
+    }
+
+    if (!data.piecesFlaggedCount) {
+        return null
     }
 
     return <div>

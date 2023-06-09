@@ -141,6 +141,20 @@ func (r *resolver) PiecesFlagged(ctx context.Context, args piecesFlaggedArgs) (*
 	}, nil
 }
 
+type piecesFlaggedCountArgs struct {
+	HasUnsealedCopy graphql.NullBool
+}
+
+func (r *resolver) PiecesFlaggedCount(ctx context.Context, args piecesFlaggedCountArgs) (int32, error) {
+	var filter *types.FlaggedPiecesListFilter
+	if args.HasUnsealedCopy.Set && args.HasUnsealedCopy.Value != nil {
+		filter = &types.FlaggedPiecesListFilter{HasUnsealedCopy: *args.HasUnsealedCopy.Value}
+	}
+
+	count, err := r.piecedirectory.FlaggedPiecesCount(ctx, filter)
+	return int32(count), err
+}
+
 func (r *resolver) PiecesWithPayloadCid(ctx context.Context, args struct{ PayloadCid string }) ([]string, error) {
 	payloadCid, err := cid.Parse(args.PayloadCid)
 	if err != nil {
