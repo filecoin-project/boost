@@ -374,6 +374,19 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	return md.IndexedAt, nil
 }
 
+func (s *Store) PiecesCount(ctx context.Context) (int, error) {
+	log.Debugw("handle.pieces-count")
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.pieces-count", "took", time.Since(now).String())
+	}(time.Now())
+
+	return s.db.PiecesCount(ctx)
+}
+
 func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	log.Debugw("handle.list-pieces")
 

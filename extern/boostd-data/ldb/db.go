@@ -448,6 +448,32 @@ func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 	return pieceCids, nil
 }
 
+func (db *DB) PiecesCount(ctx context.Context) (int, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "db.pieces_count")
+	defer span.End()
+
+	q := query.Query{
+		Prefix:   "/" + sprefixPieceCidToCursor + "/",
+		KeysOnly: true,
+	}
+	results, err := db.Query(ctx, q)
+	if err != nil {
+		return -1, fmt.Errorf("listing pieces in database: %w", err)
+	}
+
+	var count int
+	for {
+		_, ok := results.NextSync()
+		if !ok {
+			break
+		}
+
+		count++
+	}
+
+	return count, nil
+}
+
 func (db *DB) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.list_pieces")
 	defer span.End()

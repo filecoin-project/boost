@@ -63,6 +63,10 @@ func (ps *PieceDirectory) FlaggedPiecesCount(ctx context.Context, filter *bdtype
 	return ps.store.FlaggedPiecesCount(ctx, filter)
 }
 
+func (ps *PieceDirectory) PiecesCount(ctx context.Context) (int, error) {
+	return ps.store.PiecesCount(ctx)
+}
+
 // Get all metadata about a particular piece
 func (ps *PieceDirectory) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (types.PieceDirMetadata, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_metadata")
