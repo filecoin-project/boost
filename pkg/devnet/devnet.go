@@ -16,12 +16,12 @@ import (
 
 var log = logging.Logger("devnet")
 
-func Run(ctx context.Context, tempHome string, done chan struct{}, bootstrap bool) {
+func Run(ctx context.Context, tempHome string, done chan struct{}, initialize bool) {
 	var wg sync.WaitGroup
 
 	log.Debugw("using temp home dir", "dir", tempHome)
 
-	if bootstrap {
+	if initialize {
 		// The parameter files can be as large as 1GiB.
 		// If this is the first time lotus runs,
 		// and the machine doesn't have particularly fast internet,
@@ -47,13 +47,13 @@ func Run(ctx context.Context, tempHome string, done chan struct{}, bootstrap boo
 
 	wg.Add(2)
 	go func() {
-		runLotusDaemon(ctx, tempHome, bootstrap)
+		runLotusDaemon(ctx, tempHome, initialize)
 		log.Debugw("shut down lotus daemon")
 		wg.Done()
 	}()
 
 	go func() {
-		runLotusMiner(ctx, tempHome, bootstrap)
+		runLotusMiner(ctx, tempHome, initialize)
 		log.Debugw("shut down lotus miner")
 		wg.Done()
 	}()
@@ -90,9 +90,9 @@ func runCmdsWithLog(ctx context.Context, name string, commands [][]string, homeD
 	}
 }
 
-func runLotusDaemon(ctx context.Context, home string, bootstrap bool) {
+func runLotusDaemon(ctx context.Context, home string, initialize bool) {
 	cmds := [][]string{}
-	if bootstrap {
+	if initialize {
 		cmds = append(cmds, []string{"lotus-seed", "genesis", "new", "localnet.json"},
 			[]string{"lotus-seed", "pre-seal", "--sector-size=8388608", "--num-sectors=1"},
 			[]string{"lotus-seed", "genesis", "add-miner", "localnet.json",
@@ -106,11 +106,11 @@ func runLotusDaemon(ctx context.Context, home string, bootstrap bool) {
 	runCmdsWithLog(ctx, "lotus-daemon", cmds, home)
 }
 
-func runLotusMiner(ctx context.Context, home string, bootstrap bool) {
+func runLotusMiner(ctx context.Context, home string, initialize bool) {
 	cmds := [][]string{
 		{"lotus", "wait-api"}, // wait for lotus node to run
 	}
-	if bootstrap {
+	if initialize {
 		cmds = append(cmds,
 			[]string{"lotus", "wallet", "import",
 				filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.key")},

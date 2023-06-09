@@ -17,16 +17,16 @@ func init() {
 }
 
 func main() {
-
+	const initFlag = "initialize"
 	app := &cli.App{
 		Name:  "devnet",
 		Usage: "Run a local devnet",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Aliases: []string{"bs"},
-				Name:    "bootstrap",
+				Aliases: []string{"i"},
+				Name:    initFlag,
 				Value:   true,
-				Usage:   "bootstrap the devnet",
+				Usage:   "Whether to initialize the devnet from scratch",
 			},
 		},
 		Action: func(cctx *cli.Context) error {
@@ -40,7 +40,7 @@ func main() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			go devnet.Run(ctx, home, done, cctx.Bool("bootstrap"))
+			go devnet.Run(ctx, home, done, cctx.Bool(initFlag))
 
 			<-done
 			return nil
