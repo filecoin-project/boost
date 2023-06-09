@@ -7,6 +7,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/sectorstatemgr"
+	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
 )
 
 type dealData struct {
@@ -72,6 +73,21 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 		return nil, err
 	}
 
+	fpt, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{HasUnsealedCopy: true})
+	if err != nil {
+		return nil, err
+	}
+
+	fpf, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{HasUnsealedCopy: false})
+	if err != nil {
+		return nil, err
+	}
+
+	ap, err := r.piecedirectory.PiecesCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	ls := &lidState{
 		FlaggedPieces: int32(fp),
 		DealData: dealData{
@@ -80,9 +96,9 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 			FlaggedSealed:   gqltypes.Uint64(18094627905536),
 		},
 		Pieces: pieces{
-			Indexed:         360,
-			FlaggedUnsealed: 33,
-			FlaggedSealed:   480,
+			Indexed:         int32(ap - fp),
+			FlaggedUnsealed: int32(fpt),
+			FlaggedSealed:   int32(fpf),
 		},
 		SectorUnsealedCopies: sectorUnsealedCopies{
 			Sealed:   sealed,

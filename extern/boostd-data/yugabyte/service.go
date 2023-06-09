@@ -4,6 +4,9 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boostd-data/svc/types"
@@ -15,8 +18,6 @@ import (
 	"github.com/yugabyte/gocql"
 	"github.com/yugabyte/pgx/v4/pgxpool"
 	"golang.org/x/sync/errgroup"
-	"sync"
-	"time"
 )
 
 var log = logging.Logger("boostd-data-yb")
@@ -496,6 +497,21 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	}
 
 	return md.IndexedAt, nil
+}
+
+func (s *Store) PiecesCount(ctx context.Context) (int, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
+	defer span.End()
+
+	var count int
+	qry := `SELECT COUNT(*) FROM idx.PieceMetadata`
+
+	err := s.session.Query(qry).WithContext(ctx).Scan(&count)
+	if err != nil {
+		return -1, fmt.Errorf("getting pieces count: %w", err)
+	}
+
+	return count, nil
 }
 
 func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {

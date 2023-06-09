@@ -272,5 +272,11 @@ func (m *SectorStateMgr) refreshState(ctx context.Context) (*SectorStateUpdates,
 		}
 	}
 
+	for k := range allSectorStates {
+		if _, ok := activeSectors[k]; !ok {
+			log.Debugw("sector present in all sector states, but not active", "number", k)
+		}
+	}
+
 	return &SectorStateUpdates{sectorUpdates, activeSectors, sectorWithDeals, allSectorStates, time.Now()}, nil
 }

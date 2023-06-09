@@ -72,6 +72,7 @@ func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("unsmgr", "INFO")
 	_ = logging.SetLogLevel("piecedoc", "INFO")
 	_ = logging.SetLogLevel("piecedirectory", "INFO")
+	_ = logging.SetLogLevel("sectorstatemgr", "INFO")
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostd", "DEBUG")
@@ -88,6 +89,7 @@ func before(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("unsmgr", "DEBUG")
 		_ = logging.SetLogLevel("piecedoc", "DEBUG")
 		_ = logging.SetLogLevel("piecedirectory", "DEBUG")
+		_ = logging.SetLogLevel("sectorstatemgr", "DEBUG")
 	}
 
 	return nil
