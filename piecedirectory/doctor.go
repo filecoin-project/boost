@@ -149,6 +149,8 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 	if d.fullnodeApi != nil { // nil in tests
 		found := false
 		for _, dealId := range chainDealIds {
+			doclog.Debugw("checking state for market deal", "piece", pieceCid, "deal", dealId)
+
 			_, err := d.fullnodeApi.StateMarketStorageDeal(ctx, dealId, head.Key())
 			if err == nil {
 				found = true
