@@ -3,7 +3,7 @@ import {useMutation, useQuery} from "@apollo/react-hooks";
 import {
     LIDQuery,
     FlaggedPiecesQuery, PieceBuildIndexMutation,
-    PieceStatusQuery, PiecesWithPayloadCidQuery, PiecesWithRootPayloadCidQuery
+    PieceStatusQuery, PiecesWithPayloadCidQuery, PiecesWithRootPayloadCidQuery, FlaggedPiecesCountQuery
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
@@ -20,6 +20,8 @@ import {Pagination} from "./Pagination";
 import {Info, InfoListItem} from "./Info";
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import {addCommas, humanFileSize} from "./util";
+
+const lidBasePath = '/piece-doctor'
 
 export function LIDMenuItem(props) {
     return (
@@ -223,6 +225,7 @@ function FlaggedPieces({setSearchQuery}) {
             cursor: queryCursor,
             offset: listOffset,
             limit: rowsPerPage,
+            hasUnsealedCopy: true,
         },
         fetchPolicy: 'network-only',
     })
@@ -256,14 +259,17 @@ function FlaggedPieces({setSearchQuery}) {
     }
 
     return <div className="flagged-pieces">
-        <h3>Flagged pieces</h3>
+        <NoUnsealedSectorLink />
+
+        <h3>
+            Flagged pieces ({totalCount})
+        </h3>
 
         <table>
             <tbody>
             <tr>
                 <th>Piece CID</th>
                 <th>Index</th>
-                <th>Unsealed Copy</th>
                 <th>Deals</th>
             </tr>
 
@@ -281,26 +287,30 @@ function FlaggedPieces({setSearchQuery}) {
     </div>
 }
 
-function FlaggedPieceRow({piece}) {
-    // Lookup the piece by piece CID.
-    // We do this asynchronously instead of as part of the list query so that
-    // checking for unseal status of each piece doesn't block the whole page.
-    const { loading, error, data } = useQuery(PieceStatusQuery, {
+function NoUnsealedSectorLink() {
+    const {loading, error, data} = useQuery(FlaggedPiecesCountQuery, {
+        pollInterval: 10000,
         variables: {
-            pieceCid: piece.PieceCid,
+            hasUnsealedCopy: false,
         },
+        fetchPolicy: 'network-only',
     })
 
-    var isUnsealedMsg
+    if (error) return <div>Error: {error.message}</div>
     if (loading) {
-        isUnsealedMsg = '...'
-    } else if (error) {
-        isUnsealedMsg = error.Message
-    } else if (data && data.pieceStatus) {
-        const isUnsealed = hasUnsealedCopy(data.pieceStatus)
-        isUnsealedMsg = isUnsealed ? 'Yes' : 'No'
+        return <div>&nbsp;</div>
     }
 
+    if (!data.piecesFlaggedCount) {
+        return null
+    }
+
+    return <div>
+        <Link className="nav-link" to="/no-unsealed">See {data.piecesFlaggedCount} pieces with no unsealed copy ➜</Link>
+    </div>
+}
+
+function FlaggedPieceRow({piece}) {
     return <tr>
         <td>
             <Link to={"/piece-doctor/piece/"+piece.PieceCid}>
@@ -308,7 +318,6 @@ function FlaggedPieceRow({piece}) {
             </Link>
         </td>
         <td>{piece.IndexStatus.Status}</td>
-        <td>{isUnsealedMsg}</td>
         <td>{piece.Deals.length}</td>
     </tr>
 }
@@ -321,6 +330,120 @@ function hasUnsealedCopy(piece) {
     }
     return false
 }
+
+export function NoUnsealedSectorPage(props) {
+    return <PageContainer title="Piece Doctor">
+        <NoUnsealedSectorPieces />
+    </PageContainer>
+}
+
+function NoUnsealedSectorPieces() {
+    const navigate = useNavigate()
+    const params = useParams()
+    const pageNum = (params.pageNum && parseInt(params.pageNum)) || 1
+
+    var [rowsPerPage, setRowsPerPage] = useState(RowsPerPage.load)
+    const onRowsPerPageChange = (e) => {
+        const val = parseInt(e.target.value)
+        RowsPerPage.save(val)
+        setRowsPerPage(val)
+        navigate(lidBasePath)
+        scrollTop()
+    }
+
+    // Fetch rows on this page
+    const listOffset = (pageNum-1) * rowsPerPage
+    const queryCursor = (pageNum === 1) ? null : params.cursor
+    const {loading, error, data} = useQuery(FlaggedPiecesQuery, {
+        pollInterval: 10000,
+        variables: {
+            cursor: queryCursor,
+            offset: listOffset,
+            limit: rowsPerPage,
+            hasUnsealedCopy: false,
+        },
+        fetchPolicy: 'network-only',
+    })
+
+    if (error) return <div>Error: {error.message + " - check connection to Boost server"}</div>
+    if (loading) return <div>Loading...</div>
+
+    var res = data.piecesFlagged
+    var rows = res.pieces
+    const totalCount = data.piecesFlagged.totalCount
+    const moreRows = data.piecesFlagged.more
+
+    if (!totalCount) {
+        return <div className="flagged-pieces-none">
+            Boost doctor did not find any pieces that were flagged because there is no unsealed copy of the sector
+        </div>
+    }
+
+    var cursor = params.cursor
+    if (pageNum === 1 && rows.length) {
+        cursor = rows[0].CreatedAt.getTime()
+    }
+
+    const paginationParams = {
+        basePath: '/no-unsealed',
+        cursor, pageNum, totalCount,
+        rowsPerPage: rowsPerPage,
+        moreRows: moreRows,
+        onRowsPerPageChange: onRowsPerPageChange,
+        onLinkClick: scrollTop,
+    }
+
+    return <div className="flagged-pieces inspect-content">
+        <FlaggedPiecesLink />
+
+        <h3>
+            Pieces with no unsealed sector ({totalCount})
+        </h3>
+
+        <table>
+            <tbody>
+            <tr>
+                <th>Piece CID</th>
+                <th>Index</th>
+                <th>Deals</th>
+            </tr>
+
+            {rows.map(piece => (
+                <FlaggedPieceRow
+                    key={piece.Piece.PieceCid}
+                    piece={piece.Piece}
+                />
+            ))}
+            </tbody>
+        </table>
+
+        <Pagination {...paginationParams} />
+    </div>
+}
+
+function FlaggedPiecesLink() {
+    const {loading, error, data} = useQuery(FlaggedPiecesCountQuery, {
+        pollInterval: 10000,
+        variables: {
+            hasUnsealedCopy: true,
+        },
+        fetchPolicy: 'network-only',
+    })
+
+    if (error) return <div>Error: {error.message}</div>
+    if (loading) {
+        return <div>&nbsp;</div>
+    }
+
+    if (!data.piecesFlaggedCount) {
+        return null
+    }
+
+    return <div>
+        <Link className="nav-link" to="/piece-doctor">See {data.piecesFlaggedCount} flagged pieces ➜</Link>
+    </div>
+}
+
 
 // Page showing information about a particular piece
 export function InspectPiecePage(props) {
