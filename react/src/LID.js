@@ -21,11 +21,9 @@ import {Info, InfoListItem} from "./Info";
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import {addCommas, humanFileSize} from "./util";
 
-var lidBasePath = '/lid'
-
 export function LIDMenuItem(props) {
     return (
-        <Link key="lid" className="menu-item" to={lidBasePath}>
+        <Link key="lid" className="menu-item" to={"/lid"}>
             <img className="icon" alt="" src={lidImg} />
             <h3>Local Index Directory</h3>
         </Link>
@@ -212,7 +210,7 @@ function FlaggedPieces({setSearchQuery}) {
         const val = parseInt(e.target.value)
         RowsPerPage.save(val)
         setRowsPerPage(val)
-        navigate(lidBasePath)
+        navigate("/piece-doctor")
         scrollTop()
     }
 
@@ -249,7 +247,7 @@ function FlaggedPieces({setSearchQuery}) {
     }
 
     const paginationParams = {
-        basePath: lidBasePath,
+        basePath: "/piece-doctor",
         cursor, pageNum, totalCount,
         rowsPerPage: rowsPerPage,
         moreRows: moreRows,
