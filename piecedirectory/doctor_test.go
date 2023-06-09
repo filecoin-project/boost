@@ -290,7 +290,7 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	}
 
 	// Create a doctor
-	doc := NewDoctor(cl, nil)
+	doc := NewDoctor(cl, nil, nil)
 
 	// Check the piece
 	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu)
