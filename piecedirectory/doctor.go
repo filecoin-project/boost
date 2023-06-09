@@ -108,9 +108,7 @@ func (d *Doctor) Run(ctx context.Context) {
 func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorstatemgr.SectorStateUpdates, head *types.TipSet) error {
 	defer func(start time.Time) { log.Debugw("checkPiece processing", "took", time.Since(start)) }(time.Now())
 
-	////////////////////////////////////////////////
 	// Check if piece belongs to an active sector
-	////////////////////////////////////////////////
 	md, err := d.store.GetPieceMetadata(ctx, pieceCid)
 	if err != nil {
 		return fmt.Errorf("failed to get piece %s from local index directory: %w", pieceCid, err)
@@ -147,31 +145,29 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 		return nil
 	}
 
-	/////////////////////////////////////////////////////////////////
 	// Check that Deal is actually on-chain for the active sectors
-	/////////////////////////////////////////////////////////////////
-	found := false
-	for _, dealId := range chainDealIds {
-		_, err := d.fullnodeApi.StateMarketStorageDeal(ctx, dealId, head.Key())
-		if err == nil {
-			found = true
-			break
+	if d.fullnodeApi != nil { // nil in tests
+		found := false
+		for _, dealId := range chainDealIds {
+			_, err := d.fullnodeApi.StateMarketStorageDeal(ctx, dealId, head.Key())
+			if err == nil {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			doclog.Debugw("ignoring and unflagging piece as no deal id found on chain", "piece", pieceCid)
+
+			err = d.store.UnflagPiece(ctx, pieceCid)
+			if err != nil {
+				return fmt.Errorf("failed to unflag piece %s: %w", pieceCid, err)
+			}
+			return nil
 		}
 	}
 
-	if !found {
-		doclog.Debugw("ignoring and unflagging piece as no deal id found on chain", "piece", pieceCid)
-
-		err = d.store.UnflagPiece(ctx, pieceCid)
-		if err != nil {
-			return fmt.Errorf("failed to unflag piece %s: %w", pieceCid, err)
-		}
-		return nil
-	}
-
-	/////////////////////////////////////
 	// Check if piece has been indexed
-	/////////////////////////////////////
 	isIndexed, err := d.store.IsIndexed(ctx, pieceCid)
 	if err != nil {
 		return fmt.Errorf("failed to check index status of piece %s: %w", pieceCid, err)
@@ -186,9 +182,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 		return nil
 	}
 
-	//////////////////////////////////////////////////////////////////////////////////////////////
 	// If piece is indexed and has active sector and active deal on chain, check for unsealed copy
-	//////////////////////////////////////////////////////////////////////////////?///////////////
 	var hasUnsealedDeal bool
 
 	for _, dl := range md.Deals {
