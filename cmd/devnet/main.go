@@ -4,10 +4,10 @@ import (
 	"context"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/filecoin-project/boost/pkg/devnet"
+
+	"github.com/urfave/cli/v2"
 
 	logging "github.com/ipfs/go-log/v2"
 )
@@ -17,26 +17,38 @@ func init() {
 }
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
+	app := &cli.App{
+		Name:  "devnet",
+		Usage: "Run a local devnet",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Aliases: []string{"bs"},
+				Name:    "bootstrap",
+				Value:   true,
+				Usage:   "bootstrap the devnet",
+			},
+		},
+		Action: func(cctx *cli.Context) error {
+
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return err
+			}
+
+			done := make(chan struct{})
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			go devnet.Run(ctx, home, done, cctx.Bool("bootstrap"))
+
+			<-done
+			return nil
+		},
+	}
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+
 	}
 
-	done := make(chan struct{})
-	go devnet.Run(ctx, home, done)
-
-	// setup a signal handler to cancel the context
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, syscall.SIGTERM, syscall.SIGINT)
-	select {
-	case <-interrupt:
-		log.Println("closing as we got interrupt")
-		cancel()
-	case <-ctx.Done():
-	}
-
-	<-done
 }
