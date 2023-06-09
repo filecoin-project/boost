@@ -18,7 +18,7 @@ import {LegacyDealDetail} from "./LegacyDealDetail"
 import {SettingsPage} from "./Settings";
 import {Banner} from "./Banner";
 import {ProposalLogsPage} from "./ProposalLogs";
-import {PieceDoctorPage, InspectPiecePage, LIDPage} from "./LID";
+import {PieceDoctorPage, InspectPiecePage, LIDPage, NoUnsealedSectorPieces, NoUnsealedSectorPage} from "./LID";
 import {RetrievalLogsPage} from "./RetrievalLogs";
 import {RetrievalLogDetail} from "./RetrievalLogDetail";
 
@@ -56,9 +56,11 @@ function App(props) {
                                         <Route path="/deals/:dealID" element={<DealDetail />} />
                                         <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
                                         <Route path="/piece-doctor" element={<PieceDoctorPage />} />
-                                        <Route path="/piece-doctor/piece/:pieceCID" element={<InspectPiecePage />} />
                                         <Route path="/piece-doctor/from/:cursor/page/:pageNum" element={<PieceDoctorPage />} />
                                         <Route path="/piece-doctor/:query" element={<PieceDoctorPage />} />
+                                        <Route path="/piece-doctor/piece/:pieceCID" element={<InspectPiecePage />} />
+                                        <Route path="/no-unsealed" element={<NoUnsealedSectorPage />} />
+                                        <Route path="/no-unsealed/from/:cursor/page/:pageNum" element={<NoUnsealedSectorPage />} />
                                         <Route path="/" element={<StorageDealsPage />} />
                                     </Routes>
                                 </div>
