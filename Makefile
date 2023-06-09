@@ -263,6 +263,9 @@ docker/all: $(lotus_build_cmd) docker/boost docker/booster-http docker/booster-b
 test-lid:
 	cd ./extern/boostd-data && ARCH=$(ARCH) docker-compose up --build --exit-code-from go-tests
 
+test-piecedir:
+	cd ./piecedirectory && ARCH=$(ARCH) docker-compose up --build --exit-code-from go-tests
+
 devnet/up:
 	rm -rf ./docker/devnet/data && docker compose -f ./docker/devnet/docker-compose.yaml up -d
 

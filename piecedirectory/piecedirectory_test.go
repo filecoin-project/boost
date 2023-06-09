@@ -1,6 +1,3 @@
-//go:build test_lid
-// +build test_lid
-
 package piecedirectory
 
 import (

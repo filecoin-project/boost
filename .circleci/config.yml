@@ -96,6 +96,19 @@ jobs:
             set -x
             make test-lid
 
+  piecedir-docker-compose:
+    description: 'Run piece directory integration tests'
+    machine:
+      image: ubuntu-2004:202104-01
+      resource_class: xlarge
+    steps:
+      - checkout
+      - run:
+          name: piece directory docker compose tests
+          command: |
+            set -x
+            make test-piecedir
+
   test:
     description: |
       Run go tests
@@ -333,7 +346,8 @@ workflows:
       - test:
           name: test-all
           suite: all
-          target: "`go list ./... | grep -v boost/itests`"
+          target: "`go list ./... | grep -v boost/itests | grep -v boost/piecedirectory`"
 
       - lid-docker-compose
 
+      - piecedir-docker-compose
