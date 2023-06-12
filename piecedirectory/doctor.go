@@ -169,23 +169,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 		}
 	}
 
-	// Check if piece has been indexed
-	isIndexed, err := d.store.IsIndexed(ctx, pieceCid)
-	if err != nil {
-		return fmt.Errorf("failed to check index status of piece %s: %w", pieceCid, err)
-	}
-
-	if !isIndexed {
-		err = d.store.FlagPiece(ctx, pieceCid, false)
-		if err != nil {
-			return fmt.Errorf("failed to flag unindexed piece %s: %w", pieceCid, err)
-		}
-		doclog.Debugw("flagging piece as unindexed", "piece", pieceCid)
-		return nil
-	}
-
-	// If piece is indexed and has active sector and active deal on chain, check for unsealed copy
-	var hasUnsealedDeal bool
+	var hasUnsealedCopy bool
 
 	for _, dl := range md.Deals {
 		mid, err := address.IDFromAddress(dl.MinerAddr)
@@ -199,18 +183,24 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 		}
 
 		if lu.SectorStates[sectorID] == db.SealStateUnsealed {
-			hasUnsealedDeal = true
+			hasUnsealedCopy = true
 			break
 		}
 	}
 
-	if !hasUnsealedDeal {
-		err = d.store.FlagPiece(ctx, pieceCid, false)
-		if err != nil {
-			return fmt.Errorf("failed to flag piece %s with no unsealed deal: %w", pieceCid, err)
-		}
+	// Check if piece has been indexed
+	isIndexed, err := d.store.IsIndexed(ctx, pieceCid)
+	if err != nil {
+		return fmt.Errorf("failed to check index status of piece %s: %w", pieceCid, err)
+	}
 
-		doclog.Debugw("flagging piece as having no unsealed copy", "piece", pieceCid, "hasUnsealedDeal", hasUnsealedDeal, "len(activeSectors)", len(lu.ActiveSectors), "len(sectorStates)", len(lu.SectorStates))
+	// If piece is not indexed or has no unsealed copy, flag it
+	if !isIndexed || !hasUnsealedCopy {
+		err = d.store.FlagPiece(ctx, pieceCid, hasUnsealedCopy)
+		if err != nil {
+			return fmt.Errorf("failed to flag piece %s: %w", pieceCid, err)
+		}
+		doclog.Debugw("flagging piece", "piece", pieceCid, "isIndexed", isIndexed, "hasUnsealedCopy", hasUnsealedCopy, "len(activeSectors)", len(lu.ActiveSectors), "len(sectorStates)", len(lu.SectorStates))
 		return nil
 	}
 
