@@ -8,11 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-<<<<<<< HEAD
 	model "github.com/filecoin-project/boostd-data/model"
-=======
-	piecestore "github.com/filecoin-project/boost-gfm/piecestore"
->>>>>>> main
 	mount "github.com/filecoin-project/dagstore/mount"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	gomock "github.com/golang/mock/gomock"
