@@ -110,18 +110,10 @@ function LIDContent() {
     }]
 
     return <div className="lid">
-        <BlockStatsSection />
         <table className="lid-graphs">
             <tbody>
             <tr>
                 <td width="50%">
-                  <div>
-                      <h3>Deal Data</h3>
-                      <div className="storage-chart">
-                          <CumulativeBarChart bars={dealDataBars} unit="byte" />
-                          <CumulativeBarLabels bars={dealDataBars} unit="byte" />
-                      </div>
-                  </div>
                   <div>
                       <h3>Pieces</h3>
 
@@ -137,23 +129,23 @@ function LIDContent() {
                               <Link to={"/piece-doctor"} className="button">View Flagged Pieces</Link>
                           </p>
                       </div>
-                  </div>
-                </td>
-                <td>
-                  <div>
-                      <h3>Deal Sectors Copies</h3>
 
-                      <div className="storage-chart">
-                          <CumulativeBarChart bars={barsSuc} />
-                          <CumulativeBarLabels bars={barsSuc} />
+                      <div>
+                          <h3>Deal Sectors Copies</h3>
+
+                          <div className="storage-chart">
+                              <CumulativeBarChart bars={barsSuc} />
+                              <CumulativeBarLabels bars={barsSuc} />
+                          </div>
                       </div>
-                  </div>
-                  <div>
-                      <h3>Sectors Proving State</h3>
 
-                      <div className="storage-chart">
-                          <CumulativeBarChart bars={barsSps} />
-                          <CumulativeBarLabels bars={barsSps} />
+                      <div>
+                          <h3>Sectors Proving State</h3>
+
+                          <div className="storage-chart">
+                              <CumulativeBarChart bars={barsSps} />
+                              <CumulativeBarLabels bars={barsSps} />
+                          </div>
                       </div>
                   </div>
                 </td>
