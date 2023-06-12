@@ -156,7 +156,7 @@ function LIDContent() {
                           <h3>
                               Sectors Proving State
                               <Info>
-                                Sectors Proving State indicates how many sectors are in an Active state on chain
+                                Sectors Proving State indicates how many sectors this SP is actively proving on chain
                               </Info>
                           </h3>
 
