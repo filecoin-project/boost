@@ -178,7 +178,7 @@ function PiecesInfo() {
         The pieces stored by the Local Index Directory are in one of these states:
         <p>
             <b>Indexed</b><br/>
-            The piece was successfully indexed
+            The piece was successfully indexed and all CIDs within it are retrievable
         </p>
         <p>
             <b>Flagged (unsealed)</b><br/>
