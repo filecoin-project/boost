@@ -1,4 +1,4 @@
-package mpoolMonitor
+package mpoolmonitor
 
 import (
 	"context"
@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -23,19 +23,19 @@ type timeStampedMsg struct {
 }
 
 type MpoolMonitor struct {
-	ctx                context.Context
-	cancel             context.CancelFunc
-	fullNode           v1api.FullNode
-	lk                 sync.Mutex
-	pendingAlertEpochs abi.ChainEpoch
-	msgs               map[cid.Cid]*timeStampedMsg
+	ctx              context.Context
+	cancel           context.CancelFunc
+	fullNode         v1api.FullNode
+	lk               sync.Mutex
+	mpoolAlertEpochs abi.ChainEpoch
+	msgs             map[cid.Cid]*timeStampedMsg
 }
 
-func NewMonitor(fullNode v1api.FullNode, cfg config.GraphqlConfig) *MpoolMonitor {
+func NewMonitor(fullNode v1api.FullNode, mpoolAlertEpochs int64) *MpoolMonitor {
 	return &MpoolMonitor{
-		fullNode:           fullNode,
-		pendingAlertEpochs: abi.ChainEpoch(cfg.PendingAlertEpochs),
-		msgs:               make(map[cid.Cid]*timeStampedMsg),
+		fullNode:         fullNode,
+		mpoolAlertEpochs: abi.ChainEpoch(mpoolAlertEpochs),
+		msgs:             make(map[cid.Cid]*timeStampedMsg),
 	}
 }
 
@@ -44,16 +44,17 @@ func (mm *MpoolMonitor) Start(ctx context.Context) error {
 	mmctx, cancel := context.WithCancel(ctx)
 	mm.ctx = mmctx
 	mm.cancel = cancel
-	err := mm.update(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to start mpool monitor: %w", err)
-	}
 	go mm.startMonitoring(mmctx)
 	return nil
 }
 
 func (mm *MpoolMonitor) startMonitoring(ctx context.Context) {
-	ticker := time.NewTicker(10 * time.Second)
+	err := mm.update(ctx)
+	if err != nil {
+		log.Errorf("failed to start mpool monitor: %s", err)
+	}
+
+	ticker := time.NewTicker(time.Duration(build.BlockDelaySecs) * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -166,7 +167,7 @@ func (mm *MpoolMonitor) Alerts(ctx context.Context) ([]cid.Cid, error) {
 	defer mm.lk.Unlock()
 
 	for mcid := range mm.msgs {
-		if mm.msgs[mcid].added+mm.pendingAlertEpochs <= ts.Height() {
+		if mm.msgs[mcid].added+mm.mpoolAlertEpochs <= ts.Height() {
 			ret = append(ret, mcid)
 		}
 	}

@@ -39,11 +39,14 @@ type Boost struct {
 	SealerApiInfo string
 	// The connect string for the sector index RPC API (lotus miner)
 	SectorIndexApiInfo string
-	Dealmaking         DealmakingConfig
-	Wallets            WalletsConfig
-	Graphql            GraphqlConfig
-	Tracing            TracingConfig
-	ContractDeals      ContractDealsConfig
+	// The number of epochs after which alert is generated for a local pending
+	// message in lotus mpool
+	MpoolAlertEpochs int64
+	Dealmaking       DealmakingConfig
+	Wallets          WalletsConfig
+	Graphql          GraphqlConfig
+	Tracing          TracingConfig
+	ContractDeals    ContractDealsConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
@@ -77,9 +80,6 @@ type GraphqlConfig struct {
 	ListenAddress string
 	// The port that the graphql server listens on
 	Port uint64
-	// The number of epochs after which alert is generated for a local pending
-	// message in lotus mpool
-	PendingAlertEpochs int64
 }
 
 type TracingConfig struct {

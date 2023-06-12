@@ -19,7 +19,7 @@ import (
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
-	"github.com/filecoin-project/boost/lib/mpoolMonitor"
+	"github.com/filecoin-project/boost/lib/mpoolmonitor"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/markets/retrievaladapter"
 	"github.com/filecoin-project/boost/markets/storageadapter"
@@ -509,7 +509,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(smtypes.CommpCalculator), From(new(lotus_modules.MinerStorageService))),
 
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner, cfg)),
-		Override(new(*mpoolMonitor.MpoolMonitor), modules.NewMpoolMonitor(cfg)),
+		Override(new(*mpoolmonitor.MpoolMonitor), modules.NewMpoolMonitor(cfg)),
 
 		// GraphQL server
 		Override(new(gql.BlockGetter), From(new(dtypes.IndexBackedBlockstore))),

@@ -58,6 +58,8 @@ func DefaultBoost() *Boost {
 	cfg := &Boost{
 		Common: defCommon(),
 
+		MpoolAlertEpochs: 30,
+
 		Storage: StorageConfig{
 			ParallelFetchLimit:            10,
 			StorageListRefreshDuration:    Duration(time.Hour * 1),
@@ -65,9 +67,8 @@ func DefaultBoost() *Boost {
 		},
 
 		Graphql: GraphqlConfig{
-			ListenAddress:      "127.0.0.1",
-			Port:               8080,
-			PendingAlertEpochs: 10,
+			ListenAddress: "127.0.0.1",
+			Port:          8080,
 		},
 
 		Tracing: TracingConfig{
