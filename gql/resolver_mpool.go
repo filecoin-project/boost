@@ -1,19 +1,166 @@
 package gql
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"reflect"
 
+	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/types"
+	cbg "github.com/whyrusleeping/cbor-gen"
 )
 
+type msg struct {
+	To         string
+	From       string
+	Nonce      gqltypes.Uint64
+	Value      gqltypes.BigInt
+	GasFeeCap  gqltypes.BigInt
+	GasLimit   gqltypes.Uint64
+	GasPremium gqltypes.BigInt
+	Method     string
+	Params     string
+	BaseFee    gqltypes.BigInt
+}
+
 // query: mpool(local): [Message]
+//func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg, error) {
+//	var ret []*msg
+//	var msgs []*types.SignedMessage
+//
+//	ts, err := r.fullNode.ChainHead(ctx)
+//	if err != nil {
+//		return nil, fmt.Errorf("failed to get chain head: %w", err)
+//	}
+//	baseFee := ts.Blocks()[0].ParentBaseFee
+//
+//	if args.Local {
+//		msgs, err = r.mpool.PendingLocal(ctx)
+//		if err != nil {
+//			return nil, err
+//		}
+//	} else {
+//		msgs, err = r.mpool.PendingAll()
+//		if err != nil {
+//			return nil, err
+//		}
+//	}
+//
+//	// Convert params to human-readable and get method name
+//	for _, m := range msgs {
+//		var params string
+//		methodName := m.Message.Method.String()
+//		toact, err := r.fullNode.StateGetActor(ctx, m.Message.To, types.EmptyTSK)
+//		if err == nil {
+//			method, ok := consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method]
+//			if ok {
+//				methodName = method.Name
+//
+//				params = string(m.Message.Params)
+//				p, ok := reflect.New(method.Params.Elem()).Interface().(cbg.CBORUnmarshaler)
+//				if ok {
+//					if err := p.UnmarshalCBOR(bytes.NewReader(m.Message.Params)); err == nil {
+//						b, err := json.MarshalIndent(p, "", "  ")
+//						if err == nil {
+//							params = string(b)
+//						}
+//					}
+//				}
+//			}
+//		}
+//
+//		ret = append(ret, &msg{
+//			To:         m.Message.To.String(),
+//			From:       m.Message.From.String(),
+//			Nonce:      gqltypes.Uint64(m.Message.Nonce),
+//			Value:      gqltypes.BigInt{Int: m.Message.Value},
+//			GasFeeCap:  gqltypes.BigInt{Int: m.Message.GasFeeCap},
+//			GasLimit:   gqltypes.Uint64(uint64(m.Message.GasLimit)),
+//			GasPremium: gqltypes.BigInt{Int: m.Message.GasPremium},
+//			Method:     methodName,
+//			Params:     params,
+//			BaseFee:    gqltypes.BigInt{Int: baseFee},
+//		})
+//	}
+//
+//	return ret, nil
+//}
+
 func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg, error) {
-	if args.Local {
-		return r.mpool.pendingLocal(ctx)
+	msgs, err := r.fullNode.MpoolPending(ctx, types.EmptyTSK)
+	if err != nil {
+		return nil, fmt.Errorf("getting mpool messages: %w", err)
 	}
-	return r.mpool.pendingAll()
+
+	var filter map[address.Address]struct{}
+	if args.Local {
+		addrs, err := r.fullNode.WalletList(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("getting local addresses: %w", err)
+		}
+
+		filter = make(map[address.Address]struct{})
+		for _, a := range addrs {
+			filter[a] = struct{}{}
+		}
+	}
+
+	ts, err := r.fullNode.ChainHead(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain head: %w", err)
+	}
+	baseFee := ts.Blocks()[0].ParentBaseFee
+
+	gqlmsgs := make([]*msg, 0, len(msgs))
+	for _, m := range msgs {
+		if filter != nil {
+			// Filter for local messages
+			if _, has := filter[m.Message.From]; !has {
+				continue
+			}
+		}
+
+		var params string
+		methodName := m.Message.Method.String()
+		toact, err := r.fullNode.StateGetActor(ctx, m.Message.To, types.EmptyTSK)
+		if err == nil {
+			method, ok := consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method]
+			if ok {
+				methodName = method.Name
+
+				params = string(m.Message.Params)
+				p, ok := reflect.New(method.Params.Elem()).Interface().(cbg.CBORUnmarshaler)
+				if ok {
+					if err := p.UnmarshalCBOR(bytes.NewReader(m.Message.Params)); err == nil {
+						b, err := json.MarshalIndent(p, "", "  ")
+						if err == nil {
+							params = string(b)
+						}
+					}
+				}
+			}
+		}
+
+		gqlmsgs = append(gqlmsgs, &msg{
+			To:         m.Message.To.String(),
+			From:       m.Message.From.String(),
+			Nonce:      gqltypes.Uint64(m.Message.Nonce),
+			Value:      gqltypes.BigInt{Int: m.Message.Value},
+			GasFeeCap:  gqltypes.BigInt{Int: m.Message.GasFeeCap},
+			GasLimit:   gqltypes.Uint64(uint64(m.Message.GasLimit)),
+			GasPremium: gqltypes.BigInt{Int: m.Message.GasPremium},
+			Method:     methodName,
+			Params:     params,
+			BaseFee:    gqltypes.BigInt{Int: baseFee},
+		})
+	}
+
+	return gqlmsgs, nil
 }
 
 func mockMessages() []*types.SignedMessage {

@@ -15,6 +15,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/lib/mpoolMonitor"
 	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
@@ -64,11 +65,10 @@ type resolver struct {
 	publisher  *storageadapter.DealPublisher
 	spApi      sealingpipeline.API
 	fullNode   v1api.FullNode
-	mpool      *mpoolMonitor
+	mpool      *mpoolMonitor.MpoolMonitor
 }
 
-func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode) *resolver {
-	mpm := newMpoolMonitor(fullNode, cfg.Graphql)
+func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode, mpool *mpoolMonitor.MpoolMonitor) *resolver {
 	return &resolver{
 		cfg:        cfg,
 		repo:       r,
@@ -89,7 +89,7 @@ func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsD
 		publisher:  publisher,
 		spApi:      spApi,
 		fullNode:   fullNode,
-		mpool:      mpm,
+		mpool:      mpool,
 	}
 }
 

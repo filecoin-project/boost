@@ -6,12 +6,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	retrievalimpl "github.com/filecoin-project/boost-gfm/retrievalmarket/impl"
-	rmnet "github.com/filecoin-project/boost-gfm/retrievalmarket/network"
-	"github.com/filecoin-project/boost/markets/pricing"
-	"github.com/filecoin-project/go-state-types/big"
 	"path"
 	"time"
+
+	retrievalimpl "github.com/filecoin-project/boost-gfm/retrievalmarket/impl"
+	rmnet "github.com/filecoin-project/boost-gfm/retrievalmarket/network"
+	"github.com/filecoin-project/boost/lib/mpoolMonitor"
+	"github.com/filecoin-project/boost/markets/pricing"
+	"github.com/filecoin-project/go-state-types/big"
 
 	piecestoreimpl "github.com/filecoin-project/boost-gfm/piecestore/impl"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
@@ -629,14 +631,14 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 	}
 }
 
-func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, fullNode v1api.FullNode, bg gql.BlockGetter) *gql.Server {
+func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, fullNode v1api.FullNode, bg gql.BlockGetter, mpool *mpoolMonitor.MpoolMonitor) *gql.Server {
 	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
 		storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API,
 		legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer,
 		ps dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface,
-		fullNode v1api.FullNode, bg gql.BlockGetter) *gql.Server {
+		fullNode v1api.FullNode, bg gql.BlockGetter, mpool *mpoolMonitor.MpoolMonitor) *gql.Server {
 
-		resolver := gql.NewResolver(cfg, r, h, dealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyProv, legacyDT, ps, sa, dagst, publisher, fullNode)
+		resolver := gql.NewResolver(cfg, r, h, dealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyProv, legacyDT, ps, sa, dagst, publisher, fullNode, mpool)
 		server := gql.NewServer(resolver, bg)
 
 		lc.Append(fx.Hook{
@@ -889,4 +891,17 @@ func (l *lotusGFMSPN) GetDataCap(ctx context.Context, addr address.Address, tok 
 func (l *lotusGFMSPN) GetProofType(ctx context.Context, addr address.Address, tok lotus_gfm_shared.TipSetToken) (abi.RegisteredSealProof, error) {
 	//TODO implement me
 	panic("implement me")
+}
+
+func NewMpoolMonitor(cfg *config.Boost) func(lc fx.Lifecycle, a v1api.FullNode) *mpoolMonitor.MpoolMonitor {
+	return func(lc fx.Lifecycle, a v1api.FullNode) *mpoolMonitor.MpoolMonitor {
+		mpm := mpoolMonitor.NewMonitor(a, cfg.Graphql)
+
+		lc.Append(fx.Hook{
+			OnStart: mpm.Start,
+			OnStop:  mpm.Stop,
+		})
+
+		return mpm
+	}
 }
