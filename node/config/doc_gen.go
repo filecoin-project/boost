@@ -435,6 +435,13 @@ for any other deal.`,
 
 			Comment: `The port that the graphql server listens on`,
 		},
+		{
+			Name: "PendingAlertEpochs",
+			Type: "int64",
+
+			Comment: `The number of epochs after which alert is generated for a local pending
+message in lotus mpool`,
+		},
 	},
 	"IndexProviderAnnounceConfig": []DocField{
 		{
