@@ -77,6 +77,9 @@ type GraphqlConfig struct {
 	ListenAddress string
 	// The port that the graphql server listens on
 	Port uint64
+	// The number of epochs after which alert is generated for a local pending
+	// message in lotus mpool
+	PendingAlertEpochs int64
 }
 
 type TracingConfig struct {

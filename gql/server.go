@@ -38,9 +38,15 @@ var schemaGraqhql string
 func (s *Server) Start(ctx context.Context) error {
 	log.Info("graphql server: starting")
 
+	// Start mpool monitoring
+	err := s.resolver.mpool.start(ctx)
+	if err != nil {
+		return err
+	}
+
 	// Serve React app
 	mux := http.NewServeMux()
-	err := serveReactApp(mux)
+	err = serveReactApp(mux)
 	if err != nil {
 		return err
 	}
@@ -184,6 +190,7 @@ func (s *Server) Stop(ctx context.Context) error {
 	}
 
 	s.wg.Wait()
+	s.resolver.mpool.stop()
 
 	return nil
 }
