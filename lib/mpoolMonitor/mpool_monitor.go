@@ -35,6 +35,7 @@ func NewMonitor(fullNode v1api.FullNode, cfg config.GraphqlConfig) *MpoolMonitor
 	return &MpoolMonitor{
 		fullNode:           fullNode,
 		pendingAlertEpochs: abi.ChainEpoch(cfg.PendingAlertEpochs),
+		msgs:               make(map[cid.Cid]*timeStampedMsg),
 	}
 }
 
@@ -43,8 +44,6 @@ func (mm *MpoolMonitor) Start(ctx context.Context) error {
 	mmctx, cancel := context.WithCancel(ctx)
 	mm.ctx = mmctx
 	mm.cancel = cancel
-	mm.lk.Lock()
-	defer mm.lk.Unlock()
 	err := mm.update(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start mpool monitor: %w", err)
@@ -62,12 +61,10 @@ func (mm *MpoolMonitor) startMonitoring(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			mm.lk.Lock()
 			err := mm.update(ctx)
 			if err != nil {
 				log.Errorf("failed to get messages from mpool: %s", err)
 			}
-			mm.lk.Unlock()
 		}
 	}
 }
@@ -164,6 +161,9 @@ func (mm *MpoolMonitor) Alerts(ctx context.Context) ([]cid.Cid, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chain head: %w", err)
 	}
+
+	mm.lk.Lock()
+	defer mm.lk.Unlock()
 
 	for mcid := range mm.msgs {
 		if mm.msgs[mcid].added+mm.pendingAlertEpochs <= ts.Height() {
