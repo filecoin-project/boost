@@ -115,7 +115,7 @@ function LIDContent() {
             <tr>
                 <td width="50%">
                   <div>
-                      <h3>Pieces</h3>
+                      <h3>Pieces<PiecesInfo/></h3>
 
                       <div className="storage-chart">
                           <CumulativeBarChart bars={piecesBars} />
@@ -123,7 +123,14 @@ function LIDContent() {
                       </div>
 
                       <div className="flagged-pieces-link">
-                          <h3>Flagged Pieces</h3>
+                          <h3>
+                              Flagged Pieces
+                              <Info>
+                                  Flagged Pieces are pieces that have been flagged by the Piece Doctor because it was
+                                  not possible to index the piece data. This could be because there was no unsealed copy
+                                  of the piece data, or because the piece data was inaccessible or corrupted.
+                              </Info>
+                          </h3>
                           <p>
                               <b>{addCommas(d.FlaggedPieces)}</b> Flagged Pieces
                               <Link to={"/piece-doctor"} className="button">View Flagged Pieces</Link>
@@ -131,7 +138,13 @@ function LIDContent() {
                       </div>
 
                       <div>
-                          <h3>Deal Sectors Copies</h3>
+                          <h3>
+                              Deal Sectors Copies
+                              <Info>
+                                  Deal Sectors Copies indicates how many sectors contain deals, and how many of those
+                                  sectors have an unsealed copy.
+                              </Info>
+                          </h3>
 
                           <div className="storage-chart">
                               <CumulativeBarChart bars={barsSuc} />
@@ -140,7 +153,12 @@ function LIDContent() {
                       </div>
 
                       <div>
-                          <h3>Sectors Proving State</h3>
+                          <h3>
+                              Sectors Proving State
+                              <Info>
+                                Sectors Proving State indicates how many sectors this SP is actively proving on chain
+                              </Info>
+                          </h3>
 
                           <div className="storage-chart">
                               <CumulativeBarChart bars={barsSps} />
@@ -153,6 +171,29 @@ function LIDContent() {
             </tbody>
         </table>
     </div>
+}
+
+function PiecesInfo() {
+    return <Info>
+        The pieces stored by the Local Index Directory are in one of these states:
+        <p>
+            <b>Indexed</b><br/>
+            The piece was successfully indexed and all CIDs within it are retrievable
+        </p>
+        <p>
+            <b>Flagged (unsealed)</b><br/>
+            Flagged by the Piece Doctor because there was some problem
+            creating an index. This could be because it was not possible
+            to read the data from the sealing subsystem, the data is
+            corrupt, etc.
+        </p>
+        <p>
+            <b>Flagged (sealed only)</b><br/>
+            Flagged by the Piece Doctor because there is no unsealed copy
+            of the piece data. This usually means the unsealed copy of the
+            sector containing the piece was deleted.
+        </p>
+    </Info>
 }
 
 function BlockStatsSection() {
