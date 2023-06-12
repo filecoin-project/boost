@@ -7,8 +7,8 @@
     display: inline-block;
     cursor: pointer;
     font-size: 1em;
-    width: 1em;
-    height: 1em;
+    width: 16px;
+    height: 16px;
     vertical-align: top;
     margin-left: 0.5em;
     background: url("./bootstrap-icons/icons/info-circle.svg");
