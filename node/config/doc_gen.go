@@ -44,6 +44,13 @@ your node if metadata log is disabled`,
 			Comment: `The connect string for the sector index RPC API (lotus miner)`,
 		},
 		{
+			Name: "MpoolAlertEpochs",
+			Type: "int64",
+
+			Comment: `The number of epochs after which alert is generated for a local pending
+message in lotus mpool`,
+		},
+		{
 			Name: "Dealmaking",
 			Type: "DealmakingConfig",
 
@@ -434,13 +441,6 @@ for any other deal.`,
 			Type: "uint64",
 
 			Comment: `The port that the graphql server listens on`,
-		},
-		{
-			Name: "PendingAlertEpochs",
-			Type: "int64",
-
-			Comment: `The number of epochs after which alert is generated for a local pending
-message in lotus mpool`,
 		},
 	},
 	"IndexProviderAnnounceConfig": []DocField{
