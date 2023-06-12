@@ -5,8 +5,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
+	"os"
+	"path/filepath"
+
+	"go.uber.org/fx"
+
+	"github.com/ipfs/go-datastore"
+	"github.com/ipld/go-ipld-prime"
+
 	"github.com/filecoin-project/boost-gfm/storagemarket"
-	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/node/config"
@@ -22,9 +30,7 @@ import (
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-ipld-prime"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/engine"
 	"github.com/ipni/index-provider/engine/xproviders"
@@ -33,10 +39,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multihash"
-	"go.uber.org/fx"
-	"net/url"
-	"os"
-	"path/filepath"
 )
 
 var log = logging.Logger("index-provider-wrapper")
@@ -47,7 +49,7 @@ type Wrapper struct {
 
 	cfg            *config.Boost
 	dealsDB        *db.DealsDB
-	legacyProv     gfm_storagemarket.StorageProvider
+	legacyProv     storagemarket.StorageProvider
 	prov           provider.Interface
 	piecedirectory *piecedirectory.PieceDirectory
 	ssm            *sectorstatemgr.SectorStateMgr
@@ -60,11 +62,11 @@ type Wrapper struct {
 }
 
 func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-	ssDB *db.SectorStateDB, legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface,
+	ssDB *db.SectorStateDB, legacyProv storagemarket.StorageProvider, prov provider.Interface,
 	piecedirectory *piecedirectory.PieceDirectory, ssm *sectorstatemgr.SectorStateMgr, meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
 
 	return func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-		ssDB *db.SectorStateDB, legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface,
+		ssDB *db.SectorStateDB, legacyProv storagemarket.StorageProvider, prov provider.Interface,
 		piecedirectory *piecedirectory.PieceDirectory,
 		ssm *sectorstatemgr.SectorStateMgr,
 		meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {

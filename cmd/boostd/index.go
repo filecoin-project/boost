@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	bcli "github.com/filecoin-project/boost/cli"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/go-cid"
@@ -66,7 +67,7 @@ var indexProvListMultihashesCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		
+
 		fmt.Printf("Found %d multihashes for deal with proposal cid %s:\n", len(mhs), propCid)
 		for _, mh := range mhs {
 			fmt.Println("  " + mh.String())
