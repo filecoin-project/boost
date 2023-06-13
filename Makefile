@@ -80,6 +80,12 @@ calibnet-go: build-go
 deps: $(BUILD_DEPS)
 .PHONY: deps
 
+migrate-lid: $(BUILD_DEPS)
+	rm -f migrate-lid
+	$(GOCC) build $(GOFLAGS) -o migrate-lid ./cmd/migrate-lid
+.PHONY: migrate-lid
+BINS+=migrate-lid
+
 boostx: $(BUILD_DEPS)
 	rm -f boostx
 	$(GOCC) build $(GOFLAGS) -o boostx ./cmd/boostx
@@ -87,12 +93,16 @@ boostx: $(BUILD_DEPS)
 BINS+=boostx
 
 boost: $(BUILD_DEPS)
-	rm -f boost boostd boostx
+	rm -f boost
 	$(GOCC) build $(GOFLAGS) -o boost ./cmd/boost
-	$(GOCC) build $(GOFLAGS) -o boostx ./cmd/boostx
-	$(GOCC) build $(GOFLAGS) -o boostd ./cmd/boostd
 .PHONY: boost
-BINS+=boost boostx boostd
+BINS+=boost
+
+boostd: $(BUILD_DEPS)
+	rm -f boostd
+	$(GOCC) build $(GOFLAGS) -o boostd ./cmd/boostd
+.PHONY: boostd
+BINS+=boostd
 
 boostd-data:
 	$(MAKE) -C ./extern/boostd-data
@@ -133,7 +143,7 @@ update-react: validate-node-version
 	npm run --prefix react build
 .PHONY: react
 
-build-go: boost boostd-data devnet
+build-go: boost boostd boostx boostd-data booster-http booster-bitswap devnet migrate-lid
 .PHONY: build-go
 
 build: react build-go
@@ -149,6 +159,9 @@ install-boost:
 	install -C ./boostd /usr/local/bin/boostd
 	install -C ./boostx /usr/local/bin/boostx
 	install -C ./boostd-data /usr/local/bin/boostd-data
+	install -C ./booster-http /usr/local/bin/booster-http
+	install -C ./booster-bitswap /usr/local/bin/booster-bitswap
+	install -C ./migrate-lid /usr/local/bin/migrate-lid
 
 install-devnet:
 	install -C ./devnet /usr/local/bin/devnet
