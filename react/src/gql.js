@@ -636,7 +636,7 @@ const MpoolQuery = gql`
 
 const MpoolAlertsQuery = gql`
     query AppMpoolAlertsQuery {
-        mpoolalerts
+        mpoolAlertsCount
     }
 `;
 

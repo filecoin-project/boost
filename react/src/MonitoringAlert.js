@@ -13,7 +13,7 @@ export function MonitoringAlert(props) {
 
     var count = 0
     if (data) {
-        count = data.mpoolalerts
+        count = data.mpoolAlertsCount
     }
     if (count < 1) {
         return null

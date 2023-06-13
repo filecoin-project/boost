@@ -91,8 +91,8 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 	return ret, nil
 }
 
-// query: mpoolalerts: int
-func (r *resolver) MpoolAlerts(ctx context.Context) (int32, error) {
+// query: mpoolAlertsCount: int
+func (r *resolver) MpoolAlertsCount(ctx context.Context) (int32, error) {
 	msgs, err := r.mpool.Alerts(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("getting alert count: %w", err)
