@@ -92,12 +92,12 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 }
 
 // query: mpoolalerts: int
-func (r *resolver) MpoolAlerts(ctx context.Context) (int, error) {
+func (r *resolver) MpoolAlerts(ctx context.Context) (int32, error) {
 	msgs, err := r.mpool.Alerts(ctx)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("getting alert count: %w", err)
 	}
-	return len(msgs), nil
+	return int32(len(msgs)), nil
 }
 
 func mockMessages() []*types.SignedMessage {
