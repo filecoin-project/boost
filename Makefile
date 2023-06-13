@@ -80,6 +80,12 @@ calibnet-go: build-go
 deps: $(BUILD_DEPS)
 .PHONY: deps
 
+migrate-lid: $(BUILD_DEPS)
+	rm -f migrate-lid
+	$(GOCC) build $(GOFLAGS) -o migrate-lid ./cmd/migrate-lid
+.PHONY: migrate-lid
+BINS+=migrate-lid
+
 boostx: $(BUILD_DEPS)
 	rm -f boostx
 	$(GOCC) build $(GOFLAGS) -o boostx ./cmd/boostx
@@ -133,7 +139,7 @@ update-react: validate-node-version
 	npm run --prefix react build
 .PHONY: react
 
-build-go: boost boostd-data devnet
+build-go: boost boostd-data devnet migrate-lid
 .PHONY: build-go
 
 build: react build-go
@@ -149,6 +155,7 @@ install-boost:
 	install -C ./boostd /usr/local/bin/boostd
 	install -C ./boostx /usr/local/bin/boostx
 	install -C ./boostd-data /usr/local/bin/boostd-data
+	install -C ./migrate-lid /usr/local/bin/migrate-lid
 
 install-devnet:
 	install -C ./devnet /usr/local/bin/devnet
