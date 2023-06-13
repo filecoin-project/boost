@@ -6,16 +6,16 @@ import {useQuery} from "@apollo/react-hooks";
 import {MpoolAlertsQuery} from "./gql";
 
 export function MonitoringAlert(props) {
-    const data = useQuery(MpoolAlertsQuery, {
+    const {data} = useQuery(MpoolAlertsQuery, {
         pollInterval: 100,
         fetchPolicy: `network-only`,
     })
 
     var count = 0
     if (data) {
-        count = data.mpoolAlertCount
+        count = data.mpoolalerts
     }
-    if (!count) {
+    if (count < 1) {
         return null
     }
 
