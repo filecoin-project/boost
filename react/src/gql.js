@@ -634,6 +634,12 @@ const MpoolQuery = gql`
     }
 `;
 
+const MpoolAlertsQuery = gql`
+    query AppMpoolAlertsQuery {
+        mpoolalerts
+    }
+`;
+
 const Libp2pAddrInfoQuery = gql`
     query AppLibp2pAddrInfoQuery {
         libp2pAddrInfo {
@@ -689,6 +695,7 @@ export {
     TransfersQuery,
     TransferStatsQuery,
     MpoolQuery,
+    MpoolAlertsQuery,
     SealingPipelineQuery,
     Libp2pAddrInfoQuery,
     StorageAskQuery,

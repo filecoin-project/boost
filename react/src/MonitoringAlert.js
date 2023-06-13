@@ -3,19 +3,18 @@ import './MonitoringAlert.css'
 import warnImg from "./bootstrap-icons/icons/exclamation-circle.svg"
 import {Link} from "react-router-dom";
 import {useQuery} from "@apollo/react-hooks";
+import {MpoolAlertQuery} from "./gql";
 
 export function MonitoringAlert(props) {
-    // const {data} = useQuery(MpoolAlertCountQuery, {
-    //     pollInterval: 10000,
-    //     fetchPolicy: 'network-only',
-    // })
-    const data = { mpoolAlertCount: 0 }
+    const data = useQuery(MpoolAlertQuery, {
+        pollInterval: 10000,
+        fetchPolicy: `network-only`,
+    })
 
     var count = 0
-    if (data) {
-        count = data.mpoolAlertCount
-    }
-    if (!count) {
+    if (data > 0) {
+        count = data
+    } else {
         return null
     }
 
