@@ -895,7 +895,7 @@ func (l *lotusGFMSPN) GetProofType(ctx context.Context, addr address.Address, to
 
 func NewMpoolMonitor(cfg *config.Boost) func(lc fx.Lifecycle, a v1api.FullNode) *mpoolmonitor.MpoolMonitor {
 	return func(lc fx.Lifecycle, a v1api.FullNode) *mpoolmonitor.MpoolMonitor {
-		mpm := mpoolmonitor.NewMonitor(a, cfg.MpoolAlertEpochs)
+		mpm := mpoolmonitor.NewMonitor(a, cfg.Monitoring.MpoolAlertEpochs)
 
 		lc.Append(fx.Hook{
 			OnStart: mpm.Start,

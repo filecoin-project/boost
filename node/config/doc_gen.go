@@ -44,13 +44,6 @@ your node if metadata log is disabled`,
 			Comment: `The connect string for the sector index RPC API (lotus miner)`,
 		},
 		{
-			Name: "MpoolAlertEpochs",
-			Type: "int64",
-
-			Comment: `The number of epochs after which alert is generated for a local pending
-message in lotus mpool`,
-		},
-		{
 			Name: "Dealmaking",
 			Type: "DealmakingConfig",
 
@@ -65,6 +58,12 @@ message in lotus mpool`,
 		{
 			Name: "Graphql",
 			Type: "GraphqlConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "Monitoring",
+			Type: "MonitoringConfig",
 
 			Comment: ``,
 		},
@@ -636,6 +635,15 @@ see https://boost.filecoin.io/configuration/deal-filters for more details`,
 			Type: "*lotus_config.RetrievalPricing",
 
 			Comment: ``,
+		},
+	},
+	"MonitoringConfig": []DocField{
+		{
+			Name: "MpoolAlertEpochs",
+			Type: "int64",
+
+			Comment: `The number of epochs after which alert is generated for a local pending
+message in lotus mpool`,
 		},
 	},
 	"StorageConfig": []DocField{

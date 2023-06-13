@@ -39,14 +39,12 @@ type Boost struct {
 	SealerApiInfo string
 	// The connect string for the sector index RPC API (lotus miner)
 	SectorIndexApiInfo string
-	// The number of epochs after which alert is generated for a local pending
-	// message in lotus mpool
-	MpoolAlertEpochs int64
-	Dealmaking       DealmakingConfig
-	Wallets          WalletsConfig
-	Graphql          GraphqlConfig
-	Tracing          TracingConfig
-	ContractDeals    ContractDealsConfig
+	Dealmaking         DealmakingConfig
+	Wallets            WalletsConfig
+	Graphql            GraphqlConfig
+	Monitoring         MonitoringConfig
+	Tracing            TracingConfig
+	ContractDeals      ContractDealsConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
@@ -363,4 +361,10 @@ type StorageConfig struct {
 	// Disable this if you wish to manually handle the refresh. If manually managing the redeclare
 	// and it is not triggered, retrieval quality for users will be impacted.
 	RedeclareOnStorageListRefresh bool
+}
+
+type MonitoringConfig struct {
+	// The number of epochs after which alert is generated for a local pending
+	// message in lotus mpool
+	MpoolAlertEpochs int64
 }
