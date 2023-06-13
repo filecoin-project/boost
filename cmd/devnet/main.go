@@ -26,7 +26,7 @@ func main() {
 				Aliases: []string{"i"},
 				Name:    initFlag,
 				Value:   true,
-				Usage:   "Whether to initialize the devnet from scratch",
+				Usage:   "Whether to initialize the devnet or attempt to use the existing state directories and config.",
 			},
 		},
 		Action: func(cctx *cli.Context) error {
