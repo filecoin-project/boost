@@ -62,6 +62,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "Monitoring",
+			Type: "MonitoringConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "Tracing",
 			Type: "TracingConfig",
 
@@ -629,6 +635,15 @@ see https://boost.filecoin.io/configuration/deal-filters for more details`,
 			Type: "*lotus_config.RetrievalPricing",
 
 			Comment: ``,
+		},
+	},
+	"MonitoringConfig": []DocField{
+		{
+			Name: "MpoolAlertEpochs",
+			Type: "int64",
+
+			Comment: `The number of epochs after which alert is generated for a local pending
+message in lotus mpool`,
 		},
 	},
 	"StorageConfig": []DocField{

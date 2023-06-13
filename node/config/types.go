@@ -42,6 +42,7 @@ type Boost struct {
 	Dealmaking         DealmakingConfig
 	Wallets            WalletsConfig
 	Graphql            GraphqlConfig
+	Monitoring         MonitoringConfig
 	Tracing            TracingConfig
 	ContractDeals      ContractDealsConfig
 
@@ -360,4 +361,10 @@ type StorageConfig struct {
 	// Disable this if you wish to manually handle the refresh. If manually managing the redeclare
 	// and it is not triggered, retrieval quality for users will be impacted.
 	RedeclareOnStorageListRefresh bool
+}
+
+type MonitoringConfig struct {
+	// The number of epochs after which alert is generated for a local pending
+	// message in lotus mpool
+	MpoolAlertEpochs int64
 }

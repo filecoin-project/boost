@@ -69,6 +69,10 @@ func DefaultBoost() *Boost {
 			Port:          8080,
 		},
 
+		Monitoring: MonitoringConfig{
+			MpoolAlertEpochs: 30,
+		},
+
 		Tracing: TracingConfig{
 			Enabled:     false,
 			Endpoint:    "",

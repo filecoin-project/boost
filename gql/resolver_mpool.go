@@ -7,13 +7,12 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/filecoin-project/lotus/chain/consensus"
-	cbg "github.com/whyrusleeping/cbor-gen"
-
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/types"
+	cbg "github.com/whyrusleeping/cbor-gen"
 )
 
 type msg struct {
@@ -31,23 +30,8 @@ type msg struct {
 
 // query: mpool(local): [Message]
 func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg, error) {
-	msgs, err := r.fullNode.MpoolPending(ctx, types.EmptyTSK)
-	if err != nil {
-		return nil, fmt.Errorf("getting mpool messages: %w", err)
-	}
-
-	var filter map[address.Address]struct{}
-	if args.Local {
-		addrs, err := r.fullNode.WalletList(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("getting local addresses: %w", err)
-		}
-
-		filter = make(map[address.Address]struct{})
-		for _, a := range addrs {
-			filter[a] = struct{}{}
-		}
-	}
+	var ret []*msg
+	var msgs []*types.SignedMessage
 
 	ts, err := r.fullNode.ChainHead(ctx)
 	if err != nil {
@@ -55,15 +39,20 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 	}
 	baseFee := ts.Blocks()[0].ParentBaseFee
 
-	gqlmsgs := make([]*msg, 0, len(msgs))
-	for _, m := range msgs {
-		if filter != nil {
-			// Filter for local messages
-			if _, has := filter[m.Message.From]; !has {
-				continue
-			}
+	if args.Local {
+		msgs, err = r.mpool.PendingLocal(ctx)
+		if err != nil {
+			return nil, err
 		}
+	} else {
+		msgs, err = r.mpool.PendingAll()
+		if err != nil {
+			return nil, err
+		}
+	}
 
+	// Convert params to human-readable and get method name
+	for _, m := range msgs {
 		var params string
 		methodName := m.Message.Method.String()
 		toact, err := r.fullNode.StateGetActor(ctx, m.Message.To, types.EmptyTSK)
@@ -85,7 +74,7 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 			}
 		}
 
-		gqlmsgs = append(gqlmsgs, &msg{
+		ret = append(ret, &msg{
 			To:         m.Message.To.String(),
 			From:       m.Message.From.String(),
 			Nonce:      gqltypes.Uint64(m.Message.Nonce),
@@ -99,7 +88,7 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 		})
 	}
 
-	return gqlmsgs, nil
+	return ret, nil
 }
 
 func mockMessages() []*types.SignedMessage {
