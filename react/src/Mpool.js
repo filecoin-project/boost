@@ -81,7 +81,7 @@ function MpoolMessage(props) {
         </tr>
         <tr key={i+"gas-limit"}>
             <td>Gas Limit</td>
-            <td>{msg.GasLimit}</td>
+            <td>{humanFIL(msg.GasLimit)}</td>
         </tr>
         <tr key={i+"gas-premium"}>
             <td>Gas Premium</td>
