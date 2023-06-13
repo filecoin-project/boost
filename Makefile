@@ -110,12 +110,6 @@ boostd-data:
 .PHONY: boostd-data
 BINS+=boostd-data
 
-boostd-data:
-	$(MAKE) -C ./extern/boostd-data
-	install -C ./extern/boostd-data/boostd-data ./boostd-data
-.PHONY: boostd-data
-BINS+=boostd-data
-
 booster-http: $(BUILD_DEPS)
 	rm -f booster-http
 	$(GOCC) build $(GOFLAGS) -o booster-http ./cmd/booster-http
@@ -149,7 +143,7 @@ update-react: validate-node-version
 	npm run --prefix react build
 .PHONY: react
 
-build-go: boost boostd-data devnet
+build-go: boost boostd boostx boostd-data booster-http booster-bitswap devnet migrate-lid
 .PHONY: build-go
 
 build: react build-go
@@ -165,6 +159,9 @@ install-boost:
 	install -C ./boostd /usr/local/bin/boostd
 	install -C ./boostx /usr/local/bin/boostx
 	install -C ./boostd-data /usr/local/bin/boostd-data
+	install -C ./booster-http /usr/local/bin/booster-http
+	install -C ./booster-bitswap /usr/local/bin/booster-bitswap
+	install -C ./migrate-lid /usr/local/bin/migrate-lid
 
 install-devnet:
 	install -C ./devnet /usr/local/bin/devnet
