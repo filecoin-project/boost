@@ -13,11 +13,11 @@ import (
 	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
-	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -48,7 +48,8 @@ type StoreMigrationApi interface {
 var desc = "It is recommended to do the dagstore migration while boost is running. " +
 	"The dagstore migration may take several hours. It is safe to stop and restart " +
 	"the process. It will continue from where it was stopped.\n" +
-	"The pieceinfo migration must be done after boost has been shut down."
+	"The pieceinfo migration must be done after boost has been shut down. " +
+	"It takes a few minutes."
 
 func checkMigrateType(migrateType string) error {
 	if migrateType != "dagstore" && migrateType != "pieceinfo" {
@@ -100,39 +101,26 @@ var migrateLevelDBCmd = &cli.Command{
 	},
 }
 
-var migrateCouchDBCmd = &cli.Command{
-	Name:        "couchbase",
-	Description: "Migrate boost piece information and dagstore to a couchbase store\n" + desc,
-	Usage:       "migrate-lid couchbase dagstore|pieceinfo",
+var migrateYugabyteDBCmd = &cli.Command{
+	Name:        "yugabyte",
+	Description: "Migrate boost piece information and dagstore to a yugabyte store\n" + desc,
+	Usage:       "migrate-lid yugabyte dagstore|pieceinfo",
 	Before:      before,
 	Flags: append(commonFlags, []cli.Flag{
+		&cli.StringSliceFlag{
+			Name:     "hosts",
+			Usage:    "yugabyte hosts to connect to over cassandra interface eg '127.0.0.1'",
+			Required: true,
+		},
 		&cli.StringFlag{
 			Name:     "connect-string",
-			Usage:    "couchbase connect string eg 'couchbase://127.0.0.1'",
+			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
 			Required: true,
 		},
-		&cli.StringFlag{
-			Name:     "username",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "password",
-			Required: true,
-		},
-		&cli.Uint64Flag{
-			Name:  "piece-meta-ram-quota-mb",
-			Usage: "megabytes of ram allocated to piece metadata couchbase bucket (recommended at least 1024)",
-			Value: 1024,
-		},
-		&cli.Uint64Flag{
-			Name:  "mh-pieces-ram-quota-mb",
-			Usage: "megabytes of ram allocated to multihash to piece cid couchbase bucket (recommended at least 1024)",
-			Value: 1024,
-		},
-		&cli.Uint64Flag{
-			Name:  "piece-offsets-ram-quota-mb",
-			Usage: "megabytes of ram allocated to piece offsets couchbase bucket (recommended at least 1024)",
-			Value: 1024,
+		&cli.IntFlag{
+			Name:  "insert-parallelism",
+			Usage: "the number of threads to use when inserting into the PayloadToPieces index",
+			Value: 16,
 		},
 	}...),
 	Action: func(cctx *cli.Context) error {
@@ -147,26 +135,15 @@ var migrateCouchDBCmd = &cli.Command{
 			return err
 		}
 
-		// Create a connection to the couchbase local index directory
-		settings := couchbase.DBSettings{
-			ConnectString: cctx.String("connect-string"),
-			Auth: couchbase.DBSettingsAuth{
-				Username: cctx.String("username"),
-				Password: cctx.String("password"),
-			},
-			PieceMetadataBucket: couchbase.DBSettingsBucket{
-				RAMQuotaMB: cctx.Uint64("piece-meta-ram-quota-mb"),
-			},
-			MultihashToPiecesBucket: couchbase.DBSettingsBucket{
-				RAMQuotaMB: cctx.Uint64("mh-pieces-ram-quota-mb"),
-			},
-			PieceOffsetsBucket: couchbase.DBSettingsBucket{
-				RAMQuotaMB: cctx.Uint64("piece-offsets-ram-quota-mb"),
-			},
+		// Create a connection to the yugabyte local index directory
+		settings := yugabyte.DBSettings{
+			Hosts:                    cctx.StringSlice("hosts"),
+			ConnectString:            cctx.String("connect-string"),
+			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
 		}
 
-		store := couchbase.NewStore(settings)
-		return migrate(cctx, "couchbase", store, migrateType)
+		store := yugabyte.NewStore(settings)
+		return migrate(cctx, "yugabyte", store, migrateType)
 	},
 }
 
@@ -558,7 +535,7 @@ var migrateReverseCmd = &cli.Command{
 	Usage: "Do a reverse migration from the local index directory back to the legacy format",
 	Subcommands: []*cli.Command{
 		migrateReverseLeveldbCmd,
-		migrateReverseCouchbaseCmd,
+		migrateReverseYugabyteCmd,
 	},
 }
 
@@ -571,27 +548,29 @@ var migrateReverseLeveldbCmd = &cli.Command{
 	},
 }
 
-var migrateReverseCouchbaseCmd = &cli.Command{
-	Name:   "couchbase",
-	Usage:  "Reverse migrate a couchbase local index directory",
+var migrateReverseYugabyteCmd = &cli.Command{
+	Name:   "yugabyte",
+	Usage:  "Reverse migrate a yugabyte local index directory",
 	Before: before,
 	Flags: []cli.Flag{
+		&cli.StringSliceFlag{
+			Name:     "hosts",
+			Usage:    "yugabyte hosts to connect to over cassandra interface eg '127.0.0.1'",
+			Required: true,
+		},
 		&cli.StringFlag{
 			Name:     "connect-string",
-			Usage:    "couchbase connect string eg 'couchbase://127.0.0.1'",
+			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
 			Required: true,
 		},
-		&cli.StringFlag{
-			Name:     "username",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "password",
-			Required: true,
+		&cli.IntFlag{
+			Name:  "insert-parallelism",
+			Usage: "the number of threads to use when inserting into the PayloadToPieces index",
+			Value: 16,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		return migrateReverse(cctx, "couchbase")
+		return migrateReverse(cctx, "yugabyte")
 	},
 }
 
@@ -610,7 +589,7 @@ func migrateReverse(cctx *cli.Context, dbType string) error {
 		return err
 	}
 
-	// Get a leveldb / couchbase store
+	// Get a leveldb / yugabyte store
 	var store StoreMigrationApi
 	if dbType == "leveldb" {
 		// Create a connection to the leveldb store
@@ -620,16 +599,13 @@ func migrateReverse(cctx *cli.Context, dbType string) error {
 		}
 		store = ldb.NewStore(ldbRepoPath)
 	} else {
-		// Create a connection to the couchbase local index directory
-		settings := couchbase.DBSettings{
-			ConnectString: cctx.String("connect-string"),
-			Auth: couchbase.DBSettingsAuth{
-				Username: cctx.String("username"),
-				Password: cctx.String("password"),
-			},
+		// Create a connection to the yugabyte local index directory
+		settings := yugabyte.DBSettings{
+			ConnectString:            cctx.String("connect-string"),
+			Hosts:                    cctx.StringSlice("hosts"),
+			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
 		}
-
-		store = couchbase.NewStore(settings)
+		store = yugabyte.NewStore(settings)
 	}
 
 	// Perform the reverse migration
