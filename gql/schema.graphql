@@ -478,7 +478,7 @@ type RootQuery {
   mpool(local: Boolean!): [MpoolMessage]!
 
   """Get alerts for local messages sruck in mpool"""
-  mpoolalerts: [Int]!
+  mpoolalerts: Int!
 
   """Get libp2p addresses and peer id"""
   libp2pAddrInfo: Libp2pAddrInfo!
