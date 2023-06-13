@@ -21,6 +21,7 @@ import {ProposalLogsPage} from "./ProposalLogs";
 import {InspectPage} from "./Inspect";
 import {RetrievalLogsPage} from "./RetrievalLogs";
 import {RetrievalLogDetail} from "./RetrievalLogDetail";
+import {MonitoringAlert} from "./MonitoringAlert";
 
 function App(props) {
     return (
@@ -32,6 +33,7 @@ function App(props) {
                             <Menu />
                             <td className="main-content">
                                 <div className="page-content">
+                                    <MonitoringAlert />
                                     <Epoch />
                                     <Banner />
                                     <Routes>
