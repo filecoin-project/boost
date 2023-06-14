@@ -575,7 +575,7 @@ func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.
 		dsw stores.DAGStoreWrapper,
 		meshCreator idxprov.MeshCreator,
 	) (gfm_storagemarket.StorageProvider, error) {
-		prov, err := StorageProvider(minerAddress, storedAsk, h, ds, r, pieceStore, indexer, dataTransfer, spn, df, dsw, meshCreator)
+		prov, err := StorageProvider(minerAddress, storedAsk, h, ds, r, pieceStore, indexer, dataTransfer, spn, df, dsw, meshCreator, cfg.Dealmaking)
 		if err != nil {
 			return prov, err
 		}

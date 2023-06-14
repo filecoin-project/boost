@@ -13,6 +13,7 @@ import (
 	smnet "github.com/filecoin-project/boost-gfm/storagemarket/network"
 	"github.com/filecoin-project/boost-gfm/stores"
 	"github.com/filecoin-project/boost/markets/idxprov"
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/go-address"
 	datatransferv2 "github.com/filecoin-project/go-data-transfer/v2"
@@ -25,6 +26,7 @@ import (
 	"github.com/ipfs/go-datastore/namespace"
 	provider "github.com/ipni/index-provider"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 func StorageProvider(minerAddress lotus_dtypes.MinerAddress,
@@ -37,9 +39,14 @@ func StorageProvider(minerAddress lotus_dtypes.MinerAddress,
 	spn storagemarket.StorageProviderNode,
 	df storageimpl.DealDeciderFunc,
 	dsw stores.DAGStoreWrapper,
-	meshCreator idxprov.MeshCreator,
+	meshCreator idxprov.MeshCreator, cfg config.DealmakingConfig,
 ) (storagemarket.StorageProvider, error) {
-	net := smnet.NewFromLibp2pHost(h)
+	var opts []smnet.Option
+	if !cfg.EnableLegacyDealProtocols {
+		opts = append(opts, smnet.SupportedDealProtocols([]protocol.ID{}))
+	}
+
+	net := smnet.NewFromLibp2pHost(h, opts...)
 
 	dir := filepath.Join(r.Path(), lotus_modules.StagingAreaDirName)
 	err := os.MkdirAll(dir, os.ModePerm)
