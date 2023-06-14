@@ -1,12 +1,16 @@
 package smtestutil
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
 
 	"github.com/filecoin-project/boost-gfm/storagemarket"
+	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
+	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	mock_sealingpipeline "github.com/filecoin-project/boost/storagemarket/sealingpipeline/mock"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/mock_types"
@@ -19,6 +23,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
+	"github.com/ipld/go-car/v2"
 )
 
 type MinerStub struct {
@@ -27,6 +32,7 @@ type MinerStub struct {
 	*mock_types.MockPieceAdder
 	*mock_types.MockCommpCalculator
 	*mock_types.MockIndexProvider
+	*mock_piecedirectory.MockPieceReader
 	*mock_sealingpipeline.MockAPI
 
 	lk                    sync.Mutex
@@ -44,6 +50,7 @@ func NewMinerStub(ctrl *gomock.Controller) *MinerStub {
 		MockChainDealManager: mock_types.NewMockChainDealManager(ctrl),
 		MockPieceAdder:       mock_types.NewMockPieceAdder(ctrl),
 		MockIndexProvider:    mock_types.NewMockIndexProvider(ctrl),
+		MockPieceReader:      mock_piecedirectory.NewMockPieceReader(ctrl),
 		MockAPI:              mock_sealingpipeline.NewMockAPI(ctrl),
 
 		unblockCommp:          make(map[uuid.UUID]chan struct{}),
@@ -81,8 +88,7 @@ func (ms *MinerStub) UnblockAddPiece(id uuid.UUID) {
 	close(ch)
 }
 
-func (ms *MinerStub) ForDeal(dp *types.DealParams, publishCid, finalPublishCid cid.Cid, dealId abi.DealID, sectorsStatusDealId abi.DealID, sectorId abi.SectorNumber,
-	offset abi.PaddedPieceSize) *MinerStubBuilder {
+func (ms *MinerStub) ForDeal(dp *types.DealParams, publishCid, finalPublishCid cid.Cid, dealId, sectorsStatusDealId abi.DealID, sectorId abi.SectorNumber, offset abi.PaddedPieceSize, carFilePath string) *MinerStubBuilder {
 	return &MinerStubBuilder{
 		stub: ms,
 		dp:   dp,
@@ -93,6 +99,7 @@ func (ms *MinerStub) ForDeal(dp *types.DealParams, publishCid, finalPublishCid c
 		sectorsStatusDealId: sectorsStatusDealId,
 		sectorId:            sectorId,
 		offset:              offset,
+		carFilePath:         carFilePath,
 	}
 }
 
@@ -105,9 +112,10 @@ type MinerStubBuilder struct {
 	dealId              abi.DealID
 	sectorsStatusDealId abi.DealID
 
-	sectorId abi.SectorNumber
-	offset   abi.PaddedPieceSize
-	rb       *[]byte
+	sectorId    abi.SectorNumber
+	offset      abi.PaddedPieceSize
+	carFilePath string
+	rb          *[]byte
 }
 
 func (mb *MinerStubBuilder) SetupNoOp() *MinerStubBuilder {
@@ -338,6 +346,18 @@ func (mb *MinerStubBuilder) SetupAnnounce(blocking bool, announce bool) *MinerSt
 		callCount = 1
 	}
 
+	// When boost finishes adding the piece to a sector, it creates an index
+	// of the piece data and then announces the index. We need to mock a piece
+	// reader that returns the CAR file.
+	getReader := func(_ context.Context, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (pdtypes.SectionReader, error) {
+		readerWithClose, err := toPieceDirSectionReader(mb.carFilePath)
+		if err != nil {
+			panic(fmt.Sprintf("creating piece dir section reader: %s", err))
+		}
+		return readerWithClose, nil
+	}
+	mb.stub.MockPieceReader.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(getReader)
+
 	mb.stub.MockIndexProvider.EXPECT().Enabled().AnyTimes().Return(true)
 	mb.stub.MockIndexProvider.EXPECT().Start(gomock.Any()).AnyTimes()
 	mb.stub.MockIndexProvider.EXPECT().AnnounceBoostDeal(gomock.Any(), gomock.Any()).Times(callCount).DoAndReturn(func(ctx context.Context, _ *types.ProviderDealState) (cid.Cid, error) {
@@ -380,6 +400,7 @@ func (mb *MinerStubBuilder) Output() *StubbedMinerOutput {
 		SealedBytes:         mb.rb,
 		SectorID:            mb.sectorId,
 		Offset:              mb.offset,
+		CarFilePath:         mb.carFilePath,
 	}
 }
 
@@ -391,4 +412,29 @@ type StubbedMinerOutput struct {
 	SealedBytes         *[]byte
 	SectorID            abi.SectorNumber
 	Offset              abi.PaddedPieceSize
+	CarFilePath         string
+}
+
+func toPieceDirSectionReader(carFilePath string) (pdtypes.SectionReader, error) {
+	carReader, err := car.OpenReader(carFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("opening car file %s: %w", carFilePath, err)
+	}
+	carv1Reader, err := carReader.DataReader()
+	if err != nil {
+		return nil, fmt.Errorf("opening car v1 reader %s: %s", carFilePath, err)
+	}
+	bz, err := io.ReadAll(carv1Reader)
+	if err != nil {
+		return nil, fmt.Errorf("reader car v1 reader %s: %s", carFilePath, err)
+	}
+	return &sectionReaderWithClose{Reader: bytes.NewReader(bz)}, nil
+}
+
+type sectionReaderWithClose struct {
+	*bytes.Reader
+}
+
+func (s *sectionReaderWithClose) Close() error {
+	return nil
 }

@@ -1,6 +1,6 @@
 version: 2.1
 orbs:
-  go: gotest/tools@0.0.13
+  go: gotest/tools@0.0.14
 
 executors:
   golang:
@@ -83,6 +83,19 @@ jobs:
           paths:
             - linux
 
+  lid-docker-compose:
+    description: 'Run LID integration tests'
+    machine:
+      image: ubuntu-2004:202104-01
+      resource_class: xlarge
+    steps:
+      - checkout
+      - run:
+          name: local index directory docker compose tests
+          command: |
+            set -x
+            make test-lid
+
   test:
     description: |
       Run go tests
@@ -98,6 +111,10 @@ jobs:
         type: string
         default: "./..."
         description: Import paths of packages to be tested.
+      cwd:
+        type: string
+        default: "."
+        description: Directory in which to run the test command
       suite:
         type: string
         default: unit
@@ -110,9 +127,16 @@ jobs:
           command: make boostci
           no_output_timeout: 30m
       - download-params
+      # Note: setup_remote_docker takes about 10s and it's only needed for
+      # local index directory tests so it may be worth refactoring so that it's
+      # only included for local index directory
+      - setup_remote_docker:
+          version: 20.10.18
+          docker_layer_caching: true
       - run:
           name: go test
           command: |
+            cd << parameters.cwd >>
             go test \
               << parameters.go-test-flags >> \
               << parameters.target >>
@@ -310,3 +334,6 @@ workflows:
           name: test-all
           suite: all
           target: "`go list ./... | grep -v boost/itests`"
+
+      - lid-docker-compose
+

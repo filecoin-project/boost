@@ -128,6 +128,12 @@ var (
 	HttpPieceByCid400ResponseCount   = stats.Int64("http/piece_by_cid_400_response_count", "Counter of /piece/<piece-cid> 400 responses", stats.UnitDimensionless)
 	HttpPieceByCid404ResponseCount   = stats.Int64("http/piece_by_cid_404_response_count", "Counter of /piece/<piece-cid> 404 responses", stats.UnitDimensionless)
 	HttpPieceByCid500ResponseCount   = stats.Int64("http/piece_by_cid_500_response_count", "Counter of /piece/<piece-cid> 500 responses", stats.UnitDimensionless)
+	HttpBlockByCidRequestCount       = stats.Int64("http/block_by_cid_request_count", "Counter of /block/<block-cid> requests", stats.UnitDimensionless)
+	HttpBlockByCidRequestDuration    = stats.Float64("http/block_by_cid_request_duration_ms", "Time spent retrieving a block by cid", stats.UnitMilliseconds)
+	HttpBlockByCid200ResponseCount   = stats.Int64("http/block_by_cid_200_response_count", "Counter of /block/<block-cid> 200 responses", stats.UnitDimensionless)
+	HttpBlockByCid400ResponseCount   = stats.Int64("http/block_by_cid_400_response_count", "Counter of /block/<block-cid> 400 responses", stats.UnitDimensionless)
+	HttpBlockByCid404ResponseCount   = stats.Int64("http/block_by_cid_404_response_count", "Counter of /block/<block-cid> 404 responses", stats.UnitDimensionless)
+	HttpBlockByCid500ResponseCount   = stats.Int64("http/block_by_cid_500_response_count", "Counter of /block/<block-cid> 500 responses", stats.UnitDimensionless)
 
 	// http remote blockstore
 	HttpRblsGetRequestCount             = stats.Int64("http/rbls_get_request_count", "Counter of RemoteBlockstore Get requests", stats.UnitDimensionless)

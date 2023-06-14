@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-
 	"github.com/docker/go-units"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/go-paramfetch"

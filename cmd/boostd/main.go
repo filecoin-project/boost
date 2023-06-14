@@ -3,12 +3,11 @@ package main
 import (
 	"os"
 
+	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/cmd"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
-
-	"github.com/filecoin-project/boost/build"
-	"github.com/filecoin-project/boostd-data/shared/cliutil"
 )
 
 var log = logging.Logger("boostd")
@@ -49,8 +48,9 @@ func main() {
 			importDataCmd,
 			logCmd,
 			dagstoreCmd,
-			piecesCmd,
 			netCmd,
+			pieceDirCmd,
+			recoverCmd,
 		},
 	}
 	app.Setup()
@@ -67,8 +67,12 @@ func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("modules", "INFO")
 	_ = logging.SetLogLevel("cfg", "INFO")
 	_ = logging.SetLogLevel("boost-storage-deal", "INFO")
+	_ = logging.SetLogLevel("piecedir", "INFO")
 	_ = logging.SetLogLevel("index-provider-wrapper", "INFO")
 	_ = logging.SetLogLevel("unsmgr", "INFO")
+	_ = logging.SetLogLevel("piecedoc", "INFO")
+	_ = logging.SetLogLevel("piecedirectory", "INFO")
+	_ = logging.SetLogLevel("sectorstatemgr", "INFO")
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostd", "DEBUG")
@@ -80,7 +84,12 @@ func before(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("boost-migrator", "DEBUG")
 		_ = logging.SetLogLevel("dagstore", "DEBUG")
 		_ = logging.SetLogLevel("migrator", "DEBUG")
+		_ = logging.SetLogLevel("piecedir", "DEBUG")
+		_ = logging.SetLogLevel("fxlog", "DEBUG")
 		_ = logging.SetLogLevel("unsmgr", "DEBUG")
+		_ = logging.SetLogLevel("piecedoc", "DEBUG")
+		_ = logging.SetLogLevel("piecedirectory", "DEBUG")
+		_ = logging.SetLogLevel("sectorstatemgr", "DEBUG")
 	}
 
 	return nil

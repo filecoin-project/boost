@@ -146,7 +146,7 @@ export function DealDetail(props) {
                 </tr>
                 <tr>
                     <th>Deal Data Root CID</th>
-                    <td><Link to={'/inspect/'+deal.DealDataRoot}>{deal.DealDataRoot}</Link></td>
+                    <td><Link to={'/piece-doctor/'+deal.DealDataRoot}>{deal.DealDataRoot}</Link></td>
                 </tr>
                 <tr>
                     <th>Verified</th>
@@ -162,7 +162,7 @@ export function DealDetail(props) {
                 </tr>
                 <tr>
                     <th>Piece CID</th>
-                    <td><Link to={'/inspect/'+deal.PieceCid}>{deal.PieceCid}</Link></td>
+                    <td><Link to={'/piece-doctor/'+deal.PieceCid}>{deal.PieceCid}</Link></td>
                 </tr>
                 <tr>
                     <th>Piece Size</th>

@@ -18,7 +18,7 @@ import {LegacyDealDetail} from "./LegacyDealDetail"
 import {SettingsPage} from "./Settings";
 import {Banner} from "./Banner";
 import {ProposalLogsPage} from "./ProposalLogs";
-import {InspectPage} from "./Inspect";
+import {PieceDoctorPage, InspectPiecePage, LIDPage, NoUnsealedSectorPieces, NoUnsealedSectorPage} from "./LID";
 import {RetrievalLogsPage} from "./RetrievalLogs";
 import {RetrievalLogDetail} from "./RetrievalLogDetail";
 import {MonitoringAlert} from "./MonitoringAlert";
@@ -47,6 +47,7 @@ function App(props) {
                                         <Route path="/retrieval-logs/from/:cursor/page/:pageNum" element={<RetrievalLogsPage />} />
                                         <Route path="/retrieval-logs/:peerID/:transferID" element={<RetrievalLogDetail />} />
                                         <Route path="/storage-space" element={<StorageSpacePage />} />
+                                        <Route path="/lid" element={<LIDPage />} />
                                         <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />
                                         <Route path="/funds" element={<FundsPage />} />
                                         <Route path="/funds/from/:cursor/page/:pageNum" element={<FundsPage />} />
@@ -56,8 +57,12 @@ function App(props) {
                                         <Route path="/settings" element={<SettingsPage />} />
                                         <Route path="/deals/:dealID" element={<DealDetail />} />
                                         <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
-                                        <Route path="/inspect" element={<InspectPage />} />
-                                        <Route path="/inspect/:query" element={<InspectPage />} />
+                                        <Route path="/piece-doctor" element={<PieceDoctorPage />} />
+                                        <Route path="/piece-doctor/from/:cursor/page/:pageNum" element={<PieceDoctorPage />} />
+                                        <Route path="/piece-doctor/:query" element={<PieceDoctorPage />} />
+                                        <Route path="/piece-doctor/piece/:pieceCID" element={<InspectPiecePage />} />
+                                        <Route path="/no-unsealed" element={<NoUnsealedSectorPage />} />
+                                        <Route path="/no-unsealed/from/:cursor/page/:pageNum" element={<NoUnsealedSectorPage />} />
                                         <Route path="/" element={<StorageDealsPage />} />
                                     </Routes>
                                 </div>

@@ -6,7 +6,7 @@ import {Info} from "./Info";
 
 export function Epoch(props) {
     const {data} = useQuery(EpochQuery, {
-        pollInterval: 5000,
+        pollInterval: 10000,
         fetchPolicy: "network-only",
     })
 

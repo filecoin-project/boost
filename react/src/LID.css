@@ -1,0 +1,49 @@
+.nav-link {
+    margin-left: 1em;
+}
+
+.block-stats th {
+    text-align: left;
+}
+
+.block-stats td, .block-stats th {
+    padding: 0.5em 1em;
+}
+
+.lid-graphs {
+    margin-top: 2em;
+    width: 100%;
+}
+
+.lid-graphs td {
+    vertical-align: top;
+}
+
+.storage-chart {
+    padding: 1em;
+}
+
+.storage-chart .indexed, .storage-chart .unsealed, .storage-chart .active {
+    background-color: rgb(44, 123, 229);
+}
+
+.storage-chart .flagged {
+    background-color: rgb(166, 197, 247);
+}
+
+.storage-chart .sealed, .storage-chart .inactive {
+    background-color: #b3b3b3;
+}
+
+.storage-fields td {
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
+
+.sectors-list-link p, .flagged-pieces-link p {
+    padding: 1em;
+}
+
+.sectors-list-link a, .flagged-pieces-link a {
+    margin-left: 1em;
+}

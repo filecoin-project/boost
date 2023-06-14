@@ -15,6 +15,7 @@ services:
   lotus:
     container_name: lotus
     image: ${LOTUS_IMAGE}
+    init: true
     ports:
       - "1234:1234"
       - "9090:9090"
@@ -32,6 +33,7 @@ services:
   lotus-miner:
     container_name: lotus-miner
     image: ${LOTUS_MINER_IMAGE}
+    init: true
     ports:
       - "2345:2345"
     environment:
@@ -52,6 +54,7 @@ services:
   boost:
     container_name: boost
     image: ${BOOST_IMAGE}
+    init: true
     ports:
       - "8080:8080"
       - "1288:1288" # For the /metrics endpoint
@@ -74,10 +77,12 @@ services:
   booster-http:
     container_name: booster-http
     image: ${BOOSTER_HTTP_IMAGE}
+    init: true
     ports:
       - "7777:7777"
     environment:
       - BOOST_PATH=/var/lib/boost
+      - LID_API_INFO=http://boost:8042
       - LOTUS_PATH=/var/lib/lotus
       - LOTUS_MINER_PATH=/var/lib/lotus-miner
     restart: unless-stopped
@@ -93,11 +98,13 @@ services:
   booster-bitswap:
     container_name: booster-bitswap
     image: ${BOOSTER_BITSWAP_IMAGE}
+    init: true
     ports:
       - "8888:8888"
     environment:
       - BOOSTER_BITSWAP_REPO=/var/lib/booster-bitswap
       - BOOST_PATH=/var/lib/boost
+      - LID_API_INFO=http://boost:8042
       - LOTUS_PATH=/var/lib/lotus
       - LOTUS_MINER_PATH=/var/lib/lotus-miner
     restart: unless-stopped
@@ -114,6 +121,7 @@ services:
   demo-http-server:
     container_name: demo-http-server
     image: nginx:1.23-alpine
+    init: true
     restart: unless-stopped
     logging: *default-logging
     volumes:
@@ -125,6 +133,7 @@ services:
 
   tc:
     image: "${DOCKER_IMAGE_TERMINAL:-lukaszlach/docker-tc}"
+    init: true
     container_name: docker-tc
     cap_add:
       - NET_ADMIN

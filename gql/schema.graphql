@@ -185,6 +185,17 @@ type PieceStatus {
   PieceInfoDeals: [PieceInfoDeal]!
 }
 
+type FlaggedPieceStatus {
+  CreatedAt: Time!
+  Piece: PieceStatus!
+}
+
+type FlaggedPiecesList {
+  totalCount: Int!
+  pieces: [FlaggedPieceStatus]!
+  more: Boolean!
+}
+
 type ProposalLog {
   DealUUID: ID!
   Accepted: Boolean!
@@ -304,6 +315,36 @@ type SealingPipeline {
   SnapDealsWaitDealsSectors: [WaitDealsSector]!
   SectorStates: SectorStates!
   Workers: [Worker]!
+}
+
+type DealData {
+  Indexed: Uint64!
+  FlaggedUnsealed: Uint64!
+  FlaggedSealed: Uint64!
+}
+
+type Pieces {
+  Indexed: Int!
+  FlaggedUnsealed: Int!
+  FlaggedSealed: Int!
+}
+
+type SectorUnsealedCopies {
+  Unsealed: Int!
+  Sealed: Int!
+}
+
+type SectorProvingState {
+  Active: Int!
+  Inactive: Int!
+}
+
+type LID {
+  DealData: DealData!
+  Pieces: Pieces!
+  SectorUnsealedCopies: SectorUnsealedCopies!
+  SectorProvingState: SectorProvingState!
+  FlaggedPieces: Int!
 }
 
 type FundsEscrow {
@@ -441,6 +482,12 @@ type RootQuery {
   """Get the number of retrieval logs"""
   retrievalLogsCount: RetrievalStatesCount!
 
+  """Get a list of pieces that have been flagged as having problems"""
+  piecesFlagged(hasUnsealedCopy: Boolean, cursor: BigInt, offset: Int, limit: Int): FlaggedPiecesList!
+
+  """Get the number of pieces that have been flagged as having problems"""
+  piecesFlaggedCount(hasUnsealedCopy: Boolean): Int!
+
   """Get information about a piece from the piece store, DAG store and database"""
   pieceStatus(pieceCid: String!): PieceStatus!
 
@@ -450,6 +497,9 @@ type RootQuery {
   """Get the pieces that have a particular root payload CID"""
   piecesWithRootPayloadCid(payloadCid: String!): [String!]!
 
+  """Get the indexes for a particular piece CID"""
+  pieceIndexes(pieceCid: String!): [String!]!
+
   """Get storage space usage"""
   storage: Storage!
 
@@ -458,6 +508,9 @@ type RootQuery {
 
   """Get sealing pipeline state"""
   sealingpipeline: SealingPipeline!
+
+  """Get LID state"""
+  lid: LID!
 
   """Get funds available"""
   funds: Funds!
@@ -499,6 +552,9 @@ type RootMutation {
 
   """Publish all pending deals now"""
   dealPublishNow: Boolean!
+
+  """Explicitly load the piece data from the sealing subsystem and index it"""
+  pieceBuildIndex(pieceCid: String!): Boolean!
 
   """Top-up the available deal collateral in escrow for deal publishing"""
   fundsMoveToEscrow(amount: BigInt!): Boolean!
