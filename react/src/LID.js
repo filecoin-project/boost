@@ -13,7 +13,6 @@ import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import xImg from './bootstrap-icons/icons/x-lg.svg'
 import lidImg from './bootstrap-icons/icons/wrench.svg'
-//import repairImg from './bootstrap-icons/icons/wrench-white.svg'
 import './LID.css'
 import './Inspect.css'
 import {Pagination} from "./Pagination";
@@ -604,10 +603,8 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
         return <div>No piece found with piece CID {pieceCid}</div>
     }
 
-    const rootCid = pieceStatus.Deals.length ? pieceStatus.Deals[0].Deal.DealDataRoot : null
-    const searchIsAnyCid = searchQuery && searchQuery != pieceCid && searchQuery != rootCid
+    const searchIsAnyCid = searchQuery && searchQuery != pieceCid
     const searchIsPieceCid = searchQuery && searchQuery == pieceCid
-    const searchIsRootCid = searchQuery && searchQuery == rootCid
     const indexFailed = pieceStatus.IndexStatus.Status === 'Failed'
     const indexRegistered = pieceStatus.IndexStatus.Status === 'Registered'
     const canReIndex = (indexFailed || indexRegistered) && hasUnsealedCopy(pieceStatus)
@@ -618,23 +615,11 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                 <tbody>
                 {searchIsAnyCid ? (
                     <tr key="payload cid">
-                        <th>Searched CID (non-root)</th>
+                        <th>Searched CID</th>
                         <td>
                             <span><strong>{searchQuery}</strong></span>
                             &nbsp;
                             <a className="download" target="_blank" href={"/download/block/"+searchQuery}>
-                                Download block
-                            </a>
-                        </td>
-                    </tr>
-                ) : null}
-                {rootCid ? (
-                    <tr key="data root cid">
-                        <th>Data Root CID</th>
-                        <td>
-                            { searchIsRootCid ? <strong>{rootCid}</strong> : <span>{rootCid}</span> }
-                            &nbsp;
-                            <a className="download" target="_blank" href={"/download/block/"+rootCid}>
                                 Download block
                             </a>
                         </td>
