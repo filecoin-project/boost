@@ -7,7 +7,7 @@ import {MpoolAlertsQuery} from "./gql";
 
 export function MonitoringAlert(props) {
     const {data} = useQuery(MpoolAlertsQuery, {
-        pollInterval: 100,
+        pollInterval: 10000,
         fetchPolicy: `network-only`,
     })
 
