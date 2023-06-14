@@ -13,7 +13,6 @@ import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import xImg from './bootstrap-icons/icons/x-lg.svg'
 import lidImg from './bootstrap-icons/icons/wrench.svg'
-//import repairImg from './bootstrap-icons/icons/wrench-white.svg'
 import './LID.css'
 import './Inspect.css'
 import {Pagination} from "./Pagination";
@@ -616,21 +615,10 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                 <tbody>
                 {searchIsAnyCid ? (
                     <tr key="payload cid">
-                        <th>Searched CID (non-root)</th>
+                        <th>Searched CID</th>
                         <td>
                             <span><strong>{searchQuery}</strong></span>
                             <a className="download" target="_blank" href={"/download/block/"+searchQuery}>
-                                Download block
-                            </a>
-                        </td>
-                    </tr>
-                ) : null}
-                {rootCid ? (
-                    <tr key="data root cid">
-                        <th>Data Root CID</th>
-                        <td>
-                            { searchIsRootCid ? <strong>{rootCid}</strong> : <span>{rootCid}</span> }
-                            <a className="download" target="_blank" href={"/download/block/"+rootCid}>
                                 Download block
                             </a>
                         </td>

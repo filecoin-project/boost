@@ -393,22 +393,6 @@ func (r *resolver) getIndexStatus(ctx context.Context, pieceCid cid.Cid, md pdty
 		idxst = IndexStatusComplete
 	}
 
-	// Try retrieving the piece payload cid as a means to check if the
-	// payload cid => piece cid index has been created correctly
-	if idxst == IndexStatusComplete && len(deals) > 0 {
-		cidstr := deals[0].Deal.DealDataRoot
-		c, err := cid.Parse(cidstr)
-		if err != nil {
-			// This should never happen, but check just in case
-			return nil, fmt.Errorf("parsing retrieved deal data root cid %s: %w", cidstr, err)
-		}
-		pieces, err := r.piecedirectory.PiecesContainingMultihash(ctx, c.Hash())
-		if err != nil || len(pieces) == 0 {
-			idxst = IndexStatusFailed
-			idxerr = fmt.Sprintf("unable to resolve piece's root payload cid %s to piece cid", cidstr)
-		}
-	}
-
 	return &indexStatus{Status: string(idxst), Error: idxerr}, nil
 }
 
