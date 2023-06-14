@@ -16,42 +16,44 @@ import (
 
 var log = logging.Logger("devnet")
 
-func Run(ctx context.Context, tempHome string, done chan struct{}) {
+func Run(ctx context.Context, tempHome string, done chan struct{}, initialize bool) {
 	var wg sync.WaitGroup
 
 	log.Debugw("using temp home dir", "dir", tempHome)
 
-	// The parameter files can be as large as 1GiB.
-	// If this is the first time lotus runs,
-	// and the machine doesn't have particularly fast internet,
-	// we don't want devnet to seemingly stall for many minutes.
-	// Instead, show the download progress explicitly.
-	// fetch-params will exit in about a second if all files are up to date.
-	// The command is also pretty verbose, so reduce its verbosity.
-	{
-		// One hour should be enough for practically any machine.
-		ctx, cancel := context.WithTimeout(ctx, time.Hour)
+	if initialize {
+		// The parameter files can be as large as 1GiB.
+		// If this is the first time lotus runs,
+		// and the machine doesn't have particularly fast internet,
+		// we don't want devnet to seemingly stall for many minutes.
+		// Instead, show the download progress explicitly.
+		// fetch-params will exit in about a second if all files are up to date.
+		// The command is also pretty verbose, so reduce its verbosity.
+		{
+			// One hour should be enough for practically any machine.
+			ctx, cancel := context.WithTimeout(ctx, time.Hour)
 
-		log.Debugw("lotus fetch-params 8388608")
-		cmd := exec.CommandContext(ctx, "lotus", "fetch-params", "8388608")
-		cmd.Env = []string{fmt.Sprintf("HOME=%s", tempHome), "GOLOG_LOG_LEVEL=error"}
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			log.Fatal(err)
+			log.Debugw("lotus fetch-params 8388608")
+			cmd := exec.CommandContext(ctx, "lotus", "fetch-params", "8388608")
+			cmd.Env = []string{fmt.Sprintf("HOME=%s", tempHome), "GOLOG_LOG_LEVEL=error"}
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				log.Fatal(err)
+			}
+			cancel()
 		}
-		cancel()
 	}
 
 	wg.Add(2)
 	go func() {
-		runLotusDaemon(ctx, tempHome)
+		runLotusDaemon(ctx, tempHome, initialize)
 		log.Debugw("shut down lotus daemon")
 		wg.Done()
 	}()
 
 	go func() {
-		runLotusMiner(ctx, tempHome)
+		runLotusMiner(ctx, tempHome, initialize)
 		log.Debugw("shut down lotus miner")
 		wg.Done()
 	}()
@@ -88,46 +90,51 @@ func runCmdsWithLog(ctx context.Context, name string, commands [][]string, homeD
 	}
 }
 
-func runLotusDaemon(ctx context.Context, home string) {
-	cmds := [][]string{
-		{"lotus-seed", "genesis", "new", "localnet.json"},
-		{"lotus-seed", "pre-seal", "--sector-size=8388608", "--num-sectors=1"},
-		{"lotus-seed", "genesis", "add-miner", "localnet.json",
-			filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.json")},
-		{"lotus", "daemon", "--lotus-make-genesis=dev.gen",
-			"--genesis-template=localnet.json", "--bootstrap=false"},
+func runLotusDaemon(ctx context.Context, home string, initialize bool) {
+	cmds := [][]string{}
+	if initialize {
+		cmds = append(cmds, []string{"lotus-seed", "genesis", "new", "localnet.json"},
+			[]string{"lotus-seed", "pre-seal", "--sector-size=8388608", "--num-sectors=1"},
+			[]string{"lotus-seed", "genesis", "add-miner", "localnet.json",
+				filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.json")},
+			[]string{"lotus", "daemon", "--lotus-make-genesis=dev.gen",
+				"--genesis-template=localnet.json", "--bootstrap=false"})
+	} else {
+		cmds = append(cmds, []string{"lotus", "daemon", "--genesis=dev.gen", "--bootstrap=false"})
 	}
 
 	runCmdsWithLog(ctx, "lotus-daemon", cmds, home)
 }
 
-func runLotusMiner(ctx context.Context, home string) {
+func runLotusMiner(ctx context.Context, home string, initialize bool) {
 	cmds := [][]string{
 		{"lotus", "wait-api"}, // wait for lotus node to run
-
-		{"lotus", "wallet", "import",
-			filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.key")},
-		{"lotus-miner", "init", "--genesis-miner", "--actor=t01000", "--sector-size=8388608",
-			"--pre-sealed-sectors=" + filepath.Join(home, ".genesis-sectors"),
-			"--pre-sealed-metadata=" + filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.json"),
-			"--nosync"},
-
-		// Starting in network version 13,
-		// pre-commits are batched by default,
-		// and commits are aggregated by default.
-		// This means deals could sit at StorageDealAwaitingPreCommit or
-		// StorageDealSealing for a while, going past our 10m test timeout.
-		{"sed", "-Ei", "-e", "s/#BatchPreCommits\\ =\\ true/BatchPreCommits=false/",
-			filepath.Join(home, ".lotusminer", "config.toml")},
-
-		{"sed", "-Ei", "-e", "s/#AggregateCommits\\ =\\ true/AggregateCommits=false/",
-			filepath.Join(home, ".lotusminer", "config.toml")},
-
-		{"sed", "-Ei", "-e", "s/#EnableMarkets\\ =\\ true/EnableMarkets=false/",
-			filepath.Join(home, ".lotusminer", "config.toml")},
-
-		{"lotus-miner", "run", "--nosync"},
 	}
+	if initialize {
+		cmds = append(cmds,
+			[]string{"lotus", "wallet", "import",
+				filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.key")},
+			[]string{"lotus-miner", "init", "--genesis-miner", "--actor=t01000", "--sector-size=8388608",
+				"--pre-sealed-sectors=" + filepath.Join(home, ".genesis-sectors"),
+				"--pre-sealed-metadata=" + filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.json"),
+				"--nosync"},
+
+			// Starting in network version 13,
+			// pre-commits are batched by default,
+			// and commits are aggregated by default.
+			// This means deals could sit at StorageDealAwaitingPreCommit or
+			// StorageDealSealing for a while, going past our 10m test timeout.
+			[]string{"sed", "-Ei", "-e", "s/#BatchPreCommits\\ =\\ true/BatchPreCommits=false/",
+				filepath.Join(home, ".lotusminer", "config.toml")},
+
+			[]string{"sed", "-Ei", "-e", "s/#AggregateCommits\\ =\\ true/AggregateCommits=false/",
+				filepath.Join(home, ".lotusminer", "config.toml")},
+
+			[]string{"sed", "-Ei", "-e", "s/#EnableMarkets\\ =\\ true/EnableMarkets=false/",
+				filepath.Join(home, ".lotusminer", "config.toml")},
+		)
+	}
+	cmds = append(cmds, []string{"lotus-miner", "run", "--nosync"})
 
 	runCmdsWithLog(ctx, "lotus-miner", cmds, home)
 }
