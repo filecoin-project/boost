@@ -4,6 +4,8 @@ import {React, useState} from "react";
 import {humanFIL} from "./util";
 import './Mpool.css'
 import {PageContainer} from "./Components";
+import {EpochQuery} from "./gql";
+import {addCommas} from "./util";
 
 export function MpoolPage(props) {
     return <PageContainer pageType="mpool" title="Message Pool">
@@ -13,7 +15,7 @@ export function MpoolPage(props) {
 
 function MpoolContent(props) {
     const [local, setLocal] = useState(true)
-    const {loading, error, data} = useQuery(MpoolQuery, { variables: { local } })
+    const {loading, error, data} = useQuery(MpoolQuery, { variables: { local } , pollInterval: 4000, fetchPolicy: "network-only"})
 
     if (loading) {
         return <div>Loading...</div>
@@ -44,32 +46,28 @@ function MpoolMessage(props) {
     const i = props.i
     const msg = props.msg
 
+    const {data} = useQuery(EpochQuery)
+    let currEpoch = data.epoch.Epoch+''
+    console.log(currEpoch)
+    let sentEpoch = msg.SentEpoch+''
+    console.log(sentEpoch)
+    let t = (currEpoch - sentEpoch)*data.epoch.SecondsPerEpoch+''
+
     const handleParamsClick = (el) => {
         el.target.classList.toggle('expanded')
     }
 
-    let t = msg.ElapsedSeconds+''
     let hh = Math.floor(t / 3600)
     t %= 3600
     let mm = Math.floor(t / 60)
-    let etime = `${hh} hours and ${mm} minutes`
+    t %= 60
+    let etime = `${hh} hours and ${mm} minutes ${t} seconds`
+    let epochInfo = `${sentEpoch} (${currEpoch - sentEpoch} epochs / ${etime} ago)`
 
     return <>
         <tr key={"sentepoch"}>
             <td>Sent At Epoch</td>
-            <td>{msg.SentEpoch+''}</td>
-        </tr>
-        <tr key={"senttime"}>
-            <td>Sent At</td>
-            <td>{Date(msg.SentTime)}</td>
-        </tr>
-        <tr key={"elapsedepoch"}>
-            <td>Elapsed Epochs</td>
-            <td>{msg.ElapsedEpoch+''}</td>
-        </tr>
-        <tr key={"elapsedtime"}>
-            <td>Elapsed Time</td>
-            <td>{etime}</td>
+            <td>{epochInfo}</td>
         </tr>
         <tr key={"to"}>
             <td>To</td>

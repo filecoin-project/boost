@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"time"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/lib/mpoolmonitor"
@@ -14,27 +13,21 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/graph-gophers/graphql-go"
 	cbg "github.com/whyrusleeping/cbor-gen"
 )
 
-const MAINNET_GENESIS_TIME = 1598306400
-
 type msg struct {
-	SentEpoch      gqltypes.Uint64
-	SentTime       graphql.Time
-	ElapsedEpoch   gqltypes.Uint64
-	ElapsedSeconds gqltypes.Uint64
-	To             string
-	From           string
-	Nonce          gqltypes.Uint64
-	Value          gqltypes.BigInt
-	GasFeeCap      gqltypes.BigInt
-	GasLimit       gqltypes.Uint64
-	GasPremium     gqltypes.BigInt
-	Method         string
-	Params         string
-	BaseFee        gqltypes.BigInt
+	SentEpoch  gqltypes.Uint64
+	To         string
+	From       string
+	Nonce      gqltypes.Uint64
+	Value      gqltypes.BigInt
+	GasFeeCap  gqltypes.BigInt
+	GasLimit   gqltypes.Uint64
+	GasPremium gqltypes.BigInt
+	Method     string
+	Params     string
+	BaseFee    gqltypes.BigInt
 }
 
 // query: mpool(local): [Message]
@@ -46,8 +39,6 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chain head: %w", err)
 	}
-
-	tnow := time.Now()
 
 	baseFee := ts.Blocks()[0].ParentBaseFee
 
@@ -87,20 +78,17 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 		}
 
 		ret = append(ret, &msg{
-			SentEpoch:      gqltypes.Uint64(m.Added),
-			SentTime:       graphql.Time{Time: m.AddedTime},
-			ElapsedEpoch:   gqltypes.Uint64(ts.Height() - m.Added),
-			ElapsedSeconds: gqltypes.Uint64(uint64(tnow.Sub(m.AddedTime).Seconds())),
-			To:             m.SignedMessage.Message.To.String(),
-			From:           m.SignedMessage.Message.From.String(),
-			Nonce:          gqltypes.Uint64(m.SignedMessage.Message.Nonce),
-			Value:          gqltypes.BigInt{Int: m.SignedMessage.Message.Value},
-			GasFeeCap:      gqltypes.BigInt{Int: m.SignedMessage.Message.GasFeeCap},
-			GasLimit:       gqltypes.Uint64(uint64(m.SignedMessage.Message.GasLimit)),
-			GasPremium:     gqltypes.BigInt{Int: m.SignedMessage.Message.GasPremium},
-			Method:         methodName,
-			Params:         params,
-			BaseFee:        gqltypes.BigInt{Int: baseFee},
+			SentEpoch:  gqltypes.Uint64(m.Added),
+			To:         m.SignedMessage.Message.To.String(),
+			From:       m.SignedMessage.Message.From.String(),
+			Nonce:      gqltypes.Uint64(m.SignedMessage.Message.Nonce),
+			Value:      gqltypes.BigInt{Int: m.SignedMessage.Message.Value},
+			GasFeeCap:  gqltypes.BigInt{Int: m.SignedMessage.Message.GasFeeCap},
+			GasLimit:   gqltypes.Uint64(uint64(m.SignedMessage.Message.GasLimit)),
+			GasPremium: gqltypes.BigInt{Int: m.SignedMessage.Message.GasPremium},
+			Method:     methodName,
+			Params:     params,
+			BaseFee:    gqltypes.BigInt{Int: baseFee},
 		})
 	}
 
