@@ -620,6 +620,10 @@ const StorageAskUpdate = gql`
 const MpoolQuery = gql`
     query AppMpoolQuery($local: Boolean!) {
         mpool(local: $local) {
+            SentEpoch
+            SentTime
+            ElapsedEpoch
+            ElapsedSeconds
             From
             To
             Nonce

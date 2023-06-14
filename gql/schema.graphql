@@ -363,6 +363,10 @@ type TransferStats {
 }
 
 type MpoolMessage {
+  SentEpoch: Uint64!
+  SentTime: Time!
+  ElapsedEpoch: Uint64!
+  ElapsedSeconds: Uint64!
   From: String!
   To: String!
   Nonce: Uint64!

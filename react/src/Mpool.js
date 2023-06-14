@@ -48,7 +48,29 @@ function MpoolMessage(props) {
         el.target.classList.toggle('expanded')
     }
 
+    let t = msg.ElapsedSeconds+''
+    let hh = Math.floor(t / 3600)
+    t %= 3600
+    let mm = Math.floor(t / 60)
+    let etime = `${hh} hours and ${mm} minutes`
+
     return <>
+        <tr key={"sentepoch"}>
+            <td>Sent At Epoch</td>
+            <td>{msg.SentEpoch+''}</td>
+        </tr>
+        <tr key={"senttime"}>
+            <td>Sent At</td>
+            <td>{Date(msg.SentTime)}</td>
+        </tr>
+        <tr key={"elapsedepoch"}>
+            <td>Elapsed Epochs</td>
+            <td>{msg.ElapsedEpoch+''}</td>
+        </tr>
+        <tr key={"elapsedtime"}>
+            <td>Elapsed Time</td>
+            <td>{etime}</td>
+        </tr>
         <tr key={"to"}>
             <td>To</td>
             <td className="address">{msg.To}</td>
