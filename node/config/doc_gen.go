@@ -413,6 +413,13 @@ Any value less than 0 will result in use of default`,
 accepted boost will tag funds for that deal so that they cannot be used
 for any other deal.`,
 		},
+		{
+			Name: "EnableLegacyDealProtocols",
+			Type: "bool",
+
+			Comment: `Whether to enable legacy deals on the Boost node or not. We recommend keeping
+them disabled. These will be completely deprecated soon.`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{
