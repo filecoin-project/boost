@@ -91,6 +91,15 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 	return ret, nil
 }
 
+// query: mpoolAlertsCount: int
+func (r *resolver) MpoolAlertsCount(ctx context.Context) (int32, error) {
+	msgs, err := r.mpool.Alerts(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("getting alert count: %w", err)
+	}
+	return int32(len(msgs)), nil
+}
+
 func mockMessages() []*types.SignedMessage {
 	to0, _ := address.NewFromString("f01469945")
 	from0, _ := address.NewFromString("f3uakndzne4lorwykinlitx2d2puuhgburvxw4dpkfskeofmzg33pm7okyzikqe2gzvaqj2k3hpunwayij6haa")
