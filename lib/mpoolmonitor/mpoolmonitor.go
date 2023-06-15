@@ -166,12 +166,14 @@ func (mm *MpoolMonitor) Alerts(ctx context.Context) ([]cid.Cid, error) {
 		return nil, fmt.Errorf("failed to get chain head: %w", err)
 	}
 
-	mm.lk.Lock()
-	defer mm.lk.Unlock()
+	msgs, err := mm.PendingLocal(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get local messages: %w", err)
+	}
 
-	for mcid := range mm.msgs {
-		if mm.msgs[mcid].Added+mm.mpoolAlertEpochs <= ts.Height() {
-			ret = append(ret, mcid)
+	for _, msg := range msgs {
+		if msg.Added+mm.mpoolAlertEpochs <= ts.Height() {
+			ret = append(ret, msg.SignedMessage.Cid())
 		}
 	}
 
