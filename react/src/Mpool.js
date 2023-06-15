@@ -15,7 +15,7 @@ export function MpoolPage(props) {
 
 function MpoolContent(props) {
     const [local, setLocal] = useState(true)
-    const {loading, error, data} = useQuery(MpoolQuery, { variables: { local } , pollInterval: 4000, fetchPolicy: "network-only"})
+    const {loading, error, data} = useQuery(MpoolQuery, { variables: { local } , pollInterval: 10000, fetchPolicy: "network-only"})
 
     if (loading) {
         return <div>Loading...</div>
