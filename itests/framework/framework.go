@@ -82,6 +82,7 @@ type TestFramework struct {
 	ClientAddr    address.Address
 	MinerAddr     address.Address
 	DefaultWallet address.Address
+	EnableLegacy  bool
 }
 
 func NewTestFramework(ctx context.Context, t *testing.T) *TestFramework {
@@ -294,6 +295,9 @@ func (f *TestFramework) Start() error {
 	// No transfers will start until the first stall check period has elapsed
 	cfg.Dealmaking.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
 	cfg.Storage.ParallelFetchLimit = 10
+	if f.EnableLegacy {
+		cfg.Dealmaking.EnableLegacyDealProtocols = true
+	}
 
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)

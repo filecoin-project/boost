@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMarketsV1Deal(t *testing.T) {
+func TestMarketsV1FailDeal(t *testing.T) {
 	ctx := context.Background()
 	log := framework.Log
 
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
 	f := framework.NewTestFramework(ctx, t)
-	f.EnableLegacy = true
+	f.EnableLegacy = false
 	err := f.Start()
 	require.NoError(t, err)
 	defer f.Stop()
@@ -42,6 +42,10 @@ func TestMarketsV1Deal(t *testing.T) {
 	require.NoError(t, err)
 
 	log.Debugw("got deal proposal cid", "cid", dealProposalCid)
+	di, err := f.FullNode.ClientGetDealInfo(ctx, *dealProposalCid)
+	require.NoError(t, err)
+
+	log.Debugw(di.Message)
 
 	err = f.WaitDealSealed(ctx, dealProposalCid)
 	require.NoError(t, err)

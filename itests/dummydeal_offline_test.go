@@ -18,6 +18,7 @@ func TestDummydealOffline(t *testing.T) {
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
 	f := framework.NewTestFramework(ctx, t)
+	f.EnableLegacy = true
 	err := f.Start()
 	require.NoError(t, err)
 	defer f.Stop()
