@@ -112,6 +112,8 @@ func (ps *PieceDirectory) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, h
 }
 
 func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+	log.Debugw("add deal for piece", "piececid", pieceCid, "uuid", dealInfo.DealUuid)
+
 	ctx, span := tracing.Tracer.Start(ctx, "pm.add_deal_for_piece")
 	defer span.End()
 

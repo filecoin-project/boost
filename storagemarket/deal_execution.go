@@ -605,6 +605,7 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
 	// add deal to piece metadata store
 	pc := deal.ClientDealProposal.Proposal.PieceCID
+	p.dealLogger.Infow(deal.DealUuid, "about to add deal for piece in LID")
 	if err := p.piecedirectory.AddDealForPiece(ctx, pc, model.DealInfo{
 		DealUuid:    deal.DealUuid.String(),
 		ChainDealID: deal.ChainDealID,
@@ -619,7 +620,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 			error: fmt.Errorf("failed to add deal to piece metadata store: %w", err),
 		}
 	}
-	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piece metadata store")
+	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to LID")
 
 	// if the index provider is enabled
 	if p.ip.Enabled() {
