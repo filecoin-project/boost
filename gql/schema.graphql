@@ -404,6 +404,7 @@ type TransferStats {
 }
 
 type MpoolMessage {
+  SentEpoch: Uint64!
   From: String!
   To: String!
   Nonce: Uint64!
