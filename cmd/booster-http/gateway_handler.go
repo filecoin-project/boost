@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/ipfs/boxo/gateway"
 	"mime"
 	"net/http"
 	"strings"
+
+	"github.com/ipfs/boxo/gateway"
 )
 
 type gatewayHandler struct {
@@ -13,7 +14,7 @@ type gatewayHandler struct {
 	supportedFormats map[string]struct{}
 }
 
-func newGatewayHandler(gw *gateway.BlocksGateway, supportedFormats []string) http.Handler {
+func newGatewayHandler(gw *gateway.BlocksBackend, supportedFormats []string) http.Handler {
 	headers := map[string][]string{}
 	gateway.AddAccessControlHeaders(headers)
 

@@ -92,7 +92,7 @@ func (s *HttpServer) Start(ctx context.Context) error {
 
 	if s.opts.Blockstore != nil {
 		blockService := blockservice.New(s.opts.Blockstore, offline.Exchange(s.opts.Blockstore))
-		gw, err := gateway.NewBlocksGateway(blockService)
+		gw, err := gateway.NewBlocksBackend(blockService)
 		if err != nil {
 			return fmt.Errorf("creating blocks gateway: %w", err)
 		}
