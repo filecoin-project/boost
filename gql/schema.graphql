@@ -417,6 +417,11 @@ type MpoolMessage {
   BaseFee: BigInt!
 }
 
+type MpoolMessages {
+  Count: Uint64!
+  Messages: [MpoolMessage]!
+}
+
 type Libp2pAddrInfo {
   Addresses: [String]!
   PeerID: String!
@@ -529,10 +534,7 @@ type RootQuery {
   transferStats: TransferStats!
 
   """Get local messages in the mpool"""
-  mpool(local: Boolean!): [MpoolMessage]!
-
-  """Get number of messages stuck in mpool"""
-  mpoolAlertsCount: Int!
+  mpool(alerts: Boolean!): MpoolMessages!
 
   """Get libp2p addresses and peer id"""
   libp2pAddrInfo: Libp2pAddrInfo!

@@ -3,6 +3,7 @@ package mpoolmonitor
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -20,7 +21,6 @@ var log = logging.Logger("mpoolmonitor")
 type TimeStampedMsg struct {
 	SignedMessage types.SignedMessage
 	Added         abi.ChainEpoch // Epoch when message was first noticed in mpool
-	AddedTime     time.Time
 }
 
 type MpoolMonitor struct {
@@ -55,7 +55,8 @@ func (mm *MpoolMonitor) startMonitoring(ctx context.Context) {
 		log.Errorf("failed to start mpool monitor: %s", err)
 	}
 
-	ticker := time.NewTicker(time.Duration(build.BlockDelaySecs) * time.Second)
+	// Run 3 times in an epoch
+	ticker := time.NewTicker(time.Duration(math.Floor(float64(build.BlockDelaySecs)/3)) * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -76,7 +77,17 @@ func (mm *MpoolMonitor) startMonitoring(ctx context.Context) {
 // Otherwise, it inserts a new key value pair for the message. It removed any msgs not found in the
 // latest output of MpoolPending
 func (mm *MpoolMonitor) update(ctx context.Context) error {
-	t := time.Now()
+	localAddr := make(map[string]struct{})
+
+	addrs, err := mm.fullNode.WalletList(ctx)
+	if err != nil {
+		return fmt.Errorf("getting local addresses: %w", err)
+	}
+
+	for _, a := range addrs {
+		localAddr[a.String()] = struct{}{}
+	}
+
 	ts, err := mm.fullNode.ChainHead(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get chain head: %w", err)
@@ -89,10 +100,14 @@ func (mm *MpoolMonitor) update(ctx context.Context) error {
 	newMsgs := make(map[cid.Cid]*TimeStampedMsg)
 
 	for _, pm := range msgs {
+
+		if _, has := localAddr[pm.Message.From.String()]; !has {
+			continue
+		}
+
 		newMsgs[pm.Cid()] = &TimeStampedMsg{
 			SignedMessage: *pm,
 			Added:         ts.Height(),
-			AddedTime:     t,
 		}
 	}
 
@@ -120,33 +135,8 @@ func (mm *MpoolMonitor) update(ctx context.Context) error {
 	return nil
 }
 
+// PendingLocal generates a list of all local pending messages in lotus node
 func (mm *MpoolMonitor) PendingLocal(ctx context.Context) ([]*TimeStampedMsg, error) {
-	localAddr := make(map[string]struct{})
-	var ret []*TimeStampedMsg
-
-	addrs, err := mm.fullNode.WalletList(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting local addresses: %w", err)
-	}
-
-	for _, a := range addrs {
-		localAddr[a.String()] = struct{}{}
-	}
-
-	mm.lk.Lock()
-	defer mm.lk.Unlock()
-
-	for _, msg := range mm.msgs {
-		if _, has := localAddr[msg.SignedMessage.Message.From.String()]; !has {
-			continue
-		}
-		ret = append(ret, msg)
-	}
-
-	return ret, nil
-}
-
-func (mm *MpoolMonitor) PendingAll() ([]*TimeStampedMsg, error) {
 	var ret []*TimeStampedMsg
 
 	mm.lk.Lock()
@@ -159,21 +149,17 @@ func (mm *MpoolMonitor) PendingAll() ([]*TimeStampedMsg, error) {
 	return ret, nil
 }
 
-func (mm *MpoolMonitor) Alerts(ctx context.Context) ([]cid.Cid, error) {
-	var ret []cid.Cid
+// Alerts generate a list if messages stuck in local mpool for more than mm.mpoolAlertEpochs epochs
+func (mm *MpoolMonitor) Alerts(ctx context.Context) ([]*TimeStampedMsg, error) {
+	var ret []*TimeStampedMsg
 	ts, err := mm.fullNode.ChainHead(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chain head: %w", err)
 	}
 
-	msgs, err := mm.PendingLocal(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get local messages: %w", err)
-	}
-
-	for _, msg := range msgs {
+	for _, msg := range mm.msgs {
 		if msg.Added+mm.mpoolAlertEpochs <= ts.Height() {
-			ret = append(ret, msg.SignedMessage.Cid())
+			ret = append(ret, msg)
 		}
 	}
 

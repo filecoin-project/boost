@@ -30,27 +30,32 @@ type msg struct {
 	BaseFee    gqltypes.BigInt
 }
 
+type mpoolmsg struct {
+	Count    int32
+	Messages []*msg
+}
+
 // query: mpool(local): [Message]
-func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg, error) {
+func (r *resolver) Mpool(ctx context.Context, args struct{ Alerts bool }) (mpoolmsg, error) {
 	var ret []*msg
 	var msgs []*mpoolmonitor.TimeStampedMsg
 
 	ts, err := r.fullNode.ChainHead(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get chain head: %w", err)
+		return mpoolmsg{}, fmt.Errorf("failed to get chain head: %w", err)
 	}
 
 	baseFee := ts.Blocks()[0].ParentBaseFee
 
-	if args.Local {
+	if !args.Alerts {
 		msgs, err = r.mpool.PendingLocal(ctx)
 		if err != nil {
-			return nil, err
+			return mpoolmsg{}, err
 		}
 	} else {
-		msgs, err = r.mpool.PendingAll()
+		msgs, err = r.mpool.Alerts(ctx)
 		if err != nil {
-			return nil, err
+			return mpoolmsg{}, err
 		}
 	}
 
@@ -92,7 +97,7 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 		})
 	}
 
-	return ret, nil
+	return mpoolmsg{Count: int32(len(msgs)), Messages: ret}, nil
 }
 
 // query: mpoolAlertsCount: int
