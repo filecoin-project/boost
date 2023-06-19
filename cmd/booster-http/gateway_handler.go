@@ -24,7 +24,10 @@ func newGatewayHandler(gw *gateway.BlocksBackend, supportedFormats []string) htt
 	}
 
 	return &gatewayHandler{
-		gwh:              gateway.NewHandler(gateway.Config{Headers: headers}, gw),
+		gwh: gateway.NewHandler(gateway.Config{
+			Headers:               headers,
+			DeserializedResponses: true,
+		}, gw),
 		supportedFormats: fmtsMap,
 	}
 }
