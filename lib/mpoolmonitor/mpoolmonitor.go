@@ -16,10 +16,11 @@ import (
 
 var log = logging.Logger("mpoolmonitor")
 
-// timeStampedMsg wraps the pending msg with a chainEpoch
-type timeStampedMsg struct {
-	m     types.SignedMessage
-	added abi.ChainEpoch // Epoch when message was first noticed in mpool
+// TimeStampedMsg wraps the pending msg with a chainEpoch
+type TimeStampedMsg struct {
+	SignedMessage types.SignedMessage
+	Added         abi.ChainEpoch // Epoch when message was first noticed in mpool
+	AddedTime     time.Time
 }
 
 type MpoolMonitor struct {
@@ -28,14 +29,14 @@ type MpoolMonitor struct {
 	fullNode         v1api.FullNode
 	lk               sync.Mutex
 	mpoolAlertEpochs abi.ChainEpoch
-	msgs             map[cid.Cid]*timeStampedMsg
+	msgs             map[cid.Cid]*TimeStampedMsg
 }
 
 func NewMonitor(fullNode v1api.FullNode, mpoolAlertEpochs int64) *MpoolMonitor {
 	return &MpoolMonitor{
 		fullNode:         fullNode,
 		mpoolAlertEpochs: abi.ChainEpoch(mpoolAlertEpochs),
-		msgs:             make(map[cid.Cid]*timeStampedMsg),
+		msgs:             make(map[cid.Cid]*TimeStampedMsg),
 	}
 }
 
@@ -71,10 +72,11 @@ func (mm *MpoolMonitor) startMonitoring(ctx context.Context) {
 }
 
 // update gets the current pending messages from mpool. It updated the local
-// copy of a message(not timeStampedMsg.added) if CID is already present in MpoolMonitor.msgs
+// copy of a message(not TimeStampedMsg.added) if CID is already present in MpoolMonitor.msgs
 // Otherwise, it inserts a new key value pair for the message. It removed any msgs not found in the
 // latest output of MpoolPending
 func (mm *MpoolMonitor) update(ctx context.Context) error {
+	t := time.Now()
 	ts, err := mm.fullNode.ChainHead(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get chain head: %w", err)
@@ -84,12 +86,13 @@ func (mm *MpoolMonitor) update(ctx context.Context) error {
 		return fmt.Errorf("getting mpool messages: %w", err)
 	}
 
-	newMsgs := make(map[cid.Cid]*timeStampedMsg)
+	newMsgs := make(map[cid.Cid]*TimeStampedMsg)
 
 	for _, pm := range msgs {
-		newMsgs[pm.Cid()] = &timeStampedMsg{
-			m:     *pm,
-			added: ts.Height(),
+		newMsgs[pm.Cid()] = &TimeStampedMsg{
+			SignedMessage: *pm,
+			Added:         ts.Height(),
+			AddedTime:     t,
 		}
 	}
 
@@ -100,7 +103,7 @@ func (mm *MpoolMonitor) update(ctx context.Context) error {
 	for k, v := range newMsgs {
 		_, ok := mm.msgs[k]
 		if ok {
-			mm.msgs[k].m = v.m
+			mm.msgs[k].SignedMessage = v.SignedMessage
 		} else {
 			mm.msgs[k] = v
 		}
@@ -117,9 +120,9 @@ func (mm *MpoolMonitor) update(ctx context.Context) error {
 	return nil
 }
 
-func (mm *MpoolMonitor) PendingLocal(ctx context.Context) ([]*types.SignedMessage, error) {
+func (mm *MpoolMonitor) PendingLocal(ctx context.Context) ([]*TimeStampedMsg, error) {
 	localAddr := make(map[string]struct{})
-	var ret []*types.SignedMessage
+	var ret []*TimeStampedMsg
 
 	addrs, err := mm.fullNode.WalletList(ctx)
 	if err != nil {
@@ -134,23 +137,23 @@ func (mm *MpoolMonitor) PendingLocal(ctx context.Context) ([]*types.SignedMessag
 	defer mm.lk.Unlock()
 
 	for _, msg := range mm.msgs {
-		if _, has := localAddr[msg.m.Message.From.String()]; !has {
+		if _, has := localAddr[msg.SignedMessage.Message.From.String()]; !has {
 			continue
 		}
-		ret = append(ret, &msg.m)
+		ret = append(ret, msg)
 	}
 
 	return ret, nil
 }
 
-func (mm *MpoolMonitor) PendingAll() ([]*types.SignedMessage, error) {
-	var ret []*types.SignedMessage
+func (mm *MpoolMonitor) PendingAll() ([]*TimeStampedMsg, error) {
+	var ret []*TimeStampedMsg
 
 	mm.lk.Lock()
 	defer mm.lk.Unlock()
 
 	for _, msg := range mm.msgs {
-		ret = append(ret, &msg.m)
+		ret = append(ret, msg)
 	}
 
 	return ret, nil
@@ -163,12 +166,14 @@ func (mm *MpoolMonitor) Alerts(ctx context.Context) ([]cid.Cid, error) {
 		return nil, fmt.Errorf("failed to get chain head: %w", err)
 	}
 
-	mm.lk.Lock()
-	defer mm.lk.Unlock()
+	msgs, err := mm.PendingLocal(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get local messages: %w", err)
+	}
 
-	for mcid := range mm.msgs {
-		if mm.msgs[mcid].added+mm.mpoolAlertEpochs <= ts.Height() {
-			ret = append(ret, mcid)
+	for _, msg := range msgs {
+		if msg.Added+mm.mpoolAlertEpochs <= ts.Height() {
+			ret = append(ret, msg.SignedMessage.Cid())
 		}
 	}
 

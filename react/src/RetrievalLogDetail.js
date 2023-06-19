@@ -39,7 +39,7 @@ export function RetrievalLogDetail(props) {
     }
 
     const {loading, error, data} = useQuery(RetrievalLogQuery, {
-        pollInterval: 1000,
+        pollInterval: 10000,
         variables: {
             peerID: params.peerID,
             transferID: params.transferID,
@@ -103,11 +103,11 @@ export function RetrievalLogDetail(props) {
                 </tr>
                 <tr>
                     <th>Deal Data Root CID</th>
-                    <td><Link to={'/inspect/'+retrieval.PayloadCID}>{retrieval.PayloadCID}</Link></td>
+                    <td><Link to={'/piece-doctor/'+retrieval.PayloadCID}>{retrieval.PayloadCID}</Link></td>
                 </tr>
                 <tr>
                     <th>Piece CID</th>
-                    <td><Link to={'/inspect/'+retrieval.PieceCid}>{retrieval.PieceCid}</Link></td>
+                    <td><Link to={'/piece-doctor/'+retrieval.PieceCid}>{retrieval.PieceCid}</Link></td>
                 </tr>
                 <tr>
                     <th>Price per byte</th>

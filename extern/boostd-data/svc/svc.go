@@ -5,74 +5,97 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/filecoin-project/boost/cmd/boostd-data/couchbase"
-	"github.com/filecoin-project/boost/cmd/boostd-data/ldb"
+	"github.com/filecoin-project/boostd-data/couchbase"
+	"github.com/filecoin-project/boostd-data/ldb"
+	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/boostd-data/yugabyte"
+	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/gorilla/mux"
 	logging "github.com/ipfs/go-log/v2"
 )
 
 var (
-	log = logging.Logger("svc")
+	log = logging.Logger("piecedir")
 )
 
-func New(db string, repopath string) *http.Server {
-	server := rpc.NewServer()
+type Service struct {
+	Impl types.ServiceImpl
+}
 
-	switch db {
-	case "couchbase":
-		ds := couchbase.NewStore()
-		server.RegisterName("boostddata", ds)
-	case "ldb":
-		ds := ldb.NewStore(repopath)
-		server.RegisterName("boostddata", ds)
-	default:
-		panic(fmt.Sprintf("unknown db: %s", db))
+func NewYugabyte(settings yugabyte.DBSettings) *Service {
+	return &Service{Impl: yugabyte.NewStore(settings)}
+}
+
+func NewCouchbase(settings couchbase.DBSettings) *Service {
+	return &Service{Impl: couchbase.NewStore(settings)}
+}
+
+func NewLevelDB(repoPath string) (*Service, error) {
+	if repoPath != "" { // an empty repo path is used for testing
+		var err error
+		repoPath, err = MakeLevelDBDir(repoPath)
+		if err != nil {
+			return nil, err
+		}
 	}
 
+	return &Service{Impl: ldb.NewStore(repoPath)}, nil
+}
+
+func MakeLevelDBDir(repoPath string) (string, error) {
+	repoPath = path.Join(repoPath, "lid", "leveldb")
+	if err := os.MkdirAll(repoPath, os.ModePerm); err != nil {
+		return "", fmt.Errorf("creating leveldb repo directory %s: %w", repoPath, err)
+	}
+	return repoPath, nil
+}
+
+func (s *Service) Start(ctx context.Context, addr string) (net.Addr, error) {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("setting up listener for local index directory service: %w", err)
+	}
+
+	err = s.Impl.Start(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("starting local index directory service: %w", err)
+	}
+
+	server := jsonrpc.NewServer()
+	server.Register("boostddata", s.Impl)
 	router := mux.NewRouter()
 	router.Handle("/", server)
 
-	log.Infow("server is listening", "addr", "localhost:8089")
-
-	return &http.Server{Handler: router}
-}
-
-func Setup(db string) (string, func(), error) {
-	addr := "localhost:0"
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return "", nil, err
-	}
-	srv := New(db, "")
+	srv := &http.Server{Handler: router}
+	log.Infow("local index directory server is listening", "addr", ln.Addr())
 
 	done := make(chan struct{})
-
-	log.Infow("server is listening", "addr", ln.Addr())
-
 	go func() {
 		err = srv.Serve(ln)
 		if err != nil && err != http.ErrServerClosed {
-			panic(err)
+			log.Errorf("exiting local index directory server: %s", err)
 		}
 
 		done <- struct{}{}
 	}()
 
-	cleanup := func() {
+	go func() {
+		<-ctx.Done()
 		log.Debug("shutting down server")
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		if err := srv.Shutdown(ctx); err != nil {
-			panic(err)
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Errorf("shutting down local index directory server: %s", err)
 		}
 
 		<-done
-	}
+	}()
 
-	return ln.Addr().String(), cleanup, nil
+	return ln.Addr(), nil
 }

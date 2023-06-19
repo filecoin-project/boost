@@ -1,0 +1,17 @@
+version: '3.7'
+
+services:
+
+  yugabyte:
+    image: public.ecr.aws/n6b0k8i7/yugabyte-test:${ARCH}-2.17.2.0
+    restart: on-failure
+
+  go-tests:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.test
+    environment:
+      YUGABYTE_HOST: yugabyte
+    volumes:
+      - ./:/go/src/
+    command: -tags=test_lid -v -count=1 -p=1 ./... 

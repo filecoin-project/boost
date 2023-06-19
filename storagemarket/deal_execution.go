@@ -8,20 +8,18 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	transporttypes "github.com/filecoin-project/boost/transport/types"
-	"github.com/filecoin-project/dagstore"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
 	lapi "github.com/filecoin-project/lotus/api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/google/uuid"
-	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-libp2p/core/event"
 )
@@ -85,6 +83,8 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (d
 	// Capture any panic as a manually retryable error
 	defer func() {
 		if err := recover(); err != nil {
+			log.Errorw("caught panic executing deal", "id", deal.DealUuid, "err", err)
+			fmt.Fprint(os.Stderr, string(debug.Stack()))
 			dmerr = &dealMakingError{
 				error: fmt.Errorf("Caught panic in deal execution: %s\n%s", err, debug.Stack()),
 				retry: smtypes.DealRetryManual,
@@ -109,11 +109,11 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (d
 		}
 		deal.NBytesReceived = fi.Size()
 		p.dealLogger.Infow(deal.DealUuid, "size of "+transferType, "filepath", deal.InboundFilePath, "size", fi.Size())
-	} else {
-		// if the deal has already been handed to the sealer, the inbound file
-		// could already have been removed and in that case, the number of
-		// bytes received should be the same as deal size as we've already
-		// verified the transfer.
+	} else if !deal.IsOffline {
+		// For online deals where the deal has already been handed to the sealer,
+		// the inbound file could already have been removed and in that case,
+		// the number of bytes received should be the same as deal size as
+		// we've already verified the transfer.
 		deal.NBytesReceived = int64(deal.Transfer.Size)
 	}
 
@@ -603,43 +603,24 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 }
 
 func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
+	// add deal to piece metadata store
 	pc := deal.ClientDealProposal.Proposal.PieceCID
-	propCid, err := deal.ClientDealProposal.Proposal.Cid()
-	if err != nil {
-		return &dealMakingError{
-			retry: types.DealRetryFatal,
-			error: fmt.Errorf("index and announce: getting deal proposal cid: %w", err),
-		}
-	}
-
-	// add deal to piecestore
-	if err := p.ps.AddDealForPiece(pc, propCid, piecestore.DealInfo{
-		DealID:   deal.ChainDealID,
-		SectorID: deal.SectorID,
-		Offset:   deal.Offset,
-		Length:   deal.Length,
+	p.dealLogger.Infow(deal.DealUuid, "about to add deal for piece in LID")
+	if err := p.piecedirectory.AddDealForPiece(ctx, pc, model.DealInfo{
+		DealUuid:    deal.DealUuid.String(),
+		ChainDealID: deal.ChainDealID,
+		MinerAddr:   p.Address,
+		SectorID:    deal.SectorID,
+		PieceOffset: deal.Offset,
+		PieceLength: deal.Length,
+		CarLength:   uint64(deal.NBytesReceived),
 	}); err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryAuto,
-			error: fmt.Errorf("failed to add deal to piecestore: %w", err),
+			error: fmt.Errorf("failed to add deal to piece metadata store: %w", err),
 		}
 	}
-	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to piecestore")
-
-	// register with dagstore
-	err = p.registerShardSync(ctx, pc)
-
-	if err != nil {
-		if !errors.Is(err, dagstore.ErrShardExists) {
-			return &dealMakingError{
-				retry: types.DealRetryAuto,
-				error: fmt.Errorf("failed to register deal with dagstore: %w", err),
-			}
-		}
-		p.dealLogger.Infow(deal.DealUuid, "deal has previously been registered in dagstore")
-	} else {
-		p.dealLogger.Infow(deal.DealUuid, "deal has successfully been registered in the dagstore")
-	}
+	p.dealLogger.Infow(deal.DealUuid, "deal successfully added to LID")
 
 	// if the index provider is enabled
 	if p.ip.Enabled() {
@@ -666,23 +647,6 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	}
 
 	return nil
-}
-
-// registerShardSync calls the DAGStore RegisterShard method and waits
-// synchronously in a dedicated channel until the registration has completed
-// fully.
-func (p *Provider) registerShardSync(ctx context.Context, pc cid.Cid) error {
-	resch := make(chan dagstore.ShardResult, 1)
-	if err := p.dagst.RegisterShard(ctx, pc, "", true, resch); err != nil {
-		return fmt.Errorf("registering shard: %w", err)
-	}
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case res := <-resch:
-		return res.Error
-	}
 }
 
 // fireSealingUpdateEvents periodically checks the sealing status of the deal

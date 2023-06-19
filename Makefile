@@ -7,6 +7,7 @@ unexport GOFLAGS
 
 GOCC?=go
 
+ARCH?=$(shell arch)
 GOVERSION:=$(shell $(GOCC) version | tr ' ' '\n' | grep go1 | sed 's/^go//' | awk -F. '{printf "%d%03d%03d", $$1, $$2, $$3}')
 ifeq ($(shell expr $(GOVERSION) \< 1016000), 1)
 $(warning Your Golang version is go$(shell expr $(GOVERSION) / 1000000).$(shell expr $(GOVERSION) % 1000000 / 1000).$(shell expr $(GOVERSION) % 1000))
@@ -79,6 +80,12 @@ calibnet-go: build-go
 deps: $(BUILD_DEPS)
 .PHONY: deps
 
+migrate-lid: $(BUILD_DEPS)
+	rm -f migrate-lid
+	$(GOCC) build $(GOFLAGS) -o migrate-lid ./cmd/migrate-lid
+.PHONY: migrate-lid
+BINS+=migrate-lid
+
 boostx: $(BUILD_DEPS)
 	rm -f boostx
 	$(GOCC) build $(GOFLAGS) -o boostx ./cmd/boostx
@@ -86,12 +93,22 @@ boostx: $(BUILD_DEPS)
 BINS+=boostx
 
 boost: $(BUILD_DEPS)
-	rm -f boost boostd boostx
+	rm -f boost
 	$(GOCC) build $(GOFLAGS) -o boost ./cmd/boost
-	$(GOCC) build $(GOFLAGS) -o boostx ./cmd/boostx
-	$(GOCC) build $(GOFLAGS) -o boostd ./cmd/boostd
 .PHONY: boost
-BINS+=boost boostx boostd
+BINS+=boost
+
+boostd: $(BUILD_DEPS)
+	rm -f boostd
+	$(GOCC) build $(GOFLAGS) -o boostd ./cmd/boostd
+.PHONY: boostd
+BINS+=boostd
+
+boostd-data:
+	$(MAKE) -C ./extern/boostd-data
+	install -C ./extern/boostd-data/boostd-data ./boostd-data
+.PHONY: boostd-data
+BINS+=boostd-data
 
 booster-http: $(BUILD_DEPS)
 	rm -f booster-http
@@ -126,7 +143,7 @@ update-react: validate-node-version
 	npm run --prefix react build
 .PHONY: react
 
-build-go: boost devnet
+build-go: boost boostd boostx boostd-data booster-http booster-bitswap devnet migrate-lid
 .PHONY: build-go
 
 build: react build-go
@@ -141,6 +158,10 @@ install-boost:
 	install -C ./boost /usr/local/bin/boost
 	install -C ./boostd /usr/local/bin/boostd
 	install -C ./boostx /usr/local/bin/boostx
+	install -C ./boostd-data /usr/local/bin/boostd-data
+	install -C ./booster-http /usr/local/bin/booster-http
+	install -C ./booster-bitswap /usr/local/bin/booster-bitswap
+	install -C ./migrate-lid /usr/local/bin/migrate-lid
 
 install-devnet:
 	install -C ./devnet /usr/local/bin/devnet
@@ -251,6 +272,9 @@ docker/booster-bitswap:
 docker/all: $(lotus_build_cmd) docker/boost docker/booster-http docker/booster-bitswap \
 	docker/lotus docker/lotus-miner
 .PHONY: docker/all
+
+test-lid:
+	cd ./extern/boostd-data && ARCH=$(ARCH) docker-compose up --build --exit-code-from go-tests
 
 devnet/up:
 	rm -rf ./docker/devnet/data && docker compose -f ./docker/devnet/docker-compose.yaml up -d

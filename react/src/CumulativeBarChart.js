@@ -1,5 +1,5 @@
 /* global BigInt */
-import {humanFIL, humanFileSize} from "./util";
+import {addCommas, humanFIL, humanFileSize, isInteger} from "./util";
 import React from "react";
 import './CumulativeBarChart.css'
 
@@ -72,7 +72,11 @@ function amountToString(unit, amount) {
         case 'attoFIL':
             return humanFIL(amount)
         default:
-            return amount.toString()
+            const amtStr = amount.toString()
+            if (isInteger(amtStr)) {
+                return addCommas(amtStr)
+            }
+            return amtStr
     }
 }
 

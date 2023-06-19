@@ -9,17 +9,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/filecoin-project/boost-gfm/piecestore"
-	"github.com/filecoin-project/boost/api"
-	bclient "github.com/filecoin-project/boost/api/client"
-	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/filters"
 	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
 	"github.com/filecoin-project/boost/metrics"
+	"github.com/filecoin-project/boost/piecedirectory"
+	bdclient "github.com/filecoin-project/boostd-data/client"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore/mount"
-	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/markets/dagstore"
@@ -54,9 +52,14 @@ var runCmd = &cli.Command{
 			Value: 7777,
 		},
 		&cli.StringFlag{
-			Name:     "api-boost",
-			Usage:    "the endpoint for the boost API",
+			Name:     "api-lid",
+			Usage:    "the endpoint for the local index directory API, eg 'http://localhost:8042'",
 			Required: true,
+		},
+		&cli.IntFlag{
+			Name:  "add-index-throttle",
+			Usage: "the maximum number of add index operations that can run in parallel",
+			Value: 4,
 		},
 		&cli.StringFlag{
 			Name:     "api-fullnode",
@@ -129,14 +132,14 @@ var runCmd = &cli.Command{
 			}()
 		}
 
-		// Connect to the Boost API
+		// Connect to the local index directory service
 		ctx := lcli.ReqContext(cctx)
-		boostApiInfo := cctx.String("api-boost")
-		bapi, bcloser, err := getBoostApi(ctx, boostApiInfo)
+		cl := bdclient.NewStore()
+		defer cl.Close(ctx)
+		err := cl.Dial(ctx, cctx.String("api-lid"))
 		if err != nil {
-			return fmt.Errorf("getting boost API: %w", err)
+			return fmt.Errorf("connecting to local index directory service: %w", err)
 		}
-		defer bcloser()
 
 		// Connect to the full node API
 		fnApiInfo := cctx.String("api-fullnode")
@@ -146,7 +149,7 @@ var runCmd = &cli.Command{
 		}
 		defer ncloser()
 
-		// Connect to the storage API
+		// Connect to the storage API and create a sector accessor
 		storageApiInfo := cctx.String("api-storage")
 		if err != nil {
 			return fmt.Errorf("parsing storage API endpoint: %w", err)
@@ -171,6 +174,9 @@ var runCmd = &cli.Command{
 		defer storageCloser()
 
 		// Create the server API
+		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
+		pd := piecedirectory.NewPieceDirectory(cl, pr, cctx.Int("add-index-throttle"))
+
 		opts := &HttpServerOptions{
 			ServePieces:              servePieces,
 			SupportedResponseFormats: responseFormats,
@@ -200,11 +206,11 @@ var runCmd = &cli.Command{
 				GetSizeFailResponseCount:    metrics.HttpRblsGetSizeFailResponseCount,
 				GetSizeSuccessResponseCount: metrics.HttpRblsGetSizeSuccessResponseCount,
 			}
-			rbs := remoteblockstore.NewRemoteBlockstore(bapi, httpBlockMetrics)
+			rbs := remoteblockstore.NewRemoteBlockstore(pd, &httpBlockMetrics)
 			filtered := filters.NewFilteredBlockstore(rbs, multiFilter)
 			opts.Blockstore = filtered
 		}
-		sapi := serverApi{ctx: ctx, bapi: bapi, sa: sa}
+		sapi := serverApi{ctx: ctx, piecedirectory: pd, sa: sa}
 		server := NewHttpServer(
 			cctx.String("base-path"),
 			cctx.String("address"),
@@ -212,6 +218,9 @@ var runCmd = &cli.Command{
 			sapi,
 			opts,
 		)
+
+		// Start the local index directory
+		pd.Start(ctx)
 
 		// Start the server
 		log.Infof("Starting booster-http node on listen address %s and port %d with base path '%s'",
@@ -301,15 +310,15 @@ func createRepoDir(repoDir string) (string, error) {
 }
 
 type serverApi struct {
-	ctx  context.Context
-	bapi api.Boost
-	sa   dagstore.SectorAccessor
+	ctx            context.Context
+	piecedirectory *piecedirectory.PieceDirectory
+	sa             dagstore.SectorAccessor
 }
 
 var _ HttpServerApi = (*serverApi)(nil)
 
-func (s serverApi) GetPieceInfo(pieceCID cid.Cid) (*piecestore.PieceInfo, error) {
-	return s.bapi.PiecesGetPieceInfo(s.ctx, pieceCID)
+func (s serverApi) GetPieceDeals(ctx context.Context, pieceCID cid.Cid) ([]model.DealInfo, error) {
+	return s.piecedirectory.GetPieceDeals(ctx, pieceCID)
 }
 
 func (s serverApi) IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error) {
@@ -318,21 +327,4 @@ func (s serverApi) IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, of
 
 func (s serverApi) UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error) {
 	return s.sa.UnsealSectorAt(ctx, sectorID, offset, length)
-}
-
-func getBoostApi(ctx context.Context, ai string) (api.Boost, jsonrpc.ClientCloser, error) {
-	ai = strings.TrimPrefix(strings.TrimSpace(ai), "BOOST_API_INFO=")
-	info := cliutil.ParseApiInfo(ai)
-	addr, err := info.DialArgs("v0")
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get DialArgs: %w", err)
-	}
-
-	log.Infof("Using boost API at %s", addr)
-	api, closer, err := bclient.NewBoostRPCV0(ctx, addr, info.AuthHeader())
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating full node service API: %w", err)
-	}
-
-	return api, closer, nil
 }

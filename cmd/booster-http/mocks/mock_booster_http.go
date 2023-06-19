@@ -8,7 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	piecestore "github.com/filecoin-project/boost-gfm/piecestore"
+	model "github.com/filecoin-project/boostd-data/model"
 	mount "github.com/filecoin-project/dagstore/mount"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	gomock "github.com/golang/mock/gomock"
@@ -38,19 +38,19 @@ func (m *MockHttpServerApi) EXPECT() *MockHttpServerApiMockRecorder {
 	return m.recorder
 }
 
-// GetPieceInfo mocks base method.
-func (m *MockHttpServerApi) GetPieceInfo(pieceCID cid.Cid) (*piecestore.PieceInfo, error) {
+// GetPieceDeals mocks base method.
+func (m *MockHttpServerApi) GetPieceDeals(ctx context.Context, pieceCID cid.Cid) ([]model.DealInfo, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPieceInfo", pieceCID)
-	ret0, _ := ret[0].(*piecestore.PieceInfo)
+	ret := m.ctrl.Call(m, "GetPieceDeals", ctx, pieceCID)
+	ret0, _ := ret[0].([]model.DealInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetPieceInfo indicates an expected call of GetPieceInfo.
-func (mr *MockHttpServerApiMockRecorder) GetPieceInfo(pieceCID interface{}) *gomock.Call {
+// GetPieceDeals indicates an expected call of GetPieceDeals.
+func (mr *MockHttpServerApiMockRecorder) GetPieceDeals(ctx, pieceCID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPieceInfo", reflect.TypeOf((*MockHttpServerApi)(nil).GetPieceInfo), pieceCID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPieceDeals", reflect.TypeOf((*MockHttpServerApi)(nil).GetPieceDeals), ctx, pieceCID)
 }
 
 // IsUnsealed mocks base method.
