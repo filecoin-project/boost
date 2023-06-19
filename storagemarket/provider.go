@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
