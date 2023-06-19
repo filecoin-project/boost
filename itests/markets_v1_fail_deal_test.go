@@ -48,11 +48,5 @@ func TestMarketsV1FailDeal(t *testing.T) {
 	log.Debugw(di.Message)
 
 	err = f.WaitDealSealed(ctx, dealProposalCid)
-	require.NoError(t, err)
-
-	log.Debugw("deal is sealed, starting retrieval", "cid", dealProposalCid, "root", res.Root)
-	outPath := f.Retrieve(ctx, t, dealProposalCid, res.Root, true)
-
-	log.Debugw("retrieval is done, compare in- and out- files", "in", inPath, "out", outPath)
-	kit.AssertFilesEqual(t, inPath, outPath)
+	require.ErrorContains(t, err, "Legacy deals are deprecated in Boost. Please propose a boost deal")
 }
