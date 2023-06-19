@@ -70,9 +70,14 @@ import (
 
 var Log = logging.Logger("boosttest")
 
+type TestFrameworkConfig struct {
+	EnableLegacy bool
+}
+
 type TestFramework struct {
-	ctx  context.Context
-	Stop func()
+	ctx    context.Context
+	Stop   func()
+	config *TestFrameworkConfig
 
 	HomeDir       string
 	Client        *boostclient.StorageClient
@@ -82,14 +87,26 @@ type TestFramework struct {
 	ClientAddr    address.Address
 	MinerAddr     address.Address
 	DefaultWallet address.Address
-	EnableLegacy  bool
 }
 
-func NewTestFramework(ctx context.Context, t *testing.T) *TestFramework {
+type FrameworkOpts func(pc *TestFrameworkConfig)
+
+func EnableLegacyDeals(enable bool) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.EnableLegacy = enable
+	}
+}
+
+func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) *TestFramework {
 	fullNode, miner := FullNodeAndMiner(t)
+	fmc := &TestFrameworkConfig{}
+	for _, opt := range opts {
+		opt(fmc)
+	}
 
 	return &TestFramework{
 		ctx:        ctx,
+		config:     fmc,
 		HomeDir:    t.TempDir(),
 		FullNode:   fullNode,
 		LotusMiner: miner,
@@ -295,7 +312,7 @@ func (f *TestFramework) Start() error {
 	// No transfers will start until the first stall check period has elapsed
 	cfg.Dealmaking.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
 	cfg.Storage.ParallelFetchLimit = 10
-	if f.EnableLegacy {
+	if f.config.EnableLegacy {
 		cfg.Dealmaking.EnableLegacyStorageDeals = true
 	}
 

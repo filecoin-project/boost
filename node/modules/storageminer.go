@@ -13,6 +13,7 @@ import (
 	rmnet "github.com/filecoin-project/boost-gfm/retrievalmarket/network"
 	"github.com/filecoin-project/boost/lib/mpoolmonitor"
 	"github.com/filecoin-project/boost/markets/pricing"
+	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/go-state-types/big"
 
 	piecestoreimpl "github.com/filecoin-project/boost-gfm/piecestore/impl"
@@ -38,7 +39,6 @@ import (
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/logs"
-	"github.com/filecoin-project/boost/storagemarket/lp2pimpl"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/transport/httptransport"
@@ -391,50 +391,53 @@ func HandleLegacyDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, lsp gfm_storage
 	return nil
 }
 
-func HandleBoostLibp2pDeals(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
-	lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi)
+func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
+	return func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
 
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			// Wait for the legacy SP to fire the "ready" event before starting
-			// the boost SP.
-			// Boost overrides some listeners so it must start after the legacy SP.
-			errch := make(chan error, 1)
-			log.Info("waiting for legacy storage provider 'ready' event")
-			legacySP.OnReady(func(err error) {
-				errch <- err
-			})
-			err := <-errch
-			if err != nil {
-				log.Errorf("failed to start legacy storage provider: %w", err)
-				return err
-			}
-			log.Info("legacy storage provider started successfully")
+		lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi, cfg.Dealmaking.EnableLegacyStorageDeals)
 
-			// Start the Boost SP
-			log.Info("starting boost storage provider")
-			err = prov.Start()
-			if err != nil {
-				return fmt.Errorf("starting storage provider: %w", err)
-			}
-			lp2pnet.Start(ctx)
-			log.Info("boost storage provider started successfully")
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				// Wait for the legacy SP to fire the "ready" event before starting
+				// the boost SP.
+				// Boost overrides some listeners so it must start after the legacy SP.
+				errch := make(chan error, 1)
+				log.Info("waiting for legacy storage provider 'ready' event")
+				legacySP.OnReady(func(err error) {
+					errch <- err
+				})
+				err := <-errch
+				if err != nil {
+					log.Errorf("failed to start legacy storage provider: %w", err)
+					return err
+				}
+				log.Info("legacy storage provider started successfully")
 
-			// Start the Boost Index Provider.
-			// It overrides the multihash lister registered by the legacy
-			// index provider so it must start after the legacy SP.
-			log.Info("starting boost index provider wrapper")
-			idxProv.Start(ctx)
-			log.Info("boost index provider wrapper started successfully")
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			lp2pnet.Stop()
-			prov.Stop()
-			idxProv.Stop()
-			return nil
-		},
-	})
+				// Start the Boost SP
+				log.Info("starting boost storage provider")
+				err = prov.Start()
+				if err != nil {
+					return fmt.Errorf("starting storage provider: %w", err)
+				}
+				lp2pnet.Start(ctx)
+				log.Info("boost storage provider started successfully")
+
+				// Start the Boost Index Provider.
+				// It overrides the multihash lister registered by the legacy
+				// index provider so it must start after the legacy SP.
+				log.Info("starting boost index provider wrapper")
+				idxProv.Start(ctx)
+				log.Info("boost index provider wrapper started successfully")
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				lp2pnet.Stop()
+				prov.Stop()
+				idxProv.Stop()
+				return nil
+			},
+		})
+	}
 }
 
 func HandleContractDeals(c *config.ContractDealsConfig) func(mctx helpers.MetricsCtx, lc fx.Lifecycle, prov *storagemarket.Provider, a v1api.FullNode, subCh *gateway.EthSubHandler, maddr lotus_dtypes.MinerAddress) {
@@ -618,7 +621,6 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 			DealLogDurationDays:         cfg.Dealmaking.DealLogDurationDays,
 			StorageFilter:               cfg.Dealmaking.Filter,
 			SealingPipelineCacheTimeout: time.Duration(cfg.Dealmaking.SealingPipelineCacheTimeout),
-			EnableLegacyStorageDeals:    cfg.Dealmaking.EnableLegacyStorageDeals,
 		}
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl)

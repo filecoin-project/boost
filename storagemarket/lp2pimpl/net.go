@@ -163,21 +163,23 @@ func NewDealClient(h host.Host, addr address.Address, walletApi api.Wallet, opti
 
 // DealProvider listens for incoming deal proposals over libp2p
 type DealProvider struct {
-	ctx      context.Context
-	host     host.Host
-	prov     *storagemarket.Provider
-	fullNode v1api.FullNode
-	plDB     *db.ProposalLogsDB
-	spApi    sealingpipeline.API
+	ctx               context.Context
+	host              host.Host
+	prov              *storagemarket.Provider
+	fullNode          v1api.FullNode
+	plDB              *db.ProposalLogsDB
+	spApi             sealingpipeline.API
+	enableLegacyDeals bool
 }
 
-func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) *DealProvider {
+func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode, plDB *db.ProposalLogsDB, spApi sealingpipeline.API, enableLegacyDeals bool) *DealProvider {
 	p := &DealProvider{
-		host:     h,
-		prov:     prov,
-		fullNode: fullNodeApi,
-		plDB:     plDB,
-		spApi:    spApi,
+		host:              h,
+		prov:              prov,
+		fullNode:          fullNodeApi,
+		plDB:              plDB,
+		spApi:             spApi,
+		enableLegacyDeals: enableLegacyDeals,
 	}
 	return p
 }
@@ -201,7 +203,7 @@ func (p *DealProvider) Start(ctx context.Context) {
 	p.host.SetStreamHandler(DealStatusV12ProtocolID, p.handleNewDealStatusStream)
 
 	// Handle legacy deal stream here and reject all legacy deals
-	if !p.prov.IsEnabledLegacyStorageDeals() {
+	if !p.enableLegacyDeals {
 		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID101, p.handleLegacyDealStream)
 		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID110, p.handleLegacyDealStream)
 		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID111, p.handleLegacyDealStream)
