@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMarketsV1FailDeal(t *testing.T) {
+func TestDisabledMarketsV1Deal(t *testing.T) {
 	ctx := context.Background()
 	log := framework.Log
 
