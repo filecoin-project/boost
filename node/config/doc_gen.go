@@ -1163,7 +1163,8 @@ Set to 0 to keep all mappings`,
 			Name: "EnableMsgIndex",
 			Type: "bool",
 
-			Comment: `EnableMsgIndex enables indexing of messages on chain.`,
+			Comment: `EXPERIMENTAL FEATURE. USE WITH CAUTION
+EnableMsgIndex enables indexing of messages on chain.`,
 		},
 	},
 	"lotus_config.IndexProviderConfig": []DocField{
