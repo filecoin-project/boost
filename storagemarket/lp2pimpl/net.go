@@ -456,6 +456,9 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 		}
 
 		localSignature, err := p.fullNode.WalletSign(p.ctx, mi.Worker, msg)
+		if err != nil {
+			reqLog.Errorf("failed to sign the message: %s", err)
+		}
 
 		signedResponse := gfm_migration.SignedResponse0{
 			Response:  resp,
@@ -498,6 +501,9 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 		}
 
 		localSignature, err := p.fullNode.WalletSign(p.ctx, mi.Worker, msg)
+		if err != nil {
+			reqLog.Errorf("failed to sign the message: %s", err)
+		}
 
 		signedResponse := gfm_network.SignedResponse{
 			Response:  resp,
@@ -541,6 +547,9 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 		}
 
 		localSignature, err := p.fullNode.WalletSign(p.ctx, mi.Worker, msg)
+		if err != nil {
+			reqLog.Errorf("failed to sign the message: %s", err)
+		}
 
 		signedResponse := gfm_network.SignedResponse{
 			Response:  resp,
