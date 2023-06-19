@@ -270,7 +270,7 @@ type DealmakingConfig struct {
 
 	// Whether to enable legacy deals on the Boost node or not. We recommend keeping
 	// them disabled. These will be completely deprecated soon.
-	EnableLegacyDealProtocols bool
+	EnableLegacyStorageDeals bool
 }
 
 type ContractDealsConfig struct {

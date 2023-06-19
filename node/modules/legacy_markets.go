@@ -42,7 +42,10 @@ func StorageProvider(minerAddress lotus_dtypes.MinerAddress,
 	meshCreator idxprov.MeshCreator, cfg config.DealmakingConfig,
 ) (storagemarket.StorageProvider, error) {
 	var opts []smnet.Option
-	if !cfg.EnableLegacyDealProtocols {
+
+	// Provide an empty deal protocol list to the libp2p host if legacy deals are disabled
+	// These protocols are handled by Boost provider and all legacy deals are rejected
+	if !cfg.EnableLegacyStorageDeals {
 		opts = append(opts, smnet.SupportedDealProtocols([]protocol.ID{}))
 	}
 

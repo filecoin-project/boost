@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost-gfm/shared"
+	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	gfm_migration "github.com/filecoin-project/boost-gfm/storagemarket/migrations"
+	gfm_network "github.com/filecoin-project/boost-gfm/storagemarket/network"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -196,6 +199,13 @@ func (p *DealProvider) Start(ctx context.Context) {
 	p.host.SetStreamHandler(DealProtocolv120ID, p.handleNewDealStream)
 
 	p.host.SetStreamHandler(DealStatusV12ProtocolID, p.handleNewDealStatusStream)
+
+	// Handle legacy deal stream here and reject all legacy deals
+	if !p.prov.IsEnabledLegacyStorageDeals() {
+		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID101, p.handleLegacyDealStream)
+		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID110, p.handleLegacyDealStream)
+		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID111, p.handleLegacyDealStream)
+	}
 }
 
 func (p *DealProvider) Stop() {
@@ -385,4 +395,132 @@ func (p *DealProvider) getDealStatus(req types.DealStatusRequest, reqLog *zap.Su
 		TransferSize:   pds.Transfer.Size,
 		NBytesReceived: bts,
 	}
+}
+
+func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
+	start := time.Now()
+	reqLogUuid := uuid.New()
+	reqLog := log.With("reqlog-uuid", reqLogUuid.String(), "client-peer", s.Conn().RemotePeer())
+	reqLog.Debugw("new legacy deal status request")
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			reqLog.Infow("closing stream", "err", err)
+		}
+		reqLog.Debugw("handled legacy deal status request", "duration", time.Since(start).String())
+	}()
+
+	_ = s.SetReadDeadline(time.Now().Add(providerReadDeadline))
+
+	ts, err := p.fullNode.ChainHead(p.ctx)
+	if err != nil {
+		reqLog.Errorf("could not get chain head: %s", err)
+	}
+
+	maddr, err := p.spApi.ActorAddress(p.ctx)
+	if err != nil {
+		reqLog.Errorf("could not get miner actor address: %s", err)
+	}
+
+	mi, err := p.fullNode.StateMinerInfo(p.ctx, maddr, ts.Key())
+	if err != nil {
+		reqLog.Errorf("could not get miner info: %s", err)
+	}
+
+	if s.Protocol() == gfm_storagemarket.DealProtocolID101 {
+		var prop0 gfm_migration.Proposal0
+		err = prop0.UnmarshalCBOR(s)
+		_ = s.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed
+		if err != nil {
+			reqLog.Errorf("failed to unmarshal the proposal message: %s", err)
+			return
+		}
+
+		pcid, err := prop0.DealProposal.Proposal.Cid()
+		if err != nil {
+			reqLog.Errorf("failed to get the proposal cid: %s", err)
+			return
+		}
+
+		resp := gfm_migration.Response0{
+			State:          gfm_storagemarket.StorageDealProposalRejected,
+			Message:        "Legacy deals are deprecated in Boost. Please propose a boost deal",
+			Proposal:       pcid,
+			PublishMessage: nil,
+		}
+
+		msg, err := cborutil.Dump(resp)
+		if err != nil {
+			reqLog.Errorf("could not convert response to bytes: %s", err)
+		}
+
+		localSignature, err := p.fullNode.WalletSign(p.ctx, mi.Worker, msg)
+
+		signedResponse := gfm_migration.SignedResponse0{
+			Response:  resp,
+			Signature: localSignature,
+		}
+
+		// Set a deadline on writing to the stream so it doesn't hang
+		_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
+		defer s.SetWriteDeadline(time.Time{}) // nolint
+
+		err = signedResponse.UnmarshalCBOR(s)
+		if err != nil {
+			reqLog.Errorf("error writing response to the stream: %s", err)
+		}
+
+		return
+	}
+
+	var prop gfm_network.Proposal
+	err = prop.UnmarshalCBOR(s)
+	_ = s.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed
+	if err != nil {
+		reqLog.Errorf("failed to unmarshal the proposal message: %s", err)
+		return
+	}
+
+	pcid, err := prop.DealProposal.Proposal.Cid()
+	if err != nil {
+		reqLog.Errorf("failed to get the proposal cid: %s", err)
+		return
+	}
+
+	resp := gfm_network.Response{
+		State:          gfm_storagemarket.StorageDealProposalRejected,
+		Message:        "Legacy deals are deprecated in Boost. Please propose a boost deal",
+		Proposal:       pcid,
+		PublishMessage: nil,
+	}
+
+	//var out bytes.Buffer
+	//if err := cborutil.WriteCborRPC(&out, resp); err != nil {
+	//	reqLog.Errorf("could not convert response to bytes: %s", err)
+	//}
+	//
+	//msg := out.Bytes()
+
+	msg, err := cborutil.Dump(&resp)
+	if err != nil {
+		reqLog.Errorf("could not convert response to bytes: %s", err)
+	}
+
+	localSignature, err := p.fullNode.WalletSign(p.ctx, mi.Worker, msg)
+
+	signedResponse := gfm_network.SignedResponse{
+		Response:  resp,
+		Signature: localSignature,
+	}
+
+	// Set a deadline on writing to the stream so it doesn't hang
+	_ = s.SetWriteDeadline(time.Now().Add(providerWriteDeadline))
+	defer s.SetWriteDeadline(time.Time{}) // nolint
+
+	err = signedResponse.UnmarshalCBOR(s)
+	if err != nil {
+		reqLog.Errorf("error writing response to the stream: %s", err)
+	}
+
+	return
 }

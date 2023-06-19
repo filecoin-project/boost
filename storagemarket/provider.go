@@ -78,6 +78,8 @@ type Config struct {
 	// Cache timeout for Sealing Pipeline status
 	SealingPipelineCacheTimeout time.Duration
 	StorageFilter               string
+	// Whether to enable legacy deals or not
+	EnableLegacyStorageDeals bool
 }
 
 var log = logging.Logger("boost-provider")
@@ -701,4 +703,8 @@ func (p *Provider) GetBalance(ctx context.Context, addr address.Address, encoded
 	}
 
 	return utils.ToSharedBalance(bal), nil
+}
+
+func (p *Provider) IsEnabledLegacyStorageDeals() bool {
+	return p.config.EnableLegacyStorageDeals
 }

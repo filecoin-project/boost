@@ -618,6 +618,7 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 			DealLogDurationDays:         cfg.Dealmaking.DealLogDurationDays,
 			StorageFilter:               cfg.Dealmaking.Filter,
 			SealingPipelineCacheTimeout: time.Duration(cfg.Dealmaking.SealingPipelineCacheTimeout),
+			EnableLegacyStorageDeals:    cfg.Dealmaking.EnableLegacyStorageDeals,
 		}
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl)

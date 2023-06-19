@@ -296,7 +296,7 @@ func (f *TestFramework) Start() error {
 	cfg.Dealmaking.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
 	cfg.Storage.ParallelFetchLimit = 10
 	if f.EnableLegacy {
-		cfg.Dealmaking.EnableLegacyDealProtocols = true
+		cfg.Dealmaking.EnableLegacyStorageDeals = true
 	}
 
 	err = lr.SetConfig(func(raw interface{}) {

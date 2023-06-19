@@ -414,7 +414,7 @@ accepted boost will tag funds for that deal so that they cannot be used
 for any other deal.`,
 		},
 		{
-			Name: "EnableLegacyDealProtocols",
+			Name: "EnableLegacyStorageDeals",
 			Type: "bool",
 
 			Comment: `Whether to enable legacy deals on the Boost node or not. We recommend keeping
