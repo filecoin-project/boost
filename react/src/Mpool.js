@@ -24,13 +24,13 @@ function MpoolContent(props) {
         return <div>Error: {error.message}</div>
     }
 
-    const msgs = data.mpool.Messages
+    msgs.sort();
 
     return <div className="mpool">
         <div className="header">
-            Showing {msgs.length} {alerts ? 'alerts' : ''} messages in message pool.
+            Showing {msgs.length} {alerts ? 'alerts' : 'messages'} in message pool.
             <div className="button" onClick={() => setAlerts(!alerts)}>
-                Show {alerts ? 'All local messages' : 'alerts'}
+                Show {alerts ? 'All local messages' : 'Alerts'}
             </div>
         </div>
 

@@ -418,7 +418,7 @@ type MpoolMessage {
 }
 
 type MpoolMessages {
-  Count: Uint64!
+  Count: Int!
   Messages: [MpoolMessage]!
 }
 
