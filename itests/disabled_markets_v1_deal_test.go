@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMarketsV1Deal(t *testing.T) {
+func TestDisabledMarketsV1Deal(t *testing.T) {
 	ctx := context.Background()
 	log := framework.Log
 
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
 	var opts []framework.FrameworkOpts
-	opts = append(opts, framework.EnableLegacyDeals(true))
+	opts = append(opts, framework.EnableLegacyDeals(false))
 	f := framework.NewTestFramework(ctx, t, opts...)
 	err := f.Start()
 	require.NoError(t, err)
@@ -43,13 +43,11 @@ func TestMarketsV1Deal(t *testing.T) {
 	require.NoError(t, err)
 
 	log.Debugw("got deal proposal cid", "cid", dealProposalCid)
-
-	err = f.WaitDealSealed(ctx, dealProposalCid)
+	di, err := f.FullNode.ClientGetDealInfo(ctx, *dealProposalCid)
 	require.NoError(t, err)
 
-	log.Debugw("deal is sealed, starting retrieval", "cid", dealProposalCid, "root", res.Root)
-	outPath := f.Retrieve(ctx, t, dealProposalCid, res.Root, true)
+	log.Debugw(di.Message)
 
-	log.Debugw("retrieval is done, compare in- and out- files", "in", inPath, "out", outPath)
-	kit.AssertFilesEqual(t, inPath, outPath)
+	err = f.WaitDealSealed(ctx, dealProposalCid)
+	require.ErrorContains(t, err, "protocol are deprecated")
 }
