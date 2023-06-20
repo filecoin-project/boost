@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost-gfm/shared"
+	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	gfm_migration "github.com/filecoin-project/boost-gfm/storagemarket/migrations"
+	gfm_network "github.com/filecoin-project/boost-gfm/storagemarket/network"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -14,6 +17,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/api/v1api"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/lib/sigs"
@@ -23,6 +27,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	typegen "github.com/whyrusleeping/cbor-gen"
 	"go.uber.org/zap"
 )
 
