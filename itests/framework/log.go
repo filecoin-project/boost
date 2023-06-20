@@ -12,4 +12,5 @@ func SetLogLevel() {
 	_ = logging.SetLogLevel("storagemanager", "DEBUG")
 	_ = logging.SetLogLevel("storageadapter", "DEBUG")
 	_ = logging.SetLogLevel("messagepool", "WARN")
+	_ = logging.SetLogLevel("consensus-common", "WARN")
 }

@@ -49,5 +49,5 @@ func TestDisabledMarketsV1Deal(t *testing.T) {
 	log.Debugw(di.Message)
 
 	err = f.WaitDealSealed(ctx, dealProposalCid)
-	require.ErrorContains(t, err, "Legacy deals are deprecated in Boost. Please propose a boost deal")
+	require.ErrorContains(t, err, "protocol are deprecated")
 }
