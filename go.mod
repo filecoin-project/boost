@@ -335,7 +335,7 @@ require (
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/filecoin-project/boost-gfm v1.26.6-0.20230617012719-f900ba7a9c0a
+	github.com/filecoin-project/boost-gfm v1.26.6
 	github.com/filecoin-project/boost-graphsync v0.13.6
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
