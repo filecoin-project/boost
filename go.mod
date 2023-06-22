@@ -6,8 +6,6 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
 replace github.com/filecoin-project/boostd-data => ./extern/boostd-data
 
-replace github.com/filecoin-project/lotus => github.com/Jorropo/lotus v1.23.0-rc1.0.20230619214506-cc207ede889e
-
 // replace github.com/filcoin-project/boost-graphsync => ../boost-graphsync
 
 // replace github.com/filecoin-project/go-data-transfer => ../go-data-transfer
@@ -339,7 +337,7 @@ require (
 	github.com/filecoin-project/boost-graphsync v0.13.6
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
-	github.com/filecoin-project/lotus v0.0.0-00010101000000-000000000000
+	github.com/filecoin-project/lotus v1.23.2-0.20230622154405-168d022018ce
 	github.com/ipfs/boxo v0.10.1
 	github.com/ipfs/kubo v0.21.0-rc1
 	github.com/ipni/go-libipni v0.0.8
