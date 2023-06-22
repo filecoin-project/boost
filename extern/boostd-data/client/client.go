@@ -123,17 +123,10 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	return s.client.AddDealForPiece(ctx, pieceCid, dealInfo)
 }
 
-func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) error {
+func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) <-chan types.AddIndexProgress {
 	log.Debugw("add-index", "piece-cid", pieceCid, "records", len(records))
 
-	respch := s.client.AddIndex(ctx, pieceCid, records, isCompleteIndex)
-	for resp := range respch {
-		if resp.Err != "" {
-			return fmt.Errorf("add index with piece cid %s: %s", pieceCid, resp.Err)
-		}
-		//fmt.Printf("%s: Percent complete: %f%%\n", time.Now(), resp.Progress*100)
-	}
-	return nil
+	return s.client.AddIndex(ctx, pieceCid, records, isCompleteIndex)
 }
 
 func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {

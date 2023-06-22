@@ -245,9 +245,11 @@ func (r *resolver) PieceBuildIndex(args struct{ PieceCid string }) (bool, error)
 	// Use the global boost context for build piece, because if the user
 	// navigates away from the page we don't want to cancel the build piece
 	// operation
-	err = r.piecedirectory.BuildIndexForPiece(r.ctx, pieceCid)
-	if err != nil {
-		return false, err
+	ch := r.piecedirectory.BuildIndexForPiece(r.ctx, pieceCid)
+	for progress := range ch {
+		if progress.Error != "" {
+			return false, fmt.Errorf("re-building index for piece %s: %s", pieceCid, progress.Error)
+		}
 	}
 	return true, nil
 }

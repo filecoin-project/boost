@@ -32,14 +32,14 @@ import (
 var log = logging.Logger("piecedirectory")
 
 type PieceDirectory struct {
-	store       *bdclient.Store
-	pieceReader types.PieceReader
+	store              *bdclient.Store
+	pieceReader        types.PieceReader
+	addIdxThrottleSize int
 
 	ctx context.Context
 
-	addIdxThrottleSize int
-	addIdxThrottle     chan struct{}
-	addIdxOpByCid      sync.Map
+	addIdxLk  sync.Mutex
+	addIdxOps []*addIdxOperation
 }
 
 func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThrottleSize int) *PieceDirectory {
@@ -47,7 +47,6 @@ func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThro
 		store:              store,
 		pieceReader:        pr,
 		addIdxThrottleSize: addIndexThrottleSize,
-		addIdxThrottle:     make(chan struct{}, addIndexThrottleSize),
 	}
 }
 
@@ -81,7 +80,13 @@ func (ps *PieceDirectory) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid
 
 	// Check if this process is currently indexing the piece
 	log.Debugw("piece metadata: get indexing status", "pieceCid", pieceCid)
-	_, indexing := ps.addIdxOpByCid.Load(pieceCid)
+	ops := ps.AddIndexOperations()
+	indexing := false
+	for _, op := range ops {
+		if op.PieceCid == pieceCid {
+			indexing = true
+		}
+	}
 
 	// Return the db piece metadata along with the indexing flag
 	log.Debugw("piece metadata: get complete", "pieceCid", pieceCid)
@@ -125,8 +130,14 @@ func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid,
 
 	if !isIndexed {
 		// Perform indexing of piece
-		if err := ps.addIndexForPieceThrottled(ctx, pieceCid, dealInfo); err != nil {
-			return fmt.Errorf("adding index for piece %s: %w", pieceCid, err)
+		op := ps.addIndexForPieceThrottled(pieceCid, dealInfo)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-op.done:
+		}
+		if op.err != nil {
+			return fmt.Errorf("adding index for piece %s: %w", pieceCid, op.err)
 		}
 	}
 
@@ -138,67 +149,133 @@ func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid,
 	return nil
 }
 
-type addIndexOperation struct {
-	done chan struct{}
-	err  error
+func (ps *PieceDirectory) AddIndexOperations() []AddIdxState {
+	ops := make([]AddIdxState, 0, len(ps.addIdxOps))
+
+	ps.addIdxLk.Lock()
+	defer ps.addIdxLk.Unlock()
+
+	for _, o := range ps.addIdxOps {
+		ops = append(ops, o.State())
+	}
+
+	return ops
 }
 
-func (ps *PieceDirectory) addIndexForPieceThrottled(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+type addIdxOperation struct {
+	pieceCid cid.Cid
+	dealInfo model.DealInfo
+	done     chan struct{}
+
+	lk       sync.RWMutex
+	started  bool
+	progress float64
+	err      error
+}
+
+type AddIdxState struct {
+	PieceCid cid.Cid
+	Progress float64
+	Err      error
+}
+
+func (o *addIdxOperation) State() AddIdxState {
+	o.lk.Lock()
+	defer o.lk.Unlock()
+	return AddIdxState{
+		PieceCid: o.pieceCid,
+		Progress: o.progress,
+		Err:      o.err,
+	}
+}
+
+func (o *addIdxOperation) setProgress(progress float64) {
+	o.lk.Lock()
+	defer o.lk.Unlock()
+	o.progress = progress
+}
+
+func (o *addIdxOperation) setErr(err error) {
+	o.lk.Lock()
+	defer o.lk.Unlock()
+	o.err = err
+}
+
+func (ps *PieceDirectory) addIndexForPieceThrottled(pieceCid cid.Cid, dealInfo model.DealInfo) *addIdxOperation {
+	ps.addIdxLk.Lock()
+	defer ps.addIdxLk.Unlock()
+
 	// Check if there is already an add index operation in progress for the
 	// given piece cid. If not, create a new one.
-	opi, loaded := ps.addIdxOpByCid.LoadOrStore(pieceCid, &addIndexOperation{
-		done: make(chan struct{}),
-	})
-	op := opi.(*addIndexOperation)
-	if loaded {
-		log.Debugw("add index: operation in progress, waiting for completion", "pieceCid", pieceCid)
-		defer func() {
-			log.Debugw("add index: in progress operation completed", "pieceCid", pieceCid)
-		}()
-
-		// There is an add index operation in progress, so wait for it to
-		// complete
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-op.done:
-			return op.err
+	for _, op := range ps.addIdxOps {
+		if op.pieceCid == pieceCid {
+			log.Debugw("add index: operation already in progress", "pieceCid", pieceCid)
+			return op
 		}
 	}
 
-	// A new operation was added to the map, so clean it up when it's done
-	defer ps.addIdxOpByCid.Delete(pieceCid)
-	defer close(op.done)
+	log.Debugw("add index: new operation", "pieceCid", pieceCid)
+	op := &addIdxOperation{pieceCid: pieceCid, dealInfo: dealInfo, done: make(chan struct{})}
+	ps.addIdxOps = append(ps.addIdxOps, op)
 
-	// Wait for the throttle to yield an open spot
-	log.Debugw("add index: wait for open throttle position",
-		"pieceCid", pieceCid, "queued", len(ps.addIdxThrottle), "queue-limit", ps.addIdxThrottleSize)
-	select {
-	case <-ctx.Done():
-		op.err = ctx.Err()
-		return ctx.Err()
-	case ps.addIdxThrottle <- struct{}{}:
+	var startNextOp func()
+	runOp := func(o *addIdxOperation) {
+		log.Debugw("add index: start", "pieceCid", pieceCid)
+
+		// Add index for piece, and record progress
+		ps.addIndexForPiece(ps.ctx, o)
+
+		// The add index operation has completed. Clean it up from the array.
+		ps.addIdxLk.Lock()
+		defer ps.addIdxLk.Unlock()
+
+		found := false
+		for i, currop := range ps.addIdxOps {
+			if currop.pieceCid == o.pieceCid {
+				found = true
+			}
+			if found && i < len(ps.addIdxOps)-1 {
+				ps.addIdxOps[i] = ps.addIdxOps[i+1]
+			}
+		}
+		ps.addIdxOps = ps.addIdxOps[:len(ps.addIdxOps)-1]
+
+		// If there are enough open slots in the throttle, start the next operation
+		startNextOp()
 	}
-	defer func() { <-ps.addIdxThrottle }()
 
-	// Perform the add index operation.
-	// Note: Once we start the add index operation we don't want to cancel it
-	// if one of the waiting threads cancels its context. So instead we use the
-	// PieceDirectory's context.
-	op.err = ps.addIndexForPiece(ps.ctx, pieceCid, dealInfo)
+	startNextOp = func() {
+		// If there is another operation waiting to run, and there are enough
+		// open slots in the throttle, start the next operation
+		for i := 0; i < ps.addIdxThrottleSize && i < len(ps.addIdxOps); i++ {
+			nextOp := ps.addIdxOps[i]
+			if !nextOp.started {
+				nextOp.started = true
+				go runOp(nextOp)
+			}
+		}
+	}
 
-	// Return the result
-	log.Debugw("add index: completed", "pieceCid", pieceCid)
-	return op.err
+	// If there are enough open slots in the throttle, start the operation
+	startNextOp()
+
+	return op
 }
 
-func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, op *addIdxOperation) {
+	defer close(op.done)
+
+	pieceCid := op.pieceCid
+	dealInfo := op.dealInfo
+
 	// Get a reader over the piece data
 	log.Debugw("add index: get index", "pieceCid", pieceCid)
 	reader, err := ps.pieceReader.GetReader(ctx, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
 	if err != nil {
-		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
+		op.setErr(fmt.Errorf("getting reader over piece %s: %w", pieceCid, err))
+		return
 	}
+	op.setProgress(0.1)
 
 	// Iterate over all the blocks in the piece to extract the index records
 	log.Debugw("add index: read index", "pieceCid", pieceCid)
@@ -206,7 +283,8 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	opts := []carv2.Option{carv2.ZeroLengthSectionAsEOF(true)}
 	blockReader, err := carv2.NewBlockReader(reader, opts...)
 	if err != nil {
-		return fmt.Errorf("getting block reader over piece %s: %w", pieceCid, err)
+		op.setErr(fmt.Errorf("getting block reader over piece %s: %w", pieceCid, err))
+		return
 	}
 
 	blockMetadata, err := blockReader.SkipNext()
@@ -222,41 +300,84 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 		blockMetadata, err = blockReader.SkipNext()
 	}
 	if !errors.Is(err, io.EOF) {
-		return fmt.Errorf("generating index for piece %s: %w", pieceCid, err)
+		op.setErr((fmt.Errorf("generating index for piece %s: %w", pieceCid, err)))
+		return
 	}
+	op.setProgress(0.2)
 
 	// Add mh => piece index to store: "which piece contains the multihash?"
 	// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
 	log.Debugw("add index: store index in local index directory", "pieceCid", pieceCid)
-	if err := ps.store.AddIndex(ctx, pieceCid, recs, true); err != nil {
-		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
+	addidxch := ps.store.AddIndex(ctx, pieceCid, recs, true)
+	for resp := range addidxch {
+		if resp.Err != "" {
+			op.setErr((fmt.Errorf("adding CAR index for piece %s: %s", pieceCid, resp.Err)))
+			return
+		}
+		op.setProgress(0.2 + resp.Progress*0.8)
 	}
-
-	return nil
 }
 
-func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.Cid) error {
+type BuildIndexProgress struct {
+	Progress float64
+	Error    string
+}
+
+func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.Cid) <-chan BuildIndexProgress {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.build_index_for_piece")
 	defer span.End()
 
 	log.Debugw("build index: get piece deals", "pieceCid", pieceCid)
 
+	ch := make(chan BuildIndexProgress, 256)
+
+	if ctx.Err() != nil {
+		ch <- BuildIndexProgress{Error: "context already cancelled"}
+		close(ch)
+		return ch
+	}
+
 	dls, err := ps.GetPieceDeals(ctx, pieceCid)
 	if err != nil {
-		return fmt.Errorf("getting piece deals: %w", err)
+		ch <- BuildIndexProgress{Error: fmt.Sprintf("getting piece deals: %s", err)}
+		close(ch)
+		return ch
 	}
 
 	if len(dls) == 0 {
 		log.Debugw("build index: no deals found for piece", "pieceCid", pieceCid)
-		return fmt.Errorf("getting piece deals: no deals found for piece")
+		ch <- BuildIndexProgress{Error: fmt.Sprintf("getting piece deals: no deals found for piece")}
+		close(ch)
+		return ch
 	}
 
-	err = ps.addIndexForPieceThrottled(ctx, pieceCid, dls[0])
-	if err != nil {
-		return fmt.Errorf("adding index for piece deal %d: %w", dls[0].ChainDealID, err)
-	}
+	// Send progress updates on the channel every second
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		defer close(ch)
 
-	return nil
+		op := ps.addIndexForPieceThrottled(pieceCid, dls[0])
+		for {
+			select {
+			case <-ctx.Done():
+				ch <- BuildIndexProgress{Error: "context cancelled"}
+				return
+			case <-op.done:
+				state := op.State()
+				errstr := ""
+				if state.Err != nil {
+					errstr = state.Err.Error()
+				}
+				ch <- BuildIndexProgress{Error: errstr, Progress: state.Progress}
+				return
+			case <-ticker.C:
+				ch <- BuildIndexProgress{Progress: op.State().Progress}
+			}
+		}
+	}()
+
+	return ch
 }
 
 func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid string) error {
@@ -453,9 +574,11 @@ func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int
 	}
 
 	// The index is incomplete, so re-build the index on the fly
-	err = ps.BuildIndexForPiece(ctx, pieces[0])
-	if err != nil {
-		return 0, fmt.Errorf("re-building index for piece %s: %w", pieces[0], err)
+	ch := ps.BuildIndexForPiece(ctx, pieces[0])
+	for progress := range ch {
+		if progress.Error != "" {
+			return 0, fmt.Errorf("re-building index for piece %s: %s", pieces[0], progress.Error)
+		}
 	}
 
 	// Now get the size again

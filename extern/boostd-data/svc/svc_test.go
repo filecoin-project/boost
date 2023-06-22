@@ -81,8 +81,10 @@ func testService(ctx context.Context, t *testing.T, bdsvc *Service, addr string)
 	randomuuid, err := uuid.Parse("4d8f5ce6-dbfd-40dc-8b03-29308e97357b")
 	require.NoError(t, err)
 
-	err = cl.AddIndex(ctx, pieceCid, records, true)
-	require.NoError(t, err)
+	respch := cl.AddIndex(ctx, pieceCid, records, true)
+	for resp := range respch {
+		require.Empty(t, resp.Err)
+	}
 
 	di := model.DealInfo{
 		DealUuid:    randomuuid.String(),
@@ -210,7 +212,10 @@ func testServiceFuzz(ctx context.Context, t *testing.T, addr string) {
 
 			randomuuid := uuid.New()
 			pieceCid := testutil.GenerateCid()
-			err = cl.AddIndex(ctx, pieceCid, records, true)
+			respch := cl.AddIndex(ctx, pieceCid, records, true)
+			for resp := range respch {
+				require.Empty(t, resp.Err)
+			}
 			require.NoError(t, err)
 
 			di := model.DealInfo{
@@ -448,8 +453,10 @@ func testCleanup(ctx context.Context, t *testing.T, bdsvc *Service, addr string)
 	records, err := getRecords(subject)
 	require.NoError(t, err)
 
-	err = cl.AddIndex(ctx, pieceCid, records, true)
-	require.NoError(t, err)
+	respch := cl.AddIndex(ctx, pieceCid, records, true)
+	for resp := range respch {
+		require.Empty(t, resp.Err)
+	}
 
 	di := model.DealInfo{
 		DealUuid:    uuid.NewString(),

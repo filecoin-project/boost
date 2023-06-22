@@ -31,11 +31,11 @@ var pdIndexGenerate = &cli.Command{
 		}
 
 		// parse piececid
-		piececid, err := cid.Decode(cctx.Args().Get(0))
+		pieceCid, err := cid.Decode(cctx.Args().Get(0))
 		if err != nil {
 			return fmt.Errorf("parsing piece CID: %w", err)
 		}
-		fmt.Println("Generating index for piece", piececid)
+		fmt.Println("Generating index for piece", pieceCid)
 
 		boostApi, ncloser, err := bcli.GetBoostAPI(cctx)
 		if err != nil {
@@ -45,12 +45,25 @@ var pdIndexGenerate = &cli.Command{
 
 		addStart := time.Now()
 
-		err = boostApi.PdBuildIndexForPieceCid(ctx, piececid)
+		progressch, err := boostApi.PdBuildIndexForPieceCid(ctx, pieceCid)
 		if err != nil {
 			return err
 		}
-
-		fmt.Println("Generated index in", time.Since(addStart).String())
+		for {
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("command cancelled after %s: %w", time.Since(addStart), ctx.Err())
+			case progress, ok := <-progressch:
+				if !ok {
+					fmt.Println("Generated index in", time.Since(addStart).String())
+					return nil
+				}
+				if progress.Error != "" {
+					return fmt.Errorf(progress.Error)
+				}
+				fmt.Printf("Progress: %.0f%%\n", progress.Progress*100)
+			}
+		}
 
 		return nil
 	},

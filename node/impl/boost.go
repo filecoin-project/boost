@@ -543,12 +543,16 @@ func (sm *BoostAPI) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, erro
 	return sm.Pd.BlockstoreGetSize(ctx, c)
 }
 
-func (sm *BoostAPI) PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Cid) error {
+func (sm *BoostAPI) PdBuildIndexForPieceCid(ctx context.Context, pieceCid cid.Cid) (<-chan piecedirectory.BuildIndexProgress, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "Boost.PdBuildIndexForPieceCid")
-	span.SetAttributes(attribute.String("piececid", piececid.String()))
+	span.SetAttributes(attribute.String("piececid", pieceCid.String()))
 	defer span.End()
 
-	return sm.Pd.BuildIndexForPiece(ctx, piececid)
+	return sm.Pd.BuildIndexForPiece(ctx, pieceCid), nil
+}
+
+func (sm *BoostAPI) PdAddIndexOperations(_ context.Context) ([]piecedirectory.AddIdxState, error) {
+	return sm.Pd.AddIndexOperations(), nil
 }
 
 func (sm *BoostAPI) OnlineBackup(ctx context.Context, dstDir string) error {

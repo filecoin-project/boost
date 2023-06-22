@@ -87,8 +87,10 @@ func testSizeLimit(ctx context.Context, t *testing.T, bdsvc *Service, addr strin
 
 	addStart := time.Now()
 	tlg.Infof("adding index")
-	err = cl.AddIndex(ctx, pieceCid, records, true)
-	require.NoError(t, err)
+	respch := cl.AddIndex(ctx, pieceCid, records, true)
+	for resp := range respch {
+		require.Empty(t, resp.Err)
+	}
 	tlg.Infof("added index in %s", time.Since(addStart))
 
 	getStart := time.Now()

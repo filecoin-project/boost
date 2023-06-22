@@ -187,8 +187,10 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 
 	recs := GetRecords(t, carv1Reader)
 	pieceCid := CalculateCommp(t, carv1Reader).PieceCID
-	err = cl.AddIndex(ctx, pieceCid, recs, false)
-	require.NoError(t, err)
+	respch := cl.AddIndex(ctx, pieceCid, recs, false)
+	for resp := range respch {
+		require.Empty(t, resp.Err)
+	}
 
 	// Add deal info for the piece - it doesn't matter what it is, the piece
 	// just needs to have at least one deal associated with it
@@ -217,8 +219,10 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	}
 
 	// Add the index to the local index directory, marked as incomplete
-	err = cl.AddIndex(ctx, pieceCid, recs, false)
-	require.NoError(t, err)
+	respch := cl.AddIndex(ctx, pieceCid, recs, false)
+	for resp := range respch {
+		require.Empty(t, resp.Err)
+	}
 
 	// Create a CARv2 index over the CAR file
 	carFileIdxReader, err := os.Open(carFilePath)
@@ -263,8 +267,10 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 
 	recs := GetRecords(t, carv1Reader)
 	commpCalc := CalculateCommp(t, carv1Reader)
-	err = cl.AddIndex(ctx, commpCalc.PieceCID, recs, true)
-	require.NoError(t, err)
+	respch := cl.AddIndex(ctx, commpCalc.PieceCID, recs, true)
+	for resp := range respch {
+		require.Empty(t, resp.Err)
+	}
 
 	// Add deal info for the piece
 	di := model.DealInfo{

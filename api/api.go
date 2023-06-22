@@ -5,6 +5,7 @@ import (
 
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost/piecedirectory"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -57,7 +58,7 @@ type Boost interface {
 	BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) //perm:read
 
 	// MethodGroup: PieceDirectory
-	PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Cid) error //perm:admin
+	PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Cid) (<-chan piecedirectory.BuildIndexProgress, error) //perm:admin
 
 	// RuntimeSubsystems returns the subsystems that are enabled
 	// in this instance.

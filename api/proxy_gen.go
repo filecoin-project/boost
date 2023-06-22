@@ -9,6 +9,7 @@ import (
 
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost/piecedirectory"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -132,7 +133,7 @@ type BoostStruct struct {
 
 		OnlineBackup func(p0 context.Context, p1 string) error `perm:"admin"`
 
-		PdBuildIndexForPieceCid func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
+		PdBuildIndexForPieceCid func(p0 context.Context, p1 cid.Cid) (<-chan piecedirectory.BuildIndexProgress, error) `perm:"admin"`
 
 		RuntimeSubsystems func(p0 context.Context) (lapi.MinerSubsystems, error) `perm:"read"`
 
@@ -793,15 +794,15 @@ func (s *BoostStub) OnlineBackup(p0 context.Context, p1 string) error {
 	return ErrNotSupported
 }
 
-func (s *BoostStruct) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) error {
+func (s *BoostStruct) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) (<-chan piecedirectory.BuildIndexProgress, error) {
 	if s.Internal.PdBuildIndexForPieceCid == nil {
-		return ErrNotSupported
+		return nil, ErrNotSupported
 	}
 	return s.Internal.PdBuildIndexForPieceCid(p0, p1)
 }
 
-func (s *BoostStub) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) error {
-	return ErrNotSupported
+func (s *BoostStub) PdBuildIndexForPieceCid(p0 context.Context, p1 cid.Cid) (<-chan piecedirectory.BuildIndexProgress, error) {
+	return nil, ErrNotSupported
 }
 
 func (s *BoostStruct) RuntimeSubsystems(p0 context.Context) (lapi.MinerSubsystems, error) {
