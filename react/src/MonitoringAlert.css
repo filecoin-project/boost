@@ -1,0 +1,25 @@
+#monitoring-alert {
+    position: absolute;
+    top: 1em;
+    left: 1em;
+    text-align: center;
+}
+
+#monitoring-alert .message {
+    display: inline-block;
+    padding: 1em;
+    border-radius: 0.2em;
+    color: #444;
+    background-color: #fff;
+}
+
+#monitoring-alert .message > img {
+    vertical-align: text-bottom;
+    height: 1.25em;
+    margin-right: 0.5em;
+    filter: invert(12%) sepia(77%) saturate(5618%) hue-rotate(5deg) brightness(79%) contrast(118%);
+}
+
+#monitoring-alert .message > span {
+    vertical-align: text-bottom;
+}

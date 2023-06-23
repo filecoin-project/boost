@@ -41,6 +41,7 @@ func main() {
 			migrateMarketsCmd,
 			backupCmd,
 			restoreCmd,
+			configCmd,
 			dummydealCmd,
 			dataTransfersCmd,
 			retrievalDealsCmd,

@@ -4,17 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-
-	"github.com/filecoin-project/lotus/chain/consensus"
+	"reflect"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	stbig "github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/specs-actors/actors/builtin/multisig"
+	cbg "github.com/whyrusleeping/cbor-gen"
 )
 
 type msg struct {
@@ -32,23 +30,8 @@ type msg struct {
 
 // query: mpool(local): [Message]
 func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg, error) {
-	msgs, err := r.fullNode.MpoolPending(ctx, types.EmptyTSK)
-	if err != nil {
-		return nil, fmt.Errorf("getting mpool messages: %w", err)
-	}
-
-	var filter map[address.Address]struct{}
-	if args.Local {
-		addrs, err := r.fullNode.WalletList(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("getting local addresses: %w", err)
-		}
-
-		filter = make(map[address.Address]struct{})
-		for _, a := range addrs {
-			filter[a] = struct{}{}
-		}
-	}
+	var ret []*msg
+	var msgs []*types.SignedMessage
 
 	ts, err := r.fullNode.ChainHead(ctx)
 	if err != nil {
@@ -56,35 +39,42 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 	}
 	baseFee := ts.Blocks()[0].ParentBaseFee
 
-	gqlmsgs := make([]*msg, 0, len(msgs))
-	for _, m := range msgs {
-		if filter != nil {
-			// Filter for local messages
-			if _, has := filter[m.Message.From]; !has {
-				continue
-			}
+	if args.Local {
+		msgs, err = r.mpool.PendingLocal(ctx)
+		if err != nil {
+			return nil, err
 		}
+	} else {
+		msgs, err = r.mpool.PendingAll()
+		if err != nil {
+			return nil, err
+		}
+	}
 
-		method := m.Message.Method.String()
+	// Convert params to human-readable and get method name
+	for _, m := range msgs {
+		var params string
+		methodName := m.Message.Method.String()
 		toact, err := r.fullNode.StateGetActor(ctx, m.Message.To, types.EmptyTSK)
 		if err == nil {
-			method = consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method].Params.Name()
-		}
+			method, ok := consensus.NewActorRegistry().Methods[toact.Code][m.Message.Method]
+			if ok {
+				methodName = method.Name
 
-		var params string
-		paramsMsg, err := messageFromBytes(m.Message.Params)
-		if err != nil {
-			params = err.Error()
-		} else {
-			paramsBytes, err := json.MarshalIndent(paramsMsg, "", "  ")
-			if err != nil {
-				params = err.Error()
-			} else {
-				params = string(paramsBytes)
+				params = string(m.Message.Params)
+				p, ok := reflect.New(method.Params.Elem()).Interface().(cbg.CBORUnmarshaler)
+				if ok {
+					if err := p.UnmarshalCBOR(bytes.NewReader(m.Message.Params)); err == nil {
+						b, err := json.MarshalIndent(p, "", "  ")
+						if err == nil {
+							params = string(b)
+						}
+					}
+				}
 			}
 		}
 
-		gqlmsgs = append(gqlmsgs, &msg{
+		ret = append(ret, &msg{
 			To:         m.Message.To.String(),
 			From:       m.Message.From.String(),
 			Nonce:      gqltypes.Uint64(m.Message.Nonce),
@@ -92,90 +82,22 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Local bool }) ([]*msg
 			GasFeeCap:  gqltypes.BigInt{Int: m.Message.GasFeeCap},
 			GasLimit:   gqltypes.Uint64(uint64(m.Message.GasLimit)),
 			GasPremium: gqltypes.BigInt{Int: m.Message.GasPremium},
-			Method:     method,
+			Method:     methodName,
 			Params:     params,
 			BaseFee:    gqltypes.BigInt{Int: baseFee},
 		})
 	}
 
-	return gqlmsgs, nil
+	return ret, nil
 }
 
-func messageFromBytes(msgb []byte) (types.ChainMsg, error) {
-	// Signed
-	{
-		var msg types.SignedMessage
-		if err := msg.UnmarshalCBOR(bytes.NewReader(msgb)); err == nil {
-			return &msg, nil
-		}
+// query: mpoolAlertsCount: int
+func (r *resolver) MpoolAlertsCount(ctx context.Context) (int32, error) {
+	msgs, err := r.mpool.Alerts(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("getting alert count: %w", err)
 	}
-
-	// Unsigned
-	{
-		var msg types.Message
-		if err := msg.UnmarshalCBOR(bytes.NewReader(msgb)); err == nil {
-			return &msg, nil
-		}
-	}
-
-	// Multisig propose?
-	{
-		var pp multisig.ProposeParams
-		if err := pp.UnmarshalCBOR(bytes.NewReader(msgb)); err == nil {
-			i, err := address.NewIDAddress(0)
-			if err != nil {
-				return nil, err
-			}
-
-			return &types.Message{
-				// Hack(-ish)
-				Version: 0x6d736967,
-				From:    i,
-
-				To:    pp.To,
-				Value: pp.Value,
-
-				Method: pp.Method,
-				Params: pp.Params,
-
-				GasFeeCap:  stbig.Zero(),
-				GasPremium: stbig.Zero(),
-			}, nil
-		}
-	}
-
-	// Encoded json???
-	{
-		if msg, err := messageFromJson(msgb); err == nil {
-			return msg, nil
-		}
-	}
-
-	return nil, errors.New("probably not a cbor-serialized message")
-}
-
-func messageFromJson(msgb []byte) (types.ChainMsg, error) {
-	// Unsigned
-	{
-		var msg types.Message
-		if err := json.Unmarshal(msgb, &msg); err == nil {
-			if msg.To != address.Undef {
-				return &msg, nil
-			}
-		}
-	}
-
-	// Signed
-	{
-		var msg types.SignedMessage
-		if err := json.Unmarshal(msgb, &msg); err == nil {
-			if msg.Message.To != address.Undef {
-				return &msg, nil
-			}
-		}
-	}
-
-	return nil, errors.New("probably not a json-serialized message")
+	return int32(len(msgs)), nil
 }
 
 func mockMessages() []*types.SignedMessage {

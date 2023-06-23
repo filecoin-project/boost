@@ -118,3 +118,18 @@
     border-left: 1px solid #000;
     height: 0.5em;
 }
+
+.mpool .params {
+    width: 1080px;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    word-break: break-all;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.mpool .params.expanded {
+    overflow: visible;
+    width: auto;
+    white-space: pre
+}

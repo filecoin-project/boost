@@ -62,6 +62,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "Monitoring",
+			Type: "MonitoringConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "Tracing",
 			Type: "TracingConfig",
 
@@ -427,7 +433,7 @@ for any other deal.`,
 			Name: "ListenAddress",
 			Type: "string",
 
-			Comment: `The ip address the GraphQL server will bind to. Default: 0.0.0.0`,
+			Comment: `The ip address the GraphQL server will bind to. Default: 127.0.0.1`,
 		},
 		{
 			Name: "Port",
@@ -629,6 +635,15 @@ see https://boost.filecoin.io/configuration/deal-filters for more details`,
 			Type: "*lotus_config.RetrievalPricing",
 
 			Comment: ``,
+		},
+	},
+	"MonitoringConfig": []DocField{
+		{
+			Name: "MpoolAlertEpochs",
+			Type: "int64",
+
+			Comment: `The number of epochs after which alert is generated for a local pending
+message in lotus mpool`,
 		},
 	},
 	"StorageConfig": []DocField{

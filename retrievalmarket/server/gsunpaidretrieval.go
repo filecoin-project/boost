@@ -181,8 +181,18 @@ func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatr
 
 	rcpt := state.cs.recipient
 	tID := state.cs.transferID
+	gsRequestID := state.gsReq
 	g.activeRetrievalsLk.Unlock()
 
+	// tell GraphSync to cancel the request
+	if (gsRequestID != graphsync.RequestID{}) {
+		err := g.Cancel(ctx, gsRequestID)
+		if err != nil {
+			log.Info("unable to force close graphsync request %s: %s", tID, err)
+		}
+	}
+
+	// send a message on data transfer
 	err := g.dtnet.SendMessage(ctx, rcpt, message.CancelResponse(tID))
 	g.failTransfer(state, errors.New("transfer cancelled by provider"))
 
@@ -326,6 +336,7 @@ func (g *GraphsyncUnpaidRetrieval) handleRetrievalDeal(peerID peer.ID, msg datat
 		retType: retType,
 		cs:      cs,
 		mkts:    mktsState,
+		gsReq:   request.ID(),
 	}
 
 	// Record the data transfer ID so that we can intercept future

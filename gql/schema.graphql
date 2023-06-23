@@ -477,6 +477,9 @@ type RootQuery {
   """Get local messages in the mpool"""
   mpool(local: Boolean!): [MpoolMessage]!
 
+  """Get number of messages stuck in mpool"""
+  mpoolAlertsCount: Int!
+
   """Get libp2p addresses and peer id"""
   libp2pAddrInfo: Libp2pAddrInfo!
 

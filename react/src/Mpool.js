@@ -44,6 +44,10 @@ function MpoolMessage(props) {
     const i = props.i
     const msg = props.msg
 
+    const handleParamsClick = (el) => {
+        el.target.classList.toggle('expanded')
+    }
+
     return <>
         <tr key={"to"}>
             <td>To</td>
@@ -67,7 +71,9 @@ function MpoolMessage(props) {
         </tr>
         <tr key={i+"params"}>
             <td>Params</td>
-            <td>{msg.Params}</td>
+            <td>
+                <div onClick={handleParamsClick} className="params">{msg.Params}</div>
+            </td>
         </tr>
         <tr key={i+"gas-fee-cap"}>
             <td>Gas Fee Cap</td>
@@ -75,7 +81,7 @@ function MpoolMessage(props) {
         </tr>
         <tr key={i+"gas-limit"}>
             <td>Gas Limit</td>
-            <td>{msg.GasLimit}</td>
+            <td>{humanFIL(msg.GasLimit)}</td>
         </tr>
         <tr key={i+"gas-premium"}>
             <td>Gas Premium</td>

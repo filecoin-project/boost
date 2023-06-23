@@ -22,7 +22,7 @@ func v1Tov2(cfgPath string) (string, error) {
 	// Update the Boost config version
 	boostCfg.ConfigVersion = 2
 
-	bz, err := ConfigUpdate(boostCfg, DefaultBoost(), true)
+	bz, err := ConfigUpdate(boostCfg, DefaultBoost(), true, false)
 	if err != nil {
 		return "", fmt.Errorf("applying configuration: %w", err)
 	}
