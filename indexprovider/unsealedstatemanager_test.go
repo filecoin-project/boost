@@ -15,7 +15,7 @@ import (
 	"github.com/filecoin-project/lotus/markets/idxprov"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/golang/mock/gomock"
-	"github.com/ipni/index-provider/metadata"
+	"github.com/ipni/go-libipni/metadata"
 	mock_provider "github.com/ipni/index-provider/mock"
 	"github.com/stretchr/testify/require"
 )

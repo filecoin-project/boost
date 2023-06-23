@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/ipfs/go-cid"
+	"github.com/ipni/go-libipni/ingest/schema"
+	"github.com/ipni/go-libipni/metadata"
 	"github.com/ipni/index-provider"
-	"github.com/ipni/index-provider/metadata"
-	"github.com/ipni/storetheindex/api/v0/ingest/schema"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 

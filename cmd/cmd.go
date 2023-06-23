@@ -3,9 +3,9 @@ package cmd
 import "github.com/urfave/cli/v2"
 
 var FlagRepo = &cli.StringFlag{
-	Name:  "repo",
-	Usage: "repo directory for Boost client",
-	Value: "~/.boost-client",
+	Name:    "repo",
+	Usage:   "repo directory for Boost client",
+	Value:   "~/.boost-client",
 	EnvVars: []string{"BOOST_CLIENT_REPO"},
 }
 

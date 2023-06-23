@@ -51,15 +51,16 @@ import (
 	"github.com/filecoin-project/lotus/storage/pipeline/sealiface"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
+	"github.com/ipfs/boxo/files"
+	dag "github.com/ipfs/boxo/ipld/merkledag"
+	dstest "github.com/ipfs/boxo/ipld/merkledag/test"
+	unixfile "github.com/ipfs/boxo/ipld/unixfs/file"
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	ipldcbor "github.com/ipfs/go-ipld-cbor"
 	ipld "github.com/ipfs/go-ipld-format"
-	"github.com/ipfs/go-libipfs/blocks"
-	"github.com/ipfs/go-libipfs/files"
 	logging "github.com/ipfs/go-log/v2"
-	dag "github.com/ipfs/go-merkledag"
-	dstest "github.com/ipfs/go-merkledag/test"
-	unixfile "github.com/ipfs/go-unixfs/file"
 	"github.com/ipld/go-car"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -128,7 +129,7 @@ func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
 	fnOpts := []kit.NodeOpt{
 		kit.ConstructorOpts(
 			lnode.Override(new(lp2p.RawHost), func() (host.Host, error) {
-				return libp2p.New()
+				return libp2p.New(libp2p.DefaultTransports)
 			}),
 		),
 		kit.ThroughRPC(),
@@ -715,7 +716,12 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 		require.NoError(t, err)
 	}
 
-	nd, err := ipld.Decode(b)
+	reg := ipld.Registry{}
+	reg.Register(cid.DagProtobuf, dag.DecodeProtobufBlock)
+	reg.Register(cid.DagCBOR, ipldcbor.DecodeBlock)
+	reg.Register(cid.Raw, dag.DecodeRawBlock)
+
+	nd, err := reg.Decode(b)
 	require.NoError(t, err)
 
 	dserv := dag.NewDAGService(bserv)
