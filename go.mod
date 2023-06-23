@@ -356,8 +356,6 @@ require (
 
 require (
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
-	github.com/couchbase/gocb/v2 v2.5.0 // indirect
-	github.com/couchbase/gocbcore/v10 v10.1.2 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 )
 
