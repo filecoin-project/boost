@@ -8,11 +8,11 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ipfs/go-blockservice"
+	"github.com/ipfs/boxo/blockservice"
+	bstore "github.com/ipfs/boxo/blockstore"
+	"github.com/ipfs/boxo/ipld/merkledag"
 	"github.com/ipfs/go-datastore"
 	dss "github.com/ipfs/go-datastore/sync"
-	bstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/ipfs/go-merkledag"
 	"github.com/stretchr/testify/require"
 )
 

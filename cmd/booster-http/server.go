@@ -21,11 +21,11 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/boxo/blockservice"
+	blockstore "github.com/ipfs/boxo/blockstore"
+	offline "github.com/ipfs/boxo/exchange/offline"
 	"github.com/ipfs/boxo/gateway"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	offline "github.com/ipfs/go-ipfs-exchange-offline"
 	"go.opencensus.io/stats"
 )
 
@@ -92,7 +92,7 @@ func (s *HttpServer) Start(ctx context.Context) error {
 
 	if s.opts.Blockstore != nil {
 		blockService := blockservice.New(s.opts.Blockstore, offline.Exchange(s.opts.Blockstore))
-		gw, err := gateway.NewBlocksGateway(blockService)
+		gw, err := gateway.NewBlocksBackend(blockService)
 		if err != nil {
 			return fmt.Errorf("creating blocks gateway: %w", err)
 		}

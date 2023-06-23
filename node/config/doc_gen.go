@@ -1163,7 +1163,8 @@ Set to 0 to keep all mappings`,
 			Name: "EnableMsgIndex",
 			Type: "bool",
 
-			Comment: `EnableMsgIndex enables indexing of messages on chain.`,
+			Comment: `EXPERIMENTAL FEATURE. USE WITH CAUTION
+EnableMsgIndex enables indexing of messages on chain.`,
 		},
 	},
 	"lotus_config.IndexProviderConfig": []DocField{
@@ -1737,8 +1738,7 @@ required to have expiration of at least the soonest-ending deal`,
 			Name: "MinTargetUpgradeSectorExpiration",
 			Type: "uint64",
 
-			Comment: `Setting this to a high value (for example to maximum deal duration - 1555200) will disable selection based on
-initial pledge - upgrade sectors will always be chosen based on longest expiration`,
+			Comment: `DEPRECATED: Target expiration is no longer used`,
 		},
 		{
 			Name: "CommittedCapacitySectorLifetime",
