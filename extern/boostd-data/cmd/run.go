@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boostd-data/svc"
@@ -18,7 +17,6 @@ var runCmd = &cli.Command{
 	Name: "run",
 	Subcommands: []*cli.Command{
 		leveldbCmd,
-		couchbaseCmd,
 		yugabyteCmd,
 	},
 }
@@ -70,41 +68,6 @@ var leveldbCmd = &cli.Command{
 		}
 
 		return runAction(cctx, "leveldb", dbsvc)
-	},
-}
-
-var couchbaseCmd = &cli.Command{
-	Name:   "couchbase",
-	Usage:  "Run boostd-data with a couchbase database",
-	Before: before,
-	Flags: append([]cli.Flag{
-		&cli.StringFlag{
-			Name:     "connect-string",
-			Usage:    "couchbase connect string eg 'couchbase://127.0.0.1'",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "username",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "password",
-			Required: true,
-		}},
-		runFlags...,
-	),
-	Action: func(cctx *cli.Context) error {
-		// Create a couchbase data service
-		settings := couchbase.DBSettings{
-			ConnectString: cctx.String("connect-string"),
-			Auth: couchbase.DBSettingsAuth{
-				Username: cctx.String("username"),
-				Password: cctx.String("password"),
-			},
-		}
-
-		bdsvc := svc.NewCouchbase(settings)
-		return runAction(cctx, "couchbase", bdsvc)
 	},
 }
 

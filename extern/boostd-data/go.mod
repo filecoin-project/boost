@@ -3,7 +3,6 @@ module github.com/filecoin-project/boostd-data
 go 1.18
 
 require (
-	github.com/couchbase/gocb/v2 v2.5.0
 	github.com/ethereum/go-ethereum v1.11.5
 	github.com/filecoin-project/boost v1.4.0
 	github.com/filecoin-project/go-address v1.0.0
@@ -40,7 +39,6 @@ require (
 	github.com/btcsuite/btcd v0.22.1 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
-	github.com/couchbase/gocbcore/v10 v10.1.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/crackcomm/go-gitignore v0.0.0-20170627025303-887ab5e44cc3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

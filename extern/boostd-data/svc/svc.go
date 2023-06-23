@@ -9,7 +9,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/boostd-data/yugabyte"
@@ -28,10 +27,6 @@ type Service struct {
 
 func NewYugabyte(settings yugabyte.DBSettings) *Service {
 	return &Service{Impl: yugabyte.NewStore(settings)}
-}
-
-func NewCouchbase(settings couchbase.DBSettings) *Service {
-	return &Service{Impl: couchbase.NewStore(settings)}
 }
 
 func NewLevelDB(repoPath string) (*Service, error) {

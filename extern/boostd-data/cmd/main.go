@@ -14,7 +14,7 @@ var log = logging.Logger("boostd-data")
 // This service exposes an RPC API that is called by boostd in order to manage
 // boostd's data. The service provides different implementations of the data
 // interface according to the technologies that a user chooses (eg leveldb vs
-// couchbase)
+// yugabyte)
 func main() {
 	app := &cli.App{
 		Name:                 "boostd-data",

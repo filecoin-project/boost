@@ -559,12 +559,6 @@ Note that this port must be open on the firewall.`,
 			Comment: ``,
 		},
 		{
-			Name: "Couchbase",
-			Type: "LocalIndexDirectoryCouchbaseConfig",
-
-			Comment: ``,
-		},
-		{
 			Name: "ParallelAddIndexLimit",
 			Type: "int",
 
@@ -593,53 +587,6 @@ Set this value to "" if the local index directory data service is embedded.`,
 			Type: "Duration",
 
 			Comment: `The RPC timeout when making requests to the boostd-data service`,
-		},
-	},
-	"LocalIndexDirectoryCouchbaseBucketConfig": []DocField{
-		{
-			Name: "RAMQuotaMB",
-			Type: "uint64",
-
-			Comment: `Bucket setting RAMQuotaMB`,
-		},
-	},
-	"LocalIndexDirectoryCouchbaseConfig": []DocField{
-		{
-			Name: "ConnectString",
-			Type: "string",
-
-			Comment: `The couchbase connect string eg "couchbase://127.0.0.1"
-If empty, a leveldb database is used instead.`,
-		},
-		{
-			Name: "Username",
-			Type: "string",
-
-			Comment: ``,
-		},
-		{
-			Name: "Password",
-			Type: "string",
-
-			Comment: ``,
-		},
-		{
-			Name: "PieceMetadataBucket",
-			Type: "LocalIndexDirectoryCouchbaseBucketConfig",
-
-			Comment: ``,
-		},
-		{
-			Name: "MultihashToPiecesBucket",
-			Type: "LocalIndexDirectoryCouchbaseBucketConfig",
-
-			Comment: ``,
-		},
-		{
-			Name: "PieceOffsetsBucket",
-			Type: "LocalIndexDirectoryCouchbaseBucketConfig",
-
-			Comment: ``,
 		},
 	},
 	"LocalIndexDirectoryYugabyteConfig": []DocField{
