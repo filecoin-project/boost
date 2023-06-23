@@ -374,22 +374,6 @@ type MonitoringConfig struct {
 	MpoolAlertEpochs int64
 }
 
-type LocalIndexDirectoryCouchbaseBucketConfig struct {
-	// Bucket setting RAMQuotaMB
-	RAMQuotaMB uint64
-}
-
-type LocalIndexDirectoryCouchbaseConfig struct {
-	// The couchbase connect string eg "couchbase://127.0.0.1"
-	// If empty, a leveldb database is used instead.
-	ConnectString           string
-	Username                string
-	Password                string
-	PieceMetadataBucket     LocalIndexDirectoryCouchbaseBucketConfig
-	MultihashToPiecesBucket LocalIndexDirectoryCouchbaseBucketConfig
-	PieceOffsetsBucket      LocalIndexDirectoryCouchbaseBucketConfig
-}
-
 type LocalIndexDirectoryYugabyteConfig struct {
 	Enabled bool
 	// The yugabyte postgres connect string eg "postgresql://postgres:postgres@localhost"
@@ -399,8 +383,7 @@ type LocalIndexDirectoryYugabyteConfig struct {
 }
 
 type LocalIndexDirectoryConfig struct {
-	Yugabyte  LocalIndexDirectoryYugabyteConfig
-	Couchbase LocalIndexDirectoryCouchbaseConfig
+	Yugabyte LocalIndexDirectoryYugabyteConfig
 	// The maximum number of add index operations allowed to execute in parallel.
 	// The add index operation is executed when a new deal is created - it fetches
 	// the piece from the sealing subsystem, creates an index of where each block

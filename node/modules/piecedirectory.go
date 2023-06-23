@@ -15,7 +15,6 @@ import (
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/sectorstatemgr"
 	bdclient "github.com/filecoin-project/boostd-data/client"
-	"github.com/filecoin-project/boostd-data/couchbase"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/boostd-data/yugabyte"
@@ -71,29 +70,6 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 					bdsvc = svc.NewYugabyte(yugabyte.DBSettings{
 						Hosts:         cfg.LocalIndexDirectory.Yugabyte.Hosts,
 						ConnectString: cfg.LocalIndexDirectory.Yugabyte.ConnectString,
-					})
-
-				case cfg.LocalIndexDirectory.Couchbase.ConnectString != "":
-					log.Infow("local index directory: connecting to couchbase server",
-						"connect-string", cfg.LocalIndexDirectory.Couchbase.ConnectString)
-
-					// If the couchbase connect string is defined, set up a
-					// local index directory service that connects to the couchbase db
-					bdsvc = svc.NewCouchbase(couchbase.DBSettings{
-						ConnectString: cfg.LocalIndexDirectory.Couchbase.ConnectString,
-						Auth: couchbase.DBSettingsAuth{
-							Username: cfg.LocalIndexDirectory.Couchbase.Username,
-							Password: cfg.LocalIndexDirectory.Couchbase.Password,
-						},
-						PieceMetadataBucket: couchbase.DBSettingsBucket{
-							RAMQuotaMB: cfg.LocalIndexDirectory.Couchbase.PieceMetadataBucket.RAMQuotaMB,
-						},
-						MultihashToPiecesBucket: couchbase.DBSettingsBucket{
-							RAMQuotaMB: cfg.LocalIndexDirectory.Couchbase.MultihashToPiecesBucket.RAMQuotaMB,
-						},
-						PieceOffsetsBucket: couchbase.DBSettingsBucket{
-							RAMQuotaMB: cfg.LocalIndexDirectory.Couchbase.PieceOffsetsBucket.RAMQuotaMB,
-						},
 					})
 
 				default:
