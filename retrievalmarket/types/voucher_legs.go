@@ -3,7 +3,7 @@ package types
 import (
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	datatransfer2 "github.com/filecoin-project/go-data-transfer/v2"
-	"github.com/ipni/storetheindex/dagsync/dtsync"
+	"github.com/ipni/go-libipni/dagsync/dtsync"
 )
 
 type LegsVoucherDTv1 struct {

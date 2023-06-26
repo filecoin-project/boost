@@ -1,7 +1,7 @@
 package bitswap
 
 import (
-	"github.com/ipfs/go-libipfs/bitswap/network"
+	"github.com/ipfs/boxo/bitswap/network"
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
 

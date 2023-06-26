@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	blocksutil "github.com/ipfs/go-ipfs-blocksutil"
-	"github.com/ipfs/go-libipfs/blocks"
 	"github.com/jbenet/go-random"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
