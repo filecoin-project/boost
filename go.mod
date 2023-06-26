@@ -333,7 +333,7 @@ require (
 )
 
 require (
-	github.com/filecoin-project/boost-gfm v1.26.6
+	github.com/filecoin-project/boost-gfm v1.26.7
 	github.com/filecoin-project/boost-graphsync v0.13.6
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
