@@ -11,7 +11,6 @@ import (
 	"github.com/filecoin-project/boost/transport/httptransport/util"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
-	multiaddrutil "github.com/filecoin-project/go-legs/httpsync/multiaddr"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/crypto"
@@ -19,6 +18,7 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
+	"github.com/ipni/go-libipni/maurl"
 )
 
 //go:generate cbor-gen-for --map-encoding StorageAsk DealParamsV120 DealParams Transfer DealResponse DealStatusRequest DealStatusResponse DealStatus
@@ -118,7 +118,7 @@ func (t *Transfer) Host() (string, error) {
 	// If the url is in libp2p format
 	if u.Scheme == util.Libp2pScheme {
 		// Get the host from the multiaddr
-		mahttp, err := multiaddrutil.ToURL(u.Multiaddr)
+		mahttp, err := maurl.ToURL(u.Multiaddr)
 		if err != nil {
 			return "", err
 		}

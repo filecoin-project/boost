@@ -24,8 +24,8 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	pipeline "github.com/filecoin-project/lotus/storage/pipeline"
 	tutils "github.com/filecoin-project/specs-actors/v2/support/testing"
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-libipfs/blocks"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/xerrors"
 )

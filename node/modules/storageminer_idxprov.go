@@ -19,9 +19,9 @@ import (
 	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
+	"github.com/ipni/go-libipni/dagsync/dtsync"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/engine"
-	"github.com/ipni/storetheindex/dagsync/dtsync"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -83,7 +83,7 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 		var e *engine.Engine
 		if cfg.Enable {
 			// Join the indexer topic using the market's pubsub instance. Otherwise, the provider
-			// engine would create its own instance of pubsub down the line in go-legs, which has
+			// engine would create its own instance of pubsub down the line in dagsync, which has
 			// no validators by default.
 			t, err := ps.Join(topicName)
 			if err != nil {

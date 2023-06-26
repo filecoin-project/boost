@@ -37,7 +37,6 @@ type TransferLimiterConfig struct {
 	StallTimeout time.Duration
 }
 
-//
 // transferLimiter maintains a queue of transfers with a soft upper limit on
 // the number of concurrent transfers.
 //
@@ -45,10 +44,10 @@ type TransferLimiterConfig struct {
 // a couple of mitigations:
 //
 // The queue is ordered such that we
-// - start transferring data for the oldest deal first
-// - prefer to start transfers with peers that don't have any ongoing transfer
-// - once the soft limit is reached, don't allow any new transfers with peers
-//   that have existing stalled transfers
+//   - start transferring data for the oldest deal first
+//   - prefer to start transfers with peers that don't have any ongoing transfer
+//   - once the soft limit is reached, don't allow any new transfers with peers
+//     that have existing stalled transfers
 //
 // Note that peers are distinguished by their host (eg foo.bar:8080) not by
 // libp2p peer ID.
@@ -67,7 +66,6 @@ type TransferLimiterConfig struct {
 // - two stalled transfers
 // then two more transfers are permitted to start (as long as they're not with
 // one of the stalled peers)
-//
 type transferLimiter struct {
 	cfg TransferLimiterConfig
 
