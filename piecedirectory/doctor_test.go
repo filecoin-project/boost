@@ -293,7 +293,7 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	doc := NewDoctor(cl, nil, nil)
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil)
 	require.NoError(t, err)
 
 	// The piece should be flagged because there is no index for it
@@ -311,7 +311,7 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil)
 	require.NoError(t, err)
 
 	// The piece should no longer be flagged
@@ -327,7 +327,7 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	ssu.SectorStates[dlSectorID] = db.SealStateSealed
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil)
 	require.NoError(t, err)
 
 	// The piece should be flagged because there is no unsealed copy
@@ -343,7 +343,7 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	ssu.SectorStates[dlSectorID] = db.SealStateUnsealed
 
 	// Check the piece
-	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu)
+	err = doc.checkPiece(ctx, commpCalc.PieceCID, ssu, nil)
 	require.NoError(t, err)
 
 	// The piece should no longer be flagged
