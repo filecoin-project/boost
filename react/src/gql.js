@@ -402,21 +402,12 @@ const FlaggedPiecesQuery = gql`
         piecesFlagged(hasUnsealedCopy: $hasUnsealedCopy, cursor: $cursor, offset: $offset, limit: $limit) {
             pieces {
                 CreatedAt
-                Piece {
-                    PieceCid
-                    IndexStatus {
-                        Status
-                        Error
-                    }
-                    Deals {
-                        Deal {
-                            ID
-                            IsLegacy
-                            CreatedAt
-                            DealDataRoot
-                        }
-                    }
+                PieceCid
+                IndexStatus {
+                    Status
+                    Error
                 }
+                DealCount
             }
             totalCount
             more

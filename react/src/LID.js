@@ -303,8 +303,8 @@ function FlaggedPieces({setSearchQuery}) {
 
                 {rows.map(piece => (
                     <FlaggedPieceRow
-                        key={piece.Piece.PieceCid}
-                        piece={piece.Piece}
+                        key={piece.PieceCid}
+                        piece={piece}
                         setSearchQuery={setSearchQuery}
                     />
                 ))}
@@ -348,7 +348,7 @@ function FlaggedPieceRow({piece}) {
             </Link>
         </td>
         <td>{piece.IndexStatus.Status}</td>
-        <td>{piece.Deals.length}</td>
+        <td>{piece.DealCount}</td>
     </tr>
 }
 
@@ -436,8 +436,8 @@ function NoUnsealedSectorPieces() {
 
                 {rows.map(piece => (
                     <FlaggedPieceRow
-                        key={piece.Piece.PieceCid}
-                        piece={piece.Piece}
+                        key={piece.PieceCid}
+                        piece={piece}
                     />
                 ))}
                 </tbody>

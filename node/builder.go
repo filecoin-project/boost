@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
 	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/lib/mpoolmonitor"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/markets/retrievaladapter"
@@ -513,6 +514,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*sectorstatemgr.SectorStateMgr), sectorstatemgr.NewSectorStateMgr(cfg)),
 		Override(new(*indexprovider.Wrapper), indexprovider.NewWrapper(cfg)),
 
+		Override(new(*legacy.LegacyDealsManager), modules.NewLegacyDealsManager),
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
 		Override(new(smtypes.CommpCalculator), From(new(lotus_modules.MinerStorageService))),
 
