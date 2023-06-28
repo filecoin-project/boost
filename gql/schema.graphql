@@ -187,7 +187,9 @@ type PieceStatus {
 
 type FlaggedPieceStatus {
   CreatedAt: Time!
-  Piece: PieceStatus!
+  PieceCid: String!
+  IndexStatus: IndexStatus!
+  DealCount: Int!
 }
 
 type FlaggedPiecesList {
