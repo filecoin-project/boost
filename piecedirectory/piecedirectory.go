@@ -207,9 +207,12 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	if err != nil {
 		log.Debugw("add index: data segment check failed. falling back to car", "pieceCid", pieceCid, "err", err)
 		// Iterate over all the blocks in the piece to extract the index records
+		if _, err := reader.Seek(0, io.SeekStart); err != nil {
+			return fmt.Errorf("seek to start for piece %s: %w", pieceCid, err)
+		}
 		recs, err = parseRecordsFromCar(reader)
 		if err != nil {
-			return fmt.Errorf("for piece %s: %w", pieceCid, err)
+			return fmt.Errorf("parse car for piece %s: %w", pieceCid, err)
 		}
 	}
 
@@ -250,8 +253,8 @@ func parseRecordsFromCar(reader io.Reader) ([]model.Record, error) {
 	return recs, nil
 }
 
-func parseShardWithDataSegmentIndex(ctx context.Context, pieceCid cid.Cid, size int64, r types.SectionReader) ([]model.Record, error) {
-	ps := abi.UnpaddedPieceSize(size).Padded()
+func parseShardWithDataSegmentIndex(ctx context.Context, pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
+	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
 	dsis := datasegment.DataSegmentIndexStartOffset(ps)
 	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
 		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
