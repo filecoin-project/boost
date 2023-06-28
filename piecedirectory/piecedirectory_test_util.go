@@ -287,9 +287,9 @@ func testDataSegmentIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// directory should re-build the index and then return the size.
 	pm := NewPieceDirectory(cl, pr, 1)
 	pm.Start(ctx)
-	_, err = pm.BlockstoreGetSize(ctx, recs[0].Cid)
+	bss, err := pm.BlockstoreGetSize(ctx, recs[0].Cid)
 	require.NoError(t, err)
-	//require.Equal(t, len(blk.RawData()), sz)
+	require.Equal(t, 392273, bss)
 }
 
 func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
