@@ -3,10 +3,10 @@ package gql
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/boostd-data/svc/types"
@@ -15,6 +15,7 @@ import (
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multihash"
+	"golang.org/x/sync/errgroup"
 )
 
 type IndexStatus string
@@ -65,8 +66,10 @@ type pieceResolver struct {
 }
 
 type flaggedPieceResolver struct {
-	Piece     *pieceResolver
-	CreatedAt graphql.Time
+	PieceCid    string
+	IndexStatus *indexStatus
+	DealCount   int32
+	CreatedAt   graphql.Time
 }
 
 type piecesFlaggedArgs struct {
@@ -117,22 +120,40 @@ func (r *resolver) PiecesFlagged(ctx context.Context, args piecesFlaggedArgs) (*
 		return nil, err
 	}
 
-	allLegacyDeals, err := r.legacyProv.ListLocalDeals()
+	var eg errgroup.Group
+	flaggedPieceResolvers := make([]*flaggedPieceResolver, 0, len(flaggedPieces))
+	for _, flaggedPiece := range flaggedPieces {
+		flaggedPiece := flaggedPiece
+		eg.Go(func() error {
+			// Get piece info from local index directory
+			pieceInfo, pmErr := r.piecedirectory.GetPieceMetadata(ctx, flaggedPiece.PieceCid)
+			if pmErr != nil && !types.IsNotFound(pmErr) {
+				return pmErr
+			}
+
+			// Get the state of the piece's index
+			idxStatus, err := r.getIndexStatus(pieceInfo, pmErr)
+			if err != nil {
+				return err
+			}
+
+			flaggedPieceResolvers = append(flaggedPieceResolvers, &flaggedPieceResolver{
+				PieceCid:    flaggedPiece.PieceCid.String(),
+				IndexStatus: idxStatus,
+				DealCount:   int32(len(pieceInfo.Deals)),
+				CreatedAt:   graphql.Time{Time: flaggedPiece.CreatedAt},
+			})
+			return nil
+		})
+	}
+	err = eg.Wait()
 	if err != nil {
 		return nil, err
 	}
 
-	flaggedPieceResolvers := make([]*flaggedPieceResolver, 0, len(flaggedPieces))
-	for _, flaggedPiece := range flaggedPieces {
-		pieceResolver, err := r.pieceStatus(ctx, flaggedPiece.PieceCid, allLegacyDeals)
-		if err != nil {
-			return nil, err
-		}
-		flaggedPieceResolvers = append(flaggedPieceResolvers, &flaggedPieceResolver{
-			Piece:     pieceResolver,
-			CreatedAt: graphql.Time{Time: flaggedPiece.CreatedAt},
-		})
-	}
+	sort.Slice(flaggedPieceResolvers, func(i, j int) bool {
+		return flaggedPieceResolvers[i].CreatedAt.After(flaggedPieces[j].CreatedAt)
+	})
 
 	return &flaggedPieceListResolver{
 		TotalCount: int32(count),
@@ -194,15 +215,12 @@ func (r *resolver) PiecesWithRootPayloadCid(ctx context.Context, args struct{ Pa
 	}
 
 	// Get legacy markets deals by payload cid
-	// TODO: add method to markets to filter deals by payload CID
-	allLegacyDeals, err := r.legacyProv.ListLocalDeals()
+	legacyDeals, err := r.legacyDeals.ByPayloadCid(ctx, payloadCid)
 	if err != nil {
 		return nil, err
 	}
-	for _, dl := range allLegacyDeals {
-		if dl.Ref.Root == payloadCid {
-			pieceCidSet[dl.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
-		}
+	for _, dl := range legacyDeals {
+		pieceCidSet[dl.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
 	}
 
 	pieceCids := make([]string, 0, len(pieceCidSet))
@@ -258,15 +276,6 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 		return nil, fmt.Errorf("%s is not a valid piece cid", args.PieceCid)
 	}
 
-	allLegacyDeals, err := r.legacyProv.ListLocalDeals()
-	if err != nil {
-		return nil, err
-	}
-
-	return r.pieceStatus(ctx, pieceCid, allLegacyDeals)
-}
-
-func (r *resolver) pieceStatus(ctx context.Context, pieceCid cid.Cid, allLegacyDeals []storagemarket.MinerDeal) (*pieceResolver, error) {
 	// Get piece info from local index directory
 	pieceInfo, pmErr := r.piecedirectory.GetPieceMetadata(ctx, pieceCid)
 	if pmErr != nil && !types.IsNotFound(pmErr) {
@@ -280,11 +289,9 @@ func (r *resolver) pieceStatus(ctx context.Context, pieceCid cid.Cid, allLegacyD
 	}
 
 	// Get legacy markets deals by piece Cid
-	var legacyDeals []storagemarket.MinerDeal
-	for _, dl := range allLegacyDeals {
-		if dl.Ref.PieceCid != nil && *dl.Ref.PieceCid == pieceCid {
-			legacyDeals = append(legacyDeals, dl)
-		}
+	legacyDeals, err := r.legacyDeals.ByPieceCid(ctx, pieceCid)
+	if err != nil {
+		return nil, err
 	}
 
 	// Convert local index directory deals to graphQL format
@@ -357,7 +364,7 @@ func (r *resolver) pieceStatus(ctx context.Context, pieceCid cid.Cid, allLegacyD
 	}
 
 	// Get the state of the piece's index
-	idxStatus, err := r.getIndexStatus(ctx, pieceCid, pieceInfo, pmErr, deals)
+	idxStatus, err := r.getIndexStatus(pieceInfo, pmErr)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +377,7 @@ func (r *resolver) pieceStatus(ctx context.Context, pieceCid cid.Cid, allLegacyD
 	}, nil
 }
 
-func (r *resolver) getIndexStatus(ctx context.Context, pieceCid cid.Cid, md pdtypes.PieceDirMetadata, mdErr error, deals []*pieceDealResolver) (*indexStatus, error) {
+func (r *resolver) getIndexStatus(md pdtypes.PieceDirMetadata, mdErr error) (*indexStatus, error) {
 	var idxst IndexStatus
 	idxerr := ""
 
