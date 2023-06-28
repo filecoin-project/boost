@@ -279,25 +279,35 @@ func (w *Wrapper) Enabled() bool {
 // AnnounceExtendedProviders announces changes to Boost configuration in the context of retrieval
 // methods.
 //
-// The advertisement published by this function covers 3 cases:
+// The advertisement published by this function covers 2 protocols:
 //
-// 1. bitswap is completely disabled: in which case an advertisement is
-// published with empty extended providers that should wipe previous
-// support on indexer side.
+// Bitswap:
+//     1. bitswap is completely disabled: in which case an advertisement is
+//     published with http(or empty if http is disabled) extended providers
+//     that should wipe previous support on indexer side.
 //
-// 2. bitswap is enabled with public addresses: in which case publish an
-// advertisement with extended providers records corresponding to the
-// public addresses. Note, according the the IPNI spec, the host ID will
-// also be added to the extended providers for signing reasons with empty
-// metadata making a total of 2 extended provider records.
+//     2. bitswap is enabled with public addresses: in which case publish an
+//     advertisement with extended providers records corresponding to the
+//     public addresses. Note, according the IPNI spec, the host ID will
+//     also be added to the extended providers for signing reasons with empty
+//     metadata making a total of 2 extended provider records.
 //
-// 3. bitswap with boostd address: in which case public an advertisement
-// with one extended provider record that just adds bitswap metadata.
+//     3. bitswap with boostd address: in which case public an advertisement
+//     with one extended provider record that just adds bitswap metadata.
 //
-// Note that in any case one advertisement is published by boost on startup
-// to reflect on bitswap configuration, even if the config remains the
-// same. Future work should detect config change and only publish ads when
-// config changes.
+// HTTP:
+//     1. http is completely disabled: in which case an advertisement is
+//     published with bitswap(or empty if bitswap is disabled) extended providers
+//     that should wipe previous support on indexer side
+//
+//     2. http is enabled: in which case an advertisement is published with
+//     bitswap and http(or only http if bitswap is disabled) extended providers
+//     that should wipe previous support on indexer side
+//
+//     Note that in any case one advertisement is published by boost on startup
+//     to reflect on extended provider configuration, even if the config remains the
+//     same. Future work should detect config change and only publish ads when
+//     config changes.
 func (w *Wrapper) AnnounceExtendedProviders(ctx context.Context) error {
 	if !w.enabled {
 		return errors.New("cannot announce all deals: index provider is disabled")
