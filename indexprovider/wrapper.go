@@ -55,6 +55,7 @@ type Wrapper struct {
 	// bitswapEnabled records whether to announce bitswap as an available
 	// protocol to the network indexer
 	bitswapEnabled bool
+	httpEnabled    bool
 	stop           context.CancelFunc
 }
 
@@ -90,6 +91,7 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 			enabled:        !isDisabled,
 			piecedirectory: piecedirectory,
 			bitswapEnabled: bitswapEnabled,
+			httpEnabled:    httpEnabled,
 			ssm:            ssm,
 		}
 		return w, nil
@@ -106,7 +108,7 @@ func (w *Wrapper) Start(_ context.Context) {
 	go func() {
 		err := w.AnnounceExtendedProviders(runCtx)
 		if err != nil {
-			log.Warnf("announcing extended providers: %w", err)
+			log.Warnf("announcing extended providers: %s", err)
 		}
 	}()
 
