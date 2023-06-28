@@ -111,7 +111,7 @@ func (w *Wrapper) Start(_ context.Context) {
 	go func() {
 		err := w.AnnounceExtendedProviders(runCtx)
 		if err != nil {
-			log.Warnf("announcing extended providers: %w", err)
+			log.Warnf("announcing extended providers: %s", err)
 		}
 	}()
 
@@ -415,8 +415,10 @@ func (w *Wrapper) appendExtendedProviders(ctx context.Context, adBuilder *xprovi
 			return err
 		}
 		var ep = xproviders.Info{
+			ID:       w.h.ID().String(),
 			Addrs:    []string{w.cfg.Dealmaking.HTTPRetrievalMultiaddr},
 			Metadata: mbytes,
+			Priv:     key,
 		}
 
 		log.Infof("announcing http endpoint to indexer as extended provider: %s", ep.Addrs)
