@@ -28,9 +28,3 @@ scrape_configs:
       - targets: [ 'booster-bitswap:9696' ]
         labels:
           host: 'local'
-  - job_name: 'lotus-miner'
-    metrics_path: "/debug/metrics"
-    static_configs:
-      - targets: [ 'lotus-miner:2345' ]
-        labels:
-          host: 'local'
