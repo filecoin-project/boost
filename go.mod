@@ -337,7 +337,7 @@ require (
 	github.com/filecoin-project/boost-graphsync v0.13.6
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
-	github.com/filecoin-project/lotus v1.23.2-0.20230622154405-168d022018ce
+	github.com/filecoin-project/lotus v1.23.2
 	github.com/ipfs/boxo v0.10.1
 	github.com/ipfs/kubo v0.21.0-rc1
 	github.com/ipni/go-libipni v0.0.8
@@ -345,10 +345,14 @@ require (
 
 require (
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
-	github.com/filecoin-project/kubo-api-client v0.0.1 // indirect
 	github.com/google/pprof v0.0.0-20230602150820-91b7bce49751 // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
+	github.com/ipfs/go-ipfs-http-client v0.5.0 // indirect
+	github.com/ipfs/go-ipfs-routing v0.3.0 // indirect
+	github.com/ipfs/go-path v0.3.1 // indirect
+	github.com/ipfs/interface-go-ipfs-core v0.11.1 // indirect
+	github.com/ipni/storetheindex v0.5.10 // indirect
 	github.com/libp2p/go-doh-resolver v0.4.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
 	github.com/puzpuzpuz/xsync/v2 v2.4.0 // indirect
@@ -360,6 +364,7 @@ require (
 	github.com/ucarion/urlpath v0.0.0-20200424170820-7ccc79b76bbb // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.opentelemetry.io/otel/metric v1.16.0 // indirect
+	go.uber.org/goleak v1.2.1 // indirect
 	gonum.org/v1/gonum v0.13.0 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
