@@ -2512,7 +2512,7 @@
       },
       "id": 82,
       "panels": [],
-      "title": "dagstore",
+      "title": "Piece Reader",
       "type": "row"
     },
     {
@@ -2609,7 +2609,7 @@
           "refId": "A"
         }
       ],
-      "title": "Dagstore PR Init Count",
+      "title": "PR Init Count",
       "type": "timeseries"
     },
     {
@@ -2707,7 +2707,7 @@
           "refId": "A"
         }
       ],
-      "title": "Dagstore PR Requested Bytes",
+      "title": "PR Requested Bytes",
       "type": "timeseries"
     },
     {
@@ -2803,7 +2803,7 @@
           "refId": "A"
         }
       ],
-      "title": "Dagstore PR Discard Count",
+      "title": "PR Discard Count",
       "type": "timeseries"
     },
     {
@@ -2900,7 +2900,7 @@
           "refId": "A"
         }
       ],
-      "title": "Dagstore PR Discarded Bytes",
+      "title": "PR Discarded Bytes",
       "type": "timeseries"
     },
     {
@@ -2996,7 +2996,7 @@
           "refId": "A"
         }
       ],
-      "title": "Dagstore PR Seek Back Count",
+      "title": "PR Seek Back Count",
       "type": "timeseries"
     },
     {
@@ -3092,7 +3092,7 @@
           "refId": "A"
         }
       ],
-      "title": "Dagstore PR Seek Back Bytes",
+      "title": "PR Seek Back Bytes",
       "type": "timeseries"
     },
     {
@@ -3189,7 +3189,7 @@
           "refId": "A"
         }
       ],
-      "title": "Dagstore PR Seek Forward Count",
+      "title": "PR Seek Forward Count",
       "type": "timeseries"
     },
     {
@@ -3286,7 +3286,7 @@
           "refId": "A"
         }
       ],
-      "title": "Dagstore PR Seek Forward Bytes",
+      "title": "PR Seek Forward Bytes",
       "type": "timeseries"
     }
   ],
@@ -3326,13 +3326,13 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Provider Retrievals",
   "uid": "VG2IXa4Vk",
-  "version": 4,
+  "version": 5,
   "weekStart": ""
 }
