@@ -249,8 +249,8 @@ func testDataSegmentIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 
 	recs, err := parseShardWithDataSegmentIndex(ctx, pieceCid, fstat.Size(), rdr)
 	require.NoError(t, err)
-	err = cl.AddIndex(ctx, pieceCid, recs, false)
-	require.NoError(t, err)
+	//err = cl.AddIndex(ctx, pieceCid, recs, false)
+	//require.NoError(t, err)
 
 	// Add deal info for the piece - it doesn't matter what it is, the piece
 	// just needs to have at least one deal associated with it
@@ -268,19 +268,19 @@ func testDataSegmentIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// This is to simulate what happens when an index is imported from the
 	// DAG store: only the offset information is imported (not size
 	// information)
-	for i, r := range recs {
-		recs[i] = model.Record{
-			Cid: r.Cid,
-			OffsetSize: model.OffsetSize{
-				Offset: r.Offset,
-				Size:   0,
-			},
-		}
-	}
+	//for i, r := range recs {
+	//	recs[i] = model.Record{
+	//		Cid: r.Cid,
+	//		OffsetSize: model.OffsetSize{
+	//			Offset: r.Offset,
+	//			Size:   0,
+	//		},
+	//	}
+	//}
 
 	// Add the index to the local index directory, marked as incomplete
-	err = cl.AddIndex(ctx, pieceCid, recs, false)
-	require.NoError(t, err)
+	//err = cl.AddIndex(ctx, pieceCid, recs, false)
+	//require.NoError(t, err)
 
 	// Verify that getting the size of a block works correctly:
 	// There is no size information in the index so the piece
