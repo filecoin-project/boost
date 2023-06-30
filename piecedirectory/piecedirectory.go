@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -251,12 +252,17 @@ func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.C
 		return fmt.Errorf("getting piece deals: no deals found for piece")
 	}
 
-	err = ps.addIndexForPieceThrottled(ctx, pieceCid, dls[0])
-	if err != nil {
-		return fmt.Errorf("adding index for piece deal %d: %w", dls[0].ChainDealID, err)
+	var errs []string
+
+	for _, dl := range dls {
+		err = ps.addIndexForPieceThrottled(ctx, pieceCid, dl)
+		if err == nil {
+			return nil
+		}
+		errs = append(errs, fmt.Errorf("adding index for piece deal %d: %w", dl.ChainDealID, err).Error())
 	}
 
-	return nil
+	return fmt.Errorf(strings.Join(errs, ";"))
 }
 
 func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid string) error {
@@ -427,44 +433,55 @@ func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int
 		return 0, format.ErrNotFound{Cid: c}
 	}
 
-	// Get the size of the block from the first piece (should be the same for
-	// any piece)
-	offsetSize, err := ps.GetOffsetSize(ctx, pieces[0], c.Hash())
-	if err != nil {
-		return 0, fmt.Errorf("getting size of cid %s in piece %s: %w", c, pieces[0], err)
-	}
+	var errs []string
 
-	if offsetSize.Size > 0 {
+	for _, p := range pieces {
+		// Get the size of the block from the first piece (should be the same for
+		// any piece)
+		offsetSize, err := ps.GetOffsetSize(ctx, p, c.Hash())
+		if err != nil {
+			errs = append(errs, fmt.Errorf("getting size of cid %s in piece %s: %w", c, p, err).Error())
+			continue
+		}
+
+		if offsetSize.Size > 0 {
+			return int(offsetSize.Size), nil
+		}
+
+		// Indexes imported from the DAG store do not have block size information
+		// (they only have offset information). Check if the block size is zero
+		// because the index is incomplete.
+		isComplete, err := ps.store.IsCompleteIndex(ctx, p)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("getting index complete status for piece %s: %w", p, err).Error())
+			continue
+		}
+
+		if isComplete {
+			// The deal index is complete, so it must be a zero-sized block.
+			// A zero-sized block is unusual, but possible.
+			return int(offsetSize.Size), nil
+		}
+
+		// The index is incomplete, so re-build the index on the fly
+		err = ps.BuildIndexForPiece(ctx, p)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("re-building index for piece %s: %w", p, err).Error())
+			continue
+		}
+
+		// Now get the size again
+		offsetSize, err = ps.GetOffsetSize(ctx, p, c.Hash())
+		if err != nil {
+			errs = append(errs, fmt.Errorf("getting size of cid %s in piece %s: %w", c, p, err).Error())
+			continue
+		}
+
 		return int(offsetSize.Size), nil
 	}
 
-	// Indexes imported from the DAG store do not have block size information
-	// (they only have offset information). Check if the block size is zero
-	// because the index is incomplete.
-	isComplete, err := ps.store.IsCompleteIndex(ctx, pieces[0])
-	if err != nil {
-		return 0, fmt.Errorf("getting index complete status for piece %s: %w", pieces[0], err)
-	}
+	return 0, fmt.Errorf(strings.Join(errs, ";"))
 
-	if isComplete {
-		// The deal index is complete, so it must be a zero-sized block.
-		// A zero-sized block is unusual, but possible.
-		return int(offsetSize.Size), nil
-	}
-
-	// The index is incomplete, so re-build the index on the fly
-	err = ps.BuildIndexForPiece(ctx, pieces[0])
-	if err != nil {
-		return 0, fmt.Errorf("re-building index for piece %s: %w", pieces[0], err)
-	}
-
-	// Now get the size again
-	offsetSize, err = ps.GetOffsetSize(ctx, pieces[0], c.Hash())
-	if err != nil {
-		return 0, fmt.Errorf("getting size of cid %s in piece %s: %w", c, pieces[0], err)
-	}
-
-	return int(offsetSize.Size), nil
 }
 
 func (ps *PieceDirectory) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) {
