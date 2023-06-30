@@ -20,6 +20,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
+	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 )
 
@@ -247,10 +248,8 @@ func testDataSegmentIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 	pieceCid := CalculateCommp(t, rdr).PieceCID
 
-	recs, err := parsePieceWithDataSegmentIndex(ctx, pieceCid, fstat.Size(), rdr)
-	require.NoError(t, err)
-	err = cl.AddIndex(ctx, pieceCid, recs, false)
-	require.NoError(t, err)
+	pm := NewPieceDirectory(cl, pr, 1)
+	pm.Start(ctx)
 
 	// Add deal info for the piece - it doesn't matter what it is, the piece
 	// just needs to have at least one deal associated with it
@@ -261,13 +260,29 @@ func testDataSegmentIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 		PieceOffset: 0,
 		PieceLength: 0,
 	}
-	err = cl.AddDealForPiece(ctx, pieceCid, di)
+	// Adding the deal for the piece causes LID to fetch the piece data
+	// from the reader and index it
+	err = pm.AddDealForPiece(ctx, pieceCid, di)
 	require.NoError(t, err)
 
+	// Load the index of blocks
+	idx, err := pm.GetIterableIndex(ctx, pieceCid)
+	require.NoError(t, err)
+
+	// Count the blocks in the piece
+	var count int
+	var testCid cid.Cid
+	_ = idx.ForEach(func(h multihash.Multihash, u uint64) error {
+		testCid = cid.NewCidV1(cid.Raw, h)
+		count++
+		return fmt.Errorf("done")
+	})
+
+	// There should be exactly one cid in the piece
+	require.Equal(t, 1, count)
+
 	// Verify that getting the size of a block works correctly
-	pm := NewPieceDirectory(cl, pr, 1)
-	pm.Start(ctx)
-	bss, err := pm.BlockstoreGetSize(ctx, recs[0].Cid)
+	bss, err := pm.BlockstoreGetSize(ctx, testCid)
 	require.NoError(t, err)
 	require.Equal(t, 392273, bss)
 }

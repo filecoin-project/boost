@@ -203,7 +203,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 
 	// Try to parse data as containing a data segment index
 	log.Debugw("add index: read index", "pieceCid", pieceCid)
-	recs, err := parsePieceWithDataSegmentIndex(ctx, pieceCid, int64(dealInfo.PieceLength), reader)
+	recs, err := parsePieceWithDataSegmentIndex(pieceCid, int64(dealInfo.PieceLength), reader)
 	if err != nil {
 		log.Debugw("add index: data segment check failed. falling back to car", "pieceCid", pieceCid, "err", err)
 		// Iterate over all the blocks in the piece to extract the index records
@@ -253,7 +253,7 @@ func parseRecordsFromCar(reader io.Reader) ([]model.Record, error) {
 	return recs, nil
 }
 
-func parsePieceWithDataSegmentIndex(ctx context.Context, pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
+func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
 	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
 	dsis := datasegment.DataSegmentIndexStartOffset(ps)
 	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
