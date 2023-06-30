@@ -354,7 +354,7 @@ function FlaggedPieceRow({piece}) {
 
 function hasUnsealedCopy(piece) {
     for (var dl of piece.Deals) {
-        if (dl.SealStatus.IsUnsealed) {
+        if (dl.SealStatus.Status === 'HasUnsealedCopy') {
             return true
         }
     }
@@ -718,7 +718,19 @@ function SealStatus({status}) {
     if (status.Error) {
         return status.Error
     }
-    return status.IsUnsealed ? 'Yes' : 'No'
+    switch (status.Status) {
+        case 'HasUnsealedCopy': return 'Yes';
+        case 'NoUnsealedCopy':  return 'No';
+    }
+    return <>
+        <span>Unknown</span>
+        <Info>
+            The sealing status of the sector is unknown.
+            This could be because the sealing status caches are out of sync, or
+            it could be because the sector is corrupted.
+            Check the contents of the sector to ensure it is not corrupted.
+        </Info>
+    </>
 }
 
 function SearchBox(props) {

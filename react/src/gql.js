@@ -437,7 +437,7 @@ const PieceStatusQuery = gql`
             }
             Deals {
                 SealStatus {
-                    IsUnsealed
+                    Status
                     Error
                 }
                 Deal {
@@ -460,7 +460,7 @@ const PieceStatusQuery = gql`
                     Length
                 }
                 SealStatus {
-                    IsUnsealed
+                    Status
                     Error
                 }
             }

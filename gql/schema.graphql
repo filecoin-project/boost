@@ -162,7 +162,7 @@ type IndexStatus {
 }
 
 type SealStatus {
-  IsUnsealed: Boolean!
+  Status: String!
   Error: String!
 }
 

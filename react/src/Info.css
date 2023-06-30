@@ -19,6 +19,7 @@
 }
 
 .info .content {
+    display: none;
     z-index: 1;
     font-size: 0.8em;
     position: absolute;
@@ -31,6 +32,15 @@
     color: #465298;
     border-radius: 0.2em;
     padding: 0.75em;
+}
+
+.info .content.show {
+    display: inline-block;
+}
+
+.info .content.contain-right {
+    left: auto;
+    right: 1.75em;
 }
 
 .info .content a {
