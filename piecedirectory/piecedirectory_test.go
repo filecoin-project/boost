@@ -336,6 +336,10 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.Equal(t, 0, len(pcids))
 }
 
+// Verify that BuildIndexForPiece iterates over all deals return error if none of the deals (sectors)
+// can be used to read the piece. We are testing 2 conditions here:
+// 1. No eligible piece is found for both deals - error is expected
+// 2. 1 eligible piece is found - no error is expected
 func testReIndexMultiSector(ctx context.Context, t *testing.T, cl *client.Store) {
 	ctrl := gomock.NewController(t)
 	pr := mock_piecedirectory.NewMockPieceReader(ctrl)
@@ -354,6 +358,9 @@ func testReIndexMultiSector(ctx context.Context, t *testing.T, cl *client.Store)
 	carv1Reader, err := carReader.DataReader()
 	require.NoError(t, err)
 
+	// Return error first 3 time as during the first attempt we want to surface errors from
+	// failed BuildIndexForPiece operation for both deals. 3rd time to return error for first deal
+	// in the second run where we want the method to succeed eventually.
 	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("piece error")).Times(3)
 	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
 		func(_ context.Context, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (pdTypes.SectionReader, error) {
@@ -364,7 +371,8 @@ func testReIndexMultiSector(ctx context.Context, t *testing.T, cl *client.Store)
 	pieceCid := CalculateCommp(t, carv1Reader).PieceCID
 
 	// Add deal info for the piece - it doesn't matter what it is, the piece
-	// just needs to have at least one deal associated with it
+	// just needs to have 2 deals. One with no available pieceReader (simulating no unsealed sector)
+	// and other one with correct pieceReader
 	d1 := model.DealInfo{
 		DealUuid:    uuid.New().String(),
 		ChainDealID: 1,
@@ -387,9 +395,20 @@ func testReIndexMultiSector(ctx context.Context, t *testing.T, cl *client.Store)
 	err = cl.AddDealForPiece(ctx, pieceCid, d2)
 	require.NoError(t, err)
 
+	b, err := cl.IsIndexed(ctx, pieceCid)
+	require.NoError(t, err)
+	require.False(t, b)
+
+	// Expect error as GetReader() mock will return error for both deals
 	err = pm.BuildIndexForPiece(ctx, pieceCid)
 	require.ErrorContains(t, err, "piece error")
 
+	// No error is expected as GetReader() mock will return error for first deal
+	// but correct reader for the second deal
 	err = pm.BuildIndexForPiece(ctx, pieceCid)
 	require.NoError(t, err)
+
+	b, err = cl.IsIndexed(ctx, pieceCid)
+	require.NoError(t, err)
+	require.True(t, b)
 }

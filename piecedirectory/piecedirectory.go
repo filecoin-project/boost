@@ -235,6 +235,9 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	return nil
 }
 
+// BuildIndexForPiece builds indexes for a given piece CID. The piece must contain a valid deal
+// corresponding to an unsealed sector for this method to work. It will try to build index
+// using all available deals and will exit as soon as it succeeds for one of the deals
 func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.Cid) error {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.build_index_for_piece")
 	defer span.End()
@@ -253,6 +256,7 @@ func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.C
 
 	var merr error
 
+	// Iterate over all available deals in case first deal does not have an unsealed sector
 	for _, dl := range dls {
 		err = ps.addIndexForPieceThrottled(ctx, pieceCid, dl)
 		if err == nil {
@@ -434,9 +438,11 @@ func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int
 
 	var merr error
 
+	// Iterate over all pieces in case the sector containing the first piece with the Block
+	// is not unsealed
 	for _, p := range pieces {
-		// Get the size of the block from the first piece (should be the same for
-		// any piece)
+		// Get the size of the block from the piece (should be the same for
+		// all pieces)
 		offsetSize, err := ps.GetOffsetSize(ctx, p, c.Hash())
 		if err != nil {
 			merr = multierror.Append(merr, fmt.Errorf("getting size of cid %s in piece %s: %w", c, p, err))
