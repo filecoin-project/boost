@@ -18,6 +18,13 @@ var TestYugabyteSettings = yugabyte.DBSettings{
 	ConnectString: "postgresql://postgres:postgres@yugabyte:5433",
 }
 
+// Use when testing against a local yugabyte instance.
+// Warning: This will delete all tables in the local yugabyte instance.
+var TestYugabyteSettingsLocal = yugabyte.DBSettings{
+	Hosts:         []string{"localhost"},
+	ConnectString: "postgresql://postgres:postgres@localhost:5433",
+}
+
 func SetupYugabyte(t *testing.T) {
 	ctx := context.Background()
 
