@@ -1,17 +1,9 @@
-//go:build test_lid
-// +build test_lid
-
 package piecedirectory
 
 import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"os"
-	"testing"
-	"time"
-
 	pdTypes "github.com/filecoin-project/boost/piecedirectory/types"
 	mock_piecedirectory "github.com/filecoin-project/boost/piecedirectory/types/mocks"
 	"github.com/filecoin-project/boostd-data/client"
@@ -25,24 +17,10 @@ import (
 	"github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
 	"github.com/stretchr/testify/require"
+	"io"
+	"os"
+	"testing"
 )
-
-func TestPieceDirectory(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
-	defer cancel()
-
-	t.Run("leveldb", func(t *testing.T) {
-		bdsvc, err := svc.NewLevelDB("")
-		require.NoError(t, err)
-		testPieceDirectory(ctx, t, bdsvc)
-	})
-
-	t.Run("yugabyte", func(t *testing.T) {
-		svc.SetupYugabyte(t)
-		bdsvc := svc.NewYugabyte(svc.TestYugabyteSettings)
-		testPieceDirectory(ctx, t, bdsvc)
-	})
-}
 
 func testPieceDirectory(ctx context.Context, t *testing.T, bdsvc *svc.Service) {
 	ln, err := bdsvc.Start(ctx, "localhost:0")
