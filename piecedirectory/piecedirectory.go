@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 	"time"
 
@@ -252,17 +251,17 @@ func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.C
 		return fmt.Errorf("getting piece deals: no deals found for piece")
 	}
 
-	var errs []string
+	var merr error
 
 	for _, dl := range dls {
 		err = ps.addIndexForPieceThrottled(ctx, pieceCid, dl)
 		if err == nil {
 			return nil
 		}
-		errs = append(errs, fmt.Errorf("adding index for piece deal %d: %w", dl.ChainDealID, err).Error())
+		merr = multierror.Append(merr, fmt.Errorf("adding index for piece deal %d: %w", dl.ChainDealID, err))
 	}
 
-	return fmt.Errorf(strings.Join(errs, ";"))
+	return merr
 }
 
 func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid string) error {
@@ -433,14 +432,14 @@ func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int
 		return 0, format.ErrNotFound{Cid: c}
 	}
 
-	var errs []string
+	var merr error
 
 	for _, p := range pieces {
 		// Get the size of the block from the first piece (should be the same for
 		// any piece)
 		offsetSize, err := ps.GetOffsetSize(ctx, p, c.Hash())
 		if err != nil {
-			errs = append(errs, fmt.Errorf("getting size of cid %s in piece %s: %w", c, p, err).Error())
+			merr = multierror.Append(merr, fmt.Errorf("getting size of cid %s in piece %s: %w", c, p, err))
 			continue
 		}
 
@@ -453,7 +452,7 @@ func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int
 		// because the index is incomplete.
 		isComplete, err := ps.store.IsCompleteIndex(ctx, p)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("getting index complete status for piece %s: %w", p, err).Error())
+			merr = multierror.Append(merr, fmt.Errorf("getting index complete status for piece %s: %w", p, err))
 			continue
 		}
 
@@ -466,22 +465,21 @@ func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int
 		// The index is incomplete, so re-build the index on the fly
 		err = ps.BuildIndexForPiece(ctx, p)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("re-building index for piece %s: %w", p, err).Error())
+			merr = multierror.Append(merr, fmt.Errorf("re-building index for piece %s: %w", p, err))
 			continue
 		}
 
 		// Now get the size again
 		offsetSize, err = ps.GetOffsetSize(ctx, p, c.Hash())
 		if err != nil {
-			errs = append(errs, fmt.Errorf("getting size of cid %s in piece %s: %w", c, p, err).Error())
+			merr = multierror.Append(merr, fmt.Errorf("getting size of cid %s in piece %s: %w", c, p, err))
 			continue
 		}
 
 		return int(offsetSize.Size), nil
 	}
 
-	return 0, fmt.Errorf(strings.Join(errs, ";"))
-
+	return 0, merr
 }
 
 func (ps *PieceDirectory) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) {
