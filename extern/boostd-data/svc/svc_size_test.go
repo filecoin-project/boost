@@ -14,8 +14,6 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-car/v2/index"
-	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 )
 
@@ -121,21 +119,4 @@ func generateRandomCid(baseCid []byte) (cid.Cid, error) {
 	}
 
 	return c, nil
-}
-
-func toEntries(idx index.Index) (map[string]uint64, bool) {
-	it, ok := idx.(index.IterableIndex)
-	if !ok {
-		return nil, false
-	}
-
-	entries := make(map[string]uint64)
-	err := it.ForEach(func(mh multihash.Multihash, o uint64) error {
-		entries[mh.String()] = o
-		return nil
-	})
-	if err != nil {
-		return nil, false
-	}
-	return entries, true
 }
