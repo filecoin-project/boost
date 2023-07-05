@@ -335,7 +335,7 @@ require (
 require (
 	github.com/filecoin-project/boost-gfm v1.26.7
 	github.com/filecoin-project/boost-graphsync v0.13.6
-	github.com/filecoin-project/go-data-segment v0.0.0-20230605095649-5d01fdd3e4a1
+	github.com/filecoin-project/go-data-segment v0.0.1
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/lotus v1.23.2-0.20230622154405-168d022018ce
 	github.com/ipfs/boxo v0.10.1
