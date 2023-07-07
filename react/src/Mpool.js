@@ -14,8 +14,8 @@ export function MpoolPage(props) {
 }
 
 function MpoolContent(props) {
-    const [local, setLocal] = useState(true)
-    const {loading, error, data} = useQuery(MpoolQuery, { variables: { local } , pollInterval: 10000, fetchPolicy: "network-only"})
+    const [alerts, setAlerts] = useState(true)
+    const {loading, error, data} = useQuery(MpoolQuery, { variables: { alerts } , pollInterval: 10000, fetchPolicy: "network-only"})
 
     if (loading) {
         return <div>Loading...</div>
@@ -24,13 +24,13 @@ function MpoolContent(props) {
         return <div>Error: {error.message}</div>
     }
 
-    const msgs = data.mpool
+    const msgs = data.mpool.Messages
 
     return <div className="mpool">
         <div className="header">
-            Showing {msgs.length} {local ? 'local' : ''} messages in message pool.
-            <div className="button" onClick={() => setLocal(!local)}>
-                Show {local ? 'All' : 'Local'} messages
+            Showing {msgs.length} {alerts ? 'alerts' : 'messages'} in message pool.
+            <div className="button" onClick={() => setAlerts(!alerts)}>
+                Show {alerts ? 'All local messages' : 'Alerts'}
             </div>
         </div>
 

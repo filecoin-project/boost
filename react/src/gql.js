@@ -673,26 +673,23 @@ const StorageAskUpdate = gql`
 `;
 
 const MpoolQuery = gql`
-    query AppMpoolQuery($local: Boolean!) {
-        mpool(local: $local) {
-            SentEpoch
-            From
-            To
-            Nonce
-            Value
-            GasFeeCap
-            GasLimit
-            GasPremium
-            Method
-            Params
-            BaseFee
+    query AppMpoolQuery($alerts: Boolean!) {
+        mpool(alerts: $alerts) {
+            Count
+            Messages {
+                SentEpoch
+                From
+                To
+                Nonce
+                Value
+                GasFeeCap
+                GasLimit
+                GasPremium
+                Method
+                Params
+                BaseFee
+            }
         }
-    }
-`;
-
-const MpoolAlertsQuery = gql`
-    query AppMpoolAlertsQuery {
-        mpoolAlertsCount
     }
 `;
 
@@ -755,7 +752,6 @@ export {
     TransfersQuery,
     TransferStatsQuery,
     MpoolQuery,
-    MpoolAlertsQuery,
     SealingPipelineQuery,
     Libp2pAddrInfoQuery,
     StorageAskQuery,
