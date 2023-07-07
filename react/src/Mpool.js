@@ -24,7 +24,7 @@ function MpoolContent(props) {
         return <div>Error: {error.message}</div>
     }
 
-    msgs.sort();
+    const msgs = data.mpool.Messages
 
     return <div className="mpool">
         <div className="header">
