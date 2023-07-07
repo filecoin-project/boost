@@ -157,6 +157,8 @@ func (mm *MpoolMonitor) Alerts(ctx context.Context) ([]*TimeStampedMsg, error) {
 		return nil, fmt.Errorf("failed to get chain head: %w", err)
 	}
 
+	mm.lk.Lock()
+	defer mm.lk.Unlock()
 	for _, msg := range mm.msgs {
 		if msg.Added+mm.mpoolAlertEpochs <= ts.Height() {
 			ret = append(ret, msg)
