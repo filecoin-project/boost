@@ -48,7 +48,19 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Alerts bool }) (mpool
 
 	baseFee := ts.Blocks()[0].ParentBaseFee
 
-	gqlmsgs := make([]*msg, 0, len(msgs))
+	if !args.Alerts {
+		msgs, err = r.mpool.PendingLocal(ctx)
+		if err != nil {
+			return mpoolmsg{}, err
+		}
+	} else {
+		msgs, err = r.mpool.Alerts(ctx)
+		if err != nil {
+			return mpoolmsg{}, err
+		}
+	}
+
+	// Convert params to human-readable and get method name
 	for _, m := range msgs {
 		if filter != nil {
 			// Filter for local messages
@@ -92,7 +104,7 @@ func (r *resolver) Mpool(ctx context.Context, args struct{ Alerts bool }) (mpool
 		})
 	}
 
-	return gqlmsgs, nil
+	return mpoolmsg{Count: int32(len(msgs)), Messages: ret}, nil
 }
 
 func mockMessages() []*types.SignedMessage {
