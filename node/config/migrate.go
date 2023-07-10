@@ -24,6 +24,7 @@ var migrations = []migrateUpFn{
 	v1Tov2, // index 1 => version 2
 	v2Tov3, // index 2 => version 3
 	v3Tov4, // index 3 => version 4
+	v4Tov5, // index 4 => version 5
 }
 
 // This struct is used to get the config file version
