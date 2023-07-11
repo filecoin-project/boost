@@ -1,0 +1,172 @@
+.ipni-prov-info th, .ipni-prov-info td {
+    padding: 0.5em 1em;
+    font-weight: normal;
+    text-align: left;
+    vertical-align: top;
+}
+
+.ipni-prov-info .subtitle {
+    color: #777;
+    padding: 0 1em 1em 1em;
+}
+
+.ipni-prov-info th {
+    color: #777;
+}
+
+.ipni-prov-info .aux {
+    color:  #999;
+}
+
+.ipni .js-obj .js-obj-val {
+    color: #000;
+}
+
+.ipni-retrievals {
+    position: relative;
+}
+
+.ipni-retrievals table {
+    font-size: 1em;
+    width: 100%;
+}
+
+.ipni-retrievals td, .ipni-retrievals th {
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
+
+.ipni-retrievals th {
+    white-space: nowrap;
+    text-align: left;
+    opacity: 0.6;
+}
+
+.ipni-retrievals td.start, .ipni-retrievals th.start {
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.ipni-retrievals td.sent {
+    width: 5em;
+    white-space: nowrap;
+}
+
+.ipni-retrievals td.peer-id {
+    min-width: 8em;
+}
+
+.ipni-retrievals td.ad-cid {
+    min-width: 6em;
+}
+
+.ipni-retrievals td.transfer-id {
+    min-width: 7em;
+}
+
+.ipni-retrievals td.message {
+    width: 100%;
+}
+
+.ipni-retrievals .popup {
+    display: none;
+    position: absolute;
+    font-size: 1em;
+    top: -4em;
+    text-align: center;
+    width: 100%;
+}
+.ipni-retrievals .popup.showing {
+    display: inline-block;
+}
+
+.ipni-retrievals .popup .message {
+    display: inline-block;
+    color: #777777;
+    background-color: #fff;
+    border: 1px solid #aaa;
+    border-radius: 0.2em;
+    padding: 0.5em;
+    font-size: 0.8em;
+    margin-top: 0.8em;
+}
+
+.ipni-retrievals .peer-id > *, .ipni-retrievals .deal-id > *, .ipni-retrievals .payload-cid > * {
+    display: inline-block;
+}
+
+.ipni-retrievals .copy {
+    display: inline-block;
+    vertical-align: text-top;
+    width: 0.8em;
+    height: 0.8em;
+    margin-right: 0.5em;
+    margin-top: 0.1em;
+    cursor: pointer;
+    background: url("./bootstrap-icons/icons/clipboard.svg");
+    background-size: cover;
+}
+
+.ipni-retrievals .copy.copied {
+    animation: rotate 0.5s infinite;
+}
+
+@keyframes rotate {
+    from{ transform: rotate(0deg); }
+    to{ transform: rotate(360deg); }
+}
+
+
+.ad-detail {
+    padding-top: 1em;
+    margin: auto;
+}
+
+.ad-detail .title {
+    margin:  1em auto;
+    text-align: center;
+    font-size: 1.25em;
+    color: #a61e4d;
+}
+
+.ad-detail table {
+    font-size: 1em;
+}
+
+.ad-detail td, .ad-detail th {
+    vertical-align: top;
+    text-align: left;
+    padding: 0.5em 1em;
+}
+
+.ad-detail .metadata {
+    padding: 0 0 0.5em 0;
+}
+
+.ad-detail .metadata .metadata-protocol {
+    padding: 0 0 0.25em 0;
+}
+
+.ad-detail .metadata .metadata-content {
+    color: #777;
+}
+
+.ad-detail .metadata .metadata-content .metadata-field {
+    padding: 0.25em 0;
+}
+
+.ad-detail .metadata .metadata-content .metadata-field-value {
+    color: #000;
+}
+
+.ad-detail .metadata .metadata-piece-cid {
+    padding: 0.5em 0;
+}
+
+.ad-detail h3 {
+    margin-top: 2em;
+}
+
+.ad-detail .entries td {
+    padding: 0.3em;
+}
