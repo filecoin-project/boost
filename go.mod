@@ -74,7 +74,7 @@ require (
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/libp2p/go-libp2p v0.28.0
+	github.com/libp2p/go-libp2p v0.28.1
 	github.com/libp2p/go-libp2p-gostream v0.6.0
 	github.com/libp2p/go-libp2p-http v0.5.0
 	github.com/libp2p/go-libp2p-kad-dht v0.24.0
@@ -340,7 +340,8 @@ require (
 	github.com/filecoin-project/lotus v1.23.2-0.20230622154405-168d022018ce
 	github.com/ipfs/boxo v0.10.1
 	github.com/ipfs/kubo v0.21.0-rc1
-	github.com/ipni/go-libipni v0.2.2
+	github.com/ipni/go-libipni v0.2.8
+	github.com/ipni/ipni-cli v0.0.3
 	github.com/schollz/progressbar/v3 v3.13.1
 )
 
@@ -351,6 +352,8 @@ require (
 
 require (
 	github.com/filecoin-project/kubo-api-client v0.0.1 // indirect
+	github.com/gammazero/channelqueue v0.2.1 // indirect
+	github.com/gammazero/deque v0.2.1 // indirect
 	github.com/google/pprof v0.0.0-20230602150820-91b7bce49751 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
@@ -364,6 +367,7 @@ require (
 	github.com/jackc/pgtype v1.10.0 // indirect
 	github.com/jackc/puddle v1.2.1 // indirect
 	github.com/libp2p/go-doh-resolver v0.4.0 // indirect
+	github.com/montanaflynn/stats v0.7.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
 	github.com/puzpuzpuz/xsync/v2 v2.4.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
