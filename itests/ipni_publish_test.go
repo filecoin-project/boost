@@ -4,7 +4,6 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/itests/framework"
@@ -35,7 +34,7 @@ func TestIPNIPublish(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create new ipni-cli client
-	ipniClient, err := adpub.NewClient(addrs, adpub.WithEntriesDepthLimit(100000))
+	ipniClient, err := adpub.NewClient(addrs, adpub.WithTopicName("/indexer/ingest/mainnet"), adpub.WithEntriesDepthLimit(100000))
 	require.NoError(t, err)
 
 	// Get head when boost starts
@@ -73,12 +72,9 @@ func TestIPNIPublish(t *testing.T) {
 	require.True(t, res.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
 
-	time.Sleep(2 * time.Second)
-
 	// Wait for the deal to be added to a sector
 	err = f.WaitForDealAddedToSector(dealUuid)
 	require.NoError(t, err)
-	time.Sleep(100 * time.Millisecond)
 
 	// Get current head after the deal
 	headAfterDeal, err := ipniClient.GetAdvertisement(ctx, cid.Undef)
@@ -96,14 +92,5 @@ func TestIPNIPublish(t *testing.T) {
 
 	require.Greater(t, len(mhs), 0)
 
-	found := false
-
-	for _, mh := range mhs {
-		if mh.String() == rootCid.Hash().String() {
-			found = true
-			break
-		}
-	}
-
-	require.True(t, found)
+	require.Contains(t, mhs, rootCid.Hash())
 }
