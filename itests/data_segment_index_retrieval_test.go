@@ -64,6 +64,6 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	// Retrieve and compare the all car files within the deal
 	for i := 0; i < seg; i++ {
 		outFile := f.RetrieveDirect(ctx, t, segmentDetails.Segments[i].Root, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true)
-		kit.AssertFilesEqual(t, segmentDetails.Segments[i].Path, outFile)
+		kit.AssertFilesEqual(t, segmentDetails.Segments[i].FilePath, outFile)
 	}
 }

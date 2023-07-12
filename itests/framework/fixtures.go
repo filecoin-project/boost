@@ -16,8 +16,9 @@ import (
 )
 
 type CarDetails struct {
-	Path string
-	Root cid.Cid
+	CarPath  string
+	Root     cid.Cid
+	FilePath string
 }
 
 type segmentDetails struct {
@@ -46,8 +47,9 @@ func GenerateDataSegmentFiles(tmpdir string, num int) (segmentDetails, error) {
 		}
 
 		cars = append(cars, &CarDetails{
-			Root: rootCid,
-			Path: carFilepath,
+			Root:     rootCid,
+			CarPath:  carFilepath,
+			FilePath: fileName,
 		})
 	}
 
@@ -88,7 +90,7 @@ func generateDataSegmentCar(cars []*CarDetails, outputFile *os.File) error {
 
 	for _, car := range cars {
 
-		r, err := os.Open(car.Path)
+		r, err := os.Open(car.CarPath)
 
 		if err != nil {
 			return err
