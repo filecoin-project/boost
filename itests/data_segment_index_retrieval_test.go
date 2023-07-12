@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDataSegmentRetrieval(t *testing.T) {
+func TestDataSegmentIndexRetrieval(t *testing.T) {
 	ctx := context.Background()
 	log := framework.Log
 

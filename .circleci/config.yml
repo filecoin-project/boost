@@ -340,5 +340,10 @@ workflows:
           suite: all
           target: "`go list ./... | grep -v boost/itests`"
 
+      - test:
+          name: test-itest-data-segment-index
+          suite: itest-data-segment-index
+          target: "./itests/data_segment_index_retrieval_test.go"
+
       - lid-docker-compose
 

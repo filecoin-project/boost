@@ -52,6 +52,9 @@ func GenerateDataSegmentFiles(tmpdir string, num int) (segmentDetails, error) {
 	}
 
 	finalCar, err := os.CreateTemp(tmpdir, "finalcar")
+	if err != nil {
+		return segmentDetails{}, err
+	}
 
 	err = generateDataSegmentCar(cars, finalCar)
 	if err != nil {
