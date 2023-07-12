@@ -340,5 +340,10 @@ workflows:
           suite: all
           target: "`go list ./... | grep -v boost/itests`"
 
+      - test:
+          name: test-itest-ipni
+          suite: itest-ipni
+          target: "./itests/ipni_publish_test.go"
+
       - lid-docker-compose
 
