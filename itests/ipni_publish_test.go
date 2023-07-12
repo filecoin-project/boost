@@ -75,7 +75,7 @@ func TestIPNIPublish(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	// Wait for the first deal to be added to a sector and cleaned up so space is made
+	// Wait for the deal to be added to a sector
 	err = f.WaitForDealAddedToSector(dealUuid)
 	require.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
