@@ -6,14 +6,15 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	boost_build "github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/itests/framework"
+	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipni/ipni-cli/pkg/adpub"
-	"github.com/libp2p/go-libp2p"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,19 +35,13 @@ func TestIPNIPublish(t *testing.T) {
 	addrs, err := f.Boost.NetAddrsListen(ctx)
 	require.NoError(t, err)
 
-	host, err := libp2p.New()
+	ntwkName, err := f.FullNode.StateNetworkName(ctx)
 	require.NoError(t, err)
-	defer host.Close()
-	t.Log("Connecting ", addrs.String())
-	require.NoError(t, host.Connect(context.Background(), addrs))
-	protocols, err := host.Peerstore().GetProtocols(addrs.ID)
-	require.NoError(t, err)
-	for _, protocol := range protocols {
-		t.Log(protocol)
-	}
+
+	topicName := boost_build.IndexerIngestTopic(dtypes.NetworkName(ntwkName))
 
 	// Create new ipni-cli client
-	ipniClient, err := adpub.NewClient(addrs, adpub.WithTopicName("/indexer/ingest/mainnet"), adpub.WithEntriesDepthLimit(100000))
+	ipniClient, err := adpub.NewClient(addrs, adpub.WithTopicName(topicName), adpub.WithEntriesDepthLimit(100000))
 	require.NoError(t, err)
 
 	// Get head when boost starts
