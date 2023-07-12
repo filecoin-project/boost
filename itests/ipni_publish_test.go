@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipni/ipni-cli/pkg/adpub"
+	"github.com/libp2p/go-libp2p"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,6 +33,17 @@ func TestIPNIPublish(t *testing.T) {
 	// Get the listen address
 	addrs, err := f.Boost.NetAddrsListen(ctx)
 	require.NoError(t, err)
+
+	host, err := libp2p.New()
+	require.NoError(t, err)
+	defer host.Close()
+	t.Log("Connecting ", addrs.String())
+	require.NoError(t, host.Connect(context.Background(), addrs))
+	protocols, err := host.Peerstore().GetProtocols(addrs.ID)
+	require.NoError(t, err)
+	for _, protocol := range protocols {
+		t.Log(protocol)
+	}
 
 	// Create new ipni-cli client
 	ipniClient, err := adpub.NewClient(addrs, adpub.WithTopicName("/indexer/ingest/mainnet"), adpub.WithEntriesDepthLimit(100000))
