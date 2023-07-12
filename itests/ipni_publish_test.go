@@ -35,7 +35,7 @@ func TestIPNIPublish(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create new ipni-cli client
-	ipniClient, err := adpub.NewClient(addrs, adpub.WithTopicName("/indexer/ingest/mainnet"), adpub.WithEntriesDepthLimit(100000))
+	ipniClient, err := adpub.NewClient(addrs, adpub.WithEntriesDepthLimit(100000))
 	require.NoError(t, err)
 
 	// Get head when boost starts
@@ -49,13 +49,11 @@ func TestIPNIPublish(t *testing.T) {
 	tempdir := t.TempDir()
 	log.Debugw("using tempdir", "dir", tempdir)
 
-	fileSize := 2000000
+	fileSize := 200000
 	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, fileSize)
 	require.NoError(t, err)
 
-	// NOTE: these calls to CreateDenseCARv2 have the identity CID builder enabled so will
-	// produce a root identity CID for this case. So we're testing deal-making and retrieval
-	// where a DAG has an identity CID root
+	// create a dense carv2 for deal making
 	rootCid, carFilepath, err := testutil.CreateDenseCARv2(tempdir, randomFilepath)
 	require.NoError(t, err)
 
@@ -91,24 +89,21 @@ func TestIPNIPublish(t *testing.T) {
 
 	// Confirm this ad is not a remove type
 	require.False(t, headAfterDeal.IsRemove)
-	j := rootCid.String()
-	x := rootCid.Hash().String()
-	y := rootCid.Hash().B58String()
-	z := rootCid.Hash().HexString()
-	t.Log(x, y, z, j)
 
 	// Get all multihashes - indexer retrieval
 	mhs, err := headAfterDeal.Entries.Drain()
 	require.NoError(t, err)
 
-	var mhsString []string
-
 	require.Greater(t, len(mhs), 0)
+
+	found := false
+
 	for _, mh := range mhs {
-		mhsString = append(mhsString, mh.String())
+		if mh.String() == rootCid.Hash().String() {
+			found = true
+			break
+		}
 	}
 
-	t.Log("Stop")
-
-	t.Log(mhsString)
+	require.True(t, found)
 }
