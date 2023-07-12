@@ -244,7 +244,8 @@ func testDataSegmentIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	fstat, err := os.Stat("./testdata/deal.data")
 	require.NoError(t, err)
 
-	rdr, err := pr.GetReader(ctx, 0, 0, abi.PaddedPieceSize(fstat.Size()))
+	paddedPieceSize := abi.PaddedPieceSize(fstat.Size())
+	rdr, err := pr.GetReader(ctx, 0, 0, paddedPieceSize)
 	require.NoError(t, err)
 	pieceCid := CalculateCommp(t, rdr).PieceCID
 
@@ -258,7 +259,7 @@ func testDataSegmentIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 		ChainDealID: 1,
 		SectorID:    2,
 		PieceOffset: 0,
-		PieceLength: 0,
+		PieceLength: paddedPieceSize,
 	}
 	// Adding the deal for the piece causes LID to fetch the piece data
 	// from the reader and index it
@@ -285,6 +286,11 @@ func testDataSegmentIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	bss, err := pm.BlockstoreGetSize(ctx, testCid)
 	require.NoError(t, err)
 	require.Equal(t, 392273, bss)
+
+	// validate getting a cid from the 2nd segment:
+	bss, err = pm.BlockstoreGetSize(ctx, cid.MustParse("bafk2bzacecul64ojb2rl7szydmytaaqqfvbceueaooclsshi5ennuyhsgzt2m"))
+	require.NoError(t, err)
+	require.Equal(t, 188193, bss)
 }
 
 func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
