@@ -30,7 +30,14 @@ import (
 func bitswapMultiAddrs(cfg *config.Boost, h host.Host) ([]multiaddr.Multiaddr, error) {
 	// if BitswapPublicAddresses is empty, that means we'll be serving bitswap directly from this host, so just return host multiaddresses
 	if len(cfg.Dealmaking.BitswapPublicAddresses) == 0 {
-		return h.Addrs(), nil
+		maddr, err := peer.AddrInfoToP2pAddrs(&peer.AddrInfo{
+			ID:    h.ID(),
+			Addrs: h.Addrs(),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("could not parse bitswap address: %w", err)
+		}
+		return maddr, nil
 	}
 
 	// otherwise bitswap protocols are exposed publicly directly from booster bitswap.
@@ -63,9 +70,16 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 
 		// Get the libp2p addresses from the Host
 		if len(h.Addrs()) > 0 {
+			maddr, err := peer.AddrInfoToP2pAddrs(&peer.AddrInfo{
+				ID:    h.ID(),
+				Addrs: h.Addrs(),
+			})
+			if err != nil {
+				return nil, fmt.Errorf("could not parse libp2p address: %w", err)
+			}
 			protos = append(protos, types.Protocol{
 				Name:      "libp2p",
-				Addresses: h.Addrs(),
+				Addresses: maddr,
 			})
 		}
 
@@ -78,10 +92,16 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 				msg += "Could not parse '%s' as multiaddr: %w"
 				return nil, fmt.Errorf(msg, cfg.Dealmaking.HTTPRetrievalMultiaddr, err)
 			}
-
+			httpaddr, err := peer.AddrInfoToP2pAddrs(&peer.AddrInfo{
+				ID:    h.ID(),
+				Addrs: []multiaddr.Multiaddr{maddr},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("could not parse libp2p address: %w", err)
+			}
 			protos = append(protos, types.Protocol{
 				Name:      "http",
-				Addresses: []multiaddr.Multiaddr{maddr},
+				Addresses: httpaddr,
 			})
 		}
 

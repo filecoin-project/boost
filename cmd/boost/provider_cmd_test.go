@@ -1,9 +1,10 @@
 package main
 
 import (
+	"testing"
+
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestMultiaddrToNative(t *testing.T) {
@@ -32,6 +33,11 @@ func TestMultiaddrToNative(t *testing.T) {
 		proto:    "fancynewproto",
 		ma:       "/dns/foo.com/tcp/80/http",
 		expected: "",
+	}, {
+		name:     "test protocol",
+		proto:    "http",
+		ma:       "/dns/foo.com/tcp/7777/http/p2p/12D3KooWHf7cahZvAVB36SGaVXc7fiVDoJdRJq42zDRcN2s2512h",
+		expected: "http://foo.com:7777",
 	}}
 
 	for _, tc := range testCases {
