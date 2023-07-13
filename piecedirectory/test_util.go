@@ -43,8 +43,13 @@ func GetRecords(t *testing.T, reader car.SectionReader) []model.Record {
 	return recs
 }
 
-func CreateCarFile(t *testing.T) string {
-	rseed := int(time.Now().UnixMilli())
+func CreateCarFile(t *testing.T, seed ...int) string {
+	var rseed int
+	if len(seed) == 0 {
+		rseed = int(time.Now().UnixMilli())
+	} else {
+		rseed = seed[0]
+	}
 	randomFilePath, err := testutil.CreateRandomFile(t.TempDir(), rseed, 64*1024)
 	require.NoError(t, err)
 	_, carFilePath, err := testutil.CreateDenseCARv2(t.TempDir(), randomFilePath)
@@ -74,6 +79,20 @@ func CreateMockPieceReader(t *testing.T, reader car.SectionReader) *mock_piecedi
 			_, err := reader.Seek(0, io.SeekStart)
 			return MockSectionReader{reader}, err
 		})
+	return pr
+}
+
+func CreateMockPieceReaders(t *testing.T, readers map[abi.SectorNumber]car.SectionReader) *mock_piecedirectory.MockPieceReader {
+	ctrl := gomock.NewController(t)
+	pr := mock_piecedirectory.NewMockPieceReader(ctrl)
+	for sectorNumber := range readers {
+		pr.EXPECT().GetReader(gomock.Any(), sectorNumber, gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
+			func(_ context.Context, sectorNumber abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (types.SectionReader, error) {
+				r := readers[sectorNumber]
+				_, err := r.Seek(0, io.SeekStart)
+				return MockSectionReader{r}, err
+			})
+	}
 	return pr
 }
 

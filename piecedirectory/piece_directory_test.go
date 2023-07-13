@@ -12,3 +12,10 @@ func TestPieceDirectoryLevelDB(t *testing.T) {
 	require.NoError(t, err)
 	testPieceDirectory(context.Background(), t, bdsvc)
 }
+
+func TestPieceDirectoryLevelDBFuzz(t *testing.T) {
+	//_ = logging.SetLogLevel("piecedirectory", "debug")
+	bdsvc, err := svc.NewLevelDB("")
+	require.NoError(t, err)
+	testPieceDirectoryFuzz(context.Background(), t, bdsvc)
+}
