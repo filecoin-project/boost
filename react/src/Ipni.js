@@ -114,7 +114,7 @@ function ProviderIpniInfo({peerId}) {
 function ProviderConfig({configJson}) {
     const cfg = JSON.parse(configJson)
     return <div>
-        <h3>Index Provider Config</h3>
+        <h3>Indexer Config</h3>
         <ExpandableJSObject v={cfg} topLevel={false} expanded={true} key={'config'} />
     </div>
 }

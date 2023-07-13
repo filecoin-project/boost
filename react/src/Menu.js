@@ -24,9 +24,10 @@ export function Menu(props) {
             <ProposalLogsMenuItem />
             <RetrievalLogsMenuItem />
             <LIDMenuItem />
-            <StorageSpaceMenuItem />
             <SealingPipelineMenuItem />
             <DealPublishMenuItem />
+            <IpniMenuItem />
+            <StorageSpaceMenuItem />
             <FundsMenuItem />
             <DealTransfersMenuItem />
             <Link key="mpool" className="menu-item" to="/mpool">

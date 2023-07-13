@@ -294,6 +294,54 @@ const RetrievalLogsCountQuery = gql`
     }
 `;
 
+const IpniProviderInfoQuery = gql`
+    query AppIpniProviderInfoQuery {
+        ipniProviderInfo {
+            PeerID
+            Config
+        }
+    }
+`;
+
+const IpniAdQuery = gql`
+    query AppIpniAdQuery($adCid: String!) {
+        ipniAdvertisement(adCid: $adCid) {
+            ContextID
+            Metadata {
+                Protocol
+                Metadata
+            }
+            PreviousEntry
+            Provider
+            Addresses
+            IsRemove
+            ExtendedProviders {
+                Override
+                Providers {
+                    ID
+                    Addresses
+                    Metadata {
+                        Protocol
+                        Metadata
+                    }
+                }
+            }
+        }
+    }
+`;
+
+const IpniAdEntriesQuery = gql`
+    query AppIpniAdEntriesQuery($adCid: String!) {
+        ipniAdvertisementEntries(adCid: $adCid)
+    }
+`;
+
+const IpniAdEntriesCountQuery = gql`
+    query AppIpniAdEntriesCountQuery($adCid: String!) {
+        ipniAdvertisementEntriesCount(adCid: $adCid)
+    }
+`;
+
 const DealCancelMutation = gql`
     mutation AppDealCancelMutation($id: ID!) {
         dealCancel(id: $id)

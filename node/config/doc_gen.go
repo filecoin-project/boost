@@ -516,6 +516,12 @@ starts. By default, the cache is rehydrated from previously cached entries store
 datastore if any is present.`,
 		},
 		{
+			Name: "WebHost",
+			Type: "string",
+
+			Comment: `The network indexer host that the web UI should link to for published announcements`,
+		},
+		{
 			Name: "Announce",
 			Type: "IndexProviderAnnounceConfig",
 

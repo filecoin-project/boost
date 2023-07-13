@@ -23,14 +23,22 @@ import (
 var log = logging.Logger("gql")
 
 type Server struct {
-	resolver *resolver
-	bstore   BlockGetter
-	srv      *http.Server
-	wg       sync.WaitGroup
+	resolver   *resolver
+	bstore     BlockGetter
+	cfgHandler http.Handler
+	srv        *http.Server
+	wg         sync.WaitGroup
 }
 
-func NewServer(resolver *resolver, bstore BlockGetter) *Server {
-	return &Server{resolver: resolver, bstore: bstore}
+func NewServer(cfg *config.Boost, resolver *resolver, bstore BlockGetter) *Server {
+	webCfg := &corsHandler{sub: &webConfigServer{
+		cfg: webConfig{
+			Ipni: webConfigIpni{
+				IndexerHost: cfg.IndexProvider.WebHost,
+			},
+		},
+	}}
+	return &Server{resolver: resolver, bstore: bstore, cfgHandler: webCfg}
 }
 
 //go:embed schema.graphql
