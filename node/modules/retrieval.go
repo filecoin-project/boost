@@ -35,7 +35,7 @@ func bitswapMultiAddrs(cfg *config.Boost, h host.Host) ([]multiaddr.Multiaddr, e
 			Addrs: h.Addrs(),
 		})
 		if err != nil {
-			return nil, fmt.Errorf("could not parse bitswap address: %w", err)
+			return nil, fmt.Errorf("could not parse bitswap addresses: %w", err)
 		}
 		return maddr, nil
 	}
@@ -75,7 +75,7 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 				Addrs: h.Addrs(),
 			})
 			if err != nil {
-				return nil, fmt.Errorf("could not parse libp2p address: %w", err)
+				return nil, fmt.Errorf("could not parse libp2p addresses: %w", err)
 			}
 			protos = append(protos, types.Protocol{
 				Name:      "libp2p",
@@ -97,7 +97,7 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 				Addrs: []multiaddr.Multiaddr{maddr},
 			})
 			if err != nil {
-				return nil, fmt.Errorf("could not parse libp2p address: %w", err)
+				return nil, fmt.Errorf("could not parse http addresses: %w", err)
 			}
 			protos = append(protos, types.Protocol{
 				Name:      "http",
