@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/react"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
@@ -22,14 +23,22 @@ import (
 var log = logging.Logger("gql")
 
 type Server struct {
-	resolver *resolver
-	bstore   BlockGetter
-	srv      *http.Server
-	wg       sync.WaitGroup
+	resolver   *resolver
+	bstore     BlockGetter
+	cfgHandler http.Handler
+	srv        *http.Server
+	wg         sync.WaitGroup
 }
 
-func NewServer(resolver *resolver, bstore BlockGetter) *Server {
-	return &Server{resolver: resolver, bstore: bstore}
+func NewServer(cfg *config.Boost, resolver *resolver, bstore BlockGetter) *Server {
+	webCfg := &corsHandler{sub: &webConfigServer{
+		cfg: webConfig{
+			Ipni: webConfigIpni{
+				IndexerHost: cfg.IndexProvider.WebHost,
+			},
+		},
+	}}
+	return &Server{resolver: resolver, bstore: bstore, cfgHandler: webCfg}
 }
 
 //go:embed schema.graphql
@@ -40,7 +49,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// Serve React app
 	mux := http.NewServeMux()
-	err := serveReactApp(mux)
+	err := s.serveReactApp(mux)
 	if err != nil {
 		return err
 	}
@@ -113,7 +122,7 @@ func (f *fsPrefix) Open(name string) (fs.File, error) {
 	return f.FS.Open(f.prefix + "/" + name)
 }
 
-func serveReactApp(mux *http.ServeMux) error {
+func (s *Server) serveReactApp(mux *http.ServeMux) error {
 	// Catch all requests that are not handled by other handlers
 	urlPath := "/"
 
@@ -142,6 +151,12 @@ func serveReactApp(mux *http.ServeMux) error {
 	reactApp := http.StripPrefix(urlPath, http.FileServer(http.FS(reactFS)))
 
 	mux.HandleFunc(urlPath, func(writer http.ResponseWriter, request *http.Request) {
+		// Handle requests to get server-side config
+		if request.URL.Path == urlPath+"config.json" {
+			s.cfgHandler.ServeHTTP(writer, request)
+			return
+		}
+
 		matchesFile := func() bool {
 			// Check each file in the react build path for a match against
 			// the URL path

@@ -660,7 +660,7 @@ func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo
 
 		resolverCtx, cancel := context.WithCancel(context.Background())
 		resolver := gql.NewResolver(resolverCtx, cfg, r, h, dealsDB, logsDB, retDB, plDB, fundsDB, fundMgr, storageMgr, spApi, prov, legacyDeals, legacyProv, legacyDT, ps, sa, piecedirectory, publisher, indexProv, idxProvWrapper, fullNode, ssm, mpool)
-		server := gql.NewServer(resolver, bg)
+		server := gql.NewServer(cfg, resolver, bg)
 
 		lc.Append(fx.Hook{
 			OnStart: server.Start,

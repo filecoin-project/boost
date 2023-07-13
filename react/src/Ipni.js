@@ -20,9 +20,14 @@ import {addClassFor} from "./util-ui";
 import bezier2Img from "./bootstrap-icons/icons/bezier2.svg";
 import {getDealStatus} from "./RetrievalLogDetail";
 import closeImg from "./bootstrap-icons/icons/x-circle.svg";
+import {getConfig} from "./config"
 
 const basePath = '/ipni'
-const indexerHost = 'cid.contact'
+
+function indexerHost() {
+    const cfg = getConfig()
+    return cfg.Ipni.IndexerHost
+}
 
 export function IpniPage(props) {
     return <PageContainer pageType="ipni" title="Network Indexer">
@@ -48,6 +53,7 @@ function ProviderInfo(props) {
 
 function ProviderIpniInfo({peerId}) {
     const [{loading, error, data}, setResp] = useState({ loading: true })
+    const idxHost = indexerHost()
 
     // When running boost on a local devnet, hard-code the peer ID to
     // sofiaminer's peer ID so we get real provider info back from the indexer
@@ -55,8 +61,8 @@ function ProviderIpniInfo({peerId}) {
         peerId = '12D3KooWE8yt84RVwW3sFcd6WMjbUdWrZer2YtT4dmtj3dHdahSZ'
     }
     useEffect(() => {
-        fetch('https://'+indexerHost+'/providers/'+peerId).then((res) => {
-            if (res.status != 200) {
+        fetch('https://'+idxHost+'/providers/'+peerId).then((res) => {
+            if (res.status !== 200) {
                 throw Error("Failed to fetch provider info for "+peerId+" with status code "+res.status)
             }
             return res.json()
@@ -65,14 +71,14 @@ function ProviderIpniInfo({peerId}) {
         }).catch((err) => setResp({ loading: false, error: err }))
     }, [])
 
-    if (error) return <div>Error: {"Fetching provider info from "+indexerHost+": "+error.message}</div>
+    if (error) return <div>Error: {"Fetching provider info from "+idxHost+": "+error.message}</div>
     if (loading) return <div>Loading...</div>
     if (!data) return null
 
     return <div className="ipni-prov-info">
         <h3>Provider Indexer Info</h3>
         <div className="subtitle">
-            From <a href={"https://"+indexerHost+"/providers/"+data.Publisher.ID}>{indexerHost} provider record</a>
+            From <a href={"https://"+idxHost+"/providers/"+data.Publisher.ID}>{idxHost} provider record</a>
         </div>
         <table>
             <tbody>
@@ -85,7 +91,7 @@ function ProviderIpniInfo({peerId}) {
                 <td>{data.Publisher.ID}</td>
             </tr>
             <tr>
-                <th>Last Advertisement Processed by {indexerHost}</th>
+                <th>Last Advertisement Processed by {idxHost}</th>
                 <td>
                     {data.LastAdvertisement['/']}
                     &nbsp;
@@ -325,6 +331,8 @@ function IpniAdDetailFields({adCid}) {
 
     var ad = data.ipniAdvertisement
 
+    const idxHost = indexerHost()
+
     return <div>
         <table className="ad-fields">
         <tbody>
@@ -354,7 +362,7 @@ function IpniAdDetailFields({adCid}) {
         </tr>
         <tr>
             <th>Provider</th>
-            <td><a href={'https://'+indexerHost+'/providers/'+ad.Provider}>{ad.Provider}</a></td>
+            <td><a href={'https://'+idxHost+'/providers/'+ad.Provider}>{ad.Provider}</a></td>
         </tr>
         <tr>
             <th>Addresses</th>
@@ -474,6 +482,7 @@ export function IpniAdEntries() {
         return <div>Loading ...</div>
     }
 
+    const idxHost = indexerHost()
     var entries = data.ipniAdvertisementEntries
     return <div className="ad-detail modal" id={params.adCid}>
         <div className="content">
@@ -484,7 +493,7 @@ export function IpniAdEntries() {
                 <span>Advertisement {'…'+params.adCid.slice(-8)} Entries</span>
             </div>
             <div className="entries">
-                { entries.length == 0 ? (
+                { entries.length === 0 ? (
                     <span>Advertisement {params.adCid} has no entries</span>
                 ) : (
                     <table>
@@ -493,7 +502,7 @@ export function IpniAdEntries() {
                             return <tr>
                                 <td>{i+1}.</td>
                                 <td>
-                                    <a href={"https://"+indexerHost+"/multihash/"+entry}>{entry}</a>
+                                    <a href={"https://"+idxHost+"/multihash/"+entry}>{entry}</a>
                                 </td>
                             </tr>
                         })}
