@@ -349,7 +349,7 @@ function IpniAdDetailFields({adCid}) {
             <td><IpniAdDetailEntryCount adCid={adCid} /></td>
         </tr>
         <tr>
-            <th>Previous Entry</th>
+            <th>Previous Advertisement</th>
             <td><Link to={'/ipni/ad/'+ad.PreviousEntry}>{ad.PreviousEntry}</Link></td>
         </tr>
         <tr>
