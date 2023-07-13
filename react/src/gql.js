@@ -258,8 +258,8 @@ const RetrievalLogQuery = gql`
 `;
 
 const RetrievalLogsListQuery = gql`
-    query AppRetrievalLogsListQuery($cursor: Uint64, $offset: Int, $limit: Int) {
-        retrievalLogs(cursor: $cursor, offset: $offset, limit: $limit) {
+    query AppRetrievalLogsListQuery($isIndexer: Boolean, $cursor: Uint64, $offset: Int, $limit: Int) {
+        retrievalLogs(isIndexer: $isIndexer, cursor: $cursor, offset: $offset, limit: $limit) {
             logs {
                 RowID
                 CreatedAt
@@ -286,11 +286,59 @@ const RetrievalLogsListQuery = gql`
 `;
 
 const RetrievalLogsCountQuery = gql`
-    query AppRetrievalLogsCountQuery {
-        retrievalLogsCount {
+    query AppRetrievalLogsCountQuery($isIndexer: Boolean) {
+        retrievalLogsCount(isIndexer: $isIndexer) {
             Count
             Period
         }
+    }
+`;
+
+const IpniProviderInfoQuery = gql`
+    query AppIpniProviderInfoQuery {
+        ipniProviderInfo {
+            PeerID
+            Config
+        }
+    }
+`;
+
+const IpniAdQuery = gql`
+    query AppIpniAdQuery($adCid: String!) {
+        ipniAdvertisement(adCid: $adCid) {
+            ContextID
+            Metadata {
+                Protocol
+                Metadata
+            }
+            PreviousEntry
+            Provider
+            Addresses
+            IsRemove
+            ExtendedProviders {
+                Override
+                Providers {
+                    ID
+                    Addresses
+                    Metadata {
+                        Protocol
+                        Metadata
+                    }
+                }
+            }
+        }
+    }
+`;
+
+const IpniAdEntriesQuery = gql`
+    query AppIpniAdEntriesQuery($adCid: String!) {
+        ipniAdvertisementEntries(adCid: $adCid)
+    }
+`;
+
+const IpniAdEntriesCountQuery = gql`
+    query AppIpniAdEntriesCountQuery($adCid: String!) {
+        ipniAdvertisementEntriesCount(adCid: $adCid)
     }
 `;
 
@@ -734,6 +782,10 @@ export {
     RetrievalLogQuery,
     RetrievalLogsListQuery,
     RetrievalLogsCountQuery,
+    IpniProviderInfoQuery,
+    IpniAdQuery,
+    IpniAdEntriesQuery,
+    IpniAdEntriesCountQuery,
     PiecesWithRootPayloadCidQuery,
     PiecesWithPayloadCidQuery,
     PieceBuildIndexMutation,

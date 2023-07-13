@@ -58,6 +58,7 @@ function RetrievalLogsContent(props) {
             cursor: queryCursor,
             offset: listOffset,
             limit: rowsPerPage,
+            isIndexer: false,
         },
         fetchPolicy: 'network-only',
     })
@@ -198,7 +199,7 @@ export function RetrievalLogsMenuItem(props) {
         pollInterval: 10000,
         fetchPolicy: 'network-only',
         variables: {
-            accepted: true,
+            isIndexer: false,
         }
     })
 

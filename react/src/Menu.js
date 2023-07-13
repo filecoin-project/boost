@@ -11,6 +11,7 @@ import {SettingsMenuItem} from "./Settings";
 import {LIDMenuItem} from "./LID";
 import {ProposalLogsMenuItem} from "./ProposalLogs";
 import {RetrievalLogsMenuItem} from "./RetrievalLogs";
+import {IpniMenuItem} from "./Ipni";
 
 export function Menu(props) {
     function scrollToTop() {
@@ -23,9 +24,10 @@ export function Menu(props) {
             <ProposalLogsMenuItem />
             <RetrievalLogsMenuItem />
             <LIDMenuItem />
-            <StorageSpaceMenuItem />
             <SealingPipelineMenuItem />
             <DealPublishMenuItem />
+            <IpniMenuItem />
+            <StorageSpaceMenuItem />
             <FundsMenuItem />
             <DealTransfersMenuItem />
             <Link key="mpool" className="menu-item" to="/mpool">

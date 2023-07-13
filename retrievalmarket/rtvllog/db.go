@@ -114,10 +114,20 @@ func (d *RetrievalLogDB) Get(ctx context.Context, peerID string, transferID uint
 	return &rows[0], nil
 }
 
-func (d *RetrievalLogDB) List(ctx context.Context, cursor *uint64, offset int, limit int) ([]RetrievalDealState, error) {
+func (d *RetrievalLogDB) List(ctx context.Context, isIndexer *bool, cursor *uint64, offset int, limit int) ([]RetrievalDealState, error) {
 	where := ""
 	whereArgs := []interface{}{}
+	if isIndexer != nil {
+		if *isIndexer {
+			where += "DealID = 0"
+		} else {
+			where += "DealID != 0"
+		}
+	}
 	if cursor != nil {
+		if where != "" {
+			where += " AND "
+		}
 		where += "RowID <= ?"
 		whereArgs = append(whereArgs, *cursor)
 	}
@@ -253,9 +263,16 @@ func (d *RetrievalLogDB) list(ctx context.Context, offset int, limit int, where 
 	return dealStates, nil
 }
 
-func (d *RetrievalLogDB) Count(ctx context.Context) (int, error) {
+func (d *RetrievalLogDB) Count(ctx context.Context, isIndexer *bool) (int, error) {
 	var count int
 	qry := "SELECT count(*) FROM RetrievalDealStates"
+	if isIndexer != nil {
+		if *isIndexer {
+			qry += " WHERE DealID = 0"
+		} else {
+			qry += " WHERE DealID != 0"
+		}
+	}
 	row := d.db.QueryRowContext(ctx, qry)
 	err := row.Scan(&count)
 	return count, err
