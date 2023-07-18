@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/ipfs/go-cid"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
@@ -53,6 +54,7 @@ type DealPublisher struct {
 	ctx      context.Context
 	Shutdown context.CancelFunc
 
+	manualPSD             bool
 	maxDealsPerPublishMsg uint64
 	publishPeriod         time.Duration
 	publishSpec           *api.MessageSendSpec
@@ -66,9 +68,10 @@ type DealPublisher struct {
 
 // A deal that is queued to be published
 type pendingDeal struct {
-	ctx    context.Context
-	deal   market.ClientDealProposal
-	Result chan publishResult
+	ctx         context.Context
+	deal        market.ClientDealProposal
+	Result      chan publishResult
+	proposalCid cid.Cid
 }
 
 // The result of publishing a deal
@@ -77,12 +80,20 @@ type publishResult struct {
 	err    error
 }
 
-func newPendingDeal(ctx context.Context, deal market.ClientDealProposal) *pendingDeal {
-	return &pendingDeal{
-		ctx:    ctx,
-		deal:   deal,
-		Result: make(chan publishResult),
+func newPendingDeal(ctx context.Context, deal market.ClientDealProposal) (*pendingDeal, error) {
+
+	// Generate unique identifier for the deal
+	signedProp, err := cborutil.AsIpld(&deal)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute signed deal proposal ipld node: %w", err)
 	}
+
+	return &pendingDeal{
+		ctx:         ctx,
+		deal:        deal,
+		Result:      make(chan publishResult),
+		proposalCid: signedProp.Cid(),
+	}, nil
 }
 
 type PublishMsgConfig struct {
@@ -94,6 +105,9 @@ type PublishMsgConfig struct {
 	MaxDealsPerMsg uint64
 	// Minimum start epoch buffer to give time for sealing of sector with deal
 	StartEpochSealingBuffer uint64
+	// Enable ExternalDealPublishControl to allow users to choose when to send Publish messages
+	// for each deal
+	ExternalDealPublishControl bool
 }
 
 func NewDealPublisher(
@@ -133,6 +147,7 @@ func newDealPublisher(
 		publishPeriod:           publishMsgCfg.Period,
 		startEpochSealingBuffer: abi.ChainEpoch(publishMsgCfg.StartEpochSealingBuffer),
 		publishSpec:             publishSpec,
+		manualPSD:               publishMsgCfg.ExternalDealPublishControl,
 	}
 }
 
@@ -172,10 +187,17 @@ func (p *DealPublisher) ForcePublishPendingDeals() {
 }
 
 func (p *DealPublisher) Publish(ctx context.Context, deal market.ClientDealProposal) (cid.Cid, error) {
-	pdeal := newPendingDeal(ctx, deal)
+	pdeal, err := newPendingDeal(ctx, deal)
+	if err != nil {
+		return cid.Undef, fmt.Errorf("failed to generate cid for the deal proposal: %w", err)
+	}
 
 	// Add the deal to the queue
-	p.processNewDeal(pdeal)
+	if p.manualPSD {
+		p.queueDeals(pdeal)
+	} else {
+		p.processNewDeal(pdeal)
+	}
 
 	// Wait for the deal to be submitted
 	select {
@@ -257,11 +279,13 @@ func (p *DealPublisher) waitForMoreDeals() {
 }
 
 func (p *DealPublisher) publishAllDeals() {
-	// If the timeout hasn't yet been cancelled, cancel it
-	if p.cancelWaitForMoreDeals != nil {
-		p.cancelWaitForMoreDeals()
-		p.cancelWaitForMoreDeals = nil
-		p.publishPeriodStart = time.Time{}
+	if !p.manualPSD {
+		// If the timeout hasn't yet been cancelled, cancel it
+		if p.cancelWaitForMoreDeals != nil {
+			p.cancelWaitForMoreDeals()
+			p.cancelWaitForMoreDeals = nil
+			p.publishPeriodStart = time.Time{}
+		}
 	}
 
 	// Filter out any deals that have been cancelled
@@ -442,4 +466,84 @@ func (p *DealPublisher) filterCancelledDeals() {
 		filtered = append(filtered, pd)
 	}
 	p.pending = filtered
+}
+
+func (p *DealPublisher) queueDeals(pdeal *pendingDeal) {
+	p.lk.Lock()
+	defer p.lk.Unlock()
+
+	// Filter out any cancelled deals
+	p.filterCancelledDeals()
+
+	// Make sure the new deal hasn't been cancelled
+	if pdeal.ctx.Err() != nil {
+		return
+	}
+
+	// Add the new deal to the queue
+	p.pending = append(p.pending, pdeal)
+	log.Infof("add deal with piece CID %s to publish deals queue - %d deals in queue",
+		pdeal.deal.Proposal.PieceCID, len(p.pending))
+}
+
+func (p *DealPublisher) PublishQueuedDeals(deals []cid.Cid) (error, []cid.Cid) {
+	p.lk.Lock()
+	var notFound []cid.Cid
+	var toPublish []*pendingDeal
+
+	// Check that each deal is part of the queue
+	for _, c := range deals {
+		found := false
+		for _, pd := range p.pending {
+			if c == pd.proposalCid {
+				found = true
+				toPublish = append(toPublish, pd)
+				break
+			}
+		}
+
+		if !found {
+			notFound = append(notFound, c)
+		}
+	}
+
+	p.lk.Unlock()
+
+	if len(notFound) > 0 {
+		return fmt.Errorf("deals not found in the publisher queue"), notFound
+	}
+
+	// Remove the deal from Pending
+	p.cleanupPending(deals)
+
+	// Send the publish message
+	go p.publishReady(toPublish)
+	return nil, nil
+}
+
+func (p *DealPublisher) cleanupPending(dealIds []cid.Cid) {
+	p.lk.Lock()
+	defer p.lk.Unlock()
+
+	var newPending []*pendingDeal
+
+	for _, dp := range p.pending {
+		found := false
+		for _, id := range dealIds {
+			if id == dp.proposalCid {
+				found = true
+			}
+		}
+
+		if !found {
+			newPending = append(newPending, dp)
+		}
+	}
+
+	p.pending = newPending
+
+}
+
+func (p *DealPublisher) ManualPSD() bool {
+	return p.manualPSD
 }

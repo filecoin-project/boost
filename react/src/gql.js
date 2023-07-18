@@ -685,6 +685,7 @@ const FundsLogsQuery = gql`
 const DealPublishQuery = gql`
     query AppDealPublishQuery {
         dealPublish {
+            ManualPSD
             Start
             Period
             MaxDealsPerMsg
@@ -764,6 +765,12 @@ const StorageAskQuery = gql`
     }
 `;
 
+const PublishPendingDealsMutation = gql`
+    mutation AppPublishPendingDealMutation($ids: PublishDealIds) {
+        publishPendingDeals(ids: $ids)
+    }
+`;
+
 export {
     gqlClient,
     EpochQuery,
@@ -807,4 +814,5 @@ export {
     SealingPipelineQuery,
     Libp2pAddrInfoQuery,
     StorageAskQuery,
+    PublishPendingDealsMutation,
 }
