@@ -40,6 +40,29 @@ function DealPublishContent() {
     var publishTime = moment(data.dealPublish.Start).add(period)
 
     var deals = data.dealPublish.Deals
+
+    if (data.dealPublish.ManualPSD) {
+        return <div>
+            {deals.length ? (
+                <>
+                    <p>
+                        {deals.length} deal{deals.length === 1 ? '' : 's'} pending to be published
+                    </p>
+
+                    <div className="buttons">
+                        <div className="button" onClick={doPublish}>Publish Now</div>
+                    </div>
+                </>
+            ) : null}
+
+            <h3>ExternalDealPublishControl is enabled. Users must publish deals manually</h3>
+
+            { deals.length ? <DealsTable deals={deals} /> : (
+                <p>There are no deals in the batch publish queue</p>
+            ) }
+        </div>
+    }
+
     return <div>
         {deals.length ? (
             <>

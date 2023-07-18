@@ -412,6 +412,7 @@ type FundsLog {
 }
 
 type DealPublish {
+  ManualPSD: Boolean!
   Period: Int!
   Start: Time!
   MaxDealsPerMsg: Int!
@@ -609,6 +610,9 @@ type RootMutation {
 
   """Update the Storage Ask (price of doing a storage deal)"""
   storageAskUpdate(update: StorageAskUpdate!): Boolean!
+
+  """Publish the deal for the supplied deal UUIDs"""
+  publishPendingDeals(ids: [ID!]!): Boolean!
 }
 
 type RootSubscription {

@@ -5,10 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/filecoin-project/boost/gql/types"
 	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
+	"github.com/ipfs/go-cid"
 )
 
 // basicDealResolver just has simple types (as opposed to dealResolver which
@@ -32,10 +35,15 @@ type basicDealResolver struct {
 }
 
 type dealPublishResolver struct {
+	ManualPSD      bool
 	Start          graphql.Time
 	Period         int32
 	MaxDealsPerMsg int32
 	Deals          []*basicDealResolver
+}
+
+type dealsToPublish struct {
+	IDs []graphql.ID
 }
 
 // query: dealPublish: DealPublish
@@ -151,6 +159,7 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 	}
 
 	return &dealPublishResolver{
+		ManualPSD:      r.publisher.ManualPSD(),
 		Deals:          basicDeals,
 		Period:         int32(pending.PublishPeriod.Seconds()),
 		Start:          graphql.Time{Time: pending.PublishPeriodStart},
@@ -161,5 +170,39 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 // mutation: dealPublishNow(): bool
 func (r *resolver) DealPublishNow(ctx context.Context) (bool, error) {
 	r.publisher.ForcePublishPendingDeals()
+	return true, nil
+}
+
+func (r *resolver) PublishPendingDeals(ctx context.Context, args dealsToPublish) (bool, error) {
+
+	var pcids []cid.Cid
+	uuidToPcid := make(map[cid.Cid]uuid.UUID)
+
+	for _, id := range args.IDs {
+		dealId, err := toUuid(id)
+		if err != nil {
+			return false, err
+		}
+		deal, err := r.dealsDB.ByID(ctx, dealId)
+		if err != nil {
+			return false, fmt.Errorf("failed to get deal details from DB %s: %w", dealId.String(), err)
+		}
+		pcid, err := deal.ClientDealProposal.Proposal.Cid()
+		if err != nil {
+			return false, fmt.Errorf("error in generating proposal cid for deal %s: %w", dealId.String(), err)
+		}
+		uuidToPcid[pcid] = dealId
+		pcids = append(pcids, pcid)
+	}
+
+	err, errCids := r.publisher.PublishQueuedDeals(pcids)
+	if err != nil {
+		var errStr []string
+		for _, pcid := range errCids {
+			errStr = append(errStr, uuidToPcid[pcid].String())
+		}
+		return false, fmt.Errorf("%w: %s", err, strings.Join(errStr, ","))
+	}
+
 	return true, nil
 }

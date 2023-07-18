@@ -272,6 +272,12 @@ type DealmakingConfig struct {
 	// Whether to enable legacy deals on the Boost node or not. We recommend keeping
 	// them disabled. These will be completely deprecated soon.
 	EnableLegacyStorageDeals bool
+
+	// When ExternalDealPublishControl is set to true, user is responsible to publish the deal message.
+	// A list of pending deals can be queried on the GraphQL endpoint
+	// If this value is set to true, the values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
+	// ignored
+	ExternalDealPublishControl bool
 }
 
 type ContractDealsConfig struct {
