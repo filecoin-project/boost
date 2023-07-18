@@ -283,8 +283,8 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 			// one corrupt segment shouldn't translate into an error in other segments.
 			continue
 		}
-		for _, r := range subRecs {
-			r.Offset += segOffset
+		for i := range subRecs {
+			subRecs[i].Offset += segOffset
 		}
 		recs = append(recs, subRecs...)
 	}
