@@ -5,78 +5,85 @@ import (
 	"io"
 	"math/bits"
 	"os"
+	"testing"
 
 	"github.com/filecoin-project/boost/storagemarket"
-	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-data-segment/datasegment"
 	commcid "github.com/filecoin-project/go-fil-commcid"
 	commp "github.com/filecoin-project/go-fil-commp-hashhash"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/ipfs/go-cid"
+	"github.com/ipld/go-car/v2"
 )
 
 type CarDetails struct {
 	CarPath  string
-	Root     cid.Cid
+	Root     []cid.Cid
 	FilePath string
 }
 
-type segmentDetails struct {
+type SegmentDetails struct {
 	Piece    *abi.PieceInfo
 	Segments []*CarDetails
 	CarPath  string
 }
 
-func GenerateDataSegmentFiles(tmpdir string, num int) (segmentDetails, error) {
+func GenerateDataSegmentFiles(t *testing.T, tmpdir string, num int) (SegmentDetails, error) {
 	if num < 2 {
-		return segmentDetails{}, errors.New("at least 2 deals are required to test data segment index")
+		return SegmentDetails{}, errors.New("at least 2 deals are required to test data segment index")
 	}
 
-	fileSize := 200000
+	fileSize := 2000
 
 	var cars []*CarDetails
 	for i := 1; i <= num; i++ {
-		fileName, err := testutil.CreateRandomFile(tmpdir, i, fileSize)
+
+		carPath, filePath := kit.CreateRandomCARv1(t, i, fileSize)
+		rd, err := car.OpenReader(carPath)
 		if err != nil {
-			return segmentDetails{}, err
+			return SegmentDetails{}, err
 		}
 
-		rootCid, carFilepath, err := testutil.CreateDenseCARv2(tmpdir, fileName)
+		roots, err := rd.Roots()
 		if err != nil {
-			return segmentDetails{}, err
+			return SegmentDetails{}, err
+		}
+
+		err = rd.Close()
+		if err != nil {
+			return SegmentDetails{}, err
 		}
 
 		cars = append(cars, &CarDetails{
-			Root:     rootCid,
-			CarPath:  carFilepath,
-			FilePath: fileName,
+			CarPath:  carPath,
+			FilePath: filePath,
+			Root:     roots,
 		})
 	}
 
 	finalCar, err := os.CreateTemp(tmpdir, "finalcar")
 	if err != nil {
-		return segmentDetails{}, err
+		return SegmentDetails{}, err
 	}
 
 	err = generateDataSegmentCar(cars, finalCar)
 	if err != nil {
-		return segmentDetails{}, err
+		return SegmentDetails{}, err
 	}
 
 	finalCarName := finalCar.Name()
 	err = finalCar.Close()
 	if err != nil {
-		return segmentDetails{}, err
+		return SegmentDetails{}, err
 	}
-
-	//finalCarPath := path.Join(tmpdir, finalCarName)
 
 	cidAndSize, err := storagemarket.GenerateCommP(finalCarName)
 	if err != nil {
-		return segmentDetails{}, err
+		return SegmentDetails{}, err
 	}
 
-	return segmentDetails{
+	return SegmentDetails{
 		Piece:    cidAndSize,
 		Segments: cars,
 		CarPath:  finalCarName,
@@ -88,9 +95,9 @@ func generateDataSegmentCar(cars []*CarDetails, outputFile *os.File) error {
 	readers := make([]io.Reader, 0)
 	deals := make([]abi.PieceInfo, 0)
 
-	for _, car := range cars {
+	for _, cf := range cars {
 
-		r, err := os.Open(car.CarPath)
+		r, err := os.Open(cf.CarPath)
 
 		if err != nil {
 			return err

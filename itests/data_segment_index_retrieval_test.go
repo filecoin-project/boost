@@ -35,10 +35,10 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	log.Debugw("using tempdir", "dir", tempdir)
 
 	// Select the number of car segments to use in test
-	seg := 2
+	seg := 4
 
 	// Generate car file containing multiple car files
-	segmentDetails, err := framework.GenerateDataSegmentFiles(tempdir, seg)
+	segmentDetails, err := framework.GenerateDataSegmentFiles(t, tempdir, seg)
 	require.NoError(t, err)
 
 	// Start a web server to serve the car files
@@ -52,7 +52,7 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	dealUuid := uuid.New()
 
 	// Make a deal
-	res, err := f.MakeDummyDeal(dealUuid, segmentDetails.CarPath, segmentDetails.Segments[0].Root, server.URL+"/"+filepath.Base(segmentDetails.CarPath), false)
+	res, err := f.MakeDummyDeal(dealUuid, segmentDetails.CarPath, segmentDetails.Piece.PieceCID, server.URL+"/"+filepath.Base(segmentDetails.CarPath), false)
 	require.NoError(t, err)
 	require.True(t, res.Result.Accepted)
 	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
@@ -63,7 +63,9 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 
 	// Retrieve and compare the all car files within the deal
 	for i := 0; i < seg; i++ {
-		outFile := f.RetrieveDirect(ctx, t, segmentDetails.Segments[i].Root, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true)
-		kit.AssertFilesEqual(t, segmentDetails.Segments[i].FilePath, outFile)
+		for _, r := range segmentDetails.Segments[i].Root {
+			outFile := f.RetrieveDirect(ctx, t, r, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true)
+			kit.AssertFilesEqual(t, segmentDetails.Segments[i].FilePath, outFile)
+		}
 	}
 }
