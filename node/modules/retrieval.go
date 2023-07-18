@@ -92,16 +92,9 @@ func NewTransportsListener(cfg *config.Boost) func(h host.Host) (*lp2pimpl.Trans
 				msg += "Could not parse '%s' as multiaddr: %w"
 				return nil, fmt.Errorf(msg, cfg.Dealmaking.HTTPRetrievalMultiaddr, err)
 			}
-			httpaddr, err := peer.AddrInfoToP2pAddrs(&peer.AddrInfo{
-				ID:    h.ID(),
-				Addrs: []multiaddr.Multiaddr{maddr},
-			})
-			if err != nil {
-				return nil, fmt.Errorf("could not parse http addresses: %w", err)
-			}
 			protos = append(protos, types.Protocol{
 				Name:      "http",
-				Addresses: httpaddr,
+				Addresses: []multiaddr.Multiaddr{maddr},
 			})
 		}
 
