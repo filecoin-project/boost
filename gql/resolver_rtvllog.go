@@ -142,9 +142,10 @@ func (r *resolver) RetrievalLog(ctx context.Context, args retLogArgs) (*retrieva
 }
 
 type retrievalStatesArgs struct {
-	Cursor *gqltypes.Uint64 // database row id
-	Offset graphql.NullInt
-	Limit  graphql.NullInt
+	Cursor    *gqltypes.Uint64 // database row id
+	IsIndexer graphql.NullBool
+	Offset    graphql.NullInt
+	Limit     graphql.NullInt
 }
 
 func (r *resolver) RetrievalLogs(ctx context.Context, args retrievalStatesArgs) (*retrievalStateListResolver, error) {
@@ -158,14 +159,18 @@ func (r *resolver) RetrievalLogs(ctx context.Context, args retrievalStatesArgs) 
 		limit = int(*args.Limit.Value)
 	}
 
-	// Fetch one extra row so that we can check if there are more rows
-	// beyond the limit
+	var isIndexer *bool
+	if args.IsIndexer.Set {
+		isIndexer = args.IsIndexer.Value
+	}
 	var cursor *uint64
 	if args.Cursor != nil {
 		cursorptr := uint64(*args.Cursor)
 		cursor = &cursorptr
 	}
-	rows, err := r.retDB.List(ctx, cursor, offset, limit+1)
+	// Fetch one extra row so that we can check if there are more rows
+	// beyond the limit
+	rows, err := r.retDB.List(ctx, isIndexer, cursor, offset, limit+1)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +181,7 @@ func (r *resolver) RetrievalLogs(ctx context.Context, args retrievalStatesArgs) 
 	}
 
 	// Get the total row count
-	count, err := r.retDB.Count(ctx)
+	count, err := r.retDB.Count(ctx, isIndexer)
 	if err != nil {
 		return nil, err
 	}
@@ -198,8 +203,12 @@ type retStateCount struct {
 	Period gqltypes.Uint64
 }
 
-func (r *resolver) RetrievalLogsCount(ctx context.Context) (*retStateCount, error) {
-	count, err := r.retDB.Count(ctx)
+func (r *resolver) RetrievalLogsCount(ctx context.Context, args struct{ IsIndexer graphql.NullBool }) (*retStateCount, error) {
+	var isIndexer *bool
+	if args.IsIndexer.Set {
+		isIndexer = args.IsIndexer.Value
+	}
+	count, err := r.retDB.Count(ctx, isIndexer)
 	return &retStateCount{
 		Count:  int32(count),
 		Period: gqltypes.Uint64(r.cfg.Dealmaking.RetrievalLogDuration),

@@ -71,11 +71,11 @@ require (
 	github.com/ipld/go-car/v2 v2.10.1
 	github.com/ipld/go-ipld-prime v0.20.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
-	github.com/ipni/index-provider v0.12.0
+	github.com/ipni/index-provider v0.13.4
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/libp2p/go-libp2p v0.27.6
+	github.com/libp2p/go-libp2p v0.28.1
 	github.com/libp2p/go-libp2p-gostream v0.6.0
 	github.com/libp2p/go-libp2p-http v0.5.0
 	github.com/libp2p/go-libp2p-kad-dht v0.24.0
@@ -91,13 +91,13 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/open-rpc/meta-schema v0.0.0-20201029221707-1b72ef2ea333
 	github.com/pressly/goose/v3 v3.5.3
-	github.com/prometheus/client_golang v1.14.0
+	github.com/prometheus/client_golang v1.15.1
 	github.com/raulk/clock v1.1.0
 	github.com/raulk/go-watchdog v1.3.0
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.5
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
-	github.com/whyrusleeping/cbor-gen v0.0.0-20230126041949-52956bd4c9aa
+	github.com/whyrusleeping/cbor-gen v0.0.0-20230418232409-daab9ece03a0
 	go.opencensus.io v0.24.0
 	go.opentelemetry.io/otel v1.16.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.14.0 // indirect
@@ -250,9 +250,9 @@ require (
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.0 // indirect
 	github.com/libp2p/go-maddr-filter v0.1.0 // indirect
 	github.com/libp2p/go-mplex v0.7.0 // indirect
-	github.com/libp2p/go-nat v0.1.0 // indirect
+	github.com/libp2p/go-nat v0.2.0 // indirect
 	github.com/libp2p/go-netroute v0.2.1 // indirect
-	github.com/libp2p/go-reuseport v0.2.0 // indirect
+	github.com/libp2p/go-reuseport v0.3.0 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.0.3 // indirect
 	github.com/magefile/mage v1.9.0 // indirect
@@ -341,7 +341,8 @@ require (
 	github.com/ipfs/boxo v0.10.1
 	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/kubo v0.21.0-rc1
-	github.com/ipni/go-libipni v0.0.8
+	github.com/ipni/go-libipni v0.2.8
+	github.com/ipni/ipni-cli v0.0.3
 	github.com/schollz/progressbar/v3 v3.13.1
 )
 
@@ -352,6 +353,8 @@ require (
 
 require (
 	github.com/filecoin-project/kubo-api-client v0.0.1 // indirect
+	github.com/gammazero/channelqueue v0.2.1 // indirect
+	github.com/gammazero/deque v0.2.1 // indirect
 	github.com/google/pprof v0.0.0-20230602150820-91b7bce49751 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
@@ -365,6 +368,7 @@ require (
 	github.com/jackc/pgtype v1.10.0 // indirect
 	github.com/jackc/puddle v1.2.1 // indirect
 	github.com/libp2p/go-doh-resolver v0.4.0 // indirect
+	github.com/montanaflynn/stats v0.7.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
 	github.com/puzpuzpuz/xsync/v2 v2.4.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
@@ -379,5 +383,4 @@ require (
 	go.opentelemetry.io/otel/metric v1.16.0 // indirect
 	gonum.org/v1/gonum v0.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	nhooyr.io/websocket v1.8.7 // indirect
 )

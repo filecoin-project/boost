@@ -195,6 +195,8 @@ func DefaultBoost() *Boost {
 			TopicName:         "",
 			PurgeCacheOnStart: false,
 
+			WebHost: "cid.contact",
+
 			Announce: IndexProviderAnnounceConfig{
 				AnnounceOverHttp:   false,
 				DirectAnnounceURLs: []string{"https://cid.contact/ingest/announce"},

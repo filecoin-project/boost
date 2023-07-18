@@ -349,6 +349,37 @@ type LID {
   FlaggedPieces: Int!
 }
 
+type IpniProviderInfo {
+  PeerID: String!
+  Config: String!
+}
+
+type IpniAdvertisementMetadata {
+  Protocol: String!
+  Metadata: String!
+}
+
+type IpniExtendedProviders {
+  ID: String!
+  Addresses: [String!]!
+  Metadata: [IpniAdvertisementMetadata]!
+}
+
+type IpniExtendedProvidersList {
+  Providers: [IpniExtendedProviders]!
+  Override: Boolean!
+}
+
+type IpniAdvertisement {
+  ContextID: String!
+  IsRemove: Boolean!
+  Metadata: [IpniAdvertisementMetadata]!
+  PreviousEntry: String!
+  Provider: String!
+  Addresses: [String!]!
+  ExtendedProviders: IpniExtendedProvidersList
+}
+
 type FundsEscrow {
   Available: BigInt!
   Locked: BigInt!
@@ -419,6 +450,11 @@ type MpoolMessage {
   BaseFee: BigInt!
 }
 
+type MpoolMessages {
+  Count: Int!
+  Messages: [MpoolMessage]!
+}
+
 type Libp2pAddrInfo {
   Addresses: [String]!
   PeerID: String!
@@ -480,10 +516,10 @@ type RootQuery {
   retrievalLog(peerID: String!, transferID: Uint64!): RetrievalState
 
   """Get retrieval logs"""
-  retrievalLogs(cursor: Uint64, offset: Int, limit: Int): RetrievalStateList!
+  retrievalLogs(isIndexer: Boolean, cursor: Uint64, offset: Int, limit: Int): RetrievalStateList!
 
   """Get the number of retrieval logs"""
-  retrievalLogsCount: RetrievalStatesCount!
+  retrievalLogsCount(isIndexer: Boolean): RetrievalStatesCount!
 
   """Get a list of pieces that have been flagged as having problems"""
   piecesFlagged(hasUnsealedCopy: Boolean, cursor: BigInt, offset: Int, limit: Int): FlaggedPiecesList!
@@ -512,6 +548,18 @@ type RootQuery {
   """Get sealing pipeline state"""
   sealingpipeline: SealingPipeline!
 
+  """Get IPNI Provider configuration and state"""
+  ipniProviderInfo: IpniProviderInfo!
+
+  """Get IPNI advertisement"""
+  ipniAdvertisement(adCid: String!): IpniAdvertisement!
+
+  """Get entries for an IPNI advertisement"""
+  ipniAdvertisementEntries(adCid: String!): [String]!
+
+  """Get count of entries for an IPNI advertisement"""
+  ipniAdvertisementEntriesCount(adCid: String!): Int!
+
   """Get LID state"""
   lid: LID!
 
@@ -531,10 +579,7 @@ type RootQuery {
   transferStats: TransferStats!
 
   """Get local messages in the mpool"""
-  mpool(local: Boolean!): [MpoolMessage]!
-
-  """Get number of messages stuck in mpool"""
-  mpoolAlertsCount: Int!
+  mpool(alerts: Boolean!): MpoolMessages!
 
   """Get libp2p addresses and peer id"""
   libp2pAddrInfo: Libp2pAddrInfo!

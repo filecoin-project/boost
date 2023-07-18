@@ -2,7 +2,7 @@ import './App.css';
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import {ApolloProvider} from "@apollo/react-hooks";
-import {gqlClient,} from "./gql";
+import {gqlClient} from "./gql";
 import {Menu} from "./Menu";
 import {StorageSpacePage} from "./StorageSpace";
 import {FundsPage} from "./Funds";
@@ -22,6 +22,7 @@ import {PieceDoctorPage, InspectPiecePage, LIDPage, NoUnsealedSectorPieces, NoUn
 import {RetrievalLogsPage} from "./RetrievalLogs";
 import {RetrievalLogDetail} from "./RetrievalLogDetail";
 import {MonitoringAlert} from "./MonitoringAlert";
+import {IpniAdDetail, IpniAdEntries, IpniPage} from "./Ipni";
 
 function App(props) {
     return (
@@ -46,6 +47,10 @@ function App(props) {
                                         <Route path="/retrieval-logs" element={<RetrievalLogsPage />} />
                                         <Route path="/retrieval-logs/from/:cursor/page/:pageNum" element={<RetrievalLogsPage />} />
                                         <Route path="/retrieval-logs/:peerID/:transferID" element={<RetrievalLogDetail />} />
+                                        <Route path="/ipni" element={<IpniPage />} />
+                                        <Route path="/ipni/from/:cursor/page/:pageNum" element={<IpniPage />} />
+                                        <Route path="/ipni/ad/:adCid" element={<IpniAdDetail />} />
+                                        <Route path="/ipni/ad/:adCid/entries" element={<IpniAdEntries />} />
                                         <Route path="/storage-space" element={<StorageSpacePage />} />
                                         <Route path="/lid" element={<LIDPage />} />
                                         <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />

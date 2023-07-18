@@ -345,5 +345,11 @@ workflows:
           suite: itest-data-segment-index
           target: "./itests/data_segment_index_retrieval_test.go"
 
+      - test:
+          name: test-itest-ipni
+          suite: itest-ipni
+          target: "./itests/ipni_publish_test.go"
+
       - lid-docker-compose
 
+        

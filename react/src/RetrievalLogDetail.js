@@ -97,56 +97,67 @@ export function RetrievalLogDetail(props) {
                     <th>Transfer ID</th>
                     <td>{retrieval.TransferID+''}</td>
                 </tr>
-                <tr>
-                    <th>Retrieval Deal ID</th>
-                    <td>{retrieval.DealID+''}</td>
-                </tr>
-                <tr>
-                    <th>Deal Data Root CID</th>
-                    <td><Link to={'/piece-doctor/'+retrieval.PayloadCID}>{retrieval.PayloadCID}</Link></td>
-                </tr>
-                <tr>
-                    <th>Piece CID</th>
-                    <td><Link to={'/piece-doctor/'+retrieval.PieceCid}>{retrieval.PieceCid}</Link></td>
-                </tr>
-                <tr>
-                    <th>Price per byte</th>
-                    <td>{humanFIL(retrieval.PricePerByte)}</td>
-                </tr>
-                <tr>
-                    <th>Unseal price</th>
-                    <td>{humanFIL(retrieval.UnsealPrice)}</td>
-                </tr>
-                <tr>
-                    <th>Payment Interval</th>
-                    <td>
-                        {humanFileSize(retrieval.PaymentInterval)}
-                        &nbsp;
-                        <span className="aux">({addCommas(retrieval.PaymentInterval)} bytes)</span>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Payment Interval Increase</th>
-                    <td>
-                        {humanFileSize(retrieval.PaymentIntervalIncrease)}
-                        &nbsp;
-                        <span className="aux">({addCommas(retrieval.PaymentIntervalIncrease)} bytes)</span>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Sent</th>
-                    <td>
-                        {humanFileSize(retrieval.TotalSent)}
-                        &nbsp;
-                        <span className="aux">({addCommas(retrieval.TotalSent)} bytes)</span>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Status</th>
-                    <td>
-                        {getDealStatus(retrieval.Status) + (retrieval.Message ? ': '+ retrieval.Message : '')}
-                    </td>
-                </tr>
+
+                {/* If retrieval deal ID is zero, assume it's an indexer retrieval */}
+                {retrieval.DealID == 0 ? (
+                    <tr>
+                        <th>Ad CID</th>
+                        <td>{retrieval.PayloadCID}</td>
+                    </tr>
+                ) : (
+                    <>
+                        <tr>
+                            <th>Retrieval Deal ID</th>
+                            <td>{retrieval.DealID+''}</td>
+                        </tr>
+                        <tr>
+                            <th>Deal Data Root CID</th>
+                            <td><Link to={'/piece-doctor/'+retrieval.PayloadCID}>{retrieval.PayloadCID}</Link></td>
+                        </tr>
+                        <tr>
+                            <th>Piece CID</th>
+                            <td><Link to={'/piece-doctor/'+retrieval.PieceCid}>{retrieval.PieceCid}</Link></td>
+                        </tr>
+                        <tr>
+                            <th>Price per byte</th>
+                            <td>{humanFIL(retrieval.PricePerByte)}</td>
+                        </tr>
+                        <tr>
+                            <th>Unseal price</th>
+                            <td>{humanFIL(retrieval.UnsealPrice)}</td>
+                        </tr>
+                        <tr>
+                            <th>Payment Interval</th>
+                            <td>
+                                {humanFileSize(retrieval.PaymentInterval)}
+                                &nbsp;
+                                <span className="aux">({addCommas(retrieval.PaymentInterval)} bytes)</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Payment Interval Increase</th>
+                            <td>
+                                {humanFileSize(retrieval.PaymentIntervalIncrease)}
+                                &nbsp;
+                                <span className="aux">({addCommas(retrieval.PaymentIntervalIncrease)} bytes)</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Sent</th>
+                            <td>
+                                {humanFileSize(retrieval.TotalSent)}
+                                &nbsp;
+                                <span className="aux">({addCommas(retrieval.TotalSent)} bytes)</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Status</th>
+                            <td>
+                                {getDealStatus(retrieval.Status) + (retrieval.Message ? ': '+ retrieval.Message : '')}
+                            </td>
+                        </tr>
+                    </>
+                )}
 
                 </tbody>
             </table>
