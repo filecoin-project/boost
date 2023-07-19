@@ -34,7 +34,7 @@ func GenerateDataSegmentFiles(t *testing.T, tmpdir string, num int) (SegmentDeta
 		return SegmentDetails{}, errors.New("at least 2 deals are required to test data segment index")
 	}
 
-	fileSize := 2000
+	fileSize := 1572864
 
 	var cars []*CarDetails
 	for i := 1; i <= num; i++ {

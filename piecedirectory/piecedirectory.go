@@ -205,7 +205,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	log.Debugw("add index: read index", "pieceCid", pieceCid)
 	recs, err := parsePieceWithDataSegmentIndex(pieceCid, int64(dealInfo.PieceLength.Unpadded()), reader)
 	if err != nil {
-		log.Debugw("add index: data segment check failed. falling back to car", "pieceCid", pieceCid, "err", err)
+		log.Infow("add index: data segment check failed. falling back to car", "pieceCid", pieceCid, "err", err)
 		// Iterate over all the blocks in the piece to extract the index records
 		if _, err := reader.Seek(0, io.SeekStart); err != nil {
 			return fmt.Errorf("seek to start for piece %s: %w", pieceCid, err)

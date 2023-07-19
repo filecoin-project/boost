@@ -22,10 +22,17 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	framework.SetLogLevel()
 	var opts []framework.FrameworkOpts
 	opts = append(opts, framework.EnableLegacyDeals(true))
+	opts = append(opts, framework.SetMaxStagingBytes(10000000)) // 10 MB
 	f := framework.NewTestFramework(ctx, t, opts...)
 	err := f.Start()
 	require.NoError(t, err)
 	defer f.Stop()
+
+	//err = f.Boost.LogSetLevel(ctx, "piecedirectory", "debug")
+	//require.NoError(t, err)
+
+	err = f.LotusMiner.LogSetLevel(ctx, "stores", "info")
+	require.NoError(t, err)
 
 	err = f.AddClientProviderBalance(abi.NewTokenAmount(1e15))
 	require.NoError(t, err)
@@ -35,7 +42,7 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	log.Debugw("using tempdir", "dir", tempdir)
 
 	// Select the number of car segments to use in test
-	seg := 4
+	seg := 2
 
 	// Generate car file containing multiple car files
 	segmentDetails, err := framework.GenerateDataSegmentFiles(t, tempdir, seg)
