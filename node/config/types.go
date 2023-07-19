@@ -272,8 +272,8 @@ type DealmakingConfig struct {
 	// them disabled. These will be completely deprecated soon.
 	EnableLegacyStorageDeals bool
 
-	// When ExternalDealPublishControl is set to true, user is responsible to publish the deal message.
-	// A list of pending deals can be queried on the GraphQL endpoint
+	// When set to true, user is responsible to publish the deal message.
+	// A list of pending deals can be queried and published using the GraphQL endpoint.
 	// If this value is set to true, the values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
 	// ignored
 	ExternalDealPublishControl bool
