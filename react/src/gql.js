@@ -766,7 +766,7 @@ const StorageAskQuery = gql`
 `;
 
 const PublishPendingDealsMutation = gql`
-    mutation AppPublishPendingDealMutation($ids: PublishDealIds) {
+    mutation AppPublishPendingDealMutation($ids: [ID!]!) {
         publishPendingDeals(ids: $ids)
     }
 `;

@@ -142,7 +142,7 @@ func DefaultBoost() *Boost {
 			SealingPipelineCacheTimeout:        Duration(30 * time.Second),
 			FundsTaggingEnabled:                true,
 			EnableLegacyStorageDeals:           false,
-			ExternalDealPublishControl:         false,
+			ManualDealPublish:                  false,
 		},
 
 		LotusDealmaking: lotus_config.DealmakingConfig{

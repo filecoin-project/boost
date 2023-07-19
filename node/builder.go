@@ -629,7 +629,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 			Period:                     time.Duration(cfg.LotusDealmaking.PublishMsgPeriod),
 			MaxDealsPerMsg:             cfg.LotusDealmaking.MaxDealsPerPublishMsg,
 			StartEpochSealingBuffer:    cfg.LotusDealmaking.StartEpochSealingBuffer,
-			ExternalDealPublishControl: cfg.Dealmaking.ExternalDealPublishControl,
+			ExternalDealPublishControl: cfg.Dealmaking.ManualDealPublish,
 		})),
 
 		Override(new(sealer.Unsealer), From(new(lotus_modules.MinerStorageService))),

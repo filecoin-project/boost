@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/ipfs/go-cid"
 	"github.com/raulk/clock"
 	"github.com/stretchr/testify/require"
@@ -186,7 +187,7 @@ func TestDealPublisher(t *testing.T) {
 	}
 }
 
-func TestForcePublish(t *testing.T) {
+func TestPublishPendingDeals(t *testing.T) {
 	//stm: @MARKET_DEAL_PUBLISHER_PUBLISH_001, @MARKET_DEAL_PUBLISHER_GET_PENDING_DEALS_001
 	//stm: @MARKET_DEAL_PUBLISHER_FORCE_PUBLISH_ALL_001
 	dpapi := newDPAPI(t)
@@ -221,8 +222,17 @@ func TestForcePublish(t *testing.T) {
 	require.True(t, pendingInfo.PublishPeriodStart.After(start))
 	require.True(t, pendingInfo.PublishPeriodStart.Before(build.Clock.Now()))
 
-	// Force publish all pending deals
-	dp.ForcePublishPendingDeals()
+	var pcids []cid.Cid
+	props := pendingInfo.Deals
+	for _, p := range props {
+		signedProp, err := cborutil.AsIpld(&p)
+		require.NoError(t, err)
+		pcids = append(pcids, signedProp.Cid())
+	}
+
+	// Publish all pending deals and verify all have been published
+	publishedDeals := dp.PublishQueuedDeals(pcids)
+	require.Equal(t, pcids, publishedDeals)
 
 	// Should be no pending deals
 	pendingInfo = dp.PendingDeals()
