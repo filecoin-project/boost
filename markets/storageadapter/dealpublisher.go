@@ -176,28 +176,14 @@ func (p *DealPublisher) PendingDeals() api.PendingDealInfo {
 	}
 }
 
-// ForcePublishPendingDeals publishes all pending deals without waiting for
-// the publish period to elapse
-func (p *DealPublisher) ForcePublishPendingDeals() {
-	p.lk.Lock()
-	defer p.lk.Unlock()
-
-	log.Infof("force publishing deals")
-	p.publishAllDeals()
-}
-
 func (p *DealPublisher) Publish(ctx context.Context, deal market.ClientDealProposal) (cid.Cid, error) {
 	pdeal, err := newPendingDeal(ctx, deal)
 	if err != nil {
-		return cid.Undef, fmt.Errorf("failed to generate cid for the deal proposal: %w", err)
+		return cid.Undef, fmt.Errorf("failed create pending deal: %w", err)
 	}
 
 	// Add the deal to the queue
-	if p.manualPSD {
-		p.queueDeals(pdeal)
-	} else {
-		p.processNewDeal(pdeal)
-	}
+	p.processNewDeal(pdeal)
 
 	// Wait for the deal to be submitted
 	select {
@@ -230,6 +216,11 @@ func (p *DealPublisher) processNewDeal(pdeal *pendingDeal) {
 	p.pending = append(p.pending, pdeal)
 	log.Infof("add deal with piece CID %s to publish deals queue - %d deals in queue (max queue size %d)",
 		pdeal.deal.Proposal.PieceCID, len(p.pending), p.maxDealsPerPublishMsg)
+
+	// Return from here if manual PSD is enabled
+	if p.manualPSD {
+		return
+	}
 
 	// If the maximum number of deals per message has been reached or we're not batching, send a
 	// publish message
@@ -279,13 +270,12 @@ func (p *DealPublisher) waitForMoreDeals() {
 }
 
 func (p *DealPublisher) publishAllDeals() {
-	if !p.manualPSD {
-		// If the timeout hasn't yet been cancelled, cancel it
-		if p.cancelWaitForMoreDeals != nil {
-			p.cancelWaitForMoreDeals()
-			p.cancelWaitForMoreDeals = nil
-			p.publishPeriodStart = time.Time{}
-		}
+
+	// If the timeout hasn't yet been cancelled, cancel it
+	if p.cancelWaitForMoreDeals != nil {
+		p.cancelWaitForMoreDeals()
+		p.cancelWaitForMoreDeals = nil
+		p.publishPeriodStart = time.Time{}
 	}
 
 	// Filter out any deals that have been cancelled
@@ -468,27 +458,9 @@ func (p *DealPublisher) filterCancelledDeals() {
 	p.pending = filtered
 }
 
-func (p *DealPublisher) queueDeals(pdeal *pendingDeal) {
+func (p *DealPublisher) PublishQueuedDeals(deals []cid.Cid) []cid.Cid {
 	p.lk.Lock()
-	defer p.lk.Unlock()
-
-	// Filter out any cancelled deals
-	p.filterCancelledDeals()
-
-	// Make sure the new deal hasn't been cancelled
-	if pdeal.ctx.Err() != nil {
-		return
-	}
-
-	// Add the new deal to the queue
-	p.pending = append(p.pending, pdeal)
-	log.Infof("add deal with piece CID %s to publish deals queue - %d deals in queue",
-		pdeal.deal.Proposal.PieceCID, len(p.pending))
-}
-
-func (p *DealPublisher) PublishQueuedDeals(deals []cid.Cid) (error, []cid.Cid) {
-	p.lk.Lock()
-	var notFound []cid.Cid
+	var ret []cid.Cid
 	var toPublish []*pendingDeal
 
 	// Check that each deal is part of the queue
@@ -501,24 +473,23 @@ func (p *DealPublisher) PublishQueuedDeals(deals []cid.Cid) (error, []cid.Cid) {
 				break
 			}
 		}
-
-		if !found {
-			notFound = append(notFound, c)
+		if found {
+			ret = append(ret, c)
+		} else {
+			log.Debugf("failed to find the proposal %S in pending deals", c)
 		}
 	}
 
 	p.lk.Unlock()
 
-	if len(notFound) > 0 {
-		return fmt.Errorf("deals not found in the publisher queue"), notFound
-	}
+	log.Infof("publishing deal proposals: %s", ret)
 
 	// Remove the deal from Pending
 	p.cleanupPending(deals)
 
 	// Send the publish message
 	go p.publishReady(toPublish)
-	return nil, nil
+	return ret
 }
 
 func (p *DealPublisher) cleanupPending(dealIds []cid.Cid) {
@@ -534,7 +505,6 @@ func (p *DealPublisher) cleanupPending(dealIds []cid.Cid) {
 				found = true
 			}
 		}
-
 		if !found {
 			newPending = append(newPending, dp)
 		}

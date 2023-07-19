@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/filecoin-project/boost/gql/types"
 	cborutil "github.com/filecoin-project/go-cbor-util"
@@ -167,46 +166,34 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 	}, nil
 }
 
-// mutation: dealPublishNow(): bool
-func (r *resolver) DealPublishNow(ctx context.Context) (bool, error) {
-	r.publisher.ForcePublishPendingDeals()
-	return true, nil
-}
-
-func (r *resolver) PublishPendingDeals(ctx context.Context, args dealsToPublish) (bool, error) {
-	if !r.publisher.ManualPSD() {
-		return false, fmt.Errorf("manual deal publishing is disabled")
-	}
-
+// mutation: publishPendingDeals([ID!]!): [ID!]!
+func (r *resolver) PublishPendingDeals(ctx context.Context, args dealsToPublish) (dealsToPublish, error) {
 	var pcids []cid.Cid
 	uuidToPcid := make(map[cid.Cid]uuid.UUID)
+	var ret dealsToPublish
 
 	for _, id := range args.IDs {
 		dealId, err := toUuid(id)
 		if err != nil {
-			return false, err
+			return dealsToPublish{}, err
 		}
 		deal, err := r.dealsDB.ByID(ctx, dealId)
 		if err != nil {
-			return false, fmt.Errorf("failed to get deal details from DB %s: %w", dealId.String(), err)
+			return dealsToPublish{}, fmt.Errorf("failed to get deal details from DB %s: %w", dealId.String(), err)
 		}
 		signedProp, err := cborutil.AsIpld(&deal.ClientDealProposal)
-		pcid := signedProp.Cid()
 		if err != nil {
-			return false, fmt.Errorf("error in generating proposal cid for deal %s: %w", dealId.String(), err)
+			return dealsToPublish{}, fmt.Errorf("error in generating proposal cid for deal %s: %w", dealId.String(), err)
 		}
+		pcid := signedProp.Cid()
 		uuidToPcid[pcid] = dealId
 		pcids = append(pcids, pcid)
 	}
 
-	err, errCids := r.publisher.PublishQueuedDeals(pcids)
-	if err != nil {
-		var errStr []string
-		for _, pcid := range errCids {
-			errStr = append(errStr, uuidToPcid[pcid].String())
-		}
-		return false, fmt.Errorf("%w: %s", err, strings.Join(errStr, ", "))
+	publishedCids := r.publisher.PublishQueuedDeals(pcids)
+	for _, c := range publishedCids {
+		ret.IDs = append(ret.IDs, graphql.ID(uuidToPcid[c].String()))
 	}
 
-	return true, nil
+	return ret, nil
 }

@@ -612,7 +612,7 @@ type RootMutation {
   storageAskUpdate(update: StorageAskUpdate!): Boolean!
 
   """Publish the deal for the supplied deal UUIDs"""
-  publishPendingDeals(ids: [ID!]!): Boolean!
+  publishPendingDeals(ids: [ID!]!): [ID!]!
 }
 
 type RootSubscription {
