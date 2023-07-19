@@ -426,6 +426,15 @@ for any other deal.`,
 			Comment: `Whether to enable legacy deals on the Boost node or not. We recommend keeping
 them disabled. These will be completely deprecated soon.`,
 		},
+		{
+			Name: "ExternalDealPublishControl",
+			Type: "bool",
+
+			Comment: `When set to true, user is responsible to publish the deal message.
+A list of pending deals can be queried and published using the GraphQL endpoint.
+If this value is set to true, the values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
+ignored`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{
