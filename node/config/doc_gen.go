@@ -427,13 +427,12 @@ for any other deal.`,
 them disabled. These will be completely deprecated soon.`,
 		},
 		{
-			Name: "ExternalDealPublishControl",
+			Name: "ManualDealPublish",
 			Type: "bool",
 
-			Comment: `When set to true, user is responsible to publish the deal message.
-A list of pending deals can be queried and published using the GraphQL endpoint.
-If this value is set to true, the values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
-ignored`,
+			Comment: `When set to true, the user is responsible for publishing deals manually.
+The values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
+ignored, and deals will remain in the pending state until manually published.`,
 		},
 	},
 	"FeeConfig": []DocField{
