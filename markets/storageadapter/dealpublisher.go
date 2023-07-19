@@ -495,7 +495,7 @@ func (p *DealPublisher) PublishQueuedDeals(deals []cid.Cid) (error, []cid.Cid) {
 	for _, c := range deals {
 		found := false
 		for _, pd := range p.pending {
-			if c == pd.proposalCid {
+			if c.Equals(pd.proposalCid) {
 				found = true
 				toPublish = append(toPublish, pd)
 				break

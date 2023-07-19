@@ -174,6 +174,9 @@ func (r *resolver) DealPublishNow(ctx context.Context) (bool, error) {
 }
 
 func (r *resolver) PublishPendingDeals(ctx context.Context, args dealsToPublish) (bool, error) {
+	if !r.publisher.ManualPSD() {
+		return false, fmt.Errorf("manual deal publishing is disabled")
+	}
 
 	var pcids []cid.Cid
 	uuidToPcid := make(map[cid.Cid]uuid.UUID)
@@ -187,7 +190,8 @@ func (r *resolver) PublishPendingDeals(ctx context.Context, args dealsToPublish)
 		if err != nil {
 			return false, fmt.Errorf("failed to get deal details from DB %s: %w", dealId.String(), err)
 		}
-		pcid, err := deal.ClientDealProposal.Proposal.Cid()
+		signedProp, err := cborutil.AsIpld(&deal.ClientDealProposal)
+		pcid := signedProp.Cid()
 		if err != nil {
 			return false, fmt.Errorf("error in generating proposal cid for deal %s: %w", dealId.String(), err)
 		}
@@ -201,7 +205,7 @@ func (r *resolver) PublishPendingDeals(ctx context.Context, args dealsToPublish)
 		for _, pcid := range errCids {
 			errStr = append(errStr, uuidToPcid[pcid].String())
 		}
-		return false, fmt.Errorf("%w: %s", err, strings.Join(errStr, ","))
+		return false, fmt.Errorf("%w: %s", err, strings.Join(errStr, ", "))
 	}
 
 	return true, nil
