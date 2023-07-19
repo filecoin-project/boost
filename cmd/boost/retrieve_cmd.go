@@ -17,8 +17,8 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/boxo/blockservice"
-	blockstore "github.com/ipfs/boxo/blockstore"
-	offline "github.com/ipfs/boxo/exchange/offline"
+	"github.com/ipfs/boxo/blockstore"
+	"github.com/ipfs/boxo/exchange/offline"
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/ipld/merkledag"
 	unixfile "github.com/ipfs/boxo/ipld/unixfs/file"
@@ -112,13 +112,18 @@ var retrieveCmd = &cli.Command{
 			}
 		}
 
+		outputPath, err := homedir.Expand(output)
+		if err != nil {
+			return fmt.Errorf("expanding output path: %w", err)
+		}
+
 		// The output path must not exist already
-		_, err = os.Stat(output)
+		_, err = os.Stat(outputPath)
 		if err == nil {
-			return fmt.Errorf("there is already a file at output path %s", output)
+			return fmt.Errorf("there is already a file at output path %s", outputPath)
 		}
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("checking output path %s: %w", output, err)
+			return fmt.Errorf("checking output path %s: %w", outputPath, err)
 		}
 
 		// Get subselector node
@@ -259,13 +264,13 @@ var retrieveCmd = &cli.Command{
 
 		if cctx.Bool(flagCar.Name) {
 			// Write file as car file
-			file, err := os.Create(output + ".car")
+			file, err := os.Create(outputPath + ".car")
 			if err != nil {
 				return err
 			}
 			_ = car.WriteCar(ctx, dservOffline, []cid.Cid{c}, file)
 
-			fmt.Println("Saved .car output to", output+".car")
+			fmt.Println("Saved .car output to", outputPath+".car")
 		} else {
 			// Otherwise write file as UnixFS File
 			ufsFile, err := unixfile.NewUnixfsFile(ctx, dservOffline, dnode)
@@ -273,11 +278,11 @@ var retrieveCmd = &cli.Command{
 				return err
 			}
 
-			if err := files.WriteTo(ufsFile, output); err != nil {
+			if err := files.WriteTo(ufsFile, outputPath); err != nil {
 				return err
 			}
 
-			fmt.Println("Saved output to", output)
+			fmt.Println("Saved output to", outputPath)
 		}
 
 		return nil
