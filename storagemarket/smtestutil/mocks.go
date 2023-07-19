@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/filecoin-project/go-address"
 	"io"
 	"strings"
 	"sync"
@@ -349,14 +350,14 @@ func (mb *MinerStubBuilder) SetupAnnounce(blocking bool, announce bool) *MinerSt
 	// When boost finishes adding the piece to a sector, it creates an index
 	// of the piece data and then announces the index. We need to mock a piece
 	// reader that returns the CAR file.
-	getReader := func(_ context.Context, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (pdtypes.SectionReader, error) {
+	getReader := func(_ context.Context, _ address.Address, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (pdtypes.SectionReader, error) {
 		readerWithClose, err := toPieceDirSectionReader(mb.carFilePath)
 		if err != nil {
 			panic(fmt.Sprintf("creating piece dir section reader: %s", err))
 		}
 		return readerWithClose, nil
 	}
-	mb.stub.MockPieceReader.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(getReader)
+	mb.stub.MockPieceReader.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(getReader)
 
 	mb.stub.MockIndexProvider.EXPECT().Enabled().AnyTimes().Return(true)
 	mb.stub.MockIndexProvider.EXPECT().Start(gomock.Any()).AnyTimes()

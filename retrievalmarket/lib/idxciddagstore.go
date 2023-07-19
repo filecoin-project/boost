@@ -8,6 +8,7 @@ import (
 	"github.com/filecoin-project/dagstore/indexbs"
 	"github.com/filecoin-project/dagstore/shard"
 	"github.com/ipfs/go-cid"
+	"github.com/multiformats/go-multihash"
 )
 
 // IndexBackedBlockstoreDagstore implements the dagstore interface needed
@@ -23,7 +24,7 @@ func NewIndexBackedBlockstoreDagstore(ds dagstore.Interface) indexbs.IdxBstoreDa
 	return &IndexBackedBlockstoreDagstore{Interface: ds}
 }
 
-// ShardsContainingCid checks the dagstore for shards containing the given cid.
+// ShardsContainingCid checks the db for shards containing the given cid.
 // If there are no shards with that cid, it checks if the shard is an identity
 // cid, and gets the shards containing the identity cid's child cids.
 // This is for the case where the identity cid was not stored in the original
@@ -35,8 +36,8 @@ func (i *IndexBackedBlockstoreDagstore) ShardsContainingCid(ctx context.Context,
 	}
 
 	var idErr error
-	piecesWithTargetBlock, idErr := server.GetCommonPiecesFromIdentityCidLinks(func(c cid.Cid) ([]cid.Cid, error) {
-		return i.piecesContainingBlock(ctx, c)
+	piecesWithTargetBlock, idErr := server.GetCommonPiecesFromIdentityCidLinks(ctx, func(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
+		return i.piecesContainingBlock(ctx, mh)
 	}, c)
 	if idErr != nil {
 		return nil, fmt.Errorf("getting common pieces for cid %s: %w", c, idErr)
@@ -54,10 +55,10 @@ func (i *IndexBackedBlockstoreDagstore) ShardsContainingCid(ctx context.Context,
 	return shards, nil
 }
 
-func (i *IndexBackedBlockstoreDagstore) piecesContainingBlock(ctx context.Context, c cid.Cid) ([]cid.Cid, error) {
-	shards, err := i.Interface.ShardsContainingMultihash(ctx, c.Hash())
+func (i *IndexBackedBlockstoreDagstore) piecesContainingBlock(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error) {
+	shards, err := i.Interface.ShardsContainingMultihash(ctx, mh)
 	if err != nil {
-		return nil, fmt.Errorf("finding shards containing child cid %s: %w", c, err)
+		return nil, fmt.Errorf("finding shards containing child mh %s: %w", mh, err)
 	}
 	pcids := make([]cid.Cid, 0, len(shards))
 	for _, s := range shards {

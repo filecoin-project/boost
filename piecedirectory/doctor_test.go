@@ -246,7 +246,7 @@ func testNextPiecesPagination(ctx context.Context, t *testing.T, cl *client.Stor
 
 func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Create a random CAR file
-	carFilePath := CreateCarFile(t)
+	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()

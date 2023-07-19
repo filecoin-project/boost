@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
@@ -84,7 +85,7 @@ func testPieceDirectoryNotFound(ctx context.Context, t *testing.T, cl *client.St
 
 // Verify that Has, GetSize and Get block work
 func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.Store) {
-	carFilePath := CreateCarFile(t)
+	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()
@@ -155,7 +156,7 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 // will re-build the index
 func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Create a random CAR file
-	carFilePath := CreateCarFile(t)
+	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()
@@ -234,7 +235,7 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 
 func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Create a random CAR file
-	carFilePath := CreateCarFile(t)
+	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()
@@ -325,7 +326,7 @@ func testReIndexMultiSector(ctx context.Context, t *testing.T, cl *client.Store)
 	pm.Start(ctx)
 
 	// Create a random CAR file
-	carFilePath := CreateCarFile(t)
+	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()
@@ -339,11 +340,11 @@ func testReIndexMultiSector(ctx context.Context, t *testing.T, cl *client.Store)
 	// Return error first 3 time as during the first attempt we want to surface errors from
 	// failed BuildIndexForPiece operation for both deals. 3rd time to return error for first deal
 	// in the second run where we want the method to succeed eventually.
-	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("piece error")).Times(3)
-	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
-		func(_ context.Context, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (pdTypes.SectionReader, error) {
+	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("piece error")).Times(3)
+	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
+		func(_ context.Context, _ address.Address, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (pdTypes.SectionReader, error) {
 			_, err := carv1Reader.Seek(0, io.SeekStart)
-			return MockSectionReader{carv1Reader}, err
+			return &MockSectionReader{SectionReader: carv1Reader}, err
 		})
 
 	pieceCid := CalculateCommp(t, carv1Reader).PieceCID

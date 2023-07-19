@@ -72,6 +72,7 @@ import (
 var Log = logging.Logger("boosttest")
 
 type TestFrameworkConfig struct {
+	Ensemble     *kit.Ensemble
 	EnableLegacy bool
 }
 
@@ -98,13 +99,19 @@ func EnableLegacyDeals(enable bool) FrameworkOpts {
 	}
 }
 
+func WithEnsemble(e *kit.Ensemble) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.Ensemble = e
+	}
+}
+
 func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) *TestFramework {
-	fullNode, miner := FullNodeAndMiner(t)
 	fmc := &TestFrameworkConfig{}
 	for _, opt := range opts {
 		opt(fmc)
 	}
 
+	fullNode, miner := FullNodeAndMiner(t, fmc.Ensemble)
 	return &TestFramework{
 		ctx:        ctx,
 		config:     fmc,
@@ -114,7 +121,7 @@ func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) 
 	}
 }
 
-func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
+func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, *kit.TestMiner) {
 	// Set up a full node and a miner (without markets)
 	var fullNode kit.TestFullNode
 	var miner kit.TestMiner
@@ -154,21 +161,30 @@ func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
 		secSizeOpt,
 	}
 
-	eOpts := []kit.EnsembleOpt{
-		//TODO: at the moment we are not mocking proofs
-		//maybe enable this in the future to speed up tests further
+	defaultEnsemble := ensemble == nil
+	if defaultEnsemble {
+		eOpts := []kit.EnsembleOpt{
+			//TODO: at the moment we are not mocking proofs
+			//maybe enable this in the future to speed up tests further
 
-		//kit.MockProofs(),
+			//kit.MockProofs(),
+		}
+		ensemble = kit.NewEnsemble(t, eOpts...)
 	}
 
-	blockTime := 100 * time.Millisecond
-	ens := kit.NewEnsemble(t, eOpts...).FullNode(&fullNode, fnOpts...).Miner(&miner, &fullNode, minerOpts...).Start()
-	ens.BeginMining(blockTime)
+	ensemble.FullNode(&fullNode, fnOpts...).Miner(&miner, &fullNode, minerOpts...)
+	if defaultEnsemble {
+		ensemble.Start()
+		blockTime := 100 * time.Millisecond
+		ensemble.BeginMining(blockTime)
+	}
 
 	return &fullNode, &miner
 }
 
-func (f *TestFramework) Start() error {
+type ConfigOpt func(cfg *config.Boost)
+
+func (f *TestFramework) Start(opts ...ConfigOpt) error {
 	lapi.RunningNodeType = lapi.NodeMiner
 
 	fullnodeApi := f.FullNode
@@ -285,11 +301,10 @@ func (f *TestFramework) Start() error {
 		return err
 	}
 
-	token, err := f.LotusMiner.AuthNew(f.ctx, api.AllPermissions)
+	apiInfo, err := f.LotusMinerApiInfo()
 	if err != nil {
 		return err
 	}
-	apiInfo := fmt.Sprintf("%s:%s", token, f.LotusMiner.ListenAddr)
 	Log.Debugf("miner API info: %s", apiInfo)
 
 	cfg, ok := c.(*config.Boost)
@@ -315,6 +330,10 @@ func (f *TestFramework) Start() error {
 	cfg.Storage.ParallelFetchLimit = 10
 	if f.config.EnableLegacy {
 		cfg.Dealmaking.EnableLegacyStorageDeals = true
+	}
+
+	for _, o := range opts {
+		o(cfg)
 	}
 
 	err = lr.SetConfig(func(raw interface{}) {
@@ -447,6 +466,14 @@ func (f *TestFramework) Start() error {
 	}
 
 	return nil
+}
+
+func (f *TestFramework) LotusMinerApiInfo() (string, error) {
+	token, err := f.LotusMiner.AuthNew(f.ctx, api.AllPermissions)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s:%s", token, f.LotusMiner.ListenAddr), nil
 }
 
 // Add funds escrow in StorageMarketActor for both client and provider

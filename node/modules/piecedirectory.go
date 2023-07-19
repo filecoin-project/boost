@@ -9,8 +9,8 @@ import (
 	"github.com/filecoin-project/boost-gfm/shared"
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost-gfm/stores"
+	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/gql"
-	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/sectorstatemgr"
@@ -26,8 +26,6 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
-	"github.com/filecoin-project/lotus/storage/sealer"
-	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	bstore "github.com/ipfs/boxo/blockstore"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
@@ -108,20 +106,40 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 	}
 }
 
-func NewPieceDirectory(cfg *config.Boost) func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store *bdclient.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
-	return func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store *bdclient.Store, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) *piecedirectory.PieceDirectory {
-		sa := sectoraccessor.NewSectorAccessor(maddr, secb, pp, full)
-		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		pd := piecedirectory.NewPieceDirectory(store, pr, cfg.LocalIndexDirectory.ParallelAddIndexLimit)
+func NewMultiminerSectorAccessor(cfg *config.Boost) func(full v1api.FullNode) *lib.MultiMinerAccessor {
+	return func(full v1api.FullNode) *lib.MultiMinerAccessor {
+		// Get the endpoints of all the miners that this boost node can query
+		// for retrieval data
+		storageApiInfos := cfg.StorageAccessApiInfo
+		if len(cfg.StorageAccessApiInfo) == 0 {
+			// If the endpoints aren't explicitly configured, fall back to just
+			// serving retrieval data from the same endpoint where data is stored to
+			storageApiInfos = []string{cfg.SectorIndexApiInfo}
+		}
 
+		// Create a reader that muxes between all the storage access endpoints
+		return lib.NewMultiMinerAccessor(storageApiInfos, full)
+	}
+}
+
+func NewPieceDirectory(cfg *config.Boost) func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store *bdclient.Store, sa *lib.MultiMinerAccessor) *piecedirectory.PieceDirectory {
+	return func(lc fx.Lifecycle, maddr dtypes.MinerAddress, store *bdclient.Store, sa *lib.MultiMinerAccessor) *piecedirectory.PieceDirectory {
+
+		// Create the piece directory implementation
 		pdctx, cancel := context.WithCancel(context.Background())
+		pd := piecedirectory.NewPieceDirectory(store, sa, cfg.LocalIndexDirectory.ParallelAddIndexLimit)
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
+				err := sa.Start(ctx, log)
+				if err != nil {
+					return fmt.Errorf("starting piece directory: connecting to miners: %w", err)
+				}
 				pd.Start(pdctx)
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
 				cancel()
+				sa.Close()
 				return nil
 			},
 		})
