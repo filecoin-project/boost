@@ -27,6 +27,7 @@ type SegmentDetails struct {
 	Piece    *abi.PieceInfo
 	Segments []*CarDetails
 	CarPath  string
+	CarSize  int64
 }
 
 func GenerateDataSegmentFiles(t *testing.T, tmpdir string, num int) (SegmentDetails, error) {
@@ -73,6 +74,11 @@ func GenerateDataSegmentFiles(t *testing.T, tmpdir string, num int) (SegmentDeta
 	}
 
 	finalCarName := finalCar.Name()
+	carStat, err := finalCar.Stat()
+	if err != nil {
+		return SegmentDetails{}, err
+	}
+	carSize := carStat.Size()
 	err = finalCar.Close()
 	if err != nil {
 		return SegmentDetails{}, err
@@ -87,6 +93,7 @@ func GenerateDataSegmentFiles(t *testing.T, tmpdir string, num int) (SegmentDeta
 		Piece:    cidAndSize,
 		Segments: cars,
 		CarPath:  finalCarName,
+		CarSize:  carSize,
 	}, nil
 }
 
