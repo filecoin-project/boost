@@ -55,7 +55,7 @@ function DealPublishContent() {
                 </>
             ) : null}
 
-            <h3>ExternalDealPublishControl is enabled. Users must publish deals manually</h3>
+            <h5>Note: Users must publish deals manually as external deal publish control is enabled</h5>
 
             { deals.length ? <DealsTable deals={deals} /> : (
                 <p>There are no deals in the batch publish queue</p>
