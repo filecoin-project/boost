@@ -2,9 +2,10 @@ package piecedirectory
 
 import (
 	"context"
+	"testing"
+
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestPieceDirectoryLevelDB(t *testing.T) {

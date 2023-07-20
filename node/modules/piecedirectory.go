@@ -29,8 +29,8 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	bstore "github.com/ipfs/boxo/blockstore"
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-libipfs/blocks"
 	carindex "github.com/ipld/go-car/v2/index"
 	"go.uber.org/fx"
 )

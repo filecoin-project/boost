@@ -29,6 +29,7 @@ import (
 	carindex "github.com/ipld/go-car/v2/index"
 	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 var log = logging.Logger("piecedirectory")
@@ -311,6 +312,7 @@ func (ps *PieceDirectory) RemoveDealForPiece(ctx context.Context, pieceCid cid.C
 func (ps *PieceDirectory) GetPieceReader(ctx context.Context, pieceCid cid.Cid) (types.SectionReader, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_reader")
 	defer span.End()
+	span.SetAttributes(attribute.String("piececid", pieceCid.String()))
 
 	// Get all deals containing this piece
 	deals, err := ps.GetPieceDeals(ctx, pieceCid)

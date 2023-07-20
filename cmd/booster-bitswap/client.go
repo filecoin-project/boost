@@ -208,6 +208,12 @@ func getBlocks(ctx context.Context, bsClient *client.Client, c cid.Cid, throttle
 	}
 
 	var count = uint64(1)
+	ipldDecoder := ipldlegacy.NewDecoder()
+	nd, err := ipldDecoder.DecodeNode(ctx, blk)
+	if err != nil {
+		return 0, 0, fmt.Errorf("decoding node %s: %w", c, err)
+	}
+
 	var eg errgroup.Group
 	for _, link := range links {
 		link := link
