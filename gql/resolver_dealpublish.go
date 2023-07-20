@@ -41,10 +41,6 @@ type dealPublishResolver struct {
 	Deals          []*basicDealResolver
 }
 
-type dealsToPublish struct {
-	IDs []graphql.ID
-}
-
 // query: dealPublish: DealPublish
 func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error) {
 	// Get deals pending publish from deal publisher
@@ -167,23 +163,23 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 }
 
 // mutation: publishPendingDeals([ID!]!): [ID!]!
-func (r *resolver) PublishPendingDeals(ctx context.Context, args dealsToPublish) (dealsToPublish, error) {
+func (r *resolver) PublishPendingDeals(ctx context.Context, args struct{ IDs []graphql.ID }) ([]graphql.ID, error) {
 	var pcids []cid.Cid
 	uuidToPcid := make(map[cid.Cid]uuid.UUID)
-	var ret dealsToPublish
+	var ret []graphql.ID
 
 	for _, id := range args.IDs {
 		dealId, err := toUuid(id)
 		if err != nil {
-			return dealsToPublish{}, err
+			return nil, err
 		}
 		deal, err := r.dealsDB.ByID(ctx, dealId)
 		if err != nil {
-			return dealsToPublish{}, fmt.Errorf("failed to get deal details from DB %s: %w", dealId.String(), err)
+			return nil, fmt.Errorf("failed to get deal details from DB %s: %w", dealId.String(), err)
 		}
 		signedProp, err := cborutil.AsIpld(&deal.ClientDealProposal)
 		if err != nil {
-			return dealsToPublish{}, fmt.Errorf("error in generating proposal cid for deal %s: %w", dealId.String(), err)
+			return nil, fmt.Errorf("error in generating proposal cid for deal %s: %w", dealId.String(), err)
 		}
 		pcid := signedProp.Cid()
 		uuidToPcid[pcid] = dealId
@@ -192,7 +188,7 @@ func (r *resolver) PublishPendingDeals(ctx context.Context, args dealsToPublish)
 
 	publishedCids := r.publisher.PublishQueuedDeals(pcids)
 	for _, c := range publishedCids {
-		ret.IDs = append(ret.IDs, graphql.ID(uuidToPcid[c].String()))
+		ret = append(ret, graphql.ID(uuidToPcid[c].String()))
 	}
 
 	return ret, nil
