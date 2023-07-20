@@ -40,7 +40,8 @@ type PieceDirectory struct {
 	store       *bdclient.Store
 	pieceReader types.PieceReader
 
-	pieceReaderCache *ttlcache.Cache
+	pieceReaderCacheMu sync.Mutex
+	pieceReaderCache   *ttlcache.Cache
 
 	ctx context.Context
 
@@ -370,6 +371,7 @@ func (ps *PieceDirectory) GetSharedPieceReader(ctx context.Context, pieceCid cid
 	var r *cachedSectionReader
 
 	// Check if there is already a piece reader in the cache
+	ps.pieceReaderCacheMu.Lock()
 	rr, err := ps.pieceReaderCache.Get(pieceCid.String())
 	if err != nil {
 		// There is not yet a cached piece reader, create a new one and add it
@@ -380,6 +382,7 @@ func (ps *PieceDirectory) GetSharedPieceReader(ctx context.Context, pieceCid cid
 			ready:    make(chan struct{}),
 		}
 		_ = ps.pieceReaderCache.Set(pieceCid.String(), r)
+		ps.pieceReaderCacheMu.Unlock()
 
 		// We just added a cached reader, so get its underlying piece reader
 		sr, err := ps.GetPieceReader(ctx, pieceCid)
@@ -390,6 +393,8 @@ func (ps *PieceDirectory) GetSharedPieceReader(ctx context.Context, pieceCid cid
 		// Inform any waiting threads that the cached reader is ready
 		close(r.ready)
 	} else {
+		ps.pieceReaderCacheMu.Unlock()
+
 		r = rr.(*cachedSectionReader)
 
 		// We already had a cached reader, wait for it to be ready
