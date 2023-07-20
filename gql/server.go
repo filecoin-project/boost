@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/filecoin-project/boost/lib/corshandler"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/react"
 	"github.com/graph-gophers/graphql-go"
@@ -31,7 +32,7 @@ type Server struct {
 }
 
 func NewServer(cfg *config.Boost, resolver *resolver, bstore BlockGetter) *Server {
-	webCfg := &corsHandler{sub: &webConfigServer{
+	webCfg := &corshandler.CorsHandler{Sub: &webConfigServer{
 		cfg: webConfig{
 			Ipni: webConfigIpni{
 				IndexerHost: cfg.IndexProvider.WebHost,
@@ -91,8 +92,8 @@ func (s *Server) Start(ctx context.Context) error {
 	listenAddr := fmt.Sprintf("%s:%d", bindAddress, port)
 	s.srv = &http.Server{Addr: listenAddr, Handler: mux}
 	fmt.Printf("Graphql server listening on %s\n", listenAddr)
-	mux.Handle("/graphql/subscription", &corsHandler{wsHandler})
-	mux.Handle("/graphql/query", &corsHandler{queryHandler})
+	mux.Handle("/graphql/subscription", &corshandler.CorsHandler{Sub: wsHandler})
+	mux.Handle("/graphql/query", &corshandler.CorsHandler{Sub: queryHandler})
 
 	s.wg.Add(1)
 	go func() {

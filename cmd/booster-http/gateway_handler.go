@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/filecoin-project/boost/lib/corshandler"
 	"github.com/ipfs/boxo/gateway"
 )
 
@@ -24,10 +25,11 @@ func newGatewayHandler(gw *gateway.BlocksBackend, supportedFormats []string) htt
 	}
 
 	return &gatewayHandler{
-		gwh: gateway.NewHandler(gateway.Config{
-			Headers:               headers,
-			DeserializedResponses: true,
-		}, gw),
+		gwh: &corshandler.CorsHandler{
+			Sub: gateway.NewHandler(gateway.Config{
+				Headers:               headers,
+				DeserializedResponses: true,
+			}, gw)},
 		supportedFormats: fmtsMap,
 	}
 }
