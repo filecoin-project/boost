@@ -772,7 +772,7 @@ and it is not triggered, retrieval quality for users will be impacted.`,
 			Name: "Miner",
 			Type: "string",
 
-			Comment: `The "owner" address of the miner`,
+			Comment: `The miner ID`,
 		},
 		{
 			Name: "PublishStorageDeals",
