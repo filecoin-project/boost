@@ -7,7 +7,6 @@ See the docs at [https://boost.filecoin.io](https://boost.filecoin.io/getting-st
 ## Table of Contents
 
 - [Building and Installing Boost](#building-and-installing-boost)
-- [Running Boost for development](#running-boost-for-development)
 - [Running Boost devnet in Docker](#running-boost-devnet-in-docker)
 - [License](#license)
 
