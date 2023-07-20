@@ -18,7 +18,6 @@ import (
 	"github.com/filecoin-project/lotus/lib/readerutil"
 	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/hashicorp/go-multierror"
-	lru "github.com/hashicorp/golang-lru/v2"
 	bstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
 	format "github.com/ipfs/go-ipld-format"
@@ -27,6 +26,7 @@ import (
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
+	"github.com/jellydator/ttlcache/v2"
 	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
@@ -40,8 +40,7 @@ type PieceDirectory struct {
 	store       *bdclient.Store
 	pieceReader types.PieceReader
 
-	prCacheLk        sync.Mutex
-	pieceReaderCache *lru.Cache[cid.Cid, *cachedSectionReader]
+	pieceReaderCache *ttlcache.Cache
 
 	ctx context.Context
 
@@ -51,7 +50,10 @@ type PieceDirectory struct {
 }
 
 func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThrottleSize int) *PieceDirectory {
-	prCache, _ := lru.New[cid.Cid, *cachedSectionReader](MaxCachedReaders)
+	prCache := ttlcache.NewCache()
+	_ = prCache.SetTTL(5 * time.Second)
+	prCache.SetCacheSizeLimit(MaxCachedReaders)
+
 	return &PieceDirectory{
 		store:              store,
 		pieceReader:        pr,
@@ -347,8 +349,6 @@ type cachedSectionReader struct {
 	types.SectionReader
 	ps       *PieceDirectory
 	pieceCid cid.Cid
-	// The number of references to the piece reader - only accessed under prCacheLk
-	refs int
 	// Signals when the underlying piece reader is ready
 	ready chan struct{}
 	// err is non-nil if there's an error getting the underlying piece reader
@@ -356,14 +356,6 @@ type cachedSectionReader struct {
 }
 
 func (r *cachedSectionReader) Close() error {
-	r.ps.prCacheLk.Lock()
-	defer r.ps.prCacheLk.Unlock()
-
-	r.refs--
-	if r.refs == 0 {
-		r.ps.pieceReaderCache.Remove(r.pieceCid)
-		return r.SectionReader.Close()
-	}
 	return nil
 }
 
@@ -371,37 +363,35 @@ func (r *cachedSectionReader) Close() error {
 // performant for random acccess (eg bitswap reads).
 // If there is no error, the caller must call Close() on the section reader.
 func (ps *PieceDirectory) GetSharedPieceReader(ctx context.Context, pieceCid cid.Cid) (types.SectionReader, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "pm.get_shared_piece_reader")
+	defer span.End()
+	span.SetAttributes(attribute.String("piececid", pieceCid.String()))
+
+	var r *cachedSectionReader
+
 	// Check if there is already a piece reader in the cache
-	ps.prCacheLk.Lock()
-	r, haveCachedReader := ps.pieceReaderCache.Get(pieceCid)
-	if haveCachedReader {
-		// There is already a cached piece reader, just increment its reference count
-		r.refs++
-	} else {
+	rr, err := ps.pieceReaderCache.Get(pieceCid.String())
+	if err != nil {
 		// There is not yet a cached piece reader, create a new one and add it
 		// to the cache
 		r = &cachedSectionReader{
 			ps:       ps,
 			pieceCid: pieceCid,
 			ready:    make(chan struct{}),
-			refs:     1,
 		}
-		ps.pieceReaderCache.Add(pieceCid, r)
-	}
-	ps.prCacheLk.Unlock()
+		ps.pieceReaderCache.Set(pieceCid.String(), r)
 
-	if !haveCachedReader {
 		// We just added a cached reader, so get its underlying piece reader
 		sr, err := ps.GetPieceReader(ctx, pieceCid)
 
-		ps.prCacheLk.Lock()
 		r.SectionReader = sr
 		r.err = err
-		ps.prCacheLk.Unlock()
 
 		// Inform any waiting threads that the cached reader is ready
 		close(r.ready)
 	} else {
+		r = rr.(*cachedSectionReader)
+
 		// We already had a cached reader, wait for it to be ready
 		select {
 		case <-ctx.Done():
