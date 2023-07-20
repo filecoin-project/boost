@@ -63,7 +63,7 @@ func (b *Boost) SetDealmakingConfig(other lotus_config.DealmakingConfig) {
 }
 
 type WalletsConfig struct {
-	// The "owner" address of the miner
+	// The miner ID
 	Miner string
 	// The wallet used to send PublishStorageDeals messages.
 	// Must be a control or worker address of the miner.
