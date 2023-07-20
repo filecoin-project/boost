@@ -4,15 +4,16 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"github.com/ipld/go-ipld-prime"
-	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
-	"github.com/ipld/go-ipld-prime/traversal"
-	mh "github.com/multiformats/go-multihash"
 	"net/http"
 	_ "net/http/pprof"
 	"sort"
 	"sync/atomic"
 	"time"
+
+	"github.com/ipld/go-ipld-prime"
+	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/ipld/go-ipld-prime/traversal"
+	mh "github.com/multiformats/go-multihash"
 
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/bitswap"
 	lotus_blockstore "github.com/filecoin-project/lotus/blockstore"
@@ -208,12 +209,6 @@ func getBlocks(ctx context.Context, bsClient *client.Client, c cid.Cid, throttle
 	}
 
 	var count = uint64(1)
-	ipldDecoder := ipldlegacy.NewDecoder()
-	nd, err := ipldDecoder.DecodeNode(ctx, blk)
-	if err != nil {
-		return 0, 0, fmt.Errorf("decoding node %s: %w", c, err)
-	}
-
 	var eg errgroup.Group
 	for _, link := range links {
 		link := link
