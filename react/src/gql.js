@@ -703,6 +703,12 @@ const DealPublishQuery = gql`
     }
 `;
 
+const DealPublishNowMutation = gql`
+    mutation AppDealPublishNowMutation {
+        dealPublishNow
+    }
+`;
+
 const FundsMoveToEscrow = gql`
     mutation AppDealPublishNowMutation($amount: BigInt!) {
         fundsMoveToEscrow(amount: $amount)
@@ -799,6 +805,7 @@ export {
     FundsQuery,
     FundsLogsQuery,
     DealPublishQuery,
+    DealPublishNowMutation,
     FundsMoveToEscrow,
     StorageAskUpdate,
     TransfersQuery,

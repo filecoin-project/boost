@@ -187,6 +187,52 @@ func TestDealPublisher(t *testing.T) {
 	}
 }
 
+func TestForcePublish(t *testing.T) {
+	//stm: @MARKET_DEAL_PUBLISHER_PUBLISH_001, @MARKET_DEAL_PUBLISHER_GET_PENDING_DEALS_001
+	//stm: @MARKET_DEAL_PUBLISHER_FORCE_PUBLISH_ALL_001
+	dpapi := newDPAPI(t)
+
+	// Create a deal publisher
+	start := build.Clock.Now()
+	publishPeriod := time.Hour
+	dp := newDealPublisher(dpapi, nil, PublishMsgConfig{
+		Period:         publishPeriod,
+		MaxDealsPerMsg: 10,
+	}, &api.MessageSendSpec{MaxFee: abi.NewTokenAmount(1)})
+
+	// Queue three deals for publishing, one with a cancelled context
+	var dealsToPublish []markettypes.ClientDealProposal
+	// 1. Regular deal
+	deal := publishDeal(t, dp, 0, false, false)
+	dealsToPublish = append(dealsToPublish, deal)
+	// 2. Deal with cancelled context
+	publishDeal(t, dp, 0, true, false)
+	// 3. Regular deal
+	deal = publishDeal(t, dp, 0, false, false)
+	dealsToPublish = append(dealsToPublish, deal)
+
+	// Allow a moment for them to be queued
+	build.Clock.Sleep(10 * time.Millisecond)
+
+	// Should be two deals in the pending deals list
+	// (deal with cancelled context is ignored)
+	pendingInfo := dp.PendingDeals()
+	require.Len(t, pendingInfo.Deals, 2)
+	require.Equal(t, publishPeriod, pendingInfo.PublishPeriod)
+	require.True(t, pendingInfo.PublishPeriodStart.After(start))
+	require.True(t, pendingInfo.PublishPeriodStart.Before(build.Clock.Now()))
+
+	// Force publish all pending deals
+	dp.ForcePublishPendingDeals()
+
+	// Should be no pending deals
+	pendingInfo = dp.PendingDeals()
+	require.Len(t, pendingInfo.Deals, 0)
+
+	// Make sure the expected deals were published
+	checkPublishedDeals(t, dpapi, dealsToPublish, []int{2})
+}
+
 func TestPublishPendingDeals(t *testing.T) {
 	//stm: @MARKET_DEAL_PUBLISHER_PUBLISH_001, @MARKET_DEAL_PUBLISHER_GET_PENDING_DEALS_001
 	//stm: @MARKET_DEAL_PUBLISHER_FORCE_PUBLISH_ALL_001

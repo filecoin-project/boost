@@ -162,6 +162,11 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 	}, nil
 }
 
+func (r *resolver) DealPublishNow(ctx context.Context) (bool, error) {
+	r.publisher.ForcePublishPendingDeals()
+	return true, nil
+}
+
 // mutation: publishPendingDeals([ID!]!): [ID!]!
 func (r *resolver) PublishPendingDeals(ctx context.Context, args struct{ IDs []graphql.ID }) ([]graphql.ID, error) {
 	var pcids []cid.Cid

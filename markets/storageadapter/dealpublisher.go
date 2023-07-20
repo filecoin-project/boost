@@ -176,6 +176,16 @@ func (p *DealPublisher) PendingDeals() api.PendingDealInfo {
 	}
 }
 
+// ForcePublishPendingDeals publishes all pending deals without waiting for
+// the publish period to elapse
+func (p *DealPublisher) ForcePublishPendingDeals() {
+	p.lk.Lock()
+	defer p.lk.Unlock()
+
+	log.Infof("force publishing deals")
+	p.publishAllDeals()
+}
+
 func (p *DealPublisher) Publish(ctx context.Context, deal market.ClientDealProposal) (cid.Cid, error) {
 	pdeal, err := newPendingDeal(ctx, deal)
 	if err != nil {
