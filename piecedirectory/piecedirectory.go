@@ -379,7 +379,7 @@ func (ps *PieceDirectory) GetSharedPieceReader(ctx context.Context, pieceCid cid
 			pieceCid: pieceCid,
 			ready:    make(chan struct{}),
 		}
-		ps.pieceReaderCache.Set(pieceCid.String(), r)
+		_ = ps.pieceReaderCache.Set(pieceCid.String(), r)
 
 		// We just added a cached reader, so get its underlying piece reader
 		sr, err := ps.GetPieceReader(ctx, pieceCid)

@@ -338,7 +338,6 @@ require (
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
 	github.com/filecoin-project/lotus v1.23.2-0.20230622154405-168d022018ce
-	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/ipfs/boxo v0.10.1
 	github.com/ipfs/kubo v0.21.0-rc1
 	github.com/ipni/go-libipni v0.2.8
@@ -358,6 +357,7 @@ require (
 	github.com/google/pprof v0.0.0-20230602150820-91b7bce49751 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.11.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
