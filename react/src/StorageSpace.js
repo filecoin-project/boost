@@ -17,7 +17,7 @@ export function StorageSpacePage(props) {
 }
 
 function StorageSpaceContent(props) {
-    const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 1000 })
+    const {loading, error, data} = useQuery(StorageQuery, { pollInterval: 10000 })
 
     if (loading) {
         return <div>Loading...</div>
@@ -82,7 +82,7 @@ function StorageSpaceContent(props) {
 }
 
 function LegacyStorageSpaceContent(props) {
-    const {loading, error, data} = useQuery(LegacyStorageQuery, { pollInterval: 1000 })
+    const {loading, error, data} = useQuery(LegacyStorageQuery, { pollInterval: 10000 })
 
     if (loading) {
         return <div>Loading...</div>
@@ -138,7 +138,7 @@ function LegacyStorageSpaceContent(props) {
 
 export function StorageSpaceMenuItem(props) {
     const {data} = useQuery(StorageQuery, {
-        pollInterval: 5000,
+        pollInterval: 10000,
         fetchPolicy: 'network-only',
     })
 

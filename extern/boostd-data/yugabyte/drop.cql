@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS idx.PayloadToPieces;
+DROP TABLE IF EXISTS idx.PieceBlockOffsetSize;
+DROP TABLE IF EXISTS idx.PieceMetadata;
+DROP INDEX IF EXISTS idx.PieceMetadataIndexedAt;
+DROP TABLE IF EXISTS idx.PieceDeal;
+DROP TABLE IF EXISTS idx.PieceTracker;
+DROP INDEX IF EXISTS idx.PieceTrackerUpdatedAt;
+DROP TABLE IF EXISTS idx.PieceFlagged;
+DROP INDEX IF EXISTS idx.PieceFlaggedCreatedAt;
+DROP INDEX IF EXISTS idx.PieceFlaggedUpdatedAt;

@@ -1,12 +1,15 @@
 /boost
 /boostx
 /boostd
+/boostd-data
+/migrate-lid
 /devnet
 /booster-http
 /booster-bitswap
 /docgen-md
 /docgen-openrpc
 extern/filecoin-ffi/rust/target
+extern/boostd-data/boostd-data
 **/*.a
 **/*.pc
 /**/*/.DS_STORE

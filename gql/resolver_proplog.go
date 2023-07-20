@@ -2,8 +2,6 @@ package gql
 
 import (
 	"context"
-	"time"
-
 	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/graph-gophers/graphql-go"
@@ -56,12 +54,7 @@ func (r *resolver) ProposalLogs(ctx context.Context, args proposalLogsArgs) (*pr
 
 	// Fetch one extra deal so that we can check if there are more deals
 	// beyond the limit
-	var cursor *time.Time
-	if args.Cursor != nil {
-		val := (*args.Cursor).Int64()
-		asTime := time.Unix(val/1000, (val%1000)*1e6)
-		cursor = &asTime
-	}
+	cursor := bigIntToTime(args.Cursor)
 	logs, err := r.plDB.List(ctx, args.Accepted.Value, cursor, offset, limit+1)
 	if err != nil {
 		return nil, err

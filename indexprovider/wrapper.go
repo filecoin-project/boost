@@ -5,24 +5,27 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io/fs"
-	"math"
 	"net/url"
 	"os"
 	"path/filepath"
 
-	"github.com/filecoin-project/dagstore/index"
+	"go.uber.org/fx"
+
 	"github.com/ipfs/go-datastore"
 	"github.com/ipld/go-ipld-prime"
 
-	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/node/config"
+	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	dst "github.com/filecoin-project/dagstore"
-	"github.com/filecoin-project/lotus/markets/dagstore"
+	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/go-address"
+	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/filecoin-project/go-state-types/abi"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/hashicorp/go-multierror"
@@ -35,36 +38,40 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"go.uber.org/fx"
+	"github.com/multiformats/go-multihash"
 )
 
 var log = logging.Logger("index-provider-wrapper")
-var shardRegMarker = ".boost-shard-registration-complete"
 var defaultDagStoreDir = "dagstore"
 
 type Wrapper struct {
-	cfg         *config.Boost
-	enabled     bool
-	dealsDB     *db.DealsDB
-	legacyProv  gfm_storagemarket.StorageProvider
-	prov        provider.Interface
-	dagStore    *dagstore.Wrapper
-	meshCreator idxprov.MeshCreator
-	h           host.Host
-	usm         *UnsealedStateManager
+	enabled bool
+
+	cfg            *config.Boost
+	dealsDB        *db.DealsDB
+	legacyProv     storagemarket.StorageProvider
+	prov           provider.Interface
+	piecedirectory *piecedirectory.PieceDirectory
+	ssm            *sectorstatemgr.SectorStateMgr
+	meshCreator    idxprov.MeshCreator
+	h              host.Host
 	// bitswapEnabled records whether to announce bitswap as an available
 	// protocol to the network indexer
 	bitswapEnabled bool
+	httpEnabled    bool
 	stop           context.CancelFunc
 }
 
 func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-	ssDB *db.SectorStateDB, legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
-	meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
+	ssDB *db.SectorStateDB, legacyProv storagemarket.StorageProvider, prov provider.Interface,
+	piecedirectory *piecedirectory.PieceDirectory, ssm *sectorstatemgr.SectorStateMgr, meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
 
 	return func(lc fx.Lifecycle, h host.Host, r repo.LockedRepo, dealsDB *db.DealsDB,
-		ssDB *db.SectorStateDB, legacyProv gfm_storagemarket.StorageProvider, prov provider.Interface, dagStore *dagstore.Wrapper,
+		ssDB *db.SectorStateDB, legacyProv storagemarket.StorageProvider, prov provider.Interface,
+		piecedirectory *piecedirectory.PieceDirectory,
+		ssm *sectorstatemgr.SectorStateMgr,
 		meshCreator idxprov.MeshCreator, storageService lotus_modules.MinerStorageService) (*Wrapper, error) {
+
 		if cfg.DAGStore.RootDir == "" {
 			cfg.DAGStore.RootDir = filepath.Join(r.Path(), defaultDagStoreDir)
 		}
@@ -73,6 +80,8 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 
 		// bitswap is enabled if there is a bitswap peer id
 		bitswapEnabled := cfg.Dealmaking.BitswapPeerID != ""
+		// http is considered enabled if there is an http retrieval multiaddr set
+		httpEnabled := cfg.Dealmaking.HTTPRetrievalMultiaddr != ""
 
 		// setup bitswap extended provider if there is a public multi addr for bitswap
 		w := &Wrapper{
@@ -80,15 +89,183 @@ func NewWrapper(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, r repo.Loc
 			dealsDB:        dealsDB,
 			legacyProv:     legacyProv,
 			prov:           prov,
-			dagStore:       dagStore,
 			meshCreator:    meshCreator,
 			cfg:            cfg,
-			bitswapEnabled: bitswapEnabled,
 			enabled:        !isDisabled,
+			piecedirectory: piecedirectory,
+			bitswapEnabled: bitswapEnabled,
+			httpEnabled:    httpEnabled,
+			ssm:            ssm,
 		}
-		w.usm = NewUnsealedStateManager(w, legacyProv, dealsDB, ssDB, storageService, w.cfg.Storage)
 		return w, nil
 	}
+}
+
+func (w *Wrapper) Start(_ context.Context) {
+	w.prov.RegisterMultihashLister(w.MultihashLister)
+
+	runCtx, runCancel := context.WithCancel(context.Background())
+	w.stop = runCancel
+
+	// Announce all deals on startup in case of a config change
+	go func() {
+		err := w.AnnounceExtendedProviders(runCtx)
+		if err != nil {
+			log.Warnf("announcing extended providers: %s", err)
+		}
+	}()
+
+	log.Info("starting index provider")
+
+	go w.checkForUpdates(runCtx)
+}
+
+func (w *Wrapper) checkForUpdates(ctx context.Context) {
+	updates := w.ssm.PubSub.Subscribe()
+
+	for {
+		select {
+		case u, ok := <-updates:
+			if !ok {
+				log.Debugw("state updates subscription closed")
+				return
+			}
+			log.Debugw("got state updates from SectorStateMgr", "u", len(u.Updates))
+
+			err := w.handleUpdates(ctx, u.Updates)
+			if err != nil {
+				log.Errorw("error while handling state updates", "err", err)
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (w *Wrapper) handleUpdates(ctx context.Context, sectorUpdates map[abi.SectorID]db.SealState) error {
+	legacyDeals, err := w.legacyDealsBySectorID(sectorUpdates)
+	if err != nil {
+		return fmt.Errorf("getting legacy deals from datastore: %w", err)
+	}
+
+	log.Debugf("checking for sector state updates for %d states", len(sectorUpdates))
+
+	for sectorID, sectorSealState := range sectorUpdates {
+		// for all updated sectors, get all deals (legacy and boost) in the sector
+		deals, err := w.dealsBySectorID(ctx, legacyDeals, sectorID)
+		if err != nil {
+			return fmt.Errorf("getting deals for miner %d / sector %d: %w", sectorID.Miner, sectorID.Number, err)
+		}
+		log.Debugf("sector %d has %d deals, seal status %s", sectorID, len(deals), sectorSealState)
+
+		for _, deal := range deals {
+			if !deal.AnnounceToIPNI {
+				continue
+			}
+
+			propnd, err := cborutil.AsIpld(&deal.DealProposal)
+			if err != nil {
+				return fmt.Errorf("failed to compute signed deal proposal ipld node: %w", err)
+			}
+			propCid := propnd.Cid()
+
+			if sectorSealState == db.SealStateRemoved {
+				// announce deals that are no longer unsealed as removed to indexer
+				announceCid, err := w.AnnounceBoostDealRemoved(ctx, propCid)
+				if err != nil {
+					// check if the error is because the deal wasn't previously announced
+					if !errors.Is(err, provider.ErrContextIDNotFound) {
+						log.Errorw("announcing deal removed to index provider",
+							"deal id", deal.DealID, "error", err)
+						continue
+					}
+				} else {
+					log.Infow("announced to index provider that deal has been removed",
+						"deal id", deal.DealID, "sector id", deal.SectorID.Number, "announce cid", announceCid.String())
+				}
+			} else if sectorSealState != db.SealStateCache {
+				// announce deals that have changed seal state to indexer
+				md := metadata.GraphsyncFilecoinV1{
+					PieceCID:      deal.DealProposal.Proposal.PieceCID,
+					FastRetrieval: sectorSealState == db.SealStateUnsealed,
+					VerifiedDeal:  deal.DealProposal.Proposal.VerifiedDeal,
+				}
+				announceCid, err := w.AnnounceBoostDealMetadata(ctx, md, propCid)
+				if err != nil {
+					log.Errorf("announcing deal %s to index provider: %w", deal.DealID, err)
+				} else {
+					log.Infow("announced deal seal state to index provider",
+						"deal id", deal.DealID, "sector id", deal.SectorID.Number,
+						"seal state", sectorSealState, "announce cid", announceCid.String())
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// Get deals by sector ID, whether they're legacy or boost deals
+func (w *Wrapper) dealsBySectorID(ctx context.Context, legacyDeals map[abi.SectorID][]storagemarket.MinerDeal, sectorID abi.SectorID) ([]basicDealInfo, error) {
+	// First query the boost database
+	deals, err := w.dealsDB.BySectorID(ctx, sectorID)
+	if err != nil {
+		return nil, fmt.Errorf("getting deals from boost database: %w", err)
+	}
+
+	basicDeals := make([]basicDealInfo, 0, len(deals))
+	for _, dl := range deals {
+		basicDeals = append(basicDeals, basicDealInfo{
+			AnnounceToIPNI: dl.AnnounceToIPNI,
+			DealID:         dl.DealUuid.String(),
+			SectorID:       sectorID,
+			DealProposal:   dl.ClientDealProposal,
+		})
+	}
+
+	// Then check the legacy deals
+	legDeals, ok := legacyDeals[sectorID]
+	if ok {
+		for _, dl := range legDeals {
+			basicDeals = append(basicDeals, basicDealInfo{
+				AnnounceToIPNI: true,
+				DealID:         dl.ProposalCid.String(),
+				SectorID:       sectorID,
+				DealProposal:   dl.ClientDealProposal,
+			})
+		}
+	}
+
+	return basicDeals, nil
+}
+
+// Iterate over all legacy deals and make a map of sector ID -> legacy deal.
+// To save memory, only include legacy deals with a sector ID that we know
+// we're going to query, ie the set of sector IDs in the stateUpdates map.
+func (w *Wrapper) legacyDealsBySectorID(stateUpdates map[abi.SectorID]db.SealState) (map[abi.SectorID][]storagemarket.MinerDeal, error) {
+	legacyDeals, err := w.legacyProv.ListLocalDeals()
+	if err != nil {
+		return nil, err
+	}
+
+	bySectorID := make(map[abi.SectorID][]storagemarket.MinerDeal, len(legacyDeals))
+	for _, deal := range legacyDeals {
+		minerID, err := address.IDFromAddress(deal.Proposal.Provider)
+		if err != nil {
+			// just skip the deal if we can't convert its address to an ID address
+			continue
+		}
+		sectorID := abi.SectorID{
+			Miner:  abi.ActorID(minerID),
+			Number: deal.SectorNumber,
+		}
+		_, ok := stateUpdates[sectorID]
+		if ok {
+			bySectorID[sectorID] = append(bySectorID[sectorID], deal)
+		}
+	}
+
+	return bySectorID, nil
 }
 
 func (w *Wrapper) Stop() {
@@ -102,25 +279,35 @@ func (w *Wrapper) Enabled() bool {
 // AnnounceExtendedProviders announces changes to Boost configuration in the context of retrieval
 // methods.
 //
-// The advertisement published by this function covers 3 cases:
+// The advertisement published by this function covers 2 protocols:
 //
-// 1. bitswap is completely disabled: in which case an advertisement is
-// published with empty extended providers that should wipe previous
-// support on indexer side.
+// Bitswap:
+//     1. bitswap is completely disabled: in which case an advertisement is
+//     published with http(or empty if http is disabled) extended providers
+//     that should wipe previous support on indexer side.
 //
-// 2. bitswap is enabled with public addresses: in which case publish an
-// advertisement with extended providers records corresponding to the
-// public addresses. Note, according the the IPNI spec, the host ID will
-// also be added to the extended providers for signing reasons with empty
-// metadata making a total of 2 extended provider records.
+//     2. bitswap is enabled with public addresses: in which case publish an
+//     advertisement with extended providers records corresponding to the
+//     public addresses. Note, according the IPNI spec, the host ID will
+//     also be added to the extended providers for signing reasons with empty
+//     metadata making a total of 2 extended provider records.
 //
-// 3. bitswap with boostd address: in which case public an advertisement
-// with one extended provider record that just adds bitswap metadata.
+//     3. bitswap with boostd address: in which case public an advertisement
+//     with one extended provider record that just adds bitswap metadata.
 //
-// Note that in any case one advertisement is published by boost on startup
-// to reflect on bitswap configuration, even if the config remains the
-// same. Future work should detect config change and only publish ads when
-// config changes.
+// HTTP:
+//     1. http is completely disabled: in which case an advertisement is
+//     published with bitswap(or empty if bitswap is disabled) extended providers
+//     that should wipe previous support on indexer side
+//
+//     2. http is enabled: in which case an advertisement is published with
+//     bitswap and http(or only http if bitswap is disabled) extended providers
+//     that should wipe previous support on indexer side
+//
+//     Note that in any case one advertisement is published by boost on startup
+//     to reflect on extended provider configuration, even if the config remains the
+//     same. Future work should detect config change and only publish ads when
+//     config changes.
 func (w *Wrapper) AnnounceExtendedProviders(ctx context.Context) error {
 	if !w.enabled {
 		return errors.New("cannot announce all deals: index provider is disabled")
@@ -131,6 +318,41 @@ func (w *Wrapper) AnnounceExtendedProviders(ctx context.Context) error {
 	// build the extended providers announcement
 	key := w.h.Peerstore().PrivKey(w.h.ID())
 	adBuilder := xproviders.NewAdBuilder(w.h.ID(), key, w.h.Addrs())
+
+	err := w.appendExtendedProviders(ctx, adBuilder, key)
+	if err != nil {
+		return err
+	}
+
+	last, _, err := w.prov.GetLatestAdv(ctx)
+	if err != nil {
+		return err
+	}
+	adBuilder.WithLastAdID(last)
+	ad, err := adBuilder.BuildAndSign()
+	if err != nil {
+		return err
+	}
+
+	// make sure we're connected to the mesh so that the message will go through
+	// pubsub and reach the indexer
+	err = w.meshCreator.Connect(ctx)
+	if err != nil {
+		log.Warnf("could not connect to pubsub mesh before announcing extended provider: %w", err)
+	}
+
+	// publish the extended providers announcement
+	adCid, err := w.prov.Publish(ctx, *ad)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("announced endpoint to indexer with advertisement cid %s", adCid)
+
+	return nil
+}
+
+func (w *Wrapper) appendExtendedProviders(ctx context.Context, adBuilder *xproviders.AdBuilder, key crypto.PrivKey) error {
 
 	if !w.bitswapEnabled {
 		// If bitswap is completely disabled, publish an advertisement with empty extended providers
@@ -193,30 +415,26 @@ func (w *Wrapper) AnnounceExtendedProviders(ctx context.Context) error {
 		adBuilder.WithExtendedProviders(ep)
 	}
 
-	last, _, err := w.prov.GetLatestAdv(ctx)
-	if err != nil {
-		return err
-	}
-	adBuilder.WithLastAdID(last)
-	ad, err := adBuilder.BuildAndSign()
-	if err != nil {
-		return err
-	}
+	if !w.httpEnabled {
+		log.Info("Dealmaking.HTTPRetrievalMultiaddr is not set - announcing http disabled to Indexer")
+	} else {
+		// marshal http metadata
+		meta := metadata.Default.New(metadata.IpfsGatewayHttp{})
+		mbytes, err := meta.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		var ep = xproviders.Info{
+			ID:       w.h.ID().String(),
+			Addrs:    []string{w.cfg.Dealmaking.HTTPRetrievalMultiaddr},
+			Metadata: mbytes,
+			Priv:     key,
+		}
 
-	// make sure we're connected to the mesh so that the message will go through
-	// pubsub and reach the indexer
-	err = w.meshCreator.Connect(ctx)
-	if err != nil {
-		log.Warnf("could not connect to pubsub mesh before announcing extended provider: %w", err)
-	}
+		log.Infof("announcing http endpoint to indexer as extended provider: %s", ep.Addrs)
 
-	// publish the extended providers announcement
-	adCid, err := w.prov.Publish(ctx, *ad)
-	if err != nil {
-		return err
+		adBuilder.WithExtendedProviders(ep)
 	}
-
-	log.Infof("announced endpoint to indexer with advertisement cid %s", adCid)
 
 	return nil
 }
@@ -309,36 +527,12 @@ func (w *Wrapper) IndexerAnnounceLatestHttp(ctx context.Context, announceUrls []
 	return e.PublishLatestHTTP(ctx, urls...)
 }
 
-func (w *Wrapper) Start(ctx context.Context) {
-	// re-init dagstore shards for Boost deals if needed
-	if _, err := w.DagstoreReinitBoostDeals(ctx); err != nil {
-		log.Errorw("failed to migrate dagstore indices for Boost deals", "err", err)
-	}
-
-	w.prov.RegisterMultihashLister(w.MultihashLister)
-
-	runCtx, runCancel := context.WithCancel(context.Background())
-	w.stop = runCancel
-
-	// Watch for changes in sector unseal state and update the
-	// indexer when there are changes
-	go w.usm.Run(runCtx)
-
-	// Announce all deals on startup in case of a config change
-	go func() {
-		err := w.AnnounceExtendedProviders(runCtx)
-		if err != nil {
-			log.Warnf("announcing extended providers: %w", err)
-		}
-	}()
-}
-
 func (w *Wrapper) MultihashLister(ctx context.Context, prov peer.ID, contextID []byte) (provider.MultihashIterator, error) {
 	provideF := func(proposalCid cid.Cid, pieceCid cid.Cid) (provider.MultihashIterator, error) {
-		ii, err := w.dagStore.GetIterableIndexForPiece(pieceCid)
+		ii, err := w.piecedirectory.GetIterableIndex(ctx, pieceCid)
 		if err != nil {
 			e := fmt.Errorf("failed to get iterable index: %w", err)
-			if errors.Is(err, index.ErrNotFound) || errors.Is(err, fs.ErrNotExist) {
+			if bdtypes.IsNotFound(err) {
 				// If it's a not found error, skip over this piece and continue ingesting
 				log.Infow("skipping ingestion: piece not found", "piece", pieceCid, "propCid", proposalCid, "err", e)
 				return nil, skipError(e)
@@ -347,6 +541,18 @@ func (w *Wrapper) MultihashLister(ctx context.Context, prov peer.ID, contextID [
 			// Some other error, pause ingestion
 			log.Infow("pausing ingestion: error getting piece", "piece", pieceCid, "propCid", proposalCid, "err", e)
 			return nil, e
+		}
+
+		// Check if there are any records in the iterator.
+		hasRecords := ii.ForEach(func(_ multihash.Multihash, _ uint64) error {
+			return fmt.Errorf("has at least one record")
+		})
+		if hasRecords == nil {
+			// If there are no records, it's effectively the same as a not
+			// found error. Skip over this piece and continue ingesting.
+			e := fmt.Errorf("no records found for piece %s", pieceCid)
+			log.Infow("skipping ingestion: piece has no records", "piece", pieceCid, "propCid", proposalCid, "err", e)
+			return nil, skipError(e)
 		}
 
 		mhi, err := provider.CarMultihashIterator(ii)
@@ -426,10 +632,10 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, deal *types.ProviderDea
 		FastRetrieval: deal.FastRetrieval,
 		VerifiedDeal:  deal.ClientDealProposal.Proposal.VerifiedDeal,
 	}
-	return w.announceBoostDealMetadata(ctx, md, propCid)
+	return w.AnnounceBoostDealMetadata(ctx, md, propCid)
 }
 
-func (w *Wrapper) announceBoostDealMetadata(ctx context.Context, md metadata.GraphsyncFilecoinV1, propCid cid.Cid) (cid.Cid, error) {
+func (w *Wrapper) AnnounceBoostDealMetadata(ctx context.Context, md metadata.GraphsyncFilecoinV1, propCid cid.Cid) (cid.Cid, error) {
 	if !w.enabled {
 		return cid.Undef, errors.New("cannot announce deal: index provider is disabled")
 	}
@@ -472,129 +678,9 @@ func (w *Wrapper) AnnounceBoostDealRemoved(ctx context.Context, propCid cid.Cid)
 	return annCid, err
 }
 
-func (w *Wrapper) DagstoreReinitBoostDeals(ctx context.Context) (bool, error) {
-	deals, err := w.dealsDB.ListActive(ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to list active Boost deals: %w", err)
-	}
-
-	log := log.Named("boost-migrator")
-	log.Infof("dagstore root is %s", w.cfg.DAGStore.RootDir)
-
-	// Check if all deals have already been registered as shards
-	isComplete, err := w.boostRegistrationComplete()
-	if err != nil {
-		return false, fmt.Errorf("failed to get boost dagstore migration status: %w", err)
-	}
-	if isComplete {
-		// All deals have been registered as shards, bail out
-		log.Info("no boost shard migration necessary; already marked complete")
-		return false, nil
-	}
-
-	log.Infow("registering shards for all active boost deals in sealing subsystem", "count", len(deals))
-
-	// channel where results will be received, and channel where the total
-	// number of registered shards will be sent.
-	resch := make(chan dst.ShardResult, 32)
-	totalCh := make(chan int)
-	doneCh := make(chan struct{})
-
-	// Start making progress consuming results. We won't know how many to
-	// actually consume until we register all shards.
-	//
-	// If there are any problems registering shards, just log an error
-	go func() {
-		defer close(doneCh)
-
-		var total = math.MaxInt64
-		var res dst.ShardResult
-		for rcvd := 0; rcvd < total; {
-			select {
-			case total = <-totalCh:
-				// we now know the total number of registered shards
-				// nullify so that we no longer consume from it after closed.
-				close(totalCh)
-				totalCh = nil
-			case res = <-resch:
-				rcvd++
-				if res.Error == nil {
-					log.Infow("async boost shard registration completed successfully", "shard_key", res.Key)
-				} else {
-					log.Warnw("async boost shard registration failed", "shard_key", res.Key, "error", res.Error)
-				}
-			}
-		}
-	}()
-
-	var registered int
-	for _, deal := range deals {
-		pieceCid := deal.ClientDealProposal.Proposal.PieceCID
-
-		// enrich log statements in this iteration with deal ID and piece CID.
-		log := log.With("deal_id", deal.ChainDealID, "piece_cid", pieceCid)
-
-		// Filter out deals that have not yet been indexed and announced as they will be re-indexed anyways
-		if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
-			continue
-		}
-
-		log.Infow("registering boost deal in dagstore with lazy init")
-
-		// Register the deal as a shard with the DAG store with lazy initialization.
-		// The index will be populated the first time the deal is retrieved, or
-		// through the bulk initialization script.
-		err = w.dagStore.RegisterShard(ctx, pieceCid, "", false, resch)
-		if err != nil {
-			log.Warnw("failed to register boost shard", "error", err)
-			continue
-		}
-		registered++
-	}
-
-	log.Infow("finished registering all boost shards", "total", registered)
-	totalCh <- registered
-	select {
-	case <-ctx.Done():
-		return false, ctx.Err()
-	case <-doneCh:
-	}
-
-	log.Infow("confirmed registration of all boost shards")
-
-	// Completed registering all shards, so mark the migration as complete
-	err = w.markBoostRegistrationComplete()
-	if err != nil {
-		log.Errorf("failed to mark boost shards as registered: %s", err)
-	} else {
-		log.Info("successfully marked boost migration as complete")
-	}
-
-	log.Infow("boost dagstore migration complete")
-
-	return true, nil
-}
-
-// Check for the existence of a "marker" file indicating that the migration
-// has completed
-func (w *Wrapper) boostRegistrationComplete() (bool, error) {
-	path := filepath.Join(w.cfg.DAGStore.RootDir, shardRegMarker)
-	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-// Create a "marker" file indicating that the migration has completed
-func (w *Wrapper) markBoostRegistrationComplete() error {
-	path := filepath.Join(w.cfg.DAGStore.RootDir, shardRegMarker)
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	return file.Close()
+type basicDealInfo struct {
+	AnnounceToIPNI bool
+	DealID         string
+	SectorID       abi.SectorID
+	DealProposal   storagemarket.ClientDealProposal
 }

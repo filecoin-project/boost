@@ -8,74 +8,112 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/cmd/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boostd-data/shared/tracing"
+	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-car/v2/index"
 	carindex "github.com/ipld/go-car/v2/index"
-	"github.com/multiformats/go-multicodec"
-	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 )
 
+// The current piece metadata version. This version will be used when doing
+// data migrations (migrations are not yet implemented in version 1).
+const pieceMetadataVersion = "1"
+
 var log = logging.Logger("boostd-data-ldb")
+
+type LeveldbFlaggedMetadata struct {
+	CreatedAt       time.Time `json:"c"`
+	UpdatedAt       time.Time `json:"u"`
+	HasUnsealedCopy bool      `json:"huc"`
+}
+
+type LeveldbMetadata struct {
+	model.Metadata
+	Cursor uint64 `json:"c"`
+}
+
+func newLeveldbMetadata() LeveldbMetadata {
+	return LeveldbMetadata{
+		Metadata: model.Metadata{Version: pieceMetadataVersion},
+	}
+}
 
 type Store struct {
 	sync.Mutex
-	db *DB
+	db       *DB
+	repopath string
 }
 
-func NewStore(_repopath string) *Store {
-	// tests
-	repopath := _repopath
-	if _repopath == "" {
+var _ types.ServiceImpl = (*Store)(nil)
+
+func NewStore(repopath string) *Store {
+	return &Store{repopath: repopath}
+}
+
+func (s *Store) Start(ctx context.Context) error {
+	repopath := s.repopath
+	if repopath == "" {
+		// used by tests
 		var err error
 		repopath, err = os.MkdirTemp("", "ds-leveldb")
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("creating leveldb tmp dir: %w", err)
 		}
 	}
 
-	db, err := newDB(repopath, false)
+	var err error
+	s.db, err = newDB(repopath, false)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	// tests
-	if _repopath == "" {
-		// prepare db
-		log.Debug("preparing db with next cursor")
-		db.SetNextCursor(context.Background(), 100)
+	// Prepare db with a cursor
+	err = s.db.InitCursor(ctx)
+	if err != nil {
+		return err
 	}
 
-	log.Debugw("new piece meta service", "repo path", repopath)
-
-	return &Store{
-		db: db,
-	}
+	log.Debugw("new leveldb local index directory service", "repo path", repopath)
+	return nil
 }
 
-func (s *Store) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error {
+func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	log.Debugw("handle.add-deal-for-piece", "piece-cid", pieceCid)
 
+	ctx, span := tracing.Tracer.Start(ctx, "store.add_deal_for_piece")
+	defer span.End()
+
 	defer func(now time.Time) {
-		log.Debugw("handled.add-deal-for-piece", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.add-deal-for-piece", "took", time.Since(now).String())
 	}(time.Now())
 
 	s.Lock()
 	defer s.Unlock()
 
-	ctx := context.Background()
-
+	// Get the existing deals for the piece
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
-		return err
+		if !errors.Is(err, ds.ErrNotFound) {
+			return fmt.Errorf("getting piece cid metadata for piece %s: %w", pieceCid, err)
+		}
+		// there isn't yet any metadata, so create new metadata
+		md = newLeveldbMetadata()
 	}
 
+	// Check if the deal has already been added
+	for _, dl := range md.Deals {
+		if dl == dealInfo {
+			return nil
+		}
+	}
+
+	// Add the deal to the list
 	md.Deals = append(md.Deals, dealInfo)
 
+	// Write the piece metadata back to the db
 	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
 	if err != nil {
 		return err
@@ -84,186 +122,325 @@ func (s *Store) AddDealForPiece(pieceCid cid.Cid, dealInfo model.DealInfo) error
 	return nil
 }
 
-func (s *Store) GetRecords(pieceCid cid.Cid) ([]model.Record, error) {
-	log.Debugw("handle.get-iterable-index", "piece-cid", pieceCid)
+func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Multihash) (*model.OffsetSize, error) {
+	log.Debugw("handle.get-offset-size", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.get_offset_size")
+	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-iterable-index", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-offset-size", "took", time.Since(now).String())
 	}(time.Now())
 
 	s.Lock()
 	defer s.Unlock()
 
-	ctx := context.Background()
-
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
-		return nil, err
+		return nil, normalizePieceCidError(pieceCid, err)
 	}
 
-	records, err := s.db.AllRecords(ctx, md.Cursor)
-	if err != nil {
-		return nil, err
-	}
-
-	return records, nil
+	return s.db.GetOffsetSize(ctx, fmt.Sprintf("%d", md.Cursor)+"/", hash)
 }
 
-func (s *Store) GetOffset(pieceCid cid.Cid, hash mh.Multihash) (uint64, error) {
-	log.Debugw("handle.get-offset", "piece-cid", pieceCid)
+func (s *Store) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error) {
+	log.Debugw("handle.get-piece-metadata", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.get_piece_metadata")
+	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.get-offset", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-piece-metadata", "took", time.Since(now).String())
 	}(time.Now())
-
-	s.Lock()
-	defer s.Unlock()
-
-	ctx := context.Background()
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
-		return 0, err
+		err = normalizePieceCidError(pieceCid, err)
+		return model.Metadata{}, fmt.Errorf("getting piece metadata for piece %s: %w", pieceCid, err)
 	}
 
-	return s.db.GetOffset(ctx, fmt.Sprintf("%d", md.Cursor)+"/", hash)
+	return md.Metadata, nil
 }
 
-func (s *Store) GetPieceDeals(pieceCid cid.Cid) ([]model.DealInfo, error) {
+func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.DealInfo, error) {
 	log.Debugw("handle.get-piece-deals", "piece-cid", pieceCid)
 
+	ctx, span := tracing.Tracer.Start(ctx, "store.get_piece_deals")
+	defer span.End()
+
 	defer func(now time.Time) {
-		log.Debugw("handled.get-piece-deals", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.get-piece-deals", "took", time.Since(now).String())
 	}(time.Now())
 
 	s.Lock()
 	defer s.Unlock()
 
-	ctx := context.Background()
-
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
-		return nil, err
+		err = normalizePieceCidError(pieceCid, err)
+		return nil, fmt.Errorf("getting piece deals for piece %s: %w", pieceCid, err)
 	}
 
 	return md.Deals, nil
 }
 
 // Get all pieces that contain a multihash (used when retrieving by payload CID)
-func (s *Store) PiecesContainingMultihash(m mh.Multihash) ([]cid.Cid, error) {
+func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) ([]cid.Cid, error) {
 	log.Debugw("handle.pieces-containing-mh", "mh", m)
 
+	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_containing_multihash")
+	defer span.End()
+
 	defer func(now time.Time) {
-		log.Debugw("handled.pieces-containing-mh", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.pieces-containing-mh", "took", time.Since(now).String())
 	}(time.Now())
 
 	s.Lock()
 	defer s.Unlock()
 
-	ctx := context.Background()
-	return s.db.GetPieceCidsByMultihash(ctx, m)
+	pcs, err := s.db.GetPieceCidsByMultihash(ctx, m)
+	return pcs, normalizeMultihashError(m, err)
 }
 
-func (s *Store) GetIndex(pieceCid cid.Cid) ([]model.Record, error) {
+func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.IndexRecord, error) {
 	log.Warnw("handle.get-index", "pieceCid", pieceCid)
 
+	ctx, span := tracing.Tracer.Start(ctx, "store.get_index")
+	defer span.End()
+
 	defer func(now time.Time) {
-		log.Warnw("handled.get-index", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Warnw("handled.get-index", "took", time.Since(now).String())
 	}(time.Now())
 
 	s.Lock()
 	defer s.Unlock()
-
-	ctx := context.Background()
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
 	if err != nil {
-		return nil, err
+		return nil, normalizePieceCidError(pieceCid, err)
 	}
 
 	records, err := s.db.AllRecords(ctx, md.Cursor)
 	if err != nil {
-		return nil, err
+		err = normalizePieceCidError(pieceCid, err)
+		return nil, fmt.Errorf("getting all records for cursor %d: %w", md.Cursor, err)
 	}
 
 	log.Warnw("handle.get-index.records", "len(records)", len(records))
 
-	return records, nil
+	recs := make(chan types.IndexRecord, len(records))
+	for _, r := range records {
+		recs <- types.IndexRecord{Record: r}
+	}
+	close(recs)
+
+	return recs, nil
 }
 
-func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
-	log.Debugw("handle.add-index", "records", len(records))
+func (s *Store) IsIndexed(ctx context.Context, pieceCid cid.Cid) (bool, error) {
+	t, err := s.IndexedAt(ctx, pieceCid)
+	if err != nil {
+		return false, err
+	}
+	return !t.IsZero(), nil
+}
+
+func (s *Store) IsCompleteIndex(ctx context.Context, pieceCid cid.Cid) (bool, error) {
+	log.Debugw("handle.is-complete-index", "pieceCid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.is_incomplete_index")
+	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.add-index", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.is-complete-index", "took", time.Since(now).String())
+	}(time.Now())
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return false, normalizePieceCidError(pieceCid, err)
+	}
+
+	return md.CompleteIndex, nil
+}
+
+func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, records []model.Record, isCompleteIndex bool) <-chan types.AddIndexProgress {
+	log.Debugw("handle.add-index", "records", len(records))
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.add_index")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.add-index", "took", time.Since(now).String())
+	}(time.Now())
+
+	progress := make(chan types.AddIndexProgress, 1)
+	go func() {
+		defer close(progress)
+
+		s.Lock()
+		defer s.Unlock()
+
+		var recs []carindex.Record
+		for _, r := range records {
+			recs = append(recs, carindex.Record{
+				Cid:    r.Cid,
+				Offset: r.Offset,
+			})
+		}
+
+		err := s.db.SetMultihashesToPieceCid(ctx, recs, pieceCid)
+		if err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
+		}
+		progress <- types.AddIndexProgress{Progress: 0.45}
+
+		// get and set next cursor (handle synchronization, maybe with CAS)
+		cursor, keyCursorPrefix, err := s.db.NextCursor(ctx)
+		if err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
+		}
+
+		// allocate metadata for pieceCid
+		err = s.db.SetNextCursor(ctx, cursor+1)
+		if err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
+		}
+
+		// process index and store entries
+		for _, rec := range records {
+			err := s.db.AddIndexRecord(ctx, keyCursorPrefix, rec)
+			if err != nil {
+				progress <- types.AddIndexProgress{Err: err.Error()}
+				return
+			}
+		}
+		progress <- types.AddIndexProgress{Progress: 0.9}
+
+		// get the metadata for the piece
+		md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+		if err != nil {
+			if !errors.Is(err, ds.ErrNotFound) {
+				progress <- types.AddIndexProgress{Err: err.Error()}
+				return
+			}
+			// there isn't yet any metadata, so create new metadata
+			md = newLeveldbMetadata()
+		}
+
+		// mark indexing as complete
+		md.Cursor = cursor
+		md.IndexedAt = time.Now()
+		md.CompleteIndex = isCompleteIndex
+
+		err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
+		if err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
+		}
+		progress <- types.AddIndexProgress{Progress: 0.95}
+
+		err = s.db.Sync(ctx, ds.NewKey(fmt.Sprintf("%d", cursor)))
+		if err != nil {
+			progress <- types.AddIndexProgress{Err: err.Error()}
+			return
+		}
+		progress <- types.AddIndexProgress{Progress: 1}
+	}()
+
+	return progress
+}
+
+func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, error) {
+	log.Debugw("handle.indexed-at", "pieceCid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.indexed_at")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.indexed-at", "took", time.Since(now).String())
 	}(time.Now())
 
 	s.Lock()
 	defer s.Unlock()
 
-	ctx := context.Background()
-
-	var recs []carindex.Record
-	for _, r := range records {
-		recs = append(recs, carindex.Record{
-			Cid:    r.Cid,
-			Offset: r.Offset,
-		})
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil && !errors.Is(err, ds.ErrNotFound) {
+		return time.Time{}, err
 	}
 
-	err := s.db.SetMultihashesToPieceCid(ctx, recs, pieceCid)
+	return md.IndexedAt, nil
+}
+
+func (s *Store) PiecesCount(ctx context.Context) (int, error) {
+	log.Debugw("handle.pieces-count")
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.pieces-count", "took", time.Since(now).String())
+	}(time.Now())
+
+	return s.db.PiecesCount(ctx)
+}
+
+func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
+	log.Debugw("handle.list-pieces")
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.list_pieces")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.list-pieces", "took", time.Since(now).String())
+	}(time.Now())
+
+	return s.db.ListPieces(ctx)
+}
+
+func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "store.next_pieces_to_check")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.next-pieces-to-check", "took", time.Since(now).String())
+	}(time.Now())
+
+	return s.db.NextPiecesToCheck(ctx)
+}
+
+func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool) error {
+	log.Debugw("handle.flag-piece", "piece-cid", pieceCid, "hasUnsealedCopy", hasUnsealedCopy)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.flag-piece", "took", time.Since(now).String())
+	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
+
+	now := time.Now()
+
+	// Get the existing deals for the piece
+	fm, err := s.db.GetPieceCidToFlagged(ctx, pieceCid)
 	if err != nil {
-		return fmt.Errorf("failed to add entry from mh to pieceCid: %w", err)
-	}
-
-	// get and set next cursor (handle synchronization, maybe with CAS)
-	cursor, keyCursorPrefix, err := s.db.NextCursor(ctx)
-	if err != nil {
-		return fmt.Errorf("couldnt generate next cursor: %w", err)
-	}
-
-	// alloacte metadata for pieceCid
-	err = s.db.SetNextCursor(ctx, cursor+1)
-	if err != nil {
-		return err
-	}
-
-	mis := make(index.MultihashIndexSorted)
-	err = mis.Load(recs)
-	if err != nil {
-		return err
-	}
-
-	var subject index.Index
-	subject = &mis
-
-	// process index and store entries
-	switch idx := subject.(type) {
-	case index.IterableIndex:
-		err := idx.ForEach(func(m multihash.Multihash, offset uint64) error {
-
-			return s.db.AddOffset(ctx, keyCursorPrefix, m, offset)
-		})
-		if err != nil {
-			return err
+		if !errors.Is(err, ds.ErrNotFound) {
+			return fmt.Errorf("getting piece cid flagged metadata for piece %s: %w", pieceCid, err)
 		}
-
-	default:
-		return errors.New(fmt.Sprintf("wanted %v but got %v\n", multicodec.CarMultihashIndexSorted, idx.Codec()))
+		// there isn't yet any flagged metadata, so create new metadata
+		fm = LeveldbFlaggedMetadata{CreatedAt: now}
 	}
 
-	// mark that indexing is complete
-	md := model.Metadata{
-		Cursor:    cursor,
-		IndexedAt: time.Now(),
-	}
+	fm.UpdatedAt = now
+	fm.HasUnsealedCopy = hasUnsealedCopy
 
-	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
-	if err != nil {
-		return err
-	}
-
-	err = s.db.Sync(ctx, datastore.NewKey(fmt.Sprintf("%d", cursor)))
+	// Write the piece metadata back to the db
+	err = s.db.SetPieceCidToFlagged(ctx, pieceCid, fm)
 	if err != nil {
 		return err
 	}
@@ -271,22 +448,167 @@ func (s *Store) AddIndex(pieceCid cid.Cid, records []model.Record) error {
 	return nil
 }
 
-func (s *Store) IndexedAt(pieceCid cid.Cid) (time.Time, error) {
-	log.Debugw("handle.indexed-at", "pieceCid", pieceCid)
+func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
+	log.Debugw("handle.unflag-piece", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.unflag_piece")
+	defer span.End()
 
 	defer func(now time.Time) {
-		log.Debugw("handled.indexed-at", "took", fmt.Sprintf("%s", time.Since(now)))
+		log.Debugw("handled.unflag-piece", "took", time.Since(now).String())
 	}(time.Now())
 
 	s.Lock()
 	defer s.Unlock()
 
-	ctx := context.Background()
+	err := s.db.DeletePieceCidToFlagged(ctx, pieceCid)
+	if err != nil {
+		return fmt.Errorf("deleting piece cid flagged metadata for piece %s: %w", pieceCid, err)
+	}
+	return nil
+}
+
+func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {
+	log.Debugw("handle.flagged-pieces-list")
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_list")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.flagged-pieces-list", "took", time.Since(now).String())
+	}(time.Now())
+
+	return s.db.ListFlaggedPieces(ctx, filter, cursor, offset, limit)
+}
+
+func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error) {
+	log.Debugw("handle.flagged-pieces-count")
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.flagged_pieces_count")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.flagged-pieces-count", "took", time.Since(now).String())
+	}(time.Now())
+
+	return s.db.FlaggedPiecesCount(ctx, filter)
+}
+
+func normalizePieceCidError(pieceCid cid.Cid, err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, ds.ErrNotFound) {
+		return fmt.Errorf("piece %s: %s", pieceCid, types.ErrNotFound)
+	}
+	return err
+}
+
+func normalizeMultihashError(m mh.Multihash, err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, ds.ErrNotFound) {
+		return fmt.Errorf("multihash %s: %s", m, types.ErrNotFound)
+	}
+	return err
+}
+
+// RemoveDealForPiece remove Single deal for pieceCID. If []Deals is empty then Metadata is removed as well
+func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealUuid string) error {
+	log.Debugw("handle.remove-deal-for-piece", "piece-cid", pieceCid, "deal-uuid", dealUuid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.remove-deal-for-piece", "took", time.Since(now).String())
+	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
 
 	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
-	if err != nil && err != ds.ErrNotFound {
-		return time.Time{}, err
+	if err != nil {
+		if errors.Is(err, ds.ErrNotFound) {
+			return nil
+		}
+		return err
 	}
 
-	return md.IndexedAt, nil
+	for i, v := range md.Deals {
+		if v.DealUuid == dealUuid {
+			md.Deals[i] = md.Deals[len(md.Deals)-1]
+			md.Deals = md.Deals[:len(md.Deals)-1]
+			break
+		}
+	}
+
+	if len(md.Deals) == 0 {
+		// Remove Metadata if removed deal was last one
+		if err := s.db.RemovePieceMetadata(ctx, pieceCid); err != nil {
+			return fmt.Errorf("failed to remove the Metadata after removing the last deal: %w", err)
+		}
+		return nil
+	}
+
+	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemovePieceMetadata remove all Metadata for pieceCID
+func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
+	log.Debugw("handle.remove-piece-metadata", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.remove_piece_metadata")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.remove-piece-metadata", "took", time.Since(now).String())
+	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
+
+	if err := s.db.RemovePieceMetadata(ctx, pieceCid); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemoveIndexes removes all MultiHashes for pieceCID. To be used manually in case of failure
+// in RemoveDealForPiece or RemovePieceMetadata. Metadata for the piece must be
+// present in the database
+func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
+	log.Debugw("handle.remove-indexes", "piece-cid", pieceCid)
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.remove_indexes")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.remove-indexes", "took", time.Since(now).String())
+	}(time.Now())
+
+	s.Lock()
+	defer s.Unlock()
+
+	md, err := s.db.GetPieceCidToMetadata(ctx, pieceCid)
+	if err != nil {
+		return err
+	}
+
+	if err := s.db.RemoveIndexes(ctx, md.Cursor, pieceCid); err != nil {
+		return err
+	}
+
+	md.IndexedAt = time.Time{}
+
+	err = s.db.SetPieceCidToMetadata(ctx, pieceCid, md)
+
+	return err
 }

@@ -115,8 +115,8 @@ func (r *resolver) LegacyDeals(ctx context.Context, args dealsArgs) (*legacyDeal
 	}, nil
 }
 
-func (r *resolver) LegacyDealsCount() (int32, error) {
-	dealCount, err := r.legacyProv.LocalDealCount()
+func (r *resolver) LegacyDealsCount(ctx context.Context) (int32, error) {
+	dealCount, err := r.legacyDeals.DealCount(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("getting deal count: %w", err)
 	}

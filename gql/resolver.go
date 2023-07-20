@@ -15,24 +15,28 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/lib/mpoolmonitor"
 	"github.com/filecoin-project/boost/markets/storageadapter"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
+	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
+	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
-	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/build"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/ipfs/go-cid"
+	provider "github.com/ipni/index-provider"
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 )
@@ -46,50 +50,62 @@ type dealListResolver struct {
 // resolver translates from a request for a graphql field to the data for
 // that field
 type resolver struct {
-	cfg        *config.Boost
-	repo       lotus_repo.LockedRepo
-	h          host.Host
-	dealsDB    *db.DealsDB
-	logsDB     *db.LogsDB
-	retDB      *rtvllog.RetrievalLogDB
-	plDB       *db.ProposalLogsDB
-	fundsDB    *db.FundsDB
-	fundMgr    *fundmanager.FundManager
-	storageMgr *storagemanager.StorageManager
-	provider   *storagemarket.Provider
-	legacyProv gfm_storagemarket.StorageProvider
-	legacyDT   dtypes.ProviderDataTransfer
-	ps         piecestore.PieceStore
-	sa         retrievalmarket.SectorAccessor
-	dagst      dagstore.Interface
-	publisher  *storageadapter.DealPublisher
-	spApi      sealingpipeline.API
-	fullNode   v1api.FullNode
-	mpool      *mpoolmonitor.MpoolMonitor
+	// This context is closed when boost shuts down
+	ctx context.Context
+
+	cfg            *config.Boost
+	repo           lotus_repo.LockedRepo
+	h              host.Host
+	dealsDB        *db.DealsDB
+	logsDB         *db.LogsDB
+	retDB          *rtvllog.RetrievalLogDB
+	plDB           *db.ProposalLogsDB
+	fundsDB        *db.FundsDB
+	fundMgr        *fundmanager.FundManager
+	storageMgr     *storagemanager.StorageManager
+	provider       *storagemarket.Provider
+	legacyDeals    *legacy.LegacyDealsManager
+	legacyProv     gfm_storagemarket.StorageProvider
+	legacyDT       dtypes.ProviderDataTransfer
+	ps             piecestore.PieceStore
+	ssm            *sectorstatemgr.SectorStateMgr
+	sa             retrievalmarket.SectorAccessor
+	piecedirectory *piecedirectory.PieceDirectory
+	publisher      *storageadapter.DealPublisher
+	idxProv        provider.Interface
+	idxProvWrapper *indexprovider.Wrapper
+	spApi          sealingpipeline.API
+	fullNode       v1api.FullNode
+	mpool          *mpoolmonitor.MpoolMonitor
 }
 
-func NewResolver(cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, dagst dagstore.Interface, publisher *storageadapter.DealPublisher, fullNode v1api.FullNode, mpool *mpoolmonitor.MpoolMonitor) *resolver {
+func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor) *resolver {
 	return &resolver{
-		cfg:        cfg,
-		repo:       r,
-		h:          h,
-		dealsDB:    dealsDB,
-		logsDB:     logsDB,
-		retDB:      retDB,
-		plDB:       plDB,
-		fundsDB:    fundsDB,
-		fundMgr:    fundMgr,
-		storageMgr: storageMgr,
-		provider:   provider,
-		legacyProv: legacyProv,
-		legacyDT:   legacyDT,
-		ps:         ps,
-		sa:         sa,
-		dagst:      dagst,
-		publisher:  publisher,
-		spApi:      spApi,
-		fullNode:   fullNode,
-		mpool:      mpool,
+		ctx:            ctx,
+		cfg:            cfg,
+		repo:           r,
+		h:              h,
+		dealsDB:        dealsDB,
+		logsDB:         logsDB,
+		retDB:          retDB,
+		plDB:           plDB,
+		fundsDB:        fundsDB,
+		fundMgr:        fundMgr,
+		storageMgr:     storageMgr,
+		provider:       provider,
+		legacyDeals:    legacyDeals,
+		legacyProv:     legacyProv,
+		legacyDT:       legacyDT,
+		ps:             ps,
+		sa:             sa,
+		piecedirectory: piecedirectory,
+		publisher:      publisher,
+		spApi:          spApi,
+		idxProv:        indexProv,
+		idxProvWrapper: idxProvWrapper,
+		fullNode:       fullNode,
+		ssm:            ssm,
+		mpool:          mpool,
 	}
 }
 

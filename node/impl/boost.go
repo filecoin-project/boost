@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 
 	"github.com/filecoin-project/boost/node/impl/backupmgr"
+	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -77,6 +79,9 @@ type BoostAPI struct {
 	// Sealing Pipeline API
 	Sps sealingpipeline.API
 
+	// Piece Directory
+	Pd *piecedirectory.PieceDirectory
+
 	// GraphSQL server
 	GraphqlServer *gql.Server
 
@@ -143,6 +148,28 @@ func (sm *BoostAPI) BoostDealBySignedProposalCid(ctx context.Context, proposalCi
 
 func (sm *BoostAPI) BoostIndexerAnnounceAllDeals(ctx context.Context) error {
 	return sm.IndexProvider.IndexerAnnounceAllDeals(ctx)
+}
+
+// BoostIndexerListMultihashes calls the index provider multihash lister for a given proposal cid
+func (sm *BoostAPI) BoostIndexerListMultihashes(ctx context.Context, proposalCid cid.Cid) ([]multihash.Multihash, error) {
+	it, err := sm.IndexProvider.MultihashLister(ctx, "", proposalCid.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	var mhs []multihash.Multihash
+	mh, err := it.Next()
+	for {
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return mhs, nil
+			}
+			return nil, err
+		}
+		mhs = append(mhs, mh)
+
+		mh, err = it.Next()
+	}
 }
 
 func (sm *BoostAPI) BoostIndexerAnnounceLatest(ctx context.Context) (cid.Cid, error) {
@@ -505,19 +532,23 @@ func (sm *BoostAPI) BoostMakeDeal(ctx context.Context, params types.DealParams) 
 }
 
 func (sm *BoostAPI) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error) {
-	blk, err := sm.IndexBackedBlockstore.Get(ctx, c)
-	if err != nil {
-		return nil, err
-	}
-	return blk.RawData(), nil
+	return sm.Pd.BlockstoreGet(ctx, c)
 }
 
 func (sm *BoostAPI) BlockstoreHas(ctx context.Context, c cid.Cid) (bool, error) {
-	return sm.IndexBackedBlockstore.Has(ctx, c)
+	return sm.Pd.BlockstoreHas(ctx, c)
 }
 
 func (sm *BoostAPI) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int, error) {
-	return sm.IndexBackedBlockstore.GetSize(ctx, c)
+	return sm.Pd.BlockstoreGetSize(ctx, c)
+}
+
+func (sm *BoostAPI) PdBuildIndexForPieceCid(ctx context.Context, piececid cid.Cid) error {
+	ctx, span := tracing.Tracer.Start(ctx, "Boost.PdBuildIndexForPieceCid")
+	span.SetAttributes(attribute.String("piececid", piececid.String()))
+	defer span.End()
+
+	return sm.Pd.BuildIndexForPiece(ctx, piececid)
 }
 
 func (sm *BoostAPI) OnlineBackup(ctx context.Context, dstDir string) error {

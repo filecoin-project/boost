@@ -162,7 +162,7 @@ type IndexStatus {
 }
 
 type SealStatus {
-  IsUnsealed: Boolean!
+  Status: String!
   Error: String!
 }
 
@@ -183,6 +183,19 @@ type PieceStatus {
   IndexStatus: IndexStatus!
   Deals: [PieceDeal]!
   PieceInfoDeals: [PieceInfoDeal]!
+}
+
+type FlaggedPieceStatus {
+  CreatedAt: Time!
+  PieceCid: String!
+  IndexStatus: IndexStatus!
+  DealCount: Int!
+}
+
+type FlaggedPiecesList {
+  totalCount: Int!
+  pieces: [FlaggedPieceStatus]!
+  more: Boolean!
 }
 
 type ProposalLog {
@@ -306,6 +319,67 @@ type SealingPipeline {
   Workers: [Worker]!
 }
 
+type DealData {
+  Indexed: Uint64!
+  FlaggedUnsealed: Uint64!
+  FlaggedSealed: Uint64!
+}
+
+type Pieces {
+  Indexed: Int!
+  FlaggedUnsealed: Int!
+  FlaggedSealed: Int!
+}
+
+type SectorUnsealedCopies {
+  Unsealed: Int!
+  Sealed: Int!
+}
+
+type SectorProvingState {
+  Active: Int!
+  Inactive: Int!
+}
+
+type LID {
+  DealData: DealData!
+  Pieces: Pieces!
+  SectorUnsealedCopies: SectorUnsealedCopies!
+  SectorProvingState: SectorProvingState!
+  FlaggedPieces: Int!
+}
+
+type IpniProviderInfo {
+  PeerID: String!
+  Config: String!
+}
+
+type IpniAdvertisementMetadata {
+  Protocol: String!
+  Metadata: String!
+}
+
+type IpniExtendedProviders {
+  ID: String!
+  Addresses: [String!]!
+  Metadata: [IpniAdvertisementMetadata]!
+}
+
+type IpniExtendedProvidersList {
+  Providers: [IpniExtendedProviders]!
+  Override: Boolean!
+}
+
+type IpniAdvertisement {
+  ContextID: String!
+  IsRemove: Boolean!
+  Metadata: [IpniAdvertisementMetadata]!
+  PreviousEntry: String!
+  Provider: String!
+  Addresses: [String!]!
+  ExtendedProviders: IpniExtendedProvidersList
+}
+
 type FundsEscrow {
   Available: BigInt!
   Locked: BigInt!
@@ -376,6 +450,11 @@ type MpoolMessage {
   BaseFee: BigInt!
 }
 
+type MpoolMessages {
+  Count: Int!
+  Messages: [MpoolMessage]!
+}
+
 type Libp2pAddrInfo {
   Addresses: [String]!
   PeerID: String!
@@ -437,10 +516,16 @@ type RootQuery {
   retrievalLog(peerID: String!, transferID: Uint64!): RetrievalState
 
   """Get retrieval logs"""
-  retrievalLogs(cursor: Uint64, offset: Int, limit: Int): RetrievalStateList!
+  retrievalLogs(isIndexer: Boolean, cursor: Uint64, offset: Int, limit: Int): RetrievalStateList!
 
   """Get the number of retrieval logs"""
-  retrievalLogsCount: RetrievalStatesCount!
+  retrievalLogsCount(isIndexer: Boolean): RetrievalStatesCount!
+
+  """Get a list of pieces that have been flagged as having problems"""
+  piecesFlagged(hasUnsealedCopy: Boolean, cursor: BigInt, offset: Int, limit: Int): FlaggedPiecesList!
+
+  """Get the number of pieces that have been flagged as having problems"""
+  piecesFlaggedCount(hasUnsealedCopy: Boolean): Int!
 
   """Get information about a piece from the piece store, DAG store and database"""
   pieceStatus(pieceCid: String!): PieceStatus!
@@ -451,6 +536,9 @@ type RootQuery {
   """Get the pieces that have a particular root payload CID"""
   piecesWithRootPayloadCid(payloadCid: String!): [String!]!
 
+  """Get the indexes for a particular piece CID"""
+  pieceIndexes(pieceCid: String!): [String!]!
+
   """Get storage space usage"""
   storage: Storage!
 
@@ -459,6 +547,21 @@ type RootQuery {
 
   """Get sealing pipeline state"""
   sealingpipeline: SealingPipeline!
+
+  """Get IPNI Provider configuration and state"""
+  ipniProviderInfo: IpniProviderInfo!
+
+  """Get IPNI advertisement"""
+  ipniAdvertisement(adCid: String!): IpniAdvertisement!
+
+  """Get entries for an IPNI advertisement"""
+  ipniAdvertisementEntries(adCid: String!): [String]!
+
+  """Get count of entries for an IPNI advertisement"""
+  ipniAdvertisementEntriesCount(adCid: String!): Int!
+
+  """Get LID state"""
+  lid: LID!
 
   """Get funds available"""
   funds: Funds!
@@ -476,10 +579,7 @@ type RootQuery {
   transferStats: TransferStats!
 
   """Get local messages in the mpool"""
-  mpool(local: Boolean!): [MpoolMessage]!
-
-  """Get number of messages stuck in mpool"""
-  mpoolAlertsCount: Int!
+  mpool(alerts: Boolean!): MpoolMessages!
 
   """Get libp2p addresses and peer id"""
   libp2pAddrInfo: Libp2pAddrInfo!
@@ -500,6 +600,9 @@ type RootMutation {
 
   """Publish all pending deals now"""
   dealPublishNow: Boolean!
+
+  """Explicitly load the piece data from the sealing subsystem and index it"""
+  pieceBuildIndex(pieceCid: String!): Boolean!
 
   """Top-up the available deal collateral in escrow for deal publishing"""
   fundsMoveToEscrow(amount: BigInt!): Boolean!

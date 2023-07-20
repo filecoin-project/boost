@@ -79,6 +79,16 @@ func DefaultBoost() *Boost {
 			ServiceName: "boostd",
 		},
 
+		LocalIndexDirectory: LocalIndexDirectoryConfig{
+			Yugabyte: LocalIndexDirectoryYugabyteConfig{
+				Enabled: false,
+			},
+			ParallelAddIndexLimit: 4,
+			EmbeddedServicePort:   8042,
+			ServiceApiInfo:        "",
+			ServiceRPCTimeout:     Duration(15 * time.Minute),
+		},
+
 		ContractDeals: ContractDealsConfig{
 			Enabled:            false,
 			AllowlistContracts: []string{},
@@ -131,6 +141,7 @@ func DefaultBoost() *Boost {
 			DealLogDurationDays:                30,
 			SealingPipelineCacheTimeout:        Duration(30 * time.Second),
 			FundsTaggingEnabled:                true,
+			EnableLegacyStorageDeals:           false,
 		},
 
 		LotusDealmaking: lotus_config.DealmakingConfig{
@@ -183,6 +194,8 @@ func DefaultBoost() *Boost {
 			// format: "/indexer/ingest/<network-name>"
 			TopicName:         "",
 			PurgeCacheOnStart: false,
+
+			WebHost: "cid.contact",
 
 			Announce: IndexProviderAnnounceConfig{
 				AnnounceOverHttp:   false,

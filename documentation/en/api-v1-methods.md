@@ -25,6 +25,7 @@
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
   * [BoostIndexerAnnounceLatest](#boostindexerannouncelatest)
   * [BoostIndexerAnnounceLatestHttp](#boostindexerannouncelatesthttp)
+  * [BoostIndexerListMultihashes](#boostindexerlistmultihashes)
   * [BoostMakeDeal](#boostmakedeal)
   * [BoostOfflineDealWithData](#boostofflinedealwithdata)
 * [Deals](#deals)
@@ -86,12 +87,8 @@
   * [NetStat](#netstat)
 * [Online](#online)
   * [OnlineBackup](#onlinebackup)
-* [Pieces](#pieces)
-  * [PiecesGetCIDInfo](#piecesgetcidinfo)
-  * [PiecesGetMaxOffset](#piecesgetmaxoffset)
-  * [PiecesGetPieceInfo](#piecesgetpieceinfo)
-  * [PiecesListCidInfos](#pieceslistcidinfos)
-  * [PiecesListPieces](#pieceslistpieces)
+* [Pd](#pd)
+  * [PdBuildIndexForPieceCid](#pdbuildindexforpiececid)
 * [Runtime](#runtime)
   * [RuntimeSubsystems](#runtimesubsystems)
 * [Sectors](#sectors)
@@ -598,6 +595,27 @@ Response:
 {
   "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
 }
+```
+
+### BoostIndexerListMultihashes
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
+Response:
+```json
+[
+  "Bw=="
+]
 ```
 
 ### BoostMakeDeal
@@ -1790,45 +1808,13 @@ Inputs:
 
 Response: `{}`
 
-## Pieces
+## Pd
 
 
-### PiecesGetCIDInfo
+### PdBuildIndexForPieceCid
+There are not yet any comments for this method.
 
-
-Perms: read
-
-Inputs:
-```json
-[
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
-]
-```
-
-Response:
-```json
-{
-  "CID": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
-  "PieceBlockLocations": [
-    {
-      "RelOffset": 42,
-      "BlockSize": 42,
-      "PieceCID": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      }
-    }
-  ]
-}
-```
-
-### PiecesGetMaxOffset
-
-
-Perms: read
+Perms: admin
 
 Inputs:
 ```json
@@ -1839,70 +1825,7 @@ Inputs:
 ]
 ```
 
-Response: `42`
-
-### PiecesGetPieceInfo
-
-
-Perms: read
-
-Inputs:
-```json
-[
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
-]
-```
-
-Response:
-```json
-{
-  "PieceCID": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
-  "Deals": [
-    {
-      "DealID": 5432,
-      "SectorID": 9,
-      "Offset": 1032,
-      "Length": 1032
-    }
-  ]
-}
-```
-
-### PiecesListCidInfos
-
-
-Perms: read
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
-]
-```
-
-### PiecesListPieces
-
-
-Perms: read
-
-Inputs: `null`
-
-Response:
-```json
-[
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
-]
-```
+Response: `{}`
 
 ## Runtime
 

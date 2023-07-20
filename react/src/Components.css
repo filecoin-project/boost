@@ -1,0 +1,31 @@
+.js-obj {
+    position: relative;
+    color: #777777;
+    line-height: 1.5em;
+}
+
+.js-obj.expandable > .js-obj-name {
+    cursor: pointer;
+}
+
+.js-obj .js-obj {
+    padding-left: 1em;
+    display: none;
+}
+.js-obj.expanded .js-obj {
+    display: block;
+}
+
+.js-obj .expand-collapse {
+    margin-left: 0.5em;
+    opacity: 0.5;
+    width: 0.8em;
+    height: 0.8em;
+    display: inline-block;
+    background: url("./bootstrap-icons/icons/caret-right-fill.svg");
+    background-size: cover;
+}
+
+.js-obj.expanded .expand-collapse {
+    background: url("./bootstrap-icons/icons/caret-down-fill.svg")
+}

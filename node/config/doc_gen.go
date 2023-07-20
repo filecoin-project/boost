@@ -74,6 +74,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "LocalIndexDirectory",
+			Type: "LocalIndexDirectoryConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "ContractDeals",
 			Type: "ContractDealsConfig",
 
@@ -413,6 +419,13 @@ Any value less than 0 will result in use of default`,
 accepted boost will tag funds for that deal so that they cannot be used
 for any other deal.`,
 		},
+		{
+			Name: "EnableLegacyStorageDeals",
+			Type: "bool",
+
+			Comment: `Whether to enable legacy deals on the Boost node or not. We recommend keeping
+them disabled. These will be completely deprecated soon.`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{
@@ -503,6 +516,12 @@ starts. By default, the cache is rehydrated from previously cached entries store
 datastore if any is present.`,
 		},
 		{
+			Name: "WebHost",
+			Type: "string",
+
+			Comment: `The network indexer host that the web UI should link to for published announcements`,
+		},
+		{
 			Name: "Announce",
 			Type: "IndexProviderAnnounceConfig",
 
@@ -536,6 +555,64 @@ This is usually the same as the for the boost node.`,
 
 			Comment: `Set the port on which to listen for index provider requests over HTTP.
 Note that this port must be open on the firewall.`,
+		},
+	},
+	"LocalIndexDirectoryConfig": []DocField{
+		{
+			Name: "Yugabyte",
+			Type: "LocalIndexDirectoryYugabyteConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "ParallelAddIndexLimit",
+			Type: "int",
+
+			Comment: `The maximum number of add index operations allowed to execute in parallel.
+The add index operation is executed when a new deal is created - it fetches
+the piece from the sealing subsystem, creates an index of where each block
+is in the piece, and adds the index to the local index directory.`,
+		},
+		{
+			Name: "EmbeddedServicePort",
+			Type: "uint64",
+
+			Comment: `The port that the embedded local index directory data service runs on.
+Set this value to zero to disable the embedded local index directory data service
+(in that case the local index directory data service must be running externally)`,
+		},
+		{
+			Name: "ServiceApiInfo",
+			Type: "string",
+
+			Comment: `The connect string for the local index directory data service RPC API eg "ws://localhost:8042"
+Set this value to "" if the local index directory data service is embedded.`,
+		},
+		{
+			Name: "ServiceRPCTimeout",
+			Type: "Duration",
+
+			Comment: `The RPC timeout when making requests to the boostd-data service`,
+		},
+	},
+	"LocalIndexDirectoryYugabyteConfig": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: ``,
+		},
+		{
+			Name: "ConnectString",
+			Type: "string",
+
+			Comment: `The yugabyte postgres connect string eg "postgresql://postgres:postgres@localhost"`,
+		},
+		{
+			Name: "Hosts",
+			Type: "[]string",
+
+			Comment: `The yugabyte cassandra hosts eg ["127.0.0.1"]`,
 		},
 	},
 	"LotusDealmakingConfig": []DocField{
@@ -695,7 +772,7 @@ and it is not triggered, retrieval quality for users will be impacted.`,
 			Name: "Miner",
 			Type: "string",
 
-			Comment: `The "owner" address of the miner`,
+			Comment: `The miner ID`,
 		},
 		{
 			Name: "PublishStorageDeals",

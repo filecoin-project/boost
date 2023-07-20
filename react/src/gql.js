@@ -258,8 +258,8 @@ const RetrievalLogQuery = gql`
 `;
 
 const RetrievalLogsListQuery = gql`
-    query AppRetrievalLogsListQuery($cursor: Uint64, $offset: Int, $limit: Int) {
-        retrievalLogs(cursor: $cursor, offset: $offset, limit: $limit) {
+    query AppRetrievalLogsListQuery($isIndexer: Boolean, $cursor: Uint64, $offset: Int, $limit: Int) {
+        retrievalLogs(isIndexer: $isIndexer, cursor: $cursor, offset: $offset, limit: $limit) {
             logs {
                 RowID
                 CreatedAt
@@ -286,14 +286,61 @@ const RetrievalLogsListQuery = gql`
 `;
 
 const RetrievalLogsCountQuery = gql`
-    query AppRetrievalLogsCountQuery {
-        retrievalLogsCount {
+    query AppRetrievalLogsCountQuery($isIndexer: Boolean) {
+        retrievalLogsCount(isIndexer: $isIndexer) {
             Count
             Period
         }
     }
 `;
 
+const IpniProviderInfoQuery = gql`
+    query AppIpniProviderInfoQuery {
+        ipniProviderInfo {
+            PeerID
+            Config
+        }
+    }
+`;
+
+const IpniAdQuery = gql`
+    query AppIpniAdQuery($adCid: String!) {
+        ipniAdvertisement(adCid: $adCid) {
+            ContextID
+            Metadata {
+                Protocol
+                Metadata
+            }
+            PreviousEntry
+            Provider
+            Addresses
+            IsRemove
+            ExtendedProviders {
+                Override
+                Providers {
+                    ID
+                    Addresses
+                    Metadata {
+                        Protocol
+                        Metadata
+                    }
+                }
+            }
+        }
+    }
+`;
+
+const IpniAdEntriesQuery = gql`
+    query AppIpniAdEntriesQuery($adCid: String!) {
+        ipniAdvertisementEntries(adCid: $adCid)
+    }
+`;
+
+const IpniAdEntriesCountQuery = gql`
+    query AppIpniAdEntriesCountQuery($adCid: String!) {
+        ipniAdvertisementEntriesCount(adCid: $adCid)
+    }
+`;
 
 const DealCancelMutation = gql`
     mutation AppDealCancelMutation($id: ID!) {
@@ -398,6 +445,36 @@ const PiecesWithPayloadCidQuery = gql`
     }
 `;
 
+const FlaggedPiecesQuery = gql`
+    query AppFlaggedPiecesQuery($hasUnsealedCopy: Boolean, $cursor: BigInt, $offset: Int, $limit: Int) {
+        piecesFlagged(hasUnsealedCopy: $hasUnsealedCopy, cursor: $cursor, offset: $offset, limit: $limit) {
+            pieces {
+                CreatedAt
+                PieceCid
+                IndexStatus {
+                    Status
+                    Error
+                }
+                DealCount
+            }
+            totalCount
+            more
+        }
+    }
+`;
+
+const FlaggedPiecesCountQuery = gql`
+    query AppFlaggedPiecesCountQuery($hasUnsealedCopy: Boolean) {
+        piecesFlaggedCount(hasUnsealedCopy: $hasUnsealedCopy)
+    }
+`;
+
+const PieceBuildIndexMutation = gql`
+    mutation AppPieceBuildIndexMutation($pieceCid: String!) {
+        pieceBuildIndex(pieceCid: $pieceCid)
+    }
+`;
+
 const PieceStatusQuery = gql`
     query AppPieceStatusQuery($pieceCid: String!) {
         pieceStatus(pieceCid: $pieceCid) {
@@ -408,7 +485,7 @@ const PieceStatusQuery = gql`
             }
             Deals {
                 SealStatus {
-                    IsUnsealed
+                    Status
                     Error
                 }
                 Deal {
@@ -431,10 +508,36 @@ const PieceStatusQuery = gql`
                     Length
                 }
                 SealStatus {
-                    IsUnsealed
+                    Status
                     Error
                 }
             }
+        }
+    }
+`;
+
+const LIDQuery = gql`
+    query AppLIDQuery {
+        lid {
+            DealData {
+                Indexed
+                FlaggedUnsealed
+                FlaggedSealed
+            }
+            Pieces {
+                Indexed
+                FlaggedUnsealed
+                FlaggedSealed
+            }
+            SectorUnsealedCopies {
+                Unsealed
+                Sealed
+            }
+            SectorProvingState {
+                Active
+                Inactive
+            }
+            FlaggedPieces
         }
     }
 `;
@@ -618,26 +721,23 @@ const StorageAskUpdate = gql`
 `;
 
 const MpoolQuery = gql`
-    query AppMpoolQuery($local: Boolean!) {
-        mpool(local: $local) {
-            SentEpoch
-            From
-            To
-            Nonce
-            Value
-            GasFeeCap
-            GasLimit
-            GasPremium
-            Method
-            Params
-            BaseFee
+    query AppMpoolQuery($alerts: Boolean!) {
+        mpool(alerts: $alerts) {
+            Count
+            Messages {
+                SentEpoch
+                From
+                To
+                Nonce
+                Value
+                GasFeeCap
+                GasLimit
+                GasPremium
+                Method
+                Params
+                BaseFee
+            }
         }
-    }
-`;
-
-const MpoolAlertsQuery = gql`
-    query AppMpoolAlertsQuery {
-        mpoolAlertsCount
     }
 `;
 
@@ -682,9 +782,17 @@ export {
     RetrievalLogQuery,
     RetrievalLogsListQuery,
     RetrievalLogsCountQuery,
+    IpniProviderInfoQuery,
+    IpniAdQuery,
+    IpniAdEntriesQuery,
+    IpniAdEntriesCountQuery,
     PiecesWithRootPayloadCidQuery,
     PiecesWithPayloadCidQuery,
+    PieceBuildIndexMutation,
     PieceStatusQuery,
+    FlaggedPiecesQuery,
+    FlaggedPiecesCountQuery,
+    LIDQuery,
     StorageQuery,
     LegacyStorageQuery,
     FundsQuery,
@@ -696,7 +804,6 @@ export {
     TransfersQuery,
     TransferStatsQuery,
     MpoolQuery,
-    MpoolAlertsQuery,
     SealingPipelineQuery,
     Libp2pAddrInfoQuery,
     StorageAskQuery,

@@ -5,7 +5,6 @@ import {TransfersQuery, TransferStatsQuery} from "./gql";
 import moment from "moment"
 import {PageContainer} from "./Components";
 import {Link} from "react-router-dom";
-import {toFixed} from "./util";
 import arrowLeftRightImg from './bootstrap-icons/icons/arrow-left-right.svg'
 import './DealTransfers.css'
 

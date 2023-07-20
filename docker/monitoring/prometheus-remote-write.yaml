@@ -23,11 +23,6 @@ scrape_configs:
       - targets: [ 'booster-http:7777' ]
         labels:
           host: 'unknown'
-  - job_name: 'lotus-miner'
-    static_configs:
-      - targets: [ 'lotus-miner:2345' ]
-        labels:
-          host: 'unknown'
 
 remote_write:
   - url: <remote-write-url>

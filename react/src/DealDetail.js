@@ -1,6 +1,6 @@
 /* global BigInt */
 
-import React, {useEffect, useState} from "react";
+import React, {useEffect} from "react";
 import {useMutation, useQuery, useSubscription} from "@apollo/react-hooks";
 import {DealCancelMutation, DealFailPausedMutation, DealRetryPausedMutation, DealSubscription, EpochQuery} from "./gql";
 import {useNavigate, useParams, Link} from "react-router-dom";
@@ -8,9 +8,11 @@ import {dateFormat} from "./util-date";
 import moment from "moment";
 import {addCommas, humanFIL, humanFileSize, isContractAddress} from "./util";
 import './DealDetail.css'
+import './Components.css'
 import closeImg from './bootstrap-icons/icons/x-circle.svg'
 import {Info} from "./Info";
 import {addClassFor} from "./util-ui";
+import {ExpandableJSObject} from "./Components";
 
 export function DealDetail(props) {
     const params = useParams()
@@ -146,7 +148,7 @@ export function DealDetail(props) {
                 </tr>
                 <tr>
                     <th>Deal Data Root CID</th>
-                    <td><Link to={'/inspect/'+deal.DealDataRoot}>{deal.DealDataRoot}</Link></td>
+                    <td><Link to={'/piece-doctor/'+deal.DealDataRoot}>{deal.DealDataRoot}</Link></td>
                 </tr>
                 <tr>
                     <th>Verified</th>
@@ -162,7 +164,7 @@ export function DealDetail(props) {
                 </tr>
                 <tr>
                     <th>Piece CID</th>
-                    <td><Link to={'/inspect/'+deal.PieceCid}>{deal.PieceCid}</Link></td>
+                    <td><Link to={'/piece-doctor/'+deal.PieceCid}>{deal.PieceCid}</Link></td>
                 </tr>
                 <tr>
                     <th>Piece Size</th>
@@ -449,39 +451,9 @@ function DealLog(props) {
                 <span className="subsystem">{log.Subsystem}{log.Subsystem ? ': ' : ''}</span>
                 {log.LogMsg}
             </div>
-            {Object.keys(logParams).sort().map(k => <LogParam k={k} v={logParams[k]} topLevel={true} key={k} />)}
+            {Object.keys(logParams).sort().map(k => <ExpandableJSObject k={k} v={logParams[k]} topLevel={true} key={k} />)}
         </td>
     </tr>
-}
-
-function LogParam(props) {
-    const [expanded, setExpanded] = useState(false)
-
-    var val = props.v
-    const isObject = (val && typeof val === 'object')
-    if (isObject) {
-        val = Object.keys(val).sort().map(ck => <LogParam k={ck} v={val[ck]} key={ck} />)
-    } else if ((typeof val === 'string' || typeof val === 'number') && (''+val).match(/^[0-9]+$/)) {
-        val = addCommas(BigInt(val))
-    }
-
-    function toggleExpandState() {
-        setExpanded(!expanded)
-    }
-
-    const expandable = isObject && props.topLevel
-    return (
-        <div className={"param" + (expandable ? ' expandable' : '') + (expanded ? ' expanded' : '')}>
-            <span className="param-name" onClick={toggleExpandState}>
-                {props.k}:
-                {expandable ? (
-                    <div className="expand-collapse"></div>
-                ) : null}
-            </span>
-            &nbsp;
-            {val}
-        </div>
-    )
 }
 
 function getAllDataAsText(detailTableEl, dealID, logs) {

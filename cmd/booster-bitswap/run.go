@@ -1,20 +1,17 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
-	"strings"
 
-	"github.com/filecoin-project/boost/api"
-	bclient "github.com/filecoin-project/boost/api/client"
-	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/filters"
 	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
 	"github.com/filecoin-project/boost/metrics"
+	"github.com/filecoin-project/boost/piecedirectory"
+	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
-	"github.com/filecoin-project/go-jsonrpc"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mitchellh/go-homedir"
@@ -46,9 +43,24 @@ var runCmd = &cli.Command{
 			Value: 9696,
 		},
 		&cli.StringFlag{
-			Name:     "api-boost",
-			Usage:    "the endpoint for the boost API",
+			Name:     "api-fullnode",
+			Usage:    "the endpoint for the full node API",
 			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "api-storage",
+			Usage:    "the endpoint for the storage node API",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "api-lid",
+			Usage:    "the endpoint for the local index directory API, eg 'http://localhost:8042'",
+			Required: true,
+		},
+		&cli.IntFlag{
+			Name:  "add-index-throttle",
+			Usage: "the maximum number of add index operations that can run in parallel",
+			Value: 4,
 		},
 		&cli.StringFlag{
 			Name:  "proxy",
@@ -129,14 +141,31 @@ var runCmd = &cli.Command{
 			}()
 		}
 
-		// Connect to the Boost API
-		boostAPIInfo := cctx.String("api-boost")
-		bapi, bcloser, err := getBoostAPI(ctx, boostAPIInfo)
+		// Connect to the full node API
+		fnApiInfo := cctx.String("api-fullnode")
+		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log)
 		if err != nil {
-			return fmt.Errorf("getting boost API: %w", err)
+			return fmt.Errorf("getting full node API: %w", err)
 		}
-		defer bcloser()
+		defer ncloser()
 
+		// Connect to the storage API and create a sector accessor
+		storageApiInfo := cctx.String("api-storage")
+		sa, storageCloser, err := lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
+		if err != nil {
+			return err
+		}
+		defer storageCloser()
+
+		// Connect to the local index directory service
+		cl := bdclient.NewStore()
+		defer cl.Close(ctx)
+		err = cl.Dial(ctx, cctx.String("api-lid"))
+		if err != nil {
+			return fmt.Errorf("connecting to local index directory service: %w", err)
+		}
+
+		// Create the bitswap host
 		bitswapBlockMetrics := remoteblockstore.BlockMetrics{
 			GetRequestCount:             metrics.BitswapRblsGetRequestCount,
 			GetFailResponseCount:        metrics.BitswapRblsGetFailResponseCount,
@@ -149,12 +178,12 @@ var runCmd = &cli.Command{
 			GetSizeFailResponseCount:    metrics.BitswapRblsGetSizeFailResponseCount,
 			GetSizeSuccessResponseCount: metrics.BitswapRblsGetSizeSuccessResponseCount,
 		}
-		remoteStore := remoteblockstore.NewRemoteBlockstore(bapi, bitswapBlockMetrics)
+
 		// Create the server API
 		port := cctx.Int("port")
 		repoDir, err := homedir.Expand(cctx.String(FlagRepo.Name))
 		if err != nil {
-			return fmt.Errorf("expanding repo file path: %w", err)
+			return fmt.Errorf("expanding repo file path %s: %w", cctx.String(FlagRepo.Name), err)
 		}
 		host, err := setupHost(repoDir, port)
 		if err != nil {
@@ -167,6 +196,9 @@ var runCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)
 		}
+		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
+		pd := piecedirectory.NewPieceDirectory(cl, pr, cctx.Int("add-index-throttle"))
+		remoteStore := remoteblockstore.NewRemoteBlockstore(pd, &bitswapBlockMetrics)
 		server := NewBitswapServer(remoteStore, host, multiFilter)
 
 		var proxyAddrInfo *peer.AddrInfo
@@ -177,6 +209,9 @@ var runCmd = &cli.Command{
 				return fmt.Errorf("parsing proxy multiaddr %s: %w", proxy, err)
 			}
 		}
+
+		// Start the local index directory
+		pd.Start(ctx)
 
 		// Start the bitswap server
 		log.Infof("Starting booster-bitswap node on port %d", port)
@@ -217,21 +252,4 @@ var runCmd = &cli.Command{
 
 		return nil
 	},
-}
-
-func getBoostAPI(ctx context.Context, ai string) (api.Boost, jsonrpc.ClientCloser, error) {
-	ai = strings.TrimPrefix(strings.TrimSpace(ai), "BOOST_API_INFO=")
-	info := cliutil.ParseApiInfo(ai)
-	addr, err := info.DialArgs("v0")
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get DialArgs: %w", err)
-	}
-
-	log.Infof("Using boost API at %s", addr)
-	api, closer, err := bclient.NewBoostRPCV0(ctx, addr, info.AuthHeader())
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating full node service API: %w", err)
-	}
-
-	return api, closer, nil
 }

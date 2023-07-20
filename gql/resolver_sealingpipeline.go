@@ -228,7 +228,7 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 			}
 
 			// match not found in boost db - fallback to legacy deals list
-			lds, err := r.legacyProv.ListLocalDeals()
+			lds, err := r.legacyDeals.ByPublishCid(ctx, *publishCid)
 			if err != nil {
 				return nil, err
 			}
@@ -236,16 +236,12 @@ func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers [
 			var j int
 			for ; j < len(lds); j++ {
 				l := lds[j]
-				if l.PublishCid == nil {
-					continue
-				}
-
 				lpcid, err := l.ClientDealProposal.Proposal.Cid()
 				if err != nil {
 					return nil, err
 				}
 
-				if l.PublishCid.Equals(*publishCid) && lpcid.Equals(dcid) {
+				if lpcid.Equals(dcid) {
 					break
 				}
 			}

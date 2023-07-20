@@ -53,11 +53,12 @@ function RetrievalLogsContent(props) {
         } catch {}
     }
     const {loading, error, data} = useQuery(RetrievalLogsListQuery, {
-        pollInterval: 1000,
+        pollInterval: 10000,
         variables: {
             cursor: queryCursor,
             offset: listOffset,
             limit: rowsPerPage,
+            isIndexer: false,
         },
         fetchPolicy: 'network-only',
     })
@@ -176,7 +177,7 @@ function TableRow(props) {
                 </Link>
             </td>
             <td className="payload-cid">
-                <Link to={'/inspect/'+row.PayloadCID}>
+                <Link to={'/piece-doctor/'+row.PayloadCID}>
                     <ShortCID cid={row.PayloadCID} />
                 </Link>
             </td>
@@ -195,10 +196,10 @@ function TableRow(props) {
 
 export function RetrievalLogsMenuItem(props) {
     const {data} = useQuery(RetrievalLogsCountQuery, {
-        pollInterval: 5000,
+        pollInterval: 10000,
         fetchPolicy: 'network-only',
         variables: {
-            accepted: true,
+            isIndexer: false,
         }
     })
 

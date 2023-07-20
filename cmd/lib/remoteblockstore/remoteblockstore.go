@@ -29,7 +29,7 @@ type RemoteBlockstoreAPI interface {
 // RemoteBlockstore is a read-only blockstore over all cids across all pieces on a provider.
 type RemoteBlockstore struct {
 	api          RemoteBlockstoreAPI
-	blockMetrics BlockMetrics
+	blockMetrics *BlockMetrics
 }
 
 type BlockMetrics struct {
@@ -45,7 +45,7 @@ type BlockMetrics struct {
 	GetSizeSuccessResponseCount *stats.Int64Measure
 }
 
-func NewRemoteBlockstore(api RemoteBlockstoreAPI, blockMetrics BlockMetrics) blockstore.Blockstore {
+func NewRemoteBlockstore(api RemoteBlockstoreAPI, blockMetrics *BlockMetrics) blockstore.Blockstore {
 	return &RemoteBlockstore{
 		api:          api,
 		blockMetrics: blockMetrics,
@@ -56,7 +56,9 @@ func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block,
 	ctx, span := tracing.Tracer.Start(ctx, "rbls.get")
 	defer span.End()
 	span.SetAttributes(attribute.String("cid", c.String()))
-	stats.Record(ctx, ro.blockMetrics.GetRequestCount.M(1))
+	if ro.blockMetrics != nil {
+		stats.Record(ctx, ro.blockMetrics.GetRequestCount.M(1))
+	}
 
 	log.Debugw("Get", "cid", c)
 	data, err := ro.api.BlockstoreGet(ctx, c)
@@ -64,12 +66,16 @@ func (ro *RemoteBlockstore) Get(ctx context.Context, c cid.Cid) (b blocks.Block,
 	log.Debugw("Get response", "cid", c, "size", len(data), "error", err)
 	if err != nil {
 		log.Infow("Get failed", "cid", c, "error", err)
-		stats.Record(ctx, ro.blockMetrics.GetFailResponseCount.M(1))
+		if ro.blockMetrics != nil {
+			stats.Record(ctx, ro.blockMetrics.GetFailResponseCount.M(1))
+		}
 		return nil, err
 	}
 	log.Infow("Get", "cid", c, "size", len(data))
-	stats.Record(ctx, ro.blockMetrics.GetSuccessResponseCount.M(1))
-	stats.Record(ctx, ro.blockMetrics.BytesSentCount.M(int64(len(data))))
+	if ro.blockMetrics != nil {
+		stats.Record(ctx, ro.blockMetrics.GetSuccessResponseCount.M(1))
+		stats.Record(ctx, ro.blockMetrics.BytesSentCount.M(int64(len(data))))
+	}
 	return blocks.NewBlockWithCid(data, c)
 }
 
@@ -77,14 +83,17 @@ func (ro *RemoteBlockstore) Has(ctx context.Context, c cid.Cid) (bool, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "rbls.has")
 	defer span.End()
 	span.SetAttributes(attribute.String("cid", c.String()))
-	stats.Record(ctx, ro.blockMetrics.HasRequestCount.M(1))
+
+	if ro.blockMetrics != nil {
+		stats.Record(ctx, ro.blockMetrics.HasRequestCount.M(1))
+	}
 
 	log.Debugw("Has", "cid", c)
 	has, err := ro.api.BlockstoreHas(ctx, c)
 	log.Debugw("Has response", "cid", c, "has", has, "error", err)
-	if err != nil {
+	if err != nil && ro.blockMetrics != nil {
 		stats.Record(ctx, ro.blockMetrics.HasFailResponseCount.M(1))
-	} else {
+	} else if ro.blockMetrics != nil {
 		stats.Record(ctx, ro.blockMetrics.HasSuccessResponseCount.M(1))
 	}
 	return has, err
@@ -94,15 +103,17 @@ func (ro *RemoteBlockstore) GetSize(ctx context.Context, c cid.Cid) (int, error)
 	ctx, span := tracing.Tracer.Start(ctx, "rbls.get_size")
 	defer span.End()
 	span.SetAttributes(attribute.String("cid", c.String()))
-	stats.Record(ctx, ro.blockMetrics.GetSizeRequestCount.M(1))
+	if ro.blockMetrics != nil {
+		stats.Record(ctx, ro.blockMetrics.GetSizeRequestCount.M(1))
+	}
 
 	log.Debugw("GetSize", "cid", c)
 	size, err := ro.api.BlockstoreGetSize(ctx, c)
 	err = normalizeError(err)
 	log.Debugw("GetSize response", "cid", c, "size", size, "error", err)
-	if err != nil {
+	if err != nil && ro.blockMetrics != nil {
 		stats.Record(ctx, ro.blockMetrics.GetSizeFailResponseCount.M(1))
-	} else {
+	} else if ro.blockMetrics != nil {
 		stats.Record(ctx, ro.blockMetrics.GetSizeSuccessResponseCount.M(1))
 	}
 	return size, err
