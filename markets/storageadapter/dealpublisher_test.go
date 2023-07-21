@@ -234,28 +234,25 @@ func TestForcePublish(t *testing.T) {
 }
 
 func TestPublishPendingDeals(t *testing.T) {
-	//stm: @MARKET_DEAL_PUBLISHER_PUBLISH_001, @MARKET_DEAL_PUBLISHER_GET_PENDING_DEALS_001
-	//stm: @MARKET_DEAL_PUBLISHER_FORCE_PUBLISH_ALL_001
 	dpapi := newDPAPI(t)
 
 	// Create a deal publisher
-	start := build.Clock.Now()
 	publishPeriod := time.Hour
 	dp := newDealPublisher(dpapi, nil, PublishMsgConfig{
-		Period:         publishPeriod,
-		MaxDealsPerMsg: 10,
+		Period:            publishPeriod,
+		MaxDealsPerMsg:    10,
+		ManualDealPublish: true,
 	}, &api.MessageSendSpec{MaxFee: abi.NewTokenAmount(1)})
 
 	// Queue three deals for publishing, one with a cancelled context
-	var dealsToPublish []markettypes.ClientDealProposal
 	// 1. Regular deal
-	deal := publishDeal(t, dp, 0, false, false)
-	dealsToPublish = append(dealsToPublish, deal)
+	publishDeal(t, dp, 0, false, false)
 	// 2. Deal with cancelled context
 	publishDeal(t, dp, 0, true, false)
 	// 3. Regular deal
-	deal = publishDeal(t, dp, 0, false, false)
-	dealsToPublish = append(dealsToPublish, deal)
+	publishDeal(t, dp, 0, false, false)
+	// 4. Regular deal
+	publishDeal(t, dp, 0, false, false)
 
 	// Allow a moment for them to be queued
 	build.Clock.Sleep(10 * time.Millisecond)
@@ -263,10 +260,7 @@ func TestPublishPendingDeals(t *testing.T) {
 	// Should be two deals in the pending deals list
 	// (deal with cancelled context is ignored)
 	pendingInfo := dp.PendingDeals()
-	require.Len(t, pendingInfo.Deals, 2)
-	require.Equal(t, publishPeriod, pendingInfo.PublishPeriod)
-	require.True(t, pendingInfo.PublishPeriodStart.After(start))
-	require.True(t, pendingInfo.PublishPeriodStart.Before(build.Clock.Now()))
+	require.Len(t, pendingInfo.Deals, 3)
 
 	var pcids []cid.Cid
 	props := pendingInfo.Deals
@@ -276,16 +270,30 @@ func TestPublishPendingDeals(t *testing.T) {
 		pcids = append(pcids, signedProp.Cid())
 	}
 
+	toPublish := pcids[1:]
+	pending := []cid.Cid{pcids[0]}
+
+	// Send an additional CID not present in publisher
+	c, err := cid.Decode("bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4")
+	require.NoError(t, err)
+
 	// Publish all pending deals and verify all have been published
-	publishedDeals := dp.PublishQueuedDeals(pcids)
-	require.Equal(t, pcids, publishedDeals)
+	publishedDeals := dp.PublishQueuedDeals(append(toPublish, c))
+	require.Equal(t, toPublish, publishedDeals)
 
 	// Should be no pending deals
-	pendingInfo = dp.PendingDeals()
-	require.Len(t, pendingInfo.Deals, 0)
+	pendingInfo1 := dp.PendingDeals()
+	var ppcids []cid.Cid
+	require.Len(t, pendingInfo1.Deals, 1)
+	for _, p := range pendingInfo1.Deals {
+		signedProp, err := cborutil.AsIpld(&p)
+		require.NoError(t, err)
+		ppcids = append(ppcids, signedProp.Cid())
+	}
+	require.Equal(t, pending, ppcids)
 
 	// Make sure the expected deals were published
-	checkPublishedDeals(t, dpapi, dealsToPublish, []int{2})
+	checkPublishedDeals(t, dpapi, props[1:], []int{2})
 }
 
 func publishDeal(t *testing.T, dp *DealPublisher, invalid int, ctxCancelled bool, expired bool) markettypes.ClientDealProposal {
