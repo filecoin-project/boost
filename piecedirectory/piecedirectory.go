@@ -388,9 +388,9 @@ func (r *cachedSectionReader) Close() error {
 	if r.refs == 0 {
 		_, err := r.ps.pieceReaderCache.Get(r.pieceCid.String())
 		if err == ttlcache.ErrNotFound {
-			log.Warnw("closing underlying section reader as cache entry doesn't exist", "piececid", r.pieceCid)
+			log.Warnw("canceling underlying section reader context as cache entry doesn't exist", "piececid", r.pieceCid)
 
-			_ = r.SectionReader.Close()
+			r.cancel()
 		}
 	}
 
