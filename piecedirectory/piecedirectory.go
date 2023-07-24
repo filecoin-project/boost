@@ -71,6 +71,8 @@ func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThro
 		pd.pieceReaderCacheMu.Lock()
 		defer pd.pieceReaderCacheMu.Unlock()
 
+		r.expired = true
+
 		if r.refs <= 0 {
 			r.cancel()
 			return
@@ -375,8 +377,9 @@ type cachedSectionReader struct {
 	// err is non-nil if there's an error getting the underlying piece reader
 	err error
 	// cancel for underlying GetPieceReader call
-	cancel func()
-	refs   int
+	cancel  func()
+	refs    int
+	expired bool
 }
 
 func (r *cachedSectionReader) Close() error {
@@ -385,13 +388,10 @@ func (r *cachedSectionReader) Close() error {
 
 	r.refs--
 
-	if r.refs == 0 {
-		_, err := r.ps.pieceReaderCache.Get(r.pieceCid.String())
-		if err == ttlcache.ErrNotFound {
-			log.Warnw("canceling underlying section reader context as cache entry doesn't exist", "piececid", r.pieceCid)
+	if r.refs == 0 && r.expired {
+		log.Warnw("canceling underlying section reader context as cache entry doesn't exist", "piececid", r.pieceCid)
 
-			r.cancel()
-		}
+		r.cancel()
 	}
 
 	return nil
