@@ -78,7 +78,7 @@ func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThro
 			return
 		}
 
-		log.Warnw("expire callback with refs > 0", "refs", r.refs, "piececid", key, "reason", reason)
+		log.Debugw("expire callback with refs > 0", "refs", r.refs, "piececid", key, "reason", reason)
 	}
 
 	prCache.SetExpirationReasonCallback(expireCallback)
@@ -389,7 +389,7 @@ func (r *cachedSectionReader) Close() error {
 	r.refs--
 
 	if r.refs == 0 && r.expired {
-		log.Warnw("canceling underlying section reader context as cache entry doesn't exist", "piececid", r.pieceCid)
+		log.Debugw("canceling underlying section reader context as cache entry doesn't exist", "piececid", r.pieceCid)
 
 		r.cancel()
 	}
