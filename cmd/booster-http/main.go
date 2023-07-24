@@ -40,13 +40,12 @@ func main() {
 
 func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("booster", "INFO")
+	_ = logging.SetLogLevel("remote-blockstore", "INFO")
 
-	if cliutil.IsVerbose {
-		_ = logging.SetLogLevel("remote-blockstore", "INFO")
-	}
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("booster", "DEBUG")
 		_ = logging.SetLogLevel("remote-blockstore", "DEBUG")
+		_ = logging.SetLogLevel("piecedirectory", "DEBUG")
 	}
 
 	return nil
