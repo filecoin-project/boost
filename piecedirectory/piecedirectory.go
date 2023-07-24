@@ -385,6 +385,15 @@ func (r *cachedSectionReader) Close() error {
 
 	r.refs--
 
+	if r.refs == 0 {
+		_, err := r.ps.pieceReaderCache.Get(r.pieceCid.String())
+		if err == ttlcache.ErrNotFound {
+			log.Warnw("closing underlying section reader as cache entry doesn't exist", "piececid", r.pieceCid)
+
+			_ = r.SectionReader.Close()
+		}
+	}
+
 	return nil
 }
 
