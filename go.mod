@@ -287,7 +287,7 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/prometheus/statsd_exporter v0.22.7 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	github.com/rs/cors v1.7.0 // indirect
+	github.com/rs/cors v1.7.0
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
