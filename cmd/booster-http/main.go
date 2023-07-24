@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
@@ -22,8 +23,8 @@ func main() {
 		Name:                 "booster-http",
 		Usage:                "HTTP endpoint for retrieval from Filecoin",
 		EnableBashCompletion: true,
+		Version:              build.UserVersion(),
 		Flags: []cli.Flag{
-			cliutil.FlagVerbose,
 			cliutil.FlagVeryVerbose,
 			FlagRepo,
 		},
