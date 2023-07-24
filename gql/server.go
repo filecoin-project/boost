@@ -12,13 +12,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost/lib/corshandler"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/react"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
 	"github.com/graph-gophers/graphql-transport-ws/graphqlws"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/rs/cors"
 )
 
 var log = logging.Logger("gql")
@@ -32,13 +32,14 @@ type Server struct {
 }
 
 func NewServer(cfg *config.Boost, resolver *resolver, bstore BlockGetter) *Server {
-	webCfg := &corshandler.CorsHandler{Sub: &webConfigServer{
+	c := cors.Default()
+	webCfg := c.Handler(&webConfigServer{
 		cfg: webConfig{
 			Ipni: webConfigIpni{
 				IndexerHost: cfg.IndexProvider.WebHost,
 			},
 		},
-	}}
+	})
 	return &Server{resolver: resolver, bstore: bstore, cfgHandler: webCfg}
 }
 
@@ -50,6 +51,13 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// Serve React app
 	mux := http.NewServeMux()
+
+	// Get new cors
+	options := cors.Options{
+		AllowedHeaders: []string{"*"},
+	}
+	c := cors.New(options)
+
 	err := s.serveReactApp(mux)
 	if err != nil {
 		return err
@@ -90,10 +98,10 @@ func (s *Server) Start(ctx context.Context) error {
 	wsHandler := graphqlws.NewHandlerFunc(schema, queryHandler, wsOpts...)
 
 	listenAddr := fmt.Sprintf("%s:%d", bindAddress, port)
-	s.srv = &http.Server{Addr: listenAddr, Handler: mux}
+	s.srv = &http.Server{Addr: listenAddr, Handler: c.Handler(mux)}
 	fmt.Printf("Graphql server listening on %s\n", listenAddr)
-	mux.Handle("/graphql/subscription", &corshandler.CorsHandler{Sub: wsHandler})
-	mux.Handle("/graphql/query", &corshandler.CorsHandler{Sub: queryHandler})
+	mux.Handle("/graphql/subscription", wsHandler)
+	mux.Handle("/graphql/query", queryHandler)
 
 	s.wg.Add(1)
 	go func() {
