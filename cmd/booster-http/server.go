@@ -27,6 +27,7 @@ import (
 	"github.com/ipfs/boxo/gateway"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/rs/cors"
 	"go.opencensus.io/stats"
 )
 
@@ -83,8 +84,17 @@ func (s *HttpServer) ipfsBasePath() string {
 	return s.path + "/ipfs/"
 }
 
+func newCors() *cors.Cors {
+	options := cors.Options{
+		AllowedHeaders: []string{"*"},
+	}
+	c := cors.New(options)
+	return c
+}
+
 func (s *HttpServer) Start(ctx context.Context) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
+	c := newCors()
 	handler := http.NewServeMux()
 
 	if s.opts.ServePieces {
@@ -106,7 +116,7 @@ func (s *HttpServer) Start(ctx context.Context) error {
 	handler.Handle("/metrics", metrics.Exporter("booster_http")) // metrics
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", s.listenAddr, s.port),
-		Handler: handler,
+		Handler: c.Handler(handler),
 		// This context will be the parent of the context associated with all
 		// incoming requests
 		BaseContext: func(listener net.Listener) context.Context {
