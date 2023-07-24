@@ -354,6 +354,8 @@ type cachedSectionReader struct {
 	ready chan struct{}
 	// err is non-nil if there's an error getting the underlying piece reader
 	err error
+	// cancel for underlying GetPieceReader call
+	cancel func()
 }
 
 func (r *cachedSectionReader) Close() error {
@@ -385,10 +387,12 @@ func (ps *PieceDirectory) GetSharedPieceReader(ctx context.Context, pieceCid cid
 		ps.pieceReaderCacheMu.Unlock()
 
 		// We just added a cached reader, so get its underlying piece reader
-		sr, err := ps.GetPieceReader(ctx, pieceCid)
+		readerCtx, readerCtxCancel := context.WithCancel(context.Background())
+		sr, err := ps.GetPieceReader(readerCtx, pieceCid)
 
 		r.SectionReader = sr
 		r.err = err
+		r.cancel = readerCtxCancel
 
 		// Inform any waiting threads that the cached reader is ready
 		close(r.ready)
