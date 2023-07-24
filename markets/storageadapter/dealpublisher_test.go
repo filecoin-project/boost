@@ -257,7 +257,7 @@ func TestPublishPendingDeals(t *testing.T) {
 	// Allow a moment for them to be queued
 	build.Clock.Sleep(10 * time.Millisecond)
 
-	// Should be two deals in the pending deals list
+	// Should be three deals in the pending deals list
 	// (deal with cancelled context is ignored)
 	pendingInfo := dp.PendingDeals()
 	require.Len(t, pendingInfo.Deals, 3)
@@ -277,11 +277,11 @@ func TestPublishPendingDeals(t *testing.T) {
 	c, err := cid.Decode("bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4")
 	require.NoError(t, err)
 
-	// Publish all pending deals and verify all have been published
+	// Publish three pending deals and verify all deals whose context has not expired have been published
 	publishedDeals := dp.PublishQueuedDeals(append(toPublish, c))
 	require.Equal(t, toPublish, publishedDeals)
 
-	// Should be no pending deals
+	// Should be one remaining pending deal
 	pendingInfo1 := dp.PendingDeals()
 	var ppcids []cid.Cid
 	require.Len(t, pendingInfo1.Deals, 1)

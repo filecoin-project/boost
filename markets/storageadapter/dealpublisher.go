@@ -295,7 +295,7 @@ func (p *DealPublisher) publishAllDeals() {
 	for _, deal := range p.pending {
 		deals = append(deals, deal)
 	}
-	p.pending = nil
+	p.pending = make(map[cid.Cid]*pendingDeal)
 	go p.publishReady(deals)
 }
 
@@ -460,14 +460,11 @@ func pieceCids(deals []market.ClientDealProposal) string {
 
 // filter out deals that have been cancelled
 func (p *DealPublisher) filterCancelledDeals() {
-	filtered := make(map[cid.Cid]*pendingDeal)
 	for c, pd := range p.pending {
 		if pd.ctx.Err() != nil {
-			continue
+			delete(p.pending, c)
 		}
-		filtered[c] = pd
 	}
-	p.pending = filtered
 }
 
 func (p *DealPublisher) PublishQueuedDeals(deals []cid.Cid) []cid.Cid {
