@@ -147,6 +147,7 @@ func newDealPublisher(
 		startEpochSealingBuffer: abi.ChainEpoch(publishMsgCfg.StartEpochSealingBuffer),
 		publishSpec:             publishSpec,
 		manualPSD:               publishMsgCfg.ManualDealPublish,
+		pending:                 make(map[cid.Cid]*pendingDeal),
 	}
 }
 
