@@ -32,14 +32,13 @@ type Server struct {
 }
 
 func NewServer(cfg *config.Boost, resolver *resolver, bstore BlockGetter) *Server {
-	c := cors.Default()
-	webCfg := c.Handler(&webConfigServer{
+	webCfg := &webConfigServer{
 		cfg: webConfig{
 			Ipni: webConfigIpni{
 				IndexerHost: cfg.IndexProvider.WebHost,
 			},
 		},
-	})
+	}
 	return &Server{resolver: resolver, bstore: bstore, cfgHandler: webCfg}
 }
 
