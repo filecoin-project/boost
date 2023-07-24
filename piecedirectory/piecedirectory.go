@@ -52,16 +52,36 @@ type PieceDirectory struct {
 
 func NewPieceDirectory(store *bdclient.Store, pr types.PieceReader, addIndexThrottleSize int) *PieceDirectory {
 	prCache := ttlcache.NewCache()
-	_ = prCache.SetTTL(5 * time.Second)
+	_ = prCache.SetTTL(30 * time.Second)
 	prCache.SetCacheSizeLimit(MaxCachedReaders)
 
-	return &PieceDirectory{
+	pd := &PieceDirectory{
 		store:              store,
 		pieceReader:        pr,
 		pieceReaderCache:   prCache,
 		addIdxThrottleSize: addIndexThrottleSize,
 		addIdxThrottle:     make(chan struct{}, addIndexThrottleSize),
 	}
+
+	expireCallback := func(key string, reason ttlcache.EvictionReason, value interface{}) {
+		log.Debugw("expire callback", "piececid", key, "reason", reason)
+
+		r := value.(*cachedSectionReader)
+
+		pd.pieceReaderCacheMu.Lock()
+		defer pd.pieceReaderCacheMu.Unlock()
+
+		if r.refs <= 0 {
+			r.cancel()
+			return
+		}
+
+		log.Warnw("expire callback with refs > 0", "refs", r.refs, "piececid", key, "reason", reason)
+	}
+
+	prCache.SetExpirationReasonCallback(expireCallback)
+
+	return pd
 }
 
 func (ps *PieceDirectory) Start(ctx context.Context) {
@@ -356,9 +376,15 @@ type cachedSectionReader struct {
 	err error
 	// cancel for underlying GetPieceReader call
 	cancel func()
+	refs   int
 }
 
 func (r *cachedSectionReader) Close() error {
+	r.ps.pieceReaderCacheMu.Lock()
+	defer r.ps.pieceReaderCacheMu.Unlock()
+
+	r.refs--
+
 	return nil
 }
 
@@ -382,6 +408,7 @@ func (ps *PieceDirectory) GetSharedPieceReader(ctx context.Context, pieceCid cid
 			ps:       ps,
 			pieceCid: pieceCid,
 			ready:    make(chan struct{}),
+			refs:     1,
 		}
 		_ = ps.pieceReaderCache.Set(pieceCid.String(), r)
 		ps.pieceReaderCacheMu.Unlock()
@@ -397,9 +424,11 @@ func (ps *PieceDirectory) GetSharedPieceReader(ctx context.Context, pieceCid cid
 		// Inform any waiting threads that the cached reader is ready
 		close(r.ready)
 	} else {
-		ps.pieceReaderCacheMu.Unlock()
 
 		r = rr.(*cachedSectionReader)
+		r.refs++
+
+		ps.pieceReaderCacheMu.Unlock()
 
 		// We already had a cached reader, wait for it to be ready
 		select {
