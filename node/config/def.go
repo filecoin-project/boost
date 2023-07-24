@@ -143,6 +143,7 @@ func DefaultBoost() *Boost {
 			FundsTaggingEnabled:                true,
 			EnableLegacyStorageDeals:           false,
 			ManualDealPublish:                  false,
+			BitswapPublicAddresses:             []string{},
 		},
 
 		LotusDealmaking: lotus_config.DealmakingConfig{
