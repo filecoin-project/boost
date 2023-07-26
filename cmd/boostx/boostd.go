@@ -23,7 +23,7 @@ var minerCmd = &cli.Command{
 var minerAddressCmd = &cli.Command{
 	Name:        "miner-address",
 	Usage:       "boostx boostd miner-address",
-	Description: "Fetched the miner address from the datastore. Boostd process must be stopped before running this command.",
+	Description: "Fetch the miner address from the datastore. Boostd process must be stopped before running this command.",
 	Action: func(cctx *cli.Context) error {
 
 		boostRepoPath := cctx.String(FlagBoostRepo)
