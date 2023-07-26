@@ -342,6 +342,12 @@ const IpniAdEntriesCountQuery = gql`
     }
 `;
 
+const IpniLatestAdQuery = gql`
+    query AppIpniLatestAdQuery {
+        ipniLatestAdvertisement
+    }
+`;
+
 const DealCancelMutation = gql`
     mutation AppDealCancelMutation($id: ID!) {
         dealCancel(id: $id)
@@ -793,6 +799,7 @@ export {
     IpniAdQuery,
     IpniAdEntriesQuery,
     IpniAdEntriesCountQuery,
+    IpniLatestAdQuery,
     PiecesWithRootPayloadCidQuery,
     PiecesWithPayloadCidQuery,
     PieceBuildIndexMutation,

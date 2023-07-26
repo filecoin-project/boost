@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+
 	"github.com/ipfs/go-cid"
+	"github.com/ipni/go-libipni/ingest/schema"
 	"github.com/ipni/go-libipni/metadata"
 	"github.com/multiformats/go-multicodec"
 )
@@ -62,38 +64,7 @@ func (r *resolver) IpniAdvertisement(ctx context.Context, args struct{ AdCid str
 		return nil, err
 	}
 
-	var contextId string
-	c, err := cid.Parse(ad.ContextID)
-	if err == nil {
-		contextId = c.String()
-	} else {
-		contextId = base64.StdEncoding.EncodeToString(ad.ContextID)
-	}
-
-	res := &adResolver{
-		ContextID:     contextId,
-		IsRemove:      ad.IsRm,
-		Metadata:      getMetadata(ad.Metadata),
-		PreviousEntry: ad.PreviousID.String(),
-		Provider:      ad.Provider,
-		Addresses:     ad.Addresses,
-	}
-
-	if ad.ExtendedProvider != nil {
-		extProvs := &extendedProvsResolver{
-			Override: ad.ExtendedProvider.Override,
-		}
-		for _, p := range ad.ExtendedProvider.Providers {
-			extProvs.Providers = append(extProvs.Providers, &extendedProvResolver{
-				ID:        p.ID,
-				Addresses: p.Addresses,
-				Metadata:  getMetadata(p.Metadata),
-			})
-		}
-		res.ExtendedProviders = extProvs
-	}
-
-	return res, nil
+	return resolveAd(ad), nil
 }
 
 func getMetadata(adMdBytes []byte) []*adMetadata {
@@ -183,4 +154,47 @@ func (r *resolver) IpniAdvertisementEntriesCount(ctx context.Context, args struc
 	}
 
 	return count, nil
+}
+
+func (r *resolver) IpniLatestAdvertisement(ctx context.Context) (string, error) {
+	adCid, _, err := r.idxProv.GetLatestAdv(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return adCid.String(), nil
+}
+
+func resolveAd(ad *schema.Advertisement) *adResolver {
+	var contextId string
+	c, err := cid.Parse(ad.ContextID)
+	if err == nil {
+		contextId = c.String()
+	} else {
+		contextId = base64.StdEncoding.EncodeToString(ad.ContextID)
+	}
+
+	res := &adResolver{
+		ContextID:     contextId,
+		IsRemove:      ad.IsRm,
+		Metadata:      getMetadata(ad.Metadata),
+		PreviousEntry: ad.PreviousID.String(),
+		Provider:      ad.Provider,
+		Addresses:     ad.Addresses,
+	}
+
+	if ad.ExtendedProvider != nil {
+		extProvs := &extendedProvsResolver{
+			Override: ad.ExtendedProvider.Override,
+		}
+		for _, p := range ad.ExtendedProvider.Providers {
+			extProvs.Providers = append(extProvs.Providers, &extendedProvResolver{
+				ID:        p.ID,
+				Addresses: p.Addresses,
+				Metadata:  getMetadata(p.Metadata),
+			})
+		}
+		res.ExtendedProviders = extProvs
+	}
+	return res
 }
