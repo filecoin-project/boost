@@ -77,11 +77,6 @@ function ProviderIpniInfo({peerId}) {
     if (loading) return <div>Loading...</div>
     if (!data) return null
 
-    let defined = false
-    if (head.data !== undefined ) {
-        defined = true
-    }
-
     return <div className="ipni-prov-info">
         <h3>Provider Indexer Info</h3>
         <div className="subtitle">
@@ -108,7 +103,7 @@ function ProviderIpniInfo({peerId}) {
             <tr>
                 <th>Latest Advertisement on Boost</th>
                 <td>
-                    {defined ? <Link to={'/ipni/ad/'+head.data.ipniLatestAdvertisement}>{head.data.ipniLatestAdvertisement}</Link>: ''}
+                    {head.data ? <Link to={'/ipni/ad/'+head.data.ipniLatestAdvertisement}>{head.data.ipniLatestAdvertisement}</Link>: ''}
                 </td>
             </tr>
             <tr>
