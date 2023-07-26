@@ -561,6 +561,9 @@ type RootQuery {
   """Get count of entries for an IPNI advertisement"""
   ipniAdvertisementEntriesCount(adCid: String!): Int!
 
+  """Get the latest IPNI advertisemen"""
+  ipniLatestAdvertisement: String!
+
   """Get LID state"""
   lid: LID!
 

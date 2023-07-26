@@ -5,6 +5,7 @@ import {
     IpniAdEntriesQuery,
     IpniAdQuery,
     IpniProviderInfoQuery,
+    IpniLatestAdQuery,
     RetrievalLogsCountQuery, RetrievalLogsListQuery,
 } from "./gql";
 import moment from "moment";
@@ -52,6 +53,7 @@ function ProviderInfo(props) {
 }
 
 function ProviderIpniInfo({peerId}) {
+    const head = useQuery(IpniLatestAdQuery)
     const [{loading, error, data}, setResp] = useState({ loading: true })
     const idxHost = indexerHost()
 
@@ -75,6 +77,11 @@ function ProviderIpniInfo({peerId}) {
     if (loading) return <div>Loading...</div>
     if (!data) return null
 
+    let defined = false
+    if (head.data !== undefined ) {
+        defined = true
+    }
+
     return <div className="ipni-prov-info">
         <h3>Provider Indexer Info</h3>
         <div className="subtitle">
@@ -96,6 +103,12 @@ function ProviderIpniInfo({peerId}) {
                     {data.LastAdvertisement['/']}
                     &nbsp;
                     <span className="aux">({moment(data.LastAdvertisementTime).fromNow()} ago)</span>
+                </td>
+            </tr>
+            <tr>
+                <th>Latest Advertisement on Boost</th>
+                <td>
+                    {defined ? <Link to={'/ipni/ad/'+head.data.ipniLatestAdvertisement}>{head.data.ipniLatestAdvertisement}</Link>: ''}
                 </td>
             </tr>
             <tr>
