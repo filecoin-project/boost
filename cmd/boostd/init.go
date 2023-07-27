@@ -482,24 +482,19 @@ func migrateMarketsConfig(cctx *cli.Context, mktsRepo lotus_repo.LockedRepo, boo
 		}
 		rcfg.Common.Backup = mktsCfg.Common.Backup
 		rcfg.Common.Libp2p = mktsCfg.Common.Libp2p
-		rcfg.Storage = config.StorageConfig{ParallelFetchLimit: mktsCfg.Storage.ParallelFetchLimit}
+		rcfg.Storage.ParallelFetchLimit = mktsCfg.Storage.ParallelFetchLimit
 		setBoostDealMakingCfg(&rcfg.Dealmaking, mktsCfg)
 		rcfg.LotusDealmaking = mktsCfg.Dealmaking
-		rcfg.LotusFees = config.FeeConfig{
-			MaxPublishDealsFee:     mktsCfg.Fees.MaxPublishDealsFee,
-			MaxMarketBalanceAddFee: mktsCfg.Fees.MaxMarketBalanceAddFee,
-		}
+		rcfg.LotusFees.MaxMarketBalanceAddFee = mktsCfg.Fees.MaxMarketBalanceAddFee
+		rcfg.LotusFees.MaxPublishDealsFee = mktsCfg.Fees.MaxPublishDealsFee
 		rcfg.DAGStore = mktsCfg.DAGStore
 		// Clear the DAG store root dir config, because the DAG store is no longer configurable in Boost
 		// (it is always at <repo path>/dagstore
 		rcfg.DAGStore.RootDir = ""
-		rcfg.IndexProvider = config.IndexProviderConfig{
-			Enable:               mktsCfg.IndexProvider.Enable,
-			EntriesCacheCapacity: mktsCfg.IndexProvider.EntriesCacheCapacity,
-			EntriesChunkSize:     mktsCfg.IndexProvider.EntriesChunkSize,
-			TopicName:            mktsCfg.IndexProvider.TopicName,
-			PurgeCacheOnStart:    mktsCfg.IndexProvider.PurgeCacheOnStart,
-		}
+		rcfg.IndexProvider.EntriesCacheCapacity = mktsCfg.IndexProvider.EntriesCacheCapacity
+		rcfg.IndexProvider.EntriesChunkSize = mktsCfg.IndexProvider.EntriesChunkSize
+		rcfg.IndexProvider.TopicName = mktsCfg.IndexProvider.TopicName
+		rcfg.IndexProvider.PurgeCacheOnStart = mktsCfg.IndexProvider.PurgeCacheOnStart
 		rcfg.IndexProvider.Enable = true // Enable index provider in Boost by default
 
 		if fromMonolith {
