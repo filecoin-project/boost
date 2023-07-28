@@ -44,6 +44,14 @@ your node if metadata log is disabled`,
 			Comment: `The connect string for the sector index RPC API (lotus miner)`,
 		},
 		{
+			Name: "StorageAccessApiInfo",
+			Type: "[]string",
+
+			Comment: `The connect strings for the RPC APIs of each miner that boost can read
+sector data from (when serving retrievals).
+If not set, boost will read data from the endpoint in SectorIndexApiInfo.`,
+		},
+		{
 			Name: "Dealmaking",
 			Type: "DealmakingConfig",
 

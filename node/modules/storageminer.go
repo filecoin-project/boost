@@ -17,6 +17,7 @@ import (
 	storageimpl "github.com/filecoin-project/boost-gfm/storagemarket/impl"
 	"github.com/filecoin-project/boost-gfm/storagemarket/impl/storedask"
 	"github.com/filecoin-project/boost-gfm/stores"
+	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
@@ -34,6 +35,7 @@ import (
 	"github.com/filecoin-project/boost/piecedirectory"
 	brm "github.com/filecoin-project/boost/retrievalmarket/lib"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
+	"github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemanager"
 	"github.com/filecoin-project/boost/storagemarket"
@@ -367,6 +369,20 @@ func HandleRetrieval(host host.Host, lc fx.Lifecycle, m retrievalmarket.Retrieva
 		},
 		OnStop: func(context.Context) error {
 			return m.Stop()
+		},
+	})
+}
+
+func HandleQueryAsk(lc fx.Lifecycle, h host.Host, maddr lotus_dtypes.MinerAddress, pd *piecedirectory.PieceDirectory, sa *lib.MultiMinerAccessor, askStore server.AskGetter, full v1api.FullNode) {
+	handler := server.NewQueryAskHandler(h, address.Address(maddr), pd, sa, askStore, full)
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			handler.Start()
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			handler.Stop()
+			return nil
 		},
 	})
 }

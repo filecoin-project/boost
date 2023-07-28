@@ -38,7 +38,12 @@ type Boost struct {
 	// The connect string for the sealing RPC API (lotus miner)
 	SealerApiInfo string
 	// The connect string for the sector index RPC API (lotus miner)
-	SectorIndexApiInfo  string
+	SectorIndexApiInfo string
+	// The connect strings for the RPC APIs of each miner that boost can read
+	// sector data from (when serving retrievals).
+	// If not set, boost will read data from the endpoint in SectorIndexApiInfo.
+	StorageAccessApiInfo []string
+
 	Dealmaking          DealmakingConfig
 	Wallets             WalletsConfig
 	Graphql             GraphqlConfig

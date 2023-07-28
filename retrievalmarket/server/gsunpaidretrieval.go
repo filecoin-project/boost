@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	retrievalimpl "github.com/filecoin-project/boost-gfm/retrievalmarket/impl"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket/migrations"
-	"github.com/filecoin-project/boost-gfm/stores"
 	graphsync "github.com/filecoin-project/boost-graphsync"
 	"github.com/filecoin-project/boost/metrics"
+	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-data-transfer/encoding"
@@ -76,15 +75,10 @@ var defaultExtensions = []graphsync.ExtensionName{
 	extension.ExtensionDataTransfer1_1,
 }
 
-type AskGetter interface {
-	GetAsk() *retrievalmarket.Ask
-}
-
 type ValidationDeps struct {
 	DealDecider    retrievalimpl.DealDecider
-	DagStore       stores.DAGStoreWrapper
-	PieceStore     piecestore.PieceStore
-	SectorAccessor retrievalmarket.SectorAccessor
+	PieceDirectory *piecedirectory.PieceDirectory
+	SectorAccessor SectorAccessor
 	AskStore       AskGetter
 }
 
@@ -129,6 +123,7 @@ func (g *GraphsyncUnpaidRetrieval) Start(ctx context.Context) error {
 			return fmt.Errorf("setting persistence option for index advertisement retrieval: %w", err)
 		}
 	}
+
 	return nil
 }
 
@@ -186,7 +181,7 @@ func (g *GraphsyncUnpaidRetrieval) CancelTransfer(ctx context.Context, id datatr
 
 	// tell GraphSync to cancel the request
 	if (gsRequestID != graphsync.RequestID{}) {
-		err := g.Cancel(ctx, gsRequestID)
+		err := g.GraphExchange.Cancel(ctx, gsRequestID)
 		if err != nil {
 			log.Info("unable to force close graphsync request %s: %s", tID, err)
 		}
@@ -551,6 +546,7 @@ func (g *GraphsyncUnpaidRetrieval) RegisterCompletedResponseListener(listener gr
 
 func (g *GraphsyncUnpaidRetrieval) RegisterRequestorCancelledListener(listener graphsync.OnRequestorCancelledListener) graphsync.UnregisterHookFunc {
 	return g.GraphExchange.RegisterRequestorCancelledListener(func(p peer.ID, request graphsync.RequestData) {
+
 		stats.Record(g.ctx, metrics.GraphsyncRequestClientCancelledCount.M(1))
 
 		_, state, intercept := g.isRequestForActiveUnpaidRetrieval(p, request)
