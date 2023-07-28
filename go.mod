@@ -62,7 +62,7 @@ require (
 	github.com/ipfs/go-ipfs-files v0.3.0 // indirect
 	github.com/ipfs/go-ipld-format v0.5.0
 	github.com/ipfs/go-ipld-legacy v0.2.1
-	github.com/ipfs/go-libipfs v0.7.0
+	github.com/ipfs/go-libipfs v0.7.0 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/ipfs/go-merkledag v0.11.0 // indirect
 	github.com/ipfs/go-metrics-interface v0.0.1
@@ -287,7 +287,7 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/prometheus/statsd_exporter v0.22.7 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	github.com/rs/cors v1.7.0 // indirect
+	github.com/rs/cors v1.7.0
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
@@ -325,20 +325,20 @@ require (
 )
 
 require (
-	github.com/NYTimes/gziphandler v1.1.1
 	github.com/filecoin-project/boostd-data v0.0.0-00010101000000-000000000000
 	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
-	github.com/ipfs/go-ds-flatfs v0.5.1
 	github.com/ipfs/go-ipfs-redirects-file v0.1.1 // indirect
 )
 
 require (
+	github.com/NYTimes/gziphandler v1.1.1
 	github.com/filecoin-project/boost-gfm v1.26.7
 	github.com/filecoin-project/boost-graphsync v0.13.6
 	github.com/filecoin-project/go-data-segment v0.0.1
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/lotus v1.23.2-0.20230622154405-168d022018ce
 	github.com/ipfs/boxo v0.10.1
+	github.com/ipfs/go-ds-flatfs v0.5.1
 	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/kubo v0.21.0-rc1
 	github.com/ipni/go-libipni v0.2.8
@@ -346,12 +346,10 @@ require (
 	github.com/schollz/progressbar/v3 v3.13.1
 )
 
-require (
-	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
-	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
-)
+require github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 
 require (
+	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
 	github.com/filecoin-project/kubo-api-client v0.0.1 // indirect
 	github.com/gammazero/channelqueue v0.2.1 // indirect
 	github.com/gammazero/deque v0.2.1 // indirect

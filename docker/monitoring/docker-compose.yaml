@@ -15,6 +15,7 @@ services:
       - ./tempo-data:/tmp/tempo
     ports:
       - "14268:14268"  # jaeger ingest
+    restart: unless-stopped
     logging:
       driver: loki
       options:
@@ -31,6 +32,7 @@ services:
       - JAEGER_ENDPOINT=http://tempo:14268/api/traces # send traces to Tempo
       - JAEGER_SAMPLER_TYPE=const
       - JAEGER_SAMPLER_PARAM=1
+    restart: unless-stopped
     logging:
       driver: loki
       options:
@@ -42,6 +44,7 @@ services:
     command: [ "--config.file=/etc/prometheus.yaml" ]
     volumes:
       - ./${PROMETHEUS_CONFIG_FILE:-prometheus.yaml}:/etc/prometheus.yaml
+    restart: unless-stopped
     ports:
       - "9190:9090"
     ## Uncomment and modify this section depending on your Filecoin deployment.
@@ -76,6 +79,7 @@ services:
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/var/lib/grafana/dashboards/exported_dashboard.json"
     ports:
       - "3333:3000"
+    restart: unless-stopped
     logging:
       driver: loki
       options:

@@ -63,7 +63,7 @@ func (b *Boost) SetDealmakingConfig(other lotus_config.DealmakingConfig) {
 }
 
 type WalletsConfig struct {
-	// The "owner" address of the miner
+	// The miner ID
 	Miner string
 	// The wallet used to send PublishStorageDeals messages.
 	// Must be a control or worker address of the miner.
@@ -272,6 +272,11 @@ type DealmakingConfig struct {
 	// Whether to enable legacy deals on the Boost node or not. We recommend keeping
 	// them disabled. These will be completely deprecated soon.
 	EnableLegacyStorageDeals bool
+
+	// When set to true, the user is responsible for publishing deals manually.
+	// The values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
+	// ignored, and deals will remain in the pending state until manually published.
+	ManualDealPublish bool
 }
 
 type ContractDealsConfig struct {

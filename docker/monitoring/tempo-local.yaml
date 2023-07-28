@@ -81,3 +81,4 @@ storage:
 overrides:
   per_tenant_override_config: /etc/overrides.yaml
   metrics_generator_processors: [service-graphs, span-metrics]
+  max_bytes_per_trace: 9900000

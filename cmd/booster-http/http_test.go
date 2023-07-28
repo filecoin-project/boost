@@ -32,6 +32,17 @@ func TestNewHttpServer(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 200, resp.StatusCode)
 
+	// Create a request with Cors header
+	req, err := http.NewRequest("GET", "http://localhost:7777/", nil)
+	require.NoError(t, err)
+	req.Header.Add("Origin", "test")
+	client := new(http.Client)
+	response, err := client.Do(req)
+	require.NoError(t, err)
+
+	// Check for Cors header
+	require.Equal(t, "*", response.Header.Get("Access-Control-Allow-Origin"))
+
 	// Stop the server
 	err = httpServer.Stop()
 	require.NoError(t, err)

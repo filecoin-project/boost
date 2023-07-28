@@ -8,7 +8,9 @@ import (
 
 	"github.com/filecoin-project/boost/gql/types"
 	cborutil "github.com/filecoin-project/go-cbor-util"
+	"github.com/google/uuid"
 	"github.com/graph-gophers/graphql-go"
+	"github.com/ipfs/go-cid"
 )
 
 // basicDealResolver just has simple types (as opposed to dealResolver which
@@ -32,6 +34,7 @@ type basicDealResolver struct {
 }
 
 type dealPublishResolver struct {
+	ManualPSD      bool
 	Start          graphql.Time
 	Period         int32
 	MaxDealsPerMsg int32
@@ -151,6 +154,7 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 	}
 
 	return &dealPublishResolver{
+		ManualPSD:      r.publisher.ManualPSD(),
 		Deals:          basicDeals,
 		Period:         int32(pending.PublishPeriod.Seconds()),
 		Start:          graphql.Time{Time: pending.PublishPeriodStart},
@@ -158,8 +162,39 @@ func (r *resolver) DealPublish(ctx context.Context) (*dealPublishResolver, error
 	}, nil
 }
 
-// mutation: dealPublishNow(): bool
 func (r *resolver) DealPublishNow(ctx context.Context) (bool, error) {
 	r.publisher.ForcePublishPendingDeals()
 	return true, nil
+}
+
+// mutation: publishPendingDeals([ID!]!): [ID!]!
+func (r *resolver) PublishPendingDeals(ctx context.Context, args struct{ IDs []graphql.ID }) ([]graphql.ID, error) {
+	var pcids []cid.Cid
+	uuidToPcid := make(map[cid.Cid]uuid.UUID)
+	var ret []graphql.ID
+
+	for _, id := range args.IDs {
+		dealId, err := toUuid(id)
+		if err != nil {
+			return nil, err
+		}
+		deal, err := r.dealsDB.ByID(ctx, dealId)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get deal details from DB %s: %w", dealId.String(), err)
+		}
+		signedProp, err := cborutil.AsIpld(&deal.ClientDealProposal)
+		if err != nil {
+			return nil, fmt.Errorf("error in generating proposal cid for deal %s: %w", dealId.String(), err)
+		}
+		pcid := signedProp.Cid()
+		uuidToPcid[pcid] = dealId
+		pcids = append(pcids, pcid)
+	}
+
+	publishedCids := r.publisher.PublishQueuedDeals(pcids)
+	for _, c := range publishedCids {
+		ret = append(ret, graphql.ID(uuidToPcid[c].String()))
+	}
+
+	return ret, nil
 }

@@ -5,6 +5,7 @@ import {
     IpniAdEntriesQuery,
     IpniAdQuery,
     IpniProviderInfoQuery,
+    IpniLatestAdQuery,
     RetrievalLogsCountQuery, RetrievalLogsListQuery,
 } from "./gql";
 import moment from "moment";
@@ -52,6 +53,7 @@ function ProviderInfo(props) {
 }
 
 function ProviderIpniInfo({peerId}) {
+    const head = useQuery(IpniLatestAdQuery)
     const [{loading, error, data}, setResp] = useState({ loading: true })
     const idxHost = indexerHost()
 
@@ -99,6 +101,12 @@ function ProviderIpniInfo({peerId}) {
                 </td>
             </tr>
             <tr>
+                <th>Latest Advertisement on Boost</th>
+                <td>
+                    {head.data ? <Link to={'/ipni/ad/'+head.data.ipniLatestAdvertisement}>{head.data.ipniLatestAdvertisement}</Link>: ''}
+                </td>
+            </tr>
+            <tr>
                 <th>Last Ingestion</th>
                 <td>
                     {data.LastError ? data.LastError : 'Success'}
@@ -114,7 +122,7 @@ function ProviderIpniInfo({peerId}) {
 function ProviderConfig({configJson}) {
     const cfg = JSON.parse(configJson)
     return <div>
-        <h3>Indexer Config</h3>
+        <h3>Index Provider Config</h3>
         <ExpandableJSObject v={cfg} topLevel={false} expanded={true} key={'config'} />
     </div>
 }

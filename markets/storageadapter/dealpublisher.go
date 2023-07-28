@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/ipfs/go-cid"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
@@ -53,12 +54,13 @@ type DealPublisher struct {
 	ctx      context.Context
 	Shutdown context.CancelFunc
 
+	manualPSD             bool
 	maxDealsPerPublishMsg uint64
 	publishPeriod         time.Duration
 	publishSpec           *api.MessageSendSpec
 
 	lk                      sync.Mutex
-	pending                 []*pendingDeal
+	pending                 map[cid.Cid]*pendingDeal
 	cancelWaitForMoreDeals  context.CancelFunc
 	publishPeriodStart      time.Time
 	startEpochSealingBuffer abi.ChainEpoch
@@ -77,12 +79,19 @@ type publishResult struct {
 	err    error
 }
 
-func newPendingDeal(ctx context.Context, deal market.ClientDealProposal) *pendingDeal {
+func newPendingDeal(ctx context.Context, deal market.ClientDealProposal) (*pendingDeal, cid.Cid, error) {
+
+	// Generate unique identifier for the deal
+	signedProp, err := cborutil.AsIpld(&deal)
+	if err != nil {
+		return nil, cid.Undef, fmt.Errorf("failed to compute signed deal proposal ipld node: %w", err)
+	}
+
 	return &pendingDeal{
 		ctx:    ctx,
 		deal:   deal,
 		Result: make(chan publishResult),
-	}
+	}, signedProp.Cid(), nil
 }
 
 type PublishMsgConfig struct {
@@ -94,6 +103,10 @@ type PublishMsgConfig struct {
 	MaxDealsPerMsg uint64
 	// Minimum start epoch buffer to give time for sealing of sector with deal
 	StartEpochSealingBuffer uint64
+	// When set to true, the user is responsible for publishing deals manually.
+	// The values of MaxDealsPerMsg and Period will be ignored, and deals will
+	// remain in the pending state until manually published.
+	ManualDealPublish bool
 }
 
 func NewDealPublisher(
@@ -133,6 +146,8 @@ func newDealPublisher(
 		publishPeriod:           publishMsgCfg.Period,
 		startEpochSealingBuffer: abi.ChainEpoch(publishMsgCfg.StartEpochSealingBuffer),
 		publishSpec:             publishSpec,
+		manualPSD:               publishMsgCfg.ManualDealPublish,
+		pending:                 make(map[cid.Cid]*pendingDeal),
 	}
 }
 
@@ -172,10 +187,13 @@ func (p *DealPublisher) ForcePublishPendingDeals() {
 }
 
 func (p *DealPublisher) Publish(ctx context.Context, deal market.ClientDealProposal) (cid.Cid, error) {
-	pdeal := newPendingDeal(ctx, deal)
+	pdeal, pcid, err := newPendingDeal(ctx, deal)
+	if err != nil {
+		return cid.Undef, fmt.Errorf("failed create pending deal: %w", err)
+	}
 
 	// Add the deal to the queue
-	p.processNewDeal(pdeal)
+	p.processNewDeal(pdeal, pcid)
 
 	// Wait for the deal to be submitted
 	select {
@@ -186,7 +204,7 @@ func (p *DealPublisher) Publish(ctx context.Context, deal market.ClientDealPropo
 	}
 }
 
-func (p *DealPublisher) processNewDeal(pdeal *pendingDeal) {
+func (p *DealPublisher) processNewDeal(pdeal *pendingDeal, pcid cid.Cid) {
 	p.lk.Lock()
 	defer p.lk.Unlock()
 
@@ -205,9 +223,14 @@ func (p *DealPublisher) processNewDeal(pdeal *pendingDeal) {
 	}
 
 	// Add the new deal to the queue
-	p.pending = append(p.pending, pdeal)
+	p.pending[pcid] = pdeal
 	log.Infof("add deal with piece CID %s to publish deals queue - %d deals in queue (max queue size %d)",
 		pdeal.deal.Proposal.PieceCID, len(p.pending), p.maxDealsPerPublishMsg)
+
+	// Return from here if manual PSD is enabled
+	if p.manualPSD {
+		return
+	}
 
 	// If the maximum number of deals per message has been reached or we're not batching, send a
 	// publish message
@@ -257,6 +280,7 @@ func (p *DealPublisher) waitForMoreDeals() {
 }
 
 func (p *DealPublisher) publishAllDeals() {
+
 	// If the timeout hasn't yet been cancelled, cancel it
 	if p.cancelWaitForMoreDeals != nil {
 		p.cancelWaitForMoreDeals()
@@ -266,10 +290,13 @@ func (p *DealPublisher) publishAllDeals() {
 
 	// Filter out any deals that have been cancelled
 	p.filterCancelledDeals()
-	deals := p.pending
-	p.pending = nil
 
 	// Send the publish message
+	var deals []*pendingDeal
+	for _, deal := range p.pending {
+		deals = append(deals, deal)
+	}
+	p.pending = make(map[cid.Cid]*pendingDeal)
 	go p.publishReady(deals)
 }
 
@@ -434,12 +461,38 @@ func pieceCids(deals []market.ClientDealProposal) string {
 
 // filter out deals that have been cancelled
 func (p *DealPublisher) filterCancelledDeals() {
-	filtered := p.pending[:0]
-	for _, pd := range p.pending {
+	for c, pd := range p.pending {
 		if pd.ctx.Err() != nil {
-			continue
+			delete(p.pending, c)
 		}
-		filtered = append(filtered, pd)
 	}
-	p.pending = filtered
+}
+
+func (p *DealPublisher) PublishQueuedDeals(deals []cid.Cid) []cid.Cid {
+	p.lk.Lock()
+	defer p.lk.Unlock()
+	var ret []cid.Cid
+	var toPublish []*pendingDeal
+
+	p.filterCancelledDeals()
+
+	for _, c := range deals {
+		if p.pending[c] != nil {
+			toPublish = append(toPublish, p.pending[c])
+			ret = append(ret, c)
+			delete(p.pending, c)
+		} else {
+			log.Debugf("failed to find the proposal %s in pending deals", c)
+		}
+	}
+
+	log.Infof("publishing deal proposals: %s", ret)
+
+	// Send the publish message
+	go p.publishReady(toPublish)
+	return ret
+}
+
+func (p *DealPublisher) ManualPSD() bool {
+	return p.manualPSD
 }

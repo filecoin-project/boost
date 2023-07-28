@@ -40,3 +40,10 @@ func TestSegmentParsing(t *testing.T) {
 	err = rd.Close()
 	require.NoError(t, err)
 }
+
+func TestPieceDirectoryLevelDBFuzz(t *testing.T) {
+	//_ = logging.SetLogLevel("piecedirectory", "debug")
+	bdsvc, err := svc.NewLevelDB("")
+	require.NoError(t, err)
+	testPieceDirectoryFuzz(context.Background(), t, bdsvc)
+}

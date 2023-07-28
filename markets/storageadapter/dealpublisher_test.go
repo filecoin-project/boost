@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/ipfs/go-cid"
 	"github.com/raulk/clock"
 	"github.com/stretchr/testify/require"
@@ -230,6 +231,69 @@ func TestForcePublish(t *testing.T) {
 
 	// Make sure the expected deals were published
 	checkPublishedDeals(t, dpapi, dealsToPublish, []int{2})
+}
+
+func TestPublishPendingDeals(t *testing.T) {
+	dpapi := newDPAPI(t)
+
+	// Create a deal publisher
+	publishPeriod := time.Hour
+	dp := newDealPublisher(dpapi, nil, PublishMsgConfig{
+		Period:            publishPeriod,
+		MaxDealsPerMsg:    10,
+		ManualDealPublish: true,
+	}, &api.MessageSendSpec{MaxFee: abi.NewTokenAmount(1)})
+
+	// Queue three deals for publishing, one with a cancelled context
+	// 1. Regular deal
+	publishDeal(t, dp, 0, false, false)
+	// 2. Deal with cancelled context
+	publishDeal(t, dp, 0, true, false)
+	// 3. Regular deal
+	publishDeal(t, dp, 0, false, false)
+	// 4. Regular deal
+	publishDeal(t, dp, 0, false, false)
+
+	// Allow a moment for them to be queued
+	build.Clock.Sleep(10 * time.Millisecond)
+
+	// Should be three deals in the pending deals list
+	// (deal with cancelled context is ignored)
+	pendingInfo := dp.PendingDeals()
+	require.Len(t, pendingInfo.Deals, 3)
+
+	var pcids []cid.Cid
+	props := pendingInfo.Deals
+	for _, p := range props {
+		signedProp, err := cborutil.AsIpld(&p)
+		require.NoError(t, err)
+		pcids = append(pcids, signedProp.Cid())
+	}
+
+	toPublish := pcids[1:]
+	pending := []cid.Cid{pcids[0]}
+
+	// Send an additional CID not present in publisher
+	c, err := cid.Decode("bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4")
+	require.NoError(t, err)
+
+	// Publish three pending deals and verify all deals whose context has not expired have been published
+	publishedDeals := dp.PublishQueuedDeals(append(toPublish, c))
+	require.Equal(t, toPublish, publishedDeals)
+
+	// Should be one remaining pending deal
+	pendingInfo1 := dp.PendingDeals()
+	var ppcids []cid.Cid
+	require.Len(t, pendingInfo1.Deals, 1)
+	for _, p := range pendingInfo1.Deals {
+		signedProp, err := cborutil.AsIpld(&p)
+		require.NoError(t, err)
+		ppcids = append(ppcids, signedProp.Cid())
+	}
+	require.Equal(t, pending, ppcids)
+
+	// Make sure the expected deals were published
+	checkPublishedDeals(t, dpapi, props[1:], []int{2})
 }
 
 func publishDeal(t *testing.T, dp *DealPublisher, invalid int, ctxCancelled bool, expired bool) markettypes.ClientDealProposal {

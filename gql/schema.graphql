@@ -412,6 +412,7 @@ type FundsLog {
 }
 
 type DealPublish {
+  ManualPSD: Boolean!
   Period: Int!
   Start: Time!
   MaxDealsPerMsg: Int!
@@ -560,6 +561,9 @@ type RootQuery {
   """Get count of entries for an IPNI advertisement"""
   ipniAdvertisementEntriesCount(adCid: String!): Int!
 
+  """Get the latest IPNI advertisemen"""
+  ipniLatestAdvertisement: String!
+
   """Get LID state"""
   lid: LID!
 
@@ -609,6 +613,9 @@ type RootMutation {
 
   """Update the Storage Ask (price of doing a storage deal)"""
   storageAskUpdate(update: StorageAskUpdate!): Boolean!
+
+  """Publish the deal for the supplied deal UUIDs"""
+  publishPendingDeals(ids: [ID!]!): [ID!]!
 }
 
 type RootSubscription {

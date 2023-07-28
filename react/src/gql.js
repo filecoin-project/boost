@@ -342,6 +342,12 @@ const IpniAdEntriesCountQuery = gql`
     }
 `;
 
+const IpniLatestAdQuery = gql`
+    query AppIpniLatestAdQuery {
+        ipniLatestAdvertisement
+    }
+`;
+
 const DealCancelMutation = gql`
     mutation AppDealCancelMutation($id: ID!) {
         dealCancel(id: $id)
@@ -685,6 +691,7 @@ const FundsLogsQuery = gql`
 const DealPublishQuery = gql`
     query AppDealPublishQuery {
         dealPublish {
+            ManualPSD
             Start
             Period
             MaxDealsPerMsg
@@ -764,6 +771,12 @@ const StorageAskQuery = gql`
     }
 `;
 
+const PublishPendingDealsMutation = gql`
+    mutation AppPublishPendingDealMutation($ids: [ID!]!) {
+        publishPendingDeals(ids: $ids)
+    }
+`;
+
 export {
     gqlClient,
     EpochQuery,
@@ -786,6 +799,7 @@ export {
     IpniAdQuery,
     IpniAdEntriesQuery,
     IpniAdEntriesCountQuery,
+    IpniLatestAdQuery,
     PiecesWithRootPayloadCidQuery,
     PiecesWithPayloadCidQuery,
     PieceBuildIndexMutation,
@@ -807,4 +821,5 @@ export {
     SealingPipelineQuery,
     Libp2pAddrInfoQuery,
     StorageAskQuery,
+    PublishPendingDealsMutation,
 }
