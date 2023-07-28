@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
+	carv2 "github.com/ipld/go-car/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,8 +30,8 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Stop()
 
-	//err = f.Boost.LogSetLevel(ctx, "piecedirectory", "debug")
-	//require.NoError(t, err)
+	err = f.Boost.LogSetLevel(ctx, "piecedirectory", "debug")
+	require.NoError(t, err)
 
 	err = f.LotusMiner.LogSetLevel(ctx, "stores", "info")
 	require.NoError(t, err)
@@ -63,7 +64,7 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	log.Debug("creating dummy deal")
 	dealUuid := uuid.New()
 
-	pieceCid, err := cid.Parse(string("baga6ea4seaqly4jqbnjbw5dz4gpcu5uuu3o3t7ohzjpjx7x6z3v53tkfutogwga"))
+	pieceCid, err := cid.Parse(string("baga6ea4seaqanfmumt5zr3srygv2dkuausxwykfip74jhkjbm7qyxiyrze4yscq"))
 	require.NoError(t, err)
 
 	// Make a deal
@@ -77,11 +78,31 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	err = f.WaitForDealAddedToSector(dealUuid)
 	require.NoError(t, err)
 
-	// Retrieve and compare the all car files within the deal
+	////Retrieve and compare the all car files within the deal
 	//for i := 0; i < seg; i++ {
 	//	for _, r := range segmentDetails.Segments[i].Root {
 	//		outFile := f.RetrieveDirect(ctx, t, r, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true)
 	//		kit.AssertFilesEqual(t, segmentDetails.Segments[i].FilePath, outFile)
 	//	}
 	//}
+
+	r1, err := cid.Parse("bafybeietcrtui6xasfzz7gamb3r4vjcfm2jzcmnom6ajmftjo5luarnem4")
+	require.NoError(t, err)
+	r2, err := cid.Parse("bafybeid26fjobqnhvdfv37x3diuvzkbnby3unm3m7fka4trgqwxlauk6by")
+	require.NoError(t, err)
+
+	outF1 := f.RetrieveDirect(ctx, t, r1, &pieceCid, true)
+	r, err := carv2.OpenReader(outF1)
+	require.NoError(t, err)
+	rs, err := r.Roots()
+	require.NoError(t, err)
+	require.Equal(t, r1, rs[0])
+	r.Close()
+	outf2 := f.RetrieveDirect(ctx, t, r2, &pieceCid, true)
+	r, err = carv2.OpenReader(outf2)
+	require.NoError(t, err)
+	rs, err = r.Roots()
+	require.NoError(t, err)
+	require.Equal(t, r1, rs[0])
+	r.Close()
 }
