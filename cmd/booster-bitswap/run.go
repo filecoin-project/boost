@@ -143,7 +143,7 @@ var runCmd = &cli.Command{
 
 		// Connect to the full node API
 		fnApiInfo := cctx.String("api-fullnode")
-		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log)
+		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log, true)
 		if err != nil {
 			return fmt.Errorf("getting full node API: %w", err)
 		}

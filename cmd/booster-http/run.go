@@ -114,6 +114,12 @@ var runCmd = &cli.Command{
 			Usage: "the endpoints for fetching one or more custom BadBits list instead of the default one at https://badbits.dwebops.pub/denylist.json",
 			Value: cli.NewStringSlice("https://badbits.dwebops.pub/denylist.json"),
 		},
+		&cli.BoolFlag{
+			Name:   "api-version-check",
+			Usage:  "Check API versions (param is used by tests)",
+			Hidden: true,
+			Value:  true,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		servePieces := cctx.Bool("serve-pieces")
@@ -143,7 +149,7 @@ var runCmd = &cli.Command{
 
 		// Connect to the full node API
 		fnApiInfo := cctx.String("api-fullnode")
-		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log)
+		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log, cctx.Bool("api-version-check"))
 		if err != nil {
 			return fmt.Errorf("getting full node API: %w", err)
 		}

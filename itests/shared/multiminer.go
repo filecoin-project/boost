@@ -1,4 +1,4 @@
-package itests
+package shared
 
 import (
 	"context"
@@ -9,15 +9,22 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
-func TestMultiMinerRetrieval(t *testing.T) {
+type RetrievalTest struct {
+	BoostAndMiner1 *framework.TestFramework
+	BoostAndMiner2 *framework.TestFramework
+	SampleFilePath string
+	RootCid        cid.Cid
+}
+
+func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *testing.T, rt *RetrievalTest)) {
 	ctx := context.Background()
-	log := framework.Log
 
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()
@@ -64,7 +71,7 @@ func TestMultiMinerRetrieval(t *testing.T) {
 
 	// Create a CAR file
 	tempdir := t.TempDir()
-	log.Debugw("using tempdir", "dir", tempdir)
+	t.Logf("using tempdir %s", tempdir)
 
 	fileSize := 200000
 	randomFilepath, err := testutil.CreateRandomFile(tempdir, 5, fileSize)
@@ -75,13 +82,13 @@ func TestMultiMinerRetrieval(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start a web server to serve the car files
-	log.Debug("starting webserver")
+	t.Logf("starting webserver")
 	server, err := testutil.HttpTestFileServer(t, tempdir)
 	require.NoError(t, err)
 	defer server.Close()
 
 	// Create a new dummy deal
-	log.Debug("creating dummy deal")
+	t.Logf("creating dummy deal")
 	dealUuid := uuid.New()
 
 	// Make a storage deal on the first boost, which will store the index to
@@ -89,20 +96,16 @@ func TestMultiMinerRetrieval(t *testing.T) {
 	res, err := boostAndMiner1.MakeDummyDeal(dealUuid, carFilepath, rootCid, server.URL+"/"+filepath.Base(carFilepath), false)
 	require.NoError(t, err)
 	require.True(t, res.Result.Accepted)
-	log.Debugw("got response from MarketDummyDeal", "res", spew.Sdump(res))
+	t.Logf("created MarketDummyDeal %s", spew.Sdump(res))
 
 	// Wait for the deal to be added to a sector
 	err = boostAndMiner1.WaitForDealAddedToSector(dealUuid)
 	require.NoError(t, err)
 
-	// Retrieve the deal from the second boost. It should
-	// - get the index of the piece's block offsets from LID
-	// - get the deal info from LID
-	// - recognize that the deal is for a sector on the first miner
-	// - read the data for the deal from the first miner
-	log.Debugw("deal is added to piece, starting retrieval", "root", rootCid)
-	outPath := boostAndMiner2.RetrieveDirect(ctx, t, rootCid, nil, true)
-
-	log.Debugw("retrieval is done, compare in- and out- files", "in", randomFilepath, "out", outPath)
-	kit.AssertFilesEqual(t, randomFilepath, outPath)
+	rt(ctx, t, &RetrievalTest{
+		BoostAndMiner1: boostAndMiner1,
+		BoostAndMiner2: boostAndMiner2,
+		SampleFilePath: randomFilepath,
+		RootCid:        rootCid,
+	})
 }

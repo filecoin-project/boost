@@ -473,7 +473,16 @@ func (f *TestFramework) LotusMinerApiInfo() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return fmt.Sprintf("%s:%s", token, f.LotusMiner.ListenAddr), nil
+}
+
+func (f *TestFramework) LotusFullNodeApiInfo() (string, error) {
+	token, err := f.FullNode.AuthNew(f.ctx, api.AllPermissions)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s:%s", token, f.FullNode.ListenAddr), nil
 }
 
 // Add funds escrow in StorageMarketActor for both client and provider
