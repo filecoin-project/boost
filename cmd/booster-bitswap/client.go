@@ -13,6 +13,7 @@ import (
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/traversal"
+	"github.com/libp2p/go-libp2p/core/host"
 	mh "github.com/multiformats/go-multihash"
 
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/bitswap"
@@ -90,14 +91,7 @@ var fetchCmd = &cli.Command{
 			return err
 		}
 
-		host, err := libp2p.New(
-			libp2p.Transport(tcp.NewTCPTransport),
-			libp2p.Transport(quic.NewTransport),
-			libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
-			libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
-			libp2p.Identity(privKey),
-			libp2p.ResourceManager(&network.NullResourceManager{}),
-		)
+		host, err := createClientHost(privKey)
 		if err != nil {
 			return err
 		}
@@ -167,6 +161,17 @@ var fetchCmd = &cli.Command{
 		defer func() { log.Infow("finalize complete", "duration", time.Since(finalizeStart).String()) }()
 		return bs.Finalize()
 	},
+}
+
+func createClientHost(privKey crypto.PrivKey) (host.Host, error) {
+	return libp2p.New(
+		libp2p.Transport(tcp.NewTCPTransport),
+		libp2p.Transport(quic.NewTransport),
+		libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
+		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
+		libp2p.Identity(privKey),
+		libp2p.ResourceManager(&network.NullResourceManager{}),
+	)
 }
 
 func getBlocks(ctx context.Context, bsClient *client.Client, c cid.Cid, throttle chan struct{}) (uint64, uint64, error) {
