@@ -164,11 +164,16 @@ func action(cctx *cli.Context) error {
 	// Connect to the full node API
 	fnApiInfo := cctx.String("api-fullnode")
 	var ncloser jsonrpc.ClientCloser
-	fullnodeApi, ncloser, err = lib.GetFullNodeApi(ctx, fnApiInfo, log, true)
+	fullnodeApi, ncloser, err = lib.GetFullNodeApi(ctx, fnApiInfo, log)
 	if err != nil {
 		return fmt.Errorf("getting full node API: %w", err)
 	}
 	defer ncloser()
+
+	err = lib.CheckFullNodeApiVersion(ctx, fullnodeApi)
+	if err != nil {
+		return err
+	}
 
 	// Connect to the storage API and create a sector accessor
 	storageApiInfo := cctx.String("api-storage")

@@ -143,11 +143,16 @@ var runCmd = &cli.Command{
 
 		// Connect to the full node API
 		fnApiInfo := cctx.String("api-fullnode")
-		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log, true)
+		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log)
 		if err != nil {
 			return fmt.Errorf("getting full node API: %w", err)
 		}
 		defer ncloser()
+
+		err = lib.CheckFullNodeApiVersion(ctx, fullnodeApi)
+		if err != nil {
+			return err
+		}
 
 		// Connect to the storage API(s) and create a piece reader
 		sa := lib.NewMultiMinerAccessor(cctx.StringSlice("api-storage"), fullnodeApi)

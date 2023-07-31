@@ -33,7 +33,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 )
 
-func GetFullNodeApi(ctx context.Context, ai string, log *logging.ZapEventLogger, doVersionCheck bool) (v1api.FullNode, jsonrpc.ClientCloser, error) {
+func GetFullNodeApi(ctx context.Context, ai string, log *logging.ZapEventLogger) (v1api.FullNode, jsonrpc.ClientCloser, error) {
 	ai = strings.TrimPrefix(strings.TrimSpace(ai), "FULLNODE_API_INFO=")
 	info := cliutil.ParseApiInfo(ai)
 	addr, err := info.DialArgs("v1")
@@ -47,18 +47,20 @@ func GetFullNodeApi(ctx context.Context, ai string, log *logging.ZapEventLogger,
 		return nil, nil, fmt.Errorf("creating full node service API: %w", err)
 	}
 
-	if doVersionCheck {
-		v, err := fnapi.Version(ctx)
-		if err != nil {
-			return nil, nil, fmt.Errorf("checking full node service API version: %w", err)
-		}
+	return fnapi, closer, nil
+}
 
-		if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
-			return nil, nil, fmt.Errorf("full node service API version didn't match (expected %s, remote %s)", api.FullAPIVersion1, v.APIVersion)
-		}
+func CheckFullNodeApiVersion(ctx context.Context, fnapi v1api.FullNode) error {
+	v, err := fnapi.Version(ctx)
+	if err != nil {
+		return fmt.Errorf("checking full node service API version: %w", err)
 	}
 
-	return fnapi, closer, nil
+	if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
+		return fmt.Errorf("full node service API version didn't match (expected %s, remote %s)", api.FullAPIVersion1, v.APIVersion)
+	}
+
+	return nil
 }
 
 func GetMinerApi(ctx context.Context, ai string, log *logging.ZapEventLogger) (v0api.StorageMiner, jsonrpc.ClientCloser, error) {

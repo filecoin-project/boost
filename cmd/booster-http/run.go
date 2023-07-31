@@ -149,11 +149,18 @@ var runCmd = &cli.Command{
 
 		// Connect to the full node API
 		fnApiInfo := cctx.String("api-fullnode")
-		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log, cctx.Bool("api-version-check"))
+		fullnodeApi, ncloser, err := lib.GetFullNodeApi(ctx, fnApiInfo, log)
 		if err != nil {
 			return fmt.Errorf("getting full node API: %w", err)
 		}
 		defer ncloser()
+
+		if cctx.Bool("api-version-check") {
+			err = lib.CheckFullNodeApiVersion(ctx, fullnodeApi)
+			if err != nil {
+				return err
+			}
+		}
 
 		// Instantiate the tracer and exporter
 		enableTracing := cctx.Bool("tracing")
