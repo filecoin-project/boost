@@ -338,7 +338,7 @@ workflows:
       - test:
           name: test-all
           suite: all
-          target: "`go list ./... | grep -v boost/itests | grep -v cmd/booster-http`"
+          target: "`go list ./... | grep -v boost/itests | grep -v cmd/booster-http | grep -v cmd/booster-bitswap`"
 
       - test:
           name: test-itest-ipni
@@ -354,6 +354,11 @@ workflows:
           name: test-booster-http
           suite: booster-http
           target: "./cmd/booster-http"
+
+      - test:
+          name: test-booster-bitswap
+          suite: booster-bitswap
+          target: "./cmd/booster-bitswap"
 
       - lid-docker-compose
 

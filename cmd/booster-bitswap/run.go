@@ -114,6 +114,12 @@ var runCmd = &cli.Command{
 			Usage: "Number of threads (goroutines) sending outgoing messages. Throttles the number of concurrent send operations",
 			Value: 128,
 		},
+		&cli.BoolFlag{
+			Name:   "api-version-check",
+			Usage:  "Check API versions (param is used by tests)",
+			Hidden: true,
+			Value:  true,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -149,9 +155,11 @@ var runCmd = &cli.Command{
 		}
 		defer ncloser()
 
-		err = lib.CheckFullNodeApiVersion(ctx, fullnodeApi)
-		if err != nil {
-			return err
+		if cctx.Bool("api-version-check") {
+			err = lib.CheckFullNodeApiVersion(ctx, fullnodeApi)
+			if err != nil {
+				return err
+			}
 		}
 
 		// Connect to the storage API(s) and create a piece reader
