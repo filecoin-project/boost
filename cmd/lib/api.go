@@ -47,16 +47,20 @@ func GetFullNodeApi(ctx context.Context, ai string, log *logging.ZapEventLogger)
 		return nil, nil, fmt.Errorf("creating full node service API: %w", err)
 	}
 
+	return fnapi, closer, nil
+}
+
+func CheckFullNodeApiVersion(ctx context.Context, fnapi v1api.FullNode) error {
 	v, err := fnapi.Version(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("checking full node service API version: %w", err)
+		return fmt.Errorf("checking full node service API version: %w", err)
 	}
 
 	if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
-		return nil, nil, fmt.Errorf("full node service API version didn't match (expected %s, remote %s)", api.FullAPIVersion1, v.APIVersion)
+		return fmt.Errorf("full node service API version didn't match (expected %s, remote %s)", api.FullAPIVersion1, v.APIVersion)
 	}
 
-	return fnapi, closer, nil
+	return nil
 }
 
 func GetMinerApi(ctx context.Context, ai string, log *logging.ZapEventLogger) (v0api.StorageMiner, jsonrpc.ClientCloser, error) {
