@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	ds "github.com/ipfs/go-datastore"
@@ -391,7 +392,7 @@ func init() {
 	checked = make(map[string]time.Time)
 }
 
-func (db *DB) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
+func (db *DB) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.next_pieces_to_check")
 	defer span.End()
 

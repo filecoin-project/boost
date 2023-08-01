@@ -11,6 +11,7 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
@@ -400,7 +401,7 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	return s.db.ListPieces(ctx)
 }
 
-func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
+func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.next_pieces_to_check")
 	defer span.End()
 
@@ -408,7 +409,7 @@ func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 		log.Debugw("handled.next-pieces-to-check", "took", time.Since(now).String())
 	}(time.Now())
 
-	return s.db.NextPiecesToCheck(ctx)
+	return s.db.NextPiecesToCheck(ctx, maddr)
 }
 
 func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool) error {

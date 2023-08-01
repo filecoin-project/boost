@@ -78,6 +78,7 @@ type pieceResolver struct {
 }
 
 type flaggedPieceResolver struct {
+	MinerAddr   string
 	PieceCid    string
 	IndexStatus *indexStatus
 	DealCount   int32
@@ -85,6 +86,7 @@ type flaggedPieceResolver struct {
 }
 
 type piecesFlaggedArgs struct {
+	MinerAddr       graphql.NullString
 	HasUnsealedCopy graphql.NullBool
 	Cursor          *gqltypes.BigInt // CreatedAt in milli-seconds
 	Offset          graphql.NullInt
@@ -109,8 +111,18 @@ func (r *resolver) PiecesFlagged(ctx context.Context, args piecesFlaggedArgs) (*
 	}
 
 	var filter *types.FlaggedPiecesListFilter
+	if args.MinerAddr.Set && args.MinerAddr.Value != nil {
+		maddr, err := address.NewFromString(*args.MinerAddr.Value)
+		if err != nil {
+			return nil, fmt.Errorf("parsing miner address '%s': %w", args.MinerAddr.Value, err)
+		}
+		filter = &types.FlaggedPiecesListFilter{MinerAddr: maddr}
+	}
 	if args.HasUnsealedCopy.Set && args.HasUnsealedCopy.Value != nil {
-		filter = &types.FlaggedPiecesListFilter{HasUnsealedCopy: *args.HasUnsealedCopy.Value}
+		if filter == nil {
+			filter = &types.FlaggedPiecesListFilter{}
+		}
+		filter.HasUnsealedCopy = *args.HasUnsealedCopy.Value
 	}
 
 	// Fetch one extra row so that we can check if there are more rows
@@ -150,6 +162,7 @@ func (r *resolver) PiecesFlagged(ctx context.Context, args piecesFlaggedArgs) (*
 			}
 
 			flaggedPieceResolvers = append(flaggedPieceResolvers, &flaggedPieceResolver{
+				MinerAddr:   flaggedPiece.MinerAddr.String(),
 				PieceCid:    flaggedPiece.PieceCid.String(),
 				IndexStatus: idxStatus,
 				DealCount:   int32(len(pieceInfo.Deals)),

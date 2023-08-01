@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
 )
@@ -35,6 +36,7 @@ type AddIndexProgress struct {
 }
 
 type FlaggedPiecesListFilter struct {
+	MinerAddr       address.Address
 	HasUnsealedCopy bool
 }
 
@@ -53,7 +55,7 @@ type Service interface {
 	RemoveDealForPiece(context.Context, cid.Cid, string) error
 	RemovePieceMetadata(context.Context, cid.Cid) error
 	RemoveIndexes(context.Context, cid.Cid) error
-	NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error)
+	NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error)
 	FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool) error
 	UnflagPiece(ctx context.Context, pieceCid cid.Cid) error
 	FlaggedPiecesList(ctx context.Context, filter *FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)

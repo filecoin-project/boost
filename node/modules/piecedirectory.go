@@ -25,6 +25,7 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	lotus_dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	bstore "github.com/ipfs/boxo/blockstore"
 	blocks "github.com/ipfs/go-block-format"
@@ -33,8 +34,8 @@ import (
 	"go.uber.org/fx"
 )
 
-func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo) *bdclient.Store {
-	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo) *bdclient.Store {
+func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_repo.LockedRepo, maddr lotus_dtypes.MinerAddress) *bdclient.Store {
+	return func(lc fx.Lifecycle, r lotus_repo.LockedRepo, maddr lotus_dtypes.MinerAddress) *bdclient.Store {
 		svcDialOpts := []jsonrpc.Option{
 			jsonrpc.WithTimeout(time.Duration(cfg.LocalIndexDirectory.ServiceRPCTimeout)),
 		}
@@ -68,7 +69,7 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 					bdsvc = svc.NewYugabyte(yugabyte.DBSettings{
 						Hosts:         cfg.LocalIndexDirectory.Yugabyte.Hosts,
 						ConnectString: cfg.LocalIndexDirectory.Yugabyte.ConnectString,
-					})
+					}, address.Address(maddr))
 
 				default:
 					log.Infow("local index directory: connecting to leveldb instance")
@@ -152,8 +153,8 @@ func NewPieceStore(pm *piecedirectory.PieceDirectory, maddr address.Address) pie
 	return &boostPieceStoreWrapper{piecedirectory: pm, maddr: maddr}
 }
 
-func NewPieceDoctor(lc fx.Lifecycle, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *piecedirectory.Doctor {
-	doc := piecedirectory.NewDoctor(store, ssm, fullnodeApi)
+func NewPieceDoctor(lc fx.Lifecycle, maddr lotus_dtypes.MinerAddress, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *piecedirectory.Doctor {
+	doc := piecedirectory.NewDoctor(address.Address(maddr), store, ssm, fullnodeApi)
 	docctx, cancel := context.WithCancel(context.Background())
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {

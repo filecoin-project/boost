@@ -38,6 +38,7 @@ type DBSettings struct {
 type Store struct {
 	settings  DBSettings
 	cluster   *gocql.ClusterConfig
+	maddr     address.Address
 	session   *gocql.Session
 	db        *pgxpool.Pool
 	startOnce sync.Once
@@ -45,7 +46,7 @@ type Store struct {
 
 var _ types.ServiceImpl = (*Store)(nil)
 
-func NewStore(settings DBSettings) *Store {
+func NewStore(settings DBSettings, maddr address.Address) *Store {
 	if settings.PayloadPiecesParallelism == 0 {
 		settings.PayloadPiecesParallelism = 16
 	}
@@ -54,6 +55,7 @@ func NewStore(settings DBSettings) *Store {
 	return &Store{
 		settings: settings,
 		cluster:  cluster,
+		maddr:    maddr,
 	}
 }
 
