@@ -12,7 +12,6 @@ import (
 	"github.com/filecoin-project/boostd-data/ldb"
 	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/boostd-data/yugabyte"
-	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/gorilla/mux"
 	logging "github.com/ipfs/go-log/v2"
@@ -26,8 +25,8 @@ type Service struct {
 	Impl types.ServiceImpl
 }
 
-func NewYugabyte(settings yugabyte.DBSettings, maddr address.Address) *Service {
-	return &Service{Impl: yugabyte.NewStore(settings, maddr)}
+func NewYugabyte(settings yugabyte.DBSettings, migrator *yugabyte.Migrator) *Service {
+	return &Service{Impl: yugabyte.NewStore(settings, migrator)}
 }
 
 func NewLevelDB(repoPath string) (*Service, error) {

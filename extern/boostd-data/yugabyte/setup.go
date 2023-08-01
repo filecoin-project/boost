@@ -2,10 +2,8 @@ package yugabyte
 
 import (
 	"context"
-	"database/sql"
 	_ "embed"
 	"fmt"
-	"github.com/filecoin-project/boostd-data/yugabyte/migrations"
 	"strings"
 )
 
@@ -28,23 +26,7 @@ func (s *Store) Create(ctx context.Context) error {
 		return fmt.Errorf("creating postgres tables: %w", err)
 	}
 
-	// Create a connection to be used only for running migrations.
-	// Note that the migration library requires a *sql.DB, but there's no way
-	// to go from a pgxpool connection to a *sql.DB so we need to open a new
-	// connection.
-	sqldb, err := sql.Open("postgres", s.settings.ConnectString)
-	if err != nil {
-		return fmt.Errorf("opening postgres connection to %s: %w", s.settings.ConnectString, err)
-	}
-
-	log.Infow("running migrations")
-	err = migrations.Migrate(sqldb, migrations.MigrateParams{MinerAddress: s.maddr})
-	if err != nil {
-		return fmt.Errorf("running postgres migrations: %w", err)
-	}
-	log.Infow("migrations complete")
-
-	return nil
+	return s.migrator.Migrate()
 }
 
 //go:embed drop.cql
