@@ -76,9 +76,17 @@ func BoostHandler(a api.Boost, permissioned bool) (http.Handler, error) {
 	m.Handle("/rpc/streams/v0/push/{uuid}", readerHandler)
 	m.PathPrefix("/remote").HandlerFunc(a.(*impl.BoostAPI).ServeRemote(permissioned))
 
-	// debugging
+	// metrics
 	m.Handle("/metrics", metrics.Exporter("boost"))
-	m.PathPrefix("/").Handler(http.DefaultServeMux) // pprof
+
+	// health
+	m.HandleFunc("/healthz", healthz)
+
+	// health
+	m.HandleFunc("/configz", configz)
+
+	// pprof
+	m.PathPrefix("/").Handler(http.DefaultServeMux)
 
 	if !permissioned {
 		return m, nil

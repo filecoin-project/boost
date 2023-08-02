@@ -41,6 +41,11 @@ var runCmd = &cli.Command{
 			Value: "",
 		},
 		&cli.StringFlag{
+			Name:  "adminaddr",
+			Usage: "the listen address and port for the admin server",
+			Value: "0.0.0.0:6464",
+		},
+		&cli.StringFlag{
 			Name:    "address",
 			Aliases: []string{"addr"},
 			Usage:   "the listen address for the web server",
@@ -229,6 +234,16 @@ var runCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("starting http server: %w", err)
 		}
+
+		// Start the admin server (healthz, configz, etc.)
+		adminaddr := cctx.String("adminaddr")
+		_, err = AdminServerStart(ctx, adminaddr)
+		if err != nil {
+			return fmt.Errorf("starting admin server: %w", err)
+		}
+
+		log.Infof("Started booster-http admin server address %s",
+			adminaddr)
 
 		log.Infof(ipfsGatewayMsg(cctx, server.ipfsBasePath()))
 		if servePieces {
