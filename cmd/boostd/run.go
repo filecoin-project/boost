@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/lib/adminserver"
 	"github.com/filecoin-project/boost/node"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 
@@ -30,6 +31,11 @@ var runCmd = &cli.Command{
 		&cli.BoolFlag{
 			Name:  "pprof",
 			Usage: "run pprof web server on localhost:6060",
+		},
+		&cli.StringFlag{
+			Name:  "adminaddr",
+			Usage: "the listen address and port for the admin server",
+			Value: "0.0.0.0:6463",
 		},
 		&cli.BoolFlag{
 			Name:  "nosync",
@@ -146,6 +152,13 @@ var runCmd = &cli.Command{
 		rpcStopper, err := node.ServeRPC(handler, "boost", endpoint)
 		if err != nil {
 			return fmt.Errorf("failed to start json-rpc endpoint: %s", err)
+		}
+
+		// Start the admin server (healthz, configz, etc.)
+		adminaddr := cctx.String("adminaddr")
+		_, err = adminserver.Start(ctx, adminaddr)
+		if err != nil {
+			return fmt.Errorf("starting admin server: %w", err)
 		}
 
 		// Monitor for shutdown.

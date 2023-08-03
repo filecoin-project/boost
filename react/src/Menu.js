@@ -12,6 +12,7 @@ import {LIDMenuItem} from "./LID";
 import {ProposalLogsMenuItem} from "./ProposalLogs";
 import {RetrievalLogsMenuItem} from "./RetrievalLogs";
 import {IpniMenuItem} from "./Ipni";
+import {HealthMenuItem} from "./Health";
 
 export function Menu(props) {
     function scrollToTop() {
@@ -27,6 +28,7 @@ export function Menu(props) {
             <SealingPipelineMenuItem />
             <DealPublishMenuItem />
             <IpniMenuItem />
+            <HealthMenuItem />
             <StorageSpaceMenuItem />
             <FundsMenuItem />
             <DealTransfersMenuItem />

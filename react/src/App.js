@@ -12,6 +12,7 @@ import {SealingPipelinePage} from "./SealingPipeline";
 import {DealPublishPage} from "./DealPublish";
 import {DealTransfersPage} from "./DealTransfers"
 import {MpoolPage} from "./Mpool";
+import {HealthPage} from "./Health";
 import {DealDetail} from "./DealDetail";
 import {Epoch} from "./Epoch";
 import {LegacyDealDetail} from "./LegacyDealDetail"
@@ -51,6 +52,7 @@ function App(props) {
                                         <Route path="/ipni/from/:cursor/page/:pageNum" element={<IpniPage />} />
                                         <Route path="/ipni/ad/:adCid" element={<IpniAdDetail />} />
                                         <Route path="/ipni/ad/:adCid/entries" element={<IpniAdEntries />} />
+                                        <Route path="/health" element={<HealthPage />} />
                                         <Route path="/storage-space" element={<StorageSpacePage />} />
                                         <Route path="/lid" element={<LIDPage />} />
                                         <Route path="/sealing-pipeline" element={<SealingPipelinePage />} />

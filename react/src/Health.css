@@ -1,0 +1,172 @@
+.health-prov-info th, .ipni-prov-info td {
+    padding: 0.5em 1em;
+    font-weight: normal;
+    text-align: left;
+    vertical-align: top;
+}
+
+.health-prov-info .subtitle {
+    color: #777;
+    padding: 0 1em 1em 1em;
+}
+
+.health-prov-info th {
+    color: #777;
+}
+
+.health-prov-info .aux {
+    color:  #999;
+}
+
+.health .js-obj .js-obj-val {
+    color: #000;
+}
+
+.health-retrievals {
+    position: relative;
+}
+
+.health-retrievals table {
+    font-size: 1em;
+    width: 100%;
+}
+
+.health-retrievals td, .ipni-retrievals th {
+    padding: 0.5em 1em;
+    font-weight: normal;
+}
+
+.health-retrievals th {
+    white-space: nowrap;
+    text-align: left;
+    opacity: 0.6;
+}
+
+.health-retrievals td.start, .ipni-retrievals th.start {
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.health-retrievals td.sent {
+    width: 5em;
+    white-space: nowrap;
+}
+
+.health-retrievals td.peer-id {
+    min-width: 8em;
+}
+
+.health-retrievals td.ad-cid {
+    min-width: 6em;
+}
+
+.health-retrievals td.transfer-id {
+    min-width: 7em;
+}
+
+.health-retrievals td.message {
+    width: 100%;
+}
+
+.health-retrievals .popup {
+    display: none;
+    position: absolute;
+    font-size: 1em;
+    top: -4em;
+    text-align: center;
+    width: 100%;
+}
+.health-retrievals .popup.showing {
+    display: inline-block;
+}
+
+.health-retrievals .popup .message {
+    display: inline-block;
+    color: #777777;
+    background-color: #fff;
+    border: 1px solid #aaa;
+    border-radius: 0.2em;
+    padding: 0.5em;
+    font-size: 0.8em;
+    margin-top: 0.8em;
+}
+
+.health-retrievals .peer-id > *, .ipni-retrievals .deal-id > *, .ipni-retrievals .payload-cid > * {
+    display: inline-block;
+}
+
+.health-retrievals .copy {
+    display: inline-block;
+    vertical-align: text-top;
+    width: 0.8em;
+    height: 0.8em;
+    margin-right: 0.5em;
+    margin-top: 0.1em;
+    cursor: pointer;
+    background: url("./bootstrap-icons/icons/clipboard.svg");
+    background-size: cover;
+}
+
+.health-retrievals .copy.copied {
+    animation: rotate 0.5s infinite;
+}
+
+@keyframes rotate {
+    from{ transform: rotate(0deg); }
+    to{ transform: rotate(360deg); }
+}
+
+
+.ad-detail {
+    padding-top: 1em;
+    margin: auto;
+}
+
+.ad-detail .title {
+    margin:  1em auto;
+    text-align: center;
+    font-size: 1.25em;
+    color: #a61e4d;
+}
+
+.ad-detail table {
+    font-size: 1em;
+}
+
+.ad-detail td, .ad-detail th {
+    vertical-align: top;
+    text-align: left;
+    padding: 0.5em 1em;
+}
+
+.ad-detail .metadata {
+    padding: 0 0 0.5em 0;
+}
+
+.ad-detail .metadata .metadata-protocol {
+    padding: 0 0 0.25em 0;
+}
+
+.ad-detail .metadata .metadata-content {
+    color: #777;
+}
+
+.ad-detail .metadata .metadata-content .metadata-field {
+    padding: 0.25em 0;
+}
+
+.ad-detail .metadata .metadata-content .metadata-field-value {
+    color: #000;
+}
+
+.ad-detail .metadata .metadata-piece-cid {
+    padding: 0.5em 0;
+}
+
+.ad-detail h3 {
+    margin-top: 2em;
+}
+
+.ad-detail .entries td {
+    padding: 0.3em;
+}
