@@ -8,6 +8,7 @@ import (
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/filters"
 	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
+	"github.com/filecoin-project/boost/lib/adminserver"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/piecedirectory"
 	bdclient "github.com/filecoin-project/boostd-data/client"
@@ -75,6 +76,11 @@ var runCmd = &cli.Command{
 			Name:  "tracing-endpoint",
 			Usage: "the endpoint for the tracing exporter",
 			Value: "http://tempo:14268/api/traces",
+		},
+		&cli.StringFlag{
+			Name:  "adminaddr",
+			Usage: "the listen address and port for the admin server",
+			Value: "0.0.0.0:6465",
 		},
 		&cli.StringFlag{
 			Name:  "api-filter-endpoint",
@@ -235,6 +241,16 @@ var runCmd = &cli.Command{
 				log.Errorf("could not start prometheus metric exporter server: %s", err)
 			}
 		}()
+
+		// Start the admin server (healthz, configz, etc.)
+		adminaddr := cctx.String("adminaddr")
+		_, err = adminserver.Start(ctx, adminaddr)
+		if err != nil {
+			return fmt.Errorf("starting admin server: %w", err)
+		}
+
+		log.Infof("Started booster-http admin server address %s",
+			adminaddr)
 
 		// Monitor for shutdown.
 		<-ctx.Done()

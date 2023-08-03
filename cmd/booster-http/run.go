@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/filters"
 	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
+	"github.com/filecoin-project/boost/lib/adminserver"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/piecedirectory"
 	bdclient "github.com/filecoin-project/boostd-data/client"
@@ -237,7 +238,7 @@ var runCmd = &cli.Command{
 
 		// Start the admin server (healthz, configz, etc.)
 		adminaddr := cctx.String("adminaddr")
-		_, err = AdminServerStart(ctx, adminaddr)
+		_, err = adminserver.Start(ctx, adminaddr)
 		if err != nil {
 			return fmt.Errorf("starting admin server: %w", err)
 		}

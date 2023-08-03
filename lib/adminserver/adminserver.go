@@ -1,4 +1,4 @@
-package main
+package adminserver
 
 import (
 	"context"
@@ -9,15 +9,18 @@ import (
 
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/gorilla/mux"
+	logging "github.com/ipfs/go-log/v2"
 )
 
-func AdminServerStart(ctx context.Context, addr string) (net.Addr, error) {
+var log = logging.Logger("adminserver")
+
+func Start(ctx context.Context, addr string) (net.Addr, error) {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("setting up listener for admin server: %w", err)
 	}
 
-	as := &AdminService{}
+	as := &Service{}
 
 	server := jsonrpc.NewServer()
 	server.Register("adminserver", as)
@@ -62,13 +65,13 @@ type ConfigzResponse struct {
 	RuntimeConfigHere string
 }
 
-type AdminService struct {
+type Service struct {
 }
 
-func (s *AdminService) Healthz(ctx context.Context) (*HealthzResponse, error) {
+func (s *Service) Healthz(ctx context.Context) (*HealthzResponse, error) {
 	return &HealthzResponse{Healthy: true}, nil
 }
 
-func (s *AdminService) Configz(ctx context.Context) (*ConfigzResponse, error) {
+func (s *Service) Configz(ctx context.Context) (*ConfigzResponse, error) {
 	return &ConfigzResponse{RuntimeConfigHere: "tomlpastehere"}, nil
 }

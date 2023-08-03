@@ -80,7 +80,7 @@ services:
     init: true
     ports:
       - "7777:7777"
-      - "6464:6464"
+      - "6464:6464" # adminserver
     environment:
       - BOOST_PATH=/var/lib/boost
       - LID_API_INFO=http://boost:8042
@@ -102,6 +102,7 @@ services:
     init: true
     ports:
       - "8888:8888"
+      - "6465:6465" # adminserver
     environment:
       - BOOSTER_BITSWAP_REPO=/var/lib/booster-bitswap
       - BOOST_PATH=/var/lib/boost
