@@ -26,7 +26,8 @@ If you would like to contribute, follow the steps below:
     - Start with testing on a [local devnet](https://github.com/filecoin-project/boost#running-boost-devnet-in-docker-for-development). Feel free to ask any questions you have in #boost-help.
     - After you’ve tested on a local devnet, you can work with the Boost team directly to test on our production miners (if applicable).
 7. PR merged
-8. Update Boost documentation (if applicable / if the feature is user facing)
+    - Include detailed explanations and documentation around how the feature works, directly in the PR.
+8. Update [Boost documentation](https://boost.filecoin.io) (if applicable / if the feature is user facing)
     - description of the feature
     - recommended default configuration
     - how a Filecoin storage provider should set it up
