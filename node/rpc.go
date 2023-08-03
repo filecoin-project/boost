@@ -67,9 +67,12 @@ func BoostHandler(a api.Boost, permissioned bool) (http.Handler, error) {
 		mapi = api.PermissionedBoostAPI(mapi)
 	}
 
+	as := &AdminService{}
+
 	readerHandler, readerServerOpt := rpcenc.ReaderParamDecoder()
 	rpcServer := jsonrpc.NewServer(readerServerOpt)
 	rpcServer.Register("Filecoin", mapi)
+	rpcServer.Register("adminserver", as)
 	rpcServer.AliasMethod("rpc.discover", "Filecoin.Discover")
 
 	m.Handle("/rpc/v0", rpcServer)
@@ -78,12 +81,6 @@ func BoostHandler(a api.Boost, permissioned bool) (http.Handler, error) {
 
 	// metrics
 	m.Handle("/metrics", metrics.Exporter("boost"))
-
-	// health
-	m.HandleFunc("/healthz", healthz)
-
-	// health
-	m.HandleFunc("/configz", configz)
 
 	// pprof
 	m.PathPrefix("/").Handler(http.DefaultServeMux)
@@ -97,4 +94,23 @@ func BoostHandler(a api.Boost, permissioned bool) (http.Handler, error) {
 		Next:   m.ServeHTTP,
 	}
 	return ah, nil
+}
+
+type HealthzResponse struct {
+	Healthy bool
+}
+
+type ConfigzResponse struct {
+	RuntimeConfigHere string
+}
+
+type AdminService struct {
+}
+
+func (s *AdminService) Healthz(ctx context.Context) (*HealthzResponse, error) {
+	return &HealthzResponse{Healthy: true}, nil
+}
+
+func (s *AdminService) Configz(ctx context.Context) (*ConfigzResponse, error) {
+	return &ConfigzResponse{RuntimeConfigHere: "tomlpastehere"}, nil
 }
