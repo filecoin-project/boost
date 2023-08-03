@@ -7,7 +7,8 @@ See the docs at [https://boost.filecoin.io](https://boost.filecoin.io/getting-st
 ## Table of Contents
 
 - [Building and Installing Boost](#building-and-installing-boost)
-- [Running Boost devnet in Docker](#running-boost-devnet-in-docker)
+- [Running Boost devnet in Docker](#running-boost-devnet-in-docker-for-development)
+- [External Contribution Guidelines](#external-contribution-guidelines)
 - [License](#license)
 
 ## Building and Installing Boost
@@ -106,6 +107,9 @@ make devnet/down
 
 rm -rf ~/.cache/filecoin-proof-parameters
 ```
+
+## External Contribution Guidelines
+If you want to contribute to the Boost project, please refer to [these guidelines](./CONTRIBUTING.md). 
 
 ## License
 
