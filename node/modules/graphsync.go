@@ -70,8 +70,10 @@ func (p *LinkSystemProv) LinkSys() *ipld.LinkSystem {
 }
 
 func SetLinkSystem(proxy *LinkSystemProv, prov provider.Interface) {
-	e := prov.(*engine.Engine)
-	proxy.LinkSystem = e.LinkSystem()
+	e, ok := prov.(*engine.Engine)
+	if ok {
+		proxy.LinkSystem = e.LinkSystem()
+	}
 }
 
 // RetrievalGraphsync creates a graphsync instance used to serve retrievals.
