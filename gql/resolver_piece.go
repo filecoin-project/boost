@@ -114,7 +114,7 @@ func (r *resolver) PiecesFlagged(ctx context.Context, args piecesFlaggedArgs) (*
 	if args.MinerAddr.Set && args.MinerAddr.Value != nil {
 		maddr, err := address.NewFromString(*args.MinerAddr.Value)
 		if err != nil {
-			return nil, fmt.Errorf("parsing miner address '%s': %w", args.MinerAddr.Value, err)
+			return nil, fmt.Errorf("parsing miner address '%s': %w", *args.MinerAddr.Value, err)
 		}
 		filter = &types.FlaggedPiecesListFilter{MinerAddr: maddr}
 	}

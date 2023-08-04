@@ -55,7 +55,7 @@ func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([
 
 	// Get the list of pieces that have been added since tracking information
 	// was last updated
-	qry := `SELECT PieceCid, CreatedAt from idx.PieceMetadata WHERE CreatedAt >= ?`
+	qry := `SELECT PieceCid, CreatedAt from PieceMetadata WHERE CreatedAt >= ?`
 	iter := s.session.Query(qry, lastCopied).WithContext(ctx).Iter()
 	var newPieces []pieceCreated
 	var createdAt time.Time
@@ -76,25 +76,21 @@ func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([
 	var newPieceWithMaddrLk sync.Mutex
 	var newPiecesWithMaddr []pieceCreated
 	err = s.execWithConcurrency(ctx, newPieces, insertTrackerParallelism, func(pc pieceCreated) error {
-		qry := `SELECT MinerAddr FROM idx.PieceDeal WHERE PieceCid = ?`
-		iter := s.session.Query(qry, pc.PieceCid).WithContext(ctx).Iter()
+		qry := `SELECT MinerAddr FROM PieceDeal WHERE PieceCid = ?`
+		iter := s.session.Query(qry, pc.PieceCid.Bytes()).WithContext(ctx).Iter()
 		var maddrStr string
 		for iter.Scan(&maddrStr) {
-			maddr, err := address.NewFromString(maddrStr)
+			pmaddr, err := address.NewFromString(maddrStr)
 			if err != nil {
-				return fmt.Errorf("getting new pieces: parsing miner adddress '%s': %w", maddrStr, err)
+				return fmt.Errorf("getting miners for pieces: parsing miner adddress '%s': %w", maddrStr, err)
 			}
 
-			c, err := cid.Parse(pcidstr)
-			if err != nil {
-				return fmt.Errorf("getting new pieces: parsing piece cid %s: %w", pcidstr, err)
-			}
 			newPieceWithMaddrLk.Lock()
-			newPieces = append(newPieces, pieceCreated{MinerAddr: maddr, PieceCid: c, CreatedAt: createdAt})
+			newPiecesWithMaddr = append(newPiecesWithMaddr, pieceCreated{MinerAddr: pmaddr, PieceCid: pc.PieceCid, CreatedAt: createdAt})
 			newPieceWithMaddrLk.Unlock()
 		}
 		if err := iter.Close(); err != nil {
-			return fmt.Errorf("getting new pieces: %w", err)
+			return fmt.Errorf("getting miners for pieces: %w", err)
 		}
 		return nil
 	})
@@ -137,7 +133,7 @@ func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([
 	// NextPiecesToCheck is called.
 	now := time.Now()
 	qry = `WITH cte AS (` +
-		`SELECT PieceCid FROM PieceTracker WHERE MinerAddr = $1 AND UpdatedAt < $2 LIMIT $3` +
+		`SELECT MinerAddr, PieceCid FROM PieceTracker WHERE MinerAddr = $1 AND UpdatedAt < $2 LIMIT $3` +
 		`)` +
 		`UPDATE PieceTracker pt SET UpdatedAt = $4 ` +
 		`FROM cte WHERE pt.MinerAddr = cte.MinerAddr AND pt.PieceCid = cte.PieceCid ` +
@@ -286,8 +282,11 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 		} else {
 			where += `AND `
 		}
-		where += fmt.Sprintf(`MinerAddr = $%d AND `, idx+1)
-		args = append(args, filter.MinerAddr.String())
+		if !filter.MinerAddr.Empty() {
+			where += fmt.Sprintf(`MinerAddr = $%d AND `, idx+1)
+			args = append(args, filter.MinerAddr.String())
+			idx++
+		}
 
 		where += fmt.Sprintf(`HasUnsealedCopy = $%d `, idx+1)
 		args = append(args, filter.HasUnsealedCopy)
@@ -337,7 +336,7 @@ func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiec
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("getting new pieces: %w", err)
+		return nil, fmt.Errorf("getting flagged pieces: %w", err)
 	}
 
 	return pieces, nil
@@ -351,9 +350,12 @@ func (s *Store) FlaggedPiecesCount(ctx context.Context, filter *types.FlaggedPie
 	var count int
 	qry := `SELECT COUNT(*) FROM PieceFlagged`
 	if filter != nil {
-		qry += ` WHERE MinerAddr = $1 AND HasUnsealedCopy = $2`
-		args = append(args, filter.MinerAddr)
+		qry += ` WHERE HasUnsealedCopy = $1`
 		args = append(args, filter.HasUnsealedCopy)
+		if !filter.MinerAddr.Empty() {
+			qry += ` AND MinerAddr = $2`
+			args = append(args, filter.MinerAddr)
+		}
 	}
 
 	err := s.db.QueryRow(ctx, qry, args...).Scan(&count)

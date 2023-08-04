@@ -20,10 +20,7 @@ func TestServiceYugabyte(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	SetupYugabyte(t)
-
-	bdsvc := NewYugabyte(TestYugabyteSettings)
-
+	bdsvc := SetupYugabyte(t)
 	addr := "localhost:0"
 	testService(ctx, t, bdsvc, addr)
 }
@@ -34,8 +31,7 @@ func TestServiceFuzzYugabyte(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	SetupYugabyte(t)
-	bdsvc := NewYugabyte(TestYugabyteSettings)
+	bdsvc := SetupYugabyte(t)
 
 	addr := "localhost:0"
 	ln, err := bdsvc.Start(ctx, addr)
@@ -52,8 +48,6 @@ func TestCleanupYugabyte(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	SetupYugabyte(t)
-
-	bdsvc := NewYugabyte(TestYugabyteSettings)
+	bdsvc := SetupYugabyte(t)
 	testCleanup(ctx, t, bdsvc, "localhost:0")
 }

@@ -25,8 +25,8 @@ type Service struct {
 	Impl types.ServiceImpl
 }
 
-func NewYugabyte(settings yugabyte.DBSettings, migrator *yugabyte.Migrator) *Service {
-	return &Service{Impl: yugabyte.NewStore(settings, migrator)}
+func NewYugabyte(settings yugabyte.DBSettings, migrator *yugabyte.Migrator, storeOpts ...yugabyte.StoreOpt) *Service {
+	return &Service{Impl: yugabyte.NewStore(settings, migrator, storeOpts...)}
 }
 
 func NewLevelDB(repoPath string) (*Service, error) {

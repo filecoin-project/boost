@@ -40,10 +40,7 @@ func TestSizeLimit(t *testing.T) {
 	t.Run("yugabyte", func(t *testing.T) {
 		_ = logging.SetLogLevel("boostd-data-yb", "debug")
 
-		SetupYugabyte(t)
-
-		bdsvc := NewYugabyte(TestYugabyteSettings)
-
+		bdsvc := SetupYugabyte(t)
 		addr := "localhost:0"
 		testSizeLimit(ctx, t, bdsvc, addr)
 	})
