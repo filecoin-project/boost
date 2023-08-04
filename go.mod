@@ -4,8 +4,6 @@ go 1.19
 
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
-replace github.com/filecoin-project/boostd-data => ./extern/boostd-data
-
 // replace github.com/filcoin-project/boost-graphsync => ../boost-graphsync
 
 // replace github.com/filecoin-project/go-data-transfer => ../go-data-transfer
@@ -326,7 +324,7 @@ require (
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/filecoin-project/boostd-data v0.0.0-00010101000000-000000000000
+	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20230804095846-9827f14fc615
 	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
 	github.com/ipfs/go-ds-flatfs v0.5.1
 	github.com/ipfs/go-ipfs-redirects-file v0.1.1 // indirect

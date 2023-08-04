@@ -9,8 +9,8 @@ import (
 	reflect "reflect"
 	time "time"
 
+	model "github.com/filecoin-project/boost/extern/boostd-data/model"
 	types "github.com/filecoin-project/boost/piecedirectory/types"
-	model "github.com/filecoin-project/boostd-data/model"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"

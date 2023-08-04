@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/go-state-types/abi"
 )
 

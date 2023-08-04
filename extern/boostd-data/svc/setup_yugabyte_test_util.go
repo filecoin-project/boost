@@ -1,7 +1,7 @@
 package svc
 
 import (
-	"github.com/filecoin-project/boostd-data/yugabyte"
+	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
 	"github.com/yugabyte/gocql"

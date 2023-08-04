@@ -16,13 +16,13 @@ import (
 
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
+	bdtypes "github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/filecoin-project/boost/markets/idxprov"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/sectorstatemgr"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
-	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -282,25 +282,27 @@ func (w *Wrapper) Enabled() bool {
 // The advertisement published by this function covers 2 protocols:
 //
 // Bitswap:
-//     1. bitswap is completely disabled: in which case an advertisement is
+//
+//  1. bitswap is completely disabled: in which case an advertisement is
 //     published with http(or empty if http is disabled) extended providers
 //     that should wipe previous support on indexer side.
 //
-//     2. bitswap is enabled with public addresses: in which case publish an
+//  2. bitswap is enabled with public addresses: in which case publish an
 //     advertisement with extended providers records corresponding to the
 //     public addresses. Note, according the IPNI spec, the host ID will
 //     also be added to the extended providers for signing reasons with empty
 //     metadata making a total of 2 extended provider records.
 //
-//     3. bitswap with boostd address: in which case public an advertisement
+//  3. bitswap with boostd address: in which case public an advertisement
 //     with one extended provider record that just adds bitswap metadata.
 //
 // HTTP:
-//     1. http is completely disabled: in which case an advertisement is
+//
+//  1. http is completely disabled: in which case an advertisement is
 //     published with bitswap(or empty if bitswap is disabled) extended providers
 //     that should wipe previous support on indexer side
 //
-//     2. http is enabled: in which case an advertisement is published with
+//  2. http is enabled: in which case an advertisement is published with
 //     bitswap and http(or only http if bitswap is disabled) extended providers
 //     that should wipe previous support on indexer side
 //

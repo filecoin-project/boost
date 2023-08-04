@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/filecoin-project/boostd-data/client"
-	"github.com/filecoin-project/boostd-data/svc"
+	"github.com/filecoin-project/boost/extern/boostd-data/client"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc"
 )
 
 func NewTestStore(ctx context.Context) *client.Store {

@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/db"
+	bdtypes "github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/sectorstatemgr"
-	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
 )
 
 type dealData struct {

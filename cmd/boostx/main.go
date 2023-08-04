@@ -10,7 +10,7 @@ import (
 
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/cmd"
-	"github.com/filecoin-project/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
 )
 
 const (

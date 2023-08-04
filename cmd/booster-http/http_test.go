@@ -12,7 +12,7 @@ import (
 	"time"
 
 	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
-	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )

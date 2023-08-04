@@ -8,10 +8,10 @@ import (
 
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/boost/sectorstatemgr"
-	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"

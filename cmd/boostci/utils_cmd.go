@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/docker/go-units"
-	"github.com/filecoin-project/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
 	"github.com/filecoin-project/go-paramfetch"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/urfave/cli/v2"

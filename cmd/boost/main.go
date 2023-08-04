@@ -11,7 +11,7 @@ import (
 	llog "log"
 
 	"github.com/filecoin-project/boost/build"
-	"github.com/filecoin-project/boostd-data/shared/cliutil"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/cliutil"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 )

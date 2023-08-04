@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/db"
+	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/sectorstatemgr"
-	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
 )
