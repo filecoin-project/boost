@@ -107,6 +107,15 @@ make devnet/down
 rm -rf ~/.cache/filecoin-proof-parameters
 ```
 
+## Making a release
+
+Prior to making a release, the version of [`boostd-data`](extern/boostd-data) used by the root [go module](go.mod) must be updated to the desired version by running:
+
+```shell
+
+go get github.com/filecoin-project/boost/extern/boostd-data@<insert-desired-commit-id-here>
+```
+
 ## License
 
 Dual-licensed under [MIT](https://github.com/filecoin-project/boost/blob/main/LICENSE-MIT) + [Apache 2.0](https://github.com/filecoin-project/boost/blob/main/LICENSE-APACHE)
