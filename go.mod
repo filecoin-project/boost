@@ -324,7 +324,7 @@ require (
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20230804095846-9827f14fc615
+	github.com/filecoin-project/boost/extern/boostd-data v0.0.0-20230804101708-7565454b8600
 	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
 	github.com/ipfs/go-ds-flatfs v0.5.1
 	github.com/ipfs/go-ipfs-redirects-file v0.1.1 // indirect
