@@ -13,6 +13,12 @@ If you would like to contribute, follow the steps below:
     - Feedback addressed to proposing team
 3. Open a PR
    - Include detailed explanations and any links to documentation around how the feature works.
+   - Add detailed documentation about the feature/change (if applicable / if the feature is user facing) 
+        - description of the feature
+        - recommended default configuration
+        - how a Filecoin storage provider should set it up
+        - an example of how to use it
+        - If the PR requires update to Boost documentation, then, please add tag `docs-needed` to the PR.
    - address comments on the PR
    - fix any issues that are surfaced
 4. Testing
