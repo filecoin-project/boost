@@ -34,8 +34,3 @@ If you would like to contribute, follow the steps below:
     - After you’ve tested on a local devnet, you can work with the Boost team directly to test on our production miners (if applicable).
 7. Boost team will update the [Boost documentation](https://boost.filecoin.io) if `docs-needed` tag was provided in the PR. Verify the new documentation and suggest and required changes.
 8. PR merged
-8. Update [Boost documentation](https://boost.filecoin.io) (if applicable / if the feature is user facing)
-    - description of the feature
-    - recommended default configuration
-    - how a Filecoin storage provider should set it up
-    - an example of how to use it
