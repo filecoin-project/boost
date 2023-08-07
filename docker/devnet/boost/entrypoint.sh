@@ -77,6 +77,7 @@ fi
 ## Override config options
 echo Updating config values
 sed -i 's|ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8042"|g' $BOOST_PATH/config.toml
+sed -i 's|ExpectedSealDuration = "0h0m10s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml
 
 echo Starting LID service and boost in dev mode...
 trap 'kill %1' SIGINT
