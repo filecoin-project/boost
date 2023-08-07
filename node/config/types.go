@@ -151,7 +151,9 @@ type DealmakingConfig struct {
 	// This includes the time the deal will need to get transferred and published
 	// before being assigned to a sector
 	ExpectedSealDuration Duration
-	// Maximum amount of time proposed deal StartEpoch can be in future
+	// Maximum amount of time proposed deal StartEpoch can be in the future.
+	// This is applicable only for online deals as offline deals can take long duration
+	// to import the data
 	MaxDealStartDelay Duration
 	// The maximum collateral that the provider will put up against a deal,
 	// as a multiplier of the minimum collateral bound
