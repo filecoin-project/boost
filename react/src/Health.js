@@ -40,10 +40,28 @@ export function HealthMenuItem(props) {
 }
 
 function ServicesHealthContent() {
+    var services = [
+      {"name": "booster-http", "healthy": true},
+      {"name": "boostd", "healthy": false},
+      {"name": "booster-bitswap", "healthy": true},
+      {"name": "boostd-data", "healthy": true}
+    ]
+
     return (
       <div>
         <h3>Services Health</h3>
 
+        <table className="services">
+            <tbody>
+            {services.map(s => (
+                <tr key={s.name}>
+                    <td className="color">{(s.healthy ? 'green' : 'red')}</td>
+                    <td className="state">{s.name}</td>
+                    <td className="health">{(s.healthy ? 'healthy' : 'dead')}</td>
+                </tr>
+            ))}
+            </tbody>
+        </table>
 
       </div>
     )
