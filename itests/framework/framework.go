@@ -296,6 +296,8 @@ func (f *TestFramework) Start() error {
 	cfg.Dealmaking.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
 	cfg.Storage.ParallelFetchLimit = 10
 
+	cfg.Dealmaking.ExpectedSealDuration = 10
+
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
 		*rcfg = *cfg

@@ -74,5 +74,8 @@ if [ ! -f $BOOST_PATH/.register.boost ]; then
 	echo Super. DONE! Boostd is now configured and will be started soon
 fi
 
+## Override config options
+echo Updating config values
+sed -i 's|ExpectedSealDuration = "24h0m0s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml
 echo Starting boost in dev mode...
 exec boostd -vv run --nosync=true
