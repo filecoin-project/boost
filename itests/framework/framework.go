@@ -317,6 +317,8 @@ func (f *TestFramework) Start() error {
 		cfg.Dealmaking.EnableLegacyStorageDeals = true
 	}
 
+	cfg.Dealmaking.ExpectedSealDuration = 10
+
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
 		*rcfg = *cfg
