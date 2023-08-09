@@ -122,16 +122,37 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (d
 		return derr
 	}
 
-	// deal has been sent for sealing -> we can cleanup the deal state now and simply watch the deal on chain
+	ierr := <-dh.indexingErr
+	if ierr == nil {
+		if deal.AnnounceToIPNI {
+			p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed and announced")
+		} else {
+			p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed")
+		}
+	}
+
+	// deal has been sent for sealing -> we can clean up the deal state now and simply watch the deal on chain
 	// to wait for deal completion/slashing and update the state in DB accordingly.
 	p.cleanupDeal(deal)
 	p.dealLogger.Infow(deal.DealUuid, "finished deal cleanup after successful execution")
 
-	// Watch the sealing status of the deal and fire events for each change
-	p.dealLogger.Infow(deal.DealUuid, "watching deal sealing state changes")
-	if derr := p.fireSealingUpdateEvents(dh, deal.DealUuid, deal.SectorID); derr != nil {
-		return derr
+	// Wait for sealing to finish and return errors if any
+	serr := <-dh.sealingDone
+
+	// Check for sealingError and IndexingError
+	// If sealing error is not nil then we should return the sealing error as it is fatal
+	// If sealing error is nil and indexing error is not nil, we should return indexing error here
+	// This will prevent users from going into panic over indexing error - users get the idea that deal failed
+	// even though it is being sealed properly
+	if serr != nil {
+		return serr
+	} else {
+		if ierr != nil {
+			ierr.error = fmt.Errorf("failed to add index and announce deal: %w", ierr.error)
+			return ierr
+		}
 	}
+
 	p.cleanupDealHandler(deal.DealUuid)
 	p.dealLogger.Infow(deal.DealUuid, "deal sealing reached termination state")
 
@@ -231,17 +252,15 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 		p.dealLogger.Infow(deal.DealUuid, "storage space successfully untagged for deal after it was handed to sealer")
 	}
 
-	// Index deal in DAGStore and Announce deal
+	// Fire the goroutine to watch the sealing status of the deal and fire events for each change
+	// The result of this goroutine is read in parent func execDeal()
+	p.fireSealingUpdateEvents(dh, deal.DealUuid, deal.SectorID)
+	p.dealLogger.Infow(deal.DealUuid, "watching deal sealing state changes")
+
+	// Index deal in LID and Announce deal in a goroutine to avoid the condition where execution never
+	// checks sealing pipeline status as indexing error is not fatal
 	if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
-		if err := p.indexAndAnnounce(ctx, pub, deal); err != nil {
-			err.error = fmt.Errorf("failed to add index and announce deal: %w", err.error)
-			return err
-		}
-		if deal.AnnounceToIPNI {
-			p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed and announced")
-		} else {
-			p.dealLogger.Infow(deal.DealUuid, "deal successfully indexed")
-		}
+		p.indexAndAnnounce(ctx, dh, deal)
 	} else {
 		p.dealLogger.Infow(deal.DealUuid, "deal has already been indexed and announced")
 	}
@@ -602,7 +621,7 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	return nil
 }
 
-func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
+func (p *Provider) indexAndAnnounce(ctx context.Context, dh *dealHandler, deal *types.ProviderDealState) {
 	// add deal to piece metadata store
 	pc := deal.ClientDealProposal.Proposal.PieceCID
 	p.dealLogger.Infow(deal.DealUuid, "about to add deal for piece in LID")
@@ -615,7 +634,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 		PieceLength: deal.Length,
 		CarLength:   uint64(deal.NBytesReceived),
 	}); err != nil {
-		return &dealMakingError{
+		dh.indexingErr <- &dealMakingError{
 			retry: types.DealRetryAuto,
 			error: fmt.Errorf("failed to add deal to piece metadata store: %w", err),
 		}
@@ -629,7 +648,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 			// just retry the next time boost restarts
 			annCid, err := p.ip.AnnounceBoostDeal(ctx, deal)
 			if err != nil {
-				return &dealMakingError{
+				dh.indexingErr <- &dealMakingError{
 					retry: types.DealRetryAuto,
 					error: fmt.Errorf("failed to announce deal to network indexer: %w", err),
 				}
@@ -642,16 +661,12 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 		p.dealLogger.Infow(deal.DealUuid, "didn't announce deal because network indexer is disabled")
 	}
 
-	if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.IndexedAndAnnounced); derr != nil {
-		return derr
-	}
-
-	return nil
+	dh.indexingErr <- p.updateCheckpoint(dh.Publisher, deal, dealcheckpoints.IndexedAndAnnounced)
 }
 
 // fireSealingUpdateEvents periodically checks the sealing status of the deal
 // and fires events for each change
-func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, sectorNum abi.SectorNumber) *dealMakingError {
+func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, sectorNum abi.SectorNumber) {
 	var deal *types.ProviderDealState
 	var lastSealingState lapi.SectorState
 	checkStatus := func(force bool) lapi.SectorInfo {
@@ -688,9 +703,9 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 	info := checkStatus(true)
 	if IsFinalSealingState(info.State) {
 		if HasDeal(info.Deals, deal.ChainDealID) {
-			return nil
+			dh.sealingDone <- nil
 		}
-		return retErr
+		dh.sealingDone <- retErr
 	}
 
 	// Check status every 10 second. There is no advantage of checking it every second
@@ -701,7 +716,6 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 	for {
 		select {
 		case <-p.ctx.Done():
-			return nil
 		case <-ticker.C:
 			count++
 			// Force a status check every (ticker * forceCount) seconds, even if there
@@ -714,9 +728,9 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 
 			if IsFinalSealingState(info.State) {
 				if HasDeal(info.Deals, deal.ChainDealID) {
-					return nil
+					dh.sealingDone <- nil
 				}
-				return retErr
+				dh.sealingDone <- retErr
 			}
 		}
 	}

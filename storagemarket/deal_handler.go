@@ -80,6 +80,9 @@ type dealHandler struct {
 
 	runningLk sync.RWMutex
 	running   bool
+
+	sealingDone chan *dealMakingError
+	indexingErr chan *dealMakingError
 }
 
 func newDealHandler(ctx context.Context, dealUuid uuid.UUID) (*dealHandler, error) {
@@ -101,7 +104,9 @@ func newDealHandler(ctx context.Context, dealUuid uuid.UUID) (*dealHandler, erro
 		transferCancel: cancel,
 		transferDone:   make(chan error, 1),
 
-		activeSubs: make(map[*updatesSubscription]struct{}),
+		activeSubs:  make(map[*updatesSubscription]struct{}),
+		sealingDone: make(chan *dealMakingError, 1),
+		indexingErr: make(chan *dealMakingError, 1),
 	}, nil
 }
 
@@ -118,10 +123,10 @@ func (s *updatesSubscription) Close() error {
 }
 
 // subscribeUpdates subscribes to deal status updates
-func (d *dealHandler) subscribeUpdates() (event.Subscription, error) {
-	sub, err := d.bus.Subscribe(new(types.ProviderDealState), eventbus.BufSize(256))
+func (dh *dealHandler) subscribeUpdates() (event.Subscription, error) {
+	sub, err := dh.bus.Subscribe(new(types.ProviderDealState), eventbus.BufSize(256))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create deal update subscriber to %s: %w", d.dealUuid, err)
+		return nil, fmt.Errorf("failed to create deal update subscriber to %s: %w", dh.dealUuid, err)
 	}
 
 	// create an updatesSubscription that will delete itself from the map of
@@ -129,16 +134,16 @@ func (d *dealHandler) subscribeUpdates() (event.Subscription, error) {
 	updatesSub := &updatesSubscription{
 		Subscription: sub,
 		onClose: func(s *updatesSubscription) {
-			d.activeSubsLk.Lock()
-			defer d.activeSubsLk.Unlock()
-			delete(d.activeSubs, s)
+			dh.activeSubsLk.Lock()
+			defer dh.activeSubsLk.Unlock()
+			delete(dh.activeSubs, s)
 		},
 	}
 
 	// Add the updatesSubscription to the map of all update subscriptions
-	d.activeSubsLk.Lock()
-	defer d.activeSubsLk.Unlock()
-	d.activeSubs[updatesSub] = struct{}{}
+	dh.activeSubsLk.Lock()
+	defer dh.activeSubsLk.Unlock()
+	dh.activeSubs[updatesSub] = struct{}{}
 
 	return updatesSub, nil
 }
@@ -146,10 +151,10 @@ func (d *dealHandler) subscribeUpdates() (event.Subscription, error) {
 // hasActiveSubscribers indicates if anyone is subscribed to updates.
 // This is useful if we want to check if anyone is listening before doing an
 // expensive operation to publish an event.
-func (d *dealHandler) hasActiveSubscribers() bool {
-	d.activeSubsLk.RLock()
-	defer d.activeSubsLk.RUnlock()
-	return len(d.activeSubs) > 0
+func (dh *dealHandler) hasActiveSubscribers() bool {
+	dh.activeSubsLk.RLock()
+	defer dh.activeSubsLk.RUnlock()
+	return len(dh.activeSubs) > 0
 }
 
 // TransferCancelledByUser returns true if the user explicitly cancelled the transfer by calling `dealhandler.cancelTransfer()`
@@ -193,19 +198,19 @@ func (dh *dealHandler) close() {
 	dh.setCancelTransferResponse(errors.New("deal handler closed"))
 }
 
-func (d *dealHandler) setRunning(running bool) bool {
-	d.runningLk.Lock()
-	defer d.runningLk.Unlock()
+func (dh *dealHandler) setRunning(running bool) bool {
+	dh.runningLk.Lock()
+	defer dh.runningLk.Unlock()
 
-	if d.running == running {
+	if dh.running == running {
 		return false
 	}
-	d.running = running
+	dh.running = running
 	return true
 }
 
-func (d *dealHandler) isRunning() bool {
-	d.runningLk.RLock()
-	defer d.runningLk.RUnlock()
-	return d.running
+func (dh *dealHandler) isRunning() bool {
+	dh.runningLk.RLock()
+	defer dh.runningLk.RUnlock()
+	return dh.running
 }

@@ -440,8 +440,16 @@ func (p *Provider) Start() error {
 		// Check if deal is already proving
 		if deal.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
 			si, err := p.sps.SectorsStatus(p.ctx, deal.SectorID, false)
-			if err != nil || IsFinalSealingState(si.State) {
+			if err != nil {
 				continue
+			}
+
+			// Check if deal had reached a final state and actually sealed in a sector
+			// Otherwise skip to next step and set up a deal handler
+			if IsFinalSealingState(si.State) {
+				if HasDeal(si.Deals, deal.ChainDealID) {
+					continue
+				}
 			}
 		}
 
