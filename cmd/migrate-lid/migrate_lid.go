@@ -307,7 +307,7 @@ func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, f
 	respch := store.AddIndex(ctx, pieceCid, records, false)
 	for resp := range respch {
 		if resp.Err != "" {
-			return false, fmt.Errorf("adding index %s to store: %s", ipath.path, err)
+			return false, fmt.Errorf("adding index %s to store: %s", ipath.path, resp.Err)
 		}
 	}
 	log.Debugw("AddIndex", "took", time.Since(addStart).String())
