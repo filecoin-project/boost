@@ -161,6 +161,7 @@ type IndexProvider interface {
 	Enabled() bool
 	AnnounceBoostDeal(ctx context.Context, pds *ProviderDealState) (cid.Cid, error)
 	Start(ctx context.Context)
+	AnnounceBoostDealRemoved(ctx context.Context, propCid cid.Cid) (cid.Cid, error)
 }
 
 type AskGetter interface {

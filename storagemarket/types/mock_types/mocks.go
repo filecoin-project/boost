@@ -209,6 +209,21 @@ func (mr *MockIndexProviderMockRecorder) AnnounceBoostDeal(arg0, arg1 interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AnnounceBoostDeal", reflect.TypeOf((*MockIndexProvider)(nil).AnnounceBoostDeal), arg0, arg1)
 }
 
+// AnnounceBoostDealRemoved mocks base method.
+func (m *MockIndexProvider) AnnounceBoostDealRemoved(arg0 context.Context, arg1 cid.Cid) (cid.Cid, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AnnounceBoostDealRemoved", arg0, arg1)
+	ret0, _ := ret[0].(cid.Cid)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AnnounceBoostDealRemoved indicates an expected call of AnnounceBoostDealRemoved.
+func (mr *MockIndexProviderMockRecorder) AnnounceBoostDealRemoved(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AnnounceBoostDealRemoved", reflect.TypeOf((*MockIndexProvider)(nil).AnnounceBoostDealRemoved), arg0, arg1)
+}
+
 // Enabled mocks base method.
 func (m *MockIndexProvider) Enabled() bool {
 	m.ctrl.T.Helper()

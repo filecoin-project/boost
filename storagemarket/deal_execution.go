@@ -145,6 +145,20 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (d
 	// This will prevent users from going into panic over indexing error - users get the idea that deal failed
 	// even though it is being sealed properly
 	if serr != nil {
+		if ierr == nil {
+			// Announce removal for the indexers as well
+			propCid, err := deal.SignedProposalCid()
+			if err != nil {
+				p.dealLogger.Errorw(deal.DealUuid, "failed to get the proposal CID to announce removal for the deal")
+			} else {
+				ad, aerr := p.ip.AnnounceBoostDealRemoved(p.ctx, propCid)
+				if aerr == nil {
+					p.dealLogger.Errorw(deal.DealUuid, "failed to announce removal for the deal")
+				} else {
+					p.dealLogger.Infow(deal.DealUuid, "announced removal for the deal with cid: %s", "announcement-cid", ad)
+				}
+			}
+		}
 		return serr
 	} else {
 		if ierr != nil {
@@ -254,13 +268,13 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 
 	// Fire the goroutine to watch the sealing status of the deal and fire events for each change
 	// The result of this goroutine is read in parent func execDeal()
-	p.fireSealingUpdateEvents(dh, deal.DealUuid, deal.SectorID)
+	go p.fireSealingUpdateEvents(dh, deal.DealUuid, deal.SectorID)
 	p.dealLogger.Infow(deal.DealUuid, "watching deal sealing state changes")
 
 	// Index deal in LID and Announce deal in a goroutine to avoid the condition where execution never
 	// checks sealing pipeline status as indexing error is not fatal
 	if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
-		p.indexAndAnnounce(ctx, dh, deal)
+		go p.indexAndAnnounce(ctx, dh, deal)
 	} else {
 		p.dealLogger.Infow(deal.DealUuid, "deal has already been indexed and announced")
 	}
