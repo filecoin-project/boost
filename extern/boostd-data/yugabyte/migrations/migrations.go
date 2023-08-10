@@ -3,19 +3,29 @@ package migrations
 import (
 	"database/sql"
 	"embed"
+	"github.com/filecoin-project/go-address"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/pressly/goose/v3"
 )
 
 var log = logging.Logger("migrations")
 
-//go:embed *.sql *.go
+//go:embed *.go
 var EmbedMigrations embed.FS
 
-func Migrate(sqldb *sql.DB) error {
+// Used to pass global parameters to the migration functions
+type MigrateParams struct {
+	MinerAddress address.Address
+}
+
+var migrationParams *MigrateParams
+
+func Migrate(sqldb *sql.DB, params MigrateParams) error {
+	migrationParams = &params
+
 	goose.SetBaseFS(EmbedMigrations)
 
-	if err := goose.SetDialect("sqlite3"); err != nil {
+	if err := goose.SetDialect("postgres"); err != nil {
 		return err
 	}
 
@@ -34,7 +44,7 @@ func Migrate(sqldb *sql.DB) error {
 	}
 
 	if beforeVer != afterVer {
-		log.Warnw("boost sqlite3 migrated", "previous", beforeVer, "current", afterVer)
+		log.Warnw("boost postgres migrated", "previous", beforeVer, "current", afterVer)
 	}
 
 	return nil

@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -8,15 +9,15 @@ import (
 )
 
 func init() {
-	goose.AddMigration(UpSetStorageTaggedTransferHost, DownSetStorageTaggedTransferHost)
+	goose.AddMigrationContext(UpSetStorageTaggedTransferHost, DownSetStorageTaggedTransferHost)
 }
 
-func UpSetStorageTaggedTransferHost(tx *sql.Tx) error {
+func UpSetStorageTaggedTransferHost(ctx context.Context, tx *sql.Tx) error {
 	errPrefix := "setting StorageTagged.TransferHost: "
 	qry := "SELECT Deals.ID, Deals.TransferType, Deals.TransferParams " +
 		"FROM Deals INNER JOIN StorageTagged " +
 		"ON Deals.ID = StorageTagged.DealUUID"
-	rows, err := tx.Query(qry)
+	rows, err := tx.QueryContext(ctx, qry)
 	if err != nil {
 		return fmt.Errorf(errPrefix+"getting deals from DB: %w", err)
 	}
@@ -43,7 +44,7 @@ func UpSetStorageTaggedTransferHost(tx *sql.Tx) error {
 			continue
 		}
 
-		_, err = tx.Exec("UPDATE StorageTagged SET TransferHost = ? WHERE DealUUID = ?", host, id)
+		_, err = tx.ExecContext(ctx, "UPDATE StorageTagged SET TransferHost = ? WHERE DealUUID = ?", host, id)
 		if err != nil {
 			return fmt.Errorf(dealErrPrefix+"saving TransferHost to DB: %w", err)
 		}
@@ -51,7 +52,7 @@ func UpSetStorageTaggedTransferHost(tx *sql.Tx) error {
 	return rows.Err()
 }
 
-func DownSetStorageTaggedTransferHost(tx *sql.Tx) error {
+func DownSetStorageTaggedTransferHost(ctx context.Context, tx *sql.Tx) error {
 	// This code is executed when the migration is rolled back.
 	// Do nothing because sqlite doesn't support removing a column.
 	return nil

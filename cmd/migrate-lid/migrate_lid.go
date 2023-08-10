@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/boostd-data/yugabyte"
+	"github.com/filecoin-project/boostd-data/yugabyte/migrations"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -142,7 +143,11 @@ var migrateYugabyteDBCmd = &cli.Command{
 			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
 		}
 
-		store := yugabyte.NewStore(settings)
+		// Note that it doesn't matter what address we pass here: because the
+		// table is newly created, it doesn't contain any rows when the
+		// migration is run.
+		migrator := yugabyte.NewMigrator(settings.ConnectString, address.TestAddress)
+		store := yugabyte.NewStore(settings, migrator)
 		return migrate(cctx, "yugabyte", store, migrateType)
 	},
 }
@@ -605,7 +610,8 @@ func migrateReverse(cctx *cli.Context, dbType string) error {
 			Hosts:                    cctx.StringSlice("hosts"),
 			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
 		}
-		store = yugabyte.NewStore(settings)
+		migrator := yugabyte.NewMigrator(settings.ConnectString, migrations.DisabledMinerAddr)
+		store = yugabyte.NewStore(settings, migrator)
 	}
 
 	// Perform the reverse migration

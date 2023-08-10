@@ -7,6 +7,7 @@ import (
 
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/ipfs/go-cid"
 	logger "github.com/ipfs/go-log/v2"
@@ -33,9 +34,9 @@ type Store struct {
 		RemoveDealForPiece        func(context.Context, cid.Cid, string) error
 		RemovePieceMetadata       func(context.Context, cid.Cid) error
 		RemoveIndexes             func(context.Context, cid.Cid) error
-		NextPiecesToCheck         func(ctx context.Context) ([]cid.Cid, error)
-		FlagPiece                 func(ctx context.Context, pieceCid cid.Cid, hasUnsealedDeal bool) error
-		UnflagPiece               func(ctx context.Context, pieceCid cid.Cid) error
+		NextPiecesToCheck         func(ctx context.Context, maddr address.Address) ([]cid.Cid, error)
+		FlagPiece                 func(ctx context.Context, pieceCid cid.Cid, hasUnsealedDeal bool, maddr address.Address) error
+		UnflagPiece               func(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error
 		FlaggedPiecesList         func(ctx context.Context, filter *types.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error)
 		FlaggedPiecesCount        func(ctx context.Context, filter *types.FlaggedPiecesListFilter) (int, error)
 	}
@@ -172,16 +173,16 @@ func (s *Store) PiecesCount(ctx context.Context) (int, error) {
 	return s.client.PiecesCount(ctx)
 }
 
-func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
-	return s.client.NextPiecesToCheck(ctx)
+func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error) {
+	return s.client.NextPiecesToCheck(ctx, maddr)
 }
 
-func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedDeal bool) error {
-	return s.client.FlagPiece(ctx, pieceCid, hasUnsealedDeal)
+func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedDeal bool, maddr address.Address) error {
+	return s.client.FlagPiece(ctx, pieceCid, hasUnsealedDeal, maddr)
 }
 
-func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
-	return s.client.UnflagPiece(ctx, pieceCid)
+func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error {
+	return s.client.UnflagPiece(ctx, pieceCid, maddr)
 }
 
 func (s *Store) FlaggedPiecesList(ctx context.Context, filter *types.FlaggedPiecesListFilter, cursor *time.Time, offset int, limit int) ([]model.FlaggedPiece, error) {

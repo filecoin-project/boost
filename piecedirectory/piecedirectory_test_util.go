@@ -272,7 +272,8 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.Equal(t, 0, len(pcids))
 
 	// Flag a piece
-	err = cl.FlagPiece(ctx, commpCalc.PieceCID, false)
+	maddr := address.TestAddress
+	err = cl.FlagPiece(ctx, commpCalc.PieceCID, false, maddr)
 	require.NoError(t, err)
 
 	// Count and list of pieces should contain one piece
@@ -285,24 +286,54 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.Equal(t, 1, len(pcids))
 
 	// Test that setting the filter returns the correct results
-	count, err = cl.FlaggedPiecesCount(ctx, &types.FlaggedPiecesListFilter{HasUnsealedCopy: false})
+	filterMatchUnsealed := &types.FlaggedPiecesListFilter{HasUnsealedCopy: false}
+	filterDifferentUnsealed := &types.FlaggedPiecesListFilter{HasUnsealedCopy: true}
+	filterMatchUnsealedMatchingMiner := &types.FlaggedPiecesListFilter{HasUnsealedCopy: false, MinerAddr: maddr}
+	filterMatchUnsealedDifferentMiner := &types.FlaggedPiecesListFilter{HasUnsealedCopy: false, MinerAddr: address.TestAddress2}
+	filterDifferentUnsealedMatchingMiner := &types.FlaggedPiecesListFilter{HasUnsealedCopy: true, MinerAddr: maddr}
+
+	count, err = cl.FlaggedPiecesCount(ctx, filterMatchUnsealed)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
-	count, err = cl.FlaggedPiecesCount(ctx, &types.FlaggedPiecesListFilter{HasUnsealedCopy: true})
+	count, err = cl.FlaggedPiecesCount(ctx, filterDifferentUnsealed)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
-	pcids, err = cl.FlaggedPiecesList(ctx, &types.FlaggedPiecesListFilter{HasUnsealedCopy: false}, nil, 0, 10)
+	count, err = cl.FlaggedPiecesCount(ctx, filterMatchUnsealedMatchingMiner)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	count, err = cl.FlaggedPiecesCount(ctx, filterMatchUnsealedDifferentMiner)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	count, err = cl.FlaggedPiecesCount(ctx, filterDifferentUnsealedMatchingMiner)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	pcids, err = cl.FlaggedPiecesList(ctx, filterMatchUnsealed, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(pcids))
 
-	pcids, err = cl.FlaggedPiecesList(ctx, &types.FlaggedPiecesListFilter{HasUnsealedCopy: true}, nil, 0, 10)
+	pcids, err = cl.FlaggedPiecesList(ctx, filterDifferentUnsealed, nil, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(pcids))
+
+	pcids, err = cl.FlaggedPiecesList(ctx, filterMatchUnsealedMatchingMiner, nil, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(pcids))
+
+	pcids, err = cl.FlaggedPiecesList(ctx, filterMatchUnsealedDifferentMiner, nil, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(pcids))
+
+	pcids, err = cl.FlaggedPiecesList(ctx, filterDifferentUnsealedMatchingMiner, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pcids))
 
 	// Unflag the piece
-	err = cl.UnflagPiece(ctx, commpCalc.PieceCID)
+	err = cl.UnflagPiece(ctx, commpCalc.PieceCID, maddr)
 	require.NoError(t, err)
 
 	// Count and list of pieces should be empty
