@@ -37,6 +37,11 @@ func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([
 	ctx, span := tracing.Tracer.Start(ctx, "store.next_pieces_to_check")
 	defer span.End()
 
+	//
+	// 1. Get any new pieces that have been added to the PieceMetadata
+	//    table (cassandra) and add them to the PieceTracker table (postgres)
+	//
+
 	// Get the time at which pieces were last copied from the piece metadata
 	// to the piece tracker table
 	var lastCopiedRes pgtype.Timestamptz
@@ -112,6 +117,10 @@ func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([
 	if err != nil {
 		return nil, err
 	}
+
+	//
+	// 2. Get a batch of pieces to check from the PieceTracker table
+	//
 
 	// Work out how frequently to check each piece, based on how many pieces
 	// there are.

@@ -143,7 +143,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 	}
 
 	if !hasDealsOnThisMiner {
-		doclog.Debugw("ignoring piece as it is not present in any deals on this miner", "piece", pieceCid.String(), "miner", d.maddr.String())
+		doclog.Warnw("ignoring piece as it is not present in any deals on this miner", "piece", pieceCid.String(), "miner", d.maddr.String())
 		return nil
 	}
 

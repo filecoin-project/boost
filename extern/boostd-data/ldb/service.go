@@ -56,10 +56,6 @@ func NewStore(repopath string) *Store {
 }
 
 func (s *Store) Start(ctx context.Context) error {
-	return s.Create(ctx)
-}
-
-func (s *Store) Create(ctx context.Context) error {
 	repopath := s.repopath
 	if repopath == "" {
 		// used by tests
