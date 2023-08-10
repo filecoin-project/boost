@@ -518,6 +518,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
 		Override(new(smtypes.CommpCalculator), From(new(lotus_modules.MinerStorageService))),
 
+		Override(new(*storagemarket.DirectDealsProvider), modules.NewDirectDealsProvider(walletMiner, cfg)),
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner, cfg)),
 		Override(new(*mpoolmonitor.MpoolMonitor), modules.NewMpoolMonitor(cfg)),
 
