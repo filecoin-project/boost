@@ -21,6 +21,7 @@ var runCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		leveldbCmd,
 		yugabyteCmd,
+		yugabyteMigrateCmd,
 	},
 }
 
@@ -91,7 +92,6 @@ var yugabyteCmd = &cli.Command{
 		}},
 		runFlags...,
 	),
-	Subcommands: []*cli.Command{yugabyteMigrateCmd},
 	Action: func(cctx *cli.Context) error {
 		// Create a yugabyte data service
 		settings := yugabyte.DBSettings{
@@ -111,7 +111,7 @@ var yugabyteCmd = &cli.Command{
 		bdsvc := svc.NewYugabyte(settings, migrator)
 		err := runAction(cctx, "yugabyte", bdsvc)
 		if err != nil && errors.Is(err, migrations.ErrMissingMinerAddr) {
-			return fmt.Errorf("The database needs to be migrated. Run `boost-data run yugabyte migrate`")
+			return fmt.Errorf("The database needs to be migrated. Run `boost-data run yugabyte-migrate`")
 		}
 		return err
 	},
@@ -170,7 +170,7 @@ func runAction(cctx *cli.Context, dbType string, store *svc.Service) error {
 }
 
 var yugabyteMigrateCmd = &cli.Command{
-	Name:   "migrate",
+	Name:   "yugabyte-migrate",
 	Usage:  "Migrate boostd-data yugabyte database",
 	Before: before,
 	Flags: []cli.Flag{
@@ -202,9 +202,6 @@ var yugabyteMigrateCmd = &cli.Command{
 			return fmt.Errorf("parsing miner address '%s': %w", maddr, err)
 		}
 		migrator := yugabyte.NewMigrator(settings.ConnectString, maddr)
-		bdsvc := svc.NewYugabyte(settings, migrator)
-
-		// Create the database and run migrations
-		return bdsvc.Impl.(*yugabyte.Store).Create(cctx.Context)
+		return migrator.Migrate()
 	},
 }
