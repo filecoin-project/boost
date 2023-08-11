@@ -185,9 +185,8 @@ var yugabyteMigrateCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.StringFlag{
-			Name:     "miner-address",
-			Usage:    "default miner address eg f1234",
-			Required: true,
+			Name:  "miner-address",
+			Usage: "default miner address eg f1234",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -197,11 +196,21 @@ var yugabyteMigrateCmd = &cli.Command{
 			ConnectString: cctx.String("connect-string"),
 		}
 
-		maddr, err := address.NewFromString(cctx.String("miner-address"))
-		if err != nil {
-			return fmt.Errorf("parsing miner address '%s': %w", maddr, err)
+		maddr := migrations.DisabledMinerAddr
+		if cctx.IsSet("miner-address") {
+			var err error
+			maddr, err = address.NewFromString(cctx.String("miner-address"))
+			if err != nil {
+				return fmt.Errorf("parsing miner address '%s': %w", maddr, err)
+			}
 		}
 		migrator := yugabyte.NewMigrator(settings.ConnectString, maddr)
-		return migrator.Migrate()
+		err := migrator.Migrate()
+		if err != nil && errors.Is(err, migrations.ErrMissingMinerAddr) {
+			msg := "You must set the miner-address flag to do the migration. " +
+				"Set it to the address of the storage miner eg f1234"
+			return fmt.Errorf(msg)
+		}
+		return err
 	},
 }

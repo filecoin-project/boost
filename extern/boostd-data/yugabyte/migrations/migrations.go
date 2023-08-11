@@ -15,7 +15,8 @@ var EmbedMigrations embed.FS
 
 // Used to pass global parameters to the migration functions
 type MigrateParams struct {
-	MinerAddress address.Address
+	ConnectString string
+	MinerAddress  address.Address
 }
 
 var migrationParams *MigrateParams
