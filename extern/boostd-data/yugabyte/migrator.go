@@ -32,7 +32,7 @@ func (m *Migrator) Migrate() error {
 		return fmt.Errorf("opening postgres connection to %s: %w", m.connectString, err)
 	}
 
-	err = migrations.Migrate(sqldb, migrations.MigrateParams{MinerAddress: m.minerAddr})
+	err = migrations.Migrate(sqldb, migrations.MigrateParams{ConnectString: m.connectString, MinerAddress: m.minerAddr})
 	if err != nil {
 		return fmt.Errorf("running postgres migrations: %w", err)
 	}

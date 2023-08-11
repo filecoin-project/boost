@@ -36,12 +36,27 @@ var ErrMissingMinerAddr = errors.New("cannot perform migration: miner address ha
 // however due to a bug in the migration library we have to do this in a
 // separate migration (20230810151349_piece_tracker_add_maddr_pk)
 func upAddMinerAddr(ctx context.Context, tx *sql.Tx) error {
-	if migrationParams.MinerAddress == DisabledMinerAddr {
+	// Check if there are any rows in the PieceTracker table.
+	// If so, then after we add the MinerAddr column we need to set it to a
+	// default value.
+	// Note that if we perform a SELECT with the Transaction's connection it
+	// causes problems with subsequent operations on the Transaction. So instead
+	// we need to open a new connection just for the SELECT.
+	var count int
+	sqldb, err := sql.Open("postgres", migrationParams.ConnectString)
+	if err != nil {
+		return fmt.Errorf("opening postgres connection to %s: %w", migrationParams.ConnectString, err)
+	}
+	err = sqldb.QueryRowContext(ctx, "SELECT COUNT(*) as cnt FROM PieceTracker").Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 && migrationParams.MinerAddress == DisabledMinerAddr {
 		return ErrMissingMinerAddr
 	}
-	minerAddr := migrationParams.MinerAddress.String()
 
-	_, err := tx.ExecContext(ctx, "ALTER TABLE PieceTracker DROP CONSTRAINT piecetracker_pkey")
+	_, err = tx.ExecContext(ctx, "ALTER TABLE PieceTracker DROP CONSTRAINT piecetracker_pkey")
 	if err != nil {
 		return err
 	}
@@ -49,9 +64,12 @@ func upAddMinerAddr(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, fmt.Sprintf("UPDATE PieceTracker SET MinerAddr='%s'", minerAddr))
-	if err != nil {
-		return err
+	if count > 0 {
+		minerAddr := migrationParams.MinerAddress.String()
+		_, err = tx.ExecContext(ctx, fmt.Sprintf("UPDATE PieceTracker SET MinerAddr='%s'", minerAddr))
+		if err != nil {
+			return err
+		}
 	}
 
 	_, err = tx.ExecContext(ctx, "ALTER TABLE PieceFlagged DROP CONSTRAINT pieceflagged_pkey")
@@ -62,11 +80,13 @@ func upAddMinerAddr(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, fmt.Sprintf("UPDATE PieceFlagged SET MinerAddr='%s'", minerAddr))
-	if err != nil {
-		return err
+	if count > 0 {
+		minerAddr := migrationParams.MinerAddress.String()
+		_, err = tx.ExecContext(ctx, fmt.Sprintf("UPDATE PieceFlagged SET MinerAddr='%s'", minerAddr))
+		if err != nil {
+			return err
+		}
 	}
-
 	// Note that due to a bug in the migration library, we add the primary
 	// key back in the next migration: 20230810151349_piece_tracker_add_maddr_pk
 
