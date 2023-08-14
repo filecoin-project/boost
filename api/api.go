@@ -33,23 +33,24 @@ type Boost interface {
 	Net
 
 	// MethodGroup: Boost
-	BoostIndexerAnnounceAllDeals(ctx context.Context) error                                                                                     //perm:admin
-	BoostIndexerListMultihashes(ctx context.Context, proposalCid cid.Cid) ([]multihash.Multihash, error)                                        //perm:admin
-	BoostIndexerAnnounceLatest(ctx context.Context) (cid.Cid, error)                                                                            //perm:admin
-	BoostIndexerAnnounceLatestHttp(ctx context.Context, urls []string) (cid.Cid, error)                                                         //perm:admin
-	BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (*ProviderDealRejectionInfo, error) //perm:admin
-	BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                                                      //perm:admin
-	BoostDealBySignedProposalCid(ctx context.Context, proposalCid cid.Cid) (*smtypes.ProviderDealState, error)                                  //perm:admin
-	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                                     //perm:admin
-	BoostDagstoreRegisterShard(ctx context.Context, key string) error                                                                           //perm:admin
-	BoostDagstoreDestroyShard(ctx context.Context, key string) error                                                                            //perm:admin
-	BoostDagstoreInitializeShard(ctx context.Context, key string) error                                                                         //perm:admin
-	BoostDagstoreInitializeAll(ctx context.Context, params DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error)              //perm:admin
-	BoostDagstoreRecoverShard(ctx context.Context, key string) error                                                                            //perm:admin
-	BoostDagstoreGC(ctx context.Context) ([]DagstoreShardResult, error)                                                                         //perm:admin
-	BoostDagstorePiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error)                                      //perm:read
-	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error)                                                                   //perm:admin
-	BoostMakeDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                                      //perm:write
+	BoostIndexerAnnounceAllDeals(ctx context.Context) error                                                                                                                              //perm:admin
+	BoostIndexerListMultihashes(ctx context.Context, proposalCid cid.Cid) ([]multihash.Multihash, error)                                                                                 //perm:admin
+	BoostIndexerAnnounceLatest(ctx context.Context) (cid.Cid, error)                                                                                                                     //perm:admin
+	BoostIndexerAnnounceLatestHttp(ctx context.Context, urls []string) (cid.Cid, error)                                                                                                  //perm:admin
+	BoostOfflineDealWithData(ctx context.Context, dealUuid uuid.UUID, filePath string, delAfterImport bool) (*ProviderDealRejectionInfo, error)                                          //perm:admin
+	BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                                                                                               //perm:admin
+	BoostDealBySignedProposalCid(ctx context.Context, proposalCid cid.Cid) (*smtypes.ProviderDealState, error)                                                                           //perm:admin
+	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                                                                              //perm:admin
+	BoostDagstoreRegisterShard(ctx context.Context, key string) error                                                                                                                    //perm:admin
+	BoostDagstoreDestroyShard(ctx context.Context, key string) error                                                                                                                     //perm:admin
+	BoostDagstoreInitializeShard(ctx context.Context, key string) error                                                                                                                  //perm:admin
+	BoostDagstoreInitializeAll(ctx context.Context, params DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error)                                                       //perm:admin
+	BoostDagstoreRecoverShard(ctx context.Context, key string) error                                                                                                                     //perm:admin
+	BoostDagstoreGC(ctx context.Context) ([]DagstoreShardResult, error)                                                                                                                  //perm:admin
+	BoostDagstorePiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error)                                                                               //perm:read
+	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error)                                                                                                            //perm:admin
+	BoostMakeDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                                                                               //perm:write
+	BoostDirectData(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationid string, clientaddr address.Address) (*ProviderDealRejectionInfo, error) //perm:admin
 
 	// MethodGroup: Blockstore
 	BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error)  //perm:read

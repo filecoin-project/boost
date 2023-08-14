@@ -21,6 +21,7 @@
   * [BoostDagstoreRegisterShard](#boostdagstoreregistershard)
   * [BoostDeal](#boostdeal)
   * [BoostDealBySignedProposalCid](#boostdealbysignedproposalcid)
+  * [BoostDirectData](#boostdirectdata)
   * [BoostDummyDeal](#boostdummydeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
   * [BoostIndexerAnnounceLatest](#boostindexerannouncelatest)
@@ -495,6 +496,32 @@ Response:
   "NBytesReceived": 9,
   "FastRetrieval": true,
   "AnnounceToIPNI": true
+}
+```
+
+### BoostDirectData
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "string value",
+  true,
+  "string value",
+  "f01234"
+]
+```
+
+Response:
+```json
+{
+  "Accepted": true,
+  "Reason": "string value"
 }
 ```
 
