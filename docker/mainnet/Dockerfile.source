@@ -1,0 +1,161 @@
+#########################################################################################
+## docker will invoke this file from ../../.. dir in order to access the code
+#########################################################################################
+ARG LOTUS_TEST_IMAGE=filecoin/lotus:master
+FROM ${LOTUS_TEST_IMAGE} as lotus-test
+#########################################################################################
+FROM node:16.16-alpine3.15 AS react-builder
+
+WORKDIR /src
+COPY react /src/react
+COPY gql /src/gql
+
+RUN npm_config_legacy_peer_deps=yes npm ci --no-audit --prefix react&& \
+      npm run --prefix react build
+#########################################################################################
+FROM golang:1.20-bullseye as builder
+
+RUN apt update && apt install -y \
+      build-essential \
+      bzr pkg-config \
+      clang \
+      curl \
+      gcc git \
+      hwloc \
+      jq \
+      libhwloc-dev wget \
+      mesa-opencl-icd \
+      ocl-icd-opencl-dev
+
+### taken from https://github.com/rust-lang/docker-rust/blob/master/1.63.0/buster/Dockerfile
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH \
+    RUST_VERSION=1.63.0
+
+RUN set -eux; \
+    dpkgArch="$(dpkg --print-architecture)"; \
+    case "${dpkgArch##*-}" in \
+        amd64) rustArch='x86_64-unknown-linux-gnu'; rustupSha256='5cc9ffd1026e82e7fb2eec2121ad71f4b0f044e88bca39207b3f6b769aaa799c' ;; \
+        arm64) rustArch='aarch64-unknown-linux-gnu'; rustupSha256='e189948e396d47254103a49c987e7fb0e5dd8e34b200aa4481ecc4b8e41fb929' ;; \
+        *) echo >&2 "unsupported architecture: ${dpkgArch}"; exit 1 ;; \
+    esac; \
+    url="https://static.rust-lang.org/rustup/archive/1.25.1/${rustArch}/rustup-init"; \
+    wget "$url"; \
+    echo "${rustupSha256} *rustup-init" | sha256sum -c -; \
+    chmod +x rustup-init; \
+    ./rustup-init -y --no-modify-path --profile minimal --default-toolchain $RUST_VERSION --default-host ${rustArch}; \
+    rm rustup-init; \
+    chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
+    rustup --version; \
+    cargo --version; \
+    rustc --version;
+### end rust
+
+WORKDIR /go/src/
+
+COPY Makefile /go/src/
+### make configurable filecoin-ffi build
+ARG FFI_BUILD_FROM_SOURCE=0
+ENV FFI_BUILD_FROM_SOURCE=${FFI_BUILD_FROM_SOURCE}
+##############################################
+# prebuild filecoin-ffi
+COPY extern /go/src/extern
+COPY build /go/src/build
+COPY .git/modules/extern/filecoin-ffi /go/src/.git/modules/extern/filecoin-ffi
+
+RUN make build/.filecoin-install
+##############################################
+COPY . /go/src
+##############################################
+COPY --from=react-builder /src/react/build /go/src/react/build
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+      make debug
+#########################################################################################
+FROM ubuntu:20.04 as runner
+
+RUN apt update && apt install -y \
+      curl \
+      hwloc \
+      jq
+
+## Fix missing lib libhwloc.so.5
+RUN ls -1 /lib/*/libhwloc.so.* | head -n 1 | xargs -n1 -I {} ln -s {} /lib/libhwloc.so.5
+
+WORKDIR /app
+
+COPY --from=lotus-test /usr/local/bin/lotus /usr/local/bin/
+COPY --from=lotus-test /usr/local/bin/lotus-miner /usr/local/bin/
+## Test lotus starts
+RUN lotus -v && lotus-miner -v
+#########################################################################################
+FROM runner as boost-main
+
+ARG BUILD_VERSION=0.1
+
+LABEL org.opencontainers.image.version=$BUILD_VERSION \
+      org.opencontainers.image.authors="Boost Dev Team" \
+      name="boost-dev" \
+      maintainer="Boost Dev Team" \
+      vendor="Boost Dev Team" \
+      version=$BUILD_VERSION \
+      release=$BUILD_VERSION \
+      summary="This image is used to host the boost-dev storage provider" \
+      description="This image is used to host the boost-dev storage provider"
+
+ENV BOOST_PATH /var/lib/boost
+VOLUME /var/lib/boost
+EXPOSE 8080
+
+COPY --from=builder /go/src/boost /usr/local/bin/
+COPY docker/mainnet/boost/entrypoint.sh /app/
+COPY docker/mainnet/boost/sample/* /app/sample/
+RUN boost -v
+
+ENTRYPOINT ["./entrypoint.sh"]
+#########################################################################################
+FROM runner as booster-http-main
+
+ARG BUILD_VERSION=0.1
+
+LABEL org.opencontainers.image.version=$BUILD_VERSION \
+      org.opencontainers.image.authors="Boost Dev Team" \
+      name="booster-http-dev" \
+      maintainer="Boost Dev Team" \
+      vendor="Boost Dev Team" \
+      version=$BUILD_VERSION \
+      release=$BUILD_VERSION \
+      summary="This image is used to host booster-http-dev" \
+      description="This image is used to host booster-http-dev"
+
+EXPOSE 7777
+
+COPY --from=builder /go/src/boostd /usr/local/bin/
+COPY --from=builder /go/src/booster-http /usr/local/bin/
+COPY docker/mainnet/booster-http/entrypoint.sh /app/
+
+ENTRYPOINT ["./entrypoint.sh"]
+#########################################################################################
+FROM runner as booster-bitswap-main
+
+ARG BUILD_VERSION=0.1
+
+LABEL org.opencontainers.image.version=$BUILD_VERSION \
+      org.opencontainers.image.authors="Boost Dev Team" \
+      name="booster-bitswap-dev" \
+      maintainer="Boost Dev Team" \
+      vendor="Boost Dev Team" \
+      version=$BUILD_VERSION \
+      release=$BUILD_VERSION \
+      summary="This image is used to host booster-bitswap-dev" \
+      description="This image is used to host booster-bitswap-dev"
+
+EXPOSE 8888
+
+COPY --from=builder /go/src/boostd /usr/local/bin/
+COPY --from=builder /go/src/booster-bitswap /usr/local/bin/
+COPY docker/mainnet/booster-bitswap/entrypoint.sh /app/
+
+ENTRYPOINT ["./entrypoint.sh"]
