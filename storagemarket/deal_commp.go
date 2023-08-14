@@ -196,7 +196,8 @@ func getCarSize(filepath string, rd *carv2.Reader) (int64, error) {
 	var size int64
 	switch rd.Version {
 	case 2:
-		size = int64(rd.Header.DataSize)
+		padding := rd.Header.DataOffset - carv2.PragmaSize - carv2.HeaderSize
+		size = int64(rd.Header.DataSize) + int64(padding)
 	case 1:
 		st, err := os.Stat(filepath)
 		if err != nil {
