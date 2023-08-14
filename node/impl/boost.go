@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"sort"
 
 	"github.com/filecoin-project/boost/node/impl/backupmgr"
@@ -62,6 +61,9 @@ type BoostAPI struct {
 	// Boost
 	StorageProvider *storagemarket.Provider
 	IndexProvider   *indexprovider.Wrapper
+
+	// Boost - Direct Data onboarding
+	DirectDealsProvider *storagemarket.DirectDealsProvider
 
 	// Legacy Lotus
 	LegacyStorageProvider gfm_storagemarket.StorageProvider
@@ -529,15 +531,7 @@ func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) e
 }
 
 func (sm *BoostAPI) BoostDirectData(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationid string, clientaddr address.Address) (*api.ProviderDealRejectionInfo, error) {
-	log.Infow("received direct data import")
-
-	fi, err := os.Open(filepath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open filepath: %w", err)
-	}
-	defer fi.Close() //nolint:errcheck
-
-	return nil, nil
+	return sm.DirectDealsProvider.Import(ctx, piececid, filepath, deleteAfterImport, allocationid, clientaddr)
 }
 
 func (sm *BoostAPI) BoostMakeDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
