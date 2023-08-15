@@ -32,7 +32,7 @@ COPY . /go/src
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-      make debug
+      make build
 #########################################################################################
 FROM ubuntu:20.04 as runner
 
@@ -53,7 +53,7 @@ ARG BUILD_VERSION=0.1
 
 LABEL org.opencontainers.image.version=$BUILD_VERSION \
       org.opencontainers.image.authors="Boost Dev Team" \
-      name="boost-main" \
+      name="boost-client" \
       maintainer="Boost Dev Team" \
       vendor="Boost Dev Team" \
       version=$BUILD_VERSION \
@@ -67,7 +67,5 @@ EXPOSE 8080
 
 COPY --from=builder /go/src/boost /usr/local/bin/
 COPY docker/boost-client/entrypoint.sh /app/
-COPY docker/boost-client/sample/* /app/sample/
-RUN boost -v
 
 ENTRYPOINT ["./entrypoint.sh"]
