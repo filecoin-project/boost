@@ -14,19 +14,26 @@ type gatewayHandler struct {
 	supportedFormats map[string]struct{}
 }
 
-func newGatewayHandler(gw *gateway.BlocksBackend, supportedFormats []string) http.Handler {
+func newGatewayHandler(gw *gateway.BlocksBackend, supportedFormats []string, serveGateway string) http.Handler {
 	headers := map[string][]string{}
+	var deserializedResponse bool
 	gateway.AddAccessControlHeaders(headers)
 
 	fmtsMap := make(map[string]struct{}, len(supportedFormats))
 	for _, f := range supportedFormats {
 		fmtsMap[f] = struct{}{}
 	}
-
+	if serveGateway == "none" {
+		return &gatewayHandler{}
+	} else if serveGateway == "all" {
+		deserializedResponse = true
+	}else if serveGateway == "verifiable" {
+		deserializedResponse = false
+	}
 	return &gatewayHandler{
 		gwh: gateway.NewHandler(gateway.Config{
 			Headers:               headers,
-			DeserializedResponses: true,
+			DeserializedResponses: deserializedResponse,
 		}, gw),
 		supportedFormats: fmtsMap,
 	}

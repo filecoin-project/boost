@@ -66,9 +66,10 @@ type HttpServerOptions struct {
 	Blockstore               blockstore.Blockstore
 	ServePieces              bool
 	SupportedResponseFormats []string
+	ServeGateway			 string
 }
 
-func NewHttpServer(path string, listenAddr string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
+func NewHttpServer(path string, listenAddr string, port int, api HttpServerApi, opts *HttpServerOptions, serveGateway string) *HttpServer {
 	if opts == nil {
 		opts = &HttpServerOptions{ServePieces: true}
 	}
@@ -106,7 +107,7 @@ func (s *HttpServer) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("creating blocks gateway: %w", err)
 		}
-		handler.Handle(s.ipfsBasePath(), newGatewayHandler(gw, s.opts.SupportedResponseFormats))
+		handler.Handle(s.ipfsBasePath(), newGatewayHandler(gw, s.opts.SupportedResponseFormats, s.opts.ServeGateway))
 	}
 
 	handler.HandleFunc("/", s.handleIndex)
