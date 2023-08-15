@@ -53,7 +53,7 @@ ARG BUILD_VERSION=0.1
 
 LABEL org.opencontainers.image.version=$BUILD_VERSION \
       org.opencontainers.image.authors="Boost Dev Team" \
-      name="boost-main" \
+      name="boost-client" \
       maintainer="Boost Dev Team" \
       vendor="Boost Dev Team" \
       version=$BUILD_VERSION \
