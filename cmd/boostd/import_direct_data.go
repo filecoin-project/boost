@@ -86,7 +86,7 @@ var importDirectDataCmd = &cli.Command{
 
 		rej, err := napi.BoostDirectData(cctx.Context, piececid, filepath, deleteAfterImport, allocationid, clientaddr)
 		if err != nil {
-			return fmt.Errorf("failed to execute offline deal: %w", err)
+			return fmt.Errorf("failed to execute direct data import: %w", err)
 		}
 		if rej != nil && rej.Reason != "" {
 			return fmt.Errorf("direct data import rejected: %s", rej.Reason)

@@ -113,7 +113,7 @@ func (d *directdataAccessor) insert(ctx context.Context) error {
 	}
 
 	// Execute the INSERT
-	qry := "INSERT INTO Deals (" + directdataFieldsStr + ") "
+	qry := "INSERT INTO DirectData (" + directdataFieldsStr + ") "
 	qry += "VALUES (" + strings.Join(placeholders, ",") + ")"
 	_, err := d.db.ExecContext(ctx, qry, values...)
 	return err
