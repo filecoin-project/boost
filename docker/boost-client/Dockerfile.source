@@ -32,7 +32,7 @@ COPY . /go/src
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-      make build
+      make boost
 #########################################################################################
 FROM ubuntu:20.04 as runner
 
