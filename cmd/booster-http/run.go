@@ -76,21 +76,6 @@ var runCmd = &cli.Command{
 			Usage: "enables serving raw pieces",
 			Value: true,
 		},
-		//&cli.BoolFlag{
-		//	Name:  "serve-blocks",
-		//	Usage: "serve blocks with the ipfs gateway API",
-		//	Value: true,
-		//},
-		//&cli.BoolFlag{
-		//	Name:  "serve-cars",
-		//	Usage: "serve CAR files with the ipfs gateway API",
-		//	Value: true,
-		//},
-		//&cli.BoolFlag{
-		//	Name:  "serve-files",
-		//	Usage: "serve original files (eg jpg, mov) with the ipfs gateway API",
-		//	Value: false,
-		//},
 		&cli.StringFlag{
 			Name:  "serve-gateway",
 			Usage: "serve deserialized responses with the ipfs gateway API (values: 'verifiable','all','none')",
@@ -271,37 +256,22 @@ var runCmd = &cli.Command{
 func parseSupportedResponseFormats(cctx *cli.Context) ([]string) {
 	fmts := []string{}
 	switch cctx.String("serve-gateway") {
-	case "all":
+	case "verifiable":
 		fmts = append(fmts, "application/vnd.ipld.raw") // raw
 		fmts = append(fmts, "application/vnd.ipld.car") // car
-	case "verifiable":
+	case "all":
 		fmts = append(fmts, "")
 	}
-	//if cctx.String("serve-gateway") != "all" { // true decentralized response
-	//
-	//}
-	//if cctx.Bool("serve-blocks") {
-	//	fmts = append(fmts, "application/vnd.ipld.raw")
-	//}
-	//if cctx.Bool("serve-cars") {
-	//	fmts = append(fmts, "application/vnd.ipld.car")
-	//}
-	//if cctx.Bool("serve-files") {
-	//	// Allow the user to not specify a specific response format.
-	//	// In that case the gateway will respond with any kind of file
-	//	// (eg jpg, mov etc)
-	//	fmts = append(fmts, "")
-	//}
 	return fmts
 }
 
 func ipfsGatewayMsg(cctx *cli.Context, ipfsBasePath string) string {
 	fmts := []string{}
 	switch cctx.String("serve-gateway") {
-	case "all":
+	case "verifiable":
 		fmts = append(fmts, "blocks")
 		fmts = append(fmts, "CARs")
-	case "verifiable":
+	case "all":
 		fmts = append(fmts, "files")
 	}
 
