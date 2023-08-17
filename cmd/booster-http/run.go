@@ -167,9 +167,11 @@ var runCmd = &cli.Command{
 		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
 		pd := piecedirectory.NewPieceDirectory(cl, pr, cctx.Int("add-index-throttle"))
 
+		serveGateway := cctx.String("serve-gateway")
 		opts := &HttpServerOptions{
 			ServePieces:              servePieces,
 			SupportedResponseFormats: responseFormats,
+			ServeGateway: serveGateway,
 		}
 		if enableIpfsGateway {
 			repoDir, err := createRepoDir(cctx.String(FlagRepo.Name))
@@ -207,7 +209,6 @@ var runCmd = &cli.Command{
 			cctx.Int("port"),
 			sapi,
 			opts,
-			cctx.String("serve-gateway"),
 		)
 
 		// Start the local index directory

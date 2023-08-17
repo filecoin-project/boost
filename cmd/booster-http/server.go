@@ -69,7 +69,7 @@ type HttpServerOptions struct {
 	ServeGateway			 string
 }
 
-func NewHttpServer(path string, listenAddr string, port int, api HttpServerApi, opts *HttpServerOptions, serveGateway string) *HttpServer {
+func NewHttpServer(path string, listenAddr string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
 	if opts == nil {
 		opts = &HttpServerOptions{ServePieces: true}
 	}
