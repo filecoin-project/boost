@@ -530,7 +530,7 @@ func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) e
 	return nil
 }
 
-func (sm *BoostAPI) BoostDirectData(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationid string, clientaddr address.Address) (*api.ProviderDealRejectionInfo, error) {
+func (sm *BoostAPI) BoostDirectDeal(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationid string, clientaddr address.Address) (*api.ProviderDealRejectionInfo, error) {
 	return sm.DirectDealsProvider.Import(ctx, piececid, filepath, deleteAfterImport, allocationid, clientaddr)
 }
 

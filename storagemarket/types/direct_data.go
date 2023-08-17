@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
 	cid "github.com/ipfs/go-cid"
@@ -18,9 +19,8 @@ type DirectDataEntry struct {
 
 	PieceCID  cid.Cid
 	PieceSize abi.PaddedPieceSize
-	//VerifiedDeal bool
-	//Client       addr.Address
-	//Provider     addr.Address
+	Client    address.Address
+	Provider  address.Address
 
 	// CleanupData indicates whether to remove the data for a deal after the deal has been added to a sector.
 	// This is always true for online deals, and can be set as a flag for offline deals.
@@ -37,16 +37,10 @@ type DirectDataEntry struct {
 	StartEpoch abi.ChainEpoch
 	EndEpoch   abi.ChainEpoch
 
-	ProviderCollateral abi.TokenAmount
-	ClientCollateral   abi.TokenAmount
-
 	// set if there's an error
 	Err string
 	// if there was an error, indicates whether and how to retry (auto / manual)
 	Retry DealRetryType
-
-	// NBytesReceived is the number of bytes Received for this deal
-	NBytesReceived int64
 
 	// Keep unsealed copy of the data
 	FastRetrieval bool

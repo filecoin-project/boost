@@ -84,7 +84,7 @@ var importDirectDataCmd = &cli.Command{
 			return errors.New("both --clientaddr and --allocationid must be set")
 		}
 
-		rej, err := napi.BoostDirectData(cctx.Context, piececid, filepath, deleteAfterImport, allocationid, clientaddr)
+		rej, err := napi.BoostDirectDeal(cctx.Context, piececid, filepath, deleteAfterImport, allocationid, clientaddr)
 		if err != nil {
 			return fmt.Errorf("failed to execute direct data import: %w", err)
 		}

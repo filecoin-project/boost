@@ -8,7 +8,6 @@ import (
 
 	"github.com/filecoin-project/boost/db/fielddef"
 	"github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
@@ -113,7 +112,7 @@ func (d *directdataAccessor) insert(ctx context.Context) error {
 	}
 
 	// Execute the INSERT
-	qry := "INSERT INTO DirectData (" + directdataFieldsStr + ") "
+	qry := "INSERT INTO DirectDeals (" + directdataFieldsStr + ") "
 	qry += "VALUES (" + strings.Join(placeholders, ",") + ")"
 	_, err := d.db.ExecContext(ctx, qry, values...)
 	return err
@@ -142,7 +141,7 @@ func (d *directdataAccessor) update(ctx context.Context) error {
 	}
 
 	// Execute the UPDATE
-	qry := "UPDATE DirectData "
+	qry := "UPDATE DirectDeals "
 	qry += "SET " + strings.Join(setNames, ", ")
 
 	qry += "WHERE ID = ?"
@@ -169,7 +168,7 @@ func (d *DirectDataDB) Update(ctx context.Context, deal *types.DirectDataEntry) 
 }
 
 func (d *DirectDataDB) ByID(ctx context.Context, id uuid.UUID) (*types.DirectDataEntry, error) {
-	qry := "SELECT " + directdataFieldsStr + " FROM DirectData WHERE id=?"
+	qry := "SELECT " + directdataFieldsStr + " FROM DirectDeals WHERE id=?"
 	row := d.db.QueryRowContext(ctx, qry, id)
 	return d.scanRow(row)
 }
@@ -189,7 +188,7 @@ func (d *DirectDataDB) BySectorID(ctx context.Context, sectorID abi.SectorID) ([
 
 func (d *DirectDataDB) Count(ctx context.Context, query string, filter *FilterOptions) (int, error) {
 	whereArgs := []interface{}{}
-	where := "SELECT count(*) FROM DirectData"
+	where := "SELECT count(*) FROM DirectDeals"
 	if query != "" {
 		searchWhere, searchArgs := withSearchQuery(query)
 		where += " WHERE " + searchWhere
@@ -214,14 +213,6 @@ func (d *DirectDataDB) Count(ctx context.Context, query string, filter *FilterOp
 	var count int
 	err := row.Scan(&count)
 	return count, err
-}
-
-func (d *DirectDataDB) ListActive(ctx context.Context) ([]*types.DirectDataEntry, error) {
-	return d.list(ctx, 0, 0, "Checkpoint != ?", dealcheckpoints.Complete.String())
-}
-
-func (d *DirectDataDB) ListCompleted(ctx context.Context) ([]*types.DirectDataEntry, error) {
-	return d.list(ctx, 0, 0, "Checkpoint = ?", dealcheckpoints.Complete.String())
 }
 
 func (d *DirectDataDB) List(ctx context.Context, query string, filter *FilterOptions, cursor *graphql.ID, offset int, limit int) ([]*types.DirectDataEntry, error) {
@@ -261,7 +252,7 @@ func (d *DirectDataDB) List(ctx context.Context, query string, filter *FilterOpt
 
 func (d *DirectDataDB) list(ctx context.Context, offset int, limit int, whereClause string, whereArgs ...interface{}) ([]*types.DirectDataEntry, error) {
 	args := whereArgs
-	qry := "SELECT " + directdataFieldsStr + " FROM DirectData"
+	qry := "SELECT " + directdataFieldsStr + " FROM DirectDeals"
 	if whereClause != "" {
 		qry += " WHERE " + whereClause
 	}

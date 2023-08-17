@@ -21,7 +21,7 @@
   * [BoostDagstoreRegisterShard](#boostdagstoreregistershard)
   * [BoostDeal](#boostdeal)
   * [BoostDealBySignedProposalCid](#boostdealbysignedproposalcid)
-  * [BoostDirectData](#boostdirectdata)
+  * [BoostDirectDeal](#boostdirectdeal)
   * [BoostDummyDeal](#boostdummydeal)
   * [BoostIndexerAnnounceAllDeals](#boostindexerannouncealldeals)
   * [BoostIndexerAnnounceLatest](#boostindexerannouncelatest)
@@ -499,7 +499,7 @@ Response:
 }
 ```
 
-### BoostDirectData
+### BoostDirectDeal
 
 
 Perms: admin

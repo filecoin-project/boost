@@ -138,7 +138,6 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 	sdInfo := lapi.PieceDealInfo{
 		//DealID:       deal.ChainDealID,
 		//DealProposal: &deal.ClientDealProposal.Proposal,
-		//PublishCid:   deal.PublishCID,
 		DealSchedule: lapi.DealSchedule{
 			StartEpoch: deal.StartEpoch,
 			EndEpoch:   deal.EndEpoch,
