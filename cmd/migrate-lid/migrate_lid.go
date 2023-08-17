@@ -245,7 +245,10 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 
 		start := time.Now()
 
-		indexed, err := migrateIndexWithTimeout(ctx, ipath, store, force)
+		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 60*time.Second)
+		defer timeoutCancel()
+
+		indexed, err := migrateIndexWithTimeout(timeoutCtx, ipath, store, force)
 		bar.Add(1) //nolint:errcheck
 		if err != nil {
 			took := time.Since(start)
@@ -283,8 +286,8 @@ func migrateIndexWithTimeout(ctx context.Context, ipath idxPath, store StoreMigr
 		result <- doMigrateIndex(ctx, ipath, store, force)
 	}()
 	select {
-	case <-time.After(1 * time.Minute):
-		return false, errors.New("index migration timed out after 1 minute")
+	case <-time.After(75 * time.Second):
+		return false, errors.New("index migration timed out after 75 seconds")
 	case result := <-result:
 		return result.Indexed, result.Error
 	}
