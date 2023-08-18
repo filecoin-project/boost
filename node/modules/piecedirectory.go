@@ -111,9 +111,9 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 func NewMultiminerSectorAccessor(cfg *config.Boost) func(full v1api.FullNode) *lib.MultiMinerAccessor {
 	return func(full v1api.FullNode) *lib.MultiMinerAccessor {
 		// Get the endpoints of all the miners that this boost node can query
-		// for retrieval data
-		storageApiInfos := cfg.StorageAccessApiInfo
-		if len(cfg.StorageAccessApiInfo) == 0 {
+		// for retrieval data when serving graphsync retrievals
+		storageApiInfos := cfg.Dealmaking.GraphsyncStorageAccessApiInfo
+		if len(storageApiInfos) == 0 {
 			// If the endpoints aren't explicitly configured, fall back to just
 			// serving retrieval data from the same endpoint where data is stored to
 			storageApiInfos = []string{cfg.SectorIndexApiInfo}
