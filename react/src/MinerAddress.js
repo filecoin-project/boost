@@ -4,7 +4,6 @@ import {MinerAddressQuery} from "./gql";
 
 export function MinerAddress() {
     const {data} = useQuery(MinerAddressQuery)
-    console.log(data)
 
     if (!data) {
         return null
