@@ -43,7 +43,7 @@ type DirectDataEntry struct {
 	Retry DealRetryType
 
 	// Keep unsealed copy of the data
-	FastRetrieval bool
+	KeepUnsealedCopy bool
 
 	//Announce deal to the IPNI(Index Provider)
 	AnnounceToIPNI bool

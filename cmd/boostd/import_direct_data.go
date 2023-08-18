@@ -33,9 +33,9 @@ var importDirectDataCmd = &cli.Command{
 			Required: true,
 		},
 		&cli.BoolFlag{
-			Name:  "fast-retrieval",
-			Usage: "indicates that data should be available for fast retrieval",
-			Value: true,
+			Name:  "remove-unsealed-copy",
+			Usage: "",
+			Value: false,
 		},
 		&cli.BoolFlag{
 			Name:  "skip-ipni-announce",
@@ -84,7 +84,7 @@ var importDirectDataCmd = &cli.Command{
 
 		allocationId := cctx.Uint64("allocation-id")
 
-		rej, err := napi.BoostDirectDeal(cctx.Context, piececid, filepath, cctx.Bool("delete-after-import"), allocationId, clientAddr, cctx.Bool("fast-retrieval"), cctx.Bool("skip-ipni-announce"))
+		rej, err := napi.BoostDirectDeal(cctx.Context, piececid, filepath, cctx.Bool("delete-after-import"), allocationId, clientAddr, cctx.Bool("remove-unsealed-copy"), cctx.Bool("skip-ipni-announce"))
 		if err != nil {
 			return fmt.Errorf("failed to execute direct data import: %w", err)
 		}
