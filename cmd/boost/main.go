@@ -4,11 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	llog "log"
 	"os"
 
 	"github.com/filecoin-project/boost/cmd"
-
-	llog "log"
 
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boostd-data/shared/cliutil"
@@ -41,6 +40,8 @@ func main() {
 			offlineDealCmd,
 			providerCmd,
 			walletCmd,
+			directDealAllocate,
+			directDealGetAllocations,
 		},
 	}
 	app.Setup()

@@ -150,11 +150,11 @@ var directDealAllocate = &cli.Command{
 			}
 		}
 
-		arequest := verifregst.AllocationRequests{
+		arequest := &verifregst.AllocationRequests{
 			Allocations: allocationRequests,
 		}
 
-		receiverParams, err := actors.SerializeParams(&arequest)
+		receiverParams, err := actors.SerializeParams(arequest)
 		if err != nil {
 			return fmt.Errorf("failed to seralize the parameters: %w", err)
 		}
@@ -249,6 +249,156 @@ var directDealAllocate = &cli.Command{
 		//		}
 		//		allocs = append(allocs, alloc)
 		//	}
+		//}
+		//
+		//if !cctx.Bool("quiet") {
+		//
+		//	if cctx.Bool("json") {
+		//		// get a new list of wallets with json keys instead of tablewriter keys
+		//		var jsonAllocs []map[string]interface{}
+		//		for _, alloc := range allocs {
+		//			jsonAlloc := make(map[string]interface{})
+		//			for k, v := range alloc {
+		//				jsonAlloc[tableKeysToJsonKeys[k]] = v
+		//			}
+		//			jsonAllocs = append(jsonAllocs, jsonAlloc)
+		//		}
+		//		// then return this!
+		//		return cmd.PrintJson(jsonAllocs)
+		//	} else {
+		//		// Init the tablewriter's columns
+		//		tw := tablewriter.New(
+		//			tablewriter.Col(allocationID),
+		//			tablewriter.Col(client),
+		//			tablewriter.Col(provider),
+		//			tablewriter.Col(pieceCid),
+		//			tablewriter.Col(pieceSize),
+		//			tablewriter.Col(tMin),
+		//			tablewriter.Col(tMax),
+		//			tablewriter.NewLineCol(expr))
+		//		// populate it with content
+		//		for _, alloc := range allocs {
+		//			tw.Write(alloc)
+		//		}
+		//		// return the corresponding string
+		//		return tw.Flush(os.Stdout)
+		//	}
+		//}
+
+		return nil
+	},
+}
+
+var directDealGetAllocations = &cli.Command{
+	Name:  "get-allocations",
+	Usage: "Print all allocations for a client address(wallet)",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:    "miner",
+			Usage:   "Storage provider address. If provided, only allocations against this minerID will be printed",
+			Aliases: []string{"m", "provider", "p"},
+		},
+		&cli.StringFlag{
+			Name:  "wallet",
+			Usage: "the wallet address that will used create the allocation",
+		},
+	},
+	Before: before,
+	Action: func(cctx *cli.Context) error {
+		//ctx := bcli.ReqContext(cctx)
+		//
+		//n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//api, closer, err := lcli.GetGatewayAPI(cctx)
+		//if err != nil {
+		//	return fmt.Errorf("cant setup gateway connection: %w", err)
+		//}
+		//defer closer()
+		//
+		//// Get wallet address from input
+		//walletAddr, err := n.GetProvidedOrDefaultWallet(ctx, cctx.String("wallet"))
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//log.Debugw("selected wallet", "wallet", walletAddr)
+		//
+		//
+		//
+		//// Get old allocations for diff
+		//fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx)
+		//defer ncloser()
+		//
+		//allocations, err := fullnodeApi.StateGetAllocations(ctx, walletAddr, types.EmptyTSK)
+		//if err != nil {
+		//	return fmt.Errorf("failed to get allocations: %w", err)
+		//}
+		//
+		//if cctx.String("miner") != "" {
+		//	// Get all minerIDs from input
+		//	minerId := cctx.String("miner")
+		//	maddr, err := address.NewFromString(minerId)
+		//	if err != nil {
+		//		return err
+		//	}
+		//
+		//	// Verify that minerID exists
+		//	_, err = api.StateMinerInfo(ctx, maddr, types.EmptyTSK)
+		//	if err != nil {
+		//		return err
+		//	}
+		//
+		//	mid, err := address.IDFromAddress(maddr)
+		//	if err != nil {
+		//		return err
+		//	}
+		//
+		//	for i, v := range allocations {
+		//		if v.Provider != abi.ActorID(mid) {
+		//			delete(allocations, i)
+		//		}
+		//	}
+		//}
+		//
+		//// Map Keys. Corresponds to the standard tablewriter output
+		//allocationID := "AllocationID"
+		//client := "Client"
+		//provider := "Miner"
+		//pieceCid := "PieceCid"
+		//pieceSize := "PieceSize"
+		//tMin := "TermMin"
+		//tMax := "TermMax"
+		//expr := "Expiration"
+		//
+		//// One-to-one mapping between tablewriter keys and JSON keys
+		//tableKeysToJsonKeys := map[string]string{
+		//	allocationID: strings.ToLower(allocationID),
+		//	client:       strings.ToLower(client),
+		//	provider:     strings.ToLower(provider),
+		//	pieceCid:     strings.ToLower(pieceCid),
+		//	pieceSize:    strings.ToLower(pieceSize),
+		//	tMin:         strings.ToLower(tMin),
+		//	tMax:         strings.ToLower(tMax),
+		//	expr:         strings.ToLower(expr),
+		//}
+		//
+		//var allocs []map[string]interface{}
+		//
+		//for key, val := range allocations {
+		//	alloc := map[string]interface{}{
+		//		allocationID: key,
+		//		client:       val.Client,
+		//		provider:     val.Provider,
+		//		pieceCid:     val.Data,
+		//		pieceSize:    val.Size,
+		//		tMin:         val.TermMin,
+		//		tMax:         val.TermMax,
+		//		expr:         val.Expiration,
+		//	}
+		//	allocs = append(allocs, alloc)
 		//}
 		//
 		//if !cctx.Bool("quiet") {
