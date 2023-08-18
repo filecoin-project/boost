@@ -107,7 +107,7 @@ var directDealAllocate = &cli.Command{
 
 			n, err := strconv.ParseInt(pieceDetail[1], 10, 64)
 			if err != nil {
-				return fmt.Errorf("failed to parse the piece size for %s: %w", pieceDetail[0], err)
+				return fmt.Errorf("failed to parse the piece size for %s for pieceCid %s: %w", pieceDetail[0], pieceDetail[1], err)
 			}
 			pcid, err := cid.Parse(pieceDetail[0])
 			if err != nil {
