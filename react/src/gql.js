@@ -69,6 +69,12 @@ const EpochQuery = gql`
     }
 `;
 
+const MinerAddressQuery = gql`
+    query AppMinerAddressQuery {
+        minerAddress
+    }
+`;
+
 const DealsListQuery = gql`
     query AppDealsListQuery($query: String, $filter: DealFilter, $cursor: ID, $offset: Int, $limit: Int) {
         deals(query: $query, filter: $filter, cursor: $cursor, offset: $offset, limit: $limit) {
@@ -780,6 +786,7 @@ const PublishPendingDealsMutation = gql`
 export {
     gqlClient,
     EpochQuery,
+    MinerAddressQuery,
     DealsListQuery,
     LegacyDealsListQuery,
     DealsCountQuery,

@@ -489,6 +489,9 @@ type RootQuery {
   """Get height of chain"""
   epoch: EpochInfo!
 
+  """Get miner address"""
+  minerAddress: String!
+
   """Get Deal by ID"""
   deal(id: ID!): Deal
 
