@@ -24,11 +24,11 @@ var importDirectDataCmd = &cli.Command{
 			Value: false,
 		},
 		&cli.StringFlag{
-			Name:  "clientaddr",
+			Name:  "client-addr",
 			Usage: "",
 		},
-		&cli.StringFlag{
-			Name:  "allocationid",
+		&cli.Uint64Flag{
+			Name:  "allocation-id",
 			Usage: "",
 		},
 	},
@@ -68,23 +68,18 @@ var importDirectDataCmd = &cli.Command{
 
 		deleteAfterImport := cctx.Bool("delete-after-import")
 
-		var clientaddr address.Address
-		var allocationid string
-
-		if cctx.IsSet("clientaddr") && cctx.IsSet("allocationid") {
-			clientaddr, err = address.NewFromString(cctx.String("clientaddr"))
-			if err != nil {
-				return fmt.Errorf("failed to parse clientaddr param: %w", err)
-			}
-
-			allocationid = cctx.String("allocationid")
-		} else if cctx.IsSet("clientaddr") {
-			return errors.New("both --clientaddr and --allocationid must be set")
-		} else if cctx.IsSet("allocationid") {
+		if !cctx.IsSet("client-addr") || !cctx.IsSet("allocation-id") {
 			return errors.New("both --clientaddr and --allocationid must be set")
 		}
 
-		rej, err := napi.BoostDirectDeal(cctx.Context, piececid, filepath, deleteAfterImport, allocationid, clientaddr)
+		clientAddr, err := address.NewFromString(cctx.String("client-addr"))
+		if err != nil {
+			return fmt.Errorf("failed to parse clientaddr param: %w", err)
+		}
+
+		allocationId := cctx.Uint64("allocation-id")
+
+		rej, err := napi.BoostDirectDeal(cctx.Context, piececid, filepath, deleteAfterImport, allocationId, clientAddr)
 		if err != nil {
 			return fmt.Errorf("failed to execute direct data import: %w", err)
 		}
