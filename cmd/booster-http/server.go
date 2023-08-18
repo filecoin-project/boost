@@ -65,7 +65,6 @@ type HttpServerApi interface {
 type HttpServerOptions struct {
 	Blockstore               blockstore.Blockstore
 	ServePieces              bool
-	SupportedResponseFormats []string
 	ServeGateway			 string
 }
 
@@ -107,7 +106,7 @@ func (s *HttpServer) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("creating blocks gateway: %w", err)
 		}
-		handler.Handle(s.ipfsBasePath(), newGatewayHandler(gw, s.opts.SupportedResponseFormats, s.opts.ServeGateway))
+		handler.Handle(s.ipfsBasePath(), newGatewayHandler(gw, s.opts.ServeGateway))
 	}
 
 	handler.HandleFunc("/", s.handleIndex)

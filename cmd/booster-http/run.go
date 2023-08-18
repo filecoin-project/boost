@@ -78,7 +78,8 @@ var runCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "serve-gateway",
-			Usage: "serve deserialized responses with the ipfs gateway API (values: 'verifiable','all','none')",
+			Usage: "This flag enables serving deserialized responses with the ipfs gateway API. " +
+				"Values: 'verifiable' (default) - only serve verifiable responses, 'all' - serve all responses, 'none' - disable serving responses with the ipfs gateway API",
 			Value: "verifiable",
 		},
 		&cli.BoolFlag{
@@ -170,7 +171,6 @@ var runCmd = &cli.Command{
 		serveGateway := cctx.String("serve-gateway")
 		opts := &HttpServerOptions{
 			ServePieces:              servePieces,
-			SupportedResponseFormats: responseFormats,
 			ServeGateway: serveGateway,
 		}
 		if enableIpfsGateway {
