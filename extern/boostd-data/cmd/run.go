@@ -111,7 +111,7 @@ var yugabyteCmd = &cli.Command{
 		bdsvc := svc.NewYugabyte(settings, migrator)
 		err := runAction(cctx, "yugabyte", bdsvc)
 		if err != nil && errors.Is(err, migrations.ErrMissingMinerAddr) {
-			return fmt.Errorf("The database needs to be migrated. Run `boost-data run yugabyte-migrate`")
+			return fmt.Errorf("The database needs to be migrated. Run `boostd-data run yugabyte-migrate`")
 		}
 		return err
 	},
