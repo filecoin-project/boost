@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,12 +23,24 @@ var importDirectDataCmd = &cli.Command{
 			Value: false,
 		},
 		&cli.StringFlag{
-			Name:  "client-addr",
-			Usage: "",
+			Name:     "client-addr",
+			Usage:    "",
+			Required: true,
 		},
 		&cli.Uint64Flag{
-			Name:  "allocation-id",
-			Usage: "",
+			Name:     "allocation-id",
+			Usage:    "",
+			Required: true,
+		},
+		&cli.BoolFlag{
+			Name:  "fast-retrieval",
+			Usage: "indicates that data should be available for fast retrieval",
+			Value: true,
+		},
+		&cli.BoolFlag{
+			Name:  "skip-ipni-announce",
+			Usage: "indicates that deal index should not be announced to the IPNI(Network Indexer)",
+			Value: false,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -66,12 +77,6 @@ var importDirectDataCmd = &cli.Command{
 		}
 		defer closer()
 
-		deleteAfterImport := cctx.Bool("delete-after-import")
-
-		if !cctx.IsSet("client-addr") || !cctx.IsSet("allocation-id") {
-			return errors.New("both --clientaddr and --allocationid must be set")
-		}
-
 		clientAddr, err := address.NewFromString(cctx.String("client-addr"))
 		if err != nil {
 			return fmt.Errorf("failed to parse clientaddr param: %w", err)
@@ -79,7 +84,7 @@ var importDirectDataCmd = &cli.Command{
 
 		allocationId := cctx.Uint64("allocation-id")
 
-		rej, err := napi.BoostDirectDeal(cctx.Context, piececid, filepath, deleteAfterImport, allocationId, clientAddr)
+		rej, err := napi.BoostDirectDeal(cctx.Context, piececid, filepath, cctx.Bool("delete-after-import"), allocationId, clientAddr, cctx.Bool("fast-retrieval"), cctx.Bool("skip-ipni-announce"))
 		if err != nil {
 			return fmt.Errorf("failed to execute direct data import: %w", err)
 		}

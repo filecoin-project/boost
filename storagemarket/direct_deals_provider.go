@@ -33,7 +33,7 @@ func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAd
 	}
 }
 
-func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationId uint64, clientAddr address.Address) (*api.ProviderDealRejectionInfo, error) {
+func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationId uint64, clientAddr address.Address, fastRetrieval bool, skipIpniAnnounce bool) (*api.ProviderDealRejectionInfo, error) {
 	log.Infow("received direct data import", "piececid", piececid, "filepath", filepath, "clientAddr", clientAddr, "allocationId", allocationId)
 
 	////////////////////////////////////////////////////

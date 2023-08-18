@@ -513,7 +513,9 @@ Inputs:
   "string value",
   true,
   42,
-  "f01234"
+  "f01234",
+  true,
+  true
 ]
 ```
 
