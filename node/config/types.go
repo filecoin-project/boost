@@ -39,10 +39,6 @@ type Boost struct {
 	SealerApiInfo string
 	// The connect string for the sector index RPC API (lotus miner)
 	SectorIndexApiInfo string
-	// The connect strings for the RPC APIs of each miner that boost can read
-	// sector data from (when serving retrievals).
-	// If not set, boost will read data from the endpoint in SectorIndexApiInfo.
-	StorageAccessApiInfo []string
 
 	Dealmaking          DealmakingConfig
 	Wallets             WalletsConfig
@@ -282,6 +278,12 @@ type DealmakingConfig struct {
 	// The values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
 	// ignored, and deals will remain in the pending state until manually published.
 	ManualDealPublish bool
+
+	// The connect strings for the RPC APIs of each miner that boost can read
+	// sector data from when serving graphsync retrievals.
+	// If this parameter is not set, boost will serve data from the endpoint
+	// configured in SectorIndexApiInfo.
+	GraphsyncStorageAccessApiInfo []string
 }
 
 type ContractDealsConfig struct {

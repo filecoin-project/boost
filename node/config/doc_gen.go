@@ -44,14 +44,6 @@ your node if metadata log is disabled`,
 			Comment: `The connect string for the sector index RPC API (lotus miner)`,
 		},
 		{
-			Name: "StorageAccessApiInfo",
-			Type: "[]string",
-
-			Comment: `The connect strings for the RPC APIs of each miner that boost can read
-sector data from (when serving retrievals).
-If not set, boost will read data from the endpoint in SectorIndexApiInfo.`,
-		},
-		{
 			Name: "Dealmaking",
 			Type: "DealmakingConfig",
 
@@ -441,6 +433,15 @@ them disabled. These will be completely deprecated soon.`,
 			Comment: `When set to true, the user is responsible for publishing deals manually.
 The values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
 ignored, and deals will remain in the pending state until manually published.`,
+		},
+		{
+			Name: "GraphsyncStorageAccessApiInfo",
+			Type: "[]string",
+
+			Comment: `The connect strings for the RPC APIs of each miner that boost can read
+sector data from when serving graphsync retrievals.
+If this parameter is not set, boost will serve data from the endpoint
+configured in SectorIndexApiInfo.`,
 		},
 	},
 	"FeeConfig": []DocField{

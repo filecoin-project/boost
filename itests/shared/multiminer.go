@@ -56,7 +56,7 @@ func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *te
 
 		// Set up the second boost instance so that it can read sector data
 		// not only from the second miner, but also from the first miner
-		cfg.StorageAccessApiInfo = []string{cfg.SectorIndexApiInfo, miner1ApiInfo}
+		cfg.Dealmaking.GraphsyncStorageAccessApiInfo = []string{cfg.SectorIndexApiInfo, miner1ApiInfo}
 
 		// Set up some other ports so they don't clash
 		cfg.Graphql.Port = 8081
