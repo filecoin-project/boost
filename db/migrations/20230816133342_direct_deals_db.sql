@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS DirectDeals (
     CreatedAt DateTime,
     PieceCID TEXT,
     PieceSize INT,
-    VerifiedDeal BOOL,
     ClientAddress TEXT,
     ProviderAddress TEXT,
     StartEpoch INT,
