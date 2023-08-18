@@ -1,0 +1,9 @@
+.page-content .miner-address {
+    background: url("./bootstrap-icons/icons/database-down.svg");
+    background-repeat: no-repeat;
+    position: absolute;
+    padding-left: 1.5em;
+    left: 2em;
+    top: 1em;
+    text-align: right;
+}
