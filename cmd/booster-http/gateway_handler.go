@@ -21,9 +21,10 @@ func newGatewayHandler(gw *gateway.BlocksBackend, serveGateway string) http.Hand
 
 	if serveGateway == "none" {
 		return &gatewayHandler{}
-	} else if serveGateway == "all" {
+	}
+	if serveGateway == "all" {
 		deserializedResponse = true
-	}else if serveGateway == "verifiable" {
+	} else if serveGateway == "verifiable" {
 		deserializedResponse = false
 	}
 	return &gatewayHandler{
