@@ -108,8 +108,7 @@ var runCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		servePieces := cctx.Bool("serve-pieces")
-		responseFormats := parseSupportedResponseFormats(cctx)
-		enableIpfsGateway := len(responseFormats) > 0
+		enableIpfsGateway := shouldEnableIPFSGateway(cctx)
 		if !servePieces && !enableIpfsGateway {
 			return errors.New("one of --serve-pieces, --serve-blocks, etc must be enabled")
 		}
@@ -254,16 +253,13 @@ var runCmd = &cli.Command{
 	},
 }
 
-func parseSupportedResponseFormats(cctx *cli.Context) ([]string) {
-	fmts := []string{}
+func shouldEnableIPFSGateway(cctx *cli.Context) (bool) {
 	switch cctx.String("serve-gateway") {
 	case "verifiable":
-		fmts = append(fmts, "application/vnd.ipld.raw") // raw
-		fmts = append(fmts, "application/vnd.ipld.car") // car
 	case "all":
-		fmts = append(fmts, "")
+		return true
 	}
-	return fmts
+	return false
 }
 
 func ipfsGatewayMsg(cctx *cli.Context, ipfsBasePath string) string {

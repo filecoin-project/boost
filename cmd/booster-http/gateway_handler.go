@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	
 	"mime"
 	"net/http"
 	"strings"
@@ -11,7 +11,6 @@ import (
 
 type gatewayHandler struct {
 	gwh              http.Handler
-	supportedFormats map[string]struct{}
 }
 
 func newGatewayHandler(gw *gateway.BlocksBackend, serveGateway string) http.Handler {
@@ -36,20 +35,6 @@ func newGatewayHandler(gw *gateway.BlocksBackend, serveGateway string) http.Hand
 }
 
 func (h *gatewayHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	responseFormat, _, err := customResponseFormat(r)
-	if err != nil {
-		webError(w, fmt.Errorf("error while processing the Accept header: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	if _, ok := h.supportedFormats[responseFormat]; !ok {
-		if responseFormat == "" {
-			responseFormat = "unixfs"
-		}
-		webError(w, fmt.Errorf("unsupported response format: %s", responseFormat), http.StatusBadRequest)
-		return
-	}
-
 	h.gwh.ServeHTTP(w, r)
 }
 
