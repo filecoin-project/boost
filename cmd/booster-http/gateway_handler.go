@@ -2,9 +2,7 @@ package main
 
 import (
 
-	"mime"
 	"net/http"
-	"strings"
 
 	"github.com/ipfs/boxo/gateway"
 )
