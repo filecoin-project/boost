@@ -9,4 +9,4 @@ echo $MINER_API_INFO
 echo $LID_API_INFO
 
 echo Starting booster-http...
-exec booster-http run --serve-gateway=all --api-lid=$LID_API_INFO  --api-fullnode=$FULLNODE_API_INFO --api-storage=$MINER_API_INFO --tracing
+exec booster-http run --serve-gateway=verifiable --api-lid=$LID_API_INFO  --api-fullnode=$FULLNODE_API_INFO --api-storage=$MINER_API_INFO --tracing

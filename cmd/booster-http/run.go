@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -108,9 +107,9 @@ var runCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		servePieces := cctx.Bool("serve-pieces")
-		enableIpfsGateway := shouldEnableIPFSGateway(cctx)
-		if !servePieces && !enableIpfsGateway {
-			return errors.New("one of --serve-pieces, --serve-blocks, etc must be enabled")
+		enableIpfsGateway, err := shouldEnableIPFSGateway(cctx)
+		if err != nil {
+			return err
 		}
 
 		if cctx.Bool("pprof") {
@@ -126,7 +125,7 @@ var runCmd = &cli.Command{
 		ctx := lcli.ReqContext(cctx)
 		cl := bdclient.NewStore()
 		defer cl.Close(ctx)
-		err := cl.Dial(ctx, cctx.String("api-lid"))
+		err = cl.Dial(ctx, cctx.String("api-lid"))
 		if err != nil {
 			return fmt.Errorf("connecting to local index directory service: %w", err)
 		}
@@ -253,14 +252,19 @@ var runCmd = &cli.Command{
 	},
 }
 
-func shouldEnableIPFSGateway(cctx *cli.Context) (bool) {
-	switch cctx.String("serve-gateway") {
+func shouldEnableIPFSGateway(cctx *cli.Context) (bool, error) {
+	switch gatewayType := cctx.String("serve-gateway"); gatewayType {
 	case "verifiable":
+		return true, nil
 	case "all":
-		return true
+		return true, nil
+	case "none":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid value for serve-gateway: %s", gatewayType)
 	}
-	return false
 }
+
 
 func ipfsGatewayMsg(cctx *cli.Context, ipfsBasePath string) string {
 	fmts := []string{}
