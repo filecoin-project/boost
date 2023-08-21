@@ -5,9 +5,10 @@ func (r *resolver) MinerAddress() string {
 }
 
 func (r *resolver) GraphsyncRetrievalMinerAddresses() []string {
-	addrs := r.cfg.Dealmaking.GraphsyncStorageAccessApiInfo
-	if len(addrs) == 0 {
-		addrs = []string{r.provider.Address.String()}
+	addrs := r.mma.GetMinerAddresses()
+	strs := make([]string, 0, len(addrs))
+	for _, a := range addrs {
+		strs = append(strs, a.String())
 	}
-	return addrs
+	return strs
 }
