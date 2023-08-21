@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
@@ -33,6 +34,11 @@ type DirectDataEntry struct {
 	SectorID abi.SectorNumber
 	Offset   abi.PaddedPieceSize
 	Length   abi.PaddedPieceSize
+
+	// deal checkpoint in DB.
+	Checkpoint dealcheckpoints.Checkpoint
+	// CheckpointAt is the time at which the deal entered in the last state
+	CheckpointAt time.Time
 
 	StartEpoch abi.ChainEpoch
 	EndEpoch   abi.ChainEpoch

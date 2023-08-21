@@ -60,6 +60,8 @@ func newdirectdataAccessor(db *sql.DB, deal *types.DirectDataEntry) *directdataA
 			"SectorID":         &fielddef.FieldDef{F: &deal.SectorID},
 			"Offset":           &fielddef.FieldDef{F: &deal.Offset},
 			"Length":           &fielddef.FieldDef{F: &deal.Length},
+			"Checkpoint":       &fielddef.CkptFieldDef{F: &deal.Checkpoint},
+			"CheckpointAt":     &fielddef.FieldDef{F: &deal.CheckpointAt},
 			"Error":            &fielddef.FieldDef{F: &deal.Err},
 			"Retry":            &fielddef.FieldDef{F: &deal.Retry},
 			"KeepUnsealedCopy": &fielddef.FieldDef{F: &deal.KeepUnsealedCopy},
