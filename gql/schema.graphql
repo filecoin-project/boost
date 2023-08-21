@@ -492,6 +492,9 @@ type RootQuery {
   """Get miner address"""
   minerAddress: String!
 
+  """Get list of miners that graphsync can retrieve data from"""
+  graphsyncRetrievalMinerAddresses: [String!]!
+
   """Get Deal by ID"""
   deal(id: ID!): Deal
 

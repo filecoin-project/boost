@@ -1,6 +1,8 @@
 /* global BigInt */
 import {useQuery} from "@apollo/react-hooks";
 import {
+    GraphsyncRetrievalMinerAddressesQuery,
+    MinerAddressQuery,
     RetrievalLogsCountQuery, RetrievalLogsListQuery,
 } from "./gql";
 import moment from "moment";
@@ -24,7 +26,35 @@ export function RetrievalLogsPage(props) {
     </PageContainer>
 }
 
-function RetrievalLogsContent(props) {
+function RetrievalLogsContent() {
+    return <>
+        <RetrievalMinerAddrs />
+        <RetrievalLogsList />
+    </>
+}
+
+function RetrievalMinerAddrs() {
+    const minerAddrQuery =useQuery(MinerAddressQuery)
+    const gsRetrievalMinerAddrsQuery =useQuery(GraphsyncRetrievalMinerAddressesQuery)
+
+    if (!minerAddrQuery.data || !gsRetrievalMinerAddrsQuery.data) {
+        return null
+    }
+
+    const minerAddr = minerAddrQuery.data.minerAddress
+    const retrievalMinerAddrs = gsRetrievalMinerAddrsQuery.data.graphsyncRetrievalMinerAddresses
+
+    if (retrievalMinerAddrs.length === 1 && retrievalMinerAddrs[0] === minerAddr) {
+        return null
+    }
+
+    return <div className="retrieval-miner-addrs">
+        <h3>Retrieval Miners</h3>
+        {retrievalMinerAddrs.map(a => <div key={a} className="miner-addr">{a}</div>)}
+    </div>
+}
+
+function RetrievalLogsList() {
     const navigate = useNavigate()
     const params = useParams()
     const pageNum = (params.pageNum && parseInt(params.pageNum)) || 1
