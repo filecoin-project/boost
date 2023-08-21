@@ -193,18 +193,14 @@ func GenerateCommP(filepath string) (*abi.PieceInfo, error) {
 }
 
 func getCarSize(filepath string, rd *carv2.Reader) (int64, error) {
-	var size int64
-	switch rd.Version {
-	case 2:
-		padding := rd.Header.DataOffset - carv2.PragmaSize - carv2.HeaderSize
-		size = int64(rd.Header.DataSize) + int64(padding)
-	case 1:
+	if rd.Version == 1 || rd.Version == 2 {
 		st, err := os.Stat(filepath)
 		if err != nil {
-			return 0, fmt.Errorf("failed to get CARv1 file size: %w", err)
+			return 0, fmt.Errorf("failed to get CAR file size: %w", err)
 		}
-		size = st.Size()
+		return st.Size(), nil
 	}
 
-	return size, nil
+	return 0, fmt.Errorf("unsupported CAR version: %d", rd.Version)
 }
+
