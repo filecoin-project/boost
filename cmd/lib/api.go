@@ -140,6 +140,14 @@ func (a *MultiMinerAccessor) Close() {
 	})
 }
 
+func (a *MultiMinerAccessor) GetMinerAddresses() []address.Address {
+	addrs := make([]address.Address, 0, len(a.readers))
+	for a := range a.readers {
+		addrs = append(addrs, a)
+	}
+	return addrs
+}
+
 func (a *MultiMinerAccessor) GetReader(ctx context.Context, minerAddr address.Address, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (types.SectionReader, error) {
 	pr, ok := a.readers[minerAddr]
 	if !ok {
