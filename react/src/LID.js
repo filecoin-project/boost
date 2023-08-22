@@ -643,6 +643,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                 <table className="deals">
                     <tbody>
                     <tr>
+                        <th>Miner Address</th>
                         <th>Chain Deal ID</th>
                         <th>Sector Number</th>
                         <th>Piece Offset</th>
@@ -651,6 +652,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                     </tr>
                     {pieceStatus.PieceInfoDeals.map(deal => (
                         <tr key={deal.ChainDealID+''}>
+                            <td>{deal.MinerAddress+''}</td>
                             <td>{deal.ChainDealID+''}</td>
                             <td>{deal.Sector.ID+''}</td>
                             <td>{deal.Sector.Offset+''}</td>

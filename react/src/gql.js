@@ -519,6 +519,7 @@ const PieceStatusQuery = gql`
                 }
             }
             PieceInfoDeals {
+                MinerAddress
                 ChainDealID
                 Sector {
                     ID
