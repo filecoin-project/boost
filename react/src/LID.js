@@ -50,23 +50,6 @@ function LIDContent() {
 
     const d = data.lid
 
-    const dealDataBars = [{
-        name: 'Indexed',
-        className: 'indexed',
-        amount: d.DealData.Indexed,
-        description: ''
-    }, {
-        name: 'Flagged (unsealed)',
-        className: 'flagged',
-        amount: d.DealData.FlaggedUnsealed,
-        description: ''
-    }, {
-        name: 'Flagged (sealed only)',
-        className: 'sealed',
-        amount: d.DealData.FlaggedSealed,
-        description: ''
-    }]
-
     const piecesBars = [{
         name: 'Indexed',
         className: 'indexed',

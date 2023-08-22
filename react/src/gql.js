@@ -537,11 +537,6 @@ const PieceStatusQuery = gql`
 const LIDQuery = gql`
     query AppLIDQuery {
         lid {
-            DealData {
-                Indexed
-                FlaggedUnsealed
-                FlaggedSealed
-            }
             Pieces {
                 Indexed
                 FlaggedUnsealed

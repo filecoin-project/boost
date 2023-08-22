@@ -99,8 +99,8 @@ func (ps *PieceDirectory) FlaggedPiecesCount(ctx context.Context, filter *bdtype
 	return ps.store.FlaggedPiecesCount(ctx, filter)
 }
 
-func (ps *PieceDirectory) PiecesCount(ctx context.Context) (int, error) {
-	return ps.store.PiecesCount(ctx)
+func (ps *PieceDirectory) PiecesCount(ctx context.Context, maddr address.Address) (int, error) {
+	return ps.store.PiecesCount(ctx, maddr)
 }
 
 // Get all metadata about a particular piece

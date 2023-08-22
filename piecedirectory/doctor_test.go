@@ -58,6 +58,10 @@ func TestPieceDoctor(t *testing.T) {
 			testCheckPieces(ctx, t, cl)
 		})
 
+		t.Run("pieces count", func(t *testing.T) {
+			testPiecesCount(ctx, t, cl)
+		})
+
 		ldb.MinPieceCheckPeriod = prev
 	})
 
@@ -93,6 +97,11 @@ func TestPieceDoctor(t *testing.T) {
 		t.Run("check pieces", func(t *testing.T) {
 			svc.RecreateTables(ctx, t, ybstore)
 			testCheckPieces(ctx, t, cl)
+		})
+
+		t.Run("pieces count", func(t *testing.T) {
+			svc.RecreateTables(ctx, t, ybstore)
+			testPiecesCount(ctx, t, cl)
 		})
 
 		yugabyte.MinPieceCheckPeriod = prev
@@ -368,4 +377,67 @@ func testCheckPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	pcids, err = cl.FlaggedPiecesList(ctx, nil, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pcids))
+}
+
+func testPiecesCount(ctx context.Context, t *testing.T, cl *client.Store) {
+	// Create a random CAR file
+	_, carFilePath := CreateCarFile(t)
+	carFile, err := os.Open(carFilePath)
+	require.NoError(t, err)
+	defer carFile.Close()
+
+	carReader, err := car.OpenReader(carFilePath)
+	require.NoError(t, err)
+	defer carReader.Close()
+	carv1Reader, err := carReader.DataReader()
+	require.NoError(t, err)
+
+	commpCalc := CalculateCommp(t, carv1Reader)
+
+	// Add deal info for the piece on miner 1001
+	minerAddr, err := address.NewIDAddress(1001)
+	require.NoError(t, err)
+	di := model.DealInfo{
+		DealUuid:    uuid.New().String(),
+		ChainDealID: 1,
+		MinerAddr:   minerAddr,
+		SectorID:    1,
+		PieceOffset: 0,
+		PieceLength: commpCalc.PieceSize,
+	}
+	err = cl.AddDealForPiece(ctx, commpCalc.PieceCID, di)
+	require.NoError(t, err)
+
+	// Add deal info for the piece on miner 1002
+	minerAddr2, err := address.NewIDAddress(1002)
+	require.NoError(t, err)
+	di2 := model.DealInfo{
+		DealUuid:    uuid.New().String(),
+		ChainDealID: 2,
+		MinerAddr:   minerAddr2,
+		SectorID:    2,
+		PieceOffset: 0,
+		PieceLength: commpCalc.PieceSize,
+	}
+	err = cl.AddDealForPiece(ctx, commpCalc.PieceCID, di2)
+	require.NoError(t, err)
+
+	// In the yugabyte implementation PiecesCount queries the postgres
+	// PieceTracker table. We need to first call NextPiecesToCheck so that the
+	// piece information is copied from the cassandra database over to the
+	// postgres database PieceTracker table.
+	_, err = cl.NextPiecesToCheck(ctx, minerAddr)
+
+	// There should be one deal for the piece on the first miner address
+	count, err := cl.PiecesCount(ctx, minerAddr)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	// There should be zero pieces for another random miner address
+	otherMinerAddr, err := address.NewIDAddress(1234)
+	require.NoError(t, err)
+
+	count, err = cl.PiecesCount(ctx, otherMinerAddr)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
 }
