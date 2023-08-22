@@ -319,12 +319,6 @@ type SealingPipeline {
   Workers: [Worker]!
 }
 
-type DealData {
-  Indexed: Uint64!
-  FlaggedUnsealed: Uint64!
-  FlaggedSealed: Uint64!
-}
-
 type Pieces {
   Indexed: Int!
   FlaggedUnsealed: Int!
@@ -342,7 +336,6 @@ type SectorProvingState {
 }
 
 type LID {
-  DealData: DealData!
   Pieces: Pieces!
   SectorUnsealedCopies: SectorUnsealedCopies!
   SectorProvingState: SectorProvingState!

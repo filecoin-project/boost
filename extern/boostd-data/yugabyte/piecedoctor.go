@@ -235,6 +235,20 @@ func (s *Store) getPieceCheckPeriod(ctx context.Context) (time.Duration, error) 
 	return period, nil
 }
 
+func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
+	defer span.End()
+
+	var count int
+	qry := `SELECT COUNT(*) FROM PieceTracker WHERE MinerAddr = $1`
+	err := s.db.QueryRow(ctx, qry, maddr.String()).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("getting pieces count: %w", err)
+	}
+
+	return count, nil
+}
+
 func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool, maddr address.Address) error {
 	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
 	span.SetAttributes(attribute.String("pieceCid", pieceCid.String()))

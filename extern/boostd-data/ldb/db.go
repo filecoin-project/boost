@@ -465,13 +465,14 @@ func (db *DB) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]c
 	return pieceCids, nil
 }
 
-func (db *DB) PiecesCount(ctx context.Context) (int, error) {
+// Get the number of pieces that have an associated deal on the given miner
+func (db *DB) PiecesCount(ctx context.Context, maddr address.Address) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "db.pieces_count")
 	defer span.End()
 
 	q := query.Query{
 		Prefix:   "/" + sprefixPieceCidToCursor + "/",
-		KeysOnly: true,
+		KeysOnly: false,
 	}
 	results, err := db.Query(ctx, q)
 	if err != nil {
@@ -480,12 +481,28 @@ func (db *DB) PiecesCount(ctx context.Context) (int, error) {
 
 	var count int
 	for {
-		_, ok := results.NextSync()
+		r, ok := results.NextSync()
 		if !ok {
 			break
 		}
 
-		count++
+		k := r.Key[len(q.Prefix):]
+		pieceCid, err := cid.Parse(k)
+		if err != nil {
+			return 0, fmt.Errorf("parsing piece cid '%s': %w", k, err)
+		}
+
+		md, err := db.GetPieceCidToMetadata(ctx, pieceCid)
+		if err != nil {
+			return 0, fmt.Errorf("getting piece cid '%s' metadata: %w", k, err)
+		}
+
+		for _, dl := range md.Deals {
+			if dl.MinerAddr == maddr {
+				count++
+				break
+			}
+		}
 	}
 
 	return count, nil
