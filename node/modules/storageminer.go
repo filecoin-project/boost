@@ -312,6 +312,10 @@ func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
 	return db.NewDealsDB(sqldb)
 }
 
+func NewDirectDealsDB(sqldb *sql.DB) *db.DirectDataDB {
+	return db.NewDirectDataDB(sqldb)
+}
+
 func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
 	return db.NewLogsDB(logsSqlDB.db)
 }

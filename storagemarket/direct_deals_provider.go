@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/filecoin-project/boost/api"
+	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-commp-utils/writer"
@@ -17,6 +20,8 @@ import (
 	"github.com/ipfs/go-cidutil/cidenc"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/multiformats/go-multibase"
+
+	"github.com/google/uuid"
 )
 
 //var log = logging.Logger("direct-deals-providers")
@@ -24,25 +29,83 @@ import (
 type DirectDealsProvider struct {
 	fullnodeApi v1api.FullNode
 	pieceAdder  types.PieceAdder
+
+	//db            *sql.DB
+	directDealsDB *db.DirectDataDB
+	//logsSqlDB     *sql.DB
+	//logsDB        *db.LogsDB
+
+	dealLogger *logs.DealLogger
 }
 
-func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder) *DirectDealsProvider {
+func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
 	return &DirectDealsProvider{
 		fullnodeApi: fullnodeApi,
 		pieceAdder:  pieceAdder,
+
+		//db: db,
+		directDealsDB: directDealsDB,
+		//logsSqlDB: logsSqlDB,
+		//logsDB: logsDB,
+
+		dealLogger: dealLogger,
 	}
+}
+
+func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectDataEntry) error {
+	// Validate the deal proposal and Check for deal acceptance (allocation id, start epoch, etc.)
+
+	return nil
 }
 
 func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationId uint64, clientAddr address.Address, removeUnsealedCopy bool, skipIpniAnnounce bool) (*api.ProviderDealRejectionInfo, error) {
 	log.Infow("received direct data import", "piececid", piececid, "filepath", filepath, "clientAddr", clientAddr, "allocationId", allocationId)
 
-	////////////////////////////////////////////////////
-	// 1. Validate the deal proposal
-	//if err := p.validateDealProposal(ds); err != nil {
+	entry := &types.DirectDataEntry{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		//CreatedAt time.Time
+		PieceCID: piececid,
+		//PieceSize abi.PaddedPieceSize
+		Client: clientAddr,
+		//Provider  address.Address
+		CleanupData:      deleteAfterImport,
+		InboundFilePath:  filepath,
+		AllocationID:     allocationId,
+		KeepUnsealedCopy: !removeUnsealedCopy,
+		AnnounceToIPNI:   !skipIpniAnnounce,
+		//SectorID abi.SectorNumber
+		//Offset   abi.PaddedPieceSize
+		//Length   abi.PaddedPieceSize
+		//Checkpoint dealcheckpoints.Checkpoint
+		//CheckpointAt time.Time
+		//StartEpoch abi.ChainEpoch
+		//EndEpoch   abi.ChainEpoch
+		//Err string
+		//Retry DealRetryType
+	}
 
-	////////////////////////////////////////////////////
-	// 2. Check for deal acceptance
-	//resp, err := p.checkForDealAcceptance(ctx, &ds, false)
+	ddp.dealLogger.Infow(entry.ID, "executing direct deal import", "client", clientAddr, "piececid", piececid)
+
+	err := ddp.directDealsDB.Insert(ctx, entry)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert direct deal entry to local db: %w", err)
+	}
+
+	log.Infow("inserted direct deal entry to local db", "uuid", entry.ID, "piececid", piececid, "filepath", filepath)
+
+	chainHead, err := ddp.fullnodeApi.ChainHead(ctx)
+	if err != nil {
+		log.Warnw("failed to get chain head", "err", err)
+		return nil, err
+	}
+
+	log.Infow("chain head", "epoch", chainHead)
+
+	err = ddp.Accept(ctx, entry)
+	if err != nil {
+		return nil, err
+	}
 
 	////////////////////////////////////////////////////
 	// 3. Process direct deal proposal
@@ -61,14 +124,6 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 		return nil, fmt.Errorf("failed to open filepath: %w", err)
 	}
 	defer fi.Close() //nolint:errcheck
-
-	chainHead, err := ddp.fullnodeApi.ChainHead(ctx)
-	if err != nil {
-		log.Warnw("failed to get chain head", "err", err)
-		return nil, err
-	}
-
-	log.Infow("chain head", "epoch", chainHead)
 
 	fstat, err := os.Stat(filepath)
 	if err != nil {

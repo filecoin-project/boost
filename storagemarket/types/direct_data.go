@@ -23,6 +23,8 @@ type DirectDataEntry struct {
 	Client    address.Address
 	Provider  address.Address
 
+	AllocationID uint64
+
 	// CleanupData indicates whether to remove the data for a deal after the deal has been added to a sector.
 	// This is always true for online deals, and can be set as a flag for offline deals.
 	CleanupData bool
