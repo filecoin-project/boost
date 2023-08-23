@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS DirectDeals (
     CreatedAt DateTime,
     PieceCID TEXT,
     PieceSize INT,
+    CleanupData BOOL,
     ClientAddress TEXT,
     ProviderAddress TEXT,
     StartEpoch INT,
@@ -13,7 +14,12 @@ CREATE TABLE IF NOT EXISTS DirectDeals (
     SectorID INT,
     Offset INT,
     Length INT,
+    Checkpoint TEXT,
+    CheckpointAt DateTime,
     Error TEXT,
+    Retry TEXT,
+    AnnounceToIPNI BOOL,
+    KeepUnsealedCopy BOOL,
     PRIMARY KEY(ID)
 );
 -- +goose StatementEnd
