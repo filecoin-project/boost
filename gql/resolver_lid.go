@@ -7,7 +7,13 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/sectorstatemgr"
 	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/graph-gophers/graphql-go"
 )
+
+type resolverScanProgress struct {
+	Progress float64
+	LastScan *graphql.Time
+}
 
 type pieces struct {
 	Indexed         int32
@@ -26,6 +32,7 @@ type sectorProvingState struct {
 }
 
 type lidState struct {
+	ScanProgress         resolverScanProgress
 	Pieces               pieces
 	SectorUnsealedCopies sectorUnsealedCopies
 	SectorProvingState   sectorProvingState
@@ -84,7 +91,21 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 		return nil, err
 	}
 
+	scanProgress, err := r.piecedirectory.ScanProgress(ctx, maddr)
+	if err != nil {
+		return nil, err
+	}
+
+	var lastScan *graphql.Time
+	if !scanProgress.LastScan.IsZero() {
+		lastScan = &graphql.Time{Time: scanProgress.LastScan}
+	}
+
 	ls := &lidState{
+		ScanProgress: resolverScanProgress{
+			Progress: scanProgress.Progress,
+			LastScan: lastScan,
+		},
 		FlaggedPieces: int32(flaggedPiecesCount),
 		Pieces: pieces{
 			Indexed:         int32(ap - flaggedPiecesCount),

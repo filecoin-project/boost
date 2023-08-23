@@ -538,6 +538,10 @@ const PieceStatusQuery = gql`
 const LIDQuery = gql`
     query AppLIDQuery {
         lid {
+            ScanProgress {
+                Progress
+                LastScan
+            }
             Pieces {
                 Indexed
                 FlaggedUnsealed

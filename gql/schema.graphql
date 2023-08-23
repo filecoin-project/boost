@@ -320,6 +320,11 @@ type SealingPipeline {
   Workers: [Worker]!
 }
 
+type ScanProgress {
+  Progress: Float!
+  LastScan: Time
+}
+
 type Pieces {
   Indexed: Int!
   FlaggedUnsealed: Int!
@@ -337,6 +342,7 @@ type SectorProvingState {
 }
 
 type LID {
+  ScanProgress: ScanProgress!
   Pieces: Pieces!
   SectorUnsealedCopies: SectorUnsealedCopies!
   SectorProvingState: SectorProvingState!

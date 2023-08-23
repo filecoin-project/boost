@@ -235,6 +235,10 @@ func (s *Store) getPieceCheckPeriod(ctx context.Context) (time.Duration, error) 
 	return period, nil
 }
 
+// Returns the number of rows in the PieceTracker table.
+// Note that the PieceTracker table is populated in batches each time
+// NextPiecesToCheck is called, so PiecesCount will not be accurate until
+// all the rows have been copied over from the cassandra database.
 func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
 	defer span.End()
@@ -247,6 +251,53 @@ func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, er
 	}
 
 	return count, nil
+}
+
+// Calculate the approximate progress of the initial scan
+func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types.ScanProgress, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
+	defer span.End()
+
+	// Get the total rows scanned so far
+	var scanned int
+	qry := `SELECT COUNT(*) FROM PieceTracker WHERE ` +
+		`MinerAddr = $1 AND UpdatedAt > 'epoch'` // 'epoch' is unix zero time
+	err := s.db.QueryRow(ctx, qry, maddr.String()).Scan(&scanned)
+	if err != nil {
+		return nil, fmt.Errorf("getting scanned pieces count: %w", err)
+	}
+
+	// Get the total number of deals for the miner. This approximates to the
+	// number of pieces (but is not exactly the same, because there may be more
+	// than one deal for the same piece on the same miner).
+	// Unfortunately it's not possible to do COUNT(unique PieceCid) because
+	// of how cassandra manages indexes.
+	var total int
+	qry = `SELECT COUNT(*) FROM PieceDeal WHERE MinerAddr = ?`
+	err = s.session.Query(qry, maddr.String()).WithContext(ctx).Scan(&total)
+	if err != nil {
+		return nil, fmt.Errorf("getting total pieces count: %w", err)
+	}
+
+	var lastScanRes pgtype.Timestamptz
+	qry = `SELECT MAX(UpdatedAt) FROM PieceTracker WHERE MinerAddr = $1`
+	err = s.db.QueryRow(ctx, qry, maddr.String()).Scan(&lastScanRes)
+	if err != nil {
+		return nil, fmt.Errorf("getting time piece tracker was last scanned: %w", err)
+	}
+
+	// Calculate approximate progress
+	progress := float64(scanned) / float64(total)
+
+	// Given that the denominator may be a little inflated, round up to 100% if we're close
+	if progress > 0.95 {
+		progress = 1
+	}
+	if progress > 1 {
+		progress = 1
+	}
+
+	return &types.ScanProgress{Progress: progress, LastScan: lastScanRes.Time}, nil
 }
 
 func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool, maddr address.Address) error {

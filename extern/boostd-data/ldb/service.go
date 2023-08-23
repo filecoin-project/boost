@@ -389,6 +389,19 @@ func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, er
 	return s.db.PiecesCount(ctx, maddr)
 }
 
+func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types.ScanProgress, error) {
+	log.Debugw("handle.scan-progress")
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.scan_progress")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.scan-progress", "took", time.Since(now).String())
+	}(time.Now())
+
+	return s.db.ScanProgress(ctx, maddr)
+}
+
 func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	log.Debugw("handle.list-pieces")
 

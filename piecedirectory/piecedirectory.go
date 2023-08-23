@@ -103,6 +103,10 @@ func (ps *PieceDirectory) PiecesCount(ctx context.Context, maddr address.Address
 	return ps.store.PiecesCount(ctx, maddr)
 }
 
+func (ps *PieceDirectory) ScanProgress(ctx context.Context, maddr address.Address) (*bdtypes.ScanProgress, error) {
+	return ps.store.ScanProgress(ctx, maddr)
+}
+
 // Get all metadata about a particular piece
 func (ps *PieceDirectory) GetPieceMetadata(ctx context.Context, pieceCid cid.Cid) (types.PieceDirMetadata, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "pm.get_piece_metadata")
