@@ -70,7 +70,7 @@ require (
 	github.com/ipld/go-car/v2 v2.11.0
 	github.com/ipld/go-ipld-prime v0.21.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
-	github.com/ipni/index-provider v0.13.6-0.20230822213204-fef08bc840a4
+	github.com/ipni/index-provider v0.13.6-0.20230823065704-581fccd06545
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -340,8 +340,8 @@ require (
 	github.com/filecoin-project/lotus v1.23.2-0.20230622154405-168d022018ce
 	github.com/ipfs/boxo v0.10.2-0.20230629143123-2d3edc552442
 	github.com/ipfs/kubo v0.21.0
-	github.com/ipni/go-libipni v0.4.1-0.20230821233216-faa5859b4bc9
-	github.com/ipni/ipni-cli v0.0.15-0.20230823014240-be8255c0f6c2
+	github.com/ipni/go-libipni v0.4.1-0.20230823074140-f1e326359d4a
+	github.com/ipni/ipni-cli v0.0.15-0.20230823034604-9ad49c28e4b0
 	github.com/schollz/progressbar/v3 v3.13.1
 )
 

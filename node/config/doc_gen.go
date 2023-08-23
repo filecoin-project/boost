@@ -552,6 +552,14 @@ datastore if any is present.`,
 
 			Comment: ``,
 		},
+		{
+			Name: "DataTransferPublisher",
+			Type: "bool",
+
+			Comment: `Set this to true to use the legacy data-transfer/graphsync publisher.
+This should only be used if there if the HTTP over libp2p is not working
+and HttpPublisher is not enabled.`,
+		},
 	},
 	"IndexProviderHttpPublisherConfig": []DocField{
 		{
@@ -574,6 +582,14 @@ This is usually the same as the for the boost node.`,
 
 			Comment: `Set the port on which to listen for index provider requests over HTTP.
 Note that this port must be open on the firewall.`,
+		},
+		{
+			Name: "NoLibp2p",
+			Type: "bool",
+
+			Comment: `If publishing using exclusively plain HTTP and no HTTP over libp2pp,
+then set this to true. Otherwise, the publisher will publish content
+advertisements over both HTTP and HTTP over libp2p.`,
 		},
 	},
 	"LocalIndexDirectoryConfig": []DocField{
