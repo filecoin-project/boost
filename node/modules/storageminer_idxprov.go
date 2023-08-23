@@ -115,7 +115,16 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 					engine.WithHttpPublisherListenAddr(fmt.Sprintf("0.0.0.0:%d", cfg.HttpPublisher.Port)),
 					engine.WithHttpPublisherAnnounceAddr(announceAddr.String()),
 				)
-				llog = llog.With("publisher", "http", "announceAddr", announceAddr)
+				if cfg.HttpPublisher.NoLibp2p {
+					opts = append(opts, engine.WithHttpNoLibp2p(true))
+					llog = llog.With("publisher", "http", "announceAddr", announceAddr)
+				} else {
+					llog = llog.With("publisher", "http and libp2phttp", "announceAddr", announceAddr, "extraGossipData", ma)
+				}
+			} else if !cfg.DataTransferPublisher {
+				// HTTP publisher not enabled, so use only libp2phttp unless using DataTransferPublisher.
+				opts = append(opts, engine.WithPublisherKind(engine.HttpPublisher))
+				llog = llog.With("publisher", "libp2phttp", "extraGossipData", ma)
 			} else {
 				opts = append(opts,
 					engine.WithPublisherKind(engine.DataTransferPublisher),

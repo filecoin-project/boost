@@ -334,6 +334,11 @@ type IndexProviderConfig struct {
 	Announce IndexProviderAnnounceConfig
 
 	HttpPublisher IndexProviderHttpPublisherConfig
+
+	// Set this to true to use the legacy data-transfer/graphsync publisher.
+	// This should only be used if there if the HTTP over libp2p is not working
+	// and HttpPublisher is not enabled.
+	DataTransferPublisher bool
 }
 
 type IndexProviderAnnounceConfig struct {
@@ -356,6 +361,10 @@ type IndexProviderHttpPublisherConfig struct {
 	// Set the port on which to listen for index provider requests over HTTP.
 	// Note that this port must be open on the firewall.
 	Port int
+	// If publishing using exclusively plain HTTP and no HTTP over libp2pp,
+	// then set this to true. Otherwise, the publisher will publish content
+	// advertisements over both HTTP and HTTP over libp2p.
+	NoLibp2p bool
 }
 
 type FeeConfig struct {
