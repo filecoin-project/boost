@@ -2,6 +2,9 @@ package svc
 
 import (
 	"database/sql"
+	"testing"
+	"time"
+
 	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-address"
 	logging "github.com/ipfs/go-log/v2"
@@ -10,8 +13,6 @@ import (
 	"github.com/yugabyte/gocql"
 	"github.com/yugabyte/pgx/v4/pgxpool"
 	"golang.org/x/net/context"
-	"testing"
-	"time"
 )
 
 var tlog = logging.Logger("ybtest")
@@ -56,7 +57,7 @@ func SetupYugabyte(t *testing.T) *Service {
 
 	// Use the test keyspace to create the Cassandra tables
 	storeOpts := []yugabyte.StoreOpt{yugabyte.WithCassandraKeyspace(testSchema)}
-	migrator := yugabyte.NewMigrator(settings.ConnectString, address.TestAddress)
+	migrator := yugabyte.NewMigrator(settings.Hosts, settings.ConnectString, address.TestAddress)
 	return NewYugabyte(settings, migrator, storeOpts...)
 }
 
