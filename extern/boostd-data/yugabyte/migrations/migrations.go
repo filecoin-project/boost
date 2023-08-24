@@ -13,7 +13,7 @@ import (
 
 var log = logging.Logger("migrations")
 
-//go:embed *.go
+//go:embed *.sql *.go
 var EmbedMigrations embed.FS
 
 // Used to pass global parameters to the migration functions
