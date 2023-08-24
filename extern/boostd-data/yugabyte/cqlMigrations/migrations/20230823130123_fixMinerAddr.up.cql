@@ -1,1 +1,1 @@
-UPDATE idx.piecedeal SET MinerAddr = REPLACE(MinerAddr, 'f', 't')
+UPDATE piecedeal SET MinerAddr = REPLACE(MinerAddr, 'f', 't')
