@@ -235,7 +235,7 @@ func (s *Store) getPieceCheckPeriod(ctx context.Context) (time.Duration, error) 
 	return period, nil
 }
 
-// Returns the number of rows in the PieceTracker table.
+// PiecesCount returns the number of rows in the PieceTracker table.
 // Note that the PieceTracker table is populated in batches each time
 // NextPiecesToCheck is called, so PiecesCount will not be accurate until
 // all the rows have been copied over from the cassandra database.
