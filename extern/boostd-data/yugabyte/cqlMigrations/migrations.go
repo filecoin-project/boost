@@ -12,9 +12,6 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 )
 
-// yugaByteCassandraKeyspace defined again to avoid cyclic dependency on boostd-data/yugabyte
-const yugaByteCassandraKeyspace = "idx"
-
 var log = logging.Logger("cqlmigrations")
 
 //go:embed migrations/*.cql
@@ -22,8 +19,9 @@ var EmbedCqlMigrations embed.FS
 
 // MigrateParams is used to pass global parameters to the migration functions
 type MigrateParams struct {
-	Hosts        []string
-	MinerAddress address.Address
+	Hosts             []string
+	MinerAddress      address.Address
+	CassandraKeySpace string
 }
 
 // Migrate currently support ony schema migrations and direct CQL queries. This package does not support
@@ -31,7 +29,7 @@ type MigrateParams struct {
 func Migrate(params *MigrateParams) error {
 
 	cluster := gocql.NewCluster(params.Hosts...)
-	cluster.Keyspace = yugaByteCassandraKeyspace
+	cluster.Keyspace = params.CassandraKeySpace
 	cluster.Consistency = gocql.All
 	s, err := cluster.CreateSession()
 	if err != nil {
@@ -40,7 +38,7 @@ func Migrate(params *MigrateParams) error {
 	defer s.Close()
 
 	mcfg := &mcassandra.Config{
-		KeyspaceName: yugaByteCassandraKeyspace,
+		KeyspaceName: params.CassandraKeySpace,
 	}
 
 	casDrv, err := mcassandra.WithInstance(s, mcfg)
@@ -53,7 +51,7 @@ func Migrate(params *MigrateParams) error {
 		return err
 	}
 
-	mig, err := gmigrate.NewWithInstance("iofs", f, yugaByteCassandraKeyspace, casDrv)
+	mig, err := gmigrate.NewWithInstance("iofs", f, params.CassandraKeySpace, casDrv)
 	if err != nil {
 		return err
 	}

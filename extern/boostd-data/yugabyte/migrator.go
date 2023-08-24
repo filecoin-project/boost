@@ -11,16 +11,18 @@ import (
 )
 
 type Migrator struct {
-	hosts         []string
-	connectString string
-	minerAddr     address.Address
+	hosts             []string
+	connectString     string
+	minerAddr         address.Address
+	cassandraKeySPace string
 }
 
-func NewMigrator(hosts []string, connectString string, minerAddr address.Address) *Migrator {
+func NewMigrator(hosts []string, connectString string, minerAddr address.Address, cassandraKeySpace string) *Migrator {
 	return &Migrator{
-		hosts:         hosts,
-		connectString: connectString,
-		minerAddr:     minerAddr,
+		hosts:             hosts,
+		connectString:     connectString,
+		minerAddr:         minerAddr,
+		cassandraKeySPace: cassandraKeySpace,
 	}
 }
 
@@ -54,8 +56,9 @@ func (m *Migrator) migratePostgres() error {
 
 func (m *Migrator) migrateCassandra() error {
 	params := &cqlMigrations.MigrateParams{
-		Hosts:        m.hosts,
-		MinerAddress: m.minerAddr,
+		Hosts:             m.hosts,
+		MinerAddress:      m.minerAddr,
+		CassandraKeySpace: m.cassandraKeySPace,
 	}
 	err := cqlMigrations.Migrate(params)
 	if err != nil {

@@ -105,7 +105,7 @@ var yugabyteCmd = &cli.Command{
 		// a disabled miner address, and if the migration is needed it will
 		// throw ErrMissingMinerAddr and we can inform the user they need to
 		// perform the migration.
-		migrator := yugabyte.NewMigrator(cctx.StringSlice("hosts"), settings.ConnectString, migrations.DisabledMinerAddr)
+		migrator := yugabyte.NewMigrator(cctx.StringSlice("hosts"), settings.ConnectString, migrations.DisabledMinerAddr, yugabyte.YugaByteCassandraKeyspace)
 
 		// Create a connection to the yugabyte implementation of LID
 		bdsvc := svc.NewYugabyte(settings, migrator)
@@ -204,7 +204,7 @@ var yugabyteMigrateCmd = &cli.Command{
 				return fmt.Errorf("parsing miner address '%s': %w", maddr, err)
 			}
 		}
-		migrator := yugabyte.NewMigrator(cctx.StringSlice("hosts"), settings.ConnectString, maddr)
+		migrator := yugabyte.NewMigrator(cctx.StringSlice("hosts"), settings.ConnectString, maddr, yugabyte.YugaByteCassandraKeyspace)
 		err := migrator.Migrate()
 		if err != nil && errors.Is(err, migrations.ErrMissingMinerAddr) {
 			msg := "You must set the miner-address flag to do the migration. " +

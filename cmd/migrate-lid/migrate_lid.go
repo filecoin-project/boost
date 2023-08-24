@@ -146,7 +146,7 @@ var migrateYugabyteDBCmd = &cli.Command{
 		// Note that it doesn't matter what address we pass here: because the
 		// table is newly created, it doesn't contain any rows when the
 		// migration is run.
-		migrator := yugabyte.NewMigrator(cctx.StringSlice("hosts"), settings.ConnectString, address.TestAddress)
+		migrator := yugabyte.NewMigrator(cctx.StringSlice("hosts"), settings.ConnectString, address.TestAddress, yugabyte.YugaByteCassandraKeyspace)
 		store := yugabyte.NewStore(settings, migrator)
 		return migrate(cctx, "yugabyte", store, migrateType)
 	},
@@ -610,7 +610,7 @@ func migrateReverse(cctx *cli.Context, dbType string) error {
 			Hosts:                    cctx.StringSlice("hosts"),
 			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
 		}
-		migrator := yugabyte.NewMigrator(cctx.StringSlice("hosts"), settings.ConnectString, migrations.DisabledMinerAddr)
+		migrator := yugabyte.NewMigrator(cctx.StringSlice("hosts"), settings.ConnectString, migrations.DisabledMinerAddr, yugabyte.YugaByteCassandraKeyspace)
 		store = yugabyte.NewStore(settings, migrator)
 	}
 
