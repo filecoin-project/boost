@@ -293,9 +293,6 @@ func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types
 	if progress > 0.95 {
 		progress = 1
 	}
-	if progress > 1 {
-		progress = 1
-	}
 
 	return &types.ScanProgress{Progress: progress, LastScan: lastScanRes.Time}, nil
 }
