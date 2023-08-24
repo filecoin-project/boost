@@ -173,6 +173,7 @@ type PieceDeal {
 }
 
 type PieceInfoDeal {
+  MinerAddress: String!
   ChainDealID: Uint64!
   Sector: Sector!
   SealStatus: SealStatus!

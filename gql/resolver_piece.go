@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	pdtypes "github.com/filecoin-project/boost/piecedirectory/types"
@@ -56,9 +56,10 @@ func (pdr *pieceDealResolver) SealStatus(ctx context.Context) *sealStatusResolve
 }
 
 type pieceInfoDeal struct {
-	ChainDealID gqltypes.Uint64
-	Sector      *sectorResolver
-	ss          *sealStatusReporter
+	MinerAddress string
+	ChainDealID  gqltypes.Uint64
+	Sector       *sectorResolver
+	ss           *sealStatusReporter
 }
 
 func (pid *pieceInfoDeal) SealStatus(ctx context.Context) *sealStatusResolver {
@@ -334,10 +335,11 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 		}
 
 		pids = append(pids, &pieceInfoDeal{
-			ChainDealID: gqltypes.Uint64(dl.ChainDealID),
-			Sector:      sector,
+			MinerAddress: dl.MinerAddr.String(),
+			ChainDealID:  gqltypes.Uint64(dl.ChainDealID),
+			Sector:       sector,
 			ss: &sealStatusReporter{
-				sa:      r.sa,
+				mma:     r.mma,
 				ssm:     r.ssm,
 				sector:  sector,
 				minerID: abi.ActorID(actorId),
@@ -378,7 +380,7 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 			Deal:   &bd,
 			Sector: sector,
 			ss: &sealStatusReporter{
-				sa:      r.sa,
+				mma:     r.mma,
 				sector:  sector,
 				ssm:     r.ssm,
 				minerID: abi.ActorID(minerId),
@@ -420,7 +422,7 @@ func (r *resolver) PieceStatus(ctx context.Context, args struct{ PieceCid string
 			Sector: sector,
 			ss: &sealStatusReporter{
 				sector:  sector,
-				sa:      r.sa,
+				mma:     r.mma,
 				ssm:     r.ssm,
 				minerID: abi.ActorID(minerId),
 			},
@@ -497,7 +499,7 @@ func (r *resolver) getLegacyDealSector(ctx context.Context, pids []*pieceInfoDea
 const isUnsealedTimeout = 5 * time.Second
 
 type sealStatusReporter struct {
-	sa      retrievalmarket.SectorAccessor
+	mma     *lib.MultiMinerAccessor
 	sector  *sectorResolver
 	ssm     *sectorstatemgr.SectorStateMgr
 	minerID abi.ActorID
@@ -517,8 +519,13 @@ func (ss *sealStatusReporter) sealStatus(ctx context.Context) *sealStatusResolve
 	isUnsealedCtx, cancel := context.WithTimeout(ctx, isUnsealedTimeout)
 	defer cancel()
 
-	sectorsStatusApiIsUnsealed, err := ss.sa.IsUnsealed(
-		isUnsealedCtx, abi.SectorNumber(ss.sector.ID),
+	maddr, err := address.NewIDAddress(uint64(ss.minerID))
+	if err != nil {
+		// There should never be an error but handle it just in case
+		return &sealStatusResolver{Error: fmt.Sprintf("unable to convert miner ID %d into ID address: %s", ss.minerID, err)}
+	}
+	sectorsStatusApiIsUnsealed, err := ss.mma.IsUnsealed(
+		isUnsealedCtx, maddr, abi.SectorNumber(ss.sector.ID),
 		abi.PaddedPieceSize(ss.sector.Offset).Unpadded(),
 		abi.PaddedPieceSize(ss.sector.Length).Unpadded(),
 	)
