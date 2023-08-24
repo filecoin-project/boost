@@ -27,6 +27,7 @@ type Store struct {
 		GetOffsetSize             func(context.Context, cid.Cid, mh.Multihash) (*model.OffsetSize, error)
 		ListPieces                func(ctx context.Context) ([]cid.Cid, error)
 		PiecesCount               func(ctx context.Context, maddr address.Address) (int, error)
+		ScanProgress              func(ctx context.Context, maddr address.Address) (*types.ScanProgress, error)
 		GetPieceMetadata          func(ctx context.Context, pieceCid cid.Cid) (model.Metadata, error)
 		GetPieceDeals             func(context.Context, cid.Cid) ([]model.DealInfo, error)
 		IndexedAt                 func(context.Context, cid.Cid) (time.Time, error)
@@ -171,6 +172,10 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 
 func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, error) {
 	return s.client.PiecesCount(ctx, maddr)
+}
+
+func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types.ScanProgress, error) {
+	return s.client.ScanProgress(ctx, maddr)
 }
 
 func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error) {

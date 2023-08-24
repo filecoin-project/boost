@@ -91,67 +91,93 @@ function LIDContent() {
         description: ''
     }]
 
+    const scanPct = Math.round(d.ScanProgress.Progress * 100)
+    var lastScanMsg = ''
+    var lastScan = d.ScanProgress.LastScan
+    const now = new Date()
+    if (lastScan > now) {
+        lastScanMsg = 'just now'
+    } else if (now.getTime() - lastScan.getTime() < 60 * 1000) {
+        lastScanMsg = 'just now'
+    } else {
+        lastScanMsg = moment(lastScan).fromNow() + ' ago'
+    }
     return <div className="lid">
-        <table className="lid-graphs">
-            <tbody>
-            <tr>
-                <td width="50%">
-                  <div>
-                      <h3>Pieces<PiecesInfo/></h3>
+      {d.ScanProgress.Progress < 1 ? (
+          <div className="scan-progress">
+              <p>
+                  Piece Doctor is performing an initial scan for pieces in LID.
+                  This may take several hours.
+                  The graphs below will update as the scan makes progress. <br/>
+              </p>
+              <div className="scan-bar">
+                  <div className="completed" style={{width: scanPct+'%'}}></div>
+              </div>
+              <div className="scan-bar-label">
+                  {scanPct}% complete
+              </div>
+              <p className="last-updated">
+                  {lastScan ? (
+                      <span>Last updated: {moment(lastScan).format(dateFormat)} ({lastScanMsg})</span>
+                  ) : null}
+              </p>
+          </div>
+      ) : (
+          <div className="last-scan">
+              Last updated: {moment(lastScan).format(dateFormat)} ({lastScanMsg})
+          </div>
+      )}
 
-                      <div className="storage-chart">
-                          <CumulativeBarChart bars={piecesBars} />
-                          <CumulativeBarLabels bars={piecesBars} />
-                      </div>
+      <h3>Pieces<PiecesInfo/></h3>
 
-                      <div className="flagged-pieces-link">
-                          <h3>
-                              Flagged Pieces
-                              <Info>
-                                  Flagged Pieces are pieces that have been flagged by the Piece Doctor because it was
-                                  not possible to index the piece data. This could be because there was no unsealed copy
-                                  of the piece data, or because the piece data was inaccessible or corrupted.
-                              </Info>
-                          </h3>
-                          <p>
-                              <b>{addCommas(d.FlaggedPieces)}</b> Flagged Pieces
-                              <Link to={"/piece-doctor"} className="button">View Flagged Pieces</Link>
-                          </p>
-                      </div>
+      <div className="storage-chart">
+          <CumulativeBarChart bars={piecesBars} />
+          <CumulativeBarLabels bars={piecesBars} />
+      </div>
 
-                      <div>
-                          <h3>
-                              Deal Sectors Copies
-                              <Info>
-                                  Deal Sectors Copies indicates how many sectors contain deals, and how many of those
-                                  sectors have an unsealed copy.
-                              </Info>
-                          </h3>
+      <div className="flagged-pieces-link">
+          <h3>
+              Flagged Pieces
+              <Info>
+                  Flagged Pieces are pieces that have been flagged by the Piece Doctor because it was
+                  not possible to index the piece data. This could be because there was no unsealed copy
+                  of the piece data, or because the piece data was inaccessible or corrupted.
+              </Info>
+          </h3>
+          <p>
+              <b>{addCommas(d.FlaggedPieces)}</b> Flagged Pieces
+              <Link to={"/piece-doctor"} className="button">View Flagged Pieces</Link>
+          </p>
+      </div>
 
-                          <div className="storage-chart">
-                              <CumulativeBarChart bars={barsSuc} />
-                              <CumulativeBarLabels bars={barsSuc} />
-                          </div>
-                      </div>
+      <div>
+          <h3>
+              Deal Sectors Copies
+              <Info>
+                  Deal Sectors Copies indicates how many sectors contain deals, and how many of those
+                  sectors have an unsealed copy.
+              </Info>
+          </h3>
 
-                      <div>
-                          <h3>
-                              Sectors Proving State
-                              <Info>
-                                Sectors Proving State indicates how many sectors this SP is actively proving on chain
-                              </Info>
-                          </h3>
+          <div className="storage-chart">
+              <CumulativeBarChart bars={barsSuc} />
+              <CumulativeBarLabels bars={barsSuc} />
+          </div>
+      </div>
 
-                          <div className="storage-chart">
-                              <CumulativeBarChart bars={barsSps} />
-                              <CumulativeBarLabels bars={barsSps} />
-                          </div>
-                      </div>
-                  </div>
-                </td>
-            </tr>
-            </tbody>
-        </table>
+      <div>
+          <h3>
+              Sectors Proving State
+              <Info>
+                Sectors Proving State indicates how many sectors this SP is actively proving on chain
+              </Info>
+          </h3>
+
+          <div className="storage-chart">
+              <CumulativeBarChart bars={barsSps} />
+              <CumulativeBarLabels bars={barsSps} />
+          </div>
+      </div>
     </div>
 }
 
@@ -693,7 +719,7 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                     </tbody>
                 </table>
             ) : (
-                <p>No deals found with piece CID {pieceCid}</p>
+                <p>No deals found with piece CID {pieceCid} on this miner</p>
             )}
         </div>
     </div>

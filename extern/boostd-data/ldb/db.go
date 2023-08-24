@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/filecoin-project/boostd-data/model"
@@ -385,7 +386,8 @@ var (
 	offset int
 
 	// checked keeps track in memory when was the last time we processed a given piece cid
-	checked map[string]time.Time
+	checkedLk sync.Mutex
+	checked   map[string]time.Time
 
 	// batch limit for each NextPiecesToCheck call
 	PiecesToTrackerBatchSize = 1024
@@ -425,7 +427,10 @@ func (db *DB) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]c
 
 		k := r.Key[len(q.Prefix):]
 		minerPiece := maddrStr + k
-		if t, ok := checked[minerPiece]; ok {
+		checkedLk.Lock()
+		t, ok := checked[minerPiece]
+		checkedLk.Unlock()
+		if ok {
 			alreadyChecked := t.After(now.Add(-MinPieceCheckPeriod))
 
 			if alreadyChecked {
@@ -446,7 +451,10 @@ func (db *DB) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]c
 
 		for _, dl := range md.Deals {
 			if dl.MinerAddr == maddr {
+				checkedLk.Lock()
 				checked[minerPiece] = now
+				checkedLk.Unlock()
+
 				pieceCids = append(pieceCids, pieceCid)
 				break
 			}
@@ -506,6 +514,28 @@ func (db *DB) PiecesCount(ctx context.Context, maddr address.Address) (int, erro
 	}
 
 	return count, nil
+}
+
+func (db *DB) ScanProgress(ctx context.Context, maddr address.Address) (*types.ScanProgress, error) {
+	count, err := db.PiecesCount(ctx, maddr)
+	if err != nil {
+		return nil, err
+	}
+
+	checkedLk.Lock()
+	checkedCount := len(checked)
+	var lastScan time.Time
+	for _, t := range checked {
+		if t.After(lastScan) {
+			lastScan = t
+		}
+	}
+	checkedLk.Unlock()
+
+	return &types.ScanProgress{
+		Progress: float64(checkedCount) / float64(count),
+		LastScan: lastScan,
+	}, nil
 }
 
 func (db *DB) ListPieces(ctx context.Context) ([]cid.Cid, error) {

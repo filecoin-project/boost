@@ -35,6 +35,11 @@ type AddIndexProgress struct {
 	Err      string  `json:"e,omitempty"`
 }
 
+type ScanProgress struct {
+	Progress float64   `json:"p"`
+	LastScan time.Time `json:"l"`
+}
+
 type FlaggedPiecesListFilter struct {
 	MinerAddr       address.Address
 	HasUnsealedCopy bool
