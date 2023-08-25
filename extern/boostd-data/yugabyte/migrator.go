@@ -12,15 +12,29 @@ import (
 )
 
 type Migrator struct {
-	settings  DBSettings
-	minerAddr address.Address
+	settings          DBSettings
+	minerAddr         address.Address
+	CassandraKeyspace string
 }
 
-func NewMigrator(settings DBSettings, minerAddr address.Address) *Migrator {
-	return &Migrator{
-		settings:  settings,
-		minerAddr: minerAddr,
+type MigratorOpt func(m *Migrator)
+
+func WithCassandraKeyspaceOpt(ks string) MigratorOpt {
+	return func(m *Migrator) {
+		m.CassandraKeyspace = ks
 	}
+}
+
+func NewMigrator(settings DBSettings, minerAddr address.Address, opts ...MigratorOpt) *Migrator {
+	m := &Migrator{
+		settings:          settings,
+		minerAddr:         minerAddr,
+		CassandraKeyspace: defaultKeyspace,
+	}
+	for _, o := range opts {
+		o(m)
+	}
+	return m
 }
 
 func (m *Migrator) Migrate(ctx context.Context) error {
@@ -35,7 +49,7 @@ func (m *Migrator) Migrate(ctx context.Context) error {
 
 	// Create a cassandra connection to be used only for running migrations.
 	cluster := gocql.NewCluster(m.settings.Hosts...)
-	cluster.Keyspace = defaultKeyspace
+	cluster.Keyspace = m.CassandraKeyspace
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return fmt.Errorf("opening cassandra connection to %s: %w", m.settings.Hosts, err)
