@@ -68,7 +68,7 @@ require (
 	github.com/ipfs/go-unixfs v0.4.5 // indirect
 	github.com/ipld/go-car v0.6.1
 	github.com/ipld/go-car/v2 v2.10.1
-	github.com/ipld/go-ipld-prime v0.20.0
+	github.com/ipld/go-ipld-prime v0.21.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
 	github.com/ipni/index-provider v0.13.4
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
@@ -334,7 +334,7 @@ require (
 
 require (
 	github.com/filecoin-project/boost-gfm v1.26.7
-	github.com/filecoin-project/boost-graphsync v0.13.6
+	github.com/filecoin-project/boost-graphsync v0.13.7
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
 	github.com/filecoin-project/lotus v1.23.2-0.20230622154405-168d022018ce
