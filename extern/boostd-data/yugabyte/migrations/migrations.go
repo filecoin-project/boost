@@ -16,16 +16,23 @@ var log = logging.Logger("migrations")
 //go:embed *.sql *.go
 var EmbedMigrations embed.FS
 
+type DBSettings struct {
+	// The cassandra hosts to connect to
+	Hosts []string
+	// The postgres connect string
+	ConnectString string
+}
+
 // Used to pass global parameters to the migration functions
 type MigrateParams struct {
-	ConnectString       string
+	Settings            DBSettings
 	MinerAddress        address.Address
 	PieceTrackerHasRows bool
 }
 
 var migrationParams *MigrateParams
 
-func Migrate(sqldb *sql.DB, params MigrateParams) error {
+func Migrate(ctx context.Context, sqldb *sql.DB, params MigrateParams) error {
 	migrationParams = &params
 
 	// Check if there are any rows in the PieceTracker table.
@@ -33,8 +40,8 @@ func Migrate(sqldb *sql.DB, params MigrateParams) error {
 	// are rows in the PieceTracker table we need to set MinerAddr to a default
 	// value.
 	var count int
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	err := sqldb.QueryRowContext(ctx, "SELECT COUNT(*) as cnt FROM PieceTracker").Scan(&count)
+	cntCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	err := sqldb.QueryRowContext(cntCtx, "SELECT COUNT(*) as cnt FROM PieceTracker").Scan(&count)
 	cancel()
 	if err != nil {
 		return fmt.Errorf("getting number of rows in PieceTracker table: %w", err)
@@ -50,16 +57,16 @@ func Migrate(sqldb *sql.DB, params MigrateParams) error {
 		return err
 	}
 
-	beforeVer, err := goose.GetDBVersion(sqldb)
+	beforeVer, err := goose.GetDBVersionContext(ctx, sqldb)
 	if err != nil {
 		return err
 	}
 
-	if err := goose.Up(sqldb, "."); err != nil {
+	if err := goose.UpContext(ctx, sqldb, "."); err != nil {
 		return err
 	}
 
-	afterVer, err := goose.GetDBVersion(sqldb)
+	afterVer, err := goose.GetDBVersionContext(ctx, sqldb)
 	if err != nil {
 		return err
 	}

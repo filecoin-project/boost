@@ -56,7 +56,7 @@ func SetupYugabyte(t *testing.T) *Service {
 
 	// Use the test keyspace to create the Cassandra tables
 	storeOpts := []yugabyte.StoreOpt{yugabyte.WithCassandraKeyspace(testSchema)}
-	migrator := yugabyte.NewMigrator(settings.ConnectString, address.TestAddress)
+	migrator := yugabyte.NewMigrator(settings, address.TestAddress)
 	return NewYugabyte(settings, migrator, storeOpts...)
 }
 
