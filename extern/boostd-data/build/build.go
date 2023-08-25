@@ -13,7 +13,6 @@ func SetAddressNetwork(n address.Network) {
 var BuildType int
 
 const (
-	BuildDefault      = 0
 	BuildMainnet      = 0x1
 	Build2k           = 0x2
 	BuildDebug        = 0x3
@@ -24,8 +23,6 @@ const (
 
 func BuildTypeString() string {
 	switch BuildType {
-	case BuildDefault:
-		return ""
 	case BuildMainnet:
 		return "+mainnet"
 	case Build2k:

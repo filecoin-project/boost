@@ -1,1 +1,0 @@
-SELECT * FROM idx.piecedeal WHERE MinerAddr LIKE 's%'

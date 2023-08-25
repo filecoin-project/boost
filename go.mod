@@ -354,8 +354,6 @@ require (
 	github.com/filecoin-project/kubo-api-client v0.0.1 // indirect
 	github.com/gammazero/channelqueue v0.2.1 // indirect
 	github.com/gammazero/deque v0.2.1 // indirect
-	github.com/gocql/gocql v0.0.0-20210515062232-b7ef815b4556 // indirect
-	github.com/golang-migrate/migrate/v4 v4.16.2 // indirect
 	github.com/google/pprof v0.0.0-20230602150820-91b7bce49751 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
@@ -367,7 +365,7 @@ require (
 	github.com/jackc/pgproto3/v2 v2.3.2 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/jackc/pgtype v1.14.0 // indirect
-	github.com/jackc/puddle v1.2.1 // indirect
+	github.com/jackc/puddle v1.3.0 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/libp2p/go-doh-resolver v0.4.0 // indirect
 	github.com/montanaflynn/stats v0.7.0 // indirect
