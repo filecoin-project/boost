@@ -3,7 +3,6 @@ package storagemarket
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"time"
 
@@ -11,15 +10,14 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/filecoin-project/go-padreader"
+	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-cidutil/cidenc"
 	carv2 "github.com/ipld/go-car/v2"
-	"github.com/multiformats/go-multibase"
 
 	"github.com/google/uuid"
 )
@@ -107,50 +105,29 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 		return nil, err
 	}
 
-	////////////////////////////////////////////////////
-	// 3. Process direct deal proposal
-	//aerr := p.processOfflineDealProposal(dealReq.deal, dh)
-
-	////////////////////////////////////////////////////
-	// 4. Process direct deal filepath data
-	//aerr := p.processImportOfflineDealData(dealReq.deal, dh)
-
-	////////////////////////////////////////////////////
-	// 5. verify CommP matches for an offline deal
-	//if err := p.verifyCommP(deal); err != nil {
-
-	fi, err := os.Open(filepath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open filepath: %w", err)
-	}
-	defer fi.Close() //nolint:errcheck
-
+	// os stat
 	fstat, err := os.Stat(filepath)
 	if err != nil {
 		return nil, err
 	}
 
 	// commp and piece size
-
-	w := &writer.Writer{}
-	_, err = io.CopyBuffer(w, fi, make([]byte, writer.CommPBuf))
-	if err != nil {
-		return nil, fmt.Errorf("copy into commp writer: %w", err)
+	var commpCalc smtypes.CommpCalculator
+	throttle := make(chan struct{})
+	doRemoteCommP := false
+	// TODO: fix pieceSize to be based on os.Stat()
+	pieceSize := abi.UnpaddedPieceSize(fstat.Size())
+	generatedPieceCid, dmErr := generatePieceCommitment(ctx, commpCalc, throttle, filepath, pieceSize.Padded(), doRemoteCommP)
+	if dmErr != nil {
+		return nil, fmt.Errorf("couldnt generate commp: %w", dmErr)
 	}
-
-	commp, err := w.Sum()
-	if err != nil {
-		return nil, fmt.Errorf("computing commP failed: %w", err)
-	}
-
-	encoder := cidenc.Encoder{Base: multibase.MustNewEncoder(multibase.Base32)}
 
 	deal := &types.DirectDataEntry{
 		InboundFilePath: filepath,
-		PieceSize:       commp.PieceSize.Unpadded().Padded(),
+		PieceSize:       pieceSize.Padded(),
 	}
 
-	log.Infow("import details", "filepath", filepath, "supplied-piececid", piececid, "calculated-piececid", encoder.Encode(commp.PieceCID), "os stat size", fstat.Size(), "piece size for os stat", deal.PieceSize)
+	log.Infow("import details", "filepath", filepath, "supplied-piececid", piececid, "calculated-piececid", generatedPieceCid, "os stat size", fstat.Size(), "piece size for os stat", deal.PieceSize)
 
 	// Open a reader against the CAR file with the deal data
 	v2r, err := carv2.OpenReader(deal.InboundFilePath)
@@ -182,12 +159,14 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 
 	log.Infow("got v2r.DataReader over inbound file")
 
-	paddedReader, err := padreader.NewInflator(r, size, deal.PieceSize.Unpadded())
+	paddedReader, err := padreader.NewInflator(r, size, pieceSize)
 	if err != nil {
 		return nil, err
 	}
 
 	log.Infow("got paddedReader")
+
+	//TODO: fix PieceDealInfo to include information about AllocationID and Client
 
 	// Add the piece to a sector
 	sdInfo := lapi.PieceDealInfo{
@@ -201,9 +180,7 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 	}
 
 	// Attempt to add the piece to a sector (repeatedly if necessary)
-	pieceSize := deal.PieceSize.Unpadded()
-	pieceData := paddedReader
-	sectorNum, offset, err := ddp.pieceAdder.AddPiece(ctx, pieceSize, pieceData, sdInfo)
+	sectorNum, offset, err := ddp.pieceAdder.AddPiece(ctx, pieceSize, paddedReader, sdInfo)
 	if err != nil {
 		return nil, fmt.Errorf("AddPiece failed: %w", err)
 	}
