@@ -35,7 +35,7 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.3.1
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.11.1
+	github.com/filecoin-project/go-state-types v0.12.1
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/gbrlsnchs/jwt/v3 v3.0.1
@@ -157,7 +157,7 @@ require (
 	github.com/filecoin-project/filecoin-ffi v0.30.4-0.20220519234331-bfd1f5f9fe38 // indirect
 	github.com/filecoin-project/go-amt-ipld/v2 v2.1.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v3 v3.1.0 // indirect
-	github.com/filecoin-project/go-amt-ipld/v4 v4.0.0 // indirect
+	github.com/filecoin-project/go-amt-ipld/v4 v4.2.0 // indirect
 	github.com/filecoin-project/go-commp-utils/nonffi v0.0.0-20220905160352-62059082a837 // indirect
 	github.com/filecoin-project/go-crypto v0.0.1 // indirect
 	github.com/filecoin-project/go-ds-versioning v0.1.2
@@ -337,7 +337,7 @@ require (
 	github.com/filecoin-project/boost-graphsync v0.13.6
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
-	github.com/filecoin-project/lotus v1.23.2-0.20230622154405-168d022018ce
+	github.com/filecoin-project/lotus v1.23.4-0.20230828084808-f9c6ea7708e6
 	github.com/ipfs/boxo v0.10.1
 	github.com/ipfs/kubo v0.21.0-rc1
 	github.com/ipni/go-libipni v0.2.8
@@ -371,9 +371,9 @@ require (
 	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
 	github.com/puzpuzpuz/xsync/v2 v2.4.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
-	github.com/quic-go/qtls-go1-19 v0.3.2 // indirect
-	github.com/quic-go/qtls-go1-20 v0.2.2 // indirect
-	github.com/quic-go/quic-go v0.33.0 // indirect
+	github.com/quic-go/qtls-go1-19 v0.3.3 // indirect
+	github.com/quic-go/qtls-go1-20 v0.2.3 // indirect
+	github.com/quic-go/quic-go v0.33.1 // indirect
 	github.com/quic-go/webtransport-go v0.5.3 // indirect
 	github.com/ucarion/urlpath v0.0.0-20200424170820-7ccc79b76bbb // indirect
 	github.com/yugabyte/gocql v0.0.0-20221110041640-6fc475c5aeb0 // indirect
