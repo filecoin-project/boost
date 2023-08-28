@@ -5,28 +5,18 @@ import (
 	"fmt"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/yugabyte/gocql"
-	"path"
+	"reflect"
 	"runtime"
 	"sort"
+	"strings"
 )
 
 var log = logging.Logger("migrations")
 
 type migrationFn func(ctx context.Context, session *gocql.Session) error
 
-type migration struct {
-	name string
-	fn   migrationFn
-}
-
-var migrations []migration
-
-func addMigration(fn migrationFn) {
-	_, filename, _, _ := runtime.Caller(1)
-	migrations = append(migrations, migration{
-		name: path.Base(filename),
-		fn:   fn,
-	})
+var migrations = []migrationFn{
+	ts20230824154306_dealsFixMinerAddr,
 }
 
 // Migrate migrates the cassandra database
@@ -63,23 +53,22 @@ func Migrate(ctx context.Context, session *gocql.Session) error {
 	return executeMigrations(ctx, session, migrations, appliedMigrations, writeComplete)
 }
 
-func executeMigrations(ctx context.Context, session *gocql.Session, migs []migration, appliedMigrations []string, writeComplete func(string) error) error {
+func executeMigrations(ctx context.Context, session *gocql.Session, migs []migrationFn, appliedMigrations []string, writeComplete func(string) error) error {
 	sort.Strings(appliedMigrations)
-	sort.Slice(migs, func(i, j int) bool {
-		return migs[i].name < migs[j].name
-	})
 
 	// For each migration
-	for i, m := range migs {
+	for i, mfn := range migs {
+		migName := fnName(mfn)
 		// Skip completed migrations
 		if i < len(appliedMigrations) {
 			// Check the migrations order matches between the db and the executable
-			if m.name != appliedMigrations[i] {
-				err := fmt.Errorf("migrations order mismatch with db: at position %d expected %s but got %s", i, appliedMigrations[i], m.name)
+			if migName != appliedMigrations[i] {
+				err := fmt.Errorf("migrations order mismatch with db: at position %d expected %s but got %s", i, appliedMigrations[i], migName)
 				l := err.Error() + "\n"
 				l += fmt.Sprintf("migrations to run: %d\n", len(appliedMigrations))
 				for mi, mig := range migs {
-					l += fmt.Sprintf("  %d.\t%s\n", mi, mig.name)
+					mname := fnName(mig)
+					l += fmt.Sprintf("  %d.\t%s\n", mi, mname)
 				}
 				l += fmt.Sprintf("completed migrations in db: %d\n", len(appliedMigrations))
 				for mi, dbname := range appliedMigrations {
@@ -92,20 +81,26 @@ func executeMigrations(ctx context.Context, session *gocql.Session, migs []migra
 		}
 
 		// Execute the migration
-		log.Info("migrate " + m.name)
-		err := m.fn(ctx, session)
+		log.Info("migrate " + migName)
+		err := mfn(ctx, session)
 		if err != nil {
-			err = fmt.Errorf("running migration %s: %s", m.name, err)
+			err = fmt.Errorf("running migration %s: %s", migName, err)
 			log.Error(err.Error())
 			return err
 		}
 
 		// Write the completed migration to the migration_version table
-		err = writeComplete(m.name)
+		err = writeComplete(migName)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func fnName(mfn migrationFn) string {
+	fullName := runtime.FuncForPC(reflect.ValueOf(mfn).Pointer()).Name()
+	parts := strings.Split(fullName, ".")
+	return parts[len(parts)-1]
 }

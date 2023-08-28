@@ -7,74 +7,49 @@ import (
 	"testing"
 )
 
+var migrateFnCalled int
+var migrateFn = func(ctx context.Context, session *gocql.Session) error {
+	migrateFnCalled++
+	return nil
+}
+
+func migrateFn1(ctx context.Context, s *gocql.Session) error { return migrateFn(ctx, s) }
+func migrateFn2(ctx context.Context, s *gocql.Session) error { return migrateFn(ctx, s) }
+
 func TestMigrate(t *testing.T) {
 	ctx := context.Background()
 
-	var migrateFnCalled int
-	migrateFn := func(ctx context.Context, session *gocql.Session) error {
-		migrateFnCalled++
-		return nil
-	}
 	testCases := []struct {
 		name      string
-		migs      []migration
-		dbnames   []string
+		migs      []migrationFn
+		applied   []string
 		calls     int
 		expectErr bool
 	}{{
-		name: "empty db",
-		migs: []migration{{
-			name: "1-migrate",
-			fn:   migrateFn,
-		}, {
-			name: "2-migrate",
-			fn:   migrateFn,
-		}},
-		dbnames: []string{},
+		name:    "empty db",
+		migs:    []migrationFn{migrateFn1, migrateFn2},
+		applied: []string{},
 		calls:   2,
 	}, {
-		name: "one migration complete, one new",
-		migs: []migration{{
-			name: "1-migrate",
-			fn:   migrateFn,
-		}, {
-			name: "2-migrate",
-			fn:   migrateFn,
-		}},
-		dbnames: []string{"1-migrate"},
+		name:    "one migration complete, one new",
+		migs:    []migrationFn{migrateFn1, migrateFn2},
+		applied: []string{"migrateFn1"},
 		calls:   1,
 	}, {
-		name: "all migrations complete",
-		migs: []migration{{
-			name: "1-migrate",
-			fn:   migrateFn,
-		}, {
-			name: "2-migrate",
-			fn:   migrateFn,
-		}},
-		dbnames: []string{"1-migrate", "2-migrate"},
+		name:    "all migrations complete",
+		migs:    []migrationFn{migrateFn1, migrateFn2},
+		applied: []string{"migrateFn1", "migrateFn2"},
 		calls:   0,
 	}, {
-		name: "test ordering",
-		migs: []migration{{
-			name: "2-migrate",
-			fn:   migrateFn,
-		}, {
-			name: "1-migrate",
-			fn:   migrateFn,
-		}},
-		dbnames: []string{"1-migrate"},
-		calls:   1,
+		// The ordering of records in the DB is not guaranteed so we need to sort them
+		name:    "test ordering",
+		migs:    []migrationFn{migrateFn1, migrateFn2},
+		applied: []string{"migrateFn2", "migrateFn1"},
+		calls:   0,
 	}, {
-		name: "missing migration in executable",
-		migs: []migration{{
-			name: "1-migrate",
-			fn:   migrateFn,
-		}, {
-			name: "2-migrate",
-			fn:   migrateFn,
-		}},
-		dbnames:   []string{"1-migrate", "3-migrate"},
+		name:      "missing migration in executable",
+		migs:      []migrationFn{migrateFn1, migrateFn2},
+		applied:   []string{"migrateFn1", "migrateFn3"},
 		calls:     0,
 		expectErr: true,
 	}}
@@ -82,7 +57,7 @@ func TestMigrate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			migrateFnCalled = 0
-			err := executeMigrations(ctx, nil, tc.migs, tc.dbnames, func(s string) error { return nil })
+			err := executeMigrations(ctx, nil, tc.migs, tc.applied, func(s string) error { return nil })
 			if tc.expectErr {
 				require.Error(t, err)
 			} else {

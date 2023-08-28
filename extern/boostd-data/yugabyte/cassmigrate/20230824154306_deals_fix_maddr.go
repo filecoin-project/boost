@@ -7,12 +7,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func init() {
-	addMigration(dealsFixMinerAddr)
-}
-
-// dealsFixMinerAddr replaces MinerAddr t1234 with f1234
-func dealsFixMinerAddr(ctx context.Context, session *gocql.Session) error {
+// ts20230824154306_dealsFixMinerAddr replaces MinerAddr t1234 with f1234
+func ts20230824154306_dealsFixMinerAddr(ctx context.Context, session *gocql.Session) error {
 	qry := `SELECT DealUuid, MinerAddr from PieceDeal`
 	iter := session.Query(qry).WithContext(ctx).Iter()
 
