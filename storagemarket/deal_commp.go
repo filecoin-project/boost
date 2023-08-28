@@ -1,11 +1,13 @@
 package storagemarket
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/filecoin-project/boost/storagemarket/types"
+	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	commcid "github.com/filecoin-project/go-fil-commcid"
 	commp "github.com/filecoin-project/go-fil-commp-hashhash"
@@ -49,24 +51,34 @@ func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
 // generatePieceCommitment generates commp either locally or remotely,
 // depending on config, and pads it as necessary to match the piece size.
 func (p *Provider) generatePieceCommitment(filepath string, pieceSize abi.PaddedPieceSize) (cid.Cid, *dealMakingError) {
+	pi, err := generatePieceCommitment(p.ctx, p.commpCalc, p.commpThrottle, filepath, pieceSize, p.config.RemoteCommp)
+	if err != nil {
+		return cid.Undef, err
+	}
+
+	return pi.PieceCID, nil
+}
+
+// generatePieceCommitment generates commp either locally or remotely,
+// depending on config, and pads it as necessary to match the piece size.
+func generatePieceCommitment(ctx context.Context, commpCalc smtypes.CommpCalculator, throttle chan struct{}, filepath string, pieceSize abi.PaddedPieceSize, doRemoteCommP bool) (*abi.PieceInfo, *dealMakingError) {
 	// Check whether to send commp to a remote process or do it locally
 	var pi *abi.PieceInfo
-	if p.config.RemoteCommp {
+	if doRemoteCommP {
 		var err *dealMakingError
-		pi, err = p.remoteCommP(filepath)
+		pi, err = remoteCommP(ctx, commpCalc, filepath)
 		if err != nil {
 			err.error = fmt.Errorf("performing remote commp: %w", err.error)
-			return cid.Undef, err
+			return nil, err
 		}
 	} else {
-		// Throttle the number of processes that can do local commp in parallel
-		p.commpThrottle <- struct{}{}
-		defer func() { <-p.commpThrottle }()
+		throttle <- struct{}{}
+		defer func() { <-throttle }()
 
 		var err error
-		pi, err = GenerateCommP(filepath)
+		pi, err = GenerateCommPLocally(filepath)
 		if err != nil {
-			return cid.Undef, &dealMakingError{
+			return nil, &dealMakingError{
 				retry: types.DealRetryFatal,
 				error: fmt.Errorf("performing local commp: %w", err),
 			}
@@ -83,7 +95,7 @@ func (p *Provider) generatePieceCommitment(filepath string, pieceSize abi.Padded
 			uint64(pieceSize),
 		)
 		if err != nil {
-			return cid.Undef, &dealMakingError{
+			return nil, &dealMakingError{
 				retry: types.DealRetryFatal,
 				error: fmt.Errorf("failed to pad commp: %w", err),
 			}
@@ -91,11 +103,11 @@ func (p *Provider) generatePieceCommitment(filepath string, pieceSize abi.Padded
 		pi.PieceCID, _ = commcid.DataCommitmentV1ToCID(rawPaddedCommp)
 	}
 
-	return pi.PieceCID, nil
+	return pi, nil
 }
 
 // remoteCommP makes an API call to the sealing service to calculate commp
-func (p *Provider) remoteCommP(filepath string) (*abi.PieceInfo, *dealMakingError) {
+func remoteCommP(ctx context.Context, commpCalc smtypes.CommpCalculator, filepath string) (*abi.PieceInfo, *dealMakingError) {
 	// Open the CAR file
 	rd, err := carv2.OpenReader(filepath)
 	if err != nil {
@@ -130,12 +142,12 @@ func (p *Provider) remoteCommP(filepath string) (*abi.PieceInfo, *dealMakingErro
 	// pieceSize.Unpadded(), so add zeros until it reaches that size
 	pr, numBytes := padreader.New(dataReader, uint64(size))
 	log.Debugw("computing remote commp", "size", size, "padded-size", numBytes)
-	pi, err := p.commpCalc.ComputeDataCid(p.ctx, numBytes, pr)
+	pi, err := commpCalc.ComputeDataCid(ctx, numBytes, pr)
 	if err != nil {
-		if p.ctx.Err() != nil {
+		if ctx.Err() != nil {
 			return nil, &dealMakingError{
 				retry: types.DealRetryAuto,
-				error: fmt.Errorf("boost shutdown while making remote API call to calculate commp: %w", p.ctx.Err()),
+				error: fmt.Errorf("boost shutdown while making remote API call to calculate commp: %w", ctx.Err()),
 			}
 		}
 		return nil, &dealMakingError{
@@ -146,8 +158,8 @@ func (p *Provider) remoteCommP(filepath string) (*abi.PieceInfo, *dealMakingErro
 	return &pi, nil
 }
 
-// GenerateCommP calculates commp locally
-func GenerateCommP(filepath string) (*abi.PieceInfo, error) {
+// GenerateCommPLocally calculates commp locally
+func GenerateCommPLocally(filepath string) (*abi.PieceInfo, error) {
 	rd, err := carv2.OpenReader(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get CARv2 reader: %w", err)
