@@ -3,7 +3,6 @@ package yugabyte
 import (
 	"database/sql"
 	"fmt"
-
 	"github.com/filecoin-project/boostd-data/yugabyte/migrations"
 	"github.com/filecoin-project/go-address"
 	_ "github.com/lib/pq"
