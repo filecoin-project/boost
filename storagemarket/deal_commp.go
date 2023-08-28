@@ -51,12 +51,17 @@ func (p *Provider) verifyCommP(deal *types.ProviderDealState) *dealMakingError {
 // generatePieceCommitment generates commp either locally or remotely,
 // depending on config, and pads it as necessary to match the piece size.
 func (p *Provider) generatePieceCommitment(filepath string, pieceSize abi.PaddedPieceSize) (cid.Cid, *dealMakingError) {
-	return generatePieceCommitment(p.ctx, p.commpCalc, p.commpThrottle, filepath, pieceSize, p.config.RemoteCommp)
+	pi, err := generatePieceCommitment(p.ctx, p.commpCalc, p.commpThrottle, filepath, pieceSize, p.config.RemoteCommp)
+	if err != nil {
+		return cid.Undef, err
+	}
+
+	return pi.PieceCID, nil
 }
 
 // generatePieceCommitment generates commp either locally or remotely,
 // depending on config, and pads it as necessary to match the piece size.
-func generatePieceCommitment(ctx context.Context, commpCalc smtypes.CommpCalculator, throttle chan struct{}, filepath string, pieceSize abi.PaddedPieceSize, doRemoteCommP bool) (cid.Cid, *dealMakingError) {
+func generatePieceCommitment(ctx context.Context, commpCalc smtypes.CommpCalculator, throttle chan struct{}, filepath string, pieceSize abi.PaddedPieceSize, doRemoteCommP bool) (*abi.PieceInfo, *dealMakingError) {
 	// Check whether to send commp to a remote process or do it locally
 	var pi *abi.PieceInfo
 	if doRemoteCommP {
@@ -64,7 +69,7 @@ func generatePieceCommitment(ctx context.Context, commpCalc smtypes.CommpCalcula
 		pi, err = remoteCommP(ctx, commpCalc, filepath)
 		if err != nil {
 			err.error = fmt.Errorf("performing remote commp: %w", err.error)
-			return cid.Undef, err
+			return nil, err
 		}
 	} else {
 		throttle <- struct{}{}
@@ -73,7 +78,7 @@ func generatePieceCommitment(ctx context.Context, commpCalc smtypes.CommpCalcula
 		var err error
 		pi, err = GenerateCommPLocally(filepath)
 		if err != nil {
-			return cid.Undef, &dealMakingError{
+			return nil, &dealMakingError{
 				retry: types.DealRetryFatal,
 				error: fmt.Errorf("performing local commp: %w", err),
 			}
@@ -90,7 +95,7 @@ func generatePieceCommitment(ctx context.Context, commpCalc smtypes.CommpCalcula
 			uint64(pieceSize),
 		)
 		if err != nil {
-			return cid.Undef, &dealMakingError{
+			return nil, &dealMakingError{
 				retry: types.DealRetryFatal,
 				error: fmt.Errorf("failed to pad commp: %w", err),
 			}
@@ -98,7 +103,7 @@ func generatePieceCommitment(ctx context.Context, commpCalc smtypes.CommpCalcula
 		pi.PieceCID, _ = commcid.DataCommitmentV1ToCID(rawPaddedCommp)
 	}
 
-	return pi.PieceCID, nil
+	return pi, nil
 }
 
 // remoteCommP makes an API call to the sealing service to calculate commp

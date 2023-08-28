@@ -26,6 +26,8 @@ import (
 //var log = logging.Logger("direct-deals-providers")
 
 type DirectDealsProvider struct {
+	ctx context.Context // context to be stopped when stopping boostd
+
 	fullnodeApi v1api.FullNode
 	pieceAdder  types.PieceAdder
 
@@ -51,8 +53,8 @@ func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAd
 	}
 }
 
-func (ddp *DirectDealsProvider) Start() error {
-	ctx := context.Background()
+func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
+	ddp.ctx = ctx
 
 	deals, err := ddp.directDealsDB.ListAll(ctx)
 	if err != nil {
@@ -60,7 +62,7 @@ func (ddp *DirectDealsProvider) Start() error {
 	}
 
 	for _, entry := range deals {
-		log.Infow("direct deal entry", "checkpoint", entry.Checkpoint)
+		log.Infow("direct deal entry", "uuid", entry.ID, "checkpoint", entry.Checkpoint)
 
 		go func() {
 			err := ddp.Process(ctx, entry.ID)
@@ -136,7 +138,7 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 	}
 
 	go func() {
-		err := ddp.Process(ctx, entry.ID)
+		err := ddp.Process(ddp.ctx, entry.ID)
 		if err != nil {
 			log.Errorw("error while processing direct deal", "uuid", entry.ID, "err", err)
 		}
@@ -163,20 +165,23 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 
 		// commp and piece size
 		var commpCalc smtypes.CommpCalculator
-		throttle := make(chan struct{})
+		throttle := make(chan struct{}, 1)
 		doRemoteCommP := false
-		// TODO: fix pieceSize to be based on os.Stat()
+		// TODO: should we be passing pieceSize here ??!?
 		pieceSize := abi.UnpaddedPieceSize(fstat.Size())
-		generatedPieceCid, dmErr := generatePieceCommitment(ctx, commpCalc, throttle, entry.InboundFilePath, pieceSize.Padded(), doRemoteCommP)
+		generatedPieceInfo, dmErr := generatePieceCommitment(ctx, commpCalc, throttle, entry.InboundFilePath, pieceSize.Padded(), doRemoteCommP)
 		if dmErr != nil {
 			return fmt.Errorf("couldnt generate commp: %w", dmErr)
 		}
 
 		// TODO: compare generatedPieceCid and supplied piececid
-		log.Infow("direct deal details", "filepath", entry.InboundFilePath, "supplied-piececid", entry.PieceCID, "calculated-piececid", generatedPieceCid, "os stat size", fstat.Size(), "piece size for os stat", entry.PieceSize)
+		log.Infow("direct deal details", "filepath", entry.InboundFilePath, "supplied-piececid", entry.PieceCID, "calculated-piececid", generatedPieceInfo.PieceCID, "calculated-piecesize", generatedPieceInfo.Size, "os stat size", fstat.Size())
 
-		// TODO: update PieceSize in database
-		// entry.PieceSize = abi.PaddedPieceSize()
+		if !entry.PieceCID.Equals(generatedPieceInfo.PieceCID) {
+			return fmt.Errorf("commp mismatch: %v vs %v", entry.PieceCID, generatedPieceInfo.PieceCID)
+		}
+
+		entry.PieceSize = generatedPieceInfo.Size
 
 		entry.Checkpoint = dealcheckpoints.Transferred
 		err = ddp.directDealsDB.Update(ctx, entry)

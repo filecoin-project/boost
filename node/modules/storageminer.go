@@ -362,8 +362,8 @@ func HandleLegacyDeals(mctx helpers.MetricsCtx, lc fx.Lifecycle, lsp gfm_storage
 	return nil
 }
 
-func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
-	return func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
+func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, ddprov *storagemarket.DirectDealsProvider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
+	return func(lc fx.Lifecycle, h host.Host, prov *storagemarket.Provider, ddprov *storagemarket.DirectDealsProvider, a v1api.FullNode, legacySP gfm_storagemarket.StorageProvider, idxProv *indexprovider.Wrapper, plDB *db.ProposalLogsDB, spApi sealingpipeline.API) {
 
 		lp2pnet := lp2pimpl.NewDealProvider(h, prov, a, plDB, spApi, cfg.Dealmaking.EnableLegacyStorageDeals)
 
@@ -399,6 +399,14 @@ func HandleBoostLibp2pDeals(cfg *config.Boost) func(lc fx.Lifecycle, h host.Host
 				log.Info("starting boost index provider wrapper")
 				idxProv.Start(ctx)
 				log.Info("boost index provider wrapper started successfully")
+
+				// Start the Boost Direct Deals provider
+				log.Info("starting boost direct deals provider")
+				err = ddprov.Start(ctx)
+				if err != nil {
+					return fmt.Errorf("starting direct deals provider: %w", err)
+				}
+				log.Info("boost direct deals provider started successfully")
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
