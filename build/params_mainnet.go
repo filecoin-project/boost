@@ -1,5 +1,5 @@
-//go:build !calibnet && !debug && 2k
-// +build !calibnet,!debug,2k
+//go:build !calibnet && !debug && !2k
+// +build !calibnet,!debug,!2k
 
 package build
 
