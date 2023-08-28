@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/datacap"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/filecoin-project/lotus/lib/tablewriter"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
 )
@@ -58,7 +60,7 @@ var directDealAllocate = &cli.Command{
 			return err
 		}
 
-		api, closer, err := lcli.GetGatewayAPI(cctx)
+		gapi, closer, err := lcli.GetGatewayAPI(cctx)
 		if err != nil {
 			return fmt.Errorf("cant setup gateway connection: %w", err)
 		}
@@ -82,7 +84,7 @@ var directDealAllocate = &cli.Command{
 			}
 
 			// Verify that minerID exists
-			m, err := api.StateMinerInfo(ctx, maddr, types.EmptyTSK)
+			m, err := gapi.StateMinerInfo(ctx, maddr, types.EmptyTSK)
 			if err != nil {
 				return err
 			}
@@ -122,7 +124,7 @@ var directDealAllocate = &cli.Command{
 		}
 
 		// Get datacap balance
-		aDataCap, err := api.StateVerifiedClientStatus(ctx, walletAddr, types.EmptyTSK)
+		aDataCap, err := gapi.StateVerifiedClientStatus(ctx, walletAddr, types.EmptyTSK)
 		if err != nil {
 			return err
 		}
@@ -177,15 +179,12 @@ var directDealAllocate = &cli.Command{
 			Value:  big.Zero(),
 		}
 
-		//// Get old allocations for diff
-		//fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx)
-		//defer ncloser()
-		//oldallocations, err := fullnodeApi.StateGetAllocations(ctx, walletAddr, types.EmptyTSK)
-		//if err != nil {
-		//	return fmt.Errorf("failed to get allocations: %w", err)
-		//}
+		oldallocations, err := gapi.StateGetAllocations(ctx, walletAddr, types.EmptyTSK)
+		if err != nil {
+			return fmt.Errorf("failed to get allocations: %w", err)
+		}
 
-		mcid, sent, err := lib.SignAndPushToMpool(cctx, ctx, api, n, msg)
+		mcid, sent, err := lib.SignAndPushToMpool(cctx, ctx, gapi, n, msg)
 		if err != nil {
 			return err
 		}
@@ -196,7 +195,7 @@ var directDealAllocate = &cli.Command{
 		log.Infow("submitted data cap allocation message", "cid", mcid.String())
 		log.Info("waiting for message to be included in a block")
 
-		res, err := api.StateWaitMsg(ctx, mcid, 1, lapi.LookbackNoLimit, true)
+		res, err := gapi.StateWaitMsg(ctx, mcid, 1, lapi.LookbackNoLimit, true)
 		if err != nil {
 			return fmt.Errorf("waiting for message to be included in a block: %w", err)
 		}
@@ -205,85 +204,85 @@ var directDealAllocate = &cli.Command{
 			return fmt.Errorf("failed to execute the message with error: %s", res.Receipt.ExitCode.Error())
 		}
 
-		//newallocations, err := fullnodeApi.StateGetAllocations(ctx, walletAddr, types.EmptyTSK)
-		//if err != nil {
-		//	return fmt.Errorf("failed to get allocations: %w", err)
-		//}
+		newallocations, err := gapi.StateGetAllocations(ctx, walletAddr, types.EmptyTSK)
+		if err != nil {
+			return fmt.Errorf("failed to get allocations: %w", err)
+		}
 
-		//// Map Keys. Corresponds to the standard tablewriter output
-		//allocationID := "AllocationID"
-		//client := "Client"
-		//provider := "Miner"
-		//pieceCid := "PieceCid"
-		//pieceSize := "PieceSize"
-		//tMin := "TermMin"
-		//tMax := "TermMax"
-		//expr := "Expiration"
-		//
-		//// One-to-one mapping between tablewriter keys and JSON keys
-		//tableKeysToJsonKeys := map[string]string{
-		//	allocationID: strings.ToLower(allocationID),
-		//	client:       strings.ToLower(client),
-		//	provider:     strings.ToLower(provider),
-		//	pieceCid:     strings.ToLower(pieceCid),
-		//	pieceSize:    strings.ToLower(pieceSize),
-		//	tMin:         strings.ToLower(tMin),
-		//	tMax:         strings.ToLower(tMax),
-		//	expr:         strings.ToLower(expr),
-		//}
-		//
-		//var allocs []map[string]interface{}
-		//
-		//for key, val := range newallocations {
-		//	_, ok := oldallocations[key]
-		//	if !ok {
-		//		alloc := map[string]interface{}{
-		//			allocationID: key,
-		//			client:       val.Client,
-		//			provider:     val.Provider,
-		//			pieceCid:     val.Data,
-		//			pieceSize:    val.Size,
-		//			tMin:         val.TermMin,
-		//			tMax:         val.TermMax,
-		//			expr:         val.Expiration,
-		//		}
-		//		allocs = append(allocs, alloc)
-		//	}
-		//}
-		//
-		//if !cctx.Bool("quiet") {
-		//
-		//	if cctx.Bool("json") {
-		//		// get a new list of wallets with json keys instead of tablewriter keys
-		//		var jsonAllocs []map[string]interface{}
-		//		for _, alloc := range allocs {
-		//			jsonAlloc := make(map[string]interface{})
-		//			for k, v := range alloc {
-		//				jsonAlloc[tableKeysToJsonKeys[k]] = v
-		//			}
-		//			jsonAllocs = append(jsonAllocs, jsonAlloc)
-		//		}
-		//		// then return this!
-		//		return cmd.PrintJson(jsonAllocs)
-		//	} else {
-		//		// Init the tablewriter's columns
-		//		tw := tablewriter.New(
-		//			tablewriter.Col(allocationID),
-		//			tablewriter.Col(client),
-		//			tablewriter.Col(provider),
-		//			tablewriter.Col(pieceCid),
-		//			tablewriter.Col(pieceSize),
-		//			tablewriter.Col(tMin),
-		//			tablewriter.Col(tMax),
-		//			tablewriter.NewLineCol(expr))
-		//		// populate it with content
-		//		for _, alloc := range allocs {
-		//			tw.Write(alloc)
-		//		}
-		//		// return the corresponding string
-		//		return tw.Flush(os.Stdout)
-		//	}
-		//}
+		// Map Keys. Corresponds to the standard tablewriter output
+		allocationID := "AllocationID"
+		client := "Client"
+		provider := "Miner"
+		pieceCid := "PieceCid"
+		pieceSize := "PieceSize"
+		tMin := "TermMin"
+		tMax := "TermMax"
+		expr := "Expiration"
+
+		// One-to-one mapping between tablewriter keys and JSON keys
+		tableKeysToJsonKeys := map[string]string{
+			allocationID: strings.ToLower(allocationID),
+			client:       strings.ToLower(client),
+			provider:     strings.ToLower(provider),
+			pieceCid:     strings.ToLower(pieceCid),
+			pieceSize:    strings.ToLower(pieceSize),
+			tMin:         strings.ToLower(tMin),
+			tMax:         strings.ToLower(tMax),
+			expr:         strings.ToLower(expr),
+		}
+
+		var allocs []map[string]interface{}
+
+		for key, val := range newallocations {
+			_, ok := oldallocations[key]
+			if !ok {
+				alloc := map[string]interface{}{
+					allocationID: key,
+					client:       val.Client,
+					provider:     val.Provider,
+					pieceCid:     val.Data,
+					pieceSize:    val.Size,
+					tMin:         val.TermMin,
+					tMax:         val.TermMax,
+					expr:         val.Expiration,
+				}
+				allocs = append(allocs, alloc)
+			}
+		}
+
+		if !cctx.Bool("quiet") {
+
+			if cctx.Bool("json") {
+				// get a new list of wallets with json keys instead of tablewriter keys
+				var jsonAllocs []map[string]interface{}
+				for _, alloc := range allocs {
+					jsonAlloc := make(map[string]interface{})
+					for k, v := range alloc {
+						jsonAlloc[tableKeysToJsonKeys[k]] = v
+					}
+					jsonAllocs = append(jsonAllocs, jsonAlloc)
+				}
+				// then return this!
+				return cmd.PrintJson(jsonAllocs)
+			} else {
+				// Init the tablewriter's columns
+				tw := tablewriter.New(
+					tablewriter.Col(allocationID),
+					tablewriter.Col(client),
+					tablewriter.Col(provider),
+					tablewriter.Col(pieceCid),
+					tablewriter.Col(pieceSize),
+					tablewriter.Col(tMin),
+					tablewriter.Col(tMax),
+					tablewriter.NewLineCol(expr))
+				// populate it with content
+				for _, alloc := range allocs {
+					tw.Write(alloc)
+				}
+				// return the corresponding string
+				return tw.Flush(os.Stdout)
+			}
+		}
 
 		return nil
 	},
@@ -305,135 +304,129 @@ var directDealGetAllocations = &cli.Command{
 	},
 	Before: before,
 	Action: func(cctx *cli.Context) error {
-		//ctx := bcli.ReqContext(cctx)
-		//
-		//n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//api, closer, err := lcli.GetGatewayAPI(cctx)
-		//if err != nil {
-		//	return fmt.Errorf("cant setup gateway connection: %w", err)
-		//}
-		//defer closer()
-		//
-		//// Get wallet address from input
-		//walletAddr, err := n.GetProvidedOrDefaultWallet(ctx, cctx.String("wallet"))
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//log.Debugw("selected wallet", "wallet", walletAddr)
-		//
-		//
-		//
-		//// Get old allocations for diff
-		//fullnodeApi, ncloser, err := lcli.GetFullNodeAPIV1(cctx)
-		//defer ncloser()
-		//
-		//allocations, err := fullnodeApi.StateGetAllocations(ctx, walletAddr, types.EmptyTSK)
-		//if err != nil {
-		//	return fmt.Errorf("failed to get allocations: %w", err)
-		//}
-		//
-		//if cctx.String("miner") != "" {
-		//	// Get all minerIDs from input
-		//	minerId := cctx.String("miner")
-		//	maddr, err := address.NewFromString(minerId)
-		//	if err != nil {
-		//		return err
-		//	}
-		//
-		//	// Verify that minerID exists
-		//	_, err = api.StateMinerInfo(ctx, maddr, types.EmptyTSK)
-		//	if err != nil {
-		//		return err
-		//	}
-		//
-		//	mid, err := address.IDFromAddress(maddr)
-		//	if err != nil {
-		//		return err
-		//	}
-		//
-		//	for i, v := range allocations {
-		//		if v.Provider != abi.ActorID(mid) {
-		//			delete(allocations, i)
-		//		}
-		//	}
-		//}
-		//
-		//// Map Keys. Corresponds to the standard tablewriter output
-		//allocationID := "AllocationID"
-		//client := "Client"
-		//provider := "Miner"
-		//pieceCid := "PieceCid"
-		//pieceSize := "PieceSize"
-		//tMin := "TermMin"
-		//tMax := "TermMax"
-		//expr := "Expiration"
-		//
-		//// One-to-one mapping between tablewriter keys and JSON keys
-		//tableKeysToJsonKeys := map[string]string{
-		//	allocationID: strings.ToLower(allocationID),
-		//	client:       strings.ToLower(client),
-		//	provider:     strings.ToLower(provider),
-		//	pieceCid:     strings.ToLower(pieceCid),
-		//	pieceSize:    strings.ToLower(pieceSize),
-		//	tMin:         strings.ToLower(tMin),
-		//	tMax:         strings.ToLower(tMax),
-		//	expr:         strings.ToLower(expr),
-		//}
-		//
-		//var allocs []map[string]interface{}
-		//
-		//for key, val := range allocations {
-		//	alloc := map[string]interface{}{
-		//		allocationID: key,
-		//		client:       val.Client,
-		//		provider:     val.Provider,
-		//		pieceCid:     val.Data,
-		//		pieceSize:    val.Size,
-		//		tMin:         val.TermMin,
-		//		tMax:         val.TermMax,
-		//		expr:         val.Expiration,
-		//	}
-		//	allocs = append(allocs, alloc)
-		//}
-		//
-		//if !cctx.Bool("quiet") {
-		//
-		//	if cctx.Bool("json") {
-		//		// get a new list of wallets with json keys instead of tablewriter keys
-		//		var jsonAllocs []map[string]interface{}
-		//		for _, alloc := range allocs {
-		//			jsonAlloc := make(map[string]interface{})
-		//			for k, v := range alloc {
-		//				jsonAlloc[tableKeysToJsonKeys[k]] = v
-		//			}
-		//			jsonAllocs = append(jsonAllocs, jsonAlloc)
-		//		}
-		//		// then return this!
-		//		return cmd.PrintJson(jsonAllocs)
-		//	} else {
-		//		// Init the tablewriter's columns
-		//		tw := tablewriter.New(
-		//			tablewriter.Col(allocationID),
-		//			tablewriter.Col(client),
-		//			tablewriter.Col(provider),
-		//			tablewriter.Col(pieceCid),
-		//			tablewriter.Col(pieceSize),
-		//			tablewriter.Col(tMin),
-		//			tablewriter.Col(tMax),
-		//			tablewriter.NewLineCol(expr))
-		//		// populate it with content
-		//		for _, alloc := range allocs {
-		//			tw.Write(alloc)
-		//		}
-		//		// return the corresponding string
-		//		return tw.Flush(os.Stdout)
-		//	}
-		//}
+		ctx := bcli.ReqContext(cctx)
+
+		n, err := clinode.Setup(cctx.String(cmd.FlagRepo.Name))
+		if err != nil {
+			return err
+		}
+
+		gapi, closer, err := lcli.GetGatewayAPI(cctx)
+		if err != nil {
+			return fmt.Errorf("cant setup gateway connection: %w", err)
+		}
+		defer closer()
+
+		// Get wallet address from input
+		walletAddr, err := n.GetProvidedOrDefaultWallet(ctx, cctx.String("wallet"))
+		if err != nil {
+			return err
+		}
+
+		log.Debugw("selected wallet", "wallet", walletAddr)
+
+		allocations, err := gapi.StateGetAllocations(ctx, walletAddr, types.EmptyTSK)
+		if err != nil {
+			return fmt.Errorf("failed to get allocations: %w", err)
+		}
+
+		if cctx.String("miner") != "" {
+			// Get all minerIDs from input
+			minerId := cctx.String("miner")
+			maddr, err := address.NewFromString(minerId)
+			if err != nil {
+				return err
+			}
+
+			// Verify that minerID exists
+			_, err = gapi.StateMinerInfo(ctx, maddr, types.EmptyTSK)
+			if err != nil {
+				return err
+			}
+
+			mid, err := address.IDFromAddress(maddr)
+			if err != nil {
+				return err
+			}
+
+			for i, v := range allocations {
+				if v.Provider != abi.ActorID(mid) {
+					delete(allocations, i)
+				}
+			}
+		}
+
+		// Map Keys. Corresponds to the standard tablewriter output
+		allocationID := "AllocationID"
+		client := "Client"
+		provider := "Miner"
+		pieceCid := "PieceCid"
+		pieceSize := "PieceSize"
+		tMin := "TermMin"
+		tMax := "TermMax"
+		expr := "Expiration"
+
+		// One-to-one mapping between tablewriter keys and JSON keys
+		tableKeysToJsonKeys := map[string]string{
+			allocationID: strings.ToLower(allocationID),
+			client:       strings.ToLower(client),
+			provider:     strings.ToLower(provider),
+			pieceCid:     strings.ToLower(pieceCid),
+			pieceSize:    strings.ToLower(pieceSize),
+			tMin:         strings.ToLower(tMin),
+			tMax:         strings.ToLower(tMax),
+			expr:         strings.ToLower(expr),
+		}
+
+		var allocs []map[string]interface{}
+
+		for key, val := range allocations {
+			alloc := map[string]interface{}{
+				allocationID: key,
+				client:       val.Client,
+				provider:     val.Provider,
+				pieceCid:     val.Data,
+				pieceSize:    val.Size,
+				tMin:         val.TermMin,
+				tMax:         val.TermMax,
+				expr:         val.Expiration,
+			}
+			allocs = append(allocs, alloc)
+		}
+
+		if !cctx.Bool("quiet") {
+
+			if cctx.Bool("json") {
+				// get a new list of wallets with json keys instead of tablewriter keys
+				var jsonAllocs []map[string]interface{}
+				for _, alloc := range allocs {
+					jsonAlloc := make(map[string]interface{})
+					for k, v := range alloc {
+						jsonAlloc[tableKeysToJsonKeys[k]] = v
+					}
+					jsonAllocs = append(jsonAllocs, jsonAlloc)
+				}
+				// then return this!
+				return cmd.PrintJson(jsonAllocs)
+			} else {
+				// Init the tablewriter's columns
+				tw := tablewriter.New(
+					tablewriter.Col(allocationID),
+					tablewriter.Col(client),
+					tablewriter.Col(provider),
+					tablewriter.Col(pieceCid),
+					tablewriter.Col(pieceSize),
+					tablewriter.Col(tMin),
+					tablewriter.Col(tMax),
+					tablewriter.NewLineCol(expr))
+				// populate it with content
+				for _, alloc := range allocs {
+					tw.Write(alloc)
+				}
+				// return the corresponding string
+				return tw.Flush(os.Stdout)
+			}
+		}
 
 		return nil
 	},
