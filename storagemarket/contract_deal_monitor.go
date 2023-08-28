@@ -5,9 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
-
 	mbig "math/big"
+	"time"
 
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -274,7 +273,7 @@ func (c *ContractDealMonitor) getDealProposal(ctx context.Context, topicContract
 		From: &fromEthAddr,
 		To:   &toEthAddr,
 		Data: params,
-	}, "latest")
+	}, ethtypes.NewEthBlockNumberOrHashFromPredefined("latest"))
 	if err != nil {
 		return nil, fmt.Errorf("eth call erred: %w", err)
 	}
@@ -309,7 +308,7 @@ func (c *ContractDealMonitor) getExtraData(ctx context.Context, topicContractAdd
 		From: &fromEthAddr,
 		To:   &toEthAddr,
 		Data: params,
-	}, "latest")
+	}, ethtypes.NewEthBlockNumberOrHashFromPredefined("latest"))
 	if err != nil {
 		return nil, fmt.Errorf("eth call erred: %w", err)
 	}
