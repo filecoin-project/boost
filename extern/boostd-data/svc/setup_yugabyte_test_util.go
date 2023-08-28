@@ -2,6 +2,9 @@ package svc
 
 import (
 	"database/sql"
+	"testing"
+	"time"
+
 	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-address"
 	logging "github.com/ipfs/go-log/v2"
@@ -10,8 +13,6 @@ import (
 	"github.com/yugabyte/gocql"
 	"github.com/yugabyte/pgx/v4/pgxpool"
 	"golang.org/x/net/context"
-	"testing"
-	"time"
 )
 
 var tlog = logging.Logger("ybtest")
