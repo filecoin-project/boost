@@ -50,10 +50,43 @@ func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAd
 	}
 }
 
-func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectDataEntry) error {
-	// Validate the deal proposal and Check for deal acceptance (allocation id, start epoch, etc.)
+func (ddp *DirectDealsProvider) Start() error {
+	ctx := context.Background()
+
+	deals, err := ddp.directDealsDB.ListAll(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list all direct deals: %w", err)
+	}
+
+	for _, entry := range deals {
+		log.Infow("direct deal entry", "checkpoint", entry.Checkpoint)
+
+		go func() {
+			err := ddp.Process(ctx, entry.ID)
+			if err != nil {
+				log.Errorw("error while processing direct deal", "uuid", entry.ID, "err", err)
+			}
+		}()
+	}
 
 	return nil
+}
+
+func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectDataEntry) (*api.ProviderDealRejectionInfo, error) {
+	// Validate the deal proposal and Check for deal acceptance (allocation id, start epoch, etc.)
+
+	//chainHead, err := ddp.fullnodeApi.ChainHead(ctx)
+	//if err != nil {
+	//log.Warnw("failed to get chain head", "err", err)
+	//return nil, err
+	//}
+
+	//log.Infow("chain head", "epoch", chainHead)
+
+	return &api.ProviderDealRejectionInfo{
+		Accepted: true,
+		Reason:   "",
+	}, nil
 }
 
 func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationId uint64, clientAddr address.Address, removeUnsealedCopy bool, skipIpniAnnounce bool) (*api.ProviderDealRejectionInfo, error) {
@@ -85,30 +118,44 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 
 	ddp.dealLogger.Infow(entry.ID, "executing direct deal import", "client", clientAddr, "piececid", piececid)
 
-	err := ddp.directDealsDB.Insert(ctx, entry)
-	if err != nil {
-		return nil, fmt.Errorf("failed to insert direct deal entry to local db: %w", err)
-	}
+	log.Infow("check for deal acceptance", "uuid", entry.ID, "piececid", piececid, "filepath", filepath)
 
-	log.Infow("inserted direct deal entry to local db", "uuid", entry.ID, "piececid", piececid, "filepath", filepath)
-
-	chainHead, err := ddp.fullnodeApi.ChainHead(ctx)
-	if err != nil {
-		log.Warnw("failed to get chain head", "err", err)
-		return nil, err
-	}
-
-	log.Infow("chain head", "epoch", chainHead)
-
-	err = ddp.Accept(ctx, entry)
+	res, err := ddp.Accept(ctx, entry)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Infow("deal accepted. insert direct deal entry to local db", "uuid", entry.ID, "piececid", piececid, "filepath", filepath)
+
+	if res.Accepted {
+		err := ddp.directDealsDB.Insert(ctx, entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to insert direct deal entry to local db: %w", err)
+		}
+	}
+
+	go func() {
+		err := ddp.Process(ctx, entry.ID)
+		if err != nil {
+			log.Errorw("error while processing direct deal", "uuid", entry.ID, "err", err)
+		}
+	}()
+
+	return res, nil
+}
+
+func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID) error {
+	entry, err := ddp.directDealsDB.ByID(ctx, dealUuid)
+	if err != nil {
+		return err
+	}
+
+	log.Infow("processing direct deal", "piececid", entry.PieceCID, "filepath", entry.InboundFilePath, "clientAddr", entry.Client, "allocationId", entry.AllocationID)
 
 	// os stat
-	fstat, err := os.Stat(filepath)
+	fstat, err := os.Stat(entry.InboundFilePath)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// commp and piece size
@@ -117,22 +164,17 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 	doRemoteCommP := false
 	// TODO: fix pieceSize to be based on os.Stat()
 	pieceSize := abi.UnpaddedPieceSize(fstat.Size())
-	generatedPieceCid, dmErr := generatePieceCommitment(ctx, commpCalc, throttle, filepath, pieceSize.Padded(), doRemoteCommP)
+	generatedPieceCid, dmErr := generatePieceCommitment(ctx, commpCalc, throttle, entry.InboundFilePath, pieceSize.Padded(), doRemoteCommP)
 	if dmErr != nil {
-		return nil, fmt.Errorf("couldnt generate commp: %w", dmErr)
+		return fmt.Errorf("couldnt generate commp: %w", dmErr)
 	}
 
-	deal := &types.DirectDataEntry{
-		InboundFilePath: filepath,
-		PieceSize:       pieceSize.Padded(),
-	}
-
-	log.Infow("import details", "filepath", filepath, "supplied-piececid", piececid, "calculated-piececid", generatedPieceCid, "os stat size", fstat.Size(), "piece size for os stat", deal.PieceSize)
+	log.Infow("import details", "filepath", entry.InboundFilePath, "supplied-piececid", entry.PieceCID, "calculated-piececid", generatedPieceCid, "os stat size", fstat.Size(), "piece size for os stat", entry.PieceSize)
 
 	// Open a reader against the CAR file with the deal data
-	v2r, err := carv2.OpenReader(deal.InboundFilePath)
+	v2r, err := carv2.OpenReader(entry.InboundFilePath)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	defer func() {
@@ -142,9 +184,9 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 	var size uint64
 	switch v2r.Version {
 	case 1:
-		st, err := os.Stat(deal.InboundFilePath)
+		st, err := os.Stat(entry.InboundFilePath)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		size = uint64(st.Size())
 	case 2:
@@ -154,14 +196,14 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 	// Inflate the deal size so that it exactly fills a piece
 	r, err := v2r.DataReader()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	log.Infow("got v2r.DataReader over inbound file")
 
 	paddedReader, err := padreader.NewInflator(r, size, pieceSize)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	log.Infow("got paddedReader")
@@ -170,19 +212,19 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 
 	// Add the piece to a sector
 	sdInfo := lapi.PieceDealInfo{
-		//DealID:       deal.ChainDealID,
-		//DealProposal: &deal.ClientDealProposal.Proposal,
+		//DealID:       entry.ChainDealID,
+		//DealProposal: &entry.ClientDealProposal.Proposal,
 		DealSchedule: lapi.DealSchedule{
-			StartEpoch: deal.StartEpoch,
-			EndEpoch:   deal.EndEpoch,
+			StartEpoch: entry.StartEpoch,
+			EndEpoch:   entry.EndEpoch,
 		},
-		KeepUnsealed: deal.KeepUnsealedCopy,
+		KeepUnsealed: entry.KeepUnsealedCopy,
 	}
 
 	// Attempt to add the piece to a sector (repeatedly if necessary)
 	sectorNum, offset, err := ddp.pieceAdder.AddPiece(ctx, pieceSize, paddedReader, sdInfo)
 	if err != nil {
-		return nil, fmt.Errorf("AddPiece failed: %w", err)
+		return fmt.Errorf("AddPiece failed: %w", err)
 	}
 
 	_ = sectorNum
@@ -217,5 +259,5 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 	//return derr
 	//}
 
-	return nil, nil
+	return nil
 }

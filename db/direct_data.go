@@ -170,7 +170,7 @@ func (d *DirectDataDB) Update(ctx context.Context, deal *types.DirectDataEntry) 
 }
 
 func (d *DirectDataDB) ByID(ctx context.Context, id uuid.UUID) (*types.DirectDataEntry, error) {
-	qry := "SELECT " + directdataFieldsStr + " FROM DirectDeals WHERE id=?"
+	qry := "SELECT " + directdataFieldsStr + " FROM DirectDeals WHERE ID=?"
 	row := d.db.QueryRowContext(ctx, qry, id)
 	return d.scanRow(row)
 }
@@ -186,6 +186,10 @@ func (d *DirectDataDB) BySectorID(ctx context.Context, sectorID abi.SectorID) ([
 	}
 
 	return d.list(ctx, 0, 0, "ProviderAddress=? AND SectorID=?", addr.String(), sectorID.Number)
+}
+
+func (d *DirectDataDB) ListAll(ctx context.Context) ([]*types.DirectDataEntry, error) {
+	return d.list(ctx, 0, 0, "")
 }
 
 func (d *DirectDataDB) Count(ctx context.Context, query string, filter *FilterOptions) (int, error) {
