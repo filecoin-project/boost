@@ -23,6 +23,7 @@ func NewMigrator(connectString string, minerAddr address.Address) *Migrator {
 
 func (m *Migrator) Migrate() error {
 	log.Infow("running migrations")
+
 	// Create a connection to be used only for running migrations.
 	// Note that the migration library requires a *sql.DB, but there's no way
 	// to go from a pgxpool connection to a *sql.DB so we need to open a new
@@ -37,6 +38,7 @@ func (m *Migrator) Migrate() error {
 	if err != nil {
 		return fmt.Errorf("running postgres migrations: %w", err)
 	}
-	log.Infow("postgres migrations complete")
+	log.Infow("migrations complete")
+
 	return nil
 }

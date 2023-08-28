@@ -26,8 +26,6 @@ var log = logging.Logger("boostd-data-yb")
 // data migrations (migrations are not yet implemented in version 1).
 const pieceMetadataVersion = "1"
 
-const YugaByteCassandraKeyspace = "idx"
-
 type DBSettings struct {
 	// The cassandra hosts to connect to
 	Hosts []string
@@ -63,7 +61,7 @@ func NewStore(settings DBSettings, migrator *Migrator, opts ...StoreOpt) *Store 
 	}
 
 	cluster := gocql.NewCluster(settings.Hosts...)
-	cluster.Keyspace = YugaByteCassandraKeyspace
+	cluster.Keyspace = "idx"
 	s := &Store{
 		settings: settings,
 		cluster:  cluster,
