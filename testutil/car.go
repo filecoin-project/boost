@@ -6,6 +6,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"testing"
 
 	"github.com/ipfs/boxo/blockservice"
 	bstore "github.com/ipfs/boxo/blockstore"
@@ -20,9 +21,13 @@ import (
 	ds "github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	ipldformat "github.com/ipfs/go-ipld-format"
+	unixfs "github.com/ipfs/go-unixfsnode/testutil"
 	"github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
+	storagecar "github.com/ipld/go-car/v2/storage"
+	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/multiformats/go-multihash"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -60,6 +65,29 @@ func CreateRandomFile(dir string, rseed, size int) (string, error) {
 	}
 
 	return file.Name(), nil
+}
+
+func CreateRandomUnixfsFileInCar(t *testing.T, dir string, rseed, size int) (string, unixfs.DirEntry) {
+	req := require.New(t)
+
+	file, err := os.CreateTemp(dir, "sourcecar.dat")
+	req.NoError(err)
+
+	carWriter, err := storagecar.NewWritable(file, []cid.Cid{cid.MustParse("baeaaaiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")}, car.WriteAsCarV1(true))
+	req.NoError(err)
+
+	lsys := cidlink.DefaultLinkSystem()
+	lsys.SetWriteStorage(carWriter)
+
+	dirEnt := unixfs.GenerateFile(t, &lsys, rand.New(rand.NewSource(int64(rseed))), size)
+
+	err = file.Close()
+	req.NoError(err)
+
+	err = car.ReplaceRootsInFile(file.Name(), []cid.Cid{dirEnt.Root})
+	req.NoError(err)
+
+	return file.Name(), dirEnt
 }
 
 func CreateDenseCARv2(dir, src string) (cid.Cid, string, error) {
@@ -180,4 +208,27 @@ func WriteUnixfsDAGTo(path string, into ipldformat.DAGService, chunksize int64, 
 	}
 
 	return nd.Cid(), nil
+}
+
+func CidsInCar(path string) ([]cid.Cid, error) {
+	outReader, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	blockReader, err := car.NewBlockReader(outReader)
+	if err != nil {
+		return nil, err
+	}
+	gotCids := []cid.Cid{}
+	for {
+		next, err := blockReader.Next()
+		if err != nil {
+			if err != io.EOF {
+				return nil, err
+			}
+			break
+		}
+		gotCids = append(gotCids, next.Cid())
+	}
+	return gotCids, nil
 }
