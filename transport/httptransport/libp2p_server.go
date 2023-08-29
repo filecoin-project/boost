@@ -16,10 +16,10 @@ import (
 	blockstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
-	gostream "github.com/libp2p/go-libp2p-gostream"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/net/gostream"
 	"github.com/multiformats/go-multiaddr"
 )
 
