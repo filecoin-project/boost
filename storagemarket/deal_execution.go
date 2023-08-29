@@ -20,7 +20,6 @@ import (
 	lapi "github.com/filecoin-project/lotus/api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/google/uuid"
-	carv2 "github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-libp2p/core/event"
 )
 
@@ -530,45 +529,30 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 
 	p.dealLogger.Infow(deal.DealUuid, "add piece called")
 
-	// Open a reader against the CAR file with the deal data
-	v2r, err := carv2.OpenReader(deal.InboundFilePath)
+	st, err := os.Stat(deal.InboundFilePath)
 	if err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryFatal,
-			error: fmt.Errorf("failed to open CARv2 file: %w", err),
+			error: fmt.Errorf("failed to stat CARv1 file: %w", err),
+		}
+	}
+
+	r, err := os.Open(deal.InboundFilePath)
+	if err != nil {
+		return &dealMakingError{
+			retry: types.DealRetryFatal,
+			error: fmt.Errorf("failed to open file: %w", err),
 		}
 	}
 	defer func() {
-		if err := v2r.Close(); err != nil {
-			p.dealLogger.Warnw(deal.DealUuid, "failed to close carv2 reader in addpiece", "err", err.Error())
+		if err := r.Close(); err != nil {
+			p.dealLogger.Warnw(deal.DealUuid, "failed to close reader in addpiece", "err", err.Error())
 		}
 	}()
 
-	var size uint64
-	switch v2r.Version {
-	case 1:
-		st, err := os.Stat(deal.InboundFilePath)
-		if err != nil {
-			return &dealMakingError{
-				retry: types.DealRetryFatal,
-				error: fmt.Errorf("failed to stat CARv1 file: %w", err),
-			}
-		}
-		size = uint64(st.Size())
-	case 2:
-		size = v2r.Header.DataSize
-	}
-
 	// Inflate the deal size so that it exactly fills a piece
 	proposal := deal.ClientDealProposal.Proposal
-	r, err := v2r.DataReader()
-	if err != nil {
-		return &dealMakingError{
-			retry: types.DealRetryFatal,
-			error: fmt.Errorf("failed to get data reader over CAR file: %w", err),
-		}
-	}
-	paddedReader, err := padreader.NewInflator(r, size, proposal.PieceSize.Unpadded())
+	paddedReader, err := padreader.NewInflator(r, uint64(st.Size()), proposal.PieceSize.Unpadded())
 	if err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryFatal,
