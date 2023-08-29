@@ -115,6 +115,9 @@ func (p *Provider) remoteCommP(filepath string) (*abi.PieceInfo, *dealMakingErro
 	if err != nil {
 		return nil, &dealMakingError{retry: types.DealRetryFatal, error: err}
 	}
+	if st.Size() == 0 {
+		return nil, &dealMakingError{retry: types.DealRetryFatal, error: fmt.Errorf("empty file")}
+	}
 
 	// The commp calculation requires the data to be of length
 	// pieceSize.Unpadded(), so add zeros until it reaches that size
@@ -164,6 +167,9 @@ func GenerateCommP(filepath string) (*abi.PieceInfo, error) {
 
 	if written != st.Size() {
 		return nil, fmt.Errorf("number of bytes written to CommP writer %d not equal to the file size %d", written, st.Size())
+	}
+	if st.Size() == 0 {
+		return nil, fmt.Errorf("empty file")
 	}
 
 	pi, err := w.Sum()
