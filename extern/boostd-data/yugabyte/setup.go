@@ -45,7 +45,7 @@ func (s *Store) Create(ctx context.Context) error {
 		return fmt.Errorf("creating postgres tables: %w", err)
 	}
 
-	return s.migrator.Migrate()
+	return s.migrator.Migrate(ctx)
 }
 
 //go:embed drop.cql

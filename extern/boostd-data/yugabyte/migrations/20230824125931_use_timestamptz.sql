@@ -4,7 +4,6 @@ ALTER TABLE PieceTracker ALTER CreatedAt TYPE timestamptz;
 ALTER TABLE PieceTracker ALTER UpdatedAt TYPE timestamptz;
 ALTER TABLE PieceFlagged ALTER CreatedAt TYPE timestamptz;
 ALTER TABLE PieceFlagged ALTER UpdatedAt TYPE timestamptz;
-SELECT 'up SQL query';
 -- +goose StatementEnd
 
 -- +goose Down

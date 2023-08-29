@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/boostd-data/yugabyte"
 	"github.com/filecoin-project/boostd-data/yugabyte/migrations"
 	"github.com/filecoin-project/go-address"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 )
@@ -105,7 +106,7 @@ var yugabyteCmd = &cli.Command{
 		// a disabled miner address, and if the migration is needed it will
 		// throw ErrMissingMinerAddr and we can inform the user they need to
 		// perform the migration.
-		migrator := yugabyte.NewMigrator(settings.ConnectString, migrations.DisabledMinerAddr)
+		migrator := yugabyte.NewMigrator(settings, migrations.DisabledMinerAddr)
 
 		// Create a connection to the yugabyte implementation of LID
 		bdsvc := svc.NewYugabyte(settings, migrator)
@@ -190,6 +191,9 @@ var yugabyteMigrateCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
+		_ = logging.SetLogLevel("migrations", "info")
+		ctx := cliutil.ReqContext(cctx)
+
 		// Create a yugabyte data service
 		settings := yugabyte.DBSettings{
 			Hosts:         cctx.StringSlice("hosts"),
@@ -204,8 +208,8 @@ var yugabyteMigrateCmd = &cli.Command{
 				return fmt.Errorf("parsing miner address '%s': %w", maddr, err)
 			}
 		}
-		migrator := yugabyte.NewMigrator(settings.ConnectString, maddr)
-		err := migrator.Migrate()
+		migrator := yugabyte.NewMigrator(settings, maddr)
+		err := migrator.Migrate(ctx)
 		if err != nil && errors.Is(err, migrations.ErrMissingMinerAddr) {
 			msg := "You must set the miner-address flag to do the migration. " +
 				"Set it to the address of the storage miner eg f1234"
