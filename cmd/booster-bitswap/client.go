@@ -17,6 +17,7 @@ import (
 	mh "github.com/multiformats/go-multihash"
 
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/bitswap"
+	"github.com/filecoin-project/boost/p2p/muxer/mplex"
 	lotus_blockstore "github.com/filecoin-project/lotus/blockstore"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/boxo/bitswap/client"
@@ -30,7 +31,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/p2p/muxer/mplex"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
