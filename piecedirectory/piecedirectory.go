@@ -536,7 +536,10 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 			// Read the block data
 			_, data, err := util.ReadNode(bufio.NewReader(readerAt))
 			if err != nil {
-				return nil, fmt.Errorf("reading data for block %s from reader for piece %s: %w", c, pieceCid, err)
+				_, _ = reader.Seek(0, io.SeekStart)
+				cv, carVerErr := carv2.ReadVersion(reader)
+
+				return nil, fmt.Errorf("reading data for block %s from reader for piece %s (cv: %d/%s): %w", c, pieceCid, cv, carVerErr, err)
 			}
 			return data, nil
 		}()
@@ -676,7 +679,7 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 		if err := car.WriteHeader(ch, headerBuf); err != nil {
 			return nil, fmt.Errorf("copying car header for piece %s: %w", pieceCid, err)
 		}
-		empty := [40]byte{}
+		empty := [carv2.HeaderSize]byte{}
 		headerBuf.Write(empty[:])
 		bsR = carutil.NewMultiReaderAt(bytes.NewReader(headerBuf.Bytes()), sectionReader)
 	} else {
