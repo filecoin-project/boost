@@ -88,6 +88,7 @@ WORKDIR /app
 
 COPY --from=lotus-test /usr/local/bin/lotus /usr/local/bin/
 COPY --from=lotus-test /usr/local/bin/lotus-miner /usr/local/bin/
+COPY --from=lotus-test /usr/local/bin/lotus-shed /usr/local/bin/
 ## Test lotus starts
 RUN lotus -v && lotus-miner -v
 #########################################################################################

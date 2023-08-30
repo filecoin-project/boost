@@ -47,8 +47,8 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
   ROOT_KEY_2=`cat $LOTUS_PATH/rootkey-2`
   echo Root key 1: $ROOT_KEY_1
   echo Root key 2: $ROOT_KEY_2
-  lotus wallet import $LOTUS_PATH/bls-$ROOT_KEY_1.keyinfo
-  lotus wallet import $LOTUS_PATH/bls-$ROOT_KEY_2.keyinfo
+  #lotus wallet import $LOTUS_PATH/bls-$ROOT_KEY_1.keyinfo
+  #lotus wallet import $LOTUS_PATH/bls-$ROOT_KEY_2.keyinfo
   NOTARY_1=`lotus wallet new secp256k1`
   NOTARY_2=`lotus wallet new secp256k1`
   echo $NOTARY_1 > $BOOST_PATH/notary_1
