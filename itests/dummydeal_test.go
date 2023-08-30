@@ -94,6 +94,6 @@ func TestDummydealOnline(t *testing.T) {
 	require.NoError(t, err)
 
 	// rootCid is an identity CID
-	outFile := f.RetrieveDirect(ctx, t, rootCid, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true)
+	outFile := f.RetrieveDirect(ctx, t, rootCid, &res.DealParams.ClientDealProposal.Proposal.PieceCID, true, true, nil)
 	kit.AssertFilesEqual(t, randomFilepath, outFile)
 }

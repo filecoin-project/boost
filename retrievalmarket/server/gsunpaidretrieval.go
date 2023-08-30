@@ -114,7 +114,7 @@ func (g *GraphsyncUnpaidRetrieval) Start(ctx context.Context) error {
 	g.ctx = ctx
 	g.validator.ctx = ctx
 
-	if g.linkSystem != nil {
+	if g.linkSystem != nil && g.linkSystem.LinkSys() != nil {
 		// The index provider uses graphsync to fetch advertisements.
 		// We need to tell graphsync to use a different IPLD Link System to provide
 		// the advertisements (instead of using the blockstore).

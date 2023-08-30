@@ -86,39 +86,6 @@ var (
 	StorageCounterDSPrefix = "/storage/nextid"
 )
 
-func RetrievalDealFilter(userFilter dtypes.RetrievalDealFilter) func(onlineOk dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
-	offlineOk dtypes.ConsiderOfflineRetrievalDealsConfigFunc) dtypes.RetrievalDealFilter {
-	return func(onlineOk dtypes.ConsiderOnlineRetrievalDealsConfigFunc,
-		offlineOk dtypes.ConsiderOfflineRetrievalDealsConfigFunc) dtypes.RetrievalDealFilter {
-		return func(ctx context.Context, state retrievalmarket.ProviderDealState) (bool, string, error) {
-			b, err := onlineOk()
-			if err != nil {
-				return false, "miner error", err
-			}
-
-			if !b {
-				log.Warn("online retrieval deal consideration disabled; rejecting retrieval deal proposal from client")
-				return false, "miner is not accepting online retrieval deals", nil
-			}
-
-			b, err = offlineOk()
-			if err != nil {
-				return false, "miner error", err
-			}
-
-			if !b {
-				log.Info("offline retrieval has not been implemented yet")
-			}
-
-			if userFilter != nil {
-				return userFilter(ctx, state)
-			}
-
-			return true, "", nil
-		}
-	}
-}
-
 func NewConsiderOnlineStorageDealsConfigFunc(r lotus_repo.LockedRepo) (dtypes.ConsiderOnlineStorageDealsConfigFunc, error) {
 	return func() (out bool, err error) {
 		err = readCfg(r, func(cfg *config.Boost) {

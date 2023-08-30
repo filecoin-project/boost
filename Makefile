@@ -250,6 +250,13 @@ docker/lotus-all-in-one: info/lotus-all-in-one | $(lotus_src_dir)
 		-t $(lotus_base_image) --build-arg GOFLAGS=-tags=debug .
 .PHONY: docker/lotus-all-in-one
 
+# boost-client main
+docker/mainnet/boost-client: build/.update-modules
+	DOCKER_BUILDKIT=1 $(docker_build_cmd) \
+		-t $(docker_user)/boost-main:main --build-arg BUILD_VERSION=dev \
+		-f docker/boost-client/Dockerfile.source --target boost-main .
+.PHONY: docker/mainnet/boost-client
+
 ### devnet images
 docker/%:
 	cd docker/devnet/$* && DOCKER_BUILDKIT=1 $(docker_build_cmd) -t $(docker_user)/$*-dev:dev \

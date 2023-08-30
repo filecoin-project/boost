@@ -604,9 +604,9 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(HandleSetLinkSystem, modules.SetLinkSystem),
 
 		// Boost storage deal filter
-		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),
+		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(nil)),
 		If(cfg.Dealmaking.Filter != "",
-			Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, dtypes.StorageDealFilter(dealfilter.CliStorageDealFilter(cfg.Dealmaking.Filter)))),
+			Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(dtypes.StorageDealFilter(dealfilter.CliStorageDealFilter(cfg.Dealmaking.Filter)))),
 		),
 
 		// Lotus markets storage deal filter
@@ -632,7 +632,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*storageadapter.DealPublisher), storageadapter.NewDealPublisher(&legacyFees, storageadapter.PublishMsgConfig{
 			Period:                  time.Duration(cfg.LotusDealmaking.PublishMsgPeriod),
 			MaxDealsPerMsg:          cfg.LotusDealmaking.MaxDealsPerPublishMsg,
-			StartEpochSealingBuffer: cfg.LotusDealmaking.StartEpochSealingBuffer,
+			StartEpochSealingBuffer: cfg.Dealmaking.StartEpochSealingBuffer,
 			ManualDealPublish:       cfg.Dealmaking.ManualDealPublish,
 		})),
 

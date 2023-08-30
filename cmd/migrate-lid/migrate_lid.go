@@ -250,10 +250,17 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 
 		start := time.Now()
 
-		indexed, err := migrateIndex(ctx, ipath, store, force)
+		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 60*time.Second)
+		defer timeoutCancel()
+
+		indexed, err := migrateIndexWithTimeout(timeoutCtx, ipath, store, force)
 		bar.Add(1) //nolint:errcheck
 		if err != nil {
-			logger.Errorw("migrate index failed", "piece cid", ipath.name, "err", err)
+			took := time.Since(start)
+			indexTime += took
+
+			logger.Errorw("migrate index failed", "piece cid", ipath.name, "took", took.String(), "err", err)
+
 			errCount++
 			continue
 		}
@@ -271,6 +278,32 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 
 	logger.Infow("migrated indices", "total", len(idxPaths), "took", time.Since(indicesStart).String())
 	return errCount, nil
+}
+
+type migrateIndexResult struct {
+	Indexed bool
+	Error   error
+}
+
+func migrateIndexWithTimeout(ctx context.Context, ipath idxPath, store StoreMigrationApi, force bool) (bool, error) {
+	result := make(chan migrateIndexResult, 1)
+	go func() {
+		result <- doMigrateIndex(ctx, ipath, store, force)
+	}()
+	select {
+	case <-time.After(75 * time.Second):
+		return false, errors.New("index migration timed out after 75 seconds")
+	case result := <-result:
+		return result.Indexed, result.Error
+	}
+}
+
+func doMigrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, force bool) migrateIndexResult {
+	indexed, err := migrateIndex(ctx, ipath, store, force)
+	return migrateIndexResult{
+		Indexed: indexed,
+		Error:   err,
+	}
 }
 
 func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, force bool) (bool, error) {
@@ -312,7 +345,7 @@ func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, f
 	respch := store.AddIndex(ctx, pieceCid, records, false)
 	for resp := range respch {
 		if resp.Err != "" {
-			return false, fmt.Errorf("adding index %s to store: %s", ipath.path, err)
+			return false, fmt.Errorf("adding index %s to store: %s", ipath.path, resp.Err)
 		}
 	}
 	log.Debugw("AddIndex", "took", time.Since(addStart).String())

@@ -325,6 +325,12 @@ workflows:
           suite: itest-markets_v1_deal
           target: "./itests/markets_v1_deal_test.go"
 
+
+      - test:
+          name: test-itest-markets_v1_retrieval
+          suite: itest-markets_v1_retrieval
+          target: "./itests/markets_v1_retrieval_test.go"
+
       - test:
           name: test-itest-markets_v1_offline_deal
           suite: itest-markets_v1_offline_deal

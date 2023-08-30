@@ -211,7 +211,9 @@ before being assigned to a sector`,
 			Name: "MaxDealStartDelay",
 			Type: "Duration",
 
-			Comment: `Maximum amount of time proposed deal StartEpoch can be in future`,
+			Comment: `Maximum amount of time proposed deal StartEpoch can be in the future.
+This is applicable only for online deals as offline deals can take long duration
+to import the data`,
 		},
 		{
 			Name: "MaxProviderCollateralMultiplier",
