@@ -246,10 +246,15 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 
 	blockMetadata, err := blockReader.SkipNext()
 	for err == nil {
+		offset := blockMetadata.Offset
+		if blockReader.Version == 2 {
+			offset += carv2.HeaderSize
+		}
+
 		recs = append(recs, model.Record{
 			Cid: blockMetadata.Cid,
 			OffsetSize: model.OffsetSize{
-				Offset: blockMetadata.Offset,
+				Offset: offset,
 				Size:   blockMetadata.Size,
 			},
 		})
