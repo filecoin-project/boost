@@ -70,11 +70,11 @@ require (
 	github.com/ipld/go-car/v2 v2.11.0
 	github.com/ipld/go-ipld-prime v0.21.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
-	github.com/ipni/index-provider v0.13.6-0.20230829162028-0ec5626fdd88
+	github.com/ipni/index-provider v0.13.6-0.20230830185429-34d610cbd9ee
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/libp2p/go-libp2p v0.30.1-0.20230829055202-ac038dbf2d38
+	github.com/libp2p/go-libp2p v0.31.0
 	github.com/libp2p/go-libp2p-gostream v0.6.0 // indirect
 	github.com/libp2p/go-libp2p-http v0.5.0
 	github.com/libp2p/go-libp2p-kad-dht v0.24.2
@@ -340,8 +340,8 @@ require (
 	github.com/filecoin-project/lotus v1.23.4-0.20230828173308-c4214e23bff7
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
-	github.com/ipni/go-libipni v0.4.1-0.20230829161814-0c9c4cae11e0
-	github.com/ipni/ipni-cli v0.0.16-0.20230829155023-cdb10a1eb758
+	github.com/ipni/go-libipni v0.4.1-0.20230830173457-b2617d498154
+	github.com/ipni/ipni-cli v0.0.16-0.20230830175523-611fe63abbef
 	github.com/schollz/progressbar/v3 v3.13.1
 )
 
