@@ -113,6 +113,7 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 		//Length   abi.PaddedPieceSize
 		//Checkpoint dealcheckpoints.Checkpoint
 		//CheckpointAt time.Time
+		//TODO: fetch based on allocationId
 		//StartEpoch abi.ChainEpoch
 		//EndEpoch   abi.ChainEpoch
 		//Err string
