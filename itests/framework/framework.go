@@ -342,7 +342,6 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 
 	cfg.Dealmaking.ExpectedSealDuration = 10
 
-
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
 		*rcfg = *cfg
@@ -799,7 +798,7 @@ func (f *TestFramework) ExtractFileFromCAR(ctx context.Context, t *testing.T, fi
 	return tmpFile
 }
 
-func (f *TestFramework) RetrieveDirect(ctx context.Context, t *testing.T, root cid.Cid, pieceCid *cid.Cid, carExport bool, extractCar bool, selectorNode datamodel.Node) string {
+func (f *TestFramework) RetrieveDirect(ctx context.Context, t *testing.T, root cid.Cid, pieceCid *cid.Cid, extractCar bool, selectorNode datamodel.Node) string {
 	offer, err := f.FullNode.ClientMinerQueryOffer(ctx, f.MinerAddr, root, pieceCid)
 	require.NoError(t, err)
 

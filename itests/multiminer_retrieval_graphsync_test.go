@@ -2,9 +2,10 @@ package itests
 
 import (
 	"context"
+	"testing"
+
 	"github.com/filecoin-project/boost/itests/shared"
 	"github.com/filecoin-project/lotus/itests/kit"
-	"testing"
 )
 
 func TestMultiMinerRetrievalGraphsync(t *testing.T) {
@@ -16,7 +17,7 @@ func TestMultiMinerRetrievalGraphsync(t *testing.T) {
 		// - recognize that the deal is for a sector on the first miner
 		// - read the data for the deal from the first miner
 		t.Logf("deal is added to piece, starting retrieval of root %s", rt.RootCid)
-		outPath := rt.BoostAndMiner2.RetrieveDirect(ctx, t, rt.RootCid, nil, true)
+		outPath := rt.BoostAndMiner2.RetrieveDirect(ctx, t, rt.RootCid, nil, true, nil)
 
 		t.Logf("retrieval is done, compare in- and out- files in: %s, out: %s", rt.SampleFilePath, outPath)
 		kit.AssertFilesEqual(t, rt.SampleFilePath, outPath)
