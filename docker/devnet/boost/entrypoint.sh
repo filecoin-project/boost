@@ -47,8 +47,8 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
   ROOT_KEY_2=`cat $LOTUS_PATH/rootkey-2`
   echo Root key 1: $ROOT_KEY_1
   echo Root key 2: $ROOT_KEY_2
-  #lotus wallet import $LOTUS_PATH/bls-$ROOT_KEY_1.keyinfo
-  #lotus wallet import $LOTUS_PATH/bls-$ROOT_KEY_2.keyinfo
+  lotus wallet import $LOTUS_PATH/bls-$ROOT_KEY_1.keyinfo
+  lotus wallet import $LOTUS_PATH/bls-$ROOT_KEY_2.keyinfo
   NOTARY_1=`lotus wallet new secp256k1`
   NOTARY_2=`lotus wallet new secp256k1`
   echo $NOTARY_1 > $BOOST_PATH/notary_1
@@ -56,7 +56,15 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
   echo Notary 1: $NOTARY_1
   echo Notary 2: $NOTARY_2
 
+  echo Add verifier root_key_1 notary_1
   lotus-shed verifreg add-verifier $ROOT_KEY_1 $NOTARY_1 10000000
+  sleep 15
+  echo Msig inspect f080
+  lotus msig inspect f080
+  PARAMS=`lotus msig inspect f080 | tail -1 | awk '{print $8}'`
+  echo Params: $PARAMS
+  echo Msig approve
+  lotus msig approve --from=$ROOT_KEY_2 f080 0 t0100 f06 0 2 $PARAMS
 
 	echo Done
 	touch $BOOST_PATH/.init.boost
