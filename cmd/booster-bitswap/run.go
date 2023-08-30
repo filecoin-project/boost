@@ -47,7 +47,7 @@ var runCmd = &cli.Command{
 			Usage:    "the endpoint for the full node API",
 			Required: true,
 		},
-		&cli.StringFlag{
+		&cli.StringSliceFlag{
 			Name:     "api-storage",
 			Usage:    "the endpoint for the storage node API",
 			Required: true,
@@ -114,6 +114,12 @@ var runCmd = &cli.Command{
 			Usage: "Number of threads (goroutines) sending outgoing messages. Throttles the number of concurrent send operations",
 			Value: 128,
 		},
+		&cli.BoolFlag{
+			Name:   "api-version-check",
+			Usage:  "Check API versions (param is used by tests)",
+			Hidden: true,
+			Value:  true,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Bool("pprof") {
@@ -149,13 +155,20 @@ var runCmd = &cli.Command{
 		}
 		defer ncloser()
 
-		// Connect to the storage API and create a sector accessor
-		storageApiInfo := cctx.String("api-storage")
-		sa, storageCloser, err := lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
+		if cctx.Bool("api-version-check") {
+			err = lib.CheckFullNodeApiVersion(ctx, fullnodeApi)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Connect to the storage API(s) and create a piece reader
+		sa := lib.NewMultiMinerAccessor(cctx.StringSlice("api-storage"), fullnodeApi)
+		err = sa.Start(ctx, log)
 		if err != nil {
 			return err
 		}
-		defer storageCloser()
+		defer sa.Close()
 
 		// Connect to the local index directory service
 		cl := bdclient.NewStore()
@@ -196,8 +209,7 @@ var runCmd = &cli.Command{
 		if err != nil {
 			return fmt.Errorf("starting block filter: %w", err)
 		}
-		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		pd := piecedirectory.NewPieceDirectory(cl, pr, cctx.Int("add-index-throttle"))
+		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"))
 		remoteStore := remoteblockstore.NewRemoteBlockstore(pd, &bitswapBlockMetrics)
 		server := NewBitswapServer(remoteStore, host, multiFilter)
 

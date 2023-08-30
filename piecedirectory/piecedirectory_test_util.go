@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
@@ -84,7 +85,7 @@ func testPieceDirectoryNotFound(ctx context.Context, t *testing.T, cl *client.St
 
 // Verify that Has, GetSize and Get block work
 func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.Store) {
-	carFilePath := CreateCarFile(t)
+	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()
@@ -155,7 +156,7 @@ func testBasicBlockstoreMethods(ctx context.Context, t *testing.T, cl *client.St
 // will re-build the index
 func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Create a random CAR file
-	carFilePath := CreateCarFile(t)
+	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()
@@ -234,7 +235,7 @@ func testImportedIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 
 func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	// Create a random CAR file
-	carFilePath := CreateCarFile(t)
+	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()
@@ -271,7 +272,8 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.Equal(t, 0, len(pcids))
 
 	// Flag a piece
-	err = cl.FlagPiece(ctx, commpCalc.PieceCID, false)
+	maddr := address.TestAddress
+	err = cl.FlagPiece(ctx, commpCalc.PieceCID, false, maddr)
 	require.NoError(t, err)
 
 	// Count and list of pieces should contain one piece
@@ -284,24 +286,54 @@ func testFlaggingPieces(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.Equal(t, 1, len(pcids))
 
 	// Test that setting the filter returns the correct results
-	count, err = cl.FlaggedPiecesCount(ctx, &types.FlaggedPiecesListFilter{HasUnsealedCopy: false})
+	filterMatchUnsealed := &types.FlaggedPiecesListFilter{HasUnsealedCopy: false}
+	filterDifferentUnsealed := &types.FlaggedPiecesListFilter{HasUnsealedCopy: true}
+	filterMatchUnsealedMatchingMiner := &types.FlaggedPiecesListFilter{HasUnsealedCopy: false, MinerAddr: maddr}
+	filterMatchUnsealedDifferentMiner := &types.FlaggedPiecesListFilter{HasUnsealedCopy: false, MinerAddr: address.TestAddress2}
+	filterDifferentUnsealedMatchingMiner := &types.FlaggedPiecesListFilter{HasUnsealedCopy: true, MinerAddr: maddr}
+
+	count, err = cl.FlaggedPiecesCount(ctx, filterMatchUnsealed)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
-	count, err = cl.FlaggedPiecesCount(ctx, &types.FlaggedPiecesListFilter{HasUnsealedCopy: true})
+	count, err = cl.FlaggedPiecesCount(ctx, filterDifferentUnsealed)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
-	pcids, err = cl.FlaggedPiecesList(ctx, &types.FlaggedPiecesListFilter{HasUnsealedCopy: false}, nil, 0, 10)
+	count, err = cl.FlaggedPiecesCount(ctx, filterMatchUnsealedMatchingMiner)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	count, err = cl.FlaggedPiecesCount(ctx, filterMatchUnsealedDifferentMiner)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	count, err = cl.FlaggedPiecesCount(ctx, filterDifferentUnsealedMatchingMiner)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	pcids, err = cl.FlaggedPiecesList(ctx, filterMatchUnsealed, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(pcids))
 
-	pcids, err = cl.FlaggedPiecesList(ctx, &types.FlaggedPiecesListFilter{HasUnsealedCopy: true}, nil, 0, 10)
+	pcids, err = cl.FlaggedPiecesList(ctx, filterDifferentUnsealed, nil, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(pcids))
+
+	pcids, err = cl.FlaggedPiecesList(ctx, filterMatchUnsealedMatchingMiner, nil, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(pcids))
+
+	pcids, err = cl.FlaggedPiecesList(ctx, filterMatchUnsealedDifferentMiner, nil, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(pcids))
+
+	pcids, err = cl.FlaggedPiecesList(ctx, filterDifferentUnsealedMatchingMiner, nil, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pcids))
 
 	// Unflag the piece
-	err = cl.UnflagPiece(ctx, commpCalc.PieceCID)
+	err = cl.UnflagPiece(ctx, commpCalc.PieceCID, maddr)
 	require.NoError(t, err)
 
 	// Count and list of pieces should be empty
@@ -325,7 +357,7 @@ func testReIndexMultiSector(ctx context.Context, t *testing.T, cl *client.Store)
 	pm.Start(ctx)
 
 	// Create a random CAR file
-	carFilePath := CreateCarFile(t)
+	_, carFilePath := CreateCarFile(t)
 	carFile, err := os.Open(carFilePath)
 	require.NoError(t, err)
 	defer carFile.Close()
@@ -339,11 +371,11 @@ func testReIndexMultiSector(ctx context.Context, t *testing.T, cl *client.Store)
 	// Return error first 3 time as during the first attempt we want to surface errors from
 	// failed BuildIndexForPiece operation for both deals. 3rd time to return error for first deal
 	// in the second run where we want the method to succeed eventually.
-	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("piece error")).Times(3)
-	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
-		func(_ context.Context, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (pdTypes.SectionReader, error) {
+	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("piece error")).Times(3)
+	pr.EXPECT().GetReader(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
+		func(_ context.Context, _ address.Address, _ abi.SectorNumber, _ abi.PaddedPieceSize, _ abi.PaddedPieceSize) (pdTypes.SectionReader, error) {
 			_, err := carv1Reader.Seek(0, io.SeekStart)
-			return MockSectionReader{carv1Reader}, err
+			return &MockSectionReader{SectionReader: carv1Reader}, err
 		})
 
 	pieceCid := CalculateCommp(t, carv1Reader).PieceCID

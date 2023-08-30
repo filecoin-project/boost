@@ -1,24 +1,25 @@
 package migrations
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/pressly/goose/v3"
 )
 
 func init() {
-	goose.AddMigration(upSetdealsAnnounceToIPNI, downSetdealsAnnounceToIPNI)
+	goose.AddMigrationContext(upSetdealsAnnounceToIPNI, downSetdealsAnnounceToIPNI)
 }
 
-func upSetdealsAnnounceToIPNI(tx *sql.Tx) error {
-	_, err := tx.Exec("UPDATE Deals SET AnnounceToIPNI=?;", true)
+func upSetdealsAnnounceToIPNI(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, "UPDATE Deals SET AnnounceToIPNI=?;", true)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func downSetdealsAnnounceToIPNI(tx *sql.Tx) error {
+func downSetdealsAnnounceToIPNI(ctx context.Context, tx *sql.Tx) error {
 	// This code is executed when the migration is rolled back.
 	return nil
 }

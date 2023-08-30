@@ -6,12 +6,18 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/filecoin-project/boost/api"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/markets/sectoraccessor"
+	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boost/piecedirectory/types"
+	"github.com/filecoin-project/dagstore/mount"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc"
+	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -41,16 +47,20 @@ func GetFullNodeApi(ctx context.Context, ai string, log *logging.ZapEventLogger)
 		return nil, nil, fmt.Errorf("creating full node service API: %w", err)
 	}
 
+	return fnapi, closer, nil
+}
+
+func CheckFullNodeApiVersion(ctx context.Context, fnapi v1api.FullNode) error {
 	v, err := fnapi.Version(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("checking full node service API version: %w", err)
+		return fmt.Errorf("checking full node service API version: %w", err)
 	}
 
 	if !v.APIVersion.EqMajorMinor(lapi.FullAPIVersion1) {
-		return nil, nil, fmt.Errorf("full node service API version didn't match (expected %s, remote %s)", api.FullAPIVersion1, v.APIVersion)
+		return fmt.Errorf("full node service API version didn't match (expected %s, remote %s)", api.FullAPIVersion1, v.APIVersion)
 	}
 
-	return fnapi, closer, nil
+	return nil
 }
 
 func GetMinerApi(ctx context.Context, ai string, log *logging.ZapEventLogger) (v0api.StorageMiner, jsonrpc.ClientCloser, error) {
@@ -89,7 +99,85 @@ func StorageAuthWithURL(apiInfo string) (sealer.StorageAuth, error) {
 	return sealer.StorageAuth(headers), nil
 }
 
-func CreateSectorAccessor(ctx context.Context, storageApiInfo string, fullnodeApi v1api.FullNode, log *logging.ZapEventLogger) (dagstore.SectorAccessor, jsonrpc.ClientCloser, error) {
+type MultiMinerAccessor struct {
+	storageApiInfos []string
+	fullnodeApi     v1api.FullNode
+	readers         map[address.Address]types.PieceReader
+	sas             map[address.Address]dagstore.SectorAccessor
+	closeOnce       sync.Once
+	closers         []jsonrpc.ClientCloser
+}
+
+func NewMultiMinerAccessor(storageApiInfos []string, fullnodeApi v1api.FullNode) *MultiMinerAccessor {
+	return &MultiMinerAccessor{
+		storageApiInfos: storageApiInfos,
+		fullnodeApi:     fullnodeApi,
+	}
+}
+
+func (a *MultiMinerAccessor) Start(ctx context.Context, log *logging.ZapEventLogger) error {
+	a.sas = make(map[address.Address]dagstore.SectorAccessor, len(a.storageApiInfos))
+	a.readers = make(map[address.Address]types.PieceReader, len(a.storageApiInfos))
+	a.closers = make([]jsonrpc.ClientCloser, 0, len(a.storageApiInfos))
+	for _, apiInfo := range a.storageApiInfos {
+		sa, closer, err := CreateSectorAccessor(ctx, apiInfo, a.fullnodeApi, log)
+		if err != nil {
+			a.Close()
+			return fmt.Errorf("creating sector accessor for endpoint '%s': %w", apiInfo, err)
+		}
+		a.sas[sa.maddr] = sa
+		a.readers[sa.maddr] = &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
+		a.closers = append(a.closers, closer)
+	}
+	return nil
+}
+
+func (a *MultiMinerAccessor) Close() {
+	a.closeOnce.Do(func() {
+		for _, c := range a.closers {
+			c()
+		}
+	})
+}
+
+func (a *MultiMinerAccessor) GetMinerAddresses() []address.Address {
+	addrs := make([]address.Address, 0, len(a.readers))
+	for a := range a.readers {
+		addrs = append(addrs, a)
+	}
+	return addrs
+}
+
+func (a *MultiMinerAccessor) GetReader(ctx context.Context, minerAddr address.Address, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (types.SectionReader, error) {
+	pr, ok := a.readers[minerAddr]
+	if !ok {
+		return nil, fmt.Errorf("get reader: no endpoint registered for miner %s", minerAddr)
+	}
+	return pr.GetReader(ctx, minerAddr, id, offset, length)
+}
+
+func (a *MultiMinerAccessor) UnsealSectorAt(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error) {
+	sa, ok := a.sas[minerAddr]
+	if !ok {
+		return nil, fmt.Errorf("read sector: no endpoint registered for miner %s", minerAddr)
+	}
+	return sa.UnsealSectorAt(ctx, sectorID, pieceOffset, length)
+}
+
+func (a *MultiMinerAccessor) IsUnsealed(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error) {
+	sa, ok := a.sas[minerAddr]
+	if !ok {
+		return false, fmt.Errorf("is unsealed: no endpoint registered for miner %s", minerAddr)
+	}
+	return sa.IsUnsealed(ctx, sectorID, offset, length)
+}
+
+type sectorAccessor struct {
+	dagstore.SectorAccessor
+	maddr address.Address
+}
+
+func CreateSectorAccessor(ctx context.Context, storageApiInfo string, fullnodeApi v1api.FullNode, log *logging.ZapEventLogger) (*sectorAccessor, jsonrpc.ClientCloser, error) {
 	sauth, err := StorageAuthWithURL(storageApiInfo)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parsing storage API endpoint: %w", err)
@@ -140,5 +228,5 @@ func CreateSectorAccessor(ctx context.Context, storageApiInfo string, fullnodeAp
 	const maxCacheSize = 4096
 	newSectorAccessor := sectoraccessor.NewCachingSectorAccessor(maxCacheSize, 5*time.Minute)
 	sa := newSectorAccessor(dtypes.MinerAddress(maddr), storageService, pp, fullnodeApi)
-	return sa, storageCloser, nil
+	return &sectorAccessor{SectorAccessor: sa, maddr: maddr}, storageCloser, nil
 }

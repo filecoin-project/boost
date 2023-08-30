@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/boostd-data/yugabyte"
+	"github.com/filecoin-project/boostd-data/yugabyte/migrations"
+	"github.com/filecoin-project/go-address"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 )
@@ -18,6 +22,7 @@ var runCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		leveldbCmd,
 		yugabyteCmd,
+		yugabyteMigrateCmd,
 	},
 }
 
@@ -95,8 +100,21 @@ var yugabyteCmd = &cli.Command{
 			ConnectString: cctx.String("connect-string"),
 		}
 
-		bdsvc := svc.NewYugabyte(settings)
-		return runAction(cctx, "yugabyte", bdsvc)
+		// One of the migrations requires a miner address. But we don't want to
+		// add a miner-address parameter to this command just for the one time
+		// that the user needs to perform that specific migration. Instead, pass
+		// a disabled miner address, and if the migration is needed it will
+		// throw ErrMissingMinerAddr and we can inform the user they need to
+		// perform the migration.
+		migrator := yugabyte.NewMigrator(settings, migrations.DisabledMinerAddr)
+
+		// Create a connection to the yugabyte implementation of LID
+		bdsvc := svc.NewYugabyte(settings, migrator)
+		err := runAction(cctx, "yugabyte", bdsvc)
+		if err != nil && errors.Is(err, migrations.ErrMissingMinerAddr) {
+			return fmt.Errorf("The database needs to be migrated. Run `boostd-data run yugabyte-migrate`")
+		}
+		return err
 	},
 }
 
@@ -150,4 +168,53 @@ func runAction(cctx *cli.Context, dbType string, store *svc.Service) error {
 	}
 
 	return nil
+}
+
+var yugabyteMigrateCmd = &cli.Command{
+	Name:   "yugabyte-migrate",
+	Usage:  "Migrate boostd-data yugabyte database",
+	Before: before,
+	Flags: []cli.Flag{
+		&cli.StringSliceFlag{
+			Name:     "hosts",
+			Usage:    "yugabyte hosts to connect to over cassandra interface eg '127.0.0.1'",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "connect-string",
+			Usage:    "postgres connect string eg 'postgresql://postgres:postgres@localhost'",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:  "miner-address",
+			Usage: "default miner address eg f1234",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		_ = logging.SetLogLevel("migrations", "info")
+		ctx := cliutil.ReqContext(cctx)
+
+		// Create a yugabyte data service
+		settings := yugabyte.DBSettings{
+			Hosts:         cctx.StringSlice("hosts"),
+			ConnectString: cctx.String("connect-string"),
+		}
+
+		maddr := migrations.DisabledMinerAddr
+		if cctx.IsSet("miner-address") {
+			var err error
+			maddr, err = address.NewFromString(cctx.String("miner-address"))
+			if err != nil {
+				return fmt.Errorf("parsing miner address '%s': %w", maddr, err)
+			}
+		}
+		migrator := yugabyte.NewMigrator(settings, maddr)
+		err := migrator.Migrate(ctx)
+		if err != nil && errors.Is(err, migrations.ErrMissingMinerAddr) {
+			msg := "You must set the miner-address flag to do the migration. " +
+				"Set it to the address of the storage miner eg f1234"
+			return fmt.Errorf(msg)
+		}
+		return err
+	},
 }

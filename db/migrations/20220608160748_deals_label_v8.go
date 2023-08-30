@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"unicode/utf8"
@@ -11,13 +12,13 @@ import (
 )
 
 func init() {
-	goose.AddMigration(UpDealsLabelV8, DownDealsLabelV8)
+	goose.AddMigrationContext(UpDealsLabelV8, DownDealsLabelV8)
 }
 
 // Change the deal label format from a string to a marshalled DealLabel
-func UpDealsLabelV8(tx *sql.Tx) error {
+func UpDealsLabelV8(ctx context.Context, tx *sql.Tx) error {
 	errPrefix := "migrating deal label up from string to DealLabel: "
-	rows, err := tx.Query("SELECT ID, Label from Deals WHERE Label IS NOT NULL")
+	rows, err := tx.QueryContext(ctx, "SELECT ID, Label from Deals WHERE Label IS NOT NULL")
 	if err != nil {
 		return fmt.Errorf(errPrefix+"getting deals from DB: %w", err)
 	}
@@ -54,7 +55,7 @@ func UpDealsLabelV8(tx *sql.Tx) error {
 				return fmt.Errorf(dealErrPrefix+"marshalling DealLabel (bytes): %w", err)
 			}
 		}
-		_, err = tx.Exec("UPDATE Deals SET Label = ? WHERE ID = ?", marshalled, id)
+		_, err = tx.ExecContext(ctx, "UPDATE Deals SET Label = ? WHERE ID = ?", marshalled, id)
 		if err != nil {
 			return fmt.Errorf(dealErrPrefix+"saving DealLabel to DB: %w", err)
 		}
@@ -63,9 +64,9 @@ func UpDealsLabelV8(tx *sql.Tx) error {
 }
 
 // Change the deal label format from a marshalled DealLabel to a string
-func DownDealsLabelV8(tx *sql.Tx) error {
+func DownDealsLabelV8(ctx context.Context, tx *sql.Tx) error {
 	errPrefix := "migrating deal label down from DealLabel to string: "
-	rows, err := tx.Query("SELECT ID, Label from Deals WHERE Label IS NOT NULL")
+	rows, err := tx.QueryContext(ctx, "SELECT ID, Label from Deals WHERE Label IS NOT NULL")
 	if err != nil {
 		return fmt.Errorf(errPrefix+"getting deals from DB: %w", err)
 	}
@@ -100,7 +101,7 @@ func DownDealsLabelV8(tx *sql.Tx) error {
 			asString = string(asBytes)
 		}
 
-		_, err = tx.Exec("UPDATE Deals SET Label = ? WHERE ID = ?", asString, id)
+		_, err = tx.ExecContext(ctx, "UPDATE Deals SET Label = ? WHERE ID = ?", asString, id)
 		if err != nil {
 			return fmt.Errorf(dealErrPrefix+"saving deal label string to DB: %w", err)
 		}

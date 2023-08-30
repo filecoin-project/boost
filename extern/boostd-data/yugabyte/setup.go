@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/yugabyte/gocql"
 	"strings"
 )
 
@@ -13,15 +14,38 @@ var createCQL string
 //go:embed create.sql
 var createSQL string
 
+func (s *Store) CreateKeyspace(ctx context.Context) error {
+	// Create a new session using the default keyspace, then use that to create
+	// the new keyspace
+	log.Infow("creating cassandra keyspace " + s.cluster.Keyspace)
+	cluster := gocql.NewCluster(s.settings.Hosts...)
+	session, err := cluster.CreateSession()
+	if err != nil {
+		return fmt.Errorf("creating yugabyte cluster: %w", err)
+	}
+	query := `CREATE KEYSPACE IF NOT EXISTS ` + s.cluster.Keyspace +
+		` WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }`
+	log.Debug(query)
+	return session.Query(query).WithContext(ctx).Exec()
+}
+
 func (s *Store) Create(ctx context.Context) error {
+	// Create the cassandra tables using the Store's session, which has been
+	// configured to use the new keyspace
 	log.Infow("creating cassandra tables")
 	err := s.execScript(ctx, createCQL, s.execCQL)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating cassandra tables: %w", err)
 	}
 
+	// Create the postgres tables
 	log.Infow("creating postgres tables")
-	return s.execScript(ctx, createSQL, s.execSQL)
+	err = s.execScript(ctx, createSQL, s.execSQL)
+	if err != nil {
+		return fmt.Errorf("creating postgres tables: %w", err)
+	}
+
+	return s.migrator.Migrate(ctx)
 }
 
 //go:embed drop.cql
