@@ -15,8 +15,10 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
+	verifregst "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
+	ltypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
 	carv2 "github.com/ipld/go-car/v2"
 
@@ -78,13 +80,20 @@ func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectDataEntry) (*api.ProviderDealRejectionInfo, error) {
 	// Validate the deal proposal and Check for deal acceptance (allocation id, start epoch, etc.)
 
-	//chainHead, err := ddp.fullnodeApi.ChainHead(ctx)
-	//if err != nil {
-	//log.Warnw("failed to get chain head", "err", err)
-	//return nil, err
-	//}
+	chainHead, err := ddp.fullnodeApi.ChainHead(ctx)
+	if err != nil {
+		log.Warnw("failed to get chain head", "err", err)
+		return nil, err
+	}
 
-	//log.Infow("chain head", "epoch", chainHead)
+	log.Infow("chain head", "epoch", chainHead)
+
+	allocation, err := ddp.fullnodeApi.StateGetAllocation(ctx, entry.Client, entry.AllocationID, ltypes.EmptyTSK)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get allocations: %w", err)
+	}
+
+	_ = allocation
 
 	return &api.ProviderDealRejectionInfo{
 		Accepted: true,
@@ -105,7 +114,7 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 		//Provider  address.Address
 		CleanupData:      deleteAfterImport,
 		InboundFilePath:  filepath,
-		AllocationID:     allocationId,
+		AllocationID:     verifregst.AllocationId(allocationId),
 		KeepUnsealedCopy: !removeUnsealedCopy,
 		AnnounceToIPNI:   !skipIpniAnnounce,
 		//SectorID abi.SectorNumber

@@ -7,6 +7,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/google/uuid"
 	cid "github.com/ipfs/go-cid"
 )
@@ -23,7 +24,7 @@ type DirectDataEntry struct {
 	Client    address.Address
 	Provider  address.Address
 
-	AllocationID uint64
+	AllocationID verifregtypes.AllocationId
 
 	// CleanupData indicates whether to remove the data for a deal after the deal has been added to a sector.
 	// This is always true for online deals, and can be set as a flag for offline deals.
