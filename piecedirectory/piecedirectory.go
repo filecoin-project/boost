@@ -557,7 +557,7 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 							if err != nil {
 								return nil, fmt.Errorf("recovery error reading data for block %s from reader for piece %s (at: %d): %w", c, pieceCid, n.Offset, err)
 							}
-							break
+							return data, nil
 						}
 						n, err = br.SkipNext()
 					}
