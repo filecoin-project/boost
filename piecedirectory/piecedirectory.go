@@ -542,20 +542,9 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 			_, data, err := util.ReadNode(bufio.NewReader(readerAt))
 			if err != nil {
 				_, _ = reader.Seek(0, io.SeekStart)
-				cv, carVerErr := carv2.ReadVersion(reader)
+				cv, _ := carv2.ReadVersion(reader)
 
-				if cv == 2 {
-					// see if the issue has to do w/ v2 offset?
-					readerAt = readerutil.NewReadSeekerFromReaderAt(reader, int64(offsetSize.Offset-carv2.HeaderSize))
-					_, data, err = util.ReadNode(bufio.NewReader(readerAt))
-					if err == nil {
-						log.Warnf("requested block found with offset not accounting for carv2 header")
-					} else if err != nil {
-						return nil, fmt.Errorf("reading data for block %s from reader for piece %s (cv: %d/%s): %w", c, pieceCid, cv, carVerErr, err)
-					}
-				} else {
-					return nil, fmt.Errorf("reading data for block %s from reader for piece %s (cv: %d/%s): %w", c, pieceCid, cv, carVerErr, err)
-				}
+				return nil, fmt.Errorf("reading data for block %s from reader for piece %s (cv: %d): %w", c, pieceCid, cv, err)
 			}
 			return data, nil
 		}()
