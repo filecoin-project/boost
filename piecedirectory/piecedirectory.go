@@ -166,6 +166,8 @@ func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid,
 		if err := ps.addIndexForPieceThrottled(ctx, pieceCid, dealInfo); err != nil {
 			return fmt.Errorf("adding index for piece %s: %w", pieceCid, err)
 		}
+	} else {
+		log.Infow("add deal for piece", "index", "not re-indexing, piece already indexed")
 	}
 
 	// Add deal to list of deals for this piece
@@ -248,6 +250,9 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	}
 
 	blockMetadata, err := blockReader.SkipNext()
+	if blockReader.Version == 2 {
+		log.Warnf("add index: carv2 deal encountered", "offset adjustment for index", carv2.HeaderSize)
+	}
 	for err == nil {
 		offset := blockMetadata.Offset
 		if blockReader.Version == 2 {
