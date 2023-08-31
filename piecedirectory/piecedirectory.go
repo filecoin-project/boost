@@ -552,7 +552,7 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 					for err == nil {
 						if n.Cid.Equals(c) {
 							log.Warnf("blockstore get: was told by index that cid was at %d, but found it at %d", offsetSize.Offset, n.Offset)
-							_, _ = reader.Seek(int64(n.Offset), io.SeekStart)
+							_, _ = reader.Seek(int64(n.Offset)-int64(n.Size), io.SeekStart)
 							_, data, err = util.ReadNode(bufio.NewReader(reader))
 							if err != nil {
 								return nil, fmt.Errorf("recovery error reading data for block %s from reader for piece %s (at: %d): %w", c, pieceCid, n.Offset, err)
