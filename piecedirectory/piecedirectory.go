@@ -555,7 +555,7 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 							_, _ = reader.Seek(int64(n.Offset), io.SeekStart)
 							_, data, err = util.ReadNode(bufio.NewReader(reader))
 							if err != nil {
-								_, _ = reader.Seek(int64(n.Offset), io.SeekStart)
+								_, _ = reader.Seek(int64(n.Offset)-40, io.SeekStart)
 								ob := make([]byte, 1024)
 								io.ReadFull(reader, ob)
 
