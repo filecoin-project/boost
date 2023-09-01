@@ -102,30 +102,9 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 				opts = append(opts, engine.WithDirectAnnounce(cfg.Announce.DirectAnnounceURLs...))
 			}
 
-			// Advertisements can be served over the data transfer protocol
-			// (on graphsync) or over HTTP
-			if cfg.HttpPublisher.Enabled {
-				announceAddr, err := util.ToHttpMultiaddr(cfg.HttpPublisher.PublicHostname, cfg.HttpPublisher.Port)
-				if err != nil {
-					return nil, fmt.Errorf("parsing HTTP Publisher hostname '%s' / port %d: %w",
-						cfg.HttpPublisher.PublicHostname, cfg.HttpPublisher.Port, err)
-				}
-				opts = append(opts,
-					engine.WithPublisherKind(engine.HttpPublisher),
-					engine.WithHttpPublisherListenAddr(fmt.Sprintf("0.0.0.0:%d", cfg.HttpPublisher.Port)),
-					engine.WithHttpPublisherAnnounceAddr(announceAddr.String()),
-				)
-				if cfg.HttpPublisher.NoLibp2p {
-					opts = append(opts, engine.WithHttpNoLibp2p(true))
-					llog = llog.With("publisher", "http", "announceAddr", announceAddr)
-				} else {
-					llog = llog.With("publisher", "http and libp2phttp", "announceAddr", announceAddr, "extraGossipData", ma)
-				}
-			} else if !cfg.DataTransferPublisher {
-				// HTTP publisher not enabled, so use only libp2phttp unless using DataTransferPublisher.
-				opts = append(opts, engine.WithPublisherKind(engine.HttpPublisher))
-				llog = llog.With("publisher", "libp2phttp", "extraGossipData", ma)
-			} else {
+			// Advertisements can be served over HTTP, HTTP over libp2p of over
+			// the data transfer protocol (on graphsync).
+			if cfg.DataTransferPublisher {
 				opts = append(opts,
 					engine.WithPublisherKind(engine.DataTransferPublisher),
 					engine.WithDataTransfer(dtV1ToIndexerDT(dt, func() ipld.LinkSystem {
@@ -133,6 +112,27 @@ func IndexProvider(cfg config.IndexProviderConfig) func(params IdxProv, marketHo
 					})),
 				)
 				llog = llog.With("extraGossipData", ma, "publisher", "data-transfer")
+			} else if cfg.HttpPublisher.Enabled {
+				announceAddr, err := util.ToHttpMultiaddr(cfg.HttpPublisher.PublicHostname, cfg.HttpPublisher.Port)
+				if err != nil {
+					return nil, fmt.Errorf("parsing HTTP Publisher hostname '%s' / port %d: %w",
+						cfg.HttpPublisher.PublicHostname, cfg.HttpPublisher.Port, err)
+				}
+				opts = append(opts,
+					engine.WithHttpPublisherListenAddr(fmt.Sprintf("0.0.0.0:%d", cfg.HttpPublisher.Port)),
+					engine.WithHttpPublisherAnnounceAddr(announceAddr.String()),
+				)
+				if cfg.HttpPublisher.WithLibp2p {
+					opts = append(opts, engine.WithPublisherKind(engine.Libp2pHttpPublisher))
+					llog = llog.With("publisher", "http", "announceAddr", announceAddr)
+				} else {
+					opts = append(opts, engine.WithPublisherKind(engine.HttpPublisher))
+					llog = llog.With("publisher", "http and libp2phttp", "announceAddr", announceAddr, "extraGossipData", ma)
+				}
+			} else {
+				// HTTP publisher not enabled, so use only libp2p unless using DataTransferPublisher.
+				opts = append(opts, engine.WithPublisherKind(engine.Libp2pPublisher))
+				llog = llog.With("publisher", "libp2phttp", "extraGossipData", ma)
 			}
 		} else {
 			opts = append(opts, engine.WithPublisherKind(engine.NoPublisher))

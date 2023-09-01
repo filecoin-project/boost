@@ -52,7 +52,6 @@ require (
 	github.com/ipfs/go-cidutil v0.1.0
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-graphsync v0.14.10
-	github.com/ipfs/go-ipfs-blockstore v1.3.0 // indirect
 	github.com/ipfs/go-ipfs-blocksutil v0.0.1
 	github.com/ipfs/go-ipfs-chunker v0.0.5 // indirect
 	github.com/ipfs/go-ipfs-ds-help v1.1.0 // indirect
@@ -70,7 +69,7 @@ require (
 	github.com/ipld/go-car/v2 v2.11.0
 	github.com/ipld/go-ipld-prime v0.21.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
-	github.com/ipni/index-provider v0.13.6-0.20230830185429-34d610cbd9ee
+	github.com/ipni/index-provider v0.13.7-0.20230901111826-e1a840c2f295
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -337,11 +336,11 @@ require (
 	github.com/filecoin-project/boost-graphsync v0.13.9
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
-	github.com/filecoin-project/lotus v1.23.4-0.20230828173308-c4214e23bff7
+	github.com/filecoin-project/lotus v1.23.3
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
-	github.com/ipni/go-libipni v0.4.1-0.20230830173457-b2617d498154
-	github.com/ipni/ipni-cli v0.0.16-0.20230830175523-611fe63abbef
+	github.com/ipni/go-libipni v0.5.0
+	github.com/ipni/ipni-cli v0.0.16-0.20230831215529-9e7460ebf460
 	github.com/schollz/progressbar/v3 v3.13.1
 )
 

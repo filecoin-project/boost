@@ -353,7 +353,7 @@ type IndexProviderAnnounceConfig struct {
 }
 
 type IndexProviderHttpPublisherConfig struct {
-	// If not enabled, requests are served over graphsync instead.
+	// If not enabled, requests are served over HTTP instead of libp2p.
 	Enabled bool
 	// Set the public hostname / IP for the index provider listener.
 	// eg "82.129.73.111"
@@ -362,10 +362,10 @@ type IndexProviderHttpPublisherConfig struct {
 	// Set the port on which to listen for index provider requests over HTTP.
 	// Note that this port must be open on the firewall.
 	Port int
-	// If publishing using exclusively plain HTTP and no HTTP over libp2p,
-	// then set this to true. Otherwise, the publisher will publish content
-	// advertisements using both HTTP and HTTP over libp2p.
-	NoLibp2p bool
+	// Set this to true to publish HTTP over libp2p in addition to plain HTTP,
+	// Otherwise, the publisher will publish content advertisements using only
+	// plain HTTP if Enabled is true.
+	WithLibp2p bool
 }
 
 type FeeConfig struct {

@@ -567,7 +567,7 @@ data-transfer/graphsync was previously working.`,
 			Name: "Enabled",
 			Type: "bool",
 
-			Comment: `If not enabled, requests are served over graphsync instead.`,
+			Comment: `If not enabled, requests are served over HTTP instead of libp2p.`,
 		},
 		{
 			Name: "PublicHostname",
@@ -585,12 +585,12 @@ This is usually the same as the for the boost node.`,
 Note that this port must be open on the firewall.`,
 		},
 		{
-			Name: "NoLibp2p",
+			Name: "WithLibp2p",
 			Type: "bool",
 
-			Comment: `If publishing using exclusively plain HTTP and no HTTP over libp2p,
-then set this to true. Otherwise, the publisher will publish content
-advertisements using both HTTP and HTTP over libp2p.`,
+			Comment: `Set this to true to publish HTTP over libp2p in addition to plain HTTP,
+Otherwise, the publisher will publish content advertisements using only
+plain HTTP if Enabled is true.`,
 		},
 	},
 	"LocalIndexDirectoryConfig": []DocField{
@@ -1226,6 +1226,35 @@ the database must already exist and be writeable. If a relative path is provided
 relative to the CWD (current working directory).`,
 		},
 	},
+	"lotus_config.FaultReporterConfig": []DocField{
+		{
+			Name: "EnableConsensusFaultReporter",
+			Type: "bool",
+
+			Comment: `EnableConsensusFaultReporter controls whether the node will monitor and
+report consensus faults. When enabled, the node will watch for malicious
+behaviors like double-mining and parent grinding, and submit reports to the
+network. This can earn reporter rewards, but is not guaranteed. Nodes should
+enable fault reporting with care, as it may increase resource usage, and may
+generate gas fees without earning rewards.`,
+		},
+		{
+			Name: "ConsensusFaultReporterDataDir",
+			Type: "string",
+
+			Comment: `ConsensusFaultReporterDataDir is the path where fault reporter state will be
+persisted. This directory should have adequate space and permissions for the
+node process.`,
+		},
+		{
+			Name: "ConsensusFaultReporterAddress",
+			Type: "string",
+
+			Comment: `ConsensusFaultReporterAddress is the wallet address used for submitting
+ReportConsensusFault messages. It will pay for gas fees, and receive any
+rewards. This address should have adequate funds to cover gas fees.`,
+		},
+	},
 	"lotus_config.FeeConfig": []DocField{
 		{
 			Name: "DefaultMaxFee",
@@ -1296,6 +1325,12 @@ Set to 0 to keep all mappings`,
 		{
 			Name: "Index",
 			Type: "IndexConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "FaultReporter",
+			Type: "FaultReporterConfig",
 
 			Comment: ``,
 		},
