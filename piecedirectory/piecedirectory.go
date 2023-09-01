@@ -26,6 +26,7 @@ import (
 	format "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car"
+	"github.com/ipld/go-car/util"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
@@ -256,6 +257,8 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 
 	blockMetadata, err := blockReader.SkipNext()
 	for err == nil {
+		// blockMetadata.SourceOffset gives us the offset of the block data, we need to rewind to
+		// the offset of the CAR section, which is before the CID and the uvarint length prefix
 		offset := blockMetadata.SourceOffset - uint64(blockMetadata.Cid.ByteLen())
 		offset -= uint64(varint.UvarintSize(blockMetadata.Size + uint64(blockMetadata.Cid.ByteLen())))
 		recs = append(recs, model.Record{
@@ -533,13 +536,15 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 				return nil, fmt.Errorf("getting offset/size for cid %s in piece %s: %w", c, pieceCid, err)
 			}
 
-			// Seek to the block offset
-			offset := offsetSize.Offset + uint64(c.ByteLen()) // offset of the block data, which is after the cid
-			offset += uint64(varint.UvarintSize(offsetSize.Size + uint64(c.ByteLen())))
-			readerAt := readerutil.NewReadSeekerFromReaderAt(reader, int64(offset))
-			data := make([]byte, offsetSize.Size)
-			if _, err = io.ReadFull(readerAt, data); err != nil {
+			// Seek to the section offset
+			readerAt := readerutil.NewReadSeekerFromReaderAt(reader, int64(offsetSize.Offset))
+			// Read the block data
+			readCid, data, err := util.ReadNode(bufio.NewReader(readerAt))
+			if err != nil {
 				return nil, fmt.Errorf("reading data for block %s from reader for piece %s: %w", c, pieceCid, err)
+			}
+			if !bytes.Equal(readCid.Hash(), c.Hash()) {
+				return nil, fmt.Errorf("read block %s from reader for piece %s, but expected block %s", readCid, pieceCid, c)
 			}
 			return data, nil
 		}()
