@@ -250,7 +250,12 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 
 		log.Infow("got paddedReader")
 
-		clientId, err := address.IDFromAddress(entry.Client)
+		stateAddr, err := ddp.fullnodeApi.StateAccountKey(ctx, entry.Client, ltypes.EmptyTSK)
+		if err != nil {
+			return err
+		}
+
+		clientId, err := address.IDFromAddress(stateAddr)
 		if err != nil {
 			return err
 		}
