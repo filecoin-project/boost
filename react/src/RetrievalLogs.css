@@ -1,3 +1,25 @@
+.retrieval-miner-addrs {
+    margin: 0 0 2em 1em;
+}
+
+.retrieval-miner-addrs h3 {
+    margin-left: 0;
+}
+
+.retrieval-miner-addrs .title {
+    color: #a61e4d;
+    font-size: 1.25em;
+    padding: 0 0 0.5em 0;
+}
+
+.retrieval-miner-addrs .miner-addr {
+    background: url("./bootstrap-icons/icons/database-down.svg");
+    background-repeat: no-repeat;
+    padding-left: 1.5em;
+    margin-right: 1em;
+    display: inline-block;
+}
+
 .retrieval-logs {
     position: relative;
 }

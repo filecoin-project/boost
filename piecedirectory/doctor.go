@@ -26,13 +26,14 @@ var doclog = logging.Logger("piecedoc")
 // Note that multiple Doctor processes can run in parallel. The logic for which
 // pieces to give to the Doctor to check is in the local index directory.
 type Doctor struct {
+	maddr       address.Address
 	store       *bdclient.Store
 	ssm         *sectorstatemgr.SectorStateMgr
 	fullnodeApi api.FullNode
 }
 
-func NewDoctor(store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *Doctor {
-	return &Doctor{store: store, ssm: ssm, fullnodeApi: fullnodeApi}
+func NewDoctor(maddr address.Address, store *bdclient.Store, ssm *sectorstatemgr.SectorStateMgr, fullnodeApi api.FullNode) *Doctor {
+	return &Doctor{maddr: maddr, store: store, ssm: ssm, fullnodeApi: fullnodeApi}
 }
 
 // The average interval between calls to NextPiecesToCheck
@@ -68,7 +69,7 @@ func (d *Doctor) Run(ctx context.Context) {
 
 			// Get the next pieces to check (eg pieces that haven't been checked
 			// for a while) from the local index directory
-			pcids, err := d.store.NextPiecesToCheck(ctx)
+			pcids, err := d.store.NextPiecesToCheck(ctx, d.maddr)
 			if err != nil {
 				return err
 			}
@@ -115,9 +116,15 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 	}
 
 	lacksActiveSector := true // check whether the piece is present in active sector
-
+	hasDealsOnThisMiner := false
 	var chainDealIds []abi.DealID
 	for _, dl := range md.Deals {
+		// Ignore deals that were not made on this node's miner
+		if d.maddr != dl.MinerAddr {
+			continue
+		}
+		hasDealsOnThisMiner = true
+
 		mid, err := address.IDFromAddress(dl.MinerAddr)
 		if err != nil {
 			return err
@@ -135,10 +142,15 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 		}
 	}
 
-	if lacksActiveSector {
-		doclog.Debugw("ignoring and unflagging piece as it is not present in an active sector", "piece", pieceCid)
+	if !hasDealsOnThisMiner {
+		doclog.Warnw("ignoring piece as it is not present in any deals on this miner", "piece", pieceCid.String(), "miner", d.maddr.String())
+		return nil
+	}
 
-		err = d.store.UnflagPiece(ctx, pieceCid)
+	if lacksActiveSector {
+		doclog.Debugw("ignoring and unflagging piece as it is not present in an active sector", "piece", pieceCid.String())
+
+		err = d.store.UnflagPiece(ctx, pieceCid, d.maddr)
 		if err != nil {
 			return fmt.Errorf("failed to unflag piece %s: %w", pieceCid, err)
 		}
@@ -161,7 +173,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 		if !found {
 			doclog.Debugw("ignoring and unflagging piece as no deal id found on chain", "piece", pieceCid)
 
-			err = d.store.UnflagPiece(ctx, pieceCid)
+			err = d.store.UnflagPiece(ctx, pieceCid, d.maddr)
 			if err != nil {
 				return fmt.Errorf("failed to unflag piece %s: %w", pieceCid, err)
 			}
@@ -172,6 +184,11 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 	var hasUnsealedCopy bool
 
 	for _, dl := range md.Deals {
+		// Ignore deals that were not made on this node's miner
+		if d.maddr != dl.MinerAddr {
+			continue
+		}
+
 		mid, err := address.IDFromAddress(dl.MinerAddr)
 		if err != nil {
 			return err
@@ -196,7 +213,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 
 	// If piece is not indexed or has no unsealed copy, flag it
 	if !isIndexed || !hasUnsealedCopy {
-		err = d.store.FlagPiece(ctx, pieceCid, hasUnsealedCopy)
+		err = d.store.FlagPiece(ctx, pieceCid, hasUnsealedCopy, d.maddr)
 		if err != nil {
 			return fmt.Errorf("failed to flag piece %s: %w", pieceCid, err)
 		}
@@ -206,7 +223,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 
 	// There are no known issues with the piece, so unflag it
 	doclog.Debugw("unflagging piece", "piece", pieceCid)
-	err = d.store.UnflagPiece(ctx, pieceCid)
+	err = d.store.UnflagPiece(ctx, pieceCid, d.maddr)
 	if err != nil {
 		return fmt.Errorf("failed to unflag piece %s: %w", pieceCid, err)
 	}

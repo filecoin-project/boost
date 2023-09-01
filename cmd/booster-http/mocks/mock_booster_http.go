@@ -10,6 +10,7 @@ import (
 
 	model "github.com/filecoin-project/boostd-data/model"
 	mount "github.com/filecoin-project/dagstore/mount"
+	address "github.com/filecoin-project/go-address"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"
@@ -54,31 +55,31 @@ func (mr *MockHttpServerApiMockRecorder) GetPieceDeals(ctx, pieceCID interface{}
 }
 
 // IsUnsealed mocks base method.
-func (m *MockHttpServerApi) IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset, length abi.UnpaddedPieceSize) (bool, error) {
+func (m *MockHttpServerApi) IsUnsealed(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, offset, length abi.UnpaddedPieceSize) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsUnsealed", ctx, sectorID, offset, length)
+	ret := m.ctrl.Call(m, "IsUnsealed", ctx, minerAddr, sectorID, offset, length)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // IsUnsealed indicates an expected call of IsUnsealed.
-func (mr *MockHttpServerApiMockRecorder) IsUnsealed(ctx, sectorID, offset, length interface{}) *gomock.Call {
+func (mr *MockHttpServerApiMockRecorder) IsUnsealed(ctx, minerAddr, sectorID, offset, length interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsUnsealed", reflect.TypeOf((*MockHttpServerApi)(nil).IsUnsealed), ctx, sectorID, offset, length)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsUnsealed", reflect.TypeOf((*MockHttpServerApi)(nil).IsUnsealed), ctx, minerAddr, sectorID, offset, length)
 }
 
 // UnsealSectorAt mocks base method.
-func (m *MockHttpServerApi) UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, pieceOffset, length abi.UnpaddedPieceSize) (mount.Reader, error) {
+func (m *MockHttpServerApi) UnsealSectorAt(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, pieceOffset, length abi.UnpaddedPieceSize) (mount.Reader, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UnsealSectorAt", ctx, sectorID, pieceOffset, length)
+	ret := m.ctrl.Call(m, "UnsealSectorAt", ctx, minerAddr, sectorID, pieceOffset, length)
 	ret0, _ := ret[0].(mount.Reader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UnsealSectorAt indicates an expected call of UnsealSectorAt.
-func (mr *MockHttpServerApiMockRecorder) UnsealSectorAt(ctx, sectorID, pieceOffset, length interface{}) *gomock.Call {
+func (mr *MockHttpServerApiMockRecorder) UnsealSectorAt(ctx, minerAddr, sectorID, pieceOffset, length interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnsealSectorAt", reflect.TypeOf((*MockHttpServerApi)(nil).UnsealSectorAt), ctx, sectorID, pieceOffset, length)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnsealSectorAt", reflect.TypeOf((*MockHttpServerApi)(nil).UnsealSectorAt), ctx, minerAddr, sectorID, pieceOffset, length)
 }

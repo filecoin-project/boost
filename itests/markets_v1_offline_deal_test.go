@@ -83,7 +83,7 @@ func TestMarketsV1OfflineDeal(t *testing.T) {
 	require.NoError(t, err)
 
 	log.Debugw("offline deal is sealed, starting retrieval", "cid", dealProposalCid, "root", res.Root)
-	outPath := f.Retrieve(ctx, t, dealProposalCid, res.Root, true)
+	outPath := f.Retrieve(ctx, t, dealProposalCid, res.Root, true, nil)
 
 	log.Debugw("retrieval of offline deal is done, compare in- and out- files", "in", inPath, "out", outPath)
 	kit.AssertFilesEqual(t, inPath, outPath)

@@ -5,15 +5,14 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/db"
-	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/sectorstatemgr"
 	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/graph-gophers/graphql-go"
 )
 
-type dealData struct {
-	Indexed         gqltypes.Uint64
-	FlaggedUnsealed gqltypes.Uint64
-	FlaggedSealed   gqltypes.Uint64
+type resolverScanProgress struct {
+	Progress float64
+	LastScan *graphql.Time
 }
 
 type pieces struct {
@@ -33,7 +32,7 @@ type sectorProvingState struct {
 }
 
 type lidState struct {
-	DealData             dealData
+	ScanProgress         resolverScanProgress
 	Pieces               pieces
 	SectorUnsealedCopies sectorUnsealedCopies
 	SectorProvingState   sectorProvingState
@@ -68,37 +67,50 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 		}
 	}
 
-	fp, err := r.piecedirectory.FlaggedPiecesCount(ctx, nil)
+	maddr := r.provider.Address
+	fpHasUnsealed, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{
+		HasUnsealedCopy: true,
+		MinerAddr:       maddr,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	fpt, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{HasUnsealedCopy: true})
+	fpNoUnsealed, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{
+		HasUnsealedCopy: false,
+		MinerAddr:       maddr,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	fpf, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{HasUnsealedCopy: false})
+	flaggedPiecesCount := fpHasUnsealed + fpNoUnsealed
+
+	ap, err := r.piecedirectory.PiecesCount(ctx, maddr)
 	if err != nil {
 		return nil, err
 	}
 
-	ap, err := r.piecedirectory.PiecesCount(ctx)
+	scanProgress, err := r.piecedirectory.ScanProgress(ctx, maddr)
 	if err != nil {
 		return nil, err
+	}
+
+	var lastScan *graphql.Time
+	if !scanProgress.LastScan.IsZero() {
+		lastScan = &graphql.Time{Time: scanProgress.LastScan}
 	}
 
 	ls := &lidState{
-		FlaggedPieces: int32(fp),
-		DealData: dealData{
-			Indexed:         gqltypes.Uint64(12094627905536),
-			FlaggedUnsealed: gqltypes.Uint64(1094627905536),
-			FlaggedSealed:   gqltypes.Uint64(18094627905536),
+		ScanProgress: resolverScanProgress{
+			Progress: scanProgress.Progress,
+			LastScan: lastScan,
 		},
+		FlaggedPieces: int32(flaggedPiecesCount),
 		Pieces: pieces{
-			Indexed:         int32(ap - fp),
-			FlaggedUnsealed: int32(fpt),
-			FlaggedSealed:   int32(fpf),
+			Indexed:         int32(ap - flaggedPiecesCount),
+			FlaggedUnsealed: int32(fpHasUnsealed),
+			FlaggedSealed:   int32(fpNoUnsealed),
 		},
 		SectorUnsealedCopies: sectorUnsealedCopies{
 			Sealed:   sealed,

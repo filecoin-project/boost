@@ -325,6 +325,12 @@ workflows:
           suite: itest-markets_v1_deal
           target: "./itests/markets_v1_deal_test.go"
 
+
+      - test:
+          name: test-itest-markets_v1_retrieval
+          suite: itest-markets_v1_retrieval
+          target: "./itests/markets_v1_retrieval_test.go"
+
       - test:
           name: test-itest-markets_v1_offline_deal
           suite: itest-markets_v1_offline_deal
@@ -338,12 +344,27 @@ workflows:
       - test:
           name: test-all
           suite: all
-          target: "`go list ./... | grep -v boost/itests`"
+          target: "`go list ./... | grep -v boost/itests | grep -v cmd/booster-http | grep -v cmd/booster-bitswap`"
 
       - test:
           name: test-itest-ipni
           suite: itest-ipni
           target: "./itests/ipni_publish_test.go"
+
+      - test:
+          name: test-itest-multiminer-graphsync
+          suite: itest-multiminer-graphsync
+          target: "./itests/multiminer_retrieval_graphsync_test.go"
+
+      - test:
+          name: test-booster-http
+          suite: booster-http
+          target: "./cmd/booster-http"
+
+      - test:
+          name: test-booster-bitswap
+          suite: booster-bitswap
+          target: "./cmd/booster-bitswap"
 
       - lid-docker-compose
 

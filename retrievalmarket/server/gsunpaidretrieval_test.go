@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,30 +9,30 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	retrievalimpl "github.com/filecoin-project/boost-gfm/retrievalmarket/impl"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket/impl/askstore"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket/impl/testnodes"
 	rmnet "github.com/filecoin-project/boost-gfm/retrievalmarket/network"
 	tut "github.com/filecoin-project/boost-gfm/shared_testutil"
-	graphsync "github.com/filecoin-project/boost-graphsync"
 	graphsyncimpl "github.com/filecoin-project/boost-graphsync/impl"
 	"github.com/filecoin-project/boost-graphsync/network"
 	"github.com/filecoin-project/boost-graphsync/storeutil"
-	boosttu "github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/boost/piecedirectory"
+	bdclientutil "github.com/filecoin-project/boostd-data/clientutil"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-address"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	dtimpl "github.com/filecoin-project/go-data-transfer/impl"
 	"github.com/filecoin-project/go-data-transfer/testutil"
 	dtgstransport "github.com/filecoin-project/go-data-transfer/transport/graphsync"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/google/uuid"
+	"github.com/ipfs/boxo/ipld/car/v2"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	logging "github.com/ipfs/go-log/v2"
-	carv2 "github.com/ipld/go-car/v2"
-	"github.com/ipld/go-car/v2/blockstore"
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 	"github.com/ipld/go-ipld-prime/traversal/selector"
 	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
@@ -59,7 +58,7 @@ var clientCancelled = errors.New("client cancelled")
 var clientRejected = errors.New("client received reject response")
 
 func TestGS(t *testing.T) {
-	// _ = logging.SetLogLevel("testgs", "debug")
+	//_ = logging.SetLogLevel("testgs", "debug")
 	_ = logging.SetLogLevel("testgs", "info")
 	//_ = logging.SetLogLevel("dt-impl", "debug")
 
@@ -163,19 +162,37 @@ func runRequestTest(t *testing.T, tc testCase) {
 
 	// Create a CAR file and set up mocks
 	testData := tut.NewLibp2pTestData(ctx, t)
-	carRootCid, carData := createCarV1(t)
+
+	carRootCid, carFilePath := piecedirectory.CreateCarFile(t)
+	carFile, err := os.Open(carFilePath)
+	require.NoError(t, err)
+	defer carFile.Close()
+
+	// Create a random CAR file
+	carReader, err := car.OpenReader(carFilePath)
+	require.NoError(t, err)
+	defer carReader.Close()
+	carv1Reader, err := carReader.DataReader()
+	require.NoError(t, err)
+
+	// Any calls to get a reader over data should return a reader over the random CAR file
+	pr := piecedirectory.CreateMockPieceReader(t, carv1Reader)
+
+	carv1Bytes, err := io.ReadAll(carv1Reader)
+	require.NoError(t, err)
+	carSize := len(carv1Bytes)
+
+	maddr := address.TestAddress
+	pieceCid := tut.GenerateCids(1)[0]
 	sectorID := abi.SectorNumber(1)
 	offset := abi.PaddedPieceSize(0)
-	pieceInfo := piecestore.PieceInfo{
-		PieceCID: tut.GenerateCids(1)[0],
-		Deals: []piecestore.DealInfo{
-			{
-				DealID:   abi.DealID(1),
-				SectorID: sectorID,
-				Offset:   offset,
-				Length:   abi.UnpaddedPieceSize(len(carData)).Padded(),
-			},
-		},
+	dealInfo := model.DealInfo{
+		DealUuid:    uuid.New().String(),
+		ChainDealID: abi.DealID(1),
+		MinerAddr:   maddr,
+		SectorID:    sectorID,
+		PieceOffset: offset,
+		PieceLength: abi.UnpaddedPieceSize(carSize).Padded(),
 	}
 
 	askStore, err := askstore.NewAskStore(namespace.Wrap(testData.Ds1, datastore.NewKey("retrieval-ask")), datastore.NewKey("latest"))
@@ -187,35 +204,24 @@ func runRequestTest(t *testing.T, tc testCase) {
 	err = askStore.SetAsk(ask)
 	require.NoError(t, err)
 
-	sectorAccessor := testnodes.NewTestSectorAccessor()
-	if !tc.noUnsealedCopy {
-		sectorAccessor.MarkUnsealed(ctx, sectorID, offset.Unpadded(), abi.UnpaddedPieceSize(len(carData)))
-	}
+	cl := bdclientutil.NewTestStore(ctx)
+	defer cl.Close(ctx)
 
-	pieceStore := tut.NewTestPieceStore()
-	sectorAccessor.ExpectUnseal(sectorID, offset.Unpadded(), abi.UnpaddedPieceSize(len(carData)), carData)
-	dagstoreWrapper := tut.NewMockDagStoreWrapper(pieceStore, sectorAccessor)
+	pd := piecedirectory.NewPieceDirectory(cl, pr, 1)
+	pd.Start(ctx)
+	err = pd.AddDealForPiece(ctx, pieceCid, dealInfo)
+	require.NoError(t, err)
+
 	vdeps := ValidationDeps{
-		DagStore:       dagstoreWrapper,
-		PieceStore:     pieceStore,
-		SectorAccessor: sectorAccessor,
-		AskStore:       askStore,
-	}
-
-	expectedPiece := pieceInfo.PieceCID
-	pieceStore.ExpectPiece(expectedPiece, pieceInfo)
-	pieceStore.ExpectCID(carRootCid, piecestore.CIDInfo{
-		PieceBlockLocations: []piecestore.PieceBlockLocation{
-			{
-				PieceCID: expectedPiece,
-			},
+		PieceDirectory: pd,
+		SectorAccessor: &mockSectorAccessor{
+			unsealed: !tc.noUnsealedCopy,
 		},
-	})
-	dagstoreWrapper.AddBlockToPieceIndex(carRootCid, expectedPiece)
+		AskStore: askStore,
+	}
 
 	// Create a blockstore over the CAR file blocks
-	carDataBuff := bytes.NewReader(carData)
-	carDataBs, err := blockstore.NewReadOnly(carDataBuff, nil, carv2.ZeroLengthSectionAsEOF(true), blockstore.UseWholeCIDs(true))
+	carDataBs, err := pd.GetBlockstore(ctx, pieceCid)
 	require.NoError(t, err)
 
 	// Wrap graphsync with the graphsync unpaid retrieval interceptor
@@ -224,16 +230,20 @@ func runRequestTest(t *testing.T, tc testCase) {
 	gsupr, err := NewGraphsyncUnpaidRetrieval(testData.Host2.ID(), gs2, testData.DTNet2, vdeps, nil)
 	require.NoError(t, err)
 
+	// Create a Graphsync transport and call SetEventHandler, which registers
+	// listeners for all the Graphsync hooks.
+	gsTransport := dtgstransport.NewTransport(testData.Host2.ID(), gsupr)
+	err = gsTransport.SetEventHandler(nil)
+	require.NoError(t, err)
+
 	// Create the retrieval provider with the graphsync unpaid retrieval interceptor
 	paymentAddress := address.TestAddress2
-	provider := createRetrievalProvider(ctx, t, testData, pieceStore, sectorAccessor, dagstoreWrapper, gsupr, paymentAddress)
 
 	gsupr.SubscribeToDataTransferEvents(func(event datatransfer.Event, channelState datatransfer.ChannelState) {
 		tlog.Debugf("prov dt: %s %s / %s", datatransfer.Events[event.Code], event.Message, datatransfer.Statuses[channelState.Status()])
 	})
 	err = gsupr.Start(ctx)
 	require.NoError(t, err)
-	tut.StartAndWaitForReady(ctx, t, provider)
 
 	// Create a retrieval client
 	retrievalPeer := retrievalmarket.RetrievalPeer{
@@ -321,29 +331,8 @@ func runRequestTest(t *testing.T, tc testCase) {
 	}
 
 	// final verification -- the server has no active graphsync requests
-	stats := gsupr.Stats()
+	stats := gsupr.GraphExchange.Stats()
 	require.Equal(t, stats.IncomingRequests.Active, uint64(0))
-}
-
-func createRetrievalProvider(ctx context.Context, t *testing.T, testData *tut.Libp2pTestData, pieceStore *tut.TestPieceStore, sectorAccessor *testnodes.TestSectorAccessor, dagstoreWrapper *tut.MockDagStoreWrapper, gs graphsync.GraphExchange, paymentAddress address.Address) retrievalmarket.RetrievalProvider {
-	nw2 := rmnet.NewFromLibp2pHost(testData.Host2, rmnet.RetryParameters(0, 0, 0, 0))
-	dtTransport2 := dtgstransport.NewTransport(testData.Host2.ID(), gs)
-	dt2, err := dtimpl.NewDataTransfer(testData.DTStore2, testData.DTNet2, dtTransport2)
-	require.NoError(t, err)
-	testutil.StartAndWaitForReady(ctx, t, dt2)
-	providerDs := namespace.Wrap(testData.Ds2, datastore.NewKey("/retrievals/provider"))
-	priceFunc := func(ctx context.Context, dealPricingParams retrievalmarket.PricingInput) (retrievalmarket.Ask, error) {
-		return retrievalmarket.Ask{
-			UnsealPrice:  abi.NewTokenAmount(0),
-			PricePerByte: abi.NewTokenAmount(0),
-		}, nil
-	}
-	providerNode := testnodes.NewTestRetrievalProviderNode()
-	provider, err := retrievalimpl.NewProvider(
-		paymentAddress, providerNode, sectorAccessor, nw2, pieceStore, dagstoreWrapper, dt2, providerDs,
-		priceFunc)
-	require.NoError(t, err)
-	return provider
 }
 
 func createRetrievalClient(ctx context.Context, t *testing.T, testData *tut.Libp2pTestData, retrievalClientNode *testnodes.TestRetrievalClientNode) retrievalmarket.RetrievalClient {
@@ -366,34 +355,6 @@ func createRetrievalClient(ctx context.Context, t *testing.T, testData *tut.Libp
 	return client
 }
 
-func createCarV1(t *testing.T) (cid.Cid, []byte) {
-	rf, err := boosttu.CreateRandomFile(t.TempDir(), int(time.Now().Unix()), 2*1024*1024)
-	require.NoError(t, err)
-
-	// carv1
-	caropts := []carv2.Option{
-		blockstore.WriteAsCarV1(true),
-	}
-
-	root, cn, err := boosttu.CreateDenseCARWith(t.TempDir(), rf, 128*1024, 1024, caropts)
-	require.NoError(t, err)
-
-	file, err := os.Open(cn)
-	require.NoError(t, err)
-	defer file.Close()
-
-	reader, err := carv2.NewReader(file)
-	require.NoError(t, err)
-
-	v1Reader, err := reader.DataReader()
-	require.NoError(t, err)
-
-	bz, err := io.ReadAll(v1Reader)
-	require.NoError(t, err)
-
-	return root, bz
-}
-
 func waitFor(ctx context.Context, t *testing.T, resChan chan error) error {
 	var err error
 	select {
@@ -402,4 +363,12 @@ func waitFor(ctx context.Context, t *testing.T, resChan chan error) error {
 	case err = <-resChan:
 	}
 	return err
+}
+
+type mockSectorAccessor struct {
+	unsealed bool
+}
+
+func (m *mockSectorAccessor) IsUnsealed(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error) {
+	return m.unsealed, nil
 }
