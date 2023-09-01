@@ -46,7 +46,7 @@ require (
 	github.com/graph-gophers/graphql-transport-ws v0.0.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hnlq715/golang-lru v0.3.0
-	github.com/ipfs/go-block-format v0.1.2
+	github.com/ipfs/go-block-format v0.2.0
 	github.com/ipfs/go-blockservice v0.5.1 // indirect
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-cidutil v0.1.0
@@ -59,7 +59,7 @@ require (
 	github.com/ipfs/go-ipfs-exchange-interface v0.2.0 // indirect
 	github.com/ipfs/go-ipfs-exchange-offline v0.3.0 // indirect
 	github.com/ipfs/go-ipfs-files v0.3.0 // indirect
-	github.com/ipfs/go-ipld-format v0.5.0
+	github.com/ipfs/go-ipld-format v0.6.0
 	github.com/ipfs/go-ipld-legacy v0.2.1
 	github.com/ipfs/go-libipfs v0.7.0 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1
@@ -67,7 +67,7 @@ require (
 	github.com/ipfs/go-metrics-interface v0.0.1
 	github.com/ipfs/go-unixfs v0.4.5 // indirect
 	github.com/ipld/go-car v0.6.1
-	github.com/ipld/go-car/v2 v2.11.1-0.20230901052914-ceb1d88d7b17
+	github.com/ipld/go-car/v2 v2.12.0
 	github.com/ipld/go-ipld-prime v0.21.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
 	github.com/ipni/index-provider v0.13.4

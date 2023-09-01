@@ -671,28 +671,44 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 		// we transform the reader here to look like:
 		// [carv1-header [gap of carv2-header-size] block block ...]
 		// the carv1 header at the beginning makes the offset used by the subsequent `blockstore.NewReadOnly` work properly.
-		size, err := reader.Seek(0, io.SeekEnd)
+
+		// read the carv2 header to get the payload layout
+		carReader, err := carv2.NewReader(reader)
 		if err != nil {
-			return nil, fmt.Errorf("getting car length for piece %s: %w", pieceCid, err)
+			return nil, fmt.Errorf("getting car reader for piece %s: %w", pieceCid, err)
 		}
-		sectionReader := io.NewSectionReader(reader, carv2.HeaderSize+carv2.PragmaSize, size-carv2.HeaderSize-carv2.PragmaSize)
-		ch, err := car.ReadHeader(bufio.NewReader(sectionReader))
+		dataOffset := int64(carReader.Header.DataOffset)
+		dataSize := int64(carReader.Header.DataSize)
+
+		// read the payload (CARv1) header
+		sectionReader := io.NewSectionReader(reader, dataOffset, dataSize)
+		carHeader, err := car.ReadHeader(bufio.NewReader(sectionReader))
 		if err != nil {
 			return nil, fmt.Errorf("reading car header for piece %s: %w", pieceCid, err)
 		}
+
+		// write the header back out to a buffer
 		headerBuf := bytes.NewBuffer(nil)
-		if err := car.WriteHeader(ch, headerBuf); err != nil {
+		if err := car.WriteHeader(carHeader, headerBuf); err != nil {
 			return nil, fmt.Errorf("copying car header for piece %s: %w", pieceCid, err)
 		}
-		empty := [carv2.HeaderSize + carv2.PragmaSize]byte{}
-		headerBuf.Write(empty[:])
-		bsR = carutil.NewMultiReaderAt(bytes.NewReader(headerBuf.Bytes()), sectionReader)
+		headerLen := int64(headerBuf.Len())
+
+		// create a reader that will address the payload after the header
+		sectionReader = io.NewSectionReader(reader, dataOffset+headerLen, dataSize-headerLen)
+
+		bsR = carutil.NewMultiReaderAt(
+			bytes.NewReader(headerBuf.Bytes()),        // payload (CARv1) header
+			bytes.NewReader(make([]byte, dataOffset)), // padding to account for the CARv2 wrapper
+			sectionReader, // payload (CARv1) data
+		)
 	} else {
 		bsR = reader
 		if _, err := reader.Seek(0, io.SeekStart); err != nil {
 			return nil, fmt.Errorf("seeking back to start of piece %s: %w", pieceCid, err)
 		}
 	}
+
 	// Create a blockstore from the index and the piece reader
 	bs, err := blockstore.NewReadOnly(bsR, idx, carv2.ZeroLengthSectionAsEOF(true))
 	if err != nil {
