@@ -32,6 +32,7 @@ import (
 	"github.com/jellydator/ttlcache/v2"
 	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
+	"github.com/multiformats/go-varint"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -255,10 +256,12 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 
 	blockMetadata, err := blockReader.SkipNext()
 	for err == nil {
+		offset := blockMetadata.SourceOffset - uint64(blockMetadata.Cid.ByteLen())
+		offset -= uint64(varint.UvarintSize(blockMetadata.Size + uint64(blockMetadata.Cid.ByteLen())))
 		recs = append(recs, model.Record{
 			Cid: blockMetadata.Cid,
 			OffsetSize: model.OffsetSize{
-				Offset: blockMetadata.SourceOffset,
+				Offset: offset,
 				Size:   blockMetadata.Size,
 			},
 		})
@@ -531,7 +534,9 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 			}
 
 			// Seek to the block offset
-			readerAt := readerutil.NewReadSeekerFromReaderAt(reader, int64(offsetSize.Offset))
+			offset := offsetSize.Offset + uint64(c.ByteLen()) // offset of the block data, which is after the cid
+			offset += uint64(varint.UvarintSize(offsetSize.Size + uint64(c.ByteLen())))
+			readerAt := readerutil.NewReadSeekerFromReaderAt(reader, int64(offset))
 			data := make([]byte, offsetSize.Size)
 			if _, err = io.ReadFull(readerAt, data); err != nil {
 				return nil, fmt.Errorf("reading data for block %s from reader for piece %s: %w", c, pieceCid, err)
@@ -665,7 +670,7 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 		if err != nil {
 			return nil, fmt.Errorf("getting car length for piece %s: %w", pieceCid, err)
 		}
-		sectionReader := io.NewSectionReader(reader, carv2.HeaderSize, size-carv2.HeaderSize)
+		sectionReader := io.NewSectionReader(reader, carv2.HeaderSize+carv2.PragmaSize, size-carv2.HeaderSize-carv2.PragmaSize)
 		ch, err := car.ReadHeader(bufio.NewReader(sectionReader))
 		if err != nil {
 			return nil, fmt.Errorf("reading car header for piece %s: %w", pieceCid, err)
@@ -674,11 +679,14 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 		if err := car.WriteHeader(ch, headerBuf); err != nil {
 			return nil, fmt.Errorf("copying car header for piece %s: %w", pieceCid, err)
 		}
-		empty := [carv2.HeaderSize]byte{}
+		empty := [carv2.HeaderSize + carv2.PragmaSize]byte{}
 		headerBuf.Write(empty[:])
 		bsR = carutil.NewMultiReaderAt(bytes.NewReader(headerBuf.Bytes()), sectionReader)
 	} else {
 		bsR = reader
+		if _, err := reader.Seek(0, io.SeekStart); err != nil {
+			return nil, fmt.Errorf("seeking back to start of piece %s: %w", pieceCid, err)
+		}
 	}
 	// Create a blockstore from the index and the piece reader
 	bs, err := blockstore.NewReadOnly(bsR, idx, carv2.ZeroLengthSectionAsEOF(true))
