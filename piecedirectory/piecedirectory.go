@@ -25,7 +25,6 @@ import (
 	format "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car"
-	"github.com/ipld/go-car/util"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
@@ -250,19 +249,11 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	}
 
 	blockMetadata, err := blockReader.SkipNext()
-	if blockReader.Version == 2 {
-		log.Warnf("add index: carv2 deal encountered", "offset adjustment for index", carv2.HeaderSize)
-	}
 	for err == nil {
-		offset := blockMetadata.Offset
-		if blockReader.Version == 2 {
-			offset += carv2.HeaderSize
-		}
-
 		recs = append(recs, model.Record{
 			Cid: blockMetadata.Cid,
 			OffsetSize: model.OffsetSize{
-				Offset: offset,
+				Offset: blockMetadata.SourceOffset,
 				Size:   blockMetadata.Size,
 			},
 		})
@@ -537,36 +528,9 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 
 			// Seek to the block offset
 			readerAt := readerutil.NewReadSeekerFromReaderAt(reader, int64(offsetSize.Offset))
-
-			// Read the block data
-			_, data, err := util.ReadNode(bufio.NewReader(readerAt))
-			if err != nil {
-				_, _ = reader.Seek(0, io.SeekStart)
-				cv, _ := carv2.ReadVersion(reader)
-				_, _ = reader.Seek(0, io.SeekStart)
-
-				if cv == 2 {
-					// what should the offset be.
-					br, _ := carv2.NewBlockReader(reader)
-					n, err := br.SkipNext()
-					for err == nil {
-						if n.Cid.Equals(c) {
-							log.Warnf("blockstore get: was told by index that cid was at %d, but found it at %d", offsetSize.Offset, n.Offset)
-							_, _ = reader.Seek(int64(n.Offset), io.SeekStart)
-							_, data, err = util.ReadNode(bufio.NewReader(reader))
-							if err != nil {
-								_, _ = reader.Seek(int64(n.Offset)-40, io.SeekStart)
-								ob := make([]byte, 1024)
-								io.ReadFull(reader, ob)
-
-								return nil, fmt.Errorf("recovery error reading data for block %s from reader for piece %s (at: %d): %w - buffer was: %x", c, pieceCid, n.Offset, err, ob)
-							}
-							return data, nil
-						}
-						n, err = br.SkipNext()
-					}
-				}
-				return nil, fmt.Errorf("reading data for block %s from reader for piece %s (cv: %d): %w", c, pieceCid, cv, err)
+			data := make([]byte, offsetSize.Size)
+			if _, err = io.ReadFull(readerAt, data); err != nil {
+				return nil, fmt.Errorf("reading data for block %s from reader for piece %s: %w", c, pieceCid, err)
 			}
 			return data, nil
 		}()
