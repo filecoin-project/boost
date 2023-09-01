@@ -46,3 +46,4 @@ runs:
         file: ${{ inputs.file }}
         target: ${{ inputs.target }}
         build-args: ${{ inputs.build-args }}
+        platforms: linux/amd64,linux/arm64
