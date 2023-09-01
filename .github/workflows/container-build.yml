@@ -12,6 +12,9 @@ jobs:
   build:
     name: Containers
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     env:
       LOTUS_TEST_IMAGE: 'filecoin/lotus-all-in-one:v1.23.2'
       FFI_BUILD_FROM_SOURCE: '0'

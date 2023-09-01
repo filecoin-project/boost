@@ -31,8 +31,8 @@ runs:
           images: ghcr.io/${{ github.repository }}
           flavor: latest=false
           tags: |
-            type=semver,pattern={{version}}
-            type=ref,event=branch
+            type=semver,pattern={{version}},prefix=${{ inputs.name }}-
+            type=ref,event=branch,prefix=${{ inputs.name }}-
             type=sha,prefix=${{ inputs.name }}-
       - name: Build ${{ inputs.name }}
         uses: docker/build-push-action@v4
