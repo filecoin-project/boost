@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS DirectDeals (
     CleanupData BOOL,
     ClientAddress TEXT,
     ProviderAddress TEXT,
+    AllocationID INT,
     StartEpoch INT,
     EndEpoch INT,
     InboundFilePath TEXT,

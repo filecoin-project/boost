@@ -52,6 +52,7 @@ func newdirectdataAccessor(db *sql.DB, deal *types.DirectDataEntry) *directdataA
 			"CleanupData":     &fielddef.FieldDef{F: &deal.CleanupData},
 			"ClientAddress":   &fielddef.AddrFieldDef{F: &deal.Client},
 			"ProviderAddress": &fielddef.AddrFieldDef{F: &deal.Provider},
+			"AllocationID":    &fielddef.FieldDef{F: &deal.AllocationID},
 			"StartEpoch":      &fielddef.FieldDef{F: &deal.StartEpoch},
 			"EndEpoch":        &fielddef.FieldDef{F: &deal.EndEpoch},
 			//"ProviderCollateral": &fielddef.BigIntFieldDef{F: &deal.ClientDealProposal.Proposal.ProviderCollateral},

@@ -250,7 +250,7 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 
 		log.Infow("got paddedReader")
 
-		stateAddr, err := ddp.fullnodeApi.StateAccountKey(ctx, entry.Client, ltypes.EmptyTSK)
+		stateAddr, err := ddp.fullnodeApi.StateLookupID(ctx, entry.Client, ltypes.EmptyTSK)
 		if err != nil {
 			return err
 		}
@@ -269,8 +269,10 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 
 			// Common deal info, required for all pieces
 			DealSchedule: lapi.DealSchedule{
-				StartEpoch: entry.StartEpoch,
-				EndEpoch:   entry.EndEpoch,
+				//StartEpoch: entry.StartEpoch,
+				//StartEpoch: entry.EndEpoch,
+				StartEpoch: abi.ChainEpoch(35000),
+				EndEpoch:   abi.ChainEpoch(35000 + 1036800),
 			},
 
 			// Direct Data Onboarding
