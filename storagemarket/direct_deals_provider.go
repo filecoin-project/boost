@@ -43,6 +43,8 @@ type DirectDealsProvider struct {
 	//logsDB        *db.LogsDB
 
 	dealLogger *logs.DealLogger
+
+	startEpochSealingBuffer abi.ChainEpoch // TODO: move to config and init properly
 }
 
 func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
@@ -90,12 +92,19 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 
 	log.Infow("chain head", "epoch", chainHead)
 
+	if chainHead.Height()+ddp.startEpochSealingBuffer > entry.StartEpoch {
+		return &api.ProviderDealRejectionInfo{
+			Accepted: false,
+			Reason: fmt.Sprintf(
+				"cannot propose direct deal with piece CID %s: current epoch %d has passed direct deal proposal start epoch %d",
+				entry.PieceCID, chainHead.Height(), entry.StartEpoch),
+		}, nil
+	}
+
 	allocation, err := ddp.fullnodeApi.StateGetAllocation(ctx, entry.Client, entry.AllocationID, ltypes.EmptyTSK)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get allocations: %w", err)
 	}
-
-	// TODO: validate the deal proposal and check for deal acceptance (allocation id, start epoch, end epoch, etc.)
 
 	if allocation == nil {
 		return &api.ProviderDealRejectionInfo{
@@ -105,6 +114,8 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 	}
 
 	log.Infow("found allocation for client", "allocation", spew.Sdump(allocation))
+
+	// TODO: validate the deal proposal and check for deal acceptance (allocation id, term, start epoch, end epoch, etc.)
 
 	return &api.ProviderDealRejectionInfo{
 		Accepted: true,
