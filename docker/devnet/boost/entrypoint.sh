@@ -57,7 +57,7 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
   echo Notary 2: $NOTARY_2
 
   echo Add verifier root_key_1 notary_1
-  lotus-shed verifreg add-verifier $ROOT_KEY_1 $NOTARY_1 10000000
+  lotus-shed verifreg add-verifier $ROOT_KEY_1 $NOTARY_1 10000000000
   sleep 15
   echo Msig inspect f080
   lotus msig inspect f080
