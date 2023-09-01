@@ -7,6 +7,7 @@ import (
 
 	bcli "github.com/filecoin-project/boost/cli"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
@@ -41,6 +42,16 @@ var importDirectDataCmd = &cli.Command{
 			Name:  "skip-ipni-announce",
 			Usage: "indicates that deal index should not be announced to the IPNI(Network Indexer)",
 			Value: false,
+		},
+		&cli.IntFlag{
+			Name:  "start-epoch",
+			Usage: "start epoch by when the deal should be proved by provider on-chain",
+			Value: 35000, // default is 35000, handy for tests with 2k/devnet build
+		},
+		&cli.IntFlag{
+			Name:  "duration",
+			Usage: "duration of the deal in epochs",
+			Value: 518400, // default is 2880 * 180 == 180 days
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -84,7 +95,10 @@ var importDirectDataCmd = &cli.Command{
 
 		allocationId := cctx.Uint64("allocation-id")
 
-		rej, err := napi.BoostDirectDeal(cctx.Context, piececid, filepath, cctx.Bool("delete-after-import"), allocationId, clientAddr, cctx.Bool("remove-unsealed-copy"), cctx.Bool("skip-ipni-announce"))
+		startEpoch := abi.ChainEpoch(cctx.Int("start-epoch"))
+		endEpoch := startEpoch + abi.ChainEpoch(cctx.Int("duration"))
+
+		rej, err := napi.BoostDirectDeal(cctx.Context, piececid, filepath, cctx.Bool("delete-after-import"), allocationId, clientAddr, cctx.Bool("remove-unsealed-copy"), cctx.Bool("skip-ipni-announce"), startEpoch, endEpoch)
 		if err != nil {
 			return fmt.Errorf("failed to execute direct data import: %w", err)
 		}

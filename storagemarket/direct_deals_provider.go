@@ -82,8 +82,6 @@ func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 }
 
 func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectDataEntry) (*api.ProviderDealRejectionInfo, error) {
-	// Validate the deal proposal and Check for deal acceptance (allocation id, start epoch, etc.)
-
 	chainHead, err := ddp.fullnodeApi.ChainHead(ctx)
 	if err != nil {
 		log.Warnw("failed to get chain head", "err", err)
@@ -96,6 +94,8 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 	if err != nil {
 		return nil, fmt.Errorf("failed to get allocations: %w", err)
 	}
+
+	// TODO: validate the deal proposal and check for deal acceptance (allocation id, start epoch, end epoch, etc.)
 
 	if allocation == nil {
 		return &api.ProviderDealRejectionInfo{
@@ -112,7 +112,7 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 	}, nil
 }
 
-func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationId uint64, clientAddr address.Address, removeUnsealedCopy bool, skipIpniAnnounce bool) (*api.ProviderDealRejectionInfo, error) {
+func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationId uint64, clientAddr address.Address, removeUnsealedCopy bool, skipIpniAnnounce bool, startEpoch, endEpoch abi.ChainEpoch) (*api.ProviderDealRejectionInfo, error) {
 	log.Infow("received direct data import", "piececid", piececid, "filepath", filepath, "clientAddr", clientAddr, "allocationId", allocationId)
 
 	entry := &types.DirectDataEntry{
@@ -123,6 +123,10 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 		//PieceSize abi.PaddedPieceSize
 		Client: clientAddr,
 		//Provider  address.Address
+
+		StartEpoch: startEpoch,
+		EndEpoch:   endEpoch,
+
 		CleanupData:      deleteAfterImport,
 		InboundFilePath:  filepath,
 		AllocationID:     verifregst.AllocationId(allocationId),
@@ -133,9 +137,6 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 		//Length   abi.PaddedPieceSize
 		//Checkpoint dealcheckpoints.Checkpoint
 		//CheckpointAt time.Time
-		//TODO: fetch based on allocationId
-		//StartEpoch abi.ChainEpoch
-		//EndEpoch   abi.ChainEpoch
 		//Err string
 		//Retry DealRetryType
 	}
@@ -269,10 +270,8 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 
 			// Common deal info, required for all pieces
 			DealSchedule: lapi.DealSchedule{
-				//StartEpoch: entry.StartEpoch,
-				//StartEpoch: entry.EndEpoch,
-				StartEpoch: abi.ChainEpoch(35000),
-				EndEpoch:   abi.ChainEpoch(35000 + 1036800),
+				StartEpoch: entry.StartEpoch,
+				EndEpoch:   entry.EndEpoch,
 			},
 
 			// Direct Data Onboarding

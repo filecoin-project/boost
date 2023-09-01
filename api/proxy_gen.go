@@ -64,7 +64,7 @@ type BoostStruct struct {
 
 		BoostDealBySignedProposalCid func(p0 context.Context, p1 cid.Cid) (*smtypes.ProviderDealState, error) `perm:"admin"`
 
-		BoostDirectDeal func(p0 context.Context, p1 cid.Cid, p2 string, p3 bool, p4 uint64, p5 address.Address, p6 bool, p7 bool) (*ProviderDealRejectionInfo, error) `perm:"admin"`
+		BoostDirectDeal func(p0 context.Context, p1 cid.Cid, p2 string, p3 bool, p4 uint64, p5 address.Address, p6 bool, p7 bool, p8 abi.ChainEpoch, p9 abi.ChainEpoch) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
 		BoostDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
@@ -421,14 +421,14 @@ func (s *BoostStub) BoostDealBySignedProposalCid(p0 context.Context, p1 cid.Cid)
 	return nil, ErrNotSupported
 }
 
-func (s *BoostStruct) BoostDirectDeal(p0 context.Context, p1 cid.Cid, p2 string, p3 bool, p4 uint64, p5 address.Address, p6 bool, p7 bool) (*ProviderDealRejectionInfo, error) {
+func (s *BoostStruct) BoostDirectDeal(p0 context.Context, p1 cid.Cid, p2 string, p3 bool, p4 uint64, p5 address.Address, p6 bool, p7 bool, p8 abi.ChainEpoch, p9 abi.ChainEpoch) (*ProviderDealRejectionInfo, error) {
 	if s.Internal.BoostDirectDeal == nil {
 		return nil, ErrNotSupported
 	}
-	return s.Internal.BoostDirectDeal(p0, p1, p2, p3, p4, p5, p6, p7)
+	return s.Internal.BoostDirectDeal(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9)
 }
 
-func (s *BoostStub) BoostDirectDeal(p0 context.Context, p1 cid.Cid, p2 string, p3 bool, p4 uint64, p5 address.Address, p6 bool, p7 bool) (*ProviderDealRejectionInfo, error) {
+func (s *BoostStub) BoostDirectDeal(p0 context.Context, p1 cid.Cid, p2 string, p3 bool, p4 uint64, p5 address.Address, p6 bool, p7 bool, p8 abi.ChainEpoch, p9 abi.ChainEpoch) (*ProviderDealRejectionInfo, error) {
 	return nil, ErrNotSupported
 }
 

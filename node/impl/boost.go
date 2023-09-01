@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/multiformats/go-multihash"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -530,8 +531,8 @@ func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) e
 	return nil
 }
 
-func (sm *BoostAPI) BoostDirectDeal(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationId uint64, clientAddr address.Address, removeUnsealedCopy bool, skipIpniAnnounce bool) (*api.ProviderDealRejectionInfo, error) {
-	return sm.DirectDealsProvider.Import(ctx, piececid, filepath, deleteAfterImport, allocationId, clientAddr, removeUnsealedCopy, skipIpniAnnounce)
+func (sm *BoostAPI) BoostDirectDeal(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationId uint64, clientAddr address.Address, removeUnsealedCopy bool, skipIpniAnnounce bool, startEpoch, endEpoch abi.ChainEpoch) (*api.ProviderDealRejectionInfo, error) {
+	return sm.DirectDealsProvider.Import(ctx, piececid, filepath, deleteAfterImport, allocationId, clientAddr, removeUnsealedCopy, skipIpniAnnounce, startEpoch, endEpoch)
 }
 
 func (sm *BoostAPI) BoostMakeDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {
