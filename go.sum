@@ -399,8 +399,6 @@ github.com/filecoin-project/go-state-types v0.1.0/go.mod h1:ezYnPf0bNkTsDibL/psS
 github.com/filecoin-project/go-state-types v0.1.6/go.mod h1:UwGVoMsULoCK+bWjEdd/xLCvLAQFBC7EDT477SKml+Q=
 github.com/filecoin-project/go-state-types v0.1.10/go.mod h1:UwGVoMsULoCK+bWjEdd/xLCvLAQFBC7EDT477SKml+Q=
 github.com/filecoin-project/go-state-types v0.11.1/go.mod h1:SyNPwTsU7I22gL2r0OAPcImvLoTVfgRwdK/Y5rR1zz8=
-github.com/filecoin-project/go-state-types v0.12.1 h1:/1ip/jXIP4QzWd3hlaQ7RGp1DHKKYG3+NOhd/r08UJY=
-github.com/filecoin-project/go-state-types v0.12.1/go.mod h1:KOBGyvCalT8uHBS7KSKOVbjsilD90bBZHgLAqrzz6gU=
 github.com/filecoin-project/go-state-types v0.12.2-0.20230831113028-c6bbd0fc3903 h1:zCXjgJDE+F2+kr4m56iV0sgRDxc3xD8L7pfaKubPAJY=
 github.com/filecoin-project/go-state-types v0.12.2-0.20230831113028-c6bbd0fc3903/go.mod h1:KOBGyvCalT8uHBS7KSKOVbjsilD90bBZHgLAqrzz6gU=
 github.com/filecoin-project/go-statemachine v0.0.0-20200925024713-05bd7c71fbfe/go.mod h1:FGwQgZAt2Gh5mjlwJUlVB62JeYdo+if0xWxSEfBD9ig=
@@ -413,10 +411,8 @@ github.com/filecoin-project/go-storedcounter v0.1.0 h1:Mui6wSUBC+cQGHbDUBcO7rfh5
 github.com/filecoin-project/go-storedcounter v0.1.0/go.mod h1:4ceukaXi4vFURIoxYMfKzaRF5Xv/Pinh2oTnoxpv+z8=
 github.com/filecoin-project/kubo-api-client v0.0.1 h1:IR1b+sm+VYxSRvbgECVv9SbhIgygcXcSoN1Q7xsHDXg=
 github.com/filecoin-project/kubo-api-client v0.0.1/go.mod h1:c36PPMIVOkKfHDwDG5U05gUlPRY9wNuh/BePwo0e+6Y=
-github.com/filecoin-project/lotus v1.23.4-0.20230828084808-f9c6ea7708e6 h1:o+bNW8Le2RL42fp8I6DBsPR/ep1ceCkq26HXxs4uH8c=
-github.com/filecoin-project/lotus v1.23.4-0.20230828084808-f9c6ea7708e6/go.mod h1:56nGHg5UYutBuPOQZUfs0aJpdZTt4qFXcxkhQ4y9hrw=
-github.com/filecoin-project/lotus v1.23.4-0.20230831130345-eeec223e880a h1:nbIUVHCnTyX0cnpNoIwwJ3vpmESuHEhnLpzVJx/yd9s=
-github.com/filecoin-project/lotus v1.23.4-0.20230831130345-eeec223e880a/go.mod h1:zqy69/dlzXk6EQvuyWGFOEAIlNxISBP3bGZtblMBZ0Q=
+github.com/filecoin-project/lotus v1.23.4-0.20230901110834-4afb22466d7a h1:n4FSssksnFxLJkyMA+MSmGxUrPFP2yVmfJrbVbpiCyE=
+github.com/filecoin-project/lotus v1.23.4-0.20230901110834-4afb22466d7a/go.mod h1:zqy69/dlzXk6EQvuyWGFOEAIlNxISBP3bGZtblMBZ0Q=
 github.com/filecoin-project/pubsub v1.0.0 h1:ZTmT27U07e54qV1mMiQo4HDr0buo8I1LDHBYLXlsNXM=
 github.com/filecoin-project/pubsub v1.0.0/go.mod h1:GkpB33CcUtUNrLPhJgfdy4FDx4OMNR9k+46DHx/Lqrg=
 github.com/filecoin-project/specs-actors v0.9.13/go.mod h1:TS1AW/7LbG+615j4NsjMK1qlpAwaFsG9w0V2tg2gSao=
@@ -658,7 +654,6 @@ github.com/grpc-ecosystem/grpc-gateway v1.5.0/go.mod h1:RSKVYQBd5MCa4OVpNdGskqpg
 github.com/grpc-ecosystem/grpc-gateway v1.9.0/go.mod h1:vNeuVxBJEsws4ogUvrchl83t/GYV9WGTSLVdBhOQFDY=
 github.com/grpc-ecosystem/grpc-gateway v1.9.5/go.mod h1:vNeuVxBJEsws4ogUvrchl83t/GYV9WGTSLVdBhOQFDY=
 github.com/grpc-ecosystem/grpc-gateway v1.16.0 h1:gmcG1KaJ57LophUzW0Hy8NmPhnMZb4M0+kPpLofRdBo=
-github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=
 github.com/gxed/hashland/keccakpg v0.0.1/go.mod h1:kRzw3HkwxFU1mpmPP8v1WyQzwdGfmKFJ6tItnhQ67kU=
 github.com/gxed/hashland/murmur3 v0.0.1/go.mod h1:KjXop02n4/ckmZSnY2+HKcLud/tcmvhST0bie/0lS48=
 github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed h1:5upAirOpQc1Q53c0bnx2ufif5kANL7bfZWcc6VJWJd8=
@@ -1923,7 +1918,6 @@ github.com/whyrusleeping/mdns v0.0.0-20180901202407-ef14215e6b30/go.mod h1:j4l84
 github.com/whyrusleeping/mdns v0.0.0-20190826153040-b9b60ed33aa9/go.mod h1:j4l84WPFclQPj320J9gp0XwNKBb3U0zt5CBqjPp22G4=
 github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7 h1:E9S12nwJwEOXe2d6gT6qxdvqMnNq+VnSsKPgm2ZZNds=
 github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7/go.mod h1:X2c0RVCI1eSUFI8eLcY3c0423ykwiUdxLJtkDvruhjI=
-github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee/go.mod h1:m2aV4LZI4Aez7dP5PMyVKEHhUyEJ/RjmPEDOpDvudHg=
 github.com/x-cray/logrus-prefixed-formatter v0.5.2/go.mod h1:2duySbKsL6M18s5GU7VPsoEPHyzalCE06qoARUCeBBE=
 github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f/go.mod h1:N2zxlSyiKSe5eX1tZViRH5QA0qijqEDrYZiPEAiq3wU=
 github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415/go.mod h1:GwrjFmJcFw6At/Gs6z4yjiIwzuJ1/+UwLxMQDVQXShQ=

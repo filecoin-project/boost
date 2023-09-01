@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/storagemarket/logs"
@@ -93,7 +94,7 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 		return nil, fmt.Errorf("failed to get allocations: %w", err)
 	}
 
-	_ = allocation
+	log.Infow("found allocation", "allocation", spew.Sdump(allocation))
 
 	return &api.ProviderDealRejectionInfo{
 		Accepted: true,
