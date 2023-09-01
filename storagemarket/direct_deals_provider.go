@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/filecoin-project/go-state-types/builtin/v12/verifreg"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
@@ -16,6 +18,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v12/miner"
 	verifregst "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
@@ -240,16 +243,38 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 
 		log.Infow("got paddedReader")
 
-		//TODO: fix PieceDealInfo to include information about AllocationID and Client
+		clientId, err := address.IDFromAddress(entry.Client)
+		if err != nil {
+			return err
+		}
 
 		// Add the piece to a sector
 		sdInfo := lapi.PieceDealInfo{
-			//DealID:       entry.ChainDealID,
-			//DealProposal: &entry.ClientDealProposal.Proposal,
+			// "Old" builtin-market deal info
+			//PublishCid   *cid.Cid
+			//DealID       abi.DealID
+			//DealProposal *market.DealProposal
+
+			// Common deal info, required for all pieces
 			DealSchedule: lapi.DealSchedule{
 				StartEpoch: entry.StartEpoch,
 				EndEpoch:   entry.EndEpoch,
 			},
+
+			// Direct Data Onboarding
+			// When PieceActivationManifest is set, builtin-market deal info must not be set
+			PieceActivationManifest: &miner.PieceActivationManifest{
+				CID:  entry.PieceCID,
+				Size: entry.PieceSize,
+				VerifiedAllocationKey: &miner.VerifiedAllocationKey{
+					Client: abi.ActorID(clientId),
+					ID:     verifreg.AllocationId(uint64(entry.AllocationID)), // TODO: fix verifreg v9 or v12
+				},
+				//Notify                []DataActivationNotification
+				Notify: nil,
+			},
+
+			// Best-effort deal asks
 			KeepUnsealed: entry.KeepUnsealedCopy,
 		}
 
