@@ -39,7 +39,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Miner"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Miner")); err != nil {
+	if _, err := cw.WriteString(string("Miner")); err != nil {
 		return err
 	}
 
@@ -55,7 +55,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Price"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Price")); err != nil {
+	if _, err := cw.WriteString(string("Price")); err != nil {
 		return err
 	}
 
@@ -71,7 +71,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("MaxPieceSize"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("MaxPieceSize")); err != nil {
+	if _, err := cw.WriteString(string("MaxPieceSize")); err != nil {
 		return err
 	}
 
@@ -87,7 +87,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("MinPieceSize"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("MinPieceSize")); err != nil {
+	if _, err := cw.WriteString(string("MinPieceSize")); err != nil {
 		return err
 	}
 
@@ -103,7 +103,7 @@ func (t *StorageAsk) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("VerifiedPrice"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("VerifiedPrice")); err != nil {
+	if _, err := cw.WriteString(string("VerifiedPrice")); err != nil {
 		return err
 	}
 
@@ -240,7 +240,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealUUID")); err != nil {
+	if _, err := cw.WriteString(string("DealUUID")); err != nil {
 		return err
 	}
 
@@ -264,7 +264,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Transfer"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Transfer")); err != nil {
+	if _, err := cw.WriteString(string("Transfer")); err != nil {
 		return err
 	}
 
@@ -280,7 +280,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("IsOffline"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("IsOffline")); err != nil {
+	if _, err := cw.WriteString(string("IsOffline")); err != nil {
 		return err
 	}
 
@@ -296,7 +296,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealDataRoot"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealDataRoot")); err != nil {
+	if _, err := cw.WriteString(string("DealDataRoot")); err != nil {
 		return err
 	}
 
@@ -312,7 +312,7 @@ func (t *DealParamsV120) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("ClientDealProposal"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("ClientDealProposal")); err != nil {
+	if _, err := cw.WriteString(string("ClientDealProposal")); err != nil {
 		return err
 	}
 
@@ -464,7 +464,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealUUID")); err != nil {
+	if _, err := cw.WriteString(string("DealUUID")); err != nil {
 		return err
 	}
 
@@ -488,7 +488,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Transfer"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Transfer")); err != nil {
+	if _, err := cw.WriteString(string("Transfer")); err != nil {
 		return err
 	}
 
@@ -504,7 +504,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("IsOffline"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("IsOffline")); err != nil {
+	if _, err := cw.WriteString(string("IsOffline")); err != nil {
 		return err
 	}
 
@@ -520,7 +520,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealDataRoot"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealDataRoot")); err != nil {
+	if _, err := cw.WriteString(string("DealDataRoot")); err != nil {
 		return err
 	}
 
@@ -536,7 +536,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("SkipIPNIAnnounce"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("SkipIPNIAnnounce")); err != nil {
+	if _, err := cw.WriteString(string("SkipIPNIAnnounce")); err != nil {
 		return err
 	}
 
@@ -552,7 +552,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("ClientDealProposal"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("ClientDealProposal")); err != nil {
+	if _, err := cw.WriteString(string("ClientDealProposal")); err != nil {
 		return err
 	}
 
@@ -568,7 +568,7 @@ func (t *DealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("RemoveUnsealedCopy"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("RemoveUnsealedCopy")); err != nil {
+	if _, err := cw.WriteString(string("RemoveUnsealedCopy")); err != nil {
 		return err
 	}
 
@@ -756,7 +756,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Size"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Size")); err != nil {
+	if _, err := cw.WriteString(string("Size")); err != nil {
 		return err
 	}
 
@@ -772,7 +772,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Type"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Type")); err != nil {
+	if _, err := cw.WriteString(string("Type")); err != nil {
 		return err
 	}
 
@@ -783,7 +783,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Type))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Type)); err != nil {
+	if _, err := cw.WriteString(string(t.Type)); err != nil {
 		return err
 	}
 
@@ -795,7 +795,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Params"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Params")); err != nil {
+	if _, err := cw.WriteString(string("Params")); err != nil {
 		return err
 	}
 
@@ -819,7 +819,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("ClientID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("ClientID")); err != nil {
+	if _, err := cw.WriteString(string("ClientID")); err != nil {
 		return err
 	}
 
@@ -830,7 +830,7 @@ func (t *Transfer) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.ClientID))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.ClientID)); err != nil {
+	if _, err := cw.WriteString(string(t.ClientID)); err != nil {
 		return err
 	}
 	return nil
@@ -962,7 +962,7 @@ func (t *DealResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Message"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Message")); err != nil {
+	if _, err := cw.WriteString(string("Message")); err != nil {
 		return err
 	}
 
@@ -973,7 +973,7 @@ func (t *DealResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Message))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Message)); err != nil {
+	if _, err := cw.WriteString(string(t.Message)); err != nil {
 		return err
 	}
 
@@ -985,7 +985,7 @@ func (t *DealResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Accepted"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Accepted")); err != nil {
+	if _, err := cw.WriteString(string("Accepted")); err != nil {
 		return err
 	}
 
@@ -1091,7 +1091,7 @@ func (t *DealStatusRequest) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealUUID")); err != nil {
+	if _, err := cw.WriteString(string("DealUUID")); err != nil {
 		return err
 	}
 
@@ -1115,7 +1115,7 @@ func (t *DealStatusRequest) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Signature"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Signature")); err != nil {
+	if _, err := cw.WriteString(string("Signature")); err != nil {
 		return err
 	}
 
@@ -1226,7 +1226,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Error"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Error")); err != nil {
+	if _, err := cw.WriteString(string("Error")); err != nil {
 		return err
 	}
 
@@ -1237,7 +1237,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Error))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Error)); err != nil {
+	if _, err := cw.WriteString(string(t.Error)); err != nil {
 		return err
 	}
 
@@ -1249,7 +1249,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealUUID")); err != nil {
+	if _, err := cw.WriteString(string("DealUUID")); err != nil {
 		return err
 	}
 
@@ -1273,7 +1273,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("IsOffline"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("IsOffline")); err != nil {
+	if _, err := cw.WriteString(string("IsOffline")); err != nil {
 		return err
 	}
 
@@ -1289,7 +1289,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealStatus"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealStatus")); err != nil {
+	if _, err := cw.WriteString(string("DealStatus")); err != nil {
 		return err
 	}
 
@@ -1305,7 +1305,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("TransferSize"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("TransferSize")); err != nil {
+	if _, err := cw.WriteString(string("TransferSize")); err != nil {
 		return err
 	}
 
@@ -1321,7 +1321,7 @@ func (t *DealStatusResponse) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("NBytesReceived"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("NBytesReceived")); err != nil {
+	if _, err := cw.WriteString(string("NBytesReceived")); err != nil {
 		return err
 	}
 
@@ -1502,7 +1502,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Error"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Error")); err != nil {
+	if _, err := cw.WriteString(string("Error")); err != nil {
 		return err
 	}
 
@@ -1513,7 +1513,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Error))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Error)); err != nil {
+	if _, err := cw.WriteString(string(t.Error)); err != nil {
 		return err
 	}
 
@@ -1525,7 +1525,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Status"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Status")); err != nil {
+	if _, err := cw.WriteString(string("Status")); err != nil {
 		return err
 	}
 
@@ -1536,7 +1536,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.Status))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.Status)); err != nil {
+	if _, err := cw.WriteString(string(t.Status)); err != nil {
 		return err
 	}
 
@@ -1548,7 +1548,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("Proposal"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("Proposal")); err != nil {
+	if _, err := cw.WriteString(string("Proposal")); err != nil {
 		return err
 	}
 
@@ -1564,7 +1564,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("PublishCid"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("PublishCid")); err != nil {
+	if _, err := cw.WriteString(string("PublishCid")); err != nil {
 		return err
 	}
 
@@ -1586,7 +1586,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("ChainDealID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("ChainDealID")); err != nil {
+	if _, err := cw.WriteString(string("ChainDealID")); err != nil {
 		return err
 	}
 
@@ -1602,7 +1602,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("SealingStatus"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("SealingStatus")); err != nil {
+	if _, err := cw.WriteString(string("SealingStatus")); err != nil {
 		return err
 	}
 
@@ -1613,7 +1613,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.SealingStatus))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.SealingStatus)); err != nil {
+	if _, err := cw.WriteString(string(t.SealingStatus)); err != nil {
 		return err
 	}
 
@@ -1625,7 +1625,7 @@ func (t *DealStatus) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("SignedProposalCid"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("SignedProposalCid")); err != nil {
+	if _, err := cw.WriteString(string("SignedProposalCid")); err != nil {
 		return err
 	}
 
