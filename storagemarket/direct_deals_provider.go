@@ -97,7 +97,14 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 		return nil, fmt.Errorf("failed to get allocations: %w", err)
 	}
 
-	log.Infow("found allocation", "allocation", spew.Sdump(allocation))
+	if allocation == nil {
+		return &api.ProviderDealRejectionInfo{
+			Accepted: false,
+			Reason:   fmt.Sprintf("allocation %d not found for client %s", entry.AllocationID, entry.Client),
+		}, nil
+	}
+
+	log.Infow("found allocation for client", "allocation", spew.Sdump(allocation))
 
 	return &api.ProviderDealRejectionInfo{
 		Accepted: true,
