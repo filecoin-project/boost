@@ -38,7 +38,7 @@ var directDealAllocate = &cli.Command{
 		},
 		&cli.StringSliceFlag{
 			Name:     "piece-info",
-			Usage:    "data pieceInfo[s] to create the allocation. The format must be --pieceInfo pieceCid1=pieceSize1 --pieceInfo pieceCid2=pieceSize2",
+			Usage:    "data piece-info[s] to create the allocation. The format must be --piece-info pieceCid1=pieceSize1 --piece-info pieceCid2=pieceSize2",
 			Required: true,
 			Aliases:  []string{"pi"},
 		},
