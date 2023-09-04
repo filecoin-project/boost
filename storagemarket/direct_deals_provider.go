@@ -36,6 +36,7 @@ type DirectDealsProvider struct {
 
 	fullnodeApi v1api.FullNode
 	pieceAdder  types.PieceAdder
+	commpCalc   smtypes.CommpCalculator
 
 	//db            *sql.DB
 	directDealsDB *db.DirectDataDB
@@ -45,12 +46,14 @@ type DirectDealsProvider struct {
 	dealLogger *logs.DealLogger
 
 	startEpochSealingBuffer abi.ChainEpoch // TODO: move to config and init properly
+	remoteCommp             bool
 }
 
-func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
+func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
 	return &DirectDealsProvider{
 		fullnodeApi: fullnodeApi,
 		pieceAdder:  pieceAdder,
+		commpCalc:   commpCalc,
 
 		//db: db,
 		directDealsDB: directDealsDB,
@@ -64,9 +67,9 @@ func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAd
 func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 	ddp.ctx = ctx
 
-	deals, err := ddp.directDealsDB.ListAll(ctx)
+	deals, err := ddp.directDealsDB.ListActive(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list all direct deals: %w", err)
+		return fmt.Errorf("failed to list active direct deals: %w", err)
 	}
 
 	for _, entry := range deals {
@@ -197,13 +200,12 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 			return err
 		}
 
-		// commp and piece size
-		var commpCalc smtypes.CommpCalculator
+		// throttle for local commp
 		throttle := make(chan struct{}, 1)
-		doRemoteCommP := false
 		// TODO: should we be passing pieceSize here ??!?
 		pieceSize := abi.UnpaddedPieceSize(fstat.Size())
-		generatedPieceInfo, dmErr := generatePieceCommitment(ctx, commpCalc, throttle, entry.InboundFilePath, pieceSize.Padded(), doRemoteCommP)
+
+		generatedPieceInfo, dmErr := generatePieceCommitment(ctx, ddp.commpCalc, throttle, entry.InboundFilePath, pieceSize.Padded(), ddp.remoteCommp)
 		if dmErr != nil {
 			return fmt.Errorf("couldnt generate commp: %w", dmErr) // retry
 		}
@@ -308,41 +310,52 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 			return fmt.Errorf("AddPiece failed: %w", err)
 		}
 
-		_ = sectorNum
-		_ = offset
-		//TODO: retry mechanism for AddPiece
-		//TODO: store sector and offset into local db
+		ddp.dealLogger.Infow(entry.ID, "direct deal successfully handed to the sealing subsystem", "sectorNum", sectorNum.String(), "offset", offset)
 
-		//curTime := build.Clock.Now()
+		entry.SectorID = sectorNum
+		entry.Offset = offset
+		entry.Length = entry.PieceSize
 
-		//for build.Clock.Since(curTime) < addPieceRetryTimeout {
-		//if !errors.Is(err, sealing.ErrTooManySectorsSealing) {
-		//if err != nil {
-		////p.dealLogger.Warnw(deal.DealUuid, "failed to addPiece for deal, will-retry", "err", err.Error())
-		//}
-		//break
-		//}
-		//select {
-		//case <-build.Clock.After(addPieceRetryWait):
-		//sectorNum, offset, err = p.pieceAdder.AddPiece(ctx, entry.PieceSize, pieceData, sdInfo)
-		//case <-ctx.Done():
-		//return nil, fmt.Errorf("error while waiting to retry AddPiece: %w", ctx.Err())
-		//}
-		//}
+		entry.Checkpoint = dealcheckpoints.AddedPiece
+		err = ddp.directDealsDB.Update(ctx, entry)
+		if err != nil {
+			return err
+		}
+	}
 
-		//p.dealLogger.Infow(deal.DealUuid, "added new deal to sector", "sector", sectorNum.String())
-
-		//deal.SectorID = packingInfo.SectorNumber
-		//deal.Offset = packingInfo.Offset
-		//deal.Length = packingInfo.Size
-		//p.dealLogger.Infow(deal.DealUuid, "deal successfully handed to the sealing subsystem",
-		//"sectorNum", deal.SectorID.String(), "offset", deal.Offset, "length", deal.Length)
-
-		//if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece); derr != nil {
-		//return derr
-		//}
+	if entry.Checkpoint <= dealcheckpoints.AddedPiece {
+		// add index and announce
 
 	}
+
+	//curTime := build.Clock.Now()
+
+	//for build.Clock.Since(curTime) < addPieceRetryTimeout {
+	//if !errors.Is(err, sealing.ErrTooManySectorsSealing) {
+	//if err != nil {
+	////p.dealLogger.Warnw(deal.DealUuid, "failed to addPiece for deal, will-retry", "err", err.Error())
+	//}
+	//break
+	//}
+	//select {
+	//case <-build.Clock.After(addPieceRetryWait):
+	//sectorNum, offset, err = p.pieceAdder.AddPiece(ctx, entry.PieceSize, pieceData, sdInfo)
+	//case <-ctx.Done():
+	//return nil, fmt.Errorf("error while waiting to retry AddPiece: %w", ctx.Err())
+	//}
+	//}
+
+	//p.dealLogger.Infow(deal.DealUuid, "added new deal to sector", "sector", sectorNum.String())
+
+	//deal.SectorID = packingInfo.SectorNumber
+	//deal.Offset = packingInfo.Offset
+	//deal.Length = packingInfo.Size
+	//p.dealLogger.Infow(deal.DealUuid, "deal successfully handed to the sealing subsystem",
+	//"sectorNum", deal.SectorID.String(), "offset", deal.Offset, "length", deal.Length)
+
+	//if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece); derr != nil {
+	//return derr
+	//}
 
 	return nil
 }

@@ -54,7 +54,7 @@ func NewDirectDealsProvider(provAddr address.Address, cfg *config.Boost) func(lc
 
 		//func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
 
-		prov := storagemarket.NewDirectDealsProvider(fullnodeApi, secb, directDealsDB, dl)
+		prov := storagemarket.NewDirectDealsProvider(fullnodeApi, secb, commpc, directDealsDB, dl)
 		return prov, nil
 	}
 }

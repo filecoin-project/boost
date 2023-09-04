@@ -8,6 +8,7 @@ import (
 
 	"github.com/filecoin-project/boost/db/fielddef"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
@@ -255,6 +256,14 @@ func (d *DirectDataDB) List(ctx context.Context, query string, filter *FilterOpt
 	}
 
 	return d.list(ctx, offset, limit, where, whereArgs...)
+}
+
+func (d *DirectDataDB) ListActive(ctx context.Context) ([]*types.DirectDataEntry, error) {
+	return d.list(ctx, 0, 0, "Checkpoint != ?", dealcheckpoints.Complete.String())
+}
+
+func (d *DirectDataDB) ListCompleted(ctx context.Context) ([]*types.DirectDataEntry, error) {
+	return d.list(ctx, 0, 0, "Checkpoint = ?", dealcheckpoints.Complete.String())
 }
 
 func (d *DirectDataDB) list(ctx context.Context, offset int, limit int, whereClause string, whereArgs ...interface{}) ([]*types.DirectDataEntry, error) {
