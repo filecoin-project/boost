@@ -38,8 +38,9 @@ var directDealAllocate = &cli.Command{
 		},
 		&cli.StringSliceFlag{
 			Name:     "pieceInfo",
-			Usage:    "data pieceInfo[s] to create the allocation. The format must be pieceCid1=pieceSize1 pieceCid2=pieceSize2",
+			Usage:    "data pieceInfo[s] to create the allocation. The format must be --pieceInfo pieceCid1=pieceSize1 --pieceInfo pieceCid2=pieceSize2",
 			Required: true,
+			Aliases:  []string{"pi"},
 		},
 		&cli.StringFlag{
 			Name:  "wallet",
@@ -49,6 +50,23 @@ var directDealAllocate = &cli.Command{
 			Name:  "quiet",
 			Usage: "do not print the allocation list",
 			Value: false,
+		},
+		&cli.Int64Flag{
+			Name: "termmin",
+			Usage: "The minimum duration which the provider must commit to storing the piece to avoid early-termination penalties (epochs).\n" +
+				"Default is 180 days.",
+			Aliases: []string{"tmin"},
+		},
+		&cli.Int64Flag{
+			Name: "termmax",
+			Usage: "The maximum period for which a provider can earn quality-adjusted power for the piece (epochs).\n" +
+				"Default is 5 years.",
+			Aliases: []string{"tmax"},
+		},
+		&cli.Int64Flag{
+			Name: "expiration",
+			Usage: "The latest epoch by which a provider must commit data before the allocation expires (epochs).\n" +
+				"Default is 60 days.",
 		},
 	},
 	Before: before,
@@ -62,7 +80,7 @@ var directDealAllocate = &cli.Command{
 
 		gapi, closer, err := lcli.GetGatewayAPI(cctx)
 		if err != nil {
-			return fmt.Errorf("cant setup gateway connection: %w", err)
+			return fmt.Errorf("can't setup gateway connection: %w", err)
 		}
 		defer closer()
 
@@ -134,6 +152,36 @@ var directDealAllocate = &cli.Command{
 			return fmt.Errorf("requested datacap is greater then the available datacap")
 		}
 
+		// Setup policy for allocations
+		termMin := abi.ChainEpoch(verifregst.MinimumVerifiedAllocationTerm)
+		termMax := abi.ChainEpoch(verifregst.MaximumVerifiedAllocationTerm)
+		exp := abi.ChainEpoch(verifregst.MaximumVerifiedAllocationExpiration)
+
+		if cctx.IsSet("termmin") {
+			termMin = abi.ChainEpoch(cctx.Int64("termmin"))
+		}
+
+		if cctx.IsSet("termmin") {
+			termMax = abi.ChainEpoch(cctx.Int64("termmax"))
+		}
+
+		if cctx.IsSet("termmin") {
+			exp = abi.ChainEpoch(cctx.Int64("expiration"))
+		}
+
+		if termMax < termMin {
+			return fmt.Errorf("maximum duration %d cannot be smaller than minimum duration %d", termMax, termMin)
+		}
+
+		head, err := gapi.ChainHead(ctx)
+		if err != nil {
+			return err
+		}
+
+		if termMin < head.Height() || termMax < head.Height() {
+			return fmt.Errorf("current chain head %d is greater than termMin %d or termMax %d", head.Height(), termMin, termMax)
+		}
+
 		// Create allocation requests
 		var allocationRequests []verifregst.AllocationRequest
 		for mid, minfo := range maddrs {
@@ -145,9 +193,9 @@ var directDealAllocate = &cli.Command{
 					Provider:   mid,
 					Data:       p.PieceCID,
 					Size:       p.Size,
-					TermMin:    verifregst.MinimumVerifiedAllocationTerm,
-					TermMax:    verifregst.MinimumVerifiedAllocationTerm,
-					Expiration: verifregst.MaximumVerifiedAllocationExpiration,
+					TermMin:    termMin,
+					TermMax:    termMax,
+					Expiration: exp,
 				})
 			}
 		}
@@ -289,8 +337,8 @@ var directDealAllocate = &cli.Command{
 }
 
 var directDealGetAllocations = &cli.Command{
-	Name:  "get-allocations",
-	Usage: "Print all allocations for a client address(wallet)",
+	Name:  "list-allocations",
+	Usage: "Lists all allocations for a client address(wallet)",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:    "miner",
