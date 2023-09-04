@@ -116,6 +116,7 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 	log.Infow("found allocation for client", "allocation", spew.Sdump(allocation))
 
 	// TODO: validate the deal proposal and check for deal acceptance (allocation id, term, start epoch, end epoch, etc.)
+	// TermMin ; TermMax
 
 	return &api.ProviderDealRejectionInfo{
 		Accepted: true,
@@ -168,14 +169,14 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert direct deal entry to local db: %w", err)
 		}
-	}
 
-	go func() {
-		err := ddp.Process(ddp.ctx, entry.ID)
-		if err != nil {
-			log.Errorw("error while processing direct deal", "uuid", entry.ID, "err", err)
-		}
-	}()
+		go func() {
+			err := ddp.Process(ddp.ctx, entry.ID)
+			if err != nil {
+				log.Errorw("error while processing direct deal", "uuid", entry.ID, "err", err)
+			}
+		}()
+	}
 
 	return res, nil
 }
@@ -204,14 +205,13 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 		pieceSize := abi.UnpaddedPieceSize(fstat.Size())
 		generatedPieceInfo, dmErr := generatePieceCommitment(ctx, commpCalc, throttle, entry.InboundFilePath, pieceSize.Padded(), doRemoteCommP)
 		if dmErr != nil {
-			return fmt.Errorf("couldnt generate commp: %w", dmErr)
+			return fmt.Errorf("couldnt generate commp: %w", dmErr) // retry
 		}
 
-		// TODO: compare generatedPieceCid and supplied piececid
 		log.Infow("direct deal details", "filepath", entry.InboundFilePath, "supplied-piececid", entry.PieceCID, "calculated-piececid", generatedPieceInfo.PieceCID, "calculated-piecesize", generatedPieceInfo.Size, "os stat size", fstat.Size())
 
 		if !entry.PieceCID.Equals(generatedPieceInfo.PieceCID) {
-			return fmt.Errorf("commp mismatch: %v vs %v", entry.PieceCID, generatedPieceInfo.PieceCID)
+			return fmt.Errorf("commp mismatch: %v vs %v", entry.PieceCID, generatedPieceInfo.PieceCID) // retry
 		}
 
 		entry.PieceSize = generatedPieceInfo.Size
@@ -311,6 +311,8 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 		_ = sectorNum
 		_ = offset
 		//TODO: retry mechanism for AddPiece
+		//TODO: store sector and offset into local db
+
 		//curTime := build.Clock.Now()
 
 		//for build.Clock.Since(curTime) < addPieceRetryTimeout {

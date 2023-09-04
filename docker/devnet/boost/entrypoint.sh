@@ -66,6 +66,9 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
   echo Msig approve
   lotus msig approve --from=$ROOT_KEY_2 f080 0 t0100 f06 0 2 $PARAMS
 
+  echo Send 10 FIL to NOTARY_1
+  lotus send $NOTARY_1 10
+
 	echo Done
 	touch $BOOST_PATH/.init.boost
 fi
