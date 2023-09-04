@@ -133,6 +133,34 @@ const LegacyDealsListQuery = gql`
     }
 `;
 
+const DirectDealsListQuery = gql`
+    query AppDirectDealsListQuery($query: String, $filter: DealFilter, $cursor: ID, $offset: Int, $limit: Int) {
+        directDeals(query: $query, filter: $filter, cursor: $cursor, offset: $offset, limit: $limit) {
+            deals {
+                ID
+                CreatedAt
+                AllocationID
+                ClientAddress
+                Checkpoint
+                CheckpointAt
+                AnnounceToIPNI
+                KeepUnsealedCopy
+                CleanupData
+                Err
+                Retry
+                Message
+                Sector {
+                    ID
+                    Offset
+                    Length
+                }
+            }
+            totalCount
+            more
+        }
+    }
+`;
+
 const DealsCountQuery = gql`
     query AppDealCountQuery {
         dealsCount
@@ -142,6 +170,12 @@ const DealsCountQuery = gql`
 const LegacyDealsCountQuery = gql`
     query AppLegacyDealCountQuery {
         legacyDealsCount
+    }
+`;
+
+const DirectDealsCountQuery = gql`
+    query AppDirectDealCountQuery {
+        directDealsCount
     }
 `;
 
@@ -782,8 +816,10 @@ export {
     EpochQuery,
     DealsListQuery,
     LegacyDealsListQuery,
+    DirectDealsListQuery,
     DealsCountQuery,
     LegacyDealsCountQuery,
+    DirectDealsCountQuery,
     LegacyDealQuery,
     DealSubscription,
     DealCancelMutation,

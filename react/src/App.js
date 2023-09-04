@@ -18,11 +18,12 @@ import {LegacyDealDetail} from "./LegacyDealDetail"
 import {SettingsPage} from "./Settings";
 import {Banner} from "./Banner";
 import {ProposalLogsPage} from "./ProposalLogs";
-import {PieceDoctorPage, InspectPiecePage, LIDPage, NoUnsealedSectorPieces, NoUnsealedSectorPage} from "./LID";
+import {PieceDoctorPage, InspectPiecePage, LIDPage, NoUnsealedSectorPage} from "./LID";
 import {RetrievalLogsPage} from "./RetrievalLogs";
 import {RetrievalLogDetail} from "./RetrievalLogDetail";
 import {MonitoringAlert} from "./MonitoringAlert";
 import {IpniAdDetail, IpniAdEntries, IpniPage} from "./Ipni";
+import {DirectDealsPage} from "./DirectDeals";
 
 function App(props) {
     return (
@@ -42,6 +43,8 @@ function App(props) {
                                         <Route path="/storage-deals/from/:cursor/page/:pageNum" element={<StorageDealsPage />} />
                                         <Route path="/legacy-storage-deals" element={<LegacyStorageDealsPage />} />
                                         <Route path="/legacy-storage-deals/from/:cursor/page/:pageNum" element={<LegacyStorageDealsPage />} />
+                                        <Route path="/direct-deals" element={<DirectDealsPage />} />
+                                        <Route path="/direct-deals/from/:cursor/page/:pageNum" element={<DirectDealsPage />} />
                                         <Route path="/proposal-logs" element={<ProposalLogsPage />} />
                                         <Route path="/proposal-logs/from/:cursor/page/:pageNum" element={<ProposalLogsPage />} />
                                         <Route path="/retrieval-logs" element={<RetrievalLogsPage />} />
