@@ -148,7 +148,7 @@ func genKey(dir string, nameFile string) (string, error) {
 	namePath := path.Join(dir, nameFile)
 	err = os.WriteFile(namePath, key, 0666)
 	if err != nil {
-		return "", fmt.Errorf("writing file %s: %w", namePath, err.Error())
+		return "", fmt.Errorf("writing file %s: %w", namePath, err)
 	}
 
 	return keyName, nil

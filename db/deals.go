@@ -98,11 +98,15 @@ func newDealAccessor(db *sql.DB, deal *types.ProviderDealState) *dealAccessor {
 }
 
 func (d *dealAccessor) scan(row Scannable) error {
+	return scan(dealFields, d.def, row)
+}
+
+func scan(fields []string, def map[string]fielddef.FieldDefinition, row Scannable) error {
 	// For each field
 	dest := []interface{}{}
-	for _, name := range dealFields {
+	for _, name := range fields {
 		// Get a pointer to the field that will receive the scanned value
-		fieldDef := d.def[name]
+		fieldDef := def[name]
 		dest = append(dest, fieldDef.FieldPtr())
 	}
 
@@ -113,7 +117,7 @@ func (d *dealAccessor) scan(row Scannable) error {
 	}
 
 	// For each field
-	for name, fieldDef := range d.def {
+	for name, fieldDef := range def {
 		// Unmarshall the scanned value into deal object
 		err := fieldDef.Unmarshall()
 		if err != nil {
@@ -124,12 +128,16 @@ func (d *dealAccessor) scan(row Scannable) error {
 }
 
 func (d *dealAccessor) insert(ctx context.Context) error {
+	return insert(ctx, "Deals", dealFields, dealFieldsStr, d.def, d.db)
+}
+
+func insert(ctx context.Context, table string, fields []string, fieldsStr string, def map[string]fielddef.FieldDefinition, db *sql.DB) error {
 	// For each field
 	values := []interface{}{}
 	placeholders := make([]string, 0, len(values))
-	for _, name := range dealFields {
+	for _, name := range fields {
 		// Add a placeholder "?"
-		fieldDef := d.def[name]
+		fieldDef := def[name]
 		placeholders = append(placeholders, "?")
 
 		// Marshall the field into a value that can be stored in the database
@@ -141,24 +149,28 @@ func (d *dealAccessor) insert(ctx context.Context) error {
 	}
 
 	// Execute the INSERT
-	qry := "INSERT INTO Deals (" + dealFieldsStr + ") "
+	qry := "INSERT INTO " + table + " (" + fieldsStr + ") "
 	qry += "VALUES (" + strings.Join(placeholders, ",") + ")"
-	_, err := d.db.ExecContext(ctx, qry, values...)
+	_, err := db.ExecContext(ctx, qry, values...)
 	return err
 }
 
 func (d *dealAccessor) update(ctx context.Context) error {
+	return update(ctx, "Deals", dealFields, d.def, d.db, d.deal.DealUuid)
+}
+
+func update(ctx context.Context, table string, fields []string, def map[string]fielddef.FieldDefinition, db *sql.DB, dealUuid uuid.UUID) error {
 	// For each field
 	values := []interface{}{}
 	setNames := make([]string, 0, len(values))
-	for _, name := range dealFields {
+	for _, name := range fields {
 		// Skip the ID field
 		if name == "ID" {
 			continue
 		}
 
 		// Add "fieldName = ?"
-		fieldDef := d.def[name]
+		fieldDef := def[name]
 		setNames = append(setNames, name+" = ?")
 
 		// Marshall the field into a value that can be stored in the database
@@ -170,13 +182,13 @@ func (d *dealAccessor) update(ctx context.Context) error {
 	}
 
 	// Execute the UPDATE
-	qry := "UPDATE Deals "
+	qry := "UPDATE " + table + " "
 	qry += "SET " + strings.Join(setNames, ", ")
 
 	qry += "WHERE ID = ?"
-	values = append(values, d.deal.DealUuid)
+	values = append(values, dealUuid)
 
-	_, err := d.db.ExecContext(ctx, qry, values...)
+	_, err := db.ExecContext(ctx, qry, values...)
 	return err
 }
 

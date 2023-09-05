@@ -18,31 +18,31 @@ import (
 )
 
 // Used for SELECT statements: "ID, CreatedAt, ..."
-var directdataFields []string
-var directdataFieldsStr = ""
+var directDealsFields []string
+var directDealsFieldsStr = ""
 
 func init() {
-	var deal types.DirectDataEntry
-	def := newdirectdataAccessor(nil, &deal)
-	directdataFields = make([]string, 0, len(def.def))
+	var deal types.DirectDeal
+	def := newDirectDealsAccessor(nil, &deal)
+	directDealsFields = make([]string, 0, len(def.def))
 	for k := range def.def {
-		directdataFields = append(directdataFields, k)
+		directDealsFields = append(directDealsFields, k)
 	}
-	directdataFieldsStr = strings.Join(directdataFields, ", ")
+	directDealsFieldsStr = strings.Join(directDealsFields, ", ")
 }
 
-type directdataAccessor struct {
+type directDealsAccessor struct {
 	db   *sql.DB
-	deal *types.DirectDataEntry
+	deal *types.DirectDeal
 	def  map[string]fielddef.FieldDefinition
 }
 
-func (d *DirectDataDB) newDirectDataDef(deal *types.DirectDataEntry) *directdataAccessor {
-	return newdirectdataAccessor(d.db, deal)
+func (d *DirectDataDB) newDirectDataDef(deal *types.DirectDeal) *directDealsAccessor {
+	return newDirectDealsAccessor(d.db, deal)
 }
 
-func newdirectdataAccessor(db *sql.DB, deal *types.DirectDataEntry) *directdataAccessor {
-	return &directdataAccessor{
+func newDirectDealsAccessor(db *sql.DB, deal *types.DirectDeal) *directDealsAccessor {
+	return &directDealsAccessor{
 		db:   db,
 		deal: deal,
 		def: map[string]fielddef.FieldDefinition{
@@ -72,87 +72,16 @@ func newdirectdataAccessor(db *sql.DB, deal *types.DirectDataEntry) *directdataA
 	}
 }
 
-func (d *directdataAccessor) scan(row Scannable) error {
-	// For each field
-	dest := []interface{}{}
-	for _, name := range directdataFields {
-		// Get a pointer to the field that will receive the scanned value
-		fieldDef := d.def[name]
-		dest = append(dest, fieldDef.FieldPtr())
-	}
-
-	// Scan the row into each pointer
-	err := row.Scan(dest...)
-	if err != nil {
-		return fmt.Errorf("scanning deal row: %w", err)
-	}
-
-	// For each field
-	for name, fieldDef := range d.def {
-		// Unmarshall the scanned value into deal object
-		err := fieldDef.Unmarshall()
-		if err != nil {
-			return fmt.Errorf("unmarshalling db field %s: %s", name, err)
-		}
-	}
-	return nil
+func (d *directDealsAccessor) scan(row Scannable) error {
+	return scan(directDealsFields, d.def, row)
 }
 
-func (d *directdataAccessor) insert(ctx context.Context) error {
-	// For each field
-	values := []interface{}{}
-	placeholders := make([]string, 0, len(values))
-	for _, name := range directdataFields {
-		// Add a placeholder "?"
-		fieldDef := d.def[name]
-		placeholders = append(placeholders, "?")
-
-		// Marshall the field into a value that can be stored in the database
-		v, err := fieldDef.Marshall()
-		if err != nil {
-			return err
-		}
-		values = append(values, v)
-	}
-
-	// Execute the INSERT
-	qry := "INSERT INTO DirectDeals (" + directdataFieldsStr + ") "
-	qry += "VALUES (" + strings.Join(placeholders, ",") + ")"
-	_, err := d.db.ExecContext(ctx, qry, values...)
-	return err
+func (d *directDealsAccessor) insert(ctx context.Context) error {
+	return insert(ctx, "DirectDeals", directDealsFields, directDealsFieldsStr, d.def, d.db)
 }
 
-func (d *directdataAccessor) update(ctx context.Context) error {
-	// For each field
-	values := []interface{}{}
-	setNames := make([]string, 0, len(values))
-	for _, name := range directdataFields {
-		// Skip the ID field
-		if name == "ID" {
-			continue
-		}
-
-		// Add "fieldName = ?"
-		fieldDef := d.def[name]
-		setNames = append(setNames, name+" = ?")
-
-		// Marshall the field into a value that can be stored in the database
-		v, err := fieldDef.Marshall()
-		if err != nil {
-			return err
-		}
-		values = append(values, v)
-	}
-
-	// Execute the UPDATE
-	qry := "UPDATE DirectDeals "
-	qry += "SET " + strings.Join(setNames, ", ")
-
-	qry += "WHERE ID = ?"
-	values = append(values, d.deal.ID)
-
-	_, err := d.db.ExecContext(ctx, qry, values...)
-	return err
+func (d *directDealsAccessor) update(ctx context.Context) error {
+	return update(ctx, "DirectDeals", directDealsFields, d.def, d.db, d.deal.ID)
 }
 
 type DirectDataDB struct {
@@ -163,25 +92,25 @@ func NewDirectDataDB(db *sql.DB) *DirectDataDB {
 	return &DirectDataDB{db: db}
 }
 
-func (d *DirectDataDB) Insert(ctx context.Context, deal *types.DirectDataEntry) error {
+func (d *DirectDataDB) Insert(ctx context.Context, deal *types.DirectDeal) error {
 	return d.newDirectDataDef(deal).insert(ctx)
 }
 
-func (d *DirectDataDB) Update(ctx context.Context, deal *types.DirectDataEntry) error {
+func (d *DirectDataDB) Update(ctx context.Context, deal *types.DirectDeal) error {
 	return d.newDirectDataDef(deal).update(ctx)
 }
 
-func (d *DirectDataDB) ByID(ctx context.Context, id uuid.UUID) (*types.DirectDataEntry, error) {
-	qry := "SELECT " + directdataFieldsStr + " FROM DirectDeals WHERE ID=?"
+func (d *DirectDataDB) ByID(ctx context.Context, id uuid.UUID) (*types.DirectDeal, error) {
+	qry := "SELECT " + directDealsFieldsStr + " FROM DirectDeals WHERE ID=?"
 	row := d.db.QueryRowContext(ctx, qry, id)
 	return d.scanRow(row)
 }
 
-func (d *DirectDataDB) ByPieceCID(ctx context.Context, pieceCid cid.Cid) ([]*types.DirectDataEntry, error) {
+func (d *DirectDataDB) ByPieceCID(ctx context.Context, pieceCid cid.Cid) ([]*types.DirectDeal, error) {
 	return d.list(ctx, 0, 0, "PieceCID=?", pieceCid.String())
 }
 
-func (d *DirectDataDB) BySectorID(ctx context.Context, sectorID abi.SectorID) ([]*types.DirectDataEntry, error) {
+func (d *DirectDataDB) BySectorID(ctx context.Context, sectorID abi.SectorID) ([]*types.DirectDeal, error) {
 	addr, err := address.NewIDAddress(uint64(sectorID.Miner))
 	if err != nil {
 		return nil, fmt.Errorf("creating address from ID %d: %w", sectorID.Miner, err)
@@ -190,7 +119,7 @@ func (d *DirectDataDB) BySectorID(ctx context.Context, sectorID abi.SectorID) ([
 	return d.list(ctx, 0, 0, "ProviderAddress=? AND SectorID=?", addr.String(), sectorID.Number)
 }
 
-func (d *DirectDataDB) ListAll(ctx context.Context) ([]*types.DirectDataEntry, error) {
+func (d *DirectDataDB) ListAll(ctx context.Context) ([]*types.DirectDeal, error) {
 	return d.list(ctx, 0, 0, "")
 }
 
@@ -223,7 +152,7 @@ func (d *DirectDataDB) Count(ctx context.Context, query string, filter *FilterOp
 	return count, err
 }
 
-func (d *DirectDataDB) List(ctx context.Context, query string, filter *FilterOptions, cursor *graphql.ID, offset int, limit int) ([]*types.DirectDataEntry, error) {
+func (d *DirectDataDB) List(ctx context.Context, query string, filter *FilterOptions, cursor *graphql.ID, offset int, limit int) ([]*types.DirectDeal, error) {
 	where := ""
 	whereArgs := []interface{}{}
 
@@ -258,17 +187,17 @@ func (d *DirectDataDB) List(ctx context.Context, query string, filter *FilterOpt
 	return d.list(ctx, offset, limit, where, whereArgs...)
 }
 
-func (d *DirectDataDB) ListActive(ctx context.Context) ([]*types.DirectDataEntry, error) {
+func (d *DirectDataDB) ListActive(ctx context.Context) ([]*types.DirectDeal, error) {
 	return d.list(ctx, 0, 0, "Checkpoint != ?", dealcheckpoints.Complete.String())
 }
 
-func (d *DirectDataDB) ListCompleted(ctx context.Context) ([]*types.DirectDataEntry, error) {
+func (d *DirectDataDB) ListCompleted(ctx context.Context) ([]*types.DirectDeal, error) {
 	return d.list(ctx, 0, 0, "Checkpoint = ?", dealcheckpoints.Complete.String())
 }
 
-func (d *DirectDataDB) list(ctx context.Context, offset int, limit int, whereClause string, whereArgs ...interface{}) ([]*types.DirectDataEntry, error) {
+func (d *DirectDataDB) list(ctx context.Context, offset int, limit int, whereClause string, whereArgs ...interface{}) ([]*types.DirectDeal, error) {
 	args := whereArgs
-	qry := "SELECT " + directdataFieldsStr + " FROM DirectDeals"
+	qry := "SELECT " + directDealsFieldsStr + " FROM DirectDeals"
 	if whereClause != "" {
 		qry += " WHERE " + whereClause
 	}
@@ -289,7 +218,7 @@ func (d *DirectDataDB) list(ctx context.Context, offset int, limit int, whereCla
 	}
 	defer rows.Close()
 
-	deals := make([]*types.DirectDataEntry, 0, 16)
+	deals := make([]*types.DirectDeal, 0, 16)
 	for rows.Next() {
 		deal, err := d.scanRow(rows)
 		if err != nil {
@@ -304,8 +233,8 @@ func (d *DirectDataDB) list(ctx context.Context, offset int, limit int, whereCla
 	return deals, nil
 }
 
-func (d *DirectDataDB) scanRow(row Scannable) (*types.DirectDataEntry, error) {
-	var deal types.DirectDataEntry
+func (d *DirectDataDB) scanRow(row Scannable) (*types.DirectDeal, error) {
+	var deal types.DirectDeal
 	err := d.newDirectDataDef(&deal).scan(row)
 	return &deal, err
 }

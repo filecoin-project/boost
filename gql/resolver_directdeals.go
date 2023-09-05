@@ -12,7 +12,7 @@ import (
 )
 
 type directDealResolver struct {
-	types.DirectDataEntry
+	types.DirectDeal
 	transferred uint64
 	dealsDB     *db.DealsDB
 	logsDB      *db.LogsDB
@@ -81,11 +81,11 @@ func (r *resolver) DirectDeals(ctx context.Context, args dealsArgs) (*directDeal
 	for _, deal := range deals {
 		//deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
 		resolvers = append(resolvers, &directDealResolver{
-			DirectDataEntry: *deal,
-			transferred:     0, // TODO
-			dealsDB:         r.dealsDB,
-			logsDB:          r.logsDB,
-			spApi:           r.spApi,
+			DirectDeal:  *deal,
+			transferred: 0, // TODO
+			dealsDB:     r.dealsDB,
+			logsDB:      r.logsDB,
+			spApi:       r.spApi,
 		})
 	}
 
@@ -109,11 +109,11 @@ func (r *resolver) DirectDeal(ctx context.Context, args struct{ ID graphql.ID })
 	}
 
 	return &directDealResolver{
-		DirectDataEntry: *deal,
-		transferred:     0, // TODO
-		dealsDB:         r.dealsDB,
-		logsDB:          r.logsDB,
-		spApi:           r.spApi,
+		DirectDeal:  *deal,
+		transferred: 0, // TODO
+		dealsDB:     r.dealsDB,
+		logsDB:      r.logsDB,
+		spApi:       r.spApi,
 	}, nil
 }
 
@@ -127,35 +127,35 @@ func (r *resolver) DirectDealsCount(ctx context.Context) (int32, error) {
 }
 
 func (dr *directDealResolver) ID() graphql.ID {
-	return graphql.ID(dr.DirectDataEntry.ID.String())
+	return graphql.ID(dr.DirectDeal.ID.String())
 }
 
 func (dr *directDealResolver) CreatedAt() graphql.Time {
-	return graphql.Time{Time: dr.DirectDataEntry.CreatedAt}
+	return graphql.Time{Time: dr.DirectDeal.CreatedAt}
 }
 
 func (dr *directDealResolver) ClientAddress() string {
-	return dr.DirectDataEntry.Client.String()
+	return dr.DirectDeal.Client.String()
 }
 
 func (dr *directDealResolver) ProviderAddress() string {
-	return dr.DirectDataEntry.Provider.String()
+	return dr.DirectDeal.Provider.String()
 }
 
 func (dr *directDealResolver) KeepUnsealedCopy() bool {
-	return dr.DirectDataEntry.KeepUnsealedCopy
+	return dr.DirectDeal.KeepUnsealedCopy
 }
 
 func (dr *directDealResolver) AnnounceToIPNI() bool {
-	return dr.DirectDataEntry.AnnounceToIPNI
+	return dr.DirectDeal.AnnounceToIPNI
 }
 
 func (dr *directDealResolver) PieceSize() gqltypes.Uint64 {
-	return gqltypes.Uint64(dr.DirectDataEntry.PieceSize)
+	return gqltypes.Uint64(dr.DirectDeal.PieceSize)
 }
 
 func (dr *directDealResolver) AllocationID() gqltypes.Uint64 {
-	return gqltypes.Uint64(dr.DirectDataEntry.AllocationID)
+	return gqltypes.Uint64(dr.DirectDeal.AllocationID)
 }
 
 func (dr *directDealResolver) Transferred() gqltypes.Uint64 {
@@ -164,40 +164,40 @@ func (dr *directDealResolver) Transferred() gqltypes.Uint64 {
 
 func (dr *directDealResolver) Sector() *sectorResolver {
 	return &sectorResolver{
-		ID:     gqltypes.Uint64(dr.DirectDataEntry.SectorID),
-		Offset: gqltypes.Uint64(dr.DirectDataEntry.Offset),
-		Length: gqltypes.Uint64(dr.DirectDataEntry.Length),
+		ID:     gqltypes.Uint64(dr.DirectDeal.SectorID),
+		Offset: gqltypes.Uint64(dr.DirectDeal.Offset),
+		Length: gqltypes.Uint64(dr.DirectDeal.Length),
 	}
 }
 
 func (dr *directDealResolver) StartEpoch() gqltypes.Uint64 {
-	return gqltypes.Uint64(dr.DirectDataEntry.StartEpoch)
+	return gqltypes.Uint64(dr.DirectDeal.StartEpoch)
 }
 
 func (dr *directDealResolver) EndEpoch() gqltypes.Uint64 {
-	return gqltypes.Uint64(dr.DirectDataEntry.EndEpoch)
+	return gqltypes.Uint64(dr.DirectDeal.EndEpoch)
 }
 
 func (dr *directDealResolver) PieceCid() string {
-	return dr.DirectDataEntry.PieceCID.String()
+	return dr.DirectDeal.PieceCID.String()
 }
 
 func (dr *directDealResolver) Checkpoint() string {
-	return dr.DirectDataEntry.Checkpoint.String()
+	return dr.DirectDeal.Checkpoint.String()
 }
 
 func (dr *directDealResolver) CheckpointAt() graphql.Time {
-	return graphql.Time{Time: dr.DirectDataEntry.CheckpointAt}
+	return graphql.Time{Time: dr.DirectDeal.CheckpointAt}
 }
 
 func (dr *directDealResolver) Retry() string {
-	return string(dr.DirectDataEntry.Retry)
+	return string(dr.DirectDeal.Retry)
 }
 
 func (dr *directDealResolver) Message(ctx context.Context) string {
-	msg := dr.message(ctx, dr.DirectDataEntry.Checkpoint, dr.DirectDataEntry.CheckpointAt)
-	if dr.DirectDataEntry.Retry != types.DealRetryFatal && dr.DirectDataEntry.Err != "" {
-		msg = "Paused at '" + msg + "': " + dr.DirectDataEntry.Err
+	msg := dr.message(ctx, dr.DirectDeal.Checkpoint, dr.DirectDeal.CheckpointAt)
+	if dr.DirectDeal.Retry != types.DealRetryFatal && dr.DirectDeal.Err != "" {
+		msg = "Paused at '" + msg + "': " + dr.DirectDeal.Err
 	}
 	return msg
 }
@@ -205,7 +205,7 @@ func (dr *directDealResolver) Message(ctx context.Context) string {
 func (dr *directDealResolver) message(ctx context.Context, checkpoint dealcheckpoints.Checkpoint, checkpointAt time.Time) string {
 	switch checkpoint {
 	case dealcheckpoints.Accepted:
-		if dr.DirectDataEntry.InboundFilePath != "" {
+		if dr.DirectDeal.InboundFilePath != "" {
 			return "Verifying Commp"
 		}
 		return "Awaiting Direct Data Import"
@@ -243,7 +243,7 @@ func (dr *directDealResolver) sealingState(ctx context.Context) string {
 }
 
 func (dr *directDealResolver) Logs(ctx context.Context) ([]*logsResolver, error) {
-	logs, err := dr.logsDB.Logs(ctx, dr.DirectDataEntry.ID)
+	logs, err := dr.logsDB.Logs(ctx, dr.DirectDeal.ID)
 	if err != nil {
 		return nil, err
 	}

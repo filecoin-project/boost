@@ -12,8 +12,8 @@ import (
 	cid "github.com/ipfs/go-cid"
 )
 
-// DirectDataEntry is the local state tracked for direct data onboard.
-type DirectDataEntry struct {
+// DirectDeal is the local state tracked for direct data onboard.
+type DirectDeal struct {
 	// ID is an unique uuid
 	ID uuid.UUID
 	// CreatedAt is the time at which the deal was stored
@@ -58,6 +58,6 @@ type DirectDataEntry struct {
 	AnnounceToIPNI bool
 }
 
-func (d *DirectDataEntry) String() string {
+func (d *DirectDeal) String() string {
 	return fmt.Sprintf("%+v", *d)
 }

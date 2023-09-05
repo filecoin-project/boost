@@ -75,6 +75,7 @@ func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 	for _, entry := range deals {
 		log.Infow("direct deal entry", "uuid", entry.ID, "checkpoint", entry.Checkpoint)
 
+		entry := entry
 		go func() {
 			err := ddp.Process(ctx, entry.ID)
 			if err != nil {
@@ -86,7 +87,7 @@ func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 	return nil
 }
 
-func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectDataEntry) (*api.ProviderDealRejectionInfo, error) {
+func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectDeal) (*api.ProviderDealRejectionInfo, error) {
 	chainHead, err := ddp.fullnodeApi.ChainHead(ctx)
 	if err != nil {
 		log.Warnw("failed to get chain head", "err", err)
@@ -130,7 +131,7 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationId uint64, clientAddr address.Address, removeUnsealedCopy bool, skipIpniAnnounce bool, startEpoch, endEpoch abi.ChainEpoch) (*api.ProviderDealRejectionInfo, error) {
 	log.Infow("received direct data import", "piececid", piececid, "filepath", filepath, "clientAddr", clientAddr, "allocationId", allocationId)
 
-	entry := &types.DirectDataEntry{
+	entry := &types.DirectDeal{
 		ID:        uuid.New(),
 		CreatedAt: time.Now(),
 		//CreatedAt time.Time
@@ -325,7 +326,7 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 
 	if entry.Checkpoint <= dealcheckpoints.AddedPiece {
 		// add index and announce
-
+		ddp.dealLogger.Infow(entry.ID, "index and announce")
 	}
 
 	//curTime := build.Clock.Now()
