@@ -525,6 +525,9 @@ type RootQuery {
   """Get Deal made with legacy markets endpoint by ID"""
   legacyDeal(id: ID!): LegacyDeal
 
+  """Get Direct Deal by ID"""
+  directDeal(id: ID!): DirectDeal
+
   """Get all Deals"""
   deals(query: String, filter: DealFilter, cursor: ID, offset: Int, limit: Int): DealList!
 

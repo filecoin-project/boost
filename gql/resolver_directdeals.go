@@ -96,6 +96,27 @@ func (r *resolver) DirectDeals(ctx context.Context, args dealsArgs) (*directDeal
 	}, nil
 }
 
+// query: directDeal(id) DirectDeal
+func (r *resolver) DirectDeal(ctx context.Context, args struct{ ID graphql.ID }) (*directDealResolver, error) {
+	id, err := toUuid(args.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	deal, err := r.directDealsDB.ByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &directDealResolver{
+		DirectDataEntry: *deal,
+		transferred:     0, // TODO
+		dealsDB:         r.dealsDB,
+		logsDB:          r.logsDB,
+		spApi:           r.spApi,
+	}, nil
+}
+
 func (r *resolver) DirectDealsCount(ctx context.Context) (int32, error) {
 	count, err := r.directDealsDB.Count(ctx, "", nil)
 	if err != nil {
