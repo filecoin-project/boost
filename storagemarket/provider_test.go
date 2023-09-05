@@ -1879,7 +1879,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	}
 
 	// generate CommP of the CARv2 file
-	cidAndSize, err := GenerateCommP(carFilePath)
+	cidAndSize, err := GenerateCommPLocally(carFilePath)
 	require.NoError(tbuilder.t, err)
 
 	var pieceCid = cidAndSize.PieceCID
