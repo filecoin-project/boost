@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -91,12 +92,32 @@ func runCmdsWithLog(ctx context.Context, name string, commands [][]string, homeD
 }
 
 func runLotusDaemon(ctx context.Context, home string, initialize bool) {
+	genesisPath := filepath.Join(home, ".genesis-sectors")
+	lotusPath := filepath.Join(home, ".lotus")
 	cmds := [][]string{}
 	if initialize {
-		cmds = append(cmds, []string{"lotus-seed", "genesis", "new", "localnet.json"},
+		err := os.MkdirAll(lotusPath, os.ModePerm)
+		if err != nil {
+			panic("mkdir " + lotusPath + ": " + err.Error())
+		}
+
+		rootKey1, err := genKey(lotusPath, "rootkey-1")
+		if err != nil {
+			panic(err.Error())
+		}
+		rootKey2, err := genKey(lotusPath, "rootkey-2")
+		if err != nil {
+			panic(err.Error())
+		}
+
+		cmds = append(cmds,
+			[]string{"mkdir", "-p", lotusPath},
+			[]string{"lotus-seed", "genesis", "new", "localnet.json"},
 			[]string{"lotus-seed", "pre-seal", "--sector-size=8388608", "--num-sectors=1"},
+			[]string{"lotus-seed", "--sector-dir=" + genesisPath, "genesis", "set-signers",
+				"--threshold=2", "--signers=" + string(rootKey1), "--signers=" + string(rootKey2), "localnet.json"},
 			[]string{"lotus-seed", "genesis", "add-miner", "localnet.json",
-				filepath.Join(home, ".genesis-sectors", "pre-seal-t01000.json")},
+				filepath.Join(genesisPath, "pre-seal-t01000.json")},
 			[]string{"lotus", "daemon", "--lotus-make-genesis=dev.gen",
 				"--genesis-template=localnet.json", "--bootstrap=false"})
 	} else {
@@ -104,6 +125,33 @@ func runLotusDaemon(ctx context.Context, home string, initialize bool) {
 	}
 
 	runCmdsWithLog(ctx, "lotus-daemon", cmds, home)
+}
+
+func genKey(dir string, nameFile string) (string, error) {
+	// Create a new key
+	tmpPath := path.Join(dir, nameFile+".key")
+	newKeyCmd := []string{"lotus-shed", "keyinfo", "new", "--output=" + tmpPath, "bls"}
+	key, err := exec.Command(newKeyCmd[0], newKeyCmd[1:]...).Output()
+	if err != nil {
+		return "", fmt.Errorf(strings.Join(newKeyCmd, " ")+": %w", err)
+	}
+
+	// Rename the key to its generated name
+	keyName := strings.TrimSpace(string(key))
+	keyPath := path.Join(dir, "bls-"+keyName+".keyinfo")
+	err = os.Rename(tmpPath, keyPath)
+	if err != nil {
+		return "", fmt.Errorf("mv %s -> %s: %w", keyName, keyPath, err)
+	}
+
+	// Write the name of the key to the given name file
+	namePath := path.Join(dir, nameFile)
+	err = os.WriteFile(namePath, key, 0666)
+	if err != nil {
+		return "", fmt.Errorf("writing file %s: %w", namePath, err.Error())
+	}
+
+	return keyName, nil
 }
 
 func runLotusMiner(ctx context.Context, home string, initialize bool) {
