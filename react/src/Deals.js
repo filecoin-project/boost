@@ -19,6 +19,7 @@ import './Deals.css'
 import {Pagination} from "./Pagination";
 import {DealActions, IsPaused, IsTransferring, IsOfflineWaitingForData} from "./DealDetail";
 import {humanTransferRate} from "./DealTransfers";
+import {DirectDealsCount} from "./DirectDeals";
 
 const dealsBasePath = '/storage-deals'
 
@@ -375,6 +376,7 @@ export function StorageDealsMenuItem(props) {
                 </Link>
             ) : null}
 
+            <DirectDealsCount />
             <LegacyStorageDealsCount />
         </div>
     )

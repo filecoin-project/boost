@@ -223,6 +223,25 @@ export function DirectDealsMenuItem(props) {
     )
 }
 
+export function DirectDealsCount(props) {
+    const {data} = useQuery(DirectDealsCountQuery, {
+        pollInterval: 10000,
+        fetchPolicy: 'network-only',
+    })
+
+    if (!data) {
+        return null
+    }
+
+    return (
+        <Link key="direct-deals" to="/direct-deals">
+            <div className="menu-desc">
+                <b>{data.directDealsCount}</b> legacy deal{data.directDealsCount === 1 ? '' : 's'}
+            </div>
+        </Link>
+    )
+}
+
 function scrollTop() {
     window.scrollTo({ top: 0, behavior: "smooth" })
 }
