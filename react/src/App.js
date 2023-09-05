@@ -24,6 +24,7 @@ import {RetrievalLogDetail} from "./RetrievalLogDetail";
 import {MonitoringAlert} from "./MonitoringAlert";
 import {IpniAdDetail, IpniAdEntries, IpniPage} from "./Ipni";
 import {DirectDealsPage} from "./DirectDeals";
+import {DirectDealDetail} from "./DirectDealDetail";
 
 function App(props) {
     return (
@@ -65,6 +66,7 @@ function App(props) {
                                         <Route path="/settings" element={<SettingsPage />} />
                                         <Route path="/deals/:dealID" element={<DealDetail />} />
                                         <Route path="/legacy-deals/:dealID" element={<LegacyDealDetail />} />
+                                        <Route path="/direct-deals/:dealID" element={<DirectDealDetail />} />
                                         <Route path="/piece-doctor" element={<PieceDoctorPage />} />
                                         <Route path="/piece-doctor/from/:cursor/page/:pageNum" element={<PieceDoctorPage />} />
                                         <Route path="/piece-doctor/:query" element={<PieceDoctorPage />} />

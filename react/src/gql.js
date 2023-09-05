@@ -473,6 +473,42 @@ const LegacyDealQuery = gql`
     }
 `;
 
+const DirectDealQuery = gql`
+    query AppDirectDealQuery($id: ID!) {
+        directDeal(id: $id) {
+            ID
+            CreatedAt
+            AllocationID
+            ClientAddress
+            ProviderAddress
+            PieceCid
+            PieceSize
+            StartEpoch
+            EndEpoch
+            InboundFilePath
+            Checkpoint
+            CheckpointAt
+            AnnounceToIPNI
+            KeepUnsealedCopy
+            CleanupData
+            Err
+            Retry
+            Message
+            Sector {
+                ID
+                Offset
+                Length
+            }
+            Logs {
+                CreatedAt
+                LogMsg
+                LogParams
+                Subsystem
+            }
+        }
+    }
+`;
+
 const PiecesWithRootPayloadCidQuery = gql`
     query AppPiecesWithRootPayloadCidQuery($payloadCid: String!) {
         piecesWithRootPayloadCid(payloadCid: $payloadCid)
@@ -821,6 +857,7 @@ export {
     LegacyDealsCountQuery,
     DirectDealsCountQuery,
     LegacyDealQuery,
+    DirectDealQuery,
     DealSubscription,
     DealCancelMutation,
     DealRetryPausedMutation,
