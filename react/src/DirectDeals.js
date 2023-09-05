@@ -3,7 +3,7 @@ import {
     DealsListQuery, DirectDealsCountQuery, DirectDealsListQuery,
 } from "./gql";
 import moment from "moment";
-import {humanFileSize, isContractAddress} from "./util";
+import {isContractAddress} from "./util";
 import React, {useState} from "react";
 import {PageContainer, ShortClientAddress, ShortDealID} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
@@ -236,7 +236,7 @@ export function DirectDealsCount(props) {
     return (
         <Link key="direct-deals" to="/direct-deals">
             <div className="menu-desc">
-                <b>{data.directDealsCount}</b> legacy deal{data.directDealsCount === 1 ? '' : 's'}
+                <b>{data.directDealsCount}</b> direct deal{data.directDealsCount === 1 ? '' : 's'}
             </div>
         </Link>
     )
