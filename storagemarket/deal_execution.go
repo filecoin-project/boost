@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 	"time"
@@ -530,54 +531,18 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 
 	p.dealLogger.Infow(deal.DealUuid, "add piece called")
 
-	// Open a reader against the CAR file with the deal data
-	v2r, err := carv2.OpenReader(deal.InboundFilePath)
-	if err != nil {
-		return &dealMakingError{
-			retry: types.DealRetryFatal,
-			error: fmt.Errorf("failed to open CARv2 file: %w", err),
-		}
-	}
-	defer func() {
-		if err := v2r.Close(); err != nil {
-			p.dealLogger.Warnw(deal.DealUuid, "failed to close carv2 reader in addpiece", "err", err.Error())
-		}
-	}()
-
-	var size uint64
-	switch v2r.Version {
-	case 1:
-		st, err := os.Stat(deal.InboundFilePath)
-		if err != nil {
-			return &dealMakingError{
-				retry: types.DealRetryFatal,
-				error: fmt.Errorf("failed to stat CARv1 file: %w", err),
-			}
-		}
-		size = uint64(st.Size())
-	case 2:
-		size = v2r.Header.DataSize
-	}
-
-	// Inflate the deal size so that it exactly fills a piece
 	proposal := deal.ClientDealProposal.Proposal
-	r, err := v2r.DataReader()
+	paddedReader, err := openReader(deal.InboundFilePath, proposal.PieceSize.Unpadded())
 	if err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryFatal,
-			error: fmt.Errorf("failed to get data reader over CAR file: %w", err),
-		}
-	}
-	paddedReader, err := padreader.NewInflator(r, size, proposal.PieceSize.Unpadded())
-	if err != nil {
-		return &dealMakingError{
-			retry: types.DealRetryFatal,
-			error: fmt.Errorf("failed to create inflator: %w", err),
+			error: fmt.Errorf("failed to read piece data: %w", err),
 		}
 	}
 
 	// Add the piece to a sector
 	packingInfo, packingErr := p.AddPieceToSector(ctx, *deal, paddedReader)
+	_ = paddedReader.Close()
 	if packingErr != nil {
 		if ctx.Err() != nil {
 			p.dealLogger.Warnw(deal.DealUuid, "context timed out while trying to add piece")
@@ -600,6 +565,45 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	}
 
 	return nil
+}
+
+func openReader(filePath string, pieceSize abi.UnpaddedPieceSize) (io.ReadCloser, error) {
+	// Open a reader against the CAR file with the deal data
+	v2r, err := carv2.OpenReader(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open CAR reader over %s: %w", filePath, err)
+	}
+
+	var size uint64
+	switch v2r.Version {
+	case 1:
+		st, err := os.Stat(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to stat %s: %w", filePath, err)
+		}
+		size = uint64(st.Size())
+	case 2:
+		size = v2r.Header.DataSize
+	}
+
+	// Inflate the deal size so that it exactly fills a piece
+	r, err := v2r.DataReader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open CAR data reader over %s: %w", filePath, err)
+	}
+
+	reader, err := padreader.NewInflator(r, size, pieceSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inflate data: %w", err)
+	}
+
+	return struct {
+		io.Reader
+		io.Closer
+	}{
+		Reader: reader,
+		Closer: v2r,
+	}, nil
 }
 
 func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {

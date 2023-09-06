@@ -6,8 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/filecoin-project/go-state-types/builtin/v12/verifreg"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
@@ -16,17 +14,15 @@ import (
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v12/miner"
+	"github.com/filecoin-project/go-state-types/builtin/v12/verifreg"
 	verifregst "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
-	"github.com/ipfs/go-cid"
-	carv2 "github.com/ipld/go-car/v2"
-
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 )
 
 //var log = logging.Logger("direct-deals-providers")
@@ -231,45 +227,7 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 
 	// In this context Transferred === supplied and generated commp match for data
 	if entry.Checkpoint <= dealcheckpoints.Transferred {
-		ddp.dealLogger.Infow(dealUuid, "reading deal data", "filepath", entry.InboundFilePath)
-
-		// Open a reader against the CAR file with the deal data
-		v2r, err := carv2.OpenReader(entry.InboundFilePath)
-		if err != nil {
-			return err
-		}
-
-		defer func() {
-			_ = v2r.Close()
-		}()
-
-		var size uint64
-		switch v2r.Version {
-		case 1:
-			st, err := os.Stat(entry.InboundFilePath)
-			if err != nil {
-				return err
-			}
-			size = uint64(st.Size())
-		case 2:
-			size = v2r.Header.DataSize
-		}
-
-		// Inflate the deal size so that it exactly fills a piece
-		r, err := v2r.DataReader()
-		if err != nil {
-			return err
-		}
-
-		log.Infow("got v2r.DataReader over inbound file")
-
-		paddedReader, err := padreader.NewInflator(r, size, entry.PieceSize.Unpadded())
-		if err != nil {
-			return err
-		}
-
-		log.Infow("got paddedReader")
-
+		ddp.dealLogger.Infow(dealUuid, "looking up client on chain", "client", entry.Client)
 		stateAddr, err := ddp.fullnodeApi.StateLookupID(ctx, entry.Client, ltypes.EmptyTSK)
 		if err != nil {
 			return err
@@ -311,8 +269,15 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 		}
 
 		// Attempt to add the piece to a sector (repeatedly if necessary)
-		ddp.dealLogger.Infow(dealUuid, "adding piece to sector")
+		ddp.dealLogger.Infow(dealUuid, "opening reader over piece data", "filepath", entry.InboundFilePath)
+		paddedReader, err := openReader(entry.InboundFilePath, entry.PieceSize.Unpadded())
+		if err != nil {
+			return err
+		}
+
+		ddp.dealLogger.Infow(dealUuid, "adding piece to sector", "filepath", entry.InboundFilePath)
 		sectorNum, offset, err := ddp.pieceAdder.AddPiece(ctx, entry.PieceSize.Unpadded(), paddedReader, sdInfo)
+		_ = paddedReader.Close()
 		if err != nil {
 			return fmt.Errorf("AddPiece failed: %w", err)
 		}
