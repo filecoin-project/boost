@@ -107,8 +107,6 @@ LABEL org.opencontainers.image.version=$BUILD_VERSION \
       description="This image is used to host the boost-dev storage provider"
 
 ENV BOOST_PATH /var/lib/boost
-ENV BOOST_CLIENT_REPO /var/lib/boost/boost-client
-env LID_LEVELDB_PATH /var/lib/boost
 VOLUME /var/lib/boost
 EXPOSE 8080
 
