@@ -232,7 +232,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 		p.dealLogger.Infow(deal.DealUuid, "storage space successfully untagged for deal after it was handed to sealer")
 	}
 
-	// Index deal in DAGStore and Announce deal
+	// Index and Announce deal
 	if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
 		if err := p.indexAndAnnounce(ctx, pub, deal); err != nil {
 			err.error = fmt.Errorf("failed to add index and announce deal: %w", err.error)
