@@ -150,6 +150,10 @@ var directDealAllocate = &cli.Command{
 			return err
 		}
 
+		if aDataCap == nil {
+			return fmt.Errorf("wallet %s does not have any datacap", walletAddr)
+		}
+
 		// Check that we have enough data cap to make the allocation
 		if rDataCap.GreaterThan(big.NewInt(aDataCap.Int64())) {
 			return fmt.Errorf("requested datacap is greater then the available datacap")
