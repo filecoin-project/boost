@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/datacap"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/tablewriter"
@@ -95,126 +97,10 @@ var directDealAllocate = &cli.Command{
 
 		log.Debugw("selected wallet", "wallet", walletAddr)
 
-		// Get all minerIDs from input
-		maddrs := make(map[abi.ActorID]lapi.MinerInfo)
-		minerIds := cctx.StringSlice("miner")
-		for _, id := range minerIds {
-			maddr, err := address.NewFromString(id)
-			if err != nil {
-				return err
-			}
+		msg, err := CreateAllocationMsg(ctx, gapi, cctx.StringSlice("piece-info"), cctx.StringSlice("miner"), walletAddr, abi.ChainEpoch(cctx.Int64("term-min")), abi.ChainEpoch(cctx.Int64("term-max")), abi.ChainEpoch(cctx.Int64("expiration")))
 
-			// Verify that minerID exists
-			m, err := gapi.StateMinerInfo(ctx, maddr, types.EmptyTSK)
-			if err != nil {
-				return err
-			}
-
-			mid, err := address.IDFromAddress(maddr)
-			if err != nil {
-				return err
-			}
-
-			maddrs[abi.ActorID(mid)] = m
-		}
-
-		// Get all pieceCIDs from input
-		rDataCap := big.NewInt(0)
-		var pieceInfos []*abi.PieceInfo
-		pieces := cctx.StringSlice("pieceInfo")
-		for _, p := range pieces {
-			pieceDetail := strings.Split(p, "=")
-			if len(pieceDetail) > 2 {
-				return fmt.Errorf("incorrect pieceInfo format: %s", pieceDetail)
-			}
-
-			n, err := strconv.ParseInt(pieceDetail[1], 10, 64)
-			if err != nil {
-				return fmt.Errorf("failed to parse the piece size for %s for pieceCid %s: %w", pieceDetail[0], pieceDetail[1], err)
-			}
-			pcid, err := cid.Parse(pieceDetail[0])
-			if err != nil {
-				return fmt.Errorf("failed to parse the pieceCid for %s: %w", pieceDetail[0], err)
-			}
-
-			pieceInfos = append(pieceInfos, &abi.PieceInfo{
-				Size:     abi.PaddedPieceSize(n),
-				PieceCID: pcid,
-			})
-			rDataCap.Add(big.NewInt(n).Int, rDataCap.Int)
-		}
-
-		// Get datacap balance
-		aDataCap, err := gapi.StateVerifiedClientStatus(ctx, walletAddr, types.EmptyTSK)
 		if err != nil {
 			return err
-		}
-
-		if aDataCap == nil {
-			return fmt.Errorf("wallet %s does not have any datacap", walletAddr)
-		}
-
-		// Check that we have enough data cap to make the allocation
-		if rDataCap.GreaterThan(big.NewInt(aDataCap.Int64())) {
-			return fmt.Errorf("requested datacap is greater then the available datacap")
-		}
-
-		if cctx.Int64("term-max") < cctx.Int64("term-min") {
-			return fmt.Errorf("maximum duration %d cannot be smaller than minimum duration %d", cctx.Int64("term-max"), cctx.Int64("term-min"))
-		}
-
-		head, err := gapi.ChainHead(ctx)
-		if err != nil {
-			return err
-		}
-
-		if abi.ChainEpoch(cctx.Int64("term-max")) < head.Height() || abi.ChainEpoch(cctx.Int64("term-min")) < head.Height() {
-			return fmt.Errorf("current chain head %d is greater than TermMin %d or TermMax %d", head.Height(), cctx.Int64("term-min"), cctx.Int64("term-max"))
-		}
-
-		// Create allocation requests
-		var allocationRequests []verifregst.AllocationRequest
-		for mid, minfo := range maddrs {
-			for _, p := range pieceInfos {
-				if uint64(minfo.SectorSize) < uint64(p.Size) {
-					return fmt.Errorf("specified piece size %d is bigger than miner's sector size %s", uint64(p.Size), minfo.SectorSize.String())
-				}
-				allocationRequests = append(allocationRequests, verifregst.AllocationRequest{
-					Provider:   mid,
-					Data:       p.PieceCID,
-					Size:       p.Size,
-					TermMin:    abi.ChainEpoch(cctx.Int64("term-min")),
-					TermMax:    abi.ChainEpoch(cctx.Int64("term-max")),
-					Expiration: abi.ChainEpoch(cctx.Int64("expiration")),
-				})
-			}
-		}
-
-		arequest := &verifregst.AllocationRequests{
-			Allocations: allocationRequests,
-		}
-
-		receiverParams, err := actors.SerializeParams(arequest)
-		if err != nil {
-			return fmt.Errorf("failed to seralize the parameters: %w", err)
-		}
-
-		transferParams, err := actors.SerializeParams(&datacap2.TransferParams{
-			To:           builtin.VerifiedRegistryActorAddr,
-			Amount:       big.Mul(rDataCap, builtin.TokenPrecision),
-			OperatorData: receiverParams,
-		})
-
-		if err != nil {
-			return fmt.Errorf("failed to serialize transfer parameters: %w", err)
-		}
-
-		msg := &types.Message{
-			To:     builtin.DatacapActorAddr,
-			From:   walletAddr,
-			Method: datacap.Methods.TransferExported,
-			Params: transferParams,
-			Value:  big.Zero(),
 		}
 
 		oldallocations, err := gapi.StateGetAllocations(ctx, walletAddr, types.EmptyTSK)
@@ -242,87 +128,25 @@ var directDealAllocate = &cli.Command{
 			return fmt.Errorf("failed to execute the message with error: %s", res.Receipt.ExitCode.Error())
 		}
 
+		// Return early of quiet flag is set
+		if cctx.Bool("quiet") {
+			return nil
+		}
+
 		newallocations, err := gapi.StateGetAllocations(ctx, walletAddr, types.EmptyTSK)
 		if err != nil {
 			return fmt.Errorf("failed to get allocations: %w", err)
 		}
 
-		// Map Keys. Corresponds to the standard tablewriter output
-		allocationID := "AllocationID"
-		client := "Client"
-		provider := "Miner"
-		pieceCid := "PieceCid"
-		pieceSize := "PieceSize"
-		tMin := "TermMin"
-		tMax := "TermMax"
-		expr := "Expiration"
-
-		// One-to-one mapping between tablewriter keys and JSON keys
-		tableKeysToJsonKeys := map[string]string{
-			allocationID: strings.ToLower(allocationID),
-			client:       strings.ToLower(client),
-			provider:     strings.ToLower(provider),
-			pieceCid:     strings.ToLower(pieceCid),
-			pieceSize:    strings.ToLower(pieceSize),
-			tMin:         strings.ToLower(tMin),
-			tMax:         strings.ToLower(tMax),
-			expr:         strings.ToLower(expr),
-		}
-
-		var allocs []map[string]interface{}
-
-		for key, val := range newallocations {
-			_, ok := oldallocations[key]
-			if !ok {
-				alloc := map[string]interface{}{
-					allocationID: key,
-					client:       val.Client,
-					provider:     val.Provider,
-					pieceCid:     val.Data,
-					pieceSize:    val.Size,
-					tMin:         val.TermMin,
-					tMax:         val.TermMax,
-					expr:         val.Expiration,
-				}
-				allocs = append(allocs, alloc)
+		// Generate a diff to find new allocations
+		for i := range newallocations {
+			_, ok := oldallocations[i]
+			if ok {
+				delete(newallocations, i)
 			}
 		}
 
-		if !cctx.Bool("quiet") {
-
-			if cctx.Bool("json") {
-				// get a new list of wallets with json keys instead of tablewriter keys
-				var jsonAllocs []map[string]interface{}
-				for _, alloc := range allocs {
-					jsonAlloc := make(map[string]interface{})
-					for k, v := range alloc {
-						jsonAlloc[tableKeysToJsonKeys[k]] = v
-					}
-					jsonAllocs = append(jsonAllocs, jsonAlloc)
-				}
-				// then return this!
-				return cmd.PrintJson(jsonAllocs)
-			} else {
-				// Init the tablewriter's columns
-				tw := tablewriter.New(
-					tablewriter.Col(allocationID),
-					tablewriter.Col(client),
-					tablewriter.Col(provider),
-					tablewriter.Col(pieceCid),
-					tablewriter.Col(pieceSize),
-					tablewriter.Col(tMin),
-					tablewriter.Col(tMax),
-					tablewriter.NewLineCol(expr))
-				// populate it with content
-				for _, alloc := range allocs {
-					tw.Write(alloc)
-				}
-				// return the corresponding string
-				return tw.Flush(os.Stdout)
-			}
-		}
-
-		return nil
+		return printAllocation(newallocations, cctx.Bool("json"))
 	},
 }
 
@@ -394,78 +218,203 @@ var directDealGetAllocations = &cli.Command{
 			}
 		}
 
-		// Map Keys. Corresponds to the standard tablewriter output
-		allocationID := "AllocationID"
-		client := "Client"
-		provider := "Miner"
-		pieceCid := "PieceCid"
-		pieceSize := "PieceSize"
-		tMin := "TermMin"
-		tMax := "TermMax"
-		expr := "Expiration"
-
-		// One-to-one mapping between tablewriter keys and JSON keys
-		tableKeysToJsonKeys := map[string]string{
-			allocationID: strings.ToLower(allocationID),
-			client:       strings.ToLower(client),
-			provider:     strings.ToLower(provider),
-			pieceCid:     strings.ToLower(pieceCid),
-			pieceSize:    strings.ToLower(pieceSize),
-			tMin:         strings.ToLower(tMin),
-			tMax:         strings.ToLower(tMax),
-			expr:         strings.ToLower(expr),
-		}
-
-		var allocs []map[string]interface{}
-
-		for key, val := range allocations {
-			alloc := map[string]interface{}{
-				allocationID: key,
-				client:       val.Client,
-				provider:     val.Provider,
-				pieceCid:     val.Data,
-				pieceSize:    val.Size,
-				tMin:         val.TermMin,
-				tMax:         val.TermMax,
-				expr:         val.Expiration,
-			}
-			allocs = append(allocs, alloc)
-		}
-
-		if !cctx.Bool("quiet") {
-
-			if cctx.Bool("json") {
-				// get a new list of wallets with json keys instead of tablewriter keys
-				var jsonAllocs []map[string]interface{}
-				for _, alloc := range allocs {
-					jsonAlloc := make(map[string]interface{})
-					for k, v := range alloc {
-						jsonAlloc[tableKeysToJsonKeys[k]] = v
-					}
-					jsonAllocs = append(jsonAllocs, jsonAlloc)
-				}
-				// then return this!
-				return cmd.PrintJson(jsonAllocs)
-			} else {
-				// Init the tablewriter's columns
-				tw := tablewriter.New(
-					tablewriter.Col(allocationID),
-					tablewriter.Col(client),
-					tablewriter.Col(provider),
-					tablewriter.Col(pieceCid),
-					tablewriter.Col(pieceSize),
-					tablewriter.Col(tMin),
-					tablewriter.Col(tMax),
-					tablewriter.NewLineCol(expr))
-				// populate it with content
-				for _, alloc := range allocs {
-					tw.Write(alloc)
-				}
-				// return the corresponding string
-				return tw.Flush(os.Stdout)
-			}
-		}
-
-		return nil
+		return printAllocation(allocations, cctx.Bool("json"))
 	},
+}
+
+func CreateAllocationMsg(ctx context.Context, api lapi.Gateway, pInfos, miners []string, wallet address.Address, tmin, tmax, exp abi.ChainEpoch) (*types.Message, error) {
+	// Get all minerIDs from input
+	maddrs := make(map[abi.ActorID]lapi.MinerInfo)
+	minerIds := miners
+	for _, id := range minerIds {
+		maddr, err := address.NewFromString(id)
+		if err != nil {
+			return nil, err
+		}
+
+		// Verify that minerID exists
+		m, err := api.StateMinerInfo(ctx, maddr, types.EmptyTSK)
+		if err != nil {
+			return nil, err
+		}
+
+		mid, err := address.IDFromAddress(maddr)
+		if err != nil {
+			return nil, err
+		}
+
+		maddrs[abi.ActorID(mid)] = m
+	}
+
+	// Get all pieceCIDs from input
+	rDataCap := big.NewInt(0)
+	var pieceInfos []*abi.PieceInfo
+	pieces := pInfos
+	for _, p := range pieces {
+		pieceDetail := strings.Split(p, "=")
+		if len(pieceDetail) > 2 {
+			return nil, fmt.Errorf("incorrect pieceInfo format: %s", pieceDetail)
+		}
+
+		n, err := strconv.ParseInt(pieceDetail[1], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse the piece size for %s for pieceCid %s: %w", pieceDetail[0], pieceDetail[1], err)
+		}
+		pcid, err := cid.Parse(pieceDetail[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse the pieceCid for %s: %w", pieceDetail[0], err)
+		}
+
+		pieceInfos = append(pieceInfos, &abi.PieceInfo{
+			Size:     abi.PaddedPieceSize(n),
+			PieceCID: pcid,
+		})
+		rDataCap.Add(big.NewInt(n).Int, rDataCap.Int)
+	}
+
+	// Get datacap balance
+	aDataCap, err := api.StateVerifiedClientStatus(ctx, wallet, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+
+	if aDataCap == nil {
+		return nil, fmt.Errorf("wallet %s does not have any datacap", wallet)
+	}
+
+	// Check that we have enough data cap to make the allocation
+	if rDataCap.GreaterThan(big.NewInt(aDataCap.Int64())) {
+		return nil, fmt.Errorf("requested datacap is greater then the available datacap")
+	}
+
+	if tmax < tmin {
+		return nil, fmt.Errorf("maximum duration %d cannot be smaller than minimum duration %d", tmax, tmin)
+	}
+
+	head, err := api.ChainHead(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if tmax < head.Height() || tmin < head.Height() {
+		return nil, fmt.Errorf("current chain head %d is greater than TermMin %d or TermMax %d", head.Height(), tmin, tmax)
+	}
+
+	// Create allocation requests
+	var allocationRequests []verifregst.AllocationRequest
+	for mid, minfo := range maddrs {
+		for _, p := range pieceInfos {
+			if uint64(minfo.SectorSize) < uint64(p.Size) {
+				return nil, fmt.Errorf("specified piece size %d is bigger than miner's sector size %s", uint64(p.Size), minfo.SectorSize.String())
+			}
+			allocationRequests = append(allocationRequests, verifregst.AllocationRequest{
+				Provider:   mid,
+				Data:       p.PieceCID,
+				Size:       p.Size,
+				TermMin:    tmin,
+				TermMax:    tmax,
+				Expiration: exp,
+			})
+		}
+	}
+
+	arequest := &verifregst.AllocationRequests{
+		Allocations: allocationRequests,
+	}
+
+	receiverParams, err := actors.SerializeParams(arequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to seralize the parameters: %w", err)
+	}
+
+	transferParams, err := actors.SerializeParams(&datacap2.TransferParams{
+		To:           builtin.VerifiedRegistryActorAddr,
+		Amount:       big.Mul(rDataCap, builtin.TokenPrecision),
+		OperatorData: receiverParams,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize transfer parameters: %w", err)
+	}
+
+	msg := &types.Message{
+		To:     builtin.DatacapActorAddr,
+		From:   wallet,
+		Method: datacap.Methods.TransferExported,
+		Params: transferParams,
+		Value:  big.Zero(),
+	}
+
+	return msg, nil
+}
+
+func printAllocation(allocations map[verifreg.AllocationId]verifreg.Allocation, json bool) error {
+	// Map Keys. Corresponds to the standard tablewriter output
+	allocationID := "AllocationID"
+	client := "Client"
+	provider := "Miner"
+	pieceCid := "PieceCid"
+	pieceSize := "PieceSize"
+	tMin := "TermMin"
+	tMax := "TermMax"
+	expr := "Expiration"
+
+	// One-to-one mapping between tablewriter keys and JSON keys
+	tableKeysToJsonKeys := map[string]string{
+		allocationID: strings.ToLower(allocationID),
+		client:       strings.ToLower(client),
+		provider:     strings.ToLower(provider),
+		pieceCid:     strings.ToLower(pieceCid),
+		pieceSize:    strings.ToLower(pieceSize),
+		tMin:         strings.ToLower(tMin),
+		tMax:         strings.ToLower(tMax),
+		expr:         strings.ToLower(expr),
+	}
+
+	var allocs []map[string]interface{}
+
+	for key, val := range allocations {
+		alloc := map[string]interface{}{
+			allocationID: key,
+			client:       val.Client,
+			provider:     val.Provider,
+			pieceCid:     val.Data,
+			pieceSize:    val.Size,
+			tMin:         val.TermMin,
+			tMax:         val.TermMax,
+			expr:         val.Expiration,
+		}
+		allocs = append(allocs, alloc)
+	}
+
+	if json {
+		// get a new list of wallets with json keys instead of tablewriter keys
+		var jsonAllocs []map[string]interface{}
+		for _, alloc := range allocs {
+			jsonAlloc := make(map[string]interface{})
+			for k, v := range alloc {
+				jsonAlloc[tableKeysToJsonKeys[k]] = v
+			}
+			jsonAllocs = append(jsonAllocs, jsonAlloc)
+		}
+		// then return this!
+		return cmd.PrintJson(jsonAllocs)
+	} else {
+		// Init the tablewriter's columns
+		tw := tablewriter.New(
+			tablewriter.Col(allocationID),
+			tablewriter.Col(client),
+			tablewriter.Col(provider),
+			tablewriter.Col(pieceCid),
+			tablewriter.Col(pieceSize),
+			tablewriter.Col(tMin),
+			tablewriter.Col(tMax),
+			tablewriter.NewLineCol(expr))
+		// populate it with content
+		for _, alloc := range allocs {
+			tw.Write(alloc)
+		}
+		// return the corresponding string
+		return tw.Flush(os.Stdout)
+	}
 }
