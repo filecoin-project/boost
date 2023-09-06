@@ -486,10 +486,10 @@ func (p *Provider) run() {
 					if started {
 						// If the deal wasn't already running, log a message saying
 						// that it was restarted
-						p.dealLogger.Infow(deal.DealUuid, "user initiated deal retry", "checkpoint", deal.Checkpoint)
+						p.dealLogger.Infow(deal.DealUuid, "user initiated deal retry", "checkpoint", deal.Checkpoint.String())
 					} else {
 						// the deal was already running - log a message saying so
-						p.dealLogger.Infow(deal.DealUuid, "user initiated deal retry but deal is already running", "checkpoint", deal.Checkpoint)
+						p.dealLogger.Infow(deal.DealUuid, "user initiated deal retry but deal is already running", "checkpoint", deal.Checkpoint.String())
 					}
 
 					return nil
