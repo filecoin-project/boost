@@ -99,6 +99,10 @@ var directDealAllocate = &cli.Command{
 
 		msg, err := CreateAllocationMsg(ctx, gapi, cctx.StringSlice("piece-info"), cctx.StringSlice("miner"), walletAddr, abi.ChainEpoch(cctx.Int64("term-min")), abi.ChainEpoch(cctx.Int64("term-max")), abi.ChainEpoch(cctx.Int64("expiration")))
 
+		if err != nil {
+			return err
+		}
+
 		oldallocations, err := gapi.StateGetAllocations(ctx, walletAddr, types.EmptyTSK)
 		if err != nil {
 			return fmt.Errorf("failed to get allocations: %w", err)
@@ -135,7 +139,7 @@ var directDealAllocate = &cli.Command{
 		}
 
 		// Generate a diff to find new allocations
-		for i, _ := range newallocations {
+		for i := range newallocations {
 			_, ok := oldallocations[i]
 			if ok {
 				delete(newallocations, i)
