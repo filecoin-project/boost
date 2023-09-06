@@ -192,6 +192,7 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 	}
 
 	log.Infow("processing direct deal", "uuid", dealUuid, "checkpoint", entry.Checkpoint, "piececid", entry.PieceCID, "filepath", entry.InboundFilePath, "clientAddr", entry.Client, "allocationId", entry.AllocationID)
+	ddp.dealLogger.Infow(dealUuid, "deal execution initiated", "deal state", entry)
 
 	if entry.Checkpoint <= dealcheckpoints.Accepted { // before commp
 
@@ -200,6 +201,9 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 		if err != nil {
 			return err
 		}
+
+		ddp.dealLogger.Infow(dealUuid, "size of deal", "filepath", entry.InboundFilePath, "size", fstat.Size())
+		ddp.dealLogger.Infow(dealUuid, "generating commp")
 
 		// throttle for local commp
 		throttle := make(chan struct{}, 1)
@@ -216,18 +220,19 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 		if !entry.PieceCID.Equals(generatedPieceInfo.PieceCID) {
 			return fmt.Errorf("commp mismatch: %v vs %v", entry.PieceCID, generatedPieceInfo.PieceCID) // retry
 		}
+		ddp.dealLogger.Infow(dealUuid, "completed generating commp")
 
 		entry.PieceSize = generatedPieceInfo.Size
 
-		entry.Checkpoint = dealcheckpoints.Transferred
-		err = ddp.directDealsDB.Update(ctx, entry)
-		if err != nil {
+		if err = ddp.updateCheckpoint(ctx, entry, dealcheckpoints.Transferred); err != nil {
 			return err
 		}
 	}
 
 	// In this context Transferred === supplied and generated commp match for data
 	if entry.Checkpoint <= dealcheckpoints.Transferred {
+		ddp.dealLogger.Infow(dealUuid, "reading deal data", "filepath", entry.InboundFilePath)
+
 		// Open a reader against the CAR file with the deal data
 		v2r, err := carv2.OpenReader(entry.InboundFilePath)
 		if err != nil {
@@ -306,6 +311,7 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 		}
 
 		// Attempt to add the piece to a sector (repeatedly if necessary)
+		ddp.dealLogger.Infow(dealUuid, "adding piece to sector")
 		sectorNum, offset, err := ddp.pieceAdder.AddPiece(ctx, entry.PieceSize.Unpadded(), paddedReader, sdInfo)
 		if err != nil {
 			return fmt.Errorf("AddPiece failed: %w", err)
@@ -317,16 +323,14 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 		entry.Offset = offset
 		entry.Length = entry.PieceSize
 
-		entry.Checkpoint = dealcheckpoints.AddedPiece
-		err = ddp.directDealsDB.Update(ctx, entry)
-		if err != nil {
+		if err = ddp.updateCheckpoint(ctx, entry, dealcheckpoints.AddedPiece); err != nil {
 			return err
 		}
 	}
 
 	if entry.Checkpoint <= dealcheckpoints.AddedPiece {
 		// add index and announce
-		ddp.dealLogger.Infow(entry.ID, "index and announce")
+		ddp.dealLogger.Infow(dealUuid, "index and announce")
 	}
 
 	//curTime := build.Clock.Now()
@@ -357,6 +361,20 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 	//if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece); derr != nil {
 	//return derr
 	//}
+
+	return nil
+}
+
+func (ddp *DirectDealsProvider) updateCheckpoint(ctx context.Context, entry *smtypes.DirectDeal, ckpt dealcheckpoints.Checkpoint) error {
+	prev := entry.Checkpoint
+	entry.Checkpoint = ckpt
+	err := ddp.directDealsDB.Update(ctx, entry)
+	if err != nil {
+		return err
+	}
+
+	ddp.dealLogger.Infow(entry.ID, "updated deal checkpoint in DB",
+		"old checkpoint", prev.String(), "new checkpoint", ckpt.String())
 
 	return nil
 }
