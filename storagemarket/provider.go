@@ -28,6 +28,7 @@ import (
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
@@ -652,24 +653,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 
 	// Attempt to add the piece to a sector (repeatedly if necessary)
 	pieceSize := deal.ClientDealProposal.Proposal.PieceSize.Unpadded()
-	sectorNum, offset, err := p.pieceAdder.AddPiece(ctx, pieceSize, pieceData, sdInfo)
-	curTime := build.Clock.Now()
-
-	for build.Clock.Since(curTime) < addPieceRetryTimeout {
-		if !errors.Is(err, sealing.ErrTooManySectorsSealing) {
-			if err != nil {
-				p.dealLogger.Warnw(deal.DealUuid, "failed to addPiece for deal, will-retry", "err", err.Error())
-			}
-			break
-		}
-		select {
-		case <-build.Clock.After(addPieceRetryWait):
-			sectorNum, offset, err = p.pieceAdder.AddPiece(ctx, pieceSize, pieceData, sdInfo)
-		case <-ctx.Done():
-			return nil, fmt.Errorf("error while waiting to retry AddPiece: %w", ctx.Err())
-		}
-	}
-
+	sectorNum, offset, err := addPieceWithRetry(ctx, p.pieceAdder, pieceSize, pieceData, sdInfo)
 	if err != nil {
 		return nil, fmt.Errorf("AddPiece failed: %w", err)
 	}
@@ -680,4 +664,25 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 		Offset:       offset,
 		Size:         pieceSize.Padded(),
 	}, nil
+}
+
+func addPieceWithRetry(ctx context.Context, pieceAdder smtypes.PieceAdder, pieceSize abi.UnpaddedPieceSize, pieceData io.Reader, sdInfo lapi.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+	sectorNum, offset, err := pieceAdder.AddPiece(ctx, pieceSize, pieceData, sdInfo)
+	curTime := build.Clock.Now()
+	for err != nil && build.Clock.Since(curTime) < addPieceRetryTimeout {
+		// Check if the error was because there are too many sectors sealing
+		if !errors.Is(err, sealing.ErrTooManySectorsSealing) {
+			// There was some other error, return it
+			return 0, 0, err
+		}
+
+		// There are too many sectors sealing, back off for a while then try again
+		select {
+		case <-build.Clock.After(addPieceRetryWait):
+			sectorNum, offset, err = pieceAdder.AddPiece(ctx, pieceSize, pieceData, sdInfo)
+		case <-ctx.Done():
+			return 0, 0, fmt.Errorf("shutdown while adding piece")
+		}
+	}
+	return sectorNum, offset, err
 }

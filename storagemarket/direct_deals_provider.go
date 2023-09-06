@@ -268,15 +268,16 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 			KeepUnsealed: entry.KeepUnsealedCopy,
 		}
 
-		// Attempt to add the piece to a sector (repeatedly if necessary)
+		// Open a reader over the piece data
 		ddp.dealLogger.Infow(dealUuid, "opening reader over piece data", "filepath", entry.InboundFilePath)
 		paddedReader, err := openReader(entry.InboundFilePath, entry.PieceSize.Unpadded())
 		if err != nil {
 			return err
 		}
 
+		// Attempt to add the piece to a sector (repeatedly if necessary)
 		ddp.dealLogger.Infow(dealUuid, "adding piece to sector", "filepath", entry.InboundFilePath)
-		sectorNum, offset, err := ddp.pieceAdder.AddPiece(ctx, entry.PieceSize.Unpadded(), paddedReader, sdInfo)
+		sectorNum, offset, err := addPieceWithRetry(ctx, ddp.pieceAdder, entry.PieceSize.Unpadded(), paddedReader, sdInfo)
 		_ = paddedReader.Close()
 		if err != nil {
 			return fmt.Errorf("AddPiece failed: %w", err)
@@ -291,41 +292,18 @@ func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID)
 		if err = ddp.updateCheckpoint(ctx, entry, dealcheckpoints.AddedPiece); err != nil {
 			return err
 		}
+
+		// The deal has been handed off to the sealer, so we can remove the inbound file
+		if entry.CleanupData {
+			_ = os.Remove(entry.InboundFilePath)
+			ddp.dealLogger.Infow(dealUuid, "removed piece data from disk as deal has been added to a sector", "path", entry.InboundFilePath)
+		}
 	}
 
 	if entry.Checkpoint <= dealcheckpoints.AddedPiece {
 		// add index and announce
 		ddp.dealLogger.Infow(dealUuid, "index and announce")
 	}
-
-	//curTime := build.Clock.Now()
-
-	//for build.Clock.Since(curTime) < addPieceRetryTimeout {
-	//if !errors.Is(err, sealing.ErrTooManySectorsSealing) {
-	//if err != nil {
-	////p.dealLogger.Warnw(deal.DealUuid, "failed to addPiece for deal, will-retry", "err", err.Error())
-	//}
-	//break
-	//}
-	//select {
-	//case <-build.Clock.After(addPieceRetryWait):
-	//sectorNum, offset, err = p.pieceAdder.AddPiece(ctx, entry.PieceSize, pieceData, sdInfo)
-	//case <-ctx.Done():
-	//return nil, fmt.Errorf("error while waiting to retry AddPiece: %w", ctx.Err())
-	//}
-	//}
-
-	//p.dealLogger.Infow(deal.DealUuid, "added new deal to sector", "sector", sectorNum.String())
-
-	//deal.SectorID = packingInfo.SectorNumber
-	//deal.Offset = packingInfo.Offset
-	//deal.Length = packingInfo.Size
-	//p.dealLogger.Infow(deal.DealUuid, "deal successfully handed to the sealing subsystem",
-	//"sectorNum", deal.SectorID.String(), "offset", deal.Offset, "length", deal.Length)
-
-	//if derr := p.updateCheckpoint(pub, deal, dealcheckpoints.AddedPiece); derr != nil {
-	//return derr
-	//}
 
 	return nil
 }
