@@ -165,7 +165,7 @@ var directDealAllocate = &cli.Command{
 		}
 
 		if abi.ChainEpoch(cctx.Int64("term-max")) < head.Height() || abi.ChainEpoch(cctx.Int64("term-min")) < head.Height() {
-			return fmt.Errorf("current chain head %d is greater than termMin %d or termMax %d", head.Height(), cctx.Int64("term-min"), cctx.Int64("term-max"))
+			return fmt.Errorf("current chain head %d is greater than TermMin %d or TermMax %d", head.Height(), cctx.Int64("term-min"), cctx.Int64("term-max"))
 		}
 
 		// Create allocation requests
@@ -179,8 +179,8 @@ var directDealAllocate = &cli.Command{
 					Provider:   mid,
 					Data:       p.PieceCID,
 					Size:       p.Size,
-					TermMin:    abi.ChainEpoch(cctx.Int64("termmin")),
-					TermMax:    abi.ChainEpoch(cctx.Int64("termmax")),
+					TermMin:    abi.ChainEpoch(cctx.Int64("term-min")),
+					TermMax:    abi.ChainEpoch(cctx.Int64("term-max")),
 					Expiration: abi.ChainEpoch(cctx.Int64("expiration")),
 				})
 			}
