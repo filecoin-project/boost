@@ -133,11 +133,6 @@ var isUnsealedCmd = &cli.Command{
 		}
 		defer ncloser()
 
-		err = lib.CheckFullNodeApiVersion(ctx, fullnodeApi)
-		if err != nil {
-			return err
-		}
-
 		// Connect to the storage API and create a sector accessor
 		storageApiInfo := cctx.String("api-storage")
 		sa, storageCloser, err := lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
