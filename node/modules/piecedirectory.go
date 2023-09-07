@@ -73,7 +73,7 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 					migrator := yugabyte.NewMigrator(settings, address.Address(maddr))
 					bdsvc = svc.NewYugabyte(settings, migrator)
 
-				default:
+				case cfg.LocalIndexDirectory.Leveldb.Enabled:
 					log.Infow("local index directory: connecting to leveldb instance")
 
 					// Setup a local index directory service that connects to the leveldb
@@ -82,6 +82,12 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 					if err != nil {
 						return fmt.Errorf("creating leveldb local index directory: %w", err)
 					}
+
+				default:
+					return fmt.Errorf("starting local index directory client: " +
+						"neither yugabyte nor leveldb is enabled in config - " +
+						"you must explicitly configure either LocalIndexDirectory.Yugabyte "+
+						"or LocalIndexDirectory.Leveldb as the local index directory implementation")
 				}
 
 				// Start the embedded local index directory service

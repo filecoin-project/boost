@@ -584,6 +584,12 @@ Note that this port must be open on the firewall.`,
 			Comment: ``,
 		},
 		{
+			Name: "Leveldb",
+			Type: "LocalIndexDirectoryLeveldbConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "ParallelAddIndexLimit",
 			Type: "int",
 
@@ -612,6 +618,14 @@ Set this value to "" if the local index directory data service is embedded.`,
 			Type: "Duration",
 
 			Comment: `The RPC timeout when making requests to the boostd-data service`,
+		},
+	},
+	"LocalIndexDirectoryLeveldbConfig": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: ``,
 		},
 	},
 	"LocalIndexDirectoryYugabyteConfig": []DocField{
