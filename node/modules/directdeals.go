@@ -17,6 +17,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/storage/sectorblocks"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -54,7 +55,12 @@ func NewDirectDealsProvider(provAddr address.Address, cfg *config.Boost) func(lc
 
 		//func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
 
-		prov := storagemarket.NewDirectDealsProvider(fullnodeApi, secb, commpc, directDealsDB, dl)
+		ddpCfg := storagemarket.DDPConfig{
+			StartEpochSealingBuffer: abi.ChainEpoch(cfg.Dealmaking.StartEpochSealingBuffer),
+			RemoteCommp:             cfg.Dealmaking.RemoteCommp,
+		}
+
+		prov := storagemarket.NewDirectDealsProvider(ddpCfg, fullnodeApi, secb, commpc, directDealsDB, dl)
 		return prov, nil
 	}
 }

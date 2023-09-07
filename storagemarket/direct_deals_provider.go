@@ -29,8 +29,16 @@ import (
 
 //var log = logging.Logger("direct-deals-providers")
 
+type DDPConfig struct {
+	// Whether to do commp on the Boost node (local) or the sealing node (remote)
+	RemoteCommp bool
+	// Minimum start epoch buffer to give time for sealing of sector with deal
+	StartEpochSealingBuffer abi.ChainEpoch
+}
+
 type DirectDealsProvider struct {
-	ctx context.Context // context to be stopped when stopping boostd
+	config DDPConfig
+	ctx    context.Context // context to be stopped when stopping boostd
 
 	fullnodeApi v1api.FullNode
 	pieceAdder  types.PieceAdder
@@ -42,13 +50,11 @@ type DirectDealsProvider struct {
 	//logsDB        *db.LogsDB
 
 	dealLogger *logs.DealLogger
-
-	startEpochSealingBuffer abi.ChainEpoch // TODO: move to config and init properly
-	remoteCommp             bool
 }
 
-func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
+func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
 	return &DirectDealsProvider{
+		config:      cfg,
 		fullnodeApi: fullnodeApi,
 		pieceAdder:  pieceAdder,
 		commpCalc:   commpCalc,
@@ -89,7 +95,7 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 
 	log.Infow("chain head", "epoch", chainHead)
 
-	if chainHead.Height()+ddp.startEpochSealingBuffer > entry.StartEpoch {
+	if chainHead.Height()+ddp.config.StartEpochSealingBuffer > entry.StartEpoch {
 		return &api.ProviderDealRejectionInfo{
 			Accepted: false,
 			Reason: fmt.Sprintf(
@@ -254,7 +260,7 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 		// TODO: should we be passing pieceSize here ??!?
 		pieceSize := abi.UnpaddedPieceSize(fstat.Size())
 
-		generatedPieceInfo, dmErr := generatePieceCommitment(ctx, ddp.commpCalc, throttle, entry.InboundFilePath, pieceSize.Padded(), ddp.remoteCommp)
+		generatedPieceInfo, dmErr := generatePieceCommitment(ctx, ddp.commpCalc, throttle, entry.InboundFilePath, pieceSize.Padded(), ddp.config.RemoteCommp)
 		if dmErr != nil {
 			return &dealMakingError{
 				retry: types.DealRetryManual,
