@@ -401,6 +401,7 @@ type LocalIndexDirectoryYugabyteConfig struct {
 
 type LocalIndexDirectoryConfig struct {
 	Yugabyte LocalIndexDirectoryYugabyteConfig
+	Leveldb  LocalIndexDirectoryLeveldbConfig
 	// The maximum number of add index operations allowed to execute in parallel.
 	// The add index operation is executed when a new deal is created - it fetches
 	// the piece from the sealing subsystem, creates an index of where each block
@@ -415,4 +416,8 @@ type LocalIndexDirectoryConfig struct {
 	ServiceApiInfo string
 	// The RPC timeout when making requests to the boostd-data service
 	ServiceRPCTimeout Duration
+}
+
+type LocalIndexDirectoryLeveldbConfig struct {
+	Enabled bool
 }
