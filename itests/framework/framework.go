@@ -342,6 +342,9 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 
 	cfg.Dealmaking.ExpectedSealDuration = 10
 
+	// Enable LID with leveldb
+	cfg.LocalIndexDirectory.Leveldb.Enabled = true
+
 	err = lr.SetConfig(func(raw interface{}) {
 		rcfg := raw.(*config.Boost)
 		*rcfg = *cfg
