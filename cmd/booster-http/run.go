@@ -272,10 +272,10 @@ var runCmd = &cli.Command{
 func parseSupportedResponseFormats(cctx *cli.Context) []string {
 	fmts := []string{}
 	if cctx.Bool("serve-blocks") {
-		fmts = append(fmts, "application/vnd.ipld.raw")
+		fmts = append(fmts, ContentTypeBlock)
 	}
 	if cctx.Bool("serve-cars") {
-		fmts = append(fmts, "application/vnd.ipld.car")
+		fmts = append(fmts, ContentTypeCar)
 	}
 	if cctx.Bool("serve-files") {
 		// Allow the user to not specify a specific response format.
@@ -302,7 +302,13 @@ func ipfsGatewayMsg(cctx *cli.Context, ipfsBasePath string) string {
 		return "IPFS gateway is disabled"
 	}
 
-	return "serving IPFS gateway at " + ipfsBasePath + " (serving " + strings.Join(fmts, ", ") + ")"
+	msg := "serving IPFS gateway at " + ipfsBasePath
+	if len(fmts) == 1 && fmts[0] == "CARs" {
+		msg += " (serving CARs using strict Trustless Gateway API)"
+	} else {
+		msg += " (serving " + strings.Join(fmts, ", ") + " using full IPFS Gateway API)"
+	}
+	return msg
 }
 
 func createRepoDir(repoDir string) (string, error) {

@@ -25,7 +25,8 @@ type RetrievalTest struct {
 }
 
 func RunMultiminerRetrievalTest(t *testing.T, rt func(ctx context.Context, t *testing.T, rt *RetrievalTest)) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	kit.QuietMiningLogs()
 	framework.SetLogLevel()

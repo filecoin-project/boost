@@ -14,6 +14,8 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/fatih/color"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	"github.com/filecoin-project/boost-graphsync/storeutil"
+	"github.com/filecoin-project/boost/cmd/booster-http/frisbii"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
@@ -32,6 +34,11 @@ import (
 )
 
 //go:generate go run github.com/golang/mock/mockgen -destination=mocks/mock_booster_http.go -package=mocks_booster_http -source=server.go HttpServerApi,serverApi
+
+const (
+	ContentTypeCar   = "application/vnd.ipld.car"
+	ContentTypeBlock = "application/vnd.ipld.raw"
+)
 
 var ErrNotFound = errors.New("not found")
 
@@ -102,12 +109,19 @@ func (s *HttpServer) Start(ctx context.Context) error {
 	}
 
 	if s.opts.Blockstore != nil {
-		blockService := blockservice.New(s.opts.Blockstore, offline.Exchange(s.opts.Blockstore))
-		gw, err := gateway.NewBlocksBackend(blockService)
-		if err != nil {
-			return fmt.Errorf("creating blocks gateway: %w", err)
+		if len(s.opts.SupportedResponseFormats) == 1 && s.opts.SupportedResponseFormats[0] == ContentTypeCar {
+			// minimal Trustless Gateway handler
+			lsys := storeutil.LinkSystemForBlockstore(s.opts.Blockstore)
+			handler.Handle(s.ipfsBasePath(), frisbii.NewHttpIpfs(ctx, lsys))
+		} else {
+			// full IPFS Gateway handler
+			blockService := blockservice.New(s.opts.Blockstore, offline.Exchange(s.opts.Blockstore))
+			gw, err := gateway.NewBlocksBackend(blockService)
+			if err != nil {
+				return fmt.Errorf("creating blocks gateway: %w", err)
+			}
+			handler.Handle(s.ipfsBasePath(), newGatewayHandler(gw, s.opts.SupportedResponseFormats))
 		}
-		handler.Handle(s.ipfsBasePath(), newGatewayHandler(gw, s.opts.SupportedResponseFormats))
 	}
 
 	handler.HandleFunc("/", s.handleIndex)

@@ -61,9 +61,9 @@ func customResponseFormat(r *http.Request) (mediaType string, params map[string]
 		// translate query param to a content type
 		switch formatParam {
 		case "raw":
-			return "application/vnd.ipld.raw", nil, nil
+			return ContentTypeBlock, nil, nil
 		case "car":
-			return "application/vnd.ipld.car", nil, nil
+			return ContentTypeCar, nil, nil
 		case "tar":
 			return "application/x-tar", nil, nil
 		case "json":
