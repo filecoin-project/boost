@@ -212,7 +212,7 @@ require (
 	github.com/ipfs/go-ipld-cbor v0.1.0
 	github.com/ipfs/go-log v1.0.5 // indirect
 	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
-	github.com/ipfs/go-unixfsnode v1.8.0
+	github.com/ipfs/go-unixfsnode v1.9.0
 	github.com/ipfs/go-verifcid v0.0.2 // indirect
 	github.com/ipld/go-codec-dagpb v1.6.0
 	github.com/ipld/go-ipld-adl-hamt v0.0.0-20220616142416-9004dbd839e0 // indirect
@@ -301,8 +301,8 @@ require (
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.14.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/term v0.11.0
+	golang.org/x/sys v0.12.0 // indirect
+	golang.org/x/term v0.12.0
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/grpc v1.55.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
@@ -314,9 +314,7 @@ require (
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
 	github.com/ipfs/go-ds-flatfs v0.5.1
-	github.com/ipfs/go-ipfs-redirects-file v0.1.1 // indirect
 )
 
 require (
@@ -328,8 +326,12 @@ require (
 	github.com/filecoin-project/lotus v1.25.0-rc1
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
-	github.com/ipni/go-libipni v0.5.1
+	github.com/ipld/frisbii v0.4.0
+	github.com/ipld/go-fixtureplate v0.0.2
+	github.com/ipld/ipld/specs v0.0.0-20230927010225-ef4dbd703269
+	github.com/ipni/go-libipni v0.5.2
 	github.com/ipni/ipni-cli v0.1.1
+	github.com/ipni/storetheindex v0.8.1
 	github.com/schollz/progressbar/v3 v3.13.1
 )
 
@@ -351,6 +353,7 @@ require (
 	github.com/hashicorp/golang-lru/arc/v2 v2.0.5 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.5 // indirect
 	github.com/ipfs/go-ipfs-blockstore v1.3.0 // indirect
+	github.com/ipld/go-trustless-utils v0.4.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.11.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
@@ -360,7 +363,6 @@ require (
 	github.com/jackc/pgtype v1.10.0 // indirect
 	github.com/jackc/puddle v1.2.1 // indirect
 	github.com/lib/pq v1.10.9 // indirect
-	github.com/libp2p/go-doh-resolver v0.4.0 // indirect
 	github.com/montanaflynn/stats v0.7.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.11.0 // indirect
 	github.com/puzpuzpuz/xsync/v2 v2.4.0 // indirect
@@ -368,7 +370,7 @@ require (
 	github.com/quic-go/qtls-go1-20 v0.3.3 // indirect
 	github.com/quic-go/quic-go v0.38.1 // indirect
 	github.com/quic-go/webtransport-go v0.5.3 // indirect
-	github.com/ucarion/urlpath v0.0.0-20200424170820-7ccc79b76bbb // indirect
+	github.com/warpfork/go-testmark v0.12.1 // indirect
 	github.com/yugabyte/gocql v0.0.0-20230831121436-1e2272bb6bb6 // indirect
 	github.com/yugabyte/pgx/v4 v4.14.5 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect

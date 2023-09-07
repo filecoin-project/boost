@@ -13,6 +13,7 @@ import (
 	"time"
 
 	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost-gfm/storagemarket/impl/storedask"
 	"github.com/filecoin-project/boost/api"
 	boostclient "github.com/filecoin-project/boost/client"
 	"github.com/filecoin-project/boost/node"
@@ -186,6 +187,12 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 }
 
 type ConfigOpt func(cfg *config.Boost)
+
+func WithMaxStagingDealsBytes(maxBytes int64) ConfigOpt {
+	return func(cfg *config.Boost) {
+		cfg.Dealmaking.MaxStagingDealsBytes = maxBytes
+	}
+}
 
 func (f *TestFramework) Start(opts ...ConfigOpt) error {
 	lapi.RunningNodeType = lapi.NodeMiner
@@ -581,6 +588,7 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 	if err != nil {
 		return nil, err
 	}
+	price := big.Div(big.Mul(storedask.DefaultPrice, abi.NewTokenAmount(int64(cidAndSize.Size))), abi.NewTokenAmount(1<<30))
 	proposal := market.DealProposal{
 		PieceCID:             cidAndSize.PieceCID,
 		PieceSize:            cidAndSize.Size,
@@ -590,7 +598,7 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		Label:                l,
 		StartEpoch:           startEpoch,
 		EndEpoch:             startEpoch + market.DealMinDuration,
-		StoragePricePerEpoch: abi.NewTokenAmount(2000000),
+		StoragePricePerEpoch: price,
 		ProviderCollateral:   abi.NewTokenAmount(0),
 		ClientCollateral:     abi.NewTokenAmount(0),
 	}

@@ -13,6 +13,7 @@ import (
 
 	mocks_booster_http "github.com/filecoin-project/boost/cmd/booster-http/mocks"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/testutil"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -21,19 +22,21 @@ const testFile = "test/test_file"
 
 func TestNewHttpServer(t *testing.T) {
 	// Create a new mock Http server
-	ctrl := gomock.NewController(t)
-	httpServer := NewHttpServer("", "0.0.0.0", 7777, mocks_booster_http.NewMockHttpServerApi(ctrl), nil)
-	err := httpServer.Start(context.Background())
+	port, err := testutil.FreePort()
 	require.NoError(t, err)
-	waitServerUp(t, 7777)
+	ctrl := gomock.NewController(t)
+	httpServer := NewHttpServer("", "0.0.0.0", port, mocks_booster_http.NewMockHttpServerApi(ctrl), nil)
+	err = httpServer.Start(context.Background())
+	require.NoError(t, err)
+	waitServerUp(t, port)
 
 	// Check that server is responding with 200 status code
-	resp, err := http.Get("http://localhost:7777/")
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/", port))
 	require.NoError(t, err)
 	require.Equal(t, 200, resp.StatusCode)
 
 	// Create a request with Cors header
-	req, err := http.NewRequest("GET", "http://localhost:7777/", nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:%d/", port), nil)
 	require.NoError(t, err)
 	req.Header.Add("Origin", "test")
 	client := new(http.Client)
@@ -50,12 +53,14 @@ func TestNewHttpServer(t *testing.T) {
 
 func TestHttpGzipResponse(t *testing.T) {
 	// Create a new mock Http server with custom functions
+	port, err := testutil.FreePort()
+	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
-	httpServer := NewHttpServer("", "0.0.0.0", 7777, mockHttpServer, nil)
-	err := httpServer.Start(context.Background())
+	httpServer := NewHttpServer("", "0.0.0.0", port, mockHttpServer, nil)
+	err = httpServer.Start(context.Background())
 	require.NoError(t, err)
-	waitServerUp(t, 7777)
+	waitServerUp(t, port)
 
 	// Create mock unsealed file for piece/car
 	f, _ := os.Open(testFile)
@@ -81,7 +86,7 @@ func TestHttpGzipResponse(t *testing.T) {
 
 	//Create a client and make request with Encoding header
 	client := new(http.Client)
-	request, err := http.NewRequest("GET", "http://localhost:7777/piece/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", nil)
+	request, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:%d/piece/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", port), nil)
 	require.NoError(t, err)
 	request.Header.Add("Accept-Encoding", "gzip")
 
@@ -109,14 +114,16 @@ func TestHttpGzipResponse(t *testing.T) {
 func TestHttpInfo(t *testing.T) {
 	var v apiVersion
 
+	port, err := testutil.FreePort()
+	require.NoError(t, err)
 	// Create a new mock Http server
 	ctrl := gomock.NewController(t)
-	httpServer := NewHttpServer("", "0.0.0.0", 7777, mocks_booster_http.NewMockHttpServerApi(ctrl), nil)
-	err := httpServer.Start(context.Background())
+	httpServer := NewHttpServer("", "0.0.0.0", port, mocks_booster_http.NewMockHttpServerApi(ctrl), nil)
+	err = httpServer.Start(context.Background())
 	require.NoError(t, err)
-	waitServerUp(t, 7777)
+	waitServerUp(t, port)
 
-	response, err := http.Get("http://localhost:7777/info")
+	response, err := http.Get(fmt.Sprintf("http://localhost:%d/info", port))
 	require.NoError(t, err)
 	defer response.Body.Close()
 

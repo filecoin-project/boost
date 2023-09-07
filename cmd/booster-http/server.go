@@ -14,6 +14,7 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/fatih/color"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	"github.com/filecoin-project/boost-graphsync/storeutil"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boost/metrics"
@@ -21,12 +22,10 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hashicorp/go-multierror"
-	"github.com/ipfs/boxo/blockservice"
 	"github.com/ipfs/boxo/blockstore"
-	"github.com/ipfs/boxo/exchange/offline"
-	"github.com/ipfs/boxo/gateway"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/ipld/frisbii"
 	"github.com/rs/cors"
 	"go.opencensus.io/stats"
 )
@@ -64,14 +63,14 @@ type HttpServerApi interface {
 }
 
 type HttpServerOptions struct {
-	Blockstore               blockstore.Blockstore
-	ServePieces              bool
-	SupportedResponseFormats []string
+	Blockstore     blockstore.Blockstore
+	ServePieces    bool
+	ServeTrustless bool
 }
 
 func NewHttpServer(path string, listenAddr string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
 	if opts == nil {
-		opts = &HttpServerOptions{ServePieces: true}
+		opts = &HttpServerOptions{ServePieces: true, ServeTrustless: false}
 	}
 	return &HttpServer{path: path, listenAddr: listenAddr, port: port, api: api, opts: *opts, idxPage: parseTemplate(*opts)}
 }
@@ -93,6 +92,10 @@ func newCors() *cors.Cors {
 }
 
 func (s *HttpServer) Start(ctx context.Context) error {
+	if !s.opts.ServePieces && !s.opts.ServeTrustless {
+		return errors.New("no content to serve")
+	}
+
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	c := newCors()
 	handler := http.NewServeMux()
@@ -101,13 +104,12 @@ func (s *HttpServer) Start(ctx context.Context) error {
 		handler.HandleFunc(s.pieceBasePath(), s.handleByPieceCid)
 	}
 
-	if s.opts.Blockstore != nil {
-		blockService := blockservice.New(s.opts.Blockstore, offline.Exchange(s.opts.Blockstore))
-		gw, err := gateway.NewBlocksBackend(blockService)
-		if err != nil {
-			return fmt.Errorf("creating blocks gateway: %w", err)
+	if s.opts.ServeTrustless {
+		if s.opts.Blockstore == nil {
+			return errors.New("no blockstore provided for trustless gateway")
 		}
-		handler.Handle(s.ipfsBasePath(), newGatewayHandler(gw, s.opts.SupportedResponseFormats))
+		lsys := storeutil.LinkSystemForBlockstore(s.opts.Blockstore)
+		handler.Handle(s.ipfsBasePath(), frisbii.NewHttpIpfs(ctx, lsys))
 	}
 
 	handler.HandleFunc("/", s.handleIndex)
