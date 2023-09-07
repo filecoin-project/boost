@@ -84,9 +84,10 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 					}
 
 				default:
-					return fmt.Errorf("starting local index directory client:" +
-						"either LocalIndexDirectory.Yugabyte{} details must be defined or " +
-						"LocalIndexDirectory.Leveldb must be enabled")
+					return fmt.Errorf("starting local index directory client: " +
+						"neither yugabyte nor leveldb is enabled in config - " +
+						"you must explicitly configure either LocalIndexDirectory.Yugabyte "+
+						"or LocalIndexDirectory.Leveldb as the local index directory implementation")
 				}
 
 				// Start the embedded local index directory service
