@@ -65,6 +65,7 @@ type resolver struct {
 	fundMgr        *fundmanager.FundManager
 	storageMgr     *storagemanager.StorageManager
 	provider       *storagemarket.Provider
+	ddProvider     *storagemarket.DirectDealsProvider
 	legacyDeals    *legacy.LegacyDealsManager
 	legacyProv     gfm_storagemarket.StorageProvider
 	legacyDT       dtypes.ProviderDataTransfer
@@ -80,7 +81,7 @@ type resolver struct {
 	mpool          *mpoolmonitor.MpoolMonitor
 }
 
-func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, directDealsDB *db.DirectDataDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor) *resolver {
+func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, directDealsDB *db.DirectDataDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, ddProvider *storagemarket.DirectDealsProvider, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor) *resolver {
 	return &resolver{
 		ctx:            ctx,
 		cfg:            cfg,
@@ -95,6 +96,7 @@ func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo
 		fundMgr:        fundMgr,
 		storageMgr:     storageMgr,
 		provider:       provider,
+		ddProvider:     ddProvider,
 		legacyDeals:    legacyDeals,
 		legacyProv:     legacyProv,
 		legacyDT:       legacyDT,
@@ -283,6 +285,11 @@ func (r *resolver) DealNew(ctx context.Context) (<-chan *dealNewResolver, error)
 	return c, nil
 }
 
+func (r *resolver) isDirectDeal(ctx context.Context, dealUuid uuid.UUID) bool {
+	_, err := r.directDealsDB.ByID(ctx, dealUuid)
+	return err == nil
+}
+
 // mutation: dealCancel(id): ID
 func (r *resolver) DealCancel(ctx context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
 	dealUuid, err := toUuid(args.ID)
@@ -305,9 +312,15 @@ func (r *resolver) DealCancel(ctx context.Context, args struct{ ID graphql.ID })
 }
 
 // mutation: dealRetryPaused(id): ID
-func (r *resolver) DealRetryPaused(_ context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
+func (r *resolver) DealRetryPaused(ctx context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
 	dealUuid, err := toUuid(args.ID)
 	if err != nil {
+		return args.ID, err
+	}
+
+	// Check whether this is a direct deal
+	if r.isDirectDeal(ctx, dealUuid) {
+		err = r.ddProvider.RetryPausedDeal(ctx, dealUuid)
 		return args.ID, err
 	}
 
@@ -316,9 +329,15 @@ func (r *resolver) DealRetryPaused(_ context.Context, args struct{ ID graphql.ID
 }
 
 // mutation: dealFailPaused(id): ID
-func (r *resolver) DealFailPaused(_ context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
+func (r *resolver) DealFailPaused(ctx context.Context, args struct{ ID graphql.ID }) (graphql.ID, error) {
 	dealUuid, err := toUuid(args.ID)
 	if err != nil {
+		return args.ID, err
+	}
+
+	// Check whether this is a direct deal
+	if r.isDirectDeal(ctx, dealUuid) {
+		err = r.ddProvider.FailPausedDeal(ctx, dealUuid)
 		return args.ID, err
 	}
 
