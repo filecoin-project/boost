@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -50,6 +51,9 @@ type DirectDealsProvider struct {
 	//logsDB        *db.LogsDB
 
 	dealLogger *logs.DealLogger
+
+	runningLk sync.RWMutex
+	running   map[uuid.UUID]struct{}
 }
 
 func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
@@ -65,6 +69,7 @@ func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdde
 		//logsDB: logsDB,
 
 		dealLogger: dealLogger,
+		running:    make(map[uuid.UUID]struct{}),
 	}
 }
 
@@ -76,11 +81,12 @@ func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to list active direct deals: %w", err)
 	}
 
+	// For each deal
 	for _, entry := range deals {
 		log.Infow("direct deal entry", "uuid", entry.ID, "checkpoint", entry.Checkpoint)
 
-		id := entry.ID
-		go ddp.Process(ctx, id)
+		// Start executing the deal in a go routine
+		ddp.startDealThread(entry.ID)
 	}
 
 	return nil
@@ -165,21 +171,42 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 		return nil, err
 	}
 
-	log.Infow("deal accepted. insert direct deal entry to local db", "uuid", entry.ID, "piececid", piececid, "filepath", filepath)
-
 	if res.Accepted {
+		log.Infow("deal accepted. insert direct deal entry to local db", "uuid", entry.ID, "piececid", piececid, "filepath", filepath)
+
 		err := ddp.directDealsDB.Insert(ctx, entry)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert direct deal entry to local db: %w", err)
 		}
 
-		go ddp.Process(ddp.ctx, entry.ID)
+		// Start executing the deal in a go routine
+		ddp.startDealThread(entry.ID)
 	}
 
 	return res, nil
 }
 
-func (ddp *DirectDealsProvider) Process(ctx context.Context, dealUuid uuid.UUID) {
+func (ddp *DirectDealsProvider) startDealThread(id uuid.UUID) bool {
+	ddp.runningLk.Lock()
+	defer ddp.runningLk.Unlock()
+
+	_, isRunning := ddp.running[id]
+	if !isRunning {
+		ddp.running[id] = struct{}{}
+		go func() {
+			ddp.process(ddp.ctx, id)
+
+			ddp.runningLk.Lock()
+			defer ddp.runningLk.Unlock()
+			delete(ddp.running, id)
+		}()
+	}
+
+	startedNewThread := !isRunning
+	return startedNewThread
+}
+
+func (ddp *DirectDealsProvider) process(ctx context.Context, dealUuid uuid.UUID) {
 	deal, dberr := ddp.directDealsDB.ByID(ctx, dealUuid)
 	if dberr != nil {
 		log.Errorw("error fetching direct deal", "uuid", dealUuid, "err", dberr)
@@ -417,4 +444,66 @@ func (ddp *DirectDealsProvider) failDeal(deal *smtypes.DirectDeal, err error) {
 	deal.Err = err.Error()
 	ddp.dealLogger.LogError(deal.ID, "deal failed", err)
 	ddp.saveDealToDB(deal)
+}
+
+func (ddp *DirectDealsProvider) RetryPausedDeal(ctx context.Context, id uuid.UUID) error {
+	deal, err := ddp.directDealsDB.ByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if deal.Checkpoint == dealcheckpoints.Complete {
+		return fmt.Errorf("deal %s is already complete", id)
+	}
+
+	// Start executing the deal in a go routine
+	started := ddp.startDealThread(id)
+	if started {
+		// If the deal wasn't already running, log a message saying
+		// that it was restarted
+		ddp.dealLogger.Infow(id, "user initiated deal retry", "checkpoint", deal.Checkpoint.String())
+	} else {
+		// the deal was already running - log a message saying so
+		ddp.dealLogger.Infow(id, "user initiated deal retry but deal is already running", "checkpoint", deal.Checkpoint.String())
+	}
+
+	return nil
+}
+
+func (ddp *DirectDealsProvider) FailPausedDeal(ctx context.Context, id uuid.UUID) error {
+	deal, err := ddp.directDealsDB.ByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if deal.Checkpoint == dealcheckpoints.Complete {
+		return fmt.Errorf("deal %s is already complete", id)
+	}
+
+	ddp.runningLk.RLock()
+	_, isRunning := ddp.running[id]
+	ddp.runningLk.RUnlock()
+
+	// Check if the deal is running
+	if isRunning {
+		return fmt.Errorf("the deal %s is running; cannot fail running deal", id)
+	}
+
+	// Update state in DB with error
+	deal.Checkpoint = dealcheckpoints.Complete
+	deal.Retry = smtypes.DealRetryFatal
+	if deal.Err == "" {
+		err = errors.New("user manually terminated the deal")
+	} else {
+		err = errors.New(deal.Err)
+	}
+	deal.Err = "user manually terminated the deal"
+	ddp.dealLogger.LogError(id, deal.Err, err)
+	ddp.saveDealToDB(deal)
+
+	if deal.CleanupData {
+		_ = os.Remove(deal.InboundFilePath)
+	}
+
+	return nil
 }
