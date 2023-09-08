@@ -73,6 +73,7 @@ var Log = logging.Logger("boosttest")
 
 type TestFrameworkConfig struct {
 	EnableLegacy bool
+	ensembleOpts []kit.EnsembleOpt
 }
 
 type TestFramework struct {
@@ -98,13 +99,19 @@ func EnableLegacyDeals(enable bool) FrameworkOpts {
 	}
 }
 
+func EnsembleOpts(opts ...kit.EnsembleOpt) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.ensembleOpts = opts
+	}
+}
+
 func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) *TestFramework {
-	fullNode, miner := FullNodeAndMiner(t)
 	fmc := &TestFrameworkConfig{}
 	for _, opt := range opts {
 		opt(fmc)
 	}
 
+	fullNode, miner := FullNodeAndMiner(t, fmc.ensembleOpts...)
 	return &TestFramework{
 		ctx:        ctx,
 		config:     fmc,
@@ -114,7 +121,7 @@ func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) 
 	}
 }
 
-func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
+func FullNodeAndMiner(t *testing.T, ensOpts ...kit.EnsembleOpt) (*kit.TestFullNode, *kit.TestMiner) {
 	// Set up a full node and a miner (without markets)
 	var fullNode kit.TestFullNode
 	var miner kit.TestMiner
@@ -143,7 +150,8 @@ func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
 			}),
 		)),
 	}
-	fnOpts := []kit.NodeOpt{
+
+	fullNodeOpts := []kit.NodeOpt{
 		kit.ConstructorOpts(
 			lnode.Override(new(lp2p.RawHost), func() (host.Host, error) {
 				return libp2p.New(libp2p.DefaultTransports)
@@ -159,9 +167,10 @@ func FullNodeAndMiner(t *testing.T) (*kit.TestFullNode, *kit.TestMiner) {
 
 		//kit.MockProofs(),
 	}
+	eOpts = append(eOpts, ensOpts...)
 
 	blockTime := 100 * time.Millisecond
-	ens := kit.NewEnsemble(t, eOpts...).FullNode(&fullNode, fnOpts...).Miner(&miner, &fullNode, minerOpts...).Start()
+	ens := kit.NewEnsemble(t, eOpts...).FullNode(&fullNode, fullNodeOpts...).Miner(&miner, &fullNode, minerOpts...).Start()
 	ens.BeginMining(blockTime)
 
 	return &fullNode, &miner

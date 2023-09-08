@@ -6,8 +6,11 @@ import (
 	"path/filepath"
 
 	bcli "github.com/filecoin-project/boost/cli"
+	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
@@ -98,7 +101,19 @@ var importDirectDataCmd = &cli.Command{
 		startEpoch := abi.ChainEpoch(cctx.Int("start-epoch"))
 		endEpoch := startEpoch + abi.ChainEpoch(cctx.Int("duration"))
 
-		rej, err := napi.BoostDirectDeal(cctx.Context, piececid, filepath, cctx.Bool("delete-after-import"), allocationId, clientAddr, cctx.Bool("remove-unsealed-copy"), cctx.Bool("skip-ipni-announce"), startEpoch, endEpoch)
+		ddParams := types.DirectDealParams{
+			DealUUID:           uuid.New(),
+			AllocationID:       verifreg.AllocationId(allocationId),
+			PieceCid:           piececid,
+			ClientAddr:         clientAddr,
+			StartEpoch:         startEpoch,
+			EndEpoch:           endEpoch,
+			FilePath:           filepath,
+			DeleteAfterImport:  cctx.Bool("delete-after-import"),
+			RemoveUnsealedCopy: cctx.Bool("remove-unsealed-copy"),
+			SkipIPNIAnnounce:   cctx.Bool("skip-ipni-announce"),
+		}
+		rej, err := napi.BoostDirectDeal(cctx.Context, ddParams)
 		if err != nil {
 			return fmt.Errorf("failed to execute direct data import: %w", err)
 		}

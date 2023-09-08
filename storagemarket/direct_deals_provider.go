@@ -20,12 +20,10 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v12/miner"
 	"github.com/filecoin-project/go-state-types/builtin/v12/verifreg"
-	verifregst "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/google/uuid"
-	"github.com/ipfs/go-cid"
 )
 
 //var log = logging.Logger("direct-deals-providers")
@@ -133,26 +131,28 @@ func (ddp *DirectDealsProvider) Accept(ctx context.Context, entry *types.DirectD
 	}, nil
 }
 
-func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, filepath string, deleteAfterImport bool, allocationId uint64, clientAddr address.Address, removeUnsealedCopy bool, skipIpniAnnounce bool, startEpoch, endEpoch abi.ChainEpoch) (*api.ProviderDealRejectionInfo, error) {
-	log.Infow("received direct data import", "piececid", piececid, "filepath", filepath, "clientAddr", clientAddr, "allocationId", allocationId)
+func (ddp *DirectDealsProvider) Import(ctx context.Context, params smtypes.DirectDealParams) (*api.ProviderDealRejectionInfo, error) {
+	piececid := params.PieceCid.String()
+	clientAddr := params.ClientAddr.String()
+	log.Infow("received direct data import", "piececid", piececid, "filepath", params.FilePath, "clientAddr", clientAddr, "allocationId", params.AllocationID)
 
 	entry := &types.DirectDeal{
-		ID:        uuid.New(),
+		ID:        params.DealUUID,
 		CreatedAt: time.Now(),
 		//CreatedAt time.Time
-		PieceCID: piececid,
+		PieceCID: params.PieceCid,
 		//PieceSize abi.PaddedPieceSize
-		Client: clientAddr,
+		Client: params.ClientAddr,
 		//Provider  address.Address
 
-		StartEpoch: startEpoch,
-		EndEpoch:   endEpoch,
+		StartEpoch: params.StartEpoch,
+		EndEpoch:   params.EndEpoch,
 
-		CleanupData:      deleteAfterImport,
-		InboundFilePath:  filepath,
-		AllocationID:     verifregst.AllocationId(allocationId),
-		KeepUnsealedCopy: !removeUnsealedCopy,
-		AnnounceToIPNI:   !skipIpniAnnounce,
+		CleanupData:      params.DeleteAfterImport,
+		InboundFilePath:  params.FilePath,
+		AllocationID:     params.AllocationID,
+		KeepUnsealedCopy: !params.RemoveUnsealedCopy,
+		AnnounceToIPNI:   !params.SkipIPNIAnnounce,
 		//SectorID abi.SectorNumber
 		//Offset   abi.PaddedPieceSize
 		//Length   abi.PaddedPieceSize
@@ -164,7 +164,7 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 
 	ddp.dealLogger.Infow(entry.ID, "executing direct deal import", "client", clientAddr, "piececid", piececid)
 
-	log.Infow("check for deal acceptance", "uuid", entry.ID, "piececid", piececid, "filepath", filepath)
+	log.Infow("check for deal acceptance", "uuid", entry.ID.String(), "piececid", piececid, "filepath", params.FilePath)
 
 	res, err := ddp.Accept(ctx, entry)
 	if err != nil {
@@ -172,7 +172,7 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, piececid cid.Cid, fi
 	}
 
 	if res.Accepted {
-		log.Infow("deal accepted. insert direct deal entry to local db", "uuid", entry.ID, "piececid", piececid, "filepath", filepath)
+		log.Infow("deal accepted. insert direct deal entry to local db", "uuid", entry.ID, "piececid", piececid, "filepath", params.FilePath)
 
 		err := ddp.directDealsDB.Insert(ctx, entry)
 		if err != nil {
