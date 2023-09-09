@@ -1978,12 +1978,6 @@ This is useful for forcing all deals to be assigned as snap deals to sectors mar
 			Comment: `Don't send collateral with messages even if there is no available balance in the miner actor`,
 		},
 		{
-			Name: "BatchPreCommits",
-			Type: "bool",
-
-			Comment: `enable / disable precommit batching (takes effect after nv13)`,
-		},
-		{
 			Name: "MaxPreCommitBatch",
 			Type: "int",
 
@@ -2036,7 +2030,8 @@ This is useful for forcing all deals to be assigned as snap deals to sectors mar
 			Type: "types.FIL",
 
 			Comment: `network BaseFee below which to stop doing precommit batching, instead
-sending precommit messages to the chain individually`,
+sending precommit messages to the chain individually. When the basefee is
+below this threshold, precommit messages will get sent out immediately.`,
 		},
 		{
 			Name: "AggregateAboveBaseFee",
