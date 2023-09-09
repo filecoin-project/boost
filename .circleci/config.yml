@@ -86,7 +86,7 @@ jobs:
   lid-docker-compose:
     description: 'Run LID integration tests'
     machine:
-      image: 2023.07.2
+      image: ubuntu-2204:2023.07.2
       resource_class: xlarge
     steps:
       - checkout
