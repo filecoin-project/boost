@@ -33,7 +33,6 @@ import (
 	"github.com/jellydator/ttlcache/v2"
 	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/multiformats/go-varint"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -257,14 +256,10 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 
 	blockMetadata, err := blockReader.SkipNext()
 	for err == nil {
-		// blockMetadata.SourceOffset gives us the offset of the block data, we need to rewind to
-		// the offset of the CAR section, which is before the CID and the uvarint length prefix
-		offset := blockMetadata.SourceOffset - uint64(blockMetadata.Cid.ByteLen())
-		offset -= uint64(varint.UvarintSize(blockMetadata.Size + uint64(blockMetadata.Cid.ByteLen())))
 		recs = append(recs, model.Record{
 			Cid: blockMetadata.Cid,
 			OffsetSize: model.OffsetSize{
-				Offset: offset,
+				Offset: blockMetadata.SourceOffset,
 				Size:   blockMetadata.Size,
 			},
 		})
