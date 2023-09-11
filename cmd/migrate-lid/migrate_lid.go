@@ -285,6 +285,7 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 					took := time.Since(start)
 					indexTime.lck.Lock()
 					indexTime.t += took
+					indexTime.lck.Unlock()
 
 					if perr != nil {
 						logger.Errorw("migrate index failed", "piece cid", p.name, "took", took.String(), "err", perr)
@@ -301,7 +302,6 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 						atomic.AddInt64(&processed, 1)
 						logger.Infow("index already migrated", "piece cid", p.name, "processed", processed, "total", len(idxPaths))
 					}
-					indexTime.lck.Unlock()
 				}
 			}
 			return ctx.Err()
