@@ -427,7 +427,12 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(dealUuid uuid.UUID, sectorNu
 	checkSealingFinalized := func() bool {
 		// Get the sector status
 		si, err := ddp.sps.SectorsStatus(ddp.ctx, sectorNum, false)
-		if err == nil && si.State != lastSealingState {
+		if err != nil {
+			log.Warnw("getting sector sealing state", "sector", sectorNum, "err", err.Error())
+			return false
+		}
+
+		if si.State != lastSealingState {
 			// Sector status has changed
 			lastSealingState = si.State
 			ddp.dealLogger.Infow(dealUuid, "current sealing state", "state", si.State)
