@@ -421,11 +421,10 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 }
 
 // watchSealingUpdates periodically checks the sealing status of the deal,
-// and returns once the deal is active (or there's an error)
+// and returns once the deal is active (or boost is shutdown)
 func (ddp *DirectDealsProvider) watchSealingUpdates(dealUuid uuid.UUID, sectorNum abi.SectorNumber) *dealMakingError {
-	var deal *types.ProviderDealState
 	var lastSealingState lapi.SectorState
-	checkSealingFinalized := func() (bool, *dealMakingError) {
+	checkSealingFinalized := func() bool {
 		// Get the sector status
 		si, err := ddp.sps.SectorsStatus(ddp.ctx, sectorNum, false)
 		if err == nil && si.State != lastSealingState {
@@ -434,22 +433,12 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(dealUuid uuid.UUID, sectorNu
 			ddp.dealLogger.Infow(dealUuid, "current sealing state", "state", si.State)
 		}
 
-		if IsFinalSealingState(si.State) {
-			if HasDeal(si.Deals, deal.ChainDealID) {
-				return true, nil
-			}
-			return false, &dealMakingError{
-				retry: types.DealRetryFatal,
-				error: ErrDealNotInSector,
-			}
-		}
-
-		return false, nil
+		return IsFinalSealingState(si.State)
 	}
 
 	// Check immediately if the sector has reached a final sealing state
-	if complete, err := checkSealingFinalized(); complete || err != nil {
-		return err
+	if complete := checkSealingFinalized(); complete {
+		return nil
 	}
 
 	// Check status every couple of minutes
@@ -464,11 +453,9 @@ func (ddp *DirectDealsProvider) watchSealingUpdates(dealUuid uuid.UUID, sectorNu
 				error: ddp.ctx.Err(),
 			}
 		case <-ticker.C:
-			if complete, err := checkSealingFinalized(); complete || err != nil {
-				if err != nil {
-					ddp.dealLogger.Infow(dealUuid, "deal sealing reached termination state")
-				}
-				return err
+			if complete := checkSealingFinalized(); complete {
+				ddp.dealLogger.Infow(dealUuid, "deal sealing reached termination state")
+				return nil
 			}
 		}
 	}
