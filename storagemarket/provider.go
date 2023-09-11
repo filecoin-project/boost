@@ -67,10 +67,8 @@ type Config struct {
 	// The maximum amount of time a transfer can take before it fails
 	MaxTransferDuration time.Duration
 	// Whether to do commp on the Boost node (local) or the sealing node (remote)
-	RemoteCommp bool
-	// The number of commp processes that can run in parallel
-	MaxConcurrentLocalCommp uint64
-	TransferLimiter         TransferLimiterConfig
+	RemoteCommp     bool
+	TransferLimiter TransferLimiterConfig
 	// Cleanup deal logs from DB older than this many number of days
 	DealLogDurationDays int
 	// Cache timeout for Sealing Pipeline status
@@ -120,7 +118,7 @@ type Provider struct {
 	transfers      *dealTransfers
 
 	pieceAdder                  types.PieceAdder
-	commpThrottle               chan struct{}
+	commpThrottle               CommpThrottle
 	commpCalc                   smtypes.CommpCalculator
 	maxDealCollateralMultiplier uint64
 	chainDealManager            types.ChainDealManager
@@ -139,7 +137,7 @@ type Provider struct {
 }
 
 func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
-	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, commpCalc smtypes.CommpCalculator,
+	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, commpCalc smtypes.CommpCalculator, commpThrottle CommpThrottle,
 	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	piecedirectory *piecedirectory.PieceDirectory, ip types.IndexProvider, askGetter types.AskGetter,
 	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
@@ -154,11 +152,6 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-
-	// Make sure that max concurrent local commp is at least 1
-	if cfg.MaxConcurrentLocalCommp == 0 {
-		cfg.MaxConcurrentLocalCommp = 1
-	}
 
 	if cfg.SealingPipelineCacheTimeout < 0 {
 		cfg.SealingPipelineCacheTimeout = 30 * time.Second
@@ -191,7 +184,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		dealPublisher:               dp,
 		fullnodeApi:                 fullnodeApi,
 		pieceAdder:                  pa,
-		commpThrottle:               make(chan struct{}, cfg.MaxConcurrentLocalCommp),
+		commpThrottle:               commpThrottle,
 		commpCalc:                   commpCalc,
 		chainDealManager:            cm,
 		maxDealCollateralMultiplier: 2,

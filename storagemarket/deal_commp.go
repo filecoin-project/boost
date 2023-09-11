@@ -59,9 +59,29 @@ func (p *Provider) generatePieceCommitment(filepath string, pieceSize abi.Padded
 	return pi.PieceCID, nil
 }
 
+// Throttle the number of concurrent local commp processes
+type CommpThrottle chan struct{}
+
+// reserve waits until a slot is available, or returns a context cancelled error
+func (t CommpThrottle) reserve(ctx context.Context) *dealMakingError {
+	select {
+	case <-ctx.Done():
+		return &dealMakingError{
+			retry: types.DealRetryAuto,
+			error: fmt.Errorf("local commp cancelled: %w", ctx.Err()),
+		}
+	case t <- struct{}{}:
+		return nil
+	}
+}
+
+func (t CommpThrottle) release() {
+	<-t
+}
+
 // generatePieceCommitment generates commp either locally or remotely,
 // depending on config, and pads it as necessary to match the piece size.
-func generatePieceCommitment(ctx context.Context, commpCalc smtypes.CommpCalculator, throttle chan struct{}, filepath string, pieceSize abi.PaddedPieceSize, doRemoteCommP bool) (*abi.PieceInfo, *dealMakingError) {
+func generatePieceCommitment(ctx context.Context, commpCalc smtypes.CommpCalculator, throttle CommpThrottle, filepath string, pieceSize abi.PaddedPieceSize, doRemoteCommP bool) (*abi.PieceInfo, *dealMakingError) {
 	// Check whether to send commp to a remote process or do it locally
 	var pi *abi.PieceInfo
 	if doRemoteCommP {
@@ -72,8 +92,10 @@ func generatePieceCommitment(ctx context.Context, commpCalc smtypes.CommpCalcula
 			return nil, err
 		}
 	} else {
-		throttle <- struct{}{}
-		defer func() { <-throttle }()
+		if cancelledErr := throttle.reserve(ctx); cancelledErr != nil {
+			return nil, cancelledErr
+		}
+		defer throttle.release()
 
 		var err error
 		pi, err = GenerateCommPLocally(filepath)

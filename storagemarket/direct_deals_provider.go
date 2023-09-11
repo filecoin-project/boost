@@ -40,10 +40,11 @@ type DirectDealsProvider struct {
 	config DDPConfig
 	ctx    context.Context // context to be stopped when stopping boostd
 
-	fullnodeApi v1api.FullNode
-	pieceAdder  types.PieceAdder
-	commpCalc   smtypes.CommpCalculator
-	sps         sealingpipeline.API
+	fullnodeApi   v1api.FullNode
+	pieceAdder    types.PieceAdder
+	commpCalc     smtypes.CommpCalculator
+	commpThrottle CommpThrottle
+	sps           sealingpipeline.API
 
 	//db            *sql.DB
 	directDealsDB *db.DirectDataDB
@@ -56,13 +57,14 @@ type DirectDealsProvider struct {
 	running   map[uuid.UUID]struct{}
 }
 
-func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, sps sealingpipeline.API, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
+func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder smtypes.PieceAdder, commpCalc smtypes.CommpCalculator, commpt CommpThrottle, sps sealingpipeline.API, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
 	return &DirectDealsProvider{
-		config:      cfg,
-		fullnodeApi: fullnodeApi,
-		pieceAdder:  pieceAdder,
-		commpCalc:   commpCalc,
-		sps:         sps,
+		config:        cfg,
+		fullnodeApi:   fullnodeApi,
+		pieceAdder:    pieceAdder,
+		commpCalc:     commpCalc,
+		commpThrottle: commpt,
+		sps:           sps,
 
 		//db: db,
 		directDealsDB: directDealsDB,
@@ -285,12 +287,10 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 		ddp.dealLogger.Infow(dealUuid, "size of deal", "filepath", entry.InboundFilePath, "size", fstat.Size())
 		ddp.dealLogger.Infow(dealUuid, "generating commp")
 
-		// throttle for local commp
-		throttle := make(chan struct{}, 1)
 		// TODO: should we be passing pieceSize here ??!?
 		pieceSize := abi.UnpaddedPieceSize(fstat.Size())
 
-		generatedPieceInfo, dmErr := generatePieceCommitment(ctx, ddp.commpCalc, throttle, entry.InboundFilePath, pieceSize.Padded(), ddp.config.RemoteCommp)
+		generatedPieceInfo, dmErr := generatePieceCommitment(ctx, ddp.commpCalc, ddp.commpThrottle, entry.InboundFilePath, pieceSize.Padded(), ddp.config.RemoteCommp)
 		if dmErr != nil {
 			return &dealMakingError{
 				retry: types.DealRetryManual,

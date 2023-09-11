@@ -596,18 +596,27 @@ func NewLegacyStorageProvider(cfg *config.Boost) func(minerAddress lotus_dtypes.
 	}
 }
 
-func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
+func NewCommpThrottle(cfg *config.Boost) func() storagemarket.CommpThrottle {
+	return func() storagemarket.CommpThrottle {
+		size := uint64(1)
+		if cfg.Dealmaking.MaxConcurrentLocalCommp > 1 {
+			size = cfg.Dealmaking.MaxConcurrentLocalCommp
+		}
+		return make(chan struct{}, size)
+	}
+}
+
+func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks, commpc types.CommpCalculator, commpt storagemarket.CommpThrottle, sps sealingpipeline.API, df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper, lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 	return func(lc fx.Lifecycle, h host.Host, a v1api.FullNode, sqldb *sql.DB, dealsDB *db.DealsDB,
 		fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, dp *storageadapter.DealPublisher, secb *sectorblocks.SectorBlocks,
-		commpc types.CommpCalculator, sps sealingpipeline.API,
+		commpc types.CommpCalculator, commpt storagemarket.CommpThrottle, sps sealingpipeline.API,
 		df dtypes.StorageDealFilter, logsSqlDB *LogSqlDB, logsDB *db.LogsDB,
 		piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper,
 		lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.Provider, error) {
 
 		prvCfg := storagemarket.Config{
-			MaxTransferDuration:     time.Duration(cfg.Dealmaking.MaxTransferDuration),
-			RemoteCommp:             cfg.Dealmaking.RemoteCommp,
-			MaxConcurrentLocalCommp: cfg.Dealmaking.MaxConcurrentLocalCommp,
+			MaxTransferDuration: time.Duration(cfg.Dealmaking.MaxTransferDuration),
+			RemoteCommp:         cfg.Dealmaking.RemoteCommp,
 			TransferLimiter: storagemarket.TransferLimiterConfig{
 				MaxConcurrent:    cfg.Dealmaking.HttpTransferMaxConcurrentDownloads,
 				StallCheckPeriod: time.Duration(cfg.Dealmaking.HttpTransferStallCheckPeriod),
@@ -619,7 +628,7 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 		}
 		dl := logs.NewDealLogger(logsDB)
 		tspt := httptransport.New(h, dl)
-		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, commpc,
+		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, commpc, commpt,
 			sps, cdm, df, logsSqlDB.db, logsDB, piecedirectory, ip, lp, &signatureVerifier{a}, dl, tspt)
 		if err != nil {
 			return nil, err
