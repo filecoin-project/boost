@@ -246,7 +246,8 @@ func testDataSegmentIndex(ctx context.Context, t *testing.T, cl *client.Store) {
 	require.NoError(t, err)
 
 	paddedPieceSize := abi.PaddedPieceSize(fstat.Size())
-	rdr, err := pr.GetReader(ctx, 0, 0, paddedPieceSize)
+	maddr := address.TestAddress
+	rdr, err := pr.GetReader(ctx, maddr, 0, 0, paddedPieceSize)
 	require.NoError(t, err)
 	pieceCid := CalculateCommp(t, rdr).PieceCID
 
