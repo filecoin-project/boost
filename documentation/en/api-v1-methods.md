@@ -508,16 +508,19 @@ Inputs:
 ```json
 [
   {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
-  "string value",
-  true,
-  42,
-  "f01234",
-  true,
-  true,
-  10101,
-  10101
+    "DealUUID": "07070707-0707-0707-0707-070707070707",
+    "AllocationID": 0,
+    "PieceCid": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "ClientAddr": "f01234",
+    "StartEpoch": 10101,
+    "EndEpoch": 10101,
+    "FilePath": "string value",
+    "DeleteAfterImport": true,
+    "RemoveUnsealedCopy": true,
+    "SkipIPNIAnnounce": true
+  }
 ]
 ```
 

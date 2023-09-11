@@ -336,6 +336,11 @@ workflows:
           target: "./itests/disabled_markets_v1_deal_test.go"
 
       - test:
+          name: test-itest-direct_deal
+          suite: itest-direct_deal
+          target: "./itests/ddo_test.go"
+
+      - test:
           name: test-all
           suite: all
           target: "`go list ./... | grep -v boost/itests`"
