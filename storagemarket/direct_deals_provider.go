@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/storagemarket/logs"
+	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
@@ -42,6 +43,7 @@ type DirectDealsProvider struct {
 	fullnodeApi v1api.FullNode
 	pieceAdder  types.PieceAdder
 	commpCalc   smtypes.CommpCalculator
+	sps         sealingpipeline.API
 
 	//db            *sql.DB
 	directDealsDB *db.DirectDataDB
@@ -54,12 +56,13 @@ type DirectDealsProvider struct {
 	running   map[uuid.UUID]struct{}
 }
 
-func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
+func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, sps sealingpipeline.API, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
 	return &DirectDealsProvider{
 		config:      cfg,
 		fullnodeApi: fullnodeApi,
 		pieceAdder:  pieceAdder,
 		commpCalc:   commpCalc,
+		sps:         sps,
 
 		//db: db,
 		directDealsDB: directDealsDB,
@@ -404,7 +407,71 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 		ddp.dealLogger.Infow(dealUuid, "index and announce")
 	}
 
+	if entry.Checkpoint < dealcheckpoints.Complete {
+		// The deal has been added to a piece, so just watch the deal sealing state
+		if derr := ddp.watchSealingUpdates(dealUuid, entry.SectorID); derr != nil {
+			return derr
+		}
+		if err := ddp.updateCheckpoint(ctx, entry, dealcheckpoints.Complete); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+// watchSealingUpdates periodically checks the sealing status of the deal,
+// and returns once the deal is active (or there's an error)
+func (ddp *DirectDealsProvider) watchSealingUpdates(dealUuid uuid.UUID, sectorNum abi.SectorNumber) *dealMakingError {
+	var deal *types.ProviderDealState
+	var lastSealingState lapi.SectorState
+	checkSealingFinalized := func() (bool, *dealMakingError) {
+		// Get the sector status
+		si, err := ddp.sps.SectorsStatus(ddp.ctx, sectorNum, false)
+		if err == nil && si.State != lastSealingState {
+			// Sector status has changed
+			lastSealingState = si.State
+			ddp.dealLogger.Infow(dealUuid, "current sealing state", "state", si.State)
+		}
+
+		if IsFinalSealingState(si.State) {
+			if HasDeal(si.Deals, deal.ChainDealID) {
+				return true, nil
+			}
+			return false, &dealMakingError{
+				retry: types.DealRetryFatal,
+				error: ErrDealNotInSector,
+			}
+		}
+
+		return false, nil
+	}
+
+	// Check immediately if the sector has reached a final sealing state
+	if complete, err := checkSealingFinalized(); complete || err != nil {
+		return err
+	}
+
+	// Check status every couple of minutes
+	ddp.dealLogger.Infow(dealUuid, "watching deal sealing state changes")
+	ticker := time.NewTicker(2 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ddp.ctx.Done():
+			return &dealMakingError{
+				retry: types.DealRetryAuto,
+				error: ddp.ctx.Err(),
+			}
+		case <-ticker.C:
+			if complete, err := checkSealingFinalized(); complete || err != nil {
+				if err != nil {
+					ddp.dealLogger.Infow(dealUuid, "deal sealing reached termination state")
+				}
+				return err
+			}
+		}
+	}
 }
 
 func (ddp *DirectDealsProvider) updateCheckpoint(ctx context.Context, entry *smtypes.DirectDeal, ckpt dealcheckpoints.Checkpoint) *dealMakingError {
