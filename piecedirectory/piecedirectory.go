@@ -2,6 +2,7 @@ package piecedirectory
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	carutil "github.com/filecoin-project/boost/car"
 	"github.com/filecoin-project/boost/piecedirectory/types"
 	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
@@ -24,7 +26,7 @@ import (
 	"github.com/ipfs/go-cid"
 	format "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-car/util"
+	"github.com/ipld/go-car"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
@@ -169,6 +171,8 @@ func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid,
 		if err := ps.addIndexForPieceThrottled(ctx, pieceCid, dealInfo); err != nil {
 			return fmt.Errorf("adding index for piece %s: %w", pieceCid, err)
 		}
+	} else {
+		log.Infow("add deal for piece", "index", "not re-indexing, piece already indexed")
 	}
 
 	// Add deal to list of deals for this piece
@@ -280,7 +284,7 @@ func parseRecordsFromCar(reader io.Reader) ([]model.Record, error) {
 		recs = append(recs, model.Record{
 			Cid: blockMetadata.Cid,
 			OffsetSize: model.OffsetSize{
-				Offset: blockMetadata.Offset,
+				Offset: blockMetadata.SourceOffset,
 				Size:   blockMetadata.Size,
 			},
 		})
@@ -585,10 +589,8 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 
 			// Seek to the block offset
 			readerAt := readerutil.NewReadSeekerFromReaderAt(reader, int64(offsetSize.Offset))
-
-			// Read the block data
-			_, data, err := util.ReadNode(bufio.NewReader(readerAt))
-			if err != nil {
+			data := make([]byte, offsetSize.Size)
+			if _, err = io.ReadFull(readerAt, data); err != nil {
 				return nil, fmt.Errorf("reading data for block %s from reader for piece %s: %w", c, pieceCid, err)
 			}
 			return data, nil
@@ -703,8 +705,40 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 	}
 
 	// process index and store entries
+	carVersion, err := carv2.ReadVersion(reader)
+	if err != nil {
+		return nil, fmt.Errorf("getting car version for piece %s: %w", pieceCid, err)
+	}
+
+	// handle absolute index offsets for carv2.
+	var bsR io.ReaderAt
+	if carVersion == 2 {
+		// this code handles the current 'absolute' index offsets stored by boost.
+		// initially, the data looks like [carv2-header carv1-header block block ...]
+		// we transform the reader here to look like:
+		// [carv1-header [gap of carv2-header-size] block block ...]
+		// the carv1 header at the beginning makes the offset used by the subsequent `blockstore.NewReadOnly` work properly.
+		size, err := reader.Seek(0, io.SeekEnd)
+		if err != nil {
+			return nil, fmt.Errorf("getting car length for piece %s: %w", pieceCid, err)
+		}
+		sectionReader := io.NewSectionReader(reader, carv2.HeaderSize, size-carv2.HeaderSize)
+		ch, err := car.ReadHeader(bufio.NewReader(sectionReader))
+		if err != nil {
+			return nil, fmt.Errorf("reading car header for piece %s: %w", pieceCid, err)
+		}
+		headerBuf := bytes.NewBuffer(nil)
+		if err := car.WriteHeader(ch, headerBuf); err != nil {
+			return nil, fmt.Errorf("copying car header for piece %s: %w", pieceCid, err)
+		}
+		empty := [carv2.HeaderSize]byte{}
+		headerBuf.Write(empty[:])
+		bsR = carutil.NewMultiReaderAt(bytes.NewReader(headerBuf.Bytes()), sectionReader)
+	} else {
+		bsR = reader
+	}
 	// Create a blockstore from the index and the piece reader
-	bs, err := blockstore.NewReadOnly(reader, idx, carv2.ZeroLengthSectionAsEOF(true))
+	bs, err := blockstore.NewReadOnly(bsR, idx, carv2.ZeroLengthSectionAsEOF(true))
 	if err != nil {
 		return nil, fmt.Errorf("creating blockstore for piece %s: %w", pieceCid, err)
 	}
