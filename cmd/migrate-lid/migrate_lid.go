@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/filecoin-project/boost-gfm/piecestore"
@@ -235,17 +236,12 @@ func migrate(cctx *cli.Context, dbType string, store StoreMigrationApi, migrateT
 	return nil
 }
 
-type idxCount struct {
-	num int
-	lck sync.Mutex
-}
-
 type idxTime struct {
 	t   time.Duration
 	lck sync.Mutex
 }
 
-func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store StoreMigrationApi, force bool, parallel int) (int, error) {
+func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store StoreMigrationApi, force bool, parallel int) (int64, error) {
 	indicesPath := path.Join(repoDir, "dagstore", "index")
 	logger.Infof("migrating dagstore indices at %s", indicesPath)
 
@@ -258,10 +254,10 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 	bar.ChangeMax(len(idxPaths))
 
 	indicesStart := time.Now()
-	var count idxCount
-	var errCount idxCount
+	var count int64
+	var errCount int64
 	var indexTime idxTime
-	var processed idxCount
+	var processed int64
 
 	queue := make(chan idxPath, len(idxPaths))
 	for _, ipath := range idxPaths {
@@ -289,30 +285,23 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 					took := time.Since(start)
 					indexTime.lck.Lock()
 					indexTime.t += took
-					indexTime.lck.Unlock()
 
 					if perr != nil {
 						logger.Errorw("migrate index failed", "piece cid", p.name, "took", took.String(), "err", perr)
-						errCount.lck.Lock()
-						errCount.num++
-						errCount.lck.Unlock()
+						atomic.AddInt64(&errCount, 1)
 					}
 
 					if indexed {
-						count.lck.Lock()
-						processed.lck.Lock()
-						count.num++
-						processed.num++
-						logger.Infow("migrated index", "piece cid", p.name, "processed", processed.num, "total", len(idxPaths),
-							"took", took.String(), "average", (indexTime.t / time.Duration(count.num)).String())
-						processed.lck.Unlock()
-						count.lck.Unlock()
+						atomic.AddInt64(&count, 1)
+						atomic.AddInt64(&processed, 1)
+						logger.Infow("migrated index", "piece cid", p.name, "processed", processed, "total", len(idxPaths),
+							"took", took.String(), "average", (indexTime.t / time.Duration(count)).String())
+
 					} else {
-						processed.lck.Lock()
-						processed.num++
-						logger.Infow("index already migrated", "piece cid", p.name, "processed", processed.num, "total", len(idxPaths))
-						processed.lck.Unlock()
+						atomic.AddInt64(&processed, 1)
+						logger.Infow("index already migrated", "piece cid", p.name, "processed", processed, "total", len(idxPaths))
 					}
+					indexTime.lck.Unlock()
 				}
 			}
 			return ctx.Err()
@@ -323,7 +312,7 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 	logger.Errorw("waiting for indexing threads to finish", err)
 
 	logger.Infow("migrated indices", "total", len(idxPaths), "took", time.Since(indicesStart).String())
-	return errCount.num, nil
+	return errCount, nil
 }
 
 type migrateIndexResult struct {
