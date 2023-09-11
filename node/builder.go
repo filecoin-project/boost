@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/boost-gfm/storagemarket/impl/storedask"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
+	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/gql"
@@ -160,6 +161,7 @@ const (
 	HandleSetRetrievalAskGetter
 	HandleRetrievalEventsKey
 	HandleRetrievalKey
+	HandleRetrievalAskKey
 	HandleRetrievalTransportsKey
 	HandleProtocolProxyKey
 	RunSectorServiceKey
@@ -562,6 +564,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*mdagstore.Wrapper), func() *mdagstore.Wrapper { return nil }),
 
 		Override(new(*bdclient.Store), modules.NewPieceDirectoryStore(cfg)),
+		Override(new(*lib.MultiMinerAccessor), modules.NewMultiminerSectorAccessor(cfg)),
 		Override(new(*piecedirectory.PieceDirectory), modules.NewPieceDirectory(cfg)),
 		Override(DAGStoreKey, modules.NewDAGStoreWrapper),
 		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
@@ -579,6 +582,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(HandleSetRetrievalAskGetter, modules.SetAskGetter),
 		Override(HandleRetrievalEventsKey, modules.HandleRetrievalGraphsyncUpdates(time.Duration(cfg.Dealmaking.RetrievalLogDuration), time.Duration(cfg.Dealmaking.StalledRetrievalTimeout))),
 		Override(HandleRetrievalKey, modules.HandleRetrieval),
+		Override(HandleRetrievalAskKey, modules.HandleQueryAsk),
 		Override(new(*lp2pimpl.TransportsListener), modules.NewTransportsListener(cfg)),
 		Override(new(*protocolproxy.ProtocolProxy), modules.NewProtocolProxy(cfg)),
 		Override(HandleRetrievalTransportsKey, modules.HandleRetrievalTransports),
@@ -600,9 +604,9 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(HandleSetLinkSystem, modules.SetLinkSystem),
 
 		// Boost storage deal filter
-		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, nil)),
+		Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(nil)),
 		If(cfg.Dealmaking.Filter != "",
-			Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(cfg.Dealmaking, dtypes.StorageDealFilter(dealfilter.CliStorageDealFilter(cfg.Dealmaking.Filter)))),
+			Override(new(dtypes.StorageDealFilter), modules.BasicDealFilter(dtypes.StorageDealFilter(dealfilter.CliStorageDealFilter(cfg.Dealmaking.Filter)))),
 		),
 
 		// Lotus markets storage deal filter
@@ -628,7 +632,7 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*storageadapter.DealPublisher), storageadapter.NewDealPublisher(&legacyFees, storageadapter.PublishMsgConfig{
 			Period:                  time.Duration(cfg.LotusDealmaking.PublishMsgPeriod),
 			MaxDealsPerMsg:          cfg.LotusDealmaking.MaxDealsPerPublishMsg,
-			StartEpochSealingBuffer: cfg.LotusDealmaking.StartEpochSealingBuffer,
+			StartEpochSealingBuffer: cfg.Dealmaking.StartEpochSealingBuffer,
 			ManualDealPublish:       cfg.Dealmaking.ManualDealPublish,
 		})),
 

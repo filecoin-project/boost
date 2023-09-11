@@ -112,6 +112,24 @@ var initCmd = &cli.Command{
 			return fmt.Errorf("setting config: %w", err)
 		}
 
+		// Add comments to config
+		c, err := lr.Config()
+		if err != nil {
+			return fmt.Errorf("getting config: %w", err)
+		}
+		curCfg, ok := c.(*config.Boost)
+		if !ok {
+			return fmt.Errorf("parsing config from boost repo")
+		}
+		newCfg, err := config.ConfigUpdate(curCfg, config.DefaultBoost(), true, false)
+		if err != nil {
+			return err
+		}
+		err = os.WriteFile(path.Join(lr.Path(), "config.toml"), newCfg, 0644)
+		if err != nil {
+			return fmt.Errorf("writing config file %s: %w", string(newCfg), err)
+		}
+
 		// Add the miner address to the metadata datastore
 		fmt.Printf("Adding miner address %s to datastore\n", bp.minerActor)
 		err = addMinerAddressToDatastore(ds, bp.minerActor)

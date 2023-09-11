@@ -69,7 +69,7 @@ func TestDealsLabelv8(t *testing.T) {
 	// Migrate down
 	tx, err := sqldb.BeginTx(ctx, nil)
 	req.NoError(err)
-	err = migrations.DownDealsLabelV8(tx)
+	err = migrations.DownDealsLabelV8(ctx, tx)
 	req.NoError(err)
 	err = tx.Commit()
 	req.NoError(err)
@@ -85,7 +85,7 @@ func TestDealsLabelv8(t *testing.T) {
 	// Migrate up
 	tx, err = sqldb.BeginTx(ctx, nil)
 	req.NoError(err)
-	err = migrations.UpDealsLabelV8(tx)
+	err = migrations.UpDealsLabelV8(ctx, tx)
 	req.NoError(err)
 	err = tx.Commit()
 	req.NoError(err)

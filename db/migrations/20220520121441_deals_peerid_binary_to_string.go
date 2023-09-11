@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -9,11 +10,11 @@ import (
 )
 
 func init() {
-	goose.AddMigration(upDealsPeeridBinaryToString, downDealsPeeridBinaryToString)
+	goose.AddMigrationContext(upDealsPeeridBinaryToString, downDealsPeeridBinaryToString)
 }
 
-func upDealsPeeridBinaryToString(tx *sql.Tx) error {
-	rows, err := tx.Query("SELECT ID, ClientPeerID FROM Deals")
+func upDealsPeeridBinaryToString(ctx context.Context, tx *sql.Tx) error {
+	rows, err := tx.QueryContext(ctx, "SELECT ID, ClientPeerID FROM Deals")
 	if err != nil {
 		return err
 	}
@@ -31,7 +32,7 @@ func upDealsPeeridBinaryToString(tx *sql.Tx) error {
 			continue
 		}
 
-		_, err = tx.Exec("UPDATE Deals SET ClientPeerID=? WHERE ID=?", updated, id)
+		_, err = tx.ExecContext(ctx, "UPDATE Deals SET ClientPeerID=? WHERE ID=?", updated, id)
 		if err != nil {
 			log.Warnf("could not migrate row with id %s: could not save row: %w", id, err)
 			continue
@@ -72,7 +73,7 @@ func pidToString(input []byte) (*string, error) {
 	return &updated, nil
 }
 
-func downDealsPeeridBinaryToString(tx *sql.Tx) error {
+func downDealsPeeridBinaryToString(ctx context.Context, tx *sql.Tx) error {
 	// This code is executed when the migration is rolled back.
 	return nil
 }

@@ -10,6 +10,7 @@ import (
 	graphsync "github.com/filecoin-project/boost-graphsync/impl"
 	gsnet "github.com/filecoin-project/boost-graphsync/network"
 	"github.com/filecoin-project/boost-graphsync/storeutil"
+	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/remoteblockstore"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
@@ -70,29 +71,33 @@ func (p *LinkSystemProv) LinkSys() *ipld.LinkSystem {
 }
 
 func SetLinkSystem(proxy *LinkSystemProv, prov provider.Interface) {
-	e := prov.(*engine.Engine)
-	proxy.LinkSystem = e.LinkSystem()
+	e, ok := prov.(*engine.Engine)
+	if ok {
+		proxy.LinkSystem = e.LinkSystem()
+	}
 }
 
 // RetrievalGraphsync creates a graphsync instance used to serve retrievals.
-func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, pstore dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter, ls server.LinkSystemProvider) (*server.GraphsyncUnpaidRetrieval, error) {
-	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, pstore dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, askGetter server.AskGetter, ls server.LinkSystemProvider) (*server.GraphsyncUnpaidRetrieval, error) {
-		// Graphsync tracks metrics separately, pass nothing to the remote blockstore
+func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, pstore dtypes.ProviderPieceStore, sa *lib.MultiMinerAccessor, askGetter server.AskGetter, ls server.LinkSystemProvider) (*server.GraphsyncUnpaidRetrieval, error) {
+	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, pid *piecedirectory.PieceDirectory, h host.Host, net dtypes.ProviderTransferNetwork, dealDecider dtypes.RetrievalDealFilter, pstore dtypes.ProviderPieceStore, sa *lib.MultiMinerAccessor, askGetter server.AskGetter, ls server.LinkSystemProvider) (*server.GraphsyncUnpaidRetrieval, error) {
+		// Graphsync tracks metrics separately, pass nil blockMetrics to the remote blockstore
 		rb := remoteblockstore.NewRemoteBlockstore(pid, nil)
 
 		// Create a Graphsync instance
 		mkgs := Graphsync(parallelTransfersForStorage, parallelTransfersForStoragePerPeer, parallelTransfersForRetrieval)
-		gs := mkgs(mctx, lc, rb, h)
+		gs := mkgs(mctx, lc, rb, pid, h)
 
 		// Wrap the Graphsync instance with a handler for unpaid retrieval requests
 		vdeps := server.ValidationDeps{
 			DealDecider:    retrievalimpl.DealDecider(dealDecider),
-			DagStore:       NewDAGStoreWrapper(pid),
-			PieceStore:     pstore,
+			PieceDirectory: pid,
 			SectorAccessor: sa,
 			AskStore:       askGetter,
 		}
 		gsupr, err := server.NewGraphsyncUnpaidRetrieval(h.ID(), gs, net, vdeps, ls)
+		if err != nil {
+			return nil, err
+		}
 
 		// Set up a context that is cancelled when the boostd process exits
 		gsctx, cancel := context.WithCancel(context.Background())
@@ -106,12 +111,12 @@ func RetrievalGraphsync(parallelTransfersForStorage uint64, parallelTransfersFor
 			},
 		})
 
-		return gsupr, err
+		return gsupr, nil
 	}
 }
 
-func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.StagingBlockstore, h host.Host) dtypes.StagingGraphsync {
-	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.StagingBlockstore, h host.Host) dtypes.StagingGraphsync {
+func Graphsync(parallelTransfersForStorage uint64, parallelTransfersForStoragePerPeer uint64, parallelTransfersForRetrieval uint64) func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.StagingBlockstore, pid *piecedirectory.PieceDirectory, h host.Host) dtypes.StagingGraphsync {
+	return func(mctx lotus_helpers.MetricsCtx, lc fx.Lifecycle, ibs dtypes.StagingBlockstore, pid *piecedirectory.PieceDirectory, h host.Host) dtypes.StagingGraphsync {
 		graphsyncNetwork := gsnet.NewFromLibp2pHost(h)
 		lsys := storeutil.LinkSystemForBlockstore(ibs)
 		gs := graphsync.New(helpers.LifecycleCtx(mctx, lc),

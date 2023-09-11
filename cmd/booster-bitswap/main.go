@@ -18,22 +18,23 @@ var FlagRepo = &cli.StringFlag{
 	EnvVars: []string{"BOOSTER_BITSWAP_REPO"},
 }
 
+var app = &cli.App{
+	Name:                 "booster-bitswap",
+	Usage:                "Bitswap endpoint for retrieval from Filecoin",
+	EnableBashCompletion: true,
+	Version:              build.UserVersion(),
+	Flags: []cli.Flag{
+		cliutil.FlagVeryVerbose,
+		FlagRepo,
+	},
+	Commands: []*cli.Command{
+		initCmd,
+		runCmd,
+		fetchCmd,
+	},
+}
+
 func main() {
-	app := &cli.App{
-		Name:                 "booster-bitswap",
-		Usage:                "Bitswap endpoint for retrieval from Filecoin",
-		EnableBashCompletion: true,
-		Version:              build.UserVersion(),
-		Flags: []cli.Flag{
-			cliutil.FlagVeryVerbose,
-			FlagRepo,
-		},
-		Commands: []*cli.Command{
-			initCmd,
-			runCmd,
-			fetchCmd,
-		},
-	}
 	app.Setup()
 
 	if err := app.Run(os.Args); err != nil {

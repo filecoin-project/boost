@@ -69,6 +69,18 @@ const EpochQuery = gql`
     }
 `;
 
+const MinerAddressQuery = gql`
+    query AppMinerAddressQuery {
+        minerAddress
+    }
+`;
+
+const GraphsyncRetrievalMinerAddressesQuery = gql`
+    query AppGraphsyncRetrievalMinerAddressesQuery {
+        graphsyncRetrievalMinerAddresses
+    }
+`;
+
 const DealsListQuery = gql`
     query AppDealsListQuery($query: String, $filter: DealFilter, $cursor: ID, $offset: Int, $limit: Int) {
         deals(query: $query, filter: $filter, cursor: $cursor, offset: $offset, limit: $limit) {
@@ -507,6 +519,7 @@ const PieceStatusQuery = gql`
                 }
             }
             PieceInfoDeals {
+                MinerAddress
                 ChainDealID
                 Sector {
                     ID
@@ -525,10 +538,9 @@ const PieceStatusQuery = gql`
 const LIDQuery = gql`
     query AppLIDQuery {
         lid {
-            DealData {
-                Indexed
-                FlaggedUnsealed
-                FlaggedSealed
+            ScanProgress {
+                Progress
+                LastScan
             }
             Pieces {
                 Indexed
@@ -780,6 +792,8 @@ const PublishPendingDealsMutation = gql`
 export {
     gqlClient,
     EpochQuery,
+    MinerAddressQuery,
+    GraphsyncRetrievalMinerAddressesQuery,
     DealsListQuery,
     LegacyDealsListQuery,
     DealsCountQuery,

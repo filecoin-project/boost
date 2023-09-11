@@ -11,6 +11,7 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
@@ -25,9 +26,10 @@ const pieceMetadataVersion = "1"
 var log = logging.Logger("boostd-data-ldb")
 
 type LeveldbFlaggedMetadata struct {
-	CreatedAt       time.Time `json:"c"`
-	UpdatedAt       time.Time `json:"u"`
-	HasUnsealedCopy bool      `json:"huc"`
+	CreatedAt       time.Time       `json:"c"`
+	UpdatedAt       time.Time       `json:"u"`
+	HasUnsealedCopy bool            `json:"huc"`
+	MinerAddr       address.Address `json:"m"`
 }
 
 type LeveldbMetadata struct {
@@ -65,7 +67,7 @@ func (s *Store) Start(ctx context.Context) error {
 	}
 
 	var err error
-	s.db, err = newDB(repopath, false)
+	s.db, err = newDB(s.repopath, false)
 	if err != nil {
 		return err
 	}
@@ -374,7 +376,7 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	return md.IndexedAt, nil
 }
 
-func (s *Store) PiecesCount(ctx context.Context) (int, error) {
+func (s *Store) PiecesCount(ctx context.Context, maddr address.Address) (int, error) {
 	log.Debugw("handle.pieces-count")
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
@@ -384,7 +386,20 @@ func (s *Store) PiecesCount(ctx context.Context) (int, error) {
 		log.Debugw("handled.pieces-count", "took", time.Since(now).String())
 	}(time.Now())
 
-	return s.db.PiecesCount(ctx)
+	return s.db.PiecesCount(ctx, maddr)
+}
+
+func (s *Store) ScanProgress(ctx context.Context, maddr address.Address) (*types.ScanProgress, error) {
+	log.Debugw("handle.scan-progress")
+
+	ctx, span := tracing.Tracer.Start(ctx, "store.scan_progress")
+	defer span.End()
+
+	defer func(now time.Time) {
+		log.Debugw("handled.scan-progress", "took", time.Since(now).String())
+	}(time.Now())
+
+	return s.db.ScanProgress(ctx, maddr)
 }
 
 func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
@@ -400,7 +415,7 @@ func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	return s.db.ListPieces(ctx)
 }
 
-func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
+func (s *Store) NextPiecesToCheck(ctx context.Context, maddr address.Address) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.next_pieces_to_check")
 	defer span.End()
 
@@ -408,10 +423,10 @@ func (s *Store) NextPiecesToCheck(ctx context.Context) ([]cid.Cid, error) {
 		log.Debugw("handled.next-pieces-to-check", "took", time.Since(now).String())
 	}(time.Now())
 
-	return s.db.NextPiecesToCheck(ctx)
+	return s.db.NextPiecesToCheck(ctx, maddr)
 }
 
-func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool) error {
+func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy bool, maddr address.Address) error {
 	log.Debugw("handle.flag-piece", "piece-cid", pieceCid, "hasUnsealedCopy", hasUnsealedCopy)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.flag_piece")
@@ -427,20 +442,20 @@ func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy
 	now := time.Now()
 
 	// Get the existing deals for the piece
-	fm, err := s.db.GetPieceCidToFlagged(ctx, pieceCid)
+	fm, err := s.db.GetPieceCidToFlagged(ctx, pieceCid, maddr)
 	if err != nil {
 		if !errors.Is(err, ds.ErrNotFound) {
 			return fmt.Errorf("getting piece cid flagged metadata for piece %s: %w", pieceCid, err)
 		}
 		// there isn't yet any flagged metadata, so create new metadata
-		fm = LeveldbFlaggedMetadata{CreatedAt: now}
+		fm = LeveldbFlaggedMetadata{CreatedAt: now, MinerAddr: maddr}
 	}
 
 	fm.UpdatedAt = now
 	fm.HasUnsealedCopy = hasUnsealedCopy
 
 	// Write the piece metadata back to the db
-	err = s.db.SetPieceCidToFlagged(ctx, pieceCid, fm)
+	err = s.db.SetPieceCidToFlagged(ctx, pieceCid, maddr, fm)
 	if err != nil {
 		return err
 	}
@@ -448,7 +463,7 @@ func (s *Store) FlagPiece(ctx context.Context, pieceCid cid.Cid, hasUnsealedCopy
 	return nil
 }
 
-func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
+func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid, maddr address.Address) error {
 	log.Debugw("handle.unflag-piece", "piece-cid", pieceCid)
 
 	ctx, span := tracing.Tracer.Start(ctx, "store.unflag_piece")
@@ -461,7 +476,7 @@ func (s *Store) UnflagPiece(ctx context.Context, pieceCid cid.Cid) error {
 	s.Lock()
 	defer s.Unlock()
 
-	err := s.db.DeletePieceCidToFlagged(ctx, pieceCid)
+	err := s.db.DeletePieceCidToFlagged(ctx, pieceCid, maddr)
 	if err != nil {
 		return fmt.Errorf("deleting piece cid flagged metadata for piece %s: %w", pieceCid, err)
 	}

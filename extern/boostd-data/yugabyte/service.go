@@ -26,6 +26,8 @@ var log = logging.Logger("boostd-data-yb")
 // data migrations (migrations are not yet implemented in version 1).
 const pieceMetadataVersion = "1"
 
+const defaultKeyspace = "idx"
+
 type DBSettings struct {
 	// The cassandra hosts to connect to
 	Hosts []string
@@ -35,9 +37,19 @@ type DBSettings struct {
 	PayloadPiecesParallelism int
 }
 
+type StoreOpt func(*Store)
+
+// Use the given keyspace for all operations against the cassandra interface
+func WithCassandraKeyspace(ks string) StoreOpt {
+	return func(s *Store) {
+		s.cluster.Keyspace = ks
+	}
+}
+
 type Store struct {
 	settings  DBSettings
 	cluster   *gocql.ClusterConfig
+	migrator  *Migrator
 	session   *gocql.Session
 	db        *pgxpool.Pool
 	startOnce sync.Once
@@ -45,21 +57,37 @@ type Store struct {
 
 var _ types.ServiceImpl = (*Store)(nil)
 
-func NewStore(settings DBSettings) *Store {
+func NewStore(settings DBSettings, migrator *Migrator, opts ...StoreOpt) *Store {
 	if settings.PayloadPiecesParallelism == 0 {
 		settings.PayloadPiecesParallelism = 16
 	}
 
 	cluster := gocql.NewCluster(settings.Hosts...)
-	return &Store{
+	cluster.Keyspace = defaultKeyspace
+	s := &Store{
 		settings: settings,
 		cluster:  cluster,
+		migrator: migrator,
 	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s
 }
 
 func (s *Store) Start(ctx context.Context) error {
 	var startErr error
 	s.startOnce.Do(func() {
+		// Create cassandra keyspace
+		err := s.CreateKeyspace(ctx)
+		if err != nil {
+			startErr = fmt.Errorf("creating cassandra keyspace %s: %w", s.cluster.Keyspace, err)
+			return
+		}
+
+		// Create connection to cassandra interface (with new keyspace)
 		session, err := s.cluster.CreateSession()
 		if err != nil {
 			startErr = fmt.Errorf("creating yugabyte cluster: %w", err)
@@ -67,13 +95,15 @@ func (s *Store) Start(ctx context.Context) error {
 		}
 		s.session = session
 
-		db, err := pgxpool.Connect(context.Background(), s.settings.ConnectString)
+		// Create connection pool to postgres interface
+		db, err := pgxpool.Connect(ctx, s.settings.ConnectString)
 		if err != nil {
 			startErr = fmt.Errorf("connecting to database: %w", err)
 			return
 		}
 		s.db = db
 
+		// Create tables
 		startErr = s.Create(ctx)
 	})
 
@@ -89,7 +119,7 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 		return err
 	}
 
-	qry := `INSERT INTO idx.PieceDeal ` +
+	qry := `INSERT INTO PieceDeal ` +
 		`(DealUuid, PieceCid, IsLegacy, ChainDealID, MinerAddr, SectorID, PieceOffset, PieceLength, CarLength) ` +
 		`VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ` +
 		`IF NOT EXISTS`
@@ -105,7 +135,7 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 }
 
 func (s *Store) createPieceMetadata(ctx context.Context, pieceCid cid.Cid) error {
-	qry := `INSERT INTO idx.PieceMetadata (PieceCid, Version, CreatedAt) VALUES (?, ?, ?) IF NOT EXISTS`
+	qry := `INSERT INTO PieceMetadata (PieceCid, Version, CreatedAt) VALUES (?, ?, ?) IF NOT EXISTS`
 	err := s.session.Query(qry, pieceCid.String(), pieceMetadataVersion, time.Now()).WithContext(ctx).Exec()
 	if err != nil {
 		return fmt.Errorf("inserting piece metadata for piece %s: %w", pieceCid, err)
@@ -118,7 +148,7 @@ func (s *Store) GetOffsetSize(ctx context.Context, pieceCid cid.Cid, hash mh.Mul
 	defer span.End()
 
 	var offset, size uint64
-	qry := `SELECT BlockOffset, BlockSize FROM idx.PieceBlockOffsetSize WHERE PieceCid = ? AND PayloadMultihash = ?`
+	qry := `SELECT BlockOffset, BlockSize FROM PieceBlockOffsetSize WHERE PieceCid = ? AND PayloadMultihash = ?`
 	err := s.session.Query(qry, pieceCid.Bytes(), hash).WithContext(ctx).Scan(&offset, &size)
 	if err != nil {
 		err = normalizePieceCidError(pieceCid, err)
@@ -151,7 +181,7 @@ func (s *Store) getPieceMetadata(ctx context.Context, pieceCid cid.Cid) (model.M
 
 	// Get piece metadata
 	var md model.Metadata
-	qry := `SELECT Version, IndexedAt, CompleteIndex FROM idx.PieceMetadata WHERE PieceCid = ?`
+	qry := `SELECT Version, IndexedAt, CompleteIndex FROM PieceMetadata WHERE PieceCid = ?`
 	err := s.session.Query(qry, pieceCid.String()).WithContext(ctx).
 		Scan(&md.Version, &md.IndexedAt, &md.CompleteIndex)
 	if err != nil {
@@ -169,7 +199,7 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 	// Get deals for piece
 	qry := `SELECT DealUuid, IsLegacy, ChainDealID, MinerAddr, ` +
 		`SectorID, PieceOffset, PieceLength, CarLength ` +
-		`FROM idx.PieceDeal WHERE PieceCid = ?`
+		`FROM PieceDeal WHERE PieceCid = ?`
 	iter := s.session.Query(qry, pieceCid.Bytes()).WithContext(ctx).Iter()
 
 	var deals []model.DealInfo
@@ -210,7 +240,7 @@ func (s *Store) PiecesContainingMultihash(ctx context.Context, m mh.Multihash) (
 	// Get all piece cids referred to by the multihash
 	pcids := make([]cid.Cid, 0, 1)
 	var bz []byte
-	qry := `SELECT PieceCid FROM idx.PayloadToPieces WHERE PayloadMultihash = ?`
+	qry := `SELECT PieceCid FROM PayloadToPieces WHERE PayloadMultihash = ?`
 	iter := s.session.Query(qry, trimMultihash(m)).WithContext(ctx).Iter()
 	for iter.Scan(&bz) {
 		pcid, err := cid.Parse(bz)
@@ -235,7 +265,7 @@ func (s *Store) GetIndex(ctx context.Context, pieceCid cid.Cid) (<-chan types.In
 	ctx, span := tracing.Tracer.Start(ctx, "store.get_index")
 	defer span.End()
 
-	qry := `SELECT PayloadMultihash, BlockOffset, BlockSize FROM idx.PieceBlockOffsetSize WHERE PieceCid = ?`
+	qry := `SELECT PayloadMultihash, BlockOffset, BlockSize FROM PieceBlockOffsetSize WHERE PieceCid = ?`
 	iter := s.session.Query(qry, pieceCid.Bytes()).WithContext(ctx).Iter()
 
 	scannedRecordCh := make(chan struct{}, 1)
@@ -388,7 +418,7 @@ func (s *Store) AddIndex(ctx context.Context, pieceCid cid.Cid, recs []model.Rec
 		updateProgress(0.95)
 
 		// Mark indexing as complete for the piece
-		qry := `UPDATE idx.PieceMetadata ` +
+		qry := `UPDATE PieceMetadata ` +
 			`SET IndexedAt = ?, CompleteIndex = ? ` +
 			`WHERE PieceCid = ?`
 		err = s.session.Query(qry, time.Now(), isCompleteIndex, pieceCid.String()).WithContext(ctx).Exec()
@@ -410,7 +440,7 @@ func (s *Store) addMultihashesToPieces(ctx context.Context, pieceCid cid.Cid, re
 	var count float64
 	return s.execParallel(ctx, recs, s.settings.PayloadPiecesParallelism, func(rec model.Record) error {
 		multihashBytes := rec.Cid.Hash()
-		q := `INSERT INTO idx.PayloadToPieces (PayloadMultihash, PieceCid) VALUES (?, ?)`
+		q := `INSERT INTO PayloadToPieces (PayloadMultihash, PieceCid) VALUES (?, ?)`
 		err := s.session.Query(q, trimMultihash(multihashBytes), pieceCid.Bytes()).Exec()
 		if err != nil {
 			return fmt.Errorf("inserting into PayloadToPieces: %w", err)
@@ -427,7 +457,7 @@ func (s *Store) addPieceInfos(ctx context.Context, pieceCid cid.Cid, recs []mode
 	defer span.End()
 
 	batchEntries := make([]gocql.BatchEntry, 0, len(recs))
-	insertPieceOffsetsQry := `INSERT INTO idx.PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES (?, ?, ?, ?)`
+	insertPieceOffsetsQry := `INSERT INTO PieceBlockOffsetSize (PieceCid, PayloadMultihash, BlockOffset, BlockSize) VALUES (?, ?, ?, ?)`
 	for _, rec := range recs {
 		batchEntries = append(batchEntries, gocql.BatchEntry{
 			Stmt:       insertPieceOffsetsQry,
@@ -499,26 +529,11 @@ func (s *Store) IndexedAt(ctx context.Context, pieceCid cid.Cid) (time.Time, err
 	return md.IndexedAt, nil
 }
 
-func (s *Store) PiecesCount(ctx context.Context) (int, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "store.pieces_count")
-	defer span.End()
-
-	var count int
-	qry := `SELECT COUNT(*) FROM idx.PieceMetadata`
-
-	err := s.session.Query(qry).WithContext(ctx).Scan(&count)
-	if err != nil {
-		return -1, fmt.Errorf("getting pieces count: %w", err)
-	}
-
-	return count, nil
-}
-
 func (s *Store) ListPieces(ctx context.Context) ([]cid.Cid, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "store.list_pieces")
 	defer span.End()
 
-	iter := s.session.Query("SELECT PieceCid FROM idx.PieceMetadata").WithContext(ctx).Iter()
+	iter := s.session.Query("SELECT PieceCid FROM PieceMetadata").WithContext(ctx).Iter()
 	var pcids []cid.Cid
 	var cstr string
 	for iter.Scan(&cstr) {
@@ -541,7 +556,7 @@ func (s *Store) RemoveDealForPiece(ctx context.Context, pieceCid cid.Cid, dealId
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_deal_for_piece")
 	defer span.End()
 
-	qry := `DELETE FROM idx.PieceDeal WHERE DealUuid = ?`
+	qry := `DELETE FROM PieceDeal WHERE DealUuid = ?`
 	err := s.session.Query(qry, dealId).WithContext(ctx).Exec()
 	if err != nil {
 		return fmt.Errorf("removing deal %s for piece %s: %w", dealId, pieceCid, err)
@@ -574,7 +589,7 @@ func (s *Store) RemovePieceMetadata(ctx context.Context, pieceCid cid.Cid) error
 	ctx, span := tracing.Tracer.Start(ctx, "store.remove_piece_metadata")
 	defer span.End()
 
-	qry := `DELETE FROM idx.PieceMetadata WHERE PieceCid = ?`
+	qry := `DELETE FROM PieceMetadata WHERE PieceCid = ?`
 	err := s.session.Query(qry, pieceCid.String()).WithContext(ctx).Exec()
 	if err != nil {
 		return fmt.Errorf("removing piece metadata for piece %s: %w", pieceCid, err)
@@ -610,7 +625,7 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 					}
 
 					multihashBytes := rec.Cid.Hash()
-					q := `DELETE FROM idx.PayloadToPieces WHERE PayloadMultihash = ? AND PieceCid = ?`
+					q := `DELETE FROM PayloadToPieces WHERE PayloadMultihash = ? AND PieceCid = ?`
 					err := s.session.Query(q, trimMultihash(multihashBytes), pieceCid.Bytes()).Exec()
 					if err != nil {
 						return fmt.Errorf("deleting from PayloadToPieces: %w", err)
@@ -627,7 +642,7 @@ func (s *Store) RemoveIndexes(ctx context.Context, pieceCid cid.Cid) error {
 	}
 
 	// Delete from piece offsets index
-	qry := `DELETE FROM idx.PieceBlockOffsetSize WHERE PieceCid = ?`
+	qry := `DELETE FROM PieceBlockOffsetSize WHERE PieceCid = ?`
 	err = s.session.Query(qry, pieceCid.Bytes()).WithContext(ctx).Exec()
 	if err != nil {
 		return fmt.Errorf("removing indexes for piece %s: deleting offset / size info: %w", pieceCid, err)

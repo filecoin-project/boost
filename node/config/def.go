@@ -83,6 +83,9 @@ func DefaultBoost() *Boost {
 			Yugabyte: LocalIndexDirectoryYugabyteConfig{
 				Enabled: false,
 			},
+			Leveldb: LocalIndexDirectoryLeveldbConfig{
+				Enabled: false,
+			},
 			ParallelAddIndexLimit: 4,
 			EmbeddedServicePort:   8042,
 			ServiceApiInfo:        "",

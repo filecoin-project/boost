@@ -12,7 +12,7 @@ import (
 
 const metadataNamespace = "/metadata"
 
-var minerCmd = &cli.Command{
+var boostdCmd = &cli.Command{
 	Name:  "boostd",
 	Usage: "boostd utilities",
 	Subcommands: []*cli.Command{

@@ -15,7 +15,6 @@ func TestPieceDirectoryYugabyte(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
-	svc.SetupYugabyte(t)
-	bdsvc := svc.NewYugabyte(svc.TestYugabyteSettings)
+	bdsvc := svc.SetupYugabyte(t)
 	testPieceDirectory(ctx, t, bdsvc)
 }

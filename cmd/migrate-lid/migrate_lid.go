@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/boostd-data/yugabyte"
+	"github.com/filecoin-project/boostd-data/yugabyte/migrations"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -142,7 +143,11 @@ var migrateYugabyteDBCmd = &cli.Command{
 			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
 		}
 
-		store := yugabyte.NewStore(settings)
+		// Note that it doesn't matter what address we pass here: because the
+		// table is newly created, it doesn't contain any rows when the
+		// migration is run.
+		migrator := yugabyte.NewMigrator(settings, address.TestAddress)
+		store := yugabyte.NewStore(settings, migrator)
 		return migrate(cctx, "yugabyte", store, migrateType)
 	},
 }
@@ -245,10 +250,17 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 
 		start := time.Now()
 
-		indexed, err := migrateIndex(ctx, ipath, store, force)
+		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 60*time.Second)
+		defer timeoutCancel()
+
+		indexed, err := migrateIndexWithTimeout(timeoutCtx, ipath, store, force)
 		bar.Add(1) //nolint:errcheck
 		if err != nil {
-			logger.Errorw("migrate index failed", "piece cid", ipath.name, "err", err)
+			took := time.Since(start)
+			indexTime += took
+
+			logger.Errorw("migrate index failed", "piece cid", ipath.name, "took", took.String(), "err", err)
+
 			errCount++
 			continue
 		}
@@ -266,6 +278,32 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 
 	logger.Infow("migrated indices", "total", len(idxPaths), "took", time.Since(indicesStart).String())
 	return errCount, nil
+}
+
+type migrateIndexResult struct {
+	Indexed bool
+	Error   error
+}
+
+func migrateIndexWithTimeout(ctx context.Context, ipath idxPath, store StoreMigrationApi, force bool) (bool, error) {
+	result := make(chan migrateIndexResult, 1)
+	go func() {
+		result <- doMigrateIndex(ctx, ipath, store, force)
+	}()
+	select {
+	case <-time.After(75 * time.Second):
+		return false, errors.New("index migration timed out after 75 seconds")
+	case result := <-result:
+		return result.Indexed, result.Error
+	}
+}
+
+func doMigrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, force bool) migrateIndexResult {
+	indexed, err := migrateIndex(ctx, ipath, store, force)
+	return migrateIndexResult{
+		Indexed: indexed,
+		Error:   err,
+	}
 }
 
 func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, force bool) (bool, error) {
@@ -307,7 +345,7 @@ func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, f
 	respch := store.AddIndex(ctx, pieceCid, records, false)
 	for resp := range respch {
 		if resp.Err != "" {
-			return false, fmt.Errorf("adding index %s to store: %s", ipath.path, err)
+			return false, fmt.Errorf("adding index %s to store: %s", ipath.path, resp.Err)
 		}
 	}
 	log.Debugw("AddIndex", "took", time.Since(addStart).String())
@@ -605,7 +643,8 @@ func migrateReverse(cctx *cli.Context, dbType string) error {
 			Hosts:                    cctx.StringSlice("hosts"),
 			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
 		}
-		store = yugabyte.NewStore(settings)
+		migrator := yugabyte.NewMigrator(settings, migrations.DisabledMinerAddr)
+		store = yugabyte.NewStore(settings, migrator)
 	}
 
 	// Perform the reverse migration

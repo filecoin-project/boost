@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore/mount"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/boxo/blockservice"
@@ -57,8 +58,8 @@ type HttpServer struct {
 
 type HttpServerApi interface {
 	GetPieceDeals(ctx context.Context, pieceCID cid.Cid) ([]model.DealInfo, error)
-	IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error)
-	UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error)
+	IsUnsealed(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error)
+	UnsealSectorAt(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error)
 }
 
 type HttpServerOptions struct {
@@ -288,7 +289,7 @@ func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.
 	}
 
 	// Get the raw piece data from the sector
-	pieceReader, err := s.api.UnsealSectorAt(ctx, di.SectorID, di.PieceOffset.Unpadded(), di.PieceLength.Unpadded())
+	pieceReader, err := s.api.UnsealSectorAt(ctx, di.MinerAddr, di.SectorID, di.PieceOffset.Unpadded(), di.PieceLength.Unpadded())
 	if err != nil {
 		return nil, fmt.Errorf("getting raw data from sector %d: %w", di.SectorID, err)
 	}
@@ -306,7 +307,7 @@ func (s *HttpServer) unsealedDeal(ctx context.Context, pieceCid cid.Cid, pieceDe
 	sealedCount := 0
 	var allErr error
 	for _, di := range pieceDeals {
-		isUnsealed, err := s.api.IsUnsealed(ctx, di.SectorID, di.PieceOffset.Unpadded(), di.PieceLength.Unpadded())
+		isUnsealed, err := s.api.IsUnsealed(ctx, di.MinerAddr, di.SectorID, di.PieceOffset.Unpadded(), di.PieceLength.Unpadded())
 		if err != nil {
 			allErr = multierror.Append(allErr, err)
 			continue

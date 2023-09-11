@@ -6,10 +6,11 @@ import (
 	"io"
 
 	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 )
 
-//go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecedirectory.go -package=mock_piecedirectory . SectionReader,PieceReader,Store
+//go:generate go run github.com/golang/mock/mockgen -destination=mocks/piecedirectory.go -package=mock_piecedirectory . PieceReader
 
 type SectionReader interface {
 	io.Reader
@@ -22,7 +23,7 @@ var ErrSealed = errors.New("sector is not unsealed")
 
 type PieceReader interface {
 	// GetReader returns a reader over a piece. If there is no unsealed copy, returns ErrSealed.
-	GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error)
+	GetReader(ctx context.Context, minerAddr address.Address, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (SectionReader, error)
 }
 
 // PieceDirMetadata has the db metadata info and a flag to indicate if this
