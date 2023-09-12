@@ -9,7 +9,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/google/uuid"
-	cid "github.com/ipfs/go-cid"
+	"github.com/ipfs/go-cid"
 )
 
 // DirectDeal is the local state tracked for direct data onboard.
@@ -32,6 +32,7 @@ type DirectDeal struct {
 
 	// InboundCARPath is the file-path where the storage provider will persist the CAR file sent by the client.
 	InboundFilePath string
+	InboundFileSize int64
 
 	// sector packing info
 	SectorID abi.SectorNumber

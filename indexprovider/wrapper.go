@@ -190,7 +190,7 @@ func (w *Wrapper) handleUpdates(ctx context.Context, sectorUpdates map[abi.Secto
 					FastRetrieval: sectorSealState == db.SealStateUnsealed,
 					VerifiedDeal:  deal.DealProposal.Proposal.VerifiedDeal,
 				}
-				announceCid, err := w.AnnounceBoostDealMetadata(ctx, md, propCid)
+				announceCid, err := w.AnnounceBoostDealMetadata(ctx, md, propCid.Bytes())
 				if err != nil {
 					log.Errorf("announcing deal %s to index provider: %w", deal.DealID, err)
 				} else {
@@ -282,25 +282,27 @@ func (w *Wrapper) Enabled() bool {
 // The advertisement published by this function covers 2 protocols:
 //
 // Bitswap:
-//     1. bitswap is completely disabled: in which case an advertisement is
+//
+//  1. bitswap is completely disabled: in which case an advertisement is
 //     published with http(or empty if http is disabled) extended providers
 //     that should wipe previous support on indexer side.
 //
-//     2. bitswap is enabled with public addresses: in which case publish an
+//  2. bitswap is enabled with public addresses: in which case publish an
 //     advertisement with extended providers records corresponding to the
 //     public addresses. Note, according the IPNI spec, the host ID will
 //     also be added to the extended providers for signing reasons with empty
 //     metadata making a total of 2 extended provider records.
 //
-//     3. bitswap with boostd address: in which case public an advertisement
+//  3. bitswap with boostd address: in which case public an advertisement
 //     with one extended provider record that just adds bitswap metadata.
 //
 // HTTP:
-//     1. http is completely disabled: in which case an advertisement is
+//
+//  1. http is completely disabled: in which case an advertisement is
 //     published with bitswap(or empty if bitswap is disabled) extended providers
 //     that should wipe previous support on indexer side
 //
-//     2. http is enabled: in which case an advertisement is published with
+//  2. http is enabled: in which case an advertisement is published with
 //     bitswap and http(or only http if bitswap is disabled) extended providers
 //     that should wipe previous support on indexer side
 //
@@ -632,10 +634,10 @@ func (w *Wrapper) AnnounceBoostDeal(ctx context.Context, deal *types.ProviderDea
 		FastRetrieval: deal.FastRetrieval,
 		VerifiedDeal:  deal.ClientDealProposal.Proposal.VerifiedDeal,
 	}
-	return w.AnnounceBoostDealMetadata(ctx, md, propCid)
+	return w.AnnounceBoostDealMetadata(ctx, md, propCid.Bytes())
 }
 
-func (w *Wrapper) AnnounceBoostDealMetadata(ctx context.Context, md metadata.GraphsyncFilecoinV1, propCid cid.Cid) (cid.Cid, error) {
+func (w *Wrapper) AnnounceBoostDealMetadata(ctx context.Context, md metadata.GraphsyncFilecoinV1, contextID []byte) (cid.Cid, error) {
 	if !w.enabled {
 		return cid.Undef, errors.New("cannot announce deal: index provider is disabled")
 	}
@@ -648,7 +650,7 @@ func (w *Wrapper) AnnounceBoostDealMetadata(ctx context.Context, md metadata.Gra
 
 	// Announce deal to network Indexer
 	fm := metadata.Default.New(&md)
-	annCid, err := w.prov.NotifyPut(ctx, nil, propCid.Bytes(), fm)
+	annCid, err := w.prov.NotifyPut(ctx, nil, contextID, fm)
 	if err != nil {
 		// Check if the error is because the deal was already advertised
 		// (we can safely ignore this error)
@@ -683,4 +685,20 @@ type basicDealInfo struct {
 	DealID         string
 	SectorID       abi.SectorID
 	DealProposal   storagemarket.ClientDealProposal
+}
+
+func (w *Wrapper) AnnounceBoostDirectDeal(ctx context.Context, entry *types.DirectDeal) (cid.Cid, error) {
+	// Filter out deals that should not be announced
+	if !entry.AnnounceToIPNI {
+		return cid.Undef, nil
+	}
+
+	contextID := []byte(entry.AllocationID.Key())
+
+	md := metadata.GraphsyncFilecoinV1{
+		PieceCID:      entry.PieceCID,
+		FastRetrieval: entry.KeepUnsealedCopy,
+		VerifiedDeal:  true,
+	}
+	return w.AnnounceBoostDealMetadata(ctx, md, contextID)
 }

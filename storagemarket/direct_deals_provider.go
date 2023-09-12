@@ -12,11 +12,14 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/indexprovider"
+	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/storagemarket/logs"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin/v12/miner"
@@ -55,9 +58,12 @@ type DirectDealsProvider struct {
 
 	runningLk sync.RWMutex
 	running   map[uuid.UUID]struct{}
+
+	piecedirectory *piecedirectory.PieceDirectory
+	ip             *indexprovider.Wrapper
 }
 
-func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, commpt CommpThrottle, sps sealingpipeline.API, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
+func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, commpt CommpThrottle, sps sealingpipeline.API, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper) *DirectDealsProvider {
 	return &DirectDealsProvider{
 		config:        cfg,
 		fullnodeApi:   fullnodeApi,
@@ -71,8 +77,10 @@ func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdde
 		//logsSqlDB: logsSqlDB,
 		//logsDB: logsDB,
 
-		dealLogger: dealLogger,
-		running:    make(map[uuid.UUID]struct{}),
+		dealLogger:     dealLogger,
+		running:        make(map[uuid.UUID]struct{}),
+		piecedirectory: piecedirectory,
+		ip:             ip,
 	}
 }
 
@@ -298,6 +306,8 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 			}
 		}
 
+		entry.InboundFileSize = fstat.Size()
+
 		log.Infow("direct deal details", "filepath", entry.InboundFilePath, "supplied-piececid", entry.PieceCID, "calculated-piececid", generatedPieceInfo.PieceCID, "calculated-piecesize", generatedPieceInfo.Size, "os stat size", fstat.Size())
 
 		if !entry.PieceCID.Equals(generatedPieceInfo.PieceCID) {
@@ -402,9 +412,19 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 		}
 	}
 
-	if entry.Checkpoint <= dealcheckpoints.AddedPiece {
-		// add index and announce
-		ddp.dealLogger.Infow(dealUuid, "index and announce")
+	// Index and announce the deal
+	if entry.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
+		if err := ddp.indexAndAnnounce(ctx, entry); err != nil {
+			err.error = fmt.Errorf("failed to add index and announce deal: %w", err.error)
+			return err
+		}
+		if entry.AnnounceToIPNI {
+			ddp.dealLogger.Infow(entry.ID, "deal successfully indexed and announced")
+		} else {
+			ddp.dealLogger.Infow(entry.ID, "deal successfully indexed")
+		}
+	} else {
+		ddp.dealLogger.Infow(entry.ID, "deal has already been indexed and announced")
 	}
 
 	if entry.Checkpoint < dealcheckpoints.Complete {
@@ -562,6 +582,52 @@ func (ddp *DirectDealsProvider) FailPausedDeal(ctx context.Context, id uuid.UUID
 
 	if deal.CleanupData {
 		_ = os.Remove(deal.InboundFilePath)
+	}
+
+	return nil
+}
+
+func (ddp *DirectDealsProvider) indexAndAnnounce(ctx context.Context, entry *smtypes.DirectDeal) *dealMakingError {
+	// add deal to piece metadata store
+	ddp.dealLogger.Infow(entry.ID, "about to add direct deal for piece in LID")
+	if err := ddp.piecedirectory.AddDealForPiece(ctx, entry.PieceCID, model.DealInfo{
+		DealUuid:    entry.ID.String(),
+		ChainDealID: abi.DealID(entry.AllocationID), // Convert the type to avoid migration as underlying types are same
+		MinerAddr:   entry.Provider,
+		SectorID:    entry.SectorID,
+		PieceOffset: entry.Offset,
+		PieceLength: entry.Length,
+		CarLength:   uint64(entry.InboundFileSize),
+	}); err != nil {
+		return &dealMakingError{
+			retry: types.DealRetryAuto,
+			error: fmt.Errorf("failed to add deal to piece metadata store: %w", err),
+		}
+	}
+	ddp.dealLogger.Infow(entry.ID, "direct deal successfully added to LID")
+
+	// if the index provider is enabled
+	if ddp.ip.Enabled() {
+		if entry.AnnounceToIPNI {
+			// announce to the network indexer but do not fail the deal if the announcement fails,
+			// just retry the next time boost restarts
+			annCid, err := ddp.ip.AnnounceBoostDirectDeal(ctx, entry)
+			if err != nil {
+				return &dealMakingError{
+					retry: types.DealRetryAuto,
+					error: fmt.Errorf("failed to announce deal to network indexer: %w", err),
+				}
+			}
+			ddp.dealLogger.Infow(entry.ID, "announced the direct deal to network indexer", "announcement-cid", annCid)
+		} else {
+			ddp.dealLogger.Infow(entry.ID, "didn't announce the direct deal as requested in the deal proposal")
+		}
+	} else {
+		ddp.dealLogger.Infow(entry.ID, "didn't announce the direct deal because network indexer is disabled")
+	}
+
+	if derr := ddp.updateCheckpoint(ctx, entry, dealcheckpoints.IndexedAndAnnounced); derr != nil {
+		return derr
 	}
 
 	return nil
