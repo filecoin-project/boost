@@ -295,12 +295,12 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 					if indexed {
 						atomic.AddInt64(&count, 1)
 						atomic.AddInt64(&processed, 1)
-						logger.Infow("migrated index", "piece cid", p.name, "processed", processed, "total", len(idxPaths),
-							"took", took.String(), "average", (indexTime.t / time.Duration(count)).String())
+						logger.Infow("migrated index", "piece cid", p.name, "processed", atomic.LoadInt64(&processed), "total", len(idxPaths),
+							"took", took.String(), "average", (indexTime.t / time.Duration(atomic.LoadInt64(&count))).String())
 
 					} else {
 						atomic.AddInt64(&processed, 1)
-						logger.Infow("index already migrated", "piece cid", p.name, "processed", processed, "total", len(idxPaths))
+						logger.Infow("index already migrated", "piece cid", p.name, "processed", atomic.LoadInt64(&processed), "total", len(idxPaths))
 					}
 				}
 			}
@@ -312,7 +312,7 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 	logger.Errorw("waiting for indexing threads to finish", err)
 
 	logger.Infow("migrated indices", "total", len(idxPaths), "took", time.Since(indicesStart).String())
-	return errCount, nil
+	return atomic.LoadInt64(&errCount), nil
 }
 
 type migrateIndexResult struct {
