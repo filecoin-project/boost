@@ -685,7 +685,7 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 
 	retErr := &dealMakingError{
 		retry: types.DealRetryFatal,
-		error: ErrDealNotSealed,
+		error: ErrDealNotInSector,
 	}
 
 	// Check status immediately
