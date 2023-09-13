@@ -27,6 +27,7 @@ import (
 	format "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-car"
+	"github.com/ipld/go-car/util"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
 	carindex "github.com/ipld/go-car/v2/index"
@@ -262,7 +263,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 
 	// Add mh => piece index to store: "which piece contains the multihash?"
 	// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
-	log.Debugw("add index: store index in local index directory", "pieceCid", pieceCid)
+	log.Debugw("add index: store index in local index directory", "pieceCid", pieceCid, "records", len(recs))
 	if err := ps.store.AddIndex(ctx, pieceCid, recs, true); err != nil {
 		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
 	}
@@ -587,11 +588,15 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 				return nil, fmt.Errorf("getting offset/size for cid %s in piece %s: %w", c, pieceCid, err)
 			}
 
-			// Seek to the block offset
+			// Seek to the section offset
 			readerAt := readerutil.NewReadSeekerFromReaderAt(reader, int64(offsetSize.Offset))
-			data := make([]byte, offsetSize.Size)
-			if _, err = io.ReadFull(readerAt, data); err != nil {
+			// Read the block data
+			readCid, data, err := util.ReadNode(bufio.NewReader(readerAt))
+			if err != nil {
 				return nil, fmt.Errorf("reading data for block %s from reader for piece %s: %w", c, pieceCid, err)
+			}
+			if !bytes.Equal(readCid.Hash(), c.Hash()) {
+				return nil, fmt.Errorf("read block %s from reader for piece %s, but expected block %s", readCid, pieceCid, c)
 			}
 			return data, nil
 		}()
@@ -718,25 +723,44 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 		// we transform the reader here to look like:
 		// [carv1-header [gap of carv2-header-size] block block ...]
 		// the carv1 header at the beginning makes the offset used by the subsequent `blockstore.NewReadOnly` work properly.
-		size, err := reader.Seek(0, io.SeekEnd)
+
+		// read the carv2 header to get the payload layout
+		carReader, err := carv2.NewReader(reader)
 		if err != nil {
-			return nil, fmt.Errorf("getting car length for piece %s: %w", pieceCid, err)
+			return nil, fmt.Errorf("getting car reader for piece %s: %w", pieceCid, err)
 		}
-		sectionReader := io.NewSectionReader(reader, carv2.HeaderSize, size-carv2.HeaderSize)
-		ch, err := car.ReadHeader(bufio.NewReader(sectionReader))
+		dataOffset := int64(carReader.Header.DataOffset)
+		dataSize := int64(carReader.Header.DataSize)
+
+		// read the payload (CARv1) header
+		sectionReader := io.NewSectionReader(reader, dataOffset, dataSize)
+		carHeader, err := car.ReadHeader(bufio.NewReader(sectionReader))
 		if err != nil {
 			return nil, fmt.Errorf("reading car header for piece %s: %w", pieceCid, err)
 		}
+
+		// write the header back out to a buffer
 		headerBuf := bytes.NewBuffer(nil)
-		if err := car.WriteHeader(ch, headerBuf); err != nil {
+		if err := car.WriteHeader(carHeader, headerBuf); err != nil {
 			return nil, fmt.Errorf("copying car header for piece %s: %w", pieceCid, err)
 		}
-		empty := [carv2.HeaderSize]byte{}
-		headerBuf.Write(empty[:])
-		bsR = carutil.NewMultiReaderAt(bytes.NewReader(headerBuf.Bytes()), sectionReader)
+		headerLen := int64(headerBuf.Len())
+
+		// create a reader that will address the payload after the header
+		sectionReader = io.NewSectionReader(reader, dataOffset+headerLen, dataSize-headerLen)
+
+		bsR = carutil.NewMultiReaderAt(
+			bytes.NewReader(headerBuf.Bytes()),        // payload (CARv1) header
+			bytes.NewReader(make([]byte, dataOffset)), // padding to account for the CARv2 wrapper
+			sectionReader, // payload (CARv1) data
+		)
 	} else {
 		bsR = reader
+		if _, err := reader.Seek(0, io.SeekStart); err != nil {
+			return nil, fmt.Errorf("seeking back to start of piece %s: %w", pieceCid, err)
+		}
 	}
+
 	// Create a blockstore from the index and the piece reader
 	bs, err := blockstore.NewReadOnly(bsR, idx, carv2.ZeroLengthSectionAsEOF(true))
 	if err != nil {
