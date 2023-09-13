@@ -574,10 +574,10 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 	if err != nil {
 		return err
 	}
+	defer reader.Close()
 	if !isUnsealed {
 		return fmt.Errorf("sector %d is not unsealed", sid)
 	}
-	defer reader.Close()
 
 	dr.Sectors[sid].Deals[cdi].IsUnsealed = true
 	dr.Sectors[sid].Deals[cdi].GotDataReader = true
