@@ -8,6 +8,8 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/filecoin-project/boost-gfm/piecestore"
@@ -18,6 +20,7 @@ import (
 	"github.com/filecoin-project/boostd-data/svc"
 	"github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/boostd-data/yugabyte"
+	"github.com/filecoin-project/boostd-data/yugabyte/migrations"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -31,6 +34,7 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 // The methods on the store that are used for migration
@@ -63,6 +67,12 @@ var commonFlags = []cli.Flag{
 		Name:     "force",
 		Usage:    "if the index has already been migrated, overwrite it",
 		Required: false,
+	},
+	&cli.IntFlag{
+		Name:     "parallel",
+		Usage:    "the number of indexes to be processed in parallel",
+		Required: false,
+		Value:    4,
 	},
 }
 
@@ -142,7 +152,11 @@ var migrateYugabyteDBCmd = &cli.Command{
 			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
 		}
 
-		store := yugabyte.NewStore(settings)
+		// Note that it doesn't matter what address we pass here: because the
+		// table is newly created, it doesn't contain any rows when the
+		// migration is run.
+		migrator := yugabyte.NewMigrator(settings, address.TestAddress)
+		store := yugabyte.NewStore(settings, migrator)
 		return migrate(cctx, "yugabyte", store, migrateType)
 	},
 }
@@ -193,7 +207,7 @@ func migrate(cctx *cli.Context, dbType string, store StoreMigrationApi, migrateT
 	if migrateType == "dagstore" {
 		// Migrate the indices
 		bar.Describe("Migrating indices...")
-		errCount, err := migrateIndices(ctx, logger, bar, repoDir, store, cctx.Bool("force"))
+		errCount, err := migrateIndices(ctx, logger, bar, repoDir, store, cctx.Bool("force"), cctx.Int("parallel"))
 		if errCount > 0 {
 			msg := fmt.Sprintf("Warning: there were errors migrating %d indices.", errCount)
 			msg += " See the log for details:\n" + logPath
@@ -222,7 +236,12 @@ func migrate(cctx *cli.Context, dbType string, store StoreMigrationApi, migrateT
 	return nil
 }
 
-func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store StoreMigrationApi, force bool) (int, error) {
+type idxTime struct {
+	t   time.Duration
+	lck sync.Mutex
+}
+
+func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progressbar.ProgressBar, repoDir string, store StoreMigrationApi, force bool, parallel int) (int64, error) {
 	indicesPath := path.Join(repoDir, "dagstore", "index")
 	logger.Infof("migrating dagstore indices at %s", indicesPath)
 
@@ -235,44 +254,65 @@ func migrateIndices(ctx context.Context, logger *zap.SugaredLogger, bar *progres
 	bar.ChangeMax(len(idxPaths))
 
 	indicesStart := time.Now()
-	var count int
-	var errCount int
-	var indexTime time.Duration
-	for i, ipath := range idxPaths {
-		if ctx.Err() != nil {
-			return errCount, fmt.Errorf("index migration cancelled")
-		}
+	var count int64
+	var errCount int64
+	var indexTime idxTime
+	var processed int64
 
-		start := time.Now()
+	queue := make(chan idxPath, len(idxPaths))
+	for _, ipath := range idxPaths {
+		queue <- ipath
+	}
+	close(queue)
 
-		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 60*time.Second)
-		defer timeoutCancel()
+	var eg errgroup.Group
+	for i := 0; i < parallel; i++ {
+		eg.Go(func() error {
+			for ctx.Err() == nil {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case p, ok := <-queue:
+					if !ok {
+						// Finished adding all the queued items, exit the thread
+						return nil
+					}
+					start := time.Now()
 
-		indexed, err := migrateIndexWithTimeout(timeoutCtx, ipath, store, force)
-		bar.Add(1) //nolint:errcheck
-		if err != nil {
-			took := time.Since(start)
-			indexTime += took
+					indexed, perr := migrateIndexWithTimeout(ctx, p, store, force)
+					bar.Add(1) //nolint:errcheck
 
-			logger.Errorw("migrate index failed", "piece cid", ipath.name, "took", took.String(), "err", err)
+					took := time.Since(start)
+					indexTime.lck.Lock()
+					indexTime.t += took
+					indexTime.lck.Unlock()
 
-			errCount++
-			continue
-		}
+					if perr != nil {
+						logger.Errorw("migrate index failed", "piece cid", p.name, "took", took.String(), "err", perr)
+						atomic.AddInt64(&errCount, 1)
+					}
 
-		if indexed {
-			count++
-			took := time.Since(start)
-			indexTime += took
-			logger.Infow("migrated index", "piece cid", ipath.name, "processed", i+1, "total", len(idxPaths),
-				"took", took.String(), "average", (indexTime / time.Duration(count)).String())
-		} else {
-			logger.Infow("index already migrated", "piece cid", ipath.name, "processed", i+1, "total", len(idxPaths))
-		}
+					if indexed {
+						atomic.AddInt64(&count, 1)
+						atomic.AddInt64(&processed, 1)
+						logger.Infow("migrated index", "piece cid", p.name, "processed", atomic.LoadInt64(&processed), "total", len(idxPaths),
+							"took", took.String(), "average", (indexTime.t / time.Duration(atomic.LoadInt64(&count))).String())
+
+					} else {
+						atomic.AddInt64(&processed, 1)
+						logger.Infow("index already migrated", "piece cid", p.name, "processed", atomic.LoadInt64(&processed), "total", len(idxPaths))
+					}
+				}
+			}
+			return ctx.Err()
+		})
 	}
 
+	err = eg.Wait()
+	logger.Errorw("waiting for indexing threads to finish", err)
+
 	logger.Infow("migrated indices", "total", len(idxPaths), "took", time.Since(indicesStart).String())
-	return errCount, nil
+	return atomic.LoadInt64(&errCount), nil
 }
 
 type migrateIndexResult struct {
@@ -281,13 +321,20 @@ type migrateIndexResult struct {
 }
 
 func migrateIndexWithTimeout(ctx context.Context, ipath idxPath, store StoreMigrationApi, force bool) (bool, error) {
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 60*time.Second)
+	defer timeoutCancel()
+
+	return execMigrateIndexWithTimeout(timeoutCtx, ipath, store, force)
+}
+
+func execMigrateIndexWithTimeout(ctx context.Context, ipath idxPath, store StoreMigrationApi, force bool) (bool, error) {
 	result := make(chan migrateIndexResult, 1)
 	go func() {
 		result <- doMigrateIndex(ctx, ipath, store, force)
 	}()
 	select {
-	case <-time.After(75 * time.Second):
-		return false, errors.New("index migration timed out after 75 seconds")
+	case <-ctx.Done():
+		return false, errors.New("index migration timed out after 60 seconds")
 	case result := <-result:
 		return result.Indexed, result.Error
 	}
@@ -319,10 +366,12 @@ func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, f
 	}
 
 	// Load the index file
+	readStart := time.Now()
 	idx, err := loadIndex(ipath.path)
 	if err != nil {
 		return false, fmt.Errorf("loading index %s from disk: %w", ipath.path, err)
 	}
+	log.Debugw("ReadIndex", "took", time.Since(readStart).String())
 
 	itidx, ok := idx.(index.IterableIndex)
 	if !ok {
@@ -330,10 +379,12 @@ func migrateIndex(ctx context.Context, ipath idxPath, store StoreMigrationApi, f
 	}
 
 	// Convert from IterableIndex to an array of records
+	convStart := time.Now()
 	records, err := getRecords(itidx)
 	if err != nil {
 		return false, fmt.Errorf("getting records for index %s: %w", ipath.path, err)
 	}
+	log.Debugw("ConvertIndex", "took", time.Since(convStart).String())
 
 	// Add the index to the store
 	addStart := time.Now()
@@ -545,10 +596,6 @@ func getIndexPaths(pathDir string) ([]idxPath, error) {
 }
 
 func loadIndex(path string) (index.Index, error) {
-	defer func(now time.Time) {
-		log.Debugw("loadindex", "took", time.Since(now))
-	}(time.Now())
-
 	idxf, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -638,7 +685,8 @@ func migrateReverse(cctx *cli.Context, dbType string) error {
 			Hosts:                    cctx.StringSlice("hosts"),
 			PayloadPiecesParallelism: cctx.Int("insert-parallelism"),
 		}
-		store = yugabyte.NewStore(settings)
+		migrator := yugabyte.NewMigrator(settings, migrations.DisabledMinerAddr)
+		store = yugabyte.NewStore(settings, migrator)
 	}
 
 	// Perform the reverse migration

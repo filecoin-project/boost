@@ -74,6 +74,7 @@ func before(cctx *cli.Context) error {
 	_ = logging.SetLogLevel("piecedoc", "INFO")
 	_ = logging.SetLogLevel("piecedirectory", "INFO")
 	_ = logging.SetLogLevel("sectorstatemgr", "INFO")
+	_ = logging.SetLogLevel("migrations", "INFO")
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostd", "DEBUG")

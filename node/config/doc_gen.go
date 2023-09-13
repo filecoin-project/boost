@@ -436,6 +436,15 @@ them disabled. These will be completely deprecated soon.`,
 The values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
 ignored, and deals will remain in the pending state until manually published.`,
 		},
+		{
+			Name: "GraphsyncStorageAccessApiInfo",
+			Type: "[]string",
+
+			Comment: `The connect strings for the RPC APIs of each miner that boost can read
+sector data from when serving graphsync retrievals.
+If this parameter is not set, boost will serve data from the endpoint
+configured in SectorIndexApiInfo.`,
+		},
 	},
 	"FeeConfig": []DocField{
 		{
@@ -575,6 +584,12 @@ Note that this port must be open on the firewall.`,
 			Comment: ``,
 		},
 		{
+			Name: "Leveldb",
+			Type: "LocalIndexDirectoryLeveldbConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "ParallelAddIndexLimit",
 			Type: "int",
 
@@ -603,6 +618,14 @@ Set this value to "" if the local index directory data service is embedded.`,
 			Type: "Duration",
 
 			Comment: `The RPC timeout when making requests to the boostd-data service`,
+		},
+	},
+	"LocalIndexDirectoryLeveldbConfig": []DocField{
+		{
+			Name: "Enabled",
+			Type: "bool",
+
+			Comment: ``,
 		},
 	},
 	"LocalIndexDirectoryYugabyteConfig": []DocField{

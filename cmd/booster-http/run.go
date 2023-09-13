@@ -18,9 +18,9 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore/mount"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/ipfs/go-cid"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
@@ -66,7 +66,7 @@ var runCmd = &cli.Command{
 			Usage:    "the endpoint for the full node API",
 			Required: true,
 		},
-		&cli.StringFlag{
+		&cli.StringSliceFlag{
 			Name:     "api-storage",
 			Usage:    "the endpoint for the storage node API",
 			Required: true,
@@ -114,6 +114,12 @@ var runCmd = &cli.Command{
 			Usage: "the endpoints for fetching one or more custom BadBits list instead of the default one at https://badbits.dwebops.pub/denylist.json",
 			Value: cli.NewStringSlice("https://badbits.dwebops.pub/denylist.json"),
 		},
+		&cli.BoolFlag{
+			Name:   "api-version-check",
+			Usage:  "Check API versions (param is used by tests)",
+			Hidden: true,
+			Value:  true,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		servePieces := cctx.Bool("serve-pieces")
@@ -149,10 +155,11 @@ var runCmd = &cli.Command{
 		}
 		defer ncloser()
 
-		// Connect to the storage API and create a sector accessor
-		storageApiInfo := cctx.String("api-storage")
-		if err != nil {
-			return fmt.Errorf("parsing storage API endpoint: %w", err)
+		if cctx.Bool("api-version-check") {
+			err = lib.CheckFullNodeApiVersion(ctx, fullnodeApi)
+			if err != nil {
+				return err
+			}
 		}
 
 		// Instantiate the tracer and exporter
@@ -166,16 +173,16 @@ var runCmd = &cli.Command{
 			log.Info("Tracing exporter enabled")
 		}
 
-		// Create the sector accessor
-		sa, storageCloser, err := lib.CreateSectorAccessor(ctx, storageApiInfo, fullnodeApi, log)
+		// Connect to the storage API(s) and create a piece reader
+		sa := lib.NewMultiMinerAccessor(cctx.StringSlice("api-storage"), fullnodeApi)
+		err = sa.Start(ctx, log)
 		if err != nil {
 			return err
 		}
-		defer storageCloser()
+		defer sa.Close()
 
 		// Create the server API
-		pr := &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
-		pd := piecedirectory.NewPieceDirectory(cl, pr, cctx.Int("add-index-throttle"))
+		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"))
 
 		opts := &HttpServerOptions{
 			ServePieces:              servePieces,
@@ -312,7 +319,7 @@ func createRepoDir(repoDir string) (string, error) {
 type serverApi struct {
 	ctx            context.Context
 	piecedirectory *piecedirectory.PieceDirectory
-	sa             dagstore.SectorAccessor
+	sa             *lib.MultiMinerAccessor
 }
 
 var _ HttpServerApi = (*serverApi)(nil)
@@ -321,10 +328,10 @@ func (s serverApi) GetPieceDeals(ctx context.Context, pieceCID cid.Cid) ([]model
 	return s.piecedirectory.GetPieceDeals(ctx, pieceCID)
 }
 
-func (s serverApi) IsUnsealed(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error) {
-	return s.sa.IsUnsealed(ctx, sectorID, offset, length)
+func (s serverApi) IsUnsealed(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (bool, error) {
+	return s.sa.IsUnsealed(ctx, minerAddr, sectorID, offset, length)
 }
 
-func (s serverApi) UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error) {
-	return s.sa.UnsealSectorAt(ctx, sectorID, offset, length)
+func (s serverApi) UnsealSectorAt(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error) {
+	return s.sa.UnsealSectorAt(ctx, minerAddr, sectorID, offset, length)
 }

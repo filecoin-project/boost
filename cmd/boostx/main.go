@@ -47,7 +47,7 @@ func main() {
 			marketWithdrawCmd,
 			statsCmd,
 			sectorCmd,
-			minerCmd,
+			boostdCmd,
 		},
 	}
 	app.Setup()

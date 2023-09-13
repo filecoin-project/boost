@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/lib/readerutil"
 	"github.com/filecoin-project/lotus/markets/dagstore"
@@ -98,8 +99,12 @@ func (ps *PieceDirectory) FlaggedPiecesCount(ctx context.Context, filter *bdtype
 	return ps.store.FlaggedPiecesCount(ctx, filter)
 }
 
-func (ps *PieceDirectory) PiecesCount(ctx context.Context) (int, error) {
-	return ps.store.PiecesCount(ctx)
+func (ps *PieceDirectory) PiecesCount(ctx context.Context, maddr address.Address) (int, error) {
+	return ps.store.PiecesCount(ctx, maddr)
+}
+
+func (ps *PieceDirectory) ScanProgress(ctx context.Context, maddr address.Address) (*bdtypes.ScanProgress, error) {
+	return ps.store.ScanProgress(ctx, maddr)
 }
 
 // Get all metadata about a particular piece
@@ -230,7 +235,7 @@ func (ps *PieceDirectory) addIndexForPieceThrottled(ctx context.Context, pieceCi
 func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo model.DealInfo) error {
 	// Get a reader over the piece data
 	log.Debugw("add index: get index", "pieceCid", pieceCid)
-	reader, err := ps.pieceReader.GetReader(ctx, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
+	reader, err := ps.pieceReader.GetReader(ctx, dealInfo.MinerAddr, dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength)
 	if err != nil {
 		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
@@ -353,9 +358,8 @@ func (ps *PieceDirectory) GetPieceReader(ctx context.Context, pieceCid cid.Cid) 
 	// it is stored in
 	var merr error
 	for i, dl := range deals {
-		reader, err := ps.pieceReader.GetReader(ctx, dl.SectorID, dl.PieceOffset, dl.PieceLength)
+		reader, err := ps.pieceReader.GetReader(ctx, dl.MinerAddr, dl.SectorID, dl.PieceOffset, dl.PieceLength)
 		if err != nil {
-			// TODO: log error
 			if i < 3 {
 				merr = multierror.Append(merr, err)
 			}
@@ -655,7 +659,7 @@ type SectorAccessorAsPieceReader struct {
 	dagstore.SectorAccessor
 }
 
-func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (types.SectionReader, error) {
+func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, minerAddr address.Address, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (types.SectionReader, error) {
 	ctx, span := tracing.Tracer.Start(ctx, "sealer.get_reader")
 	defer span.End()
 

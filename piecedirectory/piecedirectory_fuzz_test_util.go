@@ -36,7 +36,7 @@ func testPieceDirectoryBlockstoreGetFuzz(ctx context.Context, t *testing.T, cl *
 	readers := make(map[abi.SectorNumber]car.SectionReader)
 	for i := 0; i < pieceCount; i++ {
 		// Create a random CAR file
-		carFilePath := CreateCarFile(t, i+1)
+		_, carFilePath := CreateCarFile(t, i+1)
 		carFile, err := os.Open(carFilePath)
 		require.NoError(t, err)
 		defer carFile.Close()

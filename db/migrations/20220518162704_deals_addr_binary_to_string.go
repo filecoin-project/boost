@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/filecoin-project/go-address"
@@ -8,12 +9,12 @@ import (
 )
 
 func init() {
-	goose.AddMigration(upDealsAddrBinaryToString, downDealsAddrBinaryToString)
+	goose.AddMigrationContext(upDealsAddrBinaryToString, downDealsAddrBinaryToString)
 }
 
 // Convert format of deals in the database from binary to string
-func upDealsAddrBinaryToString(tx *sql.Tx) error {
-	rows, err := tx.Query("SELECT ID, ClientAddress, ProviderAddress FROM Deals")
+func upDealsAddrBinaryToString(ctx context.Context, tx *sql.Tx) error {
+	rows, err := tx.QueryContext(ctx, "SELECT ID, ClientAddress, ProviderAddress FROM Deals")
 	if err != nil {
 		return err
 	}
@@ -38,7 +39,7 @@ func upDealsAddrBinaryToString(tx *sql.Tx) error {
 			continue
 		}
 
-		_, err = tx.Exec("UPDATE Deals SET ClientAddress=?, ProviderAddress=? WHERE ID=?", updatedClientAddr, updatedProviderAddr, id)
+		_, err = tx.ExecContext(ctx, "UPDATE Deals SET ClientAddress=?, ProviderAddress=? WHERE ID=?", updatedClientAddr, updatedProviderAddr, id)
 		if err != nil {
 			log.Warnf("could not migrate row with id %s: could not save row: %w", id, err)
 			continue
@@ -67,7 +68,7 @@ func addrToString(input []byte) (*string, error) {
 	return &updated, nil
 }
 
-func downDealsAddrBinaryToString(tx *sql.Tx) error {
+func downDealsAddrBinaryToString(ctx context.Context, tx *sql.Tx) error {
 	// This code is executed when the migration is rolled back.
 	return nil
 }

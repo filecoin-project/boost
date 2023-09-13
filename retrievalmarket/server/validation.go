@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket/migrations"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -158,21 +157,21 @@ func (rv *requestValidator) acceptDeal(receiver peer.ID, proposal *retrievalmark
 }
 
 // Get the best piece containing the payload cid (first unsealed piece)
-func (rv *requestValidator) getPiece(payloadCid cid.Cid, pieceCID *cid.Cid) (piecestore.PieceInfo, bool, error) {
+func (rv *requestValidator) getPiece(payloadCid cid.Cid, pieceCID *cid.Cid) (PieceInfo, bool, error) {
 	inPieceCid := cid.Undef
 	if pieceCID != nil {
 		inPieceCid = *pieceCID
 	}
 
-	pieces, piecesErr := GetAllPieceInfoForPayload(rv.DagStore, rv.PieceStore, payloadCid)
+	pieces, piecesErr := GetAllPieceInfoForPayload(rv.ctx, rv.PieceDirectory, payloadCid)
 	pieceInfo, isUnsealed := GetBestPieceInfoMatch(rv.ctx, rv.SectorAccessor, pieces, inPieceCid)
-	if pieceInfo.Defined() {
+	if pieceInfo.PieceCID.Defined() && len(pieceInfo.Deals) > 0 {
 		return pieceInfo, isUnsealed, nil
 	}
 	if piecesErr != nil {
-		return piecestore.PieceInfoUndefined, false, piecesErr
+		return PieceInfo{}, false, piecesErr
 	}
-	return piecestore.PieceInfoUndefined, false, fmt.Errorf("unknown pieceCID %s", pieceCID.String())
+	return PieceInfo{}, false, fmt.Errorf("unknown pieceCID %s", pieceCID.String())
 }
 
 func (rv *requestValidator) Subscribe(subscriber retrievalmarket.ProviderValidationSubscriber) retrievalmarket.Unsubscribe {

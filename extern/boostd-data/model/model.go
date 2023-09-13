@@ -84,6 +84,7 @@ func (ofsz *OffsetSize) UnmarshallBase64(str string) error {
 // FlaggedPiece is a piece that has been flagged for the user's attention
 // (eg because the index is missing)
 type FlaggedPiece struct {
+	MinerAddr       address.Address
 	PieceCid        cid.Cid
 	CreatedAt       time.Time
 	UpdatedAt       time.Time

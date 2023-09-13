@@ -25,6 +25,7 @@ import {MonitoringAlert} from "./MonitoringAlert";
 import {IpniAdDetail, IpniAdEntries, IpniPage} from "./Ipni";
 import {DirectDealsPage} from "./DirectDeals";
 import {DirectDealDetail} from "./DirectDealDetail";
+import {MinerAddress} from "./MinerAddress";
 
 function App(props) {
     return (
@@ -37,6 +38,7 @@ function App(props) {
                             <td className="main-content">
                                 <div className="page-content">
                                     <MonitoringAlert />
+                                    <MinerAddress />
                                     <Epoch />
                                     <Banner />
                                     <Routes>

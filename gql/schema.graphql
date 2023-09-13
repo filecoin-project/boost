@@ -203,6 +203,7 @@ type PieceDeal {
 }
 
 type PieceInfoDeal {
+  MinerAddress: String!
   ChainDealID: Uint64!
   Sector: Sector!
   SealStatus: SealStatus!
@@ -349,10 +350,9 @@ type SealingPipeline {
   Workers: [Worker]!
 }
 
-type DealData {
-  Indexed: Uint64!
-  FlaggedUnsealed: Uint64!
-  FlaggedSealed: Uint64!
+type ScanProgress {
+  Progress: Float!
+  LastScan: Time
 }
 
 type Pieces {
@@ -372,7 +372,7 @@ type SectorProvingState {
 }
 
 type LID {
-  DealData: DealData!
+  ScanProgress: ScanProgress!
   Pieces: Pieces!
   SectorUnsealedCopies: SectorUnsealedCopies!
   SectorProvingState: SectorProvingState!
@@ -518,6 +518,12 @@ input DealFilter {
 type RootQuery {
   """Get height of chain"""
   epoch: EpochInfo!
+
+  """Get miner address"""
+  minerAddress: String!
+
+  """Get list of miners that graphsync can retrieve data from"""
+  graphsyncRetrievalMinerAddresses: [String!]!
 
   """Get Deal by ID"""
   deal(id: ID!): Deal

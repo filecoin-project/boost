@@ -39,8 +39,8 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
 	# echo exit code: $?
 
 	echo Setting port in boost config...
-	sed -i 's|ip4/0.0.0.0/tcp/0|ip4/0.0.0.0/tcp/50000|g' $BOOST_PATH/config.toml
-	sed -i 's|127.0.0.1|0.0.0.0|g' $BOOST_PATH/config.toml
+	sed 's|ip4/0.0.0.0/tcp/0|ip4/0.0.0.0/tcp/50000|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+	sed 's|127.0.0.1|0.0.0.0|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
 
   echo Setting up FIL+ wallets
   ROOT_KEY_1=`cat $LOTUS_PATH/rootkey-1`
@@ -103,8 +103,8 @@ fi
 
 ## Override config options
 echo Updating config values
-sed -i 's|ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8042"|g' $BOOST_PATH/config.toml
-sed -i 's|ExpectedSealDuration = "24h0m0s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml
+sed 's|ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8042"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+sed 's|ExpectedSealDuration = "24h0m0s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
 
 echo Starting LID service and boost in dev mode...
 trap 'kill %1' SIGINT

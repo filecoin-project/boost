@@ -3,9 +3,9 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/filecoin-project/boost-gfm/piecestore"
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	"github.com/filecoin-project/boost-gfm/stores"
+	"github.com/filecoin-project/boost/piecedirectory"
+	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
@@ -26,38 +26,46 @@ const MaxIdentityCIDBytes = 2 << 10
 // identity CID that we are willing to check for matching pieces
 const MaxIdentityCIDLinks = 32
 
+type PieceInfo struct {
+	PieceCID cid.Cid
+	Deals    []model.DealInfo
+}
+
 // GetAllPieceInfoForPayload returns all of the pieces containing the requested Payload CID.
 // If the Payload CID is an identity CID, then we use getCommonPiecesFromIdentityCidLinks to find
 // pieces containing all of the links within that identity CID.
 // Note that it is possible to receive a non-nil error as well as a non-zero length PieceInfo slice
 // as a return from this function. In that case, there was at least one error encountered querying
 // the piece store.
-func GetAllPieceInfoForPayload(dagStore stores.DAGStoreWrapper, pieceStore piecestore.PieceStore, payloadCID cid.Cid) ([]piecestore.PieceInfo, error) {
+func GetAllPieceInfoForPayload(ctx context.Context, pd *piecedirectory.PieceDirectory, payloadCID cid.Cid) ([]PieceInfo, error) {
 	// Get all pieces that contain the target block
-	piecesWithTargetBlock, err := dagStore.GetPiecesContainingBlock(payloadCID)
+	piecesWithTargetBlock, err := pd.PiecesContainingMultihash(ctx, payloadCID.Hash())
 	if err != nil {
 		// this payloadCID may be an identity CID that's in the root of a CAR but
 		// not recorded in the index
 		var idErr error
-		piecesWithTargetBlock, idErr = GetCommonPiecesFromIdentityCidLinks(dagStore.GetPiecesContainingBlock, payloadCID)
+		piecesWithTargetBlock, idErr = GetCommonPiecesFromIdentityCidLinks(ctx, pd.PiecesContainingMultihash, payloadCID)
 		if idErr != nil {
-			return []piecestore.PieceInfo{}, idErr
+			return []PieceInfo{}, idErr
 		}
 		if len(piecesWithTargetBlock) == 0 {
-			return []piecestore.PieceInfo{}, fmt.Errorf("getting pieces for cid %s: %w", payloadCID, err)
+			return []PieceInfo{}, fmt.Errorf("getting pieces for cid %s: %w", payloadCID, err)
 		}
 	}
 
-	pieces := make([]piecestore.PieceInfo, 0)
+	pieces := make([]PieceInfo, 0)
 	var lastErr error
 	for _, pieceWithTargetBlock := range piecesWithTargetBlock {
 		// Get the deals for the piece
-		pieceInfo, err := pieceStore.GetPieceInfo(pieceWithTargetBlock)
+		deals, err := pd.GetPieceDeals(ctx, pieceWithTargetBlock)
 		if err != nil {
 			lastErr = err
 			continue
 		}
-		pieces = append(pieces, pieceInfo)
+		pieces = append(pieces, PieceInfo{
+			PieceCID: pieceWithTargetBlock,
+			Deals:    deals,
+		})
 	}
 
 	return pieces, lastErr
@@ -65,7 +73,7 @@ func GetAllPieceInfoForPayload(dagStore stores.DAGStoreWrapper, pieceStore piece
 
 // GetCommonPiecesFromIdentityCidLinks will inspect a payloadCID and if it has an identity multihash,
 // will determine which pieces contain all of the links within the decoded identity multihash block
-func GetCommonPiecesFromIdentityCidLinks(piecesWithCid func(c cid.Cid) ([]cid.Cid, error), payloadCID cid.Cid) ([]cid.Cid, error) {
+func GetCommonPiecesFromIdentityCidLinks(ctx context.Context, piecesWithCid func(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error), payloadCID cid.Cid) ([]cid.Cid, error) {
 	links, err := LinksFromIdentityCid(payloadCID)
 	if err != nil || len(links) == 0 {
 		return links, err
@@ -74,7 +82,7 @@ func GetCommonPiecesFromIdentityCidLinks(piecesWithCid func(c cid.Cid) ([]cid.Ci
 	pieces := make([]cid.Cid, 0)
 	// for each link, query the dagstore for pieces that contain it
 	for i, link := range links {
-		piecesWithThisCid, err := piecesWithCid(link)
+		piecesWithThisCid, err := piecesWithCid(ctx, link.Hash())
 		if err != nil {
 			return nil, fmt.Errorf("getting pieces for identity CID sub-link %s: %w", link, err)
 		}
@@ -167,9 +175,9 @@ func LinksFromIdentityCid(identityCid cid.Cid) ([]cid.Cid, error) {
 	return resultCids, err
 }
 
-func PieceInUnsealedSector(ctx context.Context, sa retrievalmarket.SectorAccessor, pieceInfo piecestore.PieceInfo) bool {
+func PieceInUnsealedSector(ctx context.Context, sa SectorAccessor, pieceInfo PieceInfo) bool {
 	for _, di := range pieceInfo.Deals {
-		isUnsealed, err := sa.IsUnsealed(ctx, di.SectorID, di.Offset.Unpadded(), di.Length.Unpadded())
+		isUnsealed, err := sa.IsUnsealed(ctx, di.MinerAddr, di.SectorID, di.PieceOffset.Unpadded(), di.PieceLength.Unpadded())
 		if err != nil {
 			log.Errorf("failed to find out if sector %d is unsealed, err=%s", di.SectorID, err)
 			continue
@@ -187,7 +195,7 @@ func PieceInUnsealedSector(ctx context.Context, sa retrievalmarket.SectorAccesso
 // piece is included in the list of pieces, that is used. Otherwise the first unsealed piece is used
 // and if there are no unsealed pieces, the first sealed piece is used.
 // Failure to find a matching piece will result in a piecestore.PieceInfoUndefined being returned.
-func GetBestPieceInfoMatch(ctx context.Context, sa retrievalmarket.SectorAccessor, pieces []piecestore.PieceInfo, clientPieceCID cid.Cid) (piecestore.PieceInfo, bool) {
+func GetBestPieceInfoMatch(ctx context.Context, sa SectorAccessor, pieces []PieceInfo, clientPieceCID cid.Cid) (PieceInfo, bool) {
 	sealedPieceInfo := -1
 	// For each piece that contains the target block
 	for ii, pieceInfo := range pieces {
@@ -217,5 +225,32 @@ func GetBestPieceInfoMatch(ctx context.Context, sa retrievalmarket.SectorAccesso
 		return pieces[sealedPieceInfo], false
 	}
 
-	return piecestore.PieceInfoUndefined, false
+	return PieceInfo{}, false
+}
+
+func GetStorageDealsForPiece(clientSpecificPiece bool, pieces []PieceInfo, pieceInfo PieceInfo) []abi.DealID {
+	var storageDeals []abi.DealID
+	if clientSpecificPiece {
+		// If the user wants to retrieve the payload from a specific piece,
+		// we only need to inspect storage deals made for that piece to quote a price.
+		for _, d := range pieceInfo.Deals {
+			storageDeals = append(storageDeals, d.ChainDealID)
+		}
+	} else {
+		// If the user does NOT want to retrieve from a specific piece, we'll have to inspect all storage deals
+		// made for that piece to quote a price.
+		storageDeals = dealsFromPieces(pieces)
+	}
+
+	return storageDeals
+}
+
+func dealsFromPieces(pieces []PieceInfo) []abi.DealID {
+	var dealsIds []abi.DealID
+	for _, pieceInfo := range pieces {
+		for _, d := range pieceInfo.Deals {
+			dealsIds = append(dealsIds, d.ChainDealID)
+		}
+	}
+	return dealsIds
 }

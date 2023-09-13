@@ -10,8 +10,8 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/filecoin-project/boost-gfm/piecestore"
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
@@ -71,7 +71,6 @@ type resolver struct {
 	legacyDT       dtypes.ProviderDataTransfer
 	ps             piecestore.PieceStore
 	ssm            *sectorstatemgr.SectorStateMgr
-	sa             retrievalmarket.SectorAccessor
 	piecedirectory *piecedirectory.PieceDirectory
 	publisher      *storageadapter.DealPublisher
 	idxProv        provider.Interface
@@ -79,9 +78,10 @@ type resolver struct {
 	spApi          sealingpipeline.API
 	fullNode       v1api.FullNode
 	mpool          *mpoolmonitor.MpoolMonitor
+	mma            *lib.MultiMinerAccessor
 }
 
-func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, directDealsDB *db.DirectDataDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, ddProvider *storagemarket.DirectDealsProvider, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, sa retrievalmarket.SectorAccessor, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor) *resolver {
+func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo, h host.Host, dealsDB *db.DealsDB, directDealsDB *db.DirectDataDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, spApi sealingpipeline.API, provider *storagemarket.Provider, ddProvider *storagemarket.DirectDealsProvider, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps piecestore.PieceStore, piecedirectory *piecedirectory.PieceDirectory, publisher *storageadapter.DealPublisher, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor) *resolver {
 	return &resolver{
 		ctx:            ctx,
 		cfg:            cfg,
@@ -101,7 +101,6 @@ func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo
 		legacyProv:     legacyProv,
 		legacyDT:       legacyDT,
 		ps:             ps,
-		sa:             sa,
 		piecedirectory: piecedirectory,
 		publisher:      publisher,
 		spApi:          spApi,
@@ -110,6 +109,7 @@ func NewResolver(ctx context.Context, cfg *config.Boost, r lotus_repo.LockedRepo
 		fullNode:       fullNode,
 		ssm:            ssm,
 		mpool:          mpool,
+		mma:            mma,
 	}
 }
 

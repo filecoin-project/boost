@@ -38,7 +38,8 @@ type Boost struct {
 	// The connect string for the sealing RPC API (lotus miner)
 	SealerApiInfo string
 	// The connect string for the sector index RPC API (lotus miner)
-	SectorIndexApiInfo  string
+	SectorIndexApiInfo string
+
 	Dealmaking          DealmakingConfig
 	Wallets             WalletsConfig
 	Graphql             GraphqlConfig
@@ -279,6 +280,12 @@ type DealmakingConfig struct {
 	// The values of MaxDealsPerPublishMsg and PublishMsgPeriod will be
 	// ignored, and deals will remain in the pending state until manually published.
 	ManualDealPublish bool
+
+	// The connect strings for the RPC APIs of each miner that boost can read
+	// sector data from when serving graphsync retrievals.
+	// If this parameter is not set, boost will serve data from the endpoint
+	// configured in SectorIndexApiInfo.
+	GraphsyncStorageAccessApiInfo []string
 }
 
 type ContractDealsConfig struct {
@@ -394,6 +401,7 @@ type LocalIndexDirectoryYugabyteConfig struct {
 
 type LocalIndexDirectoryConfig struct {
 	Yugabyte LocalIndexDirectoryYugabyteConfig
+	Leveldb  LocalIndexDirectoryLeveldbConfig
 	// The maximum number of add index operations allowed to execute in parallel.
 	// The add index operation is executed when a new deal is created - it fetches
 	// the piece from the sealing subsystem, creates an index of where each block
@@ -408,4 +416,8 @@ type LocalIndexDirectoryConfig struct {
 	ServiceApiInfo string
 	// The RPC timeout when making requests to the boostd-data service
 	ServiceRPCTimeout Duration
+}
+
+type LocalIndexDirectoryLeveldbConfig struct {
+	Enabled bool
 }
