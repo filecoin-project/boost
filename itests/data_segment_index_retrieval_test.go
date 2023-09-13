@@ -64,7 +64,7 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	log.Debug("creating dummy deal")
 	dealUuid := uuid.New()
 
-	pieceCid, err := cid.Parse(string("baga6ea4seaqanfmumt5zr3srygv2dkuausxwykfip74jhkjbm7qyxiyrze4yscq"))
+	pieceCid, err := cid.Parse("baga6ea4seaqly4jqbnjbw5dz4gpcu5uuu3o3t7ohzjpjx7x6z3v53tkfutogwga")
 	require.NoError(t, err)
 
 	// Make a deal
@@ -86,23 +86,23 @@ func TestDataSegmentIndexRetrieval(t *testing.T) {
 	//	}
 	//}
 
-	r1, err := cid.Parse("bafybeietcrtui6xasfzz7gamb3r4vjcfm2jzcmnom6ajmftjo5luarnem4")
+	r1, err := cid.Parse("bafykbzaceaqliwrg6y2bxrhhbbiz3nknhz43yj2bqog4rulu5km5qhkckffuw")
 	require.NoError(t, err)
-	r2, err := cid.Parse("bafybeid26fjobqnhvdfv37x3diuvzkbnby3unm3m7fka4trgqwxlauk6by")
+	r2, err := cid.Parse("bafykbzaceccq64xf6yadlbmqpfindtf5x3cssel2fozkhvdyrrtnjnutr5j52")
 	require.NoError(t, err)
 
-	outF1 := f.RetrieveDirect(ctx, t, r1, &pieceCid, true, nil)
+	outF1 := f.RetrieveDirect(ctx, t, r1, &pieceCid, false, nil)
 	r, err := carv2.OpenReader(outF1)
 	require.NoError(t, err)
 	rs, err := r.Roots()
 	require.NoError(t, err)
 	require.Equal(t, r1, rs[0])
 	r.Close()
-	outf2 := f.RetrieveDirect(ctx, t, r2, &pieceCid, true, nil)
+	outf2 := f.RetrieveDirect(ctx, t, r2, &pieceCid, false, nil)
 	r, err = carv2.OpenReader(outf2)
 	require.NoError(t, err)
 	rs, err = r.Roots()
 	require.NoError(t, err)
-	require.Equal(t, r1, rs[0])
+	require.Equal(t, r2, rs[0])
 	r.Close()
 }
