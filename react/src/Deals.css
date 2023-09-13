@@ -54,8 +54,31 @@
     align-items: center;
 }
 
-.deals tr.show-actions td.message .message-content .message-text {
+.deals .message-content {
+    position: relative;
+}
+
+.deals .message-content .message-text {
     flex-grow: 1;
+}
+
+.deals .message-content .warning-msg {
+    position: absolute;
+    top: -1em;
+    left: -1em;
+    padding: 1em;
+    background-color: #fff;
+    box-shadow: 0em 0em 1em #ddd;
+    border-radius: 0.5em;
+    z-index: 10;
+    display: none;
+}
+.deals .message-content .warning-msg.showing {
+    display: flex;
+}
+
+.deals .message-content .warning {
+    margin-right: 0.5em;
 }
 
 .deals tr.show-actions td.message .message-content .message-text .transfer-rate {

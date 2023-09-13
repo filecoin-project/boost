@@ -320,6 +320,12 @@ type SealingPipeline {
   Workers: [Worker]!
 }
 
+type SectorStatus {
+  Number: Uint64!
+  State: String!
+  DealIDs: [Uint64!]!
+}
+
 type ScanProgress {
   Progress: Float!
   LastScan: Time
@@ -554,6 +560,9 @@ type RootQuery {
 
   """Get sealing pipeline state"""
   sealingpipeline: SealingPipeline!
+
+  """Get status of a particular sector"""
+  sectorStatus(sectorNumber: Uint64!): SectorStatus!
 
   """Get IPNI Provider configuration and state"""
   ipniProviderInfo: IpniProviderInfo!
