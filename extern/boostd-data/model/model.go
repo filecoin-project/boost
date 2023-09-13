@@ -31,6 +31,7 @@ type DealInfo struct {
 
 	// If we don't have CarLength, we have to iterate over all offsets, get
 	// the largest offset and sum it with length.
+	IsDirectDeal bool `json:"d"`
 }
 
 // Metadata for PieceCid

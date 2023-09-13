@@ -591,13 +591,14 @@ func (ddp *DirectDealsProvider) indexAndAnnounce(ctx context.Context, entry *smt
 	// add deal to piece metadata store
 	ddp.dealLogger.Infow(entry.ID, "about to add direct deal for piece in LID")
 	if err := ddp.piecedirectory.AddDealForPiece(ctx, entry.PieceCID, model.DealInfo{
-		DealUuid:    entry.ID.String(),
-		ChainDealID: abi.DealID(entry.AllocationID), // Convert the type to avoid migration as underlying types are same
-		MinerAddr:   entry.Provider,
-		SectorID:    entry.SectorID,
-		PieceOffset: entry.Offset,
-		PieceLength: entry.Length,
-		CarLength:   uint64(entry.InboundFileSize),
+		DealUuid:     entry.ID.String(),
+		ChainDealID:  abi.DealID(entry.AllocationID), // Convert the type to avoid migration as underlying types are same
+		MinerAddr:    entry.Provider,
+		SectorID:     entry.SectorID,
+		PieceOffset:  entry.Offset,
+		PieceLength:  entry.Length,
+		CarLength:    uint64(entry.InboundFileSize),
+		IsDirectDeal: true,
 	}); err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryAuto,

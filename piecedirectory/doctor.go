@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/sectorstatemgr"
 	bdclient "github.com/filecoin-project/boostd-data/client"
+	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
@@ -117,7 +118,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 
 	lacksActiveSector := true // check whether the piece is present in active sector
 	hasDealsOnThisMiner := false
-	var chainDealIds []abi.DealID
+	var chainDeals []model.DealInfo
 	for _, dl := range md.Deals {
 		// Ignore deals that were not made on this node's miner
 		if d.maddr != dl.MinerAddr {
@@ -138,7 +139,7 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 		// check if we have an active sector
 		if _, ok := lu.ActiveSectors[sectorID]; ok {
 			lacksActiveSector = false
-			chainDealIds = append(chainDealIds, dl.ChainDealID)
+			chainDeals = append(chainDeals, dl)
 		}
 	}
 
@@ -160,13 +161,25 @@ func (d *Doctor) checkPiece(ctx context.Context, pieceCid cid.Cid, lu *sectorsta
 	// Check that Deal is actually on-chain for the active sectors
 	if d.fullnodeApi != nil { // nil in tests
 		found := false
-		for _, dealId := range chainDealIds {
-			doclog.Debugw("checking state for market deal", "piece", pieceCid, "deal", dealId)
-
-			_, err := d.fullnodeApi.StateMarketStorageDeal(ctx, dealId, head.Key())
-			if err == nil {
-				found = true
-				break
+		claims, err := d.fullnodeApi.StateGetClaims(ctx, d.maddr, types.EmptyTSK)
+		if err != nil {
+			return fmt.Errorf("getting claims for the miner %s: %w", d.maddr, err)
+		}
+		for _, dealId := range chainDeals {
+			if dealId.IsDirectDeal {
+				doclog.Debugw("checking state for direct deal", "piece", pieceCid, "allocation", dealId.ChainDealID)
+				for _, v := range claims {
+					if v.Sector == dealId.SectorID {
+						found = true
+					}
+				}
+			} else {
+				doclog.Debugw("checking state for market deal", "piece", pieceCid, "deal", dealId.ChainDealID)
+				_, err := d.fullnodeApi.StateMarketStorageDeal(ctx, dealId.ChainDealID, head.Key())
+				if err == nil {
+					found = true
+					break
+				}
 			}
 		}
 

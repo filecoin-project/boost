@@ -652,7 +652,7 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 			return err
 		}
 
-		logger.Infow("added index", "took", time.Since(timeAddIndex), "sector", di.SectorID, "piececid", piececid, "chain-deal-id", di.ChainDealID, "uuid", di.DealUuid)
+		logger.Infow("added index", "took", time.Since(timeAddIndex), "sector", di.SectorID, "piececid", piececid, "chain-deal-id", di.ChainDealID, "uuid", di.DealUuid) // TODO: Update this for direct deals recovery
 	}
 
 	if !ignoreCommp { // commp over data reader

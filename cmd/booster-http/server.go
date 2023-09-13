@@ -333,7 +333,12 @@ func (s *HttpServer) unsealedDeal(ctx context.Context, pieceCid cid.Cid, pieceDe
 	// Try to return an error message with as much useful information as possible
 	dealSectors := make([]string, 0, len(pieceDeals))
 	for _, di := range pieceDeals {
-		dealSectors = append(dealSectors, fmt.Sprintf("Deal %d: Sector %d", di.ChainDealID, di.SectorID))
+		if di.IsDirectDeal {
+			dealSectors = append(dealSectors, fmt.Sprintf("Allocation %d: Sector %d", di.ChainDealID, di.SectorID))
+		} else {
+			dealSectors = append(dealSectors, fmt.Sprintf("Deal %d: Sector %d", di.ChainDealID, di.SectorID))
+		}
+
 	}
 
 	if allErr == nil {
@@ -343,6 +348,10 @@ func (s *HttpServer) unsealedDeal(ctx context.Context, pieceCid cid.Cid, pieceDe
 	}
 
 	if len(pieceDeals) == 1 {
+		if pieceDeals[0].IsDirectDeal {
+			return nil, fmt.Errorf("checking unsealed status of allocation %d (sector %d) containing piece %s: %w",
+				pieceDeals[0].ChainDealID, pieceDeals[0].SectorID, pieceCid, allErr)
+		}
 		return nil, fmt.Errorf("checking unsealed status of deal %d (sector %d) containing piece %s: %w",
 			pieceDeals[0].ChainDealID, pieceDeals[0].SectorID, pieceCid, allErr)
 	}

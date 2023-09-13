@@ -611,13 +611,14 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	pc := deal.ClientDealProposal.Proposal.PieceCID
 	p.dealLogger.Infow(deal.DealUuid, "about to add deal for piece in LID")
 	if err := p.piecedirectory.AddDealForPiece(ctx, pc, model.DealInfo{
-		DealUuid:    deal.DealUuid.String(),
-		ChainDealID: deal.ChainDealID,
-		MinerAddr:   p.Address,
-		SectorID:    deal.SectorID,
-		PieceOffset: deal.Offset,
-		PieceLength: deal.Length,
-		CarLength:   uint64(deal.NBytesReceived),
+		DealUuid:     deal.DealUuid.String(),
+		ChainDealID:  deal.ChainDealID,
+		MinerAddr:    p.Address,
+		SectorID:     deal.SectorID,
+		PieceOffset:  deal.Offset,
+		PieceLength:  deal.Length,
+		CarLength:    uint64(deal.NBytesReceived),
+		IsDirectDeal: false,
 	}); err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryAuto,
