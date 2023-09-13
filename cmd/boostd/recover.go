@@ -577,13 +577,9 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 	if !isUnsealed {
 		return fmt.Errorf("sector %d is not unsealed", sid)
 	}
+	defer reader.Close()
 
 	dr.Sectors[sid].Deals[cdi].IsUnsealed = true
-
-	if err != nil {
-		return err
-	}
-
 	dr.Sectors[sid].Deals[cdi].GotDataReader = true
 
 	if !ignoreLID { // populate LID
@@ -665,8 +661,6 @@ func processPiece(ctx context.Context, sectorid abi.SectorNumber, chainDealID ab
 			return fmt.Errorf("calculated commp doesnt match on-chain data, expected %s, got %s", piececid, commp.PieceCID)
 		}
 	}
-
-	_ = reader.Close()
 
 	return nil
 }
