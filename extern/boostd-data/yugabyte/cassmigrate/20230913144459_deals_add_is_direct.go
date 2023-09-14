@@ -9,7 +9,7 @@ import (
 
 // ts20230913144459_dealsAddIsDirectDealColumn adds a new column isDirectDeal to pieceDeal table
 func ts20230913144459_dealsAddIsDirectDealColumn(ctx context.Context, session *gocql.Session) error {
-	qry := `ALTER TABLE PieceDeal ADD IsDirectDeal BOOL`
+	qry := `ALTER TABLE PieceDeal ADD IsDirectDeal BOOLEAN`
 	err := session.Query(qry).WithContext(ctx).Exec()
 
 	if err != nil {
