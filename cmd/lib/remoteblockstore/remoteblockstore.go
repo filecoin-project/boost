@@ -179,7 +179,7 @@ func normalizeError(err error) error {
 	// Check for any error with the string "not found"
 	idx = strings.Index(strings.ToLower(errMsg), "not found")
 	if idx != -1 {
-		return format.ErrNotFound{}
+		return fmt.Errorf("%s: %w", errMsg, format.ErrNotFound{})
 	}
 
 	return err
