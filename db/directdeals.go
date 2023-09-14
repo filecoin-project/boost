@@ -37,7 +37,7 @@ type directDealsAccessor struct {
 	def  map[string]fielddef.FieldDefinition
 }
 
-func (d *DirectDataDB) newDirectDataDef(deal *types.DirectDeal) *directDealsAccessor {
+func (d *DirectDealsDB) newDirectDataDef(deal *types.DirectDeal) *directDealsAccessor {
 	return newDirectDealsAccessor(d.db, deal)
 }
 
@@ -46,18 +46,16 @@ func newDirectDealsAccessor(db *sql.DB, deal *types.DirectDeal) *directDealsAcce
 		db:   db,
 		deal: deal,
 		def: map[string]fielddef.FieldDefinition{
-			"ID":              &fielddef.FieldDef{F: &deal.ID},
-			"CreatedAt":       &fielddef.FieldDef{F: &deal.CreatedAt},
-			"PieceCID":        &fielddef.CidFieldDef{F: &deal.PieceCID},
-			"PieceSize":       &fielddef.FieldDef{F: &deal.PieceSize},
-			"CleanupData":     &fielddef.FieldDef{F: &deal.CleanupData},
-			"ClientAddress":   &fielddef.AddrFieldDef{F: &deal.Client},
-			"ProviderAddress": &fielddef.AddrFieldDef{F: &deal.Provider},
-			"AllocationID":    &fielddef.FieldDef{F: &deal.AllocationID},
-			"StartEpoch":      &fielddef.FieldDef{F: &deal.StartEpoch},
-			"EndEpoch":        &fielddef.FieldDef{F: &deal.EndEpoch},
-			//"ProviderCollateral": &fielddef.BigIntFieldDef{F: &deal.ClientDealProposal.Proposal.ProviderCollateral},
-			//"ClientCollateral":   &fielddef.BigIntFieldDef{F: &deal.ClientDealProposal.Proposal.ClientCollateral},
+			"ID":               &fielddef.FieldDef{F: &deal.ID},
+			"CreatedAt":        &fielddef.FieldDef{F: &deal.CreatedAt},
+			"PieceCID":         &fielddef.CidFieldDef{F: &deal.PieceCID},
+			"PieceSize":        &fielddef.FieldDef{F: &deal.PieceSize},
+			"CleanupData":      &fielddef.FieldDef{F: &deal.CleanupData},
+			"ClientAddress":    &fielddef.AddrFieldDef{F: &deal.Client},
+			"ProviderAddress":  &fielddef.AddrFieldDef{F: &deal.Provider},
+			"AllocationID":     &fielddef.FieldDef{F: &deal.AllocationID},
+			"StartEpoch":       &fielddef.FieldDef{F: &deal.StartEpoch},
+			"EndEpoch":         &fielddef.FieldDef{F: &deal.EndEpoch},
 			"InboundFilePath":  &fielddef.FieldDef{F: &deal.InboundFilePath},
 			"SectorID":         &fielddef.FieldDef{F: &deal.SectorID},
 			"Offset":           &fielddef.FieldDef{F: &deal.Offset},
@@ -84,33 +82,33 @@ func (d *directDealsAccessor) update(ctx context.Context) error {
 	return update(ctx, "DirectDeals", directDealsFields, d.def, d.db, d.deal.ID)
 }
 
-type DirectDataDB struct {
+type DirectDealsDB struct {
 	db *sql.DB
 }
 
-func NewDirectDataDB(db *sql.DB) *DirectDataDB {
-	return &DirectDataDB{db: db}
+func NewDirectDealsDB(db *sql.DB) *DirectDealsDB {
+	return &DirectDealsDB{db: db}
 }
 
-func (d *DirectDataDB) Insert(ctx context.Context, deal *types.DirectDeal) error {
+func (d *DirectDealsDB) Insert(ctx context.Context, deal *types.DirectDeal) error {
 	return d.newDirectDataDef(deal).insert(ctx)
 }
 
-func (d *DirectDataDB) Update(ctx context.Context, deal *types.DirectDeal) error {
+func (d *DirectDealsDB) Update(ctx context.Context, deal *types.DirectDeal) error {
 	return d.newDirectDataDef(deal).update(ctx)
 }
 
-func (d *DirectDataDB) ByID(ctx context.Context, id uuid.UUID) (*types.DirectDeal, error) {
+func (d *DirectDealsDB) ByID(ctx context.Context, id uuid.UUID) (*types.DirectDeal, error) {
 	qry := "SELECT " + directDealsFieldsStr + " FROM DirectDeals WHERE ID=?"
 	row := d.db.QueryRowContext(ctx, qry, id)
 	return d.scanRow(row)
 }
 
-func (d *DirectDataDB) ByPieceCID(ctx context.Context, pieceCid cid.Cid) ([]*types.DirectDeal, error) {
+func (d *DirectDealsDB) ByPieceCID(ctx context.Context, pieceCid cid.Cid) ([]*types.DirectDeal, error) {
 	return d.list(ctx, 0, 0, "PieceCID=?", pieceCid.String())
 }
 
-func (d *DirectDataDB) BySectorID(ctx context.Context, sectorID abi.SectorID) ([]*types.DirectDeal, error) {
+func (d *DirectDealsDB) BySectorID(ctx context.Context, sectorID abi.SectorID) ([]*types.DirectDeal, error) {
 	addr, err := address.NewIDAddress(uint64(sectorID.Miner))
 	if err != nil {
 		return nil, fmt.Errorf("creating address from ID %d: %w", sectorID.Miner, err)
@@ -119,21 +117,23 @@ func (d *DirectDataDB) BySectorID(ctx context.Context, sectorID abi.SectorID) ([
 	return d.list(ctx, 0, 0, "ProviderAddress=? AND SectorID=?", addr.String(), sectorID.Number)
 }
 
-func (d *DirectDataDB) ListAll(ctx context.Context) ([]*types.DirectDeal, error) {
+func (d *DirectDealsDB) ListAll(ctx context.Context) ([]*types.DirectDeal, error) {
 	return d.list(ctx, 0, 0, "")
 }
 
-func (d *DirectDataDB) Count(ctx context.Context, query string, filter *FilterOptions) (int, error) {
+var ddSearchFields = []string{"ID", "PieceCID", "ClientAddress", "ProviderAddress"}
+
+func (d *DirectDealsDB) Count(ctx context.Context, query string, filter *FilterOptions) (int, error) {
 	whereArgs := []interface{}{}
 	where := "SELECT count(*) FROM DirectDeals"
 	if query != "" {
-		searchWhere, searchArgs := withSearchQuery(query)
+		searchWhere, searchArgs := withSearchQuery(ddSearchFields, query, false)
 		where += " WHERE " + searchWhere
 		whereArgs = append(whereArgs, searchArgs...)
 	}
 
 	if filter != nil {
-		filterWhere, filterArgs := withSearchFilter(*filter)
+		filterWhere, filterArgs := withDirectDealsSearchFilter(*filter)
 
 		if filterWhere != "" {
 			if query != "" {
@@ -152,7 +152,7 @@ func (d *DirectDataDB) Count(ctx context.Context, query string, filter *FilterOp
 	return count, err
 }
 
-func (d *DirectDataDB) List(ctx context.Context, query string, filter *FilterOptions, cursor *graphql.ID, offset int, limit int) ([]*types.DirectDeal, error) {
+func (d *DirectDealsDB) List(ctx context.Context, query string, filter *FilterOptions, cursor *graphql.ID, offset int, limit int) ([]*types.DirectDeal, error) {
 	where := ""
 	whereArgs := []interface{}{}
 
@@ -167,7 +167,7 @@ func (d *DirectDataDB) List(ctx context.Context, query string, filter *FilterOpt
 		if where != "" {
 			where += " AND "
 		}
-		searchWhere, searchArgs := withSearchQuery(query)
+		searchWhere, searchArgs := withSearchQuery(ddSearchFields, query, false)
 		where += searchWhere
 		whereArgs = append(whereArgs, searchArgs...)
 	}
@@ -177,7 +177,7 @@ func (d *DirectDataDB) List(ctx context.Context, query string, filter *FilterOpt
 			where += " AND "
 		}
 
-		filterWhere, filterArgs := withSearchFilter(*filter)
+		filterWhere, filterArgs := withDirectDealsSearchFilter(*filter)
 		if filterWhere != "" {
 			where += filterWhere
 			whereArgs = append(whereArgs, filterArgs...)
@@ -187,15 +187,32 @@ func (d *DirectDataDB) List(ctx context.Context, query string, filter *FilterOpt
 	return d.list(ctx, offset, limit, where, whereArgs...)
 }
 
-func (d *DirectDataDB) ListActive(ctx context.Context) ([]*types.DirectDeal, error) {
+func withDirectDealsSearchFilter(filter FilterOptions) (string, []interface{}) {
+	whereArgs := []interface{}{}
+	statements := []string{}
+
+	if filter.Checkpoint != nil {
+		statements = append(statements, "Checkpoint = ?")
+		whereArgs = append(whereArgs, *filter.Checkpoint)
+	}
+
+	if len(statements) == 0 {
+		return "", whereArgs
+	}
+
+	where := "(" + strings.Join(statements, " AND ") + ")"
+	return where, whereArgs
+}
+
+func (d *DirectDealsDB) ListActive(ctx context.Context) ([]*types.DirectDeal, error) {
 	return d.list(ctx, 0, 0, "Checkpoint != ?", dealcheckpoints.Complete.String())
 }
 
-func (d *DirectDataDB) ListCompleted(ctx context.Context) ([]*types.DirectDeal, error) {
+func (d *DirectDealsDB) ListCompleted(ctx context.Context) ([]*types.DirectDeal, error) {
 	return d.list(ctx, 0, 0, "Checkpoint = ?", dealcheckpoints.Complete.String())
 }
 
-func (d *DirectDataDB) list(ctx context.Context, offset int, limit int, whereClause string, whereArgs ...interface{}) ([]*types.DirectDeal, error) {
+func (d *DirectDealsDB) list(ctx context.Context, offset int, limit int, whereClause string, whereArgs ...interface{}) ([]*types.DirectDeal, error) {
 	args := whereArgs
 	qry := "SELECT " + directDealsFieldsStr + " FROM DirectDeals"
 	if whereClause != "" {
@@ -233,7 +250,7 @@ func (d *DirectDataDB) list(ctx context.Context, offset int, limit int, whereCla
 	return deals, nil
 }
 
-func (d *DirectDataDB) scanRow(row Scannable) (*types.DirectDeal, error) {
+func (d *DirectDealsDB) scanRow(row Scannable) (*types.DirectDeal, error) {
 	var deal types.DirectDeal
 	err := d.newDirectDataDef(&deal).scan(row)
 	return &deal, err

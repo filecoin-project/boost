@@ -314,8 +314,8 @@ func NewDealsDB(sqldb *sql.DB) *db.DealsDB {
 	return db.NewDealsDB(sqldb)
 }
 
-func NewDirectDealsDB(sqldb *sql.DB) *db.DirectDataDB {
-	return db.NewDirectDataDB(sqldb)
+func NewDirectDealsDB(sqldb *sql.DB) *db.DirectDealsDB {
+	return db.NewDirectDealsDB(sqldb)
 }
 
 func NewLogsDB(logsSqlDB *LogSqlDB) *db.LogsDB {
@@ -654,8 +654,8 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 	}
 }
 
-func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, ddProv *storagemarket.DirectDealsProvider, dealsDB *db.DealsDB, directDealsDB *db.DirectDataDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps dtypes.ProviderPieceStore, piecedirectory *piecedirectory.PieceDirectory, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg gql.BlockGetter, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor) *gql.Server {
-	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, ddProv *storagemarket.DirectDealsProvider, dealsDB *db.DealsDB, directDealsDB *db.DirectDataDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
+func NewGraphqlServer(cfg *config.Boost) func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, ddProv *storagemarket.DirectDealsProvider, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API, legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer, ps dtypes.ProviderPieceStore, piecedirectory *piecedirectory.PieceDirectory, indexProv provider.Interface, idxProvWrapper *indexprovider.Wrapper, fullNode v1api.FullNode, bg gql.BlockGetter, ssm *sectorstatemgr.SectorStateMgr, mpool *mpoolmonitor.MpoolMonitor, mma *lib.MultiMinerAccessor) *gql.Server {
+	return func(lc fx.Lifecycle, r repo.LockedRepo, h host.Host, prov *storagemarket.Provider, ddProv *storagemarket.DirectDealsProvider, dealsDB *db.DealsDB, directDealsDB *db.DirectDealsDB, logsDB *db.LogsDB, retDB *rtvllog.RetrievalLogDB, plDB *db.ProposalLogsDB, fundsDB *db.FundsDB, fundMgr *fundmanager.FundManager,
 		storageMgr *storagemanager.StorageManager, publisher *storageadapter.DealPublisher, spApi sealingpipeline.API,
 		legacyDeals *legacy.LegacyDealsManager, legacyProv gfm_storagemarket.StorageProvider, legacyDT dtypes.ProviderDataTransfer,
 		ps dtypes.ProviderPieceStore, piecedirectory *piecedirectory.PieceDirectory,

@@ -264,7 +264,7 @@ func (d *DealsDB) Count(ctx context.Context, query string, filter *FilterOptions
 	whereArgs := []interface{}{}
 	where := "SELECT count(*) FROM Deals"
 	if query != "" {
-		searchWhere, searchArgs := withSearchQuery(query)
+		searchWhere, searchArgs := withSearchQuery(searchFields, query, true)
 		where += " WHERE " + searchWhere
 		whereArgs = append(whereArgs, searchArgs...)
 	}
@@ -312,7 +312,7 @@ func (d *DealsDB) List(ctx context.Context, query string, filter *FilterOptions,
 		if where != "" {
 			where += " AND "
 		}
-		searchWhere, searchArgs := withSearchQuery(query)
+		searchWhere, searchArgs := withSearchQuery(searchFields, query, true)
 		where += searchWhere
 		whereArgs = append(whereArgs, searchArgs...)
 	}
@@ -366,21 +366,24 @@ func withSearchFilter(filter FilterOptions) (string, []interface{}) {
 
 var searchFields = []string{"ID", "PieceCID", "ClientAddress", "ProviderAddress", "ClientPeerID", "DealDataRoot", "PublishCID", "SignedProposalCID"}
 
-func withSearchQuery(query string) (string, []interface{}) {
+func withSearchQuery(fields []string, query string, searchLabel bool) (string, []interface{}) {
 	query = strings.Trim(query, " \t\n")
 
 	whereArgs := []interface{}{}
 	where := "("
-	for _, searchField := range searchFields {
+	for _, searchField := range fields {
 		where += searchField + " = ? OR "
 		whereArgs = append(whereArgs, query)
 	}
-	// The label field is prefixed by the ' character
-	// Note: In sqlite the concat operator is ||
-	// Note: To escape a ' character it is prefixed by another '.
-	// So when you put a ' in quotes, you have to write ''''
-	where += "Label = ('''' || ?) OR "
-	whereArgs = append(whereArgs, query)
+
+	if searchLabel {
+		// The label field is prefixed by the ' character
+		// Note: In sqlite the concat operator is ||
+		// Note: To escape a ' character it is prefixed by another '.
+		// So when you put a ' in quotes, you have to write ''''
+		where += "Label = ('''' || ?) OR "
+		whereArgs = append(whereArgs, query)
+	}
 
 	where += " instr(Error, ?) > 0"
 	whereArgs = append(whereArgs, query)
