@@ -217,7 +217,7 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=v1.23.2
+lotus_version?=v1.23.3
 ffi_from_source?=0
 build_lotus?=0
 ifeq ($(build_lotus),1)
@@ -227,9 +227,9 @@ ifeq ($(build_lotus),1)
 	lotus_build_cmd=update/lotus docker/lotus-all-in-one
 	lotus_base_image=$(docker_user)/lotus-all-in-one:$(lotus_version)-debug
 else
-# v2 (default): using lotus image
-	lotus_base_image?=$(docker_user)/lotus-all-in-one:$(lotus_version)-debug
-	lotus_info_msg=using lotus image from dockerhub: $(lotus_base_image)
+# v2 (default): using prebuilt lotus image
+	lotus_base_image?=ghcr.io/filecoin-shipyard/lotus-containers:lotus-$(lotus_version)-devnet
+	lotus_info_msg=using lotus image from github: $(lotus_base_image)
 	lotus_build_cmd=info/lotus-all-in-one
 endif
 docker_build_cmd=docker build --build-arg LOTUS_TEST_IMAGE=$(lotus_base_image) \
