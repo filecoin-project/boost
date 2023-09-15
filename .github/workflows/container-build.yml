@@ -18,7 +18,7 @@ jobs:
     env:
       LOTUS_VERSION: 'v1.23.3'
       LOTUS_SOURCE_IMAGE: 'ghcr.io/filecoin-shipyard/lotus-containers:lotus'
-      NETWORK_NAME: 'debug'
+      NETWORK_NAME: 'devnet'
       FFI_BUILD_FROM_SOURCE: '0'
       DOCKER_BUILDKIT: '1'
     steps:
