@@ -336,11 +336,11 @@ require (
 	github.com/filecoin-project/boost-graphsync v0.13.9
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
-	github.com/filecoin-project/lotus v1.23.4-0.20230907092728-d771aa353e97
+	github.com/filecoin-project/lotus v1.23.4-rc1
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
-	github.com/ipni/go-libipni v0.5.0
-	github.com/ipni/ipni-cli v0.0.17
+	github.com/ipni/go-libipni v0.5.1
+	github.com/ipni/ipni-cli v0.1.1
 	github.com/schollz/progressbar/v3 v3.13.1
 )
 
