@@ -317,7 +317,7 @@ docker/all: $(lotus_build_cmd) $(boost_build_cmd) $(booster_http_build_cmd) $(bo
 	docker/lotus docker/lotus-miner
 .PHONY: docker/all
 
-### To allow devs to pull individual images
+### To allow devs to pull individual images. Require build_boost=0 and boost_version to be supplied
 docker/get-boost: $(boost_build_cmd)
 .PHONY: docker/get-boost
 
