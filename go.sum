@@ -309,8 +309,8 @@ github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYF
 github.com/felixge/httpsnoop v1.0.3 h1:s/nj+GCswXYzN5v2DpNMuMQYe+0DDwt5WVCU6CWBdXk=
 github.com/filecoin-project/boost-gfm v1.26.7 h1:ENJEqx1OzY072QnUP37YrGVmUiCewRwHAjbtTxyW74Y=
 github.com/filecoin-project/boost-gfm v1.26.7/go.mod h1:OhG2y7WeDx3KU9DPjgWllS+3/ospPjm8/XDrvN6uOfk=
-github.com/filecoin-project/boost-graphsync v0.13.7 h1:c/CQOSd6Bpw7qnv9KUL/hbWOfN0l5xwyX8UNxQk4ElM=
-github.com/filecoin-project/boost-graphsync v0.13.7/go.mod h1:bc2M5ZLZJtXHl8kjnqtn4L1MsdEqpJErDaIeY0bJ9wk=
+github.com/filecoin-project/boost-graphsync v0.13.8 h1:QqH15/qe4IUnQj5pc1WIuBDe2gq0kzWQ6l4dUirbmfs=
+github.com/filecoin-project/boost-graphsync v0.13.8/go.mod h1:bc2M5ZLZJtXHl8kjnqtn4L1MsdEqpJErDaIeY0bJ9wk=
 github.com/filecoin-project/dagstore v0.7.0 h1:IS0R+69za8dguYWeqz/MI+nb7ONpk03tAkxPCBXEKm0=
 github.com/filecoin-project/dagstore v0.7.0/go.mod h1:YKn4qXih+/2xQWpfJsaKGOi4POw5vH5grDmfPCCnx8g=
 github.com/filecoin-project/go-address v0.0.3/go.mod h1:jr8JxKsYx+lQlQZmF5i2U0Z+cGQ59wMIps/8YW/lDj8=

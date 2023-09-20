@@ -334,7 +334,7 @@ require (
 
 require (
 	github.com/filecoin-project/boost-gfm v1.26.7
-	github.com/filecoin-project/boost-graphsync v0.13.7
+	github.com/filecoin-project/boost-graphsync v0.13.8
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
 	github.com/filecoin-project/lotus v1.23.2-0.20230622154405-168d022018ce
