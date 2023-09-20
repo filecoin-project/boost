@@ -10,7 +10,6 @@ import (
 	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/itests/framework"
 	"github.com/filecoin-project/boost/testutil"
-	"github.com/filecoin-project/lotus/api"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/itests/kit"
 	"github.com/stretchr/testify/require"
@@ -69,7 +68,7 @@ func TestMarketsV1OfflineDeal(t *testing.T) {
 	// Create a CAR file from the raw file
 	log.Debugw("generate out.car for miner")
 	carFilePath := filepath.Join(f.HomeDir, "out.car")
-	err = f.FullNode.ClientGenCar(ctx, api.FileRef{Path: inPath}, carFilePath)
+	err = f.FullNode.ClientGenCar(ctx, lapi.FileRef{Path: inPath}, carFilePath)
 	require.NoError(t, err)
 
 	// Import the CAR file on the miner - this is the equivalent to
