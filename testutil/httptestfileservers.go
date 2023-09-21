@@ -148,8 +148,8 @@ func HttpTestDisconnectingServer(t *testing.T, dir string, afterEvery int64) *ht
 	svr := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// process the start offset
 		offset := r.Header.Get("Range")
-		finalOffset := strings.TrimSuffix(strings.TrimPrefix(offset, "bytes="), "-")
-		start, _ := strconv.ParseInt(finalOffset, 10, 64)
+		startend := strings.Split(strings.TrimPrefix(offset, "bytes="), "-")
+		start, _ := strconv.ParseInt(startend[0], 10, 64)
 		// only send `afterEvery` bytes and then disconnect
 		end := start + afterEvery
 

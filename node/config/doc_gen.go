@@ -86,6 +86,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "HttpDownload",
+			Type: "HttpDownloadConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "LotusDealmaking",
 			Type: "lotus_config.DealmakingConfig",
 
@@ -472,6 +478,16 @@ configured in SectorIndexApiInfo.`,
 			Type: "uint64",
 
 			Comment: `The port that the graphql server listens on`,
+		},
+	},
+	"HttpDownloadConfig": []DocField{
+		{
+			Name: "NChunks",
+			Type: "int",
+
+			Comment: `NChunks is a number of chunks to split HTTP downloads into. Each chunk is downloaded in the goroutine of its own
+which improves the overall download speed. NChunks is always equal to 1 for libp2p transport because libp2p server
+doesn't support range requests yet. NChunks must be greater than 0 and less than 16, with the default of 5.`,
 		},
 	},
 	"IndexProviderAnnounceConfig": []DocField{

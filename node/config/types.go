@@ -47,6 +47,7 @@ type Boost struct {
 	Tracing             TracingConfig
 	LocalIndexDirectory LocalIndexDirectoryConfig
 	ContractDeals       ContractDealsConfig
+	HttpDownload        HttpDownloadConfig
 
 	// Lotus configs
 	LotusDealmaking lotus_config.DealmakingConfig
@@ -420,4 +421,11 @@ type LocalIndexDirectoryConfig struct {
 
 type LocalIndexDirectoryLeveldbConfig struct {
 	Enabled bool
+}
+
+type HttpDownloadConfig struct {
+	// NChunks is a number of chunks to split HTTP downloads into. Each chunk is downloaded in the goroutine of its own
+	// which improves the overall download speed. NChunks is always equal to 1 for libp2p transport because libp2p server
+	// doesn't support range requests yet. NChunks must be greater than 0 and less than 16, with the default of 5.
+	NChunks int
 }

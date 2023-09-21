@@ -213,6 +213,9 @@ func DefaultBoost() *Boost {
 				Port:           3104,
 			},
 		},
+		HttpDownload: HttpDownloadConfig{
+			NChunks: 5,
+		},
 	}
 	return cfg
 }
