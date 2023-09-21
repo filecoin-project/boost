@@ -46,6 +46,11 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
 	touch $BOOST_PATH/.init.boost
 fi
 
+## Override config options
+echo Updating config values
+sed 's|ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8042"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+sed 's|ExpectedSealDuration = "24h0m0s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+
 # TODO(anteva): fixme: hack as boostd fails to start without this dir
 mkdir -p /var/lib/boost/deal-staging
 
@@ -73,11 +78,6 @@ if [ ! -f $BOOST_PATH/.register.boost ]; then
 	rm -f $BOOST_PATH/boostd.log
 	echo Super. DONE! Boostd is now configured and will be started soon
 fi
-
-## Override config options
-echo Updating config values
-sed 's|ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8042"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
-sed 's|ExpectedSealDuration = "24h0m0s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
 
 echo Starting LID service and boost in dev mode...
 trap 'kill %1' SIGINT
