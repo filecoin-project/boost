@@ -239,6 +239,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	if err != nil {
 		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
+	defer reader.Close() //nolint:errcheck
 
 	// Iterate over all the blocks in the piece to extract the index records
 	log.Debugw("add index: read index", "pieceCid", pieceCid)
