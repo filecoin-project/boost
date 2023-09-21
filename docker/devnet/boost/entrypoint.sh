@@ -51,6 +51,9 @@ echo Updating config values
 sed 's|#ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8042"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
 sed 's|#ExpectedSealDuration = "24h0m0s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
 
+## run boostd-data
+boostd-data run leveldb --addr=0.0.0.0:8042 &
+
 # TODO(anteva): fixme: hack as boostd fails to start without this dir
 mkdir -p /var/lib/boost/deal-staging
 
@@ -81,4 +84,4 @@ fi
 
 echo Starting LID service and boost in dev mode...
 trap 'kill %1' SIGINT
-exec boostd-data run leveldb --addr=0.0.0.0:8042 & boostd -vv run --nosync=true
+exec boostd -vv run --nosync=true
