@@ -6,7 +6,7 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
 replace github.com/filecoin-project/boostd-data => ./extern/boostd-data
 
-// replace github.com/filcoin-project/boost-graphsync => ../boost-graphsync
+// replace github.com/filecoin-project/boost-graphsync => ../boost-graphsync
 
 // replace github.com/filecoin-project/go-data-transfer => ../go-data-transfer
 
@@ -51,7 +51,7 @@ require (
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-cidutil v0.1.0
 	github.com/ipfs/go-datastore v0.6.0
-	github.com/ipfs/go-graphsync v0.14.8
+	github.com/ipfs/go-graphsync v0.14.10
 	github.com/ipfs/go-ipfs-blockstore v1.3.0 // indirect
 	github.com/ipfs/go-ipfs-blocksutil v0.0.1
 	github.com/ipfs/go-ipfs-chunker v0.0.5 // indirect
@@ -334,7 +334,7 @@ require (
 
 require (
 	github.com/filecoin-project/boost-gfm v1.26.7
-	github.com/filecoin-project/boost-graphsync v0.13.7
+	github.com/filecoin-project/boost-graphsync v0.13.9
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
 	github.com/filecoin-project/lotus v1.23.2-0.20230622154405-168d022018ce

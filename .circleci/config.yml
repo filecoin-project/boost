@@ -325,16 +325,20 @@ workflows:
           suite: itest-markets_v1_deal
           target: "./itests/markets_v1_deal_test.go"
 
-
       - test:
-          name: test-itest-markets_v1_retrieval
-          suite: itest-markets_v1_retrieval
-          target: "./itests/markets_v1_retrieval_test.go"
+          name: test-itest-markets_v1_identity_cid
+          suite: itest-markets_v1_identity_cid
+          target: "./itests/markets_v1_identity_cid_test.go"
 
       - test:
           name: test-itest-markets_v1_offline_deal
           suite: itest-markets_v1_offline_deal
           target: "./itests/markets_v1_offline_deal_test.go"
+
+      - test:
+          name: test-itest-markets_v1_retrieval
+          suite: itest-markets_v1_retrieval
+          target: "./itests/markets_v1_retrieval_test.go"
 
       - test:
           name: test-itest-disabled_markets_v1_deal
