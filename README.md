@@ -28,6 +28,12 @@ Compile and install using the instructions at the `Building and installing` sect
 make clean docker/all
 ```
 
+On ARM-based systems (Apple M1/M2) you need to force building Filecoin's Rust libraries from the source
+
+```shell
+make clean docker/all ffi_from_source=1
+```
+
 If you need to build containers using a specific version of lotus then provide the version as a parameter, e.g. `make clean docker/all lotus_version=v1.23.3`. The version must be a tag or a remote branch name of [Lotus git repo](https://github.com/filecoin-project/lotus).
 If the branch or tag you requested does not exist in our [Github image repository](https://github.com/filecoin-shipyard/lotus-containers/pkgs/container/lotus-containers) then you can build the lotus image manually with  `make clean docker/all lotus_version=test/branch1 build_lotus=1`. We are shipping images all releases from Lotus in our [Github image repo](https://github.com/filecoin-shipyard/lotus-containers/pkgs/container/lotus-containers).
 
