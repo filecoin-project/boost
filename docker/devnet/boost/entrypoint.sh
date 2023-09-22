@@ -39,8 +39,8 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
 	# echo exit code: $?
 
 	echo Setting port in boost config...
-	sed 's|ip4/0.0.0.0/tcp/0|ip4/0.0.0.0/tcp/50000|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
-	sed 's|127.0.0.1|0.0.0.0|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+	sed 's|#ListenAddresses = \["/ip4/0.0.0.0/tcp/0", "/ip6/::/tcp/0"\]|ListenAddresses = \["/ip4/0.0.0.0/tcp/50000", "/ip6/::/tcp/0"\]|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+	sed 's|#ListenAddress = "127.0.0.1"|ListenAddress = "0.0.0.0"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
 
 	echo Done
 	touch $BOOST_PATH/.init.boost
