@@ -147,8 +147,8 @@ export function DealDetail(props) {
                     <td>{deal.SignedProposalCid}</td>
                 </tr>
                 <tr>
-                    <th>Deal Data Root CID</th>
-                    <td><Link to={'/piece-doctor/'+deal.DealDataRoot}>{deal.DealDataRoot}</Link></td>
+                    <th>Label</th>
+                    <td>{deal.DealDataRoot}</td>
                 </tr>
                 <tr>
                     <th>Verified</th>
