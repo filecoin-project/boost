@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket/migrations"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -171,7 +172,7 @@ func (rv *requestValidator) getPiece(payloadCid cid.Cid, pieceCID *cid.Cid) (Pie
 	if piecesErr != nil {
 		return PieceInfo{}, false, piecesErr
 	}
-	return PieceInfo{}, false, fmt.Errorf("unknown pieceCID %s", pieceCID.String())
+	return PieceInfo{}, false, fmt.Errorf("piece cid not found for payload cid %s", payloadCid.String())
 }
 
 func (rv *requestValidator) Subscribe(subscriber retrievalmarket.ProviderValidationSubscriber) retrievalmarket.Unsubscribe {
