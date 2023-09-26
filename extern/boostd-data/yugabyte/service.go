@@ -120,12 +120,12 @@ func (s *Store) AddDealForPiece(ctx context.Context, pieceCid cid.Cid, dealInfo 
 	}
 
 	qry := `INSERT INTO PieceDeal ` +
-		`(DealUuid, PieceCid, IsLegacy, ChainDealID, MinerAddr, SectorID, PieceOffset, PieceLength, CarLength) ` +
-		`VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ` +
+		`(DealUuid, PieceCid, IsLegacy, ChainDealID, MinerAddr, SectorID, PieceOffset, PieceLength, CarLength, IsDirectDeal) ` +
+		`VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ` +
 		`IF NOT EXISTS`
 	err = s.session.Query(qry,
 		dealInfo.DealUuid, pieceCid.Bytes(), dealInfo.IsLegacy, dealInfo.ChainDealID, dealInfo.MinerAddr.String(),
-		dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength, dealInfo.CarLength).
+		dealInfo.SectorID, dealInfo.PieceOffset, dealInfo.PieceLength, dealInfo.CarLength, dealInfo.IsDirectDeal).
 		WithContext(ctx).Exec()
 	if err != nil {
 		return fmt.Errorf("inserting deal %s for piece %s", dealInfo.DealUuid, pieceCid)
@@ -198,7 +198,7 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 
 	// Get deals for piece
 	qry := `SELECT DealUuid, IsLegacy, ChainDealID, MinerAddr, ` +
-		`SectorID, PieceOffset, PieceLength, CarLength ` +
+		`SectorID, PieceOffset, PieceLength, CarLength, IsDirectDeal ` +
 		`FROM PieceDeal WHERE PieceCid = ?`
 	iter := s.session.Query(qry, pieceCid.Bytes()).WithContext(ctx).Iter()
 
@@ -206,7 +206,7 @@ func (s *Store) GetPieceDeals(ctx context.Context, pieceCid cid.Cid) ([]model.De
 	var deal model.DealInfo
 	var minerAddr string
 	for iter.Scan(&deal.DealUuid, &deal.IsLegacy, &deal.ChainDealID, &minerAddr,
-		&deal.SectorID, &deal.PieceOffset, &deal.PieceLength, &deal.CarLength) {
+		&deal.SectorID, &deal.PieceOffset, &deal.PieceLength, &deal.CarLength, &deal.IsDirectDeal) {
 
 		ma, err := address.NewFromString(minerAddr)
 		if err != nil {

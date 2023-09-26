@@ -3,12 +3,13 @@ package cassmigrate
 import (
 	"context"
 	"fmt"
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/yugabyte/gocql"
 	"reflect"
 	"runtime"
 	"sort"
 	"strings"
+
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/yugabyte/gocql"
 )
 
 var log = logging.Logger("migrations")
@@ -17,6 +18,7 @@ type migrationFn func(ctx context.Context, session *gocql.Session) error
 
 var migrations = []migrationFn{
 	ts20230824154306_dealsFixMinerAddr,
+	ts20230913144459_dealsAddIsDirectDealColumn,
 }
 
 // Migrate migrates the cassandra database

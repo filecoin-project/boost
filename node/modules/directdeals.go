@@ -60,7 +60,7 @@ func NewDirectDealsProvider(provAddr address.Address, cfg *config.Boost) func(lc
 			RemoteCommp:             cfg.Dealmaking.RemoteCommp,
 		}
 
-		prov := storagemarket.NewDirectDealsProvider(ddpCfg, fullnodeApi, secb, commpc, commpt, sps, directDealsDB, dl)
+		prov := storagemarket.NewDirectDealsProvider(ddpCfg, fullnodeApi, secb, commpc, commpt, sps, directDealsDB, dl, piecedirectory, ip)
 		return prov, nil
 	}
 }
