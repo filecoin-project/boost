@@ -223,39 +223,6 @@ func (r *resolver) PiecesWithPayloadCid(ctx context.Context, args struct{ Payloa
 	return pieceCids, nil
 }
 
-func (r *resolver) PiecesWithRootPayloadCid(ctx context.Context, args struct{ PayloadCid string }) ([]string, error) {
-	payloadCid, err := cid.Parse(args.PayloadCid)
-	if err != nil {
-		return nil, fmt.Errorf("%s is not a valid payload cid", args.PayloadCid)
-	}
-
-	var pieceCidSet = make(map[string]struct{})
-
-	// Get boost deals by payload cid
-	boostDeals, err := r.dealsDB.ByRootPayloadCID(ctx, payloadCid)
-	if err != nil {
-		return nil, err
-	}
-	for _, dl := range boostDeals {
-		pieceCidSet[dl.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
-	}
-
-	// Get legacy markets deals by payload cid
-	legacyDeals, err := r.legacyDeals.ByPayloadCid(ctx, payloadCid)
-	if err != nil {
-		return nil, err
-	}
-	for _, dl := range legacyDeals {
-		pieceCidSet[dl.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
-	}
-
-	pieceCids := make([]string, 0, len(pieceCidSet))
-	for pieceCid := range pieceCidSet {
-		pieceCids = append(pieceCids, pieceCid)
-	}
-	return pieceCids, nil
-}
-
 func (r *resolver) PieceIndexes(ctx context.Context, args struct{ PieceCid string }) ([]string, error) {
 	var indexes []string
 	pieceCid, err := cid.Parse(args.PieceCid)
