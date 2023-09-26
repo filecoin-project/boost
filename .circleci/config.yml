@@ -5,11 +5,11 @@ orbs:
 executors:
   golang:
     docker:
-      - image: cimg/go:1.19.7
+      - image: cimg/go:1.21
     resource_class: 2xlarge
   ubuntu:
     docker:
-      - image: ubuntu:20.04
+      - image: ubuntu:22.04
 
 commands:
   install-deps:
@@ -86,7 +86,7 @@ jobs:
   lid-docker-compose:
     description: 'Run LID integration tests'
     machine:
-      image: ubuntu-2004:202104-01
+      image: ubuntu-2204:2023.07.2
       resource_class: xlarge
     steps:
       - checkout
@@ -131,7 +131,7 @@ jobs:
       # local index directory tests so it may be worth refactoring so that it's
       # only included for local index directory
       - setup_remote_docker:
-          version: 20.10.18
+          version: 20.10.23
           docker_layer_caching: true
       - run:
           name: go test
@@ -155,8 +155,8 @@ jobs:
       - run:
           name: Install go
           command: |
-            curl -O https://dl.google.com/go/go1.19.5.darwin-amd64.pkg && \
-            sudo installer -pkg go1.19.5.darwin-amd64.pkg -target /
+            curl -O https://dl.google.com/go/go1.21.0.darwin-amd64.pkg && \
+            sudo installer -pkg go1.21.0.darwin-amd64.pkg -target /
       - run:
           name: Install pkg-config
           command: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config
