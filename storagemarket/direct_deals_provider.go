@@ -48,13 +48,8 @@ type DirectDealsProvider struct {
 	commpCalc     smtypes.CommpCalculator
 	commpThrottle CommpThrottle
 	sps           sealingpipeline.API
-
-	//db            *sql.DB
-	directDealsDB *db.DirectDataDB
-	//logsSqlDB     *sql.DB
-	//logsDB        *db.LogsDB
-
-	dealLogger *logs.DealLogger
+	directDealsDB *db.DirectDealsDB
+	dealLogger    *logs.DealLogger
 
 	runningLk sync.RWMutex
 	running   map[uuid.UUID]struct{}
@@ -63,7 +58,7 @@ type DirectDealsProvider struct {
 	ip *indexprovider.Wrapper
 }
 
-func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, commpt CommpThrottle, sps sealingpipeline.API, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper) *DirectDealsProvider {
+func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, commpt CommpThrottle, sps sealingpipeline.API, directDealsDB *db.DirectDealsDB, dealLogger *logs.DealLogger, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper) *DirectDealsProvider {
 	return &DirectDealsProvider{
 		config:        cfg,
 		fullnodeApi:   fullnodeApi,
@@ -71,8 +66,6 @@ func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdde
 		commpCalc:     commpCalc,
 		commpThrottle: commpt,
 		sps:           sps,
-
-		//db: db,
 		directDealsDB: directDealsDB,
 		//logsSqlDB: logsSqlDB,
 		//logsDB: logsDB,
@@ -152,8 +145,7 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, params smtypes.Direc
 	entry := &types.DirectDeal{
 		ID:        params.DealUUID,
 		CreatedAt: time.Now(),
-		//CreatedAt time.Time
-		PieceCID: params.PieceCid,
+		PieceCID:  params.PieceCid,
 		//PieceSize abi.PaddedPieceSize
 		Client: params.ClientAddr,
 		//Provider  address.Address
@@ -166,13 +158,7 @@ func (ddp *DirectDealsProvider) Import(ctx context.Context, params smtypes.Direc
 		AllocationID:     params.AllocationID,
 		KeepUnsealedCopy: !params.RemoveUnsealedCopy,
 		AnnounceToIPNI:   !params.SkipIPNIAnnounce,
-		//SectorID abi.SectorNumber
-		//Offset   abi.PaddedPieceSize
-		//Length   abi.PaddedPieceSize
-		//Checkpoint dealcheckpoints.Checkpoint
-		//CheckpointAt time.Time
-		//Err string
-		//Retry DealRetryType
+		Retry:            smtypes.DealRetryAuto,
 	}
 
 	ddp.dealLogger.Infow(entry.ID, "executing direct deal import", "client", clientAddr, "piececid", piececid)
