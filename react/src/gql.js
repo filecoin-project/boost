@@ -451,12 +451,6 @@ const LegacyDealQuery = gql`
     }
 `;
 
-const PiecesWithRootPayloadCidQuery = gql`
-    query AppPiecesWithRootPayloadCidQuery($payloadCid: String!) {
-        piecesWithRootPayloadCid(payloadCid: $payloadCid)
-    }
-`;
-
 const PiecesWithPayloadCidQuery = gql`
     query AppPiecesWithPayloadCidQuery($payloadCid: String!) {
         piecesWithPayloadCid(payloadCid: $payloadCid)
@@ -814,7 +808,6 @@ export {
     IpniAdEntriesQuery,
     IpniAdEntriesCountQuery,
     IpniLatestAdQuery,
-    PiecesWithRootPayloadCidQuery,
     PiecesWithPayloadCidQuery,
     PieceBuildIndexMutation,
     PieceStatusQuery,
