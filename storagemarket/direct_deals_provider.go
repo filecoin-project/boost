@@ -607,7 +607,7 @@ func (ddp *DirectDealsProvider) indexAndAnnounce(ctx context.Context, entry *smt
 			}
 			ddp.dealLogger.Infow(entry.ID, "announced the direct deal to network indexer", "announcement-cid", annCid)
 		} else {
-			ddp.dealLogger.Infow(entry.ID, "didn't announce the direct deal as requested in the deal proposal")
+			ddp.dealLogger.Infow(entry.ID, "didn't announce the direct deal because the client disabled announcements for this deal")
 		}
 	} else {
 		ddp.dealLogger.Infow(entry.ID, "didn't announce the direct deal because network indexer is disabled")
