@@ -50,7 +50,7 @@ type Wrapper struct {
 
 	cfg            *config.Boost
 	dealsDB        *db.DealsDB
-	directDealsDB  *db.DirectDataDB
+	directDealsDB  *db.DirectDealsDB
 	legacyProv     storagemarket.StorageProvider
 	prov           provider.Interface
 	piecedirectory *piecedirectory.PieceDirectory
