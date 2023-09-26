@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS DirectDeals (
     StartEpoch INT,
     EndEpoch INT,
     InboundFilePath TEXT,
+    InboundFileSize INT,
     SectorID INT,
     Offset INT,
     Length INT,
