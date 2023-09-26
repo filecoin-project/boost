@@ -514,16 +514,14 @@ function SearchResults({searchQuery, setSearchQuery, showSearchPrompt}) {
     var pieceCid = null
     var pieceCids = []
     if ((payloadRes || {}).data) {
-        pieceCids = [...new Set([
-            ...payloadRes.data.piecesWithPayloadCid])]
-        if (pieceCids.length === 0) {
+        if (payloadRes.data.piecesWithPayloadCid.length === 0) {
             // If there were no results for the lookup by payload CID, use the search
             // query for a lookup by piece CID
             pieceCid = searchQuery
-        } else if (pieceCids.length === 1) {
+        } else if (payloadRes.data.piecesWithPayloadCid.length === 1) {
             // If there was exactly one result for the lookup by payload CID, use
             // the piece CID for the lookup by piece CID
-            pieceCid = pieceCids[0]
+            pieceCid = payloadRes.data.piecesWithPayloadCid[0]
         }
     }
 
