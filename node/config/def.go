@@ -211,7 +211,10 @@ func DefaultBoost() *Boost {
 				Enabled:        false,
 				PublicHostname: "",
 				Port:           3104,
+				WithLibp2p:     false,
 			},
+
+			DataTransferPublisher: false,
 		},
 	}
 	return cfg
