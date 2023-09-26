@@ -59,6 +59,7 @@ func newDirectDealsAccessor(db *sql.DB, deal *types.DirectDeal) *directDealsAcce
 			//"ProviderCollateral": &fielddef.BigIntFieldDef{F: &deal.ClientDealProposal.Proposal.ProviderCollateral},
 			//"ClientCollateral":   &fielddef.BigIntFieldDef{F: &deal.ClientDealProposal.Proposal.ClientCollateral},
 			"InboundFilePath":  &fielddef.FieldDef{F: &deal.InboundFilePath},
+			"InboundFileSize":  &fielddef.FieldDef{F: &deal.InboundFileSize},
 			"SectorID":         &fielddef.FieldDef{F: &deal.SectorID},
 			"Offset":           &fielddef.FieldDef{F: &deal.Offset},
 			"Length":           &fielddef.FieldDef{F: &deal.Length},

@@ -59,8 +59,8 @@ type DirectDealsProvider struct {
 	runningLk sync.RWMutex
 	running   map[uuid.UUID]struct{}
 
-	piecedirectory *piecedirectory.PieceDirectory
-	ip             *indexprovider.Wrapper
+	pd *piecedirectory.PieceDirectory
+	ip *indexprovider.Wrapper
 }
 
 func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, commpt CommpThrottle, sps sealingpipeline.API, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper) *DirectDealsProvider {
@@ -77,10 +77,10 @@ func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdde
 		//logsSqlDB: logsSqlDB,
 		//logsDB: logsDB,
 
-		dealLogger:     dealLogger,
-		running:        make(map[uuid.UUID]struct{}),
-		piecedirectory: piecedirectory,
-		ip:             ip,
+		dealLogger: dealLogger,
+		running:    make(map[uuid.UUID]struct{}),
+		pd:         piecedirectory,
+		ip:         ip,
 	}
 }
 
@@ -590,7 +590,7 @@ func (ddp *DirectDealsProvider) FailPausedDeal(ctx context.Context, id uuid.UUID
 func (ddp *DirectDealsProvider) indexAndAnnounce(ctx context.Context, entry *smtypes.DirectDeal) *dealMakingError {
 	// add deal to piece metadata store
 	ddp.dealLogger.Infow(entry.ID, "about to add direct deal for piece in LID")
-	if err := ddp.piecedirectory.AddDealForPiece(ctx, entry.PieceCID, model.DealInfo{
+	if err := ddp.pd.AddDealForPiece(ctx, entry.PieceCID, model.DealInfo{
 		DealUuid:     entry.ID.String(),
 		ChainDealID:  abi.DealID(entry.AllocationID), // Convert the type to avoid migration as underlying types are same
 		MinerAddr:    entry.Provider,

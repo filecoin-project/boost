@@ -537,17 +537,18 @@ func (w *Wrapper) MultihashLister(ctx context.Context, prov peer.ID, contextID [
 		if isDD {
 			idName = "UUID"
 		}
+		llog := log.With(idName, identifier, "piece", pieceCid)
 		ii, err := w.piecedirectory.GetIterableIndex(ctx, pieceCid)
 		if err != nil {
 			e := fmt.Errorf("failed to get iterable index: %w", err)
 			if bdtypes.IsNotFound(err) {
 				// If it's a not found error, skip over this piece and continue ingesting
-				log.Infow("skipping ingestion: piece not found", "piece", pieceCid, idName, identifier, "err", e)
+				llog.Infow("skipping ingestion: piece not found", "err", e)
 				return nil, skipError(e)
 			}
 
 			// Some other error, pause ingestion
-			log.Infow("pausing ingestion: error getting piece", "piece", pieceCid, idName, identifier, "err", e)
+			llog.Infow("pausing ingestion: error getting piece", "err", e)
 			return nil, e
 		}
 
@@ -559,7 +560,7 @@ func (w *Wrapper) MultihashLister(ctx context.Context, prov peer.ID, contextID [
 			// If there are no records, it's effectively the same as a not
 			// found error. Skip over this piece and continue ingesting.
 			e := fmt.Errorf("no records found for piece %s", pieceCid)
-			log.Infow("skipping ingestion: piece has no records", "piece", pieceCid, idName, identifier, "err", e)
+			llog.Infow("skipping ingestion: piece has no records", "err", e)
 			return nil, skipError(e)
 		}
 
@@ -567,11 +568,11 @@ func (w *Wrapper) MultihashLister(ctx context.Context, prov peer.ID, contextID [
 		if err != nil {
 			// Bad index, skip over this piece and continue ingesting
 			err = fmt.Errorf("failed to get mhiterator: %w", err)
-			log.Infow("skipping ingestion", "piece", pieceCid, idName, identifier, "err", err)
+			llog.Infow("skipping ingestion", "err", err)
 			return nil, skipError(err)
 		}
 
-		log.Debugw("returning piece iterator", "piece", pieceCid, idName, identifier, "err", err)
+		llog.Debugw("returning piece iterator", "err", err)
 		return mhi, nil
 	}
 
@@ -636,6 +637,12 @@ func (w *Wrapper) MultihashLister(ctx context.Context, prov peer.ID, contextID [
 			log.Infow("pausing ingestion", "deal UUID", dealUUID, "err", e)
 			return nil, e
 		}
+
+		// The deal was not found in the boost, legacy or direct deal database.
+		// Skip this deal and continue ingestion.
+		err = fmt.Errorf("deal with UUID %s not found", dealUUID)
+		log.Infow("skipping ingestion", "deal UUID", dealUUID, "err", err)
+		return nil, skipError(err)
 	}
 
 	// Bad contextID or UUID skip over this piece and continue ingesting
@@ -718,7 +725,10 @@ func (w *Wrapper) AnnounceBoostDirectDeal(ctx context.Context, entry *types.Dire
 		return cid.Undef, nil
 	}
 
-	contextID := []byte(entry.ID.String())
+	contextID, err := entry.ID.MarshalBinary()
+	if err != nil {
+		return cid.Undef, fmt.Errorf("marshalling the deal UUID: %w", err)
+	}
 
 	md := metadata.GraphsyncFilecoinV1{
 		PieceCID:      entry.PieceCID,
@@ -739,8 +749,13 @@ func (w *Wrapper) AnnounceBoostDirectDealRemoved(ctx context.Context, dealUUID u
 		log.Errorw("failed to connect boost node to full daemon node", "err", err)
 	}
 
+	contextID, err := dealUUID.MarshalBinary()
+	if err != nil {
+		return cid.Undef, fmt.Errorf("marshalling the deal UUID: %w", err)
+	}
+
 	// Announce deal removal to network Indexer
-	annCid, err := w.prov.NotifyRemove(ctx, "", []byte(dealUUID.String()))
+	annCid, err := w.prov.NotifyRemove(ctx, "", contextID)
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to announce deal removal to index provider: %w", err)
 	}
