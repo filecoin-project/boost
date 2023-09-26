@@ -145,7 +145,7 @@ jobs:
   build-macos:
     description: build darwin boost binary
     macos:
-      xcode: "12.5.1"
+      xcode: "15.0.0"
     working_directory: ~/go/src/github.com/filecoin-project/boost
     resource_class: macos.x86.medium.gen2
     steps:
