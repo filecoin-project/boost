@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"math/rand"
 	"net"
@@ -54,6 +53,11 @@ type serverTest struct {
 	bs       bstore.Blockstore
 	root     format.Node
 	carBytes []byte
+}
+
+func addContentLengthHeader(w http.ResponseWriter, length int) {
+	w.Header().Add("Content-Length", strconv.Itoa(length))
+	w.WriteHeader(200)
 }
 
 func newDealLogger(t *testing.T, ctx context.Context) *logs.DealLogger {
@@ -123,19 +127,25 @@ func httpParallelTransferTest(t *testing.T, rawSize int, nChunks, expectedChunks
 	var cnt atomic.Int32
 
 	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
-		offset := r.Header.Get("Range")
+		switch r.Method {
+		case http.MethodGet:
+			offset := r.Header.Get("Range")
 
-		startend := strings.Split(strings.TrimPrefix(offset, "bytes="), "-")
-		start, _ := strconv.ParseInt(startend[0], 10, 64)
-		end, _ := strconv.ParseInt(startend[1], 10, 64)
+			startend := strings.Split(strings.TrimPrefix(offset, "bytes="), "-")
+			start, _ := strconv.ParseInt(startend[0], 10, 64)
+			end, _ := strconv.ParseInt(startend[1], 10, 64)
 
-		w.WriteHeader(200)
-		if end == 0 {
-			w.Write(st.carBytes[start:]) //nolint:errcheck
-		} else {
-			w.Write(st.carBytes[start:end]) //nolint:errcheck
+			w.WriteHeader(200)
+			if end == 0 {
+				w.Write(st.carBytes[start:]) //nolint:errcheck
+			} else {
+				w.Write(st.carBytes[start:end]) //nolint:errcheck
+			}
+			cnt.Inc()
+		case http.MethodHead:
+			addContentLengthHeader(w, len(st.carBytes))
 		}
-		cnt.Inc()
+
 	}
 
 	svr := httptest.NewServer(handler)
@@ -158,6 +168,74 @@ func TestHttpTransferShouldBeDoneInOneChunk(t *testing.T) {
 
 func TestHttpTransferShouldBeDoneInMultipleChunks(t *testing.T) {
 	httpParallelTransferTest(t, (100*readBufferSize)+30, 5, 5)
+}
+
+func TestDealSizeIsZero(t *testing.T) {
+	// if deal size from deal info is zero then the actual size should be taken from HEAD request
+	ctx := context.Background()
+	st := newServerTest(t, 100*readBufferSize+30)
+	carSize := len(st.carBytes)
+
+	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			offset := r.Header.Get("Range")
+
+			startend := strings.Split(strings.TrimPrefix(offset, "bytes="), "-")
+			start, _ := strconv.ParseInt(startend[0], 10, 64)
+			end, _ := strconv.ParseInt(startend[1], 10, 64)
+
+			w.WriteHeader(200)
+			if end == 0 {
+				w.Write(st.carBytes[start:]) //nolint:errcheck
+			} else {
+				w.Write(st.carBytes[start:end]) //nolint:errcheck
+			}
+		case http.MethodHead:
+			addContentLengthHeader(w, len(st.carBytes))
+		}
+
+	}
+
+	svr := httptest.NewServer(handler)
+	defer svr.Close()
+
+	of := getTempFilePath(t)
+	th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks)), 0, types.HttpRequest{URL: svr.URL}, of)
+	require.NotNil(t, th)
+
+	evts := waitForTransferComplete(th)
+	require.NotEmpty(t, evts)
+	require.EqualValues(t, carSize, evts[len(evts)-1].NBytesReceived)
+	assertFileContents(t, of, st.carBytes)
+}
+
+func TestFailIfDealSizesDontMatch(t *testing.T) {
+	ctx := context.Background()
+	st := newServerTest(t, 100*readBufferSize+30)
+	carSize := len(st.carBytes)
+
+	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			require.Fail(t, "should never happen")
+		case http.MethodHead:
+			addContentLengthHeader(w, carSize)
+		}
+
+	}
+
+	svr := httptest.NewServer(handler)
+	defer svr.Close()
+
+	of := getTempFilePath(t)
+	th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks)), carSize/2, types.HttpRequest{URL: svr.URL}, of)
+	require.NotNil(t, th)
+
+	evts := waitForTransferComplete(th)
+	require.NotEmpty(t, evts)
+
+	require.Contains(t, evts[len(evts)-1].Error.Error(), "deal size mismatch")
 }
 
 func TestTransportRespectsContext(t *testing.T) {
@@ -255,7 +333,12 @@ func TestCompletionOnMultipleAttemptsWithSameFile(t *testing.T) {
 			if rangeEnd > size {
 				rangeEnd = size
 			}
-			http.ServeContent(w, r, "", time.Time{}, strings.NewReader(str[:rangeEnd]))
+			switch r.Method {
+			case http.MethodGet:
+				http.ServeContent(w, r, "", time.Time{}, strings.NewReader(str[:rangeEnd]))
+			case http.MethodHead:
+				addContentLengthHeader(w, len(str))
+			}
 		}
 	}
 
@@ -296,7 +379,7 @@ func TestCompletionOnMultipleAttemptsWithSameFile(t *testing.T) {
 				// 	  return 416: Requested Range Not Satisfiable
 				// 2. all but the last chunk have been fully downloaded. In that case appending the last chunk to the output will result into "incomlete chunk" error.
 				errMsg := evts[len(evts)-1].Error.Error()
-				require.True(t, strings.Contains(errMsg, "incomlete chunk") || strings.Contains(errMsg, "Requested Range Not Satisfiable"))
+				require.True(t, strings.Contains(errMsg, "incomplete chunk") || strings.Contains(errMsg, "Requested Range Not Satisfiable"))
 
 				s, err := os.Stat(of)
 				require.NoError(t, err)
@@ -316,9 +399,13 @@ func TestTransferCancellation(t *testing.T) {
 	size := (100 * readBufferSize) + 30
 
 	closing := make(chan struct{}, 2)
-	svcs := serversWithCustomHandler(func(http.ResponseWriter, *http.Request) {
-		fmt.Println("Hello")
-		<-closing
+	svcs := serversWithCustomHandler(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			<-closing
+		case http.MethodHead:
+			addContentLengthHeader(w, size)
+		}
 	})
 
 	for name, s := range svcs {
@@ -362,21 +449,27 @@ func TestTransferResumption(t *testing.T) {
 
 	// start http server that always sends 500Kb and disconnects (total file size is greater than 100 Mb)
 	svr := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		nAttempts.Inc()
-		offset := r.Header.Get("Range")
-		finalOffset := strings.TrimSuffix(strings.TrimPrefix(offset, "bytes="), "-")
-		start, _ := strconv.ParseInt(finalOffset, 10, 64)
+		switch r.Method {
+		case http.MethodGet:
+			nAttempts.Inc()
+			offset := r.Header.Get("Range")
+			finalOffset := strings.TrimSuffix(strings.TrimPrefix(offset, "bytes="), "-")
+			start, _ := strconv.ParseInt(finalOffset, 10, 64)
 
-		end := int(start + (readBufferSize + 70))
-		if end > size {
-			end = size
+			end := int(start + (readBufferSize + 70))
+			if end > size {
+				end = size
+			}
+
+			w.WriteHeader(200)
+			w.Write([]byte(str[start:end])) //nolint:errcheck
+			// close the connection so user sees an error while reading the response
+			c := GetConn(r)
+			c.Close() //nolint:errcheck
+		case http.MethodHead:
+			addContentLengthHeader(w, len(str))
 		}
 
-		w.WriteHeader(200)
-		w.Write([]byte(str[start:end])) //nolint:errcheck
-		// close the connection so user sees an error while reading the response
-		c := GetConn(r)
-		c.Close() //nolint:errcheck
 	}))
 	svr.Config.ConnContext = SaveConnInContext
 	svr.Start()
@@ -407,21 +500,26 @@ func TestLibp2pTransferResumption(t *testing.T) {
 
 	// start http server that always sends 500Kb and disconnects (total file size is greater than 100 Mb)
 	svr := newTestLibp2pHttpServer(t, func(w http.ResponseWriter, r *http.Request) {
-		nAttempts.Inc()
-		offset := r.Header.Get("Range")
-		finalOffset := strings.TrimSuffix(strings.TrimPrefix(offset, "bytes="), "-")
-		start, _ := strconv.ParseInt(finalOffset, 10, 64)
+		switch r.Method {
+		case http.MethodGet:
+			nAttempts.Inc()
+			offset := r.Header.Get("Range")
+			finalOffset := strings.TrimSuffix(strings.TrimPrefix(offset, "bytes="), "-")
+			start, _ := strconv.ParseInt(finalOffset, 10, 64)
 
-		end := int(start + (readBufferSize + 70))
-		if end > size {
-			end = size
+			end := int(start + (readBufferSize + 70))
+			if end > size {
+				end = size
+			}
+
+			w.WriteHeader(200)
+			w.Write([]byte(str[start:end])) //nolint:errcheck
+			// close the connection so user sees an error while reading the response
+			c := GetConn(r)
+			c.Close() //nolint:errcheck
+		case http.MethodHead:
+			addContentLengthHeader(w, len(str))
 		}
-
-		w.WriteHeader(200)
-		w.Write([]byte(str[start:end])) //nolint:errcheck
-		// close the connection so user sees an error while reading the response
-		c := GetConn(r)
-		c.Close() //nolint:errcheck
 	})
 
 	defer svr.Close()
@@ -484,18 +582,24 @@ func waitForTransferComplete(th transport.Handler) []types.TransportEvent {
 
 func serversWithRangeHandler(st *serverTest) map[string]func(t *testing.T) (req func() types.HttpRequest, close func(), h host.Host) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		offset := r.Header.Get("Range")
+		switch r.Method {
+		case http.MethodGet:
+			offset := r.Header.Get("Range")
 
-		startend := strings.Split(strings.TrimPrefix(offset, "bytes="), "-")
-		start, _ := strconv.ParseInt(startend[0], 10, 64)
-		end, _ := strconv.ParseInt(startend[1], 10, 64)
+			startend := strings.Split(strings.TrimPrefix(offset, "bytes="), "-")
+			start, _ := strconv.ParseInt(startend[0], 10, 64)
+			end, _ := strconv.ParseInt(startend[1], 10, 64)
 
-		w.WriteHeader(200)
-		if end == 0 {
-			w.Write(st.carBytes[start:]) //nolint:errcheck
-		} else {
-			w.Write(st.carBytes[start:end]) //nolint:errcheck
+			w.WriteHeader(200)
+			if end == 0 {
+				w.Write(st.carBytes[start:]) //nolint:errcheck
+			} else {
+				w.Write(st.carBytes[start:end]) //nolint:errcheck
+			}
+		case http.MethodHead:
+			addContentLengthHeader(w, len(st.carBytes))
 		}
+
 	}
 
 	svcs := serversWithCustomHandler(handler)

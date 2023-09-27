@@ -194,7 +194,8 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 
 	// is the transfer already complete ? we check this by comparing the number of bytes
 	// in the output file with the deal size.
-	if fileSize == dealInfo.DealSize {
+	// DealSize might be passed as zero for offline deals.
+	if dealInfo.DealSize != 0 && fileSize == dealInfo.DealSize {
 		defer cleanup()
 
 		t.emitEvent(types.TransportEvent{NBytesReceived: fileSize})
@@ -269,37 +270,45 @@ func (t *transfer) execute(ctx context.Context) error {
 		return &httpError{error: fmt.Errorf("failed to get stats of the output file: %w", err)}
 	}
 
-	// deal size parameter is not required when making a deal. If it's zero - determine deal size via HEAD request.
+	// determine deal size from HEAD request and make sure that it matches up with the one from the deal info
 	var dealSize int64
-	if dealSize == 0 {
-		req, err := http.NewRequest("HEAD", t.tInfo.URL, nil)
-		if err != nil {
-			return &httpError{error: fmt.Errorf("failed to create http HEAD req: %w", err)}
-		}
-		// add request headers
-		for name, val := range t.tInfo.Headers {
-			req.Header.Set(name, val)
-		}
+	req, err := http.NewRequest("HEAD", t.tInfo.URL, nil)
+	if err != nil {
+		return &httpError{error: fmt.Errorf("failed to create http HEAD req: %w", err)}
+	}
+	// add request headers
+	for name, val := range t.tInfo.Headers {
+		req.Header.Set(name, val)
+	}
 
-		resp, err := t.client.Do(req)
-		if err != nil {
-			return &httpError{error: fmt.Errorf("failed to send HEAD http req: %w", err)}
-		}
-		defer resp.Body.Close() // nolint
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return &httpError{error: fmt.Errorf("failed to send HEAD http req: %w", err)}
+	}
+	defer resp.Body.Close() // nolint
 
-		if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK {
+		return &httpError{
+			error: fmt.Errorf("http HEAD req failed: code: %d, status: %s", resp.StatusCode, resp.Status),
+			code:  resp.StatusCode,
+		}
+	}
+	if s := resp.Header.Get("Content-Length"); len(s) > 0 {
+		dealSize, err = strconv.ParseInt(s, 10, 64)
+		if err != nil {
 			return &httpError{
-				error: fmt.Errorf("http HEAD req failed: code: %d, status: %s", resp.StatusCode, resp.Status),
-				code:  resp.StatusCode,
+				error: fmt.Errorf("error parsing content-length header: %w", err),
 			}
 		}
-		if s := resp.Header.Get("Content-Length"); len(s) > 0 {
-			dealSize, err = strconv.ParseInt(s, 10, 64)
-			if err != nil {
-				return &httpError{
-					error: fmt.Errorf("error parsing content-length header: %w", err),
-				}
-			}
+	} else {
+		return &httpError{
+			error: fmt.Errorf("can't determine deal size from the head request, no header"),
+		}
+	}
+
+	if t.dealInfo.DealSize != 0 && dealSize != t.dealInfo.DealSize {
+		return &httpError{
+			error: fmt.Errorf("deal size mismatch: head: %d, dealInfo: %d", dealSize, t.dealInfo.DealSize),
 		}
 	}
 
