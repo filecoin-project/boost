@@ -118,6 +118,12 @@ func ReaderParamEncoder(addr string) jsonrpc.Option {
 
 		if !redir {
 			go func() {
+				defer func() {
+					if rrr := recover(); rrr != nil {
+						log.Errorw("recovered panic in client-side ReaderParamEncoder io.Reader", "recover", rrr)
+					}
+				}()
+
 				// TODO: figure out errors here
 				for {
 					req, err := http.NewRequest("HEAD", u.String(), nil)

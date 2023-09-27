@@ -887,7 +887,6 @@ export {
     IpniAdEntriesQuery,
     IpniAdEntriesCountQuery,
     IpniLatestAdQuery,
-    PiecesWithRootPayloadCidQuery,
     PiecesWithPayloadCidQuery,
     PieceBuildIndexMutation,
     PieceStatusQuery,

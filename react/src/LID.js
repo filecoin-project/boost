@@ -3,7 +3,7 @@ import {useMutation, useQuery} from "@apollo/react-hooks";
 import {
     LIDQuery,
     FlaggedPiecesQuery, PieceBuildIndexMutation,
-    PieceStatusQuery, PiecesWithPayloadCidQuery, PiecesWithRootPayloadCidQuery, FlaggedPiecesCountQuery
+    PieceStatusQuery, PiecesWithPayloadCidQuery, FlaggedPiecesCountQuery
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
@@ -510,31 +510,18 @@ function SearchResults({searchQuery, setSearchQuery, showSearchPrompt}) {
         skip: !searchQuery
     })
 
-    // Look up pieces by root payload cid
-    const rootPayloadRes = useQuery(PiecesWithRootPayloadCidQuery, {
-        variables: {
-            payloadCid: searchQuery
-        },
-        // Don't do this query if the search query is empty
-        skip: !searchQuery
-    })
-
-    // If the requests for payload CID & root payload CID have completed
+    // If the requests for payload CID have completed
     var pieceCid = null
     var pieceCids = []
-    if ((payloadRes || {}).data && (rootPayloadRes || {}).data) {
-        pieceCids = [...new Set([
-            ...payloadRes.data.piecesWithPayloadCid,
-            ...rootPayloadRes.data.piecesWithRootPayloadCid
-        ])]
-        if (pieceCids.length === 0) {
+    if ((payloadRes || {}).data) {
+        if (payloadRes.data.piecesWithPayloadCid.length === 0) {
             // If there were no results for the lookup by payload CID, use the search
             // query for a lookup by piece CID
             pieceCid = searchQuery
-        } else if (pieceCids.length === 1) {
+        } else if (payloadRes.data.piecesWithPayloadCid.length === 1) {
             // If there was exactly one result for the lookup by payload CID, use
             // the piece CID for the lookup by piece CID
-            pieceCid = pieceCids[0]
+            pieceCid = payloadRes.data.piecesWithPayloadCid[0]
         }
     }
 
@@ -548,7 +535,7 @@ function SearchResults({searchQuery, setSearchQuery, showSearchPrompt}) {
         skip: !pieceCid
     })
 
-    if ((pieceRes || {}).loading || (payloadRes || {}).loading || (rootPayloadRes || {}).loading) {
+    if ((pieceRes || {}).loading || (payloadRes || {}).loading) {
         return <div>Loading ...</div>
     }
 

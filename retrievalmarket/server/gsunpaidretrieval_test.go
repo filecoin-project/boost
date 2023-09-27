@@ -62,8 +62,7 @@ func TestGS(t *testing.T) {
 	_ = logging.SetLogLevel("testgs", "info")
 	//_ = logging.SetLogLevel("dt-impl", "debug")
 
-	missingCid, err := cid.Parse("bafkqaaa")
-	require.NoError(t, err)
+	missingCid := cid.MustParse("baguqeeraaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	testCases := []testCase{{
 		name: "happy path",

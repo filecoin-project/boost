@@ -171,16 +171,17 @@ func TestMarketsV1DealRetrieval(t *testing.T) {
 			// Inspect what we got
 			gotCids, err := testutil.CidsInCar(outPath)
 			require.NoError(t, err)
+
+			toStr := func(c []cid.Cid) []string {
+				// for nicer debugging given that we know the CIDs we expect
+				out := make([]string, len(c))
+				for i, v := range c {
+					out[i] = v.String()
+				}
+				return out
+			}
+
 			require.Equal(t, toStr(tc.expectCids), toStr(gotCids))
 		})
 	}
-}
-
-// for nicer debugging given that we know the CIDs we expect
-func toStr(c []cid.Cid) []string {
-	out := make([]string, len(c))
-	for i, v := range c {
-		out[i] = v.String()
-	}
-	return out
 }
