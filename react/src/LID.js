@@ -3,12 +3,12 @@ import {useMutation, useQuery} from "@apollo/react-hooks";
 import {
     LIDQuery,
     FlaggedPiecesQuery, PieceBuildIndexMutation,
-    PieceStatusQuery, PiecesWithPayloadCidQuery, FlaggedPiecesCountQuery
+    PieceStatusQuery, PiecesWithPayloadCidQuery, FlaggedPiecesCountQuery, PiecePayloadCidsQuery,
 } from "./gql";
 import moment from "moment";
 import {DebounceInput} from 'react-debounce-input';
-import React, {useState} from "react";
-import {PageContainer, ShortDealLink} from "./Components";
+import React, {useState, useEffect} from "react";
+import {PageContainer, ShortCID, ShortDealLink} from "./Components";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {dateFormat} from "./util-date";
 import xImg from './bootstrap-icons/icons/x-lg.svg'
@@ -19,6 +19,7 @@ import {Pagination} from "./Pagination";
 import {Info, InfoListItem} from "./Info";
 import {CumulativeBarChart, CumulativeBarLabels} from "./CumulativeBarChart";
 import {addCommas, humanFileSize} from "./util";
+import closeImg from "./bootstrap-icons/icons/x-circle.svg";
 
 const lidBasePath = '/piece-doctor'
 
@@ -624,9 +625,20 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                 <tr key="piece cid">
                     <th>Piece CID</th>
                     {searchIsPieceCid ? (
-                      <td><strong>{pieceCid}</strong></td>
+                      <td>
+                          <strong>{pieceCid}</strong>
+                          &nbsp;
+                          <a className="payload-icon" href={"/piece-doctor/piece-payload/"+searchQuery}>
+                              Payload CIDs
+                          </a>
+                      </td>
                     ) : (
-                      <td>{pieceCid}</td>
+                      <td>{pieceCid}
+                          &nbsp;
+                          <a className="payload-icon" href={"/piece-doctor/piece-payload/"+searchQuery}>
+                              Payload CIDs
+                          </a>
+                      </td>
                     )}
                 </tr>
                 <tr key="index status">
@@ -781,4 +793,86 @@ const RowsPerPage = {
 
 function scrollTop() {
     window.scrollTo({ top: 0, behavior: "smooth" })
+}
+
+export function PiecePayloadCids() {
+    const params = useParams()
+    const navigate = useNavigate()
+
+    // Add a class to the document body when showing the ad detail page
+    useEffect(() => {
+        document.body.classList.add('modal-open')
+
+        return function () {
+            document.body.classList.remove('modal-open')
+        }
+    })
+
+    const {loading, error, data} = useQuery(PiecePayloadCidsQuery, {
+        variables: {pieceCid: params.pieceCID},
+    })
+
+    if (error) {
+        return <div className="payloads modal" id={params.pieceCID}>
+            <div className="content">
+                <div className="close" onClick={() => navigate(-1)}>
+                    <img className="icon" alt="" src={closeImg} />
+                </div>
+                <div className="title">
+                    <span>Payloads CIDs for {params.pieceCID}</span>
+                </div>
+                <div><span>Error: {error.message}</span></div>
+            </div>
+        </div>
+    }
+
+    if (loading) {
+        return <div>Loading ...</div>
+    }
+
+    console.log(data)
+
+    var payload = data.piecePayloadCids
+    return <div className="payloads modal" id={params.pieceCID}>
+        <div className="content">
+            <div className="close" onClick={() => navigate(-1)}>
+                <img className="icon" alt="" src={closeImg} />
+            </div>
+            <div className="title">
+                <span>Payloads CIDs for {params.pieceCID}</span>
+            </div>
+            <div>
+                { payload.length === 0 ? (
+                    <span>Piece {params.pieceCID} either has no payload CIDs or is not indexed</span>
+                ) : (
+                    <table>
+                        <tbody>
+                        <tr>
+                            <th>Number</th>
+                            <th>Payload CID</th>
+                            <th>Multihash (Hexadecimal)</th>
+                            <th>Download Link</th>
+                        </tr>
+                        {payload.map((payload, i) => {
+                            return <tr key={payload.PayloadCid}>
+                                <td>{i+1}.</td>
+                                <td>
+                                    {payload.PayloadCid}
+                                </td>
+                                <td>
+                                    {payload.Multihash}
+                                </td>
+                                <td>
+                                    <a className="download" target="_blank" href={"/download/block/"+payload.PayloadCid}>
+                                        Download block
+                                    </a>
+                                </td>
+                            </tr>
+                        })}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+        </div>
+    </div>
 }

@@ -84,3 +84,41 @@
 .sectors-list-link a, .flagged-pieces-link a {
     margin-left: 1em;
 }
+
+.payload-icon {
+    background-image: url("./bootstrap-icons/icons/list.svg");
+    background-position: left;
+    background-repeat: no-repeat;
+    padding-left: 1.25em;
+    margin-left: 1em;
+}
+
+.payloads {
+    padding-top: 1em;
+    margin: auto;
+}
+
+.payloads .title {
+    margin:  1em auto;
+    text-align: center;
+    font-size: 1.25em;
+    color: #a61e4d;
+}
+
+.payloads table{
+    font-size: 1em;
+}
+
+.payloads td, .payloads th {
+    vertical-align: top;
+    text-align: left;
+    padding: 0.5em 1em;
+}
+
+.payloads .download {
+    background-image: url("./bootstrap-icons/icons/download.svg");
+    background-position: left;
+    background-repeat: no-repeat;
+    padding-left: 1.25em;
+    margin-left: 1em;
+}
