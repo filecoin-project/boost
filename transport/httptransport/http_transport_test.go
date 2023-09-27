@@ -145,7 +145,6 @@ func httpParallelTransferTest(t *testing.T, rawSize int, nChunks, expectedChunks
 		case http.MethodHead:
 			addContentLengthHeader(w, len(st.carBytes))
 		}
-
 	}
 
 	svr := httptest.NewServer(handler)
@@ -194,7 +193,6 @@ func TestDealSizeIsZero(t *testing.T) {
 		case http.MethodHead:
 			addContentLengthHeader(w, len(st.carBytes))
 		}
-
 	}
 
 	svr := httptest.NewServer(handler)
@@ -222,7 +220,6 @@ func TestFailIfDealSizesDontMatch(t *testing.T) {
 		case http.MethodHead:
 			addContentLengthHeader(w, carSize)
 		}
-
 	}
 
 	svr := httptest.NewServer(handler)
@@ -599,7 +596,6 @@ func serversWithRangeHandler(st *serverTest) map[string]func(t *testing.T) (req 
 		case http.MethodHead:
 			addContentLengthHeader(w, len(st.carBytes))
 		}
-
 	}
 
 	svcs := serversWithCustomHandler(handler)
