@@ -273,7 +273,8 @@ func (c *ContractDealMonitor) getDealProposal(ctx context.Context, topicContract
 		From: &fromEthAddr,
 		To:   &toEthAddr,
 		Data: params,
-	}, ethtypes.NewEthBlockNumberOrHashFromPredefined("latest"))
+		//}, ethtypes.NewEthBlockNumberOrHashFromPredefined("latest"))
+	}, "latest")
 	if err != nil {
 		return nil, fmt.Errorf("eth call erred: %w", err)
 	}
@@ -308,7 +309,8 @@ func (c *ContractDealMonitor) getExtraData(ctx context.Context, topicContractAdd
 		From: &fromEthAddr,
 		To:   &toEthAddr,
 		Data: params,
-	}, ethtypes.NewEthBlockNumberOrHashFromPredefined("latest"))
+		//}, ethtypes.NewEthBlockNumberOrHashFromPredefined("latest"))
+	}, "latest")
 	if err != nil {
 		return nil, fmt.Errorf("eth call erred: %w", err)
 	}

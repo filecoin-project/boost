@@ -13,7 +13,7 @@ import (
 	types "github.com/filecoin-project/boost/storagemarket/types"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	market "github.com/filecoin-project/go-state-types/builtin/v9/market"
-	piece "github.com/filecoin-project/lotus/storage/pipeline/piece"
+	api "github.com/filecoin-project/lotus/api"
 	gomock "github.com/golang/mock/gomock"
 	cid "github.com/ipfs/go-cid"
 )
@@ -42,7 +42,7 @@ func (m *MockPieceAdder) EXPECT() *MockPieceAdderMockRecorder {
 }
 
 // AddPiece mocks base method.
-func (m *MockPieceAdder) AddPiece(arg0 context.Context, arg1 abi.UnpaddedPieceSize, arg2 io.Reader, arg3 piece.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
+func (m *MockPieceAdder) AddPiece(arg0 context.Context, arg1 abi.UnpaddedPieceSize, arg2 io.Reader, arg3 api.PieceDealInfo) (abi.SectorNumber, abi.PaddedPieceSize, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddPiece", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(abi.SectorNumber)

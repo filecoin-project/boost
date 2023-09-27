@@ -12,6 +12,8 @@ import (
 )
 
 func TestDirectDealsDB(t *testing.T) {
+	t.Skip("direct deals is disabled until it gets into a Filecoin network upgrade")
+
 	req := require.New(t)
 	ctx := context.Background()
 
@@ -86,6 +88,8 @@ func TestDirectDealsDB(t *testing.T) {
 }
 
 func TestDirectDealsDBSearch(t *testing.T) {
+	t.Skip("direct deals is disabled until it gets into a Filecoin network upgrade")
+
 	req := require.New(t)
 	ctx := context.Background()
 

@@ -22,8 +22,6 @@ import (
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/builtin/v12/miner"
-	"github.com/filecoin-project/go-state-types/builtin/v12/verifreg"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
@@ -330,6 +328,8 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 			}
 		}
 
+		_ = clientId
+
 		// Add the piece to a sector
 		sdInfo := lapi.PieceDealInfo{
 			// "Old" builtin-market deal info
@@ -345,16 +345,17 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 
 			// Direct Data Onboarding
 			// When PieceActivationManifest is set, builtin-market deal info must not be set
-			PieceActivationManifest: &miner.PieceActivationManifest{
-				CID:  entry.PieceCID,
-				Size: entry.PieceSize,
-				VerifiedAllocationKey: &miner.VerifiedAllocationKey{
-					Client: abi.ActorID(clientId),
-					ID:     verifreg.AllocationId(uint64(entry.AllocationID)), // TODO: fix verifreg v9 or v12
-				},
-				//Notify                []DataActivationNotification
-				Notify: nil,
-			},
+			//TODO: enable PieceActivationManifest when DDO ends up in a network upgrade
+			//PieceActivationManifest: &miner.PieceActivationManifest{
+			//CID:  entry.PieceCID,
+			//Size: entry.PieceSize,
+			//VerifiedAllocationKey: &miner.VerifiedAllocationKey{
+			//Client: abi.ActorID(clientId),
+			//ID:     verifreg.AllocationId(uint64(entry.AllocationID)), // TODO: fix verifreg v9 or v12
+			//},
+			////Notify                []DataActivationNotification
+			//Notify: nil,
+			//},
 
 			// Best-effort deal asks
 			KeepUnsealed: entry.KeepUnsealedCopy,
