@@ -62,7 +62,7 @@ func (d *downloader) doHttp() error {
 	// send http request and validate response
 	resp, err := d.transfer.client.Do(req)
 	if err != nil {
-		return &httpError{error: fmt.Errorf("failed to send  http req: %w", err)}
+		return &httpError{error: fmt.Errorf("failed to send http req: %w", err)}
 	}
 	// we should either get back a 200 or a 206 -> anything else means something has gone wrong and we return an error.
 	defer resp.Body.Close() // nolint
