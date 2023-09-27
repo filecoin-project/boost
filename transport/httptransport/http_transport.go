@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -236,19 +237,73 @@ type transfer struct {
 	dl     *logs.DealLogger
 
 	nChunks int
+	lock    sync.RWMutex
+}
+
+func (t *transfer) addBytesReceived(n int64) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.nBytesReceived += n
+	t.emitEvent(types.TransportEvent{NBytesReceived: t.nBytesReceived})
+}
+
+func (t *transfer) getBytesReceived() int64 {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.nBytesReceived
 }
 
 func (t *transfer) execute(ctx context.Context) error {
 	duuid := t.dealInfo.DealUuid
 
-	// create downloaders. Each downloader must be initialised with the same byte range across restarts in order to resume previous downloads.
-	// if the output file contains some data in it already, do not create a downloader for it again
+	// Create downloaders. Each downloader must be initialised with the same byte range across restarts in order to resume previous downloads.
+	// If the output file contains some data in it already - do not create a downloader for it again.
+	// Consider the following scenarios:
+	// 1. some chunks have been fully downloaded, some just partially. No chunks have been merged to the main file yet. We need to do nothing for the downloaded chunks
+	// 	  and finish downloading for the partial ones;
+	// 2. some chunks have been fully downloaded, some just partially. Some of the fully downloaded chunks have been merged into the main
+	//    file and their temp files have been deleted. We should not re-download the merged chunks again, finish downloading
+	//    the partial ones and proceed with merging.
 	outputStats, err := os.Stat(t.dealInfo.OutputFile)
 	if err != nil {
 		return &httpError{error: fmt.Errorf("failed to get stats of the output file: %w", err)}
 	}
 
-	chunkSize := t.dealInfo.DealSize / int64(t.nChunks)
+	// deal size parameter is not required when making a deal. If it's zero - determine deal size via HEAD request.
+	var dealSize int64
+	if dealSize == 0 {
+		req, err := http.NewRequest("HEAD", t.tInfo.URL, nil)
+		if err != nil {
+			return &httpError{error: fmt.Errorf("failed to create http HEAD req: %w", err)}
+		}
+		// add request headers
+		for name, val := range t.tInfo.Headers {
+			req.Header.Set(name, val)
+		}
+
+		resp, err := t.client.Do(req)
+		if err != nil {
+			return &httpError{error: fmt.Errorf("failed to send HEAD http req: %w", err)}
+		}
+		defer resp.Body.Close() // nolint
+
+		if resp.StatusCode != http.StatusOK {
+			return &httpError{
+				error: fmt.Errorf("http HEAD req failed: code: %d, status: %s", resp.StatusCode, resp.Status),
+				code:  resp.StatusCode,
+			}
+		}
+		if s := resp.Header.Get("Content-Length"); len(s) > 0 {
+			dealSize, err = strconv.ParseInt(s, 10, 64)
+			if err != nil {
+				return &httpError{
+					error: fmt.Errorf("error parsing content-length header: %w", err),
+				}
+			}
+		}
+	}
+
+	chunkSize := dealSize / int64(t.nChunks)
 	lastAppendedChunk := int(outputStats.Size() / chunkSize)
 
 	downloaders := make([]*downloader, 0, t.nChunks-lastAppendedChunk)
@@ -257,7 +312,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		rangeStart := int64(i) * chunkSize
 		var rangeEnd int64
 		if i == t.nChunks-1 {
-			rangeEnd = t.dealInfo.DealSize
+			rangeEnd = dealSize
 		} else {
 			rangeEnd = rangeStart + chunkSize
 		}
@@ -276,6 +331,7 @@ func (t *transfer) execute(ctx context.Context) error {
 			rangeStart: rangeStart,
 			rangeEnd:   rangeEnd,
 			chunkNo:    i,
+			dealSize:   dealSize,
 		}
 		downloaders = append(downloaders, &d)
 
@@ -295,7 +351,7 @@ func (t *transfer) execute(ctx context.Context) error {
 
 	for {
 
-		nBytesReceived := t.nBytesReceived
+		nBytesReceived := t.getBytesReceived()
 
 		group := errgroup.Group{}
 
@@ -358,9 +414,9 @@ func (t *transfer) execute(ctx context.Context) error {
 		}
 
 		// If some data was transferred, reset the back-off count to zero
-		if t.nBytesReceived > nBytesReceived {
+		if n := t.getBytesReceived(); n > nBytesReceived {
 			t.dl.Infow(duuid, "some data was transferred before connection error, so resetting backoff to zero",
-				"transferred", t.nBytesReceived-nBytesReceived)
+				"transferred", n-nBytesReceived)
 			t.backoff.Reset()
 		}
 
@@ -386,20 +442,22 @@ func (t *transfer) execute(ctx context.Context) error {
 
 	// --- http request finished successfully. see if we got the number of bytes we expected.
 
+	nBytesReceived := t.getBytesReceived()
+
 	// if the number of bytes we've received is not the same as the deal size, we have a failure.
-	if t.nBytesReceived != t.dealInfo.DealSize {
-		return fmt.Errorf("mismatch in dealSize vs received bytes, dealSize=%d, received=%d", t.dealInfo.DealSize, t.nBytesReceived)
+	if nBytesReceived != dealSize {
+		return fmt.Errorf("mismatch in dealSize vs received bytes, dealSize=%d, received=%d", dealSize, nBytesReceived)
 	}
 	// if the file size is not equal to the number of bytes received, something has gone wrong
 	st, err := os.Stat(t.dealInfo.OutputFile)
 	if err != nil {
 		return fmt.Errorf("failed to stat output file: %w", err)
 	}
-	if t.nBytesReceived != st.Size() {
-		return fmt.Errorf("mismtach in output file size vs received bytes, fileSize=%d, receivedBytes=%d", st.Size(), t.nBytesReceived)
+	if nBytesReceived != st.Size() {
+		return fmt.Errorf("mismtach in output file size vs received bytes, fileSize=%d, receivedBytes=%d", st.Size(), nBytesReceived)
 	}
 
-	t.dl.Infow(duuid, "http request finished successfully", "nBytesReceived", t.nBytesReceived,
+	t.dl.Infow(duuid, "http request finished successfully", "nBytesReceived", nBytesReceived,
 		"file size", st.Size())
 
 	return nil
