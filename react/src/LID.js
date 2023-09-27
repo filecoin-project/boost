@@ -628,14 +628,14 @@ function PieceStatus({pieceCid, pieceStatus, searchQuery}) {
                       <td>
                           <strong>{pieceCid}</strong>
                           &nbsp;
-                          <a className="payload-icon" href={"/piece-doctor/piece-payload/"+searchQuery}>
+                          <a className="payload-icon" href={"/piece-doctor/piece-payload/"+pieceCid}>
                               Payload CIDs
                           </a>
                       </td>
                     ) : (
                       <td>{pieceCid}
                           &nbsp;
-                          <a className="payload-icon" href={"/piece-doctor/piece-payload/"+searchQuery}>
+                          <a className="payload-icon" href={"/piece-doctor/piece-payload/"+pieceCid}>
                               Payload CIDs
                           </a>
                       </td>
