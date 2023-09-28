@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -19,6 +19,7 @@ import (
 	"github.com/jpillora/backoff"
 	p2phttp "github.com/libp2p/go-libp2p-http"
 	"github.com/libp2p/go-libp2p/core/host"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -30,6 +31,8 @@ const (
 	maxBackOff           = 10 * time.Minute
 	factor               = 1.5
 	maxReconnectAttempts = 15
+
+	nChunks = 5
 )
 
 type httpError struct {
@@ -50,6 +53,12 @@ func BackOffRetryOpt(minBackoff, maxBackoff time.Duration, factor, maxReconnectA
 	}
 }
 
+func NChunksOpt(nChunks int) Option {
+	return func(h *httpTransport) {
+		h.nChunks = nChunks
+	}
+}
+
 type httpTransport struct {
 	libp2pHost   host.Host
 	libp2pClient *http.Client
@@ -58,6 +67,8 @@ type httpTransport struct {
 	maxBackoffWait       time.Duration
 	backOffFactor        float64
 	maxReconnectAttempts float64
+
+	nChunks int
 
 	dl *logs.DealLogger
 }
@@ -69,6 +80,7 @@ func New(host host.Host, dealLogger *logs.DealLogger, opts ...Option) *httpTrans
 		maxBackoffWait:       maxBackOff,
 		backOffFactor:        factor,
 		maxReconnectAttempts: maxReconnectAttempts,
+		nChunks:              nChunks,
 		dl:                   dealLogger.Subsystem("http-transport"),
 	}
 	for _, o := range opts {
@@ -120,6 +132,12 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	}
 	h.dl.Infow(duuid, "existing file size", "file size", fileSize, "deal size", dealInfo.DealSize)
 
+	// default to a single stream for libp2p urls as libp2p server doesn't support range requests
+	nChunks := h.nChunks
+	if u.Scheme == "libp2p" {
+		nChunks = 1
+	}
+
 	// construct the transfer instance that will act as the transfer handler
 	tctx, cancel := context.WithCancel(ctx)
 	t := &transfer{
@@ -136,6 +154,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 		},
 		maxReconnectAttempts: h.maxReconnectAttempts,
 		dl:                   h.dl,
+		nChunks:              nChunks,
 	}
 
 	cleanupFns := []func(){
@@ -175,7 +194,8 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 
 	// is the transfer already complete ? we check this by comparing the number of bytes
 	// in the output file with the deal size.
-	if fileSize == dealInfo.DealSize {
+	// DealSize might be passed as zero for offline deals.
+	if dealInfo.DealSize != 0 && fileSize == dealInfo.DealSize {
 		defer cleanup()
 
 		t.emitEvent(types.TransportEvent{NBytesReceived: fileSize})
@@ -216,52 +236,176 @@ type transfer struct {
 
 	client *http.Client
 	dl     *logs.DealLogger
+
+	nChunks int
+	lock    sync.RWMutex
+}
+
+func (t *transfer) addBytesReceived(n int64) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.nBytesReceived += n
+	t.emitEvent(types.TransportEvent{NBytesReceived: t.nBytesReceived})
+}
+
+func (t *transfer) getBytesReceived() int64 {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.nBytesReceived
 }
 
 func (t *transfer) execute(ctx context.Context) error {
 	duuid := t.dealInfo.DealUuid
+
+	// Create downloaders. Each downloader must be initialised with the same byte range across restarts in order to resume previous downloads.
+	// If the output file contains some data in it already - do not create a downloader for it again.
+	// Consider the following scenarios:
+	// 1. some chunks have been fully downloaded, some just partially. No chunks have been merged to the main file yet. We need to do nothing for the downloaded chunks
+	// 	  and finish downloading for the partial ones;
+	// 2. some chunks have been fully downloaded, some just partially. Some of the fully downloaded chunks have been merged into the main
+	//    file and their temp files have been deleted. We should not re-download the merged chunks again, finish downloading
+	//    the partial ones and proceed with merging.
+	outputStats, err := os.Stat(t.dealInfo.OutputFile)
+	if err != nil {
+		return &httpError{error: fmt.Errorf("failed to get stats of the output file: %w", err)}
+	}
+
+	// determine deal size from HEAD request and make sure that it matches up with the one from the deal info
+	var dealSize int64
+	req, err := http.NewRequest("HEAD", t.tInfo.URL, nil)
+	if err != nil {
+		return &httpError{error: fmt.Errorf("failed to create http HEAD req: %w", err)}
+	}
+	// add request headers
+	for name, val := range t.tInfo.Headers {
+		req.Header.Set(name, val)
+	}
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return &httpError{error: fmt.Errorf("failed to send HEAD http req: %w", err)}
+	}
+	defer resp.Body.Close() // nolint
+
+	if resp.StatusCode != http.StatusOK {
+		return &httpError{
+			error: fmt.Errorf("http HEAD req failed: code: %d, status: %s", resp.StatusCode, resp.Status),
+			code:  resp.StatusCode,
+		}
+	}
+	if s := resp.Header.Get("Content-Length"); len(s) > 0 {
+		dealSize, err = strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return &httpError{
+				error: fmt.Errorf("error parsing content-length header: %w", err),
+			}
+		}
+	} else {
+		return &httpError{
+			error: fmt.Errorf("can't determine deal size from the head request, no header"),
+		}
+	}
+
+	if t.dealInfo.DealSize != 0 && dealSize != t.dealInfo.DealSize {
+		return &httpError{
+			error: fmt.Errorf("deal size mismatch: head: %d, dealInfo: %d", dealSize, t.dealInfo.DealSize),
+		}
+	}
+
+	chunkSize := dealSize / int64(t.nChunks)
+	lastAppendedChunk := int(outputStats.Size() / chunkSize)
+
+	downloaders := make([]*downloader, 0, t.nChunks-lastAppendedChunk)
+
+	for i := lastAppendedChunk; i < t.nChunks; i++ {
+		rangeStart := int64(i) * chunkSize
+		var rangeEnd int64
+		if i == t.nChunks-1 {
+			rangeEnd = dealSize
+		} else {
+			rangeEnd = rangeStart + chunkSize
+		}
+		// write first chunk directly to the output file
+		var chunkFile string
+		if i == 0 {
+			chunkFile = t.dealInfo.OutputFile
+		} else {
+			chunkFile = t.dealInfo.OutputFile + "-" + fmt.Sprint(i)
+		}
+		d := downloader{
+			ctx:        ctx,
+			transfer:   t,
+			chunkFile:  chunkFile,
+			outputFile: t.dealInfo.OutputFile,
+			rangeStart: rangeStart,
+			rangeEnd:   rangeEnd,
+			chunkNo:    i,
+			dealSize:   dealSize,
+		}
+		downloaders = append(downloaders, &d)
+
+		// if some chunks have been partially downloaded - add their sizes to nBytesReceived.
+		// that doesn't need to be done for the very first chunk as it's already included into the number
+		if i == 0 {
+			continue
+		}
+		st, err := os.Stat(d.chunkFile)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return &httpError{error: fmt.Errorf("failed to get stats of the chunk file: %w", err)}
+		}
+		if st != nil {
+			t.nBytesReceived += st.Size()
+		}
+	}
+
 	for {
-		// construct request
-		req, err := http.NewRequest("GET", t.tInfo.URL, nil)
-		if err != nil {
-			return fmt.Errorf("failed to create http req: %w", err)
+
+		nBytesReceived := t.getBytesReceived()
+
+		group := errgroup.Group{}
+
+		// download chunks into temporary files
+		for _, d := range downloaders {
+			group.Go(d.doHttp)
 		}
 
-		// get the number of bytes already received (the size of the output file)
-		st, err := os.Stat(t.dealInfo.OutputFile)
-		if err != nil {
-			return fmt.Errorf("failed to stat output file: %w", err)
-		}
-		t.nBytesReceived = st.Size()
-
-		// add request headers
-		for name, val := range t.tInfo.Headers {
-			req.Header.Set(name, val)
+		var reqErr *httpError
+		if err := group.Wait(); err != nil {
+			reqErr = err.(*httpError)
 		}
 
-		// add range req to start reading from the last byte we have in the output file
-		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", t.nBytesReceived))
-		// init the request with the transfer context
-		req = req.WithContext(ctx)
-		// open output file in append-only mode for writing
-		of, err := os.OpenFile(t.dealInfo.OutputFile, os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to open output file: %w", err)
-		}
-		defer of.Close()
-
-		// start the http transfer
-		remaining := t.dealInfo.DealSize - t.nBytesReceived
-		reqErr := t.doHttp(ctx, req, of, remaining)
 		if reqErr == nil {
-			t.dl.Infow(duuid, "http transfer completed successfully")
+			// append chunks one by one to the output file
+			// * minimize space overhead by removing the chunk file once it has been appended ot the output successfully
+			// * keep in mind restarts, resume writing from the correct chunk / offset
+			t.dl.Infow(duuid, "http transfer completed successfully, joining chunks")
+
+			for i := 0; i < len(downloaders); i++ {
+				d := downloaders[i]
+
+				if err := d.verify(); err != nil {
+					return &httpError{error: err}
+				}
+
+				// this is the first chunk, no more job to do as it has already been written to the output file
+				if d.chunkNo == 0 {
+					continue
+				}
+
+				err := d.appendChunkToTheOutput()
+				if err != nil {
+					return &httpError{error: fmt.Errorf("failed to append chunk to the output: %w", err)}
+				}
+				err = os.Remove(d.chunkFile)
+				if err != nil {
+					return &httpError{error: fmt.Errorf("failed to remove the chunk file: %w", err)}
+				}
+			}
 			// if there's no error, transfer was successful
 			break
 		}
 
 		t.dl.Infow(duuid, "http request error", "http code", reqErr.code, "outputErr", reqErr.Error())
-
-		_ = of.Close()
 
 		// check if the error is a 4xx error, meaning there is a problem with
 		// the request (eg 401 Unauthorized)
@@ -272,16 +416,16 @@ func (t *transfer) execute(ctx context.Context) error {
 		}
 
 		// do not resume transfer if context has been cancelled or if the context deadline has exceeded
-		err = reqErr.error
+		err := reqErr.error
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			t.dl.LogError(duuid, "terminating http transfer: context cancelled or deadline exceeded", err)
 			return fmt.Errorf("transfer context canceled err: %w", err)
 		}
 
 		// If some data was transferred, reset the back-off count to zero
-		if t.nBytesReceived > st.Size() {
+		if n := t.getBytesReceived(); n > nBytesReceived {
 			t.dl.Infow(duuid, "some data was transferred before connection error, so resetting backoff to zero",
-				"transferred", t.nBytesReceived-st.Size())
+				"transferred", n-nBytesReceived)
 			t.backoff.Reset()
 		}
 
@@ -307,80 +451,25 @@ func (t *transfer) execute(ctx context.Context) error {
 
 	// --- http request finished successfully. see if we got the number of bytes we expected.
 
+	nBytesReceived := t.getBytesReceived()
+
 	// if the number of bytes we've received is not the same as the deal size, we have a failure.
-	if t.nBytesReceived != t.dealInfo.DealSize {
-		return fmt.Errorf("mismatch in dealSize vs received bytes, dealSize=%d, received=%d", t.dealInfo.DealSize, t.nBytesReceived)
+	if nBytesReceived != dealSize {
+		return fmt.Errorf("mismatch in dealSize vs received bytes, dealSize=%d, received=%d", dealSize, nBytesReceived)
 	}
 	// if the file size is not equal to the number of bytes received, something has gone wrong
 	st, err := os.Stat(t.dealInfo.OutputFile)
 	if err != nil {
 		return fmt.Errorf("failed to stat output file: %w", err)
 	}
-	if t.nBytesReceived != st.Size() {
-		return fmt.Errorf("mismtach in output file size vs received bytes, fileSize=%d, receivedBytes=%d", st.Size(), t.nBytesReceived)
+	if nBytesReceived != st.Size() {
+		return fmt.Errorf("mismtach in output file size vs received bytes, fileSize=%d, receivedBytes=%d", st.Size(), nBytesReceived)
 	}
 
-	t.dl.Infow(duuid, "http request finished successfully", "nBytesReceived", t.nBytesReceived,
+	t.dl.Infow(duuid, "http request finished successfully", "nBytesReceived", nBytesReceived,
 		"file size", st.Size())
 
 	return nil
-}
-
-func (t *transfer) doHttp(ctx context.Context, req *http.Request, dst io.Writer, toRead int64) *httpError {
-	duid := t.dealInfo.DealUuid
-	t.dl.Infow(duid, "sending http request", "received", t.nBytesReceived, "remaining",
-		toRead, "range-rq", req.Header.Get("Range"))
-
-	// send http request and validate response
-	resp, err := t.client.Do(req)
-	if err != nil {
-		return &httpError{error: fmt.Errorf("failed to send  http req: %w", err)}
-	}
-	// we should either get back a 200 or a 206 -> anything else means something has gone wrong and we return an error.
-	defer resp.Body.Close() // nolint
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
-		return &httpError{
-			error: fmt.Errorf("http req failed: code: %d, status: %s", resp.StatusCode, resp.Status),
-			code:  resp.StatusCode,
-		}
-	}
-
-	//  start reading the response stream `readBufferSize` at a time using a limit reader so we only read as many bytes as we need to.
-	buf := make([]byte, readBufferSize)
-	limitR := io.LimitReader(resp.Body, toRead)
-	for {
-		if ctx.Err() != nil {
-			t.dl.LogError(duid, "stopped reading http response: context canceled", ctx.Err())
-			return &httpError{error: ctx.Err()}
-		}
-		nr, readErr := limitR.Read(buf)
-
-		// if we read more than zero bytes, write whatever read.
-		if nr > 0 {
-			nw, writeErr := dst.Write(buf[0:nr])
-
-			// if the number of read and written bytes don't match -> something has gone wrong, abort the http req.
-			if nw < 0 || nr != nw {
-				if writeErr != nil {
-					return &httpError{error: fmt.Errorf("failed to write to output file: %w", writeErr)}
-				}
-				return &httpError{error: fmt.Errorf("read-write mismatch writing to the output file, read=%d, written=%d", nr, nw)}
-			}
-
-			t.nBytesReceived = t.nBytesReceived + int64(nw)
-
-			// emit event updating the number of bytes received
-			t.emitEvent(types.TransportEvent{NBytesReceived: t.nBytesReceived})
-		}
-		// the http stream we're reading from has sent us an EOF, nothing to do here.
-		if readErr == io.EOF {
-			t.dl.Infow(duid, "http server sent EOF", "received", t.nBytesReceived, "deal-size", t.dealInfo.DealSize)
-			return nil
-		}
-		if readErr != nil {
-			return &httpError{error: fmt.Errorf("error reading from http response stream: %w", readErr)}
-		}
-	}
 }
 
 // Close shuts down the transfer for the given deal. It is the caller's responsibility to call Close after it no longer needs the transfer.

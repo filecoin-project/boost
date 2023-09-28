@@ -622,7 +622,7 @@ func NewStorageMarketProvider(provAddr address.Address, cfg *config.Boost) func(
 			SealingPipelineCacheTimeout: time.Duration(cfg.Dealmaking.SealingPipelineCacheTimeout),
 		}
 		dl := logs.NewDealLogger(logsDB)
-		tspt := httptransport.New(h, dl)
+		tspt := httptransport.New(h, dl, httptransport.NChunksOpt(cfg.HttpDownload.NChunks))
 		prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, commpc,
 			sps, cdm, df, logsSqlDB.db, logsDB, piecedirectory, ip, lp, &signatureVerifier{a}, dl, tspt)
 		if err != nil {
