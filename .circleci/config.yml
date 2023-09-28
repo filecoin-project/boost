@@ -148,7 +148,7 @@ jobs:
     macos:
       xcode: "15.0.0"
     working_directory: ~/go/src/github.com/filecoin-project/boost
-    resource_class: macos.x86.medium.gen2
+    resource_class: macos.m1.medium.gen1
     steps:
       - prepare:
           linux: false
@@ -369,4 +369,3 @@ workflows:
           target: "./cmd/booster-bitswap"
 
       - lid-docker-compose
-
