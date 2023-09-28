@@ -783,6 +783,15 @@ const PublishPendingDealsMutation = gql`
     }
 `;
 
+const PiecePayloadCidsQuery = gql`
+    query AppPiecePayloadCidsQuery($pieceCid: String!) {
+        piecePayloadCids(pieceCid: $pieceCid) {
+            PayloadCid
+            Multihash
+        }
+    }
+`;
+
 export {
     gqlClient,
     EpochQuery,
@@ -829,4 +838,5 @@ export {
     Libp2pAddrInfoQuery,
     StorageAskQuery,
     PublishPendingDealsMutation,
+    PiecePayloadCidsQuery,
 }

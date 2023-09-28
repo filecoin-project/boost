@@ -18,7 +18,14 @@ import {LegacyDealDetail} from "./LegacyDealDetail"
 import {SettingsPage} from "./Settings";
 import {Banner} from "./Banner";
 import {ProposalLogsPage} from "./ProposalLogs";
-import {PieceDoctorPage, InspectPiecePage, LIDPage, NoUnsealedSectorPieces, NoUnsealedSectorPage} from "./LID";
+import {
+    PieceDoctorPage,
+    InspectPiecePage,
+    LIDPage,
+    NoUnsealedSectorPieces,
+    NoUnsealedSectorPage,
+    PiecePayloadCids,
+} from "./LID";
 import {RetrievalLogsPage} from "./RetrievalLogs";
 import {RetrievalLogDetail} from "./RetrievalLogDetail";
 import {MonitoringAlert} from "./MonitoringAlert";
@@ -68,6 +75,7 @@ function App(props) {
                                         <Route path="/piece-doctor/from/:cursor/page/:pageNum" element={<PieceDoctorPage />} />
                                         <Route path="/piece-doctor/:query" element={<PieceDoctorPage />} />
                                         <Route path="/piece-doctor/piece/:pieceCID" element={<InspectPiecePage />} />
+                                        <Route path="/piece-doctor/piece-payload/:pieceCID" element={<PiecePayloadCids />} />
                                         <Route path="/no-unsealed" element={<NoUnsealedSectorPage />} />
                                         <Route path="/no-unsealed/from/:cursor/page/:pageNum" element={<NoUnsealedSectorPage />} />
                                         <Route path="/" element={<StorageDealsPage />} />
