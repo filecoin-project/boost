@@ -61,7 +61,7 @@ func NChunksOpt(nChunks int) Option {
 	}
 }
 
-func AllowProvateIPsOpt(b bool) Option {
+func AllowPrivateIPsOpt(b bool) Option {
 	return func(h *httpTransport) {
 		h.allowPrivateIPs = b
 	}
