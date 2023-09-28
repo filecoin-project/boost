@@ -126,8 +126,7 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse request url: %w", err)
 	}
-	ip := net.ParseIP(pu.Hostname())
-	if ip != nil && ip.IsPrivate() {
+	if ip := net.ParseIP(pu.Hostname()); ip != nil && ip.IsPrivate() {
 		return nil, fmt.Errorf("downloading from private ip addresses is not allowed")
 	}
 
