@@ -316,6 +316,73 @@ func TestConcurrentTransfers(t *testing.T) {
 	}
 }
 
+func TestDownloadFromPrivateIPs(t *testing.T) {
+	ctx := context.Background()
+	of := getTempFilePath(t)
+	// deal info is irrelevant in this test
+	dealInfo := &types.TransportDealInfo{
+		OutputFile: of,
+		DealSize:   1000,
+	}
+	// ht := New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks))
+	bz, err := json.Marshal(types.HttpRequest{URL: "http://192.168.0.1/blah"})
+	require.NoError(t, err)
+
+	// do not allow download from private IP addresses by default
+	_, err = New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks)).Execute(ctx, bz, dealInfo)
+	require.Error(t, err, "downloading from private addresses is not allowed")
+	// allow download from private addresses if explicitly enabled
+	_, err = New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks), AllowPrivateIPsOpt(true)).Execute(ctx, bz, dealInfo)
+	require.NoError(t, err)
+}
+
+func TestDontFollowHttpRedirects(t *testing.T) {
+	// we should not follow http redirects for security reasons. If the target URL tries to redirect, the client should return 303 response instead.
+	// This test sets up two servers, with one redirecting to the other. Without the redirect check the download would have been completed successfully.
+	rawSize := (100 * readBufferSize) + 30
+	ctx := context.Background()
+	st := newServerTest(t, rawSize)
+	carSize := len(st.carBytes)
+
+	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			offset := r.Header.Get("Range")
+
+			startend := strings.Split(strings.TrimPrefix(offset, "bytes="), "-")
+			start, _ := strconv.ParseInt(startend[0], 10, 64)
+			end, _ := strconv.ParseInt(startend[1], 10, 64)
+
+			w.WriteHeader(200)
+			if end == 0 {
+				w.Write(st.carBytes[start:]) //nolint:errcheck
+			} else {
+				w.Write(st.carBytes[start:end]) //nolint:errcheck
+			}
+		case http.MethodHead:
+			addContentLengthHeader(w, len(st.carBytes))
+		}
+	}
+	svr := httptest.NewServer(handler)
+	defer svr.Close()
+
+	var redirectHandler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, svr.URL, http.StatusSeeOther)
+	}
+	redirectSvr := httptest.NewServer(redirectHandler)
+	defer redirectSvr.Close()
+
+	of := getTempFilePath(t)
+	th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks)), carSize, types.HttpRequest{URL: redirectSvr.URL}, of)
+	require.NotNil(t, th)
+
+	evts := waitForTransferComplete(th)
+	require.NotEmpty(t, evts)
+	require.Equal(t, 1, len(evts))
+	require.EqualValues(t, 0, evts[0].NBytesReceived)
+	require.Contains(t, evts[0].Error.Error(), "303 See Other")
+}
+
 func TestCompletionOnMultipleAttemptsWithSameFile(t *testing.T) {
 	ctx := context.Background()
 	of := getTempFilePath(t)
