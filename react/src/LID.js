@@ -830,8 +830,6 @@ export function PiecePayloadCids() {
         return <div>Loading ...</div>
     }
 
-    console.log(data)
-
     var payload = data.piecePayloadCids
     return <div className="payloads modal" id={params.pieceCID}>
         <div className="content">
