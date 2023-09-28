@@ -214,7 +214,8 @@ func DefaultBoost() *Boost {
 			},
 		},
 		HttpDownload: HttpDownloadConfig{
-			NChunks: 5,
+			NChunks:         5,
+			AllowPrivateIPs: false,
 		},
 	}
 	return cfg

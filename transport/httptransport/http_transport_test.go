@@ -316,7 +316,7 @@ func TestConcurrentTransfers(t *testing.T) {
 	}
 }
 
-func TestDontAllowDownloadingFromPrivateAddresses(t *testing.T) {
+func TestDownloadFromPrivateIPs(t *testing.T) {
 	ctx := context.Background()
 	of := getTempFilePath(t)
 	// deal info is irrelevant in this test
@@ -324,12 +324,16 @@ func TestDontAllowDownloadingFromPrivateAddresses(t *testing.T) {
 		OutputFile: of,
 		DealSize:   1000,
 	}
-	ht := New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks))
+	// ht := New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks))
 	bz, err := json.Marshal(types.HttpRequest{URL: "http://192.168.0.1/blah"})
 	require.NoError(t, err)
 
-	_, err = ht.Execute(ctx, bz, dealInfo)
+	// do not allow download from private IP addresses by default
+	_, err = New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks)).Execute(ctx, bz, dealInfo)
 	require.Error(t, err, "downloading from private addresses is not allowed")
+	// allow download from private addresses if explicitly enabled
+	_, err = New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks), AllowProvateIPsOpt(true)).Execute(ctx, bz, dealInfo)
+	require.NoError(t, err)
 }
 
 func TestDontFollowHttpRedirects(t *testing.T) {

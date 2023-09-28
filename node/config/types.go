@@ -428,4 +428,7 @@ type HttpDownloadConfig struct {
 	// which improves the overall download speed. NChunks is always equal to 1 for libp2p transport because libp2p server
 	// doesn't support range requests yet. NChunks must be greater than 0 and less than 16, with the default of 5.
 	NChunks int
+	// AllowPrivateIPs defines whether boost should allow HTTP downloads from private IPs as per https://en.wikipedia.org/wiki/Private_network.
+	// The default is false.
+	AllowPrivateIPs bool
 }

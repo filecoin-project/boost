@@ -61,6 +61,12 @@ func NChunksOpt(nChunks int) Option {
 	}
 }
 
+func AllowProvateIPsOpt(b bool) Option {
+	return func(h *httpTransport) {
+		h.allowPrivateIPs = b
+	}
+}
+
 type httpTransport struct {
 	libp2pHost   host.Host
 	libp2pClient *http.Client
@@ -70,7 +76,8 @@ type httpTransport struct {
 	backOffFactor        float64
 	maxReconnectAttempts float64
 
-	nChunks int
+	nChunks         int
+	allowPrivateIPs bool
 
 	dl *logs.DealLogger
 }
@@ -121,13 +128,14 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	}
 	tInfo.URL = u.Url
 
-	// don't allow private network addresses as per https://en.wikipedia.org/wiki/Private_network
-	pu, err := url.Parse(u.Url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse request url: %w", err)
-	}
-	if ip := net.ParseIP(pu.Hostname()); ip != nil && ip.IsPrivate() {
-		return nil, fmt.Errorf("downloading from private ip addresses is not allowed")
+	if !h.allowPrivateIPs {
+		pu, err := url.Parse(u.Url)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse the request url: %w", err)
+		}
+		if ip := net.ParseIP(pu.Hostname()); ip != nil && ip.IsPrivate() {
+			return nil, fmt.Errorf("downloading from private ip addresses is not allowed")
+		}
 	}
 
 	// check that the outputFile exists
