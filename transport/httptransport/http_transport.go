@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"sync"
@@ -119,6 +121,16 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 	}
 	tInfo.URL = u.Url
 
+	// don't allow private network addresses as per https://en.wikipedia.org/wiki/Private_network
+	pu, err := url.Parse(u.Url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse request url: %w", err)
+	}
+	ip := net.ParseIP(pu.Hostname())
+	if ip != nil && ip.IsPrivate() {
+		return nil, fmt.Errorf("downloading from private ip addresses is not allowed")
+	}
+
 	// check that the outputFile exists
 	fi, err := os.Stat(dealInfo.OutputFile)
 	if err != nil {
@@ -188,7 +200,13 @@ func (h *httpTransport) Execute(ctx context.Context, transportInfo []byte, dealI
 			h.libp2pHost.ConnManager().Unprotect(u.PeerID, tag)
 		})
 	} else {
-		t.client = http.DefaultClient
+		// do not follow http redirects for security reasons
+		t.client = &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+
 		h.dl.Infow(duuid, "http url", "url", tInfo.URL)
 	}
 
