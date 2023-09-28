@@ -332,7 +332,7 @@ func TestDownloadFromPrivateIPs(t *testing.T) {
 	_, err = New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks)).Execute(ctx, bz, dealInfo)
 	require.Error(t, err, "downloading from private addresses is not allowed")
 	// allow download from private addresses if explicitly enabled
-	_, err = New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks), AllowProvateIPsOpt(true)).Execute(ctx, bz, dealInfo)
+	_, err = New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks), AllowPrivateIPsOpt(true)).Execute(ctx, bz, dealInfo)
 	require.NoError(t, err)
 }
 
