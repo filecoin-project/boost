@@ -93,7 +93,8 @@ func handleConnection(t *testing.T, localConn net.Conn, remoteAddr string, laten
 		buf := make([]byte, readBufferSize)
 		for {
 			// ensures that we don't get blocked on reading multi-chunked payloads
-			from.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			rerr := from.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			require.NoError(t, rerr)
 			numBytesRead, rerr := from.Read(buf)
 			if numBytesRead > 0 {
 				_, werr := to.Write(buf[0:numBytesRead])
