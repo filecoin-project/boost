@@ -217,7 +217,7 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=lotus@v1.23.4-rc1
+lotus_version?=lotus@v1.23.4-rc2
 ffi_from_source?=0
 build_lotus?=0
 build_boost?=1

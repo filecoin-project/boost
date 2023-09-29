@@ -51,7 +51,7 @@ require (
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-cidutil v0.1.0
 	github.com/ipfs/go-datastore v0.6.0
-	github.com/ipfs/go-graphsync v0.14.10
+	github.com/ipfs/go-graphsync v0.15.1
 	github.com/ipfs/go-ipfs-blocksutil v0.0.1
 	github.com/ipfs/go-ipfs-chunker v0.0.5 // indirect
 	github.com/ipfs/go-ipfs-ds-help v1.1.0 // indirect
@@ -336,10 +336,10 @@ require (
 	github.com/filecoin-project/boost-graphsync v0.13.9
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
-	github.com/filecoin-project/lotus v1.23.4-rc1
+	github.com/filecoin-project/lotus v1.23.4-rc2
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
-	github.com/ipni/go-libipni v0.5.1
+	github.com/ipni/go-libipni v0.5.4
 	github.com/ipni/ipni-cli v0.1.1
 	github.com/schollz/progressbar/v3 v3.13.1
 )
