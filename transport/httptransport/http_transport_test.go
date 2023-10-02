@@ -197,7 +197,8 @@ func TestFirstUpgradeToChunking(t *testing.T) {
 			of := getTempFilePath(t)
 
 			// write some content into the output file to simulate a half-finished download
-			os.WriteFile(of, st.carBytes[:readBufferSize/10], 0644)
+			err := os.WriteFile(of, st.carBytes[:readBufferSize/10], 0644)
+			require.NoError(t, err)
 
 			th := executeTransfer(t, ctx, New(h, newDealLogger(t, ctx)), carSize, reqFn(), of)
 			require.NotNil(t, th)
