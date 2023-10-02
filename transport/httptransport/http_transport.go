@@ -1,6 +1,7 @@
 package httptransport
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -299,20 +301,25 @@ func (t *transfer) execute(ctx context.Context) error {
 			nChunks = 1
 		}
 
-		err := os.WriteFile(controlFile, []byte(strconv.Itoa(nChunks)), 0644)
+		err := t.writeControlFile(controlFile, map[string]string{"nChunks": strconv.Itoa(nChunks)})
 		if err != nil {
 			return &httpError{error: fmt.Errorf("failed to create control file %s: %w", controlFile, err)}
 		}
 	} else if err != nil {
 		return &httpError{error: fmt.Errorf("failed to get stats of control file %s: %w", controlFile, err)}
 	} else {
-		b, err := os.ReadFile(controlFile)
+		conf, err := t.readControlFile(controlFile)
 		if err != nil {
 			return &httpError{error: fmt.Errorf("failed to read control file %s: %w", controlFile, err)}
 		}
-		nChunks, err = strconv.Atoi(string(b))
-		if err != nil {
-			return &httpError{error: fmt.Errorf("failed to parse control file %s: %w", controlFile, err)}
+		if snChunks, ok := conf["nChunks"]; ok {
+			nChunks, err = strconv.Atoi(string(snChunks))
+			if err != nil {
+				return &httpError{error: fmt.Errorf("failed to parse control file %s: %w", controlFile, err)}
+			}
+		} else {
+			t.dl.Infow(duuid, "Control file is missing nChunks property, defaulting to 1", "file", controlFile)
+			nChunks = 1
 		}
 	}
 
@@ -572,4 +579,37 @@ func (t *transfer) closeEventChannel(ctx context.Context) {
 		}
 	}
 	close(t.eventCh)
+}
+
+func (t *transfer) readControlFile(cf string) (map[string]string, error) {
+	input, err := os.OpenFile(cf, os.O_RDONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("error opening control file for read %s: %w", cf, err)
+	}
+	defer input.Close()
+
+	config := make(map[string]string)
+	s := bufio.NewScanner(input)
+	for s.Scan() {
+		conf := strings.Split(s.Text(), "=")
+		config[conf[0]] = conf[1]
+	}
+
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
+
+	return config, nil
+}
+
+func (t *transfer) writeControlFile(cf string, config map[string]string) error {
+	output, err := os.OpenFile(cf, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("error opening control file for write %s: %w", cf, err)
+	}
+	defer output.Close()
+	for k, v := range config {
+		output.WriteString(fmt.Sprintf("%s=%s\n", k, v))
+	}
+	return nil
 }
