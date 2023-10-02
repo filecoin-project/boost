@@ -376,7 +376,7 @@ export function StorageDealsMenuItem(props) {
                 </Link>
             ) : null}
 
-            <DirectDealsCount />
+            //<DirectDealsCount />
             <LegacyStorageDealsCount />
         </div>
     )

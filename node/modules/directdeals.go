@@ -32,28 +32,7 @@ func NewDirectDealsProvider(provAddr address.Address, cfg *config.Boost) func(lc
 		piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper,
 		lp gfm_storagemarket.StorageProvider, cdm *storagemarket.ChainDealManager) (*storagemarket.DirectDealsProvider, error) {
 
-		//prvCfg := storagemarket.Config{
-		//MaxTransferDuration:     time.Duration(cfg.Dealmaking.MaxTransferDuration),
-		//RemoteCommp:             cfg.Dealmaking.RemoteCommp,
-		//MaxConcurrentLocalCommp: cfg.Dealmaking.MaxConcurrentLocalCommp,
-		//TransferLimiter: storagemarket.TransferLimiterConfig{
-		//MaxConcurrent:    cfg.Dealmaking.HttpTransferMaxConcurrentDownloads,
-		//StallCheckPeriod: time.Duration(cfg.Dealmaking.HttpTransferStallCheckPeriod),
-		//StallTimeout:     time.Duration(cfg.Dealmaking.HttpTransferStallTimeout),
-		//},
-		//DealLogDurationDays:         cfg.Dealmaking.DealLogDurationDays,
-		//StorageFilter:               cfg.Dealmaking.Filter,
-		//SealingPipelineCacheTimeout: time.Duration(cfg.Dealmaking.SealingPipelineCacheTimeout),
-		//}
 		dl := logs.NewDealLogger(logsDB)
-		//tspt := httptransport.New(h, dl)
-		//prov, err := storagemarket.NewProvider(prvCfg, sqldb, dealsDB, fundMgr, storageMgr, a, dp, provAddr, secb, commpc,
-		//sps, cdm, df, logsSqlDB.db, logsDB, piecedirectory, ip, lp, &signatureVerifier{a}, dl, tspt)
-		//if err != nil {
-		//return nil, err
-		//}
-
-		//func NewDirectDealsProvider(fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, directDealsDB *db.DirectDataDB, dealLogger *logs.DealLogger) *DirectDealsProvider {
 
 		ddpCfg := storagemarket.DDPConfig{
 			StartEpochSealingBuffer: abi.ChainEpoch(cfg.Dealmaking.StartEpochSealingBuffer),
