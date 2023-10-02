@@ -120,7 +120,7 @@ func TestSimpleTransfer(t *testing.T) {
 	}
 }
 
-func httpParallelTransferTest(t *testing.T, rawSize int, nChunks, expectedChunks int) {
+func httpParallelTransferTest(t *testing.T, of string, rawSize int, nChunks, expectedChunks int) {
 	ctx := context.Background()
 	st := newServerTest(t, rawSize)
 	carSize := len(st.carBytes)
@@ -150,7 +150,6 @@ func httpParallelTransferTest(t *testing.T, rawSize int, nChunks, expectedChunks
 	svr := httptest.NewServer(handler)
 	defer svr.Close()
 
-	of := getTempFilePath(t)
 	th := executeTransfer(t, ctx, New(nil, newDealLogger(t, ctx), NChunksOpt(nChunks)), carSize, types.HttpRequest{URL: svr.URL}, of)
 	require.NotNil(t, th)
 
@@ -162,11 +161,59 @@ func httpParallelTransferTest(t *testing.T, rawSize int, nChunks, expectedChunks
 }
 
 func TestHttpTransferShouldBeDoneInOneChunk(t *testing.T) {
-	httpParallelTransferTest(t, (100*readBufferSize)+30, 1, 1)
+	httpParallelTransferTest(t, getTempFilePath(t), (100*readBufferSize)+30, 1, 1)
 }
 
 func TestHttpTransferShouldBeDoneInMultipleChunks(t *testing.T) {
-	httpParallelTransferTest(t, (100*readBufferSize)+30, 5, 5)
+	httpParallelTransferTest(t, getTempFilePath(t), (100*readBufferSize)+30, 5, 5)
+}
+
+func TestChangeNumberOfChunksForUnfinishedDownloads(t *testing.T) {
+	// This test ensures that downloads complete with the same chunking setting that they have been started with.
+	// For example if a download has been started with NChunks=3, then
+	// it should finish in 3 chunks even if the node has been restarted in between with the setting changed.
+	of := getTempFilePath(t)
+	err := os.WriteFile(of+"-control", []byte(strconv.Itoa(3)), 0644)
+	require.NoError(t, err)
+	// here we start download in 5 chunks while control file has 3 captured in it
+	httpParallelTransferTest(t, of, (100*readBufferSize)+30, 5, 3)
+}
+
+func TestFirstUpgradeToChunking(t *testing.T) {
+	// verify that users can finish their existsing downloads when they upgrade to chunking for the first time,
+	// regardless of what their new chunking setting is. This test ensures that the number of chunks is set to one
+	// for all previously unnfinished downloads
+
+	ctx := context.Background()
+	rawSize := (100 * readBufferSize) + 30
+	st := newServerTest(t, rawSize)
+	carSize := len(st.carBytes)
+	svcs := serversWithRangeHandler(st)
+
+	for name, init := range svcs {
+		t.Run(name, func(t *testing.T) {
+			reqFn, closer, h := init(t)
+			defer closer()
+			of := getTempFilePath(t)
+
+			// write some content into the output file to simulate a half-finished download
+			os.WriteFile(of, st.carBytes[:readBufferSize/10], 0644)
+
+			th := executeTransfer(t, ctx, New(h, newDealLogger(t, ctx)), carSize, reqFn(), of)
+			require.NotNil(t, th)
+
+			evts := waitForTransferComplete(th)
+			require.NotEmpty(t, evts)
+			require.EqualValues(t, carSize, evts[len(evts)-1].NBytesReceived)
+			assertFileContents(t, of, st.carBytes)
+
+			// verify that the output folder contains just a single output file, no temporary chunks
+			dir, _ := os.Open(filepath.Dir(of))
+			files, _ := dir.Readdir(0)
+			require.Equal(t, 1, len(files))
+			require.Equal(t, filepath.Base(of), files[0].Name())
+		})
+	}
 }
 
 func TestDealSizeIsZero(t *testing.T) {
