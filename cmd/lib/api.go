@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/api"
 	cliutil "github.com/filecoin-project/boost/cli/util"
 	"github.com/filecoin-project/boost/markets/sectoraccessor"
@@ -126,6 +127,7 @@ func (a *MultiMinerAccessor) Start(ctx context.Context, log *logging.ZapEventLog
 			return fmt.Errorf("creating sector accessor for endpoint '%s': %w", apiInfo, err)
 		}
 		a.sas[sa.maddr] = sa
+		spew.Dump(sa.maddr)
 		a.readers[sa.maddr] = &piecedirectory.SectorAccessorAsPieceReader{SectorAccessor: sa}
 		a.closers = append(a.closers, closer)
 	}

@@ -3,15 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/filecoin-project/boost/itests/shared"
-	"github.com/filecoin-project/lotus/itests/kit"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"os"
 	"path"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/filecoin-project/boost/itests/shared"
+	"github.com/filecoin-project/lotus/itests/kit"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMultiMinerHttpRetrieval(t *testing.T) {
@@ -19,8 +21,12 @@ func TestMultiMinerHttpRetrieval(t *testing.T) {
 		miner1ApiInfo, err := rt.BoostAndMiner1.LotusMinerApiInfo()
 		require.NoError(t, err)
 
+		spew.Dump(miner1ApiInfo)
+
 		miner2ApiInfo, err := rt.BoostAndMiner2.LotusMinerApiInfo()
 		require.NoError(t, err)
+
+		spew.Dump(miner2ApiInfo)
 
 		fullNode2ApiInfo, err := rt.BoostAndMiner2.LotusFullNodeApiInfo()
 		require.NoError(t, err)
@@ -84,6 +90,7 @@ func runBoosterHttp(ctx context.Context, repo string, minerApiInfo []string, ful
 
 	args := []string{"booster-http",
 		"--repo=" + repo,
+		"--vv",
 		"run",
 		"--api-fullnode=" + fullNodeApiInfo,
 		"--api-lid=" + lidApiInfo,

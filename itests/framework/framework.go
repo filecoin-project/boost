@@ -32,16 +32,13 @@ import (
 	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/builtin/v9/market"
 	minertypes "github.com/filecoin-project/go-state-types/builtin/v9/miner"
-	verifregtypes "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/go-state-types/exitcode"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	lbuild "github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
-	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	chaintypes "github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/chain/wallet/key"
 	"github.com/filecoin-project/lotus/gateway"
 	"github.com/filecoin-project/lotus/itests/kit"
 	lnode "github.com/filecoin-project/lotus/node"
@@ -81,7 +78,6 @@ var Log = logging.Logger("boosttest")
 type TestFrameworkConfig struct {
 	Ensemble     *kit.Ensemble
 	EnableLegacy bool
-	ensembleOpts []kit.EnsembleOpt
 }
 
 type TestFramework struct {
@@ -113,19 +109,13 @@ func WithEnsemble(e *kit.Ensemble) FrameworkOpts {
 	}
 }
 
-func EnsembleOpts(opts ...kit.EnsembleOpt) FrameworkOpts {
-	return func(tmc *TestFrameworkConfig) {
-		tmc.ensembleOpts = opts
-	}
-}
-
 func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) *TestFramework {
 	fmc := &TestFrameworkConfig{}
 	for _, opt := range opts {
 		opt(fmc)
 	}
 
-	fullNode, miner := FullNodeAndMiner(t, fmc.ensembleOpts...)
+	fullNode, miner := FullNodeAndMiner(t, fmc.Ensemble)
 	return &TestFramework{
 		ctx:        ctx,
 		config:     fmc,
@@ -135,7 +125,7 @@ func NewTestFramework(ctx context.Context, t *testing.T, opts ...FrameworkOpts) 
 	}
 }
 
-func FullNodeAndMiner(t *testing.T, ensOpts ...kit.EnsembleOpt) (*kit.TestFullNode, *kit.TestMiner) {
+func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, *kit.TestMiner) {
 	// Set up a full node and a miner (without markets)
 	var fullNode kit.TestFullNode
 	var miner kit.TestMiner
@@ -157,6 +147,7 @@ func FullNodeAndMiner(t *testing.T, ensOpts ...kit.EnsembleOpt) (*kit.TestFullNo
 					sc.MaxSealingSectorsForDeals = 3
 					sc.AlwaysKeepUnsealedCopy = true
 					sc.WaitDealsDelay = time.Hour
+					sc.BatchPreCommits = false
 					sc.AggregateCommits = false
 
 					return sc, nil
@@ -164,8 +155,7 @@ func FullNodeAndMiner(t *testing.T, ensOpts ...kit.EnsembleOpt) (*kit.TestFullNo
 			}),
 		)),
 	}
-
-	fullNodeOpts := []kit.NodeOpt{
+	fnOpts := []kit.NodeOpt{
 		kit.ConstructorOpts(
 			lnode.Override(new(lp2p.RawHost), func() (host.Host, error) {
 				return libp2p.New(libp2p.DefaultTransports)
@@ -175,17 +165,23 @@ func FullNodeAndMiner(t *testing.T, ensOpts ...kit.EnsembleOpt) (*kit.TestFullNo
 		secSizeOpt,
 	}
 
-	eOpts := []kit.EnsembleOpt{
-		//TODO: at the moment we are not mocking proofs
-		//maybe enable this in the future to speed up tests further
+	defaultEnsemble := ensemble == nil
+	if defaultEnsemble {
+		eOpts := []kit.EnsembleOpt{
+			//TODO: at the moment we are not mocking proofs
+			//maybe enable this in the future to speed up tests further
 
-		//kit.MockProofs(),
+			//kit.MockProofs(),
+		}
+		ensemble = kit.NewEnsemble(t, eOpts...)
 	}
-	eOpts = append(eOpts, ensOpts...)
 
-	blockTime := 100 * time.Millisecond
-	ens := kit.NewEnsemble(t, eOpts...).FullNode(&fullNode, fullNodeOpts...).Miner(&miner, &fullNode, minerOpts...).Start()
-	ens.BeginMining(blockTime)
+	ensemble.FullNode(&fullNode, fnOpts...).Miner(&miner, &fullNode, minerOpts...)
+	if defaultEnsemble {
+		ensemble.Start()
+		blockTime := 100 * time.Millisecond
+		ensemble.BeginMining(blockTime)
+	}
 
 	return &fullNode, &miner
 }
@@ -528,87 +524,6 @@ func (f *TestFramework) AddClientProviderBalance(bal abi.TokenAmount) error {
 	}
 
 	Log.Info("done adding balance requirements")
-	return nil
-}
-
-func (f *TestFramework) AddClientDataCap(ctx context.Context, rootKey *key.Key, verifierKey *key.Key, datacap int) error {
-	// import the root key.
-	rootAddr, err := f.FullNode.WalletImport(ctx, &rootKey.KeyInfo)
-	if err != nil {
-		return err
-	}
-
-	// import the verifier's key.
-	verifierAddr, err := f.FullNode.WalletImport(ctx, &verifierKey.KeyInfo)
-	if err != nil {
-		return err
-	}
-
-	// add datacap allowance to the verifier
-	params, err := actors.SerializeParams(&verifregtypes.AddVerifierParams{Address: verifierAddr, Allowance: big.NewInt(100000000000)})
-	if err != nil {
-		return err
-	}
-
-	msg := &ltypes.Message{
-		From:   rootAddr,
-		To:     verifreg.Address,
-		Method: verifreg.Methods.AddVerifier,
-		Params: params,
-		Value:  big.Zero(),
-	}
-
-	sm, err := f.FullNode.MpoolPushMessage(ctx, msg, nil)
-	if err != nil {
-		return fmt.Errorf("AddVerifier failed: %w", err)
-	}
-	res, err := f.FullNode.StateWaitMsg(ctx, sm.Cid(), 1, lapi.LookbackNoLimit, true)
-	if err != nil {
-		return fmt.Errorf("AddVerifier failed: %w", err)
-	}
-	if res.Receipt.ExitCode != 0 {
-		return fmt.Errorf("AddVerifier non-zero exit code: %d", res.Receipt.ExitCode)
-	}
-
-	// assign datacap to client
-	params, err = actors.SerializeParams(&verifregtypes.AddVerifiedClientParams{
-		Address:   f.ClientAddr,
-		Allowance: big.NewInt(int64(datacap)),
-	})
-	if err != nil {
-		return err
-	}
-
-	msg = &ltypes.Message{
-		From:   verifierAddr,
-		To:     verifreg.Address,
-		Method: verifreg.Methods.AddVerifiedClient,
-		Params: params,
-		Value:  big.Zero(),
-	}
-
-	sm, err = f.FullNode.MpoolPushMessage(ctx, msg, nil)
-	if err != nil {
-		return fmt.Errorf("AddVerifiedClient failed: %w", err)
-	}
-
-	res, err = f.FullNode.StateWaitMsg(ctx, sm.Cid(), 1, lapi.LookbackNoLimit, true)
-	if err != nil {
-		return fmt.Errorf("AddVerifiedClient failed: %w", err)
-	}
-	if res.Receipt.ExitCode != 0 {
-		return fmt.Errorf("AddVerifiedClient non-zero exit code: %d", res.Receipt.ExitCode)
-	}
-
-	// check datacap balance
-	dcap, err := f.FullNode.StateVerifiedClientStatus(ctx, f.ClientAddr, ltypes.EmptyTSK)
-	if err != nil {
-		return err
-	}
-	if int64(datacap) != dcap.Int64() {
-		return fmt.Errorf("verified client datacap is %s but expected %d", dcap, datacap)
-	}
-
 	return nil
 }
 
@@ -961,39 +876,4 @@ consumeEvents:
 	}
 
 	return ret
-}
-
-type DatacapParams struct {
-	RootKey     *key.Key
-	VerifierKey *key.Key
-	Opts        []kit.EnsembleOpt
-}
-
-func BuildDatacapParams() (*DatacapParams, error) {
-	rootKey, err := key.GenerateKey(ltypes.KTSecp256k1)
-	if err != nil {
-		return nil, err
-	}
-
-	verifierKey, err := key.GenerateKey(ltypes.KTSecp256k1)
-	if err != nil {
-		return nil, err
-	}
-
-	bal, err := ltypes.ParseFIL("100fil")
-	if err != nil {
-		return nil, err
-	}
-
-	eOpts := []kit.EnsembleOpt{
-		kit.RootVerifier(rootKey, abi.NewTokenAmount(bal.Int64())),
-		// assign some balance to the verifier so they can send an AddClient message.
-		kit.Account(verifierKey, abi.NewTokenAmount(bal.Int64())),
-	}
-
-	return &DatacapParams{
-		RootKey:     rootKey,
-		VerifierKey: verifierKey,
-		Opts:        eOpts,
-	}, nil
 }
