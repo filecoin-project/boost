@@ -609,7 +609,10 @@ func (t *transfer) writeControlFile(cf string, config map[string]string) error {
 	}
 	defer output.Close()
 	for k, v := range config {
-		output.WriteString(fmt.Sprintf("%s=%s\n", k, v))
+		_, err = output.WriteString(fmt.Sprintf("%s=%s\n", k, v))
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
