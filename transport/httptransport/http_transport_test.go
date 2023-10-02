@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"math/rand"
 	"net"
@@ -174,7 +173,9 @@ func TestChangeNumberOfChunksForUnfinishedDownloads(t *testing.T) {
 	// For example if a download has been started with NChunks=3, then
 	// it should finish in 3 chunks even if the node has been restarted in between with the setting changed.
 	of := getTempFilePath(t)
-	err := os.WriteFile(of+"-control", []byte(fmt.Sprintf("nChunks=%s\n", strconv.Itoa(3))), 0644)
+	data, err := json.Marshal(transferConfig{NChunks: 3})
+	require.NoError(t, err)
+	err = os.WriteFile(of+"-control", data, 0644)
 	require.NoError(t, err)
 	// here we start download in 5 chunks while control file has 3 captured in it
 	httpParallelTransferTest(t, of, (100*readBufferSize)+30, 5, 3)

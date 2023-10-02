@@ -1,17 +1,16 @@
 package httptransport
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -301,7 +300,7 @@ func (t *transfer) execute(ctx context.Context) error {
 			nChunks = 1
 		}
 
-		err := t.writeControlFile(controlFile, map[string]string{"nChunks": strconv.Itoa(nChunks)})
+		err := t.writeControlFile(controlFile, transferConfig{nChunks})
 		if err != nil {
 			return &httpError{error: fmt.Errorf("failed to create control file %s: %w", controlFile, err)}
 		}
@@ -312,15 +311,7 @@ func (t *transfer) execute(ctx context.Context) error {
 		if err != nil {
 			return &httpError{error: fmt.Errorf("failed to read control file %s: %w", controlFile, err)}
 		}
-		if snChunks, ok := conf["nChunks"]; ok {
-			nChunks, err = strconv.Atoi(string(snChunks))
-			if err != nil {
-				return &httpError{error: fmt.Errorf("failed to parse control file %s: %w", controlFile, err)}
-			}
-		} else {
-			t.dl.Infow(duuid, "Control file is missing nChunks property, defaulting to 1", "file", controlFile)
-			nChunks = 1
-		}
+		nChunks = conf.NChunks
 	}
 
 	// Create downloaders. Each downloader must be initialised with the same byte range across restarts in order to resume previous downloads.
@@ -581,38 +572,46 @@ func (t *transfer) closeEventChannel(ctx context.Context) {
 	close(t.eventCh)
 }
 
-func (t *transfer) readControlFile(cf string) (map[string]string, error) {
+type transferConfig struct {
+	NChunks int
+}
+
+func (t *transfer) readControlFile(cf string) (*transferConfig, error) {
 	input, err := os.OpenFile(cf, os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("error opening control file for read %s: %w", cf, err)
 	}
 	defer input.Close()
 
-	config := make(map[string]string)
-	s := bufio.NewScanner(input)
-	for s.Scan() {
-		conf := strings.Split(s.Text(), "=")
-		config[conf[0]] = conf[1]
+	data, err := io.ReadAll(input)
+	if err != nil {
+		return nil, fmt.Errorf("error reading control file %s: %w", cf, err)
+	}
+	var conf transferConfig
+	err = json.Unmarshal(data, &conf)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshalling control file %s: %w", cf, err)
 	}
 
-	if err := s.Err(); err != nil {
-		return nil, err
-	}
-
-	return config, nil
+	return &conf, nil
 }
 
-func (t *transfer) writeControlFile(cf string, config map[string]string) error {
+func (t *transfer) writeControlFile(cf string, conf transferConfig) error {
 	output, err := os.OpenFile(cf, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("error opening control file for write %s: %w", cf, err)
 	}
 	defer output.Close()
-	for k, v := range config {
-		_, err = output.WriteString(fmt.Sprintf("%s=%s\n", k, v))
-		if err != nil {
-			return err
-		}
+
+	data, err := json.Marshal(&conf)
+	if err != nil {
+		return fmt.Errorf("error marshalling transfer config: %w", err)
 	}
+
+	_, err = output.Write(data)
+	if err != nil {
+		return fmt.Errorf("error writing into control file %s: %w", cf, err)
+	}
+
 	return nil
 }
