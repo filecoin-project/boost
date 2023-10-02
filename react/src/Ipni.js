@@ -483,7 +483,17 @@ export function IpniAdEntries() {
     })
 
     if (error) {
-        return <div>Error: {error.message}</div>
+        return <div className="ad-detail modal" id={params.adCid}>
+            <div className="content">
+                <div className="close" onClick={() => navigate(-1)}>
+                    <img className="icon" alt="" src={closeImg} />
+                </div>
+                <div className="title">
+                    <span>Advertisement {'…'+params.adCid.slice(-8)} Entries</span>
+                </div>
+                <div><span>Error: {error.message}</span></div>
+            </div>
+        </div>
     }
 
     if (loading) {
