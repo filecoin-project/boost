@@ -17,7 +17,6 @@ import (
 	mh "github.com/multiformats/go-multihash"
 
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/bitswap"
-	"github.com/filecoin-project/boost/p2p/muxer/mplex"
 	lotus_blockstore "github.com/filecoin-project/lotus/blockstore"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/ipfs/boxo/bitswap/client"
@@ -167,7 +166,6 @@ func createClientHost(privKey crypto.PrivKey) (host.Host, error) {
 	return libp2p.New(
 		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Transport(quic.NewTransport),
-		libp2p.Muxer("/mplex/6.7.0", mplex.DefaultTransport),
 		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
 		libp2p.Identity(privKey),
 		libp2p.ResourceManager(&network.NullResourceManager{}),
