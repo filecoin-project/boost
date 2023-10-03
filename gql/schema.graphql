@@ -601,6 +601,9 @@ type RootQuery {
 
   """Get the payload CIDs and corresponding multihashes for a particular piece CID"""
   piecePayloadCids(pieceCid: String!): [PiecePayload]!
+
+  """Get the latest IPNI advertisemen"""
+  ipniDistanceFromLatestAd(LatestAdcid: String!, Adcid: String!): Int!
 }
 
 type RootMutation {

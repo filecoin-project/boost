@@ -73,7 +73,7 @@ func TestOutboundForwarding(t *testing.T) {
 			},
 			expectedResponse: &messages.ForwardingResponse{
 				Code:    messages.ResponseRejected,
-				Message: "remote peer: protocols not supported",
+				Message: "remote peer: failed to negotiate protocol: protocols not supported",
 			},
 		},
 	}
