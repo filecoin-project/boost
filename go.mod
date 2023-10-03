@@ -335,7 +335,7 @@ require (
 	github.com/filecoin-project/boost-graphsync v0.13.9
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
 	github.com/filecoin-project/go-fil-markets v1.28.3
-	github.com/filecoin-project/lotus v1.23.4-rc1
+	github.com/filecoin-project/lotus v1.23.4-rc2
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
 	github.com/ipni/go-libipni v0.5.1
