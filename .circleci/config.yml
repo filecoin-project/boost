@@ -1,5 +1,6 @@
 version: 2.1
 orbs:
+  golang: circleci/go@1.7.3
   go: gotest/tools@0.0.14
 
 executors:
@@ -145,18 +146,15 @@ jobs:
   build-macos:
     description: build darwin boost binary
     macos:
-      xcode: "12.5.1"
+      xcode: "15.0.0"
     working_directory: ~/go/src/github.com/filecoin-project/boost
     resource_class: macos.x86.medium.gen2
     steps:
       - prepare:
           linux: false
           darwin: true
-      - run:
-          name: Install go
-          command: |
-            curl -O https://dl.google.com/go/go1.20.7.darwin-amd64.pkg && \
-            sudo installer -pkg go1.20.7.darwin-amd64.pkg -target /
+      - golang/install:
+          version: "1.20.7"
       - run:
           name: Install pkg-config
           command: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config

@@ -451,12 +451,6 @@ const LegacyDealQuery = gql`
     }
 `;
 
-const PiecesWithRootPayloadCidQuery = gql`
-    query AppPiecesWithRootPayloadCidQuery($payloadCid: String!) {
-        piecesWithRootPayloadCid(payloadCid: $payloadCid)
-    }
-`;
-
 const PiecesWithPayloadCidQuery = gql`
     query AppPiecesWithPayloadCidQuery($payloadCid: String!) {
         piecesWithPayloadCid(payloadCid: $payloadCid)
@@ -789,6 +783,15 @@ const PublishPendingDealsMutation = gql`
     }
 `;
 
+const PiecePayloadCidsQuery = gql`
+    query AppPiecePayloadCidsQuery($pieceCid: String!) {
+        piecePayloadCids(pieceCid: $pieceCid) {
+            PayloadCid
+            Multihash
+        }
+    }
+`;
+
 export {
     gqlClient,
     EpochQuery,
@@ -814,7 +817,6 @@ export {
     IpniAdEntriesQuery,
     IpniAdEntriesCountQuery,
     IpniLatestAdQuery,
-    PiecesWithRootPayloadCidQuery,
     PiecesWithPayloadCidQuery,
     PieceBuildIndexMutation,
     PieceStatusQuery,
@@ -836,4 +838,5 @@ export {
     Libp2pAddrInfoQuery,
     StorageAskQuery,
     PublishPendingDealsMutation,
+    PiecePayloadCidsQuery,
 }
