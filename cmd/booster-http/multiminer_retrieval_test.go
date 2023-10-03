@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path"
 	"testing"
 	"time"
 
 	"github.com/filecoin-project/boost/itests/shared"
-	"github.com/filecoin-project/lotus/itests/kit"
+	"github.com/filecoin-project/boost/testutil"
+	"github.com/ipfs/go-cid"
+	"github.com/ipld/go-car/v2"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
 )
@@ -27,9 +27,15 @@ func TestMultiMinerHttpRetrieval(t *testing.T) {
 		fullNode2ApiInfo, err := rt.BoostAndMiner2.LotusFullNodeApiInfo()
 		require.NoError(t, err)
 
-		runAndWaitForBoosterHttp(ctx, t, []string{miner1ApiInfo, miner2ApiInfo}, fullNode2ApiInfo, 7777)
+		port, err := testutil.OpenPort()
+		require.NoError(t, err)
 
-		resp, err := http.Get("http://localhost:7777/ipfs/" + rt.RootCid.String())
+		runAndWaitForBoosterHttp(ctx, t, []string{miner1ApiInfo, miner2ApiInfo}, fullNode2ApiInfo, port)
+
+		req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:%d/ipfs/%s", port, rt.RootCid.String()), nil)
+		require.NoError(t, err)
+		req.Header.Set("Accept", "application/vnd.ipld.car")
+		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
 		if resp.StatusCode != 200 {
 			body, err := io.ReadAll(resp.Body)
@@ -38,16 +44,22 @@ func TestMultiMinerHttpRetrieval(t *testing.T) {
 			require.Fail(t, msg)
 		}
 
-		respBytes, err := io.ReadAll(resp.Body)
+		wantCids, err := testutil.CidsInCar(rt.CarFilepath)
 		require.NoError(t, err)
 
-		outPath := path.Join(t.TempDir(), "out.dat")
-		err = os.WriteFile(outPath, respBytes, 0666)
+		cr, err := car.NewBlockReader(resp.Body)
 		require.NoError(t, err)
-
-		t.Logf("retrieval is done, compare in- and out- files in: %s, out: %s", rt.SampleFilePath, outPath)
-		kit.AssertFilesEqual(t, rt.SampleFilePath, outPath)
-		t.Logf("file retrieved successfully")
+		require.Equal(t, []cid.Cid{rt.RootCid}, cr.Roots)
+		cnt := 0
+		for ; ; cnt++ {
+			next, err := cr.Next()
+			if err != nil {
+				require.Equal(t, io.EOF, err)
+				break
+			}
+			require.Contains(t, wantCids, next.Cid())
+		}
+		require.Equal(t, len(wantCids), cnt)
 	})
 }
 
@@ -90,7 +102,6 @@ func runBoosterHttp(ctx context.Context, repo string, minerApiInfo []string, ful
 		"run",
 		"--api-fullnode=" + fullNodeApiInfo,
 		"--api-lid=" + lidApiInfo,
-		"--serve-files=true",
 		"--api-version-check=false",
 	}, args...)
 	for _, apiInfo := range minerApiInfo {

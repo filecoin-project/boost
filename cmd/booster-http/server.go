@@ -23,10 +23,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/hashicorp/go-multierror"
-	"github.com/ipfs/boxo/blockservice"
 	"github.com/ipfs/boxo/blockstore"
-	"github.com/ipfs/boxo/exchange/offline"
-	"github.com/ipfs/boxo/gateway"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/rs/cors"
@@ -34,11 +31,6 @@ import (
 )
 
 //go:generate go run github.com/golang/mock/mockgen -destination=mocks/mock_booster_http.go -package=mocks_booster_http -source=server.go HttpServerApi,serverApi
-
-const (
-	ContentTypeCar   = "application/vnd.ipld.car"
-	ContentTypeBlock = "application/vnd.ipld.raw"
-)
 
 var ErrNotFound = errors.New("not found")
 
@@ -71,14 +63,14 @@ type HttpServerApi interface {
 }
 
 type HttpServerOptions struct {
-	Blockstore               blockstore.Blockstore
-	ServePieces              bool
-	SupportedResponseFormats []string
+	Blockstore     blockstore.Blockstore
+	ServePieces    bool
+	ServeTrustless bool
 }
 
 func NewHttpServer(path string, listenAddr string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
 	if opts == nil {
-		opts = &HttpServerOptions{ServePieces: true}
+		opts = &HttpServerOptions{ServePieces: true, ServeTrustless: true}
 	}
 	return &HttpServer{path: path, listenAddr: listenAddr, port: port, api: api, opts: *opts, idxPage: parseTemplate(*opts)}
 }
@@ -100,6 +92,10 @@ func newCors() *cors.Cors {
 }
 
 func (s *HttpServer) Start(ctx context.Context) error {
+	if !s.opts.ServePieces && !s.opts.ServeTrustless {
+		return errors.New("no content to serve")
+	}
+
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	c := newCors()
 	handler := http.NewServeMux()
@@ -108,20 +104,12 @@ func (s *HttpServer) Start(ctx context.Context) error {
 		handler.HandleFunc(s.pieceBasePath(), s.handleByPieceCid)
 	}
 
-	if s.opts.Blockstore != nil {
-		if len(s.opts.SupportedResponseFormats) == 1 && s.opts.SupportedResponseFormats[0] == ContentTypeCar {
-			// minimal Trustless Gateway handler
-			lsys := storeutil.LinkSystemForBlockstore(s.opts.Blockstore)
-			handler.Handle(s.ipfsBasePath(), frisbii.NewHttpIpfs(ctx, lsys))
-		} else {
-			// full IPFS Gateway handler
-			blockService := blockservice.New(s.opts.Blockstore, offline.Exchange(s.opts.Blockstore))
-			gw, err := gateway.NewBlocksBackend(blockService)
-			if err != nil {
-				return fmt.Errorf("creating blocks gateway: %w", err)
-			}
-			handler.Handle(s.ipfsBasePath(), newGatewayHandler(gw, s.opts.SupportedResponseFormats))
+	if s.opts.ServeTrustless {
+		if s.opts.Blockstore == nil {
+			return errors.New("no blockstore provided for trustless gateway")
 		}
+		lsys := storeutil.LinkSystemForBlockstore(s.opts.Blockstore)
+		handler.Handle(s.ipfsBasePath(), frisbii.NewHttpIpfs(ctx, lsys))
 	}
 
 	handler.HandleFunc("/", s.handleIndex)

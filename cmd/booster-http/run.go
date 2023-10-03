@@ -7,7 +7,6 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"strings"
 
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/cmd/lib/filters"
@@ -77,19 +76,9 @@ var runCmd = &cli.Command{
 			Value: true,
 		},
 		&cli.BoolFlag{
-			Name:  "serve-blocks",
-			Usage: "serve blocks with the ipfs gateway API",
-			Value: true,
-		},
-		&cli.BoolFlag{
 			Name:  "serve-cars",
-			Usage: "serve CAR files with the ipfs gateway API",
+			Usage: "serve CAR files with the Trustless IPFS Gateway API",
 			Value: true,
-		},
-		&cli.BoolFlag{
-			Name:  "serve-files",
-			Usage: "serve original files (eg jpg, mov) with the ipfs gateway API",
-			Value: false,
 		},
 		&cli.BoolFlag{
 			Name:  "tracing",
@@ -123,10 +112,10 @@ var runCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		servePieces := cctx.Bool("serve-pieces")
-		responseFormats := parseSupportedResponseFormats(cctx)
-		enableIpfsGateway := len(responseFormats) > 0
-		if !servePieces && !enableIpfsGateway {
-			return errors.New("one of --serve-pieces, --serve-blocks, etc must be enabled")
+		serveTrustless := cctx.Bool("serve-cars")
+
+		if !servePieces && !serveTrustless {
+			return errors.New("one of --serve-pieces, --serve-cars must be enabled")
 		}
 
 		if cctx.Bool("pprof") {
@@ -185,10 +174,11 @@ var runCmd = &cli.Command{
 		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"))
 
 		opts := &HttpServerOptions{
-			ServePieces:              servePieces,
-			SupportedResponseFormats: responseFormats,
+			ServePieces:    servePieces,
+			ServeTrustless: serveTrustless,
 		}
-		if enableIpfsGateway {
+
+		if serveTrustless {
 			repoDir, err := createRepoDir(cctx.String(FlagRepo.Name))
 			if err != nil {
 				return err
@@ -237,11 +227,15 @@ var runCmd = &cli.Command{
 			return fmt.Errorf("starting http server: %w", err)
 		}
 
-		log.Infof(ipfsGatewayMsg(cctx, server.ipfsBasePath()))
 		if servePieces {
 			log.Infof("serving raw pieces at " + server.pieceBasePath())
 		} else {
 			log.Infof("serving raw pieces is disabled")
+		}
+		if serveTrustless {
+			log.Infof("serving IPFS Trustless Gateway CARs at " + server.ipfsBasePath())
+		} else {
+			log.Infof("serving IPFS Trustless Gateway CARs is disabled")
 		}
 
 		// Monitor for shutdown.
@@ -267,48 +261,6 @@ var runCmd = &cli.Command{
 
 		return nil
 	},
-}
-
-func parseSupportedResponseFormats(cctx *cli.Context) []string {
-	fmts := []string{}
-	if cctx.Bool("serve-blocks") {
-		fmts = append(fmts, ContentTypeBlock)
-	}
-	if cctx.Bool("serve-cars") {
-		fmts = append(fmts, ContentTypeCar)
-	}
-	if cctx.Bool("serve-files") {
-		// Allow the user to not specify a specific response format.
-		// In that case the gateway will respond with any kind of file
-		// (eg jpg, mov etc)
-		fmts = append(fmts, "")
-	}
-	return fmts
-}
-
-func ipfsGatewayMsg(cctx *cli.Context, ipfsBasePath string) string {
-	fmts := []string{}
-	if cctx.Bool("serve-blocks") {
-		fmts = append(fmts, "blocks")
-	}
-	if cctx.Bool("serve-cars") {
-		fmts = append(fmts, "CARs")
-	}
-	if cctx.Bool("serve-files") {
-		fmts = append(fmts, "files")
-	}
-
-	if len(fmts) == 0 {
-		return "IPFS gateway is disabled"
-	}
-
-	msg := "serving IPFS gateway at " + ipfsBasePath
-	if len(fmts) == 1 && fmts[0] == "CARs" {
-		msg += " (serving CARs using strict Trustless Gateway API)"
-	} else {
-		msg += " (serving " + strings.Join(fmts, ", ") + " using full IPFS Gateway API)"
-	}
-	return msg
 }
 
 func createRepoDir(repoDir string) (string, error) {

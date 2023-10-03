@@ -49,50 +49,40 @@ func TestTrustlessGateway(t *testing.T) {
 
 	dealTestCarInParts(ctx, t, boostAndMiner, carFilepath, rootCid)
 
-	// full ipfs gateway by enabling cars & blocks
-	runAndWaitForBoosterHttp(ctx, t, []string{minerApiInfo}, fullNodeApiInfo, 7776, "--serve-pieces=false", "--serve-blocks=true", "--serve-cars=true", "--serve-files=false")
-	// mini trustless gateway only using Frisbii by enabling just cars
-	runAndWaitForBoosterHttp(ctx, t, []string{minerApiInfo}, fullNodeApiInfo, 7775, "--serve-pieces=false", "--serve-blocks=false", "--serve-cars=true", "--serve-files=false")
+	port, err := testutil.OpenPort()
+	require.NoError(t, err)
+
+	runAndWaitForBoosterHttp(ctx, t, []string{minerApiInfo}, fullNodeApiInfo, port, "--serve-pieces=false", "--serve-cars=true")
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Logf("query=%s, blocks=%d", tc.AsQuery(), len(tc.ExpectedCids))
-			for _, typ := range []struct {
-				name string
-				port int
-			}{{"full", 7776}, {"mini", 7775}} {
-				t.Run(typ.name, func(t *testing.T) {
-					req := require.New(t)
+			req := require.New(t)
 
-					request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d%s", typ.port, tc.AsQuery()), nil)
-					req.NoError(err)
-					request.Header.Set("Accept", "application/vnd.ipld.car; version=1; order=dfs; dups=n")
-					res, err := http.DefaultClient.Do(request)
-					req.NoError(err)
-					req.Equal(http.StatusOK, res.StatusCode)
+			request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d%s", port, tc.AsQuery()), nil)
+			req.NoError(err)
+			request.Header.Set("Accept", "application/vnd.ipld.car; version=1; order=dfs; dups=n")
+			res, err := http.DefaultClient.Do(request)
+			req.NoError(err)
+			req.Equal(http.StatusOK, res.StatusCode)
 
-					carReader, err := car.NewBlockReader(res.Body)
-					req.NoError(err)
-					req.Equal(uint64(1), carReader.Version)
-					if typ.name == "mini" {
-						// boxo serves last segment CID as root, frisbii/lassie serve requested CID as root
-						req.Equal([]cid.Cid{tc.Root}, carReader.Roots)
-					}
-					// log all headers
-					for k, v := range res.Header {
-						t.Logf("  header %s: %s", k, v)
-					}
+			carReader, err := car.NewBlockReader(res.Body)
+			req.NoError(err)
+			req.Equal(uint64(1), carReader.Version)
+			req.Equal([]cid.Cid{tc.Root}, carReader.Roots)
+			// log all headers
+			for k, v := range res.Header {
+				t.Logf("  header %s: %s", k, v)
+			}
 
-					for ii, expectedCid := range tc.ExpectedCids {
-						blk, err := carReader.Next()
-						if err != nil {
-							req.Equal(io.EOF, err)
-							req.Len(tc.ExpectedCids, ii+1)
-							break
-						}
-						req.Equal(expectedCid, blk.Cid())
-					}
-				})
+			for ii, expectedCid := range tc.ExpectedCids {
+				blk, err := carReader.Next()
+				if err != nil {
+					req.Equal(io.EOF, err)
+					req.Len(tc.ExpectedCids, ii+1)
+					break
+				}
+				req.Equal(expectedCid, blk.Cid())
 			}
 		})
 	}
