@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ipfs/go-cid"
+	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/ingest/schema"
 	"github.com/ipni/go-libipni/metadata"
 	"github.com/multiformats/go-multicodec"
@@ -197,4 +198,34 @@ func resolveAd(ad *schema.Advertisement) *adResolver {
 		res.ExtendedProviders = extProvs
 	}
 	return res
+}
+
+func (r *resolver) IpniDistanceFromLatestAd(ctx context.Context, args struct {
+	LatestAdcid string
+	Adcid       string
+}) (int32, error) {
+	count := int32(0)
+	if args.Adcid == args.LatestAdcid {
+		return count, nil
+	}
+	LatestAd, err := cid.Parse(args.LatestAdcid)
+	if err != nil {
+		return count, fmt.Errorf("parsing ad cid %s: %w", args.LatestAdcid, err)
+	}
+
+	ad, err := r.idxProv.GetAdv(ctx, LatestAd)
+	if err != nil {
+		return count, err
+	}
+
+	for ad.PreviousID.String() != args.Adcid {
+		prevCid := ad.PreviousID.(cidlink.Link).Cid
+		ad, err = r.idxProv.GetAdv(ctx, prevCid)
+		if err != nil {
+			return count, err
+		}
+		count++
+	}
+
+	return count, nil
 }

@@ -567,7 +567,7 @@ data-transfer/graphsync was previously working.`,
 			Name: "Enabled",
 			Type: "bool",
 
-			Comment: `If not enabled, requests are served over HTTP instead of libp2p.`,
+			Comment: `If enabled, requests are served over HTTP instead of libp2p.`,
 		},
 		{
 			Name: "PublicHostname",

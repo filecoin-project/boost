@@ -6,7 +6,7 @@ import {
     IpniAdQuery,
     IpniProviderInfoQuery,
     IpniLatestAdQuery,
-    RetrievalLogsCountQuery, RetrievalLogsListQuery,
+    RetrievalLogsCountQuery, RetrievalLogsListQuery, IpniDistanceFromLatestAdQuery,
 } from "./gql";
 import moment from "moment";
 import React, {useEffect, useState} from "react";
@@ -34,7 +34,6 @@ export function IpniPage(props) {
     return <PageContainer pageType="ipni" title="Network Indexer">
         <div className="ipni">
             <ProviderInfo />
-            <RetrievalLogsContent />
         </div>
     </PageContainer>
 }
@@ -71,12 +70,31 @@ function ProviderIpniInfo({peerId}) {
         }).then((data) => {
             setResp({ loading: false, data })
         }).catch((err) => setResp({ loading: false, error: err }))
-    }, [])
+    }, [idxHost, peerId])
 
     if (error) return <div>Error: {"Fetching provider info from "+idxHost+": "+error.message}</div>
     if (loading) return <div>Loading...</div>
     if (!data) return null
 
+    return <>
+        <ProviderIpniInfoRender data={data} idxHost={idxHost} lad={head.data.ipniLatestAdvertisement} />
+    </>
+}
+
+function ProviderIpniInfoRender(props){
+    const data = props.data
+    const idxHost = props.idxHost
+    const lad = props.lad
+    let ADCID = data.LastAdvertisement['/']
+    if (process.env.NODE_ENV === 'development') {
+        ADCID = 'baguqeera4d4mgsbukpnlwu4bxuwir2pbchhdar4gmz3ti75cxuwhiviyowua'
+    }
+    const distance = useQuery(IpniDistanceFromLatestAdQuery, {
+        variables: {
+            latestAdcid: lad,
+            adcid: ADCID
+        }
+    })
     return <div className="ipni-prov-info">
         <h3>Provider Indexer Info</h3>
         <div className="subtitle">
@@ -98,12 +116,14 @@ function ProviderIpniInfo({peerId}) {
                     {data.LastAdvertisement['/']}
                     &nbsp;
                     <span className="aux">({moment(data.LastAdvertisementTime).fromNow()} ago)</span>
+                    &nbsp;
+                    {distance.data ? <span className="aux">({distance.data.ipniDistanceFromLatestAd} behind)</span>: ''}
                 </td>
             </tr>
             <tr>
                 <th>Latest Advertisement on Boost</th>
                 <td>
-                    {head.data ? <Link to={'/ipni/ad/'+head.data.ipniLatestAdvertisement}>{head.data.ipniLatestAdvertisement}</Link>: ''}
+                    {lad ? <Link to={'/ipni/ad/'+lad}>{lad}</Link>: ''}
                 </td>
             </tr>
             <tr>
