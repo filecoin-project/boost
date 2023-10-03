@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -282,6 +283,37 @@ func (t *transfer) getBytesReceived() int64 {
 func (t *transfer) execute(ctx context.Context) error {
 	duuid := t.dealInfo.DealUuid
 
+	outputStats, err := os.Stat(t.dealInfo.OutputFile)
+	if err != nil {
+		return &httpError{error: fmt.Errorf("failed to get stats of the output file %s: %w", t.dealInfo.OutputFile, err)}
+	}
+	controlFile := t.dealInfo.OutputFile + "-control"
+	controlStats, err := os.Stat(controlFile)
+
+	// Check if the control file exists and create it if it doesn't. Control file captures the number of chunks that the transfer has been started with.
+	// If the number of chunks changes half way through, the transfer should continue with the same chunking setting.
+	nChunks := t.nChunks
+	if errors.Is(err, os.ErrNotExist) {
+		// if the output file is not empty, but there is no control file then that must be a continuation of a transfer from before chunking was introduced.
+		// in that case set nChunks to one.
+		if outputStats.Size() > 0 && controlStats == nil {
+			nChunks = 1
+		}
+
+		err := t.writeControlFile(controlFile, transferConfig{nChunks})
+		if err != nil {
+			return &httpError{error: fmt.Errorf("failed to create control file %s: %w", controlFile, err)}
+		}
+	} else if err != nil {
+		return &httpError{error: fmt.Errorf("failed to get stats of control file %s: %w", controlFile, err)}
+	} else {
+		conf, err := t.readControlFile(controlFile)
+		if err != nil {
+			return &httpError{error: fmt.Errorf("failed to read control file %s: %w", controlFile, err)}
+		}
+		nChunks = conf.NChunks
+	}
+
 	// Create downloaders. Each downloader must be initialised with the same byte range across restarts in order to resume previous downloads.
 	// If the output file contains some data in it already - do not create a downloader for it again.
 	// Consider the following scenarios:
@@ -290,10 +322,6 @@ func (t *transfer) execute(ctx context.Context) error {
 	// 2. some chunks have been fully downloaded, some just partially. Some of the fully downloaded chunks have been merged into the main
 	//    file and their temp files have been deleted. We should not re-download the merged chunks again, finish downloading
 	//    the partial ones and proceed with merging.
-	outputStats, err := os.Stat(t.dealInfo.OutputFile)
-	if err != nil {
-		return &httpError{error: fmt.Errorf("failed to get stats of the output file: %w", err)}
-	}
 
 	// determine deal size from HEAD request and make sure that it matches up with the one from the deal info
 	var dealSize int64
@@ -337,15 +365,15 @@ func (t *transfer) execute(ctx context.Context) error {
 		}
 	}
 
-	chunkSize := dealSize / int64(t.nChunks)
+	chunkSize := dealSize / int64(nChunks)
 	lastAppendedChunk := int(outputStats.Size() / chunkSize)
 
-	downloaders := make([]*downloader, 0, t.nChunks-lastAppendedChunk)
+	downloaders := make([]*downloader, 0, nChunks-lastAppendedChunk)
 
-	for i := lastAppendedChunk; i < t.nChunks; i++ {
+	for i := lastAppendedChunk; i < nChunks; i++ {
 		rangeStart := int64(i) * chunkSize
 		var rangeEnd int64
-		if i == t.nChunks-1 {
+		if i == nChunks-1 {
 			rangeEnd = dealSize
 		} else {
 			rangeEnd = rangeStart + chunkSize
@@ -425,6 +453,11 @@ func (t *transfer) execute(ctx context.Context) error {
 				if err != nil {
 					return &httpError{error: fmt.Errorf("failed to remove the chunk file: %w", err)}
 				}
+			}
+			// delete control file once all chunks have been merged in successfully
+			err = os.Remove(controlFile)
+			if err != nil {
+				t.dl.Infow(duuid, "error deleteing control file %s: %w", controlFile, err)
 			}
 			// if there's no error, transfer was successful
 			break
@@ -537,4 +570,48 @@ func (t *transfer) closeEventChannel(ctx context.Context) {
 		}
 	}
 	close(t.eventCh)
+}
+
+type transferConfig struct {
+	NChunks int
+}
+
+func (t *transfer) readControlFile(cf string) (*transferConfig, error) {
+	input, err := os.OpenFile(cf, os.O_RDONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("error opening control file for read %s: %w", cf, err)
+	}
+	defer input.Close()
+
+	data, err := io.ReadAll(input)
+	if err != nil {
+		return nil, fmt.Errorf("error reading control file %s: %w", cf, err)
+	}
+	var conf transferConfig
+	err = json.Unmarshal(data, &conf)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshalling control file %s: %w", cf, err)
+	}
+
+	return &conf, nil
+}
+
+func (t *transfer) writeControlFile(cf string, conf transferConfig) error {
+	output, err := os.OpenFile(cf, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("error opening control file for write %s: %w", cf, err)
+	}
+	defer output.Close()
+
+	data, err := json.Marshal(&conf)
+	if err != nil {
+		return fmt.Errorf("error marshalling transfer config: %w", err)
+	}
+
+	_, err = output.Write(data)
+	if err != nil {
+		return fmt.Errorf("error writing into control file %s: %w", cf, err)
+	}
+
+	return nil
 }
