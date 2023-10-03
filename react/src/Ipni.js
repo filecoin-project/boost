@@ -85,14 +85,14 @@ function ProviderIpniInfoRender(props){
     const data = props.data
     const idxHost = props.idxHost
     const lad = props.lad
-    let ADCID = data.LastAdvertisement['/']
+    let adCid = data.LastAdvertisement['/']
     if (process.env.NODE_ENV === 'development') {
-        ADCID = 'baguqeera4d4mgsbukpnlwu4bxuwir2pbchhdar4gmz3ti75cxuwhiviyowua'
+        adCid = 'baguqeera4d4mgsbukpnlwu4bxuwir2pbchhdar4gmz3ti75cxuwhiviyowua'
     }
     const distance = useQuery(IpniDistanceFromLatestAdQuery, {
         variables: {
             latestAdcid: lad,
-            adcid: ADCID
+            adcid: adCid
         }
     })
     return <div className="ipni-prov-info">

@@ -208,12 +208,12 @@ func (r *resolver) IpniDistanceFromLatestAd(ctx context.Context, args struct {
 	if args.Adcid == args.LatestAdcid {
 		return count, nil
 	}
-	LatestAd, err := cid.Parse(args.LatestAdcid)
+	latestAd, err := cid.Parse(args.LatestAdcid)
 	if err != nil {
 		return count, fmt.Errorf("parsing ad cid %s: %w", args.LatestAdcid, err)
 	}
 
-	ad, err := r.idxProv.GetAdv(ctx, LatestAd)
+	ad, err := r.idxProv.GetAdv(ctx, latestAd)
 	if err != nil {
 		return count, err
 	}
