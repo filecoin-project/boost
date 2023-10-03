@@ -70,7 +70,7 @@ type HttpServerOptions struct {
 
 func NewHttpServer(path string, listenAddr string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
 	if opts == nil {
-		opts = &HttpServerOptions{ServePieces: true, ServeTrustless: true}
+		opts = &HttpServerOptions{ServePieces: true, ServeTrustless: false}
 	}
 	return &HttpServer{path: path, listenAddr: listenAddr, port: port, api: api, opts: *opts, idxPage: parseTemplate(*opts)}
 }
