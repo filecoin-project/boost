@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -86,13 +87,36 @@ func (hi *HttpIpfs) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		defer cancel()
 	}
 
+	var rootCid cid.Cid
+	bytesWrittenCh := make(chan struct{})
+
 	logError := func(status int, err error) {
-		res.WriteHeader(status)
-		_, _ = res.Write([]byte(err.Error()))
+		select {
+		case <-bytesWrittenCh:
+			cs := "unknown"
+			if rootCid.Defined() {
+				cs = rootCid.String()
+			}
+			logger.Debugw("forcing unclean close", "cid", cs, "status", status, "err", err)
+			if err := closeWithUnterminatedChunk(res); err != nil {
+				log := logger.Infow
+				if strings.Contains(err.Error(), "use of closed network connection") {
+					log = logger.Debugw // it's just not as interesting in this case
+				}
+				log("unable to send early termination", "err", err)
+			}
+			return
+		default:
+			res.WriteHeader(status)
+			if _, werr := res.Write([]byte(err.Error())); werr != nil {
+				logger.Debugw("unable to write error to response", "err", werr)
+			}
+		}
+
 		if lrw, ok := res.(ErrorLogger); ok {
 			lrw.LogError(status, err)
 		} else {
-			logger.Debugf("Error handling request from [%s] for [%s] status=%d, msg=%s", req.RemoteAddr, req.URL, status, err.Error())
+			logger.Debugf("error handling request from [%s] for [%s] status=%d, msg=%s", req.RemoteAddr, req.URL, status, err.Error())
 		}
 	}
 
@@ -116,7 +140,10 @@ func (hi *HttpIpfs) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	includeDupes, err := trustlesshttp.CheckFormat(req)
+	// get the preferred `Accept` header if one exists; we should be able to
+	// handle whatever comes back from here, primarily we're looking for
+	// the `dups` parameter
+	accept, err := trustlesshttp.CheckFormat(req)
 	if err != nil {
 		logError(http.StatusBadRequest, err)
 		return
@@ -131,8 +158,7 @@ func (hi *HttpIpfs) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	// validate CID path parameter
 	var cidSeg datamodel.PathSegment
 	cidSeg, path = path.Shift()
-	rootCid, err := cid.Parse(cidSeg.String())
-	if err != nil {
+	if rootCid, err = cid.Parse(cidSeg.String()); err != nil {
 		logError(http.StatusBadRequest, errors.New("failed to parse CID path parameter"))
 		return
 	}
@@ -154,19 +180,18 @@ func (hi *HttpIpfs) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		Path:       path.String(),
 		Scope:      dagScope,
 		Bytes:      byteRange,
-		Duplicates: includeDupes,
+		Duplicates: accept.Duplicates,
 	}
 
 	if fileName == "" {
 		fileName = fmt.Sprintf("%s%s", rootCid.String(), trustlesshttp.FilenameExtCar)
 	}
 
-	bytesWrittenCh := make(chan struct{})
 	writer := newIpfsResponseWriter(res, hi.cfg.MaxResponseBytes, func() {
 		// called once we start writing blocks into the CAR (on the first Put())
 		res.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", fileName))
 		res.Header().Set("Cache-Control", trustlesshttp.ResponseCacheControlHeader)
-		res.Header().Set("Content-Type", trustlesshttp.ResponseContentTypeHeader(includeDupes))
+		res.Header().Set("Content-Type", accept.WithMimeType(trustlesshttp.MimeTypeCar).WithQuality(1).String())
 		res.Header().Set("Etag", request.Etag())
 		res.Header().Set("X-Content-Type-Options", "nosniff")
 		res.Header().Set("X-Ipfs-Path", "/"+datamodel.ParsePath(req.URL.Path).String())
@@ -174,17 +199,8 @@ func (hi *HttpIpfs) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	})
 
 	if err := StreamCar(ctx, hi.lsys, writer, request); err != nil {
-		logError(http.StatusInternalServerError, err)
-		select {
-		case <-bytesWrittenCh:
-			logger.Debugw("unclean close", "cid", rootCid, "err", err)
-			if err := closeWithUnterminatedChunk(res); err != nil {
-				logger.Infow("unable to send early termination", "err", err)
-			}
-			return
-		default:
-		}
 		logger.Debugw("error streaming CAR", "cid", rootCid, "err", err)
+		logError(http.StatusInternalServerError, err)
 	}
 }
 

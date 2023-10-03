@@ -41,7 +41,7 @@ func StreamCar(
 	}
 
 	if err := traversal.CheckPath(datamodel.ParsePath(request.Path), lastPath); err != nil {
-		logger.Warnf("failed to traverse full requested path: %s", err)
+		logger.Warn(err)
 	}
 
 	return nil

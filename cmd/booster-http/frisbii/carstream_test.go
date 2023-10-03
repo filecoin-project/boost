@@ -11,16 +11,15 @@ import (
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	gstestutil "github.com/ipfs/go-graphsync/testutil"
-	format "github.com/ipfs/go-ipld-format"
 	"github.com/ipfs/go-unixfsnode"
 	unixfs "github.com/ipfs/go-unixfsnode/testutil"
 	"github.com/ipld/go-car/v2"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/linking"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
-	"github.com/ipld/go-ipld-prime/storage"
 	"github.com/ipld/go-ipld-prime/storage/memstore"
 	trustlessutils "github.com/ipld/go-trustless-utils"
+	trustlesstestutil "github.com/ipld/go-trustless-utils/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -188,7 +187,7 @@ func entCids(ent unixfs.DirEntry) []cid.Cid {
 }
 
 func makeLsys() linking.LinkSystem {
-	store := &CorrectedMemStore{Store: &memstore.Store{
+	store := &trustlesstestutil.CorrectedMemStore{ParentStore: &memstore.Store{
 		Bag: make(map[string][]byte),
 	}}
 	lsys := cidlink.DefaultLinkSystem()
@@ -225,34 +224,4 @@ func GenerateNoDupes(gen func() unixfs.DirEntry) unixfs.DirEntry {
 			return gend
 		}
 	}
-}
-
-type CorrectedMemStore struct {
-	*memstore.Store
-}
-
-func (cms *CorrectedMemStore) Get(ctx context.Context, key string) ([]byte, error) {
-	data, err := cms.Store.Get(ctx, key)
-	cid, _ := cid.Cast([]byte(key))
-	if err != nil && err.Error() == "404" {
-		err = format.ErrNotFound{Cid: cid}
-	}
-	return data, err
-}
-
-func (cms *CorrectedMemStore) GetStream(ctx context.Context, key string) (io.ReadCloser, error) {
-	rc, err := cms.Store.GetStream(ctx, key)
-	cid, _ := cid.Cast([]byte(key))
-	if err != nil && err.Error() == "404" {
-		err = format.ErrNotFound{Cid: cid}
-	}
-	return rc, err
-}
-
-type OnlyStreamingStore struct {
-	parent storage.StreamingReadableStorage
-}
-
-func (oss *OnlyStreamingStore) GetStream(ctx context.Context, key string) (io.ReadCloser, error) {
-	return oss.parent.GetStream(ctx, key)
 }
