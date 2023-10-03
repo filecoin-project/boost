@@ -353,7 +353,7 @@ type IndexProviderAnnounceConfig struct {
 }
 
 type IndexProviderHttpPublisherConfig struct {
-	// If not enabled, requests are served over HTTP instead of libp2p.
+	// If enabled, requests are served over HTTP instead of libp2p.
 	Enabled bool
 	// Set the public hostname / IP for the index provider listener.
 	// eg "82.129.73.111"
