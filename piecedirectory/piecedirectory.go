@@ -324,9 +324,8 @@ func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r type
 		lr := io.NewSectionReader(r, int64(segOffset), int64(segSize))
 		subRecs, err := parseRecordsFromCar(lr)
 		if err != nil {
-			log.Debugw("Unexpected index format on generation in shard", "piece", pieceCid, "offset", segOffset)
-			// one corrupt segment shouldn't translate into an error in other segments.
-			continue
+			// revisit when non-car files supported: one corrupt segment shouldn't translate into an error in other segments.
+			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", len(recs), segOffset, err)
 		}
 		for i := range subRecs {
 			subRecs[i].Offset += segOffset
