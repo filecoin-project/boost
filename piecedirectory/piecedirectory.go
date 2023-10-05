@@ -303,7 +303,11 @@ func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.C
 		if err == nil {
 			return nil
 		}
-		merr = multierror.Append(merr, fmt.Errorf("adding index for piece deal %d: %w", dl.ChainDealID, err))
+		if dl.IsDirectDeal {
+			merr = multierror.Append(merr, fmt.Errorf("adding index for allocation ID %d: %w", dl.ChainDealID, err))
+		} else {
+			merr = multierror.Append(merr, fmt.Errorf("adding index for piece deal %d: %w", dl.ChainDealID, err))
+		}
 	}
 
 	return merr

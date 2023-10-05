@@ -501,13 +501,14 @@ func migratePieceStore(ctx context.Context, logger *zap.SugaredLogger, bar *prog
 			}
 
 			dealInfo := model.DealInfo{
-				DealUuid:    uuid,
-				IsLegacy:    isLegacy,
-				ChainDealID: d.DealID,
-				MinerAddr:   address.Address(maddr),
-				SectorID:    d.SectorID,
-				PieceOffset: d.Offset,
-				PieceLength: d.Length,
+				DealUuid:     uuid,
+				IsLegacy:     isLegacy,
+				ChainDealID:  d.DealID,
+				MinerAddr:    address.Address(maddr),
+				SectorID:     d.SectorID,
+				PieceOffset:  d.Offset,
+				PieceLength:  d.Length,
+				IsDirectDeal: false, // Explicitly set it to false as there should be no direct deals before this migration
 			}
 
 			err = store.AddDealForPiece(ctx, pcid, dealInfo)

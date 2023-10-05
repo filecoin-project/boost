@@ -84,6 +84,36 @@ type Deal {
   Logs: [DealLog]!
 }
 
+type DirectDeal {
+  ID: ID!
+  ClientAddress: String!
+  ProviderAddress: String!
+  CreatedAt: Time!
+  PieceCid: String!
+  PieceSize: Uint64!
+  AnnounceToIPNI: Boolean!
+  KeepUnsealedCopy: Boolean!
+  StartEpoch: Uint64!
+  EndEpoch: Uint64!
+  InboundFilePath: String!
+  AllocationID: Uint64!
+  CleanupData: Boolean!
+  Checkpoint: Checkpoint!
+  CheckpointAt: Time!
+  Err: String!
+  Retry: String!
+  Transferred: Uint64!
+  Sector: Sector!
+  Message: String!
+  Logs: [DealLog]!
+}
+
+type DirectDealList {
+  totalCount: Int!
+  deals: [DirectDeal]!
+  more: Boolean!
+}
+
 type LegacyDeal {
   ID: ID!
   ClientAddress: String!
@@ -506,17 +536,26 @@ type RootQuery {
   """Get Deal made with legacy markets endpoint by ID"""
   legacyDeal(id: ID!): LegacyDeal
 
+  """Get Direct Deal by ID"""
+  directDeal(id: ID!): DirectDeal
+
   """Get all Deals"""
   deals(query: String, filter: DealFilter, cursor: ID, offset: Int, limit: Int): DealList!
 
   """Get all Deals made with legacy markets endpoint"""
   legacyDeals(query: String, cursor: ID, offset: Int, limit: Int): LegacyDealList!
 
+  """Get all Direct Deals"""
+  directDeals(query: String, filter: DealFilter, cursor: ID, offset: Int, limit: Int): DirectDealList!
+
   """Get the total number of deals"""
   dealsCount: Int!
 
   """Get the total number of deals made with legacy markets endpoint"""
   legacyDealsCount: Int!
+
+  """Get the total number of direct deals"""
+  directDealsCount: Int!
 
   """Get deal proposal logs"""
   proposalLogs(accepted: Boolean, cursor: BigInt, offset: Int, limit: Int): ProposalLogsList!

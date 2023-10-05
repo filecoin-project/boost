@@ -54,9 +54,10 @@ var leveldbCmd = &cli.Command{
 	Before: before,
 	Flags: append([]cli.Flag{
 		&cli.StringFlag{
-			Name:  "repo",
-			Usage: "repo directory where the leveldb database is created",
-			Value: "~/.boost",
+			Name:    "repo",
+			EnvVars: []string{"LID_LEVELDB_PATH"},
+			Usage:   "repo directory where the leveldb database is created. Default is ~/.boost",
+			Value:   "~/.boost",
 		}},
 		runFlags...,
 	),

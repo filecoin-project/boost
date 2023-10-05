@@ -434,6 +434,7 @@ var BoostNode = Options(
 	Override(new(*modules.LogSqlDB), modules.NewLogsSqlDB),
 	Override(new(*modules.RetrievalSqlDB), modules.NewRetrievalSqlDB),
 	Override(HandleCreateRetrievalTablesKey, modules.CreateRetrievalTables),
+	Override(new(*db.DirectDealsDB), modules.NewDirectDealsDB),
 	Override(new(*db.DealsDB), modules.NewDealsDB),
 	Override(new(*db.LogsDB), modules.NewLogsDB),
 	Override(new(*db.ProposalLogsDB), modules.NewProposalLogsDB),
@@ -524,6 +525,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
 		Override(new(smtypes.CommpCalculator), From(new(lotus_modules.MinerStorageService))),
 
+		Override(new(storagemarket.CommpThrottle), modules.NewCommpThrottle(cfg)),
+		Override(new(*storagemarket.DirectDealsProvider), modules.NewDirectDealsProvider(walletMiner, cfg)),
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner, cfg)),
 		Override(new(*mpoolmonitor.MpoolMonitor), modules.NewMpoolMonitor(cfg)),
 

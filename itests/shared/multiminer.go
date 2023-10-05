@@ -2,6 +2,10 @@ package shared
 
 import (
 	"context"
+	"path/filepath"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/filecoin-project/boost/itests/framework"
 	"github.com/filecoin-project/boost/node/config"
@@ -11,9 +15,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
-	"path/filepath"
-	"testing"
-	"time"
 )
 
 type RetrievalTest struct {

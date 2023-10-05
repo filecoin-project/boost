@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/filecoin-project/boost/itests/shared"
-	"github.com/filecoin-project/lotus/itests/kit"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"os"
 	"path"
 	"testing"
 	"time"
+
+	"github.com/filecoin-project/boost/itests/shared"
+	"github.com/filecoin-project/lotus/itests/kit"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMultiMinerHttpRetrieval(t *testing.T) {
@@ -84,6 +85,7 @@ func runBoosterHttp(ctx context.Context, repo string, minerApiInfo []string, ful
 
 	args := []string{"booster-http",
 		"--repo=" + repo,
+		"--vv",
 		"run",
 		"--api-fullnode=" + fullNodeApiInfo,
 		"--api-lid=" + lidApiInfo,

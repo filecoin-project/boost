@@ -1,4 +1,3 @@
-/* global BigInt */
 import {useQuery} from "@apollo/react-hooks";
 import {
     DealsCountQuery,
@@ -20,6 +19,7 @@ import './Deals.css'
 import {Pagination} from "./Pagination";
 import {DealActions, IsPaused, IsTransferring, IsOfflineWaitingForData} from "./DealDetail";
 import {humanTransferRate} from "./DealTransfers";
+import {DirectDealsCount} from "./DirectDeals";
 
 const dealsBasePath = '/storage-deals'
 

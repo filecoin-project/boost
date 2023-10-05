@@ -1639,7 +1639,8 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 		SealingPipelineCacheTimeout: time.Second,
 		StorageFilter:               "1",
 	}
-	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, minerStub, sps, minerStub, df, sqldb,
+	commpThrottle := make(chan struct{}, 1)
+	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, minerStub, commpThrottle, sps, minerStub, df, sqldb,
 		logsDB, pm, minerStub, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
 	require.NoError(t, err)
 	ph.Provider = prov
@@ -1706,8 +1707,9 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	t.Cleanup(cancel)
 
 	// construct a new provider with pre-existing state
+	commpThrottle := make(chan struct{}, 1)
 	prov, err := NewProvider(h.Provider.config, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
-		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MinerStub, h.MockSealingPipelineAPI, h.MinerStub,
+		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MinerStub, commpThrottle, h.MockSealingPipelineAPI, h.MinerStub,
 		df, h.Provider.logsSqlDB, h.Provider.logsDB, pm, h.MinerStub, h.Provider.askGetter,
 		h.Provider.sigVerifier, h.Provider.dealLogger, h.Provider.Transport)
 
@@ -1879,7 +1881,7 @@ func (ph *ProviderHarness) newDealBuilder(t *testing.T, seed int, opts ...dealPr
 	}
 
 	// generate CommP of the CARv2 file
-	cidAndSize, err := GenerateCommP(carFilePath)
+	cidAndSize, err := GenerateCommPLocally(carFilePath)
 	require.NoError(tbuilder.t, err)
 
 	var pieceCid = cidAndSize.PieceCID

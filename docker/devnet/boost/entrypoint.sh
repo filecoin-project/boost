@@ -42,6 +42,33 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
 	sed 's|#ListenAddresses = \["/ip4/0.0.0.0/tcp/0", "/ip6/::/tcp/0"\]|ListenAddresses = \["/ip4/0.0.0.0/tcp/50000", "/ip6/::/tcp/0"\]|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
 	sed 's|#ListenAddress = "127.0.0.1"|ListenAddress = "0.0.0.0"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
 
+  echo Setting up FIL+ wallets
+  ROOT_KEY_1=`cat $LOTUS_PATH/rootkey-1`
+  ROOT_KEY_2=`cat $LOTUS_PATH/rootkey-2`
+  echo Root key 1: $ROOT_KEY_1
+  echo Root key 2: $ROOT_KEY_2
+  lotus wallet import $LOTUS_PATH/bls-$ROOT_KEY_1.keyinfo
+  lotus wallet import $LOTUS_PATH/bls-$ROOT_KEY_2.keyinfo
+  NOTARY_1=`lotus wallet new secp256k1`
+  NOTARY_2=`lotus wallet new secp256k1`
+  echo $NOTARY_1 > $BOOST_PATH/notary_1
+  echo $NOTARY_2 > $BOOST_PATH/notary_2
+  echo Notary 1: $NOTARY_1
+  echo Notary 2: $NOTARY_2
+
+  echo Add verifier root_key_1 notary_1
+  lotus-shed verifreg add-verifier $ROOT_KEY_1 $NOTARY_1 10000000000
+  sleep 15
+  echo Msig inspect f080
+  lotus msig inspect f080
+  PARAMS=`lotus msig inspect f080 | tail -1 | awk '{print $8}'`
+  echo Params: $PARAMS
+  echo Msig approve
+  lotus msig approve --from=$ROOT_KEY_2 f080 0 t0100 f06 0 2 $PARAMS
+
+  echo Send 10 FIL to NOTARY_1
+  lotus send $NOTARY_1 10
+
 	echo Done
 	touch $BOOST_PATH/.init.boost
 fi

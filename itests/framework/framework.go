@@ -567,7 +567,7 @@ type DealResult struct {
 }
 
 func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool) (*DealResult, error) {
-	cidAndSize, err := storagemarket.GenerateCommP(carFilepath)
+	cidAndSize, err := storagemarket.GenerateCommPLocally(carFilepath)
 	if err != nil {
 		return nil, err
 	}

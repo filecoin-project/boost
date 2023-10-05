@@ -64,6 +64,8 @@ type BoostStruct struct {
 
 		BoostDealBySignedProposalCid func(p0 context.Context, p1 cid.Cid) (*smtypes.ProviderDealState, error) `perm:"admin"`
 
+		BoostDirectDeal func(p0 context.Context, p1 smtypes.DirectDealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
+
 		BoostDummyDeal func(p0 context.Context, p1 smtypes.DealParams) (*ProviderDealRejectionInfo, error) `perm:"admin"`
 
 		BoostIndexerAnnounceAllDeals func(p0 context.Context) error `perm:"admin"`
@@ -416,6 +418,17 @@ func (s *BoostStruct) BoostDealBySignedProposalCid(p0 context.Context, p1 cid.Ci
 }
 
 func (s *BoostStub) BoostDealBySignedProposalCid(p0 context.Context, p1 cid.Cid) (*smtypes.ProviderDealState, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *BoostStruct) BoostDirectDeal(p0 context.Context, p1 smtypes.DirectDealParams) (*ProviderDealRejectionInfo, error) {
+	if s.Internal.BoostDirectDeal == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.BoostDirectDeal(p0, p1)
+}
+
+func (s *BoostStub) BoostDirectDeal(p0 context.Context, p1 smtypes.DirectDealParams) (*ProviderDealRejectionInfo, error) {
 	return nil, ErrNotSupported
 }
 
