@@ -757,7 +757,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DealUUID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DealUUID")); err != nil {
+	if _, err := cw.WriteString(string("DealUUID")); err != nil {
 		return err
 	}
 
@@ -781,7 +781,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("EndEpoch"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("EndEpoch")); err != nil {
+	if _, err := cw.WriteString(string("EndEpoch")); err != nil {
 		return err
 	}
 
@@ -803,7 +803,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("FilePath"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("FilePath")); err != nil {
+	if _, err := cw.WriteString(string("FilePath")); err != nil {
 		return err
 	}
 
@@ -814,7 +814,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.FilePath))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string(t.FilePath)); err != nil {
+	if _, err := cw.WriteString(string(t.FilePath)); err != nil {
 		return err
 	}
 
@@ -826,7 +826,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("PieceCid"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("PieceCid")); err != nil {
+	if _, err := cw.WriteString(string("PieceCid")); err != nil {
 		return err
 	}
 
@@ -842,7 +842,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("ClientAddr"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("ClientAddr")); err != nil {
+	if _, err := cw.WriteString(string("ClientAddr")); err != nil {
 		return err
 	}
 
@@ -858,7 +858,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("StartEpoch"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("StartEpoch")); err != nil {
+	if _, err := cw.WriteString(string("StartEpoch")); err != nil {
 		return err
 	}
 
@@ -880,7 +880,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("AllocationID"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("AllocationID")); err != nil {
+	if _, err := cw.WriteString(string("AllocationID")); err != nil {
 		return err
 	}
 
@@ -896,7 +896,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("SkipIPNIAnnounce"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("SkipIPNIAnnounce")); err != nil {
+	if _, err := cw.WriteString(string("SkipIPNIAnnounce")); err != nil {
 		return err
 	}
 
@@ -912,7 +912,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("DeleteAfterImport"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("DeleteAfterImport")); err != nil {
+	if _, err := cw.WriteString(string("DeleteAfterImport")); err != nil {
 		return err
 	}
 
@@ -928,7 +928,7 @@ func (t *DirectDealParams) MarshalCBOR(w io.Writer) error {
 	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len("RemoveUnsealedCopy"))); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, string("RemoveUnsealedCopy")); err != nil {
+	if _, err := cw.WriteString(string("RemoveUnsealedCopy")); err != nil {
 		return err
 	}
 
