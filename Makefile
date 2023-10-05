@@ -9,9 +9,9 @@ GOCC?=go
 
 ARCH?=$(shell arch)
 GOVERSION:=$(shell $(GOCC) version | tr ' ' '\n' | grep go1 | sed 's/^go//' | awk -F. '{printf "%d%03d%03d", $$1, $$2, $$3}')
-ifeq ($(shell expr $(GOVERSION) \< 1016000), 1)
+ifeq ($(shell expr $(GOVERSION) \< 1020000), 1)
 $(warning Your Golang version is go$(shell expr $(GOVERSION) / 1000000).$(shell expr $(GOVERSION) % 1000000 / 1000).$(shell expr $(GOVERSION) % 1000))
-$(error Update Golang to version to at least 1.16.0)
+$(error Update Golang to version to at least 1.20.0)
 endif
 
 ALLOWED_NODE_VERSIONS := 16 18
@@ -217,7 +217,7 @@ docsgen-openrpc-boost: docsgen-openrpc-bin
 
 ## DOCKER IMAGES
 docker_user?=filecoin
-lotus_version?=v1.23.3
+lotus_version?=v1.23.4-rc1
 ffi_from_source?=0
 build_lotus?=0
 build_boost?=1

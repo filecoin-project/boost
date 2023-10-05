@@ -868,6 +868,12 @@ const PiecePayloadCidsQuery = gql`
     }
 `;
 
+const IpniDistanceFromLatestAdQuery = gql`
+    query AppIpniDistanceFromLatestAdQuery($latestAdcid: String!, $adcid: String!) {
+        ipniDistanceFromLatestAd(LatestAdcid: $latestAdcid, Adcid: $adcid)
+    }
+`;
+
 export {
     gqlClient,
     EpochQuery,
@@ -896,6 +902,7 @@ export {
     IpniAdEntriesQuery,
     IpniAdEntriesCountQuery,
     IpniLatestAdQuery,
+    IpniDistanceFromLatestAdQuery,
     PiecesWithPayloadCidQuery,
     PieceBuildIndexMutation,
     PieceStatusQuery,

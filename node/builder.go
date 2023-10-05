@@ -477,6 +477,10 @@ func ConfigBoost(cfg *config.Boost) Option {
 		return Error(fmt.Errorf("Detected custom DAG store path %s. The DAG store must be at $BOOST_PATH/dagstore", cfg.DAGStore.RootDir))
 	}
 
+	if cfg.HttpDownload.NChunks < 1 || cfg.HttpDownload.NChunks > 16 {
+		return Error(errors.New("HttpDownload.NChunks should be between 1 and 16"))
+	}
+
 	legacyFees := cfg.LotusFees.Legacy()
 
 	return Options(

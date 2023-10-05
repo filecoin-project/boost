@@ -269,12 +269,16 @@ func (c *ContractDealMonitor) getDealProposal(ctx context.Context, topicContract
 		return nil, fmt.Errorf("decoding params failed: %w", err)
 	}
 
+	latestID := "latest"
+	latest := ethtypes.EthBlockNumberOrHash{
+		PredefinedBlock: &latestID,
+	}
+
 	res, err := c.api.EthCall(ctx, ethtypes.EthCall{
 		From: &fromEthAddr,
 		To:   &toEthAddr,
 		Data: params,
-		//}, ethtypes.NewEthBlockNumberOrHashFromPredefined("latest"))
-	}, "latest")
+	}, latest)
 	if err != nil {
 		return nil, fmt.Errorf("eth call erred: %w", err)
 	}
@@ -305,12 +309,16 @@ func (c *ContractDealMonitor) getExtraData(ctx context.Context, topicContractAdd
 		return nil, fmt.Errorf("decoding params failed: %w", err)
 	}
 
+	latestID := "latest"
+	latest := ethtypes.EthBlockNumberOrHash{
+		PredefinedBlock: &latestID,
+	}
+
 	res, err := c.api.EthCall(ctx, ethtypes.EthCall{
 		From: &fromEthAddr,
 		To:   &toEthAddr,
 		Data: params,
-		//}, ethtypes.NewEthBlockNumberOrHashFromPredefined("latest"))
-	}, "latest")
+	}, latest)
 	if err != nil {
 		return nil, fmt.Errorf("eth call erred: %w", err)
 	}

@@ -147,7 +147,6 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 					sc.MaxSealingSectorsForDeals = 3
 					sc.AlwaysKeepUnsealedCopy = true
 					sc.WaitDealsDelay = time.Hour
-					sc.BatchPreCommits = false
 					sc.AggregateCommits = false
 
 					return sc, nil
