@@ -311,8 +311,8 @@ require (
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.14.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/term v0.11.0
+	golang.org/x/sys v0.12.0 // indirect
+	golang.org/x/term v0.12.0
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/grpc v1.55.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
@@ -336,9 +336,9 @@ require (
 	github.com/filecoin-project/lotus v1.23.4-rc1
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
-	github.com/ipld/go-trustless-utils v0.3.1
+	github.com/ipld/frisbii v0.2.1
 	github.com/ipld/ipld/specs v0.0.0-20230927010225-ef4dbd703269
-	github.com/ipni/go-libipni v0.5.1
+	github.com/ipni/go-libipni v0.5.2
 	github.com/ipni/ipni-cli v0.1.1
 	github.com/schollz/progressbar/v3 v3.13.1
 )
@@ -361,6 +361,7 @@ require (
 	github.com/hashicorp/golang-lru/arc/v2 v2.0.5 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.5 // indirect
 	github.com/ipfs/go-ipfs-blockstore v1.3.0 // indirect
+	github.com/ipld/go-trustless-utils v0.3.1 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.11.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect

@@ -15,7 +15,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost-graphsync/storeutil"
-	"github.com/filecoin-project/boost/cmd/booster-http/frisbii"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
@@ -26,6 +25,7 @@ import (
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/ipld/frisbii"
 	"github.com/rs/cors"
 	"go.opencensus.io/stats"
 )
