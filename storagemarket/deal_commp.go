@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
+	carv2 "github.com/ipld/go-car/v2"
 )
 
 var ErrCommpMismatch = fmt.Errorf("commp mismatch")
@@ -110,6 +111,15 @@ func (p *Provider) remoteCommP(filepath string) (*abi.PieceInfo, *dealMakingErro
 		}
 	}()
 
+	// (willscott - oct 2023 - remove once raw byte supported): confirm file is a car file
+	if _, err := carv2.ReadVersion(rd); err != nil {
+		return nil, &dealMakingError{
+			retry: types.DealRetryFatal,
+			error: fmt.Errorf("failed to read car header: %w", err),
+		}
+	}
+	_, _ = rd.Seek(0, io.SeekStart)
+
 	// Get the size of the file
 	st, err := os.Stat(filepath)
 	if err != nil {
@@ -151,6 +161,15 @@ func GenerateCommP(filepath string) (*abi.PieceInfo, error) {
 			log.Warnf("failed to close reader for %s: %w", filepath, err)
 		}
 	}()
+
+	// (willscott - oct 2023 - remove once raw byte supported): confirm file is a car file
+	if _, err := carv2.ReadVersion(rd); err != nil {
+		return nil, &dealMakingError{
+			retry: types.DealRetryFatal,
+			error: fmt.Errorf("failed to open carv2 reader: %w", err),
+		}
+	}
+	_, _ = rd.Seek(0, io.SeekStart)
 
 	w := &writer.Writer{}
 
