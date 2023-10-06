@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/filecoin-project/boost/itests/shared"
 	"github.com/filecoin-project/boost/testutil"
+	"github.com/filecoin-project/boostd-data/shared/cliutil"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2"
 	"github.com/stretchr/testify/require"
@@ -27,7 +29,7 @@ func TestMultiMinerHttpRetrieval(t *testing.T) {
 		fullNode2ApiInfo, err := rt.BoostAndMiner2.LotusFullNodeApiInfo()
 		require.NoError(t, err)
 
-		port, err := testutil.OpenPort()
+		port, err := testutil.FreePort()
 		require.NoError(t, err)
 
 		runAndWaitForBoosterHttp(ctx, t, []string{miner1ApiInfo, miner2ApiInfo}, fullNode2ApiInfo, port)
@@ -64,20 +66,23 @@ func TestMultiMinerHttpRetrieval(t *testing.T) {
 }
 
 func runAndWaitForBoosterHttp(ctx context.Context, t *testing.T, minerApiInfo []string, fullNodeApiInfo string, port int, args ...string) {
-	req := require.New(t)
-
 	args = append(args, fmt.Sprintf("--port=%d", port))
 
 	go func() {
-		_ = runBoosterHttp(ctx, t.TempDir(), minerApiInfo, fullNodeApiInfo, "ws://localhost:8042", args...)
+		_ = runBoosterHttp(ctx, t, minerApiInfo, fullNodeApiInfo, "ws://localhost:8042", args...)
 	}()
 
 	t.Logf("waiting for booster-http server to come up on port %d...", port)
 	start := time.Now()
-	req.Eventually(func() bool {
+	waitForHttp(ctx, t, port, http.StatusOK, 1*time.Minute)
+	t.Logf("booster-http is up after %s", time.Since(start))
+}
+
+func waitForHttp(ctx context.Context, t *testing.T, port int, waitForCode int, waitFor time.Duration) {
+	require.Eventually(t, func() bool {
 		// Wait for server to come up
 		resp, err := http.Get(fmt.Sprintf("http://localhost:%d", port))
-		if err == nil && resp != nil && resp.StatusCode == 200 {
+		if err == nil && resp != nil && resp.StatusCode == waitForCode {
 			return true
 		}
 		msg := "Waiting for http server to come up: "
@@ -86,18 +91,17 @@ func runAndWaitForBoosterHttp(ctx context.Context, t *testing.T, minerApiInfo []
 		}
 		if resp != nil {
 			respBody, err := io.ReadAll(resp.Body)
-			req.NoError(err)
+			require.NoError(t, err)
 			msg += " / Resp: " + resp.Status + "\n" + string(respBody)
 		}
 		t.Log(msg)
 		return false
-	}, 30*time.Second, 1*time.Second)
-	t.Logf("booster-http is up after %s", time.Since(start))
+	}, waitFor, 5*time.Second)
 }
 
-func runBoosterHttp(ctx context.Context, repo string, minerApiInfo []string, fullNodeApiInfo string, lidApiInfo string, args ...string) error {
+func runBoosterHttp(ctx context.Context, t *testing.T, minerApiInfo []string, fullNodeApiInfo string, lidApiInfo string, args ...string) error {
 	args = append([]string{"booster-http",
-		"--repo=" + repo,
+		"--repo=" + t.TempDir(),
 		"--vv",
 		"run",
 		"--api-fullnode=" + fullNodeApiInfo,
@@ -107,10 +111,11 @@ func runBoosterHttp(ctx context.Context, repo string, minerApiInfo []string, ful
 	for _, apiInfo := range minerApiInfo {
 		args = append(args, "--api-storage="+apiInfo)
 	}
+	t.Logf("Running: %s", strings.Join(args, " "))
 	// new app per call
 	app := cli.NewApp()
 	app.Name = "booster-http"
-	app.Flags = []cli.Flag{FlagRepo}
+	app.Flags = []cli.Flag{cliutil.FlagVeryVerbose, FlagRepo}
 	app.Commands = []*cli.Command{runCmd}
 	return app.RunContext(ctx, args)
 }

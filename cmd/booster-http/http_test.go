@@ -22,7 +22,7 @@ const testFile = "test/test_file"
 
 func TestNewHttpServer(t *testing.T) {
 	// Create a new mock Http server
-	port, err := testutil.OpenPort()
+	port, err := testutil.FreePort()
 	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	httpServer := NewHttpServer("", "0.0.0.0", port, mocks_booster_http.NewMockHttpServerApi(ctrl), nil)
@@ -53,7 +53,7 @@ func TestNewHttpServer(t *testing.T) {
 
 func TestHttpGzipResponse(t *testing.T) {
 	// Create a new mock Http server with custom functions
-	port, err := testutil.OpenPort()
+	port, err := testutil.FreePort()
 	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
@@ -114,7 +114,7 @@ func TestHttpGzipResponse(t *testing.T) {
 func TestHttpInfo(t *testing.T) {
 	var v apiVersion
 
-	port, err := testutil.OpenPort()
+	port, err := testutil.FreePort()
 	require.NoError(t, err)
 	// Create a new mock Http server
 	ctrl := gomock.NewController(t)

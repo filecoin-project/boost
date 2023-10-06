@@ -49,7 +49,7 @@ func TestTrustlessGateway(t *testing.T) {
 
 	dealTestCarInParts(ctx, t, boostAndMiner, carFilepath, rootCid)
 
-	port, err := testutil.OpenPort()
+	port, err := testutil.FreePort()
 	require.NoError(t, err)
 
 	runAndWaitForBoosterHttp(ctx, t, []string{minerApiInfo}, fullNodeApiInfo, port, "--serve-pieces=false", "--serve-cars=true")
@@ -70,10 +70,6 @@ func TestTrustlessGateway(t *testing.T) {
 			req.NoError(err)
 			req.Equal(uint64(1), carReader.Version)
 			req.Equal([]cid.Cid{tc.Root}, carReader.Roots)
-			// log all headers
-			for k, v := range res.Header {
-				t.Logf("  header %s: %s", k, v)
-			}
 
 			for ii, expectedCid := range tc.ExpectedCids {
 				blk, err := carReader.Next()
@@ -137,8 +133,8 @@ func dealTestCarInParts(ctx context.Context, t *testing.T, boostAndMiner *framew
 		// LID and store the data on the first miner
 		res, err := boostAndMiner.MakeDummyDeal(dealUuid, file.Name(), rootCid, server.URL+"/"+filepath.Base(file.Name()), false)
 		req.NoError(err)
-		req.True(res.Result.Accepted)
 		t.Logf("created MarketDummyDeal %s", spew.Sdump(res))
+		req.True(res.Result.Accepted)
 		req.NoError(boostAndMiner.WaitForDealAddedToSector(dealUuid))
 	}
 }
