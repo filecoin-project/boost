@@ -898,8 +898,8 @@ github.com/ipfs/go-verifcid v0.0.2 h1:XPnUv0XmdH+ZIhLGKg6U2vaPaRDXb9urMyNVCE7uvT
 github.com/ipfs/go-verifcid v0.0.2/go.mod h1:40cD9x1y4OWnFXbLNJYRe7MpNvWlMn3LZAG5Wb4xnPU=
 github.com/ipfs/kubo v0.22.0 h1:HxYkvtFqlF+qQMTxHW+xBhrIWykWm+WbEuQpw1d67mM=
 github.com/ipfs/kubo v0.22.0/go.mod h1:Sn3hp55POjH9Ni0lEd/+smXpkZ0J1gKlm0Fx+E1LE60=
-github.com/ipld/frisbii v0.2.2-0.20231006085121-7d48d11641db h1:94GghLok3xtbxprTSEsGlzT9BeqOTgvaW7ptKBcteqA=
-github.com/ipld/frisbii v0.2.2-0.20231006085121-7d48d11641db/go.mod h1:veapLCF7yc/lFr49vxU6DxNVfxEo6nSESHSecgm8Gpg=
+github.com/ipld/frisbii v0.3.0 h1:yBmx73aoCL9aqrCGaVJWjzHSx51qvZgtjsExyxuqlIU=
+github.com/ipld/frisbii v0.3.0/go.mod h1:Gwj+LVuIwgHfeRMlar2luIy+PTK1SIy1QMA0hKiQ/J0=
 github.com/ipld/go-car v0.1.0/go.mod h1:RCWzaUh2i4mOEkB3W45Vc+9jnS/M6Qay5ooytiBHl3g=
 github.com/ipld/go-car v0.6.1 h1:blWbEHf1j62JMWFIqWE//YR0m7k5ZMw0AuUOU5hjrH8=
 github.com/ipld/go-car v0.6.1/go.mod h1:oEGXdwp6bmxJCZ+rARSkDliTeYnVzv3++eXajZ+Bmr8=
@@ -931,8 +931,8 @@ github.com/ipld/go-ipld-prime/storage/bsadapter v0.0.0-20211210234204-ce2a1c70cd
 github.com/ipld/go-ipld-prime/storage/bsadapter v0.0.0-20230102063945-1a409dc236dd h1:gMlw/MhNr2Wtp5RwGdsW23cs+yCuj9k2ON7i9MiJlRo=
 github.com/ipld/go-ipld-selector-text-lite v0.0.1 h1:lNqFsQpBHc3p5xHob2KvEg/iM5dIFn6iw4L/Hh+kS1Y=
 github.com/ipld/go-ipld-selector-text-lite v0.0.1/go.mod h1:U2CQmFb+uWzfIEF3I1arrDa5rwtj00PrpiwwCO+k1RM=
-github.com/ipld/go-trustless-utils v0.3.2-0.20231006083052-c8beabd68ce4 h1:D976Ll2XBjjfwbSASRfK6xNMrljvN0FCdaT+vFD/01A=
-github.com/ipld/go-trustless-utils v0.3.2-0.20231006083052-c8beabd68ce4/go.mod h1:SQR5abLVb2YcZiy9QEsBhNyIPj6ubWISJnrpwNBdmpA=
+github.com/ipld/go-trustless-utils v0.4.0 h1:ZSRvbfQG39BzGYeyHVmttTexZAEdA/grWdu6MB1kiJI=
+github.com/ipld/go-trustless-utils v0.4.0/go.mod h1:SQR5abLVb2YcZiy9QEsBhNyIPj6ubWISJnrpwNBdmpA=
 github.com/ipld/ipld/specs v0.0.0-20230927010225-ef4dbd703269 h1:MXBxKsw8geRJitw8f1dr3EfwbEV0WXVbEH7e/o3p+NI=
 github.com/ipld/ipld/specs v0.0.0-20230927010225-ef4dbd703269/go.mod h1:WcT0DfRe+e2QFY0kcbsOnuT6jL5Q0JNZ83I5DHIdStg=
 github.com/ipni/go-libipni v0.5.2 h1:9vaYOnR4dskd8p88NOboqI6yVqBwYPNCQ/zOaRSr59I=

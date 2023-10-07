@@ -99,7 +99,10 @@ func TestE2E(t *testing.T) {
 	bifrostMetricsPort, err := testutil.FreePort()
 	req.NoError(err)
 	bifrostReady := test.NewStdoutWatcher("Path gateway listening on ")
-	tr.Env = append(tr.Env, fmt.Sprintf("PROXY_GATEWAY_URL=http://0.0.0.0:%d", boosterHttpPort))
+	tr.Env = append(tr.Env,
+		fmt.Sprintf("PROXY_GATEWAY_URL=http://0.0.0.0:%d", boosterHttpPort),
+		"GRAPH_BACKEND=true", // enable "graph" mode, instead of blockstore mode which just fetches raw blocks
+	)
 
 	cmdBifrost := tr.Start(test.NewExecution(bifrostGateway,
 		"--gateway-port", fmt.Sprintf("%d", bifrostPort),
