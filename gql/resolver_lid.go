@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/filecoin-project/boost/db"
+	bdtypes "github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/filecoin-project/boost/sectorstatemgr"
-	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/graph-gophers/graphql-go"
 )
 

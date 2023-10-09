@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/filecoin-project/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2/index"
 	_ "github.com/lib/pq"

@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boostd-data/model"
-	"github.com/filecoin-project/boostd-data/shared/tracing"
-	"github.com/filecoin-project/boostd-data/svc/types"
+	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
