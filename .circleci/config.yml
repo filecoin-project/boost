@@ -1,15 +1,16 @@
 version: 2.1
 orbs:
+  golang: circleci/go@1.7.3
   go: gotest/tools@0.0.14
 
 executors:
   golang:
     docker:
-      - image: cimg/go:1.19.7
+      - image: cimg/go:1.20.7
     resource_class: 2xlarge
   ubuntu:
     docker:
-      - image: ubuntu:20.04
+      - image: ubuntu:22.04
 
 commands:
   install-deps:
@@ -86,7 +87,7 @@ jobs:
   lid-docker-compose:
     description: 'Run LID integration tests'
     machine:
-      image: ubuntu-2004:202104-01
+      image: ubuntu-2204:2023.07.2
       resource_class: xlarge
     steps:
       - checkout
@@ -131,7 +132,7 @@ jobs:
       # local index directory tests so it may be worth refactoring so that it's
       # only included for local index directory
       - setup_remote_docker:
-          version: 20.10.18
+          version: 20.10.23
           docker_layer_caching: true
       - run:
           name: go test
@@ -145,18 +146,15 @@ jobs:
   build-macos:
     description: build darwin boost binary
     macos:
-      xcode: "12.5.1"
+      xcode: "15.0.0"
     working_directory: ~/go/src/github.com/filecoin-project/boost
-    resource_class: macos.x86.medium.gen2
+    resource_class: macos.m1.medium.gen1
     steps:
       - prepare:
           linux: false
           darwin: true
-      - run:
-          name: Install go
-          command: |
-            curl -O https://dl.google.com/go/go1.19.5.darwin-amd64.pkg && \
-            sudo installer -pkg go1.19.5.darwin-amd64.pkg -target /
+      - golang/install:
+          version: "1.20.7"
       - run:
           name: Install pkg-config
           command: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config
@@ -325,11 +323,10 @@ workflows:
           suite: itest-markets_v1_deal
           target: "./itests/markets_v1_deal_test.go"
 
-
       - test:
-          name: test-itest-markets_v1_retrieval
-          suite: itest-markets_v1_retrieval
-          target: "./itests/markets_v1_retrieval_test.go"
+          name: test-itest-markets_v1_identity_cid
+          suite: itest-markets_v1_identity_cid
+          target: "./itests/markets_v1_identity_cid_test.go"
 
       - test:
           name: test-itest-markets_v1_offline_deal
@@ -337,9 +334,19 @@ workflows:
           target: "./itests/markets_v1_offline_deal_test.go"
 
       - test:
+          name: test-itest-markets_v1_retrieval
+          suite: itest-markets_v1_retrieval
+          target: "./itests/markets_v1_retrieval_test.go"
+
+      - test:
           name: test-itest-disabled_markets_v1_deal
           suite: itest-disabled_markets_v1_deal
           target: "./itests/disabled_markets_v1_deal_test.go"
+
+      #- test:
+          #name: test-itest-direct_deal
+          #suite: itest-direct_deal
+          #target: "./itests/ddo_test.go"
 
       - test:
           name: test-all
@@ -372,4 +379,3 @@ workflows:
           target: "./cmd/booster-bitswap"
 
       - lid-docker-compose
-

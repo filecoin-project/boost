@@ -245,6 +245,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	if err != nil {
 		return fmt.Errorf("getting reader over piece %s: %w", pieceCid, err)
 	}
+	defer reader.Close() //nolint:errcheck
 
 	// Try to parse data as containing a data segment index
 	log.Debugw("add index: read index", "pieceCid", pieceCid)
@@ -363,7 +364,11 @@ func (ps *PieceDirectory) BuildIndexForPiece(ctx context.Context, pieceCid cid.C
 		if err == nil {
 			return nil
 		}
-		merr = multierror.Append(merr, fmt.Errorf("adding index for piece deal %d: %w", dl.ChainDealID, err))
+		if dl.IsDirectDeal {
+			merr = multierror.Append(merr, fmt.Errorf("adding index for allocation ID %d: %w", dl.ChainDealID, err))
+		} else {
+			merr = multierror.Append(merr, fmt.Errorf("adding index for piece deal %d: %w", dl.ChainDealID, err))
+		}
 	}
 
 	return merr

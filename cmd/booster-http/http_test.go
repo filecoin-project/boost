@@ -67,10 +67,11 @@ func TestHttpGzipResponse(t *testing.T) {
 
 	// Crate pieceInfo
 	deal := model.DealInfo{
-		ChainDealID: 1234567,
-		SectorID:    0,
-		PieceOffset: 1233,
-		PieceLength: 123,
+		ChainDealID:  1234567,
+		SectorID:     0,
+		PieceOffset:  1233,
+		PieceLength:  123,
+		IsDirectDeal: false,
 	}
 	deals := []model.DealInfo{deal}
 

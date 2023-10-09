@@ -61,6 +61,9 @@ type BoostAPI struct {
 	StorageProvider *storagemarket.Provider
 	IndexProvider   *indexprovider.Wrapper
 
+	// Boost - Direct Data onboarding
+	DirectDealsProvider *storagemarket.DirectDealsProvider
+
 	// Legacy Lotus
 	LegacyStorageProvider gfm_storagemarket.StorageProvider
 
@@ -524,6 +527,11 @@ func (sm *BoostAPI) BoostDagstoreDestroyShard(ctx context.Context, key string) e
 		return fmt.Errorf("failed to destroy shard: %w", err)
 	}
 	return nil
+}
+
+func (sm *BoostAPI) BoostDirectDeal(ctx context.Context, params types.DirectDealParams) (*api.ProviderDealRejectionInfo, error) {
+        return nil, fmt.Errorf("not implemented")
+	// return sm.DirectDealsProvider.Import(ctx, params)
 }
 
 func (sm *BoostAPI) BoostMakeDeal(ctx context.Context, params types.DealParams) (*api.ProviderDealRejectionInfo, error) {

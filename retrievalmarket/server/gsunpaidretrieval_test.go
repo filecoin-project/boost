@@ -28,11 +28,11 @@ import (
 	dtgstransport "github.com/filecoin-project/go-data-transfer/transport/graphsync"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/google/uuid"
-	"github.com/ipfs/boxo/ipld/car/v2"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipld/go-car/v2"
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 	"github.com/ipld/go-ipld-prime/traversal/selector"
 	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
@@ -63,8 +63,7 @@ func TestGS(t *testing.T) {
 	_ = logging.SetLogLevel("testgs", "info")
 	//_ = logging.SetLogLevel("dt-impl", "debug")
 
-	missingCid, err := cid.Parse("bafkqaaa")
-	require.NoError(t, err)
+	missingCid := cid.MustParse("baguqeeraaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	testCases := []testCase{{
 		name: "happy path",

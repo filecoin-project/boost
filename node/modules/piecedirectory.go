@@ -86,7 +86,7 @@ func NewPieceDirectoryStore(cfg *config.Boost) func(lc fx.Lifecycle, r lotus_rep
 				default:
 					return fmt.Errorf("starting local index directory client: " +
 						"neither yugabyte nor leveldb is enabled in config - " +
-						"you must explicitly configure either LocalIndexDirectory.Yugabyte "+
+						"you must explicitly configure either LocalIndexDirectory.Yugabyte " +
 						"or LocalIndexDirectory.Leveldb as the local index directory implementation")
 				}
 
@@ -202,7 +202,8 @@ func (pw *boostPieceStoreWrapper) AddDealForPiece(pieceCID cid.Cid, proposalCid 
 		// TODO: It would be nice if there's some way to figure out the CAR
 		// file size here (but I don't think there is an easy way in legacy
 		// markets without having access to the piece data itself)
-		CarLength: 0,
+		CarLength:    0,
+		IsDirectDeal: false, // There should be no direct deals from legacy code base
 	}
 	return pw.piecedirectory.AddDealForPiece(context.Background(), pieceCID, di)
 }

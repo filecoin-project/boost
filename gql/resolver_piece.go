@@ -51,6 +51,11 @@ type pieceDealResolver struct {
 	ss     *sealStatusReporter
 }
 
+type piecePayload struct {
+	PayloadCid string
+	Multihash  string
+}
+
 func (pdr *pieceDealResolver) SealStatus(ctx context.Context) *sealStatusResolver {
 	return pdr.ss.sealStatus(ctx)
 }
@@ -219,39 +224,6 @@ func (r *resolver) PiecesWithPayloadCid(ctx context.Context, args struct{ Payloa
 	pieceCids := make([]string, 0, len(pieces))
 	for _, piece := range pieces {
 		pieceCids = append(pieceCids, piece.String())
-	}
-	return pieceCids, nil
-}
-
-func (r *resolver) PiecesWithRootPayloadCid(ctx context.Context, args struct{ PayloadCid string }) ([]string, error) {
-	payloadCid, err := cid.Parse(args.PayloadCid)
-	if err != nil {
-		return nil, fmt.Errorf("%s is not a valid payload cid", args.PayloadCid)
-	}
-
-	var pieceCidSet = make(map[string]struct{})
-
-	// Get boost deals by payload cid
-	boostDeals, err := r.dealsDB.ByRootPayloadCID(ctx, payloadCid)
-	if err != nil {
-		return nil, err
-	}
-	for _, dl := range boostDeals {
-		pieceCidSet[dl.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
-	}
-
-	// Get legacy markets deals by payload cid
-	legacyDeals, err := r.legacyDeals.ByPayloadCid(ctx, payloadCid)
-	if err != nil {
-		return nil, err
-	}
-	for _, dl := range legacyDeals {
-		pieceCidSet[dl.ClientDealProposal.Proposal.PieceCID.String()] = struct{}{}
-	}
-
-	pieceCids := make([]string, 0, len(pieceCidSet))
-	for pieceCid := range pieceCidSet {
-		pieceCids = append(pieceCids, pieceCid)
 	}
 	return pieceCids, nil
 }
@@ -579,4 +551,39 @@ func (ss *sealStatusReporter) sealStatus(ctx context.Context) *sealStatusResolve
 	}
 
 	return ssr
+}
+
+func (r *resolver) PiecePayloadCids(ctx context.Context, args struct{ PieceCid string }) ([]*piecePayload, error) {
+	var out []*piecePayload
+	pieceCid, err := cid.Parse(args.PieceCid)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not a valid piece cid", args.PieceCid)
+	}
+
+	// Additional check to return early if piece in not present in LID
+	// This is to avoid a slow operation of reading all the indexes from the DB
+	_, err = r.piecedirectory.GetPieceMetadata(ctx, pieceCid)
+	if err != nil {
+		return nil, err
+	}
+
+	ii, err := r.piecedirectory.GetIterableIndex(ctx, pieceCid)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ii.ForEach(func(m multihash.Multihash, _ uint64) error {
+		payload := piecePayload{
+			PayloadCid: cid.NewCidV1(cid.Raw, m).String(),
+			Multihash:  m.HexString(),
+		}
+		out = append(out, &payload)
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("iterating index for piece %s: %w", pieceCid, err)
+	}
+
+	return out, nil
 }

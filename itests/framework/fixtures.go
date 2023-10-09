@@ -84,7 +84,7 @@ func GenerateDataSegmentFiles(t *testing.T, tmpdir string, num int) (SegmentDeta
 		return SegmentDetails{}, err
 	}
 
-	cidAndSize, err := storagemarket.GenerateCommP(finalCarName)
+	cidAndSize, err := storagemarket.GenerateCommPLocally(finalCarName)
 	if err != nil {
 		return SegmentDetails{}, err
 	}

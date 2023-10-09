@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -12,30 +11,24 @@ import (
 	"github.com/filecoin-project/boost-gfm/stores"
 	clinode "github.com/filecoin-project/boost/cli/node"
 	"github.com/filecoin-project/boost/cmd"
+	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/node/repo"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/go-commp-utils/writer"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
 	markettypes "github.com/filecoin-project/go-state-types/builtin/v9/market"
-	"github.com/filecoin-project/lotus/api"
-	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/actors"
 	marketactor "github.com/filecoin-project/lotus/chain/actors/builtin/market"
-	"github.com/filecoin-project/lotus/chain/messagesigner"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/backupds"
 	"github.com/filecoin-project/lotus/lib/unixfs"
-	"github.com/filecoin-project/lotus/node/modules"
 	lotus_repo "github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/node/repo/imports"
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-cidutil/cidenc"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
-	ds_sync "github.com/ipfs/go-datastore/sync"
 	"github.com/ipld/go-car"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
@@ -110,7 +103,7 @@ var marketAddCmd = &cli.Command{
 			Params: params,
 		}
 
-		cid, sent, err := signAndPushToMpool(cctx, ctx, api, n, msg)
+		cid, sent, err := lib.SignAndPushToMpool(cctx, ctx, api, n, msg)
 		if err != nil {
 			return err
 		}
@@ -185,7 +178,7 @@ var marketWithdrawCmd = &cli.Command{
 			Params: params,
 		}
 
-		cid, sent, err := signAndPushToMpool(cctx, ctx, api, n, msg)
+		cid, sent, err := lib.SignAndPushToMpool(cctx, ctx, api, n, msg)
 		if err != nil {
 			return err
 		}
@@ -408,65 +401,4 @@ var generatecarCmd = &cli.Command{
 
 		return nil
 	},
-}
-
-func signAndPushToMpool(cctx *cli.Context, ctx context.Context, api api.Gateway, n *clinode.Node, msg *types.Message) (cid cid.Cid, sent bool, err error) {
-	ds := ds_sync.MutexWrap(datastore.NewMapDatastore())
-	messagesigner := messagesigner.NewMessageSigner(n.Wallet, &modules.MpoolNonceAPI{ChainModule: api, StateModule: api}, ds)
-
-	head, err := api.ChainHead(ctx)
-	if err != nil {
-		return
-	}
-	basefee := head.Blocks()[0].ParentBaseFee
-
-	spec := &lapi.MessageSendSpec{
-		MaxFee: abi.NewTokenAmount(1000000000), // 1 nFIL
-	}
-	msg, err = api.GasEstimateMessageGas(ctx, msg, spec, types.EmptyTSK)
-	if err != nil {
-		err = fmt.Errorf("GasEstimateMessageGas error: %w", err)
-		return
-	}
-
-	// use basefee + 20%
-	newGasFeeCap := big.Mul(big.Int(basefee), big.NewInt(6))
-	newGasFeeCap = big.Div(newGasFeeCap, big.NewInt(5))
-
-	if big.Cmp(msg.GasFeeCap, newGasFeeCap) < 0 {
-		msg.GasFeeCap = newGasFeeCap
-	}
-
-	smsg, err := messagesigner.SignMessage(ctx, msg, nil, func(*types.SignedMessage) error { return nil })
-	if err != nil {
-		return
-	}
-
-	fmt.Println("about to send message with the following gas costs")
-	maxFee := big.Mul(smsg.Message.GasFeeCap, big.NewInt(smsg.Message.GasLimit))
-	fmt.Println("max fee:     ", types.FIL(maxFee), "(absolute maximum amount you are willing to pay to get your transaction confirmed)")
-	fmt.Println("gas fee cap: ", types.FIL(smsg.Message.GasFeeCap))
-	fmt.Println("gas limit:   ", smsg.Message.GasLimit)
-	fmt.Println("gas premium: ", types.FIL(smsg.Message.GasPremium))
-	fmt.Println("basefee:     ", types.FIL(basefee))
-	fmt.Println()
-	if !cctx.Bool("assume-yes") {
-		var yes bool
-		yes, err = confirm(ctx)
-		if err != nil {
-			return
-		}
-		if !yes {
-			return
-		}
-	}
-
-	cid, err = api.MpoolPush(ctx, smsg)
-	if err != nil {
-		err = fmt.Errorf("mpool push: failed to push message: %w", err)
-		return
-	}
-
-	sent = true
-	return
 }

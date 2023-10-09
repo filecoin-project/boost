@@ -106,7 +106,7 @@ var dummydealCmd = &cli.Command{
 			}
 
 			// Generate CommP
-			cidAndSize, err := storagemarket.GenerateCommP(carFilepath)
+			cidAndSize, err := storagemarket.GenerateCommPLocally(carFilepath)
 			if err != nil {
 				return fmt.Errorf("generating commp for %s: %w", carFilepath, err)
 			}

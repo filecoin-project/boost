@@ -27,10 +27,12 @@ type DealInfo struct {
 	PieceLength abi.PaddedPieceSize `json:"l"`
 	// The size of the CAR file without zero-padding.
 	// This value may be zero if the size is unknown.
+	// If we don't have CarLength, we have to iterate
+	// over all offsets, get the largest offset and
+	// sum it with length.
 	CarLength uint64 `json:"c"`
 
-	// If we don't have CarLength, we have to iterate over all offsets, get
-	// the largest offset and sum it with length.
+	IsDirectDeal bool `json:"d"`
 }
 
 // Metadata for PieceCid

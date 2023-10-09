@@ -147,8 +147,8 @@ export function DealDetail(props) {
                     <td>{deal.SignedProposalCid}</td>
                 </tr>
                 <tr>
-                    <th>Deal Data Root CID</th>
-                    <td><Link to={'/piece-doctor/'+deal.DealDataRoot}>{deal.DealDataRoot}</Link></td>
+                    <th>Label</th>
+                    <td>{deal.DealDataRoot}</td>
                 </tr>
                 <tr>
                     <th>Verified</th>
@@ -404,7 +404,7 @@ export function IsOfflineWaitingForData(deal) {
     return deal.IsOffline && deal.Checkpoint === 'Accepted'
 }
 
-function DealLog(props) {
+export function DealLog(props) {
     var prev = props.prev
     var log = props.log
     var sinceLast = ''
@@ -456,7 +456,7 @@ function DealLog(props) {
     </tr>
 }
 
-function getAllDataAsText(detailTableEl, dealID, logs) {
+export function getAllDataAsText(detailTableEl, dealID, logs) {
     var lines = []
     lines.push('=== Deal ' + dealID + ' ===')
     lines.push('')
@@ -494,7 +494,7 @@ function getAllDataAsText(detailTableEl, dealID, logs) {
     return lines.join('\n')+'\n'
 }
 
-function DealStatusInfo(props) {
+export function DealStatusInfo(props) {
     return <span className="deal-status-info">
         <Info>
             The deal can be in one of the following states:

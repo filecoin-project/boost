@@ -39,12 +39,47 @@ if [ ! -f $BOOST_PATH/.init.boost ]; then
 	# echo exit code: $?
 
 	echo Setting port in boost config...
-	sed 's|ip4/0.0.0.0/tcp/0|ip4/0.0.0.0/tcp/50000|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
-	sed 's|127.0.0.1|0.0.0.0|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+	sed 's|#ListenAddresses = \["/ip4/0.0.0.0/tcp/0", "/ip6/::/tcp/0"\]|ListenAddresses = \["/ip4/0.0.0.0/tcp/50000", "/ip6/::/tcp/0"\]|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+	sed 's|#ListenAddress = "127.0.0.1"|ListenAddress = "0.0.0.0"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+
+  echo Setting up FIL+ wallets
+  ROOT_KEY_1=`cat $LOTUS_PATH/rootkey-1`
+  ROOT_KEY_2=`cat $LOTUS_PATH/rootkey-2`
+  echo Root key 1: $ROOT_KEY_1
+  echo Root key 2: $ROOT_KEY_2
+  lotus wallet import $LOTUS_PATH/bls-$ROOT_KEY_1.keyinfo
+  lotus wallet import $LOTUS_PATH/bls-$ROOT_KEY_2.keyinfo
+  NOTARY_1=`lotus wallet new secp256k1`
+  NOTARY_2=`lotus wallet new secp256k1`
+  echo $NOTARY_1 > $BOOST_PATH/notary_1
+  echo $NOTARY_2 > $BOOST_PATH/notary_2
+  echo Notary 1: $NOTARY_1
+  echo Notary 2: $NOTARY_2
+
+  echo Add verifier root_key_1 notary_1
+  lotus-shed verifreg add-verifier $ROOT_KEY_1 $NOTARY_1 10000000000
+  sleep 15
+  echo Msig inspect f080
+  lotus msig inspect f080
+  PARAMS=`lotus msig inspect f080 | tail -1 | awk '{print $8}'`
+  echo Params: $PARAMS
+  echo Msig approve
+  lotus msig approve --from=$ROOT_KEY_2 f080 0 t0100 f06 0 2 $PARAMS
+
+  echo Send 10 FIL to NOTARY_1
+  lotus send $NOTARY_1 10
 
 	echo Done
 	touch $BOOST_PATH/.init.boost
 fi
+
+## Override config options
+echo Updating config values
+sed 's|#ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8042"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+sed 's|#ExpectedSealDuration = "24h0m0s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
+
+## run boostd-data
+boostd-data run leveldb --repo $BOOST_PATH --addr=0.0.0.0:8042 &
 
 # TODO(anteva): fixme: hack as boostd fails to start without this dir
 mkdir -p /var/lib/boost/deal-staging
@@ -74,11 +109,6 @@ if [ ! -f $BOOST_PATH/.register.boost ]; then
 	echo Super. DONE! Boostd is now configured and will be started soon
 fi
 
-## Override config options
-echo Updating config values
-sed 's|ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8042"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
-sed 's|ExpectedSealDuration = "24h0m0s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
-
 echo Starting LID service and boost in dev mode...
 trap 'kill %1' SIGINT
-exec boostd-data run leveldb --addr=0.0.0.0:8042 & boostd -vv run --nosync=true
+exec boostd -vv run --nosync=true

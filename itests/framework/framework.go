@@ -154,7 +154,6 @@ func FullNodeAndMiner(t *testing.T, ensemble *kit.Ensemble) (*kit.TestFullNode, 
 					sc.MaxSealingSectorsForDeals = 3
 					sc.AlwaysKeepUnsealedCopy = true
 					sc.WaitDealsDelay = time.Hour
-					sc.BatchPreCommits = false
 					sc.AggregateCommits = false
 
 					return sc, nil
@@ -581,7 +580,7 @@ type DealResult struct {
 }
 
 func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, rootCid cid.Cid, url string, isOffline bool) (*DealResult, error) {
-	cidAndSize, err := storagemarket.GenerateCommP(carFilepath)
+	cidAndSize, err := storagemarket.GenerateCommPLocally(carFilepath)
 	if err != nil {
 		return nil, err
 	}

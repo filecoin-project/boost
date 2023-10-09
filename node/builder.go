@@ -434,6 +434,7 @@ var BoostNode = Options(
 	Override(new(*modules.LogSqlDB), modules.NewLogsSqlDB),
 	Override(new(*modules.RetrievalSqlDB), modules.NewRetrievalSqlDB),
 	Override(HandleCreateRetrievalTablesKey, modules.CreateRetrievalTables),
+	Override(new(*db.DirectDealsDB), modules.NewDirectDealsDB),
 	Override(new(*db.DealsDB), modules.NewDealsDB),
 	Override(new(*db.LogsDB), modules.NewLogsDB),
 	Override(new(*db.ProposalLogsDB), modules.NewProposalLogsDB),
@@ -474,6 +475,10 @@ func ConfigBoost(cfg *config.Boost) Option {
 	}
 	if len(cfg.DAGStore.RootDir) > 0 {
 		return Error(fmt.Errorf("Detected custom DAG store path %s. The DAG store must be at $BOOST_PATH/dagstore", cfg.DAGStore.RootDir))
+	}
+
+	if cfg.HttpDownload.NChunks < 1 || cfg.HttpDownload.NChunks > 16 {
+		return Error(errors.New("HttpDownload.NChunks should be between 1 and 16"))
 	}
 
 	legacyFees := cfg.LotusFees.Legacy()
@@ -520,6 +525,8 @@ func ConfigBoost(cfg *config.Boost) Option {
 		Override(new(*storagemarket.ChainDealManager), modules.NewChainDealManager),
 		Override(new(smtypes.CommpCalculator), From(new(lotus_modules.MinerStorageService))),
 
+		Override(new(storagemarket.CommpThrottle), modules.NewCommpThrottle(cfg)),
+		Override(new(*storagemarket.DirectDealsProvider), modules.NewDirectDealsProvider(walletMiner, cfg)),
 		Override(new(*storagemarket.Provider), modules.NewStorageMarketProvider(walletMiner, cfg)),
 		Override(new(*mpoolmonitor.MpoolMonitor), modules.NewMpoolMonitor(cfg)),
 

@@ -86,6 +86,12 @@ your node if metadata log is disabled`,
 			Comment: ``,
 		},
 		{
+			Name: "HttpDownload",
+			Type: "HttpDownloadConfig",
+
+			Comment: ``,
+		},
+		{
 			Name: "LotusDealmaking",
 			Type: "lotus_config.DealmakingConfig",
 
@@ -474,6 +480,23 @@ configured in SectorIndexApiInfo.`,
 			Comment: `The port that the graphql server listens on`,
 		},
 	},
+	"HttpDownloadConfig": []DocField{
+		{
+			Name: "NChunks",
+			Type: "int",
+
+			Comment: `NChunks is a number of chunks to split HTTP downloads into. Each chunk is downloaded in the goroutine of its own
+which improves the overall download speed. NChunks is always equal to 1 for libp2p transport because libp2p server
+doesn't support range requests yet. NChunks must be greater than 0 and less than 16, with the default of 5.`,
+		},
+		{
+			Name: "AllowPrivateIPs",
+			Type: "bool",
+
+			Comment: `AllowPrivateIPs defines whether boost should allow HTTP downloads from private IPs as per https://en.wikipedia.org/wiki/Private_network.
+The default is false.`,
+		},
+	},
 	"IndexProviderAnnounceConfig": []DocField{
 		{
 			Name: "AnnounceOverHttp",
@@ -552,13 +575,22 @@ datastore if any is present.`,
 
 			Comment: ``,
 		},
+		{
+			Name: "DataTransferPublisher",
+			Type: "bool",
+
+			Comment: `Set this to true to use the legacy data-transfer/graphsync publisher.
+This should only be used as a temporary fall-back if publishing ipnisync
+over libp2p or HTTP is not working, and publishing over
+data-transfer/graphsync was previously working.`,
+		},
 	},
 	"IndexProviderHttpPublisherConfig": []DocField{
 		{
 			Name: "Enabled",
 			Type: "bool",
 
-			Comment: `If not enabled, requests are served over graphsync instead.`,
+			Comment: `If enabled, requests are served over HTTP instead of libp2p.`,
 		},
 		{
 			Name: "PublicHostname",
@@ -574,6 +606,14 @@ This is usually the same as the for the boost node.`,
 
 			Comment: `Set the port on which to listen for index provider requests over HTTP.
 Note that this port must be open on the firewall.`,
+		},
+		{
+			Name: "WithLibp2p",
+			Type: "bool",
+
+			Comment: `Set this to true to publish HTTP over libp2p in addition to plain HTTP,
+Otherwise, the publisher will publish content advertisements using only
+plain HTTP if Enabled is true.`,
 		},
 	},
 	"LocalIndexDirectoryConfig": []DocField{
@@ -1209,6 +1249,35 @@ the database must already exist and be writeable. If a relative path is provided
 relative to the CWD (current working directory).`,
 		},
 	},
+	"lotus_config.FaultReporterConfig": []DocField{
+		{
+			Name: "EnableConsensusFaultReporter",
+			Type: "bool",
+
+			Comment: `EnableConsensusFaultReporter controls whether the node will monitor and
+report consensus faults. When enabled, the node will watch for malicious
+behaviors like double-mining and parent grinding, and submit reports to the
+network. This can earn reporter rewards, but is not guaranteed. Nodes should
+enable fault reporting with care, as it may increase resource usage, and may
+generate gas fees without earning rewards.`,
+		},
+		{
+			Name: "ConsensusFaultReporterDataDir",
+			Type: "string",
+
+			Comment: `ConsensusFaultReporterDataDir is the path where fault reporter state will be
+persisted. This directory should have adequate space and permissions for the
+node process.`,
+		},
+		{
+			Name: "ConsensusFaultReporterAddress",
+			Type: "string",
+
+			Comment: `ConsensusFaultReporterAddress is the wallet address used for submitting
+ReportConsensusFault messages. It will pay for gas fees, and receive any
+rewards. This address should have adequate funds to cover gas fees.`,
+		},
+	},
 	"lotus_config.FeeConfig": []DocField{
 		{
 			Name: "DefaultMaxFee",
@@ -1279,6 +1348,12 @@ Set to 0 to keep all mappings`,
 		{
 			Name: "Index",
 			Type: "IndexConfig",
+
+			Comment: ``,
+		},
+		{
+			Name: "FaultReporter",
+			Type: "FaultReporterConfig",
 
 			Comment: ``,
 		},
@@ -1926,12 +2001,6 @@ This is useful for forcing all deals to be assigned as snap deals to sectors mar
 			Comment: `Don't send collateral with messages even if there is no available balance in the miner actor`,
 		},
 		{
-			Name: "BatchPreCommits",
-			Type: "bool",
-
-			Comment: `enable / disable precommit batching (takes effect after nv13)`,
-		},
-		{
 			Name: "MaxPreCommitBatch",
 			Type: "int",
 
@@ -1984,7 +2053,8 @@ This is useful for forcing all deals to be assigned as snap deals to sectors mar
 			Type: "types.FIL",
 
 			Comment: `network BaseFee below which to stop doing precommit batching, instead
-sending precommit messages to the chain individually`,
+sending precommit messages to the chain individually. When the basefee is
+below this threshold, precommit messages will get sent out immediately.`,
 		},
 		{
 			Name: "AggregateAboveBaseFee",

@@ -50,6 +50,7 @@ type Boost interface {
 	BoostDagstorePiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error)                                      //perm:read
 	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error)                                                                   //perm:admin
 	BoostMakeDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                                      //perm:write
+	BoostDirectDeal(ctx context.Context, params smtypes.DirectDealParams) (*ProviderDealRejectionInfo, error)                                   //perm:admin
 
 	// MethodGroup: Blockstore
 	BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte, error)  //perm:read

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 	"time"
@@ -20,6 +21,7 @@ import (
 	lapi "github.com/filecoin-project/lotus/api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/google/uuid"
+	carv2 "github.com/ipld/go-car/v2"
 	"github.com/libp2p/go-libp2p/core/event"
 )
 
@@ -230,7 +232,7 @@ func (p *Provider) execDealUptoAddPiece(ctx context.Context, deal *types.Provide
 		p.dealLogger.Infow(deal.DealUuid, "storage space successfully untagged for deal after it was handed to sealer")
 	}
 
-	// Index deal in DAGStore and Announce deal
+	// Index and Announce deal
 	if deal.Checkpoint < dealcheckpoints.IndexedAndAnnounced {
 		if err := p.indexAndAnnounce(ctx, pub, deal); err != nil {
 			err.error = fmt.Errorf("failed to add index and announce deal: %w", err.error)
@@ -529,39 +531,18 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 
 	p.dealLogger.Infow(deal.DealUuid, "add piece called")
 
-	st, err := os.Stat(deal.InboundFilePath)
-	if err != nil {
-		return &dealMakingError{
-			retry: types.DealRetryFatal,
-			error: fmt.Errorf("failed to stat CARv1 file: %w", err),
-		}
-	}
-
-	r, err := os.Open(deal.InboundFilePath)
-	if err != nil {
-		return &dealMakingError{
-			retry: types.DealRetryFatal,
-			error: fmt.Errorf("failed to open file: %w", err),
-		}
-	}
-	defer func() {
-		if err := r.Close(); err != nil {
-			p.dealLogger.Warnw(deal.DealUuid, "failed to close reader in addpiece", "err", err.Error())
-		}
-	}()
-
-	// Inflate the deal size so that it exactly fills a piece
 	proposal := deal.ClientDealProposal.Proposal
-	paddedReader, err := padreader.NewInflator(r, uint64(st.Size()), proposal.PieceSize.Unpadded())
+	paddedReader, err := openReader(deal.InboundFilePath, proposal.PieceSize.Unpadded())
 	if err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryFatal,
-			error: fmt.Errorf("failed to create inflator: %w", err),
+			error: fmt.Errorf("failed to read piece data: %w", err),
 		}
 	}
 
 	// Add the piece to a sector
 	packingInfo, packingErr := p.AddPieceToSector(ctx, *deal, paddedReader)
+	_ = paddedReader.Close()
 	if packingErr != nil {
 		if ctx.Err() != nil {
 			p.dealLogger.Warnw(deal.DealUuid, "context timed out while trying to add piece")
@@ -586,18 +567,52 @@ func (p *Provider) addPiece(ctx context.Context, pub event.Emitter, deal *types.
 	return nil
 }
 
+func openReader(filePath string, pieceSize abi.UnpaddedPieceSize) (io.ReadCloser, error) {
+	st, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat %s: %w", filePath, err)
+	}
+	size := uint64(st.Size())
+
+	// Open a reader against the CAR file with the deal data
+	v2r, err := carv2.OpenReader(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open CAR reader over %s: %w", filePath, err)
+	}
+	v2r.Close()
+
+	r, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open %s: %w", filePath, err)
+	}
+
+	reader, err := padreader.NewInflator(r, size, pieceSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inflate data: %w", err)
+	}
+
+	return struct {
+		io.Reader
+		io.Closer
+	}{
+		Reader: reader,
+		Closer: r,
+	}, nil
+}
+
 func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal *types.ProviderDealState) *dealMakingError {
 	// add deal to piece metadata store
 	pc := deal.ClientDealProposal.Proposal.PieceCID
 	p.dealLogger.Infow(deal.DealUuid, "about to add deal for piece in LID")
 	if err := p.piecedirectory.AddDealForPiece(ctx, pc, model.DealInfo{
-		DealUuid:    deal.DealUuid.String(),
-		ChainDealID: deal.ChainDealID,
-		MinerAddr:   p.Address,
-		SectorID:    deal.SectorID,
-		PieceOffset: deal.Offset,
-		PieceLength: deal.Length,
-		CarLength:   uint64(deal.NBytesReceived),
+		DealUuid:     deal.DealUuid.String(),
+		ChainDealID:  deal.ChainDealID,
+		MinerAddr:    p.Address,
+		SectorID:     deal.SectorID,
+		PieceOffset:  deal.Offset,
+		PieceLength:  deal.Length,
+		CarLength:    uint64(deal.NBytesReceived),
+		IsDirectDeal: false,
 	}); err != nil {
 		return &dealMakingError{
 			retry: types.DealRetryAuto,
@@ -665,7 +680,7 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 
 	retErr := &dealMakingError{
 		retry: types.DealRetryFatal,
-		error: ErrDealNotSealed,
+		error: ErrDealNotInSector,
 	}
 
 	// Check status immediately

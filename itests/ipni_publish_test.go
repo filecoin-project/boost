@@ -93,6 +93,13 @@ func TestIPNIPublish(t *testing.T) {
 	// Confirm this ad is not a remove type
 	require.False(t, headAfterDeal.IsRemove)
 
+	// Check that advertisement has entries
+	require.True(t, headAfterDeal.HasEntries())
+
+	// Sync the entries chain
+	err = ipniClient.SyncEntriesWithRetry(ctx, headAfterDeal.Entries.Root())
+	require.NoError(t, err)
+
 	// Get all multihashes - indexer retrieval
 	mhs, err := headAfterDeal.Entries.Drain()
 	require.NoError(t, err)

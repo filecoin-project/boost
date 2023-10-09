@@ -5,9 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
-
 	mbig "math/big"
+	"time"
 
 	"github.com/filecoin-project/boost/node/config"
 	"github.com/filecoin-project/boost/storagemarket/types"
@@ -270,11 +269,16 @@ func (c *ContractDealMonitor) getDealProposal(ctx context.Context, topicContract
 		return nil, fmt.Errorf("decoding params failed: %w", err)
 	}
 
+	latestID := "latest"
+	latest := ethtypes.EthBlockNumberOrHash{
+		PredefinedBlock: &latestID,
+	}
+
 	res, err := c.api.EthCall(ctx, ethtypes.EthCall{
 		From: &fromEthAddr,
 		To:   &toEthAddr,
 		Data: params,
-	}, "latest")
+	}, latest)
 	if err != nil {
 		return nil, fmt.Errorf("eth call erred: %w", err)
 	}
@@ -305,11 +309,16 @@ func (c *ContractDealMonitor) getExtraData(ctx context.Context, topicContractAdd
 		return nil, fmt.Errorf("decoding params failed: %w", err)
 	}
 
+	latestID := "latest"
+	latest := ethtypes.EthBlockNumberOrHash{
+		PredefinedBlock: &latestID,
+	}
+
 	res, err := c.api.EthCall(ctx, ethtypes.EthCall{
 		From: &fromEthAddr,
 		To:   &toEthAddr,
 		Data: params,
-	}, "latest")
+	}, latest)
 	if err != nil {
 		return nil, fmt.Errorf("eth call erred: %w", err)
 	}
