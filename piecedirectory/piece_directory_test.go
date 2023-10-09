@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/filecoin-project/boostd-data/svc"
+	"github.com/filecoin-project/boost/extern/boostd-data/svc"
 	"github.com/stretchr/testify/require"
 )
 

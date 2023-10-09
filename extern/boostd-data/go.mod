@@ -1,4 +1,4 @@
-module github.com/filecoin-project/boostd-data
+module github.com/filecoin-project/boost/extern/boostd-data
 
 go 1.18
 

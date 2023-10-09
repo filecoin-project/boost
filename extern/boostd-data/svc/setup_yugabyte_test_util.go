@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boostd-data/yugabyte"
+	"github.com/filecoin-project/boost/extern/boostd-data/yugabyte"
 	"github.com/filecoin-project/go-address"
 	logging "github.com/ipfs/go-log/v2"
 	_ "github.com/lib/pq"
