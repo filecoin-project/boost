@@ -115,6 +115,11 @@ var runCmd = &cli.Command{
 				"a reverse proxy with compression",
 			Value: gzip.BestSpeed,
 		},
+		&cli.StringFlag{
+			Name:  "log-file",
+			Usage: "path to file to append HTTP request and error logs to, defaults to stdout (-)",
+			Value: "-",
+		},
 		&cli.BoolFlag{
 			Name:  "tracing",
 			Usage: "enables tracing of booster-http calls",
@@ -243,6 +248,18 @@ var runCmd = &cli.Command{
 			filtered := filters.NewFilteredBlockstore(rbs, multiFilter)
 			opts.Blockstore = filtered
 		}
+
+		switch cctx.String("log-file") {
+		case "":
+		case "-":
+			opts.LogWriter = cctx.App.Writer
+		default:
+			opts.LogWriter, err = os.OpenFile(cctx.String("log-file"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				return err
+			}
+		}
+
 		sapi := serverApi{ctx: ctx, piecedirectory: pd, sa: sa}
 		server := NewHttpServer(
 			cctx.String("base-path"),

@@ -12,6 +12,8 @@ replace github.com/filecoin-project/boostd-data => ./extern/boostd-data
 
 // replace github.com/filecoin-project/boost-gfm => ../boost-gfm
 
+replace github.com/ipld/frisbii => ../../ipld/frisbii
+
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2
 	github.com/BurntSushi/toml v1.3.2

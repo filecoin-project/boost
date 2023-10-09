@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/NYTimes/gziphandler"
-	"github.com/fatih/color"
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost-graphsync/storeutil"
 	"github.com/filecoin-project/boost/metrics"
@@ -68,6 +67,8 @@ type HttpServerOptions struct {
 	ServePieces      bool
 	ServeTrustless   bool
 	CompressionLevel int
+	LogWriter        io.Writer          // for a standardised log write format
+	LogHandler       frisbii.LogHandler // for more granular control over log output
 }
 
 func NewHttpServer(path string, listenAddr string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
@@ -128,8 +129,10 @@ func (s *HttpServer) Start(ctx context.Context) error {
 	handler.HandleFunc("/info", s.handleInfo)
 	handler.Handle("/metrics", metrics.Exporter("booster_http")) // metrics
 	s.server = &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", s.listenAddr, s.port),
-		Handler: c.Handler(handler),
+		Addr: fmt.Sprintf("%s:%d", s.listenAddr, s.port),
+		Handler: c.Handler(
+			frisbii.NewLogMiddleware(handler, frisbii.WithLogWriter(s.opts.LogWriter), frisbii.WithLogHandler(s.opts.LogHandler)),
+		),
 		// This context will be the parent of the context associated with all
 		// incoming requests
 		BaseContext: func(listener net.Listener) context.Context {
@@ -174,8 +177,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	// Remove the path up to the piece cid
 	prefixLen := len(s.pieceBasePath())
 	if len(r.URL.Path) <= prefixLen {
-		msg := fmt.Sprintf("path '%s' is missing piece CID", r.URL.Path)
-		writeError(w, r, http.StatusBadRequest, msg)
+		writeError(w, r, http.StatusBadRequest, fmt.Errorf("path '%s' is missing piece CID", r.URL.Path))
 		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
 		return
 	}
@@ -183,8 +185,7 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	pieceCidStr := r.URL.Path[prefixLen:]
 	pieceCid, err := cid.Parse(pieceCidStr)
 	if err != nil {
-		msg := fmt.Sprintf("parsing piece CID '%s': %s", pieceCidStr, err.Error())
-		writeError(w, r, http.StatusBadRequest, msg)
+		writeError(w, r, http.StatusBadRequest, fmt.Errorf("parsing piece CID '%s': %s", pieceCidStr, err.Error()))
 		stats.Record(ctx, metrics.HttpPieceByCid400ResponseCount.M(1))
 		return
 	}
@@ -193,13 +194,11 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 	content, err := s.getPieceContent(ctx, pieceCid)
 	if err != nil {
 		if isNotFoundError(err) {
-			writeError(w, r, http.StatusNotFound, err.Error())
+			writeError(w, r, http.StatusNotFound, err)
 			stats.Record(ctx, metrics.HttpPieceByCid404ResponseCount.M(1))
 			return
 		}
-		log.Errorf("getting content for piece %s: %s", pieceCid, err)
-		msg := fmt.Sprintf("server error getting content for piece CID %s", pieceCid)
-		writeError(w, r, http.StatusInternalServerError, msg)
+		writeError(w, r, http.StatusInternalServerError, fmt.Errorf("server error getting content for piece CID %s: %s", pieceCid, err.Error()))
 		stats.Record(ctx, metrics.HttpPieceByCid500ResponseCount.M(1))
 		return
 	}
@@ -234,45 +233,22 @@ func setHeaders(w http.ResponseWriter, pieceCid cid.Cid, isGzipped bool) {
 	w.Header().Set("Cache-Control", "public, max-age=29030400, immutable")
 }
 
-func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker, isGzipped bool) {
-	var writer http.ResponseWriter
-
+func serveContent(res http.ResponseWriter, req *http.Request, content io.ReadSeeker, isGzipped bool) {
 	// http.ServeContent ignores errors when writing to the stream, so we
 	// replace the writer with a class that watches for errors
-	var err error
-	writeErrWatcher := &writeErrorWatcher{ResponseWriter: w, onError: func(e error) {
-		err = e
-	}}
-
-	writer = writeErrWatcher //Need writeErrWatcher to be of type writeErrorWatcher for addCommas()
+	res = newPieceAccountingWriter(res, toLoggingResponseWriter(res))
 
 	// Note that the last modified time is a constant value because the data
 	// in a piece identified by a cid will never change.
-	start := time.Now()
 
-	if r.Method == "HEAD" {
+	if req.Method == "HEAD" {
 		// For an HTTP HEAD request ServeContent doesn't send any data (just headers)
-		http.ServeContent(writer, r, "", time.Time{}, content)
-		alog("%s\tHEAD %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
+		http.ServeContent(res, req, "", time.Time{}, content)
 		return
 	}
 
 	// Send the content
-	http.ServeContent(writer, r, "", lastModified, content)
-
-	// Write a line to the log
-	end := time.Now()
-	completeMsg := fmt.Sprintf("GET %s\n%s - %s: %s / %s bytes transferred",
-		r.URL, end.Format(timeFmt), start.Format(timeFmt), time.Since(start), addCommas(writeErrWatcher.count))
-	if isGzipped {
-		completeMsg += " (gzipped)"
-	}
-	if err == nil {
-		alogAt(end, "%s\t%s", color.New(color.FgGreen).Sprint("DONE"), completeMsg)
-	} else {
-		alogAt(end, "%s\t%s\n%s",
-			color.New(color.FgRed).Sprint("FAIL"), completeMsg, err)
-	}
+	http.ServeContent(res, req, "", lastModified, content)
 }
 
 // isNotFoundError falls back to checking the error string for "not found".
@@ -291,11 +267,14 @@ func isNotFoundError(err error) bool {
 	return strings.Contains(strings.ToLower(err.Error()), "not found")
 }
 
-func writeError(w http.ResponseWriter, r *http.Request, status int, msg string) {
-	w.WriteHeader(status)
-	w.Write([]byte("Error: " + msg)) //nolint:errcheck
-	alog("%s\tGET %s\n%s",
-		color.New(color.FgRed).Sprintf("%d", status), r.URL, msg)
+func writeError(w http.ResponseWriter, r *http.Request, status int, msg error) {
+	log.Warnf("error handling request [%s]: %s", r.URL.String(), msg.Error())
+	if lrw := toLoggingResponseWriter(w); lrw != nil {
+		lrw.LogError(status, msg) // will log the lowest wrapped error, so %w errors are isolated
+	} else {
+		log.Error("no logging response writer to report to")
+		http.Error(w, msg.Error(), status)
+	}
 }
 
 func (s *HttpServer) getPieceContent(ctx context.Context, pieceCid cid.Cid) (io.ReadSeeker, error) {
@@ -378,28 +357,36 @@ func (s *HttpServer) unsealedDeal(ctx context.Context, pieceCid cid.Cid, pieceDe
 		len(pieceDeals), pieceCid, sealedCount, len(pieceDeals)-sealedCount, dealSectors, allErr)
 }
 
-// writeErrorWatcher calls onError if there is an error writing to the writer
-type writeErrorWatcher struct {
-	http.ResponseWriter
-	count   uint64
-	onError func(err error)
-}
-
-func (w *writeErrorWatcher) Write(bz []byte) (int, error) {
-	count, err := w.ResponseWriter.Write(bz)
-	if err != nil {
-		w.onError(err)
+func toLoggingResponseWriter(res http.ResponseWriter) *frisbii.LoggingResponseWriter {
+	switch lrw := res.(type) {
+	case *frisbii.LoggingResponseWriter:
+		return lrw
+	case *gziphandler.GzipResponseWriter:
+		if lrw, ok := lrw.ResponseWriter.(*frisbii.LoggingResponseWriter); ok {
+			return lrw
+		}
 	}
-	w.count += uint64(count)
+	return nil
+}
+
+// pieceAccountingWriter reports the number of bytes written to a
+// LoggingResponseWriter so the compression ratio can be calculated.
+type pieceAccountingWriter struct {
+	http.ResponseWriter
+	lrw *frisbii.LoggingResponseWriter
+}
+
+func newPieceAccountingWriter(
+	w http.ResponseWriter,
+	lrw *frisbii.LoggingResponseWriter,
+) *pieceAccountingWriter {
+	return &pieceAccountingWriter{ResponseWriter: w, lrw: lrw}
+}
+
+func (w *pieceAccountingWriter) Write(bz []byte) (int, error) {
+	count, err := w.ResponseWriter.Write(bz)
+	if w.lrw != nil {
+		w.lrw.WroteBytes(count)
+	}
 	return count, err
-}
-
-const timeFmt = "2006-01-02T15:04:05.000Z0700"
-
-func alog(l string, args ...interface{}) {
-	alogAt(time.Now(), l, args...)
-}
-
-func alogAt(at time.Time, l string, args ...interface{}) {
-	fmt.Printf(at.Format(timeFmt)+"\t"+l+"\n", args...)
 }

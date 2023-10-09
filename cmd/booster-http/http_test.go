@@ -8,7 +8,10 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,49 +35,98 @@ const (
 )
 
 func TestNewHttpServer(t *testing.T) {
+	req := require.New(t)
+
 	// Create a new mock Http server
 	port, err := testutil.FreePort()
-	require.NoError(t, err)
+	req.NoError(err)
 	ctrl := gomock.NewController(t)
-	httpServer := NewHttpServer("", "0.0.0.0", port, mocks_booster_http.NewMockHttpServerApi(ctrl), nil)
+
+	var requestCount int
+	serverUpCh := make(chan struct{})
+	logHandler := func(ts time.Time, remoteAddr, method string, url url.URL, status int, duration time.Duration, bytes int, compressionRatio, userAgent, msg string) {
+		select {
+		case <-serverUpCh:
+		default:
+			return
+		}
+
+		t.Logf("%s %s %s %s %d %s %d %s %s %s", ts.Format(time.RFC3339), remoteAddr, method, url.String(), status, duration, bytes, compressionRatio, userAgent, msg)
+		requestCount++
+		req.Equal("GET", method)
+		req.Equal("-", compressionRatio)
+
+		switch requestCount {
+		case 1, 2:
+			req.Equal("/", url.Path)
+			req.Equal(http.StatusOK, status)
+		case 3:
+			req.Equal("/piece/bafynotacid!", url.Path)
+			req.Equal(http.StatusBadRequest, status)
+			req.Contains(msg, "invalid cid")
+		default:
+			req.Failf("unexpected request count", "count: %d", requestCount)
+		}
+	}
+
+	httpServer := NewHttpServer(
+		"",
+		"0.0.0.0",
+		port,
+		mocks_booster_http.NewMockHttpServerApi(ctrl),
+		&HttpServerOptions{ServePieces: true, LogHandler: logHandler},
+	)
 	err = httpServer.Start(context.Background())
-	require.NoError(t, err)
+	req.NoError(err)
 	waitServerUp(t, port)
+	close(serverUpCh)
 
 	// Check that server is responding with 200 status code
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/", port))
-	require.NoError(t, err)
-	require.Equal(t, 200, resp.StatusCode)
+	req.NoError(err)
+	req.Equal(200, resp.StatusCode)
 
 	// Create a request with Cors header
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:%d/", port), nil)
-	require.NoError(t, err)
-	req.Header.Add("Origin", "test")
+	request, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:%d/", port), nil)
+	req.NoError(err)
+	request.Header.Add("Origin", "test")
 	client := new(http.Client)
-	response, err := client.Do(req)
-	require.NoError(t, err)
+	response, err := client.Do(request)
+	req.NoError(err)
 
 	// Check for Cors header
-	require.Equal(t, "*", response.Header.Get("Access-Control-Allow-Origin"))
+	req.Equal("*", response.Header.Get("Access-Control-Allow-Origin"))
+
+	// Test an error condition
+	request, err = http.NewRequest("GET", fmt.Sprintf("http://localhost:%d/piece/bafynotacid!", port), nil)
+	req.NoError(err)
+	response, err = client.Do(request)
+	req.NoError(err)
+	if response.StatusCode != http.StatusBadRequest {
+		body, _ := io.ReadAll(response.Body)
+		req.Failf("wrong response code not received", "expected %d, got %d; body: [%s]", http.StatusOK, response.StatusCode, string(body))
+	}
 
 	// Stop the server
 	err = httpServer.Stop()
-	require.NoError(t, err)
+	req.NoError(err)
 }
 
 func TestHttpGzipResponse(t *testing.T) {
+	req := require.New(t)
+
 	// Create a new mock Http server with custom functions
 	port, err := testutil.FreePort()
-	require.NoError(t, err)
+	req.NoError(err)
 	ctrl := gomock.NewController(t)
 	mockHttpServer := mocks_booster_http.NewMockHttpServerApi(ctrl)
 
 	// Create mock unsealed file for piece/car
 	f, _ := os.Open(testFile)
 	testFileBytes, err := io.ReadAll(f)
-	require.NoError(t, err)
+	req.NoError(err)
 	_, err = f.Seek(0, io.SeekStart)
-	require.NoError(t, err)
+	req.NoError(err)
 	defer f.Close()
 
 	// Crate pieceInfo
@@ -102,10 +154,10 @@ func TestHttpGzipResponse(t *testing.T) {
 	lsys.TrustedStorage = true
 
 	entity, err := unixfsgen.Parse("file:1MiB{zero}")
-	require.NoError(t, err)
+	req.NoError(err)
 	t.Logf("Generating: %s", entity.Describe(""))
 	rootEnt, err := entity.Generate(lsys, rndReader)
-	require.NoError(t, err)
+	req.NoError(err)
 
 	// mirror of a similar set of tests in frisbii, but includes piece retrieval too
 	testCases := []struct {
@@ -165,19 +217,44 @@ func TestHttpGzipResponse(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 
+			logHandler := func(ts time.Time, remoteAddr, method string, url url.URL, status int, duration time.Duration, bytes int, compressionRatio, userAgent, msg string) {
+				t.Logf("%s %s %s %s %d %s %d %s %s %s", ts.Format(time.RFC3339), remoteAddr, method, url.String(), status, duration, bytes, compressionRatio, userAgent, msg)
+				req.Equal("GET", method)
+				if url.Path == "/" { // waitServerUp
+					return
+				}
+				if strings.HasPrefix(url.Path, "/piece") {
+					req.Equal("/piece/"+testPieceCid, url.Path)
+				} else if strings.HasPrefix(url.Path, "/ipfs") {
+					req.Equal("/ipfs/"+rootEnt.Root.String(), url.Path)
+				} else {
+					req.Failf("unexpected url path", "path: %s", url.Path)
+				}
+				req.Equal(http.StatusOK, status)
+				if tc.expectGzip {
+					req.NotEqual("-", compressionRatio, "compression ratio should be set for %s", url.Path)
+					// convert compressionRatio string to a float64
+					compressionRatio, err := strconv.ParseFloat(compressionRatio, 64)
+					req.NoError(err)
+					req.True(compressionRatio > 10, "compression ratio (%s) should be > 10 for %s", compressionRatio, url.Path) // it's all zeros
+				}
+			}
+
 			httpServer := NewHttpServer("", "0.0.0.0", port, mockHttpServer, &HttpServerOptions{
 				ServePieces:      true,
 				ServeTrustless:   true,
 				CompressionLevel: tc.serverCompressionLevel,
 				Blockstore:       testutil.NewLinkSystemBlockstore(lsys),
+				LogWriter:        os.Stderr,
+				LogHandler:       logHandler,
 			})
 			err = httpServer.Start(ctx)
-			require.NoError(t, err)
+			req.NoError(err)
 			waitServerUp(t, port)
 			defer func() {
 				// Stop the server
 				err = httpServer.Stop()
-				require.NoError(t, err)
+				req.NoError(err)
 			}()
 
 			{ // test /piece retrieval
@@ -190,7 +267,7 @@ func TestHttpGzipResponse(t *testing.T) {
 				request = request.WithContext(ctx)
 				client := &http.Client{Transport: &http.Transport{DisableCompression: tc.noClientCompression}}
 				response, err := client.Do(request)
-				require.NoError(t, err)
+				req.NoError(err)
 				defer response.Body.Close()
 
 				if response.StatusCode != http.StatusOK {
@@ -217,10 +294,10 @@ func TestHttpGzipResponse(t *testing.T) {
 
 				// Get the uncompressed bytes
 				out, err := io.ReadAll(rdr)
-				require.NoError(t, err)
+				req.NoError(err)
 
 				// Compare bytes from original file to uncompressed http response
-				require.Equal(t, testFileBytes, out)
+				req.Equal(testFileBytes, out)
 			}
 
 			{ // test /ipfs CAR retrieval
