@@ -336,7 +336,7 @@ require (
 	github.com/filecoin-project/lotus v1.23.4-rc1
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
-	github.com/ipld/frisbii v0.3.0
+	github.com/ipld/frisbii v0.4.0
 	github.com/ipld/go-fixtureplate v0.0.2
 	github.com/ipld/ipld/specs v0.0.0-20230927010225-ef4dbd703269
 	github.com/ipni/go-libipni v0.5.2

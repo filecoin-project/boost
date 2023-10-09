@@ -898,8 +898,8 @@ github.com/ipfs/go-verifcid v0.0.2 h1:XPnUv0XmdH+ZIhLGKg6U2vaPaRDXb9urMyNVCE7uvT
 github.com/ipfs/go-verifcid v0.0.2/go.mod h1:40cD9x1y4OWnFXbLNJYRe7MpNvWlMn3LZAG5Wb4xnPU=
 github.com/ipfs/kubo v0.22.0 h1:HxYkvtFqlF+qQMTxHW+xBhrIWykWm+WbEuQpw1d67mM=
 github.com/ipfs/kubo v0.22.0/go.mod h1:Sn3hp55POjH9Ni0lEd/+smXpkZ0J1gKlm0Fx+E1LE60=
-github.com/ipld/frisbii v0.3.0 h1:yBmx73aoCL9aqrCGaVJWjzHSx51qvZgtjsExyxuqlIU=
-github.com/ipld/frisbii v0.3.0/go.mod h1:Gwj+LVuIwgHfeRMlar2luIy+PTK1SIy1QMA0hKiQ/J0=
+github.com/ipld/frisbii v0.4.0 h1:lZAD47T+MhmqYNF1/fENxo+VaM0JXjS73/UUO2cuFuU=
+github.com/ipld/frisbii v0.4.0/go.mod h1:Gwj+LVuIwgHfeRMlar2luIy+PTK1SIy1QMA0hKiQ/J0=
 github.com/ipld/go-car v0.1.0/go.mod h1:RCWzaUh2i4mOEkB3W45Vc+9jnS/M6Qay5ooytiBHl3g=
 github.com/ipld/go-car v0.6.1 h1:blWbEHf1j62JMWFIqWE//YR0m7k5ZMw0AuUOU5hjrH8=
 github.com/ipld/go-car v0.6.1/go.mod h1:oEGXdwp6bmxJCZ+rARSkDliTeYnVzv3++eXajZ+Bmr8=
