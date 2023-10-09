@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/go-state-types/abi"
 	market8 "github.com/filecoin-project/go-state-types/builtin/v9/market"
 	"github.com/filecoin-project/go-state-types/exitcode"
@@ -36,7 +36,7 @@ type CurrentDealInfo struct {
 	PublishMsgTipSet ctypes.TipSetKey
 }
 
-func (c *ChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market8.DealProposal) (*storagemarket.PublishDealsWaitResult, error) {
+func (c *ChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market8.DealProposal) (*types.PublishDealsWaitResult, error) {
 	// Wait for deal to be published (plus additional time for confidence)
 	receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, c.cfg.PublishDealsConfidence, api.LookbackNoLimit, true)
 	if err != nil {
@@ -58,7 +58,7 @@ func (c *ChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid c
 		return nil, fmt.Errorf("WaitForPublishDeals getting deal info errored: %w", err)
 	}
 
-	return &storagemarket.PublishDealsWaitResult{DealID: res.DealID, FinalCid: receipt.Message}, nil
+	return &types.PublishDealsWaitResult{DealID: res.DealID, FinalCid: receipt.Message}, nil
 }
 
 // GetCurrentDealInfo gets the current deal state and deal ID.

@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/url"
 
-	"github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/boost/transport/httptransport/util"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
@@ -18,8 +18,11 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipni/go-libipni/maurl"
 )
+
+var log = logging.Logger("boost-provider-types")
 
 //go:generate cbor-gen-for --map-encoding StorageAsk DealParamsV120 DealParams Transfer DealResponse DealStatusRequest DealStatusResponse DealStatus
 //go:generate go run github.com/golang/mock/mockgen -destination=mock_types/mocks.go -package=mock_types . PieceAdder,CommpCalculator,DealPublisher,ChainDealManager,IndexProvider
@@ -154,7 +157,7 @@ type DealPublisher interface {
 }
 
 type ChainDealManager interface {
-	WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market.DealProposal) (*storagemarket.PublishDealsWaitResult, error)
+	WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market.DealProposal) (*PublishDealsWaitResult, error)
 }
 
 type IndexProvider interface {
@@ -164,9 +167,16 @@ type IndexProvider interface {
 }
 
 type AskGetter interface {
-	GetAsk() *storagemarket.SignedStorageAsk
+	GetAsk(miner address.Address) *legacytypes.SignedStorageAsk
 }
 
 type SignatureVerifier interface {
 	VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte) (bool, error)
+}
+
+// PublishDealsWaitResult is the result of a call to wait for publish deals to
+// appear on chain
+type PublishDealsWaitResult struct {
+	DealID   abi.DealID
+	FinalCid cid.Cid
 }

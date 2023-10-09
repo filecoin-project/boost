@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/shared"
+	"github.com/filecoin-project/boost/markets/shared"
 	"github.com/filecoin-project/boost/retrievalmarket/types"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"

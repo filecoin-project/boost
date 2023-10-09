@@ -13,7 +13,6 @@ import (
 
 	"github.com/NYTimes/gziphandler"
 	"github.com/fatih/color"
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
@@ -270,9 +269,6 @@ func isNotFoundError(err error) bool {
 		return true
 	}
 	if errors.Is(err, datastore.ErrNotFound) {
-		return true
-	}
-	if errors.Is(err, retrievalmarket.ErrNotFound) {
 		return true
 	}
 	return strings.Contains(strings.ToLower(err.Error()), "not found")

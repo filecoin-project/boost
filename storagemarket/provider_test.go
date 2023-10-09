@@ -16,8 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/shared_testutil"
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/fundmanager"
 	"github.com/filecoin-project/boost/piecedirectory"
@@ -28,6 +26,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/smtestutil"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/boost/testutil"
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/boost/transport/httptransport"
@@ -848,12 +847,12 @@ func TestDealAskValidation(t *testing.T) {
 	ctx := context.Background()
 
 	tcs := map[string]struct {
-		ask         *storagemarket.StorageAsk
+		ask         *legacytypes.StorageAsk
 		dbuilder    func(h *ProviderHarness) *testDeal
 		expectedErr string
 	}{
 		"fails if price below minimum for unverified deal": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(100000000000),
 			},
 			dbuilder: func(h *ProviderHarness) *testDeal {
@@ -863,7 +862,7 @@ func TestDealAskValidation(t *testing.T) {
 			expectedErr: "storage price per epoch less than asking price",
 		},
 		"fails if price below minimum for verified deal": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price:         abi.NewTokenAmount(0),
 				VerifiedPrice: abi.NewTokenAmount(100000000000),
 			},
@@ -874,7 +873,7 @@ func TestDealAskValidation(t *testing.T) {
 			expectedErr: "storage price per epoch less than asking price",
 		},
 		"fails if piece size below minimum": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price:        abi.NewTokenAmount(0),
 				MinPieceSize: abi.PaddedPieceSize(1000000000),
 			},
@@ -885,7 +884,7 @@ func TestDealAskValidation(t *testing.T) {
 			expectedErr: "piece size less than minimum required size",
 		},
 		"fails if piece size above maximum": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price:        abi.NewTokenAmount(0),
 				MaxPieceSize: abi.PaddedPieceSize(1),
 			},
@@ -920,14 +919,14 @@ func TestDealVerification(t *testing.T) {
 	ctx := context.Background()
 
 	tcs := map[string]struct {
-		ask         *storagemarket.StorageAsk
+		ask         *legacytypes.StorageAsk
 		dbuilder    func(t *testing.T, h *ProviderHarness) *testDeal
 		expectedErr string
 		expect      func(h *ProviderHarness)
 		opts        []harnessOpt
 	}{
 		"fails if client does not have enough datacap for verified deal": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				VerifiedPrice: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
@@ -941,7 +940,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "verified deal DataCap 1 too small",
 		},
 		"fails if can't fetch datacap for verified deal": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				VerifiedPrice: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
@@ -954,7 +953,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "getting verified datacap",
 		},
 		"fails if client does NOT have enough balance for deal": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
@@ -964,7 +963,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "funds in escrow 0 not enough",
 		},
 		"fails if client signature is not valid": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
@@ -976,7 +975,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "invalid signature",
 		},
 		"fails if client signature verification fails": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
@@ -988,7 +987,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "validating signature",
 		},
 		"fails if proposed provider collateral below minimum": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
@@ -997,7 +996,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "proposed provider collateral 0 below minimum",
 		},
 		"fails if proposed provider collateral above maximum": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(_ *testing.T, h *ProviderHarness) *testDeal {
@@ -1007,7 +1006,7 @@ func TestDealVerification(t *testing.T) {
 		},
 
 		"fails if provider address does not match": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
@@ -1018,7 +1017,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "incorrect provider for deal",
 		},
 		"proposal piece cid has wrong prefix": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
@@ -1027,7 +1026,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "proposal PieceCID had wrong prefix",
 		},
 		"proposal piece cid undefined": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
@@ -1036,7 +1035,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "proposal PieceCID undefined",
 		},
 		"proposal end 9 before proposal start 10": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
@@ -1045,7 +1044,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "proposal end 9 before proposal start 10",
 		},
 		"deal start epoch has already elapsed": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
@@ -1054,7 +1053,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "deal start epoch -1 has already elapsed",
 		},
 		"deal piece size invalid": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
@@ -1063,7 +1062,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "proposal piece size is invalid",
 		},
 		"deal end epoch too far out": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
@@ -1074,7 +1073,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "invalid deal end epoch",
 		},
 		"deal duration greater than max duration": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
@@ -1084,7 +1083,7 @@ func TestDealVerification(t *testing.T) {
 			expectedErr: "deal duration out of bounds",
 		},
 		"deal duration less than min duration": {
-			ask: &storagemarket.StorageAsk{
+			ask: &legacytypes.StorageAsk{
 				Price: abi.NewTokenAmount(0),
 			},
 			dbuilder: func(t *testing.T, h *ProviderHarness) *testDeal {
@@ -1373,8 +1372,7 @@ type ProviderHarness struct {
 
 	Transport transport.Transport
 
-	SqlDB    *sql.DB
-	DAGStore *shared_testutil.MockDagStoreWrapper
+	SqlDB *sql.DB
 }
 
 type ChainHeadFn func(ctx context.Context) (*chaintypes.TipSet, error)
@@ -2380,21 +2378,20 @@ func (td *testDeal) assertDealFailedNonRecoverable(t *testing.T, ctx context.Con
 }
 
 type mockAskStore struct {
-	ask *storagemarket.StorageAsk
+	ask *legacytypes.StorageAsk
 }
 
 func (m *mockAskStore) SetAsk(price, verifiedPrice abi.TokenAmount, minPieceSize, maxPieceSize abi.PaddedPieceSize) {
-	m.ask = &storagemarket.StorageAsk{
+	m.ask = &legacytypes.StorageAsk{
 		Price:         price,
 		VerifiedPrice: verifiedPrice,
 		MinPieceSize:  minPieceSize,
 		MaxPieceSize:  maxPieceSize,
 	}
-
 }
 
-func (m *mockAskStore) GetAsk() *storagemarket.SignedStorageAsk {
-	return &storagemarket.SignedStorageAsk{
+func (m *mockAskStore) GetAsk(miner address.Address) *legacytypes.SignedStorageAsk {
+	return &legacytypes.SignedStorageAsk{
 		Ask: m.ask,
 	}
 }

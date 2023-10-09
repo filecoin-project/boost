@@ -7,11 +7,9 @@ import (
 	"path"
 	"time"
 
-	lotus_retrievalmarket "github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/boost/cmd/booster-bitswap/bitswap"
 	"github.com/filecoin-project/boost/db"
 	"github.com/filecoin-project/boost/node/config"
-	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/protocolproxy"
 	"github.com/filecoin-project/boost/retrievalmarket/lp2pimpl"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
@@ -156,19 +154,15 @@ func NewRetrievalLogDB(db *RetrievalSqlDB) *rtvllog.RetrievalLogDB {
 }
 
 // Write graphsync retrieval updates to the database
-func HandleRetrievalGraphsyncUpdates(duration time.Duration, stalledDuration time.Duration) func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt dtypes.ProviderDataTransfer, gsur *server.GraphsyncUnpaidRetrieval) {
-	return func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, m lotus_retrievalmarket.RetrievalProvider, dt dtypes.ProviderDataTransfer, gsur *server.GraphsyncUnpaidRetrieval) {
-		rel := rtvllog.NewRetrievalLog(db, duration, dt, stalledDuration, gsur)
+func HandleRetrievalGraphsyncUpdates(duration time.Duration, stalledDuration time.Duration) func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, gsur *server.GraphsyncUnpaidRetrieval) {
+	return func(lc fx.Lifecycle, db *rtvllog.RetrievalLogDB, gsur *server.GraphsyncUnpaidRetrieval) {
+		rel := rtvllog.NewRetrievalLog(db, duration, stalledDuration, gsur)
 
 		relctx, cancel := context.WithCancel(context.Background())
 		type unsubFn func()
 		var unsubs []unsubFn
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				unsubs = append(unsubs, unsubFn(m.SubscribeToEvents(rel.OnRetrievalEvent)))
-				unsubs = append(unsubs, unsubFn(m.SubscribeToQueryEvents(rel.OnQueryEvent)))
-				unsubs = append(unsubs, unsubFn(m.SubscribeToValidationEvents(rel.OnValidationEvent)))
-				unsubs = append(unsubs, unsubFn(dt.SubscribeToEvents(rel.OnDataTransferEvent)))
 				unsubs = append(unsubs, unsubFn(gsur.SubscribeToDataTransferEvents(rel.OnDataTransferEvent)))
 				unsubs = append(unsubs, unsubFn(gsur.SubscribeToMarketsEvents(rel.OnRetrievalEvent)))
 				rel.Start(relctx)

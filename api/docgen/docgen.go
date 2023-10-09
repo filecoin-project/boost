@@ -12,8 +12,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/filecoin-project/boost-gfm/filestore"
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -94,7 +93,7 @@ func init() {
 
 	storeIDExample := imports.ID(50)
 	textSelExample := textselector.Expression("Links/21/Hash/Links/42/Hash")
-	clientEvent := retrievalmarket.ClientEventDealAccepted
+	clientEvent := legacyretrievaltypes.ClientEventDealAccepted
 
 	addExample(bitfield.NewFromSet([]uint64{5}))
 	addExample(abi.RegisteredSealProof_StackedDrg32GiBV1_1)
@@ -129,8 +128,8 @@ func init() {
 	addExample(&storeIDExample)
 	addExample(clientEvent)
 	addExample(&clientEvent)
-	addExample(retrievalmarket.ClientEventDealAccepted)
-	addExample(retrievalmarket.DealStatusNew)
+	addExample(legacyretrievaltypes.ClientEventDealAccepted)
+	addExample(legacyretrievaltypes.DealStatusNew)
 	addExample(&textSelExample)
 	addExample(network.ReachabilityPublic)
 	addExample(build.TestNetworkVersion)
@@ -186,10 +185,9 @@ func init() {
 	ExampleValues[reflect.TypeOf(struct{ A multiaddr.Multiaddr }{}).Field(0).Type] = maddr
 
 	// miner specific
-	addExample(filestore.Path(".lotusminer/fstmp123"))
 	si := uint64(12)
 	addExample(&si)
-	addExample(retrievalmarket.DealID(5))
+	addExample(legacyretrievaltypes.DealID(5))
 	addExample(abi.ActorID(1000))
 	addExample(storiface.ID("76f1988b-ef30-4d7e-b3ec-9a627f4ba5a8"))
 	addExample(storiface.FTUnsealed)
@@ -273,15 +271,6 @@ func init() {
 
 	addExample(api.CheckStatusCode(0))
 	addExample(map[string]interface{}{"abc": 123})
-	addExample(api.DagstoreShardResult{
-		Key:   "baga6ea4seaqecmtz7iak33dsfshi627abz4i4665dfuzr3qfs4bmad6dx3iigdq",
-		Error: "<error>",
-	})
-	addExample(api.DagstoreShardInfo{
-		Key:   "baga6ea4seaqecmtz7iak33dsfshi627abz4i4665dfuzr3qfs4bmad6dx3iigdq",
-		State: "ShardStateAvailable",
-		Error: "<error>",
-	})
 	addExample(storiface.ResourceTable)
 	addExample(network.ScopeStat{
 		Memory:             123,

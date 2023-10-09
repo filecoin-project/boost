@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/shared"
-	gfm_storagemarket "github.com/filecoin-project/boost-gfm/storagemarket"
-	gfm_migration "github.com/filecoin-project/boost-gfm/storagemarket/migrations"
-	gfm_network "github.com/filecoin-project/boost-gfm/storagemarket/network"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/markets/shared"
 	"github.com/filecoin-project/boost/storagemarket"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
+	mig "github.com/filecoin-project/boost/storagemarket/types/legacytypes/migrations"
+	gfm_network "github.com/filecoin-project/boost/storagemarket/types/legacytypes/network"
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/filecoin-project/go-state-types/crypto"
@@ -205,11 +205,9 @@ func (p *DealProvider) Start(ctx context.Context) {
 	p.host.SetStreamHandler(DealStatusV12ProtocolID, p.handleNewDealStatusStream)
 
 	// Handle legacy deal stream here and reject all legacy deals
-	if !p.enableLegacyDeals {
-		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID101, p.handleLegacyDealStream)
-		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID110, p.handleLegacyDealStream)
-		p.host.SetStreamHandler(gfm_storagemarket.DealProtocolID111, p.handleLegacyDealStream)
-	}
+	p.host.SetStreamHandler(legacytypes.DealProtocolID101, p.handleLegacyDealStream)
+	p.host.SetStreamHandler(legacytypes.DealProtocolID110, p.handleLegacyDealStream)
+	p.host.SetStreamHandler(legacytypes.DealProtocolID111, p.handleLegacyDealStream)
 }
 
 func (p *DealProvider) Stop() {
@@ -416,13 +414,13 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 
 	rejMsg := fmt.Sprintf("deal proposals made over the legacy %s protocol are deprecated"+
 		" - please use the %s deal proposal protocol", s.Protocol(), DealProtocolv121ID)
-	const rejState = gfm_storagemarket.StorageDealProposalRejected
+	const rejState = 2
 	var signedResponse typegen.CBORMarshaler
 
 	_ = s.SetReadDeadline(time.Now().Add(providerReadDeadline))
 	switch s.Protocol() {
-	case gfm_storagemarket.DealProtocolID101:
-		var prop gfm_migration.Proposal0
+	case legacytypes.DealProtocolID101:
+		var prop mig.Proposal0
 		err := prop.UnmarshalCBOR(s)
 		_ = s.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed
 		if err != nil {
@@ -436,17 +434,17 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 			return
 		}
 
-		resp := gfm_migration.Response0{State: rejState, Message: rejMsg, Proposal: pcid}
+		resp := mig.Response0{State: rejState, Message: rejMsg, Proposal: pcid}
 		sig, err := p.signLegacyResponse(&resp)
 		if err != nil {
 			reqLog.Errorf("getting signed response: %s", err)
 			return
 		}
 
-		signedResponse = &gfm_migration.SignedResponse0{Response: resp, Signature: sig}
+		signedResponse = &mig.SignedResponse0{Response: resp, Signature: sig}
 
-	case gfm_storagemarket.DealProtocolID110:
-		var prop gfm_migration.Proposal1
+	case legacytypes.DealProtocolID110:
+		var prop mig.Proposal1
 		err := prop.UnmarshalCBOR(s)
 		_ = s.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed
 		if err != nil {
@@ -469,7 +467,7 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 
 		signedResponse = &gfm_network.SignedResponse{Response: resp, Signature: sig}
 
-	case gfm_storagemarket.DealProtocolID111:
+	case legacytypes.DealProtocolID111:
 		var prop gfm_network.Proposal
 		err := prop.UnmarshalCBOR(s)
 		_ = s.SetReadDeadline(time.Time{}) // Clear read deadline so conn doesn't get closed

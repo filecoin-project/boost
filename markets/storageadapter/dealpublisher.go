@@ -9,6 +9,7 @@ import (
 
 	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
@@ -26,6 +27,8 @@ import (
 	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/storage/ctladdr"
 )
+
+var log = logging.Logger("storageadapter")
 
 type dealPublisherAPI interface {
 	ChainHead(context.Context) (*types.TipSet, error)

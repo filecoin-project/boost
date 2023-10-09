@@ -2,13 +2,10 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	"github.com/filecoin-project/lotus/chain/types"
 
-	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/ipfs/go-cid"
 
@@ -59,51 +56,6 @@ type PubsubScore struct {
 
 type MessageSendSpec struct {
 	MaxFee abi.TokenAmount
-}
-
-type DataTransferChannel struct {
-	TransferID  datatransfer.TransferID
-	Status      datatransfer.Status
-	BaseCID     cid.Cid
-	IsInitiator bool
-	IsSender    bool
-	Voucher     string
-	Message     string
-	OtherPeer   peer.ID
-	Transferred uint64
-	Stages      *datatransfer.ChannelStages
-}
-
-// NewDataTransferChannel constructs an API DataTransferChannel type from full channel state snapshot and a host id
-func NewDataTransferChannel(hostID peer.ID, channelState datatransfer.ChannelState) DataTransferChannel {
-	channel := DataTransferChannel{
-		TransferID: channelState.TransferID(),
-		Status:     channelState.Status(),
-		BaseCID:    channelState.BaseCID(),
-		IsSender:   channelState.Sender() == hostID,
-		Message:    channelState.Message(),
-	}
-	stringer, ok := channelState.Voucher().(fmt.Stringer)
-	if ok {
-		channel.Voucher = stringer.String()
-	} else {
-		voucherJSON, err := json.Marshal(channelState.Voucher())
-		if err != nil {
-			channel.Voucher = fmt.Errorf("Voucher Serialization: %w", err).Error()
-		} else {
-			channel.Voucher = string(voucherJSON)
-		}
-	}
-	if channel.IsSender {
-		channel.IsInitiator = !channelState.IsPull()
-		channel.Transferred = channelState.Sent()
-		channel.OtherPeer = channelState.Recipient()
-	} else {
-		channel.IsInitiator = channelState.IsPull()
-		channel.Transferred = channelState.Received()
-		channel.OtherPeer = channelState.Sender()
-	}
-	return channel
 }
 
 type ExtendedPeerInfo struct {
@@ -177,24 +129,6 @@ type MessageCheckStatus struct {
 type MessagePrototype struct {
 	Message    types.Message
 	ValidNonce bool
-}
-
-type RetrievalInfo struct {
-	PayloadCID   cid.Cid
-	ID           retrievalmarket.DealID
-	PieceCID     *cid.Cid
-	PricePerByte abi.TokenAmount
-	UnsealPrice  abi.TokenAmount
-
-	Status        retrievalmarket.DealStatus
-	Message       string // more information about deal state, particularly errors
-	Provider      peer.ID
-	BytesReceived uint64
-	BytesPaidFor  uint64
-	TotalPaid     abi.TokenAmount
-
-	TransferChannelID *datatransfer.ChannelID
-	DataTransfer      *DataTransferChannel
 }
 
 type SealingPipelineState struct {

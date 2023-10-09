@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/api"
 	"github.com/filecoin-project/boost/build"
 	"github.com/filecoin-project/boost/db"
@@ -24,10 +23,12 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/boost/transport"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
@@ -54,6 +55,13 @@ type SealingPipelineCache struct {
 	Status     sealingpipeline.Status
 	CacheTime  time.Time
 	CacheError error
+}
+
+// PackingResult returns information about how a deal was put into a sector
+type PackingResult struct {
+	SectorNumber abi.SectorNumber
+	Offset       abi.PaddedPieceSize
+	Size         abi.PaddedPieceSize
 }
 
 // DagstoreShardRegistry provides the one method from the Dagstore that we use
@@ -227,8 +235,8 @@ func (p *Provider) DealBySignedProposalCid(ctx context.Context, propCid cid.Cid)
 	return deal, nil
 }
 
-func (p *Provider) GetAsk() *storagemarket.SignedStorageAsk {
-	return p.askGetter.GetAsk()
+func (p *Provider) GetAsk() *legacytypes.SignedStorageAsk {
+	return p.askGetter.GetAsk(p.Address)
 }
 
 // ImportOfflineDealData is called when the Storage Provider imports data for
@@ -632,7 +640,7 @@ func (p *Provider) CancelDealDataTransfer(dealUuid uuid.UUID) error {
 	return err
 }
 
-func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDealState, pieceData io.Reader) (*storagemarket.PackingResult, error) {
+func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDealState, pieceData io.Reader) (*PackingResult, error) {
 	// Sanity check - we must have published the deal before handing it off
 	// to the sealing subsystem
 	if deal.PublishCID == nil {
@@ -675,7 +683,7 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 	}
 	p.dealLogger.Infow(deal.DealUuid, "added new deal to sector", "sector", sectorNum.String())
 
-	return &storagemarket.PackingResult{
+	return &PackingResult{
 		SectorNumber: sectorNum,
 		Offset:       offset,
 		Size:         pieceSize.Padded(),

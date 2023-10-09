@@ -5,17 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ipfs/go-cid"
-	textselector "github.com/ipld/go-ipld-selector-text-lite"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	"github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/ipfs/go-cid"
 
 	"github.com/filecoin-project/go-state-types/builtin/v8/paych"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
@@ -87,29 +81,6 @@ type Import struct {
 
 	// CARPath is the path of the CAR file containing the DAG for this import.
 	CARPath string
-}
-
-type DealInfo struct {
-	ProposalCid cid.Cid
-	State       storagemarket.StorageDealStatus
-	Message     string // more information about deal state, particularly errors
-	DealStages  *storagemarket.DealStages
-	Provider    address.Address
-
-	DataRef  *storagemarket.DataRef
-	PieceCID cid.Cid
-	Size     uint64
-
-	PricePerEpoch types.BigInt
-	Duration      uint64
-
-	DealID abi.DealID
-
-	CreationTime time.Time
-	Verified     bool
-
-	TransferChannelID *datatransfer.ChannelID
-	DataTransfer      *DataTransferChannel
 }
 
 type MsgLookup struct {
@@ -222,37 +193,6 @@ type MinerPower struct {
 	HasMinPower bool
 }
 
-type QueryOffer struct {
-	Err string
-
-	Root  cid.Cid
-	Piece *cid.Cid
-
-	Size                    uint64
-	MinPrice                types.BigInt
-	UnsealPrice             types.BigInt
-	PaymentInterval         uint64
-	PaymentIntervalIncrease uint64
-	Miner                   address.Address
-	MinerPeer               retrievalmarket.RetrievalPeer
-}
-
-func (o *QueryOffer) Order(client address.Address) RetrievalOrder {
-	return RetrievalOrder{
-		Root:                    o.Root,
-		Piece:                   o.Piece,
-		Size:                    o.Size,
-		Total:                   o.MinPrice,
-		UnsealPrice:             o.UnsealPrice,
-		PaymentInterval:         o.PaymentInterval,
-		PaymentIntervalIncrease: o.PaymentIntervalIncrease,
-		Client:                  client,
-
-		Miner:     o.Miner,
-		MinerPeer: &o.MinerPeer,
-	}
-}
-
 type MarketBalance struct {
 	Escrow big.Int
 	Locked big.Int
@@ -261,24 +201,6 @@ type MarketBalance struct {
 type MarketDeal struct {
 	Proposal market.DealProposal
 	State    market.DealState
-}
-
-type RetrievalOrder struct {
-	// TODO: make this less unixfs specific
-	Root                  cid.Cid
-	Piece                 *cid.Cid
-	DatamodelPathSelector *textselector.Expression
-	Size                  uint64
-
-	FromLocalCAR string // if specified, get data from a local CARv2 file.
-	// TODO: support offset
-	Total                   types.BigInt
-	UnsealPrice             types.BigInt
-	PaymentInterval         uint64
-	PaymentIntervalIncrease uint64
-	Client                  address.Address
-	Miner                   address.Address
-	MinerPeer               *retrievalmarket.RetrievalPeer
 }
 
 type InvocResult struct {

@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost/cmd/lib"
 	"github.com/filecoin-project/boost/db"
+	"github.com/filecoin-project/boost/markets/piecestore"
 	"github.com/filecoin-project/boost/piecedirectory"
 	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"

@@ -2,6 +2,7 @@ package gql
 
 import (
 	"context"
+
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/graph-gophers/graphql-go"

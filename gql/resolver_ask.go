@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/filecoin-project/boost-gfm/storagemarket"
 	"github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/storagemarket/types/legacytypes"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/graph-gophers/graphql-go"
@@ -27,7 +27,7 @@ func (r *resolver) StorageAsk(ctx context.Context) (*storageAskResolver, error) 
 		return nil, fmt.Errorf("getting chain head: %w", err)
 	}
 
-	signedAsk := r.legacyProv.GetAsk()
+	signedAsk := r.askProv.GetAsk(r.provider.Address)
 	ask := signedAsk.Ask
 	expTimeEpochs := ask.Expiry - head.Height()
 	expTime := time.Now().Add(time.Duration(expTimeEpochs) * time.Duration(build.BlockDelaySecs) * time.Second)
@@ -49,8 +49,8 @@ type storageAskUpdate struct {
 	MaxPieceSize  *types.Uint64
 }
 
-func (r *resolver) StorageAskUpdate(args struct{ Update storageAskUpdate }) (bool, error) {
-	signedAsk := r.legacyProv.GetAsk()
+func (r *resolver) StorageAskUpdate(ctx context.Context, args struct{ Update storageAskUpdate }) (bool, error) {
+	signedAsk := r.askProv.GetAsk(r.provider.Address)
 	ask := signedAsk.Ask
 
 	dur := 87660 * time.Hour // 10 years
@@ -58,7 +58,7 @@ func (r *resolver) StorageAskUpdate(args struct{ Update storageAskUpdate }) (boo
 
 	price := ask.Price
 	verifiedPrice := ask.VerifiedPrice
-	var opts []storagemarket.StorageAskOption
+	var opts []legacytypes.StorageAskOption
 
 	update := args.Update
 	if update.Price != nil {
@@ -68,13 +68,13 @@ func (r *resolver) StorageAskUpdate(args struct{ Update storageAskUpdate }) (boo
 		verifiedPrice = (*update.VerifiedPrice).Int
 	}
 	if update.MinPieceSize != nil {
-		opts = append(opts, storagemarket.MinPieceSize(abi.PaddedPieceSize(*update.MinPieceSize)))
+		opts = append(opts, legacytypes.MinPieceSize(abi.PaddedPieceSize(*update.MinPieceSize)))
 	}
 	if update.MaxPieceSize != nil {
-		opts = append(opts, storagemarket.MaxPieceSize(abi.PaddedPieceSize(*update.MaxPieceSize)))
+		opts = append(opts, legacytypes.MaxPieceSize(abi.PaddedPieceSize(*update.MaxPieceSize)))
 	}
 
-	err := r.legacyProv.SetAsk(price, verifiedPrice, duration, opts...)
+	err := r.askProv.SetAsk(ctx, price, verifiedPrice, duration, r.provider.Address, opts...)
 	if err != nil {
 		return false, fmt.Errorf("setting ask: %w", err)
 	}

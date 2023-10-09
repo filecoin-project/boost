@@ -77,19 +77,7 @@ var importDataCmd = &cli.Command{
 					return err
 				}
 
-				if deleteAfterImport {
-					return fmt.Errorf("cannot find boost deal with proposal cid %s and legacy deal data cannot be automatically deleted after import (only new deals)", proposalCid)
-				}
-
-				// The deal is not in the boost database, try the legacy
-				// markets datastore (v1.1.0 deal)
-				err := napi.MarketImportDealData(cctx.Context, *proposalCid, filePath)
-				if err != nil {
-					return fmt.Errorf("couldnt import v1.1.0 deal, or find boost deal: %w", err)
-				}
-
-				fmt.Printf("Offline deal import for v1.1.0 deal %s scheduled for execution\n", proposalCid.String())
-				return nil
+				return fmt.Errorf("cannot find boost deal with proposal cid %s and legacy deals are no olnger supported", proposalCid)
 			}
 
 			// Get the deal UUID from the deal

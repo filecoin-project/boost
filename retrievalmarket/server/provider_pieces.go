@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -12,11 +13,6 @@ import (
 	"github.com/ipld/go-ipld-prime/traversal"
 	"github.com/multiformats/go-multihash"
 )
-
-// This code is copied directly from
-// https://github.com/filecoin-project/go-fil-markets/blob/955fd43fad7da2e68539c257f0c8199a6b0c2a4d/retrievalmarket/impl/provider_pieces.go#L1
-// TODO: Create a PR against go-fil-markets to make these methods public,
-// so that we can import them from go-fil-markets instead of copying the code here.
 
 // MaxIdentityCIDBytes is the largest identity CID as a PayloadCID that we are
 // willing to decode

@@ -3,9 +3,9 @@ package server
 import (
 	"bytes"
 
-	"github.com/filecoin-project/boost-gfm/retrievalmarket"
 	graphsync "github.com/filecoin-project/boost-graphsync"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
+	"github.com/filecoin-project/boost/datatransfer"
+	"github.com/filecoin-project/boost/retrievalmarket/types/legacyretrievaltypes"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
@@ -22,12 +22,12 @@ const RetrievalTypeLegs RetrievalType = "Legs"
 type retrievalState struct {
 	retType RetrievalType
 	cs      *channelState
-	mkts    *retrievalmarket.ProviderDealState
+	mkts    *legacyretrievaltypes.ProviderDealState
 	gsReq   graphsync.RequestID
 }
 
-func (r retrievalState) ChannelState() channelState                           { return *r.cs }
-func (r retrievalState) ProviderDealState() retrievalmarket.ProviderDealState { return *r.mkts }
+func (r retrievalState) ChannelState() channelState                                { return *r.cs }
+func (r retrievalState) ProviderDealState() legacyretrievaltypes.ProviderDealState { return *r.mkts }
 
 // channelState is immutable channel data plus mutable state
 type channelState struct {
@@ -102,8 +102,8 @@ func (c channelState) Selector() ipld.Node {
 }
 
 // Voucher returns the voucher for this data transfer
-func (c channelState) Voucher() datatransfer.Voucher {
-	return nil
+func (c channelState) Voucher() datatransfer.TypedVoucher {
+	return datatransfer.TypedVoucher{}
 }
 
 // ReceivedCidsTotal returns the number of (non-unique) cids received so far
@@ -147,22 +147,6 @@ func (c channelState) ChannelID() datatransfer.ChannelID {
 
 func (c channelState) Message() string {
 	return c.message
-}
-
-func (c channelState) Vouchers() []datatransfer.Voucher {
-	return nil
-}
-
-func (c channelState) LastVoucher() datatransfer.Voucher {
-	return nil
-}
-
-func (c channelState) LastVoucherResult() datatransfer.VoucherResult {
-	return nil
-}
-
-func (c channelState) VoucherResults() []datatransfer.VoucherResult {
-	return nil
 }
 
 func (c channelState) SelfPeer() peer.ID {
