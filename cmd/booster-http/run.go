@@ -25,6 +25,15 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+const (
+	trustlessMessage = "booster-http only supports trustless HTTP. For " +
+		"trusted HTTP use https://github.com/ipfs/bifrost-gateway to translate " +
+		"trustless responses. Run bifrost-gateway with the environment variable " +
+		"PROXY_GATEWAY_URL=http://localhost:7777 to point to booster-http, and " +
+		"GRAPH_BACKEND=true to efficiently translate booster-http's trustless " +
+		"responses."
+)
+
 var runCmd = &cli.Command{
 	Name:   "run",
 	Usage:  "Start a booster-http process",
@@ -76,9 +85,27 @@ var runCmd = &cli.Command{
 			Value: true,
 		},
 		&cli.BoolFlag{
+			Name:   "serve-blocks",
+			Usage:  "(removed option)",
+			Hidden: true,
+			Action: func(ctx *cli.Context, _ bool) error {
+				fmt.Fprintf(ctx.App.ErrWriter, "--serve-blocks is no longer supported.\n\n%s\n\n", trustlessMessage)
+				return errors.New("--serve-blocks is no longer supported, use bifrost-gateway instead")
+			},
+		},
+		&cli.BoolFlag{
 			Name:  "serve-cars",
 			Usage: "serve CAR files with the Trustless IPFS Gateway API",
 			Value: true,
+		},
+		&cli.BoolFlag{
+			Name:   "serve-files",
+			Usage:  "(removed option)",
+			Hidden: true,
+			Action: func(ctx *cli.Context, _ bool) error {
+				fmt.Fprintf(ctx.App.ErrWriter, "--serve-files is no longer supported.\n\n%s\n\n", trustlessMessage)
+				return errors.New("--serve-files is no longer supported, use bifrost-gateway instead")
+			},
 		},
 		&cli.BoolFlag{
 			Name:  "tracing",
