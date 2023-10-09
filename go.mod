@@ -31,7 +31,8 @@ require (
 	github.com/filecoin-project/go-commp-utils v0.1.4
 	github.com/filecoin-project/go-data-transfer v1.15.4-boost
 	github.com/filecoin-project/go-fil-commcid v0.1.0
-	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
+	github.com/filecoin-project/go-fil-commp-hashhash v0.2.0
+	github.com/filecoin-project/go-fil-markets v1.28.3
 	github.com/filecoin-project/go-jsonrpc v0.3.1
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
@@ -211,7 +212,6 @@ require (
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.1.0 // indirect
 	github.com/ipfs/go-ds-badger2 v0.1.3 // indirect
-	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/go-ds-measure v0.2.0 // indirect
 	github.com/ipfs/go-fs-lock v0.0.7 // indirect
 	github.com/ipfs/go-ipfs-cmds v0.10.0 // indirect
@@ -323,33 +323,32 @@ require (
 )
 
 require (
-	github.com/NYTimes/gziphandler v1.1.1
 	github.com/filecoin-project/boostd-data v0.0.0-00010101000000-000000000000
 	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
-	github.com/ipfs/go-ds-flatfs v0.5.1
 	github.com/ipfs/go-ipfs-redirects-file v0.1.1 // indirect
 )
 
 require (
+	github.com/NYTimes/gziphandler v1.1.1
 	github.com/filecoin-project/boost-gfm v1.26.7
 	github.com/filecoin-project/boost-graphsync v0.13.9
+	github.com/filecoin-project/go-data-segment v0.0.1
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc7
-	github.com/filecoin-project/go-fil-markets v1.28.3
 	github.com/filecoin-project/lotus v1.23.4-rc1
 	github.com/ipfs/boxo v0.12.0
+	github.com/ipfs/go-ds-flatfs v0.5.1
+	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/ipfs/kubo v0.22.0
 	github.com/ipni/go-libipni v0.5.1
 	github.com/ipni/ipni-cli v0.1.1
 	github.com/schollz/progressbar/v3 v3.13.1
 )
 
-require (
-	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
-	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
-)
+require github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 
 require (
 	github.com/Jorropo/jsync v1.0.1 // indirect
+	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
 	github.com/filecoin-project/kubo-api-client v0.0.2-0.20230829103503-14448166d14d // indirect
 	github.com/gammazero/channelqueue v0.2.1 // indirect
 	github.com/gammazero/deque v0.2.1 // indirect

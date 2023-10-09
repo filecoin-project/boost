@@ -1287,12 +1287,10 @@ func (h *ProviderHarness) AssertFundManagerState(t *testing.T, ctx context.Conte
 }
 
 func (h *ProviderHarness) AssertSealedContents(t *testing.T, carV2FilePath string, read []byte) {
-	cr, err := carv2.OpenReader(carV2FilePath)
+	r, err := os.Open(carV2FilePath)
 	require.NoError(t, err)
-	defer cr.Close()
+	defer r.Close()
 
-	r, err := cr.DataReader()
-	require.NoError(t, err)
 	actual, err := io.ReadAll(r)
 	require.NoError(t, err)
 

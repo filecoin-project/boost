@@ -76,8 +76,9 @@ import (
 var Log = logging.Logger("boosttest")
 
 type TestFrameworkConfig struct {
-	Ensemble     *kit.Ensemble
-	EnableLegacy bool
+	Ensemble        *kit.Ensemble
+	EnableLegacy    bool
+	MaxStagingBytes int64
 }
 
 type TestFramework struct {
@@ -100,6 +101,12 @@ type FrameworkOpts func(pc *TestFrameworkConfig)
 func EnableLegacyDeals(enable bool) FrameworkOpts {
 	return func(tmc *TestFrameworkConfig) {
 		tmc.EnableLegacy = enable
+	}
+}
+
+func SetMaxStagingBytes(max int64) FrameworkOpts {
+	return func(tmc *TestFrameworkConfig) {
+		tmc.MaxStagingBytes = max
 	}
 }
 
@@ -326,7 +333,7 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 		return err
 	}
 	cfg.LotusFees.MaxPublishDealsFee = val
-	cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
+
 	cfg.Dealmaking.RemoteCommp = true
 	// No transfers will start until the first stall check period has elapsed
 	cfg.Dealmaking.HttpTransferStallCheckPeriod = config.Duration(100 * time.Millisecond)
@@ -337,6 +344,12 @@ func (f *TestFramework) Start(opts ...ConfigOpt) error {
 
 	for _, o := range opts {
 		o(cfg)
+	}
+
+	if f.config.MaxStagingBytes > 0 {
+		cfg.Dealmaking.MaxStagingDealsBytes = f.config.MaxStagingBytes
+	} else {
+		cfg.Dealmaking.MaxStagingDealsBytes = 4000000 // 4 MB
 	}
 
 	cfg.Dealmaking.ExpectedSealDuration = 10
@@ -590,7 +603,7 @@ func (f *TestFramework) MakeDummyDeal(dealUuid uuid.UUID, carFilepath string, ro
 		Label:                l,
 		StartEpoch:           startEpoch,
 		EndEpoch:             startEpoch + market.DealMinDuration,
-		StoragePricePerEpoch: abi.NewTokenAmount(2000000),
+		StoragePricePerEpoch: abi.NewTokenAmount(200000000),
 		ProviderCollateral:   abi.NewTokenAmount(0),
 		ClientCollateral:     abi.NewTokenAmount(0),
 	}

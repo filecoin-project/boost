@@ -2,6 +2,7 @@ package piecedirectory
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,12 +10,14 @@ import (
 	"sync"
 	"time"
 
+	carutil "github.com/filecoin-project/boost/car"
 	"github.com/filecoin-project/boost/piecedirectory/types"
 	bdclient "github.com/filecoin-project/boostd-data/client"
 	"github.com/filecoin-project/boostd-data/model"
 	"github.com/filecoin-project/boostd-data/shared/tracing"
 	bdtypes "github.com/filecoin-project/boostd-data/svc/types"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-data-segment/datasegment"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/lib/readerutil"
 	"github.com/filecoin-project/lotus/markets/dagstore"
@@ -23,6 +26,7 @@ import (
 	"github.com/ipfs/go-cid"
 	format "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipld/go-car"
 	"github.com/ipld/go-car/util"
 	carv2 "github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/blockstore"
@@ -168,6 +172,8 @@ func (ps *PieceDirectory) AddDealForPiece(ctx context.Context, pieceCid cid.Cid,
 		if err := ps.addIndexForPieceThrottled(ctx, pieceCid, dealInfo); err != nil {
 			return fmt.Errorf("adding index for piece %s: %w", pieceCid, err)
 		}
+	} else {
+		log.Infow("add deal for piece", "index", "not re-indexing, piece already indexed")
 	}
 
 	// Add deal to list of deals for this piece
@@ -241,13 +247,38 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 	}
 	defer reader.Close() //nolint:errcheck
 
-	// Iterate over all the blocks in the piece to extract the index records
+	// Try to parse data as containing a data segment index
 	log.Debugw("add index: read index", "pieceCid", pieceCid)
+	recs, err := parsePieceWithDataSegmentIndex(pieceCid, int64(dealInfo.PieceLength.Unpadded()), reader)
+	if err != nil {
+		log.Infow("add index: data segment check failed. falling back to car", "pieceCid", pieceCid, "err", err)
+		// Iterate over all the blocks in the piece to extract the index records
+		if _, err := reader.Seek(0, io.SeekStart); err != nil {
+			return fmt.Errorf("seek to start for piece %s: %w", pieceCid, err)
+		}
+		recs, err = parseRecordsFromCar(reader)
+		if err != nil {
+			return fmt.Errorf("parse car for piece %s: %w", pieceCid, err)
+		}
+	}
+
+	// Add mh => piece index to store: "which piece contains the multihash?"
+	// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
+	log.Debugw("add index: store index in local index directory", "pieceCid", pieceCid, "records", len(recs))
+	if err := ps.store.AddIndex(ctx, pieceCid, recs, true); err != nil {
+		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
+	}
+
+	return nil
+}
+
+func parseRecordsFromCar(reader io.Reader) ([]model.Record, error) {
+	// Iterate over all the blocks in the piece to extract the index records
 	recs := make([]model.Record, 0)
 	opts := []carv2.Option{carv2.ZeroLengthSectionAsEOF(true)}
 	blockReader, err := carv2.NewBlockReader(reader, opts...)
 	if err != nil {
-		return fmt.Errorf("getting block reader over piece %s: %w", pieceCid, err)
+		return nil, fmt.Errorf("getting block reader over piece: %w", err)
 	}
 
 	blockMetadata, err := blockReader.SkipNext()
@@ -255,7 +286,7 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 		recs = append(recs, model.Record{
 			Cid: blockMetadata.Cid,
 			OffsetSize: model.OffsetSize{
-				Offset: blockMetadata.Offset,
+				Offset: blockMetadata.SourceOffset,
 				Size:   blockMetadata.Size,
 			},
 		})
@@ -263,17 +294,47 @@ func (ps *PieceDirectory) addIndexForPiece(ctx context.Context, pieceCid cid.Cid
 		blockMetadata, err = blockReader.SkipNext()
 	}
 	if !errors.Is(err, io.EOF) {
-		return fmt.Errorf("generating index for piece %s: %w", pieceCid, err)
+		return nil, fmt.Errorf("generating index for piece: %w", err)
+	}
+	return recs, nil
+}
+
+func parsePieceWithDataSegmentIndex(pieceCid cid.Cid, unpaddedSize int64, r types.SectionReader) ([]model.Record, error) {
+	ps := abi.UnpaddedPieceSize(unpaddedSize).Padded()
+	dsis := datasegment.DataSegmentIndexStartOffset(ps)
+	if _, err := r.Seek(int64(dsis), io.SeekStart); err != nil {
+		return nil, fmt.Errorf("could not seek to data segment index: %w", err)
+	}
+	dataSegments, err := datasegment.ParseDataSegmentIndex(r)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse data segment index: %w", err)
+	}
+	segments, err := dataSegments.ValidEntries()
+	if err != nil {
+		return nil, fmt.Errorf("could not calculate valid entries: %w", err)
+	}
+	if len(segments) == 0 {
+		return nil, fmt.Errorf("no data segments found")
 	}
 
-	// Add mh => piece index to store: "which piece contains the multihash?"
-	// Add mh => offset index to store: "what is the offset of the multihash within the piece?"
-	log.Debugw("add index: store index in local index directory", "pieceCid", pieceCid)
-	if err := ps.store.AddIndex(ctx, pieceCid, recs, true); err != nil {
-		return fmt.Errorf("adding CAR index for piece %s: %w", pieceCid, err)
+	recs := make([]model.Record, 0)
+	for _, s := range segments {
+		segOffset := s.UnpaddedOffest()
+		segSize := s.UnpaddedLength()
+
+		lr := io.NewSectionReader(r, int64(segOffset), int64(segSize))
+		subRecs, err := parseRecordsFromCar(lr)
+		if err != nil {
+			// revisit when non-car files supported: one corrupt segment shouldn't translate into an error in other segments.
+			return nil, fmt.Errorf("could not parse data segment #%d at offset %d: %w", len(recs), segOffset, err)
+		}
+		for i := range subRecs {
+			subRecs[i].Offset += segOffset
+		}
+		recs = append(recs, subRecs...)
 	}
 
-	return nil
+	return recs, nil
 }
 
 // BuildIndexForPiece builds indexes for a given piece CID. The piece must contain a valid deal
@@ -531,13 +592,15 @@ func (ps *PieceDirectory) BlockstoreGet(ctx context.Context, c cid.Cid) ([]byte,
 				return nil, fmt.Errorf("getting offset/size for cid %s in piece %s: %w", c, pieceCid, err)
 			}
 
-			// Seek to the block offset
+			// Seek to the section offset
 			readerAt := readerutil.NewReadSeekerFromReaderAt(reader, int64(offsetSize.Offset))
-
 			// Read the block data
-			_, data, err := util.ReadNode(bufio.NewReader(readerAt))
+			readCid, data, err := util.ReadNode(bufio.NewReader(readerAt))
 			if err != nil {
 				return nil, fmt.Errorf("reading data for block %s from reader for piece %s: %w", c, pieceCid, err)
+			}
+			if !bytes.Equal(readCid.Hash(), c.Hash()) {
+				return nil, fmt.Errorf("read block %s from reader for piece %s, but expected block %s", readCid, pieceCid, c)
 			}
 			return data, nil
 		}()
@@ -651,8 +714,59 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 	}
 
 	// process index and store entries
+	carVersion, err := carv2.ReadVersion(reader)
+	if err != nil {
+		return nil, fmt.Errorf("getting car version for piece %s: %w", pieceCid, err)
+	}
+
+	// handle absolute index offsets for carv2.
+	var bsR io.ReaderAt
+	if carVersion == 2 {
+		// this code handles the current 'absolute' index offsets stored by boost.
+		// initially, the data looks like [carv2-header carv1-header block block ...]
+		// we transform the reader here to look like:
+		// [carv1-header [gap of carv2-header-size] block block ...]
+		// the carv1 header at the beginning makes the offset used by the subsequent `blockstore.NewReadOnly` work properly.
+
+		// read the carv2 header to get the payload layout
+		carReader, err := carv2.NewReader(reader)
+		if err != nil {
+			return nil, fmt.Errorf("getting car reader for piece %s: %w", pieceCid, err)
+		}
+		dataOffset := int64(carReader.Header.DataOffset)
+		dataSize := int64(carReader.Header.DataSize)
+
+		// read the payload (CARv1) header
+		sectionReader := io.NewSectionReader(reader, dataOffset, dataSize)
+		carHeader, err := car.ReadHeader(bufio.NewReader(sectionReader))
+		if err != nil {
+			return nil, fmt.Errorf("reading car header for piece %s: %w", pieceCid, err)
+		}
+
+		// write the header back out to a buffer
+		headerBuf := bytes.NewBuffer(nil)
+		if err := car.WriteHeader(carHeader, headerBuf); err != nil {
+			return nil, fmt.Errorf("copying car header for piece %s: %w", pieceCid, err)
+		}
+		headerLen := int64(headerBuf.Len())
+
+		// create a reader that will address the payload after the header
+		sectionReader = io.NewSectionReader(reader, dataOffset+headerLen, dataSize-headerLen)
+
+		bsR = carutil.NewMultiReaderAt(
+			bytes.NewReader(headerBuf.Bytes()),        // payload (CARv1) header
+			bytes.NewReader(make([]byte, dataOffset)), // padding to account for the CARv2 wrapper
+			sectionReader, // payload (CARv1) data
+		)
+	} else {
+		bsR = reader
+		if _, err := reader.Seek(0, io.SeekStart); err != nil {
+			return nil, fmt.Errorf("seeking back to start of piece %s: %w", pieceCid, err)
+		}
+	}
+
 	// Create a blockstore from the index and the piece reader
-	bs, err := blockstore.NewReadOnly(reader, idx, carv2.ZeroLengthSectionAsEOF(true))
+	bs, err := blockstore.NewReadOnly(bsR, idx, carv2.ZeroLengthSectionAsEOF(true))
 	if err != nil {
 		return nil, fmt.Errorf("creating blockstore for piece %s: %w", pieceCid, err)
 	}

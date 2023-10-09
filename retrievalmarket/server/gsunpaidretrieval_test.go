@@ -47,6 +47,7 @@ type testCase struct {
 	watch                     func(client retrievalmarket.RetrievalClient, gsupr *GraphsyncUnpaidRetrieval)
 	ask                       *retrievalmarket.Ask
 	noUnsealedCopy            bool
+	useCarV2                  bool
 	expectErr                 bool
 	expectClientCancelEvent   bool
 	expectProviderCancelEvent bool
@@ -66,6 +67,9 @@ func TestGS(t *testing.T) {
 
 	testCases := []testCase{{
 		name: "happy path",
+	}, {
+		name:     "happy path w/ carv2",
+		useCarV2: true,
 	}, {
 		name:          "request missing payload cid",
 		reqPayloadCid: missingCid,
@@ -162,22 +166,29 @@ func runRequestTest(t *testing.T, tc testCase) {
 	// Create a CAR file and set up mocks
 	testData := tut.NewLibp2pTestData(ctx, t)
 
-	carRootCid, carFilePath := piecedirectory.CreateCarFile(t)
-	carFile, err := os.Open(carFilePath)
-	require.NoError(t, err)
-	defer carFile.Close()
-
 	// Create a random CAR file
-	carReader, err := car.OpenReader(carFilePath)
-	require.NoError(t, err)
-	defer carReader.Close()
-	carv1Reader, err := carReader.DataReader()
-	require.NoError(t, err)
+	carRootCid, carFilePath := piecedirectory.CreateCarFile(t)
+
+	var sectionReader car.SectionReader
+
+	if tc.useCarV2 {
+		var err error
+		sectionReader, err = os.Open(carFilePath)
+		require.NoError(t, err)
+		defer sectionReader.(*os.File).Close()
+	} else {
+		carReader, err := car.OpenReader(carFilePath)
+		require.NoError(t, err)
+		defer carReader.Close()
+		sectionReader, err = carReader.DataReader()
+		require.NoError(t, err)
+
+	}
 
 	// Any calls to get a reader over data should return a reader over the random CAR file
-	pr := piecedirectory.CreateMockPieceReader(t, carv1Reader)
+	pr := piecedirectory.CreateMockPieceReader(t, sectionReader)
 
-	carv1Bytes, err := io.ReadAll(carv1Reader)
+	carv1Bytes, err := io.ReadAll(sectionReader)
 	require.NoError(t, err)
 	carSize := len(carv1Bytes)
 
