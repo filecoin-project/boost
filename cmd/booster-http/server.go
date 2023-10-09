@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -63,14 +64,15 @@ type HttpServerApi interface {
 }
 
 type HttpServerOptions struct {
-	Blockstore     blockstore.Blockstore
-	ServePieces    bool
-	ServeTrustless bool
+	Blockstore       blockstore.Blockstore
+	ServePieces      bool
+	ServeTrustless   bool
+	CompressionLevel int
 }
 
 func NewHttpServer(path string, listenAddr string, port int, api HttpServerApi, opts *HttpServerOptions) *HttpServer {
 	if opts == nil {
-		opts = &HttpServerOptions{ServePieces: true, ServeTrustless: false}
+		opts = &HttpServerOptions{ServePieces: true, ServeTrustless: false, CompressionLevel: gzip.NoCompression}
 	}
 	return &HttpServer{path: path, listenAddr: listenAddr, port: port, api: api, opts: *opts, idxPage: parseTemplate(*opts)}
 }
@@ -101,7 +103,13 @@ func (s *HttpServer) Start(ctx context.Context) error {
 	handler := http.NewServeMux()
 
 	if s.opts.ServePieces {
-		handler.HandleFunc(s.pieceBasePath(), s.handleByPieceCid)
+		var pieceHandler http.Handler = http.HandlerFunc(s.handleByPieceCid)
+		if s.opts.CompressionLevel != gzip.NoCompression {
+			gzipWrapper := gziphandler.MustNewGzipLevelHandler(s.opts.CompressionLevel)
+			pieceHandler = gzipWrapper(pieceHandler)
+			log.Debugf("enabling compression with a level of %d", s.opts.CompressionLevel)
+		}
+		handler.HandleFunc(s.pieceBasePath(), pieceHandler.ServeHTTP)
 	}
 
 	if s.opts.ServeTrustless {
@@ -109,7 +117,10 @@ func (s *HttpServer) Start(ctx context.Context) error {
 			return errors.New("no blockstore provided for trustless gateway")
 		}
 		lsys := storeutil.LinkSystemForBlockstore(s.opts.Blockstore)
-		handler.Handle(s.ipfsBasePath(), frisbii.NewHttpIpfs(ctx, lsys))
+		handler.Handle(
+			s.ipfsBasePath(),
+			frisbii.NewHttpIpfs(ctx, lsys, frisbii.WithCompressionLevel(s.opts.CompressionLevel)),
+		)
 	}
 
 	handler.HandleFunc("/", s.handleIndex)
@@ -128,7 +139,7 @@ func (s *HttpServer) Start(ctx context.Context) error {
 
 	go func() {
 		if err := s.server.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("http.ListenAndServe(): %w", err)
+			log.Fatalf("http.ListenAndServe(): %v", err.Error())
 		}
 	}()
 
@@ -193,20 +204,37 @@ func (s *HttpServer) handleByPieceCid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set an Etag based on the piece cid
-	setEtag(w, pieceCid.String())
-
-	serveContent(w, r, content, "application/piece")
+	isGzipped := isGzipped(w)
+	setHeaders(w, pieceCid, isGzipped)
+	serveContent(w, r, content, isGzipped)
 
 	stats.Record(ctx, metrics.HttpPieceByCid200ResponseCount.M(1))
 	stats.Record(ctx, metrics.HttpPieceByCidRequestDuration.M(float64(time.Since(startTime).Milliseconds())))
 }
 
-func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker, contentType string) {
-	// Set the Content-Type header explicitly so that http.ServeContent doesn't
-	// try to do it implicitly
-	w.Header().Set("Content-Type", contentType)
+func isGzipped(res http.ResponseWriter) bool {
+	switch res.(type) {
+	case *gziphandler.GzipResponseWriter, gziphandler.GzipResponseWriterWithCloseNotify:
+		// there are conditions where we may have a GzipResponseWriter but the
+		// response will not be compressed, but they are related to very small
+		// response sizes so this shouldn't matter (much)
+		return true
+	}
+	return false
+}
 
+func setHeaders(w http.ResponseWriter, pieceCid cid.Cid, isGzipped bool) {
+	w.Header().Set("Vary", "Accept-Encoding")
+	etag := `"` + pieceCid.String() + `"` // must be quoted
+	if isGzipped {
+		etag = etag[:len(etag)-1] + ".gz\""
+	}
+	w.Header().Set("Etag", etag)
+	w.Header().Set("Content-Type", "application/piece")
+	w.Header().Set("Cache-Control", "public, max-age=29030400, immutable")
+}
+
+func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker, isGzipped bool) {
 	var writer http.ResponseWriter
 
 	// http.ServeContent ignores errors when writing to the stream, so we
@@ -221,18 +249,6 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 	// Note that the last modified time is a constant value because the data
 	// in a piece identified by a cid will never change.
 	start := time.Now()
-	alogAt(start, "%s\tGET %s", color.New(color.FgGreen).Sprintf("%d", http.StatusOK), r.URL)
-	isGzipped := strings.Contains(r.Header.Get("Accept-Encoding"), "gzip")
-	if isGzipped {
-		// If Accept-Encoding header contains gzip then send a gzipped response
-
-		gzwriter := gziphandler.GzipResponseWriter{
-			ResponseWriter: writeErrWatcher,
-		}
-		// Close the writer to flush buffer
-		defer gzwriter.Close()
-		writer = &gzwriter
-	}
 
 	if r.Method == "HEAD" {
 		// For an HTTP HEAD request ServeContent doesn't send any data (just headers)
@@ -257,11 +273,6 @@ func serveContent(w http.ResponseWriter, r *http.Request, content io.ReadSeeker,
 		alogAt(end, "%s\t%s\n%s",
 			color.New(color.FgRed).Sprint("FAIL"), completeMsg, err)
 	}
-}
-
-func setEtag(w http.ResponseWriter, etag string) {
-	// Note: the etag must be surrounded by "quotes"
-	w.Header().Set("Etag", `"`+etag+`"`)
 }
 
 // isNotFoundError falls back to checking the error string for "not found".

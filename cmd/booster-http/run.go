@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -107,6 +108,13 @@ var runCmd = &cli.Command{
 				return errors.New("--serve-files is no longer supported, use bifrost-gateway instead")
 			},
 		},
+		&cli.IntFlag{
+			Name: "compression-level",
+			Usage: "compression level to use for responses, 0-9, 0 is no " +
+				"compression, 9 is maximum compression; set to 0 to disable if using " +
+				"a reverse proxy with compression",
+			Value: gzip.BestSpeed,
+		},
 		&cli.BoolFlag{
 			Name:  "tracing",
 			Usage: "enables tracing of booster-http calls",
@@ -201,8 +209,9 @@ var runCmd = &cli.Command{
 		pd := piecedirectory.NewPieceDirectory(cl, sa, cctx.Int("add-index-throttle"))
 
 		opts := &HttpServerOptions{
-			ServePieces:    servePieces,
-			ServeTrustless: serveTrustless,
+			ServePieces:      servePieces,
+			ServeTrustless:   serveTrustless,
+			CompressionLevel: cctx.Int("compression-level"),
 		}
 
 		if serveTrustless {
