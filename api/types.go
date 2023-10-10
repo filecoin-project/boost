@@ -89,7 +89,7 @@ func NewDataTransferChannel(hostID peer.ID, channelState datatransfer.ChannelSta
 	} else {
 		voucherJSON, err := json.Marshal(channelState.Voucher())
 		if err != nil {
-			channel.Voucher = fmt.Errorf("Voucher Serialization: %w", err).Error()
+			channel.Voucher = fmt.Sprintf("Voucher Serialization: %s", err.Error())
 		} else {
 			channel.Voucher = string(voucherJSON)
 		}
