@@ -14,7 +14,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/etclabscore/go-openrpc-reflect v0.0.36
 	github.com/fatih/color v1.13.0
-	github.com/filecoin-project/dagstore v0.7.0
+	github.com/filecoin-project/dagstore v0.7.0 // indirect
 	github.com/filecoin-project/go-address v1.1.0
 	github.com/filecoin-project/go-bitfield v0.2.4
 	github.com/filecoin-project/go-cbor-util v0.0.1
@@ -35,7 +35,6 @@ require (
 	github.com/graph-gophers/graphql-go v1.3.0
 	github.com/graph-gophers/graphql-transport-ws v0.0.2
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/hnlq715/golang-lru v0.4.0
 	github.com/ipfs/go-block-format v0.2.0
 	github.com/ipfs/go-blockservice v0.5.1 // indirect
 	github.com/ipfs/go-cid v0.4.1

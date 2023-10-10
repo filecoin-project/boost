@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	model "github.com/filecoin-project/boost/extern/boostd-data/model"
-	mount "github.com/filecoin-project/dagstore/mount"
+	"github.com/filecoin-project/boost/lib/legacy"
 	address "github.com/filecoin-project/go-address"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	gomock "github.com/golang/mock/gomock"
@@ -70,10 +70,10 @@ func (mr *MockHttpServerApiMockRecorder) IsUnsealed(ctx, minerAddr, sectorID, of
 }
 
 // UnsealSectorAt mocks base method.
-func (m *MockHttpServerApi) UnsealSectorAt(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, pieceOffset, length abi.UnpaddedPieceSize) (mount.Reader, error) {
+func (m *MockHttpServerApi) UnsealSectorAt(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, pieceOffset, length abi.UnpaddedPieceSize) (legacy.MountReader, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UnsealSectorAt", ctx, minerAddr, sectorID, pieceOffset, length)
-	ret0, _ := ret[0].(mount.Reader)
+	ret0, _ := ret[0].(legacy.MountReader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

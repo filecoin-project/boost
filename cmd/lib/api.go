@@ -11,10 +11,10 @@ import (
 
 	"github.com/filecoin-project/boost/api"
 	cliutil "github.com/filecoin-project/boost/cli/util"
+	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/markets/sectoraccessor"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/boost/piecedirectory/types"
-	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -22,7 +22,6 @@ import (
 	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/api/v1api"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/config"
 	lotus_modules "github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -103,7 +102,7 @@ type MultiMinerAccessor struct {
 	storageApiInfos []string
 	fullnodeApi     v1api.FullNode
 	readers         map[address.Address]types.PieceReader
-	sas             map[address.Address]dagstore.SectorAccessor
+	sas             map[address.Address]legacy.SectorAccessor
 	closeOnce       sync.Once
 	closers         []jsonrpc.ClientCloser
 }
@@ -116,7 +115,7 @@ func NewMultiMinerAccessor(storageApiInfos []string, fullnodeApi v1api.FullNode)
 }
 
 func (a *MultiMinerAccessor) Start(ctx context.Context, log *logging.ZapEventLogger) error {
-	a.sas = make(map[address.Address]dagstore.SectorAccessor, len(a.storageApiInfos))
+	a.sas = make(map[address.Address]legacy.SectorAccessor, len(a.storageApiInfos))
 	a.readers = make(map[address.Address]types.PieceReader, len(a.storageApiInfos))
 	a.closers = make([]jsonrpc.ClientCloser, 0, len(a.storageApiInfos))
 	for _, apiInfo := range a.storageApiInfos {
@@ -156,7 +155,7 @@ func (a *MultiMinerAccessor) GetReader(ctx context.Context, minerAddr address.Ad
 	return pr.GetReader(ctx, minerAddr, id, offset, length)
 }
 
-func (a *MultiMinerAccessor) UnsealSectorAt(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error) {
+func (a *MultiMinerAccessor) UnsealSectorAt(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (legacy.MountReader, error) {
 	sa, ok := a.sas[minerAddr]
 	if !ok {
 		return nil, fmt.Errorf("read sector: no endpoint registered for miner %s", minerAddr)
@@ -173,7 +172,7 @@ func (a *MultiMinerAccessor) IsUnsealed(ctx context.Context, minerAddr address.A
 }
 
 type sectorAccessor struct {
-	dagstore.SectorAccessor
+	legacy.SectorAccessor
 	maddr address.Address
 }
 

@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/boost/db"
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
+	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/piecedirectory"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-commp-utils/writer"
@@ -28,7 +29,6 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -43,7 +43,7 @@ import (
 
 var (
 	dr          *DisasterRecovery
-	sa          dagstore.SectorAccessor
+	sa          legacy.SectorAccessor
 	fullnodeApi v1api.FullNode
 	minerApi    api.StorageMiner
 	pd          *piecedirectory.PieceDirectory

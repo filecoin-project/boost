@@ -4,19 +4,18 @@ import (
 	"context"
 	"io"
 
+	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/boost-gfm/retrievalmarket"
-	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
@@ -34,7 +33,7 @@ type sectorAccessor struct {
 
 var _ retrievalmarket.SectorAccessor = (*sectorAccessor)(nil)
 
-func NewSectorAccessor(maddr dtypes.MinerAddress, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) dagstore.SectorAccessor {
+func NewSectorAccessor(maddr dtypes.MinerAddress, secb sectorblocks.SectorBuilder, pp sealer.PieceProvider, full v1api.FullNode) legacy.SectorAccessor {
 	return &sectorAccessor{address.Address(maddr), secb, pp, full}
 }
 
@@ -42,7 +41,7 @@ func (sa *sectorAccessor) UnsealSector(ctx context.Context, sectorID abi.SectorN
 	return sa.UnsealSectorAt(ctx, sectorID, pieceOffset, length)
 }
 
-func (sa *sectorAccessor) UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error) {
+func (sa *sectorAccessor) UnsealSectorAt(ctx context.Context, sectorID abi.SectorNumber, pieceOffset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (legacy.MountReader, error) {
 	log.Debugf("get sector %d, pieceOffset %d, length %d", sectorID, pieceOffset, length)
 	si, err := sa.sectorsStatus(ctx, sectorID, false)
 	if err != nil {

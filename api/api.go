@@ -41,14 +41,6 @@ type Boost interface {
 	BoostDeal(ctx context.Context, dealUuid uuid.UUID) (*smtypes.ProviderDealState, error)                                                      //perm:admin
 	BoostDealBySignedProposalCid(ctx context.Context, proposalCid cid.Cid) (*smtypes.ProviderDealState, error)                                  //perm:admin
 	BoostDummyDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                                     //perm:admin
-	BoostDagstoreRegisterShard(ctx context.Context, key string) error                                                                           //perm:admin
-	BoostDagstoreDestroyShard(ctx context.Context, key string) error                                                                            //perm:admin
-	BoostDagstoreInitializeShard(ctx context.Context, key string) error                                                                         //perm:admin
-	BoostDagstoreInitializeAll(ctx context.Context, params DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error)              //perm:admin
-	BoostDagstoreRecoverShard(ctx context.Context, key string) error                                                                            //perm:admin
-	BoostDagstoreGC(ctx context.Context) ([]DagstoreShardResult, error)                                                                         //perm:admin
-	BoostDagstorePiecesContainingMultihash(ctx context.Context, mh multihash.Multihash) ([]cid.Cid, error)                                      //perm:read
-	BoostDagstoreListShards(ctx context.Context) ([]DagstoreShardInfo, error)                                                                   //perm:admin
 	BoostMakeDeal(context.Context, smtypes.DealParams) (*ProviderDealRejectionInfo, error)                                                      //perm:write
 	BoostDirectDeal(ctx context.Context, params smtypes.DirectDealParams) (*ProviderDealRejectionInfo, error)                                   //perm:admin
 
@@ -100,35 +92,4 @@ type Boost interface {
 
 	// MethodGroup: Misc
 	OnlineBackup(context.Context, string) error //perm:admin
-}
-
-// DagstoreShardInfo is the serialized form of dagstore.DagstoreShardInfo that
-// we expose through JSON-RPC to avoid clients having to depend on the
-// dagstore lib.
-type DagstoreShardInfo struct {
-	Key   string
-	State string
-	Error string
-}
-
-// DagstoreShardResult enumerates results per shard.
-type DagstoreShardResult struct {
-	Key     string
-	Success bool
-	Error   string
-}
-
-type DagstoreInitializeAllParams struct {
-	MaxConcurrency int
-	IncludeSealed  bool
-}
-
-// DagstoreInitializeAllEvent represents an initialization event.
-type DagstoreInitializeAllEvent struct {
-	Key     string
-	Event   string // "start", "end"
-	Success bool
-	Error   string
-	Total   int
-	Current int
 }

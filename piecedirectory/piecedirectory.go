@@ -13,11 +13,11 @@ import (
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
 	bdtypes "github.com/filecoin-project/boost/extern/boostd-data/svc/types"
+	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/piecedirectory/types"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/lib/readerutil"
-	"github.com/filecoin-project/lotus/markets/dagstore"
 	"github.com/hashicorp/go-multierror"
 	bstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
@@ -661,7 +661,7 @@ func (ps *PieceDirectory) GetBlockstore(ctx context.Context, pieceCid cid.Cid) (
 }
 
 type SectorAccessorAsPieceReader struct {
-	dagstore.SectorAccessor
+	legacy.SectorAccessor
 }
 
 func (s *SectorAccessorAsPieceReader) GetReader(ctx context.Context, minerAddr address.Address, id abi.SectorNumber, offset abi.PaddedPieceSize, length abi.PaddedPieceSize) (types.SectionReader, error) {

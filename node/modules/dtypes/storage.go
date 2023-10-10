@@ -11,8 +11,6 @@ import (
 
 	"github.com/filecoin-project/boost-gfm/piecestore"
 	"github.com/filecoin-project/boost-gfm/storagemarket/impl/requestvalidation"
-	ipfsblockstore "github.com/ipfs/boxo/blockstore"
-
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/node/repo/imports"
 )
@@ -60,10 +58,6 @@ type (
 	// holds a 'false' for that block), the process should signal so by calling
 	// blockstore.AllCaches.Dirty(cid).
 	ExposedBlockstore blockstore.Blockstore
-
-	// IndexBackedBlockstore is an abstraction on top of the DAGStore that provides
-	// access to any CID in a free or unsealed sector
-	IndexBackedBlockstore ipfsblockstore.Blockstore
 )
 
 type ChainBitswap exchange.Interface

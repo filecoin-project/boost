@@ -15,9 +15,9 @@ import (
 	bdclient "github.com/filecoin-project/boost/extern/boostd-data/client"
 	"github.com/filecoin-project/boost/extern/boostd-data/model"
 	"github.com/filecoin-project/boost/extern/boostd-data/shared/tracing"
+	"github.com/filecoin-project/boost/lib/legacy"
 	"github.com/filecoin-project/boost/metrics"
 	"github.com/filecoin-project/boost/piecedirectory"
-	"github.com/filecoin-project/dagstore/mount"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	lcli "github.com/filecoin-project/lotus/cli"
@@ -332,6 +332,6 @@ func (s serverApi) IsUnsealed(ctx context.Context, minerAddr address.Address, se
 	return s.sa.IsUnsealed(ctx, minerAddr, sectorID, offset, length)
 }
 
-func (s serverApi) UnsealSectorAt(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (mount.Reader, error) {
+func (s serverApi) UnsealSectorAt(ctx context.Context, minerAddr address.Address, sectorID abi.SectorNumber, offset abi.UnpaddedPieceSize, length abi.UnpaddedPieceSize) (legacy.MountReader, error) {
 	return s.sa.UnsealSectorAt(ctx, minerAddr, sectorID, offset, length)
 }

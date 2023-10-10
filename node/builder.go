@@ -44,7 +44,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/dealfilter"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
-	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
 	lotus_gfm_storagemarket "github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -567,18 +566,10 @@ func ConfigBoost(cfg *config.Boost) Option {
 
 		// TODO: Not sure how to completely get rid of these yet:
 		// Error: creating node: starting node: missing dependencies for function "reflect".makeFuncStub (/usr/local/go/src/reflect/asm_amd64.s:30): missing types: *dagstore.DAGStore; *dagstore.Wrapper (did you mean stores.DAGStoreWrapper?)
-		Override(new(*dagstore.DAGStore), func() *dagstore.DAGStore { return nil }),
-		Override(new(*mdagstore.Wrapper), func() *mdagstore.Wrapper { return nil }),
 
 		Override(new(*bdclient.Store), modules.NewPieceDirectoryStore(cfg)),
 		Override(new(*lib.MultiMinerAccessor), modules.NewMultiminerSectorAccessor(cfg)),
 		Override(new(*piecedirectory.PieceDirectory), modules.NewPieceDirectory(cfg)),
-		Override(DAGStoreKey, modules.NewDAGStoreWrapper),
-		Override(new(dagstore.Interface), From(new(*dagstore.DAGStore))),
-
-		Override(new(*modules.ShardSelector), modules.NewShardSelector),
-		Override(new(dtypes.IndexBackedBlockstore), modules.NewIndexBackedBlockstore(cfg)),
-		Override(HandleSetShardSelector, modules.SetShardSelectorFunc),
 
 		// Lotus Markets (retrieval)
 		Override(new(mdagstore.SectorAccessor), modules.NewSectorAccessor(cfg)),

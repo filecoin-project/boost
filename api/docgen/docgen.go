@@ -273,15 +273,6 @@ func init() {
 
 	addExample(api.CheckStatusCode(0))
 	addExample(map[string]interface{}{"abc": 123})
-	addExample(api.DagstoreShardResult{
-		Key:   "baga6ea4seaqecmtz7iak33dsfshi627abz4i4665dfuzr3qfs4bmad6dx3iigdq",
-		Error: "<error>",
-	})
-	addExample(api.DagstoreShardInfo{
-		Key:   "baga6ea4seaqecmtz7iak33dsfshi627abz4i4665dfuzr3qfs4bmad6dx3iigdq",
-		State: "ShardStateAvailable",
-		Error: "<error>",
-	})
 	addExample(storiface.ResourceTable)
 	addExample(network.ScopeStat{
 		Memory:             123,

@@ -48,7 +48,6 @@ func main() {
 			importDataCmd,
 			//importDirectDataCmd,
 			logCmd,
-			dagstoreCmd,
 			netCmd,
 			pieceDirCmd,
 			recoverCmd,
@@ -61,7 +60,7 @@ func main() {
 	}
 }
 
-func before(cctx *cli.Context) error {
+func before(_ *cli.Context) error {
 	_ = logging.SetLogLevel("boostd", "INFO")
 	_ = logging.SetLogLevel("db", "INFO")
 	_ = logging.SetLogLevel("boost-prop", "INFO")
@@ -84,7 +83,6 @@ func before(cctx *cli.Context) error {
 		_ = logging.SetLogLevel("storagemanager", "DEBUG")
 		_ = logging.SetLogLevel("index-provider-wrapper", "DEBUG")
 		_ = logging.SetLogLevel("boost-migrator", "DEBUG")
-		_ = logging.SetLogLevel("dagstore", "DEBUG")
 		_ = logging.SetLogLevel("migrator", "DEBUG")
 		_ = logging.SetLogLevel("piecedir", "DEBUG")
 		_ = logging.SetLogLevel("fxlog", "DEBUG")

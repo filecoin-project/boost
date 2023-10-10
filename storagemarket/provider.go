@@ -26,7 +26,6 @@ import (
 	smtypes "github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
-	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
@@ -55,12 +54,6 @@ type SealingPipelineCache struct {
 	Status     sealingpipeline.Status
 	CacheTime  time.Time
 	CacheError error
-}
-
-// DagstoreShardRegistry provides the one method from the Dagstore that we use
-// in deal execution: registering a shard
-type DagstoreShardRegistry interface {
-	RegisterShard(ctx context.Context, pieceCid cid.Cid, carPath string, eagerInit bool, resch chan dagstore.ShardResult) error
 }
 
 type Config struct {

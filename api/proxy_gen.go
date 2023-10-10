@@ -44,22 +44,6 @@ type BoostStruct struct {
 
 		BlockstoreHas func(p0 context.Context, p1 cid.Cid) (bool, error) `perm:"read"`
 
-		BoostDagstoreDestroyShard func(p0 context.Context, p1 string) error `perm:"admin"`
-
-		BoostDagstoreGC func(p0 context.Context) ([]DagstoreShardResult, error) `perm:"admin"`
-
-		BoostDagstoreInitializeAll func(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) `perm:"admin"`
-
-		BoostDagstoreInitializeShard func(p0 context.Context, p1 string) error `perm:"admin"`
-
-		BoostDagstoreListShards func(p0 context.Context) ([]DagstoreShardInfo, error) `perm:"admin"`
-
-		BoostDagstorePiecesContainingMultihash func(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) `perm:"read"`
-
-		BoostDagstoreRecoverShard func(p0 context.Context, p1 string) error `perm:"admin"`
-
-		BoostDagstoreRegisterShard func(p0 context.Context, p1 string) error `perm:"admin"`
-
 		BoostDeal func(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) `perm:"admin"`
 
 		BoostDealBySignedProposalCid func(p0 context.Context, p1 cid.Cid) (*smtypes.ProviderDealState, error) `perm:"admin"`
@@ -309,94 +293,6 @@ func (s *BoostStruct) BlockstoreHas(p0 context.Context, p1 cid.Cid) (bool, error
 
 func (s *BoostStub) BlockstoreHas(p0 context.Context, p1 cid.Cid) (bool, error) {
 	return false, ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreDestroyShard(p0 context.Context, p1 string) error {
-	if s.Internal.BoostDagstoreDestroyShard == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreDestroyShard(p0, p1)
-}
-
-func (s *BoostStub) BoostDagstoreDestroyShard(p0 context.Context, p1 string) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreGC(p0 context.Context) ([]DagstoreShardResult, error) {
-	if s.Internal.BoostDagstoreGC == nil {
-		return *new([]DagstoreShardResult), ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreGC(p0)
-}
-
-func (s *BoostStub) BoostDagstoreGC(p0 context.Context) ([]DagstoreShardResult, error) {
-	return *new([]DagstoreShardResult), ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreInitializeAll(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) {
-	if s.Internal.BoostDagstoreInitializeAll == nil {
-		return nil, ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreInitializeAll(p0, p1)
-}
-
-func (s *BoostStub) BoostDagstoreInitializeAll(p0 context.Context, p1 DagstoreInitializeAllParams) (<-chan DagstoreInitializeAllEvent, error) {
-	return nil, ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreInitializeShard(p0 context.Context, p1 string) error {
-	if s.Internal.BoostDagstoreInitializeShard == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreInitializeShard(p0, p1)
-}
-
-func (s *BoostStub) BoostDagstoreInitializeShard(p0 context.Context, p1 string) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreListShards(p0 context.Context) ([]DagstoreShardInfo, error) {
-	if s.Internal.BoostDagstoreListShards == nil {
-		return *new([]DagstoreShardInfo), ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreListShards(p0)
-}
-
-func (s *BoostStub) BoostDagstoreListShards(p0 context.Context) ([]DagstoreShardInfo, error) {
-	return *new([]DagstoreShardInfo), ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstorePiecesContainingMultihash(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) {
-	if s.Internal.BoostDagstorePiecesContainingMultihash == nil {
-		return *new([]cid.Cid), ErrNotSupported
-	}
-	return s.Internal.BoostDagstorePiecesContainingMultihash(p0, p1)
-}
-
-func (s *BoostStub) BoostDagstorePiecesContainingMultihash(p0 context.Context, p1 multihash.Multihash) ([]cid.Cid, error) {
-	return *new([]cid.Cid), ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreRecoverShard(p0 context.Context, p1 string) error {
-	if s.Internal.BoostDagstoreRecoverShard == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreRecoverShard(p0, p1)
-}
-
-func (s *BoostStub) BoostDagstoreRecoverShard(p0 context.Context, p1 string) error {
-	return ErrNotSupported
-}
-
-func (s *BoostStruct) BoostDagstoreRegisterShard(p0 context.Context, p1 string) error {
-	if s.Internal.BoostDagstoreRegisterShard == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.BoostDagstoreRegisterShard(p0, p1)
-}
-
-func (s *BoostStub) BoostDagstoreRegisterShard(p0 context.Context, p1 string) error {
-	return ErrNotSupported
 }
 
 func (s *BoostStruct) BoostDeal(p0 context.Context, p1 uuid.UUID) (*smtypes.ProviderDealState, error) {

@@ -34,7 +34,6 @@ import (
 	"github.com/filecoin-project/boost/node/impl/backupmgr"
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	"github.com/filecoin-project/boost/piecedirectory"
-	brm "github.com/filecoin-project/boost/retrievalmarket/lib"
 	"github.com/filecoin-project/boost/retrievalmarket/rtvllog"
 	"github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/boost/sectorstatemgr"
@@ -45,9 +44,6 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/transport/httptransport"
-	"github.com/filecoin-project/dagstore"
-	"github.com/filecoin-project/dagstore/indexbs"
-	"github.com/filecoin-project/dagstore/shard"
 	"github.com/filecoin-project/go-address"
 	dtnet "github.com/filecoin-project/go-data-transfer/network"
 	dtgstransport "github.com/filecoin-project/go-data-transfer/transport/graphsync"
@@ -683,74 +679,6 @@ func NewSectorAccessor(cfg *config.Boost) sectoraccessor.SectorAccessorConstruct
 	// for cache size
 	const maxCacheSize = 4096
 	return sectoraccessor.NewCachingSectorAccessor(maxCacheSize, time.Duration(cfg.Dealmaking.IsUnsealedCacheExpiry))
-}
-
-// ShardSelector helps to resolve a circular dependency:
-// The IndexBackedBlockstore has a shard selector, which needs to query the
-// RetrievalProviderNode's ask to find out if it's free to retrieve a
-// particular piece.
-// However the RetrievalProviderNode depends on the DAGStore which depends on
-// IndexBackedBlockstore.
-// So we
-//   - create a ShardSelector that has no dependencies with a default shard
-//     selection function that just selects no shards
-//   - later call SetShardSelectorFunc to create a real shard selector function
-//     with all its dependencies, and set it on the ShardSelector object.
-type ShardSelector struct {
-	Proxy  indexbs.ShardSelectorF
-	Target indexbs.ShardSelectorF
-}
-
-func NewShardSelector() *ShardSelector {
-	ss := &ShardSelector{
-		// The default target function always selects no shards
-		Target: func(c cid.Cid, shards []shard.Key) (shard.Key, error) {
-			return shard.Key{}, indexbs.ErrNoShardSelected
-		},
-	}
-	ss.Proxy = func(c cid.Cid, shards []shard.Key) (shard.Key, error) {
-		return ss.Target(c, shards)
-	}
-
-	return ss
-}
-
-func SetShardSelectorFunc(lc fx.Lifecycle, shardSelector *ShardSelector, ps dtypes.ProviderPieceStore, sa retrievalmarket.SectorAccessor, rp retrievalmarket.RetrievalProvider) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	lc.Append(fx.Hook{
-		OnStop: func(ctx context.Context) error {
-			cancel()
-			return nil
-		},
-	})
-
-	ss, err := brm.NewShardSelector(ctx, ps, sa, rp)
-	if err != nil {
-		return fmt.Errorf("creating shard selector: %w", err)
-	}
-
-	shardSelector.Target = ss.ShardSelectorF
-
-	return nil
-}
-
-func NewIndexBackedBlockstore(cfg *config.Boost) func(lc fx.Lifecycle, dagst dagstore.Interface, ss *ShardSelector) (dtypes.IndexBackedBlockstore, error) {
-	return func(lc fx.Lifecycle, dagst dagstore.Interface, ss *ShardSelector) (dtypes.IndexBackedBlockstore, error) {
-		ctx, cancel := context.WithCancel(context.Background())
-		lc.Append(fx.Hook{
-			OnStop: func(ctx context.Context) error {
-				cancel()
-				return nil
-			},
-		})
-
-		ibsds := brm.NewIndexBackedBlockstoreDagstore(dagst)
-		rbs, err := indexbs.NewIndexBackedBlockstore(ctx, ibsds, ss.Proxy, cfg.Dealmaking.BlockstoreCacheMaxShards, time.Duration(cfg.Dealmaking.BlockstoreCacheExpiry))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create index backed blockstore: %w", err)
-		}
-		return dtypes.IndexBackedBlockstore(rbs), nil
-	}
 }
 
 func NewTracing(cfg *config.Boost) func(lc fx.Lifecycle) (*tracing.Tracing, error) {
