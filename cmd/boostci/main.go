@@ -5,13 +5,11 @@ import (
 	"log"
 	"os"
 
-	llog "log"
-
 	"github.com/urfave/cli/v2"
 )
 
 func init() {
-	llog.SetOutput(io.Discard)
+	log.SetOutput(io.Discard)
 }
 
 func main() {
