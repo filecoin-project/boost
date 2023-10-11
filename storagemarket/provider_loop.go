@@ -406,6 +406,7 @@ func (p *Provider) run() {
 
 				// send an accept response
 				dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: true}}
+				continue
 			}
 
 			// Send new online and offline deals for processing.
