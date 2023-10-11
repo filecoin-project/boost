@@ -40,6 +40,8 @@ func before(cctx *cli.Context) error {
 
 	if cliutil.IsVeryVerbose {
 		_ = logging.SetLogLevel("boostd-data", "DEBUG")
+		_ = logging.SetLogLevel("boostd-data-ldb", "DEBUG")
+		_ = logging.SetLogLevel("boostd-data-yb", "DEBUG")
 	}
 
 	return nil
