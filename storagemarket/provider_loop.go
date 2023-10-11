@@ -414,7 +414,7 @@ func (p *Provider) run() {
 				p.setupHandlerAndStartDeal(deal, dealReq.rsp)
 
 				// send an accept response
-				dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: true}, err: nil}
+				dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: true}}
 			}
 
 			// Send online deal for processing
@@ -530,7 +530,7 @@ func (p *Provider) run() {
 			p.setupHandlerAndStartDeal(deal, processedDeal.rsp)
 
 			// send an accept response
-			processedDeal.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: true}, err: nil}
+			processedDeal.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: true}}
 
 		case <-p.ctx.Done():
 			return
@@ -612,7 +612,7 @@ func (p *Provider) setupHandlerAndStartDeal(deal *types.ProviderDealState, rsp c
 	// set up deal handler so that clients can subscribe to deal update events
 	dh, err := p.mkAndInsertDealHandler(deal.DealUuid)
 	if err != nil {
-		p.sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: starting deal thread"}, rsp, deal.DealUuid)
+		p.sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: setting up deal handler"}, rsp, deal.DealUuid)
 		return
 	}
 
