@@ -393,15 +393,6 @@ func (p *Provider) run() {
 			deal := dealReq.deal
 			p.dealLogger.Infow(deal.DealUuid, "processing deal acceptance request")
 
-			if deal.IsOffline && !dealReq.isImport {
-				// When the client proposes an offline deal, save the deal
-				// to the database but don't execute the deal. The deal
-				// will be executed when the Storage Provider imports the
-				// deal data.
-				go p.processDeal(deal, dealReq.rsp)
-				continue
-			}
-
 			if deal.IsOffline && dealReq.isImport {
 				// The Storage Provider is importing offline deal data, so tag
 				// funds for the deal and execute it
@@ -417,7 +408,11 @@ func (p *Provider) run() {
 				dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: true}}
 			}
 
-			// Send online deal for processing
+			// Send new online and offline deals for processing.
+			// When the client proposes an offline deal, save the deal
+			// to the database but don't execute the deal. The deal
+			// will be executed when the Storage Provider imports the
+			// deal data.
 			go p.processDeal(deal, dealReq.rsp)
 
 		case storageSpaceDealReq := <-p.storageSpaceChan:
