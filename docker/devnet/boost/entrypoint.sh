@@ -6,6 +6,7 @@ lotus wait-api
 echo Wait for lotus-miner is ready ...
 lotus-miner wait-api
 echo BOOST_PATH=$BOOST_PATH
+echo BOOSTD_DATA_PATH=$BOOSTD_DATA_PATH
 export DEFAULT_WALLET=`lotus wallet default`
 export FULLNODE_API_INFO=`lotus auth api-info --perm=admin | cut -f2 -d=`
 export MINER_API_INFO=`lotus-miner auth api-info --perm=admin | cut -f2 -d=`
@@ -52,10 +53,10 @@ sed 's|#ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8042"|g' $BOOST_PAT
 sed 's|#ExpectedSealDuration = "24h0m0s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
 
 ## run boostd-data
-boostd-data --vv run leveldb --repo $BOOST_PATH --addr=0.0.0.0:8042 > $BOOST_PATH/boostd-data.log &
+boostd-data -vv run leveldb --repo=$BOOSTD_DATA_PATH --addr=0.0.0.0:8042 &>$BOOSTD_DATA_PATH/boostd-data.log &
 
 # TODO(anteva): fixme: hack as boostd fails to start without this dir
-mkdir -p /var/lib/boost/deal-staging
+mkdir -p $BOOST_PATH/deal-staging
 
 if [ ! -f $BOOST_PATH/.register.boost ]; then
 	echo Temporary starting boost to get maddr...
