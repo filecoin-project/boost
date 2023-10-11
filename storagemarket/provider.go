@@ -96,6 +96,7 @@ type Provider struct {
 	publishedDealChan    chan publishDealReq
 	updateRetryStateChan chan updateRetryStateReq
 	storageSpaceChan     chan storageSpaceDealReq
+	processedDealChan    chan processedDealReq
 
 	// Sealing Pipeline API
 	sps      sealingpipeline.API
@@ -175,6 +176,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		publishedDealChan:    make(chan publishDealReq),
 		updateRetryStateChan: make(chan updateRetryStateReq),
 		storageSpaceChan:     make(chan storageSpaceDealReq),
+		processedDealChan:    make(chan processedDealReq),
 
 		Transport:      tspt,
 		xferLimiter:    xferLimiter,
