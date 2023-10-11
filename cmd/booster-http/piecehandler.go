@@ -126,7 +126,7 @@ func serveContent(res http.ResponseWriter, req *http.Request, content io.ReadSee
 	// Note that the last modified time is a constant value because the data
 	// in a piece identified by a cid will never change.
 
-	if req.Method == "HEAD" {
+	if req.Method == http.MethodHead {
 		// For an HTTP HEAD request ServeContent doesn't send any data (just headers)
 		http.ServeContent(res, req, "", time.Time{}, content)
 		return
@@ -140,16 +140,15 @@ func serveContent(res http.ResponseWriter, req *http.Request, content io.ReadSee
 // Unfortunately we can't always use errors.Is() because the error might
 // have crossed an RPC boundary.
 func isNotFoundError(err error) bool {
-	if errors.Is(err, ErrNotFound) {
+	switch {
+	case errors.Is(err, ErrNotFound),
+		errors.Is(err, datastore.ErrNotFound),
+		errors.Is(err, retrievalmarket.ErrNotFound),
+		strings.Contains(strings.ToLower(err.Error()), "not found"):
 		return true
+	default:
+		return false
 	}
-	if errors.Is(err, datastore.ErrNotFound) {
-		return true
-	}
-	if errors.Is(err, retrievalmarket.ErrNotFound) {
-		return true
-	}
-	return strings.Contains(strings.ToLower(err.Error()), "not found")
 }
 
 func writeError(w http.ResponseWriter, r *http.Request, status int, msg error) {
@@ -193,7 +192,6 @@ func (s *HttpServer) unsealedDeal(ctx context.Context, pieceCid cid.Cid, pieceDe
 		} else {
 			dealSectors = append(dealSectors, fmt.Sprintf("Deal %d: Sector %d", di.ChainDealID, di.SectorID))
 		}
-
 	}
 
 	if allErr == nil {

@@ -34,7 +34,7 @@ func TestMultiMinerHttpRetrieval(t *testing.T) {
 
 		runAndWaitForBoosterHttp(ctx, t, []string{miner1ApiInfo, miner2ApiInfo}, fullNode2ApiInfo, port)
 
-		req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:%d/ipfs/%s", port, rt.RootCid.String()), nil)
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/ipfs/%s", port, rt.RootCid.String()), nil)
 		require.NoError(t, err)
 		req.Header.Set("Accept", "application/vnd.ipld.car")
 		resp, err := http.DefaultClient.Do(req)
@@ -100,7 +100,8 @@ func waitForHttp(ctx context.Context, t *testing.T, port int, waitForCode int, w
 }
 
 func runBoosterHttp(ctx context.Context, t *testing.T, minerApiInfo []string, fullNodeApiInfo string, lidApiInfo string, args ...string) error {
-	args = append([]string{"booster-http",
+	args = append([]string{
+		"booster-http",
 		"--repo=" + t.TempDir(),
 		"--vv",
 		"run",

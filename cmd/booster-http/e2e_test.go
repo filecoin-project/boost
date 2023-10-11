@@ -133,8 +133,7 @@ func TestE2E(t *testing.T) {
 		{"/foo/bar/fizz.mov", rootEnt.Children[0].Children[0].Children[2].Content, "video/quicktime"},
 		{"/qux.html", rootEnt.Children[1].Content, "text/html"},
 	} {
-		byts, ct, code, err := curl(fmt.Sprintf("http://0.0.0.0:%d/ipfs/%s%s", bifrostPort, rootEnt.Root.String(), fetch.path))
-		req.NoError(err)
+		byts, ct, code := requireHttpResponse(t, fmt.Sprintf("http://0.0.0.0:%d/ipfs/%s%s", bifrostPort, rootEnt.Root.String(), fetch.path))
 		req.Equal(http.StatusOK, code)
 		req.Equal(fetch.expect, byts)
 		req.Equal(fetch.expectType, ct)
@@ -142,14 +141,12 @@ func TestE2E(t *testing.T) {
 
 	t.Log("Perform some curl requests to bifrost-gateway that should fail")
 
-	byts, ct, code, err := curl(fmt.Sprintf("http://0.0.0.0:%d/ipfs/%s/nope", bifrostPort, rootEnt.Root.String()))
-	req.NoError(err)
+	byts, ct, code := requireHttpResponse(t, fmt.Sprintf("http://0.0.0.0:%d/ipfs/%s/nope", bifrostPort, rootEnt.Root.String()))
 	req.Equal(http.StatusNotFound, code)
 	req.Contains(string(byts), "failed to resolve")
 	req.Equal("text/plain; charset=utf-8", ct)
 
-	byts, ct, code, err = curl(fmt.Sprintf("http://0.0.0.0:%d/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", bifrostPort))
-	req.NoError(err)
+	byts, ct, code = requireHttpResponse(t, fmt.Sprintf("http://0.0.0.0:%d/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi", bifrostPort))
 	req.Equal(http.StatusBadGateway, code)
 	req.Contains(string(byts), "failed to resolve")
 	req.Equal("text/plain; charset=utf-8", ct)
@@ -196,15 +193,11 @@ func verifyCarContains(t *testing.T, carFilepath string, wantCids []cid.Cid) {
 }
 
 // simulate a curl to the url and return the body bytes, content type and status code
-func curl(to string) ([]byte, string, int, error) {
+func requireHttpResponse(t *testing.T, to string) ([]byte, string, int) {
 	req, err := http.Get(to)
-	if err != nil {
-		return nil, "", 0, err
-	}
+	require.NoError(t, err)
 	defer req.Body.Close()
 	byts, err := io.ReadAll(req.Body)
-	if err != nil {
-		return nil, "", 0, err
-	}
-	return byts, req.Header.Get("Content-Type"), req.StatusCode, nil
+	require.NoError(t, err)
+	return byts, req.Header.Get("Content-Type"), req.StatusCode
 }

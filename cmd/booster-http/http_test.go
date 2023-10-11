@@ -53,7 +53,7 @@ func TestNewHttpServer(t *testing.T) {
 
 		t.Logf("%s %s %s %s %d %s %d %s %s %s", ts.Format(time.RFC3339), remoteAddr, method, url.String(), status, duration, bytes, compressionRatio, userAgent, msg)
 		requestCount++
-		req.Equal("GET", method)
+		req.Equal(http.MethodGet, method)
 		req.Equal("-", compressionRatio)
 
 		switch requestCount {
@@ -87,7 +87,7 @@ func TestNewHttpServer(t *testing.T) {
 	req.Equal(200, resp.StatusCode)
 
 	// Create a request with Cors header
-	request, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:%d/", port), nil)
+	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/", port), nil)
 	req.NoError(err)
 	request.Header.Add("Origin", "test")
 	client := new(http.Client)
@@ -98,7 +98,7 @@ func TestNewHttpServer(t *testing.T) {
 	req.Equal("*", response.Header.Get("Access-Control-Allow-Origin"))
 
 	// Test an error condition
-	request, err = http.NewRequest("GET", fmt.Sprintf("http://localhost:%d/piece/bafynotacid!", port), nil)
+	request, err = http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/piece/bafynotacid!", port), nil)
 	req.NoError(err)
 	response, err = client.Do(request)
 	req.NoError(err)
@@ -219,7 +219,7 @@ func TestHttpGzipResponse(t *testing.T) {
 
 			logHandler := func(ts time.Time, remoteAddr, method string, url url.URL, status int, duration time.Duration, bytes int, compressionRatio, userAgent, msg string) {
 				t.Logf("%s %s %s %s %d %s %d %s %s %s", ts.Format(time.RFC3339), remoteAddr, method, url.String(), status, duration, bytes, compressionRatio, userAgent, msg)
-				req.Equal("GET", method)
+				req.Equal(http.MethodGet, method)
 				if url.Path == "/" { // waitServerUp
 					return
 				}
@@ -258,7 +258,7 @@ func TestHttpGzipResponse(t *testing.T) {
 			}()
 
 			{ // test /piece retrieval
-				request, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:%d/piece/%s", port, testPieceCid), nil)
+				request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/piece/%s", port, testPieceCid), nil)
 				request.Header.Set("Accept", "application/vnd.ipld.car")
 				if tc.acceptGzip {
 					request.Header.Set("Accept-Encoding", "gzip")
@@ -301,7 +301,7 @@ func TestHttpGzipResponse(t *testing.T) {
 			}
 
 			{ // test /ipfs CAR retrieval
-				request, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:%d/ipfs/%s", port, rootEnt.Root.String()), nil)
+				request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/ipfs/%s", port, rootEnt.Root.String()), nil)
 				request.Header.Set("Accept", "application/vnd.ipld.car")
 				if tc.acceptGzip {
 					request.Header.Set("Accept-Encoding", "gzip")

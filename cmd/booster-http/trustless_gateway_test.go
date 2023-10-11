@@ -82,7 +82,6 @@ func TestTrustlessGateway(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 // dealTestCarInParts creates deals for the given CAR file in 7M chunks since we

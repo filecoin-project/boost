@@ -90,7 +90,9 @@ var runCmd = &cli.Command{
 			Usage:  "(removed option)",
 			Hidden: true,
 			Action: func(ctx *cli.Context, _ bool) error {
-				fmt.Fprintf(ctx.App.ErrWriter, "--serve-blocks is no longer supported.\n\n%s\n\n", trustlessMessage)
+				if _, err := fmt.Fprintf(ctx.App.ErrWriter, "--serve-blocks is no longer supported.\n\n%s\n\n", trustlessMessage); err != nil {
+					return err
+				}
 				return errors.New("--serve-blocks is no longer supported, use bifrost-gateway instead")
 			},
 		},
@@ -104,7 +106,9 @@ var runCmd = &cli.Command{
 			Usage:  "(removed option)",
 			Hidden: true,
 			Action: func(ctx *cli.Context, _ bool) error {
-				fmt.Fprintf(ctx.App.ErrWriter, "--serve-files is no longer supported.\n\n%s\n\n", trustlessMessage)
+				if _, err := fmt.Fprintf(ctx.App.ErrWriter, "--serve-files is no longer supported.\n\n%s\n\n", trustlessMessage); err != nil {
+					return err
+				}
 				return errors.New("--serve-files is no longer supported, use bifrost-gateway instead")
 			},
 		},
@@ -254,7 +258,7 @@ var runCmd = &cli.Command{
 		case "-":
 			opts.LogWriter = cctx.App.Writer
 		default:
-			opts.LogWriter, err = os.OpenFile(cctx.String("log-file"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			opts.LogWriter, err = os.OpenFile(cctx.String("log-file"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 			if err != nil {
 				return err
 			}
@@ -324,7 +328,7 @@ func createRepoDir(repoDir string) (string, error) {
 	if repoDir == "" {
 		return "", fmt.Errorf("%s is a required flag", FlagRepo.Name)
 	}
-	return repoDir, os.MkdirAll(repoDir, 0744)
+	return repoDir, os.MkdirAll(repoDir, 0o744)
 }
 
 type serverApi struct {
