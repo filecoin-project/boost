@@ -79,7 +79,7 @@ sed 's|#ServiceApiInfo = ""|ServiceApiInfo = "ws://localhost:8042"|g' $BOOST_PAT
 sed 's|#ExpectedSealDuration = "24h0m0s"|ExpectedSealDuration = "0h0m10s"|g' $BOOST_PATH/config.toml > $BOOST_PATH/config.toml.tmp; cp $BOOST_PATH/config.toml.tmp $BOOST_PATH/config.toml; rm $BOOST_PATH/config.toml.tmp
 
 ## run boostd-data
-boostd-data run leveldb --repo $BOOST_PATH --addr=0.0.0.0:8042 &
+boostd-data --vv run leveldb --repo $BOOST_PATH --addr=0.0.0.0:8042 > $BOOST_PATH/boostd-data.log &
 
 # TODO(anteva): fixme: hack as boostd fails to start without this dir
 mkdir -p /var/lib/boost/deal-staging

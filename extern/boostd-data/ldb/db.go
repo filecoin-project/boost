@@ -532,8 +532,13 @@ func (db *DB) ScanProgress(ctx context.Context, maddr address.Address) (*types.S
 	}
 	checkedLk.Unlock()
 
+	progress := float64(1.0)
+	if count != 0 {
+		progress = float64(checkedCount) / float64(count)
+	}
+
 	return &types.ScanProgress{
-		Progress: float64(checkedCount) / float64(count),
+		Progress: progress,
 		LastScan: lastScan,
 	}, nil
 }
