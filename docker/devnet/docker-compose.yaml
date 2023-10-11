@@ -69,6 +69,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     volumes:
+      - ./data/boostd-data:/var/lib/boostd-data:rw
       - ./data/boost:/var/lib/boost:rw
       - ./data/lotus:/var/lib/lotus:ro
       - ./data/lotus-miner:/var/lib/lotus-miner:ro
