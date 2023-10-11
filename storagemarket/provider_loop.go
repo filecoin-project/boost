@@ -278,7 +278,6 @@ func (p *Provider) processDeal(deal *types.ProviderDealState, rsp chan acceptDea
 	case p.processedDealChan <- processedDealReq{deal: deal, err: err, rsp: rsp}:
 	case <-p.ctx.Done():
 	}
-	return
 }
 
 func (p *Provider) processImportOfflineDealData(deal *types.ProviderDealState) *acceptError {
