@@ -393,23 +393,6 @@ func (p *Provider) run() {
 			deal := dealReq.deal
 			p.dealLogger.Infow(deal.DealUuid, "processing deal acceptance request")
 
-			sendErrorResp := func(aerr *acceptError) {
-				// If the error is a severe error (eg can't connect to database)
-				if aerr.isSevereError {
-					// Send a rejection message to the client with a reason for rejection
-					resp := acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: aerr.reason}}
-					// Log an error with more details for the provider
-					p.dealLogger.LogError(deal.DealUuid, "error while processing deal acceptance request", aerr)
-					dealReq.rsp <- resp
-					return
-				}
-
-				// The error is not a severe error, so don't log an error, just
-				// send a message to the client with a rejection reason
-				p.dealLogger.Infow(deal.DealUuid, "deal acceptance request rejected", "reason", aerr.reason, "error", aerr.error)
-				dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: aerr.reason}, err: nil}
-			}
-
 			if deal.IsOffline && !dealReq.isImport {
 				// When the client proposes an offline deal, save the deal
 				// to the database but don't execute the deal. The deal
@@ -424,26 +407,14 @@ func (p *Provider) run() {
 				// funds for the deal and execute it
 				aerr := p.processImportOfflineDealData(dealReq.deal)
 				if aerr != nil {
-					sendErrorResp(aerr)
+					p.sendErrorResp(aerr, dealReq.rsp, deal.DealUuid)
 					continue
 				}
 
-				// set up deal handler so that clients can subscribe to deal update events
-				dh, err := p.mkAndInsertDealHandler(deal.DealUuid)
-				if err != nil {
-					sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: starting deal thread"})
-					continue
-				}
-
-				// start executing the deal
-				_, err = p.startDealThread(dh, deal)
-				if err != nil {
-					sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: starting deal thread"})
-					continue
-				}
+				p.setupHandlerAndStartDeal(deal, dealReq.rsp)
 
 				// send an accept response
-				dealReq.rsp <- acceptDealResp{&api.ProviderDealRejectionInfo{Accepted: true}, nil}
+				dealReq.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: true}, err: nil}
 			}
 
 			// Send online deal for processing
@@ -530,37 +501,21 @@ func (p *Provider) run() {
 
 		case processedDeal := <-p.processedDealChan:
 			deal := processedDeal.deal
-			sendErrorResp := func(aerr *acceptError) {
-				// If the error is a severe error (eg can't connect to database)
-				if aerr.isSevereError {
-					// Send a rejection message to the client with a reason for rejection
-					resp := acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: aerr.reason}}
-					// Log an error with more details for the provider
-					p.dealLogger.LogError(deal.DealUuid, "error while processing deal acceptance request", aerr)
-					processedDeal.rsp <- resp
-					return
-				}
-
-				// The error is not a severe error, so don't log an error, just
-				// send a message to the client with a rejection reason
-				p.dealLogger.Infow(deal.DealUuid, "deal acceptance request rejected", "reason", aerr.reason, "error", aerr.error)
-				processedDeal.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: aerr.reason}, err: nil}
-			}
 			if processedDeal.err != nil {
 				// Reject offline deal
 				if deal.IsOffline {
 					dh, err := p.mkAndInsertDealHandler(deal.DealUuid)
 					if err != nil {
-						sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: getting deal thread"})
+						p.sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: getting deal thread"}, processedDeal.rsp, deal.DealUuid)
 						continue
 					}
 					dh.close()
 					p.delDealHandler(deal.DealUuid)
-					sendErrorResp(processedDeal.err)
+					p.sendErrorResp(processedDeal.err, processedDeal.rsp, deal.DealUuid)
 					continue
 				}
 				// Reject online deal
-				sendErrorResp(processedDeal.err)
+				p.sendErrorResp(processedDeal.err, processedDeal.rsp, deal.DealUuid)
 				continue
 			}
 
@@ -572,23 +527,10 @@ func (p *Provider) run() {
 				continue
 			}
 
-			// Handle online accepted deal
-			// set up deal handler so that clients can subscribe to deal update events
-			dh, err := p.mkAndInsertDealHandler(deal.DealUuid)
-			if err != nil {
-				sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: starting deal thread"})
-				continue
-			}
-
-			// start executing the deal
-			_, err = p.startDealThread(dh, deal)
-			if err != nil {
-				sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: starting deal thread"})
-				continue
-			}
+			p.setupHandlerAndStartDeal(deal, processedDeal.rsp)
 
 			// send an accept response
-			processedDeal.rsp <- acceptDealResp{&api.ProviderDealRejectionInfo{Accepted: true}, nil}
+			processedDeal.rsp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: true}, err: nil}
 
 		case <-p.ctx.Done():
 			return
@@ -646,4 +588,37 @@ func (p *Provider) failPausedDeal(dh *dealHandler, deal *smtypes.ProviderDealSta
 	go p.cleanupDeal(deal)
 
 	return nil
+}
+
+func (p *Provider) sendErrorResp(aerr *acceptError, resp chan acceptDealResp, dealId uuid.UUID) {
+	// If the error is a severe error (eg can't connect to database)
+	if aerr.isSevereError {
+		// Send a rejection message to the client with a reason for rejection
+		rsp := acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: aerr.reason}}
+		// Log an error with more details for the provider
+		p.dealLogger.LogError(dealId, "error while processing deal acceptance request", aerr)
+		resp <- rsp
+		return
+	}
+
+	// The error is not a severe error, so don't log an error, just
+	// send a message to the client with a rejection reason
+	p.dealLogger.Infow(dealId, "deal acceptance request rejected", "reason", aerr.reason, "error", aerr.error)
+	resp <- acceptDealResp{ri: &api.ProviderDealRejectionInfo{Accepted: false, Reason: aerr.reason}, err: nil}
+}
+
+func (p *Provider) setupHandlerAndStartDeal(deal *types.ProviderDealState, rsp chan acceptDealResp) {
+	// Handle online accepted deal
+	// set up deal handler so that clients can subscribe to deal update events
+	dh, err := p.mkAndInsertDealHandler(deal.DealUuid)
+	if err != nil {
+		p.sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: starting deal thread"}, rsp, deal.DealUuid)
+		return
+	}
+
+	// start executing the deal
+	_, err = p.startDealThread(dh, deal)
+	if err != nil {
+		p.sendErrorResp(&acceptError{error: err, isSevereError: true, reason: "server error: starting deal thread"}, rsp, deal.DealUuid)
+	}
 }
