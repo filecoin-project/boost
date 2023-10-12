@@ -41,7 +41,7 @@ require (
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-cidutil v0.1.0
 	github.com/ipfs/go-datastore v0.6.0
-	github.com/ipfs/go-graphsync v0.14.10
+	github.com/ipfs/go-graphsync v0.15.1
 	github.com/ipfs/go-ipfs-blocksutil v0.0.1
 	github.com/ipfs/go-ipfs-chunker v0.0.5 // indirect
 	github.com/ipfs/go-ipfs-ds-help v1.1.0 // indirect
@@ -94,10 +94,10 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/fx v1.20.0
 	go.uber.org/multierr v1.11.0
-	golang.org/x/crypto v0.12.0
+	golang.org/x/crypto v0.14.0
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63
 	golang.org/x/sync v0.3.0
-	golang.org/x/text v0.12.0
+	golang.org/x/text v0.13.0
 	golang.org/x/tools v0.12.1-0.20230815132531-74c255bcf846
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4 // indirect
@@ -300,9 +300,9 @@ require (
 	go.uber.org/zap v1.25.0
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/mod v0.12.0 // indirect
-	golang.org/x/net v0.14.0 // indirect
-	golang.org/x/sys v0.12.0 // indirect
-	golang.org/x/term v0.12.0
+	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/term v0.13.0
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/grpc v1.55.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
@@ -326,10 +326,10 @@ require (
 	github.com/filecoin-project/lotus v1.25.0-rc1
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/kubo v0.22.0
-	github.com/ipld/frisbii v0.4.0
+	github.com/ipld/frisbii v0.4.1
 	github.com/ipld/go-fixtureplate v0.0.2
-	github.com/ipld/go-trustless-utils v0.4.0
-	github.com/ipld/ipld/specs v0.0.0-20230927010225-ef4dbd703269
+	github.com/ipld/go-trustless-utils v0.4.1
+	github.com/ipld/ipld/specs v0.0.0-20231012031213-54d3b21deda4
 	github.com/ipni/go-libipni v0.5.2
 	github.com/ipni/ipni-cli v0.1.1
 	github.com/ipni/storetheindex v0.8.1
