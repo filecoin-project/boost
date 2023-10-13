@@ -8,6 +8,7 @@ import (
 	"net/url"
 
 	"github.com/filecoin-project/boost-gfm/storagemarket"
+	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/transport/httptransport/util"
 	"github.com/filecoin-project/boost/transport/types"
 	"github.com/filecoin-project/go-address"
@@ -183,4 +184,10 @@ type AskGetter interface {
 
 type SignatureVerifier interface {
 	VerifySignature(ctx context.Context, sig crypto.Signature, addr address.Address, input []byte) (bool, error)
+}
+
+type MinerEndpoints interface {
+	SealingPipilineAPI(addr address.Address) (sealingpipeline.API, error)
+	PieceAdder(addr address.Address) (PieceAdder, error)
+	CommpCalculator() (CommpCalculator, error)
 }

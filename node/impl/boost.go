@@ -24,7 +24,6 @@ import (
 	"github.com/filecoin-project/boost/node/modules/dtypes"
 	retmarket "github.com/filecoin-project/boost/retrievalmarket/server"
 	"github.com/filecoin-project/boost/storagemarket"
-	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/dagstore"
 	"github.com/filecoin-project/dagstore/shard"
@@ -78,9 +77,6 @@ type BoostAPI struct {
 
 	// Graphsync Unpaid Retrieval
 	GraphsyncUnpaidRetrieval *retmarket.GraphsyncUnpaidRetrieval
-
-	// Sealing Pipeline API
-	Sps sealingpipeline.API
 
 	// Piece Directory
 	Pd *piecedirectory.PieceDirectory

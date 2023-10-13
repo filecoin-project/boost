@@ -1522,16 +1522,16 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 	// Create a temporary directory for all the tests.
 	dir := t.TempDir()
 
-	// setup mocks
-	fn := lotusmocks.NewMockFullNode(ctrl)
-	minerStub := smtestutil.NewMinerStub(ctrl)
-	sps := minerStub.MockAPI
-
 	// setup client and miner addrs
 	minerAddr, err := address.NewIDAddress(1011)
 	require.NoError(t, err)
 	cAddr, err := address.NewIDAddress(1014)
 	require.NoError(t, err)
+
+	// setup mocks
+	fn := lotusmocks.NewMockFullNode(ctrl)
+	minerStub := smtestutil.NewMinerStub(ctrl, minerAddr)
+	sps := minerStub.MockAPI
 
 	// instantiate the http servers that will serve the files
 	normalServer := testutil.HttpTestUnstartedFileServer(t, dir)
@@ -1639,9 +1639,17 @@ func NewHarness(t *testing.T, opts ...harnessOpt) *ProviderHarness {
 		SealingPipelineCacheTimeout: time.Second,
 		StorageFilter:               "1",
 	}
+	// var ss lotus_modules.MinerStorageService
+	// ss = minerStub.(modules.MinerStorageService)
+
+	// me := MinerEndpoints{
+	// 	StorageServices: map[address.Address]modules.MinerStorageService{minerAddr: minerStub.(modules.MinerStorageService)},
+	// 	SealingServices: map[address.Address]modules.MinerSealingService{minerAddr: minerStub.(modules.MinerStorageService)},
+	// }
+
 	commpThrottle := make(chan struct{}, 1)
-	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, minerStub, minerStub, commpThrottle, sps, minerStub, df, sqldb,
-		logsDB, pm, minerStub, askStore, &mockSignatureVerifier{true, nil}, dl, tspt)
+	prov, err := NewProvider(prvCfg, sqldb, dealsDB, fm, sm, fn, minerStub, minerAddr, commpThrottle, minerStub, df, sqldb,
+		logsDB, pm, minerStub, askStore, &mockSignatureVerifier{true, nil}, dl, tspt, minerStub.MinerEndpoints)
 	require.NoError(t, err)
 	ph.Provider = prov
 
@@ -1693,7 +1701,7 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	}
 	// shutdown old provider
 	h.Provider.Stop()
-	h.MinerStub = smtestutil.NewMinerStub(h.GoMockCtrl)
+	h.MinerStub = smtestutil.NewMinerStub(h.GoMockCtrl, h.MinerAddr)
 	h.MockSealingPipelineAPI = h.MinerStub.MockAPI
 	// no-op deal filter, as we are mostly testing the Provider and provider_loop here
 	df := func(ctx context.Context, deal dealfilter.DealFilterParams) (bool, string, error) {
@@ -1709,9 +1717,9 @@ func (h *ProviderHarness) shutdownAndCreateNewProvider(t *testing.T, opts ...har
 	// construct a new provider with pre-existing state
 	commpThrottle := make(chan struct{}, 1)
 	prov, err := NewProvider(h.Provider.config, h.Provider.db, h.Provider.dealsDB, h.Provider.fundManager,
-		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, h.MinerStub, h.MinerStub, commpThrottle, h.MockSealingPipelineAPI, h.MinerStub,
+		h.Provider.storageManager, h.Provider.fullnodeApi, h.MinerStub, h.MinerAddr, commpThrottle, h.MinerStub,
 		df, h.Provider.logsSqlDB, h.Provider.logsDB, pm, h.MinerStub, h.Provider.askGetter,
-		h.Provider.sigVerifier, h.Provider.dealLogger, h.Provider.Transport)
+		h.Provider.sigVerifier, h.Provider.dealLogger, h.Provider.Transport, h.MinerStub.MinerEndpoints)
 
 	require.NoError(t, err)
 	h.Provider = prov

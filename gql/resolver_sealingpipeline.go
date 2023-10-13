@@ -4,6 +4,7 @@ import (
 	"context"
 
 	gqltypes "github.com/filecoin-project/boost/gql/types"
+	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
@@ -14,7 +15,13 @@ import (
 
 // query: sealingpipeline: [SealingPipeline]
 func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, error) {
-	res, err := r.spApi.WorkerJobs(ctx)
+	// TODO: pass miner id as a parameter
+	spApi, err := r.me.SealingPipilineAPI(r.provider.Addresses[0])
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := spApi.WorkerJobs(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -31,12 +38,12 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		}
 	}
 
-	summary, err := r.spApi.SectorsSummary(ctx)
+	summary, err := spApi.SectorsSummary(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	minerAddr, err := r.spApi.ActorAddress(ctx)
+	minerAddr, err := spApi.ActorAddress(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -46,21 +53,21 @@ func (r *resolver) SealingPipeline(ctx context.Context) (*sealingPipelineState, 
 		return nil, err
 	}
 
-	wdSectors, err := r.spApi.SectorsListInStates(ctx, []api.SectorState{"WaitDeals"})
+	wdSectors, err := spApi.SectorsListInStates(ctx, []api.SectorState{"WaitDeals"})
 	if err != nil {
 		return nil, err
 	}
 
-	sdwdSectors, err := r.spApi.SectorsListInStates(ctx, []api.SectorState{"SnapDealsWaitDeals"})
+	sdwdSectors, err := spApi.SectorsListInStates(ctx, []api.SectorState{"SnapDealsWaitDeals"})
 	if err != nil {
 		return nil, err
 	}
 
-	waitDealsSectors, err := r.populateWaitDealsSectors(ctx, wdSectors, ssize)
+	waitDealsSectors, err := r.populateWaitDealsSectors(ctx, spApi, wdSectors, ssize)
 	if err != nil {
 		return nil, err
 	}
-	snapDealsWaitDealsSectors, err := r.populateWaitDealsSectors(ctx, sdwdSectors, ssize)
+	snapDealsWaitDealsSectors, err := r.populateWaitDealsSectors(ctx, spApi, sdwdSectors, ssize)
 	if err != nil {
 		return nil, err
 	}
@@ -169,13 +176,13 @@ func getSectorSize(ctx context.Context, fullNode v1api.FullNode, maddr address.A
 	return uint64(mi.SectorSize), nil
 }
 
-func (r *resolver) populateWaitDealsSectors(ctx context.Context, sectorNumbers []abi.SectorNumber, ssize uint64) ([]*waitDealSector, error) {
+func (r *resolver) populateWaitDealsSectors(ctx context.Context, spApi sealingpipeline.API, sectorNumbers []abi.SectorNumber, ssize uint64) ([]*waitDealSector, error) {
 	waitDealsSectors := []*waitDealSector{}
 	for _, s := range sectorNumbers {
 		used := uint64(0)
 		deals := []*waitDeal{}
 
-		wdSectorStatus, err := r.spApi.SectorsStatus(ctx, s, false)
+		wdSectorStatus, err := spApi.SectorsStatus(ctx, s, false)
 		if err != nil {
 			return nil, err
 		}

@@ -30,6 +30,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
+	lotus_api "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
 	"github.com/google/uuid"
@@ -81,7 +82,7 @@ var log = logging.Logger("boost-provider")
 type Provider struct {
 	config Config
 	// Address of the provider on chain.
-	Address address.Address
+	Addresses []address.Address
 
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -97,8 +98,6 @@ type Provider struct {
 	updateRetryStateChan chan updateRetryStateReq
 	storageSpaceChan     chan storageSpaceDealReq
 
-	// Sealing Pipeline API
-	sps      sealingpipeline.API
 	spsCache SealingPipelineCache
 
 	// Boost deal filter
@@ -117,9 +116,7 @@ type Provider struct {
 	dealPublisher  types.DealPublisher
 	transfers      *dealTransfers
 
-	pieceAdder                  types.PieceAdder
 	commpThrottle               CommpThrottle
-	commpCalc                   smtypes.CommpCalculator
 	maxDealCollateralMultiplier uint64
 	chainDealManager            types.ChainDealManager
 
@@ -134,13 +131,15 @@ type Provider struct {
 	ip             types.IndexProvider
 	askGetter      types.AskGetter
 	sigVerifier    types.SignatureVerifier
+
+	me types.MinerEndpoints
 }
 
 func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundmanager.FundManager, storageMgr *storagemanager.StorageManager,
-	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, pa types.PieceAdder, commpCalc smtypes.CommpCalculator, commpThrottle CommpThrottle,
-	sps sealingpipeline.API, cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
+	fullnodeApi v1api.FullNode, dp types.DealPublisher, addr address.Address, commpThrottle CommpThrottle,
+	cm types.ChainDealManager, df dtypes.StorageDealFilter, logsSqlDB *sql.DB, logsDB *db.LogsDB,
 	piecedirectory *piecedirectory.PieceDirectory, ip types.IndexProvider, askGetter types.AskGetter,
-	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport) (*Provider, error) {
+	sigVerifier types.SignatureVerifier, dl *logs.DealLogger, tspt transport.Transport, me types.MinerEndpoints) (*Provider, error) {
 
 	xferLimiter, err := newTransferLimiter(cfg.TransferLimiter)
 	if err != nil {
@@ -156,19 +155,18 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 	if cfg.SealingPipelineCacheTimeout < 0 {
 		cfg.SealingPipelineCacheTimeout = 30 * time.Second
 	}
-
 	return &Provider{
 		ctx:       ctx,
 		cancel:    cancel,
 		config:    cfg,
-		Address:   addr,
+		Addresses: []address.Address{addr},
 		newDealPS: newDealPS,
 		db:        sqldb,
 		dealsDB:   dealsDB,
 		logsSqlDB: logsSqlDB,
-		sps:       sps,
-		spsCache:  SealingPipelineCache{},
-		df:        df,
+		// sps:       nil,
+		spsCache: SealingPipelineCache{},
+		df:       df,
 
 		acceptDealChan:       make(chan acceptDealReq),
 		finishedDealChan:     make(chan finishedDealReq),
@@ -181,11 +179,11 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		fundManager:    fundMgr,
 		storageManager: storageMgr,
 
-		dealPublisher:               dp,
-		fullnodeApi:                 fullnodeApi,
-		pieceAdder:                  pa,
-		commpThrottle:               commpThrottle,
-		commpCalc:                   commpCalc,
+		dealPublisher: dp,
+		fullnodeApi:   fullnodeApi,
+		// pieceAdder:                  nil,
+		commpThrottle: commpThrottle,
+		// commpCalc:                   nil,
 		chainDealManager:            cm,
 		maxDealCollateralMultiplier: 2,
 		transfers:                   newDealTransfers(),
@@ -198,6 +196,7 @@ func NewProvider(cfg Config, sqldb *sql.DB, dealsDB *db.DealsDB, fundMgr *fundma
 		ip:             ip,
 		askGetter:      askGetter,
 		sigVerifier:    sigVerifier,
+		me:             me,
 	}, nil
 }
 
@@ -433,7 +432,7 @@ func (p *Provider) Start() error {
 	for _, deal := range activeDeals {
 		// Check if deal is already proving
 		if deal.Checkpoint >= dealcheckpoints.IndexedAndAnnounced {
-			si, err := p.sps.SectorsStatus(p.ctx, deal.SectorID, false)
+			si, err := p.sectorsStatus(p.ctx, deal.ClientDealProposal.Proposal.Provider, deal.SectorID, false)
 			if err != nil || IsFinalSealingState(si.State) {
 				continue
 			}
@@ -492,6 +491,14 @@ func (p *Provider) Start() error {
 
 	log.Infow("storage provider: started")
 	return nil
+}
+
+func (p *Provider) sectorsStatus(ctx context.Context, miner address.Address, sid abi.SectorNumber, showOnChainInfo bool) (lotus_api.SectorInfo, error) {
+	spApi, err := p.me.SealingPipilineAPI(miner)
+	if err != nil {
+		return lotus_api.SectorInfo{}, err
+	}
+	return spApi.SectorsStatus(ctx, sid, showOnChainInfo)
 }
 
 func (p *Provider) cleanupDealOnRestart(deal *types.ProviderDealState) {
@@ -646,7 +653,14 @@ func (p *Provider) AddPieceToSector(ctx context.Context, deal smtypes.ProviderDe
 
 	// Attempt to add the piece to a sector (repeatedly if necessary)
 	pieceSize := deal.ClientDealProposal.Proposal.PieceSize.Unpadded()
-	sectorNum, offset, err := addPieceWithRetry(ctx, p.pieceAdder, pieceSize, pieceData, sdInfo)
+
+	minerId := sdInfo.DealProposal.Provider
+	pieceAdder, err := p.me.PieceAdder(minerId)
+	if err != nil {
+		return nil, err
+	}
+
+	sectorNum, offset, err := addPieceWithRetry(ctx, pieceAdder, pieceSize, pieceData, sdInfo)
 	if err != nil {
 		return nil, fmt.Errorf("AddPiece failed: %w", err)
 	}
