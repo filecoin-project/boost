@@ -2,13 +2,14 @@ package gql
 
 import (
 	"context"
+	"time"
+
 	"github.com/filecoin-project/boost/db"
 	gqltypes "github.com/filecoin-project/boost/gql/types"
 	"github.com/filecoin-project/boost/storagemarket/sealingpipeline"
 	"github.com/filecoin-project/boost/storagemarket/types"
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/graph-gophers/graphql-go"
-	"time"
 )
 
 type directDealResolver struct {
@@ -80,12 +81,18 @@ func (r *resolver) DirectDeals(ctx context.Context, args dealsArgs) (*directDeal
 	resolvers := make([]*directDealResolver, 0, len(deals))
 	for _, deal := range deals {
 		//deal.NBytesReceived = int64(r.provider.NBytesReceived(deal.DealUuid))
+
+		spApi, err := r.me.SealingPipilineAPI(deal.Provider)
+		if err == nil {
+			return nil, err
+		}
+
 		resolvers = append(resolvers, &directDealResolver{
 			DirectDeal:  *deal,
 			transferred: 0, // TODO
 			dealsDB:     r.dealsDB,
 			logsDB:      r.logsDB,
-			spApi:       r.spApi,
+			spApi:       spApi,
 		})
 	}
 
@@ -108,12 +115,17 @@ func (r *resolver) DirectDeal(ctx context.Context, args struct{ ID graphql.ID })
 		return nil, err
 	}
 
+	spApi, err := r.me.SealingPipilineAPI(deal.Provider)
+	if err != nil {
+		return nil, err
+	}
+
 	return &directDealResolver{
 		DirectDeal:  *deal,
 		transferred: 0, // TODO
 		dealsDB:     r.dealsDB,
 		logsDB:      r.logsDB,
-		spApi:       r.spApi,
+		spApi:       spApi,
 	}, nil
 }
 

@@ -45,7 +45,6 @@ type DirectDealsProvider struct {
 	pieceAdder    types.PieceAdder
 	commpCalc     smtypes.CommpCalculator
 	commpThrottle CommpThrottle
-	sps           sealingpipeline.API
 	directDealsDB *db.DirectDealsDB
 	dealLogger    *logs.DealLogger
 
@@ -54,16 +53,22 @@ type DirectDealsProvider struct {
 
 	pd *piecedirectory.PieceDirectory
 	ip *indexprovider.Wrapper
+
+	me smtypes.MinerEndpoints
 }
 
-func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder types.PieceAdder, commpCalc smtypes.CommpCalculator, commpt CommpThrottle, sps sealingpipeline.API, directDealsDB *db.DirectDealsDB, dealLogger *logs.DealLogger, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper) *DirectDealsProvider {
+func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdder smtypes.PieceAdder, commpt CommpThrottle, me smtypes.MinerEndpoints, directDealsDB *db.DirectDealsDB, dealLogger *logs.DealLogger, piecedirectory *piecedirectory.PieceDirectory, ip *indexprovider.Wrapper) (*DirectDealsProvider, error) {
+	commpCalc, err := me.CommpCalculator()
+	if err != nil {
+		return nil, err
+	}
+
 	return &DirectDealsProvider{
 		config:        cfg,
 		fullnodeApi:   fullnodeApi,
 		pieceAdder:    pieceAdder,
 		commpCalc:     commpCalc,
 		commpThrottle: commpt,
-		sps:           sps,
 		directDealsDB: directDealsDB,
 		//logsSqlDB: logsSqlDB,
 		//logsDB: logsDB,
@@ -72,7 +77,8 @@ func NewDirectDealsProvider(cfg DDPConfig, fullnodeApi v1api.FullNode, pieceAdde
 		running:    make(map[uuid.UUID]struct{}),
 		pd:         piecedirectory,
 		ip:         ip,
-	}
+		me:         me,
+	}, nil
 }
 
 func (ddp *DirectDealsProvider) Start(ctx context.Context) error {
@@ -415,8 +421,16 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 	}
 
 	if entry.Checkpoint < dealcheckpoints.Complete {
+		spApi, err := ddp.me.SealingPipilineAPI(entry.Provider)
+		if err != nil {
+			return &dealMakingError{
+				retry: types.DealRetryAuto,
+				error: err,
+			}
+		}
+
 		// The deal has been added to a piece, so just watch the deal sealing state
-		if derr := ddp.watchSealingUpdates(dealUuid, entry.SectorID); derr != nil {
+		if derr := ddp.watchSealingUpdates(dealUuid, spApi, entry.SectorID); derr != nil {
 			return derr
 		}
 		if err := ddp.updateCheckpoint(ctx, entry, dealcheckpoints.Complete); err != nil {
@@ -429,11 +443,11 @@ func (ddp *DirectDealsProvider) execDeal(ctx context.Context, entry *smtypes.Dir
 
 // watchSealingUpdates periodically checks the sealing status of the deal,
 // and returns once the deal is active (or boost is shutdown)
-func (ddp *DirectDealsProvider) watchSealingUpdates(dealUuid uuid.UUID, sectorNum abi.SectorNumber) *dealMakingError {
+func (ddp *DirectDealsProvider) watchSealingUpdates(dealUuid uuid.UUID, spApi sealingpipeline.API, sectorNum abi.SectorNumber) *dealMakingError {
 	var lastSealingState lapi.SectorState
 	checkSealingFinalized := func() bool {
 		// Get the sector status
-		si, err := ddp.sps.SectorsStatus(ddp.ctx, sectorNum, false)
+		si, err := spApi.SectorsStatus(ddp.ctx, sectorNum, false)
 		if err != nil {
 			log.Warnw("getting sector sealing state", "sector", sectorNum, "err", err.Error())
 			return false

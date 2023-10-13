@@ -61,8 +61,15 @@ func (p *Provider) validateDealProposal(deal types.ProviderDealState) *validatio
 	}
 
 	// validate deal proposal
-	if proposal.Provider != p.Address {
-		err := fmt.Errorf("incorrect provider for deal; proposal.Provider: %s; provider.Address: %s", proposal.Provider, p.Address)
+	pfound := false
+	for _, addr := range p.Addresses {
+		if proposal.Provider == addr {
+			pfound = true
+			break
+		}
+	}
+	if !pfound {
+		err := fmt.Errorf("incorrect provider for deal; proposal.Provider: %s; provider.Addresses: %s", proposal.Provider, p.Addresses)
 		return &validationError{error: err}
 	}
 

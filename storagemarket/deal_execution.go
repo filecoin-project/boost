@@ -15,6 +15,7 @@ import (
 	"github.com/filecoin-project/boost/storagemarket/types/dealcheckpoints"
 	"github.com/filecoin-project/boost/transport"
 	transporttypes "github.com/filecoin-project/boost/transport/types"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
 	acrypto "github.com/filecoin-project/go-state-types/crypto"
@@ -130,7 +131,7 @@ func (p *Provider) execDeal(deal *smtypes.ProviderDealState, dh *dealHandler) (d
 
 	// Watch the sealing status of the deal and fire events for each change
 	p.dealLogger.Infow(deal.DealUuid, "watching deal sealing state changes")
-	if derr := p.fireSealingUpdateEvents(dh, deal.DealUuid, deal.SectorID); derr != nil {
+	if derr := p.fireSealingUpdateEvents(dh, deal.ClientDealProposal.Proposal.Provider, deal.DealUuid, deal.SectorID); derr != nil {
 		return derr
 	}
 	p.cleanupDealHandler(deal.DealUuid)
@@ -613,7 +614,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 	if err := p.piecedirectory.AddDealForPiece(ctx, pc, model.DealInfo{
 		DealUuid:     deal.DealUuid.String(),
 		ChainDealID:  deal.ChainDealID,
-		MinerAddr:    p.Address,
+		MinerAddr:    deal.ClientDealProposal.Proposal.Provider,
 		SectorID:     deal.SectorID,
 		PieceOffset:  deal.Offset,
 		PieceLength:  deal.Length,
@@ -656,7 +657,7 @@ func (p *Provider) indexAndAnnounce(ctx context.Context, pub event.Emitter, deal
 
 // fireSealingUpdateEvents periodically checks the sealing status of the deal
 // and fires events for each change
-func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, sectorNum abi.SectorNumber) *dealMakingError {
+func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, miner address.Address, dealUuid uuid.UUID, sectorNum abi.SectorNumber) *dealMakingError {
 	var deal *types.ProviderDealState
 	var lastSealingState lapi.SectorState
 	checkStatus := func(force bool) lapi.SectorInfo {
@@ -667,7 +668,7 @@ func (p *Provider) fireSealingUpdateEvents(dh *dealHandler, dealUuid uuid.UUID, 
 		}
 
 		// Get the sector status
-		si, err := p.sps.SectorsStatus(p.ctx, sectorNum, false)
+		si, err := p.sectorsStatus(p.ctx, miner, sectorNum, false)
 		if err == nil && si.State != lastSealingState {
 			lastSealingState = si.State
 

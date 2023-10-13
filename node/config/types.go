@@ -35,10 +35,15 @@ type Boost struct {
 	Common
 
 	Storage StorageConfig
-	// The connect string for the sealing RPC API (lotus miner)
+	// The connect string for the sealing RPC API (lotus miner).
 	SealerApiInfo string
-	// The connect string for the sector index RPC API (lotus miner)
+	// The connect string for the sector index RPC API (lotus miner).
 	SectorIndexApiInfo string
+
+	// Connect strings for the sealing RPC APIs (lotus miners).
+	SealerApiInfos []string
+	// Connect strings for the sector index RPC APIs (lotus miners).
+	SectorIndexApiInfos []string
 
 	Dealmaking          DealmakingConfig
 	Wallets             WalletsConfig

@@ -170,17 +170,17 @@ type DealProvider struct {
 	prov              *storagemarket.Provider
 	fullNode          v1api.FullNode
 	plDB              *db.ProposalLogsDB
-	spApi             sealingpipeline.API
 	enableLegacyDeals bool
+	me                types.MinerEndpoints
 }
 
-func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode, plDB *db.ProposalLogsDB, spApi sealingpipeline.API, enableLegacyDeals bool) *DealProvider {
+func NewDealProvider(h host.Host, prov *storagemarket.Provider, fullNodeApi v1api.FullNode, plDB *db.ProposalLogsDB, me types.MinerEndpoints, enableLegacyDeals bool) *DealProvider {
 	p := &DealProvider{
 		host:              h,
 		prov:              prov,
 		fullNode:          fullNodeApi,
 		plDB:              plDB,
-		spApi:             spApi,
+		me:                me,
 		enableLegacyDeals: enableLegacyDeals,
 	}
 	return p
@@ -370,7 +370,13 @@ func (p *DealProvider) getDealStatus(req types.DealStatusRequest, reqLog *zap.Su
 
 	bts := p.prov.NBytesReceived(req.DealUUID)
 
-	si, err := p.spApi.SectorsStatus(p.ctx, pds.SectorID, false)
+	spApi, err := p.me.SealingPipilineAPI(pds.ClientDealProposal.Proposal.Provider)
+	if err != nil {
+		reqLog.Errorw("connecting to sealing pipiline api", "err", err)
+		return errResp("connecting to sealing pipiline api")
+	}
+
+	si, err := spApi.SectorsStatus(p.ctx, pds.SectorID, false)
 	if err != nil {
 		reqLog.Errorw("getting sector status from sealer", "err", err)
 		return errResp("getting sector status from sealer")
@@ -436,8 +442,14 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 			return
 		}
 
+		spApi, err := p.me.SealingPipilineAPI(prop.DealProposal.Proposal.Provider)
+		if err != nil {
+			reqLog.Errorf("error connecting to sealing pipiline: %s", err)
+			return
+		}
+
 		resp := gfm_migration.Response0{State: rejState, Message: rejMsg, Proposal: pcid}
-		sig, err := p.signLegacyResponse(&resp)
+		sig, err := p.signLegacyResponse(spApi, &resp)
 		if err != nil {
 			reqLog.Errorf("getting signed response: %s", err)
 			return
@@ -460,8 +472,14 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 			return
 		}
 
+		spApi, err := p.me.SealingPipilineAPI(prop.DealProposal.Proposal.Provider)
+		if err != nil {
+			reqLog.Errorf("error connecting to sealing pipiline: %s", err)
+			return
+		}
+
 		resp := gfm_network.Response{State: rejState, Message: rejMsg, Proposal: pcid}
-		sig, err := p.signLegacyResponse(&resp)
+		sig, err := p.signLegacyResponse(spApi, &resp)
 		if err != nil {
 			reqLog.Errorf("getting signed response: %s", err)
 			return
@@ -484,8 +502,14 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 			return
 		}
 
+		spApi, err := p.me.SealingPipilineAPI(prop.DealProposal.Proposal.Provider)
+		if err != nil {
+			reqLog.Errorf("error connecting to sealing pipiline: %s", err)
+			return
+		}
+
 		resp := gfm_network.Response{State: rejState, Message: rejMsg, Proposal: pcid}
-		sig, err := p.signLegacyResponse(&resp)
+		sig, err := p.signLegacyResponse(spApi, &resp)
 		if err != nil {
 			reqLog.Errorf("getting signed response: %s", err)
 			return
@@ -504,13 +528,13 @@ func (p *DealProvider) handleLegacyDealStream(s network.Stream) {
 	}
 }
 
-func (p *DealProvider) signLegacyResponse(resp typegen.CBORMarshaler) (*crypto.Signature, error) {
+func (p *DealProvider) signLegacyResponse(spApi sealingpipeline.API, resp typegen.CBORMarshaler) (*crypto.Signature, error) {
 	ts, err := p.fullNode.ChainHead(p.ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting chain head: %w", err)
 	}
 
-	maddr, err := p.spApi.ActorAddress(p.ctx)
+	maddr, err := spApi.ActorAddress(p.ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting miner actor address: %w", err)
 	}

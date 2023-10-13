@@ -67,7 +67,8 @@ func (r *resolver) LID(ctx context.Context) (*lidState, error) {
 		}
 	}
 
-	maddr := r.provider.Address
+	// TODO: pass in miner id explicitly from the UI
+	maddr := r.provider.Addresses[0]
 	fpHasUnsealed, err := r.piecedirectory.FlaggedPiecesCount(ctx, &bdtypes.FlaggedPiecesListFilter{
 		HasUnsealedCopy: true,
 		MinerAddr:       maddr,
